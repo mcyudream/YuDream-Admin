@@ -40,11 +40,11 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BaseException.class)
     public Object baseException(BaseException e, HttpServletRequest request, HttpServletResponse response) throws JsonProcessingException {
-        log.error("出现自定义异常: {}",e.getMessage());
+        log.error("出现自定义异常: {}",e.getMsg());
         if (printTraceLog){
             e.printStackTrace();
         }
-        R<String> res = R.fail(e.getMessage(),e.getCode());
+        R<String> res = R.fail(e.getMsg(),e.getCode());
         response.setStatus(e.getCode());
         if (enableResEncode) {
             String originalJson = new ObjectMapper().writeValueAsString(res);
@@ -67,7 +67,7 @@ public class GlobalExceptionHandler {
     /* 无权限 / 无角色 */
     @ExceptionHandler({NotPermissionException.class, NotRoleException.class})
     public ResponseEntity<?> handleAuthz(SaTokenException e) {
-        log.warn("Authz denied: {}", e.getMessage());
+        log.warn("Auth denied: {}", e.getMessage());
         if (printTraceLog) log.debug("stack", e);
         R<?> body = R.fail(e.getMessage(), e.getCode());
         return build(body, HttpStatus.FORBIDDEN);
