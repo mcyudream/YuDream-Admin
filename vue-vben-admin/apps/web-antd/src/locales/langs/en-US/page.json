@@ -1,0 +1,21 @@
+{
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "codeLogin": "Code Login",
+    "qrcodeLogin": "Qr Code Login",
+    "forgetPassword": "Forget Password"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "analytics": "Analytics",
+    "workspace": "Workspace"
+  },
+  "codegen": {
+    "title":"Code Gen",
+    "card": {
+      "title": "Code Gen Module",
+      "description": "This is a lightweight code generation module (MongoCodeGenerator) for Spring Boot 3+Spring Data MongoDB: based on the FreeMarker template, Entity, Repository/Mapper, Service, and ServiceImpl can be automatically generated with a specified package name and output directory in one configuration; Support field type/index declaration, custom collection name, Lombok annotation, and @ CreatedDate/@ LastModifierdDate time auditing; Can freely switch between Repository/Mapper suffixes; Built in class path+file system dual channel template loading, no need to start the Spring container in development mode, run directly through main/JUnit; The default template includes standardized annotations and reserved derived queries for secondary expansion; In the future, batch generation and team standardization can be achieved by introducing YAML/JSON descriptions. Place the template in src/main/resources/codegen/, fill in the class name, collection name, package path, and field definitions as needed, and execute the generator to quickly implement the standardized Mongo persistence and service layer skeleton in the project."
+    }
+  }
+}

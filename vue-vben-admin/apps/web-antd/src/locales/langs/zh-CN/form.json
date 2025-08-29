@@ -1,0 +1,60 @@
+{
+  "codegen": {
+    "packageName": {
+      "label": "基础包名",
+      "description": "该基础包名需为模块共同包，且会根据该包名查找生成路径",
+      "placeholder": "请输入基础包名"
+    },
+    "className": {
+      "label": "生成类名",
+      "description": "将会用于实体类名和其他层前缀",
+      "placeholder": "输入生成类名"
+    },
+    "collectionName": {
+      "label": "集合名称",
+      "description": "生成mongodb集合名称，留空则类名小驼峰",
+      "placeholder": "输入集合名称"
+    },"moduleEntity": {
+      "label": "实体模块",
+      "description": "实体类生成模块目标",
+      "placeholder": "输入实体模块文件夹名称"
+    },"moduleRepository": {
+      "label": "映射模块",
+      "description": "映射类生成模块目标",
+      "placeholder": "输入映射模块文件夹名称"
+    },"moduleService": {
+      "label": "服务模块",
+      "description": "服务类生成模块目标",
+      "placeholder": "输入服务模块文件夹名称"
+    },"moduleServiceImpl": {
+      "label": "实现模块",
+      "description": "实现类生成模块目标",
+      "placeholder": "输入实现模块文件夹名称"
+    },"packageEntity": {
+      "label": "实体包后缀",
+      "description": "实体类生成包后缀",
+      "placeholder": "输入实体包后缀"
+    },"packageRepository": {
+      "label": "映射包后缀",
+      "description": "映射类生成包后缀",
+      "placeholder": "输入映射包后缀"
+    },"packageService": {
+      "label": "服务包后缀",
+      "description": "服务类生成包后缀",
+      "placeholder": "输入服务包后缀"
+    },"packageServiceImpl": {
+      "label": "实现包后缀",
+      "description": "实现类生成包后缀",
+      "placeholder": "输入实现包后缀"
+    },"outputDir": {
+      "label": "输出目标文件夹",
+      "description": "不懂请勿修改",
+      "placeholder": "输入输出目标文件夹"
+    },
+    "field": {
+      "title": "字段名称",
+      "type": "字段类型",
+      "indexed": "是否索引"
+    }
+  }
+}

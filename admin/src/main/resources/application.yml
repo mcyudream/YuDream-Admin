@@ -1,0 +1,5 @@
+spring:
+  application:
+    name: YuDream Admin
+  profiles:
+    active: dev

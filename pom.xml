@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>online.yudream.spring</groupId>
+    <artifactId>YudreamAdmin</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <modules>
+        <module>base</module>
+        <module>entity</module>
+        <module>init</module>
+        <module>plugin</module>
+        <module>admin</module>
+    </modules>
+
+    <properties>
+        <spring.version>3.4.9</spring.version>
+        <yudream.version>1.0.0</yudream.version>
+        <satoken.version>1.44.0</satoken.version>
+        <freemarker.version>2.3.34</freemarker.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>online.yudream.spring</groupId>
+                <artifactId>base</artifactId>
+                <version>${yudream.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>online.yudream.spring</groupId>
+                <artifactId>admin</artifactId>
+                <version>${yudream.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>online.yudream.spring</groupId>
+                <artifactId>entity</artifactId>
+                <version>${yudream.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>online.yudream.spring</groupId>
+                <artifactId>init</artifactId>
+                <version>${yudream.version}</version>
+            </dependency>
+            <!-- Sa-Token 权限认证，在线文档：https://sa-token.cc -->
+            <!-- https://mvnrepository.com/artifact/cn.dev33/sa-token-spring-boot3-starter -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-spring-boot3-starter</artifactId>
+                <version>${satoken.version}</version>
+            </dependency>
+            <!-- Sa-Token 整合 RedisTemplate -->
+            <dependency>
+                <groupId>cn.dev33</groupId>
+                <artifactId>sa-token-redis-template</artifactId>
+                <version>${satoken.version}</version>
+            </dependency>
+
+            <!-- 提供 Redis 连接池 -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-pool2</artifactId>
+            </dependency>
+<!--            代码生成-->
+            <dependency>
+                <groupId>org.freemarker</groupId>
+                <artifactId>freemarker</artifactId>
+                <version>${freemarker.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <!-- 统一插件版本，子模块只需要引用，不要重复写版本 -->
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.11.0</version>
+                    <configuration>
+                        <source>${java.version}</source>
+                        <target>${java.version}</target>
+                        <release>${java.version}</release>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>

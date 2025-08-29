@@ -1,0 +1,69 @@
+{
+  "codegen": {
+    "packageName": {
+      "label": "Base Package Name",
+      "description": "The base package name must be a common package for the module, and the generation path will be searched based on this package name.",
+      "placeholder": "Enter the base package name"
+    },
+    "className": {
+      "label": "Generated Class Name",
+      "description": "Will be used for entity class name and other layer prefixes",
+      "placeholder": "Enter the generated class name"
+    },
+    "collectionName": {
+      "label": "Collection Name",
+      "description": "Generated MongoDB collection name, leave blank for camelCase class name",
+      "placeholder": "Enter the collection name"
+    },
+    "moduleEntity": {
+      "label": "Entity Module",
+      "description": "Target module for entity class generation",
+      "placeholder": "Enter the entity module folder name"
+    },
+    "moduleRepository": {
+      "label": "Repository Module",
+      "description": "Target module for repository class generation",
+      "placeholder": "Enter the repository module folder name"
+    },
+    "moduleService": {
+      "label": "Service Module",
+      "description": "Target module for service class generation",
+      "placeholder": "Enter the service module folder name"
+    },
+    "moduleServiceImpl": {
+      "label": "Implementation Module",
+      "description": "Target module for implementation class generation",
+      "placeholder": "Enter the implementation module folder name"
+    },
+    "packageEntity": {
+      "label": "Entity Package Suffix",
+      "description": "Suffix for entity class package generation",
+      "placeholder": "Enter the entity package suffix"
+    },
+    "packageRepository": {
+      "label": "Repository Package Suffix",
+      "description": "Suffix for repository class package generation",
+      "placeholder": "Enter the repository package suffix"
+    },
+    "packageService": {
+      "label": "Service Package Suffix",
+      "description": "Suffix for service class package generation",
+      "placeholder": "Enter the service package suffix"
+    },
+    "packageServiceImpl": {
+      "label": "Implementation Package Suffix",
+      "description": "Suffix for implementation class package generation",
+      "placeholder": "Enter the implementation package suffix"
+    },
+    "outputDir": {
+      "label": "Output Target Folder",
+      "description": "Do not modify if you do not understand",
+      "placeholder": "Enter the output target folder"
+    },
+    "field": {
+      "title": "Field Name",
+      "type": "Field Type",
+      "indexed": "Indexed"
+    }
+  }
+}
