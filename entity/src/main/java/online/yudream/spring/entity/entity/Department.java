@@ -8,8 +8,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.DocumentReference;
 import org.springframework.data.mongodb.core.mapping.MongoId;
 
-import java.util.List;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -25,9 +23,4 @@ public class Department {
     private Department parent;
 
     private String description;
-
-    @DocumentReference(lazy = true)
-    private List<Role> roles;
-
-    
 }

@@ -1,0 +1,11 @@
+{
+ "auth": {
+   "notFound": "不存在的用户!",
+   "password": {
+     "notMatch": "密码不匹配"
+   }
+ } ,
+  "codegen": {
+    "generateAll": "生成代码失败!"
+  }
+}
