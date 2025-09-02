@@ -10,8 +10,10 @@ const departments = ref<Department[]>([])
 
 <template>
   <div id="department" class="p-5 w-full">
-    <department-table v-model:department="departments"  />
+    <div class="card-box p-2">
+      <department-table v-model:department="departments"  />
 
+    </div>
   </div>
 </template>
 

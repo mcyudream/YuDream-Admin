@@ -20,7 +20,15 @@ const routes: RouteRecordRaw[] = [
           icon: 'lucide:building',
           title: $t('page.organizationalStructure.department.title'),
         },
-      },
+      },{
+        name: 'Role',
+        path: 'role',
+        component: () => import('#/views/organizationalStructure/role/Index.vue'),
+        meta: {
+          icon: 'lucide:user',
+          title: $t('page.organizationalStructure.role.title'),
+        }
+      }
     ],
   },
 ];

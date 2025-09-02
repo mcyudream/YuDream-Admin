@@ -21,7 +21,13 @@
   "organizationalStructure": {
     "title": "组织架构",
     "department": {
-      "title": "部门管理"
+      "title": "部门管理",
+      "create": "创建部门",
+      "edit": "编辑",
+      "delete": "删除"
+    },
+    "role": {
+      "title": "角色管理"
     }
   }
 }

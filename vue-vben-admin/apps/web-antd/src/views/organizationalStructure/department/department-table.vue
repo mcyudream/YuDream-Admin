@@ -117,14 +117,6 @@ const gridOptions: VxeGridProps<Department> = {
 
 const [Grid, gridApi] = useVbenVxeGrid({ formOptions,gridOptions });
 
-const expandAll = () => {
-  gridApi.grid?.setAllTreeExpand(true);
-};
-
-const collapseAll = () => {
-  gridApi.grid?.setAllTreeExpand(false);
-};
-
 const emit = defineEmits(['onCreate'])
 const [CreateModal, modalApi] = useVbenModal({
   connectedComponent: CreateDepartmentModal
@@ -161,15 +153,11 @@ function editRowEvent(row: Department) {
   <div class="w-full">
     <Grid>
       <template #toolbar-tools>
-        <Button class="mr-2"  type="primary" @click="onCreate()">创建组织</Button>
-        <Button class="mr-2" type="primary" @click="expandAll">
-          展开全部
-        </Button>
-        <Button type="primary" @click="collapseAll"> 折叠全部 </Button>
+        <Button class="mr-2"  type="primary" @click="onCreate()">{{$t('page.organizationalStructure.department.create')}}</Button>
       </template>
       <template #action="{ row }">
-          <Button type="link" class="mr-2"  @click="editRowEvent(row)">编辑</Button>
-          <Button danger type="link" class="mr-2" @click="onDelete(row)">删除</Button>
+          <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('page.organizationalStructure.department.edit')}}</Button>
+          <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('page.organizationalStructure.department.delete')}}</Button>
       </template>
 
     </Grid>
