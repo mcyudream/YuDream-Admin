@@ -5,7 +5,7 @@ import { $t } from '@vben/locales';
 
 import type {  Department } from '#/types/organizationalStructure/department';
 import {computed, watch} from "vue";
-import {updateDepartmentApi} from "#/api/core/departmentApi";
+import {updateDepartmentApi} from "#/api/core/department";
 import {message} from "ant-design-vue";
 
 const props = defineProps({
@@ -24,7 +24,7 @@ const getDataLabel = computed(() => {
     }
   });
 })
-const [CreateForm, formApi] = useVbenForm({
+const [EditForm, formApi] = useVbenForm({
   commonConfig: {
     componentProps: {
       class: 'w-full',
@@ -92,7 +92,7 @@ const [Modal, modalApi] = useVbenModal<{}>({
 
 <template>
   <Modal title="编辑组织">
-    <CreateForm />
+    <edit-form />
   </Modal>
 </template>
 

@@ -5,3 +5,8 @@ export interface SearchPageParams {
   size?: number;
   keywords?: Record<string, string>;
 }
+
+export interface SearchPageResponse<T> {
+  totalElements: number;
+  content: T []
+}

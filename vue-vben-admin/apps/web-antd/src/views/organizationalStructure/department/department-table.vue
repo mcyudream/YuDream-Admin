@@ -5,7 +5,7 @@ import {useVbenVxeGrid} from '#/adapter/vxe-table';
 import {Button, message} from 'ant-design-vue';
 import { confirm } from '@vben/common-ui';
 import {type VbenFormProps} from "#/adapter/form";
-import {deleteDepartmentApi, getAllDepartments} from "#/api/core/departmentApi";
+import {deleteDepartmentApi, getAllDepartments} from "#/api/core/department";
 import type {SearchPageParams} from "#/types/common";
 import type {Department} from "#/types/organizationalStructure/department";
 import {$t} from "@vben/locales";
@@ -55,7 +55,7 @@ const formOptions: VbenFormProps = {
   // 控制表单是否显示折叠按钮
   showCollapseButton: true,
   submitButtonOptions: {
-    content: '查询',
+    content: $t('form.common.search'),
   },
   // 是否在字段值改变时提交表单
   submitOnChange: false,
@@ -75,7 +75,7 @@ const gridOptions: VxeGridProps<Department> = {
       field: 'action',
       fixed: 'right',
       slots: { default: 'action' },
-      title: $t('form.department.table.field.action'),
+      title: $t('form.common.action.title'),
       width: 200,
     },
 
@@ -89,7 +89,7 @@ const gridOptions: VxeGridProps<Department> = {
         let res  = await getAllDepartments(searchParams)
         departmentData.value = res
         return {
-          items: res
+          content: res
         }
       }
     }

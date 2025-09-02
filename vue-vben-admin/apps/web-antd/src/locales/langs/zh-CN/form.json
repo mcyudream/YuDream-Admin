@@ -1,4 +1,11 @@
 {
+  "common": {
+    "action": {
+      "title": "操作"
+    },
+    "search": "查询",
+    "edit": "编辑"
+  },
   "codegen": {
     "packageName": {
       "label": "基础包名",
@@ -96,6 +103,53 @@
           "title": "描述",
           "placeholder": "请输入描述"
         }
+      }
+    }
+  },
+  "role": {
+    "table": {
+      "field": {
+        "id": "ID",
+        "name": "名称",
+        "description": "描述",
+        "level": "级别",
+        "enable": "状态"
+      },
+      "search": {
+        "id": {
+          "title": "ID",
+          "placeholder": "请输入ID"
+        },
+        "name": {
+          "title": "名称",
+          "placeholder": "请输入名称"
+        },
+        "description": {
+          "title": "描述",
+          "placeholder": "请输入描述"
+        }
+      }
+    },
+    "create": {
+      "id": {
+        "title": "ID",
+        "placeholder": "请输入id",
+        "description": "角色id，最好为纯英文组成的连续字符串"
+      },
+      "name": {
+        "title": "名称",
+        "placeholder": "请输入角色名称",
+        "description": "角色的展示名称"
+      },
+      "description": {
+        "title": "描述",
+        "placeholder": "请输入角色描述",
+        "description": "角色的描述信息，可理解为备注"
+      },
+      "level": {
+        "title": "权限级别",
+        "placeholder": "请输入权限级别",
+        "description": "权限越大其权限级别越小"
       }
     }
   }

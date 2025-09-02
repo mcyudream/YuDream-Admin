@@ -31,12 +31,13 @@ public class SearchUtils {
         List<Criteria> andCriteriaList = new ArrayList<>();
 
         // 遍历关键词
-        for (Map.Entry<String, String> entry : searchPageDto.keywords().entrySet()) {
-            if (StringUtils.isNotBlank(entry.getValue())) {
-                andCriteriaList.add(Criteria.where(entry.getKey()).regex(getRegex(entry.getValue())));
+        if (searchPageDto.keywords() !=null){
+            for (Map.Entry<String, String> entry : searchPageDto.keywords().entrySet()) {
+                if (StringUtils.isNotBlank(entry.getValue())) {
+                    andCriteriaList.add(Criteria.where(entry.getKey()).regex(getRegex(entry.getValue())));
+                }
             }
         }
-
         // 如果没有关键词，返回一个空的 Criteria
         if (andCriteriaList.isEmpty()) {
             return new Criteria();

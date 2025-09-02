@@ -3,7 +3,7 @@ import { useVbenModal } from '@vben/common-ui';
 import { useVbenForm } from '#/adapter/form';
 import { $t } from '@vben/locales';
 
-import { createDepartmentApi } from '#/api/core/departmentApi';
+import { createDepartmentApi } from '#/api/core/department';
 import type { CreateDepartment, Department } from '#/types/organizationalStructure/department';
 import {computed} from "vue";
 
