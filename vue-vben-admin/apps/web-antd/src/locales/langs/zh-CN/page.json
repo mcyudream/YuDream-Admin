@@ -15,7 +15,13 @@
     "title": "代码生成",
     "card": {
       "title": "代码生成模块",
-      "description": "这是一个面向 Spring Boot 3 + Spring Data MongoDB 的轻量级代码生成模块（MongoCodeGenerator）：基于 FreeMarker 模板，一次配置即可把 Entity、Repository/Mapper、Service、ServiceImpl 按指定包名与输出目录自动生成；支持字段类型/索引声明、集合名自定义、Lombok 注解以及 @CreatedDate/@LastModifiedDate 时间审计；可在 Repository/Mapper 后缀间自由切换；内置类路径 + 文件系统双通道模板加载，开发态无需启动 Spring 容器，直接通过 main/JUnit 运行即可；默认模板包含规范化注释与派生查询预留，便于二次扩展；后续可通过引入 YAML/JSON 描述实现批量生成与团队规范固化。将模板放到 src/main/resources/codegen/，按需填写类名、集合名、包路径与字段定义后执行生成器，即可在项目中快速落地标准化的 Mongo 持久层与服务层骨架。"
+      "description": "MongoDB 后端代码生成模块。"
+    }
+  },
+  "organizationalStructure": {
+    "title": "组织架构",
+    "department": {
+      "title": "部门管理"
     }
   }
 }

@@ -1,7 +1,9 @@
 package online.yudream.spring.base.common;
 
+import java.util.Map;
+
 public record SearchPageDto(
-        String keyword,
+        Map<String, String> keywords,
         int page,
         int size
 ) {

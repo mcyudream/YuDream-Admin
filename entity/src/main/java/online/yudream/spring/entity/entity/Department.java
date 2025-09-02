@@ -22,8 +22,7 @@ public class Department {
     private String id;
 
     private String name;
-
-    private List<Department> children;
+    private String parentId;
     private String description;
     @CreatedDate
     private LocalDateTime createdTime;

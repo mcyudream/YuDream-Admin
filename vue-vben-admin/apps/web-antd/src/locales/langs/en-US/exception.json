@@ -7,10 +7,5 @@
  } ,
   "codegen": {
     "generateAll": "生成代码失败!"
-  },
-  "department": {
-    "parentId": {
-      "index": "父级节点不能为自身!"
-    }
   }
 }

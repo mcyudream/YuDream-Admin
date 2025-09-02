@@ -10,9 +10,9 @@ const onSubmitCodeGen = async (values: Record<string, any>) => {
     ...values,
     fields: fieldList.value
   }
-  console.log(fieldList.value)
-  // let res = await codegenApi(entityDef);
-  // console.log(res)
+
+  let res = await codegenApi(entityDef);
+  console.log(res)
 }
 const fieldList = ref<FieldDefinition[]>([]);
 

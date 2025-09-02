@@ -8,7 +8,6 @@ const routes: RouteRecordRaw[] = [
       icon: 'lucide:square-dashed-bottom-code',
       order: 999,
       title: $t('page.codegen.title'),
-      affixTab: true,
     },
     name: 'Codegen',
     path: '/codegen',

@@ -56,5 +56,47 @@
       "type": "字段类型",
       "indexed": "是否索引"
     }
+  },
+  "department": {
+    "create": {
+      "name": {
+        "title": "名称",
+        "description": "部门名称",
+        "placeholder": "请输入名称"
+      },"parentId": {
+        "title": "父级部门",
+        "description": "父级部门，留空则为根部门",
+        "placeholder": "请选择对应部门"
+      },"description": {
+        "title": "描述",
+        "description": "部门描述",
+        "placeholder": "请输入描述"
+      }
+    },
+    "table": {
+      "field": {
+        "name": "名称",
+        "id": "ID",
+        "description": "部门描述",
+        "createdTime": "创建时间",
+        "updatedTime": "更新时间",
+        "parentId": "父部门",
+        "action": "操作"
+      },
+      "search": {
+        "id": {
+          "title": "ID",
+          "placeholder": "请输入ID"
+        },
+        "name": {
+          "title": "名称",
+          "placeholder":"请输入名称"
+        },
+        "description": {
+          "title": "描述",
+          "placeholder": "请输入描述"
+        }
+      }
+    }
   }
 }
