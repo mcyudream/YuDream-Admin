@@ -25,8 +25,24 @@ const routes: RouteRecordRaw[] = [
         path: 'role',
         component: () => import('#/views/organizationalStructure/role/Index.vue'),
         meta: {
-          icon: 'lucide:user',
+          icon: 'lucide:users',
           title: $t('page.organizationalStructure.role.title'),
+        }
+      },{
+        name: 'UserManager',
+        path: '/admin/user',
+        component: () => import('#/views/organizationalStructure/user/Index.vue'),
+        meta: {
+          icon: 'lucide:user',
+          title: $t("page.organizationalStructure.userManager.title"),
+        },
+      },{
+        name: 'Permission',
+        path: '/permission',
+        component: () => import('#/views/organizationalStructure/permission/Index.vue'),
+        meta: {
+          icon: 'lucide:user-lock',
+          title: $t("page.organizationalStructure.permission.title"),
         }
       }
     ],

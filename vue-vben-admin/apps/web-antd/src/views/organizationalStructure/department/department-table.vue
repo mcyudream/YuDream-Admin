@@ -156,10 +156,9 @@ function editRowEvent(row: Department) {
         <Button class="mr-2"  type="primary" @click="onCreate()">{{$t('page.organizationalStructure.department.create')}}</Button>
       </template>
       <template #action="{ row }">
-          <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('page.organizationalStructure.department.edit')}}</Button>
-          <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('page.organizationalStructure.department.delete')}}</Button>
+        <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('form.common.edit')}}</Button>
+        <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('form.common.delete')}}</Button>
       </template>
-
     </Grid>
     <CreateModal @on-submit="gridApi.query()" v-model:department="departmentData"/>
     <EditModal :initial-value="currentRow" @on-submit="gridApi.query()" v-model:department="departmentData"/>

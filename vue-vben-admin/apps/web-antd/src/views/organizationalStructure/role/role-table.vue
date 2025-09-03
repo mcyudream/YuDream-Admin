@@ -126,8 +126,8 @@ const onDelete = (row:Role) => {
           <span class="icon-[mdi--add-box] size-4" ></span>创建角色</Button>
       </template>
       <template #action="{ row }">
-        <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('page.organizationalStructure.department.edit')}}</Button>
-        <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('page.organizationalStructure.department.delete')}}</Button>
+        <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('form.common.edit')}}</Button>
+        <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('form.common.delete')}}</Button>
       </template>
     </Grid>
     <create-modal @on-submit="gridApi.query()"/>

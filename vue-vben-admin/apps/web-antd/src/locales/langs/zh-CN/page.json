@@ -28,6 +28,12 @@
     },
     "role": {
       "title": "角色管理"
+    },
+    "userManager": {
+      "title": "用户管理"
+    },
+    "permission": {
+      "title": "权限管理"
     }
   }
 }

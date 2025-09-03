@@ -4,7 +4,8 @@
       "title": "操作"
     },
     "search": "查询",
-    "edit": "编辑"
+    "edit": "编辑",
+    "delete": "删除"
   },
   "codegen": {
     "packageName": {
@@ -151,6 +152,59 @@
         "placeholder": "请输入权限级别",
         "description": "权限越大其权限级别越小"
       }
+    }
+  },
+  "user": {
+    "table": {
+      "search": {
+        "id": {
+          "title": "ID",
+          "placeholder": "请输入ID"
+        },
+        "nickname": {
+          "title": "昵称",
+          "placeholder": "请输入昵称"
+        },
+        "email": {
+          "title": "邮箱",
+          "placeholder":"请输入邮箱"
+        },
+        "phone": {
+          "title": "手机",
+          "placeholder": "请输入手机"
+        },
+        "status": {
+          "title": "状态",
+          "placeholder": "请选择状态"
+        }
+      },
+      "field": {
+        "id": "ID",
+        "nickname": "昵称",
+        "email": "邮箱",
+        "phone": "手机",
+        "status": "状态",
+        "createTime": "创建时间",
+        "updateTime": "更新时间"
+      }
+    },
+    "edit": {
+      "nickname": {
+        "title": "昵称",
+        "placeholder": "请输入昵称",
+        "description": "用户的展示名称"
+      },
+      "email": {
+        "title": "邮箱",
+        "placeholder": "请输入邮箱",
+        "description": "邮箱"
+      },
+      "phone": {
+        "title": "手机",
+        "placeholder": "请输入手机",
+        "description": "手机"
+      }
+
     }
   }
 }
