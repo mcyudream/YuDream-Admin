@@ -35,5 +35,44 @@
     "permission": {
       "title": "权限管理"
     }
+  },
+  "system": {
+    "title": "系统监测",
+    "cpuInfo": {
+      "title": "CPU信息",
+      "coreCount": "核心数",
+      "userUsageRate": "用户使用率",
+      "systemUsageRate": "系统使用率",
+      "free": "空闲"
+    },
+    "memoryInfo": {
+      "title": "内存信息",
+      "totalMemory": "总内存",
+      "usedMemory": "已使用",
+      "freeMemory": "空闲内存",
+      "usageRate": "使用率"
+    },
+    "serverInfo":{
+      "title": "服务器信息",
+      "osName": "系统",
+      "serverName": "主机名称",
+      "serverIp": "主机IP"
+    },
+    "javaVmInfo": {
+      "title": "JVM信息",
+      "javaName": "Java名称",
+      "javaVersion": "Java版本",
+      "startTime": "启动时间",
+      "installPath": "安装路径",
+      "runParameters": "运行参数"
+    },
+    "diskInfo": {
+      "availableSize": "可用空间",
+      "diskType": "磁盘类型",
+      "fileSystem": "文件系统",
+      "usedPercentage": "使用比例",
+      "usedSize": "已使用",
+      "totalSize": "总空间"
+    }
   }
 }

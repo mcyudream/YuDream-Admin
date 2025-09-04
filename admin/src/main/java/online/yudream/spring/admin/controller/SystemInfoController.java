@@ -2,6 +2,7 @@ package online.yudream.spring.admin.controller;
 
 import jakarta.annotation.Resource;
 import online.yudream.spring.admin.service.SystemInfoService;
+import online.yudream.spring.base.common.R;
 import online.yudream.spring.entity.system.SystemData;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,7 +15,7 @@ public class SystemInfoController {
     private SystemInfoService systemInfoService;
 
     @GetMapping
-    public SystemData getSystemInfo() {
-        return systemInfoService.getSystemInfo();
+    public R<SystemData> getSystemInfo() {
+        return R.success(systemInfoService.getSystemInfo());
     }
 }
