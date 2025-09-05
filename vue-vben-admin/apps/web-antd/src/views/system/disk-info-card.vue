@@ -9,7 +9,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <Descriptions  :title="item.diskPath" v-for="item in data">
+  <Descriptions  :title="item.diskPath" v-for="item in props.data">
     <DescriptionsItem :label="$t('page.system.diskInfo.diskType')">
         {{item.diskType}}
     </DescriptionsItem>

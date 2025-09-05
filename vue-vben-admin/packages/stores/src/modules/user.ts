@@ -36,11 +36,11 @@ import { acceptHMRUpdate, defineStore } from 'pinia';
  }
 
 export interface Role {
-  id: string;
-  name: string;
-  level: number;
-  description: string;
-  enabled: boolean;
+  id?: string;
+  name?: string;
+  level?: number;
+  description?: string;
+  enabled?: boolean;
 }
 
 interface AccessState {

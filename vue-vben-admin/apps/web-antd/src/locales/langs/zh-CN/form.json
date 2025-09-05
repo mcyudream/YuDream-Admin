@@ -5,7 +5,8 @@
     },
     "search": "查询",
     "edit": "编辑",
-    "delete": "删除"
+    "delete": "删除",
+    "select": "选择"
   },
   "codegen": {
     "packageName": {
@@ -205,6 +206,25 @@
         "description": "手机"
       }
 
+    }
+  },
+  "permission": {
+    "create": {
+      "id": {
+        "title": "ID",
+        "placeholder": "请输入ID",
+        "description": "权限id，最好为纯英文组成的连续字符串"
+      },
+      "name": {
+        "title": "名称",
+        "placeholder":"请输入名称",
+        "description": "仅用于展示和辨认"
+      },
+      "description": {
+        "title": "描述",
+        "placeholder": "请输入描述",
+        "description": "仅用于辨认"
+      }
     }
   }
 }
