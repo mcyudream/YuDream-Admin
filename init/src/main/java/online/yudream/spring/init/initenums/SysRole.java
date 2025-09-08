@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.ToString;
 import online.yudream.spring.entity.entity.Role;
 
+import java.util.List;
+
 @AllArgsConstructor
 @ToString
 @Getter
@@ -15,6 +17,7 @@ public enum SysRole {
                     .name("超级管理员")
                     .description("最高管理员")
                     .enabled(true)
+                    .permissionId(List.of("*"))
                     .build()
     ),
     ADMIN(
@@ -24,6 +27,7 @@ public enum SysRole {
                     .name("管理员")
                     .description("网站管理员")
                     .enabled(true)
+                    .permissionId(List.of("*"))
                     .build()
     ),
     USER(
