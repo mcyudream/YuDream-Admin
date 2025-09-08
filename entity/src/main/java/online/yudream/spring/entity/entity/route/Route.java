@@ -1,5 +1,9 @@
 package online.yudream.spring.entity.entity.route;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -15,6 +19,10 @@ import java.time.Instant;
         @CompoundIndex(name = "parent_order_idx", def = "{'parentId':1,'order':1}"),
         @CompoundIndex(name = "enabled_type_idx", def = "{'enabled':1,'type':1}")
 })
+@AllArgsConstructor
+@NoArgsConstructor
+@Data
+@Builder
 public class Route {
     @Id
     private String id;
@@ -27,7 +35,7 @@ public class Route {
 
     private String component;
     private String redirect;
-
+    private String permission;
     private RouteType type;
     private String parentId;
     private Integer order;

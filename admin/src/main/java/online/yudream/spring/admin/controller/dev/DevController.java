@@ -28,6 +28,6 @@ public class DevController {
             codegenService.gencode(gencodeDto);
             return R.success("success");
         }
-        return R.fail("非开发模式静止使用本接口");
+        return R.fail("非开发模式禁止使用本接口");
     }
 }
