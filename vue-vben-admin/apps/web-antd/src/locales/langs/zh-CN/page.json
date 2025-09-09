@@ -74,5 +74,11 @@
       "usedSize": "已使用",
       "totalSize": "总空间"
     }
+  },
+  "config": {
+    "title": "系统配置",
+    "base": {
+      "title": "基础配置"
+    }
   }
 }

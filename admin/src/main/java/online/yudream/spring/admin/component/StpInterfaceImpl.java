@@ -51,6 +51,8 @@ public class StpInterfaceImpl implements StpInterface {
         if (user == null) {
             throw new NotFoundException();
         }
+        System.out.println(user);
+        System.out.println(user.getRoles());
         return user.getRoles().stream().map(Role::getId).collect(Collectors.toList());
     }
 }

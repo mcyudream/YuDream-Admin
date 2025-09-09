@@ -5,6 +5,7 @@ import {useVbenForm} from "#/adapter/form";
 import CodeGenFieldTable from "#/views/codegen/code-gen-field-table.vue";
 import type {EntityDefinition, FieldDefinition} from "#/types/codegen";
 import {codegenApi} from "#/api";
+import {message} from "ant-design-vue";
 const onSubmitCodeGen = async (values: Record<string, any>) => {
   let entityDef: EntityDefinition = {
     ...values,
@@ -12,7 +13,8 @@ const onSubmitCodeGen = async (values: Record<string, any>) => {
   }
 
   let res = await codegenApi(entityDef);
-  console.log(res)
+  // @ts-ignore
+  message.success(res.message)
 }
 const fieldList = ref<FieldDefinition[]>([]);
 

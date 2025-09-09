@@ -1,5 +1,6 @@
 package online.yudream.spring.admin.controller.dev;
 
+import cn.dev33.satoken.annotation.SaCheckOr;
 import cn.dev33.satoken.annotation.SaCheckRole;
 import jakarta.annotation.Resource;
 import online.yudream.spring.admin.service.CodegenService;
@@ -12,7 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@SaCheckRole({"admin","super"})
+@SaCheckOr(
+        role = {@SaCheckRole("super"), @SaCheckRole("admin")}
+)
 @RequestMapping("/dev")
 public class DevController {
     @Resource

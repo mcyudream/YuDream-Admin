@@ -35,7 +35,7 @@ public class User {
 
     private UserStatus status = UserStatus.NORMAL;
 
-    @DocumentReference(lazy = true)
+    @DocumentReference(lazy = false)
     private List<Role> roles;
     @CreatedDate
     private LocalDateTime createTime;
