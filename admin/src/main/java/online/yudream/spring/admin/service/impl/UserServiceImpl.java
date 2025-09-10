@@ -6,11 +6,16 @@ import online.yudream.spring.admin.service.UserService;
 import online.yudream.spring.base.common.SearchPageDto;
 import online.yudream.spring.base.exception.AuthException;
 import online.yudream.spring.base.utils.SearchUtils;
+import online.yudream.spring.entity.entity.Department;
 import online.yudream.spring.entity.entity.User;
+import online.yudream.spring.entity.mapper.DepartmentMapper;
 import online.yudream.spring.entity.mapper.UserMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
+
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -20,6 +25,9 @@ public class UserServiceImpl implements UserService {
 
     @Resource
     private SearchUtils searchUtils;
+
+    @Resource
+    private DepartmentMapper departmentMapper;
 
     @Override
     public User userInfo() {
@@ -35,6 +43,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public Page<User> getUsersPage(SearchPageDto searchPageDto) {
         Criteria criteria = searchUtils.searchCriteria(searchPageDto);
+        if (!Objects.equals(searchPageDto.extraId(), "all")) {
+            criteria.andOperator(Criteria.where("departments.id").is(searchPageDto.extraId()));
+        }
         return searchUtils.findPage(User.class, searchPageDto, criteria);
     }
 
@@ -59,5 +70,32 @@ public class UserServiceImpl implements UserService {
         userMapper.deleteById(id);
     }
 
+    @Override
+    public User addToDepartment(String userId, String departmentId) {
+        User user = userMapper.findById(userId).orElse(null);
+        if (user == null) {
+            throw new AuthException("exception.user.notFound");
+        }
+        Department department = departmentMapper.findById(departmentId).orElse(null);
+        if (department == null) {
+            throw new AuthException("exception.department.notFound");
+        }
+        user.getDepartments().add(department);
+        System.out.println(user.getDepartments());
+        return userMapper.save(user);
+    }
 
+    @Override
+    public User deleteDepartment(String userId, String departmentId) {
+        User user = userMapper.findById(userId).orElse(null);
+        if (user == null) {
+            throw new AuthException("exception.user.notFound");
+        }
+        Department department = departmentMapper.findById(departmentId).orElse(null);
+        if (department == null) {
+            throw new AuthException("exception.department.notFound");
+        }
+        user.setDepartments(user.getDepartments().stream().filter(item->!item.getId().equals(departmentId)).collect(Collectors.toList()));
+        return userMapper.save(user);
+    }
 }

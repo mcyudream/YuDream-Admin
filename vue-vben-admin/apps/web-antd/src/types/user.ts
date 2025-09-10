@@ -1,3 +1,5 @@
+import type {Department} from "#/types/organizationalStructure/department";
+
 export interface User {
   id?: string;
   nickname?: string;
@@ -6,4 +8,5 @@ export interface User {
   status?: number;
   createTime?: Date;
   updateTime?: Date;
+  departments?: Department[];
 }

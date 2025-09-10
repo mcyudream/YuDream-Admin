@@ -6,6 +6,8 @@ import jakarta.annotation.Resource;
 import online.yudream.spring.admin.service.UserService;
 import online.yudream.spring.base.common.R;
 import online.yudream.spring.base.common.SearchPageDto;
+import online.yudream.spring.entity.dto.UserDepartmentDto;
+import online.yudream.spring.entity.entity.Department;
 import online.yudream.spring.entity.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
@@ -40,5 +42,16 @@ public class UserController {
     public R<String> deleteUser(@PathVariable(name = "id") String id){
         userService.deleteUser(id);
         return R.success();
+    }
+
+    @PostMapping("/department")
+    public R<User> addUserDepartment(@RequestBody UserDepartmentDto userDepartmentDto){
+        return R.success(userService.addToDepartment(userDepartmentDto.username(), userDepartmentDto.department()));
+    }
+
+    @PostMapping("/department/d")
+    public R<User> deleteUserDepartment(@RequestBody UserDepartmentDto userDepartmentDto){
+
+        return R.success(userService.deleteDepartment(userDepartmentDto.username(), userDepartmentDto.department()));
     }
 }

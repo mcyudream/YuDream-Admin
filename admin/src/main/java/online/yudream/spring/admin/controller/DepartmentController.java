@@ -8,6 +8,7 @@ import online.yudream.spring.base.common.R;
 import online.yudream.spring.base.common.SearchPageDto;
 import online.yudream.spring.entity.dto.ParamsDepartmentDto;
 import online.yudream.spring.entity.entity.Department;
+import online.yudream.spring.entity.vo.TreeVo;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,6 +46,12 @@ public class DepartmentController {
     public R<Department> updateDepartment(@RequestBody ParamsDepartmentDto departmentDto) {
         departmentService.editDepartment(departmentDto);
         return R.success();
+    }
+
+    @GetMapping("/tree")
+    public R<List<TreeVo>> getDepartmentVoList(){
+        List<TreeVo> departmentVos = departmentService.getDepartmentVoList();
+        return R.success(departmentVos);
     }
 
 }

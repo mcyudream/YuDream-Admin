@@ -34,3 +34,22 @@ export async function editUserApi(user: User){
 export async function deleteUserApi(user: User){
   return requestClient.delete(`/user/${user.id}`);
 }
+
+
+export async function addToDepartmentApi(user: User, department: string){
+  return requestClient.post<User>(`/user/department`, {
+    username: user.id,
+    department: department,
+  }, {
+    responseReturn:"body"
+  });
+}
+
+export async function deleteUserDepartmentApi(user: User, department: string){
+  return requestClient.post<User>(`/user/department/d`, {
+    username: user.id,
+    department: department,
+  }, {
+    responseReturn:"body"
+  });
+}

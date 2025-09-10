@@ -1,6 +1,7 @@
 package online.yudream.spring.entity.entity;
 
 import lombok.*;
+import org.springframework.data.mongodb.core.mapping.FieldType;
 import org.springframework.data.mongodb.core.mapping.MongoId;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.annotation.CreatedDate;
@@ -14,7 +15,7 @@ import org.springframework.data.annotation.LastModifiedDate;
 @Document("sys_tb_config")
 public class Config {
 
-    @MongoId
+    @MongoId(value = FieldType.STRING)
     private String id;
     private String value;
     private String fieldName;

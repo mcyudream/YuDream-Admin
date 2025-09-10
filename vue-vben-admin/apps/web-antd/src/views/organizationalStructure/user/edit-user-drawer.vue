@@ -1,16 +1,22 @@
 <script lang="ts" setup>
-import { useVbenDrawer } from '@vben/common-ui';
+import {useVbenDrawer, useVbenModal} from '@vben/common-ui';
 import type {User} from "#/types/user";
 import { useVbenForm } from '#/adapter/form';
 import { $t } from '@vben/locales';
 import { z } from '#/adapter/form';
-import {message} from "ant-design-vue";
-import {watch} from "vue";
-import {editUserApi} from "#/api";
+import {message,List,ListItem,Button} from "ant-design-vue";
+import {onMounted, ref, watch} from "vue";
+import {addToDepartmentApi, deleteUserDepartmentApi, editUserApi} from "#/api";
+import AddDepartmentModal from "#/views/organizationalStructure/user/add-department-modal.vue";
+import type {Department} from "#/types/organizationalStructure/department";
 
 const props = defineProps({
   initialValue: {
     type: Object as () => User,
+    required: true,
+  },
+  departments: {
+    type: Array as () => Department[],
     required: true,
   }
 })
@@ -71,7 +77,7 @@ const [EditForm, formApi] = useVbenForm({
 watch(()=> props.initialValue, () => {
   formApi.setValues(props.initialValue)
 })
-const emit = defineEmits(['onSubmit']);
+const emit = defineEmits(['onSubmit','onDepartmentUpdate']);
 
 
 
@@ -88,9 +94,54 @@ const [Drawer, drawerApi] = useVbenDrawer({
     })
   }
 });
+
+const [AddDepartment, addDepartmentModalApi] = useVbenModal({
+  connectedComponent: AddDepartmentModal,
+})
+const departments = ref<Department[]>([]);
+const onAddDepartment = async (id: string) => {
+  const res = await addToDepartmentApi(props.initialValue, id)
+  emit('onDepartmentUpdate')
+  //@ts-ignore
+  message.success(res.message)
+  //@ts-ignore
+  departments.value = res.data.departments
+}
+
+const onDeleteDepartment = async (id: string) => {
+  const res = await deleteUserDepartmentApi(props.initialValue, id)
+  emit('onDepartmentUpdate')
+  //@ts-ignore
+  message.success(res.message)
+  //@ts-ignore
+  departments.value = res.data.departments
+}
+
+watch(()=>props.initialValue, () => {
+  departments.value = props.initialValue.departments??[]
+})
+
+onMounted(()=>{
+  departments.value = props.initialValue.departments??[]
+})
 </script>
 <template>
   <Drawer title="编辑用户">
     <edit-form/>
+    <div class="flex-col gap-2 flex">
+      <span class="font-bold">{{$t('部门列表')}}</span>
+      <div class="toolbar flex flex-warp w-full justify-end ">
+        <Button type="primary" @click="addDepartmentModalApi.open()">添加到部门</Button>
+      </div>
+      <List>
+        <ListItem :title="item.name" v-for="item in departments">
+          <span class="font-bold">{{item.name}}</span>|{{item.description}}
+          <template #actions>
+            <Button danger type="link" @click="onDeleteDepartment(item.id??'')">移出</Button>
+          </template>
+        </ListItem>
+      </List>
+    </div>
+    <AddDepartment @on-submit="onAddDepartment" />
   </Drawer>
 </template>

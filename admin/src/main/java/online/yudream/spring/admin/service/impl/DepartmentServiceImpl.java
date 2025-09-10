@@ -9,6 +9,7 @@ import online.yudream.spring.base.utils.SearchUtils;
 import online.yudream.spring.entity.dto.ParamsDepartmentDto;
 import online.yudream.spring.entity.entity.Department;
 import online.yudream.spring.entity.mapper.DepartmentMapper;
+import online.yudream.spring.entity.vo.TreeVo;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 
@@ -76,6 +77,24 @@ public class DepartmentServiceImpl implements DepartmentService {
         department.setParentId(departmentDto.parentId());
         departmentMapper.save(department);
     }
+
+    @Override
+    public List<TreeVo> getDepartmentVoList(){
+        List<Department> departments = departmentMapper.findAll();
+        return departments.stream().filter(item->item.getParentId()==null).map(department -> departmentToDepartmentVo(department,departments)).toList();
+    }
+
+    private TreeVo departmentToDepartmentVo(Department department, List<Department> departments){
+        return TreeVo.builder()
+                .key(department.getId())
+                .description(department.getDescription())
+                .title(department.getName())
+                .children(departments.stream().filter(item -> Objects.equals(item.getParentId(), department.getId())).map(
+                        item -> departmentToDepartmentVo(item,departments)
+                ).toList())
+                .build();
+    }
+
 
 
 }

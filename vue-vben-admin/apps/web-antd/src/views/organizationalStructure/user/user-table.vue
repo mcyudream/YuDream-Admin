@@ -6,12 +6,17 @@ import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import type {SearchPageParams} from "#/types/common";
 import {$t} from "@vben/locales";
 import { useVbenDrawer } from '@vben/common-ui';
-import {ref} from "vue";
+import {ref, watch} from "vue";
 import { confirm } from '@vben/common-ui';
 import {deleteUserApi, getUsersPageApi} from "#/api";
 import type {User} from "#/types/user";
 import EditUserDrawer from "#/views/organizationalStructure/user/edit-user-drawer.vue";
-
+const props = defineProps({
+  departmentId: {
+    type: String,
+    default: 'all',
+  }
+})
 
 const formOptions: VbenFormProps = {
   // 默认展开
@@ -107,7 +112,8 @@ const gridOptions: VxeGridProps<User> = {
           size: page.pageSize,
           keywords: {
             ...formValues
-          }
+          },
+          extraId: props.departmentId
         }
         return await getUsersPageApi(pageSearch);
       },
@@ -139,18 +145,28 @@ const onDelete = (row:User) => {
     await gridApi.query()
   })
 }
+
+watch(()=>props.departmentId, ()=>{
+  gridApi.query()
+})
+
+const onDepartmentUpdate = async () => {
+  await gridApi.query()
+}
 </script>
 
 <template>
   <div class="w-full">
-    <Grid >
-      <template #toolbar-tools>
-      </template>
-      <template #action="{ row }">
-        <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('form.common.edit')}}</Button>
-        <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('form.common.delete')}}</Button>
-      </template>
-    </Grid>
-    <edit-modal :initial-value="currentRole" @on-submit="gridApi.query()"/>
+
+        <Grid >
+          <template #toolbar-tools>
+          </template>
+          <template #action="{ row }">
+            <Button type="link" class="mr-2"  @click="editRowEvent(row)">{{$t('form.common.edit')}}</Button>
+            <Button danger type="link" class="mr-2" @click="onDelete(row)">{{$t('form.common.delete')}}</Button>
+          </template>
+        </Grid>
+
+    <edit-modal @on-department-update="onDepartmentUpdate" :initial-value="currentRole" @on-submit="gridApi.query()"/>
   </div>
 </template>

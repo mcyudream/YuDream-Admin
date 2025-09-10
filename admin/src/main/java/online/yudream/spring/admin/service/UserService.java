@@ -12,4 +12,9 @@ public interface UserService {
     void editUser(User user);
 
     void deleteUser(String id);
+
+    User addToDepartment(String userId, String departmentId);
+
+
+    User deleteDepartment(String userId, String departmentId);
 }

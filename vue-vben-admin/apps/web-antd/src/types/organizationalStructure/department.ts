@@ -12,3 +12,5 @@ export interface CreateDepartment {
   parentId?: string;
   description?: string;
 }
+
+

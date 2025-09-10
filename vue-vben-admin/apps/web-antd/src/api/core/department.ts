@@ -1,6 +1,10 @@
 import {requestClient} from "#/api/request";
-import type {CreateDepartment, Department} from "#/types/organizationalStructure/department";
+import type {
+  CreateDepartment,
+  Department,
+} from "#/types/organizationalStructure/department";
 import type {SearchPageParams} from "#/types/common";
+import type {TreeVo} from "#/types/tree";
 
 /**
    * 创建部门
@@ -33,4 +37,11 @@ export async function updateDepartmentApi(department: Department) {
   return requestClient.post(`/department`, department, {
     responseReturn:"body"
   });
+}
+
+/**
+ * 获取部门树形结构
+ */
+export async function getDepartmentTreeApi(){
+  return requestClient.get<TreeVo[]>('/department/tree');
 }
