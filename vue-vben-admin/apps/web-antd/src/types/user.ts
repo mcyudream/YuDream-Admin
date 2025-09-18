@@ -1,4 +1,5 @@
 import type {Department} from "#/types/organizationalStructure/department";
+import type {Role} from "#/types/organizationalStructure/role";
 
 export interface User {
   id?: string;
@@ -8,5 +9,11 @@ export interface User {
   status?: number;
   createTime?: Date;
   updateTime?: Date;
-  departments?: Department[];
+  departmentRoles?: DepartmentRoleEntity[];
+}
+
+export interface DepartmentRoleEntity {
+  department?: Department;
+  role?: Role,
+  dataRange: string;
 }

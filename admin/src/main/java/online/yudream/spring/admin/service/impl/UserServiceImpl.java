@@ -8,6 +8,7 @@ import online.yudream.spring.base.exception.AuthException;
 import online.yudream.spring.base.utils.SearchUtils;
 import online.yudream.spring.entity.entity.Department;
 import online.yudream.spring.entity.entity.User;
+import online.yudream.spring.entity.entity.common.DepartmentRoleEntity;
 import online.yudream.spring.entity.mapper.DepartmentMapper;
 import online.yudream.spring.entity.mapper.UserMapper;
 import org.springframework.data.domain.Page;
@@ -44,7 +45,7 @@ public class UserServiceImpl implements UserService {
     public Page<User> getUsersPage(SearchPageDto searchPageDto) {
         Criteria criteria = searchUtils.searchCriteria(searchPageDto);
         if (!Objects.equals(searchPageDto.extraId(), "all")) {
-            criteria.andOperator(Criteria.where("departments.id").is(searchPageDto.extraId()));
+            criteria.andOperator(Criteria.where("departmentRoles.department.id").is(searchPageDto.extraId()));
         }
         return searchUtils.findPage(User.class, searchPageDto, criteria);
     }
@@ -80,8 +81,9 @@ public class UserServiceImpl implements UserService {
         if (department == null) {
             throw new AuthException("exception.department.notFound");
         }
-        user.getDepartments().add(department);
-        System.out.println(user.getDepartments());
+        user.getDepartmentRoles().add(DepartmentRoleEntity.builder()
+                        .department(department)
+                .build());
         return userMapper.save(user);
     }
 
@@ -95,7 +97,7 @@ public class UserServiceImpl implements UserService {
         if (department == null) {
             throw new AuthException("exception.department.notFound");
         }
-        user.setDepartments(user.getDepartments().stream().filter(item->!item.getId().equals(departmentId)).collect(Collectors.toList()));
+        user.setDepartmentRoles(user.getDepartmentRoles().stream().filter(item->!item.getDepartment().getId().equals(departmentId)).collect(Collectors.toList()));
         return userMapper.save(user);
     }
 }

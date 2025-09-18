@@ -4,6 +4,7 @@ package online.yudream.spring.init.service.impl;
 import jakarta.annotation.Resource;
 import online.yudream.spring.base.utils.BcryptHasher;
 import online.yudream.spring.entity.entity.User;
+import online.yudream.spring.entity.entity.common.DepartmentRoleEntity;
 import online.yudream.spring.entity.enums.UserStatus;
 import online.yudream.spring.entity.mapper.UserMapper;
 import online.yudream.spring.init.initenums.SysDepartment;
@@ -37,9 +38,11 @@ public class UserInitServiceImpl implements InitService {
                 .nickname(username)
                 .password(bcryptHasher.hash(password))
                 .status(UserStatus.NORMAL)
-                .departments(
+                .departmentRoles(
                         List.of(
-                                SysDepartment.ADMIN.getDepartment()
+                                DepartmentRoleEntity.builder()
+                                        .department(SysDepartment.ADMIN.getDepartment())
+                                        .build()
                         )
                 )
                 .roles(List.of(

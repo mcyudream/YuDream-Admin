@@ -2,6 +2,7 @@ package online.yudream.spring.entity.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
+import online.yudream.spring.entity.entity.common.DepartmentRoleEntity;
 import online.yudream.spring.entity.entity.common.IpEntity;
 import online.yudream.spring.entity.enums.UserStatus;
 import org.springframework.data.annotation.CreatedDate;
@@ -32,9 +33,11 @@ public class User {
     private String email;
     private String phone;
     private List<IpEntity> ips; // 近n次登录ip
+//
+//    @DocumentReference(lazy = false)
+//    private List<Department>  departments;
 
-    @DocumentReference(lazy = false)
-    private List<Department>  departments;
+    private List<DepartmentRoleEntity> departmentRoles;
 
     private UserStatus status = UserStatus.NORMAL;
 
@@ -44,5 +47,6 @@ public class User {
     private LocalDateTime createTime;
     @LastModifiedDate
     private LocalDateTime updateTime;
+
 
 }

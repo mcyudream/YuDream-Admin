@@ -8,4 +8,6 @@ import java.util.List;
 
 public interface PermissionMapper extends MongoRepository<Permission, String> {
     List<Permission> findByIdIn(Collection<String> ids);
+
+    List<Permission> deleteAllByIdRegex(String id);
 }
