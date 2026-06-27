@@ -3,7 +3,6 @@ package online.yudream.base.domain.valobj;
 import cn.hutool.core.util.ReUtil;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 
 @AllArgsConstructor
 @Getter

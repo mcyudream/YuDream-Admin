@@ -7,8 +7,9 @@ import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
 import online.yudream.base.domain.valobj.Phone;
 import online.yudream.base.domain.valobj.QQ;
+import online.yudream.base.domain.system.user.valobj.DeptID;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 
 @EqualsAndHashCode(callSuper = true)
@@ -29,4 +30,6 @@ public class User extends BaseDomain {
     private QQ qq;
 
     private Password password;
+
+    private List<DeptID> depts;
 }
