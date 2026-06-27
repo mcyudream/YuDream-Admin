@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>欢迎</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6;">
+<h2>欢迎加入，<span th:text="${username}">用户</span>！</h2>
+<p>请点击下方链接完成邮箱验证：</p>
+<a th:href="${verifyUrl}"
+   style="display:inline-block;padding:10px 20px;background:#007bff;color:#fff;text-decoration:none;border-radius:4px;">
+    验证邮箱
+</a>
+<p style="color:#999;font-size:12px;">如非本人操作，请忽略此邮件。</p>
+</body>
+</html>

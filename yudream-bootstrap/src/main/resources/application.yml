@@ -1,12 +1,25 @@
 server:
   port: 8080
 
-spring:
-  application:
+spring.application:
     name: yudream-admin
-  data:
-    mongodb:
-      uri: mongodb://localhost:27017/yudream
+
+spring.data:
+  mongodb:
+    uri: ${MONGO_URI}
+
+spring.mail:
+  host: ${MAIL_HOST:smtp.qq.com}      # 必须有 host，否则自动配置跳过
+  port: ${MAIL_PORT:465}
+  username: ${MAIL_USERNAME}
+  password: ${MAIL_PASSWORD}
+  default-encoding: UTF-8
+
+spring.thymeleaf:
+  prefix: classpath:/templates/
+  suffix: .html
+  mode: HTML
+  cache: false
 
 logging:
   level:
@@ -15,5 +28,8 @@ logging:
 
 # 雪花算法配置
 snowflake:
-  data-center-id: 1
-  machine-id: 1
+  data-center-id: ${SNOWFLAKE_DCI:1}
+  machine-id: ${SNOWFLAKE_MI:1}
+
+mail:
+  from: ${MAIL_FROM}
