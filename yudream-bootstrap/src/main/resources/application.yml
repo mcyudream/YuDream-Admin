@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: yudream-admin
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/yudream
+
+logging:
+  level:
+    online.yudream.base: debug
+    org.springframework.data.mongodb: debug
+
+# 雪花算法配置
+snowflake:
+  data-center-id: 1
+  machine-id: 1
