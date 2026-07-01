@@ -3,13 +3,17 @@ package online.yudream.base.domain.system.user.aggregate;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
+import online.yudream.base.domain.system.user.valobj.DeptID;
+import online.yudream.base.domain.system.user.valobj.RoleID;
+import online.yudream.base.domain.system.user.valobj.UserDept;
 import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
 import online.yudream.base.domain.valobj.Phone;
 import online.yudream.base.domain.valobj.QQ;
-import online.yudream.base.domain.system.user.valobj.DeptID;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 
 @EqualsAndHashCode(callSuper = true)
@@ -31,5 +35,39 @@ public class User extends BaseDomain {
 
     private Password password;
 
-    private List<DeptID> depts;
+    private List<UserDept> depts = new ArrayList<>();
+
+    private List<RoleID> roles = new ArrayList<>();
+
+    public void joinDept(DeptID deptID, boolean isDefault) {
+        depts.removeIf(d -> d.id().equals(deptID));
+        depts.add(new UserDept(deptID, isDefault));
+    }
+
+    public void assignRoles(RoleID roleID) {
+        if (!roles.contains(roleID)) {
+            roles.add(roleID);
+        }
+    }
+
+    public boolean belongsToDept(DeptID deptID) {
+        return depts.stream().anyMatch(d -> d.id().equals(deptID));
+    }
+
+    public DeptID getDefaultDeptID() {
+        return depts.stream()
+                .filter(UserDept::isDefault)
+                .findFirst()
+                .map(UserDept::id)
+                .orElse(depts.isEmpty() ? null : depts.getFirst().id());
+    }
+
+    public List<RoleID> getRoleInDept(DeptID deptID, Function<RoleID, DeptID> roleDeptLoader) {
+        return roles.stream().filter(
+                rid -> {
+                    DeptID id = roleDeptLoader.apply(rid);
+                    return id != null && id.equals(deptID);
+                }
+        ).toList();
+    }
 }
