@@ -56,3 +56,18 @@ yudream.cache:
   metrics:
     enabled: ${CACHE_METRICS_ENABLED:true}
     aggregate-by-prefix: ${CACHE_METRICS_AGGREGATE:true}
+
+# Sa-Token 配置
+sa-token:
+  token-name: Authorization
+  timeout: 86400
+  active-timeout: -1
+  is-concurrent: true
+  is-share: true
+  token-style: uuid
+  is-read-cookie: false
+  is-read-header: true
+
+# 应用基础地址（用于生成邮件验证链接）
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}

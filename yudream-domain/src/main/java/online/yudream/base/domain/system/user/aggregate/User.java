@@ -35,6 +35,8 @@ public class User extends BaseDomain {
 
     private Password password;
 
+    private boolean emailVerified;
+
     private List<UserDept> depts = new ArrayList<>();
 
     private List<RoleID> roles = new ArrayList<>();
@@ -42,6 +44,10 @@ public class User extends BaseDomain {
     public void joinDept(DeptID deptID, boolean isDefault) {
         depts.removeIf(d -> d.id().equals(deptID));
         depts.add(new UserDept(deptID, isDefault));
+    }
+
+    public void verifyEmail() {
+        this.emailVerified = true;
     }
 
     public void assignRoles(RoleID roleID) {

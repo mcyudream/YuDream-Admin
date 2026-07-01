@@ -24,4 +24,6 @@ public class UserDO extends BaseDO {
     private String qq;
 
     private String password;
+
+    private boolean emailVerified;
 }
