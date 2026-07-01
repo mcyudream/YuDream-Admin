@@ -7,7 +7,6 @@ import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.infra.system.user.dataobj.RoleDO;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -19,21 +18,21 @@ public class RoleInfraMapper {
 
     public static RoleDO toDataObj(Role role) {
         if (role == null) return null;
-        return RoleDO.builder()
-                .id(role.getId())
-                .name(role.getName())
-                .deptId(role.getDeptId() == null ? null : role.getDeptId().getValue())
-                .code(role.getCode())
-                .level(role.getLevel())
-                .systemRole(role.isSystemRole())
-                .systemType(role.getSystemType())
-                .permissions(role.getPermissions() == null ? Collections.emptyList() :
-                        role.getPermissions().stream().map(PermissionID::getCode).collect(Collectors.toList()))
-                .status(role.getStatus())
-                .version(role.getVersion())
-                .createTime(role.getCreateTime())
-                .updateTime(role.getUpdateTime())
-                .build();
+        RoleDO roleDO = new RoleDO();
+        roleDO.setId(role.getId());
+        roleDO.setName(role.getName());
+        roleDO.setDeptId(role.getDeptId() == null ? null : role.getDeptId().getValue());
+        roleDO.setCode(role.getCode());
+        roleDO.setLevel(role.getLevel());
+        roleDO.setSystemRole(role.isSystemRole());
+        roleDO.setSystemType(role.getSystemType());
+        roleDO.setPermissions(role.getPermissions() == null ? Collections.emptyList() :
+                role.getPermissions().stream().map(PermissionID::getCode).collect(Collectors.toList()));
+        roleDO.setStatus(role.getStatus());
+        roleDO.setVersion(role.getVersion());
+        roleDO.setCreateTime(role.getCreateTime());
+        roleDO.setUpdateTime(role.getUpdateTime());
+        return roleDO;
     }
 
     public static Role toDomain(RoleDO roleDO) {

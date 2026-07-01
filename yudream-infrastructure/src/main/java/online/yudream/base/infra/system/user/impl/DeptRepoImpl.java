@@ -41,4 +41,11 @@ public class DeptRepoImpl implements DeptRepo {
         DeptDO deptDO = mongoTemplate.findOne(query, DeptDO.class);
         return Optional.ofNullable(DeptInfraMapper.toDomain(deptDO));
     }
+
+    @Override
+    public Optional<Dept> findByType(SystemDeptType type) {
+        Query query = Query.query(Criteria.where("deptType").is(type));
+        DeptDO deptDO = mongoTemplate.findOne(query, DeptDO.class);
+        return Optional.ofNullable(DeptInfraMapper.toDomain(deptDO));
+    }
 }

@@ -42,6 +42,9 @@ public class User extends BaseDomain {
     private List<RoleID> roles = new ArrayList<>();
 
     public void joinDept(DeptID deptID, boolean isDefault) {
+        if (depts == null) {
+            depts = new ArrayList<>();
+        }
         depts.removeIf(d -> d.id().equals(deptID));
         depts.add(new UserDept(deptID, isDefault));
     }
@@ -51,24 +54,33 @@ public class User extends BaseDomain {
     }
 
     public void assignRoles(RoleID roleID) {
+        if (roles == null) {
+            roles = new ArrayList<>();
+        }
         if (!roles.contains(roleID)) {
             roles.add(roleID);
         }
     }
 
     public boolean belongsToDept(DeptID deptID) {
-        return depts.stream().anyMatch(d -> d.id().equals(deptID));
+        return depts != null && depts.stream().anyMatch(d -> d.id().equals(deptID));
     }
 
     public DeptID getDefaultDeptID() {
+        if (depts == null || depts.isEmpty()) {
+            return null;
+        }
         return depts.stream()
                 .filter(UserDept::isDefault)
                 .findFirst()
                 .map(UserDept::id)
-                .orElse(depts.isEmpty() ? null : depts.getFirst().id());
+                .orElse(depts.getFirst().id());
     }
 
     public List<RoleID> getRoleInDept(DeptID deptID, Function<RoleID, DeptID> roleDeptLoader) {
+        if (roles == null) {
+            return new ArrayList<>();
+        }
         return roles.stream().filter(
                 rid -> {
                     DeptID id = roleDeptLoader.apply(rid);
