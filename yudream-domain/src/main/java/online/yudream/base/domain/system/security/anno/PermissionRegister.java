@@ -13,8 +13,11 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface PermissionRegister {
-    /** 唯一编码，如 "user:create" */
-    String code();
+    /**
+     * 唯一编码，如 "user:create"。
+     * <p>为空时自动从同方法的 {@code @SaCheckPermission} 取值，避免重复定义。
+     */
+    String code() default "";
     /** 展示名称 */
     String name();
     /** 所属模块 */
