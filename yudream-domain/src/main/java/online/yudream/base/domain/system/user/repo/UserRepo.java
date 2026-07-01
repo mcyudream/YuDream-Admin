@@ -6,9 +6,16 @@ import java.util.Optional;
 
 public interface UserRepo {
     User save(User user);
+
     boolean existsByUsername(String username);
+
     boolean existsByEmail(String email);
-    boolean existsByQQ(String email);
-    boolean existsByPhone(String email);
+
+    boolean existsByQQ(String qq);
+
+    boolean existsByPhone(String phone);
+
     Optional<User> findByUsername(String username);
+
+    Optional<User> findByEmail(String email);
 }

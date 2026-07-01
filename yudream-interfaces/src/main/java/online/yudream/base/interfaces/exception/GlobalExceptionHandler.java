@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.exception;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.common.ResultCode;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
