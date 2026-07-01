@@ -15,20 +15,20 @@ public class DeptInfraMapper {
 
     public static DeptDO toDataObj(Dept dept) {
         if (dept == null) return null;
-        return DeptDO.builder()
-                .id(dept.getId())
-                .name(dept.getName())
-                .description(dept.getDescription())
-                .leaderId(dept.getLeader() == null ? null : dept.getLeader().getValue())
-                .phone(dept.getPhone() == null ? null : dept.getPhone().getValue())
-                .parentId(dept.getParentId() == null ? null : dept.getParentId().getValue())
-                .sortOrder(dept.getSortOrder())
-                .deptType(dept.getDeptType())
-                .status(dept.getStatus())
-                .version(dept.getVersion())
-                .createTime(dept.getCreateTime())
-                .updateTime(dept.getUpdateTime())
-                .build();
+        DeptDO deptDO = new DeptDO();
+        deptDO.setId(dept.getId());
+        deptDO.setName(dept.getName());
+        deptDO.setDescription(dept.getDescription());
+        deptDO.setLeaderId(dept.getLeader() == null ? null : dept.getLeader().getValue());
+        deptDO.setPhone(dept.getPhone() == null ? null : dept.getPhone().getValue());
+        deptDO.setParentId(dept.getParentId() == null ? null : dept.getParentId().getValue());
+        deptDO.setSortOrder(dept.getSortOrder());
+        deptDO.setDeptType(dept.getDeptType());
+        deptDO.setStatus(dept.getStatus());
+        deptDO.setVersion(dept.getVersion());
+        deptDO.setCreateTime(dept.getCreateTime());
+        deptDO.setUpdateTime(dept.getUpdateTime());
+        return deptDO;
     }
 
     public static Dept toDomain(DeptDO deptDO) {

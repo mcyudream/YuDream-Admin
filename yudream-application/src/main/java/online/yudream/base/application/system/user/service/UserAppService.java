@@ -11,7 +11,6 @@ import online.yudream.base.domain.common.service.PasswordEncoder;
 import online.yudream.base.domain.system.user.aggregate.Dept;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
-import online.yudream.base.domain.system.user.enumerate.SystemDeptType;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
@@ -29,8 +28,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 @Service
 public class UserAppService {
-
-    private static final Long ROOT_DEPT_ID = 1L;
 
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
@@ -63,9 +60,10 @@ public class UserAppService {
             throw new BizException("邮箱已被注册");
         }
 
-        Dept rootDept = deptRepo.findRoot().orElseGet(this::createRootDept);
+        Dept rootDept = deptRepo.findRoot()
+                .orElseThrow(() -> new BizException("系统根部门未初始化"));
         Role userRole = roleRepo.findBySystemType(SystemRoleType.USER)
-                .orElseGet(() -> createUserRole(rootDept));
+                .orElseThrow(() -> new BizException("普通用户角色未初始化"));
 
         User user = User.builder()
                 .username(cmd.getUsername())
@@ -99,17 +97,4 @@ public class UserAppService {
         log.info("邮箱验证成功: id={}, email={}", user.getId(), email);
     }
 
-    private Dept createRootDept() {
-        Dept root = Dept.create(ROOT_DEPT_ID, "根部门", null, SystemDeptType.ROOT);
-        Dept saved = deptRepo.save(root);
-        log.info("自动创建系统根部门: id={}", saved.getId());
-        return saved;
-    }
-
-    private Role createUserRole(Dept rootDept) {
-        Role userRole = Role.createSystemRole(SystemRoleType.USER, DeptID.of(rootDept.getId()));
-        Role saved = roleRepo.save(userRole);
-        log.info("自动创建普通用户角色: id={}", saved.getId());
-        return saved;
-    }
 }

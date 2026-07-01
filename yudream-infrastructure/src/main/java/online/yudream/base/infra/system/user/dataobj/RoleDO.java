@@ -1,8 +1,9 @@
 package online.yudream.base.infra.system.user.dataobj;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.SuperBuilder;
+import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
@@ -16,7 +17,8 @@ import java.util.List;
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "sysRole")
 public class RoleDO extends BaseDO {
 

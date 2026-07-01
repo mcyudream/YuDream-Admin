@@ -1,8 +1,9 @@
 package online.yudream.base.infra.system.user.dataobj;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.SuperBuilder;
+import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.user.enumerate.DeptStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemDeptType;
 import online.yudream.base.infra.common.baseobj.BaseDO;
@@ -13,7 +14,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
-@SuperBuilder
+@NoArgsConstructor
+@AllArgsConstructor
 @Document(collection = "sysDept")
 public class DeptDO extends BaseDO {
 
