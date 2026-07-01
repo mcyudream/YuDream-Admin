@@ -6,7 +6,8 @@ import lombok.Getter;
 @AllArgsConstructor
 @Getter
 public class DeptID {
-    private final Long value;
+    private Long value;
+
 
     public static DeptID of(Long value){
         return new DeptID(value);

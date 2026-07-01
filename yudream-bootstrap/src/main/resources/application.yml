@@ -7,6 +7,17 @@ spring.application:
 spring.data:
   mongodb:
     uri: ${MONGO_URI}
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
+    database: ${REDIS_DB:0}
+    timeout: ${REDIS_TIMEOUT:2000ms}
+    lettuce:
+      pool:
+        max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+        max-idle: ${REDIS_POOL_MAX_IDLE:8}
+        min-idle: ${REDIS_POOL_MIN_IDLE:0}
 
 spring.mail:
   host: ${MAIL_HOST:smtp.qq.com}      # 必须有 host，否则自动配置跳过
@@ -33,3 +44,15 @@ snowflake:
 
 mail:
   from: ${MAIL_FROM}
+
+yudream.cache:
+  key-prefix: ${CACHE_KEY_PREFIX:yudream}
+  enabled: ${CACHE_ENABLED:true}
+  default-null-expire: ${CACHE_DEFAULT_NULL_EXPIRE:60}
+  l1:
+    enabled: ${CACHE_L1_ENABLED:false}
+    maximum-size: ${CACHE_L1_MAX_SIZE:10000}
+    expire-after-write: ${CACHE_L1_EXPIRE:60}
+  metrics:
+    enabled: ${CACHE_METRICS_ENABLED:true}
+    aggregate-by-prefix: ${CACHE_METRICS_AGGREGATE:true}
