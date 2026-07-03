@@ -30,5 +30,18 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:capability:test", name = "测试平台能力", type = MenuNodeType.BUTTON,
             parentName = "CAPABILITY", permission = "platform:capability:test")
-    CAPABILITY_TEST
+    CAPABILITY_TEST,
+
+    @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
+            path = "/platform/api-doc", component = "platform/api-doc/index.vue",
+            icon = "i-ri:file-list-2-line", sort = 90)
+    API_DOCS,
+
+    @MenuNode(code = "platform:docs:view", name = "查看API文档", type = MenuNodeType.BUTTON,
+            parentName = "API_DOCS", permission = "platform:docs:view")
+    API_DOCS_VIEW,
+
+    @MenuNode(code = "platform:docs:config", name = "配置API文档", type = MenuNodeType.BUTTON,
+            parentName = "API_DOCS", permission = "platform:docs:config")
+    API_DOCS_CONFIG
 }
