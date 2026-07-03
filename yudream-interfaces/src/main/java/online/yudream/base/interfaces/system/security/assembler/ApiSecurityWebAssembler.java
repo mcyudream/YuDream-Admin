@@ -28,6 +28,8 @@ import online.yudream.base.application.system.security.dto.OAuthTokenDTO;
 import online.yudream.base.application.system.security.dto.PasskeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.PasskeyRegistrationOptionsDTO;
 import online.yudream.base.domain.common.PageResult;
+import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.system.security.enumerate.OAuthClientAuthMethod;
 import online.yudream.base.interfaces.system.security.request.ApiKeyCreateRequest;
 import online.yudream.base.interfaces.system.security.request.ApiSecurityPolicyUpdateRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthAuthorizeRequest;
@@ -54,6 +56,9 @@ import online.yudream.base.interfaces.system.security.res.PasskeyRegistrationOpt
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport.SecurityPrincipal;
 import org.springframework.web.servlet.view.RedirectView;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 public class ApiSecurityWebAssembler {
@@ -131,14 +136,41 @@ public class ApiSecurityWebAssembler {
     }
 
     public static OAuthTokenCmd toCmd(OAuthTokenRequest request) {
+        return toCmd(request, null);
+    }
+
+    public static OAuthTokenCmd toCmd(OAuthTokenRequest request, String authorizationHeader) {
         OAuthTokenCmd cmd = new OAuthTokenCmd();
         cmd.setGrantType(request.getGrantType());
         cmd.setClientId(request.getClientId());
         cmd.setClientSecret(request.getClientSecret());
+        cmd.setAuthMethod(request.getClientSecret() == null || request.getClientSecret().isBlank()
+                ? OAuthClientAuthMethod.NONE
+                : OAuthClientAuthMethod.CLIENT_SECRET_POST);
+        applyBasicClientCredentials(cmd, authorizationHeader);
         cmd.setCode(request.getCode());
         cmd.setRedirectUri(request.getRedirectUri());
         cmd.setRefreshToken(request.getRefreshToken());
         return cmd;
+    }
+
+    private static void applyBasicClientCredentials(OAuthTokenCmd cmd, String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Basic ")) {
+            return;
+        }
+        String decoded;
+        try {
+            decoded = new String(Base64.getDecoder().decode(authorizationHeader.substring(6).trim()), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ex) {
+            throw new BizException("OAuth Basic 认证格式错误");
+        }
+        int separator = decoded.indexOf(':');
+        if (separator < 0) {
+            throw new BizException("OAuth Basic 认证格式错误");
+        }
+        cmd.setClientId(URLDecoder.decode(decoded.substring(0, separator), StandardCharsets.UTF_8));
+        cmd.setClientSecret(URLDecoder.decode(decoded.substring(separator + 1), StandardCharsets.UTF_8));
+        cmd.setAuthMethod(OAuthClientAuthMethod.CLIENT_SECRET_BASIC);
     }
 
     public static OAuthClientSaveCmd toCmd(Long id, OAuthClientSaveRequest request) {

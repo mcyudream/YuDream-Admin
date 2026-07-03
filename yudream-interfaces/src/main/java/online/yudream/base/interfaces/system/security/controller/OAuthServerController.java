@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.view.RedirectView;
@@ -31,7 +32,8 @@ public class OAuthServerController {
     }
 
     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-    public OAuthTokenRes token(@ModelAttribute OAuthTokenRequest request) {
-        return ApiSecurityWebAssembler.toRes(oauthServerAppService.token(ApiSecurityWebAssembler.toCmd(request)));
+    public OAuthTokenRes token(@ModelAttribute OAuthTokenRequest request,
+                               @RequestHeader(value = "Authorization", required = false) String authorizationHeader) {
+        return ApiSecurityWebAssembler.toRes(oauthServerAppService.token(ApiSecurityWebAssembler.toCmd(request, authorizationHeader)));
     }
 }
