@@ -22,9 +22,6 @@ import online.yudream.base.domain.system.security.valobj.TokenPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
@@ -86,7 +83,7 @@ public class ApiSecurityAppService {
         String prefix = prefixOf(plaintext);
         ApiKeyCredential credential = ApiKeyCredential.create(
                 cmd.getName(),
-                new ApiKeySecret(prefix, hash(plaintext), ApiKeySecret.mask(prefix)),
+                new ApiKeySecret(prefix, ApiKeySecretHasher.hash(plaintext), ApiKeySecret.mask(prefix)),
                 cmd.getCreatorUserId(),
                 scope,
                 cmd.getExpireTime()
@@ -122,12 +119,4 @@ public class ApiSecurityAppService {
         return plaintext.substring(0, length);
     }
 
-    private String hash(String plaintext) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(plaintext.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new BizException("API Key 加密算法不可用");
-        }
-    }
 }

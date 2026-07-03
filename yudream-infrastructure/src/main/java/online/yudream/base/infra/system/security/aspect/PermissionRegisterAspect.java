@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
+import online.yudream.base.domain.system.security.service.ApiKeyAuthenticationContext;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -36,6 +37,10 @@ public class PermissionRegisterAspect {
         Method method = ((MethodSignature) point.getSignature()).getMethod();
         SaCheckPermission saCheck = AnnotatedElementUtils.findMergedAnnotation(method, SaCheckPermission.class);
         if (saCheck == null) {
+            if (ApiKeyAuthenticationContext.hasPermission(code)) {
+                log.debug("Permission check passed via API Key, code={}", code);
+                return point.proceed();
+            }
             StpUtil.checkPermission(code);
             log.debug("Permission check passed via @PermissionRegister, code={}", code);
         }
