@@ -13,6 +13,7 @@ import online.yudream.base.application.platform.integration.dto.RuntimeScriptDTO
 import online.yudream.base.application.platform.integration.query.IntegrationPageQuery;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.integration.aggregate.HttpConnector;
 import online.yudream.base.domain.platform.integration.aggregate.HttpInvocationLog;
 import online.yudream.base.domain.platform.integration.aggregate.RuntimeExecutionLog;
@@ -38,6 +39,9 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class IntegrationAppService {
 
+    private static final String INTEGRATION_CAPABILITY_CODE = "integration";
+
+    private final CapabilityModuleRepo capabilityModuleRepo;
     private final HttpConnectorRepo httpConnectorRepo;
     private final HttpInvocationLogRepo httpInvocationLogRepo;
     private final RuntimeScriptRepo runtimeScriptRepo;
@@ -53,6 +57,7 @@ public class IntegrationAppService {
 
     @Transactional
     public HttpConnectorDTO saveConnector(HttpConnectorSaveCmd cmd) {
+        ensureIntegrationEnabled();
         HttpConnector connector = cmd.getId() == null ? createConnector(cmd) : connector(cmd.getId());
         connector.update(cmd.getName(), cmd.getUrl(), cmd.getMethod(), cmd.getHeaders(), cmd.getQueryParams(),
                 cmd.getBodyTemplate(), cmd.getTimeoutMillis(), cmd.getRetryTimes(), cmd.getStatus());
@@ -61,6 +66,7 @@ public class IntegrationAppService {
 
     @Transactional
     public void disableConnector(Long id) {
+        ensureIntegrationEnabled();
         HttpConnector connector = connector(id);
         connector.disable();
         httpConnectorRepo.save(connector);
@@ -68,6 +74,7 @@ public class IntegrationAppService {
 
     @Transactional
     public HttpInvocationLogDTO invoke(HttpInvokeCmd cmd) {
+        ensureIntegrationEnabled();
         HttpConnector connector = connector(cmd.getConnectorId());
         if (connector.getStatus() != ConnectorStatus.ACTIVE) {
             throw new BizException("HTTP 连接器已停用");
@@ -107,6 +114,7 @@ public class IntegrationAppService {
 
     @Transactional
     public RuntimeScriptDTO saveScript(RuntimeScriptSaveCmd cmd) {
+        ensureIntegrationEnabled();
         RuntimeScript script = cmd.getId() == null ? createScript(cmd) : script(cmd.getId());
         script.update(cmd.getName(), cmd.getLanguage(), cmd.getScriptContent(), cmd.getTimeoutMillis(), cmd.getEnv(), cmd.getStatus());
         return IntegrationAssembler.toDTO(runtimeScriptRepo.save(script));
@@ -114,6 +122,7 @@ public class IntegrationAppService {
 
     @Transactional
     public void disableScript(Long id) {
+        ensureIntegrationEnabled();
         RuntimeScript script = script(id);
         script.disable();
         runtimeScriptRepo.save(script);
@@ -121,6 +130,7 @@ public class IntegrationAppService {
 
     @Transactional
     public RuntimeExecutionLogDTO execute(RuntimeExecuteCmd cmd) {
+        ensureIntegrationEnabled();
         RuntimeScript script = script(cmd.getScriptId());
         if (script.getStatus() != ConnectorStatus.ACTIVE) {
             throw new BizException("运行脚本已停用");
@@ -168,6 +178,15 @@ public class IntegrationAppService {
 
     private RuntimeScript script(Long id) {
         return runtimeScriptRepo.findById(id).orElseThrow(() -> new BizException("运行脚本不存在"));
+    }
+
+    private void ensureIntegrationEnabled() {
+        boolean enabled = capabilityModuleRepo.findByCode(INTEGRATION_CAPABILITY_CODE)
+                .map(module -> Boolean.TRUE.equals(module.getEnabled()))
+                .orElse(false);
+        if (!enabled) {
+            throw new BizException("集成调用能力未启用");
+        }
     }
 
     private Map<String, String> merge(Map<String, String> defaults, Map<String, String> overrides) {
