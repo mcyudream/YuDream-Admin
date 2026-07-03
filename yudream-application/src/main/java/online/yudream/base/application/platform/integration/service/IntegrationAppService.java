@@ -51,6 +51,7 @@ public class IntegrationAppService {
 
     @Transactional(readOnly = true)
     public PageResult<HttpConnectorDTO> pageConnectors(IntegrationPageQuery query) {
+        ensureIntegrationEnabled();
         PageResult<HttpConnector> page = httpConnectorRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(IntegrationAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
@@ -102,12 +103,14 @@ public class IntegrationAppService {
 
     @Transactional(readOnly = true)
     public PageResult<HttpInvocationLogDTO> pageHttpLogs(IntegrationPageQuery query) {
+        ensureIntegrationEnabled();
         PageResult<HttpInvocationLog> page = httpInvocationLogRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(IntegrationAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
 
     @Transactional(readOnly = true)
     public PageResult<RuntimeScriptDTO> pageScripts(IntegrationPageQuery query) {
+        ensureIntegrationEnabled();
         PageResult<RuntimeScript> page = runtimeScriptRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(IntegrationAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
@@ -154,6 +157,7 @@ public class IntegrationAppService {
 
     @Transactional(readOnly = true)
     public PageResult<RuntimeExecutionLogDTO> pageExecutionLogs(IntegrationPageQuery query) {
+        ensureIntegrationEnabled();
         PageResult<RuntimeExecutionLog> page = runtimeExecutionLogRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(IntegrationAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
