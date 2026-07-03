@@ -3,6 +3,8 @@ package online.yudream.base.interfaces.system.security.assembler;
 import online.yudream.base.application.system.security.cmd.ApiKeyCreateCmd;
 import online.yudream.base.application.system.security.cmd.ApiKeyRevokeCmd;
 import online.yudream.base.application.system.security.cmd.ApiSecurityPolicyUpdateCmd;
+import online.yudream.base.application.system.security.cmd.OAuthClientAuthorizeCmd;
+import online.yudream.base.application.system.security.cmd.OAuthClientCallbackCmd;
 import online.yudream.base.application.system.security.cmd.OAuthClientSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthAuthorizeCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
@@ -12,6 +14,8 @@ import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.ApiSecurityPolicyDTO;
 import online.yudream.base.application.system.security.dto.OAuthAuthorizationDTO;
+import online.yudream.base.application.system.security.dto.OAuthClientAuthorizeDTO;
+import online.yudream.base.application.system.security.dto.OAuthClientCallbackDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientCreateResultDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientDTO;
 import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
@@ -21,6 +25,8 @@ import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.system.security.request.ApiKeyCreateRequest;
 import online.yudream.base.interfaces.system.security.request.ApiSecurityPolicyUpdateRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthAuthorizeRequest;
+import online.yudream.base.interfaces.system.security.request.OAuthClientAuthorizeRequest;
+import online.yudream.base.interfaces.system.security.request.OAuthClientCallbackRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthClientSaveRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthProviderSaveRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthTokenRequest;
@@ -28,6 +34,8 @@ import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.ApiSecurityPolicyRes;
 import online.yudream.base.interfaces.system.security.res.OAuthAuthorizationRes;
+import online.yudream.base.interfaces.system.security.res.OAuthClientAuthorizeRes;
+import online.yudream.base.interfaces.system.security.res.OAuthClientCallbackRes;
 import online.yudream.base.interfaces.system.security.res.OAuthClientCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.OAuthClientRes;
 import online.yudream.base.interfaces.system.security.res.OAuthProviderRes;
@@ -77,6 +85,21 @@ public class ApiSecurityWebAssembler {
 
     public static OAuthClientSaveCmd toCmd(OAuthClientSaveRequest request) {
         return toCmd(null, request);
+    }
+
+    public static OAuthClientAuthorizeCmd toCmd(String providerCode, OAuthClientAuthorizeRequest request) {
+        OAuthClientAuthorizeCmd cmd = new OAuthClientAuthorizeCmd();
+        cmd.setProviderCode(providerCode);
+        cmd.setState(request.getState());
+        return cmd;
+    }
+
+    public static OAuthClientCallbackCmd toCmd(String providerCode, OAuthClientCallbackRequest request) {
+        OAuthClientCallbackCmd cmd = new OAuthClientCallbackCmd();
+        cmd.setProviderCode(providerCode);
+        cmd.setCode(request.getCode());
+        cmd.setState(request.getState());
+        return cmd;
     }
 
     public static OAuthAuthorizeCmd toCmd(OAuthAuthorizeRequest request, Long userId) {
@@ -207,6 +230,26 @@ public class ApiSecurityWebAssembler {
                 .tokenType(dto.getTokenType())
                 .expiresIn(dto.getExpiresIn())
                 .scope(dto.getScope())
+                .build();
+    }
+
+    public static OAuthClientAuthorizeRes toRes(OAuthClientAuthorizeDTO dto) {
+        return OAuthClientAuthorizeRes.builder()
+                .providerCode(dto.getProviderCode())
+                .authorizationUrl(dto.getAuthorizationUrl())
+                .state(dto.getState())
+                .build();
+    }
+
+    public static OAuthClientCallbackRes toRes(OAuthClientCallbackDTO dto) {
+        return OAuthClientCallbackRes.builder()
+                .providerCode(dto.getProviderCode())
+                .subject(dto.getSubject())
+                .username(dto.getUsername())
+                .nickname(dto.getNickname())
+                .email(dto.getEmail())
+                .avatar(dto.getAvatar())
+                .raw(dto.getRaw())
                 .build();
     }
 
