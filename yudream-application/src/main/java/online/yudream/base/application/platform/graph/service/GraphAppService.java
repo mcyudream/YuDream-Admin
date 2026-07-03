@@ -36,6 +36,7 @@ public class GraphAppService {
 
     @Transactional(readOnly = true)
     public PageResult<GraphConnectionDTO> pageConnections(GraphPageQuery query) {
+        ensureGraphEnabled();
         PageResult<GraphConnection> page = graphConnectionRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(GraphAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
@@ -78,6 +79,7 @@ public class GraphAppService {
 
     @Transactional(readOnly = true)
     public PageResult<GraphQueryLogDTO> pageLogs(GraphPageQuery query) {
+        ensureGraphEnabled();
         PageResult<GraphQueryLog> page = graphQueryLogRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(GraphAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }

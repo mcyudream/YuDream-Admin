@@ -43,6 +43,7 @@ public class WordDocumentAppService {
 
     @Transactional(readOnly = true)
     public PageResult<WordTemplateDTO> pageTemplates(WordDocumentPageQuery query) {
+        ensureEnabled();
         PageResult<WordTemplate> page = wordTemplateRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(
                 page.getRecords().stream().map(template -> WordDocumentAssembler.toDTO(template, fileAppService::fileUrl)).toList(),
@@ -125,6 +126,7 @@ public class WordDocumentAppService {
 
     @Transactional(readOnly = true)
     public PageResult<WordGenerationRecordDTO> pageRecords(WordDocumentPageQuery query) {
+        ensureEnabled();
         PageResult<WordGenerationRecord> page = wordGenerationRecordRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(
                 page.getRecords().stream().map(record -> WordDocumentAssembler.toDTO(record, fileAppService::fileUrl)).toList(),

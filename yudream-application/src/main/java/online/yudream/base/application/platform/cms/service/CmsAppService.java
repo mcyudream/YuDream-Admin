@@ -30,6 +30,7 @@ public class CmsAppService {
 
     @Transactional(readOnly = true)
     public PageResult<CmsPageDTO> page(CmsPageQuery query) {
+        ensureEnabled();
         PageResult<CmsPage> page = cmsPageRepo.page(query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(CmsAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
@@ -60,6 +61,7 @@ public class CmsAppService {
 
     @Transactional(readOnly = true)
     public HomePageLayoutDTO homeLayout() {
+        ensureEnabled();
         return CmsAssembler.toDTO(homePageLayoutRepo.findCurrent().orElseGet(HomePageLayout::defaultLayout));
     }
 
