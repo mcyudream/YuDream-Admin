@@ -6,6 +6,7 @@ import online.yudream.base.application.system.menu.cmd.MenuUpdateCmd;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
@@ -27,6 +28,15 @@ public class MenuAppService {
 
     private final MenuDomainService menuDomainService;
     private final MenuRepo menuRepo;
+    private final CapabilityModuleRepo capabilityModuleRepo;
+
+    private static final Map<String, String> PLATFORM_MENU_CAPABILITIES = Map.of(
+            "platform:docs", "api-docs",
+            "platform:integration", "integration",
+            "platform:document", "document-template",
+            "platform:graph", "neo4j",
+            "platform:cms", "cms"
+    );
 
     @Transactional(readOnly = true)
     public List<MenuManageDTO> tree(MenuTreeQuery query) {
@@ -101,7 +111,9 @@ public class MenuAppService {
      */
     public List<Map<String, Object>> buildRouteTree(Collection<String> userPermissions) {
         Set<String> permissionSet = userPermissions == null ? Collections.emptySet() : new HashSet<>(userPermissions);
-        List<Menu> allMenus = menuDomainService.findActiveMenus();
+        List<Menu> allMenus = menuDomainService.findActiveMenus().stream()
+                .filter(this::platformCapabilityVisible)
+                .toList();
 
         // 按 code 索引，便于构建树
         Map<String, Menu> menuMap = allMenus.stream()
@@ -300,6 +312,21 @@ public class MenuAppService {
         }
         String permissionCode = menu.getPermissionCode();
         return userPermissions.contains(permissionCode);
+    }
+
+    private boolean platformCapabilityVisible(Menu menu) {
+        String capabilityCode = PLATFORM_MENU_CAPABILITIES.entrySet().stream()
+                .filter(entry -> Objects.equals(menu.getCode(), entry.getKey())
+                        || Objects.equals(menu.getParentCode(), entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+        if (capabilityCode == null) {
+            return true;
+        }
+        return capabilityModuleRepo.findByCode(capabilityCode)
+                .map(module -> Boolean.TRUE.equals(module.getEnabled()))
+                .orElse(false);
     }
 
     private String resolveComponent(MenuNodeType type, String component) {
