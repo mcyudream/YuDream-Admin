@@ -9,6 +9,7 @@ import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
+import online.yudream.base.infra.platform.menu.enumerate.PlatformMenuModule;
 import online.yudream.base.infra.system.menu.enumerate.SystemMenuModule;
 import online.yudream.base.infra.system.menu.scanner.MenuEnumScanner;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -37,7 +38,7 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
         log.info("Initializing system menus from enums...");
-        List<Class<? extends Enum<?>>> moduleClasses = List.of(SystemMenuModule.class);
+        List<Class<? extends Enum<?>>> moduleClasses = List.of(SystemMenuModule.class, PlatformMenuModule.class);
         List<Menu> modules = MenuEnumScanner.scan(moduleClasses);
         menuDomainService.syncMenus(modules);
 
