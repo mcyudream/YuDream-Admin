@@ -4,27 +4,36 @@ import online.yudream.base.application.system.security.cmd.ApiKeyCreateCmd;
 import online.yudream.base.application.system.security.cmd.ApiKeyRevokeCmd;
 import online.yudream.base.application.system.security.cmd.ApiSecurityPolicyUpdateCmd;
 import online.yudream.base.application.system.security.cmd.OAuthClientSaveCmd;
+import online.yudream.base.application.system.security.cmd.OAuthAuthorizeCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
+import online.yudream.base.application.system.security.cmd.OAuthTokenCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
 import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO;
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.ApiSecurityPolicyDTO;
+import online.yudream.base.application.system.security.dto.OAuthAuthorizationDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientCreateResultDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientDTO;
 import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
+import online.yudream.base.application.system.security.dto.OAuthTokenDTO;
 import online.yudream.base.application.system.security.dto.PasskeyCredentialDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.system.security.request.ApiKeyCreateRequest;
 import online.yudream.base.interfaces.system.security.request.ApiSecurityPolicyUpdateRequest;
+import online.yudream.base.interfaces.system.security.request.OAuthAuthorizeRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthClientSaveRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthProviderSaveRequest;
+import online.yudream.base.interfaces.system.security.request.OAuthTokenRequest;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.ApiSecurityPolicyRes;
+import online.yudream.base.interfaces.system.security.res.OAuthAuthorizationRes;
 import online.yudream.base.interfaces.system.security.res.OAuthClientCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.OAuthClientRes;
 import online.yudream.base.interfaces.system.security.res.OAuthProviderRes;
+import online.yudream.base.interfaces.system.security.res.OAuthTokenRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyCredentialRes;
+import org.springframework.web.servlet.view.RedirectView;
 
 import java.util.List;
 
@@ -68,6 +77,28 @@ public class ApiSecurityWebAssembler {
 
     public static OAuthClientSaveCmd toCmd(OAuthClientSaveRequest request) {
         return toCmd(null, request);
+    }
+
+    public static OAuthAuthorizeCmd toCmd(OAuthAuthorizeRequest request, Long userId) {
+        OAuthAuthorizeCmd cmd = new OAuthAuthorizeCmd();
+        cmd.setResponseType(request.getResponseType());
+        cmd.setClientId(request.getClientId());
+        cmd.setRedirectUri(request.getRedirectUri());
+        cmd.setScope(request.getScope());
+        cmd.setState(request.getState());
+        cmd.setUserId(userId);
+        return cmd;
+    }
+
+    public static OAuthTokenCmd toCmd(OAuthTokenRequest request) {
+        OAuthTokenCmd cmd = new OAuthTokenCmd();
+        cmd.setGrantType(request.getGrantType());
+        cmd.setClientId(request.getClientId());
+        cmd.setClientSecret(request.getClientSecret());
+        cmd.setCode(request.getCode());
+        cmd.setRedirectUri(request.getRedirectUri());
+        cmd.setRefreshToken(request.getRefreshToken());
+        return cmd;
     }
 
     public static OAuthClientSaveCmd toCmd(Long id, OAuthClientSaveRequest request) {
@@ -153,6 +184,29 @@ public class ApiSecurityWebAssembler {
         return ApiKeyCreateResultRes.builder()
                 .credential(toRes(dto.getCredential()))
                 .plaintext(dto.getPlaintext())
+                .build();
+    }
+
+    public static OAuthAuthorizationRes toRes(OAuthAuthorizationDTO dto) {
+        return OAuthAuthorizationRes.builder()
+                .code(dto.getCode())
+                .state(dto.getState())
+                .redirectUri(dto.getRedirectUri())
+                .redirectUrl(dto.getRedirectUrl())
+                .build();
+    }
+
+    public static RedirectView toRedirectView(OAuthAuthorizationDTO dto) {
+        return new RedirectView(dto.getRedirectUrl());
+    }
+
+    public static OAuthTokenRes toRes(OAuthTokenDTO dto) {
+        return OAuthTokenRes.builder()
+                .accessToken(dto.getAccessToken())
+                .refreshToken(dto.getRefreshToken())
+                .tokenType(dto.getTokenType())
+                .expiresIn(dto.getExpiresIn())
+                .scope(dto.getScope())
                 .build();
     }
 
