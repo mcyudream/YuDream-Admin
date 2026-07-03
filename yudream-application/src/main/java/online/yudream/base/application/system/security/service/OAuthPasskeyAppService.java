@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.security.assembler.ApiSecurityAssembler;
 import online.yudream.base.application.system.security.cmd.OAuthClientSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyAuthenticationFinishCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyAuthenticationStartCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRegistrationFinishCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRegistrationStartCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
@@ -11,19 +13,26 @@ import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
 import online.yudream.base.application.system.security.dto.OAuthClientCreateResultDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientDTO;
 import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
+import online.yudream.base.application.system.security.dto.PasskeyAuthenticationOptionsDTO;
 import online.yudream.base.application.system.security.dto.PasskeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.PasskeyRegistrationOptionsDTO;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
 import online.yudream.base.domain.system.security.aggregate.OAuthProviderRegistration;
 import online.yudream.base.domain.system.security.aggregate.PasskeyCredential;
+import online.yudream.base.domain.system.security.enumerate.CredentialStatus;
+import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
 import online.yudream.base.domain.system.security.repo.OAuthClientRegistrationRepo;
 import online.yudream.base.domain.system.security.repo.OAuthProviderRegistrationRepo;
 import online.yudream.base.domain.system.security.repo.PasskeyCredentialRepo;
 import online.yudream.base.domain.system.security.service.PasskeyCeremonyGateway;
+import online.yudream.base.domain.system.security.valobj.PasskeyAuthenticationOptions;
+import online.yudream.base.domain.system.security.valobj.PasskeyAuthenticationResult;
 import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationOptions;
 import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationResult;
 import online.yudream.base.domain.system.user.aggregate.User;
+import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +50,7 @@ public class OAuthPasskeyAppService {
     private final OAuthClientRegistrationRepo oauthClientRegistrationRepo;
     private final OAuthProviderRegistrationRepo oauthProviderRegistrationRepo;
     private final PasskeyCredentialRepo passkeyCredentialRepo;
+    private final ApiSecurityPolicyRepo apiSecurityPolicyRepo;
     private final UserRepo userRepo;
     private final PasskeyCeremonyGateway passkeyCeremonyGateway;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -125,6 +135,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional(readOnly = true)
     public PasskeyRegistrationOptionsDTO startPasskeyRegistration(PasskeyRegistrationStartCmd cmd) {
+        ensurePasskeyEnabled();
         User user = userRepo.findById(cmd.getUserId()).orElseThrow(() -> new BizException("用户不存在"));
         PasskeyRegistrationOptions options = passkeyCeremonyGateway.startRegistration(
                 user.getId(),
@@ -140,6 +151,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional
     public PasskeyCredentialDTO finishPasskeyRegistration(PasskeyRegistrationFinishCmd cmd) {
+        ensurePasskeyEnabled();
         User user = userRepo.findById(cmd.getUserId()).orElseThrow(() -> new BizException("用户不存在"));
         PasskeyRegistrationResult result = passkeyCeremonyGateway.finishRegistration(cmd.getRequestJson(), cmd.getResponseJson());
         if (passkeyCredentialRepo.findByCredentialId(result.credentialId()).isPresent()) {
@@ -148,6 +160,40 @@ public class OAuthPasskeyAppService {
         PasskeyCredential credential = PasskeyCredential.create(user.getId(), result.credentialId(), result.publicKey(), cmd.getDeviceName());
         credential.markUsed(result.signCount(), null);
         return ApiSecurityAssembler.toDTO(passkeyCredentialRepo.save(credential));
+    }
+
+    @Transactional(readOnly = true)
+    public PasskeyAuthenticationOptionsDTO startPasskeyAuthentication(PasskeyAuthenticationStartCmd cmd) {
+        ensurePasskeyEnabled();
+        User user = loginUser(cmd.getUsername());
+        boolean hasActivePasskey = passkeyCredentialRepo.findByUserId(user.getId()).stream()
+                .anyMatch(credential -> credential.getStatus() == CredentialStatus.ACTIVE);
+        if (!hasActivePasskey) {
+            throw new BizException("当前账号未绑定可用 Passkey");
+        }
+        PasskeyAuthenticationOptions options = passkeyCeremonyGateway.startAuthentication(user.getUsername());
+        return PasskeyAuthenticationOptionsDTO.builder()
+                .requestJson(options.requestJson())
+                .publicKeyJson(options.publicKeyJson())
+                .build();
+    }
+
+    @Transactional
+    public User finishPasskeyAuthentication(PasskeyAuthenticationFinishCmd cmd) {
+        ensurePasskeyEnabled();
+        PasskeyAuthenticationResult result = passkeyCeremonyGateway.finishAuthentication(cmd.getRequestJson(), cmd.getResponseJson());
+        User user = loginUser(result.username());
+        if (!user.getId().equals(result.userId()) || !user.getUsername().equals(cmd.getUsername())) {
+            throw new BizException("Passkey 登录用户不匹配");
+        }
+        PasskeyCredential credential = passkeyCredentialRepo.findByCredentialId(result.credentialId())
+                .orElseThrow(() -> new BizException("Passkey 凭据不存在"));
+        if (!credential.getUserId().equals(user.getId()) || credential.getStatus() != CredentialStatus.ACTIVE) {
+            throw new BizException("Passkey 凭据不可用");
+        }
+        credential.markUsed(result.signCount(), null);
+        passkeyCredentialRepo.save(credential);
+        return user;
     }
 
     @Transactional
@@ -174,6 +220,25 @@ public class OAuthPasskeyAppService {
             throw new BizException("OAuth 提供商编码已存在");
         }
         return OAuthProviderRegistration.create(cmd.getCode(), cmd.getName());
+    }
+
+    private User loginUser(String username) {
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new BizException("用户不存在或未绑定 Passkey"));
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BizException("用户已停用");
+        }
+        if (!user.isEmailVerified()) {
+            throw new BizException("邮箱未验证，请先验证邮箱");
+        }
+        return user;
+    }
+
+    private void ensurePasskeyEnabled() {
+        ApiSecurityPolicy policy = apiSecurityPolicyRepo.findDefault().orElse(ApiSecurityPolicy.createDefault());
+        if (!policy.isPasskeyEnabled()) {
+            throw new BizException("Passkey 未启用");
+        }
     }
 
     private void applyClientUpdate(OAuthClientRegistration registration, OAuthClientSaveCmd cmd) {

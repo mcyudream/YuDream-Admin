@@ -1,7 +1,10 @@
 package online.yudream.base.interfaces.system.user.assembler;
 
 import online.yudream.base.application.system.security.cmd.LoginTokenRefreshCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyAuthenticationFinishCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyAuthenticationStartCmd;
 import online.yudream.base.application.system.security.dto.LoginTokenDTO;
+import online.yudream.base.application.system.security.dto.PasskeyAuthenticationOptionsDTO;
 import lombok.NoArgsConstructor;
 import online.yudream.base.application.system.user.cmd.UserLoginCmd;
 import online.yudream.base.application.system.user.cmd.UserProfileUpdateCmd;
@@ -15,10 +18,13 @@ import online.yudream.base.application.system.user.dto.UserRegisterDTO;
 import online.yudream.base.application.system.user.dto.UserRoleVO;
 import online.yudream.base.domain.system.monitor.dto.LoginLogDTO;
 import online.yudream.base.domain.system.user.aggregate.User;
+import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
+import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationStartRequest;
 import online.yudream.base.interfaces.system.user.request.UserLoginRequest;
 import online.yudream.base.interfaces.system.user.request.UserProfileUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserRegisterRequest;
 import online.yudream.base.interfaces.system.user.request.UserTokenRefreshRequest;
+import online.yudream.base.interfaces.system.user.res.PasskeyAuthenticationOptionsRes;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
@@ -51,6 +57,20 @@ public class UserWebAssembler {
     public static LoginTokenRefreshCmd toCmd(UserTokenRefreshRequest request) {
         LoginTokenRefreshCmd cmd = new LoginTokenRefreshCmd();
         cmd.setRefreshToken(request.getRefreshToken());
+        return cmd;
+    }
+
+    public static PasskeyAuthenticationStartCmd toCmd(PasskeyAuthenticationStartRequest request) {
+        PasskeyAuthenticationStartCmd cmd = new PasskeyAuthenticationStartCmd();
+        cmd.setUsername(request.getUsername());
+        return cmd;
+    }
+
+    public static PasskeyAuthenticationFinishCmd toCmd(PasskeyAuthenticationFinishRequest request) {
+        PasskeyAuthenticationFinishCmd cmd = new PasskeyAuthenticationFinishCmd();
+        cmd.setUsername(request.getUsername());
+        cmd.setRequestJson(request.getRequestJson());
+        cmd.setResponseJson(request.getResponseJson());
         return cmd;
     }
 
@@ -164,9 +184,20 @@ public class UserWebAssembler {
                 .build();
     }
 
+    public static PasskeyAuthenticationOptionsRes toRes(PasskeyAuthenticationOptionsDTO dto) {
+        return PasskeyAuthenticationOptionsRes.builder()
+                .requestJson(dto.getRequestJson())
+                .publicKeyJson(dto.getPublicKeyJson())
+                .build();
+    }
+
     public static LoginLogDTO toLoginLogDTO(UserLoginRequest request, User user, boolean success, String message, String ip, String userAgent, String token) {
+        return toLoginLogDTO(request.getUsername(), user, success, message, ip, userAgent, token);
+    }
+
+    public static LoginLogDTO toLoginLogDTO(String username, User user, boolean success, String message, String ip, String userAgent, String token) {
         return LoginLogDTO.builder()
-                .username(request.getUsername())
+                .username(username)
                 .userId(user == null ? null : user.getId())
                 .success(success)
                 .message(message)

@@ -7,18 +7,22 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
 import online.yudream.base.application.system.security.dto.LoginTokenDTO;
 import online.yudream.base.application.system.security.service.LoginTokenAppService;
+import online.yudream.base.application.system.security.service.OAuthPasskeyAppService;
 import online.yudream.base.application.system.user.service.PermissionAppService;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserContextAppService;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
+import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
+import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationStartRequest;
 import online.yudream.base.interfaces.system.user.request.UserLoginRequest;
 import online.yudream.base.interfaces.system.user.request.UserProfileUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserRegisterRequest;
 import online.yudream.base.interfaces.system.user.request.UserSwitchDeptRequest;
 import online.yudream.base.interfaces.system.user.request.UserSwitchRoleRequest;
 import online.yudream.base.interfaces.system.user.request.UserTokenRefreshRequest;
+import online.yudream.base.interfaces.system.user.res.PasskeyAuthenticationOptionsRes;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
@@ -48,6 +52,7 @@ public class UserController {
     private final PermissionAppService permissionAppService;
     private final SystemMonitorAppService systemMonitorAppService;
     private final LoginTokenAppService loginTokenAppService;
+    private final OAuthPasskeyAppService oauthPasskeyAppService;
 
     @PostMapping("/register")
     public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request) {
@@ -74,9 +79,34 @@ public class UserController {
         return Result.ok(UserWebAssembler.toLoginRes(loginTokenAppService.refresh(UserWebAssembler.toCmd(request))));
     }
 
+    @PostMapping("/passkeys/authentication/options")
+    public Result<PasskeyAuthenticationOptionsRes> startPasskeyAuthentication(@Valid @RequestBody PasskeyAuthenticationStartRequest request) {
+        return Result.ok(UserWebAssembler.toRes(oauthPasskeyAppService.startPasskeyAuthentication(UserWebAssembler.toCmd(request))));
+    }
+
+    @PostMapping("/passkeys/authentication")
+    public Result<UserLoginRes> finishPasskeyAuthentication(@Valid @RequestBody PasskeyAuthenticationFinishRequest request, HttpServletRequest httpRequest) {
+        try {
+            User user = oauthPasskeyAppService.finishPasskeyAuthentication(UserWebAssembler.toCmd(request));
+            LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
+            UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
+            recordLoginLog(request.getUsername(), httpRequest, user, true, "passkey success", res.getToken());
+            return Result.ok(res);
+        }
+        catch (RuntimeException e) {
+            recordLoginLog(request.getUsername(), httpRequest, null, false, e.getMessage(), null);
+            throw e;
+        }
+    }
+
     private void recordLoginLog(UserLoginRequest request, HttpServletRequest httpRequest, User user, boolean success, String message, String token) {
         systemMonitorAppService.recordLoginLog(UserWebAssembler.toLoginLogDTO(
                 request, user, success, message, clientIp(httpRequest), httpRequest.getHeader("User-Agent"), token));
+    }
+
+    private void recordLoginLog(String username, HttpServletRequest httpRequest, User user, boolean success, String message, String token) {
+        systemMonitorAppService.recordLoginLog(UserWebAssembler.toLoginLogDTO(
+                username, user, success, message, clientIp(httpRequest), httpRequest.getHeader("User-Agent"), token));
     }
 
     private String clientIp(HttpServletRequest request) {
