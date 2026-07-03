@@ -38,7 +38,7 @@ const tabs = [
   { key: 'templates', label: '模板管理', icon: 'i-ri:file-word-2-line' },
   { key: 'records', label: '生成记录', icon: 'i-ri:file-list-3-line' },
 ] as const
-const statusOptions: { label: string; value: TemplateStatus }[] = [
+const statusOptions: { label: string, value: TemplateStatus }[] = [
   { label: '启用', value: 'ACTIVE' },
   { label: '停用', value: 'DISABLED' },
 ]
@@ -50,7 +50,7 @@ const templateColumns = computed<TableColumn<WordTemplate>[]>(() => [
   { id: 'placeholders', header: '占位符', width: 260 },
   { id: 'status', header: '状态', width: 100, align: 'center' },
   { id: 'updateTime', header: '更新时间', width: 180 },
-  { id: 'operation', header: '操作', width: 320, align: 'center', fixed: 'right' },
+  { id: 'operation', header: '操作', width: 340, align: 'center', fixed: 'right' },
 ])
 
 const recordColumns = computed<TableColumn<WordGenerationRecord>[]>(() => [
@@ -117,13 +117,14 @@ function pickCreateFile() {
 }
 
 function onCreateFileChange(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
   if (!file) {
     return
   }
   pendingFile.value = file
   openCreate()
-  ;(event.target as HTMLInputElement).value = ''
 }
 
 function openCreate() {
@@ -181,9 +182,10 @@ function pickReplaceFile(row: WordTemplate) {
 }
 
 async function onReplaceFileChange(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
   const target = replacingTemplate.value
-  ;(event.target as HTMLInputElement).value = ''
+  input.value = ''
   if (!file || !target) {
     return
   }
@@ -313,7 +315,9 @@ function generationVariant(status: GenerationStatus) {
         <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
           <FaInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
           <div class="flex gap-2 md:justify-end">
-            <FaButton variant="outline" @click="resetSearch">重置</FaButton>
+            <FaButton variant="outline" @click="resetSearch">
+              重置
+            </FaButton>
             <FaButton :loading="loading" @click="load">
               <FaIcon name="i-ri:search-line" />
               筛选
@@ -338,12 +342,16 @@ function generationVariant(status: GenerationStatus) {
       >
         <template #cell-placeholders="{ row }">
           <div class="placeholder-tags">
-            <FaTag v-for="(_, key) in row.original.placeholders || {}" :key="key" variant="secondary">{{ key }}</FaTag>
+            <FaTag v-for="(_, key) in row.original.placeholders || {}" :key="key" variant="secondary">
+              {{ key }}
+            </FaTag>
             <span v-if="!Object.keys(row.original.placeholders || {}).length">-</span>
           </div>
         </template>
         <template #cell-status="{ row }">
-          <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+          <FaTag :variant="statusVariant(row.original.status)">
+            {{ statusText(row.original.status) }}
+          </FaTag>
         </template>
         <template #cell-updateTime="{ row }">
           {{ dateText(row.original.updateTime) }}
@@ -382,7 +390,9 @@ function generationVariant(status: GenerationStatus) {
         :data="recordRows"
       >
         <template #cell-status="{ row }">
-          <FaTag :variant="generationVariant(row.original.status)">{{ generationText(row.original.status) }}</FaTag>
+          <FaTag :variant="generationVariant(row.original.status)">
+            {{ generationText(row.original.status) }}
+          </FaTag>
         </template>
         <template #cell-generatedAt="{ row }">
           {{ dateText(row.original.generatedAt) }}
@@ -440,7 +450,9 @@ function generationVariant(status: GenerationStatus) {
           </a-form-item>
         </a-form>
         <section class="result-panel">
-          <div class="section-title">最近结果</div>
+          <div class="section-title">
+            最近结果
+          </div>
           <pre>{{ lastRecord ? JSON.stringify(lastRecord, null, 2) : '尚未生成' }}</pre>
           <FaButton v-if="lastRecord?.outputFileUrl" variant="outline" @click="openFile(lastRecord.outputFileUrl)">
             <FaIcon name="i-ri:download-2-line" />
