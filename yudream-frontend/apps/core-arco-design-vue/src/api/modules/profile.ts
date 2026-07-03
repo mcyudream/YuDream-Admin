@@ -21,8 +21,24 @@ export interface UserProfilePayload {
   qq?: string
 }
 
+export type PasskeyStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
+
+export interface PasskeyCredential {
+  id: string | number
+  userId: string | number
+  credentialId: string
+  deviceName?: string
+  status: PasskeyStatus
+  signCount: number
+  lastUsedTime?: string
+  createTime?: string
+  updateTime?: string
+}
+
 export default {
   get: () => systemClient.get<unknown, ApiResponse<UserProfile>>('api/user/me/profile'),
   update: (data: UserProfilePayload) => systemClient.put<unknown, ApiResponse<UserProfile>>('api/user/me/profile', data),
   uploadAvatar: (data: FormData) => systemClient.post<unknown, ApiResponse<UserProfile>>('api/user/me/avatar', data),
+  passkeys: () => systemClient.get<unknown, ApiResponse<PasskeyCredential[]>>('api/user/me/passkeys'),
+  revokePasskey: (id: string | number) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>(`api/user/me/passkeys/${id}/revoke`),
 }
