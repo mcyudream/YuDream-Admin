@@ -49,10 +49,10 @@
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
 
-        <!-- RabbitMQ / AMQP -->
+        <!-- RabbitMQ / AMQP：平台能力按需懒连接，不使用 starter 自动装配 -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-amqp</artifactId>
+            <groupId>org.springframework.amqp</groupId>
+            <artifactId>spring-rabbit</artifactId>
         </dependency>
 
         <!-- AOP -->
