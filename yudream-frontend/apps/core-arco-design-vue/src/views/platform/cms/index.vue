@@ -271,12 +271,59 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 function markdownPreview(markdown?: string) {
-  return (markdown || '')
-    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-    .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>')
+  const lines = escapeHtml(markdown || '').split(/\r?\n/)
+  const html: string[] = []
+  let inList = false
+  for (const line of lines) {
+    const listMatch = line.match(/^\s*[-*]\s+(.+)$/)
+    if (listMatch) {
+      if (!inList) {
+        html.push('<ul>')
+        inList = true
+      }
+      html.push(`<li>${inlineMarkdown(listMatch[1])}</li>`)
+      continue
+    }
+    if (inList) {
+      html.push('</ul>')
+      inList = false
+    }
+    if (line.startsWith('### ')) {
+      html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`)
+    }
+    else if (line.startsWith('## ')) {
+      html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`)
+    }
+    else if (line.startsWith('# ')) {
+      html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`)
+    }
+    else if (line.trim()) {
+      html.push(`<p>${inlineMarkdown(line)}</p>`)
+    }
+    else {
+      html.push('<br>')
+    }
+  }
+  if (inList) {
+    html.push('</ul>')
+  }
+  return html.join('')
+}
+
+function inlineMarkdown(value: string) {
+  return value
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 
 function dateText(value?: string) {
