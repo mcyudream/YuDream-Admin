@@ -27,6 +27,7 @@ const groups: CapabilityGroup[] = [
   { type: 'MESSAGING', title: '消息队列', icon: 'i-ri:message-3-line' },
   { type: 'DOCUMENTATION', title: '接口文档', icon: 'i-ri:file-list-3-line' },
   { type: 'INTEGRATION', title: '集成运行', icon: 'i-ri:terminal-box-line' },
+  { type: 'DOCUMENT', title: '文档生成', icon: 'i-ri:file-word-2-line' },
 ]
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])

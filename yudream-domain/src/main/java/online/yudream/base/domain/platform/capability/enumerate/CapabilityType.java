@@ -4,5 +4,6 @@ public enum CapabilityType {
     REALTIME,
     MESSAGING,
     DOCUMENTATION,
-    INTEGRATION
+    INTEGRATION,
+    DOCUMENT
 }
