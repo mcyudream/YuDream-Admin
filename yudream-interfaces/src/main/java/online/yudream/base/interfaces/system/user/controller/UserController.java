@@ -5,6 +5,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
+import online.yudream.base.application.system.security.dto.LoginTokenDTO;
+import online.yudream.base.application.system.security.service.LoginTokenAppService;
 import online.yudream.base.application.system.user.service.PermissionAppService;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserContextAppService;
@@ -16,6 +18,7 @@ import online.yudream.base.interfaces.system.user.request.UserProfileUpdateReque
 import online.yudream.base.interfaces.system.user.request.UserRegisterRequest;
 import online.yudream.base.interfaces.system.user.request.UserSwitchDeptRequest;
 import online.yudream.base.interfaces.system.user.request.UserSwitchRoleRequest;
+import online.yudream.base.interfaces.system.user.request.UserTokenRefreshRequest;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
@@ -44,6 +47,7 @@ public class UserController {
     private final UserContextAppService userContextAppService;
     private final PermissionAppService permissionAppService;
     private final SystemMonitorAppService systemMonitorAppService;
+    private final LoginTokenAppService loginTokenAppService;
 
     @PostMapping("/register")
     public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request) {
@@ -54,8 +58,8 @@ public class UserController {
     public Result<UserLoginRes> login(@Valid @RequestBody UserLoginRequest request, HttpServletRequest httpRequest) {
         try {
             User user = userAppService.login(UserWebAssembler.toLoginCmd(request));
-            StpUtil.login(user.getId());
-            UserLoginRes res = UserWebAssembler.toLoginRes(user, StpUtil.getTokenValue(), StpUtil.getTokenName(), userAppService.avatarUrl(user));
+            LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
+            UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
             recordLoginLog(request, httpRequest, user, true, "success", res.getToken());
             return Result.ok(res);
         }
@@ -63,6 +67,11 @@ public class UserController {
             recordLoginLog(request, httpRequest, null, false, e.getMessage(), null);
             throw e;
         }
+    }
+
+    @PostMapping("/token/refresh")
+    public Result<UserLoginRes> refreshToken(@RequestBody UserTokenRefreshRequest request) {
+        return Result.ok(UserWebAssembler.toLoginRes(loginTokenAppService.refresh(UserWebAssembler.toCmd(request))));
     }
 
     private void recordLoginLog(UserLoginRequest request, HttpServletRequest httpRequest, User user, boolean success, String message, String token) {

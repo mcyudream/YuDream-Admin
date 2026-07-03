@@ -3,6 +3,8 @@ package online.yudream.base.interfaces.system.user.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.security.dto.LoginTokenDTO;
+import online.yudream.base.application.system.security.service.LoginTokenAppService;
 import online.yudream.base.application.system.user.query.UserPageQuery;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserManageAppService;
@@ -34,6 +36,7 @@ public class UserManageController {
 
     private final UserManageAppService userManageAppService;
     private final UserAppService userAppService;
+    private final LoginTokenAppService loginTokenAppService;
 
     @GetMapping
     public Result<PageResult<UserManageRes>> page(UserPageQuery query) {
@@ -76,7 +79,7 @@ public class UserManageController {
     @PermissionRegister(code = "system:user:impersonate", name = "伪装用户", module = "系统管理", desc = "伪装用户访问系统")
     public Result<UserLoginRes> impersonate(@PathVariable Long id) {
         User user = userManageAppService.getImpersonationTarget(StpUtil.getLoginIdAsLong(), id);
-        String token = StpUtil.createLoginSession(user.getId());
-        return Result.ok(UserWebAssembler.toLoginRes(user, token, StpUtil.getTokenName(), userAppService.avatarUrl(user)));
+        LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
+        return Result.ok(UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user)));
     }
 }

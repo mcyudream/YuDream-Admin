@@ -20,6 +20,9 @@ public class UserLoginRes implements Serializable {
 
     private String token;
     private String tokenName;
+    private String refreshToken;
+    private boolean dualTokenEnabled;
+    private long expiresIn;
     private Long userId;
     private String username;
     private String nickname;

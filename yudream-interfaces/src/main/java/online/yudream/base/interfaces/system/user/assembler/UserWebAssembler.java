@@ -1,5 +1,7 @@
 package online.yudream.base.interfaces.system.user.assembler;
 
+import online.yudream.base.application.system.security.cmd.LoginTokenRefreshCmd;
+import online.yudream.base.application.system.security.dto.LoginTokenDTO;
 import lombok.NoArgsConstructor;
 import online.yudream.base.application.system.user.cmd.UserLoginCmd;
 import online.yudream.base.application.system.user.cmd.UserProfileUpdateCmd;
@@ -16,6 +18,7 @@ import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.system.user.request.UserLoginRequest;
 import online.yudream.base.interfaces.system.user.request.UserProfileUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserRegisterRequest;
+import online.yudream.base.interfaces.system.user.request.UserTokenRefreshRequest;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
@@ -43,6 +46,12 @@ public class UserWebAssembler {
                 .password(request.getPassword())
                 .nickname(request.getNickname())
                 .build();
+    }
+
+    public static LoginTokenRefreshCmd toCmd(UserTokenRefreshRequest request) {
+        LoginTokenRefreshCmd cmd = new LoginTokenRefreshCmd();
+        cmd.setRefreshToken(request.getRefreshToken());
+        return cmd;
     }
 
     public static UserProfileUpdateCmd toProfileUpdateCmd(UserProfileUpdateRequest request) {
@@ -117,6 +126,9 @@ public class UserWebAssembler {
         return UserLoginRes.builder()
                 .token(dto.getToken())
                 .tokenName(dto.getTokenName())
+                .refreshToken(dto.getRefreshToken())
+                .dualTokenEnabled(dto.isDualTokenEnabled())
+                .expiresIn(dto.getExpiresIn())
                 .userId(dto.getUserId())
                 .username(dto.getUsername())
                 .nickname(dto.getNickname())
@@ -126,16 +138,29 @@ public class UserWebAssembler {
                 .build();
     }
 
-    public static UserLoginRes toLoginRes(User user, String token, String tokenName, String avatar) {
+    public static UserLoginRes toLoginRes(User user, LoginTokenDTO token, String avatar) {
         return UserLoginRes.builder()
-                .token(token)
-                .tokenName(tokenName)
+                .token(token.getToken())
+                .tokenName(token.getTokenName())
+                .refreshToken(token.getRefreshToken())
+                .dualTokenEnabled(token.isDualTokenEnabled())
+                .expiresIn(token.getExpiresIn())
                 .userId(user.getId())
                 .username(user.getUsername())
                 .nickname(user.getNickname())
                 .email(user.getEmail() == null ? null : user.getEmail().getValue())
                 .avatar(avatar)
                 .createTime(user.getCreateTime())
+                .build();
+    }
+
+    public static UserLoginRes toLoginRes(LoginTokenDTO token) {
+        return UserLoginRes.builder()
+                .token(token.getToken())
+                .tokenName(token.getTokenName())
+                .refreshToken(token.getRefreshToken())
+                .dualTokenEnabled(token.isDualTokenEnabled())
+                .expiresIn(token.getExpiresIn())
                 .build();
     }
 

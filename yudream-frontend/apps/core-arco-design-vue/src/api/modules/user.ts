@@ -10,6 +10,9 @@ interface BackendResult<T> {
 export interface LoginData {
   token: string
   tokenName: string
+  refreshToken?: string
+  dualTokenEnabled?: boolean
+  expiresIn?: number
   userId: IdValue
   username: string
   nickname?: string
@@ -87,6 +90,10 @@ export default {
       username: data.account,
       password: data.password,
     })
+  },
+
+  refreshToken: (refreshToken: string) => {
+    return userApi.post<unknown, { status: 1; error: ''; data: LoginData }>('api/user/token/refresh', { refreshToken })
   },
 
   register: (data: { username: string; email: string; password: string; nickname?: string }) => {
