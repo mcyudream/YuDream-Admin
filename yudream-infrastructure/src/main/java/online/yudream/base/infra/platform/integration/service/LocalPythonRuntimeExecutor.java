@@ -7,14 +7,21 @@ import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 @Service
 public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
+
+    private static final int MAX_OUTPUT_BYTES = 128 * 1024;
+    private static final String OUTPUT_TRUNCATED = "\n...输出已截断...";
 
     @Override
     public RuntimeExecutionResult execute(RuntimeScript script, String stdin) {
@@ -33,6 +40,8 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
                 builder.environment().putAll(script.getEnv());
             }
             Process process = builder.start();
+            CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getInputStream()));
+            CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getErrorStream()));
             if (stdin != null) {
                 process.getOutputStream().write(stdin.getBytes(StandardCharsets.UTF_8));
             }
@@ -40,10 +49,11 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
             boolean finished = process.waitFor(script.getTimeoutMillis(), TimeUnit.MILLISECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                return new RuntimeExecutionResult(read(process.getInputStream()), read(process.getErrorStream()), -1, elapsed(start), ExecutionStatus.TIMEOUT, "脚本执行超时");
+                process.waitFor(1, TimeUnit.SECONDS);
+                return new RuntimeExecutionResult(output(stdoutFuture), output(stderrFuture), -1, elapsed(start), ExecutionStatus.TIMEOUT, "脚本执行超时");
             }
-            String stdout = read(process.getInputStream());
-            String stderr = read(process.getErrorStream());
+            String stdout = output(stdoutFuture);
+            String stderr = output(stderrFuture);
             ExecutionStatus status = process.exitValue() == 0 ? ExecutionStatus.SUCCESS : ExecutionStatus.FAILED;
             return new RuntimeExecutionResult(stdout, stderr, process.exitValue(), elapsed(start), status, status == ExecutionStatus.SUCCESS ? null : stderr);
         } catch (Exception e) {
@@ -53,8 +63,37 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
         }
     }
 
-    private String read(java.io.InputStream inputStream) throws IOException {
-        return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+    private String output(CompletableFuture<String> future) throws ExecutionException, InterruptedException {
+        return future.get();
+    }
+
+    private String readQuietly(InputStream inputStream) {
+        try {
+            return read(inputStream);
+        } catch (IOException e) {
+            return e.getMessage();
+        }
+    }
+
+    private String read(InputStream inputStream) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int total = 0;
+        boolean truncated = false;
+        int read;
+        while ((read = inputStream.read(buffer)) != -1) {
+            int remaining = MAX_OUTPUT_BYTES - total;
+            if (remaining > 0) {
+                int write = Math.min(read, remaining);
+                output.write(buffer, 0, write);
+                total += write;
+            }
+            if (read > remaining) {
+                truncated = true;
+            }
+        }
+        String value = output.toString(StandardCharsets.UTF_8);
+        return truncated ? value + OUTPUT_TRUNCATED : value;
     }
 
     private long elapsed(long start) {
