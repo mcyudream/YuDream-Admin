@@ -1,24 +1,54 @@
 <script setup lang="ts">
 import type { TableColumn } from '@fantastic-admin/components'
-import type { ApiKeyCredential, ApiKeyCreatePayload, ApiSecurityPolicy, CredentialStatus } from '@/api/modules/system-security'
+import type {
+  ApiKeyCredential,
+  ApiKeyCreatePayload,
+  ApiSecurityPolicy,
+  CredentialStatus,
+  OAuthClient,
+  OAuthClientAuthMethod,
+  OAuthClientPayload,
+  OAuthGrantType,
+  OAuthProvider,
+  OAuthProviderPayload,
+  OAuthRegistrationStatus,
+  PasskeyCredential,
+} from '@/api/modules/system-security'
 import type { PermissionItem } from '@/api/modules/system-role'
 import apiSecurity from '@/api/modules/system-security'
 import apiRole from '@/api/modules/system-role'
 import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
+type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'passkey'
+type OAuthPane = 'clients' | 'providers'
+
 const modal = useFaModal()
 const toast = useFaToast()
 
+const activeTab = ref<SecurityTab>('policy')
+const oauthPane = ref<OAuthPane>('clients')
 const loading = ref(false)
 const savingPolicy = ref(false)
 const creating = ref(false)
-const rows = ref<ApiKeyCredential[]>([])
+const actionLoading = ref('')
+
+const apiKeyRows = ref<ApiKeyCredential[]>([])
+const oauthClients = ref<OAuthClient[]>([])
+const oauthProviders = ref<OAuthProvider[]>([])
+const passkeyRows = ref<PasskeyCredential[]>([])
 const permissions = ref<PermissionItem[]>([])
+
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive({ keyword: '' })
+const passkeySearch = reactive({ userId: '' })
+
 const createVisible = ref(false)
 const secretVisible = ref(false)
 const oneTimeSecret = ref('')
+const oauthClientVisible = ref(false)
+const oauthProviderVisible = ref(false)
+const editingOAuthClient = ref<OAuthClient | null>(null)
+const editingOAuthProvider = ref<OAuthProvider | null>(null)
 
 const policy = reactive<ApiSecurityPolicy>({
   apiEncryptionEnabled: false,
@@ -32,11 +62,45 @@ const policy = reactive<ApiSecurityPolicy>({
   refreshRotationEnabled: true,
 })
 
-const form = reactive<ApiKeyCreatePayload>({
+const apiKeyForm = reactive<ApiKeyCreatePayload>({
   name: '',
   permissions: [],
   expireTime: undefined,
 })
+
+const oauthClientForm = reactive<OAuthClientPayload>({
+  clientId: '',
+  clientName: '',
+  authMethod: 'CLIENT_SECRET_BASIC',
+  grantTypes: ['AUTHORIZATION_CODE', 'REFRESH_TOKEN'],
+  redirectUris: [],
+  scopes: ['openid', 'profile', 'email'],
+  accessTokenTtlSeconds: 7200,
+  refreshTokenTtlSeconds: 604800,
+  status: 'ACTIVE',
+})
+
+const oauthProviderForm = reactive<OAuthProviderPayload>({
+  code: '',
+  name: '',
+  issuerUri: '',
+  authorizationUri: '',
+  tokenUri: '',
+  userInfoUri: '',
+  clientId: '',
+  clientSecret: '',
+  authMethod: 'CLIENT_SECRET_POST',
+  scopes: ['openid', 'profile', 'email'],
+  redirectUri: '',
+  status: 'ACTIVE',
+})
+
+const tabs = [
+  { key: 'policy', label: '安全策略', icon: 'i-ri:shield-check-line' },
+  { key: 'apiKey', label: 'API Key', icon: 'i-ri:key-2-line' },
+  { key: 'oauth', label: 'OAuth', icon: 'i-ri:login-circle-line' },
+  { key: 'passkey', label: 'Passkey', icon: 'i-ri:fingerprint-line' },
+] as const
 
 const policyCards = computed(() => [
   { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求体和响应体使用 RSA-OAEP + AES-GCM 加密', icon: 'i-ri:lock-password-line' },
@@ -57,7 +121,7 @@ const permissionGroups = computed(() => {
   return groups
 })
 
-const tableColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
+const apiKeyColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
   { accessorKey: 'name', header: '名称', width: 180, fixed: 'left' },
   { accessorKey: 'maskedValue', header: '密钥标识', width: 180 },
   { id: 'permissions', header: '权限', width: 220 },
@@ -67,8 +131,47 @@ const tableColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
   { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
 ])
 
+const oauthClientColumns = computed<TableColumn<OAuthClient>[]>(() => [
+  { accessorKey: 'clientName', header: '客户端名称', width: 180, fixed: 'left' },
+  { accessorKey: 'clientId', header: 'Client ID', width: 180 },
+  { id: 'grantTypes', header: '授权模式', width: 220 },
+  { id: 'redirectUris', header: '回调地址', width: 260 },
+  { id: 'status', header: '状态', width: 100, align: 'center' },
+  { id: 'operation', header: '操作', width: 160, align: 'center', fixed: 'right' },
+])
+
+const oauthProviderColumns = computed<TableColumn<OAuthProvider>[]>(() => [
+  { accessorKey: 'name', header: '提供商', width: 160, fixed: 'left' },
+  { accessorKey: 'code', header: '编码', width: 140 },
+  { accessorKey: 'clientId', header: 'Client ID', width: 180 },
+  { accessorKey: 'authorizationUri', header: '授权地址', width: 260 },
+  { id: 'status', header: '状态', width: 100, align: 'center' },
+  { id: 'operation', header: '操作', width: 160, align: 'center', fixed: 'right' },
+])
+
+const passkeyColumns = computed<TableColumn<PasskeyCredential>[]>(() => [
+  { accessorKey: 'deviceName', header: '设备名称', width: 180, fixed: 'left' },
+  { accessorKey: 'userId', header: '用户 ID', width: 140 },
+  { accessorKey: 'credentialId', header: '凭据 ID', width: 260 },
+  { accessorKey: 'signCount', header: '签名次数', width: 100, align: 'right' },
+  { id: 'status', header: '状态', width: 100, align: 'center' },
+  { accessorKey: 'lastUsedTime', header: '最后使用', width: 180 },
+  { id: 'operation', header: '操作', width: 120, align: 'center', fixed: 'right' },
+])
+
+const authMethodOptions = [
+  { label: 'client_secret_basic', value: 'CLIENT_SECRET_BASIC' },
+  { label: 'client_secret_post', value: 'CLIENT_SECRET_POST' },
+  { label: 'none', value: 'NONE' },
+]
+
+const statusOptions = [
+  { label: '启用', value: 'ACTIVE' },
+  { label: '停用', value: 'DISABLED' },
+]
+
 onMounted(async () => {
-  await Promise.all([loadPolicy(), loadApiKeys(), loadPermissions()])
+  await Promise.all([loadPolicy(), loadApiKeys(), loadPermissions(), loadOAuth()])
 })
 
 async function loadPolicy() {
@@ -97,7 +200,7 @@ async function loadApiKeys() {
       size: pagination.size,
       keyword: search.keyword || undefined,
     })
-    rows.value = res.data.records
+    apiKeyRows.value = res.data.records
     pagination.total = res.data.total
   }
   finally {
@@ -110,8 +213,32 @@ async function loadPermissions() {
   permissions.value = res.data
 }
 
+async function loadOAuth() {
+  const [clients, providers] = await Promise.all([
+    apiSecurity.oauthClients(),
+    apiSecurity.oauthProviders(),
+  ])
+  oauthClients.value = clients.data
+  oauthProviders.value = providers.data
+}
+
+async function loadPasskeys() {
+  if (!passkeySearch.userId) {
+    toast.error('请输入用户 ID')
+    return
+  }
+  loading.value = true
+  try {
+    const res = await apiSecurity.passkeys(passkeySearch.userId)
+    passkeyRows.value = res.data
+  }
+  finally {
+    loading.value = false
+  }
+}
+
 function openCreate() {
-  Object.assign(form, {
+  Object.assign(apiKeyForm, {
     name: '',
     permissions: [],
     expireTime: undefined,
@@ -123,8 +250,8 @@ async function createApiKey() {
   creating.value = true
   try {
     const res = await apiSecurity.createApiKey({
-      ...form,
-      expireTime: normalizeDateTime(form.expireTime),
+      ...apiKeyForm,
+      expireTime: normalizeDateTime(apiKeyForm.expireTime),
     })
     oneTimeSecret.value = res.data.plaintext
     secretVisible.value = true
@@ -145,6 +272,133 @@ function confirmRevoke(row: ApiKeyCredential) {
       await apiSecurity.revokeApiKey(row.id)
       toast.success('已吊销')
       await loadApiKeys()
+    },
+  })
+}
+
+function openOAuthClient(row?: OAuthClient) {
+  editingOAuthClient.value = row || null
+  Object.assign(oauthClientForm, row
+    ? {
+        clientId: row.clientId,
+        clientName: row.clientName,
+        authMethod: row.authMethod,
+        grantTypes: [...(row.grantTypes || [])],
+        redirectUris: [...(row.redirectUris || [])],
+        scopes: [...(row.scopes || [])],
+        accessTokenTtlSeconds: row.accessTokenTtlSeconds,
+        refreshTokenTtlSeconds: row.refreshTokenTtlSeconds,
+        status: row.status,
+      }
+    : {
+        clientId: '',
+        clientName: '',
+        authMethod: 'CLIENT_SECRET_BASIC' as OAuthClientAuthMethod,
+        grantTypes: ['AUTHORIZATION_CODE', 'REFRESH_TOKEN'] as OAuthGrantType[],
+        redirectUris: [],
+        scopes: ['openid', 'profile', 'email'],
+        accessTokenTtlSeconds: 7200,
+        refreshTokenTtlSeconds: 604800,
+        status: 'ACTIVE' as OAuthRegistrationStatus,
+      })
+  oauthClientVisible.value = true
+}
+
+async function saveOAuthClient() {
+  const payload = normalizeOAuthClientPayload()
+  if (editingOAuthClient.value) {
+    await apiSecurity.updateOAuthClient(editingOAuthClient.value.id, payload)
+    toast.success('OAuth 客户端已保存')
+  }
+  else {
+    const res = await apiSecurity.createOAuthClient(payload)
+    oneTimeSecret.value = res.data.clientSecret
+    secretVisible.value = true
+    toast.success('OAuth 客户端已创建')
+  }
+  oauthClientVisible.value = false
+  await loadOAuth()
+}
+
+function openOAuthProvider(row?: OAuthProvider) {
+  editingOAuthProvider.value = row || null
+  Object.assign(oauthProviderForm, row
+    ? {
+        code: row.code,
+        name: row.name,
+        issuerUri: row.issuerUri || '',
+        authorizationUri: row.authorizationUri || '',
+        tokenUri: row.tokenUri || '',
+        userInfoUri: row.userInfoUri || '',
+        clientId: row.clientId || '',
+        clientSecret: '',
+        authMethod: row.authMethod,
+        scopes: [...(row.scopes || [])],
+        redirectUri: row.redirectUri || '',
+        status: row.status,
+      }
+    : {
+        code: '',
+        name: '',
+        issuerUri: '',
+        authorizationUri: '',
+        tokenUri: '',
+        userInfoUri: '',
+        clientId: '',
+        clientSecret: '',
+        authMethod: 'CLIENT_SECRET_POST' as OAuthClientAuthMethod,
+        scopes: ['openid', 'profile', 'email'],
+        redirectUri: '',
+        status: 'ACTIVE' as OAuthRegistrationStatus,
+      })
+  oauthProviderVisible.value = true
+}
+
+async function saveOAuthProvider() {
+  const payload = normalizeOAuthProviderPayload()
+  if (editingOAuthProvider.value) {
+    await apiSecurity.updateOAuthProvider(editingOAuthProvider.value.id, payload)
+  }
+  else {
+    await apiSecurity.createOAuthProvider(payload)
+  }
+  oauthProviderVisible.value = false
+  toast.success('OAuth 提供商已保存')
+  await loadOAuth()
+}
+
+function confirmDisableOAuthClient(row: OAuthClient) {
+  modal.confirm({
+    title: '确认停用',
+    content: `确认停用 OAuth 客户端「${row.clientName}」吗？`,
+    onConfirm: async () => {
+      await apiSecurity.disableOAuthClient(row.id)
+      toast.success('已停用')
+      await loadOAuth()
+    },
+  })
+}
+
+function confirmDisableOAuthProvider(row: OAuthProvider) {
+  modal.confirm({
+    title: '确认停用',
+    content: `确认停用 OAuth 提供商「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiSecurity.disableOAuthProvider(row.id)
+      toast.success('已停用')
+      await loadOAuth()
+    },
+  })
+}
+
+function confirmRevokePasskey(row: PasskeyCredential) {
+  modal.confirm({
+    title: '确认吊销',
+    content: `确认吊销 Passkey「${row.deviceName || row.credentialId}」吗？`,
+    onConfirm: async () => {
+      await apiSecurity.revokePasskey(row.id)
+      toast.success('Passkey 已吊销')
+      await loadPasskeys()
     },
   })
 }
@@ -171,16 +425,45 @@ function onSizeChange(size: number) {
   loadApiKeys()
 }
 
-function statusText(status: CredentialStatus) {
-  const map: Record<CredentialStatus, string> = {
+function normalizeOAuthClientPayload(): OAuthClientPayload {
+  return {
+    ...oauthClientForm,
+    redirectUris: cleanList(oauthClientForm.redirectUris),
+    scopes: cleanList(oauthClientForm.scopes),
+  }
+}
+
+function normalizeOAuthProviderPayload(): OAuthProviderPayload {
+  return {
+    ...oauthProviderForm,
+    scopes: cleanList(oauthProviderForm.scopes),
+    clientSecret: oauthProviderForm.clientSecret || undefined,
+  }
+}
+
+function cleanList(values?: string[]) {
+  return (values || []).map(item => item.trim()).filter(Boolean)
+}
+
+function splitTextarea(value?: string[]) {
+  return (value || []).join('\n')
+}
+
+function updateList(target: string[], value: string) {
+  target.splice(0, target.length, ...value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean))
+}
+
+function statusText(status: CredentialStatus | OAuthRegistrationStatus) {
+  const map: Record<string, string> = {
     ACTIVE: '启用',
+    DISABLED: '停用',
     REVOKED: '已吊销',
     EXPIRED: '已过期',
   }
-  return map[status]
+  return map[status] || status
 }
 
-function statusVariant(status: CredentialStatus) {
+function statusVariant(status: CredentialStatus | OAuthRegistrationStatus) {
   return status === 'ACTIVE' ? 'default' : 'secondary'
 }
 
@@ -192,132 +475,201 @@ function normalizeDateTime(value?: string) {
 <template>
   <div>
     <FaPageHeader title="安全中心" class="mb-0">
-      <FaButton v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
+      <FaButton v-if="activeTab === 'policy'" v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
         <FaIcon name="i-ri:save-3-line" />
         保存策略
       </FaButton>
     </FaPageHeader>
 
     <FaPageMain>
-      <div class="security-layout">
-        <section class="policy-panel">
-          <div class="section-title">
-            <FaIcon name="i-ri:shield-check-line" />
-            安全策略
-          </div>
-          <div class="policy-grid">
-            <div v-for="item in policyCards" :key="item.key" class="policy-card">
-              <div class="policy-icon">
-                <FaIcon :name="item.icon" />
-              </div>
-              <div class="policy-body">
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.desc }}</span>
-              </div>
-              <FaSwitch v-model="policy[item.key]" />
-            </div>
-          </div>
-          <div class="token-grid">
-            <a-form-item label="访问令牌有效期（秒）">
-              <FaInput v-model.number="policy.accessTokenTtlSeconds" type="number" min="1" />
-            </a-form-item>
-            <a-form-item label="刷新令牌有效期（秒）">
-              <FaInput v-model.number="policy.refreshTokenTtlSeconds" type="number" min="1" />
-            </a-form-item>
-            <a-form-item label="刷新令牌轮换">
-              <FaSwitch v-model="policy.refreshRotationEnabled" />
-            </a-form-item>
-          </div>
-        </section>
-
-        <section class="key-panel">
-          <div class="key-toolbar">
-            <div class="section-title">
-              <FaIcon name="i-ri:key-line" />
-              API Key
-            </div>
-            <div class="key-actions">
-              <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" class="w-56" @keydown.enter="loadApiKeys" @clear="loadApiKeys" />
-              <FaButton variant="outline" @click="resetSearch">
-                重置
-              </FaButton>
-              <FaButton @click="loadApiKeys">
-                <FaIcon name="i-ri:search-line" />
-                筛选
-              </FaButton>
-              <FaButton v-auth="'system:security:api-key:create'" @click="openCreate">
-                <FaIcon name="i-ri:key-2-line" />
-                创建
-              </FaButton>
-            </div>
-          </div>
-
-          <FaTable
-            v-loading="loading"
-            row-key="id"
-            table-root-class="rounded-lg overflow-hidden"
-            table-class="min-w-[980px]"
-            column-visibility
-            border
-            stripe
-            :columns="tableColumns"
-            :data="rows"
-          >
-            <template #cell-permissions="{ row }">
-              <div class="permission-tags">
-                <FaTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
-                  {{ item }}
-                </FaTag>
-                <FaTag v-if="row.original.permissions.length > 3" variant="secondary">
-                  +{{ row.original.permissions.length - 3 }}
-                </FaTag>
-              </div>
-            </template>
-            <template #cell-status="{ row }">
-              <FaTag :variant="statusVariant(row.original.status)">
-                {{ statusText(row.original.status) }}
-              </FaTag>
-            </template>
-            <template #cell-operation="{ row }">
-              <FaButton
-                v-auth="'system:security:api-key:revoke'"
-                variant="destructive"
-                size="sm"
-                :disabled="row.original.status !== 'ACTIVE'"
-                @click="confirmRevoke(row.original)"
-              >
-                吊销
-              </FaButton>
-            </template>
-          </FaTable>
-
-          <FaPagination
-            v-model:page="pagination.page"
-            v-model:size="pagination.size"
-            :total="pagination.total"
-            class="mt-3"
-            @page-change="onPageChange"
-            @size-change="onSizeChange"
-          />
-        </section>
+      <div class="security-tabs">
+        <button v-for="tab in tabs" :key="tab.key" type="button" :class="{ active: activeTab === tab.key }" @click="activeTab = tab.key">
+          <FaIcon :name="tab.icon" />
+          <span>{{ tab.label }}</span>
+        </button>
       </div>
+
+      <section v-if="activeTab === 'policy'" class="panel">
+        <div class="section-title">
+          <FaIcon name="i-ri:shield-check-line" />
+          安全策略
+        </div>
+        <div class="policy-grid">
+          <div v-for="item in policyCards" :key="item.key" class="policy-card">
+            <div class="policy-icon">
+              <FaIcon :name="item.icon" />
+            </div>
+            <div class="policy-body">
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.desc }}</span>
+            </div>
+            <FaSwitch v-model="policy[item.key]" />
+          </div>
+        </div>
+        <div class="token-grid">
+          <a-form-item label="访问令牌有效期（秒）">
+            <FaInput v-model.number="policy.accessTokenTtlSeconds" type="number" min="1" />
+          </a-form-item>
+          <a-form-item label="刷新令牌有效期（秒）">
+            <FaInput v-model.number="policy.refreshTokenTtlSeconds" type="number" min="1" />
+          </a-form-item>
+          <a-form-item label="刷新令牌轮换">
+            <FaSwitch v-model="policy.refreshRotationEnabled" />
+          </a-form-item>
+        </div>
+      </section>
+
+      <section v-if="activeTab === 'apiKey'" class="panel">
+        <div class="key-toolbar">
+          <div class="section-title">
+            <FaIcon name="i-ri:key-line" />
+            API Key
+          </div>
+          <div class="key-actions">
+            <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" class="w-56" @keydown.enter="loadApiKeys" @clear="loadApiKeys" />
+            <FaButton variant="outline" @click="resetSearch">重置</FaButton>
+            <FaButton @click="loadApiKeys">
+              <FaIcon name="i-ri:search-line" />
+              筛选
+            </FaButton>
+            <FaButton v-auth="'system:security:api-key:create'" @click="openCreate">
+              <FaIcon name="i-ri:key-2-line" />
+              创建
+            </FaButton>
+          </div>
+        </div>
+        <FaTable
+          v-loading="loading"
+          row-key="id"
+          table-root-class="rounded-lg overflow-hidden"
+          table-class="min-w-[980px]"
+          column-visibility
+          border
+          stripe
+          :columns="apiKeyColumns"
+          :data="apiKeyRows"
+        >
+          <template #cell-permissions="{ row }">
+            <div class="tag-row">
+              <FaTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
+                {{ item }}
+              </FaTag>
+              <FaTag v-if="row.original.permissions.length > 3" variant="secondary">
+                +{{ row.original.permissions.length - 3 }}
+              </FaTag>
+            </div>
+          </template>
+          <template #cell-status="{ row }">
+            <FaTag :variant="statusVariant(row.original.status)">
+              {{ statusText(row.original.status) }}
+            </FaTag>
+          </template>
+          <template #cell-operation="{ row }">
+            <FaButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevoke(row.original)">
+              吊销
+            </FaButton>
+          </template>
+        </FaTable>
+        <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="onPageChange" @size-change="onSizeChange" />
+      </section>
+
+      <section v-if="activeTab === 'oauth'" class="panel">
+        <div class="key-toolbar">
+          <div class="section-title">
+            <FaIcon name="i-ri:login-circle-line" />
+            OAuth
+          </div>
+          <div class="key-actions">
+            <FaButton :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
+            <FaButton :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
+            <FaButton variant="outline" @click="loadOAuth">
+              <FaIcon name="i-ri:refresh-line" />
+              刷新
+            </FaButton>
+            <FaButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" @click="openOAuthClient()">
+              <FaIcon name="i-ri:add-line" />
+              新增客户端
+            </FaButton>
+            <FaButton v-else v-auth="'system:security:oauth:edit'" @click="openOAuthProvider()">
+              <FaIcon name="i-ri:add-line" />
+              新增提供商
+            </FaButton>
+          </div>
+        </div>
+
+        <FaTable v-if="oauthPane === 'clients'" row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthClientColumns" :data="oauthClients">
+          <template #cell-grantTypes="{ row }">
+            <div class="tag-row">
+              <FaTag v-for="item in row.original.grantTypes" :key="item" variant="secondary">{{ item }}</FaTag>
+            </div>
+          </template>
+          <template #cell-redirectUris="{ row }">
+            <span class="line-clamp-1">{{ row.original.redirectUris?.join(', ') || '-' }}</span>
+          </template>
+          <template #cell-status="{ row }">
+            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+          </template>
+          <template #cell-operation="{ row }">
+            <div class="table-actions">
+              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="openOAuthClient(row.original)">编辑</FaButton>
+              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableOAuthClient(row.original)">停用</FaButton>
+            </div>
+          </template>
+        </FaTable>
+
+        <FaTable v-else row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthProviderColumns" :data="oauthProviders">
+          <template #cell-status="{ row }">
+            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+          </template>
+          <template #cell-operation="{ row }">
+            <div class="table-actions">
+              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="openOAuthProvider(row.original)">编辑</FaButton>
+              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableOAuthProvider(row.original)">停用</FaButton>
+            </div>
+          </template>
+        </FaTable>
+      </section>
+
+      <section v-if="activeTab === 'passkey'" class="panel">
+        <div class="key-toolbar">
+          <div class="section-title">
+            <FaIcon name="i-ri:fingerprint-line" />
+            Passkey 凭据
+          </div>
+          <div class="key-actions">
+            <FaInput v-model="passkeySearch.userId" placeholder="用户 ID" class="w-56" @keydown.enter="loadPasskeys" />
+            <FaButton v-auth="'system:security:passkey:view'" :loading="loading" @click="loadPasskeys">
+              <FaIcon name="i-ri:search-line" />
+              查询
+            </FaButton>
+          </div>
+        </div>
+        <FaTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
+          <template #cell-status="{ row }">
+            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+          </template>
+          <template #cell-operation="{ row }">
+            <FaButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.original.status !== 'ACTIVE'" @click="confirmRevokePasskey(row.original)">
+              吊销
+            </FaButton>
+          </template>
+        </FaTable>
+      </section>
     </FaPageMain>
 
     <FaModal v-model="createVisible" title="创建 API Key" show-cancel-button class="sm:max-w-3xl" :confirm-loading="creating" @confirm="createApiKey">
-      <a-form :model="form" layout="vertical">
+      <a-form :model="apiKeyForm" layout="vertical">
         <a-form-item label="名称" required>
-          <FaInput v-model="form.name" placeholder="例如：外部系统同步" />
+          <FaInput v-model="apiKeyForm.name" placeholder="例如：外部系统同步" />
         </a-form-item>
         <a-form-item label="过期时间">
-          <FaInput v-model="form.expireTime" type="datetime-local" />
+          <FaInput v-model="apiKeyForm.expireTime" type="datetime-local" />
         </a-form-item>
         <a-form-item label="权限范围" required>
           <div class="permission-panel">
             <div v-for="(items, module) in permissionGroups" :key="module" class="permission-group">
-              <div class="permission-title">
-                {{ module }}
-              </div>
-              <a-checkbox-group v-model="form.permissions">
+              <div class="permission-title">{{ module }}</div>
+              <a-checkbox-group v-model="apiKeyForm.permissions">
                 <a-space wrap>
                   <a-checkbox v-for="item in items" :key="item.code" :value="item.code">
                     {{ item.name }}
@@ -326,6 +678,89 @@ function normalizeDateTime(value?: string) {
               </a-checkbox-group>
             </div>
           </div>
+        </a-form-item>
+      </a-form>
+    </FaModal>
+
+    <FaModal v-model="oauthClientVisible" :title="editingOAuthClient ? '编辑 OAuth 客户端' : '新增 OAuth 客户端'" show-cancel-button class="sm:max-w-3xl" @confirm="saveOAuthClient">
+      <a-form :model="oauthClientForm" layout="vertical">
+        <div class="form-grid">
+          <a-form-item label="Client ID" required>
+            <FaInput v-model="oauthClientForm.clientId" :disabled="!!editingOAuthClient" />
+          </a-form-item>
+          <a-form-item label="客户端名称" required>
+            <FaInput v-model="oauthClientForm.clientName" />
+          </a-form-item>
+          <a-form-item label="认证方式">
+            <FaSelect v-model="oauthClientForm.authMethod" :options="authMethodOptions" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <FaSelect v-model="oauthClientForm.status" :options="statusOptions" />
+          </a-form-item>
+          <a-form-item label="访问令牌有效期">
+            <FaInput v-model.number="oauthClientForm.accessTokenTtlSeconds" type="number" min="1" />
+          </a-form-item>
+          <a-form-item label="刷新令牌有效期">
+            <FaInput v-model.number="oauthClientForm.refreshTokenTtlSeconds" type="number" min="1" />
+          </a-form-item>
+        </div>
+        <a-form-item label="授权模式">
+          <a-checkbox-group v-model="oauthClientForm.grantTypes">
+            <a-space wrap>
+              <a-checkbox value="AUTHORIZATION_CODE">authorization_code</a-checkbox>
+              <a-checkbox value="REFRESH_TOKEN">refresh_token</a-checkbox>
+              <a-checkbox value="CLIENT_CREDENTIALS">client_credentials</a-checkbox>
+            </a-space>
+          </a-checkbox-group>
+        </a-form-item>
+        <a-form-item label="回调地址（一行一个）">
+          <FaTextarea :model-value="splitTextarea(oauthClientForm.redirectUris)" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />
+        </a-form-item>
+        <a-form-item label="授权范围（一行或逗号分隔）">
+          <FaTextarea :model-value="splitTextarea(oauthClientForm.scopes)" rows="3" @update:model-value="value => updateList(oauthClientForm.scopes, value)" />
+        </a-form-item>
+      </a-form>
+    </FaModal>
+
+    <FaModal v-model="oauthProviderVisible" :title="editingOAuthProvider ? '编辑 OAuth 提供商' : '新增 OAuth 提供商'" show-cancel-button class="sm:max-w-3xl" @confirm="saveOAuthProvider">
+      <a-form :model="oauthProviderForm" layout="vertical">
+        <div class="form-grid">
+          <a-form-item label="编码" required>
+            <FaInput v-model="oauthProviderForm.code" :disabled="!!editingOAuthProvider" />
+          </a-form-item>
+          <a-form-item label="名称" required>
+            <FaInput v-model="oauthProviderForm.name" />
+          </a-form-item>
+          <a-form-item label="Client ID">
+            <FaInput v-model="oauthProviderForm.clientId" />
+          </a-form-item>
+          <a-form-item label="Client Secret">
+            <FaInput v-model="oauthProviderForm.clientSecret" type="password" :placeholder="editingOAuthProvider ? '留空则不修改' : ''" />
+          </a-form-item>
+          <a-form-item label="认证方式">
+            <FaSelect v-model="oauthProviderForm.authMethod" :options="authMethodOptions" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <FaSelect v-model="oauthProviderForm.status" :options="statusOptions" />
+          </a-form-item>
+        </div>
+        <a-form-item label="Issuer">
+          <FaInput v-model="oauthProviderForm.issuerUri" />
+        </a-form-item>
+        <a-form-item label="授权地址">
+          <FaInput v-model="oauthProviderForm.authorizationUri" />
+        </a-form-item>
+        <a-form-item label="Token 地址">
+          <FaInput v-model="oauthProviderForm.tokenUri" />
+        </a-form-item>
+        <a-form-item label="用户信息地址">
+          <FaInput v-model="oauthProviderForm.userInfoUri" />
+        </a-form-item>
+        <a-form-item label="回调地址">
+          <FaInput v-model="oauthProviderForm.redirectUri" />
+        </a-form-item>
+        <a-form-item label="授权范围（一行或逗号分隔）">
+          <FaTextarea :model-value="splitTextarea(oauthProviderForm.scopes)" rows="3" @update:model-value="value => updateList(oauthProviderForm.scopes, value)" />
         </a-form-item>
       </a-form>
     </FaModal>
@@ -343,13 +778,32 @@ function normalizeDateTime(value?: string) {
 </template>
 
 <style scoped>
-.security-layout {
-  display: grid;
-  gap: 16px;
+.security-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
-.policy-panel,
-.key-panel {
+.security-tabs button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
+}
+
+.security-tabs button.active,
+.security-tabs button:hover {
+  border-color: rgb(var(--primary-6));
+  color: rgb(var(--primary-6));
+}
+
+.panel {
   display: grid;
   gap: 16px;
 }
@@ -398,7 +852,8 @@ function normalizeDateTime(value?: string) {
   font-size: 12px;
 }
 
-.token-grid {
+.token-grid,
+.form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
@@ -412,16 +867,12 @@ function normalizeDateTime(value?: string) {
   flex-wrap: wrap;
 }
 
-.key-actions {
+.key-actions,
+.table-actions,
+.tag-row {
   display: flex;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
-}
-
-.permission-tags {
-  display: flex;
-  gap: 6px;
   flex-wrap: wrap;
 }
 
