@@ -4,6 +4,8 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.document.service.WordTemplateRenderer;
 import online.yudream.base.domain.platform.document.valobj.RenderedDocument;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.apache.poi.xwpf.usermodel.XWPFFooter;
+import org.apache.poi.xwpf.usermodel.XWPFHeader;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
@@ -27,18 +29,31 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
              XWPFDocument document = new XWPFDocument(inputStream);
              ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
             replaceParagraphs(document.getParagraphs(), data);
-            for (XWPFTable table : document.getTables()) {
-                for (XWPFTableRow row : table.getRows()) {
-                    for (XWPFTableCell cell : row.getTableCells()) {
-                        replaceParagraphs(cell.getParagraphs(), data);
-                    }
-                }
+            replaceTables(document.getTables(), data);
+            for (XWPFHeader header : document.getHeaderList()) {
+                replaceParagraphs(header.getParagraphs(), data);
+                replaceTables(header.getTables(), data);
+            }
+            for (XWPFFooter footer : document.getFooterList()) {
+                replaceParagraphs(footer.getParagraphs(), data);
+                replaceTables(footer.getTables(), data);
             }
             document.write(outputStream);
             return new RenderedDocument(outputStream.toByteArray(), CONTENT_TYPE);
         }
         catch (Exception e) {
             throw new BizException("DOCX 模板渲染失败：" + e.getMessage());
+        }
+    }
+
+    private void replaceTables(List<XWPFTable> tables, Map<String, String> data) {
+        for (XWPFTable table : tables) {
+            for (XWPFTableRow row : table.getRows()) {
+                for (XWPFTableCell cell : row.getTableCells()) {
+                    replaceParagraphs(cell.getParagraphs(), data);
+                    replaceTables(cell.getTables(), data);
+                }
+            }
         }
     }
 
