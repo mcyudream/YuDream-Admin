@@ -29,6 +29,17 @@ function normalizeCreationOptions(publicKeyJson: string): CredentialCreationOpti
   return { publicKey }
 }
 
+function normalizeRequestOptions(publicKeyJson: string): CredentialRequestOptions {
+  const parsed = JSON.parse(publicKeyJson)
+  const publicKey = parsed.publicKey ?? parsed
+  publicKey.challenge = base64UrlToArrayBuffer(publicKey.challenge)
+  publicKey.allowCredentials = publicKey.allowCredentials?.map((item: PublicKeyCredentialDescriptor) => ({
+    ...item,
+    id: base64UrlToArrayBuffer(item.id as unknown as string),
+  }))
+  return { publicKey }
+}
+
 export async function createPasskeyRegistrationResponse(publicKeyJson: string) {
   if (!window.PublicKeyCredential || !navigator.credentials?.create) {
     throw new Error('当前浏览器不支持 Passkey')
@@ -48,6 +59,31 @@ export async function createPasskeyRegistrationResponse(publicKeyJson: string) {
       clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
       attestationObject: arrayBufferToBase64Url(response.attestationObject),
       transports: response.getTransports?.() ?? [],
+    },
+    clientExtensionResults: publicKeyCredential.getClientExtensionResults(),
+  })
+}
+
+export async function createPasskeyAuthenticationResponse(publicKeyJson: string) {
+  if (!window.PublicKeyCredential || !navigator.credentials?.get) {
+    throw new Error('当前浏览器不支持 Passkey')
+  }
+  const credential = await navigator.credentials.get(normalizeRequestOptions(publicKeyJson))
+  if (!credential) {
+    throw new Error('Passkey 登录已取消')
+  }
+  const publicKeyCredential = credential as PublicKeyCredential
+  const response = publicKeyCredential.response as AuthenticatorAssertionResponse
+  return JSON.stringify({
+    id: publicKeyCredential.id,
+    rawId: arrayBufferToBase64Url(publicKeyCredential.rawId),
+    type: publicKeyCredential.type,
+    authenticatorAttachment: publicKeyCredential.authenticatorAttachment,
+    response: {
+      clientDataJSON: arrayBufferToBase64Url(response.clientDataJSON),
+      authenticatorData: arrayBufferToBase64Url(response.authenticatorData),
+      signature: arrayBufferToBase64Url(response.signature),
+      userHandle: response.userHandle ? arrayBufferToBase64Url(response.userHandle) : null,
     },
     clientExtensionResults: publicKeyCredential.getClientExtensionResults(),
   })

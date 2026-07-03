@@ -23,6 +23,11 @@ export interface LoginData {
   createTime?: string
 }
 
+export interface PasskeyAuthenticationOptions {
+  requestJson: string
+  publicKeyJson: string
+}
+
 export type IdValue = string | number
 
 interface RegisterData {
@@ -156,6 +161,14 @@ export default {
       username: data.account,
       password: data.password,
     }, { skipTokenRefresh: true })
+  },
+
+  startPasskeyAuthentication: (username: string) => {
+    return userApi.post<unknown, { status: 1, error: '', data: PasskeyAuthenticationOptions }>('api/user/passkeys/authentication/options', { username }, { skipTokenRefresh: true })
+  },
+
+  finishPasskeyAuthentication: (data: { username: string, requestJson: string, responseJson: string }) => {
+    return userApi.post<unknown, { status: 1, error: '', data: LoginData }>('api/user/passkeys/authentication', data, { skipTokenRefresh: true })
   },
 
   refreshToken: (refreshToken: string) => {

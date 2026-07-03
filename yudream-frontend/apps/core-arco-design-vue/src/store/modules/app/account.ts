@@ -69,6 +69,21 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     await loadContext()
   }
 
+  async function passkeyLogin(data: {
+    account: string
+    requestJson: string
+    responseJson: string
+  }) {
+    const res = await apiUser.finishPasskeyAuthentication({
+      username: data.account,
+      requestJson: data.requestJson,
+      responseJson: data.responseJson,
+    })
+    clearImpersonatorSession()
+    applyLoginData(res.data)
+    await loadContext()
+  }
+
   async function refreshAccessToken() {
     if (!refreshToken.value) {
       throw new Error('缺少刷新令牌')
@@ -314,6 +329,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     isImpersonating,
     impersonatorAccount,
     login,
+    passkeyLogin,
     refreshAccessToken,
     impersonate,
     exitImpersonation,

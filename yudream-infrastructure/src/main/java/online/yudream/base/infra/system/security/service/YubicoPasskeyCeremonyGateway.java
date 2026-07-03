@@ -1,11 +1,15 @@
 package online.yudream.base.infra.system.security.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.yubico.webauthn.AssertionRequest;
+import com.yubico.webauthn.AssertionResult;
 import com.yubico.webauthn.CredentialRepository;
+import com.yubico.webauthn.FinishAssertionOptions;
 import com.yubico.webauthn.FinishRegistrationOptions;
 import com.yubico.webauthn.RegisteredCredential;
 import com.yubico.webauthn.RegistrationResult;
 import com.yubico.webauthn.RelyingParty;
+import com.yubico.webauthn.StartAssertionOptions;
 import com.yubico.webauthn.StartRegistrationOptions;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredential;
@@ -14,6 +18,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialDescriptor;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
 import com.yubico.webauthn.data.exception.Base64UrlException;
+import com.yubico.webauthn.exception.AssertionFailedException;
 import com.yubico.webauthn.exception.RegistrationFailedException;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
@@ -21,6 +26,8 @@ import online.yudream.base.domain.system.security.aggregate.PasskeyCredential;
 import online.yudream.base.domain.system.security.enumerate.CredentialStatus;
 import online.yudream.base.domain.system.security.repo.PasskeyCredentialRepo;
 import online.yudream.base.domain.system.security.service.PasskeyCeremonyGateway;
+import online.yudream.base.domain.system.security.valobj.PasskeyAuthenticationOptions;
+import online.yudream.base.domain.system.security.valobj.PasskeyAuthenticationResult;
 import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationOptions;
 import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationResult;
 import online.yudream.base.domain.system.user.aggregate.User;
@@ -88,6 +95,50 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
         }
         catch (RegistrationFailedException e) {
             throw new BizException("Passkey 注册校验失败：" + e.getMessage());
+        }
+    }
+
+    @Override
+    public PasskeyAuthenticationOptions startAuthentication(String username) {
+        try {
+            AssertionRequest request = relyingParty().startAssertion(StartAssertionOptions.builder()
+                    .username(username)
+                    .build());
+            return new PasskeyAuthenticationOptions(request.toJson(), request.toCredentialsGetJson());
+        }
+        catch (JsonProcessingException e) {
+            throw new BizException("Passkey 登录参数生成失败");
+        }
+    }
+
+    @Override
+    public PasskeyAuthenticationResult finishAuthentication(String requestJson, String responseJson) {
+        try {
+            AssertionRequest request = AssertionRequest.fromJson(requestJson);
+            AssertionResult result = relyingParty().finishAssertion(FinishAssertionOptions.builder()
+                    .request(request)
+                    .response(PublicKeyCredential.parseAssertionResponseJson(responseJson))
+                    .build());
+            if (!result.isSuccess()) {
+                throw new BizException("Passkey 登录校验失败");
+            }
+            Long userId = parseUserHandle(result.getUserHandle())
+                    .orElseThrow(() -> new BizException("Passkey 用户句柄无效"));
+            return new PasskeyAuthenticationResult(
+                    userId,
+                    result.getUsername(),
+                    result.getCredentialId().getBase64Url(),
+                    result.getSignatureCount()
+            );
+        }
+        catch (JsonProcessingException e) {
+            throw new BizException("Passkey 登录请求参数无效");
+        }
+        catch (IOException e) {
+            throw new BizException("Passkey 浏览器响应解析失败");
+        }
+        catch (AssertionFailedException e) {
+            throw new BizException("Passkey 登录校验失败：" + e.getMessage());
         }
     }
 
