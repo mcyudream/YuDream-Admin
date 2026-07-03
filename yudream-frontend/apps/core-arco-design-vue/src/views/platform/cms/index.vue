@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@fantastic-admin/components'
-import type { CmsPage, CmsPagePayload, HomePageLayout, PageStatus } from '@/api/modules/platform-cms'
+import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSectionType, PageStatus } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
 
 const modal = useFaModal()
@@ -41,9 +41,15 @@ const tabs = [
   { key: 'home', label: '首页定制', icon: 'i-ri:home-4-line' },
   { key: 'pages', label: '单页面', icon: 'i-ri:file-markdown-line' },
 ] as const
-const statusOptions: { label: string; value: PageStatus }[] = [
+const statusOptions: { label: string, value: PageStatus }[] = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' },
+]
+const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] = [
+  { type: 'HERO', label: '首屏', icon: 'i-ri:layout-top-line' },
+  { type: 'FEATURE', label: '特性', icon: 'i-ri:sparkling-line' },
+  { type: 'CONTENT', label: '内容', icon: 'i-ri:article-line' },
+  { type: 'CTA', label: '行动', icon: 'i-ri:cursor-line' },
 ]
 const tableColumns = computed<TableColumn<CmsPage>[]>(() => [
   { accessorKey: 'title', header: '页面标题', width: 200, fixed: 'left' },
@@ -130,6 +136,28 @@ async function saveHome() {
   finally {
     savingHome.value = false
   }
+}
+
+function addHomeSection(type: HomeSectionType) {
+  const sections = parseJsonArray(homeSectionsJson.value, '首页区块')
+  if (!sections) {
+    return
+  }
+  const nextSort = sections.length + 1
+  sections.push({
+    id: `${type.toLowerCase()}-${Date.now()}`,
+    type,
+    title: sectionTitle(type),
+    subtitle: '',
+    mediaUrl: '',
+    actionText: type === 'CTA' ? '立即开始' : '',
+    actionUrl: '',
+    settings: {},
+    sort: nextSort,
+    visible: true,
+  })
+  home.sections = sections
+  homeSectionsJson.value = JSON.stringify(sections, null, 2)
 }
 
 function openCreate() {
@@ -232,6 +260,16 @@ function parseJsonArray(value: string, label: string) {
   }
 }
 
+function sectionTitle(type: HomeSectionType) {
+  const titles: Record<HomeSectionType, string> = {
+    HERO: '首屏展示',
+    FEATURE: '核心特性',
+    CONTENT: '内容区块',
+    CTA: '行动引导',
+  }
+  return titles[type]
+}
+
 function markdownPreview(markdown?: string) {
   return (markdown || '')
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
@@ -302,6 +340,12 @@ function statusVariant(status: PageStatus) {
                 <FaTextarea v-model="homeSettingsJson" rows="7" input-class="font-mono" />
               </a-form-item>
               <a-form-item label="首页区块 JSON" class="md:col-span-2">
+                <div class="section-tools">
+                  <FaButton v-for="preset in sectionPresets" :key="preset.type" size="sm" variant="outline" type="button" @click="addHomeSection(preset.type)">
+                    <FaIcon :name="preset.icon" />
+                    {{ preset.label }}
+                  </FaButton>
+                </div>
                 <FaTextarea v-model="homeSectionsJson" rows="14" input-class="font-mono" />
               </a-form-item>
             </div>
@@ -329,7 +373,9 @@ function statusVariant(status: PageStatus) {
           <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
             <FaInput v-model="search.keyword" clearable placeholder="页面标题 / 路径 / 摘要" @keydown.enter="loadPages" @clear="loadPages" />
             <div class="flex gap-2 md:justify-end">
-              <FaButton variant="outline" @click="resetSearch">重置</FaButton>
+              <FaButton variant="outline" @click="resetSearch">
+                重置
+              </FaButton>
               <FaButton :loading="loading" @click="loadPages">
                 <FaIcon name="i-ri:search-line" />
                 筛选
@@ -352,7 +398,9 @@ function statusVariant(status: PageStatus) {
           :data="rows"
         >
           <template #cell-status="{ row }">
-            <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
+            <FaTag :variant="statusVariant(row.original.status)">
+              {{ statusText(row.original.status) }}
+            </FaTag>
           </template>
           <template #cell-publishedAt="{ row }">
             {{ dateText(row.original.publishedAt) }}
@@ -407,7 +455,9 @@ function statusVariant(status: PageStatus) {
             <FaTextarea v-model="form.markdownContent" rows="18" input-class="font-mono" />
           </a-form-item>
           <section class="markdown-preview">
-            <div class="section-title">预览</div>
+            <div class="section-title">
+              预览
+            </div>
             <div class="markdown-body" v-html="markdownPreview(form.markdownContent)" />
           </section>
         </div>
@@ -479,6 +529,13 @@ function statusVariant(status: PageStatus) {
 .preview-sections {
   display: grid;
   gap: 8px;
+}
+
+.section-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .preview-section,
