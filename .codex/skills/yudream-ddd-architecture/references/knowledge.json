@@ -27,6 +27,10 @@
     {
       "key": "platform-capability-disable-release",
       "text": "平台能力禁用时必须同步释放运行时资源，例如关闭 WebSocket/SSE 会话、RabbitMQ 连接工厂、Neo4j Driver 缓存；不能只改 enabled 状态。"
+    },
+    {
+      "key": "platform-capability-menu-filter",
+      "text": "除 platform:capability 能力管理入口外，平台功能菜单应在对应能力关闭时从 /api/menu/routes 隐藏；能力 Provider 必须保持懒初始化，关闭状态不能连接中间件。"
     }
   ],
   "utilities": [
