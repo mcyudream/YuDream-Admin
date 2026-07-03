@@ -19,6 +19,14 @@ spring.data:
         max-idle: ${REDIS_POOL_MAX_IDLE:8}
         min-idle: ${REDIS_POOL_MIN_IDLE:0}
 
+spring.rabbitmq:
+  host: ${RABBITMQ_HOST:localhost}
+  port: ${RABBITMQ_PORT:5672}
+  username: ${RABBITMQ_USERNAME:guest}
+  password: ${RABBITMQ_PASSWORD:guest}
+  virtual-host: ${RABBITMQ_VHOST:/}
+  connection-timeout: ${RABBITMQ_CONNECTION_TIMEOUT:3000ms}
+
 spring.mail:
   host: ${MAIL_HOST:smtp.qq.com}      # 必须有 host，否则自动配置跳过
   port: ${MAIL_PORT:465}
