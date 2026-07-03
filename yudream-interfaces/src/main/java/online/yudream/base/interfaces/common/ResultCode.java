@@ -10,7 +10,9 @@ public enum ResultCode {
     NOT_FOUND(404, "资源不存在"),
     INTERNAL_ERROR(500, "系统内部错误"),
     BIZ_ERROR(1000, "业务异常"),
-    USER_ALREADY_EXISTS(1001, "用户已存在");
+    USER_ALREADY_EXISTS(1001, "用户已存在"),
+    UNAUTHORIZED(401, "未登录或登录已过期"),
+    FORBIDDEN(403, "无权限访问");
 
     private final int code;
     private final String message;

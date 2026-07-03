@@ -1,5 +1,7 @@
 package online.yudream.base.interfaces.exception;
 
+import cn.dev33.satoken.exception.NotLoginException;
+import cn.dev33.satoken.exception.NotPermissionException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +48,18 @@ public class GlobalExceptionHandler {
                 .map(ConstraintViolation::getMessage)
                 .collect(Collectors.joining(", "));
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), message);
+    }
+
+    @ExceptionHandler(NotLoginException.class)
+    public Result<Void> handleNotLoginException(NotLoginException e) {
+        log.warn("登录状态无效: {}", e.getMessage());
+        return Result.fail(ResultCode.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(NotPermissionException.class)
+    public Result<Void> handleNotPermissionException(NotPermissionException e) {
+        log.warn("权限不足: {}", e.getMessage());
+        return Result.fail(ResultCode.FORBIDDEN.getCode(), e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

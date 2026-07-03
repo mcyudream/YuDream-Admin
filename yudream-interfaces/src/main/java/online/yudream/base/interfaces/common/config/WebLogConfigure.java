@@ -1,34 +1,34 @@
 package online.yudream.base.interfaces.common.config;
 
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
 import online.yudream.base.interfaces.common.interceptor.WebInvokeTimeInterceptor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/**
- * Web 请求日志拦截器注册配置。
- */
 @Slf4j
 @Configuration
 @EnableConfigurationProperties(WebLogProperties.class)
 public class WebLogConfigure implements WebMvcConfigurer {
 
     private final WebLogProperties properties;
+    private final SystemMonitorAppService systemMonitorAppService;
 
-    public WebLogConfigure(WebLogProperties properties) {
+    public WebLogConfigure(WebLogProperties properties, SystemMonitorAppService systemMonitorAppService) {
         this.properties = properties;
-        log.info("WebInvokeTimeInterceptor 配置加载: enabled={}, prefix={}", properties.isEnabled(), properties.getPrefix());
+        this.systemMonitorAppService = systemMonitorAppService;
+        log.info("WebInvokeTimeInterceptor loaded: enabled={}, prefix={}", properties.isEnabled(), properties.getPrefix());
     }
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         if (!properties.isEnabled()) {
-            log.warn("WebInvokeTimeInterceptor 已关闭，不会记录请求日志");
+            log.warn("WebInvokeTimeInterceptor disabled");
             return;
         }
-        registry.addInterceptor(new WebInvokeTimeInterceptor(properties))
+        registry.addInterceptor(new WebInvokeTimeInterceptor(properties, systemMonitorAppService))
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/error",
@@ -36,6 +36,6 @@ public class WebLogConfigure implements WebMvcConfigurer {
                         "/webjars/**",
                         "/favicon.ico"
                 );
-        log.info("WebInvokeTimeInterceptor 已注册");
+        log.info("WebInvokeTimeInterceptor registered");
     }
 }

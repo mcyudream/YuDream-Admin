@@ -43,7 +43,7 @@ spring.thymeleaf:
 logging:
   level:
     online.yudream.base: debug
-    org.springframework.data.mongodb: debug
+    org.springframework.data.mongodb: info
 
 # 雪花算法配置
 snowflake:
@@ -79,3 +79,17 @@ sa-token:
 # 应用基础地址（用于生成邮件验证链接）
 app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
+  web-url: ${APP_WEB_URL:${APP_BASE_URL:http://localhost:9000}}
+
+# Web 请求日志配置
+yudream.web.log:
+  enabled: ${WEB_LOG_ENABLED:true}
+  prefix: ${WEB_LOG_PREFIX:YuDreamAdmin}
+
+yudream.storage.s3:
+  endpoint: ${S3_ENDPOINT:http://localhost:9000}
+  access-key: ${S3_ACCESS_KEY:rustfsadmin}
+  secret-key: ${S3_SECRET_KEY:rustfsadmin}
+  bucket: ${S3_BUCKET:yudream-admin}
+  region: ${S3_REGION:us-east-1}
+  path-style-access: ${S3_PATH_STYLE_ACCESS:true}

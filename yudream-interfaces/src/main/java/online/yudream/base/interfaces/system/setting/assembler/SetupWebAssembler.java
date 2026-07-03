@@ -1,7 +1,9 @@
 package online.yudream.base.interfaces.system.setting.assembler;
 
 import online.yudream.base.application.system.setting.cmd.SetupCmd;
+import online.yudream.base.application.system.setting.dto.SetupStatusDTO;
 import online.yudream.base.interfaces.system.setting.request.SetupRequest;
+import online.yudream.base.interfaces.system.setting.res.SetupStatusRes;
 
 /**
  * 初始化请求参数转换。
@@ -19,6 +21,12 @@ public class SetupWebAssembler {
                 .adminEmail(request.getAdminEmail())
                 .adminPassword(request.getAdminPassword())
                 .adminConfirmPassword(request.getAdminConfirmPassword())
+                .build();
+    }
+
+    public static SetupStatusRes toRes(SetupStatusDTO dto) {
+        return SetupStatusRes.builder()
+                .setupCompleted(dto.isSetupCompleted())
                 .build();
     }
 }

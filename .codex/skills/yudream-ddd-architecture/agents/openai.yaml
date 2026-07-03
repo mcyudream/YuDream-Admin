@@ -1,0 +1,4 @@
+interface:
+  display_name: "YuDream DDD Architecture"
+  short_description: "Enforces YuDream backend DDD layering and project patterns."
+  default_prompt: "Use $yudream-ddd-architecture to implement backend changes following the YuDream DDD layering rules."
