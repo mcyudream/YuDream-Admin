@@ -1,0 +1,12 @@
+package online.yudream.base.interfaces.system.security.res;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class ApiEncryptionPublicKeyRes {
+    private boolean enabled;
+    private String algorithm;
+    private String publicKey;
+}

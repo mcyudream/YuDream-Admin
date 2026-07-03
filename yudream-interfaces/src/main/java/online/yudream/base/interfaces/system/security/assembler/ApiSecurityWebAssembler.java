@@ -12,6 +12,8 @@ import online.yudream.base.application.system.security.cmd.OAuthTokenCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
 import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO;
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
+import online.yudream.base.application.system.security.dto.ApiEncryptedPayloadDTO;
+import online.yudream.base.application.system.security.dto.ApiEncryptionPublicKeyDTO;
 import online.yudream.base.application.system.security.dto.ApiSecurityPolicyDTO;
 import online.yudream.base.application.system.security.dto.OAuthAuthorizationDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientAuthorizeDTO;
@@ -32,6 +34,8 @@ import online.yudream.base.interfaces.system.security.request.OAuthProviderSaveR
 import online.yudream.base.interfaces.system.security.request.OAuthTokenRequest;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
+import online.yudream.base.interfaces.system.security.res.ApiEncryptedPayloadRes;
+import online.yudream.base.interfaces.system.security.res.ApiEncryptionPublicKeyRes;
 import online.yudream.base.interfaces.system.security.res.ApiSecurityPolicyRes;
 import online.yudream.base.interfaces.system.security.res.OAuthAuthorizationRes;
 import online.yudream.base.interfaces.system.security.res.OAuthClientAuthorizeRes;
@@ -184,6 +188,22 @@ public class ApiSecurityWebAssembler {
                 .refreshTokenTtlSeconds(dto.getRefreshTokenTtlSeconds())
                 .refreshRotationEnabled(dto.isRefreshRotationEnabled())
                 .updateTime(dto.getUpdateTime())
+                .build();
+    }
+
+    public static ApiEncryptionPublicKeyRes toRes(ApiEncryptionPublicKeyDTO dto) {
+        return ApiEncryptionPublicKeyRes.builder()
+                .enabled(dto.isEnabled())
+                .algorithm(dto.getAlgorithm())
+                .publicKey(dto.getPublicKey())
+                .build();
+    }
+
+    public static ApiEncryptedPayloadRes toRes(ApiEncryptedPayloadDTO dto) {
+        return ApiEncryptedPayloadRes.builder()
+                .encrypted(true)
+                .iv(dto.getIv())
+                .data(dto.getData())
                 .build();
     }
 

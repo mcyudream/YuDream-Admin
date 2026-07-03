@@ -1,4 +1,11 @@
 import axios from 'axios'
+import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    apiEncryptionKey?: CryptoKey
+  }
+}
 
 interface BackendResult<T> {
   code: number
@@ -12,20 +19,29 @@ const systemClient = axios.create({
   timeout: 1000 * 60,
 })
 
-systemClient.interceptors.request.use((request) => {
+systemClient.interceptors.request.use(async (request) => {
   request.headers['Accept-Language'] = 'zh-CN'
   const token = localStorage.getItem('token')
   if (token) {
     request.headers.Authorization = token
   }
+  if (request.responseType !== 'blob') {
+    const encrypted = await prepareApiEncryption(request.url, request.data)
+    if (encrypted) {
+      Object.assign(request.headers, encrypted.headers)
+      request.data = encrypted.body
+      request.apiEncryptionKey = encrypted.key
+    }
+  }
   return request
 })
 
 systemClient.interceptors.response.use(
-  (response) => {
+  async (response) => {
     if (response.config.responseType === 'blob') {
       return Promise.resolve(response as any)
     }
+    response.data = await decryptApiResponse(response.data, response.config.apiEncryptionKey)
     const result = response.data as BackendResult<any>
     if (result && result.code === 200) {
       return Promise.resolve({

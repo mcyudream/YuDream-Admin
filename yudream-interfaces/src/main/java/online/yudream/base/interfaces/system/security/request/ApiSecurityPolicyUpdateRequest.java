@@ -13,10 +13,10 @@ public class ApiSecurityPolicyUpdateRequest {
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
 
-    @Min(value = 1, message = "访问令牌有效期必须大于0")
+    @Min(value = 1, message = "访问令牌有效期必须大于 0")
     private long accessTokenTtlSeconds;
 
-    @Min(value = 1, message = "刷新令牌有效期必须大于0")
+    @Min(value = 1, message = "刷新令牌有效期必须大于 0")
     private long refreshTokenTtlSeconds;
 
     private boolean refreshRotationEnabled;
