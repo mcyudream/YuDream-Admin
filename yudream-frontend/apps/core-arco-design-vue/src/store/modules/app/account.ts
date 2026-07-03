@@ -69,6 +69,20 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     await loadContext()
   }
 
+  async function refreshAccessToken() {
+    if (!refreshToken.value) {
+      throw new Error('缺少刷新令牌')
+    }
+    const res = await apiUser.refreshToken(refreshToken.value)
+    localStorage.setItem('token', res.data.token)
+    token.value = res.data.token
+    if (res.data.refreshToken) {
+      localStorage.setItem('refreshToken', res.data.refreshToken)
+      refreshToken.value = res.data.refreshToken
+    }
+    return res.data.token
+  }
+
   function applyLoginData(user: LoginData) {
     const nextAvatar = toBackendAssetUrl(user.avatar)
     localStorage.setItem('account', user.username)
@@ -300,6 +314,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     isImpersonating,
     impersonatorAccount,
     login,
+    refreshAccessToken,
     impersonate,
     exitImpersonation,
     register,

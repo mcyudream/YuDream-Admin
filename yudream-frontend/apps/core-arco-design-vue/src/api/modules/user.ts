@@ -1,3 +1,4 @@
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
 
@@ -55,12 +56,18 @@ const userApi = axios.create({
   timeout: 1000 * 60,
 })
 
+let refreshingToken: Promise<string> | null = null
+
 userApi.interceptors.request.use(async (request) => {
   request.headers['Accept-Language'] = 'zh-CN'
   const token = localStorage.getItem('token')
   if (token) {
     request.headers.Authorization = token
   }
+  if (request.apiPlainData === undefined) {
+    request.apiPlainData = request.data
+  }
+  request.data = request.apiPlainData
   const encrypted = await prepareApiEncryption(request.url, request.data)
   if (encrypted) {
     Object.assign(request.headers, encrypted.headers)
@@ -81,36 +88,88 @@ userApi.interceptors.response.use(
         data: result.data,
       } as any)
     }
+    if (result?.code === 401) {
+      return retryAfterRefresh(response.config)
+    }
     const message = result?.message || '请求失败'
     useFaToast().error('错误', { description: message })
     return Promise.reject(new Error(message))
   },
-  (error) => {
-    const message = error.response?.data?.message || error.message || '网络错误'
+  async (error: AxiosError) => {
+    if (error.response?.data) {
+      error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
+    }
+    if (error.response?.status === 401) {
+      return retryAfterRefresh(error.config)
+    }
+    const data = error.response?.data as BackendResult<unknown> | undefined
+    const message = data?.message || error.message || '网络错误'
     useFaToast().error('错误', { description: message })
     return Promise.reject(error)
   },
 )
+
+async function retryAfterRefresh(config?: InternalAxiosRequestConfig) {
+  if (!config || config.skipTokenRefresh || config.tokenRetried) {
+    useAppAccountStore().requestLogout()
+    return Promise.reject(new Error('登录已过期'))
+  }
+  config.tokenRetried = true
+  try {
+    await refreshTokenOnce()
+    config.data = config.apiPlainData
+    config.apiEncryptionKey = undefined
+    return userApi(config)
+  }
+  catch (error) {
+    useAppAccountStore().requestLogout()
+    return Promise.reject(error)
+  }
+}
+
+async function refreshTokenOnce() {
+  if (!refreshingToken) {
+    const refreshToken = localStorage.getItem('refreshToken')
+    if (!refreshToken) {
+      return Promise.reject(new Error('缺少刷新令牌'))
+    }
+    refreshingToken = userApi.post<unknown, { status: 1, error: '', data: LoginData }>(
+      'api/user/token/refresh',
+      { refreshToken },
+      { skipTokenRefresh: true },
+    ).then((res) => {
+      localStorage.setItem('token', res.data.token)
+      if (res.data.refreshToken) {
+        localStorage.setItem('refreshToken', res.data.refreshToken)
+      }
+      return res.data.token
+    }).finally(() => {
+      refreshingToken = null
+    })
+  }
+  return refreshingToken
+}
 
 export default {
   login: (data: { account: string, password: string }) => {
     return userApi.post<unknown, { status: 1, error: '', data: LoginData }>('api/user/login', {
       username: data.account,
       password: data.password,
-    })
+    }, { skipTokenRefresh: true })
   },
 
   refreshToken: (refreshToken: string) => {
-    return userApi.post<unknown, { status: 1, error: '', data: LoginData }>('api/user/token/refresh', { refreshToken })
+    return userApi.post<unknown, { status: 1, error: '', data: LoginData }>('api/user/token/refresh', { refreshToken }, { skipTokenRefresh: true })
   },
 
   register: (data: { username: string, email: string, password: string, nickname?: string }) => {
-    return userApi.post<unknown, { status: 1, error: '', data: RegisterData }>('api/user/register', data)
+    return userApi.post<unknown, { status: 1, error: '', data: RegisterData }>('api/user/register', data, { skipTokenRefresh: true })
   },
 
   verifyEmail: (token: string) => {
     return userApi.get<unknown, { status: 1, error: '', data: null }>('api/user/verify-email', {
       params: { token },
+      skipTokenRefresh: true,
     })
   },
 
