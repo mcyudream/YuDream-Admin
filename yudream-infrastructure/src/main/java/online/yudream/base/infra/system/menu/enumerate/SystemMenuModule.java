@@ -132,6 +132,27 @@ public enum SystemMenuModule {
             parentName = "THEME", permission = "system:setting:theme:edit")
     THEME_EDIT,
 
+    @MenuNode(code = "system:security", name = "安全中心", type = MenuNodeType.MENU,
+            parentName = "CONFIG", path = "/system/security", component = "system/security/index.vue",
+            icon = "i-ri:key-2-line", sort = 15)
+    SECURITY,
+
+    @MenuNode(code = "system:security:view", name = "查看安全中心", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:view")
+    SECURITY_VIEW,
+
+    @MenuNode(code = "system:security:edit", name = "编辑安全策略", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:edit")
+    SECURITY_EDIT,
+
+    @MenuNode(code = "system:security:api-key:create", name = "创建API Key", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:api-key:create")
+    SECURITY_API_KEY_CREATE,
+
+    @MenuNode(code = "system:security:api-key:revoke", name = "吊销API Key", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:api-key:revoke")
+    SECURITY_API_KEY_REVOKE,
+
     @MenuNode(code = "system:menu", name = "菜单管理", type = MenuNodeType.MENU,
             parentName = "CONFIG", path = "/system/menu", component = "system/menu/index.vue",
             icon = "i-ri:menu-2-line", sort = 10)
