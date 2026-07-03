@@ -68,5 +68,26 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:integration:log:view", name = "查看集成日志", type = MenuNodeType.BUTTON,
             parentName = "INTEGRATION", permission = "platform:integration:log:view")
-    INTEGRATION_LOG_VIEW
+    INTEGRATION_LOG_VIEW,
+
+    @MenuNode(code = "platform:document", name = "Word 模板", type = MenuNodeType.MENU,
+            path = "/platform/document", component = "platform/document/index.vue",
+            icon = "i-ri:file-word-2-line", sort = 70)
+    DOCUMENT,
+
+    @MenuNode(code = "platform:document:view", name = "查看Word模板", type = MenuNodeType.BUTTON,
+            parentName = "DOCUMENT", permission = "platform:document:view")
+    DOCUMENT_VIEW,
+
+    @MenuNode(code = "platform:document:edit", name = "编辑Word模板", type = MenuNodeType.BUTTON,
+            parentName = "DOCUMENT", permission = "platform:document:edit")
+    DOCUMENT_EDIT,
+
+    @MenuNode(code = "platform:document:generate", name = "生成Word文档", type = MenuNodeType.BUTTON,
+            parentName = "DOCUMENT", permission = "platform:document:generate")
+    DOCUMENT_GENERATE,
+
+    @MenuNode(code = "platform:document:log:view", name = "查看Word生成记录", type = MenuNodeType.BUTTON,
+            parentName = "DOCUMENT", permission = "platform:document:log:view")
+    DOCUMENT_LOG_VIEW
 }
