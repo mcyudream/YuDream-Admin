@@ -1,5 +1,6 @@
 package online.yudream.base.interfaces.platform.capability.service;
 
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.enumerate.CapabilityType;
 import online.yudream.base.domain.platform.capability.service.CapabilityProvider;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
@@ -66,7 +67,7 @@ public class SseCapabilityProvider implements CapabilityProvider {
 
     public SseEmitter connect() {
         if (!enabled.get()) {
-            throw new IllegalStateException("SSE 未启用");
+            throw new BizException("SSE 能力未启用，请先在平台能力中启用");
         }
         String id = UUID.randomUUID().toString();
         SseEmitter emitter = new SseEmitter(300_000L);
@@ -88,8 +89,7 @@ public class SseCapabilityProvider implements CapabilityProvider {
         }
         try {
             emitter.send(SseEmitter.event().name(event).data(message));
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             emitters.remove(id);
             emitter.completeWithError(e);
         }

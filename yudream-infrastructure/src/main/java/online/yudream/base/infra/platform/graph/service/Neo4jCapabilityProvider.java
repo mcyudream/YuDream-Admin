@@ -23,7 +23,7 @@ public class Neo4jCapabilityProvider implements CapabilityProvider {
                 CODE,
                 "Neo4j 图数据库",
                 CapabilityType.GRAPH,
-                "提供可选图数据库连接、Cypher 查询和查询日志能力",
+                "提供可选图数据库连接、Cypher 查询和查询日志能力，未启用时不会创建连接",
                 "i-ri:share-circle-line",
                 50,
                 Map.of(

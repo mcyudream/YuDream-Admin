@@ -77,6 +77,20 @@ public class CapabilityAppService {
         return CapabilityAssembler.toDTO(provider(cmd.getCode()).test(message));
     }
 
+    @Transactional(readOnly = true)
+    public boolean enabled(String code) {
+        return capabilityModuleRepo.findByCode(code)
+                .map(CapabilityModule::enabled)
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public void ensureEnabled(String code, String name) {
+        if (!enabled(code)) {
+            throw new BizException(name + "能力未启用，请先在平台能力中启用");
+        }
+    }
+
     public void syncDescriptors() {
         Map<String, CapabilityProvider> providerMap = providerMap();
         for (CapabilityProvider provider : providerMap.values()) {

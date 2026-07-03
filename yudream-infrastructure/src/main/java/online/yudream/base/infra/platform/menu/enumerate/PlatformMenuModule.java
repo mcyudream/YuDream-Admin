@@ -37,11 +37,11 @@ public enum PlatformMenuModule {
             icon = "i-ri:file-list-2-line", sort = 90)
     API_DOCS,
 
-    @MenuNode(code = "platform:docs:view", name = "查看API文档", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:docs:view", name = "查看 API 文档", type = MenuNodeType.BUTTON,
             parentName = "API_DOCS", permission = "platform:docs:view")
     API_DOCS_VIEW,
 
-    @MenuNode(code = "platform:docs:config", name = "配置API文档", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:docs:config", name = "配置 API 文档", type = MenuNodeType.BUTTON,
             parentName = "API_DOCS", permission = "platform:docs:config")
     API_DOCS_CONFIG,
 
@@ -58,7 +58,7 @@ public enum PlatformMenuModule {
             parentName = "INTEGRATION", permission = "platform:integration:edit")
     INTEGRATION_EDIT,
 
-    @MenuNode(code = "platform:integration:invoke", name = "执行HTTP调用", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:integration:invoke", name = "执行 HTTP 调用", type = MenuNodeType.BUTTON,
             parentName = "INTEGRATION", permission = "platform:integration:invoke")
     INTEGRATION_INVOKE,
 
@@ -75,19 +75,19 @@ public enum PlatformMenuModule {
             icon = "i-ri:file-word-2-line", sort = 70)
     DOCUMENT,
 
-    @MenuNode(code = "platform:document:view", name = "查看Word模板", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:document:view", name = "查看 Word 模板", type = MenuNodeType.BUTTON,
             parentName = "DOCUMENT", permission = "platform:document:view")
     DOCUMENT_VIEW,
 
-    @MenuNode(code = "platform:document:edit", name = "编辑Word模板", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:document:edit", name = "编辑 Word 模板", type = MenuNodeType.BUTTON,
             parentName = "DOCUMENT", permission = "platform:document:edit")
     DOCUMENT_EDIT,
 
-    @MenuNode(code = "platform:document:generate", name = "生成Word文档", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:document:generate", name = "生成 Word 文档", type = MenuNodeType.BUTTON,
             parentName = "DOCUMENT", permission = "platform:document:generate")
     DOCUMENT_GENERATE,
 
-    @MenuNode(code = "platform:document:log:view", name = "查看Word生成记录", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:document:log:view", name = "查看 Word 生成记录", type = MenuNodeType.BUTTON,
             parentName = "DOCUMENT", permission = "platform:document:log:view")
     DOCUMENT_LOG_VIEW,
 
