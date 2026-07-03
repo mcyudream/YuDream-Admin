@@ -1,6 +1,6 @@
 ---
 name: yudream-ddd-architecture
-description: Enforce YuDream Admin backend DDD layering and project-specific architecture. Use when modifying Java backend code, adding system modules, reviewing/refactoring controllers, assemblers, application services, domain aggregates, repositories, infrastructure implementations, Excel/import-export code, permission/menu code, or when the user asks about DDD conventions, Controller responsibilities, UTF-8/Chinese string cleanup, or project architecture rules.
+description: Enforce YuDream Admin backend DDD layering and project-specific architecture. Use when modifying Java backend code, adding system modules, reviewing/refactoring controllers, assemblers, application services, domain aggregates, repositories, infrastructure implementations, Excel/import-export code, permission/menu code, module-level git commits, Chinese commit messages, or when the user asks about DDD conventions, Controller responsibilities, UTF-8/Chinese string cleanup, or project architecture rules.
 ---
 
 # YuDream DDD Architecture
@@ -129,6 +129,13 @@ For frontend changes:
 ```powershell
 pnpm --config.engine-strict=false --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pretty false --skipLibCheck --ignoreDeprecations 6.0
 ```
+
+## Git Workflow
+
+- After completing each independently usable module, run the relevant verification, stage only files for that module, and create a git commit before moving to the next module.
+- Write commit messages in Chinese and make them describe the completed module or fix, for example `feat: 完成用户管理模块` or `fix: 修复菜单图标显示`.
+- Do not include unrelated local files such as IDE metadata or temporary setup files unless the user explicitly asks.
+- If a module cannot be committed because verification fails or the working tree contains conflicting user changes, report the blocker before continuing.
 
 ## Incremental Knowledge
 

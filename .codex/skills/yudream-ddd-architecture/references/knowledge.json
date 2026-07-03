@@ -11,6 +11,10 @@
     {
       "key": "normal-chinese-source",
       "text": "Use normal Chinese strings in source. Do not add Unicode escapes just because PowerShell displays mojibake; fix only actual mojibake in the file."
+    },
+    {
+      "key": "module-commit-chinese",
+      "text": "After completing each independently usable module, verify it, stage only module-related files, and commit immediately with a Chinese commit message. Do not include unrelated local files."
     }
   ],
   "utilities": [
