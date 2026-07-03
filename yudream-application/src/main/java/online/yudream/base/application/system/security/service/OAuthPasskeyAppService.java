@@ -4,12 +4,15 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.security.assembler.ApiSecurityAssembler;
 import online.yudream.base.application.system.security.cmd.OAuthClientSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyRegistrationFinishCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyRegistrationStartCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
 import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
 import online.yudream.base.application.system.security.dto.OAuthClientCreateResultDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientDTO;
 import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
 import online.yudream.base.application.system.security.dto.PasskeyCredentialDTO;
+import online.yudream.base.application.system.security.dto.PasskeyRegistrationOptionsDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
 import online.yudream.base.domain.system.security.aggregate.OAuthProviderRegistration;
@@ -17,6 +20,11 @@ import online.yudream.base.domain.system.security.aggregate.PasskeyCredential;
 import online.yudream.base.domain.system.security.repo.OAuthClientRegistrationRepo;
 import online.yudream.base.domain.system.security.repo.OAuthProviderRegistrationRepo;
 import online.yudream.base.domain.system.security.repo.PasskeyCredentialRepo;
+import online.yudream.base.domain.system.security.service.PasskeyCeremonyGateway;
+import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationOptions;
+import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationResult;
+import online.yudream.base.domain.system.user.aggregate.User;
+import online.yudream.base.domain.system.user.repo.UserRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +41,8 @@ public class OAuthPasskeyAppService {
     private final OAuthClientRegistrationRepo oauthClientRegistrationRepo;
     private final OAuthProviderRegistrationRepo oauthProviderRegistrationRepo;
     private final PasskeyCredentialRepo passkeyCredentialRepo;
+    private final UserRepo userRepo;
+    private final PasskeyCeremonyGateway passkeyCeremonyGateway;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional(readOnly = true)
@@ -111,6 +121,33 @@ public class OAuthPasskeyAppService {
     @Transactional(readOnly = true)
     public List<PasskeyCredentialDTO> listPasskeys(Long userId) {
         return passkeyCredentialRepo.findByUserId(userId).stream().map(ApiSecurityAssembler::toDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PasskeyRegistrationOptionsDTO startPasskeyRegistration(PasskeyRegistrationStartCmd cmd) {
+        User user = userRepo.findById(cmd.getUserId()).orElseThrow(() -> new BizException("用户不存在"));
+        PasskeyRegistrationOptions options = passkeyCeremonyGateway.startRegistration(
+                user.getId(),
+                user.getUsername(),
+                user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname(),
+                passkeyCredentialRepo.findByUserId(user.getId())
+        );
+        return PasskeyRegistrationOptionsDTO.builder()
+                .requestJson(options.requestJson())
+                .publicKeyJson(options.publicKeyJson())
+                .build();
+    }
+
+    @Transactional
+    public PasskeyCredentialDTO finishPasskeyRegistration(PasskeyRegistrationFinishCmd cmd) {
+        User user = userRepo.findById(cmd.getUserId()).orElseThrow(() -> new BizException("用户不存在"));
+        PasskeyRegistrationResult result = passkeyCeremonyGateway.finishRegistration(cmd.getRequestJson(), cmd.getResponseJson());
+        if (passkeyCredentialRepo.findByCredentialId(result.credentialId()).isPresent()) {
+            throw new BizException("Passkey 凭据已存在");
+        }
+        PasskeyCredential credential = PasskeyCredential.create(user.getId(), result.credentialId(), result.publicKey(), cmd.getDeviceName());
+        credential.markUsed(result.signCount(), null);
+        return ApiSecurityAssembler.toDTO(passkeyCredentialRepo.save(credential));
     }
 
     @Transactional

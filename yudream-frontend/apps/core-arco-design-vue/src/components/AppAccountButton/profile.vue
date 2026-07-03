@@ -3,6 +3,7 @@ import type { PasskeyCredential, PasskeyStatus, UserProfilePayload } from '@/api
 import EditPassword from '@/components/AppAccountForm/edit-password.vue'
 import apiProfile from '@/api/modules/profile'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { createPasskeyRegistrationResponse } from '@/utils/webauthn'
 
 const modal = useFaModal()
 const toast = useFaToast()
@@ -12,6 +13,7 @@ const active = ref(0)
 const loading = ref(false)
 const saving = ref(false)
 const loadingPasskeys = ref(false)
+const bindingPasskey = ref(false)
 const avatarInput = ref<HTMLInputElement>()
 const passkeys = ref<PasskeyCredential[]>([])
 const form = reactive<UserProfilePayload>({
@@ -111,6 +113,29 @@ async function uploadAvatar(event: Event) {
   toast.success('头像已更新')
 }
 
+async function bindPasskey() {
+  bindingPasskey.value = true
+  try {
+    const deviceNameInput = window.prompt('请输入设备名称', `${profile.value.username} 的 Passkey`)
+    if (deviceNameInput === null) {
+      return
+    }
+    const deviceName = deviceNameInput || undefined
+    const options = await apiProfile.startPasskeyRegistration()
+    const responseJson = await createPasskeyRegistrationResponse(options.data.publicKeyJson)
+    await apiProfile.finishPasskeyRegistration({
+      deviceName,
+      requestJson: options.data.requestJson,
+      responseJson,
+    })
+    toast.success('Passkey 已绑定')
+    await loadPasskeys()
+  }
+  finally {
+    bindingPasskey.value = false
+  }
+}
+
 function confirmRevokePasskey(row: PasskeyCredential) {
   modal.confirm({
     title: '吊销 Passkey',
@@ -198,10 +223,16 @@ function passkeyStatusText(status: PasskeyStatus) {
                 管理已经绑定到当前账号的设备凭据。
               </div>
             </div>
-            <FaButton variant="outline" :loading="loadingPasskeys" @click="loadPasskeys">
-              <FaIcon name="i-ri:refresh-line" />
-              刷新
-            </FaButton>
+            <div class="flex gap-2">
+              <FaButton variant="outline" :loading="loadingPasskeys" @click="loadPasskeys">
+                <FaIcon name="i-ri:refresh-line" />
+                刷新
+              </FaButton>
+              <FaButton :loading="bindingPasskey" @click="bindPasskey">
+                <FaIcon name="i-ri:fingerprint-line" />
+                绑定 Passkey
+              </FaButton>
+            </div>
           </div>
           <div v-loading="loadingPasskeys" class="passkey-list">
             <div v-if="!passkeys.length" class="passkey-empty">

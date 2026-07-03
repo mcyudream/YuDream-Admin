@@ -34,7 +34,7 @@ public class PasskeyCredential extends BaseDomain {
         credential.userId = userId;
         credential.credentialId = required(credentialId, "Passkey 凭据ID不能为空");
         credential.publicKey = required(publicKey, "Passkey 公钥不能为空");
-        credential.deviceName = deviceName;
+        credential.deviceName = deviceName == null || deviceName.isBlank() ? "未命名设备" : deviceName.trim();
         credential.status = CredentialStatus.ACTIVE;
         return credential;
     }

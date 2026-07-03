@@ -9,6 +9,8 @@ import online.yudream.base.application.system.security.cmd.OAuthClientSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthAuthorizeCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthTokenCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyRegistrationFinishCmd;
+import online.yudream.base.application.system.security.cmd.PasskeyRegistrationStartCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
 import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
 import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO;
@@ -24,6 +26,7 @@ import online.yudream.base.application.system.security.dto.OAuthClientDTO;
 import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
 import online.yudream.base.application.system.security.dto.OAuthTokenDTO;
 import online.yudream.base.application.system.security.dto.PasskeyCredentialDTO;
+import online.yudream.base.application.system.security.dto.PasskeyRegistrationOptionsDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.system.security.request.ApiKeyCreateRequest;
 import online.yudream.base.interfaces.system.security.request.ApiSecurityPolicyUpdateRequest;
@@ -33,6 +36,7 @@ import online.yudream.base.interfaces.system.security.request.OAuthClientCallbac
 import online.yudream.base.interfaces.system.security.request.OAuthClientSaveRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthProviderSaveRequest;
 import online.yudream.base.interfaces.system.security.request.OAuthTokenRequest;
+import online.yudream.base.interfaces.system.security.request.PasskeyRegistrationFinishRequest;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.ApiEncryptedPayloadRes;
@@ -46,6 +50,7 @@ import online.yudream.base.interfaces.system.security.res.OAuthClientRes;
 import online.yudream.base.interfaces.system.security.res.OAuthProviderRes;
 import online.yudream.base.interfaces.system.security.res.OAuthTokenRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyCredentialRes;
+import online.yudream.base.interfaces.system.security.res.PasskeyRegistrationOptionsRes;
 import org.springframework.web.servlet.view.RedirectView;
 
 import java.util.List;
@@ -176,6 +181,21 @@ public class ApiSecurityWebAssembler {
         PasskeySelfRevokeCmd cmd = new PasskeySelfRevokeCmd();
         cmd.setId(id);
         cmd.setUserId(userId);
+        return cmd;
+    }
+
+    public static PasskeyRegistrationStartCmd toPasskeyRegistrationStartCmd(Long userId) {
+        PasskeyRegistrationStartCmd cmd = new PasskeyRegistrationStartCmd();
+        cmd.setUserId(userId);
+        return cmd;
+    }
+
+    public static PasskeyRegistrationFinishCmd toPasskeyRegistrationFinishCmd(Long userId, PasskeyRegistrationFinishRequest request) {
+        PasskeyRegistrationFinishCmd cmd = new PasskeyRegistrationFinishCmd();
+        cmd.setUserId(userId);
+        cmd.setDeviceName(request.getDeviceName());
+        cmd.setRequestJson(request.getRequestJson());
+        cmd.setResponseJson(request.getResponseJson());
         return cmd;
     }
 
@@ -335,6 +355,13 @@ public class ApiSecurityWebAssembler {
                 .lastUsedTime(dto.getLastUsedTime())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
+                .build();
+    }
+
+    public static PasskeyRegistrationOptionsRes toRes(PasskeyRegistrationOptionsDTO dto) {
+        return PasskeyRegistrationOptionsRes.builder()
+                .requestJson(dto.getRequestJson())
+                .publicKeyJson(dto.getPublicKeyJson())
                 .build();
     }
 }
