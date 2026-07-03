@@ -90,7 +90,7 @@ public class OAuthPasskeyAppService {
                 cmd.getTokenUri(),
                 cmd.getUserInfoUri(),
                 cmd.getClientId(),
-                cmd.getClientSecret() == null || cmd.getClientSecret().isBlank() ? null : ApiKeySecretHasher.hash(cmd.getClientSecret()),
+                cmd.getClientSecret(),
                 cmd.getAuthMethod(),
                 cmd.getScopes(),
                 cmd.getRedirectUri(),
