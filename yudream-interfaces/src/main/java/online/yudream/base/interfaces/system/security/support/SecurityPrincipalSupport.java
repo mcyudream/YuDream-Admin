@@ -24,6 +24,18 @@ public class SecurityPrincipalSupport {
         return new SecurityPrincipal(Long.valueOf(String.valueOf(loginId)), StpUtil.getPermissionList());
     }
 
+    public static boolean hasApiKeyAuthentication() {
+        return ApiKeyAuthenticationContext.get() != null;
+    }
+
+    public static boolean hasLoginAuthentication() {
+        return StpUtil.getLoginIdDefaultNull() != null;
+    }
+
+    public static boolean hasAnyAuthentication() {
+        return hasApiKeyAuthentication() || hasLoginAuthentication();
+    }
+
     public record SecurityPrincipal(Long userId, List<String> permissions) {
 
         public boolean superAdmin() {

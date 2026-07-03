@@ -5,7 +5,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.docs.dto.ApiDocSettingsDTO;
 import online.yudream.base.application.platform.docs.service.ApiDocAppService;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -23,11 +25,25 @@ public class ApiDocAccessFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (isApiDocRequest(request) && !apiDocAppService.enabled()) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            return;
+        if (isApiDocRequest(request)) {
+            ApiDocSettingsDTO settings = apiDocAppService.settings();
+            if (!settings.isEnabled()) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND);
+                return;
+            }
+            if (!allowed(settings)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean allowed(ApiDocSettingsDTO settings) {
+        if (settings.isApiKeyAccessEnabled()) {
+            return SecurityPrincipalSupport.hasAnyAuthentication();
+        }
+        return SecurityPrincipalSupport.hasLoginAuthentication();
     }
 
     private boolean isApiDocRequest(HttpServletRequest request) {
