@@ -51,6 +51,7 @@ import online.yudream.base.interfaces.system.security.res.OAuthProviderRes;
 import online.yudream.base.interfaces.system.security.res.OAuthTokenRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyRegistrationOptionsRes;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport.SecurityPrincipal;
 import org.springframework.web.servlet.view.RedirectView;
 
 import java.util.List;
@@ -87,9 +88,15 @@ public class ApiSecurityWebAssembler {
         return cmd;
     }
 
-    public static ApiKeyRevokeCmd toRevokeCmd(Long id) {
+    public static ApiKeyCreateCmd toCmd(ApiKeyCreateRequest request, SecurityPrincipal principal) {
+        return toCmd(request, principal.userId(), principal.permissions());
+    }
+
+    public static ApiKeyRevokeCmd toRevokeCmd(Long id, SecurityPrincipal principal) {
         ApiKeyRevokeCmd cmd = new ApiKeyRevokeCmd();
         cmd.setId(id);
+        cmd.setOperatorUserId(principal.userId());
+        cmd.setSuperAdmin(principal.superAdmin());
         return cmd;
     }
 

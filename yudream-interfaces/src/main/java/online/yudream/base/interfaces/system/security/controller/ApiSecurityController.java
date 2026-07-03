@@ -1,6 +1,5 @@
 package online.yudream.base.interfaces.system.security.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.security.query.ApiKeyPageQuery;
@@ -16,6 +15,7 @@ import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.ApiEncryptionPublicKeyRes;
 import online.yudream.base.interfaces.system.security.res.ApiSecurityPolicyRes;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,12 +59,13 @@ public class ApiSecurityController {
     @PermissionRegister(code = "system:security:api-key:create", name = "创建 API Key", module = "系统管理", desc = "创建系统 API Key")
     public Result<ApiKeyCreateResultRes> createApiKey(@Valid @RequestBody ApiKeyCreateRequest request) {
         return Result.ok(ApiSecurityWebAssembler.toRes(apiSecurityAppService.createApiKey(
-                ApiSecurityWebAssembler.toCmd(request, StpUtil.getLoginIdAsLong(), StpUtil.getPermissionList()))));
+                ApiSecurityWebAssembler.toCmd(request, SecurityPrincipalSupport.current()))));
     }
 
     @PostMapping("/api-keys/{id}/revoke")
     @PermissionRegister(code = "system:security:api-key:revoke", name = "吊销 API Key", module = "系统管理", desc = "吊销系统 API Key")
     public Result<ApiKeyCredentialRes> revokeApiKey(@PathVariable Long id) {
-        return Result.ok(ApiSecurityWebAssembler.toRes(apiSecurityAppService.revokeApiKey(ApiSecurityWebAssembler.toRevokeCmd(id))));
+        return Result.ok(ApiSecurityWebAssembler.toRes(apiSecurityAppService.revokeApiKey(
+                ApiSecurityWebAssembler.toRevokeCmd(id, SecurityPrincipalSupport.current()))));
     }
 }
