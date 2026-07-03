@@ -67,7 +67,7 @@ Rules:
 - Repository implementations implement domain repo interfaces.
 - Data objects never leak to application or interface layers.
 - Mapper methods belong in infra `mapper`, not controller or application service.
-- External systems (S3, Redis, Sa-Token gateway details, mail) live here behind domain/application contracts.
+- External systems such as S3, Redis, Sa-Token gateway details, mail, RabbitMQ, and Neo4j live here behind domain/application contracts.
 
 ### Interface Layer
 
@@ -93,6 +93,14 @@ Assembler hard rules:
 - Application assembler converts `domain -> application DTO` and similar application-internal transformations.
 - Infrastructure mapper converts `domain <-> dataobj`.
 
+## Platform Capabilities
+
+- Security and identity abilities such as interface encryption, dual token, API Key, Passkey, and OAuth belong in `system`.
+- Optional engineering abilities such as SSE, WebSocket, MQ, Neo4j, Python Runtime, HTTP integration, document generation, and CMS belong in `platform`.
+- Platform capabilities default to disabled and must support dynamic enable/disable.
+- Disabled platform capabilities must not create external connections, declare middleware resources, or require projects to configure unused middleware.
+- Enabled platform capabilities should be driven by capability config and should lazily connect when a business operation or health/test action actually needs the external system.
+
 ## Excel / Import Export
 
 - Use EasyExcel for `.xlsx` import/export.
@@ -105,7 +113,7 @@ Assembler hard rules:
 
 - Do not convert Chinese strings to `\uXXXX` escapes.
 - Do not change files merely because PowerShell prints mojibake.
-- Do fix actual source text that contains mojibake such as `鐢ㄦ埛`, `绯荤粺`, `鍒犻櫎`, `鏄?`, `涓嶅瓨鍦?`.
+- Do fix actual source text that contains mojibake, such as Chinese text decoded into garbled CJK characters or broken question-mark fragments.
 - Prefer normal Chinese in source files when existing project files are already UTF-8.
 - Keep generated frontend display text localized in Chinese.
 
@@ -115,7 +123,7 @@ Before finishing backend work, run targeted scans:
 
 ```powershell
 rg -n "private .*to[A-Z]|new .*Cmd|new .*ExcelRow|\\.builder\\(\\)" yudream-interfaces/src/main/java/online/yudream/base/interfaces -g "*Controller.java"
-rg -n "鐢ㄦ埛|绯荤粺|鍒犻櫎|鏄\\?|涓嶅瓨鍦|\\\\u[0-9a-fA-F]{4}" yudream-*/src/main/java -g "*.java"
+rg -n "\\\\u[0-9a-fA-F]{4}|\\?\\)" yudream-domain/src/main/java yudream-application/src/main/java yudream-infrastructure/src/main/java yudream-interfaces/src/main/java yudream-bootstrap/src/main/java -g "*.java"
 ```
 
 Then verify:
@@ -143,7 +151,7 @@ Use `references/knowledge.json` for project-specific lessons, utilities, and rec
 - the user repeatedly corrects a style or architecture issue;
 - a bug has a reusable diagnosis/fix;
 - a utility, endpoint, or component is useful enough to reuse;
-- a rule is important but too detailed for the core SKILL.md.
+- a rule is important but too detailed for the core `SKILL.md`.
 
 Append with:
 

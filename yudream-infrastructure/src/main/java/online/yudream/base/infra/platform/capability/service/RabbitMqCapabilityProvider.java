@@ -42,7 +42,7 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
                 CODE,
                 "RabbitMQ",
                 CapabilityType.MESSAGING,
-                "按需提供 AMQP 消息发送与队列连通性测试，未启用时不创建连接",
+                "按需提供 AMQP 消息发送与队列连通性测试，未启用时不会创建连接",
                 "i-ri:message-3-line",
                 80,
                 Map.of(
@@ -75,8 +75,7 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
                     "queue", queue(),
                     "routingKey", routingKey()
             ));
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return CapabilityHealth.error("RabbitMQ 连接失败：" + e.getMessage());
         }
     }
@@ -104,8 +103,7 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
             declareRuntimeObjects();
             ensureTemplate().convertAndSend(exchange(), routingKey(), message);
             return CapabilityTestResult.success("RabbitMQ 测试消息已发送");
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return CapabilityTestResult.failure("RabbitMQ 测试发送失败：" + e.getMessage());
         }
     }
@@ -150,8 +148,7 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
     private int port() {
         try {
             return Integer.parseInt(config.getOrDefault("port", DEFAULT_PORT));
-        }
-        catch (NumberFormatException e) {
+        } catch (NumberFormatException e) {
             return Integer.parseInt(DEFAULT_PORT);
         }
     }

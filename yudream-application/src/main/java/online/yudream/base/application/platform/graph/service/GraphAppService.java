@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.graph.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.graph.assembler.GraphAssembler;
 import online.yudream.base.application.platform.graph.cmd.GraphConnectionSaveCmd;
 import online.yudream.base.application.platform.graph.cmd.GraphQueryCmd;
@@ -9,7 +10,6 @@ import online.yudream.base.application.platform.graph.dto.GraphQueryLogDTO;
 import online.yudream.base.application.platform.graph.query.GraphPageQuery;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.graph.aggregate.GraphConnection;
 import online.yudream.base.domain.platform.graph.aggregate.GraphQueryLog;
 import online.yudream.base.domain.platform.graph.repo.GraphConnectionRepo;
@@ -29,7 +29,7 @@ public class GraphAppService {
 
     private static final String GRAPH_CAPABILITY_CODE = "neo4j";
 
-    private final CapabilityModuleRepo capabilityModuleRepo;
+    private final CapabilityAppService capabilityAppService;
     private final GraphConnectionRepo graphConnectionRepo;
     private final GraphQueryLogRepo graphQueryLogRepo;
     private final GraphDatabaseGateway graphDatabaseGateway;
@@ -118,11 +118,6 @@ public class GraphAppService {
     }
 
     private void ensureGraphEnabled() {
-        boolean enabled = capabilityModuleRepo.findByCode(GRAPH_CAPABILITY_CODE)
-                .map(module -> Boolean.TRUE.equals(module.getEnabled()))
-                .orElse(false);
-        if (!enabled) {
-            throw new BizException("Neo4j 图数据库能力未启用");
-        }
+        capabilityAppService.ensureEnabled(GRAPH_CAPABILITY_CODE, "Neo4j 图数据库");
     }
 }

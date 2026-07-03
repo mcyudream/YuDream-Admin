@@ -55,9 +55,8 @@ public class WebSocketCapabilityProvider extends TextWebSocketHandler implements
         enabled.set(false);
         sessions.values().forEach(session -> {
             try {
-                session.close(CloseStatus.SERVICE_RESTARTED);
-            }
-            catch (IOException ignored) {
+                session.close(CloseStatus.SERVICE_RESTARTED.withReason("WebSocket 能力已停用"));
+            } catch (IOException ignored) {
             }
         });
         sessions.clear();
@@ -75,7 +74,7 @@ public class WebSocketCapabilityProvider extends TextWebSocketHandler implements
     @Override
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         if (!enabled.get()) {
-            session.close(CloseStatus.POLICY_VIOLATION.withReason("WebSocket 未启用"));
+            session.close(CloseStatus.POLICY_VIOLATION.withReason("WebSocket 能力未启用"));
             return;
         }
         sessions.put(session.getId(), session);
@@ -98,8 +97,7 @@ public class WebSocketCapabilityProvider extends TextWebSocketHandler implements
                 if (session.isOpen()) {
                     session.sendMessage(new TextMessage(message));
                 }
-            }
-            catch (IOException ignored) {
+            } catch (IOException ignored) {
             }
         });
     }
