@@ -1,4 +1,4 @@
-package online.yudream.base.domain.valobj.common;
+package online.yudream.base.domain.valobj;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

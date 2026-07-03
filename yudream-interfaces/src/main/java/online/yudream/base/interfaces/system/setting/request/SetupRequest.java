@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import online.yudream.base.interfaces.common.validation.anno.PasswordRule;
 
 /**
  * 系统初始化请求。
@@ -26,6 +27,7 @@ public class SetupRequest {
 
     @NotBlank(message = "管理员密码不能为空")
     @Size(min = 6, max = 18, message = "密码长度为6到18位")
+    @PasswordRule
     private String adminPassword;
 
     @NotBlank(message = "确认密码不能为空")

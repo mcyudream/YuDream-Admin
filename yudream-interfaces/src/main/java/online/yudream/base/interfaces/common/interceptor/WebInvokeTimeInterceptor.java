@@ -1,9 +1,12 @@
 package online.yudream.base.interfaces.common.interceptor;
 
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
+import online.yudream.base.domain.system.monitor.dto.ApiLogDTO;
 import online.yudream.base.interfaces.common.config.WebLogProperties;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -12,18 +15,15 @@ import org.springframework.web.util.ContentCachingRequestWrapper;
 import java.io.UnsupportedEncodingException;
 import java.util.Map;
 
-/**
- * Web 请求耗时拦截器。
- * <p>
- * 以多行、缩进、带前缀的方式输出请求开始与结束信息，方便阅读。
- */
 @Slf4j
 @RequiredArgsConstructor
 public class WebInvokeTimeInterceptor implements HandlerInterceptor {
 
     private static final String START_TIME_ATTR = "WEB_LOG_START_TIME";
+    private static final int MAX_BODY_LENGTH = 2000;
 
     private final WebLogProperties properties;
+    private final SystemMonitorAppService systemMonitorAppService;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -35,15 +35,12 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         String p = prefix();
         String url = request.getMethod() + " " + request.getRequestURI();
         String params = formatParams(request);
-
-        log.info("{} ▶ 开始请求\n{}   URL   : {}\n{}   参数  : {}",
-                p, p, url, p, params);
+        log.info("{} > start request\n{}   URL   : {}\n{}   params: {}", p, p, url, p, params);
         return true;
     }
 
     @Override
-    public void afterCompletion(HttpServletRequest request, HttpServletResponse response,
-                                Object handler, Exception ex) {
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         if (!properties.isEnabled()) {
             return;
         }
@@ -54,9 +51,9 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         String url = request.getMethod() + " " + request.getRequestURI();
         String params = formatParams(request);
         String body = formatBody(request);
-
-        log.info("{} ◀ 结束请求\n{}   URL   : {}\n{}   参数  : {}\n{}   请求体: {}\n{}   耗时  : {}ms",
+        log.info("{} < end request\n{}   URL   : {}\n{}   params: {}\n{}   body  : {}\n{}   cost  : {}ms",
                 p, p, url, p, params, p, body, p, cost);
+        recordApiLog(request, response, ex, cost, body);
     }
 
     private String prefix() {
@@ -72,7 +69,7 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         if (!paramMap.isEmpty()) {
             return paramMap.toString();
         }
-        return "无";
+        return "none";
     }
 
     private String formatBody(HttpServletRequest request) {
@@ -82,13 +79,67 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
                 try {
                     String encoding = wrapper.getCharacterEncoding();
                     String body = new String(buf, StringUtils.hasText(encoding) ? encoding : "UTF-8");
-                    return StringUtils.hasText(body) ? body : "无";
+                    return StringUtils.hasText(body) ? body : "none";
                 }
                 catch (UnsupportedEncodingException e) {
-                    return "[读取请求体失败]";
+                    return "[body read failed]";
                 }
             }
         }
-        return "无";
+        return "none";
+    }
+
+    private void recordApiLog(HttpServletRequest request, HttpServletResponse response, Exception ex, long cost, String body) {
+        try {
+            systemMonitorAppService.recordApiLog(ApiLogDTO.builder()
+                    .method(request.getMethod())
+                    .path(request.getRequestURI())
+                    .query(request.getQueryString())
+                    .requestBody(limit(maskSensitiveBody(body)))
+                    .status(response.getStatus())
+                    .costMs(cost)
+                    .success(ex == null && response.getStatus() < 400)
+                    .loginId(currentLoginId())
+                    .ip(clientIp(request))
+                    .userAgent(request.getHeader("User-Agent"))
+                    .errorMessage(ex == null ? null : ex.getMessage())
+                    .build());
+        }
+        catch (Exception ignored) {
+            log.debug("Record API log failed", ignored);
+        }
+    }
+
+    private Long currentLoginId() {
+        try {
+            Object loginId = StpUtil.getLoginIdDefaultNull();
+            return loginId == null ? null : Long.valueOf(String.valueOf(loginId));
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (StringUtils.hasText(forwarded)) {
+            return forwarded.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        return StringUtils.hasText(realIp) ? realIp : request.getRemoteAddr();
+    }
+
+    private String limit(String value) {
+        if (value == null || value.length() <= MAX_BODY_LENGTH) {
+            return value;
+        }
+        return value.substring(0, MAX_BODY_LENGTH);
+    }
+
+    private String maskSensitiveBody(String value) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        return value.replaceAll("(?i)(\"password\"\\s*:\\s*\")([^\"]*)(\")", "$1******$3");
     }
 }

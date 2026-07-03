@@ -3,6 +3,7 @@ package online.yudream.base.domain.system.user.aggregate;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
@@ -58,6 +59,31 @@ public class Role extends BaseDomain {
         if (!permissions.contains(permissionId)) {
             permissions.add(permissionId);
         }
+    }
+
+    public void updateBasic(String name, String code, DeptID deptId, RoleLevel level) {
+        if (systemRole && !this.code.equals(code)) {
+            throw new BizException("系统角色编码不可修改");
+        }
+        this.name = name;
+        this.code = code;
+        this.deptId = deptId;
+        this.level = level;
+    }
+
+    public void replacePermissions(List<PermissionID> permissions) {
+        this.permissions = permissions == null ? new ArrayList<>() : new ArrayList<>(permissions);
+    }
+
+    public void activate() {
+        this.status = RoleStatus.ACTIVE;
+    }
+
+    public void deactivate() {
+        if (systemRole) {
+            throw new BizException("系统角色不可停用");
+        }
+        this.status = RoleStatus.DEPRECATED;
     }
 
     public boolean hasPermission(String permissionCode) {

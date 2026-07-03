@@ -24,5 +24,6 @@ public class UserLoginRes implements Serializable {
     private String username;
     private String nickname;
     private String email;
+    private String avatar;
     private LocalDateTime createTime;
 }

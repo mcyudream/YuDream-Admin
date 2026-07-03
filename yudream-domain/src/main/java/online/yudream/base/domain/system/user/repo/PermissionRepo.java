@@ -14,10 +14,12 @@ public interface PermissionRepo {
 
     List<Permission> findAll();
 
+    List<Permission> findActive();
+
     /**
-     * 将不在指定 code 集合中的权限标记为已弃用。
+     * 将不在指定 code 集合中、且来源为注解扫描的权限标记为已弃用。
      *
      * @param codes 当前有效的权限编码集合
      */
-    void deprecateByCodesNotIn(Collection<String> codes);
+    void deprecateAnnotationByCodesNotIn(Collection<String> codes);
 }

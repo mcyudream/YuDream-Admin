@@ -1,0 +1,48 @@
+{
+  "rules": [
+    {
+      "key": "controller-no-mapping",
+      "text": "Controller must not create Cmd/Res/ExcelRow, template rows, or private toXxx/parseXxx helpers. Put boundary conversions in interface assembler."
+    },
+    {
+      "key": "application-assembler",
+      "text": "Application service should not accumulate large toDTO/toDomain conversion methods. Put domain-to-DTO mapping in application assembler."
+    },
+    {
+      "key": "normal-chinese-source",
+      "text": "Use normal Chinese strings in source. Do not add Unicode escapes just because PowerShell displays mojibake; fix only actual mojibake in the file."
+    }
+  ],
+  "utilities": [
+    {
+      "key": "frontend-excel-utils",
+      "path": "yudream-frontend/apps/core-arco-design-vue/src/utils/excel.ts",
+      "methods": [
+        "saveExcelResponse(response, fallbackName)",
+        "pickExcelFile(onPick)",
+        "excelForm(file)",
+        "importResultMessage(result)"
+      ],
+      "example": "const res = await apiExcel.exportUsers(params); saveExcelResponse(res, '用户管理.xlsx')"
+    },
+    {
+      "key": "excel-http-support",
+      "path": "yudream-interfaces/src/main/java/online/yudream/base/interfaces/system/excel/support/ExcelHttpSupport.java",
+      "methods": [
+        "write(response, filename, sheetName, rowClass, rows)",
+        "importRows(file, rowClass, importer)"
+      ],
+      "example": "ExcelHttpSupport.write(response, \"用户管理\", \"用户\", UserExcelRow.class, rows);"
+    }
+  ],
+  "pitfalls": [
+    {
+      "key": "role-bound-to-dept",
+      "text": "User role assignment is department-scoped. Frontend and backend must avoid assigning roles outside the user's selected departments."
+    },
+    {
+      "key": "s3-rustfs-bucket-head",
+      "text": "RustFS may reject S3 HeadBucket even when object operations can continue. Do not fail upload only because bucket head check is forbidden."
+    }
+  ]
+}

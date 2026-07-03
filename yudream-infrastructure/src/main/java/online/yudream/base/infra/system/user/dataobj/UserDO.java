@@ -5,7 +5,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import online.yudream.base.infra.common.baseobj.BaseDO;
+import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -26,5 +30,13 @@ public class UserDO extends BaseDO {
 
     private String password;
 
+    private Long avatarFileId;
+
     private boolean emailVerified;
+
+    private UserStatus status = UserStatus.ACTIVE;
+
+    private List<UserDeptDO> depts = new ArrayList<>();
+
+    private List<Long> roleIds = new ArrayList<>();
 }

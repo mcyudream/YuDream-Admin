@@ -2,9 +2,7 @@ package online.yudream.base.interfaces.system.setting.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import online.yudream.base.application.system.setting.dto.SetupStatusDTO;
 import online.yudream.base.application.system.setting.service.SetupAppService;
-import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.setting.assembler.SetupWebAssembler;
 import online.yudream.base.interfaces.system.setting.request.SetupRequest;
@@ -27,15 +25,12 @@ public class SetupController {
 
     @GetMapping("/status")
     public Result<SetupStatusRes> status() {
-        SetupStatusDTO dto = setupAppService.isSetupRequired();
-        return Result.ok(SetupStatusRes.builder()
-                .setupCompleted(dto.isSetupCompleted())
-                .build());
+        return Result.ok(SetupWebAssembler.toRes(setupAppService.isSetupRequired()));
     }
 
     @PostMapping("/init")
     public Result<Void> init(@Valid @RequestBody SetupRequest request) {
-        User user = setupAppService.initialize(SetupWebAssembler.toCmd(request));
+        setupAppService.initialize(SetupWebAssembler.toCmd(request));
         return Result.ok();
     }
 }

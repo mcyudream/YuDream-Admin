@@ -19,8 +19,8 @@ public class UserRegisterMailService implements UserRegisterMailSender {
 
     private final MailSender mailSender;
 
-    @Value("${app.base-url:http://localhost:8080}")
-    private String baseUrl;
+    @Value("${app.web-url:${app.base-url:http://localhost:9000}}")
+    private String webUrl;
 
     /**
      * 发送邮箱验证邮件。
@@ -30,7 +30,7 @@ public class UserRegisterMailService implements UserRegisterMailSender {
      * @param token    验证 token
      */
     public void sendVerifyEmail(String username, String email, String token) {
-        String verifyUrl = baseUrl + "/api/user/verify-email?token=" + token;
+        String verifyUrl = webUrl + "/verify-email?token=" + token;
         MailMessage message = MailMessage.builder()
                 .to(List.of(email))
                 .subject("邮箱验证")
