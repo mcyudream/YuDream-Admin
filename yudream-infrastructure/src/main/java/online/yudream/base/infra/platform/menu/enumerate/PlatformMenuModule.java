@@ -89,5 +89,22 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:document:log:view", name = "查看Word生成记录", type = MenuNodeType.BUTTON,
             parentName = "DOCUMENT", permission = "platform:document:log:view")
-    DOCUMENT_LOG_VIEW
+    DOCUMENT_LOG_VIEW,
+
+    @MenuNode(code = "platform:cms", name = "内容定制", type = MenuNodeType.MENU,
+            path = "/platform/cms", component = "platform/cms/index.vue",
+            icon = "i-ri:layout-masonry-line", sort = 60)
+    CMS,
+
+    @MenuNode(code = "platform:cms:view", name = "查看内容定制", type = MenuNodeType.BUTTON,
+            parentName = "CMS", permission = "platform:cms:view")
+    CMS_VIEW,
+
+    @MenuNode(code = "platform:cms:edit", name = "编辑内容定制", type = MenuNodeType.BUTTON,
+            parentName = "CMS", permission = "platform:cms:edit")
+    CMS_EDIT,
+
+    @MenuNode(code = "platform:cms:publish", name = "发布内容页面", type = MenuNodeType.BUTTON,
+            parentName = "CMS", permission = "platform:cms:publish")
+    CMS_PUBLISH
 }

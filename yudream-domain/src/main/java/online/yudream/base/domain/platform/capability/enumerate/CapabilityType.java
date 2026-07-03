@@ -5,5 +5,6 @@ public enum CapabilityType {
     MESSAGING,
     DOCUMENTATION,
     INTEGRATION,
-    DOCUMENT
+    DOCUMENT,
+    CONTENT
 }

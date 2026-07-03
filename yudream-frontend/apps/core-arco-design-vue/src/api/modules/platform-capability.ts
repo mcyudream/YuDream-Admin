@@ -1,7 +1,7 @@
 import type { ApiResponse } from './system-client'
 import systemClient from './system-client'
 
-export type CapabilityType = 'REALTIME' | 'MESSAGING' | 'DOCUMENTATION' | 'INTEGRATION' | 'DOCUMENT'
+export type CapabilityType = 'REALTIME' | 'MESSAGING' | 'DOCUMENTATION' | 'INTEGRATION' | 'DOCUMENT' | 'CONTENT'
 export type CapabilityStatus = 'ENABLED' | 'DISABLED' | 'ERROR'
 
 export interface CapabilityItem {
