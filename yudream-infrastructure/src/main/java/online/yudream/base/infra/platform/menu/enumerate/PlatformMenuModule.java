@@ -91,6 +91,27 @@ public enum PlatformMenuModule {
             parentName = "DOCUMENT", permission = "platform:document:log:view")
     DOCUMENT_LOG_VIEW,
 
+    @MenuNode(code = "platform:graph", name = "图数据库", type = MenuNodeType.MENU,
+            path = "/platform/graph", component = "platform/graph/index.vue",
+            icon = "i-ri:share-circle-line", sort = 65)
+    GRAPH,
+
+    @MenuNode(code = "platform:graph:view", name = "查看图数据库", type = MenuNodeType.BUTTON,
+            parentName = "GRAPH", permission = "platform:graph:view")
+    GRAPH_VIEW,
+
+    @MenuNode(code = "platform:graph:edit", name = "编辑图数据库", type = MenuNodeType.BUTTON,
+            parentName = "GRAPH", permission = "platform:graph:edit")
+    GRAPH_EDIT,
+
+    @MenuNode(code = "platform:graph:query", name = "执行图数据库查询", type = MenuNodeType.BUTTON,
+            parentName = "GRAPH", permission = "platform:graph:query")
+    GRAPH_QUERY,
+
+    @MenuNode(code = "platform:graph:log:view", name = "查看图数据库日志", type = MenuNodeType.BUTTON,
+            parentName = "GRAPH", permission = "platform:graph:log:view")
+    GRAPH_LOG_VIEW,
+
     @MenuNode(code = "platform:cms", name = "内容定制", type = MenuNodeType.MENU,
             path = "/platform/cms", component = "platform/cms/index.vue",
             icon = "i-ri:layout-masonry-line", sort = 60)

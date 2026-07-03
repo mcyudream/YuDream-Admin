@@ -11,6 +11,18 @@ services:
       - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+  neo4j:
+    image: docker.io/neo4j:5.26-community
+    container_name: yudream-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-yudream123456}
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4j-data:/data
 
 volumes:
   rabbitmq-data:
+  neo4j-data:
