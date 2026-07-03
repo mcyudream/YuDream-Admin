@@ -1,8 +1,12 @@
 package online.yudream.base.infra.system.security.mapper;
 
+import online.yudream.base.domain.system.security.aggregate.OAuthAccessToken;
+import online.yudream.base.domain.system.security.aggregate.OAuthAuthorizationCode;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
 import online.yudream.base.domain.system.security.aggregate.OAuthProviderRegistration;
 import online.yudream.base.domain.system.security.aggregate.PasskeyCredential;
+import online.yudream.base.infra.system.security.dataobj.OAuthAccessTokenDO;
+import online.yudream.base.infra.system.security.dataobj.OAuthAuthorizationCodeDO;
 import online.yudream.base.infra.system.security.dataobj.OAuthClientRegistrationDO;
 import online.yudream.base.infra.system.security.dataobj.OAuthProviderRegistrationDO;
 import online.yudream.base.infra.system.security.dataobj.PasskeyCredentialDO;
@@ -10,6 +14,88 @@ import online.yudream.base.infra.system.security.dataobj.PasskeyCredentialDO;
 public class OAuthSecurityInfraMapper {
 
     private OAuthSecurityInfraMapper() {
+    }
+
+    public static OAuthAuthorizationCodeDO toDataObj(OAuthAuthorizationCode authorizationCode) {
+        if (authorizationCode == null) {
+            return null;
+        }
+        OAuthAuthorizationCodeDO dataObj = new OAuthAuthorizationCodeDO();
+        dataObj.setId(authorizationCode.getId());
+        dataObj.setCode(authorizationCode.getCode());
+        dataObj.setClientId(authorizationCode.getClientId());
+        dataObj.setUserId(authorizationCode.getUserId());
+        dataObj.setRedirectUri(authorizationCode.getRedirectUri());
+        dataObj.setScopes(authorizationCode.getScopes());
+        dataObj.setState(authorizationCode.getState());
+        dataObj.setExpireTime(authorizationCode.getExpireTime());
+        dataObj.setUsedTime(authorizationCode.getUsedTime());
+        dataObj.setStatus(authorizationCode.getStatus());
+        dataObj.setVersion(authorizationCode.getVersion());
+        dataObj.setCreateTime(authorizationCode.getCreateTime());
+        dataObj.setUpdateTime(authorizationCode.getUpdateTime());
+        return dataObj;
+    }
+
+    public static OAuthAuthorizationCode toDomain(OAuthAuthorizationCodeDO dataObj) {
+        if (dataObj == null) {
+            return null;
+        }
+        return OAuthAuthorizationCode.builder()
+                .id(dataObj.getId())
+                .code(dataObj.getCode())
+                .clientId(dataObj.getClientId())
+                .userId(dataObj.getUserId())
+                .redirectUri(dataObj.getRedirectUri())
+                .scopes(dataObj.getScopes())
+                .state(dataObj.getState())
+                .expireTime(dataObj.getExpireTime())
+                .usedTime(dataObj.getUsedTime())
+                .status(dataObj.getStatus())
+                .version(dataObj.getVersion())
+                .createTime(dataObj.getCreateTime())
+                .updateTime(dataObj.getUpdateTime())
+                .build();
+    }
+
+    public static OAuthAccessTokenDO toDataObj(OAuthAccessToken token) {
+        if (token == null) {
+            return null;
+        }
+        OAuthAccessTokenDO dataObj = new OAuthAccessTokenDO();
+        dataObj.setId(token.getId());
+        dataObj.setAccessTokenHash(token.getAccessTokenHash());
+        dataObj.setRefreshTokenHash(token.getRefreshTokenHash());
+        dataObj.setClientId(token.getClientId());
+        dataObj.setUserId(token.getUserId());
+        dataObj.setScopes(token.getScopes());
+        dataObj.setAccessExpireTime(token.getAccessExpireTime());
+        dataObj.setRefreshExpireTime(token.getRefreshExpireTime());
+        dataObj.setStatus(token.getStatus());
+        dataObj.setVersion(token.getVersion());
+        dataObj.setCreateTime(token.getCreateTime());
+        dataObj.setUpdateTime(token.getUpdateTime());
+        return dataObj;
+    }
+
+    public static OAuthAccessToken toDomain(OAuthAccessTokenDO dataObj) {
+        if (dataObj == null) {
+            return null;
+        }
+        return OAuthAccessToken.builder()
+                .id(dataObj.getId())
+                .accessTokenHash(dataObj.getAccessTokenHash())
+                .refreshTokenHash(dataObj.getRefreshTokenHash())
+                .clientId(dataObj.getClientId())
+                .userId(dataObj.getUserId())
+                .scopes(dataObj.getScopes())
+                .accessExpireTime(dataObj.getAccessExpireTime())
+                .refreshExpireTime(dataObj.getRefreshExpireTime())
+                .status(dataObj.getStatus())
+                .version(dataObj.getVersion())
+                .createTime(dataObj.getCreateTime())
+                .updateTime(dataObj.getUpdateTime())
+                .build();
     }
 
     public static OAuthClientRegistrationDO toDataObj(OAuthClientRegistration registration) {
