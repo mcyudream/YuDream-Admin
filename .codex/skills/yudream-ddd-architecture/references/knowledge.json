@@ -23,6 +23,10 @@
     {
       "key": "security-in-system-platform-optional",
       "text": "接口加密、双 token、API Key、Passkey、OAuth 等安全身份能力归 system 域；SSE、WebSocket、MQ、Neo4j 等可插拔工程能力归 platform 域，并且必须支持动态启停以避免无用中间件冗余。"
+    },
+    {
+      "key": "platform-capability-disable-release",
+      "text": "平台能力禁用时必须同步释放运行时资源，例如关闭 WebSocket/SSE 会话、RabbitMQ 连接工厂、Neo4j Driver 缓存；不能只改 enabled 状态。"
     }
   ],
   "utilities": [
