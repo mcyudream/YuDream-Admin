@@ -43,5 +43,30 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:docs:config", name = "配置API文档", type = MenuNodeType.BUTTON,
             parentName = "API_DOCS", permission = "platform:docs:config")
-    API_DOCS_CONFIG
+    API_DOCS_CONFIG,
+
+    @MenuNode(code = "platform:integration", name = "集成调用", type = MenuNodeType.MENU,
+            path = "/platform/integration", component = "platform/integration/index.vue",
+            icon = "i-ri:terminal-box-line", sort = 80)
+    INTEGRATION,
+
+    @MenuNode(code = "platform:integration:view", name = "查看集成调用", type = MenuNodeType.BUTTON,
+            parentName = "INTEGRATION", permission = "platform:integration:view")
+    INTEGRATION_VIEW,
+
+    @MenuNode(code = "platform:integration:edit", name = "编辑集成调用", type = MenuNodeType.BUTTON,
+            parentName = "INTEGRATION", permission = "platform:integration:edit")
+    INTEGRATION_EDIT,
+
+    @MenuNode(code = "platform:integration:invoke", name = "执行HTTP调用", type = MenuNodeType.BUTTON,
+            parentName = "INTEGRATION", permission = "platform:integration:invoke")
+    INTEGRATION_INVOKE,
+
+    @MenuNode(code = "platform:integration:execute", name = "执行运行脚本", type = MenuNodeType.BUTTON,
+            parentName = "INTEGRATION", permission = "platform:integration:execute")
+    INTEGRATION_EXECUTE,
+
+    @MenuNode(code = "platform:integration:log:view", name = "查看集成日志", type = MenuNodeType.BUTTON,
+            parentName = "INTEGRATION", permission = "platform:integration:log:view")
+    INTEGRATION_LOG_VIEW
 }
