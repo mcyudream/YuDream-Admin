@@ -4,6 +4,7 @@ import type { ApiKeyCredential, ApiKeyCreatePayload, ApiSecurityPolicy, Credenti
 import type { PermissionItem } from '@/api/modules/system-role'
 import apiSecurity from '@/api/modules/system-security'
 import apiRole from '@/api/modules/system-role'
+import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
 const modal = useFaModal()
 const toast = useFaToast()
@@ -38,9 +39,9 @@ const form = reactive<ApiKeyCreatePayload>({
 })
 
 const policyCards = computed(() => [
-  { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求和响应加密开关', icon: 'i-ri:lock-password-line' },
-  { key: 'dualTokenEnabled', label: '双 Token', desc: '访问令牌与刷新令牌模式', icon: 'i-ri:token-swap-line' },
-  { key: 'apiKeyEnabled', label: 'API Key', desc: '第三方访问密钥认证', icon: 'i-ri:key-2-line' },
+  { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求体和响应体使用 RSA-OAEP + AES-GCM 加密', icon: 'i-ri:lock-password-line' },
+  { key: 'dualTokenEnabled', label: '双 Token', desc: '访问令牌与刷新令牌分离，可配置有效期', icon: 'i-ri:token-swap-line' },
+  { key: 'apiKeyEnabled', label: 'API Key', desc: '第三方访问密钥认证，权限不超过创建人', icon: 'i-ri:key-2-line' },
   { key: 'passkeyEnabled', label: 'Passkey', desc: '无密码登录扩展入口', icon: 'i-ri:fingerprint-line' },
   { key: 'oauthServerEnabled', label: 'OAuth 服务端', desc: '向第三方应用签发授权', icon: 'i-ri:server-line' },
   { key: 'oauthClientEnabled', label: 'OAuth 客户端', desc: '接入外部身份提供商', icon: 'i-ri:login-circle-line' },
@@ -80,6 +81,7 @@ async function savePolicy() {
   try {
     const res = await apiSecurity.updatePolicy(policy)
     Object.assign(policy, res.data)
+    clearApiEncryptionCache()
     toast.success('安全策略已保存')
   }
   finally {
@@ -137,7 +139,7 @@ async function createApiKey() {
 
 function confirmRevoke(row: ApiKeyCredential) {
   modal.confirm({
-    title: '确认信息',
+    title: '确认吊销',
     content: `确认吊销「${row.name}」吗？吊销后无法恢复。`,
     onConfirm: async () => {
       await apiSecurity.revokeApiKey(row.id)
@@ -183,7 +185,7 @@ function statusVariant(status: CredentialStatus) {
 }
 
 function normalizeDateTime(value?: string) {
-  return value ? value : undefined
+  return value || undefined
 }
 </script>
 
