@@ -26,6 +26,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -99,6 +100,9 @@ public class ApiSecurityAppService {
     public ApiKeyCredentialDTO revokeApiKey(ApiKeyRevokeCmd cmd) {
         ApiKeyCredential credential = apiKeyCredentialRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("API Key 不存在"));
+        if (!cmd.isSuperAdmin() && !Objects.equals(credential.getCreatorUserId(), cmd.getOperatorUserId())) {
+            throw new BizException("只能吊销自己创建的 API Key");
+        }
         credential.revoke();
         return ApiSecurityAssembler.toDTO(apiKeyCredentialRepo.save(credential));
     }
