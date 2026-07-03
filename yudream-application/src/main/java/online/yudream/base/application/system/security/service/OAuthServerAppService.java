@@ -11,6 +11,7 @@ import online.yudream.base.domain.system.security.aggregate.OAuthAccessToken;
 import online.yudream.base.domain.system.security.aggregate.OAuthAuthorizationCode;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
 import online.yudream.base.domain.system.security.enumerate.CredentialStatus;
+import online.yudream.base.domain.system.security.enumerate.OAuthClientAuthMethod;
 import online.yudream.base.domain.system.security.enumerate.OAuthGrantType;
 import online.yudream.base.domain.system.security.enumerate.OAuthRegistrationStatus;
 import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
@@ -90,7 +91,7 @@ public class OAuthServerAppService {
 
     private OAuthTokenDTO exchangeAuthorizationCode(OAuthTokenCmd cmd) {
         OAuthClientRegistration client = activeClient(cmd.getClientId());
-        ensureClientSecret(client, cmd.getClientSecret());
+        ensureClientAuthentication(client, cmd);
         ensureGrantAllowed(client, OAuthGrantType.AUTHORIZATION_CODE);
         OAuthAuthorizationCode authorizationCode = oauthAuthorizationCodeRepo.findByCode(cmd.getCode())
                 .orElseThrow(() -> new BizException("OAuth 授权码无效或已过期"));
@@ -108,7 +109,7 @@ public class OAuthServerAppService {
 
     private OAuthTokenDTO refreshToken(OAuthTokenCmd cmd) {
         OAuthClientRegistration client = activeClient(cmd.getClientId());
-        ensureClientSecret(client, cmd.getClientSecret());
+        ensureClientAuthentication(client, cmd);
         ensureGrantAllowed(client, OAuthGrantType.REFRESH_TOKEN);
         OAuthAccessToken existing = oauthAccessTokenRepo.findByRefreshTokenHash(ApiKeySecretHasher.hash(cmd.getRefreshToken()))
                 .orElseThrow(() -> new BizException("OAuth Refresh Token 无效或已过期"));
@@ -165,6 +166,21 @@ public class OAuthServerAppService {
             throw new BizException("OAuth 客户端已停用");
         }
         return client;
+    }
+
+    private void ensureClientAuthentication(OAuthClientRegistration client, OAuthTokenCmd cmd) {
+        OAuthClientAuthMethod expected = client.getAuthMethod() == null
+                ? OAuthClientAuthMethod.CLIENT_SECRET_BASIC
+                : client.getAuthMethod();
+        if (expected == OAuthClientAuthMethod.NONE) {
+            return;
+        }
+        if (cmd.getAuthMethod() != expected) {
+            throw new BizException(expected == OAuthClientAuthMethod.CLIENT_SECRET_BASIC
+                    ? "OAuth 客户端必须使用 HTTP Basic 认证"
+                    : "OAuth 客户端必须使用 client_secret 表单认证");
+        }
+        ensureClientSecret(client, cmd.getClientSecret());
     }
 
     private void ensureClientSecret(OAuthClientRegistration client, String clientSecret) {
