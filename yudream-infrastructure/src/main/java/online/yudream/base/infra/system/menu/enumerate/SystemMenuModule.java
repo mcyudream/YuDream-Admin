@@ -153,6 +153,22 @@ public enum SystemMenuModule {
             parentName = "SECURITY", permission = "system:security:api-key:revoke")
     SECURITY_API_KEY_REVOKE,
 
+    @MenuNode(code = "system:security:oauth:view", name = "查看OAuth配置", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:oauth:view")
+    SECURITY_OAUTH_VIEW,
+
+    @MenuNode(code = "system:security:oauth:edit", name = "编辑OAuth配置", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:oauth:edit")
+    SECURITY_OAUTH_EDIT,
+
+    @MenuNode(code = "system:security:passkey:view", name = "查看Passkey", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:passkey:view")
+    SECURITY_PASSKEY_VIEW,
+
+    @MenuNode(code = "system:security:passkey:revoke", name = "吊销Passkey", type = MenuNodeType.BUTTON,
+            parentName = "SECURITY", permission = "system:security:passkey:revoke")
+    SECURITY_PASSKEY_REVOKE,
+
     @MenuNode(code = "system:menu", name = "菜单管理", type = MenuNodeType.MENU,
             parentName = "CONFIG", path = "/system/menu", component = "system/menu/index.vue",
             icon = "i-ri:menu-2-line", sort = 10)
