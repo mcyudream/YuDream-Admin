@@ -10,6 +10,7 @@ import online.yudream.base.application.system.security.cmd.OAuthAuthorizeCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthTokenCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
+import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
 import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO;
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.ApiEncryptedPayloadDTO;
@@ -168,6 +169,13 @@ public class ApiSecurityWebAssembler {
     public static PasskeyRevokeCmd toPasskeyRevokeCmd(Long id) {
         PasskeyRevokeCmd cmd = new PasskeyRevokeCmd();
         cmd.setId(id);
+        return cmd;
+    }
+
+    public static PasskeySelfRevokeCmd toPasskeySelfRevokeCmd(Long id, Long userId) {
+        PasskeySelfRevokeCmd cmd = new PasskeySelfRevokeCmd();
+        cmd.setId(id);
+        cmd.setUserId(userId);
         return cmd;
     }
 

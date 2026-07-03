@@ -5,6 +5,7 @@ import online.yudream.base.application.system.security.assembler.ApiSecurityAsse
 import online.yudream.base.application.system.security.cmd.OAuthClientSaveCmd;
 import online.yudream.base.application.system.security.cmd.OAuthProviderSaveCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
+import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
 import online.yudream.base.application.system.security.dto.OAuthClientCreateResultDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientDTO;
 import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
@@ -42,7 +43,7 @@ public class OAuthPasskeyAppService {
     @Transactional
     public OAuthClientCreateResultDTO createClient(OAuthClientSaveCmd cmd) {
         if (oauthClientRegistrationRepo.findByClientId(cmd.getClientId()).isPresent()) {
-            throw new BizException("OAuth 客户端ID已存在");
+            throw new BizException("OAuth 客户端 ID 已存在");
         }
         String secret = generateSecret();
         OAuthClientRegistration registration = OAuthClientRegistration.create(
@@ -116,6 +117,17 @@ public class OAuthPasskeyAppService {
     public PasskeyCredentialDTO revokePasskey(PasskeyRevokeCmd cmd) {
         PasskeyCredential credential = passkeyCredentialRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("Passkey 凭据不存在"));
+        credential.revoke();
+        return ApiSecurityAssembler.toDTO(passkeyCredentialRepo.save(credential));
+    }
+
+    @Transactional
+    public PasskeyCredentialDTO revokeOwnPasskey(PasskeySelfRevokeCmd cmd) {
+        PasskeyCredential credential = passkeyCredentialRepo.findById(cmd.getId())
+                .orElseThrow(() -> new BizException("Passkey 凭据不存在"));
+        if (!credential.getUserId().equals(cmd.getUserId())) {
+            throw new BizException("无权吊销该 Passkey 凭据");
+        }
         credential.revoke();
         return ApiSecurityAssembler.toDTO(passkeyCredentialRepo.save(credential));
     }

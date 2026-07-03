@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import type { UserProfilePayload } from '@/api/modules/profile'
+import type { PasskeyCredential, PasskeyStatus, UserProfilePayload } from '@/api/modules/profile'
 import EditPassword from '@/components/AppAccountForm/edit-password.vue'
 import apiProfile from '@/api/modules/profile'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
+const modal = useFaModal()
 const toast = useFaToast()
 const appAccountStore = useAppAccountStore()
 
 const active = ref(0)
 const loading = ref(false)
 const saving = ref(false)
+const loadingPasskeys = ref(false)
 const avatarInput = ref<HTMLInputElement>()
+const passkeys = ref<PasskeyCredential[]>([])
 const form = reactive<UserProfilePayload>({
   nickname: '',
   email: '',
@@ -29,11 +32,14 @@ const tabs = ref([
   },
   {
     title: '安全设置',
-    description: '定期修改密码',
+    description: '密码与 Passkey',
   },
 ])
 
-onMounted(loadProfile)
+onMounted(async () => {
+  await loadProfile()
+  await loadPasskeys()
+})
 
 async function loadProfile() {
   loading.value = true
@@ -55,6 +61,17 @@ async function loadProfile() {
   }
   finally {
     loading.value = false
+  }
+}
+
+async function loadPasskeys() {
+  loadingPasskeys.value = true
+  try {
+    const res = await apiProfile.passkeys()
+    passkeys.value = res.data
+  }
+  finally {
+    loadingPasskeys.value = false
   }
 }
 
@@ -92,6 +109,31 @@ async function uploadAvatar(event: Event) {
   profile.value.avatar = toBackendAssetUrl(res.data.avatar)
   appAccountStore.setAvatar(res.data.avatar)
   toast.success('头像已更新')
+}
+
+function confirmRevokePasskey(row: PasskeyCredential) {
+  modal.confirm({
+    title: '吊销 Passkey',
+    content: `确认吊销「${row.deviceName || shortCredential(row.credentialId)}」吗？吊销后该设备将不能继续用于登录。`,
+    onConfirm: async () => {
+      await apiProfile.revokePasskey(row.id)
+      toast.success('Passkey 已吊销')
+      await loadPasskeys()
+    },
+  })
+}
+
+function shortCredential(value: string) {
+  return value.length > 18 ? `${value.slice(0, 10)}...${value.slice(-6)}` : value
+}
+
+function passkeyStatusText(status: PasskeyStatus) {
+  const map: Record<PasskeyStatus, string> = {
+    ACTIVE: '可用',
+    REVOKED: '已吊销',
+    EXPIRED: '已过期',
+  }
+  return map[status]
 }
 </script>
 
@@ -144,7 +186,109 @@ async function uploadAvatar(event: Event) {
           </div>
         </a-form>
       </div>
-      <EditPassword v-if="active === 1" />
+      <div v-if="active === 1" class="mx-auto max-w-2xl space-y-5">
+        <EditPassword />
+        <section class="passkey-panel">
+          <div class="passkey-title">
+            <div>
+              <div class="font-semibold">
+                Passkey 凭据
+              </div>
+              <div class="text-sm text-muted-foreground">
+                管理已经绑定到当前账号的设备凭据。
+              </div>
+            </div>
+            <FaButton variant="outline" :loading="loadingPasskeys" @click="loadPasskeys">
+              <FaIcon name="i-ri:refresh-line" />
+              刷新
+            </FaButton>
+          </div>
+          <div v-loading="loadingPasskeys" class="passkey-list">
+            <div v-if="!passkeys.length" class="passkey-empty">
+              暂无 Passkey 凭据
+            </div>
+            <div v-for="item in passkeys" :key="item.id" class="passkey-item">
+              <div class="passkey-icon">
+                <FaIcon name="i-ri:fingerprint-line" />
+              </div>
+              <div class="passkey-info">
+                <strong>{{ item.deviceName || '未命名设备' }}</strong>
+                <span>{{ shortCredential(item.credentialId) }}</span>
+                <small>创建时间：{{ item.createTime || '-' }} · 最后使用：{{ item.lastUsedTime || '-' }}</small>
+              </div>
+              <FaTag :variant="item.status === 'ACTIVE' ? 'default' : 'secondary'">
+                {{ passkeyStatusText(item.status) }}
+              </FaTag>
+              <FaButton variant="destructive" size="sm" :disabled="item.status !== 'ACTIVE'" @click="confirmRevokePasskey(item)">
+                吊销
+              </FaButton>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.passkey-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+}
+
+.passkey-title,
+.passkey-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.passkey-list {
+  display: grid;
+  gap: 10px;
+  min-height: 80px;
+}
+
+.passkey-empty {
+  display: grid;
+  place-items: center;
+  min-height: 80px;
+  color: var(--color-text-3);
+}
+
+.passkey-item {
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+}
+
+.passkey-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border-radius: 6px;
+  background: var(--color-fill-2);
+  color: var(--ui-primary);
+}
+
+.passkey-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.passkey-info span,
+.passkey-info small {
+  overflow: hidden;
+  color: var(--color-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style>
