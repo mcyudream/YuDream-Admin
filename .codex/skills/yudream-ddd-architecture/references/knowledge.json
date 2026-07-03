@@ -15,6 +15,10 @@
     {
       "key": "module-commit-chinese",
       "text": "After completing each independently usable module, verify it, stage only module-related files, and commit immediately with a Chinese commit message. Do not include unrelated local files."
+    },
+    {
+      "key": "platform-capability-optional",
+      "text": "平台能力用于可选项目能力，例如 SSE、WebSocket、MQ、Neo4j、Python Runtime。默认禁用；禁用时不得初始化外部连接、声明中间件资源或强制项目配置外部依赖，启用后由能力配置驱动运行时连接与健康检查。"
     }
   ],
   "utilities": [

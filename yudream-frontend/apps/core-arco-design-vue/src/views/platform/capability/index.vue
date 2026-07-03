@@ -2,6 +2,12 @@
 import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
 import apiCapability from '@/api/modules/platform-capability'
 
+interface CapabilityGroup {
+  type: CapabilityType
+  title: string
+  icon: string
+}
+
 const toast = useFaToast()
 
 const loading = ref(false)
@@ -16,9 +22,14 @@ const wsStatus = ref('未连接')
 let eventSource: EventSource | null = null
 let websocket: WebSocket | null = null
 
+const groups: CapabilityGroup[] = [
+  { type: 'REALTIME', title: '实时通信', icon: 'i-ri:pulse-line' },
+  { type: 'MESSAGING', title: '消息队列', icon: 'i-ri:message-3-line' },
+  { type: 'DOCUMENTATION', title: '接口文档', icon: 'i-ri:file-list-3-line' },
+  { type: 'INTEGRATION', title: '集成运行', icon: 'i-ri:terminal-box-line' },
+]
+
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
-const realtimeItems = computed(() => rows.value.filter(item => item.type === 'REALTIME'))
-const messagingItems = computed(() => rows.value.filter(item => item.type === 'MESSAGING'))
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
@@ -141,6 +152,10 @@ function replaceItem(item: CapabilityItem) {
   }
 }
 
+function itemsByType(type: CapabilityType) {
+  return rows.value.filter(item => item.type === type)
+}
+
 function connectionCount() {
   return rows.value.reduce((total, item) => {
     const value = item.metrics?.connections ?? item.metrics?.sessions ?? 0
@@ -167,7 +182,7 @@ function wsEndpoint(path: string) {
 }
 
 function typeText(type: CapabilityType) {
-  return type === 'REALTIME' ? '实时通信' : '消息队列'
+  return groups.find(group => group.type === type)?.title || type
 }
 
 function statusText(status: CapabilityStatus) {
@@ -192,7 +207,7 @@ function metricEntries(item?: CapabilityItem) {
   <div>
     <FaPageHeader title="平台能力" class="mb-0">
       <template #description>
-        管理 SSE、WebSocket、RabbitMQ 等项目基础能力的启停、配置、健康状态与测试消息。
+        管理 SSE、WebSocket、RabbitMQ、API 文档、集成运行等可选能力的启停、配置、健康状态与测试消息。
       </template>
     </FaPageHeader>
 
@@ -219,39 +234,24 @@ function metricEntries(item?: CapabilityItem) {
 
       <div class="capability-layout">
         <section class="capability-list">
-          <div class="section-title">
-            <span>实时通信</span>
-            <FaTag variant="secondary">{{ realtimeItems.length }}</FaTag>
-          </div>
-          <button
-            v-for="item in realtimeItems"
-            :key="item.code"
-            class="capability-item"
-            :class="{ active: selected?.code === item.code }"
-            type="button"
-            @click="selectedCode = item.code"
-          >
-            <FaIcon :name="item.icon || 'i-ri:plugin-line'" />
-            <span>{{ item.name }}</span>
-            <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
-          </button>
-
-          <div class="section-title mt-4">
-            <span>消息队列</span>
-            <FaTag variant="secondary">{{ messagingItems.length }}</FaTag>
-          </div>
-          <button
-            v-for="item in messagingItems"
-            :key="item.code"
-            class="capability-item"
-            :class="{ active: selected?.code === item.code }"
-            type="button"
-            @click="selectedCode = item.code"
-          >
-            <FaIcon :name="item.icon || 'i-ri:plugin-line'" />
-            <span>{{ item.name }}</span>
-            <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
-          </button>
+          <template v-for="group in groups" :key="group.type">
+            <div v-if="itemsByType(group.type).length" class="section-title">
+              <span><FaIcon :name="group.icon" /> {{ group.title }}</span>
+              <FaTag variant="secondary">{{ itemsByType(group.type).length }}</FaTag>
+            </div>
+            <button
+              v-for="item in itemsByType(group.type)"
+              :key="item.code"
+              class="capability-item"
+              :class="{ active: selected?.code === item.code }"
+              type="button"
+              @click="selectedCode = item.code"
+            >
+              <FaIcon :name="item.icon || 'i-ri:plugin-line'" />
+              <span>{{ item.name }}</span>
+              <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
+            </button>
+          </template>
         </section>
 
         <section v-if="selected" class="capability-detail">
@@ -266,11 +266,12 @@ function metricEntries(item?: CapabilityItem) {
               </div>
             </div>
             <div class="detail-actions">
-              <FaButton variant="outline" @click="openConfig(selected)">
+              <FaButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
                 <FaIcon name="i-ri:settings-4-line" />
                 配置
               </FaButton>
               <FaButton
+                v-auth="'platform:capability:test'"
                 variant="outline"
                 :disabled="!selected.enabled"
                 :loading="actionLoading === `${selected.code}:test`"
@@ -280,6 +281,7 @@ function metricEntries(item?: CapabilityItem) {
                 测试
               </FaButton>
               <FaButton
+                v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
                 :variant="selected.enabled ? 'destructive' : 'default'"
                 :loading="actionLoading === `${selected.code}:toggle`"
                 @click="toggleCapability(selected)"
@@ -320,7 +322,9 @@ function metricEntries(item?: CapabilityItem) {
                 <strong>{{ value }}</strong>
               </div>
             </div>
-            <div v-else class="empty-state">暂无运行指标</div>
+            <div v-else class="empty-state">
+              暂无运行指标
+            </div>
           </div>
 
           <div v-if="selected.code === 'sse' || selected.code === 'websocket'" class="debug-panel">
@@ -329,12 +333,12 @@ function metricEntries(item?: CapabilityItem) {
             </div>
             <div v-if="selected.code === 'sse'" class="debug-row">
               <span>SSE：{{ sseStatus }}</span>
-              <FaButton size="sm" variant="outline" @click="connectSse">连接</FaButton>
+              <FaButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectSse">连接</FaButton>
               <FaButton size="sm" variant="ghost" @click="closeSse">断开</FaButton>
             </div>
             <div v-if="selected.code === 'websocket'" class="debug-row">
               <span>WebSocket：{{ wsStatus }}</span>
-              <FaButton size="sm" variant="outline" @click="connectWs">连接</FaButton>
+              <FaButton size="sm" variant="outline" :disabled="!selected.enabled" @click="connectWs">连接</FaButton>
               <FaButton size="sm" variant="ghost" @click="closeWs">断开</FaButton>
             </div>
           </div>
@@ -434,6 +438,12 @@ function metricEntries(item?: CapabilityItem) {
   justify-content: space-between;
   color: var(--color-text-1);
   font-weight: 700;
+}
+
+.section-title span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .capability-item {
