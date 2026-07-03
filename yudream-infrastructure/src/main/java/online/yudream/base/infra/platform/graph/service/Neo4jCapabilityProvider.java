@@ -1,20 +1,24 @@
 package online.yudream.base.infra.platform.graph.service;
 
+import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.capability.enumerate.CapabilityType;
 import online.yudream.base.domain.platform.capability.service.CapabilityProvider;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
+import online.yudream.base.domain.platform.graph.service.GraphDatabaseGateway;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
+@RequiredArgsConstructor
 public class Neo4jCapabilityProvider implements CapabilityProvider {
 
     public static final String CODE = "neo4j";
 
+    private final GraphDatabaseGateway graphDatabaseGateway;
     private final AtomicBoolean enabled = new AtomicBoolean(false);
 
     @Override
@@ -49,6 +53,7 @@ public class Neo4jCapabilityProvider implements CapabilityProvider {
     @Override
     public void disable() {
         enabled.set(false);
+        graphDatabaseGateway.closeAll();
     }
 
     @Override

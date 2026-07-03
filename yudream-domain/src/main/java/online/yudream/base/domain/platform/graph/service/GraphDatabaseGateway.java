@@ -12,4 +12,6 @@ public interface GraphDatabaseGateway {
     GraphQueryResult query(GraphConnection connection, String cypher, Map<String, Object> params);
 
     void close(String code);
+
+    void closeAll();
 }

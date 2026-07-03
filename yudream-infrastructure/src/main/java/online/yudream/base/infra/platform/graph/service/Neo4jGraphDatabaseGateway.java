@@ -58,6 +58,12 @@ public class Neo4jGraphDatabaseGateway implements GraphDatabaseGateway {
         }
     }
 
+    @Override
+    public void closeAll() {
+        drivers.values().forEach(Driver::close);
+        drivers.clear();
+    }
+
     private Driver driver(GraphConnection connection) {
         return drivers.computeIfAbsent(connection.getCode(), ignored -> {
             Driver driver = GraphDatabase.driver(connection.getUri(), AuthTokens.basic(connection.getUsername(), connection.getPassword()));
