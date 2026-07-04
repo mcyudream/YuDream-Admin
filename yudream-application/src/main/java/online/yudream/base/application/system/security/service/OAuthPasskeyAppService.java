@@ -57,11 +57,13 @@ public class OAuthPasskeyAppService {
 
     @Transactional(readOnly = true)
     public List<OAuthClientDTO> listClients() {
+        ensureOAuthServerEnabled();
         return oauthClientRegistrationRepo.findAll().stream().map(ApiSecurityAssembler::toDTO).toList();
     }
 
     @Transactional
     public OAuthClientCreateResultDTO createClient(OAuthClientSaveCmd cmd) {
+        ensureOAuthServerEnabled();
         if (oauthClientRegistrationRepo.findByClientId(cmd.getClientId()).isPresent()) {
             throw new BizException("OAuth 客户端 ID 已存在");
         }
@@ -80,6 +82,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional
     public OAuthClientDTO updateClient(OAuthClientSaveCmd cmd) {
+        ensureOAuthServerEnabled();
         OAuthClientRegistration registration = oauthClientRegistrationRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("OAuth 客户端不存在"));
         applyClientUpdate(registration, cmd);
@@ -88,6 +91,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional
     public void disableClient(Long id) {
+        ensureOAuthServerEnabled();
         OAuthClientRegistration registration = oauthClientRegistrationRepo.findById(id)
                 .orElseThrow(() -> new BizException("OAuth 客户端不存在"));
         registration.disable();
@@ -96,11 +100,13 @@ public class OAuthPasskeyAppService {
 
     @Transactional(readOnly = true)
     public List<OAuthProviderDTO> listProviders() {
+        ensureOAuthClientEnabled();
         return oauthProviderRegistrationRepo.findAll().stream().map(ApiSecurityAssembler::toDTO).toList();
     }
 
     @Transactional
     public OAuthProviderDTO saveProvider(OAuthProviderSaveCmd cmd) {
+        ensureOAuthClientEnabled();
         OAuthProviderRegistration registration = cmd.getId() == null
                 ? createProvider(cmd)
                 : oauthProviderRegistrationRepo.findById(cmd.getId()).orElseThrow(() -> new BizException("OAuth 提供商不存在"));
@@ -122,6 +128,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional
     public void disableProvider(Long id) {
+        ensureOAuthClientEnabled();
         OAuthProviderRegistration registration = oauthProviderRegistrationRepo.findById(id)
                 .orElseThrow(() -> new BizException("OAuth 提供商不存在"));
         registration.disable();
@@ -130,6 +137,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional(readOnly = true)
     public List<PasskeyCredentialDTO> listPasskeys(Long userId) {
+        ensurePasskeyEnabled();
         return passkeyCredentialRepo.findByUserId(userId).stream().map(ApiSecurityAssembler::toDTO).toList();
     }
 
@@ -198,6 +206,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional
     public PasskeyCredentialDTO revokePasskey(PasskeyRevokeCmd cmd) {
+        ensurePasskeyEnabled();
         PasskeyCredential credential = passkeyCredentialRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("Passkey 凭据不存在"));
         credential.revoke();
@@ -206,6 +215,7 @@ public class OAuthPasskeyAppService {
 
     @Transactional
     public PasskeyCredentialDTO revokeOwnPasskey(PasskeySelfRevokeCmd cmd) {
+        ensurePasskeyEnabled();
         PasskeyCredential credential = passkeyCredentialRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("Passkey 凭据不存在"));
         if (!credential.getUserId().equals(cmd.getUserId())) {
@@ -238,6 +248,20 @@ public class OAuthPasskeyAppService {
         ApiSecurityPolicy policy = apiSecurityPolicyRepo.findDefault().orElse(ApiSecurityPolicy.createDefault());
         if (!policy.isPasskeyEnabled()) {
             throw new BizException("Passkey 未启用");
+        }
+    }
+
+    private void ensureOAuthServerEnabled() {
+        ApiSecurityPolicy policy = apiSecurityPolicyRepo.findDefault().orElse(ApiSecurityPolicy.createDefault());
+        if (!policy.isOauthServerEnabled()) {
+            throw new BizException("OAuth 服务端未启用");
+        }
+    }
+
+    private void ensureOAuthClientEnabled() {
+        ApiSecurityPolicy policy = apiSecurityPolicyRepo.findDefault().orElse(ApiSecurityPolicy.createDefault());
+        if (!policy.isOauthClientEnabled()) {
+            throw new BizException("OAuth 客户端未启用");
         }
     }
 
