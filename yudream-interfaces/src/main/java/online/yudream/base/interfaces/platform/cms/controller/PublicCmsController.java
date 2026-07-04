@@ -1,7 +1,9 @@
 package online.yudream.base.interfaces.platform.cms.controller;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.cms.query.CmsPageQuery;
 import online.yudream.base.application.platform.cms.service.CmsAppService;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.cms.assembler.CmsWebAssembler;
 import online.yudream.base.interfaces.platform.cms.res.CmsPageRes;
@@ -26,5 +28,10 @@ public class PublicCmsController {
     @GetMapping("/pages")
     public Result<CmsPageRes> page(@RequestParam String slug) {
         return Result.ok(CmsWebAssembler.toRes(cmsAppService.publicPage(slug)));
+    }
+
+    @GetMapping("/pages/list")
+    public Result<PageResult<CmsPageRes>> pages(CmsPageQuery query) {
+        return Result.ok(CmsWebAssembler.toPage(cmsAppService.publicPages(query)));
     }
 }

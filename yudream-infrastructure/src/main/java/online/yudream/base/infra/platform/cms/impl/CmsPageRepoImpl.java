@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.cms.impl;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
+import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
 import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.shared.IdGenerator;
 import online.yudream.base.infra.platform.cms.dataobj.CmsPageDO;
@@ -50,6 +51,18 @@ public class CmsPageRepoImpl implements CmsPageRepo {
     @Override
     public PageResult<CmsPage> page(String keyword, int page, int size) {
         Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
+        return page(query, page, size);
+    }
+
+    @Override
+    public PageResult<CmsPage> publishedPage(String keyword, int page, int size) {
+        Query query = query(keyword)
+                .addCriteria(Criteria.where("status").is(PageStatus.PUBLISHED))
+                .with(Sort.by(Sort.Direction.DESC, "publishedAt", "createTime"));
+        return page(query, page, size);
+    }
+
+    private PageResult<CmsPage> page(Query query, int page, int size) {
         long total = mongoTemplate.count(query, CmsPageDO.class);
         int currentPage = Math.max(page, 1);
         int pageSize = Math.max(size, 1);

@@ -117,10 +117,16 @@ const cmsVariables = [
   { key: '{{route.slug}}', label: '当前 Slug' },
   { key: '{{navigation.count}}', label: '导航数量' },
   { key: '{{navUsers.count}}', label: '头像用户数' },
+  { key: '{{pages.count}}', label: '公开页面数' },
+  { key: '{{categories.count}}', label: '分类数量' },
+  { key: '{{tags.count}}', label: '标签数量' },
   { key: 'data-visible-when="guest"', label: '仅游客可见' },
   { key: 'data-visible-when="logged-in"', label: '仅登录可见' },
   { key: 'data-yb-repeat="navigation"', label: '循环导航' },
   { key: 'data-yb-repeat="navUsers"', label: '循环头像用户' },
+  { key: 'data-yb-repeat="pages"', label: '循环公开页面' },
+  { key: 'data-yb-repeat="categories"', label: '循环分类' },
+  { key: 'data-yb-repeat="tags"', label: '循环标签' },
 ]
 
 watch(activeTab, async () => {

@@ -60,6 +60,66 @@ const blocks: CmsBlock[] = [
 </section>`,
   },
   {
+    title: '动态最新文章',
+    group: '内容',
+    description: '循环已发布页面，自动生成首页文章流。',
+    html: `<section data-component-title="动态最新文章" class="yb-dynamic-posts" style="padding:56px 0;">
+  <div style="display:flex; justify-content:space-between; gap:18px; align-items:end; margin-bottom:24px;">
+    <div>
+      <span style="color:#0f766e; font-weight:800;">Latest · {{pages.count}}</span>
+      <h2 style="margin:8px 0 0; font-size:40px;">最新发布</h2>
+    </div>
+    <a href="/site" style="color:#0f766e; font-weight:800; text-decoration:none;">查看全部</a>
+  </div>
+  <div data-yb-repeat="pages" style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:18px;">
+    <article style="display:grid; gap:12px; padding:18px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
+      <img src="{{item.coverImageUrl}}" alt="{{item.title}}" style="width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:14px; background:#e2e8f0;">
+      <small style="color:#0f766e; font-weight:800;">{{item.category}} · {{item.publishedAt}}</small>
+      <h3 style="margin:0; font-size:22px; line-height:1.25;">{{item.title}}</h3>
+      <p style="margin:0; color:#64748b; line-height:1.6;">{{item.excerpt}}</p>
+      <a href="{{item.url}}" style="color:#0f766e; font-weight:800; text-decoration:none;">阅读全文</a>
+    </article>
+  </div>
+</section>`,
+  },
+  {
+    title: '分类标签云',
+    group: '内容',
+    description: '循环分类和标签，搭建 WordPress 式归档入口。',
+    html: `<section data-component-title="分类标签云" class="yb-taxonomy-cloud" style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; padding:42px 0;">
+  <div style="display:grid; gap:12px; padding:22px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
+    <h2 style="margin:0; font-size:28px;">分类</h2>
+    <div data-yb-repeat="categories" style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a href="{{item.url}}" style="padding:9px 12px; border-radius:999px; background:#dcfce7; color:#166534; text-decoration:none;">{{item.label}} · {{item.count}}</a>
+    </div>
+  </div>
+  <div style="display:grid; gap:12px; padding:22px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
+    <h2 style="margin:0; font-size:28px;">标签</h2>
+    <div data-yb-repeat="tags" style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a href="{{item.url}}" style="padding:9px 12px; border-radius:999px; background:#e0f2fe; color:#075985; text-decoration:none;">#{{item.label}} · {{item.count}}</a>
+    </div>
+  </div>
+</section>`,
+  },
+  {
+    title: '内容归档侧栏',
+    group: '内容',
+    description: '主内容旁展示最近页面、分类、标签，适合博客首页。',
+    html: `<section data-component-title="内容归档侧栏" class="yb-archive-layout" style="display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:26px; padding:54px 0;">
+  <main data-yb-repeat="pages" style="display:grid; gap:16px;">
+    <a href="{{item.url}}" style="display:grid; gap:8px; padding:20px; border:1px solid #e5e7eb; border-radius:18px; background:#fff; color:#0f172a; text-decoration:none;">
+      <small style="color:#64748b;">{{item.publishedAt}} · {{item.categories}}</small>
+      <strong style="font-size:24px;">{{item.title}}</strong>
+      <span style="color:#64748b;">{{item.summary}}</span>
+    </a>
+  </main>
+  <aside style="display:grid; gap:16px; align-self:start;">
+    <div style="padding:18px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;"><strong>分类</strong><div data-yb-repeat="categories" style="display:grid; gap:8px; margin-top:12px;"><a href="{{item.url}}" style="color:#0f766e; text-decoration:none;">{{item.label}} ({{item.count}})</a></div></div>
+    <div style="padding:18px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;"><strong>标签</strong><div data-yb-repeat="tags" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;"><a href="{{item.url}}" style="color:#475569; text-decoration:none;">#{{item.label}}</a></div></div>
+  </aside>
+</section>`,
+  },
+  {
     title: '登录态行动区',
     group: '动态',
     description: '同时包含游客和已登录用户可见内容。',
