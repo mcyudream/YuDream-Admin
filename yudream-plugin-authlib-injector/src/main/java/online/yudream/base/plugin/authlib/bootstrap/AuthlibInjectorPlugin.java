@@ -62,6 +62,11 @@ public class AuthlibInjectorPlugin implements YuDreamPlugin {
         return http.metadata(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/status", permission = VIEW_PERMISSION)
+    public PluginHttpResponse status(PluginHttpRequest request) {
+        return http.status(request);
+    }
+
     @PluginHttpEndpoint(method = "POST", path = "/authserver/authenticate", wrapResult = false)
     public PluginHttpResponse authenticate(PluginHttpRequest request) {
         return http.authenticate(request);

@@ -31,6 +31,10 @@ public class AuthlibHttpFacade {
         return ali(request, PluginHttpResponse.rawJson(200, appService.metadata()));
     }
 
+    public PluginHttpResponse status(PluginHttpRequest request) {
+        return ali(request, PluginHttpResponse.ok(appService.status(apiRoot(request), textureBaseUrl(request))));
+    }
+
     public PluginHttpResponse authenticate(PluginHttpRequest request) {
         return runJson(request, () -> appService.authenticate(JsonSupport.read(request.body(), AuthenticateRequest.class)));
     }

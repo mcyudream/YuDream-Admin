@@ -56,6 +56,29 @@ public class AuthlibAppService {
         return body;
     }
 
+    public Object status(String apiRoot, String textureBaseUrl) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("apiRoot", apiRoot);
+        body.put("textureBaseUrl", textureBaseUrl);
+        body.put("skinPluginEnabled", context.framework().extension(SKIN_PLUGIN_CODE, PluginSkinService.class).isPresent());
+        body.put("metadata", metadata());
+        body.put("endpoints", List.of(
+                "GET /",
+                "POST /authserver/authenticate",
+                "POST /authserver/refresh",
+                "POST /authserver/validate",
+                "POST /authserver/invalidate",
+                "POST /authserver/signout",
+                "POST /sessionserver/session/minecraft/join",
+                "GET /sessionserver/session/minecraft/hasJoined",
+                "GET /sessionserver/session/minecraft/profile/{uuid}",
+                "POST /api/profiles/minecraft",
+                "PUT /api/user/profile/{uuid}/{textureType}",
+                "DELETE /api/user/profile/{uuid}/{textureType}"
+        ));
+        return body;
+    }
+
     public Object authenticate(AuthenticateRequest request) {
         PluginSkinUser user = skinService().authenticate(request.username(), request.password())
                 .orElseThrow(() -> authError("ForbiddenOperationException", "用户名或密码错误"));

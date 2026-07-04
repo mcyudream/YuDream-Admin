@@ -1,4 +1,5 @@
 import apiPlugin from '@/api/modules/platform-plugin'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 
 export interface YuDreamPluginSdk {
   version: string
@@ -7,6 +8,7 @@ export interface YuDreamPluginSdk {
     request: <T = unknown>(path: string, options?: { method?: string, data?: unknown }) => Promise<T>
     get: <T = unknown>(path: string) => Promise<T>
     post: <T = unknown>(path: string, data?: unknown) => Promise<T>
+    url: (path: string) => string
   }
 }
 
@@ -28,6 +30,10 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
       async post<T = unknown>(path: string, data?: unknown) {
         const res = await apiPlugin.request<T>(pluginCode, path, { method: 'POST', data })
         return res.data
+      },
+      url(path: string) {
+        const normalized = path.startsWith('/') ? path : `/${path}`
+        return toBackendAssetUrl(`/api/plugins/${pluginCode}${normalized}`)
       },
     },
   }
