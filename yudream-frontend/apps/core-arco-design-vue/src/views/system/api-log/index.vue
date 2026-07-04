@@ -6,7 +6,10 @@ import apiMonitor from '@/api/modules/system-monitor'
 import { saveExcelResponse } from '@/utils/excel'
 
 const loading = ref(false)
+const clearing = ref(false)
 const rows = ref<ApiLog[]>([])
+const modal = useFaModal()
+const toast = useFaToast()
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const search = reactive<{ keyword: string; success: string }>({
   keyword: '',
@@ -98,6 +101,27 @@ async function exportApiLogs() {
   })
   saveExcelResponse(res, '接口日志.xlsx')
 }
+
+function confirmClearApiLogs() {
+  modal.confirm({
+    title: '确认清空接口日志',
+    content: '确认删除所有接口日志吗？该操作不可恢复。',
+    onConfirm: clearApiLogs,
+  })
+}
+
+async function clearApiLogs() {
+  clearing.value = true
+  try {
+    const res = await apiMonitor.clearApiLogs()
+    toast.success(`已删除 ${res.data || 0} 条接口日志`)
+    pagination.page = 1
+    await load()
+  }
+  finally {
+    clearing.value = false
+  }
+}
 </script>
 
 <template>
@@ -106,6 +130,10 @@ async function exportApiLogs() {
       <FaButton v-auth="'system:monitor:api-log:export'" variant="outline" @click="exportApiLogs">
         <FaIcon name="i-ri:file-excel-2-line" />
         导出
+      </FaButton>
+      <FaButton v-auth="'system:monitor:api-log:delete'" variant="destructive" :loading="clearing" @click="confirmClearApiLogs">
+        <FaIcon name="i-ri:delete-bin-6-line" />
+        清空日志
       </FaButton>
     </FaPageHeader>
 

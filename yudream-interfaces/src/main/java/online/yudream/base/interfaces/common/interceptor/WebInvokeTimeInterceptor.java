@@ -90,6 +90,9 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
     }
 
     private void recordApiLog(HttpServletRequest request, HttpServletResponse response, Exception ex, long cost, String body) {
+        if (isLogClearRequest(request)) {
+            return;
+        }
         try {
             systemMonitorAppService.recordApiLog(ApiLogDTO.builder()
                     .method(request.getMethod())
@@ -108,6 +111,14 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         catch (Exception ignored) {
             log.debug("Record API log failed", ignored);
         }
+    }
+
+    private boolean isLogClearRequest(HttpServletRequest request) {
+        if (!"DELETE".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+        String uri = request.getRequestURI();
+        return "/api/system/monitor/api-logs".equals(uri) || "/api/system/monitor/login-logs".equals(uri);
     }
 
     private Long currentLoginId() {

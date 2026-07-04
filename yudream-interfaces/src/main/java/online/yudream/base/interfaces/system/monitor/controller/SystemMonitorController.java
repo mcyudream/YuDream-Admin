@@ -48,6 +48,12 @@ public class SystemMonitorController {
         return Result.ok(MonitorWebAssembler.toApiLogPage(systemMonitorAppService.pageApiLogs(keyword, success, page, size)));
     }
 
+    @DeleteMapping("/api-logs")
+    @PermissionRegister(code = "system:monitor:api-log:delete", name = "删除接口日志", module = "系统管理", desc = "一键清空系统接口日志")
+    public Result<Long> clearApiLogs() {
+        return Result.ok(systemMonitorAppService.clearApiLogs());
+    }
+
     @GetMapping("/login-logs")
     @PermissionRegister(code = "system:monitor:login-log:view", name = "查看登录日志", module = "系统管理", desc = "查看系统登录日志")
     public Result<PageResult<LoginLogRes>> loginLogs(@RequestParam(value = "keyword", required = false) String keyword,
@@ -55,5 +61,11 @@ public class SystemMonitorController {
                                                      @RequestParam(value = "page", defaultValue = "1") int page,
                                                      @RequestParam(value = "size", defaultValue = "10") int size) {
         return Result.ok(MonitorWebAssembler.toLoginLogPage(systemMonitorAppService.pageLoginLogs(keyword, success, page, size)));
+    }
+
+    @DeleteMapping("/login-logs")
+    @PermissionRegister(code = "system:monitor:login-log:delete", name = "删除登录日志", module = "系统管理", desc = "一键清空系统登录日志")
+    public Result<Long> clearLoginLogs() {
+        return Result.ok(systemMonitorAppService.clearLoginLogs());
     }
 }

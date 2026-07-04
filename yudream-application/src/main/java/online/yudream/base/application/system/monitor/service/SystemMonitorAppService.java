@@ -45,6 +45,14 @@ public class SystemMonitorAppService {
         return loginLogRepo.page(keyword, success, page, size);
     }
 
+    public long clearApiLogs() {
+        return apiLogRepo.clear();
+    }
+
+    public long clearLoginLogs() {
+        return loginLogRepo.clear();
+    }
+
     public List<OnlineUserDTO> onlineUsers(String keyword, int limit) {
         return onlineUserGateway.list(keyword, limit);
     }

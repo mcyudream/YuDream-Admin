@@ -8,4 +8,6 @@ public interface LoginLogRepo {
     void save(LoginLogDTO log);
 
     PageResult<LoginLogDTO> page(String keyword, Boolean success, int page, int size);
+
+    long clear();
 }
