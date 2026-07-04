@@ -95,8 +95,8 @@ Assembler hard rules:
 
 ## Platform Capabilities
 
-- Security and identity abilities such as interface encryption, dual token, API Key, Passkey, and OAuth belong in `system`.
-- Optional engineering abilities such as SSE, WebSocket, MQ, Neo4j, Python Runtime, HTTP integration, document generation, and CMS belong in `platform`.
+- Security and identity abilities such as interface encryption, dual token, API Key, Passkey, and OAuth are system baseline abilities and belong in `system`.
+- Optional engineering abilities such as SSE, WebSocket, MQ, Neo4j, Python Runtime, HTTP integration, document generation, and CMS are dynamically loadable platform abilities and belong in `platform`, separate from `system`.
 - Platform capabilities default to disabled and must support dynamic enable/disable.
 - Disabled platform capabilities must not create external connections, declare middleware resources, or require projects to configure unused middleware.
 - Enabled platform capabilities should be driven by capability config and should lazily connect when a business operation or health/test action actually needs the external system.

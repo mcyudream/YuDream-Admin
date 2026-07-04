@@ -16,7 +16,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -26,10 +36,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MenuAppService {
 
-    private final MenuDomainService menuDomainService;
-    private final MenuRepo menuRepo;
-    private final CapabilityModuleRepo capabilityModuleRepo;
-
     private static final Map<String, String> PLATFORM_MENU_CAPABILITIES = Map.of(
             "platform:docs", "api-docs",
             "platform:integration", "integration",
@@ -37,6 +43,10 @@ public class MenuAppService {
             "platform:graph", "neo4j",
             "platform:cms", "cms"
     );
+
+    private final MenuDomainService menuDomainService;
+    private final MenuRepo menuRepo;
+    private final CapabilityModuleRepo capabilityModuleRepo;
 
     @Transactional(readOnly = true)
     public List<MenuManageDTO> tree(MenuTreeQuery query) {
@@ -115,17 +125,11 @@ public class MenuAppService {
                 .filter(this::platformCapabilityVisible)
                 .toList();
 
-        // 按 code 索引，便于构建树
-        Map<String, Menu> menuMap = allMenus.stream()
-                .collect(Collectors.toMap(Menu::getCode, m -> m));
-
-        // 收集所有可见节点（含按钮，按钮本身不进入路由，但会影响父级是否展示？这里按节点自身权限过滤）
         Set<String> visibleCodes = allMenus.stream()
                 .filter(m -> isVisible(m, permissionSet))
                 .map(Menu::getCode)
                 .collect(Collectors.toSet());
 
-        // 将子节点挂回父节点；同时如果父节点下有可见子节点，父节点也应展示
         Map<String, List<Menu>> childrenMap = new HashMap<>();
         for (Menu menu : allMenus) {
             childrenMap.computeIfAbsent(menu.getParentCode(), k -> new ArrayList<>()).add(menu);
@@ -141,7 +145,6 @@ public class MenuAppService {
             }
         }
 
-        // 按 sort 排序
         result.sort((a, b) -> Integer.compare((int) b.getOrDefault("_sort", 0), (int) a.getOrDefault("_sort", 0)));
         result.forEach(m -> m.remove("_sort"));
         return result;
@@ -306,7 +309,6 @@ public class MenuAppService {
     }
 
     private boolean isVisible(Menu menu, Set<String> userPermissions) {
-        // 目录/分组只要有任意可见子节点即可，先视为可见；后续 buildChildren 会过滤
         if (menu.getType() == MenuNodeType.CATEGORY || menu.getType() == MenuNodeType.LAYOUT) {
             return true;
         }
