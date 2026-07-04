@@ -52,7 +52,8 @@ public class ApiSecurityController {
     @GetMapping("/api-keys")
     @PermissionRegister(code = "system:security:view", name = "查看 API Key", module = "系统管理", desc = "查看系统 API Key")
     public Result<PageResult<ApiKeyCredentialRes>> pageApiKeys(ApiKeyPageQuery query) {
-        return Result.ok(ApiSecurityWebAssembler.toPage(apiSecurityAppService.pageApiKeys(query)));
+        return Result.ok(ApiSecurityWebAssembler.toPage(apiSecurityAppService.pageApiKeys(
+                ApiSecurityWebAssembler.toQuery(query, SecurityPrincipalSupport.current()))));
     }
 
     @PostMapping("/api-keys")

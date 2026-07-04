@@ -13,6 +13,7 @@ import online.yudream.base.application.system.security.cmd.PasskeyRegistrationFi
 import online.yudream.base.application.system.security.cmd.PasskeyRegistrationStartCmd;
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
 import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
+import online.yudream.base.application.system.security.query.ApiKeyPageQuery;
 import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO;
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.ApiEncryptedPayloadDTO;
@@ -80,6 +81,19 @@ public class ApiSecurityWebAssembler {
         cmd.setRefreshTokenTtlSeconds(request.getRefreshTokenTtlSeconds());
         cmd.setRefreshRotationEnabled(request.isRefreshRotationEnabled());
         return cmd;
+    }
+
+    public static ApiKeyPageQuery toQuery(ApiKeyPageQuery requestQuery, SecurityPrincipal principal) {
+        ApiKeyPageQuery query = new ApiKeyPageQuery();
+        if (requestQuery != null) {
+            query.setPage(requestQuery.getPage());
+            query.setSize(requestQuery.getSize());
+            query.setKeyword(requestQuery.getKeyword());
+        }
+        if (!principal.superAdmin()) {
+            query.setCreatorUserId(principal.userId());
+        }
+        return query;
     }
 
     public static ApiKeyCreateCmd toCmd(ApiKeyCreateRequest request, Long creatorUserId, List<String> creatorPermissions) {

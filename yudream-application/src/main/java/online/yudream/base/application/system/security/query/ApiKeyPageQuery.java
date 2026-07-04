@@ -8,4 +8,5 @@ import online.yudream.base.application.common.PageQuery;
 @Data
 public class ApiKeyPageQuery extends PageQuery {
     private String keyword;
+    private Long creatorUserId;
 }

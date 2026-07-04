@@ -13,7 +13,7 @@ public interface ApiKeyCredentialRepo {
 
     Optional<ApiKeyCredential> findByPrefix(String prefix);
 
-    List<ApiKeyCredential> page(String keyword, int page, int size);
+    List<ApiKeyCredential> page(String keyword, Long creatorUserId, int page, int size);
 
-    long count(String keyword);
+    long count(String keyword, Long creatorUserId);
 }

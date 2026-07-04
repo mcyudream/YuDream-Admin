@@ -70,11 +70,12 @@ public class ApiSecurityAppService {
         int page = query == null ? 1 : query.getPage();
         int size = query == null ? 10 : query.getSize();
         String keyword = query == null ? null : query.getKeyword();
-        List<ApiKeyCredentialDTO> records = apiKeyCredentialRepo.page(keyword, page, size).stream()
+        Long creatorUserId = query == null ? null : query.getCreatorUserId();
+        List<ApiKeyCredentialDTO> records = apiKeyCredentialRepo.page(keyword, creatorUserId, page, size).stream()
                 .peek(credential -> credential.refreshExpiryStatus(LocalDateTime.now()))
                 .map(ApiSecurityAssembler::toDTO)
                 .toList();
-        return new PageResult<>(records, apiKeyCredentialRepo.count(keyword), Math.max(page, 1), Math.max(size, 1));
+        return new PageResult<>(records, apiKeyCredentialRepo.count(keyword, creatorUserId), Math.max(page, 1), Math.max(size, 1));
     }
 
     @Transactional
