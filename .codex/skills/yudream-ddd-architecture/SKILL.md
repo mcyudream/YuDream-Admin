@@ -125,6 +125,28 @@ Assembler hard rules:
 - CMS platform work must be a complete publishing loop, not only backend CRUD. A CMS change should include backend menu permissions, admin route/menu registration, public frontend routes, public rendering, publish/unpublish flow, SEO fields, page/template metadata, and visual-builder-compatible content storage such as saved HTML plus Markdown fallback.
 - CMS visual editing uses GrapesJS on the frontend. Store the published HTML in `htmlContent`, the published CSS in `cssContent`, and the editable GrapesJS project source in `builderProjectJson`; homepage builder data lives in `HomePageLayout.settings.homeHtml`, `homeCss`, and `homeProjectJson` unless a dedicated backend aggregate field is later added. Keep Markdown/HTML editing and legacy homepage sections as fallback modes, but do not keep a second visual-builder dependency or old visual-builder component tree after migrating to GrapesJS.
 
+## Plugin Architecture
+
+- `yudream-plugin-spi` is the only compile-time contract module that third-party plugin JARs may depend on. Plugin code must not depend on `yudream-domain`, `yudream-application`, `yudream-infrastructure`, `yudream-interfaces`, or bootstrap implementation classes.
+- Prefer annotation-driven plugin registration for static plugin metadata, permissions, menus, frontend routes, HTTP endpoints, capabilities, migrations, and extension declarations. Imperative `PluginContext.registerXxx(...)` calls are allowed for dynamic runtime contributions, conditional registrations, and compatibility fallback only. The plugin runtime should scan annotations, validate duplicate codes/routes/permissions at load time, and adapt the discovered declarations to the same runtime registry used by manual registration.
+- Keep plugin projects engineered by package responsibility. Do not place real plugin functionality in a single `YuDreamPlugin` class. A plugin with business behavior should split into packages such as `domain`, `application`, `infrastructure`, `interfaces`, `migration`, `frontend`, and `bootstrap` according to its size. The plugin entry class should describe and wire the plugin, not contain business workflows, database migration code, HTTP business logic, or UI route construction.
+- Spring-related plugin projects must follow the same DDD principles as host modules. Use aggregate/value-object/repository contracts in domain; cmd/query/dto/assembler/service in application; dataobj/mapper/impl/service in infrastructure; controller/assembler/request/res in interfaces. Plugin HTTP handlers and Spring controllers must delegate to application services and must not inline request-to-command mapping or business invariants.
+- Keep the SPI module engineering package layout by responsibility:
+  - `online.yudream.base.plugin.spi.core`: plugin descriptor, lifecycle, and runtime context;
+  - `online.yudream.base.plugin.spi.http`: generic plugin HTTP handler request/response contracts;
+  - `online.yudream.base.plugin.spi.frontend`: frontend module, remote entry, and dynamic route metadata;
+  - `online.yudream.base.plugin.spi.menu`: plugin menu contribution metadata;
+  - `online.yudream.base.plugin.spi.permission`: plugin permission declarations;
+  - `online.yudream.base.plugin.spi.capability`: optional platform capability declarations;
+  - `online.yudream.base.plugin.spi.system`: stable host framework capability ports exposed to plugins.
+- Plugin JAR entry classes implement `core.YuDreamPlugin`. All menu, permission, capability, frontend, HTTP, and extension registrations must happen through `core.PluginContext` so hot unload can remove every runtime contribution.
+- Plugins may call YuDream framework abilities only through SPI ports such as `system.FrameworkServices`, `system.user.PluginUserService`, and `system.security.PluginSecurityService`. If a new host ability is needed, add a stable SPI port/DTO first, then implement the adapter in the host application/runtime layer.
+- Do not expose domain aggregate roots, domain repositories, application services, infrastructure repositories, MyBatis/Mongo data objects, or Spring beans directly to plugin code. Domain invariants still belong in the host domain/application layers; plugins receive DTO-style views and invoke use-case-oriented ports.
+- Plugin-facing DTOs must be stable, serialization-friendly records or simple value objects. They should not reuse interface `request/res` classes or persistence `dataobj` classes.
+- Plugin HTTP endpoints should be mounted under plugin-scoped paths such as `/api/plugins/{pluginCode}/**` through a runtime dispatcher for the first version. Avoid dynamic Spring MVC controller registration until unload semantics, permissions, and diagnostics are proven stable.
+- Frontend plugins should use the host-provided dynamic frontend SDK/client instead of bundling a private axios instance. SDK version and remote entry metadata must be part of the frontend manifest so the host can refresh or replace SDK behavior without rebuilding every plugin.
+- Runtime implementations must track disposables, classloaders, registered handlers, frontend manifests, menus, permissions, and capability providers by plugin code, and must release them on disable/unload.
+
 ## System Seeds
 
 - System seed initialization, including menu enum seeds, must be controlled by configuration instead of hard-coded overwrite behavior.

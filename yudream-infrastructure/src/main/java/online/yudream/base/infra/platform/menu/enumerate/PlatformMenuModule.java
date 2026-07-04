@@ -32,6 +32,19 @@ public enum PlatformMenuModule {
             parentName = "CAPABILITY", permission = "platform:capability:test")
     CAPABILITY_TEST,
 
+    @MenuNode(code = "platform:plugin", name = "插件管理", type = MenuNodeType.MENU,
+            path = "/platform/plugin", component = "platform/plugin/index.vue",
+            icon = "i-ri:puzzle-2-line", sort = 95)
+    PLUGIN,
+
+    @MenuNode(code = "platform:plugin:view", name = "查看插件管理", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN", permission = "platform:plugin:view")
+    PLUGIN_VIEW,
+
+    @MenuNode(code = "platform:plugin:manage", name = "管理插件", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN", permission = "platform:plugin:manage")
+    PLUGIN_MANAGE,
+
     @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
             path = "/platform/api-doc", component = "platform/api-doc/index.vue",
             icon = "i-ri:file-list-2-line", sort = 90)
