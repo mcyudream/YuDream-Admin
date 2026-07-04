@@ -13,6 +13,8 @@ public interface CmsPageRepo {
 
     Optional<CmsPage> findBySlug(String slug);
 
+    void deleteById(Long id);
+
     PageResult<CmsPage> page(String keyword, int page, int size);
 
     PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size);

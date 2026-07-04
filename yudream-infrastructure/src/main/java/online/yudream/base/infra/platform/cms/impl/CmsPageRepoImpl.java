@@ -49,6 +49,12 @@ public class CmsPageRepoImpl implements CmsPageRepo {
     }
 
     @Override
+    public void deleteById(Long id) {
+        Query query = Query.query(Criteria.where("id").is(id));
+        mongoTemplate.remove(query, CmsPageDO.class);
+    }
+
+    @Override
     public PageResult<CmsPage> page(String keyword, int page, int size) {
         Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
         return page(query, page, size);

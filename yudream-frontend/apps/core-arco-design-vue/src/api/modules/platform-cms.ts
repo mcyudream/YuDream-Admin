@@ -89,6 +89,9 @@ export default {
   updatePage: (id: number, data: CmsPagePayload) => {
     return systemClient.put<unknown, ApiResponse<CmsPage>>(`api/platform/cms/pages/${id}`, data)
   },
+  deletePage: (id: number) => {
+    return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/cms/pages/${id}`)
+  },
   publish: (id: number) => {
     return systemClient.post<unknown, ApiResponse<void>>(`api/platform/cms/pages/${id}/publish`)
   },

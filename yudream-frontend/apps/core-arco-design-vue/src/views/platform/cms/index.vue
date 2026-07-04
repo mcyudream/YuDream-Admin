@@ -36,6 +36,7 @@ const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
 const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
 const selectedPageId = ref<number | null>(null)
+const showAllVariables = ref(false)
 
 const pageForm = reactive<CmsPagePayload>({
   title: '',
@@ -147,6 +148,7 @@ const footerCopyright = computed({
 const rootNavigationItems = computed(() => [...navigationItems.value].filter(item => !item.parentId).sort((a, b) => a.sort - b.sort))
 const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
 const homePreviewHtml = computed(() => sanitizeHtml(stripLayoutBlocks(homeHtml.value || emptyHomeBuilderHtml())))
+const visibleCmsVariables = computed(() => showAllVariables.value ? cmsVariables : cmsVariables.slice(0, 8))
 const cmsVariables = [
   { key: '{{site.name}}', label: '站点名称' },
   { key: '{{site.description}}', label: '站点描述' },
@@ -419,6 +421,25 @@ async function savePage() {
   }
 }
 
+function confirmDeletePage(page: CmsPage = selectedPage.value!) {
+  if (!page) {
+    return
+  }
+  modal.confirm({
+    title: '删除页面',
+    content: `确认删除「${page.title}」吗？删除后公开页将无法访问。`,
+    onConfirm: async () => {
+      await apiCms.deletePage(page.id)
+      toast.success('页面已删除')
+      if (selectedPageId.value === page.id) {
+        selectedPageId.value = null
+        resetPageForm()
+      }
+      await loadPages()
+    },
+  })
+}
+
 function confirmPublish() {
   if (!selectedPage.value) {
     pageForm.status = 'PUBLISHED'
@@ -686,11 +707,26 @@ function sectionTitle(type: HomeSectionType) {
             </FaButton>
           </div>
           <div v-loading="loading" class="page-list__items">
-            <button v-for="item in pages" :key="item.id" type="button" :class="{ active: item.id === selectedPageId }" @click="selectPage(item)">
-              <strong>{{ item.title }}</strong>
-              <span>/site/{{ item.slug }}</span>
-              <small>{{ item.status === 'PUBLISHED' ? '已发布' : '草稿' }} · {{ dateText(item.publishedAt) }}</small>
-            </button>
+            <article v-for="item in pages" :key="item.id" class="page-list-card" :class="{ active: item.id === selectedPageId }">
+              <button type="button" class="page-list-card__main" @click="selectPage(item)">
+                <span class="page-list-card__title">{{ item.title }}</span>
+                <span class="page-list-card__path">/site/{{ item.slug }}</span>
+                <span class="page-list-card__meta">
+                  <FaTag :variant="item.status === 'PUBLISHED' ? 'primary' : 'secondary'">
+                    {{ item.status === 'PUBLISHED' ? '已发布' : '草稿' }}
+                  </FaTag>
+                  <span>{{ dateText(item.publishedAt || item.updateTime || item.createTime) || '未发布' }}</span>
+                </span>
+              </button>
+              <div class="page-list-card__actions">
+                <a :href="`/site/${item.slug}`" target="_blank" rel="noopener noreferrer" title="预览">
+                  <FaIcon name="i-ri:external-link-line" />
+                </a>
+                <button v-auth="'platform:cms:delete'" type="button" title="删除" @click.stop="confirmDeletePage(item)">
+                  <FaIcon name="i-ri:delete-bin-line" />
+                </button>
+              </div>
+            </article>
             <div v-if="!pages.length" class="empty-state">
               暂无页面
             </div>
@@ -770,6 +806,10 @@ function sectionTitle(type: HomeSectionType) {
               <FaButton v-auth="'platform:cms:publish'" variant="outline" @click="confirmPublish">
                 {{ selectedPage?.status === 'PUBLISHED' ? '取消发布' : '发布' }}
               </FaButton>
+              <FaButton v-if="selectedPage" v-auth="'platform:cms:delete'" variant="ghost" @click="confirmDeletePage()">
+                <FaIcon name="i-ri:delete-bin-line" />
+                删除
+              </FaButton>
               <a :href="pagePublicUrl" target="_blank" rel="noopener noreferrer">预览公开页</a>
             </div>
           </section>
@@ -796,9 +836,14 @@ function sectionTitle(type: HomeSectionType) {
           </section>
 
           <section>
-            <h3>动态变量</h3>
-            <div class="variable-list">
-              <button v-for="item in cmsVariables" :key="item.key" type="button" @click="insertVariable(item.key)">
+            <div class="panel-title-row">
+              <h3>动态变量</h3>
+              <button type="button" @click="showAllVariables = !showAllVariables">
+                {{ showAllVariables ? '收起' : `全部 ${cmsVariables.length}` }}
+              </button>
+            </div>
+            <div class="variable-list compact">
+              <button v-for="item in visibleCmsVariables" :key="item.key" type="button" @click="insertVariable(item.key)">
                 <strong>{{ item.key }}</strong>
                 <span>{{ item.label }}</span>
               </button>
@@ -1114,7 +1159,7 @@ function sectionTitle(type: HomeSectionType) {
 
 .cms-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 340px;
+  grid-template-columns: 320px minmax(0, 1fr) 300px;
   gap: 16px;
   align-items: start;
 }
@@ -1127,32 +1172,98 @@ function sectionTitle(type: HomeSectionType) {
   min-width: 0;
 }
 
-.page-list__items {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.page-list__items button {
-  display: grid;
-  gap: 5px;
-  width: 100%;
+.page-list {
   padding: 12px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-2);
-  color: var(--color-text-1);
-  text-align: left;
 }
 
-.page-list__items button.active {
+.page-list__toolbar {
+  align-items: stretch;
+}
+
+.page-list__items {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  max-height: calc(100vh - 270px);
+  overflow: auto;
+}
+
+.page-list-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.page-list-card.active {
   border-color: rgb(var(--primary-6));
   box-shadow: inset 3px 0 0 rgb(var(--primary-6));
 }
 
-.page-list__items span,
-.page-list__items small {
+.page-list-card:hover {
+  border-color: var(--color-border-3);
+}
+
+.page-list-card__main {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: var(--color-text-1);
+  text-align: left;
+}
+
+.page-list-card__title,
+.page-list-card__path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-list-card__title {
+  font-weight: 800;
+}
+
+.page-list-card__path,
+.page-list-card__meta {
   color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.page-list-card__meta,
+.page-list-card__actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.page-list-card__actions {
+  align-self: start;
+}
+
+.page-list-card__actions a,
+.page-list-card__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  color: var(--color-text-3);
+  text-decoration: none;
+}
+
+.page-list-card__actions a:hover,
+.page-list-card__actions button:hover {
+  background: var(--color-fill-2);
+  color: rgb(var(--primary-6));
 }
 
 .title-input :deep(input) {
@@ -1271,8 +1382,21 @@ function sectionTitle(type: HomeSectionType) {
   font-size: 15px;
 }
 
+.panel-title-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title-row button {
+  color: rgb(var(--primary-6));
+  font-size: 12px;
+}
+
 .publish-actions {
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .publish-actions a {
@@ -1295,13 +1419,14 @@ function sectionTitle(type: HomeSectionType) {
 
 .variable-list.compact {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .variable-list button {
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 7px 8px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-1);
@@ -1323,12 +1448,12 @@ function sectionTitle(type: HomeSectionType) {
 
 .variable-list strong {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .variable-list span {
   color: var(--color-text-3);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .mini-preview {
