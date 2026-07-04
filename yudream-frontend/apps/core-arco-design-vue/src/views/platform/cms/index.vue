@@ -1130,6 +1130,9 @@ function sectionTitle(type: HomeSectionType) {
         :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
         :ai-enabled="aiEnabled"
         :ai-model-options="aiModelOptions"
+        :history-target-type="editorTarget"
+        :history-target-id="editorTarget === 'home' ? 'home' : (selectedPageId || pageForm.slug || pageForm.title || 'draft')"
+        :history-target-label="editorTarget === 'home' ? home.title : pageForm.title"
         @close="grapesEditorVisible = false"
         @save="saveGrapesEditor"
       />
