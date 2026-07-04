@@ -170,6 +170,7 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
   },
   isValidChunk: (chunk: SSEChunkData) => [
     'ai.message',
+    'ai.progress',
     'ai.tool',
     'ai.result',
     'ai.error',
@@ -180,7 +181,7 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
   ].includes(chunk.event || ''),
   onMessage: (chunk: SSEChunkData) => {
     const envelope = normalizeAiStreamChunk(chunk)
-    if (envelope.event === 'ai.message') {
+    if (envelope.event === 'ai.message' || envelope.event === 'ai.progress') {
       return markdownChunk(String(envelope.payload?.content || ''))
     }
     if (envelope.event === 'ai.tool') {
