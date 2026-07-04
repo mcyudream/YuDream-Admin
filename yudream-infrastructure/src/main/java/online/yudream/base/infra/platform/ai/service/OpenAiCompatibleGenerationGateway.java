@@ -27,26 +27,24 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     @Override
     public AiGenerationResult generate(AiGenerationRequest request) {
-        JSONObject json = callChatCompletion(request.config(), request.systemPrompt(), request.userPrompt());
+        JSONObject json = callChatCompletion(request.config(), request.model(), request.systemPrompt(), request.userPrompt(), request.imageDataUrl());
         return toResult(extractContent(json));
     }
 
     public void test(Map<String, String> config, String message) {
-        callChatCompletion(config, "你是 YuDream AI 能力连通性测试助手，只需返回一句简短中文。", message);
+        callChatCompletion(config, null, "你是 YuDream AI 能力连通性测试助手，只需返回一句简短中文。", message, null);
     }
 
-    private JSONObject callChatCompletion(Map<String, String> config, String systemPrompt, String userPrompt) {
+    private JSONObject callChatCompletion(Map<String, String> config, String requestModel, String systemPrompt, String userPrompt, String imageDataUrl) {
         String apiKey = value(config, "apiKey", "");
         if (!StringUtils.hasText(apiKey)) {
             throw new BizException("AI API Key 未配置");
         }
         JSONObject body = JSONUtil.createObj()
-                .set("model", value(config, "model", AiCapabilityProvider.DEFAULT_MODEL))
+                .set("model", model(config, requestModel))
                 .set("temperature", temperature(config));
-        JSONArray messages = JSONUtil.createArray()
-                .put(JSONUtil.createObj().set("role", "system").set("content", systemPrompt))
-                .put(JSONUtil.createObj().set("role", "user").set("content", userPrompt));
-        body.set("messages", messages);
+        mergeExtraBody(body, config);
+        body.set("messages", messages(systemPrompt, userPrompt, imageDataUrl));
 
         HttpRequest request = HttpRequest.post(endpoint(config))
                 .bearerAuth(apiKey)
@@ -71,6 +69,44 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         } catch (Exception e) {
             throw new BizException("AI 调用异常：" + e.getMessage());
         }
+    }
+
+    private JSONArray messages(String systemPrompt, String userPrompt, String imageDataUrl) {
+        JSONArray messages = JSONUtil.createArray()
+                .put(JSONUtil.createObj().set("role", "system").set("content", systemPrompt));
+        if (!StringUtils.hasText(imageDataUrl)) {
+            return messages.put(JSONUtil.createObj().set("role", "user").set("content", userPrompt));
+        }
+        JSONArray content = JSONUtil.createArray()
+                .put(JSONUtil.createObj().set("type", "text").set("text", userPrompt))
+                .put(JSONUtil.createObj()
+                        .set("type", "image_url")
+                        .set("image_url", JSONUtil.createObj().set("url", imageDataUrl)));
+        return messages.put(JSONUtil.createObj().set("role", "user").set("content", content));
+    }
+
+    private void mergeExtraBody(JSONObject body, Map<String, String> config) {
+        String extraBody = renderTemplate(value(config, "extraBody", ""), config);
+        if (!StringUtils.hasText(extraBody)) {
+            return;
+        }
+        try {
+            JSONObject extra = JSONUtil.parseObj(extraBody);
+            extra.forEach(body::set);
+        } catch (Exception e) {
+            throw new BizException("AI extraBody 不是有效 JSON：" + e.getMessage());
+        }
+    }
+
+    private String renderTemplate(String value, Map<String, String> config) {
+        if (!StringUtils.hasText(value)) {
+            return value;
+        }
+        return value
+                .replace("{{thinkingEnabled}}", value(config, "thinkingEnabled", "false"))
+                .replace("{{model}}", value(config, "model", AiCapabilityProvider.DEFAULT_MODEL))
+                .replace("{{embeddingModel}}", value(config, "embeddingModel", ""))
+                .replace("{{rerankModel}}", value(config, "rerankModel", ""));
     }
 
     private void applyProxy(HttpRequest request, Map<String, String> config) {
@@ -172,6 +208,10 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
         String value = body.stripLeading().toLowerCase();
         return value.startsWith("<!doctype html") || value.startsWith("<html") || value.contains("<body");
+    }
+
+    private String model(Map<String, String> config, String requestModel) {
+        return StringUtils.hasText(requestModel) ? requestModel.trim() : value(config, "model", AiCapabilityProvider.DEFAULT_MODEL);
     }
 
     private String value(Map<String, String> config, String key, String fallback) {

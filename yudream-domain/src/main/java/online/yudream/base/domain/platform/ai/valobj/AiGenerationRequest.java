@@ -5,6 +5,8 @@ import java.util.Map;
 public record AiGenerationRequest(
         String systemPrompt,
         String userPrompt,
+        String imageDataUrl,
+        String model,
         Map<String, String> config
 ) {
 }

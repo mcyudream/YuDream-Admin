@@ -9,4 +9,6 @@ public class CmsPageGenerateCmd {
     private String pageType;
     private String style;
     private String siteName;
+    private String model;
+    private String imageDataUrl;
 }

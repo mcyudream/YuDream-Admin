@@ -12,7 +12,7 @@ interface CapabilityConfigField {
   key: string
   label: string
   placeholder?: string
-  type?: 'text' | 'password' | 'number'
+  type?: 'text' | 'password' | 'number' | 'textarea'
 }
 
 const toast = useFaToast()
@@ -231,8 +231,13 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
     ai: [
       { key: 'baseUrl', label: '接口地址', placeholder: 'https://api.openai.com/v1' },
       { key: 'apiKey', label: 'API Key', placeholder: 'sk-...', type: 'password' },
-      { key: 'model', label: '模型', placeholder: 'gpt-4o-mini' },
+      { key: 'model', label: '默认生成模型', placeholder: 'gpt-4o-mini' },
+      { key: 'models', label: '可选生成模型', placeholder: 'gpt-4o-mini,deepseek-chat,qwen-vl-plus' },
       { key: 'temperature', label: '温度', placeholder: '0.4', type: 'number' },
+      { key: 'thinkingEnabled', label: '深度思考', placeholder: 'false' },
+      { key: 'extraBody', label: 'Extra Body', placeholder: '{ "enable_thinking": {{thinkingEnabled}} }', type: 'textarea' },
+      { key: 'embeddingModel', label: '向量化模型', placeholder: 'text-embedding-3-small' },
+      { key: 'rerankModel', label: '重排模型', placeholder: 'bge-reranker-v2' },
       { key: 'proxyUrl', label: '代理地址', placeholder: 'http://127.0.0.1:7890' },
     ],
   }
@@ -403,7 +408,15 @@ function parseJsonConfig() {
       <div v-if="usesStructuredConfig" class="config-form">
         <label v-for="field in configFields" :key="field.key" class="config-field">
           <span>{{ field.label }}</span>
+          <FaTextarea
+            v-if="field.type === 'textarea'"
+            v-model="configDraft[field.key]"
+            rows="5"
+            input-class="font-mono"
+            :placeholder="field.placeholder"
+          />
           <FaInput
+            v-else
             v-model="configDraft[field.key]"
             :type="field.type || 'text'"
             :placeholder="field.placeholder"

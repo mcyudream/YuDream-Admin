@@ -36,7 +36,12 @@ public class AiCapabilityProvider implements CapabilityProvider {
         defaultConfig.put("baseUrl", DEFAULT_BASE_URL);
         defaultConfig.put("apiKey", "");
         defaultConfig.put("model", DEFAULT_MODEL);
+        defaultConfig.put("models", DEFAULT_MODEL);
         defaultConfig.put("temperature", DEFAULT_TEMPERATURE);
+        defaultConfig.put("thinkingEnabled", "false");
+        defaultConfig.put("extraBody", "");
+        defaultConfig.put("embeddingModel", "");
+        defaultConfig.put("rerankModel", "");
         defaultConfig.put("proxyUrl", "");
         return new CapabilityDescriptor(
                 CODE,
@@ -54,14 +59,19 @@ public class AiCapabilityProvider implements CapabilityProvider {
         if (!enabled.get()) {
             return CapabilityHealth.disabled("AI 能力未启用");
         }
-        return CapabilityHealth.enabled("AI 能力已启用", Map.of(
-                "baseUrl", baseUrl(),
-                "endpoint", endpoint(),
-                "model", model(),
-                "proxyEnabled", String.valueOf(StringUtils.hasText(proxyUrl())),
-                "proxyUrl", proxyUrl(),
-                "apiKeyConfigured", String.valueOf(hasApiKey())
-        ));
+        Map<String, Object> metrics = new LinkedHashMap<>();
+        metrics.put("baseUrl", baseUrl());
+        metrics.put("endpoint", endpoint());
+        metrics.put("model", model());
+        metrics.put("models", config.getOrDefault("models", model()));
+        metrics.put("embeddingModel", config.getOrDefault("embeddingModel", ""));
+        metrics.put("rerankModel", config.getOrDefault("rerankModel", ""));
+        metrics.put("thinkingEnabled", config.getOrDefault("thinkingEnabled", "false"));
+        metrics.put("extraBodyConfigured", String.valueOf(StringUtils.hasText(config.get("extraBody"))));
+        metrics.put("proxyEnabled", String.valueOf(StringUtils.hasText(proxyUrl())));
+        metrics.put("proxyUrl", proxyUrl());
+        metrics.put("apiKeyConfigured", String.valueOf(hasApiKey()));
+        return CapabilityHealth.enabled("AI 能力已启用", metrics);
     }
 
     @Override
