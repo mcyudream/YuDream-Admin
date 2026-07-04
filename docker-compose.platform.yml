@@ -2,6 +2,8 @@ services:
   rabbitmq:
     image: docker.io/rabbitmq:4.3.2-management-alpine
     container_name: yudream-rabbitmq
+    profiles:
+      - mq
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
@@ -14,6 +16,8 @@ services:
   neo4j:
     image: docker.io/neo4j:5.26-community
     container_name: yudream-neo4j
+    profiles:
+      - graph
     restart: unless-stopped
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD:-yudream123456}

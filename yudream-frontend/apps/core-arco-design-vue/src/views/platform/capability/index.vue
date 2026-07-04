@@ -8,6 +8,13 @@ interface CapabilityGroup {
   icon: string
 }
 
+interface CapabilityConfigField {
+  key: string
+  label: string
+  placeholder?: string
+  type?: 'text' | 'password' | 'number'
+}
+
 const toast = useFaToast()
 
 const loading = ref(false)
@@ -16,6 +23,7 @@ const rows = ref<CapabilityItem[]>([])
 const selectedCode = ref('')
 const configVisible = ref(false)
 const configText = ref('{}')
+const configDraft = ref<Record<string, string>>({})
 const testMessage = ref('YuDream 平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
@@ -33,6 +41,8 @@ const groups: CapabilityGroup[] = [
 ]
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
+const configFields = computed(() => fieldsOf(selected.value?.code))
+const usesStructuredConfig = computed(() => configFields.value.length > 0)
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
@@ -78,6 +88,7 @@ async function toggleCapability(item: CapabilityItem) {
 
 function openConfig(item: CapabilityItem) {
   selectedCode.value = item.code
+  configDraft.value = { ...(item.config || {}) }
   configText.value = JSON.stringify(item.config || {}, null, 2)
   configVisible.value = true
 }
@@ -86,12 +97,8 @@ async function saveConfig() {
   if (!selected.value) {
     return
   }
-  let config: Record<string, string>
-  try {
-    config = JSON.parse(configText.value || '{}')
-  }
-  catch {
-    toast.error('配置格式错误', { description: '请输入合法 JSON 对象' })
+  const config = usesStructuredConfig.value ? normalizedConfig() : parseJsonConfig()
+  if (!config) {
     return
   }
   const res = await apiCapability.updateConfig(selected.value.code, config)
@@ -203,6 +210,41 @@ function statusVariant(status: CapabilityStatus) {
 
 function metricEntries(item?: CapabilityItem) {
   return Object.entries(item?.metrics || {})
+}
+
+function fieldsOf(code?: string): CapabilityConfigField[] {
+  const map: Record<string, CapabilityConfigField[]> = {
+    sse: [
+      { key: 'timeout', label: '连接超时（毫秒）', placeholder: '300000', type: 'number' },
+    ],
+    rabbitmq: [
+      { key: 'host', label: '主机', placeholder: 'localhost' },
+      { key: 'port', label: '端口', placeholder: '35672', type: 'number' },
+      { key: 'username', label: '用户名', placeholder: 'guest' },
+      { key: 'password', label: '密码', placeholder: 'guest', type: 'password' },
+      { key: 'virtualHost', label: 'Virtual Host', placeholder: '/' },
+      { key: 'exchange', label: '交换机', placeholder: 'yudream.capability' },
+      { key: 'queue', label: '队列', placeholder: 'yudream.capability.test' },
+      { key: 'routingKey', label: '路由键', placeholder: 'capability.test' },
+    ],
+  }
+  return code ? map[code] || [] : []
+}
+
+function normalizedConfig() {
+  return Object.fromEntries(
+    configFields.value.map(field => [field.key, String(configDraft.value[field.key] ?? '').trim()]),
+  )
+}
+
+function parseJsonConfig() {
+  try {
+    return JSON.parse(configText.value || '{}') as Record<string, string>
+  }
+  catch {
+    toast.error('配置格式错误', { description: '请输入合法 JSON 对象' })
+    return null
+  }
 }
 </script>
 
@@ -350,7 +392,17 @@ function metricEntries(item?: CapabilityItem) {
     </FaPageMain>
 
     <FaModal v-model="configVisible" title="能力配置" show-cancel-button class="sm:max-w-2xl" @confirm="saveConfig">
-      <FaTextarea v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
+      <div v-if="usesStructuredConfig" class="config-form">
+        <label v-for="field in configFields" :key="field.key" class="config-field">
+          <span>{{ field.label }}</span>
+          <FaInput
+            v-model="configDraft[field.key]"
+            :type="field.type || 'text'"
+            :placeholder="field.placeholder"
+          />
+        </label>
+      </div>
+      <FaTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
     </FaModal>
   </div>
 </template>
@@ -555,6 +607,23 @@ function metricEntries(item?: CapabilityItem) {
   border-radius: 6px;
   color: var(--color-text-3);
   text-align: center;
+}
+
+.config-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.config-field {
+  display: grid;
+  gap: 6px;
+}
+
+.config-field span {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .ok {
