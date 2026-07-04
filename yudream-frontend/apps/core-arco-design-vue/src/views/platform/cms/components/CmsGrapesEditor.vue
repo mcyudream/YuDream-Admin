@@ -293,7 +293,22 @@ function cmsBlocks(): grapesjs.BlockProperties[] {
   <div data-yb-repeat="navigation" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
     <a href="{{item.url}}" style="padding:8px 12px; border-radius:8px; color:#475569; text-decoration:none;">{{item.label}}</a>
   </div>
-  <a data-visible-when="guest" href="/login" style="padding:8px 14px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">登录</a>
+  <div data-visible-when="guest" style="display:flex; align-items:center; gap:8px;">
+    <a href="/login" style="padding:8px 14px; border-radius:8px; color:#475569; font-weight:700; text-decoration:none;">登录</a>
+    <a href="/register" style="padding:8px 14px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">注册</a>
+  </div>
+  <details data-visible-when="logged-in" style="position:relative;">
+    <summary style="display:flex; align-items:center; gap:10px; list-style:none; cursor:pointer;">
+      <img src="{{user.avatar}}" alt="{{user.nickname}}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; background:#e2e8f0;">
+      <span style="color:#0f172a; font-weight:800;">{{user.nickname}}</span>
+      <span style="color:#94a3b8;">⌄</span>
+    </summary>
+    <div style="position:absolute; top:calc(100% + 8px); right:0; z-index:20; display:grid; min-width:132px; padding:6px; border:1px solid #e5e7eb; border-radius:10px; background:#ffffff; box-shadow:0 14px 32px rgba(15,23,42,.12);">
+      <a href="/" style="padding:9px 10px; border-radius:8px; color:#334155; text-decoration:none;">控制台</a>
+      <a href="/profile" style="padding:9px 10px; border-radius:8px; color:#334155; text-decoration:none;">个人资料</a>
+      <a href="/logout" style="padding:9px 10px; border-radius:8px; color:#b91c1c; text-decoration:none;">退出登录</a>
+    </div>
+  </details>
 </nav>`,
     },
     {
