@@ -28,6 +28,8 @@ public class CmsInfraMapper {
         dataObj.setTags(domain.getTags());
         dataObj.setMarkdownContent(domain.getMarkdownContent());
         dataObj.setHtmlContent(domain.getHtmlContent());
+        dataObj.setCssContent(domain.getCssContent());
+        dataObj.setBuilderProjectJson(domain.getBuilderProjectJson());
         dataObj.setSeoTitle(domain.getSeoTitle());
         dataObj.setSeoDescription(domain.getSeoDescription());
         dataObj.setTemplate(domain.getTemplate());
@@ -54,6 +56,8 @@ public class CmsInfraMapper {
                 .tags(dataObj.getTags())
                 .markdownContent(dataObj.getMarkdownContent())
                 .htmlContent(dataObj.getHtmlContent())
+                .cssContent(dataObj.getCssContent())
+                .builderProjectJson(dataObj.getBuilderProjectJson())
                 .seoTitle(dataObj.getSeoTitle())
                 .seoDescription(dataObj.getSeoDescription())
                 .template(dataObj.getTemplate())

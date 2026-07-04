@@ -27,7 +27,25 @@ const slug = computed(() => {
   return value ? String(value) : ''
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
+const homeCss = computed(() => home.value?.settings?.homeCss || '')
 const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson))
+const archiveFilter = computed(() => ({
+  category: queryValue(route.query.category),
+  tag: queryValue(route.query.tag),
+  keyword: queryValue(route.query.keyword),
+}))
+const archiveTitle = computed(() => {
+  if (archiveFilter.value.category) {
+    return `分类：${archiveFilter.value.category}`
+  }
+  if (archiveFilter.value.tag) {
+    return `标签：${archiveFilter.value.tag}`
+  }
+  if (archiveFilter.value.keyword) {
+    return `搜索：${archiveFilter.value.keyword}`
+  }
+  return '全部内容'
+})
 const renderContext = computed(() => {
   const loggedIn = appAccountStore.isLogin
   const username = appAccountStore.account || ''
@@ -69,6 +87,13 @@ const renderContext = computed(() => {
     pages: pageItems,
     categories: collectTermItems(publishedPages.value, 'categories'),
     tags: collectTermItems(publishedPages.value, 'tags'),
+    archive: {
+      title: archiveTitle.value,
+      category: archiveFilter.value.category,
+      tag: archiveFilter.value.tag,
+      keyword: archiveFilter.value.keyword,
+      isFiltered: archiveFilter.value.category || archiveFilter.value.tag || archiveFilter.value.keyword ? 'true' : 'false',
+    },
   }
 })
 
@@ -109,12 +134,25 @@ async function load() {
 
 async function loadPublicPages() {
   try {
-    const res = await apiCms.publicPages({ page: 1, size: 12 })
+    const res = await apiCms.publicPages({
+      page: 1,
+      size: 12,
+      keyword: archiveFilter.value.keyword || undefined,
+      category: archiveFilter.value.category || undefined,
+      tag: archiveFilter.value.tag || undefined,
+    })
     publishedPages.value = res.data.records
   }
   catch {
     publishedPages.value = []
   }
+}
+
+function queryValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value[0] ? String(value[0]) : ''
+  }
+  return value ? String(value) : ''
 }
 
 function toPageItem(item: CmsPage) {
@@ -301,6 +339,9 @@ function escapeHtml(value: string) {
     </header>
 
     <template v-if="!page && home">
+      <component :is="'style'" v-if="homeCss">
+        {{ homeCss }}
+      </component>
       <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
       <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
         <div class="site-shell">
@@ -321,6 +362,9 @@ function escapeHtml(value: string) {
     </template>
 
     <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
+      <component :is="'style'" v-if="page.cssContent">
+        {{ page.cssContent }}
+      </component>
       <header class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
         <div class="site-shell">
           <span>{{ page.slug }}</span>
@@ -405,8 +449,8 @@ function escapeHtml(value: string) {
   object-fit: cover;
 }
 
-.site-builder-home :deep(#pagebuilder),
-.site-builder-home :deep(.pagebuilder) {
+.site-builder-home :deep(main),
+.site-builder-home :deep(section) {
   min-height: 100vh;
 }
 
@@ -516,8 +560,7 @@ function escapeHtml(value: string) {
   line-height: 1.8;
 }
 
-.site-article__body :deep(#pagebuilder),
-.site-article__body :deep(.pagebuilder) {
+.site-article__body :deep(main) {
   display: grid;
   gap: 20px;
 }

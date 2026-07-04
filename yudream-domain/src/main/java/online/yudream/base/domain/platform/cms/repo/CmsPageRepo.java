@@ -15,5 +15,5 @@ public interface CmsPageRepo {
 
     PageResult<CmsPage> page(String keyword, int page, int size);
 
-    PageResult<CmsPage> publishedPage(String keyword, int page, int size);
+    PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size);
 }

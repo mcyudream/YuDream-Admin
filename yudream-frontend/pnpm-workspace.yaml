@@ -17,7 +17,6 @@ catalog:
   '@iconify/json': ^2.2.485
   '@iconify/vue': ^5.0.1
   '@lucide/vue': ^1.17.0
-  '@myissue/vue-website-page-builder': 3.5.20
   '@spiriit/vite-plugin-svg-spritemap': ^7.0.0
   '@stylistic/stylelint-config': ^5.0.0
   '@tanstack/vue-table': ^8.21.3
@@ -51,6 +50,7 @@ catalog:
   eslint: ^10.4.1
   filesize: ^11.0.17
   fs-extra: ^11.3.5
+  grapesjs: ^0.23.2
   hotkeys-js: ^4.0.4
   http-server: ^14.1.1
   lint-staged: ^17.0.7
@@ -113,5 +113,3 @@ allowBuilds:
   esbuild: true
   simple-git-hooks: true
   vue-demi: true
-minimumReleaseAgeExclude:
-  - '@myissue/vue-website-page-builder@3.5.20'

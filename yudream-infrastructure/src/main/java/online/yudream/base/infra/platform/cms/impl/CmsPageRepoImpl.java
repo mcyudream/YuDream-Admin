@@ -55,10 +55,16 @@ public class CmsPageRepoImpl implements CmsPageRepo {
     }
 
     @Override
-    public PageResult<CmsPage> publishedPage(String keyword, int page, int size) {
+    public PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size) {
         Query query = query(keyword)
                 .addCriteria(Criteria.where("status").is(PageStatus.PUBLISHED))
                 .with(Sort.by(Sort.Direction.DESC, "publishedAt", "createTime"));
+        if (StringUtils.hasText(category)) {
+            query.addCriteria(Criteria.where("categories").is(category.trim()));
+        }
+        if (StringUtils.hasText(tag)) {
+            query.addCriteria(Criteria.where("tags").is(tag.trim()));
+        }
         return page(query, page, size);
     }
 

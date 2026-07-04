@@ -43,7 +43,7 @@ public class CmsAppService {
         String normalizedSlug = normalizeSlug(cmd.getSlug());
         ensureSlugAvailable(normalizedSlug, page.getId());
         page.update(cmd.getTitle(), normalizedSlug, cmd.getSummary(), cmd.getExcerpt(), cmd.getCoverImageUrl(),
-                cmd.getCategories(), cmd.getTags(), cmd.getMarkdownContent(), cmd.getHtmlContent(), cmd.getSeoTitle(), cmd.getSeoDescription(),
+                cmd.getCategories(), cmd.getTags(), cmd.getMarkdownContent(), cmd.getHtmlContent(), cmd.getCssContent(), cmd.getBuilderProjectJson(), cmd.getSeoTitle(), cmd.getSeoDescription(),
                 cmd.getTemplate(), cmd.getStatus());
         return CmsAssembler.toDTO(cmsPageRepo.save(page));
     }
@@ -104,7 +104,9 @@ public class CmsAppService {
         int page = query == null ? 1 : query.getPage();
         int size = query == null ? 12 : Math.min(Math.max(query.getSize(), 1), 50);
         String keyword = query == null ? null : query.getKeyword();
-        PageResult<CmsPage> result = cmsPageRepo.publishedPage(keyword, page, size);
+        String category = query == null ? null : query.getCategory();
+        String tag = query == null ? null : query.getTag();
+        PageResult<CmsPage> result = cmsPageRepo.publishedPage(keyword, category, tag, page, size);
         return new PageResult<>(result.getRecords().stream().map(CmsAssembler::toDTO).toList(), result.getTotal(), result.getPage(), result.getSize());
     }
 

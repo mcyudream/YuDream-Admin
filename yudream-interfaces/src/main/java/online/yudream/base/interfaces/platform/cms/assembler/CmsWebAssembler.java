@@ -26,6 +26,8 @@ public class CmsWebAssembler {
         cmd.setTags(request.getTags());
         cmd.setMarkdownContent(request.getMarkdownContent());
         cmd.setHtmlContent(request.getHtmlContent());
+        cmd.setCssContent(request.getCssContent());
+        cmd.setBuilderProjectJson(request.getBuilderProjectJson());
         cmd.setSeoTitle(request.getSeoTitle());
         cmd.setSeoDescription(request.getSeoDescription());
         cmd.setTemplate(request.getTemplate());
@@ -68,6 +70,8 @@ public class CmsWebAssembler {
                 .tags(dto.getTags())
                 .markdownContent(dto.getMarkdownContent())
                 .htmlContent(dto.getHtmlContent())
+                .cssContent(dto.getCssContent())
+                .builderProjectJson(dto.getBuilderProjectJson())
                 .seoTitle(dto.getSeoTitle())
                 .seoDescription(dto.getSeoDescription())
                 .template(dto.getTemplate())

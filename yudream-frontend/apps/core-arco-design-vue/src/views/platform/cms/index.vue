@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import type { BuilderResourceData, PageBuilderConfig, PageSettings } from '@myissue/vue-website-page-builder'
 import type { FileObject } from '@/api/modules/files'
 import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
-import { getPageBuilder, PageBuilder } from '@myissue/vue-website-page-builder'
 import apiFiles from '@/api/modules/files'
 import apiCms from '@/api/modules/platform-cms'
 import { toBackendAssetUrl } from '@/utils/backend-url'
-import CmsBuilderComponents from './components/CmsBuilderComponents.vue'
-import CmsMediaLibrary from './components/CmsMediaLibrary.vue'
+import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 
 type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
-type BuilderTarget = 'page' | 'home'
+type EditorTarget = 'page' | 'home'
 interface CmsNavigationItem {
   id: string
   label: string
@@ -27,8 +24,8 @@ const activeTab = ref<WorkbenchTab>('pages')
 const editorMode = ref<EditorMode>('builder')
 const loading = ref(false)
 const saving = ref(false)
-const pageBuilderVisible = ref(false)
-const builderTarget = ref<BuilderTarget>('page')
+const grapesEditorVisible = ref(false)
+const editorTarget = ref<EditorTarget>('page')
 const pages = ref<CmsPage[]>([])
 const navigationItems = ref<CmsNavigationItem[]>([])
 const mediaItems = ref<FileObject[]>([])
@@ -48,6 +45,8 @@ const pageForm = reactive<CmsPagePayload>({
   tags: [],
   markdownContent: '',
   htmlContent: '',
+  cssContent: '',
+  builderProjectJson: '',
   seoTitle: '',
   seoDescription: '',
   template: 'DEFAULT',
@@ -89,7 +88,7 @@ const pagePreviewHtml = computed(() => {
   return sanitizeHtml(pageForm.htmlContent || emptyBuilderHtml())
 })
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
-const builderContentStatus = computed(() => pageForm.htmlContent?.includes('pagebuilder') ? '已有可视化内容' : '尚未生成可视化内容')
+const builderContentStatus = computed(() => pageForm.builderProjectJson ? '已有 GrapesJS 源数据' : pageForm.htmlContent ? '已有 HTML 内容' : '尚未生成可视化内容')
 const homeHtml = computed({
   get: () => home.settings?.homeHtml || '',
   set: (value: string) => {
@@ -99,7 +98,25 @@ const homeHtml = computed({
     }
   },
 })
-const homeBuilderContentStatus = computed(() => homeHtml.value.includes('pagebuilder') ? '已有动态首页内容' : '尚未生成动态首页内容')
+const homeCss = computed({
+  get: () => home.settings?.homeCss || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeCss: value,
+    }
+  },
+})
+const homeProjectJson = computed({
+  get: () => home.settings?.homeProjectJson || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeProjectJson: value,
+    }
+  },
+})
+const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
 const homePreviewHtml = computed(() => sanitizeHtml(homeHtml.value || emptyHomeBuilderHtml()))
 const cmsVariables = [
   { key: '{{site.name}}', label: '站点名称' },
@@ -120,6 +137,10 @@ const cmsVariables = [
   { key: '{{pages.count}}', label: '公开页面数' },
   { key: '{{categories.count}}', label: '分类数量' },
   { key: '{{tags.count}}', label: '标签数量' },
+  { key: '{{archive.title}}', label: '归档标题' },
+  { key: '{{archive.category}}', label: '当前分类' },
+  { key: '{{archive.tag}}', label: '当前标签' },
+  { key: '{{archive.keyword}}', label: '当前搜索词' },
   { key: 'data-visible-when="guest"', label: '仅游客可见' },
   { key: 'data-visible-when="logged-in"', label: '仅登录可见' },
   { key: 'data-yb-repeat="navigation"', label: '循环导航' },
@@ -245,12 +266,14 @@ function selectPage(page: CmsPage) {
     tags: page.tags || [],
     markdownContent: page.markdownContent || '',
     htmlContent: page.htmlContent || '',
+    cssContent: page.cssContent || '',
+    builderProjectJson: page.builderProjectJson || '',
     seoTitle: page.seoTitle || '',
     seoDescription: page.seoDescription || '',
     template: page.template || 'DEFAULT',
     status: page.status || 'DRAFT',
   })
-  editorMode.value = page.htmlContent?.includes('pagebuilder') ? 'builder' : page.htmlContent ? 'html' : 'builder'
+  editorMode.value = page.builderProjectJson ? 'builder' : page.htmlContent ? 'html' : 'builder'
 }
 
 function pickMedia() {
@@ -340,6 +363,8 @@ function resetPageForm() {
     tags: [],
     markdownContent: '# 新页面\n\n在这里编写 Markdown 内容。',
     htmlContent: '',
+    cssContent: '',
+    builderProjectJson: '',
     seoTitle: '',
     seoDescription: '',
     template: 'DEFAULT' as PageTemplate,
@@ -403,114 +428,41 @@ async function saveHome() {
   }
 }
 
-async function openPageBuilder(target: BuilderTarget = 'page') {
-  builderTarget.value = target
-  pageBuilderVisible.value = true
-  await nextTick()
-  try {
-    const service = getPageBuilder()
-    let components: BuilderResourceData | undefined
-    let pageSettings: PageSettings | undefined
-    const content = target === 'home' ? homeHtml.value : pageForm.htmlContent
-
-    if (content?.includes('pagebuilder')) {
-      const parsed = service.parsePageBuilderHTML(content)
-      components = parsed.components
-      pageSettings = parsed.pageSettings
-    }
-
-    const result = await service.startBuilder(
-      buildPageBuilderConfig(target, pageSettings),
-      components,
-    )
-    if ('error' in result && result.error) {
-      pageBuilderVisible.value = false
-      toast.error(result.reason || '页面构建器启动失败')
-    }
-  }
-  catch (error) {
-    pageBuilderVisible.value = false
-    toast.error(error instanceof Error ? error.message : '页面构建器启动失败')
-  }
+function openGrapesEditor(target: EditorTarget = 'page') {
+  editorTarget.value = target
+  grapesEditorVisible.value = true
 }
 
-async function publishPageBuilder() {
-  const target = builderTarget.value
-  const html = syncBuilderDraft(target)
-  if (!html) {
-    toast.error('构建器没有可保存内容')
+async function saveGrapesEditor(payload: { htmlContent: string, cssContent: string, builderProjectJson: string }) {
+  grapesEditorVisible.value = false
+  await nextTick()
+  if (editorTarget.value === 'home') {
+    homeHtml.value = payload.htmlContent
+    homeCss.value = payload.cssContent
+    homeProjectJson.value = payload.builderProjectJson
+    await saveHome()
     return
   }
-  pageBuilderVisible.value = false
-  await nextTick()
-  if (target === 'home') {
-    homeHtml.value = normalizeBuilderHtml(html, '')
-    await saveHome()
-  }
-  else {
-    pageForm.htmlContent = normalizeBuilderHtml(html, pageForm.markdownContent)
-    await savePage()
-  }
-}
-
-function closePageBuilder() {
-  syncBuilderDraft(builderTarget.value)
-  pageBuilderVisible.value = false
-}
-
-function syncBuilderDraft(target: BuilderTarget = 'page') {
-  const currentContent = target === 'home' ? homeHtml.value : pageForm.htmlContent
-  if (!pageBuilderVisible.value && !currentContent) {
-    return ''
-  }
-  try {
-    const html = getPageBuilder().getSavedPageHtml()
-    if (html) {
-      if (target === 'home') {
-        homeHtml.value = html
-      }
-      else {
-        pageForm.htmlContent = html
-      }
-      return html
-    }
-  }
-  catch {
-    // 未打开 builder 时无需同步本地草稿。
-  }
-  return currentContent || ''
+  pageForm.htmlContent = payload.htmlContent
+  pageForm.cssContent = payload.cssContent
+  pageForm.builderProjectJson = payload.builderProjectJson
+  editorMode.value = 'builder'
+  await savePage()
 }
 
 function resolvePageHtmlForSave() {
-  if (editorMode.value === 'builder') {
-    const html = syncBuilderDraft('page')
-    return normalizeBuilderHtml(html, pageForm.markdownContent)
-  }
   if (editorMode.value === 'html') {
-    return normalizeBuilderHtml(pageForm.htmlContent, pageForm.markdownContent)
+    return pageForm.htmlContent || ''
   }
   const existingHtml = pageForm.htmlContent?.trim()
   if (existingHtml) {
     return existingHtml
   }
-  return normalizeBuilderHtml('', pageForm.markdownContent)
+  return editorMode.value === 'markdown' ? '' : pageForm.htmlContent || ''
 }
 
 function resolveHomeHtmlForSave() {
-  if (pageBuilderVisible.value && builderTarget.value === 'home') {
-    const html = syncBuilderDraft('home')
-    return normalizeBuilderHtml(html, '') || homeHtml.value
-  }
-  return homeHtml.value?.trim() ? normalizeBuilderHtml(homeHtml.value, '') : ''
-}
-
-function normalizeBuilderHtml(html?: string, fallbackMarkdown?: string) {
-  const value = html?.trim()
-  if (value) {
-    return value.includes('pagebuilder') ? value : `<div id="pagebuilder">${value}</div>`
-  }
-  const fallback = markdownPreview(fallbackMarkdown)
-  return fallback ? `<div id="pagebuilder"><section data-component-title="Markdown 内容" class="yb-text">${fallback}</section></div>` : ''
+  return homeHtml.value?.trim() || ''
 }
 
 function insertVariable(variable: string) {
@@ -522,45 +474,6 @@ function insertVariable(variable: string) {
   }
   else {
     pageForm.htmlContent = `${pageForm.htmlContent || emptyBuilderHtml()}\n${variable}`
-  }
-}
-
-function buildPageBuilderConfig(target: BuilderTarget, pageSettings?: PageSettings): PageBuilderConfig {
-  const isHome = target === 'home'
-  return {
-    updateOrCreate: {
-      formType: (isHome ? homeHtml.value : pageForm.htmlContent) ? 'update' : 'create',
-      formName: 'page',
-    },
-    resourceData: {
-      id: isHome ? 'site-home' : selectedPageId.value || pageForm.slug || 'new-page',
-      title: isHome ? home.title || '站点首页' : pageForm.title || '新页面',
-    },
-    userForPageBuilder: {
-      id: 'yudream-admin',
-      name: 'YuDream Admin',
-    },
-    userSettings: {
-      language: {
-        default: 'zh-Hans',
-        enable: ['zh-Hans', 'en'],
-      },
-      autoSave: true,
-      notifications: true,
-      fontFamily: 'jost, arial, helvetica',
-    },
-    settings: {
-      brandColor: '#0f766e',
-      themeColorPresets: {
-        enabled: true,
-        colors: [
-          { id: 'primary', label: '品牌主色', color: '#0f766e', enabled: true },
-          { id: 'secondary', label: '辅助色', color: '#2563eb', enabled: true },
-          { id: 'custom1', label: '强调色', color: '#f97316', enabled: true },
-        ],
-      },
-    },
-    pageSettings,
   }
 }
 
@@ -614,11 +527,11 @@ function parseNavigationItems(value?: string): CmsNavigationItem[] {
 }
 
 function emptyBuilderHtml() {
-  return '<div id="pagebuilder"><section class="yb-empty"><h1>打开可视化构建器开始设计页面</h1><p>发布后会把完整页面 HTML 保存到 CMS。</p></section></div>'
+  return '<main class="yb-empty"><section><h1>打开 GrapesJS 构建器开始设计页面</h1><p>发布后会保存 HTML、CSS 和可继续编辑的 Project JSON。</p></section></main>'
 }
 
 function emptyHomeBuilderHtml() {
-  return '<div id="pagebuilder"><section class="yb-empty"><h1>打开可视化构建器设计首页</h1><p>首页可以自由编排首屏、图文、CTA、表单和任意营销内容。</p></section></div>'
+  return '<main class="yb-empty"><section><h1>打开 GrapesJS 构建器设计首页</h1><p>首页可以自由编排首屏、图文、CTA、表单和动态内容。</p></section></main>'
 }
 
 function markdownPreview(markdown?: string) {
@@ -750,10 +663,10 @@ function sectionTitle(type: HomeSectionType) {
             <div>
               <span class="builder-entry__status">{{ builderContentStatus }}</span>
               <h2>可视化页面构建器</h2>
-              <p>使用 @myissue/vue-website-page-builder 设计页面，发布时会保存完整 HTML 到 CMS 页面内容。</p>
+              <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS 和可继续编辑的 Project JSON。</p>
             </div>
             <div class="builder-entry__actions">
-              <FaButton v-auth="'platform:cms:edit'" @click="openPageBuilder">
+              <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
                 <FaIcon name="i-ri:drag-drop-line" />
                 打开构建器
               </FaButton>
@@ -766,7 +679,7 @@ function sectionTitle(type: HomeSectionType) {
           </section>
 
           <FaTextarea v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" rows="22" input-class="font-mono" />
-          <FaTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<div id=&quot;pagebuilder&quot;>...</div>" />
+          <FaTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<main>...</main>" />
         </main>
 
         <aside class="publish-panel">
@@ -860,11 +773,11 @@ function sectionTitle(type: HomeSectionType) {
               <p>首页不再受固定区块限制，可通过可视化构建器自由组合首屏、内容、图文、行动按钮和自定义模块。</p>
             </div>
             <div class="builder-entry__actions">
-              <FaButton v-auth="'platform:cms:edit'" @click="openPageBuilder('home')">
+              <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
                 <FaIcon name="i-ri:layout-grid-line" />
                 打开首页构建器
               </FaButton>
-              <FaButton variant="outline" @click="homeHtml = ''">
+              <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeProjectJson = ''">
                 <FaIcon name="i-ri:eraser-line" />
                 清空动态内容
               </FaButton>
@@ -1049,14 +962,14 @@ function sectionTitle(type: HomeSectionType) {
       </section>
     </FaPageMain>
 
-    <div v-if="pageBuilderVisible" class="page-builder-shell">
-      <PageBuilder
-        :CustomMediaLibraryComponent="CmsMediaLibrary"
-        :CustomBuilderComponents="CmsBuilderComponents"
-        :show-close-button="true"
-        :show-publish-button="true"
-        @handle-close-page-builder="closePageBuilder"
-        @handle-publish-page-builder="publishPageBuilder"
+    <div v-if="grapesEditorVisible" class="grapes-editor-shell">
+      <CmsGrapesEditor
+        :title="editorTarget === 'home' ? home.title : pageForm.title"
+        :html-content="editorTarget === 'home' ? homeHtml : pageForm.htmlContent"
+        :css-content="editorTarget === 'home' ? homeCss : pageForm.cssContent"
+        :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
+        @close="grapesEditorVisible = false"
+        @save="saveGrapesEditor"
       />
     </div>
   </div>
@@ -1331,14 +1244,6 @@ function sectionTitle(type: HomeSectionType) {
   color: var(--color-text-1);
 }
 
-.mini-preview :deep(#pagebuilder),
-.mini-preview :deep(.pagebuilder),
-.builder-entry__preview :deep(#pagebuilder),
-.builder-entry__preview :deep(.pagebuilder) {
-  display: grid;
-  gap: 12px;
-}
-
 .mini-preview :deep(.yb-empty),
 .builder-entry__preview :deep(.yb-empty) {
   padding: 28px;
@@ -1552,73 +1457,12 @@ function sectionTitle(type: HomeSectionType) {
   text-align: center;
 }
 
-.page-builder-shell {
+.grapes-editor-shell {
   position: fixed;
   inset: 0;
   z-index: 5000;
   overflow: hidden;
   background: var(--color-bg-1);
-}
-
-.page-builder-shell :deep(.page-builder),
-.page-builder-shell :deep(#page-builder) {
-  height: 100%;
-}
-
-.page-builder-shell :deep(.material-symbols-outlined) {
-  display: inline-flex;
-  width: 1em;
-  height: 1em;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  direction: ltr;
-  font-family: "Material Symbols Outlined";
-  font-size: 20px;
-  font-style: normal;
-  font-weight: normal;
-  letter-spacing: normal;
-  line-height: 1;
-  text-transform: none;
-  white-space: nowrap;
-  word-wrap: normal;
-  -webkit-font-feature-settings: "liga";
-  -webkit-font-smoothing: antialiased;
-  font-feature-settings: "liga";
-}
-
-.page-builder-shell :deep(button) {
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.page-builder-shell :deep(.pbx-h-10.pbx-w-10),
-.page-builder-shell :deep(.pbx-h-12.pbx-w-12),
-.page-builder-shell :deep(button:has(.material-symbols-outlined)) {
-  flex: 0 0 auto;
-}
-
-.page-builder-shell :deep(.pbx-sticky),
-.page-builder-shell :deep(.pbx-fixed) {
-  min-width: 0;
-}
-
-.page-builder-shell :deep(.pbx-animate-spin) {
-  display: inline-block;
-  width: 24px;
-  height: 24px;
-  border: 3px solid #dbe4ef;
-  border-top-color: #111827;
-  border-radius: 999px;
-  color: transparent;
-  font-size: 0;
-  animation: pbx-host-spin 0.8s linear infinite;
-}
-
-@keyframes pbx-host-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @media (max-width: 1180px) {

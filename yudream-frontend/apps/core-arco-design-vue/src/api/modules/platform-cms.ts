@@ -9,6 +9,8 @@ export interface CmsPageParams {
   page: number
   size: number
   keyword?: string
+  category?: string
+  tag?: string
 }
 
 export interface HomeSection {
@@ -35,6 +37,8 @@ export interface CmsPage {
   tags?: string[]
   markdownContent?: string
   htmlContent?: string
+  cssContent?: string
+  builderProjectJson?: string
   seoTitle?: string
   seoDescription?: string
   template?: PageTemplate
@@ -54,6 +58,8 @@ export interface CmsPagePayload {
   tags?: string[]
   markdownContent?: string
   htmlContent?: string
+  cssContent?: string
+  builderProjectJson?: string
   seoTitle?: string
   seoDescription?: string
   template?: PageTemplate
