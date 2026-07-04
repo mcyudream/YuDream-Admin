@@ -28,7 +28,9 @@ public class UserPasskeyController {
     @GetMapping
     public Result<List<PasskeyCredentialRes>> listOwnPasskeys() {
         Long userId = StpUtil.getLoginIdAsLong();
-        return Result.ok(oauthPasskeyAppService.listPasskeys(userId).stream().map(ApiSecurityWebAssembler::toRes).toList());
+        return Result.ok(ApiSecurityWebAssembler.toPasskeyResList(
+                oauthPasskeyAppService.listPasskeys(ApiSecurityWebAssembler.toPasskeyCredentialQuery(userId))
+        ));
     }
 
     @PostMapping("/registration/options")

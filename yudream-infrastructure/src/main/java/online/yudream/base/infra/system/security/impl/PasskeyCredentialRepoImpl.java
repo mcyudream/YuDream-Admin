@@ -46,6 +46,14 @@ public class PasskeyCredentialRepoImpl implements PasskeyCredentialRepo {
     }
 
     @Override
+    public List<PasskeyCredential> findAll() {
+        Query query = new Query().with(Sort.by(Sort.Direction.DESC, "createTime"));
+        return mongoTemplate.find(query, PasskeyCredentialDO.class).stream()
+                .map(OAuthSecurityInfraMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<PasskeyCredential> findByUserId(Long userId) {
         Query query = Query.query(Criteria.where("userId").is(userId)).with(Sort.by(Sort.Direction.DESC, "createTime"));
         return mongoTemplate.find(query, PasskeyCredentialDO.class).stream()
