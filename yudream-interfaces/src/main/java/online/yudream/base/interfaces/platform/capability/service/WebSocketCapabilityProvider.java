@@ -5,6 +5,7 @@ import online.yudream.base.domain.platform.capability.service.CapabilityProvider
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -17,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
+@ConditionalOnProperty(prefix = "yudream.platform.capabilities.websocket", name = "enabled", havingValue = "true")
 public class WebSocketCapabilityProvider extends TextWebSocketHandler implements CapabilityProvider {
 
     public static final String CODE = "websocket";
