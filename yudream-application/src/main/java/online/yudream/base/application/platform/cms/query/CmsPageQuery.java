@@ -8,4 +8,6 @@ import online.yudream.base.application.common.PageQuery;
 @Data
 public class CmsPageQuery extends PageQuery {
     private String keyword;
+    private String category;
+    private String tag;
 }

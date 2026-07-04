@@ -24,6 +24,8 @@ public class CmsPageSaveCmd implements Serializable {
     private List<String> tags;
     private String markdownContent;
     private String htmlContent;
+    private String cssContent;
+    private String builderProjectJson;
     private String seoTitle;
     private String seoDescription;
     private PageTemplate template;

@@ -22,6 +22,8 @@ public class CmsAssembler {
                 .tags(page.getTags())
                 .markdownContent(page.getMarkdownContent())
                 .htmlContent(page.getHtmlContent())
+                .cssContent(page.getCssContent())
+                .builderProjectJson(page.getBuilderProjectJson())
                 .seoTitle(page.getSeoTitle())
                 .seoDescription(page.getSeoDescription())
                 .template(page.getTemplate())
