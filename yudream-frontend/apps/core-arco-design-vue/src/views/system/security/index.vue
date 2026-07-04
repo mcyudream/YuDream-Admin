@@ -113,13 +113,25 @@ const policyCards = computed(() => [
 
 const permissionGroups = computed(() => {
   const groups: Record<string, PermissionItem[]> = {}
-  permissions.value.forEach((item) => {
+  permissions.value.filter(item => item.status === 'ACTIVE').forEach((item) => {
     const key = item.module || '其他'
     groups[key] ||= []
     groups[key].push(item)
   })
   return groups
 })
+
+const permissionSelectOptions = computed(() => Object.entries(permissionGroups.value).map(([module, items]) => ({
+  label: module,
+  options: items.map(item => ({
+    label: `${item.name} (${item.code})`,
+    value: item.code,
+  })),
+})))
+
+const selectablePermissionCodes = computed(() => Object.values(permissionGroups.value).flat().map(item => item.code))
+
+const permissionNameMap = computed(() => new Map(permissions.value.map(item => [item.code, item.name])))
 
 const apiKeyColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
   { accessorKey: 'name', header: '名称', width: 180, fixed: 'left' },
@@ -347,10 +359,20 @@ function openCreate() {
 }
 
 async function createApiKey() {
+  const selectedPermissions = selectedApiKeyPermissions()
+  if (!apiKeyForm.name.trim()) {
+    toast.error('请输入 API Key 名称')
+    return
+  }
+  if (!selectedPermissions.length) {
+    toast.error('请选择权限范围')
+    return
+  }
   creating.value = true
   try {
     const res = await apiSecurity.createApiKey({
-      ...apiKeyForm,
+      name: apiKeyForm.name.trim(),
+      permissions: selectedPermissions,
       expireTime: normalizeDateTime(apiKeyForm.expireTime),
     })
     oneTimeSecret.value = res.data.plaintext
@@ -362,6 +384,15 @@ async function createApiKey() {
   finally {
     creating.value = false
   }
+}
+
+function selectedApiKeyPermissions() {
+  const selectableCodes = new Set(selectablePermissionCodes.value)
+  return apiKeyForm.permissions.filter(permission => selectableCodes.has(permission))
+}
+
+function permissionText(code: string) {
+  return permissionNameMap.value.get(code) || code
 }
 
 function confirmRevoke(row: ApiKeyCredential) {
@@ -653,7 +684,7 @@ function normalizeDateTime(value?: string) {
           <template #cell-permissions="{ row }">
             <div class="tag-row">
               <FaTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
-                {{ item }}
+                {{ permissionText(item) }}
               </FaTag>
               <FaTag v-if="row.original.permissions.length > 3" variant="secondary">
                 +{{ row.original.permissions.length - 3 }}
@@ -769,16 +800,25 @@ function normalizeDateTime(value?: string) {
           <FaInput v-model="apiKeyForm.expireTime" type="datetime-local" />
         </a-form-item>
         <a-form-item label="权限范围" required>
-          <div class="permission-panel">
-            <div v-for="(items, module) in permissionGroups" :key="module" class="permission-group">
-              <div class="permission-title">{{ module }}</div>
-              <a-checkbox-group v-model="apiKeyForm.permissions">
-                <a-space wrap>
-                  <a-checkbox v-for="item in items" :key="item.code" :value="item.code">
-                    {{ item.name }}
-                  </a-checkbox>
-                </a-space>
-              </a-checkbox-group>
+          <div class="permission-select-panel">
+            <FaSelect
+              v-model="apiKeyForm.permissions"
+              multiple
+              :options="permissionSelectOptions"
+              :disabled="!permissionSelectOptions.length"
+              class="w-full"
+              placeholder="请选择 API Key 可访问权限"
+            />
+            <div class="permission-select-actions">
+              <span>已选择 {{ apiKeyForm.permissions.length }} 项</span>
+              <div>
+                <FaButton variant="ghost" size="sm" :disabled="!selectablePermissionCodes.length" @click="apiKeyForm.permissions = [...selectablePermissionCodes]">
+                  全选可用
+                </FaButton>
+                <FaButton variant="ghost" size="sm" :disabled="!apiKeyForm.permissions.length" @click="apiKeyForm.permissions = []">
+                  清空
+                </FaButton>
+              </div>
             </div>
           </div>
         </a-form-item>
@@ -995,6 +1035,26 @@ function normalizeDateTime(value?: string) {
 .permission-title {
   margin-bottom: 8px;
   font-weight: 600;
+}
+
+.permission-select-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.permission-select-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-3);
+  font-size: 13px;
+}
+
+.permission-select-actions > div {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .secret-box {
