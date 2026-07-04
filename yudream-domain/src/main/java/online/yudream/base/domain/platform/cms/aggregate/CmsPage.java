@@ -36,9 +36,10 @@ public class CmsPage extends BaseDomain {
         return page;
     }
 
-    public void update(String title, String summary, String markdownContent, String seoTitle,
+    public void update(String title, String slug, String summary, String markdownContent, String seoTitle,
                        String seoDescription, PageStatus status) {
         this.title = required(title, "页面标题不能为空");
+        this.slug = PageSlug.of(slug).value();
         this.summary = summary;
         this.markdownContent = markdownContent;
         this.seoTitle = seoTitle;

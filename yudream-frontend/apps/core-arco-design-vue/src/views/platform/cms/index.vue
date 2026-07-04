@@ -482,7 +482,7 @@ function statusVariant(status: PageStatus) {
             <FaInput v-model="form.title" />
           </a-form-item>
           <a-form-item label="页面路径" required>
-            <FaInput v-model="form.slug" :disabled="!!editing" placeholder="about 或 docs/intro" />
+            <FaInput v-model="form.slug" placeholder="about 或 docs/intro" />
           </a-form-item>
           <a-form-item label="状态">
             <FaSelect v-model="form.status" :options="statusOptions" />

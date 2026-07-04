@@ -15,6 +15,7 @@ import online.yudream.base.domain.platform.cms.aggregate.HomePageLayout;
 import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
 import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
+import online.yudream.base.domain.platform.cms.valobj.PageSlug;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +40,9 @@ public class CmsAppService {
     public CmsPageDTO savePage(CmsPageSaveCmd cmd) {
         ensureEnabled();
         CmsPage page = cmd.getId() == null ? createPage(cmd) : page(cmd.getId());
-        page.update(cmd.getTitle(), cmd.getSummary(), cmd.getMarkdownContent(), cmd.getSeoTitle(), cmd.getSeoDescription(), cmd.getStatus());
+        String normalizedSlug = normalizeSlug(cmd.getSlug());
+        ensureSlugAvailable(normalizedSlug, page.getId());
+        page.update(cmd.getTitle(), normalizedSlug, cmd.getSummary(), cmd.getMarkdownContent(), cmd.getSeoTitle(), cmd.getSeoDescription(), cmd.getStatus());
         return CmsAssembler.toDTO(cmsPageRepo.save(page));
     }
 
@@ -86,7 +89,7 @@ public class CmsAppService {
     @Transactional(readOnly = true)
     public CmsPageDTO publicPage(String slug) {
         ensureEnabled();
-        CmsPage page = cmsPageRepo.findBySlug(slug).orElseThrow(() -> new BizException("页面不存在"));
+        CmsPage page = cmsPageRepo.findBySlug(normalizeSlug(slug)).orElseThrow(() -> new BizException("页面不存在"));
         if (page.getStatus() != PageStatus.PUBLISHED) {
             throw new BizException("页面未发布");
         }
@@ -94,10 +97,9 @@ public class CmsAppService {
     }
 
     private CmsPage createPage(CmsPageSaveCmd cmd) {
-        if (cmsPageRepo.findBySlug(cmd.getSlug()).isPresent()) {
-            throw new BizException("页面路径已存在");
-        }
-        return CmsPage.create(cmd.getTitle(), cmd.getSlug());
+        String normalizedSlug = normalizeSlug(cmd.getSlug());
+        ensureSlugAvailable(normalizedSlug, null);
+        return CmsPage.create(cmd.getTitle(), normalizedSlug);
     }
 
     private CmsPage page(Long id) {
@@ -111,5 +113,17 @@ public class CmsAppService {
         if (!enabled) {
             throw new BizException("内容定制能力未启用");
         }
+    }
+
+    private String normalizeSlug(String slug) {
+        return PageSlug.of(slug).value();
+    }
+
+    private void ensureSlugAvailable(String slug, Long currentPageId) {
+        cmsPageRepo.findBySlug(slug).ifPresent(existing -> {
+            if (currentPageId == null || !currentPageId.equals(existing.getId())) {
+                throw new BizException("页面路径已存在");
+            }
+        });
     }
 }
