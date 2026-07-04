@@ -881,7 +881,7 @@ function sectionTitle(type: HomeSectionType) {
 
       <section v-else-if="activeTab === 'home'" v-loading="loading" class="home-layout">
         <main class="home-form">
-          <section class="builder-entry home-builder-entry">
+          <section class="builder-entry">
             <div>
               <span class="builder-entry__status">{{ homeBuilderContentStatus }}</span>
               <h2>动态首页构建器</h2>
@@ -897,7 +897,6 @@ function sectionTitle(type: HomeSectionType) {
                 清空动态内容
               </FaButton>
             </div>
-            <div class="builder-entry__preview" v-html="homePreviewHtml" />
           </section>
 
           <section class="legacy-sections">
@@ -1363,10 +1362,6 @@ function sectionTitle(type: HomeSectionType) {
 .builder-entry__preview {
   max-height: 560px;
   overflow: auto;
-}
-
-.home-builder-entry .builder-entry__preview {
-  min-height: 360px;
 }
 
 .legacy-sections {
