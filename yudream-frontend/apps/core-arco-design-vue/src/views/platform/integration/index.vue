@@ -604,7 +604,8 @@ function executionVariant(status: ExecutionStatus) {
             <FaInput v-model="connectorForm.name" />
           </a-form-item>
           <a-form-item label="编码" required>
-            <FaInput v-model="connectorForm.code" />
+            <FaInput v-model="connectorForm.code" :disabled="!!connectorEditing" />
+            <div v-if="connectorEditing" class="field-tip">编码用于日志和调用关联，创建后不可修改。</div>
           </a-form-item>
           <a-form-item label="请求地址" required class="md:col-span-2">
             <FaInput v-model="connectorForm.url" placeholder="https://api.example.com/resource" />
@@ -661,7 +662,8 @@ function executionVariant(status: ExecutionStatus) {
             <FaInput v-model="scriptForm.name" />
           </a-form-item>
           <a-form-item label="编码" required>
-            <FaInput v-model="scriptForm.code" />
+            <FaInput v-model="scriptForm.code" :disabled="!!scriptEditing" />
+            <div v-if="scriptEditing" class="field-tip">编码用于执行记录关联，创建后不可修改。</div>
           </a-form-item>
           <a-form-item label="语言">
             <FaSelect v-model="scriptForm.language" :options="languageOptions" />
@@ -747,6 +749,12 @@ function executionVariant(status: ExecutionStatus) {
 .section-title {
   color: var(--color-text-1);
   font-weight: 700;
+}
+
+.field-tip {
+  margin-top: 6px;
+  color: var(--color-text-3);
+  font-size: 12px;
 }
 
 .result-panel pre {

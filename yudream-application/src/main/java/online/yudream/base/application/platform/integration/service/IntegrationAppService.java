@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -60,6 +61,7 @@ public class IntegrationAppService {
     public HttpConnectorDTO saveConnector(HttpConnectorSaveCmd cmd) {
         ensureIntegrationEnabled();
         HttpConnector connector = cmd.getId() == null ? createConnector(cmd) : connector(cmd.getId());
+        ensureConnectorCodeUnchanged(connector, cmd.getCode());
         connector.update(cmd.getName(), cmd.getUrl(), cmd.getMethod(), cmd.getHeaders(), cmd.getQueryParams(),
                 cmd.getBodyTemplate(), cmd.getTimeoutMillis(), cmd.getRetryTimes(), cmd.getStatus());
         return IntegrationAssembler.toDTO(httpConnectorRepo.save(connector));
@@ -119,6 +121,7 @@ public class IntegrationAppService {
     public RuntimeScriptDTO saveScript(RuntimeScriptSaveCmd cmd) {
         ensureIntegrationEnabled();
         RuntimeScript script = cmd.getId() == null ? createScript(cmd) : script(cmd.getId());
+        ensureScriptCodeUnchanged(script, cmd.getCode());
         script.update(cmd.getName(), cmd.getLanguage(), cmd.getScriptContent(), cmd.getTimeoutMillis(), cmd.getEnv(), cmd.getStatus());
         return IntegrationAssembler.toDTO(runtimeScriptRepo.save(script));
     }
@@ -169,11 +172,27 @@ public class IntegrationAppService {
         return HttpConnector.create(cmd.getName(), cmd.getCode(), cmd.getUrl(), cmd.getMethod());
     }
 
+    private void ensureConnectorCodeUnchanged(HttpConnector connector, String code) {
+        if (!Objects.equals(connector.getCode(), normalize(code))) {
+            throw new BizException("连接器编码不可修改");
+        }
+    }
+
     private RuntimeScript createScript(RuntimeScriptSaveCmd cmd) {
         if (runtimeScriptRepo.findByCode(cmd.getCode()).isPresent()) {
             throw new BizException("脚本编码已存在");
         }
         return RuntimeScript.create(cmd.getName(), cmd.getCode(), cmd.getLanguage(), cmd.getScriptContent());
+    }
+
+    private void ensureScriptCodeUnchanged(RuntimeScript script, String code) {
+        if (!Objects.equals(script.getCode(), normalize(code))) {
+            throw new BizException("脚本编码不可修改");
+        }
+    }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim();
     }
 
     private HttpConnector connector(Long id) {
