@@ -3,6 +3,7 @@ import type { RouteRecordRaw, RouterMatcher } from 'vue-router'
 import { cloneDeep } from 'es-toolkit'
 import { createRouterMatcher } from 'vue-router'
 import apiApp from '@/api/modules/app'
+import apiPlugin from '@/api/modules/platform-plugin'
 import { systemRoutes as systemRoutesRaw } from '@/router/routes'
 
 export const useAppRouteStore = defineStore(
@@ -158,20 +159,74 @@ export const useAppRouteStore = defineStore(
       }
     }
     // 生成路由（后端获取）
-    async function generateRoutesAtBack() {
-      await apiApp.routeList().then((res) => {
-        // 设置 routes 数据
-        routesRaw.value = sortAsyncRoutes(formatBackRoutes(res.data) as any)
-        // 创建路由匹配器
-        const routes: RouteRecordRaw[] = []
-        routesRaw.value.forEach((route) => {
-          if (route.children) {
-            routes.push(...route.children)
-          }
+    async function loadPluginRoutes(): Promise<RouteRecordMainRaw[]> {
+      try {
+        const res = await apiPlugin.frontendManifest()
+        const children: RouteRecordRaw[] = []
+        res.data.modules?.forEach((module) => {
+          module.routes?.forEach((route) => {
+            const routeName = route.name || `${module.pluginCode}-${route.path}`
+            const routeMeta = {
+              title: route.title,
+              icon: route.icon || 'i-ri:puzzle-2-line',
+              auth: route.permission,
+              sort: route.sort,
+              plugin: {
+                pluginCode: module.pluginCode,
+                component: route.component,
+                entry: module.entry,
+                moduleName: module.moduleName,
+                sdkVersion: module.sdkVersion || res.data.sdkVersion,
+              },
+            } as any
+            children.push({
+              path: route.path,
+              name: `${routeName}-layout`,
+              component: () => import('@/layouts/index.vue'),
+              meta: routeMeta,
+              children: [{
+                path: '',
+                name: routeName,
+                component: () => import('@/views/platform/plugin/runtime-page.vue'),
+                meta: {
+                  ...routeMeta,
+                  menu: false,
+                  breadcrumb: false,
+                },
+              }],
+            })
+          })
         })
-        routesMatcher.value = createRouterMatcher(routes, {})
-        isGenerate.value = true
+        if (!children.length) {
+          return []
+        }
+        return [{
+          meta: {
+            title: '插件扩展',
+            icon: 'i-ri:puzzle-2-line',
+            sort: 20,
+          },
+          children,
+        }]
+      }
+      catch {
+        return []
+      }
+    }
+    async function generateRoutesAtBack() {
+      const res = await apiApp.routeList()
+      const pluginRoutes = await loadPluginRoutes()
+        // 设置 routes 数据
+      routesRaw.value = sortAsyncRoutes([...(formatBackRoutes(res.data) as any), ...pluginRoutes] as any)
+        // 创建路由匹配器
+      const routes: RouteRecordRaw[] = []
+      routesRaw.value.forEach((route) => {
+        if (route.children) {
+          routes.push(...route.children)
+        }
       })
+      routesMatcher.value = createRouterMatcher(routes, {})
+      isGenerate.value = true
     }
     function setCurrentRemoveRoutes(routes: (() => void)[]) {
       currentRemoveRoutes.value = routes

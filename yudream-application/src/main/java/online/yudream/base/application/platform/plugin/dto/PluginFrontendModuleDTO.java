@@ -1,0 +1,30 @@
+package online.yudream.base.application.platform.plugin.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.io.Serial;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class PluginFrontendModuleDTO implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    private String pluginCode;
+    private String entry;
+    private String moduleName;
+    private String sdkVersion;
+    private String integrity;
+
+    @Builder.Default
+    private List<PluginFrontendRouteDTO> routes = new ArrayList<>();
+}

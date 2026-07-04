@@ -9,6 +9,8 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
+        <module>yudream-plugin-spi</module>
+        <module>yudream-sample-plugin</module>
         <module>yudream-domain</module>
         <module>yudream-application</module>
         <module>yudream-interfaces</module>
@@ -50,6 +52,11 @@
                 <scope>import</scope>
             </dependency>
             <!-- 内部模块版本锁定 -->
+            <dependency>
+                <groupId>online.yudream.base</groupId>
+                <artifactId>yudream-plugin-spi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <dependency>
                 <groupId>online.yudream.base</groupId>
                 <artifactId>yudream-application</artifactId>
