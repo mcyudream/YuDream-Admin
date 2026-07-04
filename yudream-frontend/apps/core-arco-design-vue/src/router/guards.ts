@@ -2,7 +2,7 @@ import type { Router } from 'vue-router'
 import { useNProgress } from '@vueuse/integrations/useNProgress'
 import { warnKeepAliveComponentNameMissing } from 'virtual:fantastic-admin/turbo-console'
 import apiSetup from '@/api/modules/setup'
-import { asyncRoutes } from './routes'
+import { refreshDynamicRoutes } from './dynamic'
 import '@/assets/styles/nprogress.css'
 
 // 系统初始化状态缓存
@@ -49,7 +49,6 @@ function setupRoutes(router: Router) {
     }
 
     const appSettingsStore = useAppSettingsStore()
-    const appAccountStore = useAppAccountStore()
     const appRouteStore = useAppRouteStore()
     const appMenuStore = useAppMenuStore()
     // 是否已登录
@@ -75,29 +74,7 @@ function setupRoutes(router: Router) {
       }
       else {
         try {
-          // 获取用户权限
-          appSettingsStore.settings.app.account.auth && await appAccountStore.getPermissions()
-          // 生成动态路由
-          switch (appSettingsStore.settings.app.routeBaseOn) {
-            case 'frontend':
-              appRouteStore.generateRoutesAtFront(asyncRoutes)
-              break
-            case 'backend':
-              await appRouteStore.generateRoutesAtBack()
-              break
-          }
-          // 注册并记录路由数据
-          // 记录的数据会在登出时会使用到，不使用 router.removeRoute 是考虑配置的路由可能不一定有设置 name ，则通过调用 router.addRoute() 返回的回调进行删除
-          const removeRoutes: (() => void)[] = []
-          appRouteStore.routes.forEach((route) => {
-            if (!/^(?:https?:|mailto:|tel:)/.test(route.path)) {
-              removeRoutes.push(router.addRoute(route))
-            }
-          })
-          appRouteStore.systemRoutes.forEach((route) => {
-            removeRoutes.push(router.addRoute(route))
-          })
-          appRouteStore.setCurrentRemoveRoutes(removeRoutes)
+          await refreshDynamicRoutes(router)
         }
         catch {}
         // 动态路由生成并注册后，重新进入当前路由
