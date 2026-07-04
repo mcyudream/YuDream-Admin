@@ -112,6 +112,35 @@ public enum PlatformMenuModule {
             parentName = "GRAPH", permission = "platform:graph:log:view")
     GRAPH_LOG_VIEW,
 
+    @MenuNode(code = "platform:form", name = "动态表单", type = MenuNodeType.MENU,
+            path = "/platform/form", component = "platform/form/index.vue",
+            icon = "i-ri:survey-line", sort = 62)
+    FORM,
+
+    @MenuNode(code = "platform:form:view", name = "查看动态表单", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:view")
+    FORM_VIEW,
+
+    @MenuNode(code = "platform:form:edit", name = "编辑动态表单", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:edit")
+    FORM_EDIT,
+
+    @MenuNode(code = "platform:form:publish", name = "发布动态表单", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:publish")
+    FORM_PUBLISH,
+
+    @MenuNode(code = "platform:form:delete", name = "删除动态表单", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:delete")
+    FORM_DELETE,
+
+    @MenuNode(code = "platform:form:submission:view", name = "查看表单提交", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:submission:view")
+    FORM_SUBMISSION_VIEW,
+
+    @MenuNode(code = "platform:form:statistics:view", name = "查看表单统计", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:statistics:view")
+    FORM_STATISTICS_VIEW,
+
     @MenuNode(code = "platform:cms", name = "内容定制", type = MenuNodeType.MENU,
             path = "/platform/cms", component = "platform/cms/index.vue",
             icon = "i-ri:layout-masonry-line", sort = 60)

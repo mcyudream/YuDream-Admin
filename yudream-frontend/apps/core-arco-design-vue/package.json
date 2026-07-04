@@ -28,6 +28,8 @@
     "dayjs": "catalog:",
     "eruda": "catalog:",
     "es-toolkit": "catalog:",
+    "@form-create/arco-design": "catalog:",
+    "form-create-designer-arco-design": "catalog:",
     "grapesjs": "catalog:",
     "hotkeys-js": "catalog:",
     "material-symbols": "catalog:",

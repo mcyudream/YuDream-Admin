@@ -19,6 +19,9 @@ catalogs:
     '@faker-js/faker':
       specifier: ^10.4.0
       version: 10.4.0
+    '@form-create/arco-design':
+      specifier: ^3.3.1
+      version: 3.3.1
     '@iconify/json':
       specifier: ^2.2.485
       version: 2.2.485
@@ -127,6 +130,9 @@ catalogs:
     filesize:
       specifier: ^11.0.17
       version: 11.0.17
+    form-create-designer-arco-design:
+      specifier: ^1.1.5
+      version: 1.1.5
     fs-extra:
       specifier: ^11.3.5
       version: 11.3.5
@@ -387,6 +393,9 @@ importers:
       '@fantastic-admin/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@form-create/arco-design':
+        specifier: 'catalog:'
+        version: 3.3.1(vue@3.5.38(typescript@6.0.3))
       '@tdesign-vue-next/chat':
         specifier: 'catalog:'
         version: 0.5.2(omi@7.7.13)(vue@3.5.38(typescript@6.0.3))
@@ -420,6 +429,9 @@ importers:
       es-toolkit:
         specifier: 'catalog:'
         version: 1.47.0
+      form-create-designer-arco-design:
+        specifier: 'catalog:'
+        version: 1.1.5(vue@3.5.38(typescript@6.0.3))
       grapesjs:
         specifier: 'catalog:'
         version: 0.23.2
@@ -1308,6 +1320,10 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0-0 || ^8.0.0-0 <8.0.0
 
+  '@babel/runtime-corejs3@7.29.7':
+    resolution: {integrity: sha512-ppj9ouYku+RX0ljtgZd+KMO5mkM2bCqg8H2PYAFWnLsHEIKIdRojqbJ2i3eVHrisuxy7nOFCmngTDdWtUCdXUQ==}
+    engines: {node: '>=6.9.0'}
+
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
     engines: {node: '>=6.9.0'}
@@ -1984,6 +2000,54 @@ packages:
 
   '@floating-ui/vue@1.1.11':
     resolution: {integrity: sha512-HzHKCNVxnGS35r9fCHBc3+uCnjw9IWIlCPL683cGgM9Kgj2BiAl8x1mS7vtvP6F9S/e/q4O6MApwSHj8hNLGfw==}
+
+  '@form-create/arco-design@3.3.1':
+    resolution: {integrity: sha512-y6pPnoZ1olnqGDk8PvUEol2yj6qvBHgmMrzzcqlj55vfnrvozI28YR3CpikFStvXGvKFxIN9ZYUY8mwnaCDFNw==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-arco-checkbox@3.3.0':
+    resolution: {integrity: sha512-VA9EKImtKXD52TkRQcGxLF4R3VbaEBWdTlYqcjoaUoaZE6f33oyJxBmvFgBONsTP+PRh939YV6kzLJRVLHrkFw==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-arco-frame@3.3.0':
+    resolution: {integrity: sha512-HVU5mEY96ceVNKuoN+UspJqG/DHCkB71iTeN1FiziYrVdY/wQuYST1Uj+6Z3S3Bdk2M6rCRG7+M7QF2FOW3dyQ==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-arco-group@3.3.0':
+    resolution: {integrity: sha512-06cor78r02NS5NF/l4c/+/gAzY7wmGRxIhrdgzbkQEHGYJf5yBFtDi/1engcavSeFG8LN+saPrCSQLxagg/ZsQ==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-arco-radio@3.3.0':
+    resolution: {integrity: sha512-R44SkhHVSDx74bikTS6o+vbpPrQxLHzjJjmH576BnmH2q9VbOWjjH7R4DkLdCGrRy/BhmJ9w/+2fbN0YnD9xUw==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-arco-upload@3.3.1':
+    resolution: {integrity: sha512-VrXpfzioxyqr92MssKduBePVMESG4gZsv2bYGjwKlk6GR/urizF1+fmUN6mF+WMPtp8SBoiKQEgxB2tX2kzwjw==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-subform@3.3.0':
+    resolution: {integrity: sha512-y8F6LxvVZIiHa5Jwur6xKGfxuWFuiFzR4vhwPWTXsRbARLqaPV5OVPhB3gQWjbOjoJ2cnercEEhOFvvXf99WWQ==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/component-wangeditor@3.3.0':
+    resolution: {integrity: sha512-yQaYFVbLNcbsiujsJfeDd5vcvZNhHDUUyezTCf5w5JbhIeFUNXnVLRqUFD2iwyKhTy7RsUUzW2QhEiXxtYqOow==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/core@3.3.1':
+    resolution: {integrity: sha512-anUYh93YRQokYPRKKFhMh/VY/CrWnKBWblJKlzyis4d/0d5fkACMbrVBxlG1vf2ICRVL4aVadsGZqDLvrK0r/A==}
+    peerDependencies:
+      vue: ^3.5.12
+
+  '@form-create/utils@3.3.0':
+    resolution: {integrity: sha512-4VGI3Qowkc0HsrxmC6NT1eUlEnN2xURqStjJXD+PjgbYKqzR01pNHJbz1UyfkrmcFE9HTUaWrH7IgPPxjlSo2g==}
 
   '@henrygd/queue@1.2.0':
     resolution: {integrity: sha512-jW/BLSTpcvExDhqJGxtIPgGr2O0IFF8XUNDwEbfCfhrXT8a4xztQ9Lv6U/vbYzYC0xVWn+3zv6YnLUh3bEFUKA==}
@@ -3741,6 +3805,9 @@ packages:
   core-js-compat@3.49.0:
     resolution: {integrity: sha512-VQXt1jr9cBz03b331DFDCCP90b3fanciLkgiOoy8SBHy06gNf+vQ1A3WFLqG7I8TipYIKeYK9wxd0tUrvHcOZA==}
 
+  core-js-pure@3.49.0:
+    resolution: {integrity: sha512-XM4RFka59xATyJv/cS3O3Kml72hQXUeGRuuTmMYFxwzc9/7C8OYTaIR/Ji+Yt8DXzsFLNhat15cE/JP15HrCgw==}
+
   core-js@3.49.0:
     resolution: {integrity: sha512-es1U2+YTtzpwkxVLwAFdSpaIMyQaq0PBgm3YD1W3Qpsn1NAmO3KSgZfu+oGSWVu6NvLHoHCV/aYcsE5wiB7ALg==}
 
@@ -4523,6 +4590,9 @@ packages:
   foreground-child@3.1.0:
     resolution: {integrity: sha512-lXeSPRCndWPaipZbtI4CkvTZpF6OPsy19dkvf7+5AHeJD+w+iAKPc9Q78xWBmX4SdR+8xrtY9jTXs/YDv8q+Ug==}
     engines: {node: '>=14'}
+
+  form-create-designer-arco-design@1.1.5:
+    resolution: {integrity: sha512-Xi9tXSQN7v8ANuYU0VlTYLeYzRZtYOPQAsfJNfpyalraLMUCah+0sXSyDVx1Z9VvrcKivv43TjrD/0Vc7jT2tw==}
 
   form-data@4.0.5:
     resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
@@ -6082,6 +6152,9 @@ packages:
     resolution: {integrity: sha512-stxByr12oeeOyY2BlviTNQlYV5xOj47GirPr4yA1hE9JCtxfQN0+tVbkxwCtYDQWhEKWFHsEK48ORg5jrouCAg==}
     engines: {node: '>=20'}
 
+  sortablejs@1.14.0:
+    resolution: {integrity: sha512-pBXvQCs5/33fdN1/39pPL0NZF20LeRbLQ5jtnheIPN9JQAaufGjKdWduZn4U7wCtVuzKhmRkI0DFYHYRbB2H1w==}
+
   sortablejs@1.15.7:
     resolution: {integrity: sha512-Kk8wLQPlS+yi1ZEf48a4+fzHa4yxjC30M/Sr2AnQu+f/MPwvvX9XjZ6OWejiz8crBsLwSq8GHqaxaET7u6ux0A==}
 
@@ -6814,6 +6887,11 @@ packages:
       typescript:
         optional: true
 
+  vuedraggable@4.1.0:
+    resolution: {integrity: sha512-FU5HCWBmsf20GpP3eudURW3WdWTKIbEIQxh9/8GE806hydR9qZqRRxRE3RjqX7PkuLuMQG/A7n3cfj9rCEchww==}
+    peerDependencies:
+      vue: ^3.0.1
+
   w3c-hr-time@1.0.2:
     resolution: {integrity: sha512-z8P5DvDNjKDoFIHK7q8r8lackT6l+jo/Ye3HOle7l9nICP9lf1Ci25fy9vHd0JOWewkIFzXIEig3TdKT7JQ5fQ==}
     deprecated: Use your platform's native performance.now() and performance.timeOrigin.
@@ -6824,6 +6902,9 @@ packages:
   w3c-xmlserializer@3.0.0:
     resolution: {integrity: sha512-3WFqGEgSXIyGhOmAFtlicJNMjEps8b1MG31NCA0/vOF9+nKMUW1ckhi9cnNHmf88Rzw5V+dwIwsm2C7X8k9aQg==}
     engines: {node: '>=12'}
+
+  wangeditor@4.7.15:
+    resolution: {integrity: sha512-aPTdREd8BxXVyJ5MI+LU83FQ7u1EPd341iXIorRNYSOvoimNoZ4nPg+yn3FGbB93/owEa6buLw8wdhYnMCJQLg==}
 
   weakmap-polyfill@2.0.4:
     resolution: {integrity: sha512-ZzxBf288iALJseijWelmECm/1x7ZwQn3sMYIkDr2VvZp7r6SEKuT8D0O9Wiq6L9Nl5mazrOMcmiZE/2NCenaxw==}
@@ -7716,6 +7797,10 @@ snapshots:
       '@babel/types': 7.29.7
       esutils: 2.0.3
 
+  '@babel/runtime-corejs3@7.29.7':
+    dependencies:
+      core-js-pure: 3.49.0
+
   '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.29.7':
@@ -8245,6 +8330,59 @@ snapshots:
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
+
+  '@form-create/arco-design@3.3.1(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/component-arco-checkbox': 3.3.0(vue@3.5.38(typescript@6.0.3))
+      '@form-create/component-arco-frame': 3.3.0(vue@3.5.38(typescript@6.0.3))
+      '@form-create/component-arco-group': 3.3.0(vue@3.5.38(typescript@6.0.3))
+      '@form-create/component-arco-radio': 3.3.0(vue@3.5.38(typescript@6.0.3))
+      '@form-create/component-arco-upload': 3.3.1(vue@3.5.38(typescript@6.0.3))
+      '@form-create/component-subform': 3.3.0(vue@3.5.38(typescript@6.0.3))
+      '@form-create/core': 3.3.1(vue@3.5.38(typescript@6.0.3))
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-arco-checkbox@3.3.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-arco-frame@3.3.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-arco-group@3.3.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-arco-radio@3.3.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-arco-upload@3.3.1(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-subform@3.3.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/component-wangeditor@3.3.0(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      vue: 3.5.38(typescript@6.0.3)
+      wangeditor: 4.7.15
+
+  '@form-create/core@3.3.1(vue@3.5.38(typescript@6.0.3))':
+    dependencies:
+      '@form-create/utils': 3.3.0
+      vue: 3.5.38(typescript@6.0.3)
+
+  '@form-create/utils@3.3.0': {}
 
   '@henrygd/queue@1.2.0': {}
 
@@ -10045,6 +10183,8 @@ snapshots:
     dependencies:
       browserslist: 4.28.2
 
+  core-js-pure@3.49.0: {}
+
   core-js@3.49.0: {}
 
   core-util-is@1.0.3: {}
@@ -10983,6 +11123,15 @@ snapshots:
     dependencies:
       cross-spawn: 7.0.6
       signal-exit: 4.1.0
+
+  form-create-designer-arco-design@1.1.5(vue@3.5.38(typescript@6.0.3)):
+    dependencies:
+      '@form-create/arco-design': 3.3.1(vue@3.5.38(typescript@6.0.3))
+      '@form-create/component-wangeditor': 3.3.0(vue@3.5.38(typescript@6.0.3))
+      '@form-create/utils': 3.3.0
+      vuedraggable: 4.1.0(vue@3.5.38(typescript@6.0.3))
+    transitivePeerDependencies:
+      - vue
 
   form-data@4.0.5:
     dependencies:
@@ -12738,6 +12887,8 @@ snapshots:
       ansi-styles: 6.2.3
       is-fullwidth-code-point: 5.1.0
 
+  sortablejs@1.14.0: {}
+
   sortablejs@1.15.7: {}
 
   source-map-js@1.2.1: {}
@@ -13583,6 +13734,11 @@ snapshots:
     optionalDependencies:
       typescript: 6.0.3
 
+  vuedraggable@4.1.0(vue@3.5.38(typescript@6.0.3)):
+    dependencies:
+      sortablejs: 1.14.0
+      vue: 3.5.38(typescript@6.0.3)
+
   w3c-hr-time@1.0.2:
     dependencies:
       browser-process-hrtime: 1.0.0
@@ -13592,6 +13748,12 @@ snapshots:
   w3c-xmlserializer@3.0.0:
     dependencies:
       xml-name-validator: 4.0.0
+
+  wangeditor@4.7.15:
+    dependencies:
+      '@babel/runtime': 7.29.7
+      '@babel/runtime-corejs3': 7.29.7
+      tslib: 2.8.1
 
   weakmap-polyfill@2.0.4: {}
 
