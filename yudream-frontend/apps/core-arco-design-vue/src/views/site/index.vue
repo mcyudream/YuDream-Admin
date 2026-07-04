@@ -9,6 +9,7 @@ const appSettingsStore = useAppSettingsStore()
 const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
+const publishedPages = ref<CmsPage[]>([])
 const errorMessage = ref('')
 interface SiteNavigationItem {
   id?: string
@@ -35,6 +36,7 @@ const renderContext = computed(() => {
   const navUsers = loggedIn
     ? [{ name: nickname, avatar, url: '/' }]
     : [{ name: '登录', avatar: appSettingsStore.logo, url: '/login' }]
+  const pageItems = publishedPages.value.map(toPageItem)
   return {
     site: {
       name: appSettingsStore.siteName || 'YuDream',
@@ -64,6 +66,9 @@ const renderContext = computed(() => {
     },
     navigation: navigationItems.value,
     navUsers,
+    pages: pageItems,
+    categories: collectTermItems(publishedPages.value, 'categories'),
+    tags: collectTermItems(publishedPages.value, 'tags'),
   }
 })
 
@@ -92,6 +97,7 @@ async function load() {
       home.value = res.data
       document.title = `${res.data.title || '站点首页'} - YuDream`
     }
+    await loadPublicPages()
   }
   catch (error: any) {
     errorMessage.value = error?.response?.data?.message || '页面暂不可访问'
@@ -99,6 +105,47 @@ async function load() {
   finally {
     loading.value = false
   }
+}
+
+async function loadPublicPages() {
+  try {
+    const res = await apiCms.publicPages({ page: 1, size: 12 })
+    publishedPages.value = res.data.records
+  }
+  catch {
+    publishedPages.value = []
+  }
+}
+
+function toPageItem(item: CmsPage) {
+  return {
+    id: item.id,
+    title: item.title,
+    slug: item.slug,
+    url: `/site/${item.slug}`,
+    summary: item.summary || '',
+    excerpt: item.excerpt || item.summary || '',
+    coverImageUrl: item.coverImageUrl || '',
+    category: item.categories?.[0] || '',
+    categories: (item.categories || []).join(', '),
+    tags: (item.tags || []).join(', '),
+    publishedAt: dateText(item.publishedAt || item.updateTime || item.createTime),
+  }
+}
+
+function collectTermItems(items: CmsPage[], key: 'categories' | 'tags') {
+  const counts = new Map<string, number>()
+  items.forEach((item) => {
+    ;(item[key] || []).forEach((term) => {
+      counts.set(term, (counts.get(term) || 0) + 1)
+    })
+  })
+  return Array.from(counts.entries()).map(([name, count]) => ({
+    name,
+    label: name,
+    count,
+    url: `/site?${key === 'categories' ? 'category' : 'tag'}=${encodeURIComponent(name)}`,
+  }))
 }
 
 function sectionStyle(section: HomeSection) {
@@ -141,7 +188,13 @@ function renderDynamicHtml(value?: string) {
       ? renderContext.value.navUsers
       : key === 'navigation'
         ? renderContext.value.navigation
-        : []
+        : key === 'pages'
+          ? renderContext.value.pages
+          : key === 'categories'
+            ? renderContext.value.categories
+            : key === 'tags'
+              ? renderContext.value.tags
+              : []
     const template = el.innerHTML
     el.innerHTML = rows.map((item, index) => renderVariables(template, { item, index: String(index + 1) })).join('')
   })
@@ -212,6 +265,10 @@ function inlineMarkdown(value: string) {
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/\[([^\]]+)]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+}
+
+function dateText(value?: string) {
+  return value ? value.replace('T', ' ').slice(0, 10) : ''
 }
 
 function escapeHtml(value: string) {

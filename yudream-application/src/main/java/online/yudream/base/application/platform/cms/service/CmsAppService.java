@@ -98,6 +98,16 @@ public class CmsAppService {
         return CmsAssembler.toDTO(page);
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<CmsPageDTO> publicPages(CmsPageQuery query) {
+        ensureEnabled();
+        int page = query == null ? 1 : query.getPage();
+        int size = query == null ? 12 : Math.min(Math.max(query.getSize(), 1), 50);
+        String keyword = query == null ? null : query.getKeyword();
+        PageResult<CmsPage> result = cmsPageRepo.publishedPage(keyword, page, size);
+        return new PageResult<>(result.getRecords().stream().map(CmsAssembler::toDTO).toList(), result.getTotal(), result.getPage(), result.getSize());
+    }
+
     private CmsPage createPage(CmsPageSaveCmd cmd) {
         String normalizedSlug = normalizeSlug(cmd.getSlug());
         ensureSlugAvailable(normalizedSlug, null);

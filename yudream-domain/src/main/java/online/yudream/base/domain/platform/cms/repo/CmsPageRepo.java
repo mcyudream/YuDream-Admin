@@ -14,4 +14,6 @@ public interface CmsPageRepo {
     Optional<CmsPage> findBySlug(String slug);
 
     PageResult<CmsPage> page(String keyword, int page, int size);
+
+    PageResult<CmsPage> publishedPage(String keyword, int page, int size);
 }

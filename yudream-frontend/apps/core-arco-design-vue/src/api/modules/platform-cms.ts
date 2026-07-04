@@ -101,4 +101,7 @@ export default {
   publicPage: (slug: string) => {
     return systemClient.get<unknown, ApiResponse<CmsPage>>('api/public/cms/pages', { params: { slug } })
   },
+  publicPages: (params: CmsPageParams) => {
+    return systemClient.get<unknown, ApiResponse<PageResult<CmsPage>>>('api/public/cms/pages/list', { params })
+  },
 }
