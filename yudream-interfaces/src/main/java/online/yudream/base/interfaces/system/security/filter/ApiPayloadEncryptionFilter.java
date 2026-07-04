@@ -35,6 +35,7 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
     public static final String ENCRYPTED_IV_HEADER = "X-Api-Encrypted-Iv";
 
     private static final Set<String> BODY_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
+    private static final String STATUS_PATH = "/api/system/security/encryption/status";
     private static final String PUBLIC_KEY_PATH = "/api/system/security/encryption/public-key";
 
     private final ApiEncryptionAppService apiEncryptionAppService;
@@ -75,7 +76,7 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             return false;
         }
         String path = request.getRequestURI();
-        if (PUBLIC_KEY_PATH.equals(path)) {
+        if (STATUS_PATH.equals(path) || PUBLIC_KEY_PATH.equals(path)) {
             return false;
         }
         if (path != null && path.startsWith("/api/public/cms")) {
