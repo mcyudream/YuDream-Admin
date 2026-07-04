@@ -277,7 +277,7 @@ function cmsBlocks(): grapesjs.BlockProperties[] {
       label: '卡片 Card',
       category: '基础组件',
       media: preview('card'),
-      content: `<article style="display:grid; gap:12px; padding:22px; border:1px solid #e5e7eb; border-radius:12px; background:#ffffff; box-shadow:0 10px 28px rgba(15,23,42,.06);">
+      content: `<article style="display:grid; width:min(100%, 380px); gap:12px; padding:22px; border:1px solid #e5e7eb; border-radius:12px; background:#ffffff; box-shadow:0 10px 28px rgba(15,23,42,.06);">
   <h3 style="margin:0; color:#0f172a; font-size:22px;">卡片标题</h3>
   <p style="margin:0; color:#64748b; line-height:1.7;">卡片内容描述。</p>
 </article>`,
@@ -374,8 +374,8 @@ function styleSectors() {
 }
 
 function starterHtml() {
-  return `<main style="padding:48px; min-height:100vh; background:#f8fafc; color:#0f172a;">
-  <section style="padding:72px 48px; border-radius:24px; background:#fff; border:1px solid #e5e7eb;">
+  return `<main style="padding:40px 20px; background:#f8fafc; color:#0f172a;">
+  <section style="max-width:1120px; margin:0 auto; padding:56px 48px; border-radius:24px; background:#fff; border:1px solid #e5e7eb;">
     <h1 style="margin:0; font-size:56px;">${escapeHtml(props.title || '新页面')}</h1>
     <p style="margin:18px 0 0; color:#64748b;">从左侧拖入区块，使用右侧面板调整样式和动态属性。</p>
   </section>

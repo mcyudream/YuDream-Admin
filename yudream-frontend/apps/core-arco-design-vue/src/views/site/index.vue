@@ -223,6 +223,20 @@ function renderDynamicHtml(value?: string) {
   const sanitized = sanitizeHtml(value)
   const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html')
   doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
+  doc.querySelectorAll('main, section').forEach((el) => {
+    const style = el.getAttribute('style') || ''
+    const normalizedStyle = style
+      .replace(/(?:^|;)\s*min-height\s*:\s*100vh\s*;?/gi, ';')
+      .replace(/^;\s*/, '')
+      .replace(/;\s*;/g, ';')
+      .trim()
+    if (normalizedStyle) {
+      el.setAttribute('style', normalizedStyle)
+    }
+    else {
+      el.removeAttribute('style')
+    }
+  })
   doc.querySelectorAll('[data-visible-when]').forEach((el) => {
     const rule = el.getAttribute('data-visible-when')
     const loggedIn = appAccountStore.isLogin
@@ -699,9 +713,12 @@ function escapeHtml(value: string) {
   text-align: center;
 }
 
-.site-builder-home :deep(main),
+.site-builder-home :deep(main) {
+  min-height: initial;
+}
+
 .site-builder-home :deep(section) {
-  min-height: 100vh;
+  min-height: initial;
 }
 
 .site-builder-home :deep(img) {
