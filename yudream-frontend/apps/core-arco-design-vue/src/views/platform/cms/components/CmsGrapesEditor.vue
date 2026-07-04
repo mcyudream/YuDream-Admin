@@ -2,7 +2,9 @@
 import type grapesjs from 'grapesjs'
 import type { Editor } from 'grapesjs'
 import type { FileObject } from '@/api/modules/files'
+import type { CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import apiFiles from '@/api/modules/files'
+import apiAi from '@/api/modules/platform-ai'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import 'grapesjs/dist/css/grapes.min.css'
 
@@ -17,6 +19,8 @@ const props = defineProps<{
   cssContent?: string
   builderProjectJson?: string
   title?: string
+  aiEnabled?: boolean
+  aiModelOptions?: { label: string, value: string }[]
 }>()
 
 const emit = defineEmits<{
@@ -31,8 +35,17 @@ const layersEl = ref<HTMLElement>()
 const traitsEl = ref<HTMLElement>()
 const stylesEl = ref<HTMLElement>()
 const mediaInput = ref<HTMLInputElement>()
+const aiImageInput = ref<HTMLInputElement>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
+const aiGenerating = ref(false)
+const aiPrompt = ref('')
+const aiModel = ref('')
+const aiImageDataUrl = ref('')
+const aiImageName = ref('')
+const aiMessages = ref<{ role: 'user' | 'assistant', content: string }[]>([
+  { role: 'assistant', content: '我可以读取当前画布，并按你的描述直接修改或增加区块。' },
+])
 let editor: Editor | null = null
 
 onMounted(async () => {
@@ -69,6 +82,7 @@ onMounted(async () => {
   loadInitialContent(editor)
   removeLayoutBlocks(editor)
   await loadMedia()
+  aiModel.value = props.aiModelOptions?.[0]?.value || ''
 })
 
 onBeforeUnmount(() => {
@@ -114,6 +128,99 @@ function command(command: string) {
 
 function setDevice(device: 'desktop' | 'tablet' | 'mobile') {
   editor?.setDevice(device)
+}
+
+async function askAi() {
+  if (!editor || !props.aiEnabled) {
+    toast.error('AI 能力未启用')
+    return
+  }
+  if (!aiPrompt.value.trim() && !aiImageDataUrl.value) {
+    toast.error('请输入修改想法或上传样图')
+    return
+  }
+  const prompt = aiPrompt.value.trim()
+  aiMessages.value.push({ role: 'user', content: prompt || `参考样图调整当前页面：${aiImageName.value}` })
+  aiGenerating.value = true
+  try {
+    removeLayoutBlocks(editor)
+    const projectJson = JSON.stringify(editor.getProjectData())
+    const res = await apiAi.generateCmsPage({
+      title: props.title || '',
+      prompt,
+      pageType: 'GrapesJS 可视化页面',
+      style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计',
+      model: aiModel.value || undefined,
+      imageDataUrl: aiImageDataUrl.value || undefined,
+      currentHtml: editor.getHtml(),
+      currentCss: editor.getCss(),
+      currentProjectJson: projectJson,
+    })
+    applyAiResult(res.data)
+    aiMessages.value.push({ role: 'assistant', content: res.data.summary || '已根据当前画布完成修改。' })
+    aiPrompt.value = ''
+  }
+  finally {
+    aiGenerating.value = false
+  }
+}
+
+function applyAiResult(result: CmsPageGenerateResult) {
+  if (!editor) {
+    return
+  }
+  if (result.builderProjectJson) {
+    try {
+      editor.loadProjectData(JSON.parse(result.builderProjectJson))
+      return
+    }
+    catch {
+      toast.warning('AI 返回的 Project JSON 无法解析，已使用 HTML/CSS 更新画布')
+    }
+  }
+  if (result.htmlContent) {
+    editor.setComponents(result.htmlContent)
+  }
+  if (result.cssContent) {
+    editor.setStyle(result.cssContent)
+  }
+}
+
+function pickAiImage() {
+  aiImageInput.value?.click()
+}
+
+function clearAiImage() {
+  aiImageDataUrl.value = ''
+  aiImageName.value = ''
+}
+
+async function onAiImageChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) {
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
+  if (file.size > 4 * 1024 * 1024) {
+    toast.error('样图不能超过 4MB')
+    return
+  }
+  aiImageDataUrl.value = await fileToDataUrl(file)
+  aiImageName.value = file.name
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
 }
 
 async function loadMedia() {
@@ -456,6 +563,48 @@ function escapeAttr(value: string) {
       </main>
 
       <aside class="grapes-sidebar right">
+        <section v-if="aiEnabled" class="ai-assistant">
+          <div class="ai-head">
+            <h3>AI 助手</h3>
+            <FaTag variant="secondary">读取当前画布</FaTag>
+          </div>
+          <FaSelect
+            v-if="aiModelOptions?.length"
+            v-model="aiModel"
+            :options="aiModelOptions"
+            placeholder="选择模型"
+          />
+          <div class="ai-chat">
+            <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.role">
+              {{ message.content }}
+            </div>
+          </div>
+          <FaTextarea
+            v-model="aiPrompt"
+            rows="4"
+            placeholder="比如：把首屏改成科技 SaaS 风格，增加三列功能卡片，按钮改成绿色渐变"
+            @keydown.ctrl.enter.prevent="askAi"
+          />
+          <input ref="aiImageInput" type="file" accept="image/*" hidden @change="onAiImageChange">
+          <div class="ai-tools">
+            <FaButton size="sm" variant="outline" type="button" @click="pickAiImage">
+              <FaIcon name="i-ri:image-add-line" />
+              样图
+            </FaButton>
+            <FaButton v-if="aiImageDataUrl" size="sm" variant="ghost" type="button" @click="clearAiImage">
+              <FaIcon name="i-ri:close-line" />
+              移除
+            </FaButton>
+            <FaButton size="sm" :loading="aiGenerating" type="button" @click="askAi">
+              <FaIcon name="i-ri:sparkling-2-line" />
+              修改画布
+            </FaButton>
+          </div>
+          <div v-if="aiImageDataUrl" class="ai-image-preview">
+            <img :src="aiImageDataUrl" :alt="aiImageName || 'AI 样图'">
+            <span>{{ aiImageName }}</span>
+          </div>
+        </section>
         <section>
           <h3>图层</h3>
           <div ref="layersEl" />
@@ -573,6 +722,67 @@ function escapeAttr(value: string) {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.ai-assistant {
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fbff;
+}
+
+.ai-head,
+.ai-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-chat {
+  display: grid;
+  gap: 8px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.ai-message {
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: #334155;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ai-message.user {
+  background: #dcfce7;
+  color: #14532d;
+}
+
+.ai-message.assistant {
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.ai-image-preview {
+  display: grid;
+  gap: 6px;
+}
+
+.ai-image-preview img {
+  width: 100%;
+  max-height: 160px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #e2e8f0;
+}
+
+.ai-image-preview span {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 :deep(.gjs-one-bg) {

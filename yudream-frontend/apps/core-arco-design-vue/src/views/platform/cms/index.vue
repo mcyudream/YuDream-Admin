@@ -3,7 +3,6 @@ import type { FileObject } from '@/api/modules/files'
 import type { CapabilityItem } from '@/api/modules/platform-capability'
 import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
-import apiAi from '@/api/modules/platform-ai'
 import apiCapability from '@/api/modules/platform-capability'
 import apiCms from '@/api/modules/platform-cms'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -31,14 +30,11 @@ const editorMode = ref<EditorMode>('builder')
 const loading = ref(false)
 const saving = ref(false)
 const grapesEditorVisible = ref(false)
-const aiVisible = ref(false)
-const aiGenerating = ref(false)
 const editorTarget = ref<EditorTarget>('page')
 const pages = ref<CmsPage[]>([])
 const navigationItems = ref<CmsNavigationItem[]>([])
 const mediaItems = ref<FileObject[]>([])
 const mediaInput = ref<HTMLInputElement>()
-const aiImageInput = ref<HTMLInputElement>()
 const aiCapability = ref<CapabilityItem>()
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
@@ -62,16 +58,6 @@ const pageForm = reactive<CmsPagePayload>({
   seoDescription: '',
   template: 'DEFAULT',
   status: 'DRAFT',
-})
-
-const aiForm = reactive({
-  title: '',
-  pageType: '落地页',
-  style: '现代、清爽、专业、响应式',
-  prompt: '',
-  model: '',
-  imageDataUrl: '',
-  imageName: '',
 })
 
 const home = reactive<HomePageLayout>({
@@ -243,9 +229,6 @@ async function loadAiCapability() {
   try {
     const res = await apiCapability.list()
     aiCapability.value = res.data.find(item => item.code === 'ai')
-    if (!aiForm.model && aiModelOptions.value.length) {
-      aiForm.model = aiModelOptions.value[0].value
-    }
   }
   catch {
     aiCapability.value = undefined
@@ -526,86 +509,6 @@ function openGrapesEditor(target: EditorTarget = 'page') {
   grapesEditorVisible.value = true
 }
 
-function openAiGenerate() {
-  aiForm.title = pageForm.title || ''
-  aiForm.prompt = pageForm.summary || pageForm.excerpt || ''
-  aiForm.model = aiForm.model || aiModelOptions.value[0]?.value || aiCapability.value?.config?.model || ''
-  aiVisible.value = true
-}
-
-async function generatePageWithAi() {
-  if (!aiEnabled.value) {
-    toast.error('AI 能力未启用')
-    return
-  }
-  if (!aiForm.prompt.trim() && !aiForm.imageDataUrl) {
-    toast.error('请填写想法或上传样图')
-    return
-  }
-  aiGenerating.value = true
-  try {
-    const res = await apiAi.generateCmsPage({
-      title: aiForm.title || pageForm.title,
-      pageType: aiForm.pageType,
-      style: aiForm.style,
-      prompt: aiForm.prompt,
-      siteName: home.title || 'YuDream',
-      model: aiForm.model || undefined,
-      imageDataUrl: aiForm.imageDataUrl || undefined,
-    })
-    const data = res.data
-    pageForm.title = data.title || aiForm.title || pageForm.title
-    pageForm.summary = data.summary || pageForm.summary
-    pageForm.htmlContent = stripLayoutBlocks(data.htmlContent || pageForm.htmlContent || '')
-    pageForm.cssContent = data.cssContent || pageForm.cssContent || ''
-    pageForm.builderProjectJson = data.builderProjectJson || pageForm.builderProjectJson || ''
-    pageForm.markdownContent = data.markdownContent || pageForm.markdownContent || ''
-    editorMode.value = 'builder'
-    aiVisible.value = false
-    toast.success('AI 页面草稿已生成')
-  }
-  finally {
-    aiGenerating.value = false
-  }
-}
-
-function pickAiImage() {
-  aiImageInput.value?.click()
-}
-
-function clearAiImage() {
-  aiForm.imageDataUrl = ''
-  aiForm.imageName = ''
-}
-
-async function onAiImageChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) {
-    return
-  }
-  if (!file.type.startsWith('image/')) {
-    toast.error('请选择图片文件')
-    return
-  }
-  if (file.size > 4 * 1024 * 1024) {
-    toast.error('样图不能超过 4MB')
-    return
-  }
-  aiForm.imageDataUrl = await fileToDataUrl(file)
-  aiForm.imageName = file.name
-}
-
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
 async function saveGrapesEditor(payload: { htmlContent: string, cssContent: string, builderProjectJson: string }) {
   grapesEditorVisible.value = false
   await nextTick()
@@ -873,10 +776,6 @@ function sectionTitle(type: HomeSectionType) {
               <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS 和可继续编辑的 Project JSON。</p>
             </div>
             <div class="builder-entry__actions">
-              <FaButton v-if="aiEnabled" v-auth="'platform:ai:generate'" variant="outline" :loading="aiGenerating" @click="openAiGenerate">
-                <FaIcon name="i-ri:sparkling-2-line" />
-                AI 构建
-              </FaButton>
               <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
                 <FaIcon name="i-ri:drag-drop-line" />
                 打开构建器
@@ -1229,56 +1128,12 @@ function sectionTitle(type: HomeSectionType) {
         :html-content="editorTarget === 'home' ? homeHtml : pageForm.htmlContent"
         :css-content="editorTarget === 'home' ? homeCss : pageForm.cssContent"
         :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
+        :ai-enabled="aiEnabled"
+        :ai-model-options="aiModelOptions"
         @close="grapesEditorVisible = false"
         @save="saveGrapesEditor"
       />
     </div>
-
-    <FaModal v-model="aiVisible" title="AI 一键构建页面" show-cancel-button class="sm:max-w-2xl" :confirm-loading="aiGenerating" @confirm="generatePageWithAi">
-      <div class="ai-generate-form">
-        <label>
-          <span>页面标题</span>
-          <FaInput v-model="aiForm.title" placeholder="例如：产品介绍页" />
-        </label>
-        <label v-if="aiModelOptions.length">
-          <span>生成模型</span>
-          <FaSelect v-model="aiForm.model" :options="aiModelOptions" placeholder="选择页面构建模型" />
-        </label>
-        <label>
-          <span>页面类型</span>
-          <FaInput v-model="aiForm.pageType" placeholder="落地页、文档页、活动页、内容页" />
-        </label>
-        <label>
-          <span>风格偏好</span>
-          <FaInput v-model="aiForm.style" placeholder="现代、清爽、专业、响应式" />
-        </label>
-        <label>
-          <span>想法描述</span>
-          <FaTextarea v-model="aiForm.prompt" rows="6" placeholder="描述页面目标、主要内容、栏目结构、目标用户和需要强调的卖点；也可以只上传样图让 AI 参考" />
-        </label>
-        <div class="ai-image-picker">
-          <input ref="aiImageInput" type="file" accept="image/*" hidden @change="onAiImageChange">
-          <div>
-            <span>样图参考</span>
-            <p>支持上传设计稿或截图，AI 会参考布局、视觉层次、色彩和组件组织方式。</p>
-          </div>
-          <div class="ai-image-actions">
-            <FaButton variant="outline" type="button" @click="pickAiImage">
-              <FaIcon name="i-ri:image-add-line" />
-              上传样图
-            </FaButton>
-            <FaButton v-if="aiForm.imageDataUrl" variant="ghost" type="button" @click="clearAiImage">
-              <FaIcon name="i-ri:close-line" />
-              移除
-            </FaButton>
-          </div>
-          <div v-if="aiForm.imageDataUrl" class="ai-image-preview">
-            <img :src="aiForm.imageDataUrl" :alt="aiForm.imageName || 'AI 样图'">
-            <span>{{ aiForm.imageName }}</span>
-          </div>
-        </div>
-      </div>
-    </FaModal>
   </div>
 </template>
 
@@ -1923,58 +1778,6 @@ function sectionTitle(type: HomeSectionType) {
   z-index: 5000;
   overflow: hidden;
   background: var(--color-bg-1);
-}
-
-.ai-generate-form {
-  display: grid;
-  gap: 14px;
-}
-
-.ai-generate-form label {
-  display: grid;
-  gap: 6px;
-  color: var(--color-text-2);
-  font-size: 13px;
-}
-
-.ai-image-picker {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-}
-
-.ai-image-picker span {
-  color: var(--color-text-2);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.ai-image-picker p {
-  margin: 4px 0 0;
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.ai-image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.ai-image-preview {
-  display: grid;
-  gap: 8px;
-}
-
-.ai-image-preview img {
-  max-height: 220px;
-  width: 100%;
-  border-radius: 6px;
-  object-fit: contain;
-  background: var(--color-fill-2);
 }
 
 @media (max-width: 1180px) {

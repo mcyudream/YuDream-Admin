@@ -9,6 +9,9 @@ export interface CmsPageGeneratePayload {
   siteName?: string
   model?: string
   imageDataUrl?: string
+  currentHtml?: string
+  currentCss?: string
+  currentProjectJson?: string
 }
 
 export interface CmsPageGenerateResult {
