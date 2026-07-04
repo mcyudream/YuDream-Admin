@@ -95,6 +95,8 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_API_DOCS_ENABLED:true}
   cms:
     enabled: ${PLATFORM_CMS_ENABLED:true}
+  form:
+    enabled: ${PLATFORM_FORM_ENABLED:true}
   document-template:
     enabled: ${PLATFORM_DOCUMENT_TEMPLATE_ENABLED:true}
   integration:

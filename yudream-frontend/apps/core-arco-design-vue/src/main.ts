@@ -5,6 +5,8 @@ import icons from '@/iconify/index.json'
 import directive from '@/utils/directive'
 
 import App from './App.vue'
+import formCreate from '@form-create/arco-design'
+import FcDesigner from 'form-create-designer-arco-design'
 import router from './router'
 import pinia from './store'
 import uiProvider from './ui/provider'
@@ -26,6 +28,8 @@ appSettingsStore.loadThemeSettings()
 
 app.use(router)
 app.use(uiProvider)
+app.use(formCreate)
+app.use(FcDesigner)
 directive(app)
 // 加载离线图标集合（无论是否离线，都注册到 @iconify/vue，避免在线模式下图标不显示）
 for (const info of icons.collections) {

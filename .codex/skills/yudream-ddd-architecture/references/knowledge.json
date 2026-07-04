@@ -53,6 +53,10 @@
         "importRows(file, rowClass, importer)"
       ],
       "example": "ExcelHttpSupport.write(response, \"用户管理\", \"用户\", UserExcelRow.class, rows);"
+    },
+    {
+      "key": "form-create-arco-designer",
+      "text": "Vue3 + Arco 动态表单优先使用 @form-create/arco-design 和 form-create-designer-arco-design；main.ts 全局 app.use(formCreate) 与 app.use(FcDesigner)，设计器用 fc-designer.getRule/getOption 保存 JSON，公开端用 form-create 渲染并自定义提交按钮。"
     }
   ],
   "pitfalls": [

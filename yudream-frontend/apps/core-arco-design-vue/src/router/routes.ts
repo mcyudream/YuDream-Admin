@@ -51,6 +51,15 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/forms/:code',
+    name: 'publicDynamicForm',
+    component: () => import('@/views/forms/public.vue'),
+    meta: {
+      title: '表单填写',
+      public: true,
+    },
+  },
+  {
     path: '/:all(.*)*',
     name: 'notFound',
     component: () => import('@/views/[...all].vue'),
