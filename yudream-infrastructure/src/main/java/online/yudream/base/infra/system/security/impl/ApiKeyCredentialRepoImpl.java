@@ -48,8 +48,8 @@ public class ApiKeyCredentialRepoImpl implements ApiKeyCredentialRepo {
     }
 
     @Override
-    public List<ApiKeyCredential> page(String keyword, int page, int size) {
-        Query query = buildPageQuery(keyword)
+    public List<ApiKeyCredential> page(String keyword, Long creatorUserId, int page, int size) {
+        Query query = buildPageQuery(keyword, creatorUserId)
                 .with(Sort.by(Sort.Direction.DESC, "createTime"));
         int currentPage = Math.max(page, 1);
         int pageSize = Math.max(size, 1);
@@ -60,12 +60,15 @@ public class ApiKeyCredentialRepoImpl implements ApiKeyCredentialRepo {
     }
 
     @Override
-    public long count(String keyword) {
-        return mongoTemplate.count(buildPageQuery(keyword), ApiKeyCredentialDO.class);
+    public long count(String keyword, Long creatorUserId) {
+        return mongoTemplate.count(buildPageQuery(keyword, creatorUserId), ApiKeyCredentialDO.class);
     }
 
-    private Query buildPageQuery(String keyword) {
+    private Query buildPageQuery(String keyword, Long creatorUserId) {
         Query query = new Query();
+        if (creatorUserId != null) {
+            query.addCriteria(Criteria.where("creatorUserId").is(creatorUserId));
+        }
         if (StringUtils.hasText(keyword)) {
             String pattern = ".*" + Pattern.quote(keyword.trim()) + ".*";
             query.addCriteria(new Criteria().orOperator(
