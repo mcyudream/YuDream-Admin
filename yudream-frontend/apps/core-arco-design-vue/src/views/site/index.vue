@@ -162,7 +162,12 @@ function renderVariables(value: string, localContext: Record<string, any> = {}) 
 
 function resolvePath(path: string, localContext: Record<string, any>) {
   const root = { ...renderContext.value, ...localContext }
-  return path.split('.').reduce<any>((target, key) => target?.[key], root)
+  return path.split('.').reduce<any>((target, key) => {
+    if (Array.isArray(target) && key === 'count') {
+      return target.length
+    }
+    return target?.[key]
+  }, root)
 }
 
 function markdownPreview(markdown?: string) {
