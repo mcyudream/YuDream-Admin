@@ -22,12 +22,12 @@ public class PluginContextImpl implements PluginContext {
 
     private final String pluginCode;
     private final FrameworkServices frameworkServices;
+    private final PluginExtensionRegistry pluginExtensionRegistry;
     private final List<PluginMenuItem> menus = new ArrayList<>();
     private final List<PluginPermissionItem> permissions = new ArrayList<>();
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
     private final Map<String, PluginHttpHandler> httpHandlers = new ConcurrentHashMap<>();
-    private final Map<Class<?>, Object> extensions = new ConcurrentHashMap<>();
     private final List<AutoCloseable> disposables = new ArrayList<>();
     private final Set<String> menuKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> permissionKeys = ConcurrentHashMap.newKeySet();
@@ -35,9 +35,10 @@ public class PluginContextImpl implements PluginContext {
     private final Set<String> frontendModuleKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendRouteKeys = ConcurrentHashMap.newKeySet();
 
-    public PluginContextImpl(String pluginCode, FrameworkServices frameworkServices) {
+    public PluginContextImpl(String pluginCode, FrameworkServices frameworkServices, PluginExtensionRegistry pluginExtensionRegistry) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
+        this.pluginExtensionRegistry = pluginExtensionRegistry;
     }
 
     @Override
@@ -94,13 +95,12 @@ public class PluginContextImpl implements PluginContext {
 
     @Override
     public <T> void registerExtension(Class<T> type, T extension) {
-        extensions.put(type, extension);
+        pluginExtensionRegistry.register(pluginCode, type, extension);
     }
 
     @Override
     public <T> Optional<T> getExtension(Class<T> type) {
-        Object extension = extensions.get(type);
-        return extension == null ? Optional.empty() : Optional.of(type.cast(extension));
+        return pluginExtensionRegistry.find(pluginCode, type);
     }
 
     @Override
@@ -117,11 +117,19 @@ public class PluginContextImpl implements PluginContext {
     }
 
     public Optional<PluginHttpHandler> findHttpHandler(String method, String path) {
-        PluginHttpHandler handler = httpHandlers.get(httpKey(method, path));
+        String normalizedMethod = StringUtils.hasText(method) ? method.trim().toUpperCase(Locale.ROOT) : "*";
+        String normalizedPath = normalizePath(path);
+        PluginHttpHandler handler = httpHandlers.get(httpKey(normalizedMethod, normalizedPath));
         if (handler == null) {
-            handler = httpHandlers.get(httpKey("*", path));
+            handler = httpHandlers.get(httpKey("*", normalizedPath));
         }
-        return Optional.ofNullable(handler);
+        if (handler != null) {
+            return Optional.of(handler);
+        }
+        return httpHandlers.entrySet().stream()
+                .filter(entry -> routeMatches(entry.getKey(), normalizedMethod, normalizedPath))
+                .map(Map.Entry::getValue)
+                .findFirst();
     }
 
     public void clearRuntimeContributions() {
@@ -131,7 +139,7 @@ public class PluginContextImpl implements PluginContext {
         capabilities.clear();
         frontendModules.clear();
         httpHandlers.clear();
-        extensions.clear();
+        pluginExtensionRegistry.clear(pluginCode);
         menuKeys.clear();
         permissionKeys.clear();
         capabilityKeys.clear();
@@ -156,6 +164,57 @@ public class PluginContextImpl implements PluginContext {
     private String httpKey(String method, String path) {
         String safeMethod = StringUtils.hasText(method) ? method.trim().toUpperCase(Locale.ROOT) : "*";
         return safeMethod + " " + normalizePath(path);
+    }
+
+    private boolean routeMatches(String key, String method, String path) {
+        int splitIndex = key.indexOf(' ');
+        if (splitIndex < 0) {
+            return false;
+        }
+        String routeMethod = key.substring(0, splitIndex);
+        String routePath = key.substring(splitIndex + 1);
+        if (!"*".equals(routeMethod) && !routeMethod.equals(method)) {
+            return false;
+        }
+        return pathMatches(routePath, path);
+    }
+
+    private boolean pathMatches(String routePath, String path) {
+        String[] routeSegments = trimSlashes(routePath).split("/");
+        String[] pathSegments = trimSlashes(path).split("/");
+        if (routeSegments.length == 1 && routeSegments[0].isBlank()) {
+            return pathSegments.length == 1 && pathSegments[0].isBlank();
+        }
+        int routeIndex = 0;
+        int pathIndex = 0;
+        while (routeIndex < routeSegments.length && pathIndex < pathSegments.length) {
+            String routeSegment = routeSegments[routeIndex];
+            if ("**".equals(routeSegment)) {
+                return true;
+            }
+            String pathSegment = pathSegments[pathIndex];
+            if (!isPathVariable(routeSegment) && !"*".equals(routeSegment) && !routeSegment.equals(pathSegment)) {
+                return false;
+            }
+            routeIndex++;
+            pathIndex++;
+        }
+        return routeIndex == routeSegments.length && pathIndex == pathSegments.length;
+    }
+
+    private boolean isPathVariable(String segment) {
+        return segment.startsWith("{") && segment.endsWith("}") && segment.length() > 2;
+    }
+
+    private String trimSlashes(String value) {
+        String result = value == null ? "" : value.trim();
+        while (result.startsWith("/")) {
+            result = result.substring(1);
+        }
+        while (result.endsWith("/") && result.length() > 1) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private String normalizePath(String path) {

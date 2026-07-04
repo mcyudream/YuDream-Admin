@@ -10,6 +10,8 @@ import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -21,6 +23,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final PluginSecurityService pluginSecurityService;
     private final MongoTemplate mongoTemplate;
     private final ObjectStorage objectStorage;
+    private final PluginExtensionRegistry pluginExtensionRegistry;
     private final ConcurrentMap<String, PluginDocumentStore> documentStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginFileStore> fileStores = new ConcurrentHashMap<>();
 
@@ -42,5 +45,15 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginFileStore files(String pluginCode) {
         return fileStores.computeIfAbsent(pluginCode, code -> new ObjectStoragePluginFileStore(code, objectStorage));
+    }
+
+    @Override
+    public <T> Optional<T> extension(String pluginCode, Class<T> type) {
+        return pluginExtensionRegistry.find(pluginCode, type);
+    }
+
+    @Override
+    public <T> List<T> extensions(Class<T> type) {
+        return pluginExtensionRegistry.findAll(type);
     }
 }
