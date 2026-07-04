@@ -20,6 +20,7 @@ catalog:
   '@spiriit/vite-plugin-svg-spritemap': ^7.0.0
   '@stylistic/stylelint-config': ^5.0.0
   '@tanstack/vue-table': ^8.21.3
+  '@tdesign-vue-next/chat': ^0.5.2
   '@types/fs-extra': ^11.0.4
   '@types/node': ^25.9.3
   '@types/nprogress': ^0.2.3

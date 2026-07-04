@@ -66,6 +66,10 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             writeBadRequest(response, ex.getMessage());
             return;
         }
+        if (acceptsEventStream(request)) {
+            filterChain.doFilter(nextRequest, response);
+            return;
+        }
         ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);
         filterChain.doFilter(nextRequest, wrappedResponse);
         encryptResponse(wrappedResponse, sessionKey);
@@ -94,6 +98,11 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             return true;
         }
         return contentType.toLowerCase().contains(MediaType.APPLICATION_JSON_VALUE);
+    }
+
+    private boolean acceptsEventStream(HttpServletRequest request) {
+        String accept = request.getHeader("Accept");
+        return StringUtils.hasText(accept) && accept.toLowerCase().contains(MediaType.TEXT_EVENT_STREAM_VALUE);
     }
 
     private boolean encryptedRequest(HttpServletRequest request) {

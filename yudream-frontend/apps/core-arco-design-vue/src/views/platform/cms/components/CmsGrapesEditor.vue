@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type grapesjs from 'grapesjs'
 import type { Editor } from 'grapesjs'
+import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { FileObject } from '@/api/modules/files'
-import type { CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import type { AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import { Chatbot } from '@tdesign-vue-next/chat'
+import { h } from 'vue'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import '@tdesign-vue-next/chat/es/style/index.css'
 import 'grapesjs/dist/css/grapes.min.css'
 
 interface GrapesSavePayload {
@@ -37,19 +41,13 @@ const layersEl = ref<HTMLElement>()
 const traitsEl = ref<HTMLElement>()
 const stylesEl = ref<HTMLElement>()
 const mediaInput = ref<HTMLInputElement>()
-const aiImageInput = ref<HTMLInputElement>()
+const chatbotRef = ref<{ addPrompt?: (prompt: string, autoFocus?: boolean) => void }>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
-const aiGenerating = ref(false)
-const aiPrompt = ref('')
 const aiModel = ref('')
-const aiImageDataUrl = ref('')
-const aiImageName = ref('')
+const aiAttachments = ref<any[]>([])
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
 const canvasRevision = ref(0)
-const aiMessages = ref<{ role: 'user' | 'assistant', content: string }[]>([
-  { role: 'assistant', content: '我可以读取当前画布，并按你的描述直接修改或增加区块。' },
-])
 const aiSuggestions = [
   '优化首屏视觉，让层次更清晰',
   '新增三列功能卡片并统一按钮样式',
@@ -57,6 +55,7 @@ const aiSuggestions = [
   '优化移动端排版和间距',
 ]
 let editor: Editor | null = null
+let pendingAiResult: CmsPageGenerateResult | null = null
 
 const rightPanelTabs = computed(() => {
   const tabs: { label: string, value: RightPanelTab, icon: string }[] = [
@@ -84,6 +83,118 @@ const canvasStats = computed(() => {
     { label: '项目源', value: `${JSON.stringify(editor.getProjectData()).length} 字符` },
   ]
 })
+
+const aiDefaultMessages = computed<ChatMessagesData[]>(() => [
+  {
+    id: 'cms-ai-welcome',
+    role: 'assistant',
+    status: 'complete',
+    content: [
+      {
+        type: 'markdown',
+        data: '我可以读取当前 GrapesJS 画布、CSS 和项目 JSON，并按你的描述直接修改或增加区块。你也可以附一张样图让我参考。',
+      },
+    ],
+  },
+])
+
+const aiSenderProps = computed(() => ({
+  loading: false,
+  placeholder: '输入 / 唤起插件和技能，或描述要如何修改当前画布',
+  textareaProps: {
+    autosize: { minRows: 3, maxRows: 6 },
+  },
+  attachmentsProps: {
+    items: aiAttachments.value,
+    overflow: 'scrollX' as const,
+  },
+  actions: (preset: { name: string, render: any }[]) => {
+    const uploadImage = preset.find(item => item.name === 'uploadImage')
+    const send = preset.find(item => item.name === 'send')
+    const model = props.aiModelOptions?.length
+      ? {
+          name: 'model',
+          render: h('select', {
+            class: 'ai-model-native',
+            value: aiModel.value,
+            title: '选择模型',
+            onChange: (event: Event) => {
+              aiModel.value = (event.target as HTMLSelectElement).value
+            },
+          }, props.aiModelOptions.map(option => h('option', { value: option.value }, option.label))),
+        }
+      : null
+    return [uploadImage, model, send].filter(Boolean)
+  },
+  onFileSelect: async (event: CustomEvent<File[]>) => {
+    try {
+      aiAttachments.value = await Promise.all(Array.from(event.detail || []).map(toAttachmentItem))
+    }
+    catch (error) {
+      toast.error(error instanceof Error ? error.message : '样图读取失败')
+    }
+  },
+  onFileRemove: (event: CustomEvent<any[]>) => {
+    aiAttachments.value = event.detail || []
+  },
+}))
+
+const aiMessageProps = {
+  avatar: (item: { role?: string }) => item.role === 'user' ? '你' : 'AI',
+  name: (item: { role?: string }) => item.role === 'user' ? '你' : 'YuDream AI',
+}
+
+const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
+  endpoint: apiAi.generateCmsPageStreamEndpoint(),
+  stream: true,
+  timeout: 180000,
+  onRequest: async (params: ChatRequestParams) => {
+    if (!editor || !props.aiEnabled) {
+      throw new Error('AI 能力未启用')
+    }
+    const prompt = String(params.prompt || '').trim()
+    if (!prompt && aiAttachments.value.length === 0) {
+      throw new Error('请输入修改想法或添加样图')
+    }
+    return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, params.attachments || aiAttachments.value))
+  },
+  isValidChunk: (chunk: SSEChunkData) => ['delta', 'tool', 'result', 'error'].includes(chunk.event || ''),
+  onMessage: (chunk: SSEChunkData) => {
+    if (chunk.event === 'delta') {
+      return markdownChunk(String(chunk.data?.content || ''))
+    }
+    if (chunk.event === 'tool') {
+      applyAiTool(chunk.data?.tool)
+      return null
+    }
+    if (chunk.event === 'result') {
+      pendingAiResult = chunk.data?.result || null
+      return markdownChunk('\n\n画布操作已完成。')
+    }
+    if (chunk.event === 'error') {
+      return {
+        ...markdownChunk(`\n\n生成失败：${chunk.data?.content || '未知错误'}`),
+        status: 'error',
+      } as AIMessageContent
+    }
+    return null
+  },
+  onComplete: (isAborted: boolean) => {
+    if (isAborted) {
+      return
+    }
+    if (pendingAiResult) {
+      applyAiResult(pendingAiResult)
+      pendingAiResult = null
+      clearAiAttachments()
+      return markdownChunk('\n\n画布已更新。')
+    }
+  },
+  onError: (error: Error | Response) => {
+    const message = error instanceof Response ? `${error.status} ${error.statusText}` : error.message
+    toast.error('AI 调用失败', { description: message })
+  },
+}))
 
 watch(() => props.aiEnabled, (enabled) => {
   if (!enabled && rightPanelTab.value === 'ai') {
@@ -180,46 +291,63 @@ function setDevice(device: 'desktop' | 'tablet' | 'mobile') {
   editor?.setDevice(device)
 }
 
-async function askAi() {
-  if (!editor || !props.aiEnabled) {
-    toast.error('AI 能力未启用')
-    return
+function useSuggestion(suggestion: string) {
+  chatbotRef.value?.addPrompt?.(suggestion, true)
+}
+
+function buildAiPayload(prompt: string, attachments: any[] = []) {
+  if (!editor) {
+    throw new Error('构建器未初始化')
   }
-  if (!aiPrompt.value.trim() && !aiImageDataUrl.value) {
-    toast.error('请输入修改想法或上传样图')
-    return
-  }
-  const prompt = aiPrompt.value.trim()
-  aiMessages.value.push({ role: 'user', content: prompt || `参考样图调整当前页面：${aiImageName.value}` })
-  aiGenerating.value = true
-  try {
-    removeLayoutBlocks(editor)
-    const projectJson = JSON.stringify(editor.getProjectData())
-    const res = await apiAi.generateCmsPage({
-      title: props.title || '',
-      prompt,
-      pageType: 'GrapesJS 可视化页面',
-      style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计',
-      model: aiModel.value || undefined,
-      imageDataUrl: aiImageDataUrl.value || undefined,
-      currentHtml: editor.getHtml(),
-      currentCss: editor.getCss(),
-      currentProjectJson: projectJson,
-    })
-    applyAiResult(res.data)
-    aiMessages.value.push({ role: 'assistant', content: res.data.summary || '已根据当前画布完成修改。' })
-    aiPrompt.value = ''
-  }
-  finally {
-    aiGenerating.value = false
+  removeLayoutBlocks(editor)
+  const image = firstImageAttachment(attachments)
+  return {
+    title: props.title || '',
+    prompt: prompt || `参考样图调整当前页面：${image?.name || '样图'}`,
+    pageType: 'GrapesJS 可视化页面',
+    style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。不要生成系统导航栏和页脚，它们由站点 Layout 渲染。',
+    model: aiModel.value || undefined,
+    imageDataUrl: image?.url || undefined,
+    currentHtml: editor.getHtml(),
+    currentCss: editor.getCss(),
+    currentProjectJson: JSON.stringify(editor.getProjectData()),
   }
 }
 
-function useSuggestion(suggestion: string) {
-  aiPrompt.value = suggestion
+async function toAttachmentItem(file: File) {
+  if (!file.type.startsWith('image/')) {
+    throw new Error('请选择图片文件')
+  }
+  if (file.size > 4 * 1024 * 1024) {
+    throw new Error('样图不能超过 4MB')
+  }
+  return {
+    key: `${file.name}-${file.size}-${file.lastModified}`,
+    name: file.name,
+    fileType: file.type.startsWith('image/') ? 'image' : 'txt',
+    size: file.size,
+    url: await fileToDataUrl(file),
+  }
+}
+
+function firstImageAttachment(attachments: any[]) {
+  return attachments.find(item => item?.fileType === 'image' && item?.url)
+}
+
+function markdownChunk(data: string): AIMessageContent {
+  return {
+    type: 'markdown',
+    id: 'cms-ai-stream',
+    data,
+    strategy: 'merge',
+  }
 }
 
 function applyAiResult(result: CmsPageGenerateResult) {
+  if (result.tools?.length) {
+    result.tools.forEach(applyAiTool)
+    return
+  }
   if (!editor) {
     return
   }
@@ -240,32 +368,43 @@ function applyAiResult(result: CmsPageGenerateResult) {
   }
 }
 
-function pickAiImage() {
-  aiImageInput.value?.click()
+function applyAiTool(tool?: AiToolCallResult) {
+  if (!editor || !tool) {
+    return
+  }
+  if (tool.toolName !== 'cms.canvas.patch') {
+    toast.warning(`暂不支持的 AI 工具：${tool.toolName || '未知工具'}`)
+    return
+  }
+  const payload = tool.payload || {}
+  const action = tool.action || 'replace-page'
+  if (action === 'load-project' || (action === 'replace-page' && payload.builderProjectJson)) {
+    try {
+      editor.loadProjectData(JSON.parse(String(payload.builderProjectJson)))
+      canvasRevision.value += 1
+      return
+    }
+    catch {
+      toast.warning('AI 返回的 Project JSON 无法解析，已继续应用 HTML/CSS')
+    }
+  }
+  if (action === 'replace-page' || action === 'set-html') {
+    editor.setComponents(String(payload.htmlContent || ''))
+  }
+  if (action === 'replace-page' || action === 'set-css') {
+    editor.setStyle(String(payload.cssContent || ''))
+  }
+  if (action === 'add-html' && payload.htmlContent) {
+    editor.addComponents(String(payload.htmlContent))
+  }
+  if (action === 'remove-selector' && payload.selector) {
+    editor.getWrapper()?.find(String(payload.selector)).forEach(component => component.remove())
+  }
+  canvasRevision.value += 1
 }
 
-function clearAiImage() {
-  aiImageDataUrl.value = ''
-  aiImageName.value = ''
-}
-
-async function onAiImageChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) {
-    return
-  }
-  if (!file.type.startsWith('image/')) {
-    toast.error('请选择图片文件')
-    return
-  }
-  if (file.size > 4 * 1024 * 1024) {
-    toast.error('样图不能超过 4MB')
-    return
-  }
-  aiImageDataUrl.value = await fileToDataUrl(file)
-  aiImageName.value = file.name
+function clearAiAttachments() {
+  aiAttachments.value = []
 }
 
 function fileToDataUrl(file: File) {
@@ -633,56 +772,15 @@ function escapeAttr(value: string) {
         </div>
 
         <section v-if="aiEnabled" class="right-panel ai-panel" :class="{ active: rightPanelTab === 'ai' }">
-          <div class="ai-chat" aria-label="AI 对话历史">
-            <div class="ai-hero">
-              <span>AI</span>
-              <strong>YuDream AI</strong>
-              <p>描述你想要的页面变化，我会结合当前画布内容进行修改。</p>
-            </div>
-            <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.role">
-              <span>{{ message.role === 'user' ? '你' : 'AI' }}</span>
-              <p>{{ message.content }}</p>
-            </div>
-          </div>
-
-          <div class="ai-composer">
-            <FaTextarea
-              v-model="aiPrompt"
-              rows="5"
-              placeholder="输入 / 唤起插件和技能，或直接描述要如何修改当前画布"
-              @keydown.ctrl.enter.prevent="askAi"
-            />
-            <input ref="aiImageInput" type="file" accept="image/*" hidden @change="onAiImageChange">
-            <div v-if="aiImageDataUrl" class="ai-image-preview">
-              <img :src="aiImageDataUrl" :alt="aiImageName || 'AI 样图'">
-              <div>
-                <strong>{{ aiImageName }}</strong>
-                <button type="button" @click="clearAiImage">移除样图</button>
-              </div>
-            </div>
-            <div class="ai-tools">
-              <div class="ai-tool-left">
-                <button type="button" class="ai-icon-button" title="添加样图" @click="pickAiImage">
-                  <FaIcon name="i-ri:add-line" />
-                </button>
-                <button type="button" class="ai-icon-button" title="画布上下文">
-                  <FaIcon name="i-ri:links-line" />
-                </button>
-              </div>
-              <div class="ai-tool-right">
-                <FaSelect
-                  v-if="aiModelOptions?.length"
-                  v-model="aiModel"
-                  class="ai-model-select"
-                  :options="aiModelOptions"
-                  placeholder="选择模型"
-                />
-                <button type="button" class="ai-send-button" :disabled="aiGenerating" title="修改画布" @click="askAi">
-                  <FaIcon :name="aiGenerating ? 'i-ri:loader-4-line' : 'i-ri:arrow-up-line'" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <Chatbot
+            ref="chatbotRef"
+            class="builder-chatbot"
+            layout="single"
+            :default-messages="aiDefaultMessages"
+            :chat-service-config="aiChatServiceConfig"
+            :sender-props="aiSenderProps"
+            :message-props="aiMessageProps"
+          />
 
           <div class="ai-suggestions" aria-label="AI 快捷指令">
             <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
@@ -920,208 +1018,61 @@ function escapeAttr(value: string) {
   color: #0f172a;
 }
 
-.ai-tools {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
+.builder-chatbot {
+  min-height: 0;
+  overflow: hidden;
 }
 
-.ai-chat {
+.builder-chatbot :deep(t-chatbot) {
   display: grid;
-  align-content: end;
-  gap: 10px;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+}
+
+.builder-chatbot :deep(t-chat-list),
+.builder-chatbot :deep(.t-chat-list) {
+  min-height: 0;
   overflow: auto;
-  padding-right: 2px;
 }
 
-.ai-hero {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  margin: auto 0 24px;
-  text-align: center;
-}
-
-.ai-hero span {
-  display: inline-grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
+.builder-chatbot :deep(t-chat-sender),
+.builder-chatbot :deep(.t-chat-sender) {
+  overflow: hidden;
   border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.ai-hero strong {
-  color: #020617;
-  font-size: 30px;
-  font-weight: 800;
-  letter-spacing: 0;
-}
-
-.ai-hero p {
-  max-width: 260px;
-  margin: 0;
-  color: #94a3b8;
-  font-size: 12px;
-  line-height: 1.7;
-}
-
-.ai-message {
-  display: grid;
-  gap: 4px;
-  width: min(92%, 280px);
-  padding: 9px 10px;
-  border-radius: 12px;
-  color: #334155;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.ai-message span {
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0.72;
-}
-
-.ai-message p {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.ai-message.user {
-  justify-self: end;
-  background: #dcfce7;
-  color: #14532d;
-}
-
-.ai-message.assistant {
-  background: #eff6ff;
-  color: #1e3a8a;
-}
-
-.ai-composer {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 22px;
+  border-radius: 18px;
   background: #fff;
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
 }
 
-.ai-composer :deep(textarea) {
-  min-height: 80px;
-  resize: none;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+.builder-chatbot :deep(textarea) {
+  font-size: 13px;
+  line-height: 1.7;
 }
 
-.ai-composer :deep(textarea:focus) {
-  box-shadow: none;
+.builder-chatbot :deep(t-chat-sender::part(t-chat-sender__actions__item__wrapper)) {
+  width: auto;
+  min-width: 30px;
 }
 
-.ai-image-preview {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #f8fafc;
-}
-
-.ai-image-preview img {
-  width: 56px;
-  height: 42px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: #e2e8f0;
-}
-
-.ai-image-preview div {
-  display: grid;
+.ai-model-native {
+  width: 122px;
   min-width: 0;
-  gap: 3px;
-}
-
-.ai-image-preview strong {
-  overflow: hidden;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-image-preview button {
-  width: fit-content;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: #64748b;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.ai-tool-left,
-.ai-tool-right {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-.ai-icon-button,
-.ai-send-button {
-  display: inline-grid;
-  flex: 0 0 auto;
-  width: 30px;
   height: 30px;
-  place-items: center;
+  padding: 0 26px 0 10px;
   border: 0;
   border-radius: 999px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 12px;
+  outline: none;
+  appearance: auto;
   cursor: pointer;
 }
 
-.ai-icon-button {
-  background: transparent;
-  color: #475569;
-}
-
-.ai-icon-button:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.ai-send-button {
-  background: #e2e8f0;
-  color: #fff;
-}
-
-.ai-send-button:not(:disabled) {
-  background: #111827;
-}
-
-.ai-send-button:disabled {
-  cursor: wait;
-}
-
-.ai-model-select {
-  width: 118px;
-}
-
-.ai-model-select :deep(button) {
-  height: 30px;
-  border: 0;
-  background: transparent;
-  color: #0f172a;
-  font-size: 12px;
-  box-shadow: none;
+.ai-model-native:hover {
+  background: #eef2f7;
 }
 
 :deep(.gjs-one-bg) {
