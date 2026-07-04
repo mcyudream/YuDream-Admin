@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -50,7 +51,8 @@ public class AiCapabilityProvider implements CapabilityProvider {
                 "提供 OpenAI 兼容的文本生成与页面构建能力，启用后可被 CMS、文档和其他平台模块按需调用",
                 "i-ri:sparkling-2-line",
                 95,
-                defaultConfig
+                defaultConfig,
+                List.of("sse")
         );
     }
 

@@ -9,6 +9,7 @@ import online.yudream.base.infra.common.baseobj.BaseDO;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.List;
 import java.util.Map;
 
 @EqualsAndHashCode(callSuper = true)
@@ -27,4 +28,5 @@ public class CapabilityModuleDO extends BaseDO {
     private Integer sort;
     private Boolean enabled;
     private Map<String, String> config;
+    private List<String> dependencies;
 }

@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.capability.enumerate.CapabilityType;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @EqualsAndHashCode(callSuper = true)
@@ -27,6 +28,7 @@ public class CapabilityModule extends BaseDomain {
     private Integer sort;
     private Boolean enabled;
     private Map<String, String> config;
+    private List<String> dependencies;
 
     public static CapabilityModule fromDescriptor(CapabilityDescriptor descriptor) {
         return CapabilityModule.builder()
@@ -38,6 +40,7 @@ public class CapabilityModule extends BaseDomain {
                 .sort(descriptor.sort())
                 .enabled(false)
                 .config(new HashMap<>(descriptor.defaultConfig() == null ? Map.of() : descriptor.defaultConfig()))
+                .dependencies(descriptor.dependencies())
                 .build();
     }
 
@@ -47,6 +50,7 @@ public class CapabilityModule extends BaseDomain {
         this.description = descriptor.description();
         this.icon = descriptor.icon();
         this.sort = descriptor.sort();
+        this.dependencies = descriptor.dependencies();
         if (this.enabled == null) {
             this.enabled = false;
         }

@@ -46,6 +46,7 @@ public class CapabilityAppService {
         module.updateConfig(cmd.getConfig());
         CapabilityModule saved = capabilityModuleRepo.save(module);
         if (saved.enabled()) {
+            assertDependenciesEnabled(saved);
             provider(saved.getCode()).enable(saved.getConfig());
         } else {
             provider(saved.getCode()).disable();
@@ -56,6 +57,7 @@ public class CapabilityAppService {
     @Transactional
     public CapabilityDTO enable(String code) {
         CapabilityModule module = module(code);
+        assertDependenciesEnabled(module);
         module.enable();
         CapabilityModule saved = capabilityModuleRepo.save(module);
         provider(code).enable(saved.getConfig());
@@ -68,6 +70,7 @@ public class CapabilityAppService {
         module.disable();
         CapabilityModule saved = capabilityModuleRepo.save(module);
         provider(code).disable();
+        disableDependents(code);
         return CapabilityAssembler.toDTO(saved, healthOf(saved));
     }
 
@@ -112,6 +115,13 @@ public class CapabilityAppService {
         for (CapabilityModule module : capabilityModuleRepo.findAll()) {
             CapabilityProvider provider = providerMap.get(module.getCode());
             if (module.enabled() && provider != null) {
+                try {
+                    assertDependenciesEnabled(module);
+                } catch (BizException e) {
+                    module.disable();
+                    capabilityModuleRepo.save(module);
+                    continue;
+                }
                 provider.enable(module.getConfig());
             }
         }
@@ -135,6 +145,54 @@ public class CapabilityAppService {
             return CapabilityHealth.disabled("能力未启用");
         }
         return provider(module.getCode()).health();
+    }
+
+    private void assertDependenciesEnabled(CapabilityModule module) {
+        List<String> dependencies = module.getDependencies() == null ? List.of() : module.getDependencies();
+        if (dependencies.isEmpty()) {
+            return;
+        }
+        Map<String, CapabilityProvider> providerMap = providerMap();
+        Map<String, CapabilityModule> moduleMap = capabilityModuleRepo.findAll().stream()
+                .collect(Collectors.toMap(CapabilityModule::getCode, Function.identity(), (a, b) -> a));
+        for (String dependencyCode : dependencies) {
+            if (!providerMap.containsKey(dependencyCode)) {
+                throw new BizException("依赖能力 " + dependencyCode + " 未在当前项目配置中启用");
+            }
+            CapabilityModule dependency = moduleMap.get(dependencyCode);
+            if (dependency == null || !dependency.enabled()) {
+                String dependencyName = dependency == null ? dependencyCode : dependency.getName();
+                throw new BizException("请先启用依赖能力：" + dependencyName);
+            }
+        }
+    }
+
+    private void disableDependents(String dependencyCode) {
+        Map<String, CapabilityProvider> providerMap = providerMap();
+        List<String> disabledCodes = List.of(dependencyCode);
+        boolean changed;
+        do {
+            changed = false;
+            List<String> currentDisabledCodes = disabledCodes;
+            List<CapabilityModule> dependents = capabilityModuleRepo.findAll().stream()
+                    .filter(CapabilityModule::enabled)
+                    .filter(module -> module.getDependencies() != null && module.getDependencies().stream().anyMatch(currentDisabledCodes::contains))
+                    .toList();
+            for (CapabilityModule module : dependents) {
+                module.disable();
+                capabilityModuleRepo.save(module);
+                CapabilityProvider dependentProvider = providerMap.get(module.getCode());
+                if (dependentProvider != null) {
+                    dependentProvider.disable();
+                }
+                disabledCodes = append(disabledCodes, module.getCode());
+                changed = true;
+            }
+        } while (changed);
+    }
+
+    private List<String> append(List<String> values, String value) {
+        return java.util.stream.Stream.concat(values.stream(), java.util.stream.Stream.of(value)).toList();
     }
 
     private Map<String, CapabilityProvider> providerMap() {

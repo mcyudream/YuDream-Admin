@@ -44,6 +44,9 @@ const groups: CapabilityGroup[] = [
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
 const configFields = computed(() => fieldsOf(selected.value?.code))
 const usesStructuredConfig = computed(() => configFields.value.length > 0)
+const dependencyRows = computed(() => dependencyStatus(selected.value))
+const missingDependencies = computed(() => dependencyRows.value.filter(item => !item.enabled))
+const canEnableSelected = computed(() => !selected.value?.enabled && missingDependencies.value.length === 0)
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
@@ -76,6 +79,13 @@ async function load() {
 }
 
 async function toggleCapability(item: CapabilityItem) {
+  if (!item.enabled) {
+    const missing = dependencyStatus(item).filter(dependency => !dependency.enabled)
+    if (missing.length) {
+      toast.error('依赖能力未启用', { description: `请先启用：${missing.map(item => item.name).join('、')}` })
+      return
+    }
+  }
   actionLoading.value = `${item.code}:toggle`
   try {
     const res = item.enabled ? await apiCapability.disable(item.code) : await apiCapability.enable(item.code)
@@ -213,6 +223,18 @@ function metricEntries(item?: CapabilityItem) {
   return Object.entries(item?.metrics || {})
 }
 
+function dependencyStatus(item?: CapabilityItem) {
+  return (item?.dependencies || []).map((code) => {
+    const dependency = rows.value.find(row => row.code === code)
+    return {
+      code,
+      name: dependency?.name || code,
+      enabled: Boolean(dependency?.enabled),
+      available: Boolean(dependency),
+    }
+  })
+}
+
 function fieldsOf(code?: string): CapabilityConfigField[] {
   const map: Record<string, CapabilityConfigField[]> = {
     sse: [
@@ -341,6 +363,7 @@ function parseJsonConfig() {
               <FaButton
                 v-auth="selected.enabled ? 'platform:capability:disable' : 'platform:capability:enable'"
                 :variant="selected.enabled ? 'destructive' : 'default'"
+                :disabled="!selected.enabled && !canEnableSelected"
                 :loading="actionLoading === `${selected.code}:toggle`"
                 @click="toggleCapability(selected)"
               >
@@ -367,6 +390,29 @@ function parseJsonConfig() {
               <span>检查时间</span>
               <strong>{{ selected.checkedAt || '-' }}</strong>
             </div>
+          </div>
+
+          <div v-if="dependencyRows.length" class="dependency-panel">
+            <div class="section-title">
+              <span>依赖能力</span>
+              <FaTag :variant="missingDependencies.length ? 'destructive' : 'default'">
+                {{ missingDependencies.length ? '未满足' : '已满足' }}
+              </FaTag>
+            </div>
+            <div class="dependency-list">
+              <div v-for="dependency in dependencyRows" :key="dependency.code" class="dependency-item">
+                <div>
+                  <strong>{{ dependency.name }}</strong>
+                  <code>{{ dependency.code }}</code>
+                </div>
+                <FaTag :variant="dependency.enabled ? 'default' : 'secondary'">
+                  {{ dependency.enabled ? '已启用' : dependency.available ? '未启用' : '不可用' }}
+                </FaTag>
+              </div>
+            </div>
+            <p v-if="missingDependencies.length" class="dependency-tip">
+              当前能力需要先启用依赖能力：{{ missingDependencies.map(item => item.name).join('、') }}
+            </p>
           </div>
 
           <div class="health-panel">
@@ -601,6 +647,7 @@ function parseJsonConfig() {
   background: var(--color-bg-1);
 }
 
+.dependency-panel,
 .health-panel,
 .debug-panel {
   display: grid;
@@ -608,6 +655,40 @@ function parseJsonConfig() {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--color-border-2);
+}
+
+.dependency-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dependency-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.dependency-item div {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.dependency-item strong {
+  color: var(--color-text-1);
+}
+
+.dependency-tip {
+  margin: 0;
+  color: var(--color-danger-6);
+  font-size: 12px;
 }
 
 .debug-row {

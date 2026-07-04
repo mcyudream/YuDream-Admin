@@ -19,6 +19,7 @@ public class CapabilityModuleInfraMapper {
         dataObj.setSort(module.getSort());
         dataObj.setEnabled(module.getEnabled());
         dataObj.setConfig(module.getConfig());
+        dataObj.setDependencies(module.getDependencies());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -39,6 +40,7 @@ public class CapabilityModuleInfraMapper {
                 .sort(dataObj.getSort())
                 .enabled(dataObj.getEnabled())
                 .config(dataObj.getConfig())
+                .dependencies(dataObj.getDependencies())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())
