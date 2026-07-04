@@ -78,6 +78,9 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
         if (PUBLIC_KEY_PATH.equals(path)) {
             return false;
         }
+        if (path != null && path.startsWith("/api/public/cms")) {
+            return false;
+        }
         if (path != null && (path.startsWith("/api/system/excel") || path.startsWith("/api/system/files"))) {
             return false;
         }
