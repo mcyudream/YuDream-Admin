@@ -161,7 +161,6 @@ const footerCopyright = computed({
 })
 const rootNavigationItems = computed(() => [...navigationItems.value].filter(item => !item.parentId).sort((a, b) => a.sort - b.sort))
 const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
-const homePreviewHtml = computed(() => sanitizeHtml(stripLayoutBlocks(homeHtml.value || emptyHomeBuilderHtml())))
 const visibleCmsVariables = computed(() => showAllVariables.value ? cmsVariables : cmsVariables.slice(0, 8))
 const cmsVariables = [
   { key: '{{site.name}}', label: '站点名称' },
@@ -958,29 +957,6 @@ function sectionTitle(type: HomeSectionType) {
               </a-form-item>
             </a-form>
           </section>
-
-          <section>
-            <h3>公开预览</h3>
-            <div class="variable-list compact">
-              <button v-for="item in cmsVariables.slice(0, 5)" :key="item.key" type="button" @click="insertVariable(item.key)">
-                <strong>{{ item.key }}</strong>
-              </button>
-            </div>
-            <div class="home-public-preview">
-              <div v-if="homeHtml" v-html="homePreviewHtml" />
-              <template v-else>
-                <div class="home-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
-                  <h1>{{ home.title }}</h1>
-                  <p>{{ home.subtitle }}</p>
-                </div>
-                <div v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="home-preview-section">
-                  <span>{{ section.type }}</span>
-                  <strong>{{ section.title }}</strong>
-                  <p>{{ section.subtitle }}</p>
-                </div>
-              </template>
-            </div>
-          </section>
         </aside>
       </section>
 
@@ -1349,8 +1325,7 @@ function sectionTitle(type: HomeSectionType) {
 
 .builder-entry__preview,
 .builder-block,
-.publish-panel section,
-.home-preview-section {
+.publish-panel section {
   display: grid;
   gap: 10px;
   padding: 14px;
@@ -1710,8 +1685,7 @@ function sectionTitle(type: HomeSectionType) {
   background: var(--color-bg-2);
 }
 
-.home-preview,
-.home-public-preview {
+.home-preview {
   display: grid;
   gap: 10px;
 }
@@ -1728,40 +1702,6 @@ function sectionTitle(type: HomeSectionType) {
 .home-preview h3 {
   margin: 0;
   font-size: 15px;
-}
-
-.home-public-preview {
-  max-height: 680px;
-  overflow: auto;
-}
-
-.home-hero {
-  display: grid;
-  min-height: 260px;
-  align-items: end;
-  padding: 24px;
-  border-radius: 6px;
-  background: linear-gradient(135deg, #0f766e, #334155);
-  background-position: center;
-  background-size: cover;
-  color: #fff;
-}
-
-.home-hero h1 {
-  margin: 0 0 8px;
-  font-size: 34px;
-  font-weight: 900;
-}
-
-.home-hero p,
-.home-preview-section p {
-  margin: 0;
-}
-
-.home-preview-section span {
-  color: rgb(var(--primary-6));
-  font-size: 12px;
-  font-weight: 800;
 }
 
 .empty-state {
