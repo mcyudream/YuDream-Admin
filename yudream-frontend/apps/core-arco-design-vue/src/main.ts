@@ -3,6 +3,7 @@ import { downloadAndInstall } from '@/iconify'
 import icons from '@/iconify/index.json'
 // 自定义指令
 import directive from '@/utils/directive'
+import { pageBuilder } from '@myissue/vue-website-page-builder'
 
 import App from './App.vue'
 import router from './router'
@@ -14,9 +15,12 @@ import '@/utils/storage'
 import 'virtual:uno.css'
 // 全局样式
 import '@/assets/styles/globals.css'
+import '@myissue/vue-website-page-builder/style.css'
+import 'material-symbols/outlined.css'
 
 const app = createApp(App)
 app.use(pinia)
+app.use(pageBuilder)
 
 // 加载站点设置（站点名称等）
 const appSettingsStore = useAppSettingsStore(pinia)

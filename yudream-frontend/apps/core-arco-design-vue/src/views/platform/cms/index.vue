@@ -1,20 +1,12 @@
 <script setup lang="ts">
+import type { BuilderResourceData, PageBuilderConfig, PageSettings } from '@myissue/vue-website-page-builder'
 import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
+import { getPageBuilder, PageBuilder } from '@myissue/vue-website-page-builder'
 import apiCms from '@/api/modules/platform-cms'
 
 type WorkbenchTab = 'pages' | 'home'
 type EditorMode = 'builder' | 'markdown' | 'html'
-type BuilderBlockType = 'hero' | 'text' | 'image' | 'cta'
-
-interface BuilderBlock {
-  id: string
-  type: BuilderBlockType
-  title: string
-  text: string
-  imageUrl: string
-  buttonText: string
-  buttonUrl: string
-}
+type BuilderTarget = 'page' | 'home'
 
 const toast = useFaToast()
 const modal = useFaModal()
@@ -23,6 +15,8 @@ const activeTab = ref<WorkbenchTab>('pages')
 const editorMode = ref<EditorMode>('builder')
 const loading = ref(false)
 const saving = ref(false)
+const pageBuilderVisible = ref(false)
+const builderTarget = ref<BuilderTarget>('page')
 const pages = ref<CmsPage[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
@@ -41,8 +35,6 @@ const pageForm = reactive<CmsPagePayload>({
   template: 'DEFAULT',
   status: 'DRAFT',
 })
-
-const blocks = ref<BuilderBlock[]>([])
 
 const home = reactive<HomePageLayout>({
   title: 'YuDream',
@@ -64,22 +56,33 @@ const statusOptions: { label: string, value: PageStatus }[] = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' },
 ]
-const blockPresets: { type: BuilderBlockType, label: string, icon: string }[] = [
-  { type: 'hero', label: '首屏', icon: 'i-ri:layout-top-line' },
-  { type: 'text', label: '正文', icon: 'i-ri:text' },
-  { type: 'image', label: '图片', icon: 'i-ri:image-line' },
-  { type: 'cta', label: '行动按钮', icon: 'i-ri:cursor-line' },
-]
 const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] = [
   { type: 'HERO', label: '首屏', icon: 'i-ri:layout-top-line' },
-  { type: 'FEATURE', label: '特性', icon: 'i-ri:sparkling-line' },
+  { type: 'FEATURE', label: '特色', icon: 'i-ri:sparkling-line' },
   { type: 'CONTENT', label: '内容', icon: 'i-ri:article-line' },
   { type: 'CTA', label: '行动', icon: 'i-ri:cursor-line' },
 ]
 
 const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
-const pagePreviewHtml = computed(() => editorMode.value === 'markdown' ? markdownPreview(pageForm.markdownContent) : sanitizeHtml(pageForm.htmlContent || buildHtml(blocks.value)))
+const pagePreviewHtml = computed(() => {
+  if (editorMode.value === 'markdown') {
+    return markdownPreview(pageForm.markdownContent)
+  }
+  return sanitizeHtml(pageForm.htmlContent || emptyBuilderHtml())
+})
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
+const builderContentStatus = computed(() => pageForm.htmlContent?.includes('pagebuilder') ? '已有可视化内容' : '尚未生成可视化内容')
+const homeHtml = computed({
+  get: () => home.settings?.homeHtml || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeHtml: value,
+    }
+  },
+})
+const homeBuilderContentStatus = computed(() => homeHtml.value.includes('pagebuilder') ? '已有动态首页内容' : '尚未生成动态首页内容')
+const homePreviewHtml = computed(() => sanitizeHtml(homeHtml.value || emptyHomeBuilderHtml()))
 
 watch(activeTab, async () => {
   if (activeTab.value === 'pages') {
@@ -89,12 +92,6 @@ watch(activeTab, async () => {
     await loadHome()
   }
 })
-
-watch(blocks, () => {
-  if (editorMode.value === 'builder') {
-    pageForm.htmlContent = buildHtml(blocks.value)
-  }
-}, { deep: true })
 
 onMounted(async () => {
   await loadPages()
@@ -117,6 +114,14 @@ async function loadPages() {
       resetPageForm()
     }
   }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '页面列表加载失败')
+    pages.value = []
+    pagination.total = 0
+    if (!selectedPageId.value) {
+      resetPageForm()
+    }
+  }
   finally {
     loading.value = false
   }
@@ -135,6 +140,9 @@ async function loadHome() {
       sections: res.data.sections || [],
       published: Boolean(res.data.published),
     })
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '首页配置加载失败')
   }
   finally {
     loading.value = false
@@ -156,14 +164,12 @@ function selectPage(page: CmsPage) {
     template: page.template || 'DEFAULT',
     status: page.status || 'DRAFT',
   })
-  blocks.value = page.htmlContent ? [] : [defaultBlock('hero'), defaultBlock('text')]
   editorMode.value = page.htmlContent ? 'html' : 'builder'
 }
 
 function createPage() {
   selectedPageId.value = null
   resetPageForm()
-  blocks.value = [defaultBlock('hero'), defaultBlock('text'), defaultBlock('cta')]
   editorMode.value = 'builder'
 }
 
@@ -188,7 +194,7 @@ async function savePage() {
   saving.value = true
   try {
     if (editorMode.value === 'builder') {
-      pageForm.htmlContent = buildHtml(blocks.value)
+      syncBuilderDraft()
     }
     const payload = { ...pageForm }
     const res = selectedPageId.value
@@ -224,6 +230,9 @@ function confirmPublish() {
 async function saveHome() {
   saving.value = true
   try {
+    if (builderTarget.value === 'home') {
+      syncBuilderDraft('home')
+    }
     await apiCms.saveHome({
       ...home,
       sections: home.sections,
@@ -236,12 +245,118 @@ async function saveHome() {
   }
 }
 
-function addBlock(type: BuilderBlockType) {
-  blocks.value.push(defaultBlock(type))
+async function openPageBuilder(target: BuilderTarget = 'page') {
+  builderTarget.value = target
+  pageBuilderVisible.value = true
+  await nextTick()
+  try {
+    const service = getPageBuilder()
+    let components: BuilderResourceData | undefined
+    let pageSettings: PageSettings | undefined
+    const content = target === 'home' ? homeHtml.value : pageForm.htmlContent
+
+    if (content?.includes('pagebuilder')) {
+      const parsed = service.parsePageBuilderHTML(content)
+      components = parsed.components
+      pageSettings = parsed.pageSettings
+    }
+
+    const result = await service.startBuilder(
+      buildPageBuilderConfig(target, pageSettings),
+      components,
+    )
+    if ('error' in result && result.error) {
+      pageBuilderVisible.value = false
+      toast.error(result.reason || '页面构建器启动失败')
+    }
+  }
+  catch (error) {
+    pageBuilderVisible.value = false
+    toast.error(error instanceof Error ? error.message : '页面构建器启动失败')
+  }
 }
 
-function removeBlock(id: string) {
-  blocks.value = blocks.value.filter(item => item.id !== id)
+async function publishPageBuilder() {
+  const target = builderTarget.value
+  const html = syncBuilderDraft(target)
+  if (!html) {
+    toast.error('构建器没有可保存内容')
+    return
+  }
+  pageBuilderVisible.value = false
+  if (target === 'home') {
+    await saveHome()
+  }
+  else {
+    await savePage()
+  }
+}
+
+function closePageBuilder() {
+  syncBuilderDraft(builderTarget.value)
+  pageBuilderVisible.value = false
+}
+
+function syncBuilderDraft(target: BuilderTarget = 'page') {
+  const currentContent = target === 'home' ? homeHtml.value : pageForm.htmlContent
+  if (!pageBuilderVisible.value && !currentContent) {
+    return ''
+  }
+  try {
+    const html = getPageBuilder().getSavedPageHtml()
+    if (html) {
+      if (target === 'home') {
+        homeHtml.value = html
+      }
+      else {
+        pageForm.htmlContent = html
+      }
+      return html
+    }
+  }
+  catch {
+    // 未打开 builder 时无需同步本地草稿。
+  }
+  return currentContent || ''
+}
+
+function buildPageBuilderConfig(target: BuilderTarget, pageSettings?: PageSettings): PageBuilderConfig {
+  const isHome = target === 'home'
+  return {
+    updateOrCreate: {
+      formType: (isHome ? homeHtml.value : pageForm.htmlContent) ? 'update' : 'create',
+      formName: 'page',
+    },
+    resourceData: {
+      id: isHome ? 'site-home' : selectedPageId.value || pageForm.slug || 'new-page',
+      title: isHome ? home.title || '站点首页' : pageForm.title || '新页面',
+    },
+    userForPageBuilder: {
+      id: 'yudream-admin',
+      name: 'YuDream Admin',
+    },
+    userSettings: {
+      language: {
+        default: 'zh-Hans',
+        enable: ['zh-Hans', 'en'],
+      },
+      autoSave: true,
+      notifications: true,
+      fontFamily: 'jost, arial, helvetica',
+    },
+    settings: {
+      brandColor: '#0f766e',
+      themeColorPresets: {
+        enabled: true,
+        colors: [
+          { id: 'primary', label: '品牌主色', color: '#0f766e', enabled: true },
+          { id: 'secondary', label: '辅助色', color: '#2563eb', enabled: true },
+          { id: 'custom1', label: '强调色', color: '#f97316', enabled: true },
+        ],
+      },
+    },
+    pageSettings,
+  }
 }
 
 function addHomeSection(type: HomeSectionType) {
@@ -263,50 +378,12 @@ function removeHomeSection(section: HomeSection) {
   home.sections = home.sections.filter(item => item !== section)
 }
 
-function defaultBlock(type: BuilderBlockType): BuilderBlock {
-  const titleMap: Record<BuilderBlockType, string> = {
-    hero: '用一个清晰的标题介绍页面',
-    text: '内容区块标题',
-    image: '图片展示',
-    cta: '行动引导',
-  }
-  const textMap: Record<BuilderBlockType, string> = {
-    hero: '这里适合放置页面价值主张、产品介绍或活动说明。',
-    text: '像编辑文章一样组织内容，也可以随时切换到 HTML 模式做更细的布局。',
-    image: '为页面加入产品、场景或证书图片，让公开页面更具体。',
-    cta: '给访问者一个明确的下一步。',
-  }
-  return {
-    id: `${type}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    type,
-    title: titleMap[type],
-    text: textMap[type],
-    imageUrl: '',
-    buttonText: type === 'cta' ? '立即了解' : '',
-    buttonUrl: '',
-  }
+function emptyBuilderHtml() {
+  return '<div id="pagebuilder"><section class="yb-empty"><h1>打开可视化构建器开始设计页面</h1><p>发布后会把完整页面 HTML 保存到 CMS。</p></section></div>'
 }
 
-function buildHtml(items: BuilderBlock[]) {
-  return `<div id="pagebuilder">${items.map(blockHtml).join('')}</div>`
-}
-
-function blockHtml(block: BuilderBlock) {
-  const title = escapeHtml(block.title)
-  const text = escapeHtml(block.text)
-  const image = escapeAttr(block.imageUrl)
-  const buttonText = escapeHtml(block.buttonText)
-  const buttonUrl = escapeAttr(block.buttonUrl)
-  if (block.type === 'hero') {
-    return `<section class="yb-hero"${image ? ` style="background-image:linear-gradient(90deg,rgba(15,23,42,.76),rgba(15,23,42,.18)),url('${image}')"` : ''}><h1>${title}</h1><p>${text}</p>${buttonUrl ? `<a href="${buttonUrl}">${buttonText || '了解更多'}</a>` : ''}</section>`
-  }
-  if (block.type === 'image') {
-    return `<figure class="yb-image">${image ? `<img src="${image}" alt="${title}">` : ''}<figcaption><strong>${title}</strong><span>${text}</span></figcaption></figure>`
-  }
-  if (block.type === 'cta') {
-    return `<section class="yb-cta"><h2>${title}</h2><p>${text}</p>${buttonUrl ? `<a href="${buttonUrl}">${buttonText || '立即开始'}</a>` : ''}</section>`
-  }
-  return `<section class="yb-text"><h2>${title}</h2><p>${text}</p></section>`
+function emptyHomeBuilderHtml() {
+  return '<div id="pagebuilder"><section class="yb-empty"><h1>打开可视化构建器设计首页</h1><p>首页可以自由编排首屏、图文、CTA、表单和任意营销内容。</p></section></div>'
 }
 
 function markdownPreview(markdown?: string) {
@@ -344,10 +421,6 @@ function escapeHtml(value?: string) {
     .replace(/'/g, '&#39;')
 }
 
-function escapeAttr(value?: string) {
-  return escapeHtml(value).replace(/`/g, '&#96;')
-}
-
 function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 16) : '未发布'
 }
@@ -355,7 +428,7 @@ function dateText(value?: string) {
 function sectionTitle(type: HomeSectionType) {
   return {
     HERO: '首页首屏',
-    FEATURE: '核心特性',
+    FEATURE: '核心特色',
     CONTENT: '内容区块',
     CTA: '行动引导',
   }[type]
@@ -419,34 +492,29 @@ function sectionTitle(type: HomeSectionType) {
           <div class="editor-top">
             <FaInput v-model="pageForm.title" class="title-input" />
             <div class="editor-mode">
-              <button type="button" :class="{ active: editorMode === 'builder' }" @click="editorMode = 'builder'">区块</button>
+              <button type="button" :class="{ active: editorMode === 'builder' }" @click="editorMode = 'builder'">可视化</button>
               <button type="button" :class="{ active: editorMode === 'markdown' }" @click="editorMode = 'markdown'">Markdown</button>
               <button type="button" :class="{ active: editorMode === 'html' }" @click="editorMode = 'html'">HTML</button>
             </div>
           </div>
 
-          <section v-if="editorMode === 'builder'" class="block-editor">
-            <div class="block-toolbar">
-              <FaButton v-for="preset in blockPresets" :key="preset.type" size="sm" variant="outline" @click="addBlock(preset.type)">
-                <FaIcon :name="preset.icon" />
-                {{ preset.label }}
+          <section v-if="editorMode === 'builder'" class="builder-entry">
+            <div>
+              <span class="builder-entry__status">{{ builderContentStatus }}</span>
+              <h2>可视化页面构建器</h2>
+              <p>使用 @myissue/vue-website-page-builder 设计页面，发布时会保存完整 HTML 到 CMS 页面内容。</p>
+            </div>
+            <div class="builder-entry__actions">
+              <FaButton v-auth="'platform:cms:edit'" @click="openPageBuilder">
+                <FaIcon name="i-ri:drag-drop-line" />
+                打开构建器
+              </FaButton>
+              <FaButton variant="outline" @click="editorMode = 'html'">
+                <FaIcon name="i-ri:code-s-slash-line" />
+                查看 HTML
               </FaButton>
             </div>
-            <article v-for="block in blocks" :key="block.id" class="builder-block">
-              <div class="builder-block__head">
-                <FaTag variant="secondary">{{ block.type }}</FaTag>
-                <FaButton size="sm" variant="ghost" @click="removeBlock(block.id)">
-                  <FaIcon name="i-ri:delete-bin-line" />
-                </FaButton>
-              </div>
-              <FaInput v-model="block.title" placeholder="区块标题" />
-              <FaTextarea v-model="block.text" rows="4" placeholder="区块内容" />
-              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                <FaInput v-model="block.imageUrl" placeholder="图片地址" />
-                <FaInput v-model="block.buttonUrl" placeholder="按钮链接" />
-                <FaInput v-model="block.buttonText" placeholder="按钮文案" />
-              </div>
-            </article>
+            <div class="builder-entry__preview" v-html="pagePreviewHtml" />
           </section>
 
           <FaTextarea v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" rows="22" input-class="font-mono" />
@@ -505,66 +573,111 @@ function sectionTitle(type: HomeSectionType) {
 
       <section v-else v-loading="loading" class="home-layout">
         <main class="home-form">
-          <a-form :model="home" layout="vertical">
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <section class="builder-entry home-builder-entry">
+            <div>
+              <span class="builder-entry__status">{{ homeBuilderContentStatus }}</span>
+              <h2>动态首页构建器</h2>
+              <p>首页不再受固定区块限制，可通过可视化构建器自由组合首屏、内容、图文、行动按钮和自定义模块。</p>
+            </div>
+            <div class="builder-entry__actions">
+              <FaButton v-auth="'platform:cms:edit'" @click="openPageBuilder('home')">
+                <FaIcon name="i-ri:layout-grid-line" />
+                打开首页构建器
+              </FaButton>
+              <FaButton variant="outline" @click="homeHtml = ''">
+                <FaIcon name="i-ri:eraser-line" />
+                清空动态内容
+              </FaButton>
+            </div>
+            <div class="builder-entry__preview" v-html="homePreviewHtml" />
+          </section>
+
+          <section class="legacy-sections">
+            <div class="legacy-sections__head">
+              <div>
+                <h3>兼容区块</h3>
+                <p>没有动态首页内容时，公开站点会回退渲染这些旧区块。</p>
+              </div>
+              <div class="block-toolbar">
+                <FaButton v-for="preset in sectionPresets" :key="preset.type" size="sm" variant="outline" @click="addHomeSection(preset.type)">
+                  <FaIcon :name="preset.icon" />
+                  {{ preset.label }}
+                </FaButton>
+              </div>
+            </div>
+            <article v-for="section in home.sections" :key="section.id || section.title" class="builder-block">
+              <div class="builder-block__head">
+                <FaTag variant="secondary">{{ section.type }}</FaTag>
+                <FaButton size="sm" variant="ghost" @click="removeHomeSection(section)">
+                  <FaIcon name="i-ri:delete-bin-line" />
+                </FaButton>
+              </div>
+              <FaInput v-model="section.title" placeholder="区块标题" />
+              <FaTextarea v-model="section.subtitle" rows="3" placeholder="区块说明" />
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <FaInput v-model="section.mediaUrl" placeholder="图片地址" />
+                <FaInput v-model="section.actionUrl" placeholder="按钮链接" />
+                <FaInput v-model="section.actionText" placeholder="按钮文案" />
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <FaSwitch v-model="section.visible" />
+                  显示区块
+                </label>
+              </div>
+            </article>
+          </section>
+        </main>
+
+        <aside class="home-preview">
+          <section>
+            <h3>首页基础信息</h3>
+            <a-form :model="home" layout="vertical">
               <a-form-item label="首页标题">
                 <FaInput v-model="home.title" />
               </a-form-item>
               <a-form-item label="主题">
                 <FaInput v-model="home.theme" />
               </a-form-item>
-              <a-form-item label="副标题" class="md:col-span-2">
+              <a-form-item label="副标题">
                 <FaInput v-model="home.subtitle" />
               </a-form-item>
-              <a-form-item label="首屏图片" class="md:col-span-2">
+              <a-form-item label="首屏图片">
                 <FaInput v-model="home.heroImageUrl" />
               </a-form-item>
               <a-form-item label="发布首页">
                 <FaSwitch v-model="home.published" />
               </a-form-item>
-            </div>
-          </a-form>
+            </a-form>
+          </section>
 
-          <div class="block-toolbar">
-            <FaButton v-for="preset in sectionPresets" :key="preset.type" size="sm" variant="outline" @click="addHomeSection(preset.type)">
-              <FaIcon :name="preset.icon" />
-              {{ preset.label }}
-            </FaButton>
-          </div>
-          <article v-for="section in home.sections" :key="section.id || section.title" class="builder-block">
-            <div class="builder-block__head">
-              <FaTag variant="secondary">{{ section.type }}</FaTag>
-              <FaButton size="sm" variant="ghost" @click="removeHomeSection(section)">
-                <FaIcon name="i-ri:delete-bin-line" />
-              </FaButton>
+          <section>
+            <h3>公开预览</h3>
+            <div class="home-public-preview">
+              <div v-if="homeHtml" v-html="homePreviewHtml" />
+              <template v-else>
+                <div class="home-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
+                  <h1>{{ home.title }}</h1>
+                  <p>{{ home.subtitle }}</p>
+                </div>
+                <div v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="home-preview-section">
+                  <span>{{ section.type }}</span>
+                  <strong>{{ section.title }}</strong>
+                  <p>{{ section.subtitle }}</p>
+                </div>
+              </template>
             </div>
-            <FaInput v-model="section.title" placeholder="区块标题" />
-            <FaTextarea v-model="section.subtitle" rows="3" placeholder="区块说明" />
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FaInput v-model="section.mediaUrl" placeholder="图片地址" />
-              <FaInput v-model="section.actionUrl" placeholder="按钮链接" />
-              <FaInput v-model="section.actionText" placeholder="按钮文案" />
-              <label class="inline-flex items-center gap-2 text-sm">
-                <FaSwitch v-model="section.visible" />
-                显示区块
-              </label>
-            </div>
-          </article>
-        </main>
-
-        <aside class="home-preview">
-          <div class="home-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
-            <h1>{{ home.title }}</h1>
-            <p>{{ home.subtitle }}</p>
-          </div>
-          <div v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="home-preview-section">
-            <span>{{ section.type }}</span>
-            <strong>{{ section.title }}</strong>
-            <p>{{ section.subtitle }}</p>
-          </div>
+          </section>
         </aside>
       </section>
     </FaPageMain>
+
+    <div v-if="pageBuilderVisible" class="page-builder-shell">
+      <PageBuilder
+        :show-close-button="true"
+        :show-publish-button="true"
+        @handle-close-page-builder="closePageBuilder"
+        @handle-publish-page-builder="publishPageBuilder"
+      />
+    </div>
   </div>
 </template>
 
@@ -575,7 +688,8 @@ function sectionTitle(type: HomeSectionType) {
 .editor-mode,
 .block-toolbar,
 .publish-actions,
-.builder-block__head {
+.builder-block__head,
+.builder-entry__actions {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -669,16 +783,47 @@ function sectionTitle(type: HomeSectionType) {
   flex-shrink: 0;
 }
 
-.block-editor,
-.home-form {
+.builder-entry,
+.home-form,
+.legacy-sections {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
+.builder-entry {
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.builder-entry h2,
+.builder-entry p {
+  margin: 0;
+}
+
+.builder-entry h2 {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.builder-entry p {
+  color: var(--color-text-2);
+}
+
+.builder-entry__status {
+  color: rgb(var(--primary-6));
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.builder-entry__actions,
 .block-toolbar {
   flex-wrap: wrap;
 }
 
+.builder-entry__preview,
 .builder-block,
 .publish-panel section,
 .mini-preview,
@@ -689,6 +834,40 @@ function sectionTitle(type: HomeSectionType) {
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-2);
+}
+
+.builder-entry__preview {
+  max-height: 560px;
+  overflow: auto;
+}
+
+.home-builder-entry .builder-entry__preview {
+  min-height: 360px;
+}
+
+.legacy-sections {
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.legacy-sections__head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.legacy-sections__head h3,
+.legacy-sections__head p {
+  margin: 0;
+}
+
+.legacy-sections__head p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+  font-size: 13px;
 }
 
 .builder-block__head {
@@ -721,27 +900,23 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .mini-preview :deep(#pagebuilder),
-.mini-preview :deep(.pagebuilder) {
+.mini-preview :deep(.pagebuilder),
+.builder-entry__preview :deep(#pagebuilder),
+.builder-entry__preview :deep(.pagebuilder) {
   display: grid;
   gap: 12px;
 }
 
-.mini-preview :deep(.yb-hero),
-.mini-preview :deep(.yb-cta) {
-  padding: 18px;
+.mini-preview :deep(.yb-empty),
+.builder-entry__preview :deep(.yb-empty) {
+  padding: 28px;
   border-radius: 6px;
   background: #0f766e;
   color: #fff;
 }
 
-.mini-preview :deep(.yb-text),
-.mini-preview :deep(.yb-image) {
-  padding: 14px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-}
-
-.mini-preview :deep(img) {
+.mini-preview :deep(img),
+.builder-entry__preview :deep(img) {
   max-width: 100%;
   border-radius: 6px;
 }
@@ -753,9 +928,29 @@ function sectionTitle(type: HomeSectionType) {
   align-items: start;
 }
 
-.home-preview {
+.home-preview,
+.home-public-preview {
   display: grid;
   gap: 10px;
+}
+
+.home-preview section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.home-preview h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.home-public-preview {
+  max-height: 680px;
+  overflow: auto;
 }
 
 .home-hero {
@@ -791,6 +986,75 @@ function sectionTitle(type: HomeSectionType) {
   padding: 24px;
   color: var(--color-text-3);
   text-align: center;
+}
+
+.page-builder-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  overflow: hidden;
+  background: var(--color-bg-1);
+}
+
+.page-builder-shell :deep(.page-builder),
+.page-builder-shell :deep(#page-builder) {
+  height: 100%;
+}
+
+.page-builder-shell :deep(.material-symbols-outlined) {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  direction: ltr;
+  font-family: "Material Symbols Outlined";
+  font-size: 20px;
+  font-style: normal;
+  font-weight: normal;
+  letter-spacing: normal;
+  line-height: 1;
+  text-transform: none;
+  white-space: nowrap;
+  word-wrap: normal;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "liga";
+}
+
+.page-builder-shell :deep(button) {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.page-builder-shell :deep(.pbx-h-10.pbx-w-10),
+.page-builder-shell :deep(.pbx-h-12.pbx-w-12),
+.page-builder-shell :deep(button:has(.material-symbols-outlined)) {
+  flex: 0 0 auto;
+}
+
+.page-builder-shell :deep(.pbx-sticky),
+.page-builder-shell :deep(.pbx-fixed) {
+  min-width: 0;
+}
+
+.page-builder-shell :deep(.pbx-animate-spin) {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #dbe4ef;
+  border-top-color: #111827;
+  border-radius: 999px;
+  color: transparent;
+  font-size: 0;
+  animation: pbx-host-spin 0.8s linear infinite;
+}
+
+@keyframes pbx-host-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 1180px) {

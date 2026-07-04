@@ -16,6 +16,7 @@ const slug = computed(() => {
   }
   return value ? String(value) : ''
 })
+const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 
 watch(() => route.fullPath, load, { immediate: true })
 
@@ -125,13 +126,14 @@ function escapeHtml(value: string) {
     </div>
 
     <template v-else-if="home">
-      <section class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
+      <div v-if="homeHtml" class="site-builder-home" v-html="sanitizeHtml(homeHtml)" />
+      <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
         <div class="site-shell">
           <h1>{{ home.title }}</h1>
           <p>{{ home.subtitle }}</p>
         </div>
       </section>
-      <section class="site-shell site-sections">
+      <section v-if="!homeHtml" class="site-shell site-sections">
         <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
           <div>
             <span>{{ section.type }}</span>
@@ -173,6 +175,15 @@ function escapeHtml(value: string) {
   min-height: 100vh;
   place-items: center;
   color: #64748b;
+}
+
+.site-builder-home :deep(#pagebuilder),
+.site-builder-home :deep(.pagebuilder) {
+  min-height: 100vh;
+}
+
+.site-builder-home :deep(img) {
+  max-width: 100%;
 }
 
 .site-hero,
