@@ -9,6 +9,7 @@ public record AiGenerationResult(
         String cssContent,
         String builderProjectJson,
         String markdownContent,
-        List<AiAgentToolCall> toolCalls
+        List<AiAgentToolCall> toolCalls,
+        List<AiAgentToolResult> toolResults
 ) {
 }
