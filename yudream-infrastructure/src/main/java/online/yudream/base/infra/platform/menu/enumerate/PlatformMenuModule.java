@@ -127,5 +127,9 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:cms:publish", name = "发布内容页面", type = MenuNodeType.BUTTON,
             parentName = "CMS", permission = "platform:cms:publish")
-    CMS_PUBLISH
+    CMS_PUBLISH,
+
+    @MenuNode(code = "platform:cms:delete", name = "删除内容页面", type = MenuNodeType.BUTTON,
+            parentName = "CMS", permission = "platform:cms:delete")
+    CMS_DELETE
 }

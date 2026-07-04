@@ -12,6 +12,7 @@ import online.yudream.base.interfaces.platform.cms.request.CmsPageSaveRequest;
 import online.yudream.base.interfaces.platform.cms.request.HomePageLayoutSaveRequest;
 import online.yudream.base.interfaces.platform.cms.res.CmsPageRes;
 import online.yudream.base.interfaces.platform.cms.res.HomePageLayoutRes;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -56,6 +57,13 @@ public class CmsController {
     @PermissionRegister(code = "platform:cms:publish", name = "取消发布内容页面", module = "平台能力", desc = "取消发布内容页面")
     public Result<Void> unpublish(@PathVariable Long id) {
         cmsAppService.unpublish(id);
+        return Result.ok();
+    }
+
+    @DeleteMapping("/pages/{id}")
+    @PermissionRegister(code = "platform:cms:delete", name = "删除内容页面", module = "平台能力", desc = "删除内容定制页面")
+    public Result<Void> deletePage(@PathVariable Long id) {
+        cmsAppService.deletePage(id);
         return Result.ok();
     }
 

@@ -64,6 +64,13 @@ public class CmsAppService {
         cmsPageRepo.save(page);
     }
 
+    @Transactional
+    public void deletePage(Long id) {
+        ensureEnabled();
+        page(id);
+        cmsPageRepo.deleteById(id);
+    }
+
     @Transactional(readOnly = true)
     public HomePageLayoutDTO homeLayout() {
         ensureEnabled();
