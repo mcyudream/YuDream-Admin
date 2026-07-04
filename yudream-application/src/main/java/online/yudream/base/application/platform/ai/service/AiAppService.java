@@ -61,13 +61,26 @@ public class AiAppService {
                 页面类型：%s
                 风格偏好：%s
                 样图参考：%s
-                生成需求：%s
+                当前 HTML：
+                %s
+
+                当前 CSS：
+                %s
+
+                当前 GrapesJS Project JSON：
+                %s
+
+                修改需求：
+                %s
                 """.formatted(
                 defaultText(cmd.getSiteName(), "YuDream"),
                 defaultText(cmd.getTitle(), "未命名页面"),
                 defaultText(cmd.getPageType(), "通用内容页"),
                 defaultText(cmd.getStyle(), "清爽、专业、可读性高"),
                 StringUtils.hasText(cmd.getImageDataUrl()) ? "已提供，请参考样图的布局、视觉层次、色彩和组件组织方式" : "未提供",
+                defaultText(cmd.getCurrentHtml(), "无"),
+                defaultText(cmd.getCurrentCss(), "无"),
+                defaultText(cmd.getCurrentProjectJson(), "无"),
                 defaultText(cmd.getPrompt(), "请根据样图生成完整页面")
         );
     }

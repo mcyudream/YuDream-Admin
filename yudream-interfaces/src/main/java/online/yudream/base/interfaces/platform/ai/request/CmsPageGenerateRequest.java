@@ -11,4 +11,7 @@ public class CmsPageGenerateRequest {
     private String siteName;
     private String model;
     private String imageDataUrl;
+    private String currentHtml;
+    private String currentCss;
+    private String currentProjectJson;
 }

@@ -19,6 +19,9 @@ public class AiWebAssembler {
         cmd.setSiteName(request.getSiteName());
         cmd.setModel(request.getModel());
         cmd.setImageDataUrl(request.getImageDataUrl());
+        cmd.setCurrentHtml(request.getCurrentHtml());
+        cmd.setCurrentCss(request.getCurrentCss());
+        cmd.setCurrentProjectJson(request.getCurrentProjectJson());
         return cmd;
     }
 
