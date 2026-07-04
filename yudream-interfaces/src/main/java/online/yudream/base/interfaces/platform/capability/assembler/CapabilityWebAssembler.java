@@ -40,6 +40,7 @@ public class CapabilityWebAssembler {
                 .icon(dto.getIcon())
                 .sort(dto.getSort())
                 .enabled(dto.getEnabled())
+                .dependencies(dto.getDependencies())
                 .config(dto.getConfig())
                 .status(dto.getStatus())
                 .healthMessage(dto.getHealthMessage())

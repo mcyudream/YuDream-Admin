@@ -6,6 +6,7 @@ import online.yudream.base.domain.platform.capability.enumerate.CapabilityStatus
 import online.yudream.base.domain.platform.capability.enumerate.CapabilityType;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -18,6 +19,7 @@ public class CapabilityDTO {
     private String icon;
     private Integer sort;
     private Boolean enabled;
+    private List<String> dependencies;
     private Map<String, String> config;
     private CapabilityStatus status;
     private String healthMessage;

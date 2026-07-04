@@ -17,6 +17,7 @@ public class CapabilityAssembler {
                 .icon(module.getIcon())
                 .sort(module.getSort())
                 .enabled(module.getEnabled())
+                .dependencies(module.getDependencies())
                 .config(module.getConfig())
                 .status(health.status())
                 .healthMessage(health.message())

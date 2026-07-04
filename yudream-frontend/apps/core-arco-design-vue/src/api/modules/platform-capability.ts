@@ -12,6 +12,7 @@ export interface CapabilityItem {
   icon?: string
   sort?: number
   enabled: boolean
+  dependencies?: string[]
   config: Record<string, string>
   status: CapabilityStatus
   healthMessage?: string
