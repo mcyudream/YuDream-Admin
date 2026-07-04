@@ -3,7 +3,7 @@ import type grapesjs from 'grapesjs'
 import type { Editor } from 'grapesjs'
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { FileObject } from '@/api/modules/files'
-import type { AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import type { AiStreamEnvelope, AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import { Chatbot } from '@tdesign-vue-next/chat'
 import { Select as TSelect, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
@@ -127,6 +127,33 @@ const aiMessageProps = {
   name: (item: { role?: string }) => item.role === 'user' ? '你' : 'YuDream AI',
 }
 
+function normalizeAiStreamChunk(chunk: SSEChunkData): AiStreamEnvelope<Record<string, any>> {
+  const data = (chunk.data || {}) as AiStreamEnvelope<Record<string, any>> & Record<string, any>
+  if (String(data.event || '').startsWith('ai.')) {
+    return {
+      event: data.event,
+      action: data.action,
+      module: data.module,
+      traceId: data.traceId,
+      timestamp: data.timestamp,
+      payload: data.payload || {},
+    }
+  }
+  if (chunk.event === 'delta') {
+    return { event: 'ai.message', action: 'delta', payload: { content: data.content } }
+  }
+  if (chunk.event === 'tool') {
+    return { event: 'ai.tool', action: data.tool?.action || 'tool', payload: { tool: data.tool } }
+  }
+  if (chunk.event === 'result') {
+    return { event: 'ai.result', action: 'complete', payload: { result: data.result } }
+  }
+  if (chunk.event === 'error') {
+    return { event: 'ai.error', action: 'failed', payload: { message: data.message || data.content } }
+  }
+  return { event: chunk.event || 'ai.message', action: data.action, payload: data.payload || data }
+}
+
 const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
   endpoint: apiAi.generateCmsPageStreamEndpoint(),
   stream: true,
@@ -141,22 +168,33 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
     }
     return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, params.attachments || aiAttachments.value))
   },
-  isValidChunk: (chunk: SSEChunkData) => ['delta', 'tool', 'result', 'error'].includes(chunk.event || ''),
+  isValidChunk: (chunk: SSEChunkData) => [
+    'ai.message',
+    'ai.tool',
+    'ai.result',
+    'ai.error',
+    'delta',
+    'tool',
+    'result',
+    'error',
+  ].includes(chunk.event || ''),
   onMessage: (chunk: SSEChunkData) => {
-    if (chunk.event === 'delta') {
-      return markdownChunk(String(chunk.data?.content || ''))
+    const envelope = normalizeAiStreamChunk(chunk)
+    if (envelope.event === 'ai.message') {
+      return markdownChunk(String(envelope.payload?.content || ''))
     }
-    if (chunk.event === 'tool') {
-      applyAiTool(chunk.data?.tool)
+    if (envelope.event === 'ai.tool') {
+      applyAiTool(envelope.payload?.tool)
       return null
     }
-    if (chunk.event === 'result') {
-      pendingAiResult = chunk.data?.result || null
+    if (envelope.event === 'ai.result') {
+      const result = envelope.payload?.result || null
+      pendingAiResult = result?.tools?.length ? null : result
       return markdownChunk('\n\n画布操作已完成。')
     }
-    if (chunk.event === 'error') {
+    if (envelope.event === 'ai.error') {
       return {
-        ...markdownChunk(`\n\n生成失败：${chunk.data?.content || '未知错误'}`),
+        ...markdownChunk(`\n\n生成失败：${envelope.payload?.message || envelope.payload?.content || '未知错误'}`),
         status: 'error',
       } as AIMessageContent
     }
