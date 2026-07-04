@@ -66,6 +66,7 @@ public class ApiSecurityAppService {
 
     @Transactional(readOnly = true)
     public PageResult<ApiKeyCredentialDTO> pageApiKeys(ApiKeyPageQuery query) {
+        ensureApiKeyEnabled();
         int page = query == null ? 1 : query.getPage();
         int size = query == null ? 10 : query.getSize();
         String keyword = query == null ? null : query.getKeyword();
@@ -78,6 +79,7 @@ public class ApiSecurityAppService {
 
     @Transactional
     public ApiKeyCreateResultDTO createApiKey(ApiKeyCreateCmd cmd) {
+        ensureApiKeyEnabled();
         PermissionScope scope = new PermissionScope(cmd.getPermissions());
         apiKeyPermissionPolicy.validateCreatorScope(scope, cmd.getCreatorPermissions(), cmd.isSuperAdmin());
         String plaintext = generatePlaintext();
@@ -98,6 +100,7 @@ public class ApiSecurityAppService {
 
     @Transactional
     public ApiKeyCredentialDTO revokeApiKey(ApiKeyRevokeCmd cmd) {
+        ensureApiKeyEnabled();
         ApiKeyCredential credential = apiKeyCredentialRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("API Key 不存在"));
         if (!cmd.isSuperAdmin() && !Objects.equals(credential.getCreatorUserId(), cmd.getOperatorUserId())) {
@@ -121,6 +124,12 @@ public class ApiSecurityAppService {
     private String prefixOf(String plaintext) {
         int length = Math.min(12, plaintext.length());
         return plaintext.substring(0, length);
+    }
+
+    private void ensureApiKeyEnabled() {
+        if (!currentPolicy().isApiKeyEnabled()) {
+            throw new BizException("API Key 未启用");
+        }
     }
 
 }
