@@ -31,7 +31,7 @@ public class AiWebAssembler {
         cmd.setCurrentHtml(request.getCurrentHtml());
         cmd.setCurrentCss(request.getCurrentCss());
         cmd.setCurrentProjectJson(request.getCurrentProjectJson());
-        cmd.setThinkingEnabled(request.isThinkingEnabled());
+        cmd.setThinkingEnabled(true);
         return cmd;
     }
 

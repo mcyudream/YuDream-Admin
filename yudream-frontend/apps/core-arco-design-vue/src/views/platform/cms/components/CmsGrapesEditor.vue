@@ -4,10 +4,12 @@ import type { Editor } from 'grapesjs'
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { FileObject } from '@/api/modules/files'
 import type { AiStreamEnvelope, AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import type { CmsAiChatAttachmentMeta, CmsAiChatSession, CmsAiChatSessionSummary } from '@/utils/cms-ai-chat-history'
 import { Chatbot } from '@tdesign-vue-next/chat'
-import { Select as TSelect, Switch as TSwitch, Tooltip as TTooltip } from 'tdesign-vue-next'
+import { Select as TSelect, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
+import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import '@tdesign-vue-next/chat/es/style/index.css'
 import 'grapesjs/dist/css/grapes.min.css'
@@ -27,6 +29,9 @@ const props = defineProps<{
   title?: string
   aiEnabled?: boolean
   aiModelOptions?: { label: string, value: string }[]
+  historyTargetType?: 'page' | 'home'
+  historyTargetId?: string | number | null
+  historyTargetLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -41,12 +46,21 @@ const layersEl = ref<HTMLElement>()
 const traitsEl = ref<HTMLElement>()
 const stylesEl = ref<HTMLElement>()
 const mediaInput = ref<HTMLInputElement>()
-const chatbotRef = ref<{ addPrompt?: (prompt: string, autoFocus?: boolean) => void }>()
+const chatbotRef = ref<{
+  addPrompt?: (prompt: string, autoFocus?: boolean) => void
+  setMessages?: (messages: ChatMessagesData[], mode?: 'replace' | 'prepend' | 'append') => void
+  clearMessages?: () => void
+}>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 const aiModel = ref('')
-const aiThinkingEnabled = ref(false)
 const aiAttachments = ref<any[]>([])
+const chatHistorySummaries = ref<CmsAiChatSessionSummary[]>([])
+const selectedChatHistory = ref<CmsAiChatSession | null>(null)
+const chatHistoryLoading = ref(false)
+const chatHistoryHasMore = ref(false)
+const chatHistoryOffset = ref(0)
+const chatHistoryLoadedOnce = ref(false)
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
 const canvasRevision = ref(0)
 const aiSuggestions = [
@@ -67,6 +81,7 @@ const thinkingActions = new Set([
 ])
 let editor: Editor | null = null
 let pendingAiResult: CmsPageGenerateResult | null = null
+let currentAiSession: CmsAiChatSession | null = null
 
 const rightPanelTabs = computed(() => {
   const tabs: { label: string, value: RightPanelTab, icon: string }[] = [
@@ -94,6 +109,11 @@ const canvasStats = computed(() => {
     { label: '项目源', value: `${JSON.stringify(editor.getProjectData()).length} 字符` },
   ]
 })
+
+const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
+const chatHistoryTargetId = computed(() => String(props.historyTargetId || props.title || 'draft'))
+const chatHistoryTargetKey = computed(() => cmsAiChatTargetKey(chatHistoryTargetType.value, chatHistoryTargetId.value))
+const chatHistoryTargetLabel = computed(() => props.historyTargetLabel || props.title || (chatHistoryTargetType.value === 'home' ? '首页' : '未命名页面'))
 
 const aiDefaultMessages = computed<ChatMessagesData[]>(() => [
   {
@@ -177,7 +197,9 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
     if (!prompt && aiAttachments.value.length === 0) {
       throw new Error('请输入修改想法或添加样图')
     }
-    return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, params.attachments || aiAttachments.value))
+    const attachments = params.attachments || aiAttachments.value
+    startAiHistorySession(prompt, attachments)
+    return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, attachments))
   },
   isValidChunk: (chunk: SSEChunkData) => [
     'ai.message',
@@ -194,31 +216,31 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
     const envelope = normalizeAiStreamChunk(chunk)
     if (envelope.event === 'ai.progress') {
       const content = String(envelope.payload?.content || '')
-      if (aiThinkingEnabled.value && thinkingActions.has(String(envelope.action || ''))) {
-        return thinkingChunk(content)
+      if (thinkingActions.has(String(envelope.action || ''))) {
+        return trackAiHistoryContent(thinkingChunk(content))
       }
-      return markdownChunk(formatProgress(envelope.action, content))
+      return trackAiHistoryContent(markdownChunk(formatProgress(envelope.action, content)))
     }
     if (envelope.event === 'ai.message') {
-      return markdownChunk(String(envelope.payload?.content || ''))
+      return trackAiHistoryContent(markdownChunk(String(envelope.payload?.content || '')))
     }
     if (envelope.event === 'ai.tool') {
       const tool = envelope.payload?.tool
       if (isCanvasTool(tool)) {
         applyAiTool(tool)
       }
-      return markdownChunk(formatToolMessage(tool))
+      return trackAiHistoryContent(markdownChunk(formatToolMessage(tool)))
     }
     if (envelope.event === 'ai.result') {
       const result = envelope.payload?.result || null
       pendingAiResult = result?.tools?.length ? null : result
-      return markdownChunk('\n\n画布操作已完成。')
+      return trackAiHistoryContent(markdownChunk('\n\n画布操作已完成。'))
     }
     if (envelope.event === 'ai.error') {
-      return {
+      return trackAiHistoryContent({
         ...markdownChunk(`\n\n生成失败：${envelope.payload?.message || envelope.payload?.content || '未知错误'}`),
         status: 'error',
-      } as AIMessageContent
+      } as AIMessageContent)
     }
     return null
   },
@@ -230,11 +252,19 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
       applyAiResult(pendingAiResult)
       pendingAiResult = null
       clearAiAttachments()
-      return markdownChunk('\n\n画布已更新。')
+      const completeChunk = trackAiHistoryContent(markdownChunk('\n\n画布已更新。'))
+      void finishAiHistorySession('complete')
+      return completeChunk
     }
+    void finishAiHistorySession('complete')
   },
   onError: (error: Error | Response) => {
     const message = error instanceof Response ? `${error.status} ${error.statusText}` : error.message
+    trackAiHistoryContent({
+      ...markdownChunk(`\n\n调用失败：${message}`),
+      status: 'error',
+    } as AIMessageContent)
+    void finishAiHistorySession('error')
     toast.error('AI 调用失败', { description: message })
   },
 }))
@@ -245,6 +275,12 @@ watch(() => props.aiEnabled, (enabled) => {
   }
   if (enabled && !rightPanelTabs.value.some(tab => tab.value === rightPanelTab.value)) {
     rightPanelTab.value = 'ai'
+  }
+})
+
+watch([rightPanelTab, chatHistoryTargetKey], () => {
+  if (rightPanelTab.value === 'ai') {
+    void loadChatHistory(true)
   }
 })
 
@@ -287,6 +323,9 @@ onMounted(async () => {
   canvasRevision.value += 1
   await loadMedia()
   aiModel.value = props.aiModelOptions?.[0]?.value || ''
+  if (rightPanelTab.value === 'ai') {
+    void loadChatHistory(true)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -338,6 +377,148 @@ function useSuggestion(suggestion: string) {
   chatbotRef.value?.addPrompt?.(suggestion, true)
 }
 
+function startAiHistorySession(prompt: string, attachments: any[] = []) {
+  const id = createHistoryId()
+  const now = Date.now()
+  const displayPrompt = prompt || `参考样图调整当前页面：${firstImageAttachment(attachments)?.name || '样图'}`
+  const attachmentMetas = attachmentMetaList(attachments)
+  const attachmentText = attachmentMetas.length
+    ? `\n\n附件：${attachmentMetas.map(item => item.name || item.fileType || '文件').join('、')}`
+    : ''
+  currentAiSession = {
+    id,
+    targetKey: chatHistoryTargetKey.value,
+    targetType: chatHistoryTargetType.value,
+    targetId: chatHistoryTargetId.value,
+    targetLabel: chatHistoryTargetLabel.value,
+    title: compactText(displayPrompt, 36),
+    preview: compactText(displayPrompt, 120),
+    model: aiModel.value || undefined,
+    thinkingEnabled: true,
+    attachments: attachmentMetas,
+    createdAt: now,
+    updatedAt: now,
+    messages: [
+      {
+        id: `${id}-user`,
+        role: 'user',
+        status: 'complete',
+        content: [
+          {
+            type: 'text',
+            data: `${displayPrompt}${attachmentText}`,
+          },
+        ],
+      } as ChatMessagesData,
+      {
+        id: `${id}-assistant`,
+        role: 'assistant',
+        status: 'streaming',
+        content: [],
+      } as ChatMessagesData,
+    ],
+  }
+}
+
+function trackAiHistoryContent<T extends AIMessageContent>(content: T): T {
+  if (!currentAiSession) {
+    return content
+  }
+  const assistant = currentAiSession.messages.findLast(item => item.role === 'assistant')
+  if (!assistant) {
+    return content
+  }
+  const target = assistant as Extract<ChatMessagesData, { role: 'assistant' }>
+  const existing = target.content?.find(item => item.id && item.id === content.id)
+  if (existing && content.strategy === 'merge') {
+    mergeAiContent(existing, content)
+  }
+  else {
+    target.content = [...(target.content || []), cloneAiContent(content)]
+  }
+  target.status = content.status === 'error' ? 'error' : 'streaming'
+  currentAiSession.updatedAt = Date.now()
+  currentAiSession.preview = compactText(messageText(target), 120) || currentAiSession.preview
+  return content
+}
+
+async function finishAiHistorySession(status: 'complete' | 'error') {
+  if (!currentAiSession) {
+    return
+  }
+  const session = currentAiSession
+  currentAiSession = null
+  const assistant = session.messages.findLast(item => item.role === 'assistant')
+  if (assistant) {
+    assistant.status = status
+  }
+  session.updatedAt = Date.now()
+  session.preview = compactText(messageText(assistant), 120) || session.preview
+  await saveCmsAiChatSession(session)
+  await loadChatHistory(true)
+}
+
+async function loadChatHistory(reset = false) {
+  if (chatHistoryLoading.value) {
+    return
+  }
+  chatHistoryLoading.value = true
+  try {
+    if (reset) {
+      chatHistoryOffset.value = 0
+      chatHistorySummaries.value = []
+      selectedChatHistory.value = null
+    }
+    const page = await listCmsAiChatSessionSummaries(chatHistoryTargetKey.value, chatHistoryOffset.value, 8)
+    chatHistorySummaries.value = reset ? page.items : [...chatHistorySummaries.value, ...page.items]
+    chatHistoryOffset.value = chatHistorySummaries.value.length
+    chatHistoryHasMore.value = page.hasMore
+    chatHistoryLoadedOnce.value = true
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '会话记录加载失败')
+  }
+  finally {
+    chatHistoryLoading.value = false
+  }
+}
+
+async function openChatHistory(summary: CmsAiChatSessionSummary) {
+  try {
+    selectedChatHistory.value = await getCmsAiChatSession(summary.id) || null
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '会话详情加载失败')
+  }
+}
+
+function restoreChatHistory() {
+  if (!selectedChatHistory.value) {
+    return
+  }
+  chatbotRef.value?.setMessages?.([...aiDefaultMessages.value, ...selectedChatHistory.value.messages], 'replace')
+}
+
+async function deleteSelectedChatHistory() {
+  if (!selectedChatHistory.value) {
+    return
+  }
+  await deleteCmsAiChatSession(selectedChatHistory.value.id)
+  selectedChatHistory.value = null
+  await loadChatHistory(true)
+  toast.success('会话记录已删除')
+}
+
+async function clearChatHistory() {
+  if (!chatHistorySummaries.value.length || !window.confirm(`确认删除“${chatHistoryTargetLabel.value}”的全部 AI 会话记录吗？`)) {
+    return
+  }
+  await clearCmsAiChatTarget(chatHistoryTargetKey.value)
+  selectedChatHistory.value = null
+  await loadChatHistory(true)
+  toast.success('会话记录已清空')
+}
+
 function buildAiPayload(prompt: string, attachments: any[] = []) {
   if (!editor) {
     throw new Error('构建器未初始化')
@@ -350,7 +531,6 @@ function buildAiPayload(prompt: string, attachments: any[] = []) {
     pageType: 'GrapesJS 可视化页面',
     style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。不要生成系统导航栏和页脚，它们由站点 Layout 渲染。',
     model: aiModel.value || undefined,
-    thinkingEnabled: aiThinkingEnabled.value,
     imageDataUrl: image?.url || undefined,
     currentHtml: editor.getHtml(),
     currentCss: editor.getCss(),
@@ -401,8 +581,8 @@ function thinkingChunk(text: string): AIMessageContent {
 }
 
 function formatProgress(action?: string, content?: string) {
-  const text = content || '处理中...'
-  const labelMap: Record<string, string> = {
+  const safeText = content || '处理中...'
+  const safeLabelMap: Record<string, string> = {
     accepted: '已接收',
     analysis: '分析',
     request: '请求',
@@ -414,14 +594,14 @@ function formatProgress(action?: string, content?: string) {
     'stream-complete': '汇总',
     complete: '完成',
   }
-  return `\n\n> ${labelMap[String(action || '')] || '进度'}：${text}`
+  return `\n\n> ${safeLabelMap[String(action || '')] || '进度'}：${safeText}`
 }
 
 function formatToolMessage(tool?: AiToolCallResult) {
-  const name = tool?.toolName || '未知工具'
-  const action = tool?.action || '执行'
-  const message = tool?.message || '工具调用完成'
-  return `\n\n> 工具：${name} / ${action}\n\n${message}`
+  const safeName = tool?.toolName || '未知工具'
+  const safeAction = tool?.action || '执行'
+  const safeMessage = tool?.message || '工具调用完成'
+  return `\n\n> 工具：${safeName} / ${safeAction}\n\n${safeMessage}`
 }
 
 function isCanvasTool(tool?: AiToolCallResult) {
@@ -490,6 +670,73 @@ function applyAiTool(tool?: AiToolCallResult) {
 
 function clearAiAttachments() {
   aiAttachments.value = []
+}
+
+function mergeAiContent(existing: AIMessageContent, incoming: AIMessageContent) {
+  if (existing.type === 'markdown' && incoming.type === 'markdown') {
+    existing.data = `${existing.data || ''}${incoming.data || ''}`
+    return
+  }
+  if (existing.type === 'thinking' && incoming.type === 'thinking') {
+    existing.data = {
+      title: incoming.data.title || existing.data.title || '思考中',
+      text: [existing.data.text, incoming.data.text].filter(Boolean).join('\n'),
+    }
+    return
+  }
+  Object.assign(existing, cloneAiContent(incoming))
+}
+
+function cloneAiContent<T>(content: T): T {
+  return JSON.parse(JSON.stringify(content)) as T
+}
+
+function messageText(message?: ChatMessagesData | null) {
+  return message?.content?.map(contentText).filter(Boolean).join('\n') || ''
+}
+
+function contentText(content: unknown) {
+  const item = content as Record<string, any>
+  if (item.type === 'text' || item.type === 'markdown') {
+    return String(item.data || '')
+  }
+  if (item.type === 'thinking') {
+    return String(item.data?.text || '')
+  }
+  if (item.type === 'attachment' && Array.isArray(item.data)) {
+    return `附件：${item.data.map((file: CmsAiChatAttachmentMeta) => file.name || file.fileType || '文件').join('、')}`
+  }
+  return ''
+}
+
+function attachmentMetaList(attachments: any[]): CmsAiChatAttachmentMeta[] {
+  return attachments.map(item => ({
+    name: item?.name,
+    fileType: item?.fileType,
+    size: item?.size,
+  }))
+}
+
+function compactText(value: string, maxLength: number) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim()
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
+
+function createHistoryId() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function formatHistoryTime(value: number) {
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function roleLabel(role?: string) {
+  return role === 'user' ? '你' : 'AI'
 }
 
 function fileToDataUrl(file: File) {
@@ -868,12 +1115,6 @@ function escapeAttr(value: string) {
               :message-props="aiMessageProps"
             >
               <template #sender-footer-prefix>
-                <div class="ai-chat-controls">
-                  <label class="ai-thinking-toggle">
-                    <TSwitch v-model="aiThinkingEnabled" size="small" />
-                    <span>深度思考</span>
-                  </label>
-                </div>
                 <div v-if="aiModelOptions?.length" class="ai-model-select">
                   <TTooltip content="切换模型" trigger="hover">
                     <TSelect
@@ -886,6 +1127,60 @@ function escapeAttr(value: string) {
                 </div>
               </template>
             </Chatbot>
+            <section class="ai-history" aria-label="AI 会话记录">
+              <div class="ai-history__head">
+                <div>
+                  <strong>会话记录</strong>
+                  <span>{{ chatHistoryTargetLabel }}</span>
+                </div>
+                <div class="ai-history__actions">
+                  <button type="button" :disabled="chatHistoryLoading" @click="loadChatHistory(true)">刷新</button>
+                  <button type="button" :disabled="!chatHistorySummaries.length" @click="clearChatHistory">清空</button>
+                </div>
+              </div>
+
+              <div v-if="chatHistorySummaries.length" class="ai-history__list">
+                <button
+                  v-for="item in chatHistorySummaries"
+                  :key="item.id"
+                  type="button"
+                  :class="{ active: selectedChatHistory?.id === item.id }"
+                  @click="openChatHistory(item)"
+                >
+                  <strong>{{ item.title || '未命名会话' }}</strong>
+                  <small>{{ formatHistoryTime(item.updatedAt) }} · {{ item.model || '默认模型' }}</small>
+                  <span>{{ item.preview }}</span>
+                </button>
+              </div>
+              <div v-else class="ai-history__empty">
+                {{ chatHistoryLoadedOnce ? '暂无会话记录' : '打开 AI 面板后按需加载记录' }}
+              </div>
+
+              <button
+                v-if="chatHistoryHasMore"
+                type="button"
+                class="ai-history__more"
+                :disabled="chatHistoryLoading"
+                @click="loadChatHistory(false)"
+              >
+                加载更多
+              </button>
+
+              <div v-if="selectedChatHistory" class="ai-history__detail">
+                <div class="ai-history__detail-head">
+                  <strong>{{ selectedChatHistory.title }}</strong>
+                  <button type="button" @click="selectedChatHistory = null">关闭</button>
+                </div>
+                <div class="ai-history__detail-actions">
+                  <button type="button" @click="restoreChatHistory">恢复到聊天区</button>
+                  <button type="button" @click="deleteSelectedChatHistory">删除本条</button>
+                </div>
+                <article v-for="message in selectedChatHistory.messages" :key="message.id">
+                  <strong>{{ roleLabel(message.role) }}</strong>
+                  <p>{{ compactText(messageText(message), 360) }}</p>
+                </article>
+              </div>
+            </section>
           </div>
 
           <div class="ai-suggestions" aria-label="AI 快捷指令">
@@ -1124,8 +1419,146 @@ function escapeAttr(value: string) {
   color: #0f172a;
 }
 
+.ai-history {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  min-height: 0;
+  padding: 10px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.ai-history__head,
+.ai-history__actions,
+.ai-history__detail-head,
+.ai-history__detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-history__head,
+.ai-history__detail-head {
+  justify-content: space-between;
+}
+
+.ai-history__head strong,
+.ai-history__detail-head strong {
+  display: block;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.ai-history__head span {
+  display: block;
+  max-width: 160px;
+  overflow: hidden;
+  color: #64748b;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-history button {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.ai-history button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ai-history__actions button,
+.ai-history__detail-actions button,
+.ai-history__detail-head button,
+.ai-history__more {
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.ai-history__list {
+  display: grid;
+  gap: 6px;
+  max-height: 116px;
+  overflow: auto;
+}
+
+.ai-history__list > button {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  text-align: left;
+}
+
+.ai-history__list > button.active,
+.ai-history__list > button:hover {
+  border-color: #0f766e;
+  background: #ecfdf5;
+}
+
+.ai-history__list strong,
+.ai-history__list small,
+.ai-history__list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-history__list strong {
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.ai-history__list small,
+.ai-history__list span,
+.ai-history__empty {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.ai-history__detail {
+  display: grid;
+  gap: 8px;
+  max-height: 140px;
+  overflow: auto;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.ai-history__detail article {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.ai-history__detail article strong {
+  color: #0f766e;
+  font-size: 12px;
+}
+
+.ai-history__detail article p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .builder-chatbot-wrap {
   position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
   min-height: 0;
   overflow: hidden;
 }
@@ -1161,27 +1594,6 @@ function escapeAttr(value: string) {
 .builder-chatbot :deep(textarea) {
   font-size: 13px;
   line-height: 1.7;
-}
-
-.ai-chat-controls {
-  display: flex;
-  align-items: center;
-  margin-right: 8px;
-}
-
-.ai-thinking-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #f8fafc;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 .ai-model-select {
