@@ -19,9 +19,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class SseCapabilityProvider implements CapabilityProvider {
 
     public static final String CODE = "sse";
+    private static final long DEFAULT_TIMEOUT = 300_000L;
 
     private final AtomicBoolean enabled = new AtomicBoolean(false);
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private Map<String, String> config = Map.of("timeout", String.valueOf(DEFAULT_TIMEOUT));
 
     @Override
     public CapabilityDescriptor descriptor() {
@@ -45,7 +47,8 @@ public class SseCapabilityProvider implements CapabilityProvider {
     }
 
     @Override
-    public void enable(Map<String, String> config) {
+    public synchronized void enable(Map<String, String> config) {
+        this.config = config == null ? Map.of() : config;
         enabled.set(true);
     }
 
@@ -70,7 +73,7 @@ public class SseCapabilityProvider implements CapabilityProvider {
             throw new BizException("SSE 能力未启用，请先在平台能力中启用");
         }
         String id = UUID.randomUUID().toString();
-        SseEmitter emitter = new SseEmitter(300_000L);
+        SseEmitter emitter = new SseEmitter(timeout());
         emitters.put(id, emitter);
         emitter.onCompletion(() -> emitters.remove(id));
         emitter.onTimeout(() -> emitters.remove(id));
@@ -92,6 +95,14 @@ public class SseCapabilityProvider implements CapabilityProvider {
         } catch (IOException e) {
             emitters.remove(id);
             emitter.completeWithError(e);
+        }
+    }
+
+    private long timeout() {
+        try {
+            return Long.parseLong(config.getOrDefault("timeout", String.valueOf(DEFAULT_TIMEOUT)));
+        } catch (NumberFormatException e) {
+            return DEFAULT_TIMEOUT;
         }
     }
 }
