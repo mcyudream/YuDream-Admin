@@ -9,6 +9,7 @@ import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type EditorTarget = 'page' | 'home'
+type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
 interface CmsNavigationItem {
   id: string
   label: string
@@ -73,6 +74,11 @@ const statusOptions: { label: string, value: PageStatus }[] = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' },
 ]
+const layoutOptions: { label: string, value: SiteLayoutMode }[] = [
+  { label: 'Header + Footer', value: 'HEADER_FOOTER' },
+  { label: 'Header + 版权', value: 'HEADER_COPYRIGHT' },
+  { label: '后台管理布局', value: 'ADMIN' },
+]
 const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] = [
   { type: 'HERO', label: '首屏', icon: 'i-ri:layout-top-line' },
   { type: 'FEATURE', label: '特色', icon: 'i-ri:sparkling-line' },
@@ -85,7 +91,7 @@ const pagePreviewHtml = computed(() => {
   if (editorMode.value === 'markdown') {
     return markdownPreview(pageForm.markdownContent)
   }
-  return sanitizeHtml(pageForm.htmlContent || emptyBuilderHtml())
+  return sanitizeHtml(stripLayoutBlocks(pageForm.htmlContent || emptyBuilderHtml()))
 })
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
 const builderContentStatus = computed(() => pageForm.builderProjectJson ? '已有 GrapesJS 源数据' : pageForm.htmlContent ? '已有 HTML 内容' : '尚未生成可视化内容')
@@ -116,8 +122,17 @@ const homeProjectJson = computed({
     }
   },
 })
+const homeLayoutMode = computed<SiteLayoutMode>({
+  get: () => (home.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER',
+  set: (value) => {
+    home.settings = {
+      ...(home.settings || {}),
+      siteLayout: value,
+    }
+  },
+})
 const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
-const homePreviewHtml = computed(() => sanitizeHtml(homeHtml.value || emptyHomeBuilderHtml()))
+const homePreviewHtml = computed(() => sanitizeHtml(stripLayoutBlocks(homeHtml.value || emptyHomeBuilderHtml())))
 const cmsVariables = [
   { key: '{{site.name}}', label: '站点名称' },
   { key: '{{site.description}}', label: '站点描述' },
@@ -452,17 +467,26 @@ async function saveGrapesEditor(payload: { htmlContent: string, cssContent: stri
 
 function resolvePageHtmlForSave() {
   if (editorMode.value === 'html') {
-    return pageForm.htmlContent || ''
+    return stripLayoutBlocks(pageForm.htmlContent || '')
   }
   const existingHtml = pageForm.htmlContent?.trim()
   if (existingHtml) {
-    return existingHtml
+    return stripLayoutBlocks(existingHtml)
   }
-  return editorMode.value === 'markdown' ? '' : pageForm.htmlContent || ''
+  return editorMode.value === 'markdown' ? '' : stripLayoutBlocks(pageForm.htmlContent || '')
 }
 
 function resolveHomeHtmlForSave() {
-  return homeHtml.value?.trim() || ''
+  return stripLayoutBlocks(homeHtml.value?.trim() || '')
+}
+
+function stripLayoutBlocks(value?: string) {
+  if (!value) {
+    return ''
+  }
+  const doc = new DOMParser().parseFromString(`<div>${value}</div>`, 'text/html')
+  doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
+  return doc.body.firstElementChild?.innerHTML || value
 }
 
 function insertVariable(variable: string) {
@@ -830,6 +854,9 @@ function sectionTitle(type: HomeSectionType) {
               <a-form-item label="主题">
                 <FaInput v-model="home.theme" />
               </a-form-item>
+              <a-form-item label="站点布局">
+                <FaSelect v-model="homeLayoutMode" :options="layoutOptions" />
+              </a-form-item>
               <a-form-item label="副标题">
                 <FaInput v-model="home.subtitle" />
               </a-form-item>
@@ -909,7 +936,7 @@ function sectionTitle(type: HomeSectionType) {
           <section>
             <h3>使用说明</h3>
             <p class="cms-help-text">
-              导航保存到首页 settings.navigationJson，公开站点会自动渲染；区块中也可以使用头像列表变量做会员入口。
+              导航保存到首页 settings.navigationJson，由站点布局 Header 自动渲染；登录、注册和头像菜单由布局统一处理。
             </p>
           </section>
         </aside>

@@ -18,6 +18,7 @@ interface SiteNavigationItem {
   visible?: boolean
   sort?: number
 }
+type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
 
 const slug = computed(() => {
   const value = route.params.slug
@@ -29,6 +30,9 @@ const slug = computed(() => {
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 const homeCss = computed(() => home.value?.settings?.homeCss || '')
 const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url)))
+const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
+const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
+const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
 const archiveFilter = computed(() => ({
   category: queryValue(route.query.category),
   tag: queryValue(route.query.tag),
@@ -218,7 +222,7 @@ function renderDynamicHtml(value?: string) {
   }
   const sanitized = sanitizeHtml(value)
   const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html')
-  normalizeSystemNavigation(doc)
+  doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
   doc.querySelectorAll('[data-visible-when]').forEach((el) => {
     const rule = el.getAttribute('data-visible-when')
     const loggedIn = appAccountStore.isLogin
@@ -243,30 +247,6 @@ function renderDynamicHtml(value?: string) {
     el.innerHTML = rows.map((item, index) => renderVariables(template, { item, index: String(index + 1) })).join('')
   })
   return renderVariables(doc.body.firstElementChild?.innerHTML || sanitized)
-}
-
-function normalizeSystemNavigation(doc: Document) {
-  doc.querySelectorAll('[data-yb-system-nav]').forEach((nav) => {
-    nav.querySelectorAll('[data-visible-when="guest"], [data-visible-when="logged-in"]').forEach(el => el.remove())
-    nav.insertAdjacentHTML('beforeend', `
-      <div data-visible-when="guest" style="display:flex; align-items:center; gap:8px;">
-        <a href="/login" style="padding:8px 14px; border-radius:8px; color:#475569; font-weight:700; text-decoration:none;">登录</a>
-        <a href="/register" style="padding:8px 14px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">注册</a>
-      </div>
-      <details data-visible-when="logged-in" style="position:relative;">
-        <summary style="display:flex; align-items:center; gap:10px; list-style:none; cursor:pointer;">
-          <img src="{{user.avatar}}" alt="{{user.nickname}}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; background:#e2e8f0;">
-          <span style="color:#0f172a; font-weight:800;">{{user.nickname}}</span>
-          <span style="color:#94a3b8;">⌄</span>
-        </summary>
-        <div style="position:absolute; top:calc(100% + 8px); right:0; z-index:20; display:grid; min-width:132px; padding:6px; border:1px solid #e5e7eb; border-radius:10px; background:#ffffff; box-shadow:0 14px 32px rgba(15,23,42,.12);">
-          <a href="/" style="padding:9px 10px; border-radius:8px; color:#334155; text-decoration:none;">控制台</a>
-          <a href="/profile" style="padding:9px 10px; border-radius:8px; color:#334155; text-decoration:none;">个人资料</a>
-          <a href="/logout" style="padding:9px 10px; border-radius:8px; color:#b91c1c; text-decoration:none;">退出登录</a>
-        </div>
-      </details>
-    `)
-  })
 }
 
 function sanitizeHtml(value?: string) {
@@ -350,7 +330,7 @@ function escapeHtml(value: string) {
 </script>
 
 <template>
-  <main class="site-page">
+  <main class="site-page" :class="`layout-${siteLayout.toLowerCase().replace('_', '-')}`">
     <div v-if="loading" class="site-state">
       加载中...
     </div>
@@ -358,46 +338,101 @@ function escapeHtml(value: string) {
       {{ errorMessage }}
     </div>
 
-    <template v-if="!page && home">
-      <component :is="'style'" v-if="homeCss">
-        {{ homeCss }}
-      </component>
-      <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
-      <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
-        <div class="site-shell">
-          <h1>{{ home.title }}</h1>
-          <p>{{ home.subtitle }}</p>
-        </div>
-      </section>
-      <section v-if="!homeHtml" class="site-shell site-sections">
-        <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
-          <div>
-            <span>{{ section.type }}</span>
-            <h2>{{ section.title }}</h2>
-            <p>{{ section.subtitle }}</p>
-            <a v-if="section.actionUrl" :href="section.actionUrl">{{ section.actionText || '了解更多' }}</a>
+    <template v-else>
+      <header class="site-layout-header">
+        <div class="site-layout-header__bar">
+          <a class="site-layout-header__brand" href="/site">
+            <img v-if="renderContext.site.logo" :src="renderContext.site.logo" :alt="renderContext.site.name">
+            <span>{{ renderContext.site.name }}</span>
+          </a>
+          <nav class="site-layout-header__nav">
+            <a v-for="item in navigationItems" :key="item.id || item.url" :href="item.url">{{ item.label }}</a>
+          </nav>
+          <div v-if="!appAccountStore.isLogin" class="site-layout-header__auth">
+            <a href="/login" class="ghost">登录</a>
+            <a href="/register" class="primary">注册</a>
           </div>
-        </article>
-      </section>
-    </template>
-
-    <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
-      <component :is="'style'" v-if="page.cssContent">
-        {{ page.cssContent }}
-      </component>
-      <header class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
-        <div class="site-shell">
-          <span>{{ page.slug }}</span>
-          <h1>{{ page.title }}</h1>
-          <p>{{ page.excerpt || page.summary }}</p>
-          <div v-if="page.categories?.length || page.tags?.length" class="site-article__terms">
-            <span v-for="item in page.categories" :key="`cat-${item}`">{{ item }}</span>
-            <span v-for="item in page.tags" :key="`tag-${item}`">#{{ item }}</span>
-          </div>
+          <details v-else class="site-layout-header__account">
+            <summary>
+              <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
+              <span>{{ appAccountStore.account }}</span>
+              <i>⌄</i>
+            </summary>
+            <div>
+              <a href="/">控制台</a>
+              <a href="/profile">个人资料</a>
+              <a href="/logout" class="danger">退出登录</a>
+            </div>
+          </details>
         </div>
       </header>
-      <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : markdownPreview(page.markdownContent)" />
-    </article>
+
+      <div class="site-layout-frame">
+        <aside v-if="siteLayout === 'ADMIN'" class="site-admin-sidebar">
+          <strong>{{ renderContext.site.name }}</strong>
+          <a href="/site">首页</a>
+          <a v-for="item in navigationItems" :key="`side-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
+        </aside>
+
+        <div class="site-layout-content">
+          <template v-if="!page && home">
+            <component :is="'style'" v-if="homeCss">
+              {{ homeCss }}
+            </component>
+            <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
+            <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
+              <div class="site-shell">
+                <h1>{{ home.title }}</h1>
+                <p>{{ home.subtitle }}</p>
+              </div>
+            </section>
+            <section v-if="!homeHtml" class="site-shell site-sections">
+              <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
+                <div>
+                  <span>{{ section.type }}</span>
+                  <h2>{{ section.title }}</h2>
+                  <p>{{ section.subtitle }}</p>
+                  <a v-if="section.actionUrl" :href="section.actionUrl">{{ section.actionText || '了解更多' }}</a>
+                </div>
+              </article>
+            </section>
+          </template>
+
+          <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
+            <component :is="'style'" v-if="page.cssContent">
+              {{ page.cssContent }}
+            </component>
+            <header class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
+              <div class="site-shell">
+                <span>{{ page.slug }}</span>
+                <h1>{{ page.title }}</h1>
+                <p>{{ page.excerpt || page.summary }}</p>
+                <div v-if="page.categories?.length || page.tags?.length" class="site-article__terms">
+                  <span v-for="item in page.categories" :key="`cat-${item}`">{{ item }}</span>
+                  <span v-for="item in page.tags" :key="`tag-${item}`">#{{ item }}</span>
+                </div>
+              </div>
+            </header>
+            <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : markdownPreview(page.markdownContent)" />
+          </article>
+        </div>
+      </div>
+
+      <footer v-if="showFooter" class="site-layout-footer">
+        <div class="site-shell">
+          <div>
+            <strong>{{ renderContext.site.name }}</strong>
+            <p>{{ renderContext.site.description || '由 YuDream CMS 驱动的内容站点' }}</p>
+          </div>
+          <nav>
+            <a v-for="item in navigationItems" :key="`foot-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
+          </nav>
+        </div>
+      </footer>
+      <footer v-else-if="showCopyright" class="site-layout-copyright">
+        © {{ new Date().getFullYear() }} {{ renderContext.site.name }}. All rights reserved.
+      </footer>
+    </template>
   </main>
 </template>
 
@@ -418,6 +453,250 @@ function escapeHtml(value: string) {
   min-height: 100vh;
   place-items: center;
   color: #64748b;
+}
+
+.site-layout-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  border-bottom: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(12px);
+}
+
+.site-layout-header__bar {
+  display: flex;
+  width: min(1240px, calc(100% - 40px));
+  min-height: 62px;
+  margin: 0 auto;
+  gap: 22px;
+  align-items: center;
+}
+
+.site-layout-header__brand,
+.site-layout-header__nav,
+.site-layout-header__auth,
+.site-layout-header__account summary {
+  display: flex;
+  align-items: center;
+}
+
+.site-layout-header__brand {
+  min-width: 0;
+  gap: 10px;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.site-layout-header__brand img {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.site-layout-header__nav {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.site-layout-header__nav a {
+  padding: 8px 9px;
+  border-radius: 7px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.site-layout-header__nav a:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.site-layout-header__auth {
+  gap: 8px;
+}
+
+.site-layout-header__auth a,
+.site-layout-header__account summary {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.site-layout-header__auth .ghost,
+.site-layout-header__account summary {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #334155;
+}
+
+.site-layout-header__auth .primary {
+  background: #111827;
+  color: #fff;
+}
+
+.site-layout-header__account {
+  position: relative;
+}
+
+.site-layout-header__account summary {
+  gap: 7px;
+  list-style: none;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.site-layout-header__account summary::-webkit-details-marker {
+  display: none;
+}
+
+.site-layout-header__account summary:hover,
+.site-layout-header__account[open] summary {
+  border-color: #d1d5db;
+  background: #f8fafc;
+}
+
+.site-layout-header__account summary:focus-visible {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
+}
+
+.site-layout-header__account img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.site-layout-header__account i {
+  color: #94a3b8;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.site-layout-header__account > div {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  min-width: 142px;
+  padding: 7px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
+}
+
+.site-layout-header__account a {
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: #334155;
+  text-decoration: none;
+}
+
+.site-layout-header__account a:hover {
+  background: #f1f5f9;
+}
+
+.site-layout-header__account a.danger {
+  color: #b91c1c;
+}
+
+.site-layout-frame {
+  display: flex;
+  min-height: calc(100vh - 63px);
+}
+
+.site-layout-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.site-admin-sidebar {
+  position: sticky;
+  top: 63px;
+  display: grid;
+  align-content: start;
+  width: 240px;
+  height: calc(100vh - 63px);
+  padding: 18px 14px;
+  border-right: 1px solid #e5e7eb;
+  background: #fff;
+  gap: 6px;
+}
+
+.site-admin-sidebar strong {
+  padding: 10px 12px 14px;
+  color: #0f172a;
+}
+
+.site-admin-sidebar a {
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #475569;
+  text-decoration: none;
+}
+
+.site-admin-sidebar a:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.site-layout-footer {
+  padding: 36px 0;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  color: #0f172a;
+}
+
+.site-layout-footer .site-shell {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.site-layout-footer strong {
+  font-size: 20px;
+}
+
+.site-layout-footer p {
+  margin: 8px 0 0;
+  color: #64748b;
+}
+
+.site-layout-footer nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.site-layout-footer a {
+  color: #475569;
+  text-decoration: none;
+}
+
+.site-layout-footer a:hover {
+  color: #0f766e;
+}
+
+.site-layout-copyright {
+  padding: 18px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  color: #64748b;
+  text-align: center;
 }
 
 .site-builder-home :deep(main),
@@ -602,6 +881,44 @@ function escapeHtml(value: string) {
 }
 
 @media (max-width: 760px) {
+  .site-layout-header {
+    position: static;
+  }
+
+  .site-layout-header__bar {
+    align-items: stretch;
+    flex-direction: column;
+    width: calc(100% - 28px);
+    min-height: 0;
+    padding: 12px 0;
+    gap: 10px;
+  }
+
+  .site-layout-header__nav {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .site-layout-frame {
+    display: block;
+  }
+
+  .site-admin-sidebar {
+    position: static;
+    width: auto;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .site-layout-footer .site-shell {
+    flex-direction: column;
+  }
+
+  .site-layout-footer nav {
+    justify-content: flex-start;
+  }
+
   .site-hero,
   .site-article__hero {
     min-height: 340px;
