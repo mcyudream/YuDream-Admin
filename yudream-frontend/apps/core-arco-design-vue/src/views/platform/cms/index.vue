@@ -103,12 +103,6 @@ const aiModelOptions = computed(() => {
     .filter(Boolean)
     .map(value => ({ label: value, value }))
 })
-const pagePreviewHtml = computed(() => {
-  if (editorMode.value === 'markdown') {
-    return markdownPreview(pageForm.markdownContent)
-  }
-  return sanitizeHtml(stripLayoutBlocks(pageForm.htmlContent || emptyBuilderHtml()))
-})
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
 const builderContentStatus = computed(() => pageForm.builderProjectJson ? '已有 GrapesJS 源数据' : pageForm.htmlContent ? '已有 HTML 内容' : '尚未生成可视化内容')
 const homeHtml = computed({
@@ -628,41 +622,6 @@ function emptyHomeBuilderHtml() {
   return '<main class="yb-empty"><section><h1>打开 GrapesJS 构建器设计首页</h1><p>首页可以自由编排首屏、图文、CTA、表单和动态内容。</p></section></main>'
 }
 
-function markdownPreview(markdown?: string) {
-  return escapeHtml(markdown || '')
-    .split(/\r?\n/)
-    .map((line) => {
-      if (line.startsWith('# ')) {
-        return `<h1>${line.slice(2)}</h1>`
-      }
-      if (line.startsWith('## ')) {
-        return `<h2>${line.slice(3)}</h2>`
-      }
-      if (line.trim()) {
-        return `<p>${line}</p>`
-      }
-      return ''
-    })
-    .join('')
-}
-
-function sanitizeHtml(value?: string) {
-  return (value || '')
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/javascript:/gi, '')
-}
-
-function escapeHtml(value?: string) {
-  return (value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-
 function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 16) : '未发布'
 }
@@ -784,7 +743,6 @@ function sectionTitle(type: HomeSectionType) {
                 查看 HTML
               </FaButton>
             </div>
-            <div class="builder-entry__preview" v-html="pagePreviewHtml" />
           </section>
 
           <CmsMarkdownEditor v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" />
@@ -1323,7 +1281,6 @@ function sectionTitle(type: HomeSectionType) {
   flex-wrap: wrap;
 }
 
-.builder-entry__preview,
 .builder-block,
 .publish-panel section {
   display: grid;
@@ -1332,11 +1289,6 @@ function sectionTitle(type: HomeSectionType) {
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-2);
-}
-
-.builder-entry__preview {
-  max-height: 560px;
-  overflow: auto;
 }
 
 .legacy-sections {
@@ -1450,18 +1402,6 @@ function sectionTitle(type: HomeSectionType) {
 .variable-list span {
   color: var(--color-text-3);
   font-size: 11px;
-}
-
-.builder-entry__preview :deep(.yb-empty) {
-  padding: 28px;
-  border-radius: 6px;
-  background: #0f766e;
-  color: #fff;
-}
-
-.builder-entry__preview :deep(img) {
-  max-width: 100%;
-  border-radius: 6px;
 }
 
 .home-layout {
