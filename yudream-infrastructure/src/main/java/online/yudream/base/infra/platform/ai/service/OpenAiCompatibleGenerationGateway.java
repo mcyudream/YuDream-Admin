@@ -23,7 +23,9 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
@@ -134,7 +136,20 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             }
             factory.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(uri.getHost(), uri.getPort())));
         }
-        return RestClient.builder().requestFactory(factory);
+        return RestClient.builder()
+                .requestFactory(factory)
+                .messageConverters(converters -> converters.stream()
+                        .filter(MappingJackson2HttpMessageConverter.class::isInstance)
+                        .map(MappingJackson2HttpMessageConverter.class::cast)
+                        .forEach(this::allowOctetStreamJson));
+    }
+
+    private void allowOctetStreamJson(MappingJackson2HttpMessageConverter converter) {
+        List<MediaType> mediaTypes = new ArrayList<>(converter.getSupportedMediaTypes());
+        if (!mediaTypes.contains(MediaType.APPLICATION_OCTET_STREAM)) {
+            mediaTypes.add(MediaType.APPLICATION_OCTET_STREAM);
+            converter.setSupportedMediaTypes(mediaTypes);
+        }
     }
 
     private List<ToolCallback> toolCallbacks(List<AiAgentToolResult> toolResults) {
