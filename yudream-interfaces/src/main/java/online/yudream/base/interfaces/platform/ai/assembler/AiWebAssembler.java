@@ -9,7 +9,12 @@ import online.yudream.base.interfaces.platform.ai.res.AiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
 import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
 
+import java.time.Instant;
+import java.util.Map;
+
 public class AiWebAssembler {
+
+    private static final String MODULE_CMS_BUILDER = "cms.builder";
 
     private AiWebAssembler() {
     }
@@ -41,27 +46,30 @@ public class AiWebAssembler {
                 .build();
     }
 
-    public static AiStreamEventRes toDeltaRes(String content) {
-        return AiStreamEventRes.builder()
-                .content(content)
-                .build();
+    public static AiStreamEventRes toDeltaEvent(String traceId, String content) {
+        return event("ai.message", "delta", traceId, Map.of("content", content == null ? "" : content));
     }
 
-    public static AiStreamEventRes toResultRes(CmsPageGenerateDTO dto) {
-        return AiStreamEventRes.builder()
-                .result(toRes(dto))
-                .build();
+    public static AiStreamEventRes toResultEvent(String traceId, CmsPageGenerateDTO dto) {
+        return event("ai.result", "complete", traceId, Map.of("result", toRes(dto)));
     }
 
-    public static AiStreamEventRes toToolEventRes(AiAgentToolResult result) {
-        return AiStreamEventRes.builder()
-                .tool(toToolRes(result))
-                .build();
+    public static AiStreamEventRes toToolEvent(String traceId, AiAgentToolResult result) {
+        return event("ai.tool", result.action(), traceId, Map.of("tool", toToolRes(result)));
     }
 
-    public static AiStreamEventRes toErrorRes(String message) {
+    public static AiStreamEventRes toErrorEvent(String traceId, String message) {
+        return event("ai.error", "failed", traceId, Map.of("message", message == null ? "" : message));
+    }
+
+    private static AiStreamEventRes event(String event, String action, String traceId, Map<String, Object> payload) {
         return AiStreamEventRes.builder()
-                .content(message)
+                .event(event)
+                .action(action)
+                .module(MODULE_CMS_BUILDER)
+                .traceId(traceId)
+                .timestamp(Instant.now().toEpochMilli())
+                .payload(payload)
                 .build();
     }
 

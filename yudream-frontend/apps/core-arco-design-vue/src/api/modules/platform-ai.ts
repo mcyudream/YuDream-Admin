@@ -33,6 +33,15 @@ export interface AiToolCallResult {
   payload?: Record<string, any>
 }
 
+export interface AiStreamEnvelope<T = Record<string, any>> {
+  event?: string
+  action?: string
+  module?: string
+  traceId?: string
+  timestamp?: number
+  payload?: T
+}
+
 export default {
   generateCmsPage: (data: CmsPageGeneratePayload) => {
     return systemClient.post<unknown, ApiResponse<CmsPageGenerateResult>>('api/platform/ai/cms/pages/generate', data)
