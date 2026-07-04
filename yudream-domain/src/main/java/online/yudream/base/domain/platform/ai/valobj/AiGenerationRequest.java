@@ -6,7 +6,8 @@ public record AiGenerationRequest(
         String systemPrompt,
         String userPrompt,
         String imageDataUrl,
-        String model,
+        String providerCode,
+        String modelCode,
         Map<String, String> config
 ) {
 }

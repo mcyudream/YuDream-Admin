@@ -8,6 +8,7 @@ import online.yudream.base.interfaces.platform.ai.request.CmsPageGenerateRequest
 import online.yudream.base.interfaces.platform.ai.res.AiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
 import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.Map;
@@ -26,6 +27,8 @@ public class AiWebAssembler {
         cmd.setPageType(request.getPageType());
         cmd.setStyle(request.getStyle());
         cmd.setSiteName(request.getSiteName());
+        cmd.setProviderCode(request.getProviderCode());
+        cmd.setModelCode(StringUtils.hasText(request.getModelCode()) ? request.getModelCode() : request.getModel());
         cmd.setModel(request.getModel());
         cmd.setImageDataUrl(request.getImageDataUrl());
         cmd.setCurrentHtml(request.getCurrentHtml());

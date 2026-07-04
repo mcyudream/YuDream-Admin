@@ -21,6 +21,12 @@ interface GrapesSavePayload {
 }
 
 type RightPanelTab = 'ai' | 'layers' | 'traits' | 'styles'
+interface AiModelSelectOption {
+  label: string
+  value: string
+  providerCode?: string
+  modelCode?: string
+}
 
 const props = defineProps<{
   htmlContent?: string
@@ -28,7 +34,7 @@ const props = defineProps<{
   builderProjectJson?: string
   title?: string
   aiEnabled?: boolean
-  aiModelOptions?: { label: string, value: string }[]
+  aiModelOptions?: AiModelSelectOption[]
   historyTargetType?: 'page' | 'home'
   historyTargetId?: string | number | null
   historyTargetLabel?: string
@@ -106,6 +112,7 @@ const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
 const chatHistoryTargetId = computed(() => String(props.historyTargetId || props.title || 'draft'))
 const chatHistoryTargetKey = computed(() => cmsAiChatTargetKey(chatHistoryTargetType.value, chatHistoryTargetId.value))
 const chatHistoryTargetLabel = computed(() => props.historyTargetLabel || props.title || (chatHistoryTargetType.value === 'home' ? '首页' : '未命名页面'))
+const selectedAiModelOption = computed(() => props.aiModelOptions?.find(item => item.value === aiModel.value) || props.aiModelOptions?.[0] || null)
 
 const aiDefaultMessages = computed<ChatMessagesData[]>(() => [
   {
@@ -274,6 +281,16 @@ watch(() => props.aiEnabled, (enabled) => {
   }
 })
 
+watch(() => props.aiModelOptions, (options) => {
+  if (!options?.length) {
+    aiModel.value = ''
+    return
+  }
+  if (!options.some(item => item.value === aiModel.value)) {
+    aiModel.value = options[0].value
+  }
+}, { deep: true })
+
 watch([rightPanelTab, chatHistoryTargetKey], () => {
   if (rightPanelTab.value === 'ai') {
     void loadChatHistory(true)
@@ -389,7 +406,7 @@ function startAiHistorySession(prompt: string, attachments: any[] = []) {
     targetLabel: chatHistoryTargetLabel.value,
     title: compactText(displayPrompt, 36),
     preview: compactText(displayPrompt, 120),
-    model: aiModel.value || undefined,
+    model: selectedAiModelOption.value?.label || aiModel.value || undefined,
     thinkingEnabled: true,
     attachments: attachmentMetas,
     createdAt: now,
@@ -521,12 +538,15 @@ function buildAiPayload(prompt: string, attachments: any[] = []) {
   }
   removeLayoutBlocks(editor)
   const image = firstImageAttachment(attachments)
+  const modelOption = selectedAiModelOption.value
   return {
     title: props.title || '',
     prompt: prompt || `参考样图调整当前页面：${image?.name || '样图'}`,
     pageType: 'GrapesJS 可视化页面',
     style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。不要生成系统导航栏和页脚，它们由站点 Layout 渲染。',
-    model: aiModel.value || undefined,
+    providerCode: modelOption?.providerCode,
+    modelCode: modelOption?.modelCode || aiModel.value || undefined,
+    model: modelOption?.modelCode || aiModel.value || undefined,
     imageDataUrl: image?.url || undefined,
     currentHtml: editor.getHtml(),
     currentCss: editor.getCss(),

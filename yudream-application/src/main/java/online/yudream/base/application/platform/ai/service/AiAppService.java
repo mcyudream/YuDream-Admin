@@ -79,7 +79,8 @@ public class AiAppService {
         Map<String, String> config = capabilityModuleRepo.findByCode(CAPABILITY_CODE)
                 .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
                 .orElse(Map.of());
-        AiGenerationRequest request = new AiGenerationRequest(systemPrompt(cmd), userPrompt(cmd), cmd.getImageDataUrl(), cmd.getModel(), config);
+        String modelCode = StringUtils.hasText(cmd.getModelCode()) ? cmd.getModelCode() : cmd.getModel();
+        AiGenerationRequest request = new AiGenerationRequest(systemPrompt(cmd), userPrompt(cmd), cmd.getImageDataUrl(), cmd.getProviderCode(), modelCode, config);
         AiGenerationGateway gateway = aiGenerationGatewayProvider.getIfAvailable();
         if (gateway == null) {
             throw new BizException("AI 能力未在当前项目配置中启用");
