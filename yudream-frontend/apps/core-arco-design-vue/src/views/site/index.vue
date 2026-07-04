@@ -548,9 +548,12 @@ function escapeHtml(value: string) {
 
 .site-layout-header__auth .ghost,
 .site-layout-header__account summary {
-  border: 1px solid #e2e8f0;
   background: #fff;
   color: #334155;
+}
+
+.site-layout-header__auth .ghost {
+  border: 1px solid #e2e8f0;
 }
 
 .site-layout-header__auth .primary {
@@ -564,10 +567,11 @@ function escapeHtml(value: string) {
 
 .site-layout-header__account summary {
   gap: 7px;
+  border: 0;
   list-style: none;
   cursor: pointer;
   outline: none;
-  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .site-layout-header__account summary::-webkit-details-marker {
@@ -576,12 +580,10 @@ function escapeHtml(value: string) {
 
 .site-layout-header__account summary:hover,
 .site-layout-header__account[open] summary {
-  border-color: #d1d5db;
   background: #f8fafc;
 }
 
 .site-layout-header__account summary:focus-visible {
-  border-color: #94a3b8;
   box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
 }
 
