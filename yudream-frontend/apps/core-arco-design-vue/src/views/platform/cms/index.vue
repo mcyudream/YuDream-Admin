@@ -3,10 +3,19 @@ import type { BuilderResourceData, PageBuilderConfig, PageSettings } from '@myis
 import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import { getPageBuilder, PageBuilder } from '@myissue/vue-website-page-builder'
 import apiCms from '@/api/modules/platform-cms'
+import CmsBuilderComponents from './components/CmsBuilderComponents.vue'
+import CmsMediaLibrary from './components/CmsMediaLibrary.vue'
 
-type WorkbenchTab = 'pages' | 'home'
+type WorkbenchTab = 'pages' | 'home' | 'navigation'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type BuilderTarget = 'page' | 'home'
+interface CmsNavigationItem {
+  id: string
+  label: string
+  url: string
+  visible: boolean
+  sort: number
+}
 
 const toast = useFaToast()
 const modal = useFaModal()
@@ -18,6 +27,7 @@ const saving = ref(false)
 const pageBuilderVisible = ref(false)
 const builderTarget = ref<BuilderTarget>('page')
 const pages = ref<CmsPage[]>([])
+const navigationItems = ref<CmsNavigationItem[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
 const selectedPageId = ref<number | null>(null)
@@ -83,6 +93,16 @@ const homeHtml = computed({
 })
 const homeBuilderContentStatus = computed(() => homeHtml.value.includes('pagebuilder') ? '已有动态首页内容' : '尚未生成动态首页内容')
 const homePreviewHtml = computed(() => sanitizeHtml(homeHtml.value || emptyHomeBuilderHtml()))
+const cmsVariables = [
+  { key: '{{site.name}}', label: '站点名称' },
+  { key: '{{site.description}}', label: '站点描述' },
+  { key: '{{auth.isLoggedIn}}', label: '是否登录' },
+  { key: '{{auth.welcome}}', label: '登录欢迎语' },
+  { key: '{{user.username}}', label: '用户名' },
+  { key: '{{user.nickname}}', label: '昵称' },
+  { key: '{{user.avatar}}', label: '头像地址' },
+  { key: '{{route.path}}', label: '当前路径' },
+]
 
 watch(activeTab, async () => {
   if (activeTab.value === 'pages') {
@@ -140,6 +160,7 @@ async function loadHome() {
       sections: res.data.sections || [],
       published: Boolean(res.data.published),
     })
+    navigationItems.value = parseNavigationItems(res.data.settings?.navigationJson)
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '首页配置加载失败')
@@ -193,10 +214,9 @@ function resetPageForm() {
 async function savePage() {
   saving.value = true
   try {
-    if (editorMode.value === 'builder') {
-      syncBuilderDraft()
-    }
+    const htmlContent = editorMode.value === 'builder' ? syncBuilderDraft('page') : pageForm.htmlContent
     const payload = { ...pageForm }
+    payload.htmlContent = normalizeBuilderHtml(htmlContent, pageForm.markdownContent)
     const res = selectedPageId.value
       ? await apiCms.updatePage(selectedPageId.value, payload)
       : await apiCms.createPage(payload)
@@ -230,8 +250,11 @@ function confirmPublish() {
 async function saveHome() {
   saving.value = true
   try {
-    if (builderTarget.value === 'home') {
-      syncBuilderDraft('home')
+    const html = builderTarget.value === 'home' ? syncBuilderDraft('home') : homeHtml.value
+    homeHtml.value = normalizeBuilderHtml(html, '') || homeHtml.value
+    home.settings = {
+      ...(home.settings || {}),
+      navigationJson: JSON.stringify(navigationItems.value),
     }
     await apiCms.saveHome({
       ...home,
@@ -284,10 +307,13 @@ async function publishPageBuilder() {
     return
   }
   pageBuilderVisible.value = false
+  await nextTick()
   if (target === 'home') {
+    homeHtml.value = normalizeBuilderHtml(html, '')
     await saveHome()
   }
   else {
+    pageForm.htmlContent = normalizeBuilderHtml(html, pageForm.markdownContent)
     await savePage()
   }
 }
@@ -318,6 +344,27 @@ function syncBuilderDraft(target: BuilderTarget = 'page') {
     // 未打开 builder 时无需同步本地草稿。
   }
   return currentContent || ''
+}
+
+function normalizeBuilderHtml(html?: string, fallbackMarkdown?: string) {
+  const value = html?.trim()
+  if (value) {
+    return value.includes('pagebuilder') ? value : `<div id="pagebuilder">${value}</div>`
+  }
+  const fallback = markdownPreview(fallbackMarkdown)
+  return fallback ? `<div id="pagebuilder"><section data-component-title="Markdown 内容" class="yb-text">${fallback}</section></div>` : ''
+}
+
+function insertVariable(variable: string) {
+  if (activeTab.value === 'home') {
+    homeHtml.value = `${homeHtml.value || emptyHomeBuilderHtml()}\n${variable}`
+  }
+  else if (editorMode.value === 'markdown') {
+    pageForm.markdownContent = `${pageForm.markdownContent || ''}\n${variable}`
+  }
+  else {
+    pageForm.htmlContent = `${pageForm.htmlContent || emptyBuilderHtml()}\n${variable}`
+  }
 }
 
 function buildPageBuilderConfig(target: BuilderTarget, pageSettings?: PageSettings): PageBuilderConfig {
@@ -376,6 +423,36 @@ function addHomeSection(type: HomeSectionType) {
 
 function removeHomeSection(section: HomeSection) {
   home.sections = home.sections.filter(item => item !== section)
+}
+
+function addNavigationItem() {
+  navigationItems.value.push({
+    id: `nav-${Date.now()}`,
+    label: '新菜单',
+    url: '/site',
+    visible: true,
+    sort: navigationItems.value.length + 1,
+  })
+}
+
+function removeNavigationItem(item: CmsNavigationItem) {
+  navigationItems.value = navigationItems.value.filter(current => current !== item)
+}
+
+function parseNavigationItems(value?: string): CmsNavigationItem[] {
+  if (!value) {
+    return [
+      { id: 'home', label: '首页', url: '/site', visible: true, sort: 1 },
+      { id: 'login', label: '登录', url: '/login', visible: true, sort: 2 },
+    ]
+  }
+  try {
+    const parsed = JSON.parse(value) as CmsNavigationItem[]
+    return Array.isArray(parsed) ? parsed : []
+  }
+  catch {
+    return []
+  }
 }
 
 function emptyBuilderHtml() {
@@ -448,7 +525,7 @@ function sectionTitle(type: HomeSectionType) {
       </FaButton>
       <FaButton v-else v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
         <FaIcon name="i-ri:save-3-line" />
-        保存首页
+        {{ activeTab === 'navigation' ? '保存导航' : '保存首页' }}
       </FaButton>
     </FaPageHeader>
 
@@ -461,6 +538,10 @@ function sectionTitle(type: HomeSectionType) {
         <button type="button" :class="{ active: activeTab === 'home' }" @click="activeTab = 'home'">
           <FaIcon name="i-ri:home-4-line" />
           首页外观
+        </button>
+        <button type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
+          <FaIcon name="i-ri:menu-search-line" />
+          导航菜单
         </button>
         <a class="public-link" href="/site" target="_blank" rel="noopener noreferrer">
           <FaIcon name="i-ri:external-link-line" />
@@ -565,13 +646,23 @@ function sectionTitle(type: HomeSectionType) {
           </section>
 
           <section>
+            <h3>动态变量</h3>
+            <div class="variable-list">
+              <button v-for="item in cmsVariables" :key="item.key" type="button" @click="insertVariable(item.key)">
+                <strong>{{ item.key }}</strong>
+                <span>{{ item.label }}</span>
+              </button>
+            </div>
+          </section>
+
+          <section>
             <h3>实时预览</h3>
             <div class="mini-preview" v-html="pagePreviewHtml" />
           </section>
         </aside>
       </section>
 
-      <section v-else v-loading="loading" class="home-layout">
+      <section v-else-if="activeTab === 'home'" v-loading="loading" class="home-layout">
         <main class="home-form">
           <section class="builder-entry home-builder-entry">
             <div>
@@ -651,6 +742,11 @@ function sectionTitle(type: HomeSectionType) {
 
           <section>
             <h3>公开预览</h3>
+            <div class="variable-list compact">
+              <button v-for="item in cmsVariables.slice(0, 5)" :key="item.key" type="button" @click="insertVariable(item.key)">
+                <strong>{{ item.key }}</strong>
+              </button>
+            </div>
             <div class="home-public-preview">
               <div v-if="homeHtml" v-html="homePreviewHtml" />
               <template v-else>
@@ -668,10 +764,60 @@ function sectionTitle(type: HomeSectionType) {
           </section>
         </aside>
       </section>
+
+      <section v-else v-loading="loading" class="navigation-layout">
+        <main class="navigation-panel">
+          <div class="legacy-sections__head">
+            <div>
+              <h3>站点导航</h3>
+              <p>类似 WordPress 菜单，可用于公开首页和内容页顶部导航。</p>
+            </div>
+            <FaButton v-auth="'platform:cms:edit'" @click="addNavigationItem">
+              <FaIcon name="i-ri:add-line" />
+              新增菜单
+            </FaButton>
+          </div>
+          <article v-for="item in navigationItems" :key="item.id" class="builder-block">
+            <div class="builder-block__head">
+              <FaTag variant="secondary">#{{ item.sort }}</FaTag>
+              <FaButton size="sm" variant="ghost" @click="removeNavigationItem(item)">
+                <FaIcon name="i-ri:delete-bin-line" />
+              </FaButton>
+            </div>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <FaInput v-model="item.label" placeholder="菜单名称" />
+              <FaInput v-model="item.url" placeholder="/site/about 或 https://..." />
+              <FaInput v-model.number="item.sort" type="number" placeholder="排序" />
+              <label class="inline-flex items-center gap-2 text-sm">
+                <FaSwitch v-model="item.visible" />
+                显示菜单
+              </label>
+            </div>
+          </article>
+        </main>
+        <aside class="home-preview">
+          <section>
+            <h3>导航预览</h3>
+            <nav class="cms-nav-preview">
+              <a v-for="item in navigationItems.filter(nav => nav.visible).sort((a, b) => a.sort - b.sort)" :key="item.id" :href="item.url">
+                {{ item.label }}
+              </a>
+            </nav>
+          </section>
+          <section>
+            <h3>使用说明</h3>
+            <p class="cms-help-text">
+              导航保存到首页 settings.navigationJson，公开站点会自动渲染；区块中也可以使用头像列表变量做会员入口。
+            </p>
+          </section>
+        </aside>
+      </section>
     </FaPageMain>
 
     <div v-if="pageBuilderVisible" class="page-builder-shell">
       <PageBuilder
+        :CustomMediaLibraryComponent="CmsMediaLibrary"
+        :CustomBuilderComponents="CmsBuilderComponents"
         :show-close-button="true"
         :show-publish-button="true"
         @handle-close-page-builder="closePageBuilder"
@@ -893,6 +1039,49 @@ function sectionTitle(type: HomeSectionType) {
   text-decoration: none;
 }
 
+.variable-list {
+  display: grid;
+  gap: 8px;
+}
+
+.variable-list.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.variable-list button {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+  color: var(--color-text-2);
+  text-align: left;
+}
+
+.variable-list button:hover {
+  border-color: rgb(var(--primary-6));
+  color: rgb(var(--primary-6));
+}
+
+.variable-list strong,
+.variable-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-list strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+
+.variable-list span {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
 .mini-preview {
   max-height: 460px;
   overflow: auto;
@@ -926,6 +1115,43 @@ function sectionTitle(type: HomeSectionType) {
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: 16px;
   align-items: start;
+}
+
+.navigation-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 16px;
+  align-items: start;
+}
+
+.navigation-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.cms-nav-preview {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cms-nav-preview a {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 999px;
+  color: var(--color-text-2);
+  text-decoration: none;
+}
+
+.cms-help-text {
+  margin: 0;
+  color: var(--color-text-3);
+  line-height: 1.6;
 }
 
 .home-preview,
@@ -1059,7 +1285,8 @@ function sectionTitle(type: HomeSectionType) {
 
 @media (max-width: 1180px) {
   .cms-layout,
-  .home-layout {
+  .home-layout,
+  .navigation-layout {
     grid-template-columns: 1fr;
   }
 }
