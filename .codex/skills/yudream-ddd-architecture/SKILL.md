@@ -15,6 +15,7 @@ description: Enforce YuDream Admin backend DDD layering and project-specific arc
    - `yudream-interfaces/src/main/java/online/yudream/base/interfaces/...`
 3. Prefer the `system/user` package as the baseline pattern. It is the reference for aggregate, value object, repository, application command/query/DTO/service, infra data object/mapper/impl/service, and interface controller/assembler/request/res layout.
 4. Read `references/knowledge.json` when a task involves a repeated pitfall, known utility, or tool usage. Append durable lessons with `scripts/add_knowledge.py` when the user corrects the same issue, when a bug pattern is important, or when a reusable utility is discovered.
+5. When a task proves an existing project rule is ineffective, changes an architecture decision, or introduces a reusable implementation pattern, update this skill or `references/knowledge.json` in the same work item. Do not leave code and project rules out of sync.
 
 ## Layer Contract
 
@@ -97,9 +98,13 @@ Assembler hard rules:
 
 - Security and identity abilities such as interface encryption, dual token, API Key, Passkey, and OAuth are system baseline abilities and belong in `system`.
 - Optional engineering abilities such as SSE, WebSocket, MQ, Neo4j, Python Runtime, HTTP integration, document generation, and CMS are dynamically loadable platform abilities and belong in `platform`, separate from `system`.
-- Platform capabilities default to disabled and must support dynamic enable/disable.
-- Disabled platform capabilities must not create external connections, declare middleware resources, or require projects to configure unused middleware.
-- Enabled platform capabilities should be driven by capability config and should lazily connect when a business operation or health/test action actually needs the external system.
+- Platform capability runtime has two gates:
+  - project gate: configuration file or Spring conditional annotation decides whether the project allows loading the capability provider, for example `yudream.platform.capabilities.rabbitmq.enabled=true` with `@ConditionalOnProperty`;
+  - application gate: application service checks the persisted capability state before each use case and calls `ensureEnabled(...)` before invoking technical tools.
+- A capability that is not allowed by the project gate must not appear as a runtime-toggleable provider, must not register endpoints/handlers, and must not be restored at application startup.
+- A capability disabled by the application gate must reject use cases in the application layer and must not create external connections, declare middleware resources, or require projects to configure unused middleware.
+- Infra providers are only tool wrappers. Provider construction and `enable(config)` may store local config or mark state, but must not open MQ/Neo4j/Redis-like connections, verify remote connectivity, declare queues/topics, or start long-running resources.
+- External connections/resources may be created only after both gates pass and a business operation, connect action, health action, or explicit test action actually needs the external system. Close and clear resources on disable.
 
 ## Excel / Import Export
 
@@ -142,6 +147,7 @@ pnpm --config.engine-strict=false --filter @fantastic-admin/core-arco-design-vue
 
 - After completing each independently usable module, run the relevant verification, stage only files for that module, and create a git commit before moving to the next module.
 - Write commit messages in Chinese and make them describe the completed module or fix, for example `feat: 完成用户管理模块` or `fix: 修复菜单图标显示`.
+- If a module changes or corrects project architecture rules, include the matching `.codex/skills/yudream-ddd-architecture` update in the same commit.
 - Do not include unrelated local files such as IDE metadata or temporary setup files unless the user explicitly asks.
 - If a module cannot be committed because verification fails or the working tree contains conflicting user changes, report the blocker before continuing.
 

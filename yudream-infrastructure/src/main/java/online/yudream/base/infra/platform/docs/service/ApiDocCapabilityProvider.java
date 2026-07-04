@@ -8,11 +8,13 @@ import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
 import online.yudream.base.domain.platform.docs.aggregate.ApiDocSettings;
 import online.yudream.base.domain.platform.docs.repo.ApiDocSettingsRepo;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
 @Component
+@ConditionalOnProperty(prefix = "yudream.platform.capabilities.api-docs", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class ApiDocCapabilityProvider implements CapabilityProvider {
 

@@ -7,12 +7,14 @@ import online.yudream.base.domain.platform.capability.valobj.CapabilityDescripto
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
 import online.yudream.base.domain.platform.graph.service.GraphDatabaseGateway;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
+@ConditionalOnProperty(prefix = "yudream.platform.capabilities.neo4j", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class Neo4jCapabilityProvider implements CapabilityProvider {
 

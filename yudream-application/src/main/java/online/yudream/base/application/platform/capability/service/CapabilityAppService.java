@@ -32,7 +32,9 @@ public class CapabilityAppService {
     @Transactional
     public List<CapabilityDTO> list() {
         syncDescriptors();
+        Map<String, CapabilityProvider> providerMap = providerMap();
         return capabilityModuleRepo.findAll().stream()
+                .filter(module -> providerMap.containsKey(module.getCode()))
                 .sorted(Comparator.comparing(CapabilityModule::getSort, Comparator.nullsLast(Comparator.reverseOrder())))
                 .map(module -> CapabilityAssembler.toDTO(module, healthOf(module)))
                 .toList();
@@ -106,9 +108,11 @@ public class CapabilityAppService {
 
     public void restoreEnabledProviders() {
         syncDescriptors();
+        Map<String, CapabilityProvider> providerMap = providerMap();
         for (CapabilityModule module : capabilityModuleRepo.findAll()) {
-            if (module.enabled()) {
-                provider(module.getCode()).enable(module.getConfig());
+            CapabilityProvider provider = providerMap.get(module.getCode());
+            if (module.enabled() && provider != null) {
+                provider.enable(module.getConfig());
             }
         }
     }
@@ -121,7 +125,7 @@ public class CapabilityAppService {
     private CapabilityProvider provider(String code) {
         CapabilityProvider provider = providerMap().get(code);
         if (provider == null) {
-            throw new BizException("能力提供器不存在");
+            throw new BizException("能力未在当前项目配置中启用或提供器不存在");
         }
         return provider;
     }

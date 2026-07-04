@@ -8,12 +8,14 @@ import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
 import online.yudream.base.domain.platform.integration.enumerate.ExecutionStatus;
 import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
+@ConditionalOnProperty(prefix = "yudream.platform.capabilities.integration", name = "enabled", havingValue = "true")
 @RequiredArgsConstructor
 public class IntegrationCapabilityProvider implements CapabilityProvider {
 
