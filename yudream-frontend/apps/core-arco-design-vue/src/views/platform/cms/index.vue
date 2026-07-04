@@ -5,6 +5,7 @@ import apiFiles from '@/api/modules/files'
 import apiCms from '@/api/modules/platform-cms'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
+import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
 
 type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
@@ -762,7 +763,7 @@ function sectionTitle(type: HomeSectionType) {
             <div class="builder-entry__preview" v-html="pagePreviewHtml" />
           </section>
 
-          <FaTextarea v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" rows="22" input-class="font-mono" />
+          <CmsMarkdownEditor v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" />
           <FaTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<main>...</main>" />
         </main>
 
