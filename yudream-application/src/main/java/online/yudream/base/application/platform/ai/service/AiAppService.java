@@ -67,11 +67,8 @@ public class AiAppService {
         if (gateway == null) {
             throw new BizException("AI 能力未在当前项目配置中启用");
         }
-        AiGenerationResult result = stream ? gateway.generateStream(request, null) : gateway.generate(request);
+        AiGenerationResult result = stream ? gateway.generateStream(request, onDelta) : gateway.generate(request);
         CmsPageGenerateDTO dto = AiAssembler.toDTO(result);
-        if (stream && onDelta != null && StringUtils.hasText(dto.getSummary())) {
-            onDelta.accept(dto.getSummary());
-        }
         List<AiAgentToolResult> toolResults = result.toolResults() == null || result.toolResults().isEmpty()
                 ? executeToolCalls(result, dto)
                 : result.toolResults();

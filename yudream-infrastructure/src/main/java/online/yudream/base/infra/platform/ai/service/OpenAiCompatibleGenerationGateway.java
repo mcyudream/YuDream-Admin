@@ -43,12 +43,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 @Component
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
-    private static final int TIMEOUT = 60000;
+    private static final int CONNECT_TIMEOUT = 30000;
+    private static final int READ_TIMEOUT = 180000;
     private static final int ERROR_BODY_LIMIT = 500;
     private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
 
@@ -65,6 +67,55 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             throw new BizException("AI API Key 未配置");
         }
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
+        try {
+            String content = requestSpec(request, config, toolResults).call().content();
+            return toResult(content, toolResults);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("AI 调用异常：" + explainException(e));
+        }
+    }
+
+    @Override
+    public AiGenerationResult generateStream(AiGenerationRequest request, Consumer<String> onDelta) {
+        Map<String, String> config = request.config() == null ? Map.of() : request.config();
+        if (!StringUtils.hasText(value(config, "apiKey", ""))) {
+            throw new BizException("AI API Key 未配置");
+        }
+        List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
+        StringBuilder content = new StringBuilder();
+        try {
+            requestSpec(request, config, toolResults)
+                    .stream()
+                    .content()
+                    .doOnNext(delta -> {
+                        if (!StringUtils.hasText(delta)) {
+                            return;
+                        }
+                        content.append(delta);
+                        if (onDelta != null) {
+                            onDelta.accept(delta);
+                        }
+                    })
+                    .blockLast(Duration.ofMillis(READ_TIMEOUT));
+            return toResult(content.toString(), toolResults);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("AI 流式调用异常：" + explainException(e));
+        }
+    }
+
+    public void test(Map<String, String> config, String message) {
+        generate(new AiGenerationRequest("你是 YuDream AI 能力连通性测试助手，只需要返回一句简短中文。", message, null, null, config));
+    }
+
+    private ChatClient.ChatClientRequestSpec requestSpec(
+            AiGenerationRequest request,
+            Map<String, String> config,
+            List<AiAgentToolResult> toolResults
+    ) {
         ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(config, request.model()))
                 .prompt()
                 .system(request.systemPrompt())
@@ -76,21 +127,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         if (!callbacks.isEmpty()) {
             spec.toolCallbacks(callbacks);
         }
-        try {
-            String content = spec.call().content();
-            if (!toolResults.isEmpty()) {
-                return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", List.of(), List.copyOf(toolResults));
-            }
-            return toLegacyResult(content);
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BizException("AI 调用异常：" + explainException(e));
-        }
-    }
-
-    public void test(Map<String, String> config, String message) {
-        generate(new AiGenerationRequest("你是 YuDream AI 能力连通性测试助手，只需要返回一句简短中文。", message, null, null, config));
+        return spec;
     }
 
     private OpenAiChatModel chatModel(Map<String, String> config, String requestModel) {
@@ -126,8 +163,8 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private RestClient.Builder restClientBuilder(Map<String, String> config) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(TIMEOUT));
-        factory.setReadTimeout(Duration.ofMillis(TIMEOUT));
+        factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT));
+        factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT));
         String proxyUrl = value(config, "proxyUrl", "");
         if (StringUtils.hasText(proxyUrl)) {
             URI uri = parseProxyUri(proxyUrl);
@@ -218,6 +255,13 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         } catch (Exception e) {
             throw new BizException("样图解析失败：" + e.getMessage());
         }
+    }
+
+    private AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
+        if (toolResults != null && !toolResults.isEmpty()) {
+            return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", List.of(), List.copyOf(toolResults));
+        }
+        return toLegacyResult(content);
     }
 
     private AiGenerationResult toLegacyResult(String content) {
