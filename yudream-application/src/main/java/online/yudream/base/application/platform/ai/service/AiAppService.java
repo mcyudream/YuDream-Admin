@@ -6,15 +6,23 @@ import online.yudream.base.application.platform.ai.cmd.CmsPageGenerateCmd;
 import online.yudream.base.application.platform.ai.dto.CmsPageGenerateDTO;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,9 +33,28 @@ public class AiAppService {
     private final CapabilityAppService capabilityAppService;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final ObjectProvider<AiGenerationGateway> aiGenerationGatewayProvider;
+    private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
 
     @Transactional(readOnly = true)
     public CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd) {
+        return generateCmsPage(cmd, null, false);
+    }
+
+    @Transactional(readOnly = true)
+    public CmsPageGenerateDTO streamCmsPage(CmsPageGenerateCmd cmd, Consumer<String> onDelta) {
+        return streamCmsPage(cmd, onDelta, null);
+    }
+
+    @Transactional(readOnly = true)
+    public CmsPageGenerateDTO streamCmsPage(CmsPageGenerateCmd cmd, Consumer<String> onDelta, Consumer<AiAgentToolResult> onTool) {
+        return generateCmsPage(cmd, onDelta, onTool, true);
+    }
+
+    private CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd, Consumer<String> onDelta, boolean stream) {
+        return generateCmsPage(cmd, onDelta, null, stream);
+    }
+
+    private CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd, Consumer<String> onDelta, Consumer<AiAgentToolResult> onTool, boolean stream) {
         capabilityAppService.ensureEnabled(CAPABILITY_CODE, "AI");
         if (!StringUtils.hasText(cmd.getPrompt()) && !StringUtils.hasText(cmd.getImageDataUrl())) {
             throw new BizException("生成需求或样图不能为空");
@@ -40,16 +67,27 @@ public class AiAppService {
         if (gateway == null) {
             throw new BizException("AI 能力未在当前项目配置中启用");
         }
-        return AiAssembler.toDTO(gateway.generate(request));
+        AiGenerationResult result = stream ? gateway.generateStream(request, onDelta) : gateway.generate(request);
+        CmsPageGenerateDTO dto = AiAssembler.toDTO(result);
+        List<AiAgentToolResult> toolResults = executeToolCalls(result, dto);
+        if (onTool != null) {
+            toolResults.forEach(onTool);
+        }
+        return AiAssembler.withTools(dto, toolResults);
     }
 
     private String systemPrompt() {
         return """
-                你是 YuDream CMS 页面构建 Agent。只返回一个 JSON 对象，不要 Markdown 代码块，不要解释。
-                JSON 字段必须包含：title, summary, htmlContent, cssContent, builderProjectJson, markdownContent。
-                htmlContent 只返回页面主体内容，不要 html/head/body/script，不要系统导航栏或 footer。
-                cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀。
-                builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent 足够完整。
+                你是 YuDream CMS 页面构建 Agent。只能返回一个 JSON 对象，不要 Markdown 代码块，不要解释。
+                JSON 字段必须包含：message, toolCalls。
+                message 是给用户看的简短自然语言进展说明。
+                toolCalls 是数组。当前可用工具：
+                - cms.canvas.patch：修改 GrapesJS CMS 画布。
+                  arguments.action 支持 replace-page, set-html, set-css, load-project, add-html, remove-selector。
+                  arguments.htmlContent 只返回页面主体内容，不要 html/head/body/script，不要系统导航栏或 footer。
+                  arguments.cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀。
+                  arguments.builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent 足够完整。
+                兼容字段 title, summary, htmlContent, cssContent, builderProjectJson, markdownContent 可以同步放在顶层，但真正画布修改必须放到 toolCalls[0].arguments。
                 页面视觉要现代、留白克制、响应式，不要使用外部脚本。
                 """;
     }
@@ -87,5 +125,42 @@ public class AiAppService {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value.trim() : fallback;
+    }
+
+    private List<AiAgentToolResult> executeToolCalls(AiGenerationResult result, CmsPageGenerateDTO dto) {
+        List<AiAgentToolCall> calls = result.toolCalls();
+        if (calls == null || calls.isEmpty()) {
+            calls = fallbackToolCalls(dto);
+        }
+        Map<String, AiAgentTool> tools = aiAgentToolProvider.stream()
+                .collect(Collectors.toMap(tool -> tool.descriptor().name(), tool -> tool, (left, right) -> left, LinkedHashMap::new));
+        return calls.stream()
+                .map(call -> executeTool(tools, call))
+                .toList();
+    }
+
+    private AiAgentToolResult executeTool(Map<String, AiAgentTool> tools, AiAgentToolCall call) {
+        AiAgentTool tool = tools.get(call.toolName());
+        if (tool == null) {
+            throw new BizException("AI 工具不存在：" + call.toolName());
+        }
+        return tool.execute(call);
+    }
+
+    private List<AiAgentToolCall> fallbackToolCalls(CmsPageGenerateDTO dto) {
+        if (!StringUtils.hasText(dto.getHtmlContent())
+                && !StringUtils.hasText(dto.getCssContent())
+                && !StringUtils.hasText(dto.getBuilderProjectJson())) {
+            return List.of();
+        }
+        Map<String, Object> arguments = new LinkedHashMap<>();
+        arguments.put("action", "replace-page");
+        arguments.put("title", dto.getTitle());
+        arguments.put("summary", dto.getSummary());
+        arguments.put("htmlContent", dto.getHtmlContent());
+        arguments.put("cssContent", dto.getCssContent());
+        arguments.put("builderProjectJson", dto.getBuilderProjectJson());
+        arguments.put("markdownContent", dto.getMarkdownContent());
+        return List.of(new AiAgentToolCall(CmsCanvasAiTool.TOOL_NAME, arguments));
     }
 }

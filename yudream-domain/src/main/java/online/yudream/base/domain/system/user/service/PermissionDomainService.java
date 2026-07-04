@@ -73,6 +73,20 @@ public class PermissionDomainService {
         log.info("Permission sync completed, created={}, updated={}, deprecated={}", created, updated, deprecated);
     }
 
+    public void upsertManualPermissions(Collection<PermissionMeta> permissions) {
+        if (permissions == null || permissions.isEmpty()) {
+            return;
+        }
+        for (PermissionMeta meta : permissions) {
+            Permission permission = permissionRepo.findByCode(meta.code())
+                    .orElseGet(() -> Permission.create(meta.code(), meta.name(), meta.module(), meta.desc(), PermissionSource.MANUAL));
+            permission.update(meta.name(), meta.module(), meta.desc());
+            permission.setSource(PermissionSource.MANUAL);
+            permission.activate();
+            permissionRepo.save(permission);
+        }
+    }
+
     private PermissionSource resolveSource(PermissionSource source) {
         return source == null ? PermissionSource.ANNOTATION : source;
     }

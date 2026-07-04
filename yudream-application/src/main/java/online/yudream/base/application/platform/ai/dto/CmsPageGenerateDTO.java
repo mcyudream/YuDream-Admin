@@ -3,6 +3,9 @@ package online.yudream.base.application.platform.ai.dto;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
 @Builder
 public class CmsPageGenerateDTO {
@@ -12,4 +15,6 @@ public class CmsPageGenerateDTO {
     private String cssContent;
     private String builderProjectJson;
     private String markdownContent;
+    @Builder.Default
+    private List<AiToolCallDTO> tools = new ArrayList<>();
 }
