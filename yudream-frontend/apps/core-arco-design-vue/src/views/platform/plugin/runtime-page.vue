@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import { createPluginSdk } from '@/plugins/sdk'
+import AuthlibInjectorBuiltin from './builtin/authlib-injector.vue'
+import BlessingSkinBuiltin from './builtin/blessing-skin.vue'
 
 interface PluginRouteMeta {
   pluginCode: string
@@ -19,6 +21,14 @@ const remoteError = ref('')
 
 const plugin = computed(() => (route.meta.plugin || {}) as PluginRouteMeta)
 const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
+const builtinComponent = computed<Component | null>(() => {
+  const component = plugin.value.component || ''
+  const map: Record<string, Component> = {
+    'blessing-skin/Home': BlessingSkinBuiltin,
+    'authlib-injector/Home': AuthlibInjectorBuiltin,
+  }
+  return map[component] || null
+})
 
 watch(plugin, loadRemoteComponent, { immediate: true })
 
@@ -74,6 +84,12 @@ async function callHello() {
       <component
         :is="remoteComponent"
         v-if="remoteComponent"
+        :sdk="sdk"
+        :route="route"
+      />
+      <component
+        :is="builtinComponent"
+        v-else-if="builtinComponent"
         :sdk="sdk"
         :route="route"
       />
