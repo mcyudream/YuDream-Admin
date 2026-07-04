@@ -27,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -57,6 +58,7 @@ public class WordDocumentAppService {
     public WordTemplateDTO uploadTemplate(InputStream inputStream, String originalName, String contentType,
                                           long size, WordTemplateSaveCmd cmd, Long operatorId) {
         ensureEnabled();
+        validateDocxTemplateFile(originalName, contentType);
         if (wordTemplateRepo.findByCode(cmd.getCode()).isPresent()) {
             throw new BizException("模板编码已存在");
         }
@@ -78,6 +80,7 @@ public class WordDocumentAppService {
     public WordTemplateDTO replaceTemplateFile(Long id, InputStream inputStream, String originalName, String contentType,
                                                long size, Long operatorId) {
         ensureEnabled();
+        validateDocxTemplateFile(originalName, contentType);
         WordTemplate template = template(id);
         FileObjectDTO file = fileAppService.upload(inputStream, originalName, contentType, size, "word-template", operatorId, false);
         template.replaceFile(file.getId(), originalName);
@@ -146,6 +149,19 @@ public class WordDocumentAppService {
                 .orElse(false);
         if (!enabled) {
             throw new BizException("Word 模板能力未启用");
+        }
+    }
+
+    private void validateDocxTemplateFile(String originalName, String contentType) {
+        if (originalName == null || !originalName.toLowerCase(Locale.ROOT).endsWith(".docx")) {
+            throw new BizException("Word 模板文件必须是 .docx 格式");
+        }
+        if (contentType == null || contentType.isBlank()) {
+            return;
+        }
+        String normalized = contentType.toLowerCase(Locale.ROOT);
+        if (!DOCX_CONTENT_TYPE.equals(normalized) && !"application/octet-stream".equals(normalized)) {
+            throw new BizException("Word 模板文件类型不正确");
         }
     }
 
