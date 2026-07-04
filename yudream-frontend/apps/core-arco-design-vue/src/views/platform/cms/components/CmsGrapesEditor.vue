@@ -14,6 +14,8 @@ interface GrapesSavePayload {
   builderProjectJson: string
 }
 
+type RightPanelTab = 'ai' | 'layers' | 'traits' | 'styles'
+
 const props = defineProps<{
   htmlContent?: string
   cssContent?: string
@@ -43,10 +45,54 @@ const aiPrompt = ref('')
 const aiModel = ref('')
 const aiImageDataUrl = ref('')
 const aiImageName = ref('')
+const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
+const canvasRevision = ref(0)
 const aiMessages = ref<{ role: 'user' | 'assistant', content: string }[]>([
   { role: 'assistant', content: '我可以读取当前画布，并按你的描述直接修改或增加区块。' },
 ])
+const aiSuggestions = [
+  '优化首屏视觉，让层次更清晰',
+  '新增三列功能卡片并统一按钮样式',
+  '根据样图调整版式和配色',
+  '优化移动端排版和间距',
+]
 let editor: Editor | null = null
+
+const rightPanelTabs = computed(() => {
+  const tabs: { label: string, value: RightPanelTab, icon: string }[] = [
+    { label: '图层', value: 'layers', icon: 'i-ri:stack-line' },
+    { label: '属性', value: 'traits', icon: 'i-ri:settings-3-line' },
+    { label: '样式', value: 'styles', icon: 'i-ri:palette-line' },
+  ]
+  return props.aiEnabled
+    ? [{ label: 'AI', value: 'ai' as const, icon: 'i-ri:sparkling-2-line' }, ...tabs]
+    : tabs
+})
+
+const canvasStats = computed(() => {
+  canvasRevision.value
+  if (!editor) {
+    return [
+      { label: 'HTML', value: '待加载' },
+      { label: 'CSS', value: '待加载' },
+      { label: '项目源', value: '待加载' },
+    ]
+  }
+  return [
+    { label: 'HTML', value: `${editor.getHtml().length} 字符` },
+    { label: 'CSS', value: `${editor.getCss().length} 字符` },
+    { label: '项目源', value: `${JSON.stringify(editor.getProjectData()).length} 字符` },
+  ]
+})
+
+watch(() => props.aiEnabled, (enabled) => {
+  if (!enabled && rightPanelTab.value === 'ai') {
+    rightPanelTab.value = 'layers'
+  }
+  if (enabled && !rightPanelTabs.value.some(tab => tab.value === rightPanelTab.value)) {
+    rightPanelTab.value = 'ai'
+  }
+})
 
 onMounted(async () => {
   const { default: grapes } = await import('grapesjs')
@@ -81,6 +127,10 @@ onMounted(async () => {
   registerBlocks(editor)
   loadInitialContent(editor)
   removeLayoutBlocks(editor)
+  editor.on('component:add component:update component:remove style:update undo redo load', () => {
+    canvasRevision.value += 1
+  })
+  canvasRevision.value += 1
   await loadMedia()
   aiModel.value = props.aiModelOptions?.[0]?.value || ''
 })
@@ -163,6 +213,10 @@ async function askAi() {
   finally {
     aiGenerating.value = false
   }
+}
+
+function useSuggestion(suggestion: string) {
+  aiPrompt.value = suggestion
 }
 
 function applyAiResult(result: CmsPageGenerateResult) {
@@ -563,57 +617,94 @@ function escapeAttr(value: string) {
       </main>
 
       <aside class="grapes-sidebar right">
-        <section v-if="aiEnabled" class="ai-assistant">
-          <div class="ai-head">
-            <h3>AI 助手</h3>
-            <FaTag variant="secondary">读取当前画布</FaTag>
+        <div class="right-tabs" role="tablist" aria-label="构建器右侧面板">
+          <button
+            v-for="tab in rightPanelTabs"
+            :key="tab.value"
+            type="button"
+            :class="{ active: rightPanelTab === tab.value }"
+            role="tab"
+            :aria-selected="rightPanelTab === tab.value"
+            @click="rightPanelTab = tab.value"
+          >
+            <FaIcon :name="tab.icon" />
+            <span>{{ tab.label }}</span>
+          </button>
+        </div>
+
+        <section v-if="aiEnabled" class="right-panel ai-panel" :class="{ active: rightPanelTab === 'ai' }">
+          <div class="ai-panel__head">
+            <div>
+              <h3>AI 助手</h3>
+              <p>读取当前画布，按你的想法直接修改或新增内容。</p>
+            </div>
+            <FaTag variant="secondary">上下文已连接</FaTag>
           </div>
+
+          <div class="ai-context">
+            <div v-for="item in canvasStats" :key="item.label">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+            </div>
+          </div>
+
           <FaSelect
             v-if="aiModelOptions?.length"
             v-model="aiModel"
             :options="aiModelOptions"
             placeholder="选择模型"
           />
-          <div class="ai-chat">
+
+          <div class="ai-suggestions" aria-label="AI 快捷指令">
+            <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
+              {{ suggestion }}
+            </button>
+          </div>
+
+          <div class="ai-chat" aria-label="AI 对话历史">
             <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.role">
-              {{ message.content }}
+              <span>{{ message.role === 'user' ? '你' : 'AI' }}</span>
+              <p>{{ message.content }}</p>
             </div>
           </div>
-          <FaTextarea
-            v-model="aiPrompt"
-            rows="4"
-            placeholder="比如：把首屏改成科技 SaaS 风格，增加三列功能卡片，按钮改成绿色渐变"
-            @keydown.ctrl.enter.prevent="askAi"
-          />
-          <input ref="aiImageInput" type="file" accept="image/*" hidden @change="onAiImageChange">
-          <div class="ai-tools">
-            <FaButton size="sm" variant="outline" type="button" @click="pickAiImage">
-              <FaIcon name="i-ri:image-add-line" />
-              样图
-            </FaButton>
-            <FaButton v-if="aiImageDataUrl" size="sm" variant="ghost" type="button" @click="clearAiImage">
-              <FaIcon name="i-ri:close-line" />
-              移除
-            </FaButton>
-            <FaButton size="sm" :loading="aiGenerating" type="button" @click="askAi">
-              <FaIcon name="i-ri:sparkling-2-line" />
-              修改画布
-            </FaButton>
-          </div>
-          <div v-if="aiImageDataUrl" class="ai-image-preview">
-            <img :src="aiImageDataUrl" :alt="aiImageName || 'AI 样图'">
-            <span>{{ aiImageName }}</span>
+
+          <div class="ai-composer">
+            <FaTextarea
+              v-model="aiPrompt"
+              rows="5"
+              placeholder="告诉 AI 要怎么改当前画布。支持仅描述需求，也可以附一张样图作为参考。"
+              @keydown.ctrl.enter.prevent="askAi"
+            />
+            <input ref="aiImageInput" type="file" accept="image/*" hidden @change="onAiImageChange">
+            <div v-if="aiImageDataUrl" class="ai-image-preview">
+              <img :src="aiImageDataUrl" :alt="aiImageName || 'AI 样图'">
+              <div>
+                <strong>{{ aiImageName }}</strong>
+                <button type="button" @click="clearAiImage">移除样图</button>
+              </div>
+            </div>
+            <div class="ai-tools">
+              <FaButton size="sm" variant="outline" type="button" @click="pickAiImage">
+                <FaIcon name="i-ri:image-add-line" />
+                样图
+              </FaButton>
+              <FaButton size="sm" :loading="aiGenerating" type="button" @click="askAi">
+                <FaIcon name="i-ri:sparkling-2-line" />
+                修改画布
+              </FaButton>
+            </div>
           </div>
         </section>
-        <section>
+
+        <section class="right-panel" :class="{ active: rightPanelTab === 'layers' }">
           <h3>图层</h3>
           <div ref="layersEl" />
         </section>
-        <section>
+        <section class="right-panel" :class="{ active: rightPanelTab === 'traits' }">
           <h3>属性</h3>
           <div ref="traitsEl" />
         </section>
-        <section>
+        <section class="right-panel" :class="{ active: rightPanelTab === 'styles' }">
           <h3>样式</h3>
           <div ref="stylesEl" />
         </section>
@@ -658,7 +749,7 @@ function escapeAttr(value: string) {
 
 .grapes-body {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: 280px minmax(0, 1fr) 360px;
   min-height: 0;
 }
 
@@ -678,6 +769,10 @@ function escapeAttr(value: string) {
 }
 
 .grapes-sidebar.right {
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  gap: 10px;
+  overflow: hidden;
   border-left: 1px solid #e5e7eb;
 }
 
@@ -724,14 +819,126 @@ function escapeAttr(value: string) {
   object-fit: cover;
 }
 
-.ai-assistant {
-  padding: 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 8px;
-  background: #f8fbff;
+.right-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
 }
 
-.ai-head,
+.right-tabs button {
+  display: inline-flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.right-tabs button.active {
+  background: #fff;
+  color: #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.right-tabs button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-panel {
+  display: none !important;
+  min-height: 0;
+  overflow: auto;
+}
+
+.right-panel.active {
+  display: grid !important;
+  gap: 10px;
+  align-content: start;
+}
+
+.ai-panel.active {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  height: 100%;
+  overflow: hidden;
+}
+
+.ai-panel__head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.ai-panel__head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ai-context {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ai-context div {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.ai-context span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.ai-context strong {
+  overflow: hidden;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-suggestions button {
+  max-width: 100%;
+  padding: 5px 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ai-suggestions button:hover {
+  border-color: #93c5fd;
+  background: #dbeafe;
+}
+
 .ai-tools {
   display: flex;
   gap: 8px;
@@ -742,19 +949,34 @@ function escapeAttr(value: string) {
 .ai-chat {
   display: grid;
   gap: 8px;
-  max-height: 180px;
   overflow: auto;
+  padding-right: 2px;
 }
 
 .ai-message {
-  padding: 8px 10px;
-  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  width: min(92%, 280px);
+  padding: 9px 10px;
+  border-radius: 12px;
   color: #334155;
   font-size: 12px;
   line-height: 1.6;
 }
 
+.ai-message span {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.ai-message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
 .ai-message.user {
+  justify-self: end;
   background: #dcfce7;
   color: #14532d;
 }
@@ -764,25 +986,54 @@ function escapeAttr(value: string) {
   color: #1e3a8a;
 }
 
-.ai-image-preview {
+.ai-composer {
   display: grid;
-  gap: 6px;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.ai-image-preview {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
 }
 
 .ai-image-preview img {
-  width: 100%;
-  max-height: 160px;
+  width: 56px;
+  height: 42px;
   border-radius: 8px;
-  object-fit: contain;
+  object-fit: cover;
   background: #e2e8f0;
 }
 
-.ai-image-preview span {
+.ai-image-preview div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.ai-image-preview strong {
   overflow: hidden;
-  color: #64748b;
+  color: #334155;
   font-size: 12px;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ai-image-preview button {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
 }
 
 :deep(.gjs-one-bg) {
