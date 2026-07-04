@@ -171,7 +171,8 @@ const statusOptions = [
 ]
 
 onMounted(async () => {
-  await Promise.all([loadPolicy(), loadApiKeys(), loadPermissions(), loadOAuth()])
+  await loadPolicy()
+  await loadFeatureData()
 })
 
 async function loadPolicy() {
@@ -186,6 +187,7 @@ async function savePolicy() {
     Object.assign(policy, res.data)
     clearApiEncryptionCache()
     toast.success('安全策略已保存')
+    await loadFeatureData()
   }
   finally {
     savingPolicy.value = false
@@ -193,6 +195,11 @@ async function savePolicy() {
 }
 
 async function loadApiKeys() {
+  if (!policy.apiKeyEnabled) {
+    apiKeyRows.value = []
+    pagination.total = 0
+    return
+  }
   loading.value = true
   try {
     const res = await apiSecurity.pageApiKeys({
@@ -209,17 +216,110 @@ async function loadApiKeys() {
 }
 
 async function loadPermissions() {
+  if (!policy.apiKeyEnabled) {
+    permissions.value = []
+    return
+  }
   const res = await apiRole.permissions()
   permissions.value = res.data
 }
 
 async function loadOAuth() {
-  const [clients, providers] = await Promise.all([
-    apiSecurity.oauthClients(),
-    apiSecurity.oauthProviders(),
+  oauthClients.value = []
+  oauthProviders.value = []
+  const tasks = []
+  if (policy.oauthServerEnabled) {
+    tasks.push(apiSecurity.oauthClients().then(res => oauthClients.value = res.data))
+  }
+  if (policy.oauthClientEnabled) {
+    tasks.push(apiSecurity.oauthProviders().then(res => oauthProviders.value = res.data))
+  }
+  if (!tasks.length) {
+    return
+  }
+  await Promise.all(tasks)
+}
+
+async function loadFeatureData() {
+  await Promise.all([
+    loadApiKeys(),
+    loadPermissions(),
+    loadOAuth(),
+    syncPasskeyState(),
   ])
-  oauthClients.value = clients.data
-  oauthProviders.value = providers.data
+}
+
+async function syncPasskeyState() {
+  if (!policy.passkeyEnabled) {
+    passkeyRows.value = []
+  }
+}
+
+async function refreshOAuthPane() {
+  if (oauthPane.value === 'clients' && !policy.oauthServerEnabled) {
+    return
+  }
+  if (oauthPane.value === 'providers' && !policy.oauthClientEnabled) {
+    return
+  }
+  await loadOAuth()
+}
+
+function oauthPaneEnabled() {
+  return oauthPane.value === 'clients' ? policy.oauthServerEnabled : policy.oauthClientEnabled
+}
+
+function oauthDisabledMessage() {
+  return oauthPane.value === 'clients'
+    ? 'OAuth 服务端未启用，客户端管理与授权码签发入口已关闭。'
+    : 'OAuth 客户端未启用，外部身份提供商入口已关闭。'
+}
+
+function apiKeyDisabledMessage() {
+  return 'API Key 未启用，密钥创建、列表与吊销入口已关闭。'
+}
+
+function passkeyDisabledMessage() {
+  return 'Passkey 未启用，用户凭据查询、注册和登录入口已关闭。'
+}
+
+async function guardedLoadPasskeys() {
+  if (!policy.passkeyEnabled) {
+    return
+  }
+  await loadPasskeys()
+}
+
+async function guardedLoadApiKeys() {
+  if (!policy.apiKeyEnabled) {
+    return
+  }
+  await loadApiKeys()
+}
+
+function guardedOpenCreate() {
+  if (!policy.apiKeyEnabled) {
+    return
+  }
+  openCreate()
+}
+
+function guardedOpenOAuthClient(row?: OAuthClient) {
+  if (!policy.oauthServerEnabled) {
+    return
+  }
+  openOAuthClient(row)
+}
+
+function guardedOpenOAuthProvider(row?: OAuthProvider) {
+  if (!policy.oauthClientEnabled) {
+    return
+  }
+  openOAuthProvider(row)
+}
+
+async function guardedRefreshOAuth() {
+  await refreshOAuthPane()
 }
 
 async function loadPasskeys() {
@@ -520,19 +620,20 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'apiKey'" class="panel">
+        <FaAlert v-if="!policy.apiKeyEnabled" icon="i-ri:information-line" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
             <FaIcon name="i-ri:key-line" />
             API Key
           </div>
           <div class="key-actions">
-            <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" class="w-56" @keydown.enter="loadApiKeys" @clear="loadApiKeys" />
-            <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-            <FaButton @click="loadApiKeys">
+            <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" class="w-56" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
+            <FaButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</FaButton>
+            <FaButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
               <FaIcon name="i-ri:search-line" />
               筛选
             </FaButton>
-            <FaButton v-auth="'system:security:api-key:create'" @click="openCreate">
+            <FaButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
               <FaIcon name="i-ri:key-2-line" />
               创建
             </FaButton>
@@ -574,6 +675,7 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'oauth'" class="panel">
+        <FaAlert v-if="!oauthPaneEnabled()" icon="i-ri:information-line" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
             <FaIcon name="i-ri:login-circle-line" />
@@ -582,15 +684,15 @@ function normalizeDateTime(value?: string) {
           <div class="key-actions">
             <FaButton :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
             <FaButton :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
-            <FaButton variant="outline" @click="loadOAuth">
+            <FaButton variant="outline" :disabled="!oauthPaneEnabled()" @click="guardedRefreshOAuth">
               <FaIcon name="i-ri:refresh-line" />
               刷新
             </FaButton>
-            <FaButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" @click="openOAuthClient()">
+            <FaButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
               <FaIcon name="i-ri:add-line" />
               新增客户端
             </FaButton>
-            <FaButton v-else v-auth="'system:security:oauth:edit'" @click="openOAuthProvider()">
+            <FaButton v-else v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider()">
               <FaIcon name="i-ri:add-line" />
               新增提供商
             </FaButton>
@@ -611,7 +713,7 @@ function normalizeDateTime(value?: string) {
           </template>
           <template #cell-operation="{ row }">
             <div class="table-actions">
-              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="openOAuthClient(row.original)">编辑</FaButton>
+              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row.original)">编辑</FaButton>
               <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableOAuthClient(row.original)">停用</FaButton>
             </div>
           </template>
@@ -623,7 +725,7 @@ function normalizeDateTime(value?: string) {
           </template>
           <template #cell-operation="{ row }">
             <div class="table-actions">
-              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="openOAuthProvider(row.original)">编辑</FaButton>
+              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row.original)">编辑</FaButton>
               <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableOAuthProvider(row.original)">停用</FaButton>
             </div>
           </template>
@@ -631,14 +733,15 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'passkey'" class="panel">
+        <FaAlert v-if="!policy.passkeyEnabled" icon="i-ri:information-line" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
             <FaIcon name="i-ri:fingerprint-line" />
             Passkey 凭据
           </div>
           <div class="key-actions">
-            <FaInput v-model="passkeySearch.userId" placeholder="用户 ID" class="w-56" @keydown.enter="loadPasskeys" />
-            <FaButton v-auth="'system:security:passkey:view'" :loading="loading" @click="loadPasskeys">
+            <FaInput v-model="passkeySearch.userId" placeholder="用户 ID" class="w-56" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
+            <FaButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
               <FaIcon name="i-ri:search-line" />
               查询
             </FaButton>
