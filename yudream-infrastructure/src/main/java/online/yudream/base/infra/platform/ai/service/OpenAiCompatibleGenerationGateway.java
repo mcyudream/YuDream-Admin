@@ -14,6 +14,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.model.tool.DefaultToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
@@ -60,6 +61,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     private static final int READ_TIMEOUT = 180000;
     private static final int ERROR_BODY_LIMIT = 500;
     private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
+    private static final String REASONING_CONTENT_KEY = "reasoningContent";
 
     private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
 
@@ -119,12 +121,18 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     StringUtils.hasText(request.imageDataUrl()));
             requestSpec(request, config, toolResults, onTool, onProgress)
                     .stream()
-                    .content()
+                    .chatResponse()
                     .doFirst(() -> {
                         log.debug("AI stream subscribed");
                         progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。");
                     })
-                    .doOnNext(delta -> {
+                    .doOnNext(response -> {
+                        String reasoning = reasoningDelta(response);
+                        if (StringUtils.hasText(reasoning)) {
+                            log.debug("AI stream reasoning received, length={}, preview={}", reasoning.length(), preview(reasoning));
+                            progress(onProgress, "reasoning", reasoning);
+                        }
+                        String delta = contentDelta(response);
                         if (!StringUtils.hasText(delta)) {
                             return;
                         }
@@ -513,6 +521,21 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private int length(String value) {
         return value == null ? 0 : value.length();
+    }
+
+    private String contentDelta(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        return response.getResult().getOutput().getText();
+    }
+
+    private String reasoningDelta(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        Object value = response.getResult().getOutput().getMetadata().get(REASONING_CONTENT_KEY);
+        return value == null ? "" : String.valueOf(value);
     }
 
     private String preview(String value) {

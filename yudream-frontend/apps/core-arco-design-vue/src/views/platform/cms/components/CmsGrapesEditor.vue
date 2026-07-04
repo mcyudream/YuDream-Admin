@@ -69,16 +69,8 @@ const aiSuggestions = [
   '根据样图调整版式和配色',
   '优化移动端排版和间距',
 ]
-const thinkingActions = new Set([
-  'analysis',
-  'request',
-  'subscribed',
-  'thinking',
-  'tool-start',
-  'tool-complete',
-  'first-delta',
-  'stream-complete',
-])
+const reasoningActions = new Set(['reasoning'])
+const silentProgressActions = new Set(['heartbeat'])
 let editor: Editor | null = null
 let pendingAiResult: CmsPageGenerateResult | null = null
 let currentAiSession: CmsAiChatSession | null = null
@@ -216,10 +208,14 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
     const envelope = normalizeAiStreamChunk(chunk)
     if (envelope.event === 'ai.progress') {
       const content = String(envelope.payload?.content || '')
-      if (thinkingActions.has(String(envelope.action || ''))) {
+      const action = String(envelope.action || '')
+      if (silentProgressActions.has(action)) {
+        return null
+      }
+      if (reasoningActions.has(action)) {
         return trackAiHistoryContent(thinkingChunk(content))
       }
-      return trackAiHistoryContent(markdownChunk(formatProgress(envelope.action, content)))
+      return trackAiHistoryContent(progressChunk(formatProgress(envelope.action, content)))
     }
     if (envelope.event === 'ai.message') {
       return trackAiHistoryContent(markdownChunk(String(envelope.payload?.content || '')))
@@ -567,6 +563,15 @@ function markdownChunk(data: string): AIMessageContent {
   }
 }
 
+function progressChunk(data: string): AIMessageContent {
+  return {
+    type: 'markdown',
+    id: 'cms-ai-progress',
+    data,
+    strategy: 'merge',
+  }
+}
+
 function thinkingChunk(text: string): AIMessageContent {
   return {
     type: 'thinking',
@@ -587,7 +592,8 @@ function formatProgress(action?: string, content?: string) {
     analysis: '分析',
     request: '请求',
     subscribed: '连接',
-    thinking: '思考',
+    reasoning: '思考',
+    heartbeat: '心跳',
     'tool-start': '工具',
     'tool-complete': '工具',
     'first-delta': '输出',
