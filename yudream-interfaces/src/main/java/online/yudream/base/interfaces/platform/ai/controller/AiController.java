@@ -51,7 +51,7 @@ public class AiController {
                 emitter.complete();
             } catch (Exception e) {
                 send(emitter, AiWebAssembler.toErrorEvent(traceId, e.getMessage()));
-                emitter.completeWithError(e);
+                emitter.complete();
             }
         });
         return emitter;
