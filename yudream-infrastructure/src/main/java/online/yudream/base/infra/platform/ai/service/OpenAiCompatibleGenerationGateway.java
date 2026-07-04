@@ -20,6 +20,7 @@ import java.util.Map;
 public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private static final int TIMEOUT = 60000;
+    private static final int ERROR_BODY_LIMIT = 500;
 
     @Override
     public AiGenerationResult generate(AiGenerationRequest request) {
@@ -36,7 +37,6 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         if (!StringUtils.hasText(apiKey)) {
             throw new BizException("AI API Key 未配置");
         }
-        String endpoint = value(config, "baseUrl", AiCapabilityProvider.DEFAULT_BASE_URL).replaceAll("/+$", "") + "/chat/completions";
         JSONObject body = JSONUtil.createObj()
                 .set("model", value(config, "model", AiCapabilityProvider.DEFAULT_MODEL))
                 .set("temperature", temperature(config));
@@ -44,16 +44,23 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .put(JSONUtil.createObj().set("role", "system").set("content", systemPrompt))
                 .put(JSONUtil.createObj().set("role", "user").set("content", userPrompt));
         body.set("messages", messages);
-        try (HttpResponse response = HttpRequest.post(endpoint)
+
+        try (HttpResponse response = HttpRequest.post(endpoint(config))
                 .bearerAuth(apiKey)
+                .header("Accept", "application/json")
+                .header("User-Agent", "YuDreamAdmin/1.0")
                 .contentType("application/json")
                 .body(body.toString())
                 .timeout(TIMEOUT)
                 .execute()) {
             if (!response.isOk()) {
-                throw new BizException("AI 调用失败：" + response.getStatus() + " " + response.body());
+                throw new BizException("AI 调用失败：" + response.getStatus() + "，" + explainBody(response.body()));
             }
-            return JSONUtil.parseObj(response.body());
+            String responseBody = response.body();
+            if (looksLikeHtml(responseBody)) {
+                throw new BizException("AI 调用返回了 HTML 页面，请检查 baseUrl 是否为 OpenAI 兼容 API 地址");
+            }
+            return JSONUtil.parseObj(responseBody);
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
@@ -106,6 +113,36 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             throw new BizException("AI 返回消息为空");
         }
         return message.getStr("content");
+    }
+
+    private String endpoint(Map<String, String> config) {
+        String baseUrl = value(config, "baseUrl", AiCapabilityProvider.DEFAULT_BASE_URL).replaceAll("/+$", "");
+        if (baseUrl.endsWith("/chat/completions")) {
+            return baseUrl;
+        }
+        return baseUrl + "/chat/completions";
+    }
+
+    private String explainBody(String body) {
+        if (!StringUtils.hasText(body)) {
+            return "响应体为空";
+        }
+        String normalized = body.replaceAll("\\s+", " ").trim();
+        if (looksLikeHtml(normalized)) {
+            if (normalized.contains("Cloudflare") || normalized.contains("cf-error-details")) {
+                return "目标服务返回 Cloudflare 拦截页，请更换可服务端直连的 OpenAI 兼容 API 地址，或在网关侧放行当前服务器 IP";
+            }
+            return "目标地址返回 HTML 页面，请确认 baseUrl 填的是 API 根地址，例如 https://api.openai.com/v1";
+        }
+        return normalized.length() > ERROR_BODY_LIMIT ? normalized.substring(0, ERROR_BODY_LIMIT) + "..." : normalized;
+    }
+
+    private boolean looksLikeHtml(String body) {
+        if (!StringUtils.hasText(body)) {
+            return false;
+        }
+        String value = body.stripLeading().toLowerCase();
+        return value.startsWith("<!doctype html") || value.startsWith("<html") || value.contains("<body");
     }
 
     private String value(Map<String, String> config, String key, String fallback) {

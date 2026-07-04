@@ -54,6 +54,7 @@ public class AiCapabilityProvider implements CapabilityProvider {
         }
         return CapabilityHealth.enabled("AI 能力已启用", Map.of(
                 "baseUrl", baseUrl(),
+                "endpoint", endpoint(),
                 "model", model(),
                 "apiKeyConfigured", String.valueOf(hasApiKey())
         ));
@@ -86,6 +87,11 @@ public class AiCapabilityProvider implements CapabilityProvider {
 
     private String baseUrl() {
         return config.getOrDefault("baseUrl", DEFAULT_BASE_URL);
+    }
+
+    private String endpoint() {
+        String baseUrl = baseUrl().replaceAll("/+$", "");
+        return baseUrl.endsWith("/chat/completions") ? baseUrl : baseUrl + "/chat/completions";
     }
 
     private String model() {
