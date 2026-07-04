@@ -7,6 +7,7 @@ import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -36,6 +37,7 @@ public class AiCapabilityProvider implements CapabilityProvider {
         defaultConfig.put("apiKey", "");
         defaultConfig.put("model", DEFAULT_MODEL);
         defaultConfig.put("temperature", DEFAULT_TEMPERATURE);
+        defaultConfig.put("proxyUrl", "");
         return new CapabilityDescriptor(
                 CODE,
                 "AI 助手",
@@ -56,6 +58,8 @@ public class AiCapabilityProvider implements CapabilityProvider {
                 "baseUrl", baseUrl(),
                 "endpoint", endpoint(),
                 "model", model(),
+                "proxyEnabled", String.valueOf(StringUtils.hasText(proxyUrl())),
+                "proxyUrl", proxyUrl(),
                 "apiKeyConfigured", String.valueOf(hasApiKey())
         ));
     }
@@ -96,6 +100,10 @@ public class AiCapabilityProvider implements CapabilityProvider {
 
     private String model() {
         return config.getOrDefault("model", DEFAULT_MODEL);
+    }
+
+    private String proxyUrl() {
+        return config.getOrDefault("proxyUrl", "");
     }
 
     private boolean hasApiKey() {

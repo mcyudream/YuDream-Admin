@@ -233,6 +233,7 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'apiKey', label: 'API Key', placeholder: 'sk-...', type: 'password' },
       { key: 'model', label: '模型', placeholder: 'gpt-4o-mini' },
       { key: 'temperature', label: '温度', placeholder: '0.4', type: 'number' },
+      { key: 'proxyUrl', label: '代理地址', placeholder: 'http://127.0.0.1:7890' },
     ],
   }
   return code ? map[code] || [] : []
