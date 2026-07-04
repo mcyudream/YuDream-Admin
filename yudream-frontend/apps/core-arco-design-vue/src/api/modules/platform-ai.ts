@@ -8,6 +8,8 @@ export interface CmsPageGeneratePayload {
   pageType?: string
   style?: string
   siteName?: string
+  providerCode?: string
+  modelCode?: string
   model?: string
   imageDataUrl?: string
   currentHtml?: string

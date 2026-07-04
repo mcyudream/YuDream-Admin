@@ -100,8 +100,54 @@ async function toggleCapability(item: CapabilityItem) {
 function openConfig(item: CapabilityItem) {
   selectedCode.value = item.code
   configDraft.value = { ...(item.config || {}) }
+  if (item.code === 'ai' && !configDraft.value.providers) {
+    configDraft.value.providers = legacyAiProvidersJson(item.config || {})
+    configDraft.value.defaultProvider ||= 'default'
+    configDraft.value.defaultModel ||= item.config?.model || 'gpt-4o-mini'
+  }
   configText.value = JSON.stringify(item.config || {}, null, 2)
   configVisible.value = true
+}
+
+function legacyAiProvidersJson(config: Record<string, string>) {
+  const model = config.model || 'gpt-4o-mini'
+  const models = (config.models || model)
+    .split(/[,，\n\r]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+  return JSON.stringify([
+    {
+      code: config.providerCode || 'default',
+      name: config.providerName || 'Default AI',
+      type: config.providerType || legacyAiProviderType(config.baseUrl || ''),
+      baseUrl: config.baseUrl || 'https://api.openai.com/v1',
+      apiKey: config.apiKey || '',
+      proxyUrl: config.proxyUrl || '',
+      defaultModel: model,
+      temperature: config.temperature || '0.4',
+      extraBody: config.extraBody || '',
+      models: models.map(value => ({
+        code: value,
+        name: value,
+        model: value,
+        thinkingEnabled: config.thinkingEnabled === 'true',
+        reasoningEffort: config.reasoningEffort || '',
+      })),
+      embeddingModels: config.embeddingModel ? [config.embeddingModel] : [],
+      rerankModels: config.rerankModel ? [config.rerankModel] : [],
+    },
+  ], null, 2)
+}
+
+function legacyAiProviderType(baseUrl: string) {
+  const value = baseUrl.toLowerCase()
+  if (value.includes('moonshot') || value.includes('kimi')) {
+    return 'KIMI'
+  }
+  if (value.includes('deepseek')) {
+    return 'DEEPSEEK'
+  }
+  return 'OPENAI_COMPATIBLE'
 }
 
 async function saveConfig() {
@@ -251,22 +297,28 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'routingKey', label: '路由键', placeholder: 'capability.test' },
     ],
     ai: [
-      { key: 'baseUrl', label: '接口地址', placeholder: 'https://api.openai.com/v1' },
-      { key: 'apiKey', label: 'API Key', placeholder: 'sk-...', type: 'password' },
-      { key: 'model', label: '默认生成模型', placeholder: 'gpt-4o-mini' },
-      { key: 'models', label: '可选生成模型', placeholder: 'gpt-4o-mini,deepseek-chat,qwen-vl-plus' },
-      { key: 'temperature', label: '温度', placeholder: '0.4', type: 'number' },
-      { key: 'thinkingEnabled', label: '深度思考', placeholder: 'false' },
-      { key: 'extraBody', label: 'Extra Body', placeholder: '{ "enable_thinking": {{thinkingEnabled}} }', type: 'textarea' },
-      { key: 'embeddingModel', label: '向量化模型', placeholder: 'text-embedding-3-small' },
-      { key: 'rerankModel', label: '重排模型', placeholder: 'bge-reranker-v2' },
-      { key: 'proxyUrl', label: '代理地址', placeholder: 'http://127.0.0.1:7890' },
+      { key: 'providers', label: '供应商列表 JSON', placeholder: '[{ "code": "kimi", "type": "KIMI", "baseUrl": "https://api.moonshot.cn/v1", "apiKey": "", "models": [] }]', type: 'textarea' },
+      { key: 'defaultProvider', label: '默认供应商编码', placeholder: 'openai' },
+      { key: 'defaultModel', label: '默认模型编码', placeholder: 'gpt-4o-mini' },
     ],
   }
   return code ? map[code] || [] : []
 }
 
 function normalizedConfig() {
+  if (selected.value?.code === 'ai') {
+    try {
+      const providers = JSON.parse(String(configDraft.value.providers || '[]'))
+      if (!Array.isArray(providers)) {
+        toast.error('AI providers 必须是 JSON 数组')
+        return null
+      }
+    }
+    catch {
+      toast.error('AI providers 格式错误', { description: '请输入合法 JSON 数组' })
+      return null
+    }
+  }
   return Object.fromEntries(
     configFields.value.map(field => [field.key, String(configDraft.value[field.key] ?? '').trim()]),
   )

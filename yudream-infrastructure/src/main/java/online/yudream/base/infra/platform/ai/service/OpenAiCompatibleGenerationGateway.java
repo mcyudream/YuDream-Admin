@@ -13,12 +13,14 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
+import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
+import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
+import online.yudream.base.infra.platform.ai.service.provider.ResolvedAiModel;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.model.tool.DefaultToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
-import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
@@ -28,14 +30,14 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.transport.ProxyProvider;
 
@@ -60,29 +62,36 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     private static final int CONNECT_TIMEOUT = 30000;
     private static final int READ_TIMEOUT = 180000;
     private static final int ERROR_BODY_LIMIT = 500;
-    private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
     private static final String REASONING_CONTENT_KEY = "reasoningContent";
+    private static final String REASONING_CONTENT_SNAKE_KEY = "reasoning_content";
 
     private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
+    private final AiProviderConfigParser providerConfigParser;
+    private final List<AiProviderAdapter> providerAdapters;
 
-    public OpenAiCompatibleGenerationGateway(ObjectProvider<AiAgentTool> aiAgentToolProvider) {
+    public OpenAiCompatibleGenerationGateway(
+            ObjectProvider<AiAgentTool> aiAgentToolProvider,
+            AiProviderConfigParser providerConfigParser,
+            List<AiProviderAdapter> providerAdapters
+    ) {
         this.aiAgentToolProvider = aiAgentToolProvider;
+        this.providerConfigParser = providerConfigParser;
+        this.providerAdapters = providerAdapters;
     }
 
     @Override
     public AiGenerationResult generate(AiGenerationRequest request) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
-        if (!StringUtils.hasText(value(config, "apiKey", ""))) {
-            throw new BizException("AI API Key 未配置");
-        }
+        ResolvedAiModel resolved = resolve(config, request);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         try {
-            log.debug("AI non-stream call start, endpoint={}, model={}, promptLength={}, image={}",
-                    endpointBaseUrl(config) + endpointPath(config),
-                    model(config, request.model()),
+            log.debug("AI non-stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}",
+                    resolved.provider().code(),
+                    resolved.provider().endpointUrl(),
+                    resolved.model().modelName(),
                     length(request.userPrompt()),
                     StringUtils.hasText(request.imageDataUrl()));
-            String content = requestSpec(request, config, toolResults).call().content();
+            String content = requestSpec(request, resolved, toolResults).call().content();
             log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
             return toResult(content, toolResults);
         } catch (BizException e) {
@@ -95,11 +104,6 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     }
 
     @Override
-    public AiGenerationResult generateStream(AiGenerationRequest request, Consumer<String> onDelta) {
-        return generateStream(request, onDelta, null, null);
-    }
-
-    @Override
     public AiGenerationResult generateStream(
             AiGenerationRequest request,
             Consumer<String> onDelta,
@@ -107,23 +111,24 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiGenerationProgress> onProgress
     ) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
-        if (!StringUtils.hasText(value(config, "apiKey", ""))) {
-            throw new BizException("AI API Key 未配置");
-        }
+        ResolvedAiModel resolved = resolve(config, request);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         StringBuilder content = new StringBuilder();
         try {
             progress(onProgress, "request", "正在准备模型请求。");
-            log.debug("AI stream call start, endpoint={}, model={}, promptLength={}, image={}",
-                    endpointBaseUrl(config) + endpointPath(config),
-                    model(config, request.model()),
+            log.debug("AI stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}",
+                    resolved.provider().code(),
+                    resolved.provider().endpointUrl(),
+                    resolved.model().modelName(),
                     length(request.userPrompt()),
                     StringUtils.hasText(request.imageDataUrl()));
-            requestSpec(request, config, toolResults, onTool, onProgress)
+            requestSpec(request, resolved, toolResults, onTool, onProgress)
                     .stream()
                     .chatResponse()
                     .doFirst(() -> {
-                        log.debug("AI stream subscribed");
+                        log.debug("AI stream subscribed, provider={}, model={}",
+                                resolved.provider().code(),
+                                resolved.model().modelName());
                         progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。");
                     })
                     .doOnNext(response -> {
@@ -160,25 +165,51 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     }
 
     public void test(Map<String, String> config, String message) {
-        generate(new AiGenerationRequest("你是 YuDream AI 能力连通性测试助手，只需要返回一句简短中文。", message, null, null, config));
+        generate(new AiGenerationRequest(
+                "你是 YuDream AI 能力连通性测试助手，只需要返回一句简短中文。",
+                message,
+                null,
+                null,
+                null,
+                config
+        ));
+    }
+
+    private ResolvedAiModel resolve(Map<String, String> config, AiGenerationRequest request) {
+        ResolvedAiModel resolved = providerConfigParser.resolve(
+                config,
+                request.providerCode(),
+                request.modelCode(),
+                providerAdapters
+        );
+        if (!StringUtils.hasText(resolved.provider().apiKey())) {
+            throw new BizException("AI API Key 未配置：" + resolved.provider().displayName());
+        }
+        if (!StringUtils.hasText(resolved.provider().endpointBaseUrl())) {
+            throw new BizException("AI API 地址未配置：" + resolved.provider().displayName());
+        }
+        if (!StringUtils.hasText(resolved.model().modelName())) {
+            throw new BizException("AI 模型未配置：" + resolved.provider().displayName());
+        }
+        return resolved;
     }
 
     private ChatClient.ChatClientRequestSpec requestSpec(
             AiGenerationRequest request,
-            Map<String, String> config,
+            ResolvedAiModel resolved,
             List<AiAgentToolResult> toolResults
     ) {
-        return requestSpec(request, config, toolResults, null, null);
+        return requestSpec(request, resolved, toolResults, null, null);
     }
 
     private ChatClient.ChatClientRequestSpec requestSpec(
             AiGenerationRequest request,
-            Map<String, String> config,
+            ResolvedAiModel resolved,
             List<AiAgentToolResult> toolResults,
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(config, request.model()))
+        ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, request))
                 .prompt()
                 .system(request.systemPrompt())
                 .user(user -> {
@@ -195,43 +226,27 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return spec;
     }
 
-    private OpenAiChatModel chatModel(Map<String, String> config, String requestModel) {
+    private OpenAiChatModel chatModel(ResolvedAiModel resolved, AiGenerationRequest request) {
         OpenAiApi api = OpenAiApi.builder()
-                .baseUrl(endpointBaseUrl(config))
-                .completionsPath(endpointPath(config))
-                .apiKey(value(config, "apiKey", ""))
-                .restClientBuilder(restClientBuilder(config))
-                .webClientBuilder(webClientBuilder(config))
+                .baseUrl(resolved.provider().endpointBaseUrl())
+                .completionsPath(resolved.provider().completionsPath())
+                .apiKey(resolved.provider().apiKey())
+                .restClientBuilder(restClientBuilder(resolved.provider().proxyUrl()))
+                .webClientBuilder(webClientBuilder(resolved.provider().proxyUrl()))
                 .build();
         return OpenAiChatModel.builder()
                 .openAiApi(api)
-                .defaultOptions(chatOptions(config, requestModel))
+                .defaultOptions(resolved.adapter().chatOptions(resolved.provider(), resolved.model(), request))
                 .toolCallingManager(DefaultToolCallingManager.builder().build())
                 .retryTemplate(RetryTemplate.defaultInstance())
                 .observationRegistry(ObservationRegistry.NOOP)
                 .build();
     }
 
-    private OpenAiChatOptions chatOptions(Map<String, String> config, String requestModel) {
-        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
-                .model(model(config, requestModel))
-                .temperature(temperature(config));
-        Map<String, Object> extraBody = extraBody(config);
-        if (!extraBody.isEmpty()) {
-            builder.extraBody(extraBody);
-        }
-        String reasoningEffort = value(config, "reasoningEffort", "");
-        if (StringUtils.hasText(reasoningEffort)) {
-            builder.reasoningEffort(reasoningEffort);
-        }
-        return builder.build();
-    }
-
-    private RestClient.Builder restClientBuilder(Map<String, String> config) {
+    private RestClient.Builder restClientBuilder(String proxyUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT));
         factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT));
-        String proxyUrl = value(config, "proxyUrl", "");
         if (StringUtils.hasText(proxyUrl)) {
             URI uri = parseProxyUri(proxyUrl);
             if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
@@ -247,10 +262,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         .forEach(this::allowOctetStreamJson));
     }
 
-    private WebClient.Builder webClientBuilder(Map<String, String> config) {
+    private WebClient.Builder webClientBuilder(String proxyUrl) {
         HttpClient client = HttpClient.create()
                 .responseTimeout(Duration.ofMillis(READ_TIMEOUT));
-        String proxyUrl = value(config, "proxyUrl", "");
         if (StringUtils.hasText(proxyUrl)) {
             URI uri = parseProxyUri(proxyUrl);
             if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
@@ -403,6 +417,8 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         for (Object item : iterable) {
             if (item instanceof JSONObject json) {
                 result.add(json);
+            } else if (item != null) {
+                result.add(JSONUtil.parseObj(item));
             }
         }
         return result;
@@ -414,29 +430,6 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 json.getStr("toolName", json.getStr("name", "")),
                 arguments == null ? Map.of() : toMap(arguments)
         );
-    }
-
-    private Map<String, Object> extraBody(Map<String, String> config) {
-        String extraBody = renderTemplate(value(config, "extraBody", ""), config);
-        if (!StringUtils.hasText(extraBody)) {
-            return Map.of();
-        }
-        try {
-            return toMap(JSONUtil.parseObj(extraBody));
-        } catch (Exception e) {
-            throw new BizException("AI extraBody 不是有效 JSON：" + e.getMessage());
-        }
-    }
-
-    private String renderTemplate(String value, Map<String, String> config) {
-        if (!StringUtils.hasText(value)) {
-            return value;
-        }
-        return value
-                .replace("{{thinkingEnabled}}", value(config, "thinkingEnabled", "false"))
-                .replace("{{model}}", value(config, "model", AiCapabilityProvider.DEFAULT_MODEL))
-                .replace("{{embeddingModel}}", value(config, "embeddingModel", ""))
-                .replace("{{rerankModel}}", value(config, "rerankModel", ""));
     }
 
     private JSONObject parseJsonObject(String content) {
@@ -468,45 +461,12 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return result;
     }
 
-    private String endpointBaseUrl(Map<String, String> config) {
-        String baseUrl = value(config, "baseUrl", AiCapabilityProvider.DEFAULT_BASE_URL).replaceAll("/+$", "");
-        if (baseUrl.endsWith(CHAT_COMPLETIONS_PATH)) {
-            return baseUrl.substring(0, baseUrl.length() - CHAT_COMPLETIONS_PATH.length());
-        }
-        return baseUrl;
-    }
-
-    private String endpointPath(Map<String, String> config) {
-        String baseUrl = value(config, "baseUrl", AiCapabilityProvider.DEFAULT_BASE_URL).replaceAll("/+$", "");
-        return baseUrl.endsWith(CHAT_COMPLETIONS_PATH) ? CHAT_COMPLETIONS_PATH : CHAT_COMPLETIONS_PATH;
-    }
-
     private URI parseProxyUri(String proxyUrl) {
         String value = proxyUrl.trim();
         if (!value.contains("://")) {
             value = "http://" + value;
         }
         return URI.create(value);
-    }
-
-    private String model(Map<String, String> config, String requestModel) {
-        return StringUtils.hasText(requestModel) ? requestModel.trim() : value(config, "model", AiCapabilityProvider.DEFAULT_MODEL);
-    }
-
-    private String value(Map<String, String> config, String key, String fallback) {
-        if (config == null) {
-            return fallback;
-        }
-        String value = config.get(key);
-        return StringUtils.hasText(value) ? value.trim() : fallback;
-    }
-
-    private double temperature(Map<String, String> config) {
-        try {
-            return Double.parseDouble(value(config, "temperature", AiCapabilityProvider.DEFAULT_TEMPERATURE));
-        } catch (NumberFormatException e) {
-            return Double.parseDouble(AiCapabilityProvider.DEFAULT_TEMPERATURE);
-        }
     }
 
     private String summary(String content, List<AiAgentToolResult> toolResults) {
@@ -534,7 +494,11 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
             return "";
         }
-        Object value = response.getResult().getOutput().getMetadata().get(REASONING_CONTENT_KEY);
+        Map<String, Object> metadata = response.getResult().getOutput().getMetadata();
+        Object value = metadata.get(REASONING_CONTENT_KEY);
+        if (value == null) {
+            value = metadata.get(REASONING_CONTENT_SNAKE_KEY);
+        }
         return value == null ? "" : String.valueOf(value);
     }
 

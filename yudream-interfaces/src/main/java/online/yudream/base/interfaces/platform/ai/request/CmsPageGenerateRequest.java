@@ -9,6 +9,8 @@ public class CmsPageGenerateRequest {
     private String pageType;
     private String style;
     private String siteName;
+    private String providerCode;
+    private String modelCode;
     private String model;
     private String imageDataUrl;
     private String currentHtml;

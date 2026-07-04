@@ -13,6 +13,12 @@ type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type EditorTarget = 'page' | 'home'
 type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
+interface AiModelSelectOption {
+  label: string
+  value: string
+  providerCode?: string
+  modelCode?: string
+}
 interface CmsNavigationItem {
   id: string
   label: string
@@ -94,15 +100,7 @@ const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] =
 
 const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
 const aiEnabled = computed(() => Boolean(aiCapability.value?.enabled))
-const aiModelOptions = computed(() => {
-  const config = aiCapability.value?.config || {}
-  const source = config.models || config.model || ''
-  return source
-    .split(/[,，\n\r]/)
-    .map(item => item.trim())
-    .filter(Boolean)
-    .map(value => ({ label: value, value }))
-})
+const aiModelOptions = computed<AiModelSelectOption[]>(() => aiProviderModelOptions(aiCapability.value?.config || {}))
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
 const builderContentStatus = computed(() => pageForm.builderProjectJson ? '已有 GrapesJS 源数据' : pageForm.htmlContent ? '已有 HTML 内容' : '尚未生成可视化内容')
 const homeHtml = computed({
@@ -226,6 +224,44 @@ async function loadAiCapability() {
   catch {
     aiCapability.value = undefined
   }
+}
+
+function aiProviderModelOptions(config: Record<string, string>): AiModelSelectOption[] {
+  if (config.providers) {
+    try {
+      const providers = JSON.parse(config.providers) as Array<Record<string, any>>
+      return providers.flatMap((provider) => {
+        const providerCode = String(provider.code || '').trim()
+        const providerName = String(provider.name || providerCode || 'AI').trim()
+        const models = Array.isArray(provider.models) ? provider.models : []
+        return models
+          .map((model) => {
+            const raw = typeof model === 'string' ? { code: model, model } : model
+            const modelCode = String(raw.code || raw.model || raw.name || '').trim()
+            const modelName = String(raw.name || raw.model || modelCode).trim()
+            if (!providerCode || !modelCode) {
+              return null
+            }
+            return {
+              label: `${providerName} / ${modelName}`,
+              value: `${providerCode}:${modelCode}`,
+              providerCode,
+              modelCode,
+            }
+          })
+          .filter(Boolean) as AiModelSelectOption[]
+      })
+    }
+    catch {
+      return []
+    }
+  }
+  const source = config.models || config.model || ''
+  return source
+    .split(/[,，\n\r]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+    .map(value => ({ label: value, value, modelCode: value }))
 }
 
 async function loadPages() {
