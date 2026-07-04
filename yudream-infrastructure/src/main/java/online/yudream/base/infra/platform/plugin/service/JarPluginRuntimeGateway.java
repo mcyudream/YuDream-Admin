@@ -45,6 +45,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
 
     private final PluginProperties pluginProperties;
     private final FrameworkServices frameworkServices;
+    private final PluginExtensionRegistry pluginExtensionRegistry;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -214,7 +215,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                     classLoader,
                     plugin,
                     descriptor,
-                    new PluginContextImpl(module.getCode(), frameworkServices)
+                    new PluginContextImpl(module.getCode(), frameworkServices, pluginExtensionRegistry)
             );
         } catch (IOException e) {
             throw new BizException("插件 ClassLoader 创建失败：" + e.getMessage());
