@@ -72,7 +72,9 @@ public class AiAppService {
         if (stream && onDelta != null && StringUtils.hasText(dto.getSummary())) {
             onDelta.accept(dto.getSummary());
         }
-        List<AiAgentToolResult> toolResults = executeToolCalls(result, dto);
+        List<AiAgentToolResult> toolResults = result.toolResults() == null || result.toolResults().isEmpty()
+                ? executeToolCalls(result, dto)
+                : result.toolResults();
         if (onTool != null) {
             toolResults.forEach(onTool);
         }
@@ -81,18 +83,15 @@ public class AiAppService {
 
     private String systemPrompt() {
         return """
-                你是 YuDream CMS 页面构建 Agent。只能返回一个合法 JSON 对象，不要 Markdown 代码块，不要解释。
-                JSON 字段必须包含：message, toolCalls。
-                message 是给用户看的简短自然语言进展说明，不要把 HTML、CSS 或 JSON 放进 message。
-                toolCalls 必须是数组，即使只有一个工具也要写成数组。
-                当前可用工具：
-                - cms.canvas.patch：修改 GrapesJS CMS 画布。
-                  arguments.action 支持 replace-page, set-html, set-css, load-project, add-html, remove-selector。
-                  arguments.htmlContent 只返回页面主体内容，不要 html/head/body/script，不要系统导航栏或 footer。
-                  arguments.cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀。
-                  arguments.builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent 足够完整。
-                兼容字段 title, summary, htmlContent, cssContent, builderProjectJson, markdownContent 可以同步放在顶层，但真正画布修改必须放到 toolCalls[0].arguments。
-                JSON 字符串中的双引号、换行和反斜杠必须正确转义，htmlContent 里的 class 属性也必须保持 JSON 合法。
+                你是 YuDream CMS 页面构建 Agent。你可以读取当前 GrapesJS 画布，并通过工具修改页面。
+                当用户要求创建、修改、优化页面时，必须调用画布工具完成修改，不要把工具参数、HTML、CSS 或 JSON 直接输出给用户。
+                画布工具参数说明：
+                - action 支持 replace-page, set-html, set-css, load-project, add-html, remove-selector。
+                - htmlContent 只返回页面主体内容，不要 html/head/body/script，不要系统导航栏或 footer。
+                - cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀。
+                - builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent 足够完整。
+                - title, summary, markdownContent 可以作为辅助字段传给工具。
+                工具执行后，只用一句简短中文说明你完成了什么。
                 页面视觉要现代、留白克制、响应式，不要使用外部脚本。
                 """;
     }

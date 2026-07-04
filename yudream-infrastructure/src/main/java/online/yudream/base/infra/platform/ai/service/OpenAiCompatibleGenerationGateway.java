@@ -1,29 +1,46 @@
 package online.yudream.base.infra.platform.ai.service;
 
-import cn.hutool.http.HttpRequest;
-import cn.hutool.http.HttpResponse;
-import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import io.micrometer.observation.ObservationRegistry;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.content.Media;
+import org.springframework.ai.model.tool.DefaultToolCallingManager;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.function.FunctionToolCallback;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
-import java.net.ProxySelector;
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
+import java.util.Optional;
 
 @Component
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
@@ -31,184 +48,216 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private static final int TIMEOUT = 60000;
     private static final int ERROR_BODY_LIMIT = 500;
+    private static final String CHAT_COMPLETIONS_PATH = "/chat/completions";
+
+    private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
+
+    public OpenAiCompatibleGenerationGateway(ObjectProvider<AiAgentTool> aiAgentToolProvider) {
+        this.aiAgentToolProvider = aiAgentToolProvider;
+    }
 
     @Override
     public AiGenerationResult generate(AiGenerationRequest request) {
-        JSONObject json = callChatCompletion(request.config(), request.model(), request.systemPrompt(), request.userPrompt(), request.imageDataUrl());
-        return toResult(extractContent(json));
-    }
-
-    @Override
-    public AiGenerationResult generateStream(AiGenerationRequest request, Consumer<String> onDelta) {
-        return toResult(callChatCompletionStream(
-                request.config(),
-                request.model(),
-                request.systemPrompt(),
-                request.userPrompt(),
-                request.imageDataUrl(),
-                onDelta
-        ));
+        Map<String, String> config = request.config() == null ? Map.of() : request.config();
+        if (!StringUtils.hasText(value(config, "apiKey", ""))) {
+            throw new BizException("AI API Key 未配置");
+        }
+        List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
+        ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(config, request.model()))
+                .prompt()
+                .system(request.systemPrompt())
+                .user(user -> {
+                    user.text(request.userPrompt());
+                    imageMedia(request.imageDataUrl()).ifPresent(user::media);
+                });
+        List<ToolCallback> callbacks = toolCallbacks(toolResults);
+        if (!callbacks.isEmpty()) {
+            spec.toolCallbacks(callbacks);
+        }
+        try {
+            String content = spec.call().content();
+            if (!toolResults.isEmpty()) {
+                return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", List.of(), List.copyOf(toolResults));
+            }
+            return toLegacyResult(content);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("AI 调用异常：" + explainException(e));
+        }
     }
 
     public void test(Map<String, String> config, String message) {
-        callChatCompletion(config, null, "你是 YuDream AI 能力连通性测试助手，只需返回一句简短中文。", message, null);
+        generate(new AiGenerationRequest("你是 YuDream AI 能力连通性测试助手，只需要返回一句简短中文。", message, null, null, config));
     }
 
-    private JSONObject callChatCompletion(Map<String, String> config, String requestModel, String systemPrompt, String userPrompt, String imageDataUrl) {
-        String apiKey = value(config, "apiKey", "");
-        if (!StringUtils.hasText(apiKey)) {
-            throw new BizException("AI API Key 未配置");
-        }
-        JSONObject body = chatBody(config, requestModel, systemPrompt, userPrompt, imageDataUrl, false);
-
-        HttpRequest request = HttpRequest.post(endpoint(config))
-                .bearerAuth(apiKey)
-                .header("Accept", "application/json")
-                .header("User-Agent", "YuDreamAdmin/1.0")
-                .contentType("application/json")
-                .body(body.toString())
-                .timeout(TIMEOUT);
-        applyProxy(request, config);
-
-        try (HttpResponse response = request.execute()) {
-            if (!response.isOk()) {
-                throw new BizException("AI 调用失败：" + response.getStatus() + "，" + explainBody(response.body()));
-            }
-            String responseBody = response.body();
-            if (looksLikeHtml(responseBody)) {
-                throw new BizException("AI 调用返回了 HTML 页面，请检查 baseUrl 是否为 OpenAI 兼容 API 地址");
-            }
-            return JSONUtil.parseObj(responseBody);
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BizException("AI 调用异常：" + e.getMessage());
-        }
-    }
-
-    private String callChatCompletionStream(Map<String, String> config, String requestModel, String systemPrompt, String userPrompt, String imageDataUrl, Consumer<String> onDelta) {
-        String apiKey = value(config, "apiKey", "");
-        if (!StringUtils.hasText(apiKey)) {
-            throw new BizException("AI API Key 未配置");
-        }
-        JSONObject body = chatBody(config, requestModel, systemPrompt, userPrompt, imageDataUrl, true);
-        java.net.http.HttpClient client = streamClient(config);
-        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder(URI.create(endpoint(config)))
-                .timeout(Duration.ofMillis(TIMEOUT))
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Accept", "text/event-stream")
-                .header("Content-Type", "application/json")
-                .header("User-Agent", "YuDreamAdmin/1.0")
-                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(body.toString()))
+    private OpenAiChatModel chatModel(Map<String, String> config, String requestModel) {
+        OpenAiApi api = OpenAiApi.builder()
+                .baseUrl(endpointBaseUrl(config))
+                .completionsPath(endpointPath(config))
+                .apiKey(value(config, "apiKey", ""))
+                .restClientBuilder(restClientBuilder(config))
                 .build();
-        try {
-            java.net.http.HttpResponse<Stream<String>> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofLines());
-            try (Stream<String> lines = response.body()) {
-                if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                    throw new BizException("AI 流式调用失败：" + response.statusCode() + "，" + explainBody(readLimited(lines)));
-                }
-                StringBuilder content = new StringBuilder();
-                lines.forEach(line -> appendStreamLine(line, content, onDelta));
-                if (content.isEmpty()) {
-                    throw new BizException("AI 流式返回内容为空");
-                }
-                return content.toString();
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new BizException("AI 流式调用被中断");
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BizException("AI 流式调用异常：" + e.getMessage());
-        }
+        return OpenAiChatModel.builder()
+                .openAiApi(api)
+                .defaultOptions(chatOptions(config, requestModel))
+                .toolCallingManager(DefaultToolCallingManager.builder().build())
+                .retryTemplate(RetryTemplate.defaultInstance())
+                .observationRegistry(ObservationRegistry.NOOP)
+                .build();
     }
 
-    private JSONObject chatBody(Map<String, String> config, String requestModel, String systemPrompt, String userPrompt, String imageDataUrl, boolean stream) {
-        JSONObject body = JSONUtil.createObj()
-                .set("model", model(config, requestModel))
-                .set("temperature", temperature(config));
-        mergeExtraBody(body, config);
-        body.set("messages", messages(systemPrompt, userPrompt, imageDataUrl));
-        if (stream) {
-            body.set("stream", true);
+    private OpenAiChatOptions chatOptions(Map<String, String> config, String requestModel) {
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
+                .model(model(config, requestModel))
+                .temperature(temperature(config));
+        Map<String, Object> extraBody = extraBody(config);
+        if (!extraBody.isEmpty()) {
+            builder.extraBody(extraBody);
         }
-        return body;
+        String reasoningEffort = value(config, "reasoningEffort", "");
+        if (StringUtils.hasText(reasoningEffort)) {
+            builder.reasoningEffort(reasoningEffort);
+        }
+        return builder.build();
     }
 
-    private java.net.http.HttpClient streamClient(Map<String, String> config) {
-        java.net.http.HttpClient.Builder builder = java.net.http.HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(TIMEOUT));
+    private RestClient.Builder restClientBuilder(Map<String, String> config) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(Duration.ofMillis(TIMEOUT));
+        factory.setReadTimeout(Duration.ofMillis(TIMEOUT));
         String proxyUrl = value(config, "proxyUrl", "");
         if (StringUtils.hasText(proxyUrl)) {
             URI uri = parseProxyUri(proxyUrl);
             if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
                 throw new BizException("AI 代理地址配置无效：代理地址必须包含主机和端口");
             }
-            builder.proxy(ProxySelector.of(new InetSocketAddress(uri.getHost(), uri.getPort())));
+            factory.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(uri.getHost(), uri.getPort())));
         }
-        return builder.build();
+        return RestClient.builder().requestFactory(factory);
     }
 
-    private void appendStreamLine(String line, StringBuilder content, Consumer<String> onDelta) {
-        String trimmed = line == null ? "" : line.trim();
-        if (!trimmed.startsWith("data:")) {
-            return;
-        }
-        String payload = trimmed.substring(5).trim();
-        if (!StringUtils.hasText(payload) || "[DONE]".equals(payload)) {
-            return;
-        }
-        JSONObject json;
-        try {
-            json = JSONUtil.parseObj(payload);
-        } catch (Exception ignored) {
-            return;
-        }
-        JSONArray choices = json.getJSONArray("choices");
-        if (choices == null || choices.isEmpty()) {
-            return;
-        }
-        JSONObject choice = choices.getJSONObject(0);
-        JSONObject delta = choice.getJSONObject("delta");
-        String text = delta == null ? choice.getStr("text", "") : delta.getStr("content", "");
-        if (!StringUtils.hasText(text)) {
-            return;
-        }
-        content.append(text);
-        if (onDelta != null) {
-            onDelta.accept(text);
-        }
+    private List<ToolCallback> toolCallbacks(List<AiAgentToolResult> toolResults) {
+        return aiAgentToolProvider.stream()
+                .map(tool -> toolCallback(tool, toolResults))
+                .toList();
     }
 
-    private String readLimited(Stream<String> lines) {
-        StringBuilder body = new StringBuilder();
-        lines.limit(20).forEach(line -> body.append(line).append(' '));
-        return body.toString();
+    private ToolCallback toolCallback(AiAgentTool tool, List<AiAgentToolResult> toolResults) {
+        AiAgentToolDescriptor descriptor = tool.descriptor();
+        return FunctionToolCallback.<Map<String, Object>, AiAgentToolResult>builder(safeToolName(descriptor.name()), args -> {
+                    Map<String, Object> arguments = args == null ? Map.of() : args;
+                    AiAgentToolResult result = tool.execute(new AiAgentToolCall(descriptor.name(), arguments));
+                    toolResults.add(result);
+                    return result;
+                })
+                .description(descriptor.description())
+                .inputType(new ParameterizedTypeReference<Map<String, Object>>() {
+                })
+                .inputSchema(inputSchema(descriptor))
+                .toolCallResultConverter((result, type) -> JSONUtil.toJsonStr(result))
+                .build();
     }
 
-    private JSONArray messages(String systemPrompt, String userPrompt, String imageDataUrl) {
-        JSONArray messages = JSONUtil.createArray()
-                .put(JSONUtil.createObj().set("role", "system").set("content", systemPrompt));
+    private String inputSchema(AiAgentToolDescriptor descriptor) {
+        JSONObject properties = JSONUtil.createObj();
+        Map<String, Object> schema = descriptor.inputSchema() == null ? Map.of() : descriptor.inputSchema();
+        schema.forEach((key, value) -> properties.set(key, propertySchema(value)));
+        return JSONUtil.createObj()
+                .set("type", "object")
+                .set("additionalProperties", true)
+                .set("properties", properties)
+                .toString();
+    }
+
+    private JSONObject propertySchema(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            JSONObject property = JSONUtil.createObj();
+            map.forEach((key, item) -> property.set(String.valueOf(key), item));
+            property.set("type", property.getStr("type", "string"));
+            return property;
+        }
+        return JSONUtil.createObj()
+                .set("type", "string")
+                .set("description", value == null ? "" : String.valueOf(value));
+    }
+
+    private Optional<Media> imageMedia(String imageDataUrl) {
         if (!StringUtils.hasText(imageDataUrl)) {
-            return messages.put(JSONUtil.createObj().set("role", "user").set("content", userPrompt));
+            return Optional.empty();
         }
-        JSONArray content = JSONUtil.createArray()
-                .put(JSONUtil.createObj().set("type", "text").set("text", userPrompt))
-                .put(JSONUtil.createObj()
-                        .set("type", "image_url")
-                        .set("image_url", JSONUtil.createObj().set("url", imageDataUrl)));
-        return messages.put(JSONUtil.createObj().set("role", "user").set("content", content));
+        String value = imageDataUrl.trim();
+        int comma = value.indexOf(',');
+        if (!value.startsWith("data:") || comma <= 0) {
+            throw new BizException("样图格式无效：仅支持 data URL");
+        }
+        String meta = value.substring(5, comma);
+        String mimeType = meta.split(";")[0];
+        try {
+            byte[] data = Base64.getDecoder().decode(value.substring(comma + 1));
+            return Optional.of(Media.builder()
+                    .mimeType(MimeTypeUtils.parseMimeType(mimeType))
+                    .data(new ByteArrayResource(data))
+                    .name("reference-image")
+                    .build());
+        } catch (Exception e) {
+            throw new BizException("样图解析失败：" + e.getMessage());
+        }
     }
 
-    private void mergeExtraBody(JSONObject body, Map<String, String> config) {
+    private AiGenerationResult toLegacyResult(String content) {
+        JSONObject json = parseJsonObject(content);
+        return new AiGenerationResult(
+                json.getStr("title", ""),
+                json.getStr("summary", json.getStr("message", "")),
+                json.getStr("htmlContent", ""),
+                json.getStr("cssContent", ""),
+                json.getStr("builderProjectJson", ""),
+                json.getStr("markdownContent", ""),
+                toolCalls(json),
+                List.of()
+        );
+    }
+
+    private List<AiAgentToolCall> toolCalls(JSONObject json) {
+        Object rawToolCalls = json.get("toolCalls");
+        if (rawToolCalls == null) {
+            return List.of();
+        }
+        List<JSONObject> calls = rawToolCalls instanceof Iterable<?> iterable
+                ? toJsonObjects(iterable)
+                : List.of(JSONUtil.parseObj(rawToolCalls));
+        return calls.stream()
+                .map(this::toToolCall)
+                .filter(call -> StringUtils.hasText(call.toolName()))
+                .toList();
+    }
+
+    private List<JSONObject> toJsonObjects(Iterable<?> iterable) {
+        List<JSONObject> result = new ArrayList<>();
+        for (Object item : iterable) {
+            if (item instanceof JSONObject json) {
+                result.add(json);
+            }
+        }
+        return result;
+    }
+
+    private AiAgentToolCall toToolCall(JSONObject json) {
+        JSONObject arguments = json.getJSONObject("arguments");
+        return new AiAgentToolCall(
+                json.getStr("toolName", json.getStr("name", "")),
+                arguments == null ? Map.of() : toMap(arguments)
+        );
+    }
+
+    private Map<String, Object> extraBody(Map<String, String> config) {
         String extraBody = renderTemplate(value(config, "extraBody", ""), config);
         if (!StringUtils.hasText(extraBody)) {
-            return;
+            return Map.of();
         }
         try {
-            JSONObject extra = JSONUtil.parseObj(extraBody);
-            extra.forEach(body::set);
+            return toMap(JSONUtil.parseObj(extraBody));
         } catch (Exception e) {
             throw new BizException("AI extraBody 不是有效 JSON：" + e.getMessage());
         }
@@ -225,70 +274,6 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .replace("{{rerankModel}}", value(config, "rerankModel", ""));
     }
 
-    private void applyProxy(HttpRequest request, Map<String, String> config) {
-        String proxyUrl = value(config, "proxyUrl", "");
-        if (!StringUtils.hasText(proxyUrl)) {
-            return;
-        }
-        try {
-            URI uri = parseProxyUri(proxyUrl);
-            if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
-                throw new IllegalArgumentException("代理地址必须包含主机和端口");
-            }
-            request.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(uri.getHost(), uri.getPort())));
-        } catch (Exception e) {
-            throw new BizException("AI 代理地址配置无效：" + e.getMessage());
-        }
-    }
-
-    private URI parseProxyUri(String proxyUrl) {
-        String value = proxyUrl.trim();
-        if (!value.contains("://")) {
-            value = "http://" + value;
-        }
-        return URI.create(value);
-    }
-
-    private AiGenerationResult toResult(String content) {
-        JSONObject json = parseJsonObject(content);
-        return new AiGenerationResult(
-                json.getStr("title", ""),
-                json.getStr("summary", json.getStr("message", "")),
-                json.getStr("htmlContent", ""),
-                json.getStr("cssContent", ""),
-                json.getStr("builderProjectJson", ""),
-                json.getStr("markdownContent", ""),
-                toolCalls(json)
-        );
-    }
-
-    private List<AiAgentToolCall> toolCalls(JSONObject json) {
-        JSONArray array = json.getJSONArray("toolCalls");
-        if (array == null || array.isEmpty()) {
-            return List.of();
-        }
-        return array.stream()
-                .filter(JSONObject.class::isInstance)
-                .map(JSONObject.class::cast)
-                .map(this::toToolCall)
-                .filter(call -> StringUtils.hasText(call.toolName()))
-                .toList();
-    }
-
-    private AiAgentToolCall toToolCall(JSONObject json) {
-        JSONObject arguments = json.getJSONObject("arguments");
-        return new AiAgentToolCall(
-                json.getStr("toolName", json.getStr("name", "")),
-                arguments == null ? Map.of() : toMap(arguments)
-        );
-    }
-
-    private Map<String, Object> toMap(JSONObject json) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        json.forEach(result::put);
-        return result;
-    }
-
     private JSONObject parseJsonObject(String content) {
         String normalized = stripFence(content);
         try {
@@ -299,7 +284,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             if (start >= 0 && end > start) {
                 return JSONUtil.parseObj(normalized.substring(start, end + 1));
             }
-            throw new BizException("AI 返回内容不是有效 JSON");
+            throw new BizException("AI 未调用画布工具，且返回内容不是有效 JSON");
         }
     }
 
@@ -312,46 +297,31 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return value.trim();
     }
 
-    private String extractContent(JSONObject response) {
-        JSONArray choices = response.getJSONArray("choices");
-        if (choices == null || choices.isEmpty()) {
-            throw new BizException("AI 返回结果为空");
-        }
-        JSONObject message = choices.getJSONObject(0).getJSONObject("message");
-        if (message == null || !StringUtils.hasText(message.getStr("content"))) {
-            throw new BizException("AI 返回消息为空");
-        }
-        return message.getStr("content");
+    private Map<String, Object> toMap(JSONObject json) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        json.forEach(result::put);
+        return result;
     }
 
-    private String endpoint(Map<String, String> config) {
+    private String endpointBaseUrl(Map<String, String> config) {
         String baseUrl = value(config, "baseUrl", AiCapabilityProvider.DEFAULT_BASE_URL).replaceAll("/+$", "");
-        if (baseUrl.endsWith("/chat/completions")) {
-            return baseUrl;
+        if (baseUrl.endsWith(CHAT_COMPLETIONS_PATH)) {
+            return baseUrl.substring(0, baseUrl.length() - CHAT_COMPLETIONS_PATH.length());
         }
-        return baseUrl + "/chat/completions";
+        return baseUrl;
     }
 
-    private String explainBody(String body) {
-        if (!StringUtils.hasText(body)) {
-            return "响应体为空";
-        }
-        String normalized = body.replaceAll("\\s+", " ").trim();
-        if (looksLikeHtml(normalized)) {
-            if (normalized.contains("Cloudflare") || normalized.contains("cf-error-details")) {
-                return "目标服务返回 Cloudflare 拦截页，请更换可服务端直连的 OpenAI 兼容 API 地址，或在网关侧放行当前服务器 IP";
-            }
-            return "目标地址返回 HTML 页面，请确认 baseUrl 填的是 API 根地址，例如 https://api.openai.com/v1";
-        }
-        return normalized.length() > ERROR_BODY_LIMIT ? normalized.substring(0, ERROR_BODY_LIMIT) + "..." : normalized;
+    private String endpointPath(Map<String, String> config) {
+        String baseUrl = value(config, "baseUrl", AiCapabilityProvider.DEFAULT_BASE_URL).replaceAll("/+$", "");
+        return baseUrl.endsWith(CHAT_COMPLETIONS_PATH) ? CHAT_COMPLETIONS_PATH : CHAT_COMPLETIONS_PATH;
     }
 
-    private boolean looksLikeHtml(String body) {
-        if (!StringUtils.hasText(body)) {
-            return false;
+    private URI parseProxyUri(String proxyUrl) {
+        String value = proxyUrl.trim();
+        if (!value.contains("://")) {
+            value = "http://" + value;
         }
-        String value = body.stripLeading().toLowerCase();
-        return value.startsWith("<!doctype html") || value.startsWith("<html") || value.contains("<body");
+        return URI.create(value);
     }
 
     private String model(Map<String, String> config, String requestModel) {
@@ -372,5 +342,39 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         } catch (NumberFormatException e) {
             return Double.parseDouble(AiCapabilityProvider.DEFAULT_TEMPERATURE);
         }
+    }
+
+    private String summary(String content, List<AiAgentToolResult> toolResults) {
+        if (StringUtils.hasText(content)) {
+            return content.trim();
+        }
+        return toolResults.stream()
+                .findFirst()
+                .map(AiAgentToolResult::message)
+                .orElse("画布操作已完成。");
+    }
+
+    private String safeToolName(String name) {
+        return name.replaceAll("[^a-zA-Z0-9_-]", "_");
+    }
+
+    private String explainException(Exception e) {
+        String message = e.getMessage();
+        if (!StringUtils.hasText(message)) {
+            return e.getClass().getSimpleName();
+        }
+        String normalized = message.replaceAll("\\s+", " ").trim();
+        if (looksLikeHtml(normalized)) {
+            return "目标地址返回 HTML 页面，请确认 baseUrl 填的是 API 根地址，例如 https://api.openai.com/v1";
+        }
+        return normalized.length() > ERROR_BODY_LIMIT ? normalized.substring(0, ERROR_BODY_LIMIT) + "..." : normalized;
+    }
+
+    private boolean looksLikeHtml(String body) {
+        if (!StringUtils.hasText(body)) {
+            return false;
+        }
+        String value = body.stripLeading().toLowerCase();
+        return value.startsWith("<!doctype html") || value.startsWith("<html") || value.contains("<body");
     }
 }
