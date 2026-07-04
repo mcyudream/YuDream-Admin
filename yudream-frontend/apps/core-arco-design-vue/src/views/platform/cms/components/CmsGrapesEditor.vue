@@ -196,90 +196,169 @@ function registerDynamicTypes(instance: Editor) {
 }
 
 function registerBlocks(instance: Editor) {
-  blocks().forEach(block => instance.BlockManager.add(block.id, block))
+  cmsBlocks().forEach(block => instance.BlockManager.add(block.id, block))
 }
 
-function blocks(): grapesjs.BlockProperties[] {
+function cmsBlocks(): grapesjs.BlockProperties[] {
   return [
     {
-      id: 'yb-hero',
-      label: '首页首屏',
-      category: '首页',
-      media: '<span class="gjs-block-icon">H</span>',
-      content: `<section style="padding:88px 48px; border-radius:24px; background:linear-gradient(135deg,#0f172a,#0f766e); color:#fff;">
-  <p style="margin:0 0 18px; color:rgba(255,255,255,.72); font-weight:700;">{{site.name}} · {{auth.welcome}}</p>
-  <h1 style="max-width:820px; margin:0; font-size:64px; line-height:1;">把内容、数据和业务能力组合成真正可发布的网站</h1>
-  <p style="max-width:680px; margin:22px 0 0; color:rgba(255,255,255,.82); font-size:18px;">使用 GrapesJS、媒体库和动态变量搭建页面。</p>
+      id: 'yb-section',
+      label: '区段 Section',
+      category: '布局',
+      media: preview('section'),
+      content: `<section style="padding:56px 48px; background:#ffffff;">
+  <div style="max-width:1120px; margin:0 auto;"></div>
 </section>`,
     },
     {
-      id: 'yb-post-list',
-      label: '动态文章列表',
-      category: '内容',
-      media: '<span class="gjs-block-icon">P</span>',
-      content: `<section style="padding:56px 0;">
-  <h2 style="margin:0 0 20px; font-size:40px;">最新发布 · {{pages.count}}</h2>
-  <div data-yb-repeat="pages" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px;">
-    <article style="display:grid; gap:12px; padding:18px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
-      <img src="{{item.coverImageUrl}}" alt="{{item.title}}" style="width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:14px; background:#e2e8f0;">
-      <small style="color:#0f766e; font-weight:800;">{{item.category}} · {{item.publishedAt}}</small>
-      <h3 style="margin:0; font-size:22px;">{{item.title}}</h3>
-      <p style="margin:0; color:#64748b;">{{item.excerpt}}</p>
-      <a href="{{item.url}}" style="color:#0f766e; font-weight:800;">阅读全文</a>
-    </article>
-  </div>
-</section>`,
+      id: 'yb-container',
+      label: '内容容器',
+      category: '布局',
+      media: preview('container'),
+      content: `<div style="max-width:1120px; margin:0 auto; padding:24px;"></div>`,
     },
     {
-      id: 'yb-taxonomy',
-      label: '分类标签云',
-      category: '内容',
-      media: '<span class="gjs-block-icon">#</span>',
-      content: `<section style="display:grid; grid-template-columns:1fr 1fr; gap:20px; padding:42px 0;">
-  <div style="padding:22px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
-    <h2>分类</h2>
-    <div data-yb-repeat="categories" style="display:flex; gap:8px; flex-wrap:wrap;"><a href="{{item.url}}" style="padding:9px 12px; border-radius:999px; background:#dcfce7; color:#166534;">{{item.label}} · {{item.count}}</a></div>
-  </div>
-  <div style="padding:22px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
-    <h2>标签</h2>
-    <div data-yb-repeat="tags" style="display:flex; gap:8px; flex-wrap:wrap;"><a href="{{item.url}}" style="padding:9px 12px; border-radius:999px; background:#e0f2fe; color:#075985;">#{{item.label}} · {{item.count}}</a></div>
-  </div>
-</section>`,
+      id: 'yb-grid-2',
+      label: '双列布局',
+      category: '布局',
+      media: preview('grid2'),
+      content: `<div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px;">
+  <div style="min-height:120px; padding:20px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
+  <div style="min-height:120px; padding:20px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
+</div>`,
     },
     {
-      id: 'yb-navigation',
-      label: '导航菜单',
-      category: '动态',
-      media: '<span class="gjs-block-icon">N</span>',
-      content: `<nav style="display:flex; justify-content:space-between; gap:18px; padding:16px 22px; border:1px solid #e5e7eb; border-radius:18px; background:#fff;">
-  <a href="/site" style="font-size:20px; font-weight:900; color:#0f172a;">{{site.name}}</a>
-  <div data-yb-repeat="navigation" style="display:flex; gap:8px; flex-wrap:wrap;"><a href="{{item.url}}" style="padding:9px 12px; border-radius:999px; color:#475569;">{{item.label}}</a></div>
+      id: 'yb-grid-3',
+      label: '三列布局',
+      category: '布局',
+      media: preview('grid3'),
+      content: `<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px;">
+  <div style="min-height:120px; padding:18px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
+  <div style="min-height:120px; padding:18px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
+  <div style="min-height:120px; padding:18px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
+</div>`,
+    },
+    {
+      id: 'yb-heading',
+      label: '标题 Heading',
+      category: '文字',
+      media: preview('heading'),
+      content: `<h2 style="margin:0 0 14px; color:#0f172a; font-size:40px; line-height:1.1; font-weight:900;">页面标题</h2>`,
+    },
+    {
+      id: 'yb-paragraph',
+      label: '段落 Paragraph',
+      category: '文字',
+      media: preview('paragraph'),
+      content: `<p style="margin:0 0 16px; color:#475569; font-size:16px; line-height:1.8;">这里填写正文内容，可以在右侧面板调整字体、颜色、行高和间距。</p>`,
+    },
+    {
+      id: 'yb-button',
+      label: '按钮 Button',
+      category: '基础组件',
+      media: preview('button'),
+      content: `<a href="/site" style="display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 18px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">立即查看</a>`,
+    },
+    {
+      id: 'yb-image',
+      label: '图片 Image',
+      category: '媒体',
+      media: preview('image'),
+      content: `<img src="{{site.logo}}" alt="图片" style="display:block; width:100%; max-width:720px; aspect-ratio:16/9; object-fit:cover; border-radius:12px; background:#e2e8f0;">`,
+    },
+    {
+      id: 'yb-card',
+      label: '卡片 Card',
+      category: '基础组件',
+      media: preview('card'),
+      content: `<article style="display:grid; gap:12px; padding:22px; border:1px solid #e5e7eb; border-radius:12px; background:#ffffff; box-shadow:0 10px 28px rgba(15,23,42,.06);">
+  <h3 style="margin:0; color:#0f172a; font-size:22px;">卡片标题</h3>
+  <p style="margin:0; color:#64748b; line-height:1.7;">卡片内容描述。</p>
+</article>`,
+    },
+    {
+      id: 'yb-divider',
+      label: '分割线 Divider',
+      category: '基础组件',
+      media: preview('divider'),
+      content: `<hr style="width:100%; margin:28px 0; border:0; border-top:1px solid #e5e7eb;">`,
+    },
+    {
+      id: 'yb-system-nav',
+      label: '系统导航栏',
+      category: '系统组件',
+      media: preview('nav'),
+      content: `<nav data-yb-system-nav="true" style="display:flex; align-items:center; justify-content:space-between; gap:20px; padding:14px 22px; border:1px solid #e5e7eb; border-radius:10px; background:#ffffff;">
+  <a href="/site" style="color:#0f172a; font-size:20px; font-weight:900; text-decoration:none;">{{site.name}}</a>
+  <div data-yb-repeat="navigation" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <a href="{{item.url}}" style="padding:8px 12px; border-radius:8px; color:#475569; text-decoration:none;">{{item.label}}</a>
+  </div>
+  <a data-visible-when="guest" href="/login" style="padding:8px 14px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">登录</a>
 </nav>`,
     },
     {
-      id: 'yb-auth',
-      label: '登录态入口',
-      category: '动态',
-      media: '<span class="gjs-block-icon">A</span>',
-      content: `<section style="padding:34px; border-radius:20px; background:#0f172a; color:#fff;">
-  <div data-visible-when="guest"><h2>访问更多内容</h2><p>登录后可进入个人中心并查看专属导航。</p><a href="/login" style="color:#fff; font-weight:800;">登录</a></div>
-  <div data-visible-when="logged-in"><h2>{{auth.welcome}}</h2><p>账号：{{user.username}}</p><img src="{{user.avatar}}" alt="{{user.nickname}}" style="width:56px; height:56px; border-radius:50%; object-fit:cover;"></div>
-</section>`,
+      id: 'yb-repeat-wrapper',
+      label: '动态循环容器',
+      category: '动态数据',
+      media: preview('repeat'),
+      content: `<div data-yb-repeat="pages" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px;"></div>`,
     },
     {
-      id: 'yb-gallery',
-      label: '媒体画廊',
-      category: '媒体',
-      media: '<span class="gjs-block-icon">M</span>',
-      content: `<section style="padding:54px 0;">
-  <h2 style="margin:0 0 18px; font-size:38px;">媒体画廊</h2>
-  <div style="display:grid; grid-template-columns:1.25fr .75fr; gap:14px;">
-    <img src="{{site.logo}}" alt="主图" style="width:100%; height:420px; object-fit:cover; border-radius:18px; background:#e2e8f0;">
-    <div style="display:grid; gap:14px;"><img src="{{user.avatar}}" alt="图片" style="width:100%; height:203px; object-fit:cover; border-radius:18px; background:#e2e8f0;"><div style="display:grid; place-items:center; height:203px; border:1px dashed #cbd5e1; border-radius:18px; color:#64748b;">替换为媒体库图片</div></div>
-  </div>
-</section>`,
+      id: 'yb-page-card',
+      label: '页面数据卡片',
+      category: '动态数据',
+      media: preview('pageCard'),
+      content: `<article style="display:grid; gap:12px; padding:18px; border:1px solid #e5e7eb; border-radius:12px; background:#ffffff;">
+  <img src="{{item.coverImageUrl}}" alt="{{item.title}}" style="width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:10px; background:#e2e8f0;">
+  <small style="color:#0f766e; font-weight:800;">{{item.category}} · {{item.publishedAt}}</small>
+  <h3 style="margin:0; color:#0f172a; font-size:22px;">{{item.title}}</h3>
+  <p style="margin:0; color:#64748b;">{{item.excerpt}}</p>
+  <a href="{{item.url}}" style="color:#0f766e; font-weight:800;">阅读全文</a>
+</article>`,
+    },
+    {
+      id: 'yb-tag-link',
+      label: '分类/标签链接',
+      category: '动态数据',
+      media: preview('tag'),
+      content: `<a href="{{item.url}}" style="display:inline-flex; align-items:center; min-height:34px; padding:0 12px; border-radius:999px; background:#ecfdf5; color:#047857; font-weight:700; text-decoration:none;">{{item.label}} · {{item.count}}</a>`,
+    },
+    {
+      id: 'yb-guest-box',
+      label: '游客可见容器',
+      category: '动态数据',
+      media: preview('visible'),
+      content: `<div data-visible-when="guest" style="padding:20px; border:1px dashed #cbd5e1; border-radius:12px;">游客可见内容</div>`,
+    },
+    {
+      id: 'yb-user-box',
+      label: '登录可见容器',
+      category: '动态数据',
+      media: preview('visible'),
+      content: `<div data-visible-when="logged-in" style="padding:20px; border:1px dashed #cbd5e1; border-radius:12px;">{{auth.welcome}}</div>`,
     },
   ]
+}
+
+function preview(type: string) {
+  const previewMap: Record<string, string> = {
+    section: '<div class="cms-block-preview section"><span></span><strong></strong></div>',
+    container: '<div class="cms-block-preview container"><strong></strong><span></span></div>',
+    grid2: '<div class="cms-block-preview grid two"><span></span><span></span></div>',
+    grid3: '<div class="cms-block-preview grid three"><span></span><span></span><span></span></div>',
+    heading: '<div class="cms-block-preview text heading"><strong></strong><span></span></div>',
+    paragraph: '<div class="cms-block-preview text paragraph"><span></span><span></span><span></span></div>',
+    button: '<div class="cms-block-preview button"><span></span></div>',
+    image: '<div class="cms-block-preview image"><span></span></div>',
+    card: '<div class="cms-block-preview card"><strong></strong><span></span><span></span></div>',
+    divider: '<div class="cms-block-preview divider"><span></span></div>',
+    nav: '<div class="cms-block-preview nav"><strong></strong><span></span><span></span><em></em></div>',
+    repeat: '<div class="cms-block-preview repeat"><span></span><span></span><span></span></div>',
+    pageCard: '<div class="cms-block-preview page-card"><i></i><strong></strong><span></span></div>',
+    tag: '<div class="cms-block-preview tag"><span></span><span></span><span></span></div>',
+    visible: '<div class="cms-block-preview visible"><strong></strong><span></span></div>',
+  }
+  return previewMap[type] || '<div class="cms-block-preview"></div>'
 }
 
 function styleSectors() {
@@ -567,9 +646,9 @@ function escapeAttr(value: string) {
 
 :deep(.gjs-block) {
   width: 100%;
-  min-height: 78px;
-  margin: 0 0 8px;
-  padding: 12px 10px;
+  min-height: 116px;
+  margin: 0 0 10px;
+  padding: 10px;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
@@ -586,19 +665,247 @@ function escapeAttr(value: string) {
 :deep(.gjs-block-label) {
   color: inherit;
   font-size: 12px;
+  font-weight: 700;
   line-height: 1.35;
 }
 
-:deep(.gjs-block-icon) {
-  display: inline-grid;
-  width: 28px;
-  height: 28px;
-  margin-bottom: 6px;
+:deep(.gjs-block__media) {
+  width: 100%;
+  margin: 0 0 8px;
+}
+
+:deep(.cms-block-preview) {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  height: 58px;
+  padding: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+:deep(.cms-block-preview span),
+:deep(.cms-block-preview strong),
+:deep(.cms-block-preview i),
+:deep(.cms-block-preview em) {
+  display: block;
+  min-width: 0;
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+:deep(.cms-block-preview.section) {
+  align-content: end;
+  background: linear-gradient(135deg, #ecfeff, #f8fafc);
+}
+
+:deep(.cms-block-preview.section span) {
+  width: 38%;
+  height: 8px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.section strong) {
+  width: 72%;
+  height: 14px;
+  background: #334155;
+}
+
+:deep(.cms-block-preview.container) {
+  padding: 10px 16px;
+}
+
+:deep(.cms-block-preview.container strong) {
+  width: 100%;
+  height: 30px;
+  border: 1px dashed #94a3b8;
+  border-radius: 8px;
+  background: #fff;
+}
+
+:deep(.cms-block-preview.container span) {
+  position: absolute;
+  inset: 18px 28px;
+  border-radius: 6px;
+  background: #e2e8f0;
+}
+
+:deep(.cms-block-preview.grid) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+:deep(.cms-block-preview.grid.three) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:deep(.cms-block-preview.grid span) {
+  height: 100%;
+  border-radius: 7px;
+  background: #e0f2fe;
+}
+
+:deep(.cms-block-preview.text.heading strong) {
+  width: 80%;
+  height: 16px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.text.heading span) {
+  width: 54%;
+  height: 8px;
+}
+
+:deep(.cms-block-preview.text.paragraph span) {
+  height: 7px;
+}
+
+:deep(.cms-block-preview.text.paragraph span:nth-child(1)) {
+  width: 92%;
+}
+
+:deep(.cms-block-preview.text.paragraph span:nth-child(2)) {
+  width: 78%;
+}
+
+:deep(.cms-block-preview.text.paragraph span:nth-child(3)) {
+  width: 62%;
+}
+
+:deep(.cms-block-preview.button) {
   place-items: center;
+}
+
+:deep(.cms-block-preview.button span) {
+  width: 64px;
+  height: 24px;
+  border-radius: 7px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.image) {
+  place-items: center;
+  background: linear-gradient(135deg, #e2e8f0, #f8fafc);
+}
+
+:deep(.cms-block-preview.image span) {
+  width: 54px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #94a3b8 0 45%, #cbd5e1 45% 100%);
+}
+
+:deep(.cms-block-preview.card) {
+  padding: 10px;
+  background: #fff;
+}
+
+:deep(.cms-block-preview.card strong) {
+  width: 64%;
+  height: 12px;
+  background: #334155;
+}
+
+:deep(.cms-block-preview.card span) {
+  height: 7px;
+}
+
+:deep(.cms-block-preview.card span:nth-child(2)) {
+  width: 88%;
+}
+
+:deep(.cms-block-preview.card span:nth-child(3)) {
+  width: 54%;
+}
+
+:deep(.cms-block-preview.divider) {
+  place-items: center;
+}
+
+:deep(.cms-block-preview.divider span) {
+  width: 88%;
+  height: 2px;
+}
+
+:deep(.cms-block-preview.nav) {
+  grid-template-columns: 34px 1fr 1fr 32px;
+  align-items: center;
+  background: #fff;
+}
+
+:deep(.cms-block-preview.nav strong) {
+  width: 28px;
+  height: 14px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.nav span) {
+  height: 8px;
+  background: #94a3b8;
+}
+
+:deep(.cms-block-preview.nav em) {
+  width: 28px;
+  height: 20px;
+  border-radius: 7px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.repeat) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+:deep(.cms-block-preview.repeat span) {
+  height: 100%;
   border-radius: 7px;
   background: #ecfdf5;
-  color: #0f766e;
-  font-weight: 800;
+}
+
+:deep(.cms-block-preview.page-card) {
+  grid-template-rows: 24px 8px 7px;
+}
+
+:deep(.cms-block-preview.page-card i) {
+  border-radius: 7px;
+  background: #cbd5e1;
+}
+
+:deep(.cms-block-preview.page-card strong) {
+  width: 76%;
+  height: 8px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.page-card span) {
+  width: 58%;
+  height: 7px;
+}
+
+:deep(.cms-block-preview.tag) {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+:deep(.cms-block-preview.tag span) {
+  width: 42px;
+  height: 20px;
+  border-radius: 999px;
+  background: #dcfce7;
+}
+
+:deep(.cms-block-preview.visible strong) {
+  width: 44%;
+  height: 12px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.visible span) {
+  width: 76%;
+  height: 8px;
 }
 
 :deep(.gjs-field),
