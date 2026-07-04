@@ -134,21 +134,7 @@ async function retryAfterRefresh(config?: InternalAxiosRequestConfig) {
 
 async function refreshTokenOnce() {
   if (!refreshingToken) {
-    const refreshToken = localStorage.getItem('refreshToken')
-    if (!refreshToken) {
-      return Promise.reject(new Error('缺少刷新令牌'))
-    }
-    refreshingToken = userApi.post<unknown, { status: 1, error: '', data: LoginData }>(
-      'api/user/token/refresh',
-      { refreshToken },
-      { skipTokenRefresh: true },
-    ).then((res) => {
-      localStorage.setItem('token', res.data.token)
-      if (res.data.refreshToken) {
-        localStorage.setItem('refreshToken', res.data.refreshToken)
-      }
-      return res.data.token
-    }).finally(() => {
+    refreshingToken = useAppAccountStore().refreshAccessToken().finally(() => {
       refreshingToken = null
     })
   }
