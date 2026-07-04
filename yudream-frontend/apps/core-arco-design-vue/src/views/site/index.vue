@@ -28,7 +28,7 @@ const slug = computed(() => {
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 const homeCss = computed(() => home.value?.settings?.homeCss || '')
-const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson))
+const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url)))
 const archiveFilter = computed(() => ({
   category: queryValue(route.query.category),
   tag: queryValue(route.query.tag),
@@ -207,12 +207,18 @@ function parseNavigationItems(value?: string): SiteNavigationItem[] {
   }
 }
 
+function isAuthNavigationUrl(url?: string) {
+  const normalized = (url || '').trim().toLowerCase()
+  return normalized === '/login' || normalized === '/register' || normalized === '/signup'
+}
+
 function renderDynamicHtml(value?: string) {
   if (!value) {
     return ''
   }
   const sanitized = sanitizeHtml(value)
   const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html')
+  normalizeSystemNavigation(doc)
   doc.querySelectorAll('[data-visible-when]').forEach((el) => {
     const rule = el.getAttribute('data-visible-when')
     const loggedIn = appAccountStore.isLogin
@@ -237,6 +243,30 @@ function renderDynamicHtml(value?: string) {
     el.innerHTML = rows.map((item, index) => renderVariables(template, { item, index: String(index + 1) })).join('')
   })
   return renderVariables(doc.body.firstElementChild?.innerHTML || sanitized)
+}
+
+function normalizeSystemNavigation(doc: Document) {
+  doc.querySelectorAll('[data-yb-system-nav]').forEach((nav) => {
+    nav.querySelectorAll('[data-visible-when="guest"], [data-visible-when="logged-in"]').forEach(el => el.remove())
+    nav.insertAdjacentHTML('beforeend', `
+      <div data-visible-when="guest" style="display:flex; align-items:center; gap:8px;">
+        <a href="/login" style="padding:8px 14px; border-radius:8px; color:#475569; font-weight:700; text-decoration:none;">登录</a>
+        <a href="/register" style="padding:8px 14px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">注册</a>
+      </div>
+      <details data-visible-when="logged-in" style="position:relative;">
+        <summary style="display:flex; align-items:center; gap:10px; list-style:none; cursor:pointer;">
+          <img src="{{user.avatar}}" alt="{{user.nickname}}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; background:#e2e8f0;">
+          <span style="color:#0f172a; font-weight:800;">{{user.nickname}}</span>
+          <span style="color:#94a3b8;">⌄</span>
+        </summary>
+        <div style="position:absolute; top:calc(100% + 8px); right:0; z-index:20; display:grid; min-width:132px; padding:6px; border:1px solid #e5e7eb; border-radius:10px; background:#ffffff; box-shadow:0 14px 32px rgba(15,23,42,.12);">
+          <a href="/" style="padding:9px 10px; border-radius:8px; color:#334155; text-decoration:none;">控制台</a>
+          <a href="/profile" style="padding:9px 10px; border-radius:8px; color:#334155; text-decoration:none;">个人资料</a>
+          <a href="/logout" style="padding:9px 10px; border-radius:8px; color:#b91c1c; text-decoration:none;">退出登录</a>
+        </div>
+      </details>
+    `)
+  })
 }
 
 function sanitizeHtml(value?: string) {
@@ -328,16 +358,6 @@ function escapeHtml(value: string) {
       {{ errorMessage }}
     </div>
 
-    <header v-if="!loading && !errorMessage && navigationItems.length" class="site-nav">
-      <div class="site-shell">
-        <a class="site-nav__brand" href="/site">{{ renderContext.site.name }}</a>
-        <nav>
-          <a v-for="item in navigationItems" :key="item.id || item.url" :href="item.url">{{ item.label }}</a>
-        </nav>
-        <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account" class="site-nav__avatar">
-      </div>
-    </header>
-
     <template v-if="!page && home">
       <component :is="'style'" v-if="homeCss">
         {{ homeCss }}
@@ -398,55 +418,6 @@ function escapeHtml(value: string) {
   min-height: 100vh;
   place-items: center;
   color: #64748b;
-}
-
-.site-nav {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  border-bottom: 1px solid #e5e7eb;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: blur(14px);
-}
-
-.site-nav .site-shell {
-  display: flex;
-  min-height: 64px;
-  gap: 18px;
-  align-items: center;
-}
-
-.site-nav__brand {
-  color: #0f172a;
-  font-weight: 900;
-  text-decoration: none;
-}
-
-.site-nav nav {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-}
-
-.site-nav nav a {
-  padding: 8px 10px;
-  border-radius: 999px;
-  color: #475569;
-  text-decoration: none;
-}
-
-.site-nav nav a:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.site-nav__avatar {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  object-fit: cover;
 }
 
 .site-builder-home :deep(main),
