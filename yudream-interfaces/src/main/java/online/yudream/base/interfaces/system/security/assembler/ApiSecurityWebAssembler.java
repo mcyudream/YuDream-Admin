@@ -98,6 +98,17 @@ public class ApiSecurityWebAssembler {
         return query;
     }
 
+    public static ApiKeyPageQuery toSelfQuery(ApiKeyPageQuery requestQuery, SecurityPrincipal principal) {
+        ApiKeyPageQuery query = new ApiKeyPageQuery();
+        if (requestQuery != null) {
+            query.setPage(requestQuery.getPage());
+            query.setSize(requestQuery.getSize());
+            query.setKeyword(requestQuery.getKeyword());
+        }
+        query.setCreatorUserId(principal.userId());
+        return query;
+    }
+
     public static ApiKeyCreateCmd toCmd(ApiKeyCreateRequest request, Long creatorUserId, List<String> creatorPermissions) {
         ApiKeyCreateCmd cmd = new ApiKeyCreateCmd();
         cmd.setName(request.getName());
@@ -118,6 +129,14 @@ public class ApiSecurityWebAssembler {
         cmd.setId(id);
         cmd.setOperatorUserId(principal.userId());
         cmd.setSuperAdmin(principal.superAdmin());
+        return cmd;
+    }
+
+    public static ApiKeyRevokeCmd toSelfRevokeCmd(Long id, SecurityPrincipal principal) {
+        ApiKeyRevokeCmd cmd = new ApiKeyRevokeCmd();
+        cmd.setId(id);
+        cmd.setOperatorUserId(principal.userId());
+        cmd.setSuperAdmin(false);
         return cmd;
     }
 
