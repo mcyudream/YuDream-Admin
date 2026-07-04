@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.ai.service;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import io.micrometer.observation.ObservationRegistry;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
@@ -50,6 +51,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 @Component
+@Slf4j
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
@@ -72,11 +74,19 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         try {
+            log.debug("AI non-stream call start, endpoint={}, model={}, promptLength={}, image={}",
+                    endpointBaseUrl(config) + endpointPath(config),
+                    model(config, request.model()),
+                    length(request.userPrompt()),
+                    StringUtils.hasText(request.imageDataUrl()));
             String content = requestSpec(request, config, toolResults).call().content();
+            log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
             return toResult(content, toolResults);
         } catch (BizException e) {
+            log.debug("AI non-stream call business error: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
+            log.debug("AI non-stream call failed", e);
             throw new BizException("AI 调用异常：" + explainException(e));
         }
     }
@@ -90,6 +100,11 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         StringBuilder content = new StringBuilder();
         try {
+            log.debug("AI stream call start, endpoint={}, model={}, promptLength={}, image={}",
+                    endpointBaseUrl(config) + endpointPath(config),
+                    model(config, request.model()),
+                    length(request.userPrompt()),
+                    StringUtils.hasText(request.imageDataUrl()));
             requestSpec(request, config, toolResults)
                     .stream()
                     .content()
@@ -98,15 +113,19 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                             return;
                         }
                         content.append(delta);
+                        log.debug("AI stream delta received, length={}, preview={}", delta.length(), preview(delta));
                         if (onDelta != null) {
                             onDelta.accept(delta);
                         }
                     })
                     .blockLast(Duration.ofMillis(READ_TIMEOUT));
+            log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
             return toResult(content.toString(), toolResults);
         } catch (BizException e) {
+            log.debug("AI stream call business error: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
+            log.debug("AI stream call failed", e);
             throw new BizException("AI 流式调用异常：" + explainException(e));
         }
     }
@@ -129,6 +148,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 });
         List<ToolCallback> callbacks = toolCallbacks(toolResults);
         if (!callbacks.isEmpty()) {
+            log.debug("AI tool callbacks registered, count={}, names={}",
+                    callbacks.size(),
+                    callbacks.stream().map(callback -> callback.getToolDefinition().name()).toList());
             spec.toolCallbacks(callbacks);
         }
         return spec;
@@ -222,8 +244,16 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         AiAgentToolDescriptor descriptor = tool.descriptor();
         return FunctionToolCallback.<Map<String, Object>, AiAgentToolResult>builder(safeToolName(descriptor.name()), args -> {
                     Map<String, Object> arguments = args == null ? Map.of() : args;
+                    log.debug("AI tool call start, tool={}, action={}, argsKeys={}",
+                            descriptor.name(),
+                            arguments.get("action"),
+                            arguments.keySet());
                     AiAgentToolResult result = tool.execute(new AiAgentToolCall(descriptor.name(), arguments));
                     toolResults.add(result);
+                    log.debug("AI tool call completed, tool={}, action={}, payloadKeys={}",
+                            result.toolName(),
+                            result.action(),
+                            result.payload() == null ? List.of() : result.payload().keySet());
                     return result;
                 })
                 .description(descriptor.description())
@@ -434,6 +464,18 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .findFirst()
                 .map(AiAgentToolResult::message)
                 .orElse("画布操作已完成。");
+    }
+
+    private int length(String value) {
+        return value == null ? 0 : value.length();
+    }
+
+    private String preview(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        String normalized = value.replaceAll("\\s+", " ").trim();
+        return normalized.length() > 120 ? normalized.substring(0, 120) + "..." : normalized;
     }
 
     private String safeToolName(String name) {

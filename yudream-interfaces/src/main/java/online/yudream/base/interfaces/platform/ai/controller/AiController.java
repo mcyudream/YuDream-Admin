@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.ai.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.ai.service.AiAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 @RestController
 @RequestMapping("/api/platform/ai")
 @RequiredArgsConstructor
+@Slf4j
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class AiController {
 
@@ -42,6 +44,11 @@ public class AiController {
         String traceId = UUID.randomUUID().toString();
         CompletableFuture.runAsync(() -> {
             try {
+                log.debug("AI SSE stream accepted, traceId={}, title={}, promptLength={}, image={}",
+                        traceId,
+                        request.getTitle(),
+                        request.getPrompt() == null ? 0 : request.getPrompt().length(),
+                        request.getImageDataUrl() != null && !request.getImageDataUrl().isBlank());
                 send(emitter, AiWebAssembler.toProgressEvent(traceId, "accepted", "已收到请求，正在连接模型。"));
                 var result = aiAppService.streamCmsPage(
                         AiWebAssembler.toCmd(request),
@@ -51,9 +58,13 @@ public class AiController {
                             send(emitter, AiWebAssembler.toToolEvent(traceId, tool));
                         }
                 );
+                log.debug("AI SSE stream completed, traceId={}, tools={}",
+                        traceId,
+                        result.getTools() == null ? 0 : result.getTools().size());
                 send(emitter, AiWebAssembler.toResultEvent(traceId, result));
                 emitter.complete();
             } catch (Exception e) {
+                log.debug("AI SSE stream failed, traceId={}", traceId, e);
                 send(emitter, AiWebAssembler.toErrorEvent(traceId, e.getMessage()));
                 emitter.complete();
             }
@@ -63,8 +74,13 @@ public class AiController {
 
     private void send(SseEmitter emitter, AiStreamEventRes data) {
         try {
+            log.debug("AI SSE send event, traceId={}, event={}, action={}",
+                    data.getTraceId(),
+                    data.getEvent(),
+                    data.getAction());
             emitter.send(SseEmitter.event().name(data.getEvent()).data(data));
         } catch (IOException e) {
+            log.debug("AI SSE send failed, traceId={}, event={}", data.getTraceId(), data.getEvent(), e);
             emitter.completeWithError(e);
         }
     }
