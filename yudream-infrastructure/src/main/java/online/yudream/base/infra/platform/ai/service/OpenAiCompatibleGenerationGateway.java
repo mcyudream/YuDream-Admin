@@ -13,6 +13,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.net.InetSocketAddress;
+import java.net.Proxy;
+import java.net.URI;
 import java.util.Map;
 
 @Component
@@ -45,14 +48,16 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .put(JSONUtil.createObj().set("role", "user").set("content", userPrompt));
         body.set("messages", messages);
 
-        try (HttpResponse response = HttpRequest.post(endpoint(config))
+        HttpRequest request = HttpRequest.post(endpoint(config))
                 .bearerAuth(apiKey)
                 .header("Accept", "application/json")
                 .header("User-Agent", "YuDreamAdmin/1.0")
                 .contentType("application/json")
                 .body(body.toString())
-                .timeout(TIMEOUT)
-                .execute()) {
+                .timeout(TIMEOUT);
+        applyProxy(request, config);
+
+        try (HttpResponse response = request.execute()) {
             if (!response.isOk()) {
                 throw new BizException("AI 调用失败：" + response.getStatus() + "，" + explainBody(response.body()));
             }
@@ -66,6 +71,30 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         } catch (Exception e) {
             throw new BizException("AI 调用异常：" + e.getMessage());
         }
+    }
+
+    private void applyProxy(HttpRequest request, Map<String, String> config) {
+        String proxyUrl = value(config, "proxyUrl", "");
+        if (!StringUtils.hasText(proxyUrl)) {
+            return;
+        }
+        try {
+            URI uri = parseProxyUri(proxyUrl);
+            if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
+                throw new IllegalArgumentException("代理地址必须包含主机和端口");
+            }
+            request.setProxy(new Proxy(Proxy.Type.HTTP, new InetSocketAddress(uri.getHost(), uri.getPort())));
+        } catch (Exception e) {
+            throw new BizException("AI 代理地址配置无效：" + e.getMessage());
+        }
+    }
+
+    private URI parseProxyUri(String proxyUrl) {
+        String value = proxyUrl.trim();
+        if (!value.contains("://")) {
+            value = "http://" + value;
+        }
+        return URI.create(value);
     }
 
     private AiGenerationResult toResult(String content) {
