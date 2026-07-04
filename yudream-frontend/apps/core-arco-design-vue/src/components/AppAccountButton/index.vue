@@ -32,7 +32,7 @@ const profileModal = useFaModal().create({
   footer: false,
   closeOnClickOverlay: false,
   closeOnPressEscape: false,
-  class: 'h-[500px] sm:max-w-xl overflow-hidden',
+  class: 'profile-account-modal overflow-hidden',
   contentClass: 'min-h-full p-0 flex',
   content: () => h(Profile),
 })
@@ -111,3 +111,14 @@ const dropdownItems = computed(() => [
     </FaButton>
   </FaDropdown>
 </template>
+
+<style scoped>
+:global(.profile-account-modal) {
+  width: min(1080px, calc(100vw - 48px)) !important;
+  max-width: min(1080px, calc(100vw - 48px)) !important;
+}
+
+:global(.profile-account-modal [data-slot="dialog-content"]) {
+  width: 100%;
+}
+</style>

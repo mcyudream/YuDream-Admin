@@ -1,4 +1,4 @@
-import type { ApiResponse } from './system-client'
+import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export interface UserProfile {
@@ -46,6 +46,39 @@ export interface PasskeyRegistrationFinishPayload {
   responseJson: string
 }
 
+export type CredentialStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
+
+export interface ApiKeyCredential {
+  id: string | number
+  name: string
+  keyPrefix: string
+  maskedValue: string
+  creatorUserId: string | number
+  permissions: string[]
+  expireTime?: string
+  status: CredentialStatus
+  lastUsedTime?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export interface ApiKeyCreatePayload {
+  name: string
+  permissions: string[]
+  expireTime?: string
+}
+
+export interface ApiKeyCreateResult {
+  credential: ApiKeyCredential
+  plaintext: string
+}
+
+export interface ApiKeyPageParams {
+  page: number
+  size: number
+  keyword?: string
+}
+
 export default {
   get: () => systemClient.get<unknown, ApiResponse<UserProfile>>('api/user/me/profile'),
   update: (data: UserProfilePayload) => systemClient.put<unknown, ApiResponse<UserProfile>>('api/user/me/profile', data),
@@ -54,4 +87,7 @@ export default {
   startPasskeyRegistration: () => systemClient.post<unknown, ApiResponse<PasskeyRegistrationOptions>>('api/user/me/passkeys/registration/options'),
   finishPasskeyRegistration: (data: PasskeyRegistrationFinishPayload) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>('api/user/me/passkeys/registration', data),
   revokePasskey: (id: string | number) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>(`api/user/me/passkeys/${id}/revoke`),
+  apiKeys: (params: ApiKeyPageParams) => systemClient.get<unknown, ApiResponse<PageResult<ApiKeyCredential>>>('api/user/me/api-keys', { params }),
+  createApiKey: (data: ApiKeyCreatePayload) => systemClient.post<unknown, ApiResponse<ApiKeyCreateResult>>('api/user/me/api-keys', data),
+  revokeApiKey: (id: string | number) => systemClient.post<unknown, ApiResponse<ApiKeyCredential>>(`api/user/me/api-keys/${id}/revoke`),
 }
