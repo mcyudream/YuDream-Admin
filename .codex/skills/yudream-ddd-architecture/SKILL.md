@@ -107,6 +107,15 @@ Assembler hard rules:
 - External connections/resources may be created only after both gates pass and a business operation, connect action, health action, or explicit test action actually needs the external system. Close and clear resources on disable.
 - CMS platform work must be a complete publishing loop, not only backend CRUD. A CMS change should include backend menu permissions, admin route/menu registration, public frontend routes, public rendering, publish/unpublish flow, SEO fields, page/template metadata, and page-builder-compatible content storage such as saved HTML plus Markdown fallback.
 
+## System Seeds
+
+- System seed initialization, including menu enum seeds, must be controlled by configuration instead of hard-coded overwrite behavior.
+- Menu seed sync mode is configured by `yudream.system.seed.menu.sync-mode`:
+  - `INIT_EMPTY`: initialize only when the menu table/collection is empty;
+  - `MISSING_ONLY`: insert only seed menu records whose code does not exist;
+  - `OVERWRITE`: save every seed menu and overwrite records with the same code.
+- Seed strategy judgment belongs in domain services. Infrastructure reads configuration and passes the strategy into the domain service during startup.
+
 ## Excel / Import Export
 
 - Use EasyExcel for `.xlsx` import/export.

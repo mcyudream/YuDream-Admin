@@ -69,4 +69,9 @@ public class MenuRepoImpl implements MenuRepo {
         Query query = Query.query(Criteria.where("code").is(code));
         return mongoTemplate.exists(query, MenuDO.class);
     }
+
+    @Override
+    public long count() {
+        return mongoTemplate.count(new Query(), MenuDO.class);
+    }
 }
