@@ -14,4 +14,5 @@ public class CmsPageGenerateRequest {
     private String currentHtml;
     private String currentCss;
     private String currentProjectJson;
+    private boolean thinkingEnabled;
 }

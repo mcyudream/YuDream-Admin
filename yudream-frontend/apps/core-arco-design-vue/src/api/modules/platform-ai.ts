@@ -13,6 +13,7 @@ export interface CmsPageGeneratePayload {
   currentHtml?: string
   currentCss?: string
   currentProjectJson?: string
+  thinkingEnabled?: boolean
 }
 
 export interface CmsPageGenerateResult {

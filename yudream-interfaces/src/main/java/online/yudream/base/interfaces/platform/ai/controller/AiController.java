@@ -21,6 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
 @RequestMapping("/api/platform/ai")
@@ -43,6 +44,8 @@ public class AiController {
         SseEmitter emitter = new SseEmitter(180_000L);
         String traceId = UUID.randomUUID().toString();
         CompletableFuture.runAsync(() -> {
+            AtomicBoolean running = new AtomicBoolean(true);
+            CompletableFuture<Void> heartbeat = startHeartbeat(emitter, traceId, running);
             try {
                 log.debug("AI SSE stream accepted, traceId={}, title={}, promptLength={}, image={}",
                         traceId,
@@ -56,7 +59,8 @@ public class AiController {
                         tool -> {
                             send(emitter, AiWebAssembler.toProgressEvent(traceId, "tool", "正在更新画布。"));
                             send(emitter, AiWebAssembler.toToolEvent(traceId, tool));
-                        }
+                        },
+                        progress -> send(emitter, AiWebAssembler.toProgressEvent(traceId, progress.action(), progress.content()))
                 );
                 log.debug("AI SSE stream completed, traceId={}, tools={}",
                         traceId,
@@ -67,9 +71,33 @@ public class AiController {
                 log.debug("AI SSE stream failed, traceId={}", traceId, e);
                 send(emitter, AiWebAssembler.toErrorEvent(traceId, e.getMessage()));
                 emitter.complete();
+            } finally {
+                running.set(false);
+                heartbeat.cancel(true);
             }
         });
         return emitter;
+    }
+
+    private CompletableFuture<Void> startHeartbeat(SseEmitter emitter, String traceId, AtomicBoolean running) {
+        return CompletableFuture.runAsync(() -> {
+            int count = 0;
+            while (running.get()) {
+                try {
+                    Thread.sleep(4_000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (!running.get()) {
+                    return;
+                }
+                count++;
+                log.debug("AI SSE heartbeat, traceId={}, count={}", traceId, count);
+                send(emitter, AiWebAssembler.toProgressEvent(traceId, "thinking",
+                        "模型仍在生成中，工具调用场景可能需要先完成参数规划。"));
+            }
+        });
     }
 
     private void send(SseEmitter emitter, AiStreamEventRes data) {
@@ -78,7 +106,9 @@ public class AiController {
                     data.getTraceId(),
                     data.getEvent(),
                     data.getAction());
-            emitter.send(SseEmitter.event().name(data.getEvent()).data(data));
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().name(data.getEvent()).data(data));
+            }
         } catch (IOException e) {
             log.debug("AI SSE send failed, traceId={}, event={}", data.getTraceId(), data.getEvent(), e);
             emitter.completeWithError(e);
