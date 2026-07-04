@@ -15,8 +15,10 @@ interface SiteNavigationItem {
   id?: string
   label: string
   url: string
+  parentId?: string
   visible?: boolean
   sort?: number
+  children?: SiteNavigationItem[]
 }
 type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
 
@@ -30,6 +32,11 @@ const slug = computed(() => {
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 const homeCss = computed(() => home.value?.settings?.homeCss || '')
 const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url)))
+const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
+const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))
+const footerTitle = computed(() => home.value?.settings?.footerTitle || renderContext.value.site.name)
+const footerDescription = computed(() => home.value?.settings?.footerDescription || renderContext.value.site.description || '由 YuDream CMS 驱动的内容站点')
+const footerCopyright = computed(() => home.value?.settings?.footerCopyright || `© ${new Date().getFullYear()} ${renderContext.value.site.name}. All rights reserved.`)
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
 const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
 const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
@@ -211,6 +218,40 @@ function parseNavigationItems(value?: string): SiteNavigationItem[] {
   }
 }
 
+function buildNavigationTree(items: SiteNavigationItem[]) {
+  const itemMap = new Map<string, SiteNavigationItem>()
+  const roots: SiteNavigationItem[] = []
+  items.forEach((item) => {
+    const cloned = { ...item, children: [] }
+    if (cloned.id) {
+      itemMap.set(cloned.id, cloned)
+    }
+  })
+  items.forEach((item) => {
+    const current = item.id ? itemMap.get(item.id) : { ...item, children: [] }
+    if (!current) {
+      return
+    }
+    const parent = item.parentId ? itemMap.get(item.parentId) : undefined
+    if (parent) {
+      parent.children = [...(parent.children || []), current]
+    }
+    else {
+      roots.push(current)
+    }
+  })
+  const sortItems = (list: SiteNavigationItem[]) => {
+    list.sort((a, b) => (a.sort || 0) - (b.sort || 0))
+    list.forEach(item => item.children?.sort((a, b) => (a.sort || 0) - (b.sort || 0)))
+    return list
+  }
+  return sortItems(roots)
+}
+
+function flattenNavigation(items: SiteNavigationItem[]) {
+  return items.flatMap(item => [item, ...(item.children || [])])
+}
+
 function isAuthNavigationUrl(url?: string) {
   const normalized = (url || '').trim().toLowerCase()
   return normalized === '/login' || normalized === '/register' || normalized === '/signup'
@@ -360,7 +401,15 @@ function escapeHtml(value: string) {
             <span>{{ renderContext.site.name }}</span>
           </a>
           <nav class="site-layout-header__nav">
-            <a v-for="item in navigationItems" :key="item.id || item.url" :href="item.url">{{ item.label }}</a>
+            <div v-for="item in navigationTree" :key="item.id || item.url" class="site-nav-item" :class="{ 'has-children': item.children?.length }">
+              <a :href="item.url">
+                {{ item.label }}
+                <span v-if="item.children?.length">⌄</span>
+              </a>
+              <div v-if="item.children?.length" class="site-nav-dropdown">
+                <a v-for="child in item.children" :key="child.id || child.url" :href="child.url">{{ child.label }}</a>
+              </div>
+            </div>
           </nav>
           <div v-if="!appAccountStore.isLogin" class="site-layout-header__auth">
             <a href="/login" class="ghost">登录</a>
@@ -385,7 +434,10 @@ function escapeHtml(value: string) {
         <aside v-if="siteLayout === 'ADMIN'" class="site-admin-sidebar">
           <strong>{{ renderContext.site.name }}</strong>
           <a href="/site">首页</a>
-          <a v-for="item in navigationItems" :key="`side-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
+          <template v-for="item in navigationTree" :key="`side-${item.id || item.url}`">
+            <a :href="item.url">{{ item.label }}</a>
+            <a v-for="child in item.children" :key="`side-child-${child.id || child.url}`" class="child" :href="child.url">{{ child.label }}</a>
+          </template>
         </aside>
 
         <div class="site-layout-content">
@@ -435,16 +487,17 @@ function escapeHtml(value: string) {
       <footer v-if="showFooter" class="site-layout-footer">
         <div class="site-shell">
           <div>
-            <strong>{{ renderContext.site.name }}</strong>
-            <p>{{ renderContext.site.description || '由 YuDream CMS 驱动的内容站点' }}</p>
+            <strong>{{ footerTitle }}</strong>
+            <p>{{ footerDescription }}</p>
+            <small>{{ footerCopyright }}</small>
           </div>
           <nav>
-            <a v-for="item in navigationItems" :key="`foot-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
+            <a v-for="item in footerNavigationItems" :key="`foot-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
           </nav>
         </div>
       </footer>
       <footer v-else-if="showCopyright" class="site-layout-copyright">
-        © {{ new Date().getFullYear() }} {{ renderContext.site.name }}. All rights reserved.
+        {{ footerCopyright }}
       </footer>
     </template>
   </main>
@@ -518,7 +571,15 @@ function escapeHtml(value: string) {
   min-width: 0;
 }
 
-.site-layout-header__nav a {
+.site-nav-item {
+  position: relative;
+}
+
+.site-layout-header__nav a,
+.site-nav-item > a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 8px 9px;
   border-radius: 7px;
   color: #475569;
@@ -527,9 +588,35 @@ function escapeHtml(value: string) {
   text-decoration: none;
 }
 
-.site-layout-header__nav a:hover {
+.site-layout-header__nav a:hover,
+.site-nav-item:hover > a {
   background: #f1f5f9;
   color: #0f172a;
+}
+
+.site-nav-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: none;
+  min-width: 168px;
+  padding: 6px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+}
+
+.site-nav-item:hover .site-nav-dropdown,
+.site-nav-item:focus-within .site-nav-dropdown {
+  display: grid;
+  gap: 2px;
+}
+
+.site-nav-dropdown a {
+  display: flex;
+  white-space: nowrap;
 }
 
 .site-layout-header__auth {
@@ -668,6 +755,13 @@ function escapeHtml(value: string) {
   color: #0f172a;
 }
 
+.site-admin-sidebar a.child {
+  margin-left: 12px;
+  padding-left: 18px;
+  color: #64748b;
+  font-size: 13px;
+}
+
 .site-layout-footer {
   padding: 36px 0;
   border-top: 1px solid #e5e7eb;
@@ -689,6 +783,12 @@ function escapeHtml(value: string) {
 .site-layout-footer p {
   margin: 8px 0 0;
   color: #64748b;
+}
+
+.site-layout-footer small {
+  display: block;
+  margin-top: 12px;
+  color: #94a3b8;
 }
 
 .site-layout-footer nav {

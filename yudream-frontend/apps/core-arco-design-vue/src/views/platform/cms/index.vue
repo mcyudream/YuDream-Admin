@@ -14,6 +14,7 @@ interface CmsNavigationItem {
   id: string
   label: string
   url: string
+  parentId?: string
   visible: boolean
   sort: number
 }
@@ -131,6 +132,19 @@ const homeLayoutMode = computed<SiteLayoutMode>({
     }
   },
 })
+const footerTitle = computed({
+  get: () => home.settings?.footerTitle || '',
+  set: value => setHomeSetting('footerTitle', value),
+})
+const footerDescription = computed({
+  get: () => home.settings?.footerDescription || '',
+  set: value => setHomeSetting('footerDescription', value),
+})
+const footerCopyright = computed({
+  get: () => home.settings?.footerCopyright || '',
+  set: value => setHomeSetting('footerCopyright', value),
+})
+const rootNavigationItems = computed(() => [...navigationItems.value].filter(item => !item.parentId).sort((a, b) => a.sort - b.sort))
 const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
 const homePreviewHtml = computed(() => sanitizeHtml(stripLayoutBlocks(homeHtml.value || emptyHomeBuilderHtml())))
 const cmsVariables = [
@@ -480,6 +494,13 @@ function resolveHomeHtmlForSave() {
   return stripLayoutBlocks(homeHtml.value?.trim() || '')
 }
 
+function setHomeSetting(key: string, value: string) {
+  home.settings = {
+    ...(home.settings || {}),
+    [key]: value,
+  }
+}
+
 function stripLayoutBlocks(value?: string) {
   if (!value) {
     return ''
@@ -520,18 +541,21 @@ function removeHomeSection(section: HomeSection) {
   home.sections = home.sections.filter(item => item !== section)
 }
 
-function addNavigationItem() {
+function addNavigationItem(parentId = '') {
   navigationItems.value.push({
     id: `nav-${Date.now()}`,
-    label: '新菜单',
+    label: parentId ? '子菜单' : '新菜单',
     url: '/site',
+    parentId,
     visible: true,
     sort: navigationItems.value.length + 1,
   })
 }
 
 function removeNavigationItem(item: CmsNavigationItem) {
-  navigationItems.value = navigationItems.value.filter(current => current !== item)
+  navigationItems.value = navigationItems.value
+    .filter(current => current !== item)
+    .map(current => current.parentId === item.id ? { ...current, parentId: '' } : current)
 }
 
 function parseNavigationItems(value?: string): CmsNavigationItem[] {
@@ -901,21 +925,39 @@ function sectionTitle(type: HomeSectionType) {
               <h3>站点导航</h3>
               <p>类似 WordPress 菜单，可用于公开首页和内容页顶部导航。</p>
             </div>
-            <FaButton v-auth="'platform:cms:edit'" @click="addNavigationItem">
+            <FaButton v-auth="'platform:cms:edit'" @click="addNavigationItem()">
               <FaIcon name="i-ri:add-line" />
-              新增菜单
+              新增一级菜单
             </FaButton>
           </div>
           <article v-for="item in navigationItems" :key="item.id" class="builder-block">
             <div class="builder-block__head">
-              <FaTag variant="secondary">#{{ item.sort }}</FaTag>
-              <FaButton size="sm" variant="ghost" @click="removeNavigationItem(item)">
-                <FaIcon name="i-ri:delete-bin-line" />
-              </FaButton>
+              <div class="navigation-item-title">
+                <FaTag variant="secondary">{{ item.parentId ? '二级菜单' : '一级菜单' }}</FaTag>
+                <span>{{ item.label || '未命名菜单' }}</span>
+              </div>
+              <div class="navigation-item-actions">
+                <FaButton v-if="!item.parentId" size="sm" variant="ghost" @click="addNavigationItem(item.id)">
+                  <FaIcon name="i-ri:add-line" />
+                  子菜单
+                </FaButton>
+                <FaButton size="sm" variant="ghost" @click="removeNavigationItem(item)">
+                  <FaIcon name="i-ri:delete-bin-line" />
+                </FaButton>
+              </div>
             </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
               <FaInput v-model="item.label" placeholder="菜单名称" />
               <FaInput v-model="item.url" placeholder="/site/about 或 https://..." />
+              <label class="cms-field">
+                <span>上级菜单</span>
+                <select v-model="item.parentId" class="cms-native-select">
+                  <option value="">一级菜单</option>
+                  <option v-for="parent in rootNavigationItems.filter(parent => parent.id !== item.id)" :key="parent.id" :value="parent.id">
+                    {{ parent.label }}
+                  </option>
+                </select>
+              </label>
               <FaInput v-model.number="item.sort" type="number" placeholder="排序" />
               <label class="inline-flex items-center gap-2 text-sm">
                 <FaSwitch v-model="item.visible" />
@@ -923,20 +965,44 @@ function sectionTitle(type: HomeSectionType) {
               </label>
             </div>
           </article>
+          <section class="footer-settings">
+            <div>
+              <h3>底部 Footer</h3>
+              <p>由站点布局统一渲染，留空时使用系统站点名称和默认版权。</p>
+            </div>
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <FaInput v-model="footerTitle" placeholder="Footer 标题，默认站点名称" />
+              <FaInput v-model="footerCopyright" placeholder="版权文案，默认自动生成" />
+              <FaTextarea v-model="footerDescription" rows="3" class="md:col-span-2" placeholder="Footer 描述" />
+            </div>
+          </section>
         </main>
         <aside class="home-preview">
           <section>
             <h3>导航预览</h3>
             <nav class="cms-nav-preview">
-              <a v-for="item in navigationItems.filter(nav => nav.visible).sort((a, b) => a.sort - b.sort)" :key="item.id" :href="item.url">
-                {{ item.label }}
-              </a>
+              <div v-for="item in rootNavigationItems.filter(nav => nav.visible)" :key="item.id" class="cms-nav-preview__item">
+                <a :href="item.url">{{ item.label }}</a>
+                <div v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" class="cms-nav-preview__children">
+                  <a v-for="child in navigationItems.filter(child => child.parentId === item.id && child.visible).sort((a, b) => a.sort - b.sort)" :key="child.id" :href="child.url">
+                    {{ child.label }}
+                  </a>
+                </div>
+              </div>
             </nav>
+          </section>
+          <section>
+            <h3>Footer 预览</h3>
+            <div class="cms-footer-preview">
+              <strong>{{ footerTitle || home.title || 'YuDream' }}</strong>
+              <p>{{ footerDescription || home.subtitle || '由 YuDream CMS 驱动的内容站点' }}</p>
+              <small>{{ footerCopyright || `© ${new Date().getFullYear()} ${footerTitle || home.title || 'YuDream'}. All rights reserved.` }}</small>
+            </div>
           </section>
           <section>
             <h3>使用说明</h3>
             <p class="cms-help-text">
-              导航保存到首页 settings.navigationJson，由站点布局 Header 自动渲染；登录、注册和头像菜单由布局统一处理。
+              导航保存到首页 settings.navigationJson，二级菜单通过“上级菜单”关联；Footer 配置保存到首页 settings，由站点布局统一渲染。
             </p>
           </section>
         </aside>
@@ -1308,6 +1374,55 @@ function sectionTitle(type: HomeSectionType) {
   background: var(--color-bg-2);
 }
 
+.navigation-item-title,
+.navigation-item-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cms-field {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-2);
+  font-size: 13px;
+}
+
+.cms-native-select {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+  outline: none;
+}
+
+.cms-native-select:focus {
+  border-color: rgb(var(--primary-6));
+  box-shadow: 0 0 0 2px rgba(var(--primary-6), 0.12);
+}
+
+.footer-settings {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.footer-settings h3,
+.footer-settings p {
+  margin: 0;
+}
+
+.footer-settings p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+}
+
 .cms-nav-preview {
   display: flex;
   gap: 8px;
@@ -1315,12 +1430,45 @@ function sectionTitle(type: HomeSectionType) {
   flex-wrap: wrap;
 }
 
+.cms-nav-preview__item {
+  display: grid;
+  gap: 6px;
+}
+
 .cms-nav-preview a {
+  display: inline-flex;
   padding: 8px 12px;
   border: 1px solid var(--color-border-2);
   border-radius: 999px;
   color: var(--color-text-2);
   text-decoration: none;
+}
+
+.cms-nav-preview__children {
+  display: grid;
+  gap: 4px;
+  padding-left: 12px;
+}
+
+.cms-nav-preview__children a {
+  padding: 6px 10px;
+  border-style: dashed;
+  font-size: 12px;
+}
+
+.cms-footer-preview {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-fill-1);
+}
+
+.cms-footer-preview p,
+.cms-footer-preview small {
+  margin: 0;
+  color: var(--color-text-3);
 }
 
 .cms-help-text {
