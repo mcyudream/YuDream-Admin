@@ -5,7 +5,7 @@ import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatService
 import type { FileObject } from '@/api/modules/files'
 import type { AiStreamEnvelope, AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import { Chatbot } from '@tdesign-vue-next/chat'
-import { Select as TSelect, Tooltip as TTooltip } from 'tdesign-vue-next'
+import { Select as TSelect, Switch as TSwitch, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -45,6 +45,7 @@ const chatbotRef = ref<{ addPrompt?: (prompt: string, autoFocus?: boolean) => vo
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 const aiModel = ref('')
+const aiThinkingEnabled = ref(false)
 const aiAttachments = ref<any[]>([])
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
 const canvasRevision = ref(0)
@@ -54,6 +55,16 @@ const aiSuggestions = [
   '根据样图调整版式和配色',
   '优化移动端排版和间距',
 ]
+const thinkingActions = new Set([
+  'analysis',
+  'request',
+  'subscribed',
+  'thinking',
+  'tool-start',
+  'tool-complete',
+  'first-delta',
+  'stream-complete',
+])
 let editor: Editor | null = null
 let pendingAiResult: CmsPageGenerateResult | null = null
 
@@ -181,12 +192,22 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
   ].includes(chunk.event || ''),
   onMessage: (chunk: SSEChunkData) => {
     const envelope = normalizeAiStreamChunk(chunk)
-    if (envelope.event === 'ai.message' || envelope.event === 'ai.progress') {
+    if (envelope.event === 'ai.progress') {
+      const content = String(envelope.payload?.content || '')
+      if (aiThinkingEnabled.value && thinkingActions.has(String(envelope.action || ''))) {
+        return thinkingChunk(content)
+      }
+      return markdownChunk(formatProgress(envelope.action, content))
+    }
+    if (envelope.event === 'ai.message') {
       return markdownChunk(String(envelope.payload?.content || ''))
     }
     if (envelope.event === 'ai.tool') {
-      applyAiTool(envelope.payload?.tool)
-      return null
+      const tool = envelope.payload?.tool
+      if (isCanvasTool(tool)) {
+        applyAiTool(tool)
+      }
+      return markdownChunk(formatToolMessage(tool))
     }
     if (envelope.event === 'ai.result') {
       const result = envelope.payload?.result || null
@@ -329,6 +350,7 @@ function buildAiPayload(prompt: string, attachments: any[] = []) {
     pageType: 'GrapesJS 可视化页面',
     style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。不要生成系统导航栏和页脚，它们由站点 Layout 渲染。',
     model: aiModel.value || undefined,
+    thinkingEnabled: aiThinkingEnabled.value,
     imageDataUrl: image?.url || undefined,
     currentHtml: editor.getHtml(),
     currentCss: editor.getCss(),
@@ -365,9 +387,50 @@ function markdownChunk(data: string): AIMessageContent {
   }
 }
 
+function thinkingChunk(text: string): AIMessageContent {
+  return {
+    type: 'thinking',
+    id: 'cms-ai-thinking',
+    data: {
+      title: '思考中',
+      text,
+    },
+    status: 'streaming',
+    strategy: 'merge',
+  } as AIMessageContent
+}
+
+function formatProgress(action?: string, content?: string) {
+  const text = content || '处理中...'
+  const labelMap: Record<string, string> = {
+    accepted: '已接收',
+    analysis: '分析',
+    request: '请求',
+    subscribed: '连接',
+    thinking: '思考',
+    'tool-start': '工具',
+    'tool-complete': '工具',
+    'first-delta': '输出',
+    'stream-complete': '汇总',
+    complete: '完成',
+  }
+  return `\n\n> ${labelMap[String(action || '')] || '进度'}：${text}`
+}
+
+function formatToolMessage(tool?: AiToolCallResult) {
+  const name = tool?.toolName || '未知工具'
+  const action = tool?.action || '执行'
+  const message = tool?.message || '工具调用完成'
+  return `\n\n> 工具：${name} / ${action}\n\n${message}`
+}
+
+function isCanvasTool(tool?: AiToolCallResult) {
+  return tool?.toolName === 'cms.canvas.patch'
+}
+
 function applyAiResult(result: CmsPageGenerateResult) {
   if (result.tools?.length) {
-    result.tools.forEach(applyAiTool)
+    result.tools.filter(isCanvasTool).forEach(applyAiTool)
     return
   }
   if (!editor) {
@@ -805,6 +868,12 @@ function escapeAttr(value: string) {
               :message-props="aiMessageProps"
             >
               <template #sender-footer-prefix>
+                <div class="ai-chat-controls">
+                  <label class="ai-thinking-toggle">
+                    <TSwitch v-model="aiThinkingEnabled" size="small" />
+                    <span>深度思考</span>
+                  </label>
+                </div>
                 <div v-if="aiModelOptions?.length" class="ai-model-select">
                   <TTooltip content="切换模型" trigger="hover">
                     <TSelect
@@ -1092,6 +1161,27 @@ function escapeAttr(value: string) {
 .builder-chatbot :deep(textarea) {
   font-size: 13px;
   line-height: 1.7;
+}
+
+.ai-chat-controls {
+  display: flex;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.ai-thinking-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .ai-model-select {

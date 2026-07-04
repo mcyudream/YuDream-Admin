@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import org.springframework.ai.chat.client.ChatClient;
@@ -93,6 +94,16 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     @Override
     public AiGenerationResult generateStream(AiGenerationRequest request, Consumer<String> onDelta) {
+        return generateStream(request, onDelta, null, null);
+    }
+
+    @Override
+    public AiGenerationResult generateStream(
+            AiGenerationRequest request,
+            Consumer<String> onDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
         if (!StringUtils.hasText(value(config, "apiKey", ""))) {
             throw new BizException("AI API Key 未配置");
@@ -100,17 +111,25 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         StringBuilder content = new StringBuilder();
         try {
+            progress(onProgress, "request", "正在准备模型请求。");
             log.debug("AI stream call start, endpoint={}, model={}, promptLength={}, image={}",
                     endpointBaseUrl(config) + endpointPath(config),
                     model(config, request.model()),
                     length(request.userPrompt()),
                     StringUtils.hasText(request.imageDataUrl()));
-            requestSpec(request, config, toolResults)
+            requestSpec(request, config, toolResults, onTool, onProgress)
                     .stream()
                     .content()
+                    .doFirst(() -> {
+                        log.debug("AI stream subscribed");
+                        progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。");
+                    })
                     .doOnNext(delta -> {
                         if (!StringUtils.hasText(delta)) {
                             return;
+                        }
+                        if (content.isEmpty()) {
+                            progress(onProgress, "first-delta", "模型已开始输出内容。");
                         }
                         content.append(delta);
                         log.debug("AI stream delta received, length={}, preview={}", delta.length(), preview(delta));
@@ -118,8 +137,10 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                             onDelta.accept(delta);
                         }
                     })
+                    .doOnComplete(() -> progress(onProgress, "stream-complete", "模型流式输出已完成，正在汇总结果。"))
                     .blockLast(Duration.ofMillis(READ_TIMEOUT));
             log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
+            progress(onProgress, "complete", "AI 处理完成。");
             return toResult(content.toString(), toolResults);
         } catch (BizException e) {
             log.debug("AI stream call business error: {}", e.getMessage());
@@ -139,6 +160,16 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Map<String, String> config,
             List<AiAgentToolResult> toolResults
     ) {
+        return requestSpec(request, config, toolResults, null, null);
+    }
+
+    private ChatClient.ChatClientRequestSpec requestSpec(
+            AiGenerationRequest request,
+            Map<String, String> config,
+            List<AiAgentToolResult> toolResults,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(config, request.model()))
                 .prompt()
                 .system(request.systemPrompt())
@@ -146,7 +177,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     user.text(request.userPrompt());
                     imageMedia(request.imageDataUrl()).ifPresent(user::media);
                 });
-        List<ToolCallback> callbacks = toolCallbacks(toolResults);
+        List<ToolCallback> callbacks = toolCallbacks(toolResults, onTool, onProgress);
         if (!callbacks.isEmpty()) {
             log.debug("AI tool callbacks registered, count={}, names={}",
                     callbacks.size(),
@@ -234,22 +265,36 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
     }
 
-    private List<ToolCallback> toolCallbacks(List<AiAgentToolResult> toolResults) {
+    private List<ToolCallback> toolCallbacks(
+            List<AiAgentToolResult> toolResults,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         return aiAgentToolProvider.stream()
-                .map(tool -> toolCallback(tool, toolResults))
+                .map(tool -> toolCallback(tool, toolResults, onTool, onProgress))
                 .toList();
     }
 
-    private ToolCallback toolCallback(AiAgentTool tool, List<AiAgentToolResult> toolResults) {
+    private ToolCallback toolCallback(
+            AiAgentTool tool,
+            List<AiAgentToolResult> toolResults,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         AiAgentToolDescriptor descriptor = tool.descriptor();
         return FunctionToolCallback.<Map<String, Object>, AiAgentToolResult>builder(safeToolName(descriptor.name()), args -> {
                     Map<String, Object> arguments = args == null ? Map.of() : args;
+                    progress(onProgress, "tool-start", "正在调用工具：" + descriptor.title());
                     log.debug("AI tool call start, tool={}, action={}, argsKeys={}",
                             descriptor.name(),
                             arguments.get("action"),
                             arguments.keySet());
                     AiAgentToolResult result = tool.execute(new AiAgentToolCall(descriptor.name(), arguments));
                     toolResults.add(result);
+                    if (onTool != null) {
+                        onTool.accept(result);
+                    }
+                    progress(onProgress, "tool-complete", "工具调用完成：" + descriptor.title());
                     log.debug("AI tool call completed, tool={}, action={}, payloadKeys={}",
                             result.toolName(),
                             result.action(),
@@ -476,6 +521,12 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
         String normalized = value.replaceAll("\\s+", " ").trim();
         return normalized.length() > 120 ? normalized.substring(0, 120) + "..." : normalized;
+    }
+
+    private void progress(Consumer<AiGenerationProgress> onProgress, String action, String content) {
+        if (onProgress != null) {
+            onProgress.accept(new AiGenerationProgress(action, content));
+        }
     }
 
     private String safeToolName(String name) {
