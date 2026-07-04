@@ -850,10 +850,6 @@ function sectionTitle(type: HomeSectionType) {
             </div>
           </section>
 
-          <section>
-            <h3>实时预览</h3>
-            <div class="mini-preview" v-html="pagePreviewHtml" />
-          </section>
         </aside>
       </section>
 
@@ -1324,7 +1320,6 @@ function sectionTitle(type: HomeSectionType) {
 .builder-entry__preview,
 .builder-block,
 .publish-panel section,
-.mini-preview,
 .home-preview-section {
   display: grid;
   gap: 10px;
@@ -1456,13 +1451,6 @@ function sectionTitle(type: HomeSectionType) {
   font-size: 11px;
 }
 
-.mini-preview {
-  max-height: 460px;
-  overflow: auto;
-  color: var(--color-text-1);
-}
-
-.mini-preview :deep(.yb-empty),
 .builder-entry__preview :deep(.yb-empty) {
   padding: 28px;
   border-radius: 6px;
@@ -1470,7 +1458,6 @@ function sectionTitle(type: HomeSectionType) {
   color: #fff;
 }
 
-.mini-preview :deep(img),
 .builder-entry__preview :deep(img) {
   max-width: 100%;
   border-radius: 6px;
