@@ -114,6 +114,13 @@ const cmsVariables = [
   { key: '{{user.nickname}}', label: '昵称' },
   { key: '{{user.avatar}}', label: '头像地址' },
   { key: '{{route.path}}', label: '当前路径' },
+  { key: '{{route.slug}}', label: '当前 Slug' },
+  { key: '{{navigation.count}}', label: '导航数量' },
+  { key: '{{navUsers.count}}', label: '头像用户数' },
+  { key: 'data-visible-when="guest"', label: '仅游客可见' },
+  { key: 'data-visible-when="logged-in"', label: '仅登录可见' },
+  { key: 'data-yb-repeat="navigation"', label: '循环导航' },
+  { key: 'data-yb-repeat="navUsers"', label: '循环头像用户' },
 ]
 
 watch(activeTab, async () => {
@@ -237,7 +244,7 @@ function selectPage(page: CmsPage) {
     template: page.template || 'DEFAULT',
     status: page.status || 'DRAFT',
   })
-  editorMode.value = page.htmlContent ? 'html' : 'builder'
+  editorMode.value = page.htmlContent?.includes('pagebuilder') ? 'builder' : page.htmlContent ? 'html' : 'builder'
 }
 
 function pickMedia() {
@@ -338,9 +345,8 @@ function resetPageForm() {
 async function savePage() {
   saving.value = true
   try {
-    const htmlContent = editorMode.value === 'builder' ? syncBuilderDraft('page') : pageForm.htmlContent
     const payload = { ...pageForm }
-    payload.htmlContent = normalizeBuilderHtml(htmlContent, pageForm.markdownContent)
+    payload.htmlContent = resolvePageHtmlForSave()
     const res = selectedPageId.value
       ? await apiCms.updatePage(selectedPageId.value, payload)
       : await apiCms.createPage(payload)
@@ -374,8 +380,7 @@ function confirmPublish() {
 async function saveHome() {
   saving.value = true
   try {
-    const html = builderTarget.value === 'home' ? syncBuilderDraft('home') : homeHtml.value
-    homeHtml.value = normalizeBuilderHtml(html, '') || homeHtml.value
+    homeHtml.value = resolveHomeHtmlForSave()
     home.settings = {
       ...(home.settings || {}),
       navigationJson: JSON.stringify(navigationItems.value),
@@ -468,6 +473,29 @@ function syncBuilderDraft(target: BuilderTarget = 'page') {
     // 未打开 builder 时无需同步本地草稿。
   }
   return currentContent || ''
+}
+
+function resolvePageHtmlForSave() {
+  if (editorMode.value === 'builder') {
+    const html = syncBuilderDraft('page')
+    return normalizeBuilderHtml(html, pageForm.markdownContent)
+  }
+  if (editorMode.value === 'html') {
+    return normalizeBuilderHtml(pageForm.htmlContent, pageForm.markdownContent)
+  }
+  const existingHtml = pageForm.htmlContent?.trim()
+  if (existingHtml) {
+    return existingHtml
+  }
+  return normalizeBuilderHtml('', pageForm.markdownContent)
+}
+
+function resolveHomeHtmlForSave() {
+  if (pageBuilderVisible.value && builderTarget.value === 'home') {
+    const html = syncBuilderDraft('home')
+    return normalizeBuilderHtml(html, '') || homeHtml.value
+  }
+  return homeHtml.value?.trim() ? normalizeBuilderHtml(homeHtml.value, '') : ''
 }
 
 function normalizeBuilderHtml(html?: string, fallbackMarkdown?: string) {
