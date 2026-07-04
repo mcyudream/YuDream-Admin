@@ -107,6 +107,8 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_RABBITMQ_ENABLED:false}
   neo4j:
     enabled: ${PLATFORM_NEO4J_ENABLED:false}
+  ai:
+    enabled: ${PLATFORM_AI_ENABLED:true}
 
 yudream.storage.s3:
   endpoint: ${S3_ENDPOINT:http://localhost:9000}

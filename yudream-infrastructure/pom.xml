@@ -78,6 +78,10 @@
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
         </dependency>
+        <dependency>
+            <groupId>cn.hutool</groupId>
+            <artifactId>hutool-all</artifactId>
+        </dependency>
 
         <!-- Sa-Token：用于扫描 @SaCheckPermission 实现权限自动注册 -->
         <dependency>

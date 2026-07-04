@@ -38,6 +38,7 @@ const groups: CapabilityGroup[] = [
   { type: 'DOCUMENT', title: '文档生成', icon: 'i-ri:file-word-2-line' },
   { type: 'CONTENT', title: '内容定制', icon: 'i-ri:layout-masonry-line' },
   { type: 'GRAPH', title: '图数据库', icon: 'i-ri:share-circle-line' },
+  { type: 'AI', title: 'AI 助手', icon: 'i-ri:sparkling-2-line' },
 ]
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
@@ -226,6 +227,12 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'exchange', label: '交换机', placeholder: 'yudream.capability' },
       { key: 'queue', label: '队列', placeholder: 'yudream.capability.test' },
       { key: 'routingKey', label: '路由键', placeholder: 'capability.test' },
+    ],
+    ai: [
+      { key: 'baseUrl', label: '接口地址', placeholder: 'https://api.openai.com/v1' },
+      { key: 'apiKey', label: 'API Key', placeholder: 'sk-...', type: 'password' },
+      { key: 'model', label: '模型', placeholder: 'gpt-4o-mini' },
+      { key: 'temperature', label: '温度', placeholder: '0.4', type: 'number' },
     ],
   }
   return code ? map[code] || [] : []

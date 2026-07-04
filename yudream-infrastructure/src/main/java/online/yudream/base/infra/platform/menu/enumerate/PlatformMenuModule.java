@@ -131,5 +131,9 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:cms:delete", name = "删除内容页面", type = MenuNodeType.BUTTON,
             parentName = "CMS", permission = "platform:cms:delete")
-    CMS_DELETE
+    CMS_DELETE,
+
+    @MenuNode(code = "platform:ai:generate", name = "AI 生成内容", type = MenuNodeType.BUTTON,
+            parentName = "CMS", permission = "platform:ai:generate")
+    AI_GENERATE
 }
