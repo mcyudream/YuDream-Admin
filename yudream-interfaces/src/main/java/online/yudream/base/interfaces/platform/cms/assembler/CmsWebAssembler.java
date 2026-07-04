@@ -20,9 +20,13 @@ public class CmsWebAssembler {
         cmd.setTitle(request.getTitle());
         cmd.setSlug(request.getSlug());
         cmd.setSummary(request.getSummary());
+        cmd.setExcerpt(request.getExcerpt());
+        cmd.setCoverImageUrl(request.getCoverImageUrl());
         cmd.setMarkdownContent(request.getMarkdownContent());
+        cmd.setHtmlContent(request.getHtmlContent());
         cmd.setSeoTitle(request.getSeoTitle());
         cmd.setSeoDescription(request.getSeoDescription());
+        cmd.setTemplate(request.getTemplate());
         cmd.setStatus(request.getStatus());
         return cmd;
     }
@@ -56,9 +60,13 @@ public class CmsWebAssembler {
                 .title(dto.getTitle())
                 .slug(dto.getSlug())
                 .summary(dto.getSummary())
+                .excerpt(dto.getExcerpt())
+                .coverImageUrl(dto.getCoverImageUrl())
                 .markdownContent(dto.getMarkdownContent())
+                .htmlContent(dto.getHtmlContent())
                 .seoTitle(dto.getSeoTitle())
                 .seoDescription(dto.getSeoDescription())
+                .template(dto.getTemplate())
                 .status(dto.getStatus())
                 .publishedAt(dto.getPublishedAt())
                 .createTime(dto.getCreateTime())

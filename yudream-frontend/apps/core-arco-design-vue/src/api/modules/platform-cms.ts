@@ -2,6 +2,7 @@ import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export type PageStatus = 'DRAFT' | 'PUBLISHED'
+export type PageTemplate = 'DEFAULT' | 'LANDING' | 'DOC' | 'BLANK'
 export type HomeSectionType = 'HERO' | 'FEATURE' | 'CONTENT' | 'CTA'
 
 export interface CmsPageParams {
@@ -28,9 +29,13 @@ export interface CmsPage {
   title: string
   slug: string
   summary?: string
+  excerpt?: string
+  coverImageUrl?: string
   markdownContent?: string
+  htmlContent?: string
   seoTitle?: string
   seoDescription?: string
+  template?: PageTemplate
   status: PageStatus
   publishedAt?: string
   createTime?: string
@@ -41,9 +46,13 @@ export interface CmsPagePayload {
   title: string
   slug: string
   summary?: string
+  excerpt?: string
+  coverImageUrl?: string
   markdownContent?: string
+  htmlContent?: string
   seoTitle?: string
   seoDescription?: string
+  template?: PageTemplate
   status: PageStatus
 }
 

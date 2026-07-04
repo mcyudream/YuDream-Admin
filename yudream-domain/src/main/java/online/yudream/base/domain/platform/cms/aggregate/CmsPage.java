@@ -8,6 +8,7 @@ import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
+import online.yudream.base.domain.platform.cms.enumerate.PageTemplate;
 import online.yudream.base.domain.platform.cms.valobj.PageSlug;
 
 import java.time.LocalDateTime;
@@ -22,9 +23,13 @@ public class CmsPage extends BaseDomain {
     private String title;
     private String slug;
     private String summary;
+    private String excerpt;
+    private String coverImageUrl;
     private String markdownContent;
+    private String htmlContent;
     private String seoTitle;
     private String seoDescription;
+    private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
 
@@ -32,18 +37,24 @@ public class CmsPage extends BaseDomain {
         CmsPage page = new CmsPage();
         page.title = required(title, "页面标题不能为空");
         page.slug = PageSlug.of(slug).value();
+        page.template = PageTemplate.DEFAULT;
         page.status = PageStatus.DRAFT;
         return page;
     }
 
-    public void update(String title, String slug, String summary, String markdownContent, String seoTitle,
-                       String seoDescription, PageStatus status) {
+    public void update(String title, String slug, String summary, String excerpt, String coverImageUrl,
+                       String markdownContent, String htmlContent, String seoTitle, String seoDescription,
+                       PageTemplate template, PageStatus status) {
         this.title = required(title, "页面标题不能为空");
         this.slug = PageSlug.of(slug).value();
         this.summary = summary;
+        this.excerpt = excerpt;
+        this.coverImageUrl = coverImageUrl;
         this.markdownContent = markdownContent;
+        this.htmlContent = htmlContent;
         this.seoTitle = seoTitle;
         this.seoDescription = seoDescription;
+        this.template = template == null ? PageTemplate.DEFAULT : template;
         if (status == PageStatus.PUBLISHED) {
             publish();
         }
