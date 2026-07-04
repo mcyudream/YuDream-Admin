@@ -45,6 +45,8 @@ public class CapabilityAppService {
         CapabilityModule saved = capabilityModuleRepo.save(module);
         if (saved.enabled()) {
             provider(saved.getCode()).enable(saved.getConfig());
+        } else {
+            provider(saved.getCode()).disable();
         }
         return CapabilityAssembler.toDTO(saved, healthOf(saved));
     }
