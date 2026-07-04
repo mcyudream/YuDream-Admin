@@ -5,7 +5,7 @@ import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatService
 import type { FileObject } from '@/api/modules/files'
 import type { AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import { Chatbot } from '@tdesign-vue-next/chat'
-import { h } from 'vue'
+import { Select as TSelect, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -108,24 +108,7 @@ const aiSenderProps = computed(() => ({
     items: aiAttachments.value,
     overflow: 'scrollX' as const,
   },
-  actions: (preset: { name: string, render: any }[]) => {
-    const uploadImage = preset.find(item => item.name === 'uploadImage')
-    const send = preset.find(item => item.name === 'send')
-    const model = props.aiModelOptions?.length
-      ? {
-          name: 'model',
-          render: h('select', {
-            class: 'ai-model-native',
-            value: aiModel.value,
-            title: '选择模型',
-            onChange: (event: Event) => {
-              aiModel.value = (event.target as HTMLSelectElement).value
-            },
-          }, props.aiModelOptions.map(option => h('option', { value: option.value }, option.label))),
-        }
-      : null
-    return [uploadImage, model, send].filter(Boolean)
-  },
+  actions: ['uploadImage', 'send'],
   onFileSelect: async (event: CustomEvent<File[]>) => {
     try {
       aiAttachments.value = await Promise.all(Array.from(event.detail || []).map(toAttachmentItem))
@@ -772,15 +755,30 @@ function escapeAttr(value: string) {
         </div>
 
         <section v-if="aiEnabled" class="right-panel ai-panel" :class="{ active: rightPanelTab === 'ai' }">
-          <Chatbot
-            ref="chatbotRef"
-            class="builder-chatbot"
-            layout="single"
-            :default-messages="aiDefaultMessages"
-            :chat-service-config="aiChatServiceConfig"
-            :sender-props="aiSenderProps"
-            :message-props="aiMessageProps"
-          />
+          <div class="builder-chatbot-wrap">
+            <Chatbot
+              ref="chatbotRef"
+              class="builder-chatbot"
+              layout="single"
+              :default-messages="aiDefaultMessages"
+              :chat-service-config="aiChatServiceConfig"
+              :sender-props="aiSenderProps"
+              :message-props="aiMessageProps"
+            >
+              <template #sender-footer-prefix>
+                <div v-if="aiModelOptions?.length" class="ai-model-select">
+                  <TTooltip content="切换模型" trigger="hover">
+                    <TSelect
+                      v-model="aiModel"
+                      class="ai-model-select__control"
+                      :options="aiModelOptions"
+                      size="small"
+                    />
+                  </TTooltip>
+                </div>
+              </template>
+            </Chatbot>
+          </div>
 
           <div class="ai-suggestions" aria-label="AI 快捷指令">
             <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
@@ -1018,9 +1016,15 @@ function escapeAttr(value: string) {
   color: #0f172a;
 }
 
-.builder-chatbot {
+.builder-chatbot-wrap {
+  position: relative;
   min-height: 0;
   overflow: hidden;
+}
+
+.builder-chatbot {
+  height: 100%;
+  min-height: 0;
 }
 
 .builder-chatbot :deep(t-chatbot) {
@@ -1051,28 +1055,25 @@ function escapeAttr(value: string) {
   line-height: 1.7;
 }
 
-.builder-chatbot :deep(t-chat-sender::part(t-chat-sender__actions__item__wrapper)) {
-  width: auto;
-  min-width: 30px;
+.ai-model-select {
+  display: flex;
+  align-items: center;
 }
 
-.ai-model-native {
-  width: 122px;
-  min-width: 0;
+.ai-model-select__control {
+  width: 128px;
+}
+
+.ai-model-select__control :deep(.t-input) {
   height: 30px;
-  padding: 0 26px 0 10px;
-  border: 0;
   border-radius: 999px;
+  padding: 0 12px;
   background: #f8fafc;
-  color: #0f172a;
-  font-size: 12px;
-  outline: none;
-  appearance: auto;
-  cursor: pointer;
+  box-shadow: none;
 }
 
-.ai-model-native:hover {
-  background: #eef2f7;
+.ai-model-select__control :deep(.t-input.t-is-focused) {
+  box-shadow: none;
 }
 
 :deep(.gjs-one-bg) {
