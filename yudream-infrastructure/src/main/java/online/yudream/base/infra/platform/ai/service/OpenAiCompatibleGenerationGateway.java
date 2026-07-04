@@ -26,11 +26,15 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.client.RestClient;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.transport.ProxyProvider;
 
 import java.net.InetSocketAddress;
 import java.net.Proxy;
@@ -136,6 +140,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .completionsPath(endpointPath(config))
                 .apiKey(value(config, "apiKey", ""))
                 .restClientBuilder(restClientBuilder(config))
+                .webClientBuilder(webClientBuilder(config))
                 .build();
         return OpenAiChatModel.builder()
                 .openAiApi(api)
@@ -179,6 +184,24 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         .filter(MappingJackson2HttpMessageConverter.class::isInstance)
                         .map(MappingJackson2HttpMessageConverter.class::cast)
                         .forEach(this::allowOctetStreamJson));
+    }
+
+    private WebClient.Builder webClientBuilder(Map<String, String> config) {
+        HttpClient client = HttpClient.create()
+                .responseTimeout(Duration.ofMillis(READ_TIMEOUT));
+        String proxyUrl = value(config, "proxyUrl", "");
+        if (StringUtils.hasText(proxyUrl)) {
+            URI uri = parseProxyUri(proxyUrl);
+            if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
+                throw new BizException("AI 代理地址配置无效：代理地址必须包含主机和端口");
+            }
+            client = client.proxy(proxy -> proxy
+                    .type(ProxyProvider.Proxy.HTTP)
+                    .host(uri.getHost())
+                    .port(uri.getPort()));
+        }
+        return WebClient.builder()
+                .clientConnector(new ReactorClientHttpConnector(client));
     }
 
     private void allowOctetStreamJson(MappingJackson2HttpMessageConverter converter) {
