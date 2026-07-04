@@ -41,6 +41,14 @@ const renderContext = computed(() => {
       description: home.value?.subtitle || page.value?.summary || '',
       logo: appSettingsStore.logo || '',
     },
+    page: {
+      title: page.value?.title || home.value?.title || '',
+      slug: page.value?.slug || '',
+      summary: page.value?.summary || '',
+      excerpt: page.value?.excerpt || '',
+      categories: (page.value?.categories || []).join(', '),
+      tags: (page.value?.tags || []).join(', '),
+    },
     auth: {
       isLoggedIn: loggedIn ? 'true' : 'false',
       welcome: loggedIn ? `欢迎回来，${nickname}` : '欢迎访问',
@@ -54,6 +62,7 @@ const renderContext = computed(() => {
       path: route.path,
       slug: slug.value,
     },
+    navigation: navigationItems.value,
     navUsers,
   }
 })
@@ -69,6 +78,13 @@ async function load() {
     if (slug.value) {
       const res = await apiCms.publicPage(slug.value)
       page.value = res.data
+      try {
+        const homeRes = await apiCms.publicHome()
+        home.value = homeRes.data
+      }
+      catch {
+        home.value = null
+      }
       document.title = `${res.data.seoTitle || res.data.title} - YuDream`
     }
     else {
@@ -121,7 +137,11 @@ function renderDynamicHtml(value?: string) {
   })
   doc.querySelectorAll('[data-yb-repeat]').forEach((el) => {
     const key = el.getAttribute('data-yb-repeat')
-    const rows = key === 'navUsers' ? renderContext.value.navUsers : []
+    const rows = key === 'navUsers'
+      ? renderContext.value.navUsers
+      : key === 'navigation'
+        ? renderContext.value.navigation
+        : []
     const template = el.innerHTML
     el.innerHTML = rows.map((item, index) => renderVariables(template, { item, index: String(index + 1) })).join('')
   })
@@ -208,16 +228,17 @@ function escapeHtml(value: string) {
       {{ errorMessage }}
     </div>
 
-    <template v-else-if="home">
-      <header v-if="navigationItems.length" class="site-nav">
-        <div class="site-shell">
-          <a class="site-nav__brand" href="/site">{{ renderContext.site.name }}</a>
-          <nav>
-            <a v-for="item in navigationItems" :key="item.id || item.url" :href="item.url">{{ item.label }}</a>
-          </nav>
-          <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account" class="site-nav__avatar">
-        </div>
-      </header>
+    <header v-if="!loading && !errorMessage && navigationItems.length" class="site-nav">
+      <div class="site-shell">
+        <a class="site-nav__brand" href="/site">{{ renderContext.site.name }}</a>
+        <nav>
+          <a v-for="item in navigationItems" :key="item.id || item.url" :href="item.url">{{ item.label }}</a>
+        </nav>
+        <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account" class="site-nav__avatar">
+      </div>
+    </header>
+
+    <template v-if="!page && home">
       <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
       <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
         <div class="site-shell">
@@ -237,12 +258,16 @@ function escapeHtml(value: string) {
       </section>
     </template>
 
-    <article v-else-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
+    <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
       <header class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
         <div class="site-shell">
           <span>{{ page.slug }}</span>
           <h1>{{ page.title }}</h1>
           <p>{{ page.excerpt || page.summary }}</p>
+          <div v-if="page.categories?.length || page.tags?.length" class="site-article__terms">
+            <span v-for="item in page.categories" :key="`cat-${item}`">{{ item }}</span>
+            <span v-for="item in page.tags" :key="`tag-${item}`">#{{ item }}</span>
+          </div>
         </div>
       </header>
       <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : markdownPreview(page.markdownContent)" />
@@ -360,6 +385,24 @@ function escapeHtml(value: string) {
   display: block;
   margin-bottom: 16px;
   color: rgba(255, 255, 255, 0.72);
+}
+
+.site-article__terms {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.site-article__terms span {
+  display: inline-flex;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
 }
 
 .site-sections {

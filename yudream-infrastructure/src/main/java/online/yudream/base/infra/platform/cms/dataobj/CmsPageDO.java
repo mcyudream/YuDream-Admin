@@ -9,6 +9,7 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -20,6 +21,8 @@ public class CmsPageDO extends BaseDO {
     private String summary;
     private String excerpt;
     private String coverImageUrl;
+    private List<String> categories;
+    private List<String> tags;
     private String markdownContent;
     private String htmlContent;
     private String seoTitle;

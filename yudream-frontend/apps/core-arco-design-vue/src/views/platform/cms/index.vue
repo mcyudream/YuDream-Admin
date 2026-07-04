@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { BuilderResourceData, PageBuilderConfig, PageSettings } from '@myissue/vue-website-page-builder'
+import type { FileObject } from '@/api/modules/files'
 import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import { getPageBuilder, PageBuilder } from '@myissue/vue-website-page-builder'
+import apiFiles from '@/api/modules/files'
 import apiCms from '@/api/modules/platform-cms'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 import CmsBuilderComponents from './components/CmsBuilderComponents.vue'
 import CmsMediaLibrary from './components/CmsMediaLibrary.vue'
 
-type WorkbenchTab = 'pages' | 'home' | 'navigation'
+type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type BuilderTarget = 'page' | 'home'
 interface CmsNavigationItem {
@@ -28,8 +31,11 @@ const pageBuilderVisible = ref(false)
 const builderTarget = ref<BuilderTarget>('page')
 const pages = ref<CmsPage[]>([])
 const navigationItems = ref<CmsNavigationItem[]>([])
+const mediaItems = ref<FileObject[]>([])
+const mediaInput = ref<HTMLInputElement>()
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
+const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
 const selectedPageId = ref<number | null>(null)
 
 const pageForm = reactive<CmsPagePayload>({
@@ -38,6 +44,8 @@ const pageForm = reactive<CmsPagePayload>({
   summary: '',
   excerpt: '',
   coverImageUrl: '',
+  categories: [],
+  tags: [],
   markdownContent: '',
   htmlContent: '',
   seoTitle: '',
@@ -96,6 +104,10 @@ const homePreviewHtml = computed(() => sanitizeHtml(homeHtml.value || emptyHomeB
 const cmsVariables = [
   { key: '{{site.name}}', label: '站点名称' },
   { key: '{{site.description}}', label: '站点描述' },
+  { key: '{{page.title}}', label: '页面标题' },
+  { key: '{{page.slug}}', label: '页面路径' },
+  { key: '{{page.categories}}', label: '页面分类' },
+  { key: '{{page.tags}}', label: '页面标签' },
   { key: '{{auth.isLoggedIn}}', label: '是否登录' },
   { key: '{{auth.welcome}}', label: '登录欢迎语' },
   { key: '{{user.username}}', label: '用户名' },
@@ -108,6 +120,9 @@ watch(activeTab, async () => {
   if (activeTab.value === 'pages') {
     await loadPages()
   }
+  else if (activeTab.value === 'media') {
+    await loadMedia()
+  }
   else {
     await loadHome()
   }
@@ -116,6 +131,18 @@ watch(activeTab, async () => {
 onMounted(async () => {
   await loadPages()
 })
+
+async function refreshActiveTab() {
+  if (activeTab.value === 'pages') {
+    await loadPages()
+  }
+  else if (activeTab.value === 'media') {
+    await loadMedia()
+  }
+  else {
+    await loadHome()
+  }
+}
 
 async function loadPages() {
   loading.value = true
@@ -170,6 +197,29 @@ async function loadHome() {
   }
 }
 
+async function loadMedia() {
+  loading.value = true
+  try {
+    const res = await apiFiles.page({
+      page: mediaSearch.page,
+      size: mediaSearch.size,
+      keyword: mediaSearch.keyword || undefined,
+      module: 'cms',
+      publicAccess: true,
+    })
+    mediaItems.value = res.data.records
+    mediaSearch.total = res.data.total
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '媒体库加载失败')
+    mediaItems.value = []
+    mediaSearch.total = 0
+  }
+  finally {
+    loading.value = false
+  }
+}
+
 function selectPage(page: CmsPage) {
   selectedPageId.value = page.id
   Object.assign(pageForm, {
@@ -178,6 +228,8 @@ function selectPage(page: CmsPage) {
     summary: page.summary || '',
     excerpt: page.excerpt || '',
     coverImageUrl: page.coverImageUrl || '',
+    categories: page.categories || [],
+    tags: page.tags || [],
     markdownContent: page.markdownContent || '',
     htmlContent: page.htmlContent || '',
     seoTitle: page.seoTitle || '',
@@ -186,6 +238,76 @@ function selectPage(page: CmsPage) {
     status: page.status || 'DRAFT',
   })
   editorMode.value = page.htmlContent ? 'html' : 'builder'
+}
+
+function pickMedia() {
+  mediaInput.value?.click()
+}
+
+async function uploadMedia(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) {
+    return
+  }
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
+  loading.value = true
+  try {
+    const data = new FormData()
+    data.append('file', file)
+    data.append('module', 'cms')
+    data.append('publicAccess', 'true')
+    await apiFiles.upload(data)
+    toast.success('媒体已上传')
+    await loadMedia()
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+async function copyMediaUrl(item: FileObject) {
+  const url = toBackendAssetUrl(item.url)
+  await navigator.clipboard?.writeText(url)
+  toast.success('媒体地址已复制')
+}
+
+function useMediaAsCover(item: FileObject) {
+  pageForm.coverImageUrl = toBackendAssetUrl(item.url)
+  activeTab.value = 'pages'
+  toast.success('已设为当前页面封面')
+}
+
+function splitTerms(value?: string[]) {
+  return value?.join(', ') || ''
+}
+
+function updateTerms(key: 'categories' | 'tags', value: string) {
+  pageForm[key] = value
+    .split(/[,，\n\r]/)
+    .map(item => item.trim())
+    .filter(Boolean)
+}
+
+function mediaUrl(item: FileObject) {
+  return toBackendAssetUrl(item.url)
+}
+
+function formatFileSize(size?: number) {
+  if (!size) {
+    return '-'
+  }
+  if (size < 1024) {
+    return `${size} B`
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`
+  }
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 function createPage() {
@@ -201,6 +323,8 @@ function resetPageForm() {
     summary: '',
     excerpt: '',
     coverImageUrl: '',
+    categories: [],
+    tags: [],
     markdownContent: '# 新页面\n\n在这里编写 Markdown 内容。',
     htmlContent: '',
     seoTitle: '',
@@ -515,7 +639,7 @@ function sectionTitle(type: HomeSectionType) {
 <template>
   <div class="cms-workbench">
     <FaPageHeader title="内容站点" class="cms-header">
-      <FaButton variant="outline" :loading="loading" @click="activeTab === 'pages' ? loadPages() : loadHome()">
+      <FaButton variant="outline" :loading="loading" @click="refreshActiveTab">
         <FaIcon name="i-ri:refresh-line" />
         刷新
       </FaButton>
@@ -523,10 +647,15 @@ function sectionTitle(type: HomeSectionType) {
         <FaIcon name="i-ri:save-3-line" />
         保存页面
       </FaButton>
-      <FaButton v-else v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
+      <FaButton v-else-if="activeTab === 'home' || activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
         <FaIcon name="i-ri:save-3-line" />
         {{ activeTab === 'navigation' ? '保存导航' : '保存首页' }}
       </FaButton>
+      <FaButton v-else v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+        <FaIcon name="i-ri:upload-cloud-2-line" />
+        上传媒体
+      </FaButton>
+      <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
     </FaPageHeader>
 
     <FaPageMain>
@@ -542,6 +671,10 @@ function sectionTitle(type: HomeSectionType) {
         <button type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
           <FaIcon name="i-ri:menu-search-line" />
           导航菜单
+        </button>
+        <button type="button" :class="{ active: activeTab === 'media' }" @click="activeTab = 'media'">
+          <FaIcon name="i-ri:image-2-line" />
+          媒体库
         </button>
         <a class="public-link" href="/site" target="_blank" rel="noopener noreferrer">
           <FaIcon name="i-ri:external-link-line" />
@@ -615,7 +748,29 @@ function sectionTitle(type: HomeSectionType) {
               <a-form-item label="模板">
                 <FaSelect v-model="pageForm.template" :options="templateOptions" />
               </a-form-item>
+              <a-form-item label="分类">
+                <FaInput
+                  :model-value="splitTerms(pageForm.categories)"
+                  placeholder="新闻, 产品, 案例"
+                  @update:model-value="value => updateTerms('categories', value)"
+                />
+              </a-form-item>
+              <a-form-item label="标签">
+                <FaInput
+                  :model-value="splitTerms(pageForm.tags)"
+                  placeholder="低代码, CMS, 首页"
+                  @update:model-value="value => updateTerms('tags', value)"
+                />
+              </a-form-item>
             </a-form>
+            <div class="term-chips">
+              <FaTag v-for="item in pageForm.categories" :key="`cat-${item}`" variant="secondary">
+                {{ item }}
+              </FaTag>
+              <FaTag v-for="item in pageForm.tags" :key="`tag-${item}`">
+                #{{ item }}
+              </FaTag>
+            </div>
             <div class="publish-actions">
               <FaButton v-auth="'platform:cms:publish'" variant="outline" @click="confirmPublish">
                 {{ selectedPage?.status === 'PUBLISHED' ? '取消发布' : '发布' }}
@@ -765,7 +920,7 @@ function sectionTitle(type: HomeSectionType) {
         </aside>
       </section>
 
-      <section v-else v-loading="loading" class="navigation-layout">
+      <section v-else-if="activeTab === 'navigation'" v-loading="loading" class="navigation-layout">
         <main class="navigation-panel">
           <div class="legacy-sections__head">
             <div>
@@ -811,6 +966,52 @@ function sectionTitle(type: HomeSectionType) {
             </p>
           </section>
         </aside>
+      </section>
+
+      <section v-else-if="activeTab === 'media'" v-loading="loading" class="media-workspace">
+        <div class="media-toolbar-main">
+          <div>
+            <h3>媒体库</h3>
+            <p>用于 CMS 构建器、首页和文章封面的图片资产，上传后会进入 RustFS/S3 对象存储。</p>
+          </div>
+          <div class="media-actions">
+            <FaInput v-model="mediaSearch.keyword" clearable placeholder="搜索文件名" class="w-64" @keydown.enter="loadMedia" @clear="loadMedia" />
+            <FaButton variant="outline" :loading="loading" @click="loadMedia">
+              <FaIcon name="i-ri:refresh-line" />
+              刷新
+            </FaButton>
+            <FaButton v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+              <FaIcon name="i-ri:upload-cloud-2-line" />
+              上传
+            </FaButton>
+          </div>
+        </div>
+
+        <div v-if="mediaItems.length" class="media-grid">
+          <article v-for="item in mediaItems" :key="item.id" class="media-card">
+            <div class="media-card__preview">
+              <img :src="mediaUrl(item)" :alt="item.originalName || 'CMS 媒体'">
+            </div>
+            <div class="media-card__body">
+              <strong>{{ item.originalName || `文件 #${item.id}` }}</strong>
+              <span>{{ item.contentType || 'image/*' }} · {{ formatFileSize(item.size) }}</span>
+              <small>{{ dateText(item.createTime) }}</small>
+            </div>
+            <div class="media-card__actions">
+              <FaButton size="sm" variant="outline" @click="copyMediaUrl(item)">
+                <FaIcon name="i-ri:file-copy-line" />
+                复制地址
+              </FaButton>
+              <FaButton size="sm" @click="useMediaAsCover(item)">
+                <FaIcon name="i-ri:image-edit-line" />
+                设为封面
+              </FaButton>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state media-empty">
+          暂无媒体，点击上传添加第一张 CMS 图片。
+        </div>
       </section>
     </FaPageMain>
 
@@ -1039,6 +1240,14 @@ function sectionTitle(type: HomeSectionType) {
   text-decoration: none;
 }
 
+.term-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-height: 24px;
+  margin-bottom: 12px;
+}
+
 .variable-list {
   display: grid;
   gap: 8px;
@@ -1152,6 +1361,101 @@ function sectionTitle(type: HomeSectionType) {
   margin: 0;
   color: var(--color-text-3);
   line-height: 1.6;
+}
+
+.media-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.media-toolbar-main {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.media-toolbar-main h3,
+.media-toolbar-main p {
+  margin: 0;
+}
+
+.media-toolbar-main p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+}
+
+.media-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.media-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.media-card__preview {
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  background: var(--color-fill-2);
+}
+
+.media-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-card__body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.media-card__body strong,
+.media-card__body span,
+.media-card__body small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-card__body span,
+.media-card__body small {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.media-card__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.media-empty {
+  border: 1px dashed var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
 }
 
 .home-preview,
@@ -1288,6 +1592,15 @@ function sectionTitle(type: HomeSectionType) {
   .home-layout,
   .navigation-layout {
     grid-template-columns: 1fr;
+  }
+
+  .media-toolbar-main {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .media-actions {
+    justify-content: flex-start;
   }
 }
 </style>

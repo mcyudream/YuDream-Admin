@@ -18,6 +18,8 @@ public class CmsAssembler {
                 .summary(page.getSummary())
                 .excerpt(page.getExcerpt())
                 .coverImageUrl(page.getCoverImageUrl())
+                .categories(page.getCategories())
+                .tags(page.getTags())
                 .markdownContent(page.getMarkdownContent())
                 .htmlContent(page.getHtmlContent())
                 .seoTitle(page.getSeoTitle())
