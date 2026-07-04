@@ -7,5 +7,6 @@ public enum CapabilityType {
     INTEGRATION,
     DOCUMENT,
     CONTENT,
-    GRAPH
+    GRAPH,
+    AI
 }

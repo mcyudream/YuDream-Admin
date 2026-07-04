@@ -2,6 +2,7 @@
 import type { FileObject } from '@/api/modules/files'
 import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
+import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
@@ -28,6 +29,8 @@ const editorMode = ref<EditorMode>('builder')
 const loading = ref(false)
 const saving = ref(false)
 const grapesEditorVisible = ref(false)
+const aiVisible = ref(false)
+const aiGenerating = ref(false)
 const editorTarget = ref<EditorTarget>('page')
 const pages = ref<CmsPage[]>([])
 const navigationItems = ref<CmsNavigationItem[]>([])
@@ -55,6 +58,13 @@ const pageForm = reactive<CmsPagePayload>({
   seoDescription: '',
   template: 'DEFAULT',
   status: 'DRAFT',
+})
+
+const aiForm = reactive({
+  title: '',
+  pageType: '落地页',
+  style: '现代、清爽、专业、响应式',
+  prompt: '',
 })
 
 const home = reactive<HomePageLayout>({
@@ -484,6 +494,42 @@ function openGrapesEditor(target: EditorTarget = 'page') {
   grapesEditorVisible.value = true
 }
 
+function openAiGenerate() {
+  aiForm.title = pageForm.title || ''
+  aiForm.prompt = pageForm.summary || pageForm.excerpt || ''
+  aiVisible.value = true
+}
+
+async function generatePageWithAi() {
+  if (!aiForm.prompt.trim()) {
+    toast.error('请先填写生成需求')
+    return
+  }
+  aiGenerating.value = true
+  try {
+    const res = await apiAi.generateCmsPage({
+      title: aiForm.title || pageForm.title,
+      pageType: aiForm.pageType,
+      style: aiForm.style,
+      prompt: aiForm.prompt,
+      siteName: home.title || 'YuDream',
+    })
+    const data = res.data
+    pageForm.title = data.title || aiForm.title || pageForm.title
+    pageForm.summary = data.summary || pageForm.summary
+    pageForm.htmlContent = stripLayoutBlocks(data.htmlContent || pageForm.htmlContent || '')
+    pageForm.cssContent = data.cssContent || pageForm.cssContent || ''
+    pageForm.builderProjectJson = data.builderProjectJson || pageForm.builderProjectJson || ''
+    pageForm.markdownContent = data.markdownContent || pageForm.markdownContent || ''
+    editorMode.value = 'builder'
+    aiVisible.value = false
+    toast.success('AI 页面草稿已生成')
+  }
+  finally {
+    aiGenerating.value = false
+  }
+}
+
 async function saveGrapesEditor(payload: { htmlContent: string, cssContent: string, builderProjectJson: string }) {
   grapesEditorVisible.value = false
   await nextTick()
@@ -751,6 +797,10 @@ function sectionTitle(type: HomeSectionType) {
               <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS 和可继续编辑的 Project JSON。</p>
             </div>
             <div class="builder-entry__actions">
+              <FaButton v-auth="'platform:ai:generate'" variant="outline" :loading="aiGenerating" @click="openAiGenerate">
+                <FaIcon name="i-ri:sparkling-2-line" />
+                AI 构建
+              </FaButton>
               <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
                 <FaIcon name="i-ri:drag-drop-line" />
                 打开构建器
@@ -1107,6 +1157,27 @@ function sectionTitle(type: HomeSectionType) {
         @save="saveGrapesEditor"
       />
     </div>
+
+    <FaModal v-model="aiVisible" title="AI 构建页面" show-cancel-button class="sm:max-w-2xl" :confirm-loading="aiGenerating" @confirm="generatePageWithAi">
+      <div class="ai-generate-form">
+        <label>
+          <span>页面标题</span>
+          <FaInput v-model="aiForm.title" placeholder="例如：产品介绍页" />
+        </label>
+        <label>
+          <span>页面类型</span>
+          <FaInput v-model="aiForm.pageType" placeholder="落地页、文档页、活动页、内容页" />
+        </label>
+        <label>
+          <span>风格偏好</span>
+          <FaInput v-model="aiForm.style" placeholder="现代、清爽、专业、响应式" />
+        </label>
+        <label>
+          <span>生成需求</span>
+          <FaTextarea v-model="aiForm.prompt" rows="7" placeholder="描述页面目标、主要内容、栏目结构、目标用户和需要强调的卖点" />
+        </label>
+      </div>
+    </FaModal>
   </div>
 </template>
 
@@ -1751,6 +1822,18 @@ function sectionTitle(type: HomeSectionType) {
   z-index: 5000;
   overflow: hidden;
   background: var(--color-bg-1);
+}
+
+.ai-generate-form {
+  display: grid;
+  gap: 14px;
+}
+
+.ai-generate-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-2);
+  font-size: 13px;
 }
 
 @media (max-width: 1180px) {
