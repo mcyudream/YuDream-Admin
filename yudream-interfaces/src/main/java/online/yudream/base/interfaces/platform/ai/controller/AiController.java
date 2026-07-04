@@ -42,10 +42,14 @@ public class AiController {
         String traceId = UUID.randomUUID().toString();
         CompletableFuture.runAsync(() -> {
             try {
+                send(emitter, AiWebAssembler.toProgressEvent(traceId, "accepted", "已收到请求，正在连接模型。"));
                 var result = aiAppService.streamCmsPage(
                         AiWebAssembler.toCmd(request),
                         delta -> send(emitter, AiWebAssembler.toDeltaEvent(traceId, delta)),
-                        tool -> send(emitter, AiWebAssembler.toToolEvent(traceId, tool))
+                        tool -> {
+                            send(emitter, AiWebAssembler.toProgressEvent(traceId, "tool", "正在更新画布。"));
+                            send(emitter, AiWebAssembler.toToolEvent(traceId, tool));
+                        }
                 );
                 send(emitter, AiWebAssembler.toResultEvent(traceId, result));
                 emitter.complete();

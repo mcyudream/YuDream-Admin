@@ -50,6 +50,10 @@ public class AiWebAssembler {
         return event("ai.message", "delta", traceId, Map.of("content", content == null ? "" : content));
     }
 
+    public static AiStreamEventRes toProgressEvent(String traceId, String action, String content) {
+        return event("ai.progress", action, traceId, Map.of("content", content == null ? "" : content));
+    }
+
     public static AiStreamEventRes toResultEvent(String traceId, CmsPageGenerateDTO dto) {
         return event("ai.result", "complete", traceId, Map.of("result", toRes(dto)));
     }
