@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
 import online.yudream.base.domain.system.menu.service.MenuDomainService;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.infra.platform.menu.enumerate.PlatformMenuModule;
+import online.yudream.base.infra.system.menu.config.SystemSeedProperties;
 import online.yudream.base.infra.system.menu.enumerate.SystemMenuModule;
 import online.yudream.base.infra.system.menu.scanner.MenuEnumScanner;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -34,16 +36,18 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
 
     private final MenuDomainService menuDomainService;
     private final RoleRepo roleRepo;
+    private final SystemSeedProperties systemSeedProperties;
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
-        log.info("Initializing system menus from enums...");
+        SeedSyncMode syncMode = systemSeedProperties.getMenu().getSyncMode();
+        log.info("Initializing system menus from enums, syncMode={}", syncMode);
         List<Class<? extends Enum<?>>> moduleClasses = List.of(SystemMenuModule.class, PlatformMenuModule.class);
         List<Menu> modules = MenuEnumScanner.scan(moduleClasses);
-        menuDomainService.syncMenus(modules);
+        List<Menu> syncedMenus = menuDomainService.syncMenus(modules, syncMode);
 
-        bindPermissionsToSystemRoles(modules);
-        log.info("System menus initialized, modules={}", modules.size());
+        bindPermissionsToSystemRoles(syncedMenus);
+        log.info("System menus initialized, modules={}, syncedMenus={}, syncMode={}", modules.size(), syncedMenus.size(), syncMode);
     }
 
     private void bindPermissionsToSystemRoles(List<Menu> modules) {

@@ -86,6 +86,10 @@ yudream.web.log:
   enabled: ${WEB_LOG_ENABLED:true}
   prefix: ${WEB_LOG_PREFIX:YuDreamAdmin}
 
+yudream.system.seed:
+  menu:
+    sync-mode: ${SYSTEM_SEED_MENU_SYNC_MODE:MISSING_ONLY}
+
 yudream.platform.capabilities:
   api-docs:
     enabled: ${PLATFORM_API_DOCS_ENABLED:true}

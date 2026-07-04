@@ -19,4 +19,6 @@ public interface MenuRepo {
     List<Menu> findByTypeIn(List<online.yudream.base.domain.system.menu.enumerate.MenuNodeType> types);
 
     boolean existsByCode(String code);
+
+    long count();
 }

@@ -5,12 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
+import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
 import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.enumerate.PermissionSource;
 import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
 import online.yudream.base.domain.system.user.repo.PermissionRepo;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -31,14 +33,28 @@ public class MenuDomainService {
      *
      * @param menus 解析后的菜单树
      */
-    public void syncMenus(Collection<Menu> menus) {
+    public List<Menu> syncMenus(Collection<Menu> menus) {
+        return syncMenus(menus, SeedSyncMode.OVERWRITE);
+    }
+
+    public List<Menu> syncMenus(Collection<Menu> menus, SeedSyncMode mode) {
         if (menus == null || menus.isEmpty()) {
-            return;
+            return List.of();
         }
         List<Menu> flattened = flatten(menus);
-        for (Menu menu : flattened) {
-            syncMenu(menu);
+        SeedSyncMode syncMode = mode == null ? SeedSyncMode.MISSING_ONLY : mode;
+        if (syncMode == SeedSyncMode.INIT_EMPTY && menuRepo.count() > 0) {
+            log.info("Skip menu seed sync because menu data already exists, mode={}", syncMode);
+            return List.of();
         }
+        List<Menu> synced = new ArrayList<>();
+        for (Menu menu : flattened) {
+            if (syncMode == SeedSyncMode.MISSING_ONLY && menuRepo.existsByCode(menu.getCode())) {
+                continue;
+            }
+            synced.add(syncMenu(menu));
+        }
+        return synced;
     }
 
     public Menu syncMenu(Menu menu) {
