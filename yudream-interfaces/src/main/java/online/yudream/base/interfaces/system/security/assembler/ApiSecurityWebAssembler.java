@@ -14,6 +14,7 @@ import online.yudream.base.application.system.security.cmd.PasskeyRegistrationSt
 import online.yudream.base.application.system.security.cmd.PasskeyRevokeCmd;
 import online.yudream.base.application.system.security.cmd.PasskeySelfRevokeCmd;
 import online.yudream.base.application.system.security.query.ApiKeyPageQuery;
+import online.yudream.base.application.system.security.query.PasskeyCredentialQuery;
 import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO;
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.ApiEncryptedPayloadDTO;
@@ -251,6 +252,12 @@ public class ApiSecurityWebAssembler {
         return cmd;
     }
 
+    public static PasskeyCredentialQuery toPasskeyCredentialQuery(Long userId) {
+        PasskeyCredentialQuery query = new PasskeyCredentialQuery();
+        query.setUserId(userId);
+        return query;
+    }
+
     public static PasskeySelfRevokeCmd toPasskeySelfRevokeCmd(Long id, Long userId) {
         PasskeySelfRevokeCmd cmd = new PasskeySelfRevokeCmd();
         cmd.setId(id);
@@ -437,6 +444,10 @@ public class ApiSecurityWebAssembler {
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
                 .build();
+    }
+
+    public static List<PasskeyCredentialRes> toPasskeyResList(List<PasskeyCredentialDTO> records) {
+        return records.stream().map(ApiSecurityWebAssembler::toRes).toList();
     }
 
     public static PasskeyRegistrationOptionsRes toRes(PasskeyRegistrationOptionsDTO dto) {

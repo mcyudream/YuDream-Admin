@@ -13,5 +13,7 @@ public interface PasskeyCredentialRepo {
 
     Optional<PasskeyCredential> findByCredentialId(String credentialId);
 
+    List<PasskeyCredential> findAll();
+
     List<PasskeyCredential> findByUserId(Long userId);
 }

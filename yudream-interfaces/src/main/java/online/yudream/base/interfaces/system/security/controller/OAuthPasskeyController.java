@@ -83,8 +83,10 @@ public class OAuthPasskeyController {
 
     @GetMapping("/passkeys")
     @PermissionRegister(code = "system:security:passkey:view", name = "查看Passkey", module = "系统管理", desc = "查看用户 Passkey 凭据")
-    public Result<List<PasskeyCredentialRes>> passkeys(@RequestParam Long userId) {
-        return Result.ok(oauthPasskeyAppService.listPasskeys(userId).stream().map(ApiSecurityWebAssembler::toRes).toList());
+    public Result<List<PasskeyCredentialRes>> passkeys(@RequestParam(required = false) Long userId) {
+        return Result.ok(ApiSecurityWebAssembler.toPasskeyResList(
+                oauthPasskeyAppService.listPasskeys(ApiSecurityWebAssembler.toPasskeyCredentialQuery(userId))
+        ));
     }
 
     @PostMapping("/passkeys/{id}/revoke")

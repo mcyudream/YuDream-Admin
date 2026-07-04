@@ -16,6 +16,7 @@ import online.yudream.base.application.system.security.dto.OAuthProviderDTO;
 import online.yudream.base.application.system.security.dto.PasskeyAuthenticationOptionsDTO;
 import online.yudream.base.application.system.security.dto.PasskeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.PasskeyRegistrationOptionsDTO;
+import online.yudream.base.application.system.security.query.PasskeyCredentialQuery;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
@@ -136,9 +137,13 @@ public class OAuthPasskeyAppService {
     }
 
     @Transactional(readOnly = true)
-    public List<PasskeyCredentialDTO> listPasskeys(Long userId) {
+    public List<PasskeyCredentialDTO> listPasskeys(PasskeyCredentialQuery query) {
         ensurePasskeyEnabled();
-        return passkeyCredentialRepo.findByUserId(userId).stream().map(ApiSecurityAssembler::toDTO).toList();
+        Long userId = query == null ? null : query.getUserId();
+        List<PasskeyCredential> credentials = userId == null
+                ? passkeyCredentialRepo.findAll()
+                : passkeyCredentialRepo.findByUserId(userId);
+        return credentials.stream().map(ApiSecurityAssembler::toDTO).toList();
     }
 
     @Transactional(readOnly = true)

@@ -141,6 +141,8 @@ export default {
   createOAuthProvider: (data: OAuthProviderPayload) => systemClient.post<unknown, ApiResponse<OAuthProvider>>('api/system/security/oauth/providers', data),
   updateOAuthProvider: (id: number | string, data: OAuthProviderPayload) => systemClient.put<unknown, ApiResponse<OAuthProvider>>(`api/system/security/oauth/providers/${id}`, data),
   disableOAuthProvider: (id: number | string) => systemClient.delete<unknown, ApiResponse<void>>(`api/system/security/oauth/providers/${id}`),
-  passkeys: (userId: number | string) => systemClient.get<unknown, ApiResponse<PasskeyCredential[]>>('api/system/security/passkeys', { params: { userId } }),
+  passkeys: (userId?: number | string) => systemClient.get<unknown, ApiResponse<PasskeyCredential[]>>('api/system/security/passkeys', {
+    params: userId ? { userId } : undefined,
+  }),
   revokePasskey: (id: number | string) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>(`api/system/security/passkeys/${id}/revoke`),
 }

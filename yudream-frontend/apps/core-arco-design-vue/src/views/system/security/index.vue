@@ -264,7 +264,9 @@ async function loadFeatureData() {
 async function syncPasskeyState() {
   if (!policy.passkeyEnabled) {
     passkeyRows.value = []
+    return
   }
+  await loadPasskeys()
 }
 
 async function refreshOAuthPane() {
@@ -335,13 +337,10 @@ async function guardedRefreshOAuth() {
 }
 
 async function loadPasskeys() {
-  if (!passkeySearch.userId) {
-    toast.error('请输入用户 ID')
-    return
-  }
   loading.value = true
   try {
-    const res = await apiSecurity.passkeys(passkeySearch.userId)
+    const userId = passkeySearch.userId.trim()
+    const res = await apiSecurity.passkeys(userId || undefined)
     passkeyRows.value = res.data
   }
   finally {
@@ -771,7 +770,7 @@ function normalizeDateTime(value?: string) {
             Passkey 凭据
           </div>
           <div class="key-actions">
-            <FaInput v-model="passkeySearch.userId" placeholder="用户 ID" class="w-56" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
+            <FaInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" class="w-56" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
             <FaButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
               <FaIcon name="i-ri:search-line" />
               查询
