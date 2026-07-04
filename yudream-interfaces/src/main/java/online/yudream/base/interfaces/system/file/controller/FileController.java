@@ -3,7 +3,9 @@ package online.yudream.base.interfaces.system.file.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.file.dto.FileContentDTO;
+import online.yudream.base.application.system.file.query.FileObjectPageQuery;
 import online.yudream.base.application.system.file.service.FileAppService;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.file.assembler.FileWebAssembler;
 import online.yudream.base.interfaces.system.file.res.FileObjectRes;
@@ -33,6 +35,12 @@ import java.time.Duration;
 public class FileController {
 
     private final FileAppService fileAppService;
+
+    @GetMapping
+    public Result<PageResult<FileObjectRes>> page(FileObjectPageQuery query) {
+        StpUtil.checkLogin();
+        return Result.ok(FileWebAssembler.toPage(fileAppService.page(query)));
+    }
 
     @PostMapping("/upload")
     public Result<FileObjectRes> upload(@RequestParam("file") MultipartFile file,

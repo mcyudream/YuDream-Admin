@@ -1,8 +1,10 @@
 package online.yudream.base.application.system.file.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.file.query.FileObjectPageQuery;
 import online.yudream.base.application.system.file.dto.FileContentDTO;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.file.aggregate.FileObject;
 import online.yudream.base.domain.system.file.repo.FileObjectRepo;
@@ -49,6 +51,21 @@ public class FileAppService {
     @Transactional(readOnly = true)
     public FileObjectDTO get(Long id) {
         return toDTO(getActiveFile(id));
+    }
+
+    @Transactional(readOnly = true)
+    public PageResult<FileObjectDTO> page(FileObjectPageQuery query) {
+        int page = query == null ? 1 : query.getPage();
+        int size = query == null ? 20 : query.getSize();
+        String keyword = query == null ? null : query.getKeyword();
+        String module = query == null ? null : query.getModule();
+        Boolean publicAccess = query == null ? null : query.getPublicAccess();
+        return new PageResult<>(
+                fileObjectRepo.page(keyword, module, publicAccess, page, size).stream().map(this::toDTO).toList(),
+                fileObjectRepo.count(keyword, module, publicAccess),
+                Math.max(page, 1),
+                Math.max(size, 1)
+        );
     }
 
     @Transactional(readOnly = true)

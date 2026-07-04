@@ -3,11 +3,20 @@ import type { CmsPage, HomePageLayout, HomeSection } from '@/api/modules/platfor
 import apiCms from '@/api/modules/platform-cms'
 
 const route = useRoute()
+const appAccountStore = useAppAccountStore()
+const appSettingsStore = useAppSettingsStore()
 
 const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
 const errorMessage = ref('')
+interface SiteNavigationItem {
+  id?: string
+  label: string
+  url: string
+  visible?: boolean
+  sort?: number
+}
 
 const slug = computed(() => {
   const value = route.params.slug
@@ -17,6 +26,37 @@ const slug = computed(() => {
   return value ? String(value) : ''
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
+const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson))
+const renderContext = computed(() => {
+  const loggedIn = appAccountStore.isLogin
+  const username = appAccountStore.account || ''
+  const nickname = username || '访客'
+  const avatar = appAccountStore.avatar || ''
+  const navUsers = loggedIn
+    ? [{ name: nickname, avatar, url: '/' }]
+    : [{ name: '登录', avatar: appSettingsStore.logo, url: '/login' }]
+  return {
+    site: {
+      name: appSettingsStore.siteName || 'YuDream',
+      description: home.value?.subtitle || page.value?.summary || '',
+      logo: appSettingsStore.logo || '',
+    },
+    auth: {
+      isLoggedIn: loggedIn ? 'true' : 'false',
+      welcome: loggedIn ? `欢迎回来，${nickname}` : '欢迎访问',
+    },
+    user: {
+      username: username || 'guest',
+      nickname,
+      avatar,
+    },
+    route: {
+      path: route.path,
+      slug: slug.value,
+    },
+    navUsers,
+  }
+})
 
 watch(() => route.fullPath, load, { immediate: true })
 
@@ -51,15 +91,58 @@ function sectionStyle(section: HomeSection) {
     : undefined
 }
 
-function sanitizeHtml(value?: string) {
+function parseNavigationItems(value?: string): SiteNavigationItem[] {
+  if (!value) {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(value) as SiteNavigationItem[]
+    return Array.isArray(parsed)
+      ? parsed.filter(item => item.visible !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0))
+      : []
+  }
+  catch {
+    return []
+  }
+}
+
+function renderDynamicHtml(value?: string) {
   if (!value) {
     return ''
   }
-  return value
+  const sanitized = sanitizeHtml(value)
+  const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html')
+  doc.querySelectorAll('[data-visible-when]').forEach((el) => {
+    const rule = el.getAttribute('data-visible-when')
+    const loggedIn = appAccountStore.isLogin
+    if ((rule === 'logged-in' && !loggedIn) || (rule === 'guest' && loggedIn)) {
+      el.remove()
+    }
+  })
+  doc.querySelectorAll('[data-yb-repeat]').forEach((el) => {
+    const key = el.getAttribute('data-yb-repeat')
+    const rows = key === 'navUsers' ? renderContext.value.navUsers : []
+    const template = el.innerHTML
+    el.innerHTML = rows.map((item, index) => renderVariables(template, { item, index: String(index + 1) })).join('')
+  })
+  return renderVariables(doc.body.firstElementChild?.innerHTML || sanitized)
+}
+
+function sanitizeHtml(value?: string) {
+  return (value || '')
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
     .replace(/\son\w+="[^"]*"/gi, '')
     .replace(/\son\w+='[^']*'/gi, '')
     .replace(/javascript:/gi, '')
+}
+
+function renderVariables(value: string, localContext: Record<string, any> = {}) {
+  return value.replace(/\{\{\s*([\w.]+)\s*}}/g, (_, path: string) => escapeHtml(String(resolvePath(path, localContext) ?? '')))
+}
+
+function resolvePath(path: string, localContext: Record<string, any>) {
+  const root = { ...renderContext.value, ...localContext }
+  return path.split('.').reduce<any>((target, key) => target?.[key], root)
 }
 
 function markdownPreview(markdown?: string) {
@@ -126,7 +209,16 @@ function escapeHtml(value: string) {
     </div>
 
     <template v-else-if="home">
-      <div v-if="homeHtml" class="site-builder-home" v-html="sanitizeHtml(homeHtml)" />
+      <header v-if="navigationItems.length" class="site-nav">
+        <div class="site-shell">
+          <a class="site-nav__brand" href="/site">{{ renderContext.site.name }}</a>
+          <nav>
+            <a v-for="item in navigationItems" :key="item.id || item.url" :href="item.url">{{ item.label }}</a>
+          </nav>
+          <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account" class="site-nav__avatar">
+        </div>
+      </header>
+      <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
       <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
         <div class="site-shell">
           <h1>{{ home.title }}</h1>
@@ -153,7 +245,7 @@ function escapeHtml(value: string) {
           <p>{{ page.excerpt || page.summary }}</p>
         </div>
       </header>
-      <div class="site-shell site-article__body" v-html="page.htmlContent ? sanitizeHtml(page.htmlContent) : markdownPreview(page.markdownContent)" />
+      <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : markdownPreview(page.markdownContent)" />
     </article>
   </main>
 </template>
@@ -175,6 +267,55 @@ function escapeHtml(value: string) {
   min-height: 100vh;
   place-items: center;
   color: #64748b;
+}
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
+}
+
+.site-nav .site-shell {
+  display: flex;
+  min-height: 64px;
+  gap: 18px;
+  align-items: center;
+}
+
+.site-nav__brand {
+  color: #0f172a;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.site-nav nav {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+}
+
+.site-nav nav a {
+  padding: 8px 10px;
+  border-radius: 999px;
+  color: #475569;
+  text-decoration: none;
+}
+
+.site-nav nav a:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.site-nav__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 
 .site-builder-home :deep(#pagebuilder),
