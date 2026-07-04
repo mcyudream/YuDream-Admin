@@ -33,6 +33,24 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/site',
+    name: 'publicSiteHome',
+    component: () => import('@/views/site/index.vue'),
+    meta: {
+      title: '站点首页',
+      public: true,
+    },
+  },
+  {
+    path: '/site/:slug(.*)*',
+    name: 'publicSitePage',
+    component: () => import('@/views/site/index.vue'),
+    meta: {
+      title: '内容页面',
+      public: true,
+    },
+  },
+  {
     path: '/:all(.*)*',
     name: 'notFound',
     component: () => import('@/views/[...all].vue'),

@@ -105,6 +105,7 @@ Assembler hard rules:
 - A capability disabled by the application gate must reject use cases in the application layer and must not create external connections, declare middleware resources, or require projects to configure unused middleware.
 - Infra providers are only tool wrappers. Provider construction and `enable(config)` may store local config or mark state, but must not open MQ/Neo4j/Redis-like connections, verify remote connectivity, declare queues/topics, or start long-running resources.
 - External connections/resources may be created only after both gates pass and a business operation, connect action, health action, or explicit test action actually needs the external system. Close and clear resources on disable.
+- CMS platform work must be a complete publishing loop, not only backend CRUD. A CMS change should include backend menu permissions, admin route/menu registration, public frontend routes, public rendering, publish/unpublish flow, SEO fields, page/template metadata, and page-builder-compatible content storage such as saved HTML plus Markdown fallback.
 
 ## Excel / Import Export
 

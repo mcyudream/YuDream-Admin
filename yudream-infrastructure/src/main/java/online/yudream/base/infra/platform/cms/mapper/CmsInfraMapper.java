@@ -22,9 +22,13 @@ public class CmsInfraMapper {
         dataObj.setTitle(domain.getTitle());
         dataObj.setSlug(domain.getSlug());
         dataObj.setSummary(domain.getSummary());
+        dataObj.setExcerpt(domain.getExcerpt());
+        dataObj.setCoverImageUrl(domain.getCoverImageUrl());
         dataObj.setMarkdownContent(domain.getMarkdownContent());
+        dataObj.setHtmlContent(domain.getHtmlContent());
         dataObj.setSeoTitle(domain.getSeoTitle());
         dataObj.setSeoDescription(domain.getSeoDescription());
+        dataObj.setTemplate(domain.getTemplate());
         dataObj.setStatus(domain.getStatus());
         dataObj.setPublishedAt(domain.getPublishedAt());
         return dataObj;
@@ -42,9 +46,13 @@ public class CmsInfraMapper {
                 .title(dataObj.getTitle())
                 .slug(dataObj.getSlug())
                 .summary(dataObj.getSummary())
+                .excerpt(dataObj.getExcerpt())
+                .coverImageUrl(dataObj.getCoverImageUrl())
                 .markdownContent(dataObj.getMarkdownContent())
+                .htmlContent(dataObj.getHtmlContent())
                 .seoTitle(dataObj.getSeoTitle())
                 .seoDescription(dataObj.getSeoDescription())
+                .template(dataObj.getTemplate())
                 .status(dataObj.getStatus())
                 .publishedAt(dataObj.getPublishedAt())
                 .build();
