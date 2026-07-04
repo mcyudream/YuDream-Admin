@@ -23,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
 
     private static final int MAX_OUTPUT_BYTES = 128 * 1024;
+    private static final long PYTHON_CHECK_TIMEOUT_MILLIS = 5_000L;
     private static final String OUTPUT_TRUNCATED = "\n...输出已截断...";
     private static final String DEFAULT_PYTHON_COMMAND = "python";
 
@@ -40,6 +41,33 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
 
     public String pythonCommand() {
         return pythonCommand;
+    }
+
+    public RuntimeExecutionResult checkPythonCommand() {
+        long start = System.currentTimeMillis();
+        try {
+            List<String> command = new ArrayList<>(splitCommand(pythonCommand));
+            if (command.isEmpty()) {
+                command.add(DEFAULT_PYTHON_COMMAND);
+            }
+            command.add("--version");
+            Process process = new ProcessBuilder(command).start();
+            CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getInputStream()));
+            CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getErrorStream()));
+            boolean finished = process.waitFor(PYTHON_CHECK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                process.waitFor(1, TimeUnit.SECONDS);
+                return new RuntimeExecutionResult(output(stdoutFuture), output(stderrFuture), -1, elapsed(start), ExecutionStatus.TIMEOUT, "Python 命令检测超时");
+            }
+            String stdout = output(stdoutFuture);
+            String stderr = output(stderrFuture);
+            ExecutionStatus status = process.exitValue() == 0 ? ExecutionStatus.SUCCESS : ExecutionStatus.FAILED;
+            String version = stdout.isBlank() ? stderr : stdout;
+            return new RuntimeExecutionResult(version.trim(), stderr, process.exitValue(), elapsed(start), status, status == ExecutionStatus.SUCCESS ? null : stderr);
+        } catch (Exception e) {
+            return new RuntimeExecutionResult("", "", -1, elapsed(start), ExecutionStatus.FAILED, e.getMessage());
+        }
     }
 
     @Override

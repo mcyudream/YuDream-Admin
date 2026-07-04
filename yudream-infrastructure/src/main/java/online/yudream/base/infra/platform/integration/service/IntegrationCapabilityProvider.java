@@ -6,6 +6,8 @@ import online.yudream.base.domain.platform.capability.service.CapabilityProvider
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
+import online.yudream.base.domain.platform.integration.enumerate.ExecutionStatus;
+import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -60,8 +62,16 @@ public class IntegrationCapabilityProvider implements CapabilityProvider {
 
     @Override
     public CapabilityTestResult test(String message) {
-        return enabled.get()
-                ? CapabilityTestResult.success("集成调用能力可用")
-                : CapabilityTestResult.failure("集成调用未启用");
+        if (!enabled.get()) {
+            return CapabilityTestResult.failure("集成调用未启用");
+        }
+        RuntimeExecutionResult result = localPythonRuntimeExecutor.checkPythonCommand();
+        if (result.status() == ExecutionStatus.SUCCESS) {
+            return CapabilityTestResult.success("集成调用能力可用，" + result.stdout());
+        }
+        String reason = result.errorMessage() == null || result.errorMessage().isBlank()
+                ? "Python 命令不可用"
+                : result.errorMessage();
+        return CapabilityTestResult.failure("集成调用能力检测失败：" + reason);
     }
 }
