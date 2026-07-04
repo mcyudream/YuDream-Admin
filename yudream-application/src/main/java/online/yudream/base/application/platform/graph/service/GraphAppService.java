@@ -46,7 +46,11 @@ public class GraphAppService {
         ensureGraphEnabled();
         GraphConnection connection = cmd.getId() == null ? createConnection(cmd) : connection(cmd.getId());
         connection.update(cmd.getName(), cmd.getUri(), cmd.getUsername(), cmd.getPassword(), cmd.getDatabase(), cmd.getStatus());
-        return GraphAssembler.toDTO(graphConnectionRepo.save(connection));
+        GraphConnection saved = graphConnectionRepo.save(connection);
+        if (cmd.getId() != null) {
+            graphDatabaseGateway.close(saved.getCode());
+        }
+        return GraphAssembler.toDTO(saved);
     }
 
     @Transactional
