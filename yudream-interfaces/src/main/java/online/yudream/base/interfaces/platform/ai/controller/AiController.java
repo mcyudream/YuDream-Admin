@@ -94,8 +94,7 @@ public class AiController {
                 }
                 count++;
                 log.debug("AI SSE heartbeat, traceId={}, count={}", traceId, count);
-                send(emitter, AiWebAssembler.toProgressEvent(traceId, "thinking",
-                        "模型仍在生成中，工具调用场景可能需要先完成参数规划。"));
+                send(emitter, AiWebAssembler.toProgressEvent(traceId, "heartbeat", "模型仍在生成中。"));
             }
         });
     }
