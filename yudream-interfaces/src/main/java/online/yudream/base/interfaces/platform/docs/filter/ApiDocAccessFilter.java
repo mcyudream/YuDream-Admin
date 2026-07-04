@@ -20,6 +20,8 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class ApiDocAccessFilter extends OncePerRequestFilter {
 
+    private static final String API_DOC_VIEW_PERMISSION = "platform:docs:view";
+
     private final ApiDocAppService apiDocAppService;
 
     @Override
@@ -41,9 +43,10 @@ public class ApiDocAccessFilter extends OncePerRequestFilter {
 
     private boolean allowed(ApiDocSettingsDTO settings) {
         if (settings.isApiKeyAccessEnabled()) {
-            return SecurityPrincipalSupport.hasAnyAuthentication();
+            return SecurityPrincipalSupport.hasPermission(API_DOC_VIEW_PERMISSION);
         }
-        return SecurityPrincipalSupport.hasLoginAuthentication();
+        return SecurityPrincipalSupport.hasLoginAuthentication()
+                && SecurityPrincipalSupport.hasPermission(API_DOC_VIEW_PERMISSION);
     }
 
     private boolean isApiDocRequest(HttpServletRequest request) {

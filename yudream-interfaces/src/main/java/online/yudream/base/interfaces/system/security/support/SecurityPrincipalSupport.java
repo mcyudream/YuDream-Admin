@@ -36,6 +36,18 @@ public class SecurityPrincipalSupport {
         return hasApiKeyAuthentication() || hasLoginAuthentication();
     }
 
+    public static boolean hasPermission(String permission) {
+        if (ApiKeyAuthenticationContext.hasPermission(permission)) {
+            return true;
+        }
+        Object loginId = StpUtil.getLoginIdDefaultNull();
+        return loginId != null && containsPermission(StpUtil.getPermissionList(), permission);
+    }
+
+    private static boolean containsPermission(List<String> permissions, String permission) {
+        return permissions != null && (permissions.contains("*") || permissions.contains(permission));
+    }
+
     public record SecurityPrincipal(Long userId, List<String> permissions) {
 
         public boolean superAdmin() {
