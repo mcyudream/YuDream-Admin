@@ -48,6 +48,11 @@ public class LoginLogRepoImpl implements LoginLogRepo {
         return new PageResult<>(records, total, currentPage, pageSize);
     }
 
+    @Override
+    public long clear() {
+        return mongoTemplate.remove(new Query(), LoginLogDO.class).getDeletedCount();
+    }
+
     private Query buildQuery(String keyword, Boolean success) {
         Query query = new Query();
         if (StringUtils.hasText(keyword)) {

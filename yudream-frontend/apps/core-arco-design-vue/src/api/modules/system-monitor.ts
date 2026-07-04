@@ -79,7 +79,13 @@ export default {
   apiLogs: (params?: { keyword?: string; success?: boolean; page?: number; size?: number }) => {
     return systemClient.get<unknown, ApiResponse<PageResult<ApiLog>>>('api/system/monitor/api-logs', { params })
   },
+  clearApiLogs: () => {
+    return systemClient.delete<unknown, ApiResponse<number>>('api/system/monitor/api-logs')
+  },
   loginLogs: (params?: { keyword?: string; success?: boolean; page?: number; size?: number }) => {
     return systemClient.get<unknown, ApiResponse<PageResult<LoginLog>>>('api/system/monitor/login-logs', { params })
+  },
+  clearLoginLogs: () => {
+    return systemClient.delete<unknown, ApiResponse<number>>('api/system/monitor/login-logs')
   },
 }

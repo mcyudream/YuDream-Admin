@@ -8,4 +8,6 @@ public interface ApiLogRepo {
     void save(ApiLogDTO log);
 
     PageResult<ApiLogDTO> page(String keyword, Boolean success, int page, int size);
+
+    long clear();
 }

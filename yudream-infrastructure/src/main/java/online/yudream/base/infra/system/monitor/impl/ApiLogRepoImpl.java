@@ -48,6 +48,11 @@ public class ApiLogRepoImpl implements ApiLogRepo {
         return new PageResult<>(records, total, currentPage, pageSize);
     }
 
+    @Override
+    public long clear() {
+        return mongoTemplate.remove(new Query(), ApiLogDO.class).getDeletedCount();
+    }
+
     private Query buildQuery(String keyword, Boolean success) {
         Query query = new Query();
         if (StringUtils.hasText(keyword)) {

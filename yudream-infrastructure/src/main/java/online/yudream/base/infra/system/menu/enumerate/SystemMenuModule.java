@@ -241,6 +241,10 @@ public enum SystemMenuModule {
             parentName = "API_LOG", permission = "system:monitor:api-log:export")
     API_LOG_EXPORT,
 
+    @MenuNode(code = "system:api-log:delete", name = "删除接口日志", type = MenuNodeType.BUTTON,
+            parentName = "API_LOG", permission = "system:monitor:api-log:delete")
+    API_LOG_DELETE,
+
     @MenuNode(code = "system:login-log", name = "登录日志", type = MenuNodeType.MENU,
             parentName = "LOGS", path = "/system/login-log", component = "system/login-log/index.vue",
             icon = "i-ri:login-box-line", sort = 10)
@@ -253,4 +257,8 @@ public enum SystemMenuModule {
     @MenuNode(code = "system:login-log:export", name = "导出登录日志", type = MenuNodeType.BUTTON,
             parentName = "LOGIN_LOG", permission = "system:monitor:login-log:export")
     LOGIN_LOG_EXPORT,
+
+    @MenuNode(code = "system:login-log:delete", name = "删除登录日志", type = MenuNodeType.BUTTON,
+            parentName = "LOGIN_LOG", permission = "system:monitor:login-log:delete")
+    LOGIN_LOG_DELETE,
 }
