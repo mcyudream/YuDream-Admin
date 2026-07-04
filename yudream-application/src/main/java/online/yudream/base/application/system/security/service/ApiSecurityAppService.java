@@ -19,6 +19,7 @@ import online.yudream.base.domain.system.security.service.ApiKeyPermissionPolicy
 import online.yudream.base.domain.system.security.valobj.ApiKeySecret;
 import online.yudream.base.domain.system.security.valobj.PermissionScope;
 import online.yudream.base.domain.system.security.valobj.TokenPolicy;
+import online.yudream.base.domain.system.user.repo.PermissionRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,8 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +40,7 @@ public class ApiSecurityAppService {
 
     private final ApiSecurityPolicyRepo apiSecurityPolicyRepo;
     private final ApiKeyCredentialRepo apiKeyCredentialRepo;
+    private final PermissionRepo permissionRepo;
     private final ApiKeyPermissionPolicy apiKeyPermissionPolicy = new ApiKeyPermissionPolicy();
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -82,6 +86,7 @@ public class ApiSecurityAppService {
     public ApiKeyCreateResultDTO createApiKey(ApiKeyCreateCmd cmd) {
         ensureApiKeyEnabled();
         PermissionScope scope = new PermissionScope(cmd.getPermissions());
+        validateRegisteredPermissions(scope);
         apiKeyPermissionPolicy.validateCreatorScope(scope, cmd.getCreatorPermissions(), cmd.isSuperAdmin());
         String plaintext = generatePlaintext();
         String prefix = prefixOf(plaintext);
@@ -125,6 +130,18 @@ public class ApiSecurityAppService {
     private String prefixOf(String plaintext) {
         int length = Math.min(12, plaintext.length());
         return plaintext.substring(0, length);
+    }
+
+    private void validateRegisteredPermissions(PermissionScope scope) {
+        Set<String> registeredCodes = permissionRepo.findActive().stream()
+                .map(permission -> permission.getId().getCode())
+                .collect(Collectors.toSet());
+        List<String> invalidCodes = scope.permissions().stream()
+                .filter(permission -> !registeredCodes.contains(permission))
+                .toList();
+        if (!invalidCodes.isEmpty()) {
+            throw new BizException("API Key 权限范围包含未注册权限：" + String.join(", ", invalidCodes));
+        }
     }
 
     private void ensureApiKeyEnabled() {

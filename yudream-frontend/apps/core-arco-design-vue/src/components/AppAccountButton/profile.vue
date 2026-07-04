@@ -68,6 +68,16 @@ const permissionGroups = computed(() => {
 
 const selectablePermissionCodes = computed(() => Object.values(permissionGroups.value).flat().map(item => item.code))
 
+const permissionSelectOptions = computed(() => Object.entries(permissionGroups.value).map(([module, items]) => ({
+  label: module,
+  options: items.map(item => ({
+    label: `${item.name} (${item.code})`,
+    value: item.code,
+  })),
+})))
+
+const permissionNameMap = computed(() => new Map(availablePermissions.value.map(item => [item.code, item.name])))
+
 onMounted(async () => {
   await loadProfile()
   await loadPasskeys()
@@ -221,11 +231,12 @@ function confirmRevokePasskey(row: PasskeyCredential) {
 }
 
 async function createApiKey() {
+  const selectedPermissions = selectedApiKeyPermissions()
   if (!apiKeyForm.name.trim()) {
     toast.error('请输入 API Key 名称')
     return
   }
-  if (!apiKeyForm.permissions.length) {
+  if (!selectedPermissions.length) {
     toast.error('请选择权限范围')
     return
   }
@@ -233,7 +244,7 @@ async function createApiKey() {
   try {
     const res = await apiProfile.createApiKey({
       name: apiKeyForm.name.trim(),
-      permissions: apiKeyForm.permissions,
+      permissions: selectedPermissions,
       expireTime: apiKeyForm.expireTime || undefined,
     })
     createdApiKeyPlaintext.value = res.data.plaintext
@@ -244,6 +255,15 @@ async function createApiKey() {
   finally {
     creatingApiKey.value = false
   }
+}
+
+function selectedApiKeyPermissions() {
+  const selectableCodes = new Set(selectablePermissionCodes.value)
+  return apiKeyForm.permissions.filter(permission => selectableCodes.has(permission))
+}
+
+function permissionText(code: string) {
+  return permissionNameMap.value.get(code) || code
 }
 
 function confirmRevokeApiKey(row: ApiKeyCredential) {
@@ -455,21 +475,16 @@ function dateText(value?: string) {
                     </FaButton>
                   </div>
                 </div>
-                <div v-if="!Object.keys(permissionGroups).length" class="empty-state">
+                <FaSelect
+                  v-if="permissionSelectOptions.length"
+                  v-model="apiKeyForm.permissions"
+                  multiple
+                  :options="permissionSelectOptions"
+                  class="w-full"
+                  placeholder="请选择 API Key 可访问权限"
+                />
+                <div v-else class="empty-state">
                   暂无可选择权限
-                </div>
-                <div v-for="(items, module) in permissionGroups" :key="module" class="permission-group">
-                  <div class="permission-title">{{ module }}</div>
-                  <a-checkbox-group v-model="apiKeyForm.permissions">
-                    <a-space wrap>
-                      <a-checkbox v-for="item in items" :key="item.code" :value="item.code">
-                        <span class="permission-label">
-                          <strong>{{ item.name }}</strong>
-                          <small>{{ item.code }}</small>
-                        </span>
-                      </a-checkbox>
-                    </a-space>
-                  </a-checkbox-group>
                 </div>
               </div>
             </a-form-item>
@@ -504,7 +519,7 @@ function dateText(value?: string) {
                 <small>过期：{{ dateText(item.expireTime) }} · 最后使用：{{ dateText(item.lastUsedTime) }}</small>
                 <div class="permission-line">
                   <FaTag v-for="permission in item.permissions.slice(0, 4)" :key="permission" variant="secondary">
-                    {{ permission }}
+                    {{ permissionText(permission) }}
                   </FaTag>
                   <span v-if="item.permissions.length > 4">+{{ item.permissions.length - 4 }}</span>
                 </div>
