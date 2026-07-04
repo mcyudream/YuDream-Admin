@@ -12,6 +12,8 @@ import online.yudream.base.domain.platform.cms.enumerate.PageTemplate;
 import online.yudream.base.domain.platform.cms.valobj.PageSlug;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -25,6 +27,8 @@ public class CmsPage extends BaseDomain {
     private String summary;
     private String excerpt;
     private String coverImageUrl;
+    private List<String> categories;
+    private List<String> tags;
     private String markdownContent;
     private String htmlContent;
     private String seoTitle;
@@ -43,13 +47,15 @@ public class CmsPage extends BaseDomain {
     }
 
     public void update(String title, String slug, String summary, String excerpt, String coverImageUrl,
-                       String markdownContent, String htmlContent, String seoTitle, String seoDescription,
+                       List<String> categories, List<String> tags, String markdownContent, String htmlContent, String seoTitle, String seoDescription,
                        PageTemplate template, PageStatus status) {
         this.title = required(title, "页面标题不能为空");
         this.slug = PageSlug.of(slug).value();
         this.summary = summary;
         this.excerpt = excerpt;
         this.coverImageUrl = coverImageUrl;
+        this.categories = normalizeTerms(categories);
+        this.tags = normalizeTerms(tags);
         this.markdownContent = markdownContent;
         this.htmlContent = htmlContent;
         this.seoTitle = seoTitle;
@@ -79,5 +85,17 @@ public class CmsPage extends BaseDomain {
             throw new BizException(message);
         }
         return value.trim();
+    }
+
+    private static List<String> normalizeTerms(List<String> terms) {
+        if (terms == null) {
+            return new ArrayList<>();
+        }
+        return terms.stream()
+                .filter(term -> term != null && !term.trim().isEmpty())
+                .map(String::trim)
+                .distinct()
+                .limit(20)
+                .toList();
     }
 }

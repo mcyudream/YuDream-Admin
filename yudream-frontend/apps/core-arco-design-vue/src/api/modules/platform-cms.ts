@@ -31,6 +31,8 @@ export interface CmsPage {
   summary?: string
   excerpt?: string
   coverImageUrl?: string
+  categories?: string[]
+  tags?: string[]
   markdownContent?: string
   htmlContent?: string
   seoTitle?: string
@@ -48,6 +50,8 @@ export interface CmsPagePayload {
   summary?: string
   excerpt?: string
   coverImageUrl?: string
+  categories?: string[]
+  tags?: string[]
   markdownContent?: string
   htmlContent?: string
   seoTitle?: string

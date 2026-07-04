@@ -5,6 +5,8 @@ import lombok.Data;
 import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
 import online.yudream.base.domain.platform.cms.enumerate.PageTemplate;
 
+import java.util.List;
+
 @Data
 public class CmsPageSaveRequest {
     @NotBlank(message = "页面标题不能为空")
@@ -14,6 +16,8 @@ public class CmsPageSaveRequest {
     private String summary;
     private String excerpt;
     private String coverImageUrl;
+    private List<String> categories;
+    private List<String> tags;
     private String markdownContent;
     private String htmlContent;
     private String seoTitle;

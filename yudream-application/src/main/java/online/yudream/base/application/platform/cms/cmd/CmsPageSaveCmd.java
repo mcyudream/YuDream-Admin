@@ -6,6 +6,7 @@ import online.yudream.base.domain.platform.cms.enumerate.PageTemplate;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.List;
 
 @Data
 public class CmsPageSaveCmd implements Serializable {
@@ -19,6 +20,8 @@ public class CmsPageSaveCmd implements Serializable {
     private String summary;
     private String excerpt;
     private String coverImageUrl;
+    private List<String> categories;
+    private List<String> tags;
     private String markdownContent;
     private String htmlContent;
     private String seoTitle;
