@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
 import apiPlugin from '@/api/modules/platform-plugin'
+import router from '@/router'
+import { refreshDynamicRoutes } from '@/router/dynamic'
 
 const toast = useFaToast()
 const loading = ref(false)
@@ -42,6 +44,7 @@ async function refresh() {
   try {
     const res = await apiPlugin.refresh()
     rows.value = res.data
+    await refreshDynamicRoutes(router)
     toast.success('插件目录已刷新')
   }
   finally {
@@ -54,6 +57,9 @@ async function runAction(code: string, action: 'load' | 'enable' | 'disable' | '
   try {
     const res = await apiPlugin[action](code)
     replaceItem(res.data)
+    if (['enable', 'disable', 'unload'].includes(action)) {
+      await refreshDynamicRoutes(router)
+    }
     toast.success(actionText(action))
   }
   finally {
@@ -86,9 +92,9 @@ function statusVariant(status: PluginStatus) {
 function actionText(action: string) {
   const map: Record<string, string> = {
     load: '插件已加载',
-    enable: '插件已启用，刷新页面后可看到动态菜单',
-    disable: '插件已禁用',
-    unload: '插件已卸载',
+    enable: '插件已启用，动态菜单已同步',
+    disable: '插件已禁用，动态菜单已同步',
+    unload: '插件已卸载，动态菜单已同步',
   }
   return map[action] || '操作完成'
 }
