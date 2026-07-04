@@ -18,6 +18,7 @@ import online.yudream.base.application.system.security.dto.ApiKeyCreateResultDTO
 import online.yudream.base.application.system.security.dto.ApiKeyCredentialDTO;
 import online.yudream.base.application.system.security.dto.ApiEncryptedPayloadDTO;
 import online.yudream.base.application.system.security.dto.ApiEncryptionPublicKeyDTO;
+import online.yudream.base.application.system.security.dto.ApiEncryptionStatusDTO;
 import online.yudream.base.application.system.security.dto.ApiSecurityPolicyDTO;
 import online.yudream.base.application.system.security.dto.OAuthAuthorizationDTO;
 import online.yudream.base.application.system.security.dto.OAuthClientAuthorizeDTO;
@@ -44,6 +45,7 @@ import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.ApiEncryptedPayloadRes;
 import online.yudream.base.interfaces.system.security.res.ApiEncryptionPublicKeyRes;
+import online.yudream.base.interfaces.system.security.res.ApiEncryptionStatusRes;
 import online.yudream.base.interfaces.system.security.res.ApiSecurityPolicyRes;
 import online.yudream.base.interfaces.system.security.res.OAuthAuthorizationRes;
 import online.yudream.base.interfaces.system.security.res.OAuthClientAuthorizeRes;
@@ -277,6 +279,13 @@ public class ApiSecurityWebAssembler {
                 .enabled(dto.isEnabled())
                 .algorithm(dto.getAlgorithm())
                 .publicKey(dto.getPublicKey())
+                .build();
+    }
+
+    public static ApiEncryptionStatusRes toRes(ApiEncryptionStatusDTO dto) {
+        return ApiEncryptionStatusRes.builder()
+                .enabled(dto.isEnabled())
+                .algorithm(dto.getAlgorithm())
                 .build();
     }
 

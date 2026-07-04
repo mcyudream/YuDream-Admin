@@ -9,6 +9,14 @@ interface PublicKeyResult {
   }
 }
 
+interface EncryptionStatusResult {
+  code: number
+  data?: {
+    enabled: boolean
+    algorithm: string
+  }
+}
+
 interface EncryptionSession {
   encryptedKey: string
   key: CryptoKey
@@ -21,6 +29,7 @@ interface EncryptedPayload {
 }
 
 const backendBaseURL = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL
+let statusCache: { enabled: boolean, algorithm?: string } | null = null
 let publicKeyCache: { enabled: boolean, publicKey?: CryptoKey } | null = null
 
 export function isEncryptablePayload(data: unknown) {
@@ -28,7 +37,11 @@ export function isEncryptablePayload(data: unknown) {
 }
 
 export async function prepareApiEncryption(url?: string, data?: unknown) {
-  if (url?.includes('api/system/security/encryption/public-key')) {
+  if (isApiEncryptionBootstrapUrl(url)) {
+    return null
+  }
+  const status = await loadEncryptionStatus()
+  if (!status.enabled) {
     return null
   }
   const publicKey = await loadPublicKey()
@@ -59,7 +72,32 @@ export async function decryptApiResponse(responseData: unknown, sessionKey?: Cry
 }
 
 export function clearApiEncryptionCache() {
+  statusCache = null
   publicKeyCache = null
+}
+
+function isApiEncryptionBootstrapUrl(url?: string) {
+  return url?.includes('api/system/security/encryption/status')
+    || url?.includes('api/system/security/encryption/public-key')
+}
+
+async function loadEncryptionStatus() {
+  if (statusCache) {
+    return statusCache
+  }
+  const res = await axios.get<EncryptionStatusResult>('api/system/security/encryption/status', {
+    baseURL: backendBaseURL,
+    headers: { 'Accept-Language': 'zh-CN' },
+  })
+  const data = res.data.data
+  statusCache = {
+    enabled: Boolean(data?.enabled),
+    algorithm: data?.algorithm,
+  }
+  if (!statusCache.enabled) {
+    publicKeyCache = { enabled: false }
+  }
+  return statusCache
 }
 
 async function loadPublicKey() {

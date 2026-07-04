@@ -97,6 +97,7 @@ Assembler hard rules:
 ## Platform Capabilities
 
 - Security and identity abilities such as interface encryption, dual token, API Key, Passkey, and OAuth are system baseline abilities and belong in `system`.
+- API encryption must expose an unauthenticated and unencrypted status endpoint before the public-key endpoint, so frontend clients can decide whether to encrypt before login. The encryption filter must explicitly bypass both status and public-key bootstrap endpoints.
 - Optional engineering abilities such as SSE, WebSocket, MQ, Neo4j, Python Runtime, HTTP integration, document generation, and CMS are dynamically loadable platform abilities and belong in `platform`, separate from `system`.
 - Platform capability runtime has two gates:
   - project gate: configuration file or Spring conditional annotation decides whether the project allows loading the capability provider, for example `yudream.platform.capabilities.rabbitmq.enabled=true` with `@ConditionalOnProperty`;

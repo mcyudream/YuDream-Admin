@@ -14,6 +14,7 @@ import online.yudream.base.interfaces.system.security.request.ApiSecurityPolicyU
 import online.yudream.base.interfaces.system.security.res.ApiKeyCreateResultRes;
 import online.yudream.base.interfaces.system.security.res.ApiKeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.ApiEncryptionPublicKeyRes;
+import online.yudream.base.interfaces.system.security.res.ApiEncryptionStatusRes;
 import online.yudream.base.interfaces.system.security.res.ApiSecurityPolicyRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,6 +32,11 @@ public class ApiSecurityController {
 
     private final ApiSecurityAppService apiSecurityAppService;
     private final ApiEncryptionAppService apiEncryptionAppService;
+
+    @GetMapping("/encryption/status")
+    public Result<ApiEncryptionStatusRes> encryptionStatus() {
+        return Result.ok(ApiSecurityWebAssembler.toRes(apiEncryptionAppService.status()));
+    }
 
     @GetMapping("/encryption/public-key")
     public Result<ApiEncryptionPublicKeyRes> encryptionPublicKey() {

@@ -3,6 +3,7 @@ package online.yudream.base.application.system.security.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.security.dto.ApiEncryptedPayloadDTO;
 import online.yudream.base.application.system.security.dto.ApiEncryptionPublicKeyDTO;
+import online.yudream.base.application.system.security.dto.ApiEncryptionStatusDTO;
 import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
 import online.yudream.base.domain.system.security.service.ApiPayloadEncryptionGateway;
@@ -16,6 +17,13 @@ public class ApiEncryptionAppService {
 
     private final ApiSecurityPolicyRepo apiSecurityPolicyRepo;
     private final ApiPayloadEncryptionGateway apiPayloadEncryptionGateway;
+
+    public ApiEncryptionStatusDTO status() {
+        return ApiEncryptionStatusDTO.builder()
+                .enabled(enabled())
+                .algorithm(ALGORITHM)
+                .build();
+    }
 
     public ApiEncryptionPublicKeyDTO publicKey() {
         boolean enabled = enabled();
