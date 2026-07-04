@@ -29,13 +29,13 @@ public class AiAppService {
     @Transactional(readOnly = true)
     public CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd) {
         capabilityAppService.ensureEnabled(CAPABILITY_CODE, "AI");
-        if (!StringUtils.hasText(cmd.getPrompt())) {
-            throw new BizException("生成需求不能为空");
+        if (!StringUtils.hasText(cmd.getPrompt()) && !StringUtils.hasText(cmd.getImageDataUrl())) {
+            throw new BizException("生成需求或样图不能为空");
         }
         Map<String, String> config = capabilityModuleRepo.findByCode(CAPABILITY_CODE)
                 .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
                 .orElse(Map.of());
-        AiGenerationRequest request = new AiGenerationRequest(systemPrompt(), userPrompt(cmd), config);
+        AiGenerationRequest request = new AiGenerationRequest(systemPrompt(), userPrompt(cmd), cmd.getImageDataUrl(), cmd.getModel(), config);
         AiGenerationGateway gateway = aiGenerationGatewayProvider.getIfAvailable();
         if (gateway == null) {
             throw new BizException("AI 能力未在当前项目配置中启用");
@@ -60,13 +60,15 @@ public class AiAppService {
                 页面标题：%s
                 页面类型：%s
                 风格偏好：%s
+                样图参考：%s
                 生成需求：%s
                 """.formatted(
                 defaultText(cmd.getSiteName(), "YuDream"),
                 defaultText(cmd.getTitle(), "未命名页面"),
                 defaultText(cmd.getPageType(), "通用内容页"),
                 defaultText(cmd.getStyle(), "清爽、专业、可读性高"),
-                cmd.getPrompt().trim()
+                StringUtils.hasText(cmd.getImageDataUrl()) ? "已提供，请参考样图的布局、视觉层次、色彩和组件组织方式" : "未提供",
+                defaultText(cmd.getPrompt(), "请根据样图生成完整页面")
         );
     }
 
