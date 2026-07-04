@@ -633,35 +633,12 @@ function escapeAttr(value: string) {
         </div>
 
         <section v-if="aiEnabled" class="right-panel ai-panel" :class="{ active: rightPanelTab === 'ai' }">
-          <div class="ai-panel__head">
-            <div>
-              <h3>AI 助手</h3>
-              <p>读取当前画布，按你的想法直接修改或新增内容。</p>
-            </div>
-            <FaTag variant="secondary">上下文已连接</FaTag>
-          </div>
-
-          <div class="ai-context">
-            <div v-for="item in canvasStats" :key="item.label">
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }}</strong>
-            </div>
-          </div>
-
-          <FaSelect
-            v-if="aiModelOptions?.length"
-            v-model="aiModel"
-            :options="aiModelOptions"
-            placeholder="选择模型"
-          />
-
-          <div class="ai-suggestions" aria-label="AI 快捷指令">
-            <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
-              {{ suggestion }}
-            </button>
-          </div>
-
           <div class="ai-chat" aria-label="AI 对话历史">
+            <div class="ai-hero">
+              <span>AI</span>
+              <strong>YuDream AI</strong>
+              <p>描述你想要的页面变化，我会结合当前画布内容进行修改。</p>
+            </div>
             <div v-for="(message, index) in aiMessages" :key="index" class="ai-message" :class="message.role">
               <span>{{ message.role === 'user' ? '你' : 'AI' }}</span>
               <p>{{ message.content }}</p>
@@ -672,7 +649,7 @@ function escapeAttr(value: string) {
             <FaTextarea
               v-model="aiPrompt"
               rows="5"
-              placeholder="告诉 AI 要怎么改当前画布。支持仅描述需求，也可以附一张样图作为参考。"
+              placeholder="输入 / 唤起插件和技能，或直接描述要如何修改当前画布"
               @keydown.ctrl.enter.prevent="askAi"
             />
             <input ref="aiImageInput" type="file" accept="image/*" hidden @change="onAiImageChange">
@@ -684,15 +661,39 @@ function escapeAttr(value: string) {
               </div>
             </div>
             <div class="ai-tools">
-              <FaButton size="sm" variant="outline" type="button" @click="pickAiImage">
-                <FaIcon name="i-ri:image-add-line" />
-                样图
-              </FaButton>
-              <FaButton size="sm" :loading="aiGenerating" type="button" @click="askAi">
-                <FaIcon name="i-ri:sparkling-2-line" />
-                修改画布
-              </FaButton>
+              <div class="ai-tool-left">
+                <button type="button" class="ai-icon-button" title="添加样图" @click="pickAiImage">
+                  <FaIcon name="i-ri:add-line" />
+                </button>
+                <button type="button" class="ai-icon-button" title="画布上下文">
+                  <FaIcon name="i-ri:links-line" />
+                </button>
+              </div>
+              <div class="ai-tool-right">
+                <FaSelect
+                  v-if="aiModelOptions?.length"
+                  v-model="aiModel"
+                  class="ai-model-select"
+                  :options="aiModelOptions"
+                  placeholder="选择模型"
+                />
+                <button type="button" class="ai-send-button" :disabled="aiGenerating" title="修改画布" @click="askAi">
+                  <FaIcon :name="aiGenerating ? 'i-ri:loader-4-line' : 'i-ri:arrow-up-line'" />
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div class="ai-suggestions" aria-label="AI 快捷指令">
+            <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
+              {{ suggestion }}
+            </button>
+          </div>
+
+          <div class="ai-context">
+            <span v-for="item in canvasStats" :key="item.label">
+              {{ item.label }} {{ item.value }}
+            </span>
           </div>
         </section>
 
@@ -869,74 +870,54 @@ function escapeAttr(value: string) {
 }
 
 .ai-panel.active {
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
   height: 100%;
+  gap: 12px;
   overflow: hidden;
-}
-
-.ai-panel__head {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.ai-panel__head p {
-  margin: 4px 0 0;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.6;
 }
 
 .ai-context {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.ai-context div {
-  display: grid;
-  gap: 3px;
-  padding: 8px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.ai-context span {
-  color: #64748b;
-  font-size: 11px;
-}
-
-.ai-context strong {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   overflow: hidden;
-  color: #0f172a;
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 .ai-suggestions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.ai-suggestions::-webkit-scrollbar {
+  display: none;
 }
 
 .ai-suggestions button {
-  max-width: 100%;
-  padding: 5px 8px;
-  border: 1px solid #dbeafe;
+  display: inline-flex;
+  flex: 0 0 auto;
+  max-width: 180px;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
   border-radius: 999px;
-  background: #eff6ff;
-  color: #1d4ed8;
+  background: #fff;
+  color: #475569;
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
 .ai-suggestions button:hover {
-  border-color: #93c5fd;
-  background: #dbeafe;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .ai-tools {
@@ -948,9 +929,45 @@ function escapeAttr(value: string) {
 
 .ai-chat {
   display: grid;
-  gap: 8px;
+  align-content: end;
+  gap: 10px;
   overflow: auto;
   padding-right: 2px;
+}
+
+.ai-hero {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  margin: auto 0 24px;
+  text-align: center;
+}
+
+.ai-hero span {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ai-hero strong {
+  color: #020617;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.ai-hero p {
+  max-width: 260px;
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .ai-message {
@@ -989,8 +1006,23 @@ function escapeAttr(value: string) {
 .ai-composer {
   display: grid;
   gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid #e5e7eb;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.ai-composer :deep(textarea) {
+  min-height: 80px;
+  resize: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.ai-composer :deep(textarea:focus) {
+  box-shadow: none;
 }
 
 .ai-image-preview {
@@ -999,7 +1031,7 @@ function escapeAttr(value: string) {
   align-items: center;
   padding: 8px;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #f8fafc;
 }
 
@@ -1034,6 +1066,62 @@ function escapeAttr(value: string) {
   color: #64748b;
   font-size: 12px;
   cursor: pointer;
+}
+
+.ai-tool-left,
+.ai-tool-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-icon-button,
+.ai-send-button {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ai-icon-button {
+  background: transparent;
+  color: #475569;
+}
+
+.ai-icon-button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ai-send-button {
+  background: #e2e8f0;
+  color: #fff;
+}
+
+.ai-send-button:not(:disabled) {
+  background: #111827;
+}
+
+.ai-send-button:disabled {
+  cursor: wait;
+}
+
+.ai-model-select {
+  width: 118px;
+}
+
+.ai-model-select :deep(button) {
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  font-size: 12px;
+  box-shadow: none;
 }
 
 :deep(.gjs-one-bg) {
