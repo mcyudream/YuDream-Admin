@@ -610,7 +610,7 @@
   white-space: nowrap;
 }
 
-.skin-detail-panel > .skin-detail-head {
+.skin-action-panel.skin-detail-panel > .skin-detail-head {
   display: flex;
   gap: 12px;
   align-items: flex-start;

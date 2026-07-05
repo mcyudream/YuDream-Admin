@@ -91,32 +91,72 @@
           </div>
         </SkinPreview>
 
-        <div class="skin-action-panel">
-          <div>
-            <strong>{{ model.selectedTexture?.name || '选择一个材质' }}</strong>
-            <span>{{ model.selectedTexture?.hash || '从左侧材质库中选择后再操作' }}</span>
+        <div class="skin-action-panel skin-detail-panel">
+          <div class="skin-detail-head">
+            <div class="skin-detail-title">
+              <strong>{{ selectedTitle }}</strong>
+              <span>{{ selectedSubtitle }}</span>
+            </div>
+            <div v-if="model.canUse" class="skin-detail-actions">
+              <FaTooltip text="加入衣柜" side="top">
+                <span class="skin-action-tooltip">
+                  <FaButton
+                    variant="outline"
+                    size="icon-sm"
+                    class="skin-action-icon"
+                    :disabled="!model.selectedTexture"
+                    :loading="model.saving === 'closet'"
+                    aria-label="加入衣柜"
+                    @click="model.selectedTexture && model.addTextureToCloset(model.selectedTexture)"
+                  >
+                    <FaIcon name="i-ri:archive-drawer-line" />
+                  </FaButton>
+                </span>
+              </FaTooltip>
+              <FaTooltip text="应用到当前角色" side="top">
+                <span class="skin-action-tooltip">
+                  <FaButton
+                    size="icon-sm"
+                    class="skin-action-icon"
+                    :disabled="!model.selectedTexture || !model.selectedPlayer"
+                    :loading="model.selectedTexture ? model.saving === `use-texture:${model.selectedTexture.hash}` : false"
+                    aria-label="应用到当前角色"
+                    @click="model.useTextureOnSelectedPlayer()"
+                  >
+                    <FaIcon name="i-ri:t-shirt-2-line" />
+                  </FaButton>
+                </span>
+              </FaTooltip>
+            </div>
           </div>
-          <div class="skin-action-panel__buttons">
-            <FaButton
-              v-if="model.canUse"
-              variant="outline"
-              :disabled="!model.selectedTexture"
-              :loading="model.saving === 'closet'"
-              @click="model.selectedTexture && model.addTextureToCloset(model.selectedTexture)"
-            >
-              <FaIcon name="i-ri:archive-drawer-line" />
-              加入衣柜
-            </FaButton>
-            <FaButton
-              v-if="model.canUse"
-              :disabled="!model.selectedTexture || !model.selectedPlayer"
-              :loading="model.selectedTexture ? model.saving === `use-texture:${model.selectedTexture.hash}` : false"
-              @click="model.useTextureOnSelectedPlayer()"
-            >
-              <FaIcon name="i-ri:t-shirt-2-line" />
-              应用到当前角色
-            </FaButton>
+
+          <div class="skin-detail-meta">
+            <div>
+              <span>类型</span>
+              <strong>{{ selectedKind }}</strong>
+            </div>
+            <div>
+              <span>上传人</span>
+              <strong>{{ selectedUploader }}</strong>
+            </div>
+            <div>
+              <span>权限</span>
+              <strong>{{ selectedVisibility }}</strong>
+            </div>
+            <div>
+              <span>大小</span>
+              <strong>{{ selectedSize }}</strong>
+            </div>
+            <div>
+              <span>上传时间</span>
+              <strong>{{ selectedUploadedAt }}</strong>
+            </div>
+            <div>
+              <span>材质 Hash</span>
+              <code class="skin-hash" :title="selectedHash">{{ selectedHashShort }}</code>
+            </div>
           </div>
+          <p v-if="!model.selectedTexture" class="skin-help-text">从左侧材质库中选择后再操作。</p>
           <p v-if="model.canUse && !model.selectedPlayer" class="skin-help-text">先在“我的角色”中选择或设定默认角色，再一键应用材质。</p>
         </div>
       </aside>
@@ -157,7 +197,7 @@
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
 import type { SkinTexture } from '../types'
 import { computed, ref } from 'vue'
-import { FaButton, FaIcon, FaInput, FaModal, FaSelect, FaSwitch, FaTag } from '@fantastic-admin/components'
+import { FaButton, FaIcon, FaInput, FaModal, FaSelect, FaSwitch, FaTag, FaTooltip } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
 import SkinTexturePreview from '../components/SkinTexturePreview.vue'
@@ -243,6 +283,34 @@ const selectedKind = computed(() => {
   const texture = props.model.selectedTexture
   return texture ? textureKind(texture) : '-'
 })
+const selectedTitle = computed(() => {
+  return props.model.selectedTexture?.name || '选择一个材质'
+})
+const selectedSubtitle = computed(() => {
+  return props.model.selectedTexture ? selectedKind.value : '从左侧材质库中选择后再操作'
+})
+const selectedHash = computed(() => {
+  return props.model.selectedTexture?.hash || ''
+})
+const selectedHashShort = computed(() => {
+  return shortenHash(selectedHash.value)
+})
+const selectedUploader = computed(() => {
+  return props.model.userName(props.model.selectedTexture?.uploaderId)
+})
+const selectedVisibility = computed(() => {
+  const texture = props.model.selectedTexture
+  if (!texture) {
+    return '-'
+  }
+  return texture.publicAccess ? '公开材质' : '私有材质'
+})
+const selectedUploadedAt = computed(() => {
+  return props.model.dateText(props.model.selectedTexture?.uploadedAt)
+})
+const selectedSize = computed(() => {
+  return formatSize(props.model.selectedTexture?.size)
+})
 
 function textureKind(texture: SkinTexture) {
   if (texture.type === 'cape') {
@@ -252,7 +320,27 @@ function textureKind(texture: SkinTexture) {
 }
 
 function shortHash(hash?: string) {
-  return hash ? hash.slice(0, 10) : '-'
+  return shortenHash(hash, 10)
+}
+
+function shortenHash(hash?: string, head = 10) {
+  if (!hash) {
+    return '-'
+  }
+  return hash.length > 18 ? `${hash.slice(0, head)}...${hash.slice(-6)}` : hash
+}
+
+function formatSize(size?: number) {
+  if (!size) {
+    return '-'
+  }
+  if (size < 1024) {
+    return `${size} B`
+  }
+  if (size < 1024 * 1024) {
+    return `${(size / 1024).toFixed(1)} KB`
+  }
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
 }
 
 function resetFilters() {
