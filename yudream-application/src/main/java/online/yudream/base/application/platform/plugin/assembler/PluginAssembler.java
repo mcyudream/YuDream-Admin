@@ -52,6 +52,9 @@ public class PluginAssembler {
                 .moduleName(module.moduleName())
                 .sdkVersion(module.sdkVersion())
                 .integrity(module.integrity())
+                .menuTitle(module.menuTitle())
+                .menuIcon(module.menuIcon())
+                .menuSort(module.menuSort())
                 .routes(module.routes().stream().map(PluginAssembler::toDTO).toList())
                 .build();
     }

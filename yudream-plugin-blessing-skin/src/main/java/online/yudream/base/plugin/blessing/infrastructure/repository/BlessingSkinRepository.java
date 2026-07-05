@@ -1,8 +1,10 @@
 package online.yudream.base.plugin.blessing.infrastructure.repository;
 
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinPlayer;
+import online.yudream.base.plugin.blessing.domain.aggregate.SkinClosetItem;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinTexture;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinUser;
+import online.yudream.base.plugin.blessing.domain.valobj.SkinSiteSettings;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
@@ -20,6 +22,9 @@ public class BlessingSkinRepository {
     private static final String TEXTURES = "textures";
     private static final String CLOSET = "closet";
     private static final String OPTIONS = "options";
+    private static final String OPTION_MAX_PLAYERS = "maxPlayersPerUser";
+    private static final String OPTION_PUBLIC_UPLOAD = "allowPublicUpload";
+    private static final String OPTION_SITE_NOTICE = "siteNotice";
 
     private final PluginDocumentStore documents;
     private final PluginFileStore files;
@@ -104,12 +109,29 @@ public class BlessingSkinRepository {
         return Optional.of(files.get(texture.objectKey()));
     }
 
-    public void saveClosetItem(String userId, String textureHash, String itemName) {
+    public SkinClosetItem saveClosetItem(String userId, String textureHash, String itemName) {
+        return saveClosetItem(new SkinClosetItem(closetId(userId, textureHash), userId, textureHash, itemName, System.currentTimeMillis()));
+    }
+
+    public SkinClosetItem saveClosetItem(SkinClosetItem item) {
         Map<String, Object> document = new LinkedHashMap<>();
-        document.put("userId", userId);
-        document.put("textureHash", textureHash);
-        document.put("itemName", itemName);
-        documents.save(CLOSET, userId + ":" + textureHash, document);
+        document.put("userId", item.userId());
+        document.put("textureHash", item.textureHash());
+        document.put("itemName", item.itemName());
+        document.put("createdAt", item.createdAt());
+        return toClosetItem(documents.save(CLOSET, item.id(), document));
+    }
+
+    public List<SkinClosetItem> listClosetItems(int page, int size) {
+        return documents.findAll(CLOSET, page, size).stream().map(this::toClosetItem).toList();
+    }
+
+    public List<SkinClosetItem> findClosetByUser(String userId, int page, int size) {
+        return documents.findByField(CLOSET, "userId", userId, page, size).stream().map(this::toClosetItem).toList();
+    }
+
+    public void deleteClosetItem(String id) {
+        documents.delete(CLOSET, id);
     }
 
     public long closetCount() {
@@ -121,6 +143,23 @@ public class BlessingSkinRepository {
         document.put("key", key);
         document.put("value", value);
         documents.save(OPTIONS, key, document);
+    }
+
+    public SkinSiteSettings settings() {
+        SkinSiteSettings defaults = SkinSiteSettings.defaults();
+        return new SkinSiteSettings(
+                intOption(OPTION_MAX_PLAYERS, defaults.maxPlayersPerUser()),
+                boolOption(OPTION_PUBLIC_UPLOAD, defaults.allowPublicUpload()),
+                optionValue(OPTION_SITE_NOTICE, defaults.siteNotice())
+        );
+    }
+
+    public SkinSiteSettings saveSettings(SkinSiteSettings settings) {
+        SkinSiteSettings normalized = settings == null ? SkinSiteSettings.defaults() : settings;
+        saveOption(OPTION_MAX_PLAYERS, String.valueOf(normalized.safeMaxPlayersPerUser()));
+        saveOption(OPTION_PUBLIC_UPLOAD, String.valueOf(normalized.publicUploadEnabled()));
+        saveOption(OPTION_SITE_NOTICE, normalized.siteNotice() == null ? "" : normalized.siteNotice());
+        return settings();
     }
 
     public long optionCount() {
@@ -207,6 +246,16 @@ public class BlessingSkinRepository {
         );
     }
 
+    private SkinClosetItem toClosetItem(Map<String, Object> document) {
+        return new SkinClosetItem(
+                string(document, "id"),
+                string(document, "userId"),
+                string(document, "textureHash"),
+                string(document, "itemName"),
+                number(document, "createdAt")
+        );
+    }
+
     private String string(Map<String, Object> document, String key) {
         Object value = document.get(key);
         return value == null ? null : String.valueOf(value);
@@ -231,11 +280,32 @@ public class BlessingSkinRepository {
         return value == null ? null : Boolean.parseBoolean(String.valueOf(value));
     }
 
+    private String optionValue(String key, String defaultValue) {
+        return documents.findById(OPTIONS, key)
+                .map(document -> string(document, "value"))
+                .filter(value -> !value.isBlank())
+                .orElse(defaultValue);
+    }
+
+    private Integer intOption(String key, Integer defaultValue) {
+        String value = optionValue(key, defaultValue == null ? null : String.valueOf(defaultValue));
+        return value == null || value.isBlank() ? defaultValue : Integer.parseInt(value);
+    }
+
+    private Boolean boolOption(String key, Boolean defaultValue) {
+        String value = optionValue(key, defaultValue == null ? null : String.valueOf(defaultValue));
+        return value == null || value.isBlank() ? defaultValue : Boolean.parseBoolean(value);
+    }
+
     private String lower(String value) {
         return value == null ? null : value.trim().toLowerCase();
     }
 
     private String normalizeUuid(String uuid) {
         return uuid == null ? null : uuid.replace("-", "");
+    }
+
+    private String closetId(String userId, String textureHash) {
+        return userId + ":" + textureHash;
     }
 }

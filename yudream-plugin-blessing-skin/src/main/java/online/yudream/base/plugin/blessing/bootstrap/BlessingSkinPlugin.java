@@ -27,15 +27,56 @@ import online.yudream.base.plugin.spi.system.skin.PluginSkinService;
         @PluginPermission(code = BlessingSkinPlugin.VIEW_PERMISSION, name = "查看皮肤站", module = "平台插件", description = "查看皮肤站用户、角色和材质"),
         @PluginPermission(code = BlessingSkinPlugin.MANAGE_PERMISSION, name = "管理皮肤站", module = "平台插件", description = "管理皮肤站用户、角色、材质和迁移任务")
 })
-@PluginFrontend(moduleName = "blessingSkin", routes = {
+@PluginFrontend(
+        moduleName = "blessingSkin",
+        menuTitle = "皮肤",
+        menuIcon = "i-ri:t-shirt-2-line",
+        menuSort = 19,
+        routes = {
         @PluginRoute(
-                path = "/platform/plugins/blessing-skin",
-                name = "platform-plugin-blessing-skin",
-                title = "皮肤站",
+                path = "/platform/plugins/blessing-skin/dashboard",
+                name = "platform-plugin-blessing-skin-dashboard",
+                title = "仪表盘",
+                icon = "i-ri:dashboard-3-line",
+                component = "blessing-skin/Dashboard",
+                permission = BlessingSkinPlugin.VIEW_PERMISSION,
+                sort = 50
+        ),
+        @PluginRoute(
+                path = "/platform/plugins/blessing-skin/players",
+                name = "platform-plugin-blessing-skin-players",
+                title = "角色管理",
+                icon = "i-ri:gamepad-line",
+                component = "blessing-skin/Players",
+                permission = BlessingSkinPlugin.VIEW_PERMISSION,
+                sort = 40
+        ),
+        @PluginRoute(
+                path = "/platform/plugins/blessing-skin/textures",
+                name = "platform-plugin-blessing-skin-textures",
+                title = "皮肤库",
                 icon = "i-ri:t-shirt-2-line",
-                component = "blessing-skin/Home",
+                component = "blessing-skin/Textures",
+                permission = BlessingSkinPlugin.VIEW_PERMISSION,
+                sort = 30
+        ),
+        @PluginRoute(
+                path = "/platform/plugins/blessing-skin/closet",
+                name = "platform-plugin-blessing-skin-closet",
+                title = "衣柜管理",
+                icon = "i-ri:archive-drawer-line",
+                component = "blessing-skin/Closet",
                 permission = BlessingSkinPlugin.VIEW_PERMISSION,
                 sort = 20
+        ),
+        @PluginRoute(
+                path = "/platform/plugins/blessing-skin/system",
+                name = "platform-plugin-blessing-skin-system",
+                title = "系统管理",
+                icon = "i-ri:settings-3-line",
+                component = "blessing-skin/System",
+                permission = BlessingSkinPlugin.MANAGE_PERMISSION,
+                sort = 10
         )
 })
 public class BlessingSkinPlugin implements YuDreamPlugin {
@@ -111,6 +152,31 @@ public class BlessingSkinPlugin implements YuDreamPlugin {
     @PluginHttpEndpoint(method = "GET", path = "/textures/{hash}", wrapResult = false)
     public PluginHttpResponse textureContent(PluginHttpRequest request) {
         return http.textureContent(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/closet", permission = VIEW_PERMISSION)
+    public PluginHttpResponse closet(PluginHttpRequest request) {
+        return http.closet(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/closet", permission = MANAGE_PERMISSION)
+    public PluginHttpResponse saveClosetItem(PluginHttpRequest request) {
+        return http.saveClosetItem(request);
+    }
+
+    @PluginHttpEndpoint(method = "DELETE", path = "/closet/{id}", permission = MANAGE_PERMISSION)
+    public PluginHttpResponse deleteClosetItem(PluginHttpRequest request) {
+        return http.deleteClosetItem(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/settings", permission = VIEW_PERMISSION)
+    public PluginHttpResponse settings() {
+        return http.settings();
+    }
+
+    @PluginHttpEndpoint(method = "PUT", path = "/settings", permission = MANAGE_PERMISSION)
+    public PluginHttpResponse saveSettings(PluginHttpRequest request) {
+        return http.saveSettings(request);
     }
 
     @PluginHttpEndpoint(method = "GET", path = "/csl/{name}", wrapResult = false)

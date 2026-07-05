@@ -60,6 +60,9 @@ public class PluginWebAssembler {
                 .moduleName(dto.getModuleName())
                 .sdkVersion(dto.getSdkVersion())
                 .integrity(dto.getIntegrity())
+                .menuTitle(dto.getMenuTitle())
+                .menuIcon(dto.getMenuIcon())
+                .menuSort(dto.getMenuSort())
                 .routes(dto.getRoutes().stream().map(PluginWebAssembler::toRes).toList())
                 .build();
     }

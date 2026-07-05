@@ -1,19 +1,24 @@
 package online.yudream.base.plugin.blessing.application.service;
 
+import online.yudream.base.plugin.blessing.application.cmd.AssignTextureCmd;
+import online.yudream.base.plugin.blessing.application.cmd.ClosetItemSaveCmd;
+import online.yudream.base.plugin.blessing.application.cmd.CreatePlayerCmd;
+import online.yudream.base.plugin.blessing.application.cmd.CreateSkinUserCmd;
+import online.yudream.base.plugin.blessing.application.cmd.MigrationCmd;
+import online.yudream.base.plugin.blessing.application.cmd.SkinSettingsSaveCmd;
+import online.yudream.base.plugin.blessing.application.cmd.TextureUploadCmd;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinPlayer;
+import online.yudream.base.plugin.blessing.domain.aggregate.SkinClosetItem;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinTexture;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinUser;
 import online.yudream.base.plugin.blessing.domain.enumerate.SkinTextureType;
+import online.yudream.base.plugin.blessing.domain.valobj.MigrationConfig;
 import online.yudream.base.plugin.blessing.domain.valobj.MigrationReport;
+import online.yudream.base.plugin.blessing.domain.valobj.SkinSiteSettings;
 import online.yudream.base.plugin.blessing.infrastructure.repository.BlessingSkinRepository;
 import online.yudream.base.plugin.blessing.infrastructure.service.BlessingSkinMigrationService;
 import online.yudream.base.plugin.blessing.infrastructure.service.SkinPasswordService;
 import online.yudream.base.plugin.blessing.infrastructure.support.HashSupport;
-import online.yudream.base.plugin.blessing.interfaces.request.AssignTextureRequest;
-import online.yudream.base.plugin.blessing.interfaces.request.CreatePlayerRequest;
-import online.yudream.base.plugin.blessing.interfaces.request.CreateSkinUserRequest;
-import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
-import online.yudream.base.plugin.blessing.interfaces.request.TextureUploadRequest;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinProfile;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinService;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinTexture;
@@ -41,26 +46,26 @@ public class BlessingSkinAppService implements PluginSkinService {
 
     public Object summary() {
         return new Summary(repository.userCount(), repository.playerCount(), repository.textureCount(),
-                repository.closetCount(), repository.optionCount());
+                repository.closetCount(), repository.optionCount(), settings());
     }
 
     public List<SkinUser> listUsers(int page, int size) {
         return repository.listUsers(page, size);
     }
 
-    public SkinUser createUser(CreateSkinUserRequest request) {
-        requireText(request.email(), "邮箱不能为空");
-        requireText(request.password(), "密码不能为空");
-        repository.findUserByEmail(request.email()).ifPresent(ignored -> {
+    public SkinUser createUser(CreateSkinUserCmd cmd) {
+        requireText(cmd.email(), "邮箱不能为空");
+        requireText(cmd.password(), "密码不能为空");
+        repository.findUserByEmail(cmd.email()).ifPresent(ignored -> {
             throw new IllegalArgumentException("邮箱已存在");
         });
-        String nickname = hasText(request.nickname()) ? request.nickname().trim() : request.email();
+        String nickname = hasText(cmd.nickname()) ? cmd.nickname().trim() : cmd.email();
         SkinUser user = new SkinUser(
                 UUID.randomUUID().toString(),
-                request.email().trim(),
-                request.email().trim().toLowerCase(Locale.ROOT),
+                cmd.email().trim(),
+                cmd.email().trim().toLowerCase(Locale.ROOT),
                 nickname,
-                passwordService.hash(request.password()),
+                passwordService.hash(cmd.password()),
                 null,
                 System.currentTimeMillis()
         );
@@ -75,14 +80,18 @@ public class BlessingSkinAppService implements PluginSkinService {
         return repository.findPlayerByName(name);
     }
 
-    public SkinPlayer createPlayer(CreatePlayerRequest request, Long currentUserId) {
-        String name = requireText(request.name(), "角色名不能为空");
+    public SkinPlayer createPlayer(CreatePlayerCmd cmd, Long currentUserId) {
+        String name = requireText(cmd.name(), "角色名不能为空");
         repository.findPlayerByName(name).ifPresent(ignored -> {
             throw new IllegalArgumentException("角色名已存在");
         });
-        String ownerId = hasText(request.ownerId())
-                ? request.ownerId().trim()
+        String ownerId = hasText(cmd.ownerId())
+                ? cmd.ownerId().trim()
                 : currentUserId == null ? "system" : String.valueOf(currentUserId);
+        int maxPlayers = settings().safeMaxPlayersPerUser();
+        if (maxPlayers > 0 && repository.findPlayersByOwner(ownerId).size() >= maxPlayers) {
+            throw new IllegalArgumentException("当前用户最多只能拥有 " + maxPlayers + " 个角色");
+        }
         return repository.savePlayer(new SkinPlayer(
                 HashSupport.playerUuid(name),
                 ownerId,
@@ -95,11 +104,11 @@ public class BlessingSkinAppService implements PluginSkinService {
         ));
     }
 
-    public SkinPlayer assignTextures(String playerName, AssignTextureRequest request) {
+    public SkinPlayer assignTextures(String playerName, AssignTextureCmd cmd) {
         SkinPlayer player = repository.findPlayerByName(playerName)
                 .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
-        String skinHash = blankToNull(request.skinHash());
-        String capeHash = blankToNull(request.capeHash());
+        String skinHash = blankToNull(cmd.skinHash());
+        String capeHash = blankToNull(cmd.capeHash());
         if (skinHash != null) {
             requireTexture(skinHash);
         }
@@ -113,29 +122,63 @@ public class BlessingSkinAppService implements PluginSkinService {
         return repository.listTextures(page, size);
     }
 
-    public SkinTexture uploadTexture(TextureUploadRequest request, Long currentUserId) {
-        byte[] bytes = Base64.getDecoder().decode(requireText(request.base64(), "材质 base64 不能为空"));
+    public SkinTexture uploadTexture(TextureUploadCmd cmd, Long currentUserId) {
+        byte[] bytes = Base64.getDecoder().decode(requireText(cmd.base64(), "材质 base64 不能为空"));
         String hash = HashSupport.sha256(bytes);
-        SkinTextureType type = SkinTextureType.from(hasText(request.model()) ? request.model() : request.type());
-        String contentType = hasText(request.contentType()) ? request.contentType() : "image/png";
+        SkinTextureType type = SkinTextureType.from(hasText(cmd.model()) ? cmd.model() : cmd.type());
+        String contentType = hasText(cmd.contentType()) ? cmd.contentType() : "image/png";
         String objectKey = repository.saveTextureFile(hash, bytes, contentType);
+        boolean publicAccess = settings().publicUploadEnabled() && (cmd.publicAccess() == null || cmd.publicAccess());
         return repository.saveTexture(new SkinTexture(
                 hash,
-                hasText(request.name()) ? request.name().trim() : hash,
+                hasText(cmd.name()) ? cmd.name().trim() : hash,
                 type.yggdrasilType(),
                 type.model(),
                 contentType,
                 (long) bytes.length,
-                hasText(request.uploaderId()) ? request.uploaderId() : currentUserId == null ? "system" : String.valueOf(currentUserId),
-                request.publicAccess() == null || request.publicAccess(),
+                hasText(cmd.uploaderId()) ? cmd.uploaderId() : currentUserId == null ? "system" : String.valueOf(currentUserId),
+                publicAccess,
                 objectKey,
                 null,
                 System.currentTimeMillis()
         ));
     }
 
-    public MigrationReport migrate(MigrationRequest request) {
-        return migrationService.migrate(request);
+    public List<SkinClosetItem> listCloset(String userId, int page, int size) {
+        return hasText(userId) ? repository.findClosetByUser(userId.trim(), page, size) : repository.listClosetItems(page, size);
+    }
+
+    public SkinClosetItem saveClosetItem(ClosetItemSaveCmd cmd, Long currentUserId) {
+        String userId = hasText(cmd.userId()) ? cmd.userId().trim() : currentUserId == null ? "system" : String.valueOf(currentUserId);
+        String textureHash = requireText(cmd.textureHash(), "材质不能为空");
+        SkinTexture texture = requireTexture(textureHash);
+        return repository.saveClosetItem(userId, texture.hash(), hasText(cmd.itemName()) ? cmd.itemName().trim() : texture.name());
+    }
+
+    public void deleteClosetItem(String id) {
+        repository.deleteClosetItem(requireText(id, "衣柜项不能为空"));
+    }
+
+    public SkinSiteSettings settings() {
+        return repository.settings();
+    }
+
+    public SkinSiteSettings saveSettings(SkinSettingsSaveCmd cmd) {
+        int maxPlayers = cmd.maxPlayersPerUser() == null ? SkinSiteSettings.defaults().maxPlayersPerUser() : cmd.maxPlayersPerUser();
+        if (maxPlayers < 0) {
+            throw new IllegalArgumentException("最多角色数不能小于 0");
+        }
+        return repository.saveSettings(new SkinSiteSettings(maxPlayers, cmd.allowPublicUpload(), cmd.siteNotice()));
+    }
+
+    public MigrationReport migrate(MigrationCmd cmd) {
+        return migrationService.migrate(new MigrationConfig(
+                cmd.driverClass(),
+                cmd.jdbcUrl(),
+                cmd.username(),
+                cmd.password(),
+                cmd.textureBaseDir()
+        ));
     }
 
     @Override
@@ -240,6 +283,6 @@ public class BlessingSkinAppService implements PluginSkinService {
         return hasText(value) ? value.trim() : null;
     }
 
-    public record Summary(long users, long players, long textures, long closetItems, long options) {
+    public record Summary(long users, long players, long textures, long closetItems, long options, SkinSiteSettings settings) {
     }
 }

@@ -36,6 +36,9 @@ export interface PluginFrontendModule {
   moduleName?: string
   sdkVersion?: string
   integrity?: string
+  menuTitle?: string
+  menuIcon?: string
+  menuSort?: number
   routes: PluginFrontendRoute[]
 }
 

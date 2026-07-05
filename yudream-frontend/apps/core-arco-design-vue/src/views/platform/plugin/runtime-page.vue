@@ -25,6 +25,11 @@ const builtinComponent = computed<Component | null>(() => {
   const component = plugin.value.component || ''
   const map: Record<string, Component> = {
     'blessing-skin/Home': BlessingSkinBuiltin,
+    'blessing-skin/Dashboard': BlessingSkinBuiltin,
+    'blessing-skin/Players': BlessingSkinBuiltin,
+    'blessing-skin/Textures': BlessingSkinBuiltin,
+    'blessing-skin/Closet': BlessingSkinBuiltin,
+    'blessing-skin/System': BlessingSkinBuiltin,
     'authlib-injector/Home': AuthlibInjectorBuiltin,
   }
   return map[component] || null
