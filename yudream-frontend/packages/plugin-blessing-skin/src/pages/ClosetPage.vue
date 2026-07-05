@@ -20,7 +20,7 @@
         </template>
         <div class="skin-card-grid closet">
           <button
-            v-for="item in model.closetItems"
+            v-for="item in pagedClosetItems"
             :key="item.id"
             type="button"
             class="skin-texture-card"
@@ -41,6 +41,16 @@
           </button>
           <div v-if="!model.closetItems.length" class="empty-state">衣柜还是空的，可以先到皮肤库收藏或上传材质。</div>
         </div>
+        <FaPagination
+          v-if="model.closetItems.length"
+          v-model:page="closetPagination.page"
+          v-model:size="closetPagination.size"
+          :total="model.closetItems.length"
+          :sizes="closetPageSizes"
+          class="skin-list-pagination"
+          layout="total, sizes, ->, pager"
+          @size-change="onClosetPageSizeChange"
+        />
       </SkinPanel>
 
       <aside class="skin-inspector">
@@ -155,8 +165,8 @@
 <script setup lang="ts">
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
 import type { SkinClosetItem } from '../types'
-import { computed, ref } from 'vue'
-import { FaButton, FaIcon, FaInput, FaModal, FaTag, FaTooltip } from '@fantastic-admin/components'
+import { computed, reactive, ref, watch } from 'vue'
+import { FaButton, FaIcon, FaInput, FaModal, FaPagination, FaTag, FaTooltip } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
 import SkinTexturePreview from '../components/SkinTexturePreview.vue'
@@ -166,6 +176,23 @@ const props = defineProps<{
 }>()
 
 const renameVisible = ref(false)
+const closetPageSizes = [12, 24, 48, 96]
+const closetPagination = reactive({ page: 1, size: 12 })
+
+const pagedClosetItems = computed(() => {
+  const start = (closetPagination.page - 1) * closetPagination.size
+  return props.model.closetItems.slice(start, start + closetPagination.size)
+})
+
+const closetTotalPages = computed(() => {
+  return Math.max(1, Math.ceil(props.model.closetItems.length / closetPagination.size))
+})
+
+watch(closetTotalPages, (totalPages) => {
+  if (closetPagination.page > totalPages) {
+    closetPagination.page = totalPages
+  }
+})
 
 const selectedTitle = computed(() => {
   return props.model.selectedClosetItem?.itemName || '选择衣柜项'
@@ -218,6 +245,10 @@ function openRename() {
 
 function closetTexture(item: SkinClosetItem) {
   return props.model.textures.find(texture => texture.hash === item.textureHash)
+}
+
+function onClosetPageSizeChange() {
+  closetPagination.page = 1
 }
 
 async function submitRename() {
