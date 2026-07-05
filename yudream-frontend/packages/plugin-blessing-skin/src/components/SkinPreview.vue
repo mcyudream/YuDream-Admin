@@ -37,8 +37,8 @@
         :enable-rotate="controls"
         :enable-zoom="controls"
         :enable-pan="false"
-        :global-light="0.9"
-        :camera-light="0.35"
+        :global-light="1.05"
+        :camera-light="0.7"
         :zoom="zoom"
         :background="{ type: 'color', value: backgroundValue }"
       />
@@ -56,7 +56,7 @@
 
 <script setup lang="ts">
 import type { SkinViewer } from 'skinview3d'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { SkinView3d, type CapeOptions, type SkinOptions } from 'vue-skinview3d'
 import { IdleAnimation, RunningAnimation, WalkingAnimation } from 'vue-skinview3d/animations'
 
@@ -80,15 +80,29 @@ const props = withDefaults(defineProps<{
   view: 'front',
 })
 
-const backgrounds = [
-  { label: '浅色', color: '#f4f7fb', value: 0xf4f7fb },
-  { label: '深色', color: '#1f2937', value: 0x1f2937 },
-  { label: '草地', color: '#dceccd', value: 0xdceccd },
+interface PreviewBackground {
+  label: string
+  color: string
+  value: number
+}
+
+interface RgbColor {
+  r: number
+  g: number
+  b: number
+}
+
+const fallbackBackgrounds: PreviewBackground[] = [
+  { label: '主题', color: '#f5f5f6', value: 0xf5f5f6 },
+  { label: '柔和', color: '#fafafa', value: 0xfafafa },
+  { label: '对比', color: '#e7e7ea', value: 0xe7e7ea },
 ]
-const backgroundValue = ref(backgrounds[0].value)
+const backgrounds = ref<PreviewBackground[]>(fallbackBackgrounds)
+const backgroundValue = ref(fallbackBackgrounds[0].value)
 const rotateEnabled = ref(props.autoRotate)
 const animationIndex = ref(0)
 const viewerRef = ref<InstanceType<typeof SkinView3d> | null>(null)
+let themeObserver: MutationObserver | null = null
 const animations = [
   { label: '待机', create: () => new IdleAnimation() },
   { label: '行走', create: () => new WalkingAnimation() },
@@ -121,7 +135,18 @@ const viewRotation = computed(() => {
 })
 
 onMounted(() => {
+  syncThemeBackgrounds()
+  themeObserver = new MutationObserver(syncThemeBackgrounds)
+  themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] })
+  if (document.body) {
+    themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] })
+  }
   void applyView()
+})
+
+onBeforeUnmount(() => {
+  themeObserver?.disconnect()
+  themeObserver = null
 })
 
 watch([viewRotation, rotateEnabled, () => props.skin, () => props.cape], () => {
@@ -149,6 +174,67 @@ function resolveViewer(): SkinViewer | null {
     return (exposed as { value?: SkinViewer | null }).value || null
   }
   return exposed as SkinViewer
+}
+
+function syncThemeBackgrounds() {
+  const styles = getComputedStyle(document.documentElement)
+  const surface = readThemeColor(styles, '--color-bg-2', { r: 245, g: 245, b: 246 })
+  const fill = readThemeColor(styles, '--color-fill-1', surface)
+  const text = readThemeColor(styles, '--color-text-1', { r: 32, g: 34, b: 37 })
+  const currentIndex = backgrounds.value.findIndex(item => item.value === backgroundValue.value)
+  const nextBackgrounds = [
+    toPreviewBackground('主题', fill),
+    toPreviewBackground('柔和', mixColor(surface, fill, 0.62)),
+    toPreviewBackground('对比', mixColor(surface, text, 0.12)),
+  ]
+  backgrounds.value = nextBackgrounds
+  if (currentIndex >= 0) {
+    backgroundValue.value = nextBackgrounds[Math.min(currentIndex, nextBackgrounds.length - 1)].value
+  }
+}
+
+function readThemeColor(styles: CSSStyleDeclaration, name: string, fallback: RgbColor): RgbColor {
+  return parseCssColor(styles.getPropertyValue(name)) || fallback
+}
+
+function parseCssColor(value: string): RgbColor | null {
+  const text = value.trim()
+  const hex = text.match(/^#([\da-f]{3}|[\da-f]{6})$/i)
+  if (hex) {
+    const full = hex[1].length === 3
+      ? hex[1].split('').map(item => item + item).join('')
+      : hex[1]
+    return {
+      r: Number.parseInt(full.slice(0, 2), 16),
+      g: Number.parseInt(full.slice(2, 4), 16),
+      b: Number.parseInt(full.slice(4, 6), 16),
+    }
+  }
+  const rgb = text.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i) || text.match(/^(\d+),\s*(\d+),\s*(\d+)$/)
+  if (!rgb) {
+    return null
+  }
+  return {
+    r: Number(rgb[1]),
+    g: Number(rgb[2]),
+    b: Number(rgb[3]),
+  }
+}
+
+function mixColor(base: RgbColor, overlay: RgbColor, ratio: number): RgbColor {
+  return {
+    r: Math.round(base.r * (1 - ratio) + overlay.r * ratio),
+    g: Math.round(base.g * (1 - ratio) + overlay.g * ratio),
+    b: Math.round(base.b * (1 - ratio) + overlay.b * ratio),
+  }
+}
+
+function toPreviewBackground(label: string, color: RgbColor): PreviewBackground {
+  return {
+    label,
+    color: `rgb(${color.r}, ${color.g}, ${color.b})`,
+    value: (color.r << 16) + (color.g << 8) + color.b,
+  }
 }
 
 function nextAnimation() {

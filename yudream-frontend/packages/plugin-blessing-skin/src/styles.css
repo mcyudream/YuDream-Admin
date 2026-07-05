@@ -1,6 +1,9 @@
 .skin-plugin {
   display: grid;
   gap: 14px;
+  --skin-accent-soft: rgba(var(--primary-6), 0.06);
+  --skin-accent-border: rgba(var(--primary-6), 0.28);
+  --skin-surface-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .skin-page {
@@ -16,9 +19,8 @@
   padding: 16px 18px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
-  background:
-    linear-gradient(135deg, rgba(var(--primary-6), 0.10), transparent 42%),
-    var(--color-bg-2);
+  background: var(--color-bg-2);
+  box-shadow: var(--skin-surface-shadow);
 }
 
 .skin-command-bar span {
@@ -71,8 +73,9 @@
 
 .skin-primary-link {
   padding: 0 14px;
-  background: var(--color-text-1);
-  color: var(--color-bg-1);
+  border: 1px solid var(--skin-accent-border);
+  background: var(--skin-accent-soft);
+  color: rgb(var(--primary-6));
 }
 
 .skin-secondary-link,
@@ -86,7 +89,19 @@
 .skin-primary-link:hover,
 .skin-secondary-link:hover,
 .skin-next-actions a:hover {
-  opacity: 0.9;
+  border-color: var(--skin-accent-border);
+  background: var(--color-fill-2);
+}
+
+.skin-plugin .bg-primary {
+  border: 1px solid var(--skin-accent-border) !important;
+  background: var(--skin-accent-soft) !important;
+  color: rgb(var(--primary-6)) !important;
+  box-shadow: none !important;
+}
+
+.skin-plugin .bg-primary:hover {
+  background: var(--color-fill-2) !important;
 }
 
 .skin-dashboard {
@@ -101,9 +116,8 @@
   padding: 18px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
-  background:
-    linear-gradient(135deg, rgba(var(--primary-6), 0.09), transparent 46%),
-    var(--color-bg-2);
+  background: var(--color-bg-2);
+  box-shadow: var(--skin-surface-shadow);
 }
 
 .skin-dashboard-hero__copy {
@@ -189,9 +203,7 @@
   min-height: 300px;
   place-items: center;
   border-radius: 6px;
-  background:
-    radial-gradient(circle at 50% 38%, rgba(var(--primary-6), 0.12), transparent 54%),
-    var(--color-fill-1);
+  background: var(--color-fill-1);
 }
 
 .skin-current-card__body {
@@ -248,7 +260,7 @@
 }
 
 .skin-mini-row:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   background: var(--color-fill-2);
 }
 
@@ -328,7 +340,7 @@
 
 .skin-texture-card.active,
 .skin-texture-card:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   background: var(--color-fill-2);
 }
 
@@ -339,8 +351,8 @@
   overflow: hidden;
   border-radius: 5px;
   background:
-    linear-gradient(45deg, rgba(148, 163, 184, 0.08) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(148, 163, 184, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, rgba(128, 128, 128, 0.06) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(128, 128, 128, 0.06) 25%, transparent 25%),
     var(--color-fill-2);
   background-size: 18px 18px;
 }
@@ -450,7 +462,7 @@
 
 .skin-role-item.active,
 .skin-role-item:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   background: var(--color-fill-2);
 }
 
@@ -604,7 +616,7 @@
 
 .list-row.active,
 .list-row:not(.static):hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   background: var(--color-fill-2);
 }
 
@@ -683,7 +695,7 @@
 
 .texture-card.active,
 .texture-card:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   background: var(--color-fill-2);
 }
 
@@ -726,7 +738,7 @@
 
 .closet-card.active,
 .closet-card:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   background: var(--color-fill-2);
 }
 
@@ -767,9 +779,7 @@
   padding: 12px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
-  background:
-    linear-gradient(90deg, rgba(var(--primary-6), 0.05), transparent),
-    var(--color-bg-1);
+  background: var(--color-bg-1);
 }
 
 .skin-preview.compact {
@@ -810,7 +820,7 @@
 
 .skin-preview__actions button.active,
 .skin-preview__actions button:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--skin-accent-border);
   color: rgb(var(--primary-6));
 }
 
