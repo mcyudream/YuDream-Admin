@@ -432,6 +432,9 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
     if (!userId) {
       return '-'
     }
+    if (userId === currentUserId.value) {
+      return accountName.value
+    }
     const user = users.value.find(item => item.id === userId)
     return user ? `${user.nickname || user.email}` : userId
   }
