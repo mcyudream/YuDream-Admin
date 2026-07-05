@@ -4,6 +4,7 @@ import online.yudream.base.plugin.blessing.application.cmd.AssignTextureCmd;
 import online.yudream.base.plugin.blessing.application.cmd.ClosetItemSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreatePlayerCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreateSkinUserCmd;
+import online.yudream.base.plugin.blessing.application.cmd.DefaultPlayerSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.MigrationCmd;
 import online.yudream.base.plugin.blessing.application.cmd.RenameClosetItemCmd;
 import online.yudream.base.plugin.blessing.application.cmd.RenamePlayerCmd;
@@ -91,6 +92,24 @@ public class BlessingSkinAppService implements PluginSkinService {
         return repository.findPlayerByName(name);
     }
 
+    public Optional<SkinPlayer> defaultPlayer(String ownerId) {
+        String userId = requireText(ownerId, "用户不能为空");
+        return repository.findDefaultPlayerUuid(userId)
+                .flatMap(repository::findPlayerByUuid)
+                .filter(player -> userId.equals(player.ownerId()));
+    }
+
+    public SkinPlayer setDefaultPlayer(String ownerId, DefaultPlayerSaveCmd cmd) {
+        String userId = requireText(ownerId, "用户不能为空");
+        SkinPlayer player = repository.findPlayerByName(requireText(cmd.name(), "角色名不能为空"))
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + cmd.name()));
+        if (!userId.equals(player.ownerId())) {
+            throw new IllegalArgumentException("只能设置自己的角色为默认角色");
+        }
+        repository.saveDefaultPlayerUuid(userId, player.uuid());
+        return player;
+    }
+
     public SkinPlayer createPlayer(CreatePlayerCmd cmd, Long currentUserId) {
         String name = requireText(cmd.name(), "角色名不能为空");
         repository.findPlayerByName(name).ifPresent(ignored -> {
@@ -103,7 +122,7 @@ public class BlessingSkinAppService implements PluginSkinService {
         if (maxPlayers > 0 && repository.findPlayersByOwner(ownerId).size() >= maxPlayers) {
             throw new IllegalArgumentException("当前用户最多只能拥有 " + maxPlayers + " 个角色");
         }
-        return repository.savePlayer(new SkinPlayer(
+        SkinPlayer player = repository.savePlayer(new SkinPlayer(
                 HashSupport.playerUuid(name),
                 ownerId,
                 name,
@@ -113,6 +132,10 @@ public class BlessingSkinAppService implements PluginSkinService {
                 null,
                 System.currentTimeMillis()
         ));
+        if (defaultPlayer(ownerId).isEmpty()) {
+            repository.saveDefaultPlayerUuid(ownerId, player.uuid());
+        }
+        return player;
     }
 
     public SkinPlayer assignTextures(String playerName, AssignTextureCmd cmd) {
@@ -171,15 +194,22 @@ public class BlessingSkinAppService implements PluginSkinService {
     public void deletePlayer(String playerName) {
         SkinPlayer player = repository.findPlayerByName(playerName)
                 .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
+        repository.findDefaultPlayerUuid(player.ownerId())
+                .filter(uuid -> uuid.equalsIgnoreCase(player.uuid()))
+                .ifPresent(ignored -> repository.saveDefaultPlayerUuid(player.ownerId(), null));
         repository.deletePlayer(player.uuid());
     }
 
     public void deleteOwnPlayer(String playerName, String ownerId) {
         SkinPlayer player = repository.findPlayerByName(playerName)
                 .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
-        if (!player.ownerId().equals(requireText(ownerId, "用户不能为空"))) {
+        String userId = requireText(ownerId, "用户不能为空");
+        if (!player.ownerId().equals(userId)) {
             throw new IllegalArgumentException("只能操作自己的角色");
         }
+        repository.findDefaultPlayerUuid(userId)
+                .filter(uuid -> uuid.equalsIgnoreCase(player.uuid()))
+                .ifPresent(ignored -> repository.saveDefaultPlayerUuid(userId, null));
         repository.deletePlayer(player.uuid());
     }
 

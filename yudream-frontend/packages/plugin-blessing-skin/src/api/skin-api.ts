@@ -20,6 +20,7 @@ export function createSkinApi(sdk: YuDreamPluginSdk) {
     deletePlayer: (name: string) => sdk.http.request(`/me/players/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     deleteAdminPlayer: (name: string) => sdk.http.request(`/admin/players/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     assignTextures: (name: string, data: Record<string, unknown>) => sdk.http.request<SkinPlayer>(`/me/players/${encodeURIComponent(name)}/textures`, { method: 'PUT', data }),
+    setDefaultPlayer: (data: Record<string, unknown>) => sdk.http.request<SkinPlayer>('/me/default-player', { method: 'PUT', data }),
     assignAdminTextures: (name: string, data: Record<string, unknown>) => sdk.http.request<SkinPlayer>(`/admin/players/${encodeURIComponent(name)}/textures`, { method: 'PUT', data }),
     uploadTexture: (data: Record<string, unknown>) => sdk.http.post<SkinTexture>('/me/textures', data),
     saveClosetItem: (data: Record<string, unknown>) => sdk.http.post<SkinClosetItem>('/me/closet', data),

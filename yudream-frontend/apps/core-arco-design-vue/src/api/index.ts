@@ -51,11 +51,19 @@ function handleError(error: any) {
     useAppAccountStore().requestLogout()
   }
   else {
-    useFaToast().error('Error', {
-      description: error.message,
+    useFaToast().error('错误', {
+      description: errorMessage(error),
     })
   }
   return Promise.reject(error)
+}
+
+function errorMessage(error: any) {
+  const data = error?.response?.data
+  if (data && typeof data === 'object') {
+    return data.message || data.msg || data.error || data.data?.message || error.message || '请求失败'
+  }
+  return error?.message || '请求失败'
 }
 
 api.interceptors.response.use(

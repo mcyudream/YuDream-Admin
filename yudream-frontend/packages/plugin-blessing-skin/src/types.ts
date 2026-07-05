@@ -25,6 +25,7 @@ export interface SkinMe {
     avatar?: string
   }
   skinUser?: SkinUser
+  defaultPlayerName?: string
   permissions: string[]
   manage: boolean
 }

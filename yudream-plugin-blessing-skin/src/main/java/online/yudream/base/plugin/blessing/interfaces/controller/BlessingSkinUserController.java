@@ -39,6 +39,11 @@ public class BlessingSkinUserController {
         return http.assignMyTextures(request);
     }
 
+    @PluginHttpEndpoint(method = "PUT", path = "/me/default-player", permission = BlessingSkinPlugin.USER_PERMISSION)
+    public PluginHttpResponse saveMyDefaultPlayer(PluginHttpRequest request) {
+        return http.saveMyDefaultPlayer(request);
+    }
+
     @PluginHttpEndpoint(method = "DELETE", path = "/me/players/{name}", permission = BlessingSkinPlugin.USER_PERMISSION)
     public PluginHttpResponse deleteMyPlayer(PluginHttpRequest request) {
         return http.deleteMyPlayer(request);

@@ -7,6 +7,7 @@ import online.yudream.base.plugin.blessing.interfaces.request.AssignTextureReque
 import online.yudream.base.plugin.blessing.interfaces.request.ClosetItemSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreatePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreateSkinUserRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.DefaultPlayerSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.RenameClosetItemRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.RenamePlayerRequest;
@@ -51,6 +52,7 @@ public class BlessingSkinHttpFacade {
         body.put("userId", userId);
         body.put("hostUser", hostUserId == null ? null : framework.users().findById(hostUserId).orElse(null));
         body.put("skinUser", appService.findUser(userId).orElse(null));
+        body.put("defaultPlayerName", appService.defaultPlayer(userId).map(player -> player.name()).orElse(null));
         body.put("permissions", request.principal().permissions());
         body.put("manage", request.principal().hasPermission("plugin:blessing-skin:manage"));
         return PluginHttpResponse.ok(body);
@@ -131,6 +133,11 @@ public class BlessingSkinHttpFacade {
                 ownerId(request),
                 assembler.toCmd(body)
         ));
+    }
+
+    public PluginHttpResponse saveMyDefaultPlayer(PluginHttpRequest request) {
+        DefaultPlayerSaveRequest body = JsonSupport.read(request.body(), DefaultPlayerSaveRequest.class);
+        return PluginHttpResponse.ok(appService.setDefaultPlayer(ownerId(request), assembler.toCmd(body)));
     }
 
     public PluginHttpResponse textures(PluginHttpRequest request) {

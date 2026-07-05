@@ -4,7 +4,7 @@
       <div>
         <span>我的角色</span>
         <h2>{{ model.selectedPlayerName || '管理 Minecraft 角色' }}</h2>
-        <p>角色属于当前账号，换装只从自己的衣柜中选择，避免误用全站材质。</p>
+        <p>角色属于当前账号，默认角色会作为皮肤库与衣柜一键应用的目标。</p>
       </div>
       <FaButton variant="outline" :loading="model.loading" @click="model.load">
         <FaIcon name="i-ri:refresh-line" />
@@ -28,6 +28,18 @@
         <div class="skin-character-card__meta">
           <strong>{{ model.selectedPlayerName || '未选择角色' }}</strong>
           <span>{{ model.selectedPlayer?.uuid || '创建或选择一个角色后开始换装' }}</span>
+          <FaTag v-if="model.selectedPlayerName && model.defaultPlayerName === model.selectedPlayerName" variant="secondary">
+            默认角色
+          </FaTag>
+          <FaButton
+            v-else-if="model.selectedPlayer"
+            variant="outline"
+            :loading="model.saving === `default-player:${model.selectedPlayer.name}`"
+            @click="model.setDefaultPlayer(model.selectedPlayer)"
+          >
+            <FaIcon name="i-ri:star-line" />
+            设为默认角色
+          </FaButton>
         </div>
       </aside>
 
@@ -37,20 +49,38 @@
             <FaTag variant="secondary">{{ model.players.length }}</FaTag>
           </template>
           <div class="skin-role-list">
-            <button
+            <div
               v-for="player in model.players"
               :key="player.uuid"
-              type="button"
               class="skin-role-item"
-              :class="{ active: model.selectedPlayerName === player.name }"
-              @click="model.selectPlayer(player)"
+              :class="{ active: model.selectedPlayerName === player.name, 'is-default': model.defaultPlayerName === player.name }"
             >
-              <span>
-                <strong>{{ player.name }}</strong>
-                <small>{{ player.skinHash ? '已配置外观' : '待换装' }}</small>
-              </span>
-              <FaIcon name="i-ri:arrow-right-s-line" />
-            </button>
+              <button type="button" class="skin-role-select" @click="model.selectPlayer(player)">
+                <span class="skin-role-meta">
+                  <strong>{{ player.name }}</strong>
+                  <small>{{ player.skinHash ? '已配置外观' : '待换装' }}</small>
+                </span>
+                <span class="skin-role-badges">
+                  <FaTag v-if="model.defaultPlayerName === player.name" variant="secondary">默认</FaTag>
+                  <FaIcon name="i-ri:arrow-right-s-line" />
+                </span>
+              </button>
+              <FaTooltip :text="model.defaultPlayerName === player.name ? '当前默认角色' : '设为默认角色'" side="top">
+                <span class="skin-action-tooltip">
+                  <FaButton
+                    variant="ghost"
+                    size="icon-sm"
+                    class="skin-role-default"
+                    :disabled="model.defaultPlayerName === player.name"
+                    :loading="model.saving === `default-player:${player.name}`"
+                    aria-label="设为默认角色"
+                    @click="model.setDefaultPlayer(player)"
+                  >
+                    <FaIcon :name="model.defaultPlayerName === player.name ? 'i-ri:star-fill' : 'i-ri:star-line'" />
+                  </FaButton>
+                </span>
+              </FaTooltip>
+            </div>
             <div v-if="!model.players.length" class="empty-state">还没有角色，先创建一个 Minecraft ID。</div>
           </div>
 
@@ -108,7 +138,7 @@
 
 <script setup lang="ts">
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
-import { FaButton, FaIcon, FaInput, FaSelect, FaTag } from '@fantastic-admin/components'
+import { FaButton, FaIcon, FaInput, FaSelect, FaTag, FaTooltip } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
 

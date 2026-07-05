@@ -25,6 +25,7 @@ public class BlessingSkinRepository {
     private static final String OPTION_MAX_PLAYERS = "maxPlayersPerUser";
     private static final String OPTION_PUBLIC_UPLOAD = "allowPublicUpload";
     private static final String OPTION_SITE_NOTICE = "siteNotice";
+    private static final String OPTION_DEFAULT_PLAYER_PREFIX = "defaultPlayerUuid:";
 
     private final PluginDocumentStore documents;
     private final PluginFileStore files;
@@ -155,6 +156,23 @@ public class BlessingSkinRepository {
         document.put("key", key);
         document.put("value", value);
         documents.save(OPTIONS, key, document);
+    }
+
+    public void deleteOption(String key) {
+        documents.delete(OPTIONS, key);
+    }
+
+    public Optional<String> findDefaultPlayerUuid(String ownerId) {
+        return Optional.ofNullable(optionValue(defaultPlayerOptionKey(ownerId), null))
+                .filter(value -> !value.isBlank());
+    }
+
+    public void saveDefaultPlayerUuid(String ownerId, String uuid) {
+        if (uuid == null || uuid.isBlank()) {
+            deleteOption(defaultPlayerOptionKey(ownerId));
+            return;
+        }
+        saveOption(defaultPlayerOptionKey(ownerId), normalizeUuid(uuid));
     }
 
     public SkinSiteSettings settings() {
@@ -319,5 +337,9 @@ public class BlessingSkinRepository {
 
     private String closetId(String userId, String textureHash) {
         return userId + ":" + textureHash;
+    }
+
+    private String defaultPlayerOptionKey(String ownerId) {
+        return OPTION_DEFAULT_PLAYER_PREFIX + ownerId;
     }
 }

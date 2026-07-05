@@ -4,6 +4,7 @@ import online.yudream.base.plugin.blessing.application.cmd.AssignTextureCmd;
 import online.yudream.base.plugin.blessing.application.cmd.ClosetItemSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreatePlayerCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreateSkinUserCmd;
+import online.yudream.base.plugin.blessing.application.cmd.DefaultPlayerSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.MigrationCmd;
 import online.yudream.base.plugin.blessing.application.cmd.RenameClosetItemCmd;
 import online.yudream.base.plugin.blessing.application.cmd.RenamePlayerCmd;
@@ -13,6 +14,7 @@ import online.yudream.base.plugin.blessing.interfaces.request.AssignTextureReque
 import online.yudream.base.plugin.blessing.interfaces.request.ClosetItemSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreatePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreateSkinUserRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.DefaultPlayerSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.RenameClosetItemRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.RenamePlayerRequest;
@@ -39,6 +41,10 @@ public class BlessingSkinWebAssembler {
 
     public RenamePlayerCmd toCmd(RenamePlayerRequest request) {
         return new RenamePlayerCmd(request.name());
+    }
+
+    public DefaultPlayerSaveCmd toCmd(DefaultPlayerSaveRequest request) {
+        return new DefaultPlayerSaveCmd(request.name());
     }
 
     public TextureUploadCmd toCmd(TextureUploadRequest request) {
