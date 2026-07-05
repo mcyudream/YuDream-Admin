@@ -42,6 +42,7 @@ const emits = defineEmits<{
 }>()
 
 const value = defineModel<AcceptableValue>()
+const EMPTY_STRING_ITEM_VALUE = '__FA_SELECT_EMPTY_STRING__'
 
 const dir = useTextDirection({
   observe: true,
@@ -49,6 +50,25 @@ const dir = useTextDirection({
 
 watch(value, (newValue) => {
   emits('change', newValue)
+})
+
+function toSelectItemValue(itemValue: undefined): undefined
+function toSelectItemValue(itemValue: AcceptableValue): AcceptableValue
+function toSelectItemValue(itemValue: AcceptableValue | undefined) {
+  return itemValue === '' ? EMPTY_STRING_ITEM_VALUE : itemValue
+}
+
+function fromSelectItemValue(itemValue: AcceptableValue | undefined) {
+  return itemValue === EMPTY_STRING_ITEM_VALUE ? '' : itemValue
+}
+
+const selectValue = computed({
+  get() {
+    return value.value === undefined ? undefined : toSelectItemValue(value.value)
+  },
+  set(newValue) {
+    value.value = fromSelectItemValue(newValue)
+  },
 })
 
 const selectedOption = computed({
@@ -89,13 +109,13 @@ const selectedOption = computed({
     return null
   },
   set(val) {
-    value.value = val?.value || null
+    value.value = val ? val.value : undefined
   },
 })
 </script>
 
 <template>
-  <Select v-model="value" :multiple :disabled :dir="dir === 'ltr' ? 'ltr' : 'rtl'">
+  <Select v-model="selectValue" :multiple :disabled :dir="dir === 'ltr' ? 'ltr' : 'rtl'">
     <SelectTrigger :class="cn('w-[200px]', props.class)">
       <SelectValue :placeholder="props.placeholder" :selected-option="selectedOption?.label" />
     </SelectTrigger>
@@ -106,7 +126,7 @@ const selectedOption = computed({
           <SelectItem
             v-for="(item, index) in (option as GroupOption).options"
             :key="index"
-            :value="item.value"
+            :value="toSelectItemValue(item.value)"
             :disabled="item.disabled"
           >
             {{ item.label }}
@@ -114,7 +134,7 @@ const selectedOption = computed({
         </SelectGroup>
         <SelectItem
           v-else
-          :value="(option as Option).value"
+          :value="toSelectItemValue((option as Option).value)"
           :disabled="(option as Option).disabled"
         >
           {{ option.label }}

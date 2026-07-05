@@ -188,10 +188,10 @@
 
 .skin-current-card {
   display: grid;
-  grid-template-columns: minmax(280px, 0.58fr) minmax(0, 1fr);
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  min-height: 340px;
+  min-height: 430px;
   padding: 16px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
@@ -200,10 +200,9 @@
 
 .skin-current-card__preview {
   display: grid;
-  min-height: 300px;
+  width: 100%;
+  max-width: 100%;
   place-items: center;
-  border-radius: 6px;
-  background: var(--color-fill-1);
 }
 
 .skin-current-card__body {
@@ -248,7 +247,7 @@
 
 .skin-mini-row {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) auto;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
   padding: 8px;
@@ -264,13 +263,30 @@
   background: var(--color-fill-2);
 }
 
-.skin-mini-row img {
-  width: 42px;
-  height: 42px;
-  object-fit: contain;
-  image-rendering: pixelated;
+.skin-mini-preview {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  overflow: hidden;
   border-radius: 4px;
   background: var(--color-fill-2);
+}
+
+.skin-mini-preview .skin-texture-preview {
+  width: 100%;
+  height: 100%;
+  gap: 2px;
+  border-radius: 4px;
+}
+
+.skin-mini-preview .skin-texture-preview__label {
+  display: none;
+}
+
+.skin-mini-preview .skin-texture-preview__canvas {
+  max-width: 100%;
+  max-height: 50px;
 }
 
 .skin-mini-row span {
@@ -317,7 +333,7 @@
 
 .skin-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
   gap: 10px;
 }
 
@@ -358,7 +374,7 @@
 }
 
 .skin-texture-card__image.render {
-  height: 168px;
+  height: 152px;
   background: var(--color-bg-1);
 }
 
@@ -367,6 +383,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   justify-items: center;
+  gap: 8px;
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -389,35 +406,22 @@
   line-height: 1;
 }
 
-.skin-texture-preview canvas {
+.skin-texture-preview__canvas {
+  display: block;
   max-width: 100%;
+  max-height: 120px;
   filter: brightness(1.12) saturate(1.05);
+  image-rendering: pixelated;
 }
 
 .skin-texture-preview.cape {
-  padding: 18px 22px;
-  gap: 10px;
+  grid-template-columns: 1fr;
+  padding: 14px 18px;
 }
 
-.skin-texture-preview__cape {
-  display: grid;
-  width: 74px;
-  height: 116px;
-  place-items: center;
-  border-radius: 5px;
-  background: var(--color-bg-2);
-  box-shadow: inset 0 0 0 1px var(--color-border-2);
-}
-
-.skin-texture-preview__cape.back img {
-  transform: scaleX(-1);
-}
-
-.skin-texture-preview__cape img {
-  width: 88%;
-  height: 88%;
-  object-fit: contain;
-  image-rendering: pixelated;
+.skin-texture-preview__empty {
+  color: var(--color-text-3);
+  font-size: 12px;
 }
 
 .skin-texture-card__image img {
@@ -434,17 +438,26 @@
 }
 
 .skin-filter-bar {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(128px, 150px)) auto;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 
 .skin-filter-keyword {
-  width: 100%;
+  flex: 1 1 220px;
+  min-width: min(100%, 220px);
+}
+
+.skin-filter-select {
+  flex: 1 1 132px;
+  width: 100% !important;
+  min-width: 128px;
+  max-width: 180px;
 }
 
 .skin-filter-reset {
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 
@@ -1167,11 +1180,19 @@
     position: static;
   }
 
+  .skin-current-card__preview {
+    justify-self: center;
+  }
+
   .skin-dress-form,
   .skin-filter-bar,
   .skin-upload-form,
   .skin-collapse .skin-inline-form {
     grid-template-columns: 1fr;
+  }
+
+  .skin-filter-select {
+    max-width: none;
   }
 }
 
@@ -1194,6 +1215,10 @@
     grid-template-columns: 1fr;
   }
 
+  .skin-current-card__preview {
+    width: 100%;
+  }
+
   .skin-command-actions,
   .skin-action-panel__buttons,
   .skin-inline-form {
@@ -1205,5 +1230,13 @@
   .skin-action-panel__buttons > *,
   .skin-inline-form > * {
     width: 100%;
+  }
+
+  .skin-filter-keyword,
+  .skin-filter-select,
+  .skin-filter-reset {
+    flex-basis: 100%;
+    width: 100% !important;
+    max-width: none;
   }
 }

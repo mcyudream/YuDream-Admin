@@ -34,9 +34,9 @@
             placeholder="搜索名称、Hash 或上传人"
             @clear="keyword = ''"
           />
-          <FaSelect v-model="typeFilter" data-testid="skin-texture-type" :options="typeFilterOptions" />
-          <FaSelect v-model="ownerFilter" data-testid="skin-texture-source" :options="ownerFilterOptions" />
-          <FaSelect v-model="sortType" data-testid="skin-texture-sort" :options="sortOptions" />
+          <FaSelect v-model="typeFilter" class="skin-filter-select" data-testid="skin-texture-type" :options="typeFilterOptions" />
+          <FaSelect v-model="ownerFilter" class="skin-filter-select" data-testid="skin-texture-source" :options="ownerFilterOptions" />
+          <FaSelect v-model="sortType" class="skin-filter-select" data-testid="skin-texture-sort" :options="sortOptions" />
           <FaButton v-if="activeFilterCount" variant="outline" class="skin-filter-reset" @click="resetFilters">
             <FaIcon name="i-ri:filter-off-line" />
             清空

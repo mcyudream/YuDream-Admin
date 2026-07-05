@@ -42,11 +42,10 @@
       <section class="skin-current-card">
         <div class="skin-current-card__preview">
           <SkinPreview
+            title="当前外观"
             :skin="model.selectedPlayerSkin"
             :cape="model.selectedPlayerCape"
             :slim="model.selectedPlayerSlim"
-            :auto-rotate="false"
-            compact
           />
         </div>
         <div class="skin-current-card__body">
@@ -75,7 +74,13 @@
               class="skin-mini-row"
               href="/platform/plugins/blessing-skin/closet"
             >
-              <img :src="model.textureUrl(item.textureHash)" alt="">
+              <span class="skin-mini-preview" aria-hidden="true">
+                <SkinTexturePreview
+                  :texture-url="model.textureUrl(item.textureHash)"
+                  :type="textureType(item.textureHash)"
+                  :model="textureModel(item.textureHash)"
+                />
+              </span>
               <span>
                 <strong>{{ item.itemName || model.textureName(item.textureHash) }}</strong>
                 <small>{{ model.textureName(item.textureHash) }}</small>
@@ -119,6 +124,7 @@ import { computed } from 'vue'
 import { FaButton, FaIcon } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
+import SkinTexturePreview from '../components/SkinTexturePreview.vue'
 
 const props = defineProps<{
   model: SkinPluginModel
@@ -153,4 +159,15 @@ const currentPlayerDescription = computed(() => {
   const cape = props.model.textureName(player.capeHash)
   return `皮肤：${skin} / 披风：${cape}`
 })
+function textureByHash(hash?: string) {
+  return props.model.textures.find(texture => texture.hash === hash)
+}
+
+function textureType(hash?: string) {
+  return textureByHash(hash)?.type
+}
+
+function textureModel(hash?: string) {
+  return textureByHash(hash)?.model
+}
 </script>
