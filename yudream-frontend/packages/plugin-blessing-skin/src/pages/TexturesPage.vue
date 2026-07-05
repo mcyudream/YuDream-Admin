@@ -45,7 +45,7 @@
 
         <div class="skin-card-grid">
           <button
-            v-for="texture in filteredTextures"
+            v-for="texture in pagedTextures"
             :key="texture.hash"
             type="button"
             class="skin-texture-card"
@@ -76,6 +76,16 @@
           </button>
           <div v-if="!filteredTextures.length" class="empty-state">没有匹配的材质</div>
         </div>
+        <FaPagination
+          v-if="filteredTextures.length"
+          v-model:page="texturePagination.page"
+          v-model:size="texturePagination.size"
+          :total="filteredTextures.length"
+          :sizes="texturePageSizes"
+          class="skin-list-pagination"
+          layout="total, sizes, ->, pager"
+          @size-change="onTexturePageSizeChange"
+        />
       </SkinPanel>
 
       <aside class="skin-inspector">
@@ -196,8 +206,8 @@
 <script setup lang="ts">
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
 import type { SkinTexture } from '../types'
-import { computed, ref } from 'vue'
-import { FaButton, FaIcon, FaInput, FaModal, FaSelect, FaSwitch, FaTag, FaTooltip } from '@fantastic-admin/components'
+import { computed, reactive, ref, watch } from 'vue'
+import { FaButton, FaIcon, FaInput, FaModal, FaPagination, FaSelect, FaSwitch, FaTag, FaTooltip } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
 import SkinTexturePreview from '../components/SkinTexturePreview.vue'
@@ -211,6 +221,8 @@ const keyword = ref('')
 const typeFilter = ref('all')
 const ownerFilter = ref('all')
 const sortType = ref('new')
+const texturePageSizes = [12, 24, 48, 96]
+const texturePagination = reactive({ page: 1, size: 12 })
 const textureTypeOptions = [
   { label: 'Steve 皮肤', value: 'steve' },
   { label: 'Alex 皮肤', value: 'alex' },
@@ -277,6 +289,25 @@ const filteredTextures = computed(() => {
       const rightTime = right.uploadedAt || 0
       return sortType.value === 'old' ? leftTime - rightTime : rightTime - leftTime
     })
+})
+
+const pagedTextures = computed(() => {
+  const start = (texturePagination.page - 1) * texturePagination.size
+  return filteredTextures.value.slice(start, start + texturePagination.size)
+})
+
+const textureTotalPages = computed(() => {
+  return Math.max(1, Math.ceil(filteredTextures.value.length / texturePagination.size))
+})
+
+watch([keyword, typeFilter, ownerFilter, sortType], () => {
+  texturePagination.page = 1
+})
+
+watch(textureTotalPages, (totalPages) => {
+  if (texturePagination.page > totalPages) {
+    texturePagination.page = totalPages
+  }
 })
 
 const selectedKind = computed(() => {
@@ -347,6 +378,10 @@ function resetFilters() {
   keyword.value = ''
   typeFilter.value = 'all'
   ownerFilter.value = 'all'
+}
+
+function onTexturePageSizeChange() {
+  texturePagination.page = 1
 }
 
 async function submitUpload() {
