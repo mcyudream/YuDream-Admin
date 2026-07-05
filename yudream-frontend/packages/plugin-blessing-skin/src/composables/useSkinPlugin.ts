@@ -134,7 +134,7 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
         closetForm.userId = currentUserId.value
       }
       if (!selectedPlayerName.value && players.value.length) {
-        selectPlayer(players.value[0])
+        selectPlayer(players.value.find(player => !!player.skinHash || !!player.capeHash) || players.value[0])
       }
       if (!selectedTextureHash.value && textures.value.length) {
         selectTexture(textures.value[0])
