@@ -7,4 +7,7 @@ public record SkinClosetItem(
         String itemName,
         Long createdAt
 ) {
+    public SkinClosetItem withItemName(String newItemName) {
+        return new SkinClosetItem(id, userId, textureHash, newItemName, createdAt);
+    }
 }

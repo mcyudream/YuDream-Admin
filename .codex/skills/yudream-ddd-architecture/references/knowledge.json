@@ -31,6 +31,10 @@
     {
       "key": "platform-capability-menu-filter",
       "text": "除 platform:capability 能力管理入口外，平台功能菜单应在对应能力关闭时从 /api/menu/routes 隐藏；能力 Provider 必须保持懒初始化，关闭状态不能连接中间件。"
+    },
+    {
+      "key": "plugin-user-ownership-from-session",
+      "text": "插件用户侧资源归属必须由后端从当前会话/PluginPrincipal/Sa 上下文推导，前端不得传 uploaderId、ownerId 等可伪造归属字段；如需管理员代操作，应设计独立管理用例和权限。"
     }
   ],
   "utilities": [

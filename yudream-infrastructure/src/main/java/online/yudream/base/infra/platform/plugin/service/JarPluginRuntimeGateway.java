@@ -6,6 +6,7 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -150,6 +152,24 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .flatMap(entry -> entry.getValue().getContext().frontendModules().stream()
                         .map(module -> toInfo(entry.getKey(), module)))
                 .toList();
+    }
+
+    @Override
+    public Optional<PluginFrontendAssetInfo> frontendAsset(String code, String assetPath) {
+        PluginRuntimeHolder holder = holder(code);
+        if (!holder.isEnabled()) {
+            throw new BizException("插件未启用");
+        }
+        String path = normalizeAssetPath(assetPath);
+        String resourcePath = "META-INF/yudream-plugin/frontend/" + code + "/" + path;
+        try (InputStream inputStream = holder.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                return Optional.empty();
+            }
+            return Optional.of(new PluginFrontendAssetInfo(path, contentType(path), inputStream.readAllBytes()));
+        } catch (IOException e) {
+            throw new BizException("插件前端资源读取失败：" + e.getMessage());
+        }
     }
 
     @Override
@@ -280,6 +300,49 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 route.permission(),
                 route.sort()
         );
+    }
+
+    private String normalizeAssetPath(String assetPath) {
+        String path = assetPath == null ? "" : assetPath.replace('\\', '/');
+        while (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        if (!StringUtils.hasText(path) || path.contains("..")) {
+            throw new BizException("插件前端资源路径非法");
+        }
+        return path;
+    }
+
+    private String contentType(String path) {
+        String lower = path.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".js") || lower.endsWith(".mjs")) {
+            return "text/javascript;charset=UTF-8";
+        }
+        if (lower.endsWith(".css")) {
+            return "text/css;charset=UTF-8";
+        }
+        if (lower.endsWith(".json") || lower.endsWith(".map")) {
+            return "application/json;charset=UTF-8";
+        }
+        if (lower.endsWith(".svg")) {
+            return "image/svg+xml";
+        }
+        if (lower.endsWith(".png")) {
+            return "image/png";
+        }
+        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
+            return "image/jpeg";
+        }
+        if (lower.endsWith(".webp")) {
+            return "image/webp";
+        }
+        if (lower.endsWith(".woff2")) {
+            return "font/woff2";
+        }
+        if (lower.endsWith(".woff")) {
+            return "font/woff";
+        }
+        return "application/octet-stream";
     }
 
     private void closeClassLoader(URLClassLoader classLoader) {

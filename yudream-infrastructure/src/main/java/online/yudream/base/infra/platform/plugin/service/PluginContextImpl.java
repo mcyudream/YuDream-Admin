@@ -34,6 +34,7 @@ public class PluginContextImpl implements PluginContext {
     private final Set<String> capabilityKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendModuleKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendRouteKeys = ConcurrentHashMap.newKeySet();
+    private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
     public PluginContextImpl(String pluginCode, FrameworkServices frameworkServices, PluginExtensionRegistry pluginExtensionRegistry) {
         this.pluginCode = pluginCode;
@@ -82,7 +83,7 @@ public class PluginContextImpl implements PluginContext {
             ensureUnique(frontendRouteKeys, "path:" + pathKey, "插件前端路由路径重复：" + pathKey);
             ensureUnique(frontendRouteKeys, "name:" + nameKey, "插件前端路由名称重复：" + nameKey);
         }
-        frontendModules.add(module);
+        frontendModules.add(withDefaultFrontendEntry(module, moduleName));
     }
 
     @Override
@@ -91,6 +92,14 @@ public class PluginContextImpl implements PluginContext {
         if (httpHandlers.putIfAbsent(key, handler) != null) {
             throw new BizException("插件 HTTP 端点重复：" + key);
         }
+    }
+
+    @Override
+    public void registerHttpController(Object controller) {
+        if (controller == null) {
+            throw new BizException("插件 HTTP Controller 不能为空");
+        }
+        annotationRegistrar.registerHttpEndpoints(controller, controller.getClass(), this);
     }
 
     @Override
@@ -230,6 +239,24 @@ public class PluginContextImpl implements PluginContext {
             throw new BizException(message);
         }
         return value.trim();
+    }
+
+    private PluginFrontendModule withDefaultFrontendEntry(PluginFrontendModule module, String moduleName) {
+        String entry = StringUtils.hasText(module.entry()) ? module.entry().trim() : defaultFrontendEntry();
+        return new PluginFrontendModule(
+                entry,
+                moduleName,
+                module.sdkVersion(),
+                module.integrity(),
+                module.menuTitle(),
+                module.menuIcon(),
+                module.menuSort(),
+                module.routes()
+        );
+    }
+
+    private String defaultFrontendEntry() {
+        return "/api/platform/plugins/" + pluginCode + "/assets/remoteEntry.js";
     }
 
     private void ensureUnique(Set<String> keys, String key, String message) {

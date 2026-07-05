@@ -8,10 +8,13 @@ import online.yudream.base.plugin.blessing.interfaces.request.ClosetItemSaveRequ
 import online.yudream.base.plugin.blessing.interfaces.request.CreatePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreateSkinUserRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.RenameClosetItemRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.RenamePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.SkinSettingsSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.TextureUploadRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
+import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinProfile;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 
@@ -26,9 +29,11 @@ public class BlessingSkinHttpFacade {
 
     private final BlessingSkinAppService appService;
     private final BlessingSkinWebAssembler assembler = new BlessingSkinWebAssembler();
+    private final FrameworkServices framework;
 
-    public BlessingSkinHttpFacade(BlessingSkinAppService appService) {
+    public BlessingSkinHttpFacade(BlessingSkinAppService appService, FrameworkServices framework) {
         this.appService = appService;
+        this.framework = framework;
     }
 
     public PluginHttpResponse status() {
@@ -37,6 +42,18 @@ public class BlessingSkinHttpFacade {
 
     public PluginHttpResponse users(PluginHttpRequest request) {
         return PluginHttpResponse.ok(appService.listUsers(page(request), size(request)));
+    }
+
+    public PluginHttpResponse me(PluginHttpRequest request) {
+        Long hostUserId = request.principal().userId();
+        String userId = ownerId(request);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("userId", userId);
+        body.put("hostUser", hostUserId == null ? null : framework.users().findById(hostUserId).orElse(null));
+        body.put("skinUser", appService.findUser(userId).orElse(null));
+        body.put("permissions", request.principal().permissions());
+        body.put("manage", request.principal().hasPermission("plugin:blessing-skin:manage"));
+        return PluginHttpResponse.ok(body);
     }
 
     public PluginHttpResponse createUser(PluginHttpRequest request) {
@@ -48,10 +65,22 @@ public class BlessingSkinHttpFacade {
         return PluginHttpResponse.ok(appService.listPlayers(page(request), size(request)));
     }
 
+    public PluginHttpResponse myPlayers(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.listPlayersByOwner(ownerId(request)));
+    }
+
     public PluginHttpResponse createPlayer(PluginHttpRequest request) {
         CreatePlayerRequest body = JsonSupport.read(request.body(), CreatePlayerRequest.class);
         return PluginHttpResponse.ok(appService.createPlayer(
                 assembler.toCmd(body),
+                request.principal().userId()
+        ));
+    }
+
+    public PluginHttpResponse createMyPlayer(PluginHttpRequest request) {
+        CreatePlayerRequest body = JsonSupport.read(request.body(), CreatePlayerRequest.class);
+        return PluginHttpResponse.ok(appService.createPlayer(
+                assembler.toCmd(body, ownerId(request)),
                 request.principal().userId()
         ));
     }
@@ -63,8 +92,30 @@ public class BlessingSkinHttpFacade {
                 .orElseGet(() -> PluginHttpResponse.rawJson(404, Map.of("message", "角色不存在")));
     }
 
+    public PluginHttpResponse renamePlayer(PluginHttpRequest request) {
+        String name = playerNameFromPath(request.path());
+        RenamePlayerRequest body = JsonSupport.read(request.body(), RenamePlayerRequest.class);
+        return PluginHttpResponse.ok(appService.renamePlayer(name, assembler.toCmd(body)));
+    }
+
+    public PluginHttpResponse renameMyPlayer(PluginHttpRequest request) {
+        String name = playerNameFromPath(request.path());
+        RenamePlayerRequest body = JsonSupport.read(request.body(), RenamePlayerRequest.class);
+        return PluginHttpResponse.ok(appService.renameOwnPlayer(name, ownerId(request), assembler.toCmd(body)));
+    }
+
+    public PluginHttpResponse deletePlayer(PluginHttpRequest request) {
+        appService.deletePlayer(lastPathSegment(request.path()));
+        return PluginHttpResponse.ok(Map.of("deleted", true));
+    }
+
+    public PluginHttpResponse deleteMyPlayer(PluginHttpRequest request) {
+        appService.deleteOwnPlayer(lastPathSegment(request.path()), ownerId(request));
+        return PluginHttpResponse.ok(Map.of("deleted", true));
+    }
+
     public PluginHttpResponse assignTextures(PluginHttpRequest request) {
-        String name = pathSegment(request.path(), 1);
+        String name = playerNameFromPath(request.path());
         AssignTextureRequest body = JsonSupport.read(request.body(), AssignTextureRequest.class);
         return PluginHttpResponse.ok(appService.assignTextures(
                 name,
@@ -72,14 +123,38 @@ public class BlessingSkinHttpFacade {
         ));
     }
 
+    public PluginHttpResponse assignMyTextures(PluginHttpRequest request) {
+        String name = playerNameFromPath(request.path());
+        AssignTextureRequest body = JsonSupport.read(request.body(), AssignTextureRequest.class);
+        return PluginHttpResponse.ok(appService.assignOwnTextures(
+                name,
+                ownerId(request),
+                assembler.toCmd(body)
+        ));
+    }
+
     public PluginHttpResponse textures(PluginHttpRequest request) {
-        return PluginHttpResponse.ok(appService.listTextures(page(request), size(request)));
+        return PluginHttpResponse.ok(appService.listVisibleTextures(
+                ownerId(request),
+                request.principal().hasPermission("plugin:blessing-skin:manage"),
+                page(request),
+                size(request)
+        ));
     }
 
     public PluginHttpResponse uploadTexture(PluginHttpRequest request) {
         TextureUploadRequest body = JsonSupport.read(request.body(), TextureUploadRequest.class);
         return PluginHttpResponse.ok(appService.uploadTexture(
                 assembler.toCmd(body),
+                request.principal().userId()
+        ));
+    }
+
+    public PluginHttpResponse uploadMyTexture(PluginHttpRequest request) {
+        TextureUploadRequest body = JsonSupport.read(request.body(), TextureUploadRequest.class);
+        return PluginHttpResponse.ok(appService.uploadOwnTexture(
+                assembler.toCmd(body),
+                ownerId(request),
                 request.principal().userId()
         ));
     }
@@ -113,6 +188,10 @@ public class BlessingSkinHttpFacade {
         return PluginHttpResponse.ok(appService.listCloset(firstQuery(request, "userId"), page(request), size(request)));
     }
 
+    public PluginHttpResponse myCloset(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.listCloset(ownerId(request), page(request), size(request)));
+    }
+
     public PluginHttpResponse saveClosetItem(PluginHttpRequest request) {
         ClosetItemSaveRequest body = JsonSupport.read(request.body(), ClosetItemSaveRequest.class);
         return PluginHttpResponse.ok(appService.saveClosetItem(
@@ -121,8 +200,36 @@ public class BlessingSkinHttpFacade {
         ));
     }
 
+    public PluginHttpResponse saveMyClosetItem(PluginHttpRequest request) {
+        ClosetItemSaveRequest body = JsonSupport.read(request.body(), ClosetItemSaveRequest.class);
+        return PluginHttpResponse.ok(appService.saveOwnClosetItem(
+                assembler.toCmd(body, ownerId(request)),
+                ownerId(request),
+                request.principal().userId()
+        ));
+    }
+
+    public PluginHttpResponse renameClosetItem(PluginHttpRequest request) {
+        RenameClosetItemRequest body = JsonSupport.read(request.body(), RenameClosetItemRequest.class);
+        return PluginHttpResponse.ok(appService.renameClosetItem(lastPathSegment(request.path()), assembler.toCmd(body)));
+    }
+
+    public PluginHttpResponse renameMyClosetItem(PluginHttpRequest request) {
+        RenameClosetItemRequest body = JsonSupport.read(request.body(), RenameClosetItemRequest.class);
+        return PluginHttpResponse.ok(appService.renameOwnClosetItem(
+                lastPathSegment(request.path()),
+                ownerId(request),
+                assembler.toCmd(body)
+        ));
+    }
+
     public PluginHttpResponse deleteClosetItem(PluginHttpRequest request) {
         appService.deleteClosetItem(lastPathSegment(request.path()));
+        return PluginHttpResponse.ok(Map.of("deleted", true));
+    }
+
+    public PluginHttpResponse deleteMyClosetItem(PluginHttpRequest request) {
+        appService.deleteOwnClosetItem(lastPathSegment(request.path()), ownerId(request));
         return PluginHttpResponse.ok(Map.of("deleted", true));
     }
 
@@ -178,6 +285,21 @@ public class BlessingSkinHttpFacade {
     private String lastPathSegment(String path) {
         String[] segments = trim(path).split("/");
         return decode(segments[segments.length - 1]);
+    }
+
+    private String playerNameFromPath(String path) {
+        String[] segments = trim(path).split("/");
+        for (int i = 0; i < segments.length - 1; i++) {
+            if ("players".equals(segments[i])) {
+                return decode(segments[i + 1]);
+            }
+        }
+        return lastPathSegment(path);
+    }
+
+    private String ownerId(PluginHttpRequest request) {
+        Long userId = request.principal().userId();
+        return userId == null ? "system" : String.valueOf(userId);
     }
 
     private String pathSegment(String path, int indexAfterRoot) {

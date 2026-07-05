@@ -6,7 +6,6 @@ public record TextureUploadRequest(
         String model,
         String contentType,
         String base64,
-        Boolean publicAccess,
-        String uploaderId
+        Boolean publicAccess
 ) {
 }

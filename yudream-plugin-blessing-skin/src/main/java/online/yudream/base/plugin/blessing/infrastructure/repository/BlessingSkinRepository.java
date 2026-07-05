@@ -78,6 +78,10 @@ public class BlessingSkinRepository {
         return documents.findAll(PLAYERS, page, size).stream().map(this::toPlayer).toList();
     }
 
+    public void deletePlayer(String uuid) {
+        documents.delete(PLAYERS, normalizeUuid(uuid));
+    }
+
     public long playerCount() {
         return documents.count(PLAYERS);
     }
@@ -128,6 +132,14 @@ public class BlessingSkinRepository {
 
     public List<SkinClosetItem> findClosetByUser(String userId, int page, int size) {
         return documents.findByField(CLOSET, "userId", userId, page, size).stream().map(this::toClosetItem).toList();
+    }
+
+    public Optional<SkinClosetItem> findClosetItem(String id) {
+        return documents.findById(CLOSET, id).map(this::toClosetItem);
+    }
+
+    public Optional<SkinClosetItem> findClosetByUserAndTexture(String userId, String textureHash) {
+        return findClosetItem(closetId(userId, textureHash));
     }
 
     public void deleteClosetItem(String id) {

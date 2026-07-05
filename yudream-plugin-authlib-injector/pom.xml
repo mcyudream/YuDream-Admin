@@ -11,6 +11,19 @@
 
     <artifactId>yudream-plugin-authlib-injector</artifactId>
 
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>../yudream-frontend/packages/plugin-authlib-injector/dist</directory>
+                <targetPath>META-INF/yudream-plugin/frontend/authlib-injector</targetPath>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>online.yudream.base</groupId>

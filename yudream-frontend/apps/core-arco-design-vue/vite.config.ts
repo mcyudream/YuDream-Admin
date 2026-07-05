@@ -57,6 +57,7 @@ export default defineConfig(({ mode, command }) => {
       alias: {
         '@': path.resolve(__dirname, 'src'),
         '#': path.resolve(__dirname, 'src/types'),
+        '@yudream/plugin-sdk': path.resolve(__dirname, '../../packages/plugin-sdk/src/index.ts'),
       },
     },
     css: {

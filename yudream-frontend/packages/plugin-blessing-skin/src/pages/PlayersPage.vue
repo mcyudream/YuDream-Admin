@@ -1,0 +1,118 @@
+<template>
+  <section class="skin-page">
+    <div class="skin-command-bar">
+      <div>
+        <span>我的角色</span>
+        <h2>{{ model.selectedPlayerName || '管理 Minecraft 角色' }}</h2>
+        <p>角色属于当前账号，换装只从自己的衣柜中选择，避免误用全站材质。</p>
+      </div>
+      <FaButton variant="outline" :loading="model.loading" @click="model.load">
+        <FaIcon name="i-ri:refresh-line" />
+        刷新
+      </FaButton>
+    </div>
+
+    <div class="skin-player-layout">
+      <aside class="skin-character-card">
+        <SkinPreview
+          title="当前外观"
+          :skin="model.selectedPlayerSkin"
+          :cape="model.selectedPlayerCape"
+          :slim="model.selectedPlayerSlim"
+        >
+          <div class="preview-meta">
+            <span>皮肤：{{ model.textureName(model.selectedPlayer?.skinHash) }}</span>
+            <span>披风：{{ model.textureName(model.selectedPlayer?.capeHash) }}</span>
+          </div>
+        </SkinPreview>
+        <div class="skin-character-card__meta">
+          <strong>{{ model.selectedPlayerName || '未选择角色' }}</strong>
+          <span>{{ model.selectedPlayer?.uuid || '创建或选择一个角色后开始换装' }}</span>
+        </div>
+      </aside>
+
+      <main class="skin-flow">
+        <SkinPanel title="角色">
+          <template #header>
+            <FaTag variant="secondary">{{ model.players.length }}</FaTag>
+          </template>
+          <div class="skin-role-list">
+            <button
+              v-for="player in model.players"
+              :key="player.uuid"
+              type="button"
+              class="skin-role-item"
+              :class="{ active: model.selectedPlayerName === player.name }"
+              @click="model.selectPlayer(player)"
+            >
+              <span>
+                <strong>{{ player.name }}</strong>
+                <small>{{ player.skinHash ? '已配置外观' : '待换装' }}</small>
+              </span>
+              <FaIcon name="i-ri:arrow-right-s-line" />
+            </button>
+            <div v-if="!model.players.length" class="empty-state">还没有角色，先创建一个 Minecraft ID。</div>
+          </div>
+
+          <div class="skin-inline-form">
+            <FaInput v-model="model.playerForm.name" placeholder="输入角色名，例如 Steve" />
+            <FaButton :loading="model.saving === 'player'" @click="model.createPlayer">
+              <FaIcon name="i-ri:add-line" />
+              创建角色
+            </FaButton>
+          </div>
+        </SkinPanel>
+
+        <SkinPanel title="从衣柜换装">
+          <template #header>
+            <FaTag variant="secondary">{{ model.closetItems.length }}</FaTag>
+          </template>
+          <div class="skin-dress-form">
+            <label>
+              <span>皮肤</span>
+              <FaSelect v-model="model.assignForm.skinHash" clearable :options="model.skinTextureOptions" />
+            </label>
+            <label>
+              <span>披风</span>
+              <FaSelect v-model="model.assignForm.capeHash" clearable :options="model.capeTextureOptions" />
+            </label>
+            <FaButton :disabled="!model.selectedPlayer" :loading="model.saving === 'assign'" @click="model.assignTextures">
+              <FaIcon name="i-ri:save-3-line" />
+              保存外观
+            </FaButton>
+          </div>
+          <p v-if="!model.closetItems.length" class="skin-help-text">衣柜是换装来源，可以先在皮肤库收藏材质，或上传自己的 PNG 材质。</p>
+        </SkinPanel>
+
+        <details class="skin-collapse" :open="false">
+          <summary>
+            <span>角色设置</span>
+            <FaIcon name="i-ri:arrow-down-s-line" />
+          </summary>
+          <div class="skin-inline-form">
+            <FaInput v-model="model.playerRenameForm.name" placeholder="新的角色名" />
+            <FaButton variant="outline" :loading="model.saving === 'player-rename'" @click="model.renamePlayer">
+              <FaIcon name="i-ri:edit-2-line" />
+              重命名
+            </FaButton>
+            <FaButton variant="outline" :loading="model.saving === 'player-delete'" @click="model.deletePlayer">
+              <FaIcon name="i-ri:delete-bin-6-line" />
+              删除
+            </FaButton>
+          </div>
+        </details>
+      </main>
+    </div>
+  </section>
+</template>
+
+<script setup lang="ts">
+import type { SkinPluginModel } from '../composables/useSkinPlugin'
+import { FaButton, FaIcon, FaInput, FaSelect, FaTag } from '@fantastic-admin/components'
+import SkinPanel from '../components/SkinPanel.vue'
+import SkinPreview from '../components/SkinPreview.vue'
+
+defineProps<{
+  model: SkinPluginModel
+}>()
+</script>
