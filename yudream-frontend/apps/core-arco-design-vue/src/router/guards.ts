@@ -49,6 +49,7 @@ function setupRoutes(router: Router) {
     }
 
     const appSettingsStore = useAppSettingsStore()
+    const appAccountStore = useAppAccountStore()
     const appRouteStore = useAppRouteStore()
     const appMenuStore = useAppMenuStore()
     // 是否已登录
