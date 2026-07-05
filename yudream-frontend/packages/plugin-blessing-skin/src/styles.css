@@ -174,10 +174,10 @@
 
 .skin-current-card {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 0.58fr) minmax(0, 1fr);
   gap: 16px;
   align-items: center;
-  min-height: 310px;
+  min-height: 340px;
   padding: 16px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
@@ -186,10 +186,12 @@
 
 .skin-current-card__preview {
   display: grid;
-  min-height: 260px;
+  min-height: 300px;
   place-items: center;
   border-radius: 6px;
-  background: var(--color-fill-1);
+  background:
+    radial-gradient(circle at 50% 38%, rgba(var(--primary-6), 0.12), transparent 54%),
+    var(--color-fill-1);
 }
 
 .skin-current-card__body {
@@ -771,6 +773,8 @@
 }
 
 .skin-preview.compact {
+  width: 100%;
+  min-width: 240px;
   padding: 10px;
 }
 
@@ -819,7 +823,14 @@
 .skin-preview__stage {
   display: grid;
   max-width: 100%;
+  min-height: 260px;
   place-items: center;
+}
+
+.skin-preview__stage canvas {
+  display: block;
+  max-width: 100%;
+  image-rendering: auto;
 }
 
 .skin-preview__empty {
