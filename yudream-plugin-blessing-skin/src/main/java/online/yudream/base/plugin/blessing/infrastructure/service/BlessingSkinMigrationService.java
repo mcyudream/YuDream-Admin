@@ -4,10 +4,10 @@ import online.yudream.base.plugin.blessing.domain.aggregate.SkinPlayer;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinTexture;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinUser;
 import online.yudream.base.plugin.blessing.domain.enumerate.SkinTextureType;
+import online.yudream.base.plugin.blessing.domain.valobj.MigrationConfig;
 import online.yudream.base.plugin.blessing.domain.valobj.MigrationReport;
 import online.yudream.base.plugin.blessing.infrastructure.repository.BlessingSkinRepository;
 import online.yudream.base.plugin.blessing.infrastructure.support.HashSupport;
-import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,7 +31,7 @@ public class BlessingSkinMigrationService {
         this.repository = repository;
     }
 
-    public MigrationReport migrate(MigrationRequest request) {
+    public MigrationReport migrate(MigrationConfig request) {
         if (request == null || request.jdbcUrl() == null || request.jdbcUrl().isBlank()) {
             throw new IllegalArgumentException("JDBC 地址不能为空");
         }

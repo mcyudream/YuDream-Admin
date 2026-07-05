@@ -17,5 +17,11 @@ public @interface PluginFrontend {
 
     String integrity() default "";
 
+    String menuTitle() default "";
+
+    String menuIcon() default "";
+
+    int menuSort() default 0;
+
     PluginRoute[] routes() default {};
 }

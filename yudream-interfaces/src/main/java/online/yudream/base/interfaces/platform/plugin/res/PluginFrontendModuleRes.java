@@ -24,6 +24,9 @@ public class PluginFrontendModuleRes implements Serializable {
     private String moduleName;
     private String sdkVersion;
     private String integrity;
+    private String menuTitle;
+    private String menuIcon;
+    private Integer menuSort;
 
     @Builder.Default
     private List<PluginFrontendRouteRes> routes = new ArrayList<>();

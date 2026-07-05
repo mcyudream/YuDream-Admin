@@ -2,10 +2,13 @@ package online.yudream.base.plugin.blessing.interfaces.http;
 
 import online.yudream.base.plugin.blessing.application.service.BlessingSkinAppService;
 import online.yudream.base.plugin.blessing.infrastructure.support.JsonSupport;
+import online.yudream.base.plugin.blessing.interfaces.assembler.BlessingSkinWebAssembler;
 import online.yudream.base.plugin.blessing.interfaces.request.AssignTextureRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.ClosetItemSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreatePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreateSkinUserRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.SkinSettingsSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.TextureUploadRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
@@ -22,6 +25,7 @@ import java.util.Map;
 public class BlessingSkinHttpFacade {
 
     private final BlessingSkinAppService appService;
+    private final BlessingSkinWebAssembler assembler = new BlessingSkinWebAssembler();
 
     public BlessingSkinHttpFacade(BlessingSkinAppService appService) {
         this.appService = appService;
@@ -36,7 +40,8 @@ public class BlessingSkinHttpFacade {
     }
 
     public PluginHttpResponse createUser(PluginHttpRequest request) {
-        return PluginHttpResponse.ok(appService.createUser(JsonSupport.read(request.body(), CreateSkinUserRequest.class)));
+        CreateSkinUserRequest body = JsonSupport.read(request.body(), CreateSkinUserRequest.class);
+        return PluginHttpResponse.ok(appService.createUser(assembler.toCmd(body)));
     }
 
     public PluginHttpResponse players(PluginHttpRequest request) {
@@ -44,8 +49,9 @@ public class BlessingSkinHttpFacade {
     }
 
     public PluginHttpResponse createPlayer(PluginHttpRequest request) {
+        CreatePlayerRequest body = JsonSupport.read(request.body(), CreatePlayerRequest.class);
         return PluginHttpResponse.ok(appService.createPlayer(
-                JsonSupport.read(request.body(), CreatePlayerRequest.class),
+                assembler.toCmd(body),
                 request.principal().userId()
         ));
     }
@@ -59,9 +65,10 @@ public class BlessingSkinHttpFacade {
 
     public PluginHttpResponse assignTextures(PluginHttpRequest request) {
         String name = pathSegment(request.path(), 1);
+        AssignTextureRequest body = JsonSupport.read(request.body(), AssignTextureRequest.class);
         return PluginHttpResponse.ok(appService.assignTextures(
                 name,
-                JsonSupport.read(request.body(), AssignTextureRequest.class)
+                assembler.toCmd(body)
         ));
     }
 
@@ -70,8 +77,9 @@ public class BlessingSkinHttpFacade {
     }
 
     public PluginHttpResponse uploadTexture(PluginHttpRequest request) {
+        TextureUploadRequest body = JsonSupport.read(request.body(), TextureUploadRequest.class);
         return PluginHttpResponse.ok(appService.uploadTexture(
-                JsonSupport.read(request.body(), TextureUploadRequest.class),
+                assembler.toCmd(body),
                 request.principal().userId()
         ));
     }
@@ -101,8 +109,35 @@ public class BlessingSkinHttpFacade {
         return PluginHttpResponse.rawJson(200, body);
     }
 
+    public PluginHttpResponse closet(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.listCloset(firstQuery(request, "userId"), page(request), size(request)));
+    }
+
+    public PluginHttpResponse saveClosetItem(PluginHttpRequest request) {
+        ClosetItemSaveRequest body = JsonSupport.read(request.body(), ClosetItemSaveRequest.class);
+        return PluginHttpResponse.ok(appService.saveClosetItem(
+                assembler.toCmd(body),
+                request.principal().userId()
+        ));
+    }
+
+    public PluginHttpResponse deleteClosetItem(PluginHttpRequest request) {
+        appService.deleteClosetItem(lastPathSegment(request.path()));
+        return PluginHttpResponse.ok(Map.of("deleted", true));
+    }
+
+    public PluginHttpResponse settings() {
+        return PluginHttpResponse.ok(appService.settings());
+    }
+
+    public PluginHttpResponse saveSettings(PluginHttpRequest request) {
+        SkinSettingsSaveRequest body = JsonSupport.read(request.body(), SkinSettingsSaveRequest.class);
+        return PluginHttpResponse.ok(appService.saveSettings(assembler.toCmd(body)));
+    }
+
     public PluginHttpResponse migrate(PluginHttpRequest request) {
-        return PluginHttpResponse.ok(appService.migrate(JsonSupport.read(request.body(), MigrationRequest.class)));
+        MigrationRequest body = JsonSupport.read(request.body(), MigrationRequest.class);
+        return PluginHttpResponse.ok(appService.migrate(assembler.toCmd(body)));
     }
 
     private PluginHttpResponse toBinaryResponse(PluginStoredFile file) {
@@ -133,6 +168,11 @@ public class BlessingSkinHttpFacade {
             return defaultValue;
         }
         return Integer.parseInt(values.get(0));
+    }
+
+    private String firstQuery(PluginHttpRequest request, String key) {
+        List<String> values = request.query().get(key);
+        return values == null || values.isEmpty() ? null : values.get(0);
     }
 
     private String lastPathSegment(String path) {

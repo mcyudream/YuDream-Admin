@@ -145,6 +145,7 @@ Assembler hard rules:
 - Plugin-facing DTOs must be stable, serialization-friendly records or simple value objects. They should not reuse interface `request/res` classes or persistence `dataobj` classes.
 - Plugin HTTP endpoints should be mounted under plugin-scoped paths such as `/api/plugins/{pluginCode}/**` through a runtime dispatcher for the first version. Avoid dynamic Spring MVC controller registration until unload semantics, permissions, and diagnostics are proven stable.
 - Frontend plugins should use the host-provided dynamic frontend SDK/client instead of bundling a private axios instance. SDK version and remote entry metadata must be part of the frontend manifest so the host can refresh or replace SDK behavior without rebuilding every plugin.
+- Plugin frontend manifests should support module-level top menu metadata, such as menu title, icon, and sort. A business plugin with multiple management surfaces should register multiple frontend routes under its own top-level menu instead of hiding major pages behind tabs in one runtime page. For example, a skin plugin should expose separate routes such as dashboard, player management, texture library, closet management, and system management.
 - Runtime implementations must track disposables, classloaders, registered handlers, frontend manifests, menus, permissions, and capability providers by plugin code, and must release them on disable/unload.
 
 ## System Seeds

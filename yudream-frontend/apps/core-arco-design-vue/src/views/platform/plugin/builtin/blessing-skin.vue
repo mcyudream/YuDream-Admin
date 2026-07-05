@@ -1,5 +1,14 @@
 <script setup lang="ts">
+import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { YuDreamPluginSdk } from '@/plugins/sdk'
+
+type SkinPage = 'dashboard' | 'players' | 'textures' | 'closet' | 'system'
+
+interface SkinSettings {
+  maxPlayersPerUser: number
+  allowPublicUpload: boolean
+  siteNotice: string
+}
 
 interface SkinSummary {
   users: number
@@ -7,6 +16,7 @@ interface SkinSummary {
   textures: number
   closetItems: number
   options: number
+  settings?: SkinSettings
 }
 
 interface SkinUser {
@@ -35,6 +45,14 @@ interface SkinTexture {
   publicAccess?: boolean
 }
 
+interface SkinClosetItem {
+  id: string
+  userId: string
+  textureHash: string
+  itemName?: string
+  createdAt?: number
+}
+
 interface MigrationReport {
   users: number
   players: number
@@ -46,17 +64,19 @@ interface MigrationReport {
 
 const props = defineProps<{
   sdk: YuDreamPluginSdk
+  route?: RouteLocationNormalizedLoaded
 }>()
 
 const toast = useFaToast()
 const loading = ref(false)
 const saving = ref('')
-const activeTab = ref<'players' | 'textures' | 'users' | 'migration'>('players')
 
 const summary = ref<SkinSummary>({ users: 0, players: 0, textures: 0, closetItems: 0, options: 0 })
+const settings = ref<SkinSettings>({ maxPlayersPerUser: 3, allowPublicUpload: true, siteNotice: '' })
 const users = ref<SkinUser[]>([])
 const players = ref<SkinPlayer[]>([])
 const textures = ref<SkinTexture[]>([])
+const closetItems = ref<SkinClosetItem[]>([])
 const migrationReport = ref<MigrationReport | null>(null)
 
 const userForm = reactive({ email: '', nickname: '', password: '' })
@@ -70,6 +90,8 @@ const textureForm = reactive({
   publicAccess: true,
   uploaderId: '',
 })
+const closetForm = reactive({ userId: '', textureHash: '', itemName: '' })
+const settingsForm = reactive<SkinSettings>({ maxPlayersPerUser: 3, allowPublicUpload: true, siteNotice: '' })
 const migrationForm = reactive({
   driverClass: '',
   jdbcUrl: '',
@@ -81,11 +103,28 @@ const migrationForm = reactive({
 const selectedPlayerName = ref('')
 const assignForm = reactive({ skinHash: '', capeHash: '' })
 
+const currentPage = computed<SkinPage>(() => {
+  const component = String((props.route?.meta?.plugin as any)?.component || '').toLowerCase()
+  if (component.includes('players')) {
+    return 'players'
+  }
+  if (component.includes('textures')) {
+    return 'textures'
+  }
+  if (component.includes('closet')) {
+    return 'closet'
+  }
+  if (component.includes('system')) {
+    return 'system'
+  }
+  return 'dashboard'
+})
+
 const statCards = computed(() => [
   { label: '用户', value: summary.value.users, icon: 'i-ri:user-3-line' },
   { label: '角色', value: summary.value.players, icon: 'i-ri:gamepad-line' },
-  { label: '材质', value: summary.value.textures, icon: 'i-ri:t-shirt-2-line' },
-  { label: '衣柜', value: summary.value.closetItems, icon: 'i-ri:archive-drawer-line' },
+  { label: '皮肤材质', value: summary.value.textures, icon: 'i-ri:t-shirt-2-line' },
+  { label: '衣柜项', value: summary.value.closetItems, icon: 'i-ri:archive-drawer-line' },
 ])
 
 const textureOptions = computed(() => textures.value.map(item => ({
@@ -93,21 +132,32 @@ const textureOptions = computed(() => textures.value.map(item => ({
   value: item.hash,
 })))
 
+const userOptions = computed(() => users.value.map(item => ({
+  label: `${item.nickname || item.email} (${item.id})`,
+  value: item.id,
+})))
+
 onMounted(load)
+watch(currentPage, () => load())
 
 async function load() {
   loading.value = true
   try {
-    const [status, userList, playerList, textureList] = await Promise.all([
+    const [status, userList, playerList, textureList, closetList, savedSettings] = await Promise.all([
       props.sdk.http.get<SkinSummary>('/status'),
       props.sdk.http.get<SkinUser[]>('/users?page=1&size=100'),
       props.sdk.http.get<SkinPlayer[]>('/players?page=1&size=100'),
       props.sdk.http.get<SkinTexture[]>('/textures?page=1&size=100'),
+      props.sdk.http.get<SkinClosetItem[]>('/closet?page=1&size=200'),
+      props.sdk.http.get<SkinSettings>('/settings'),
     ])
     summary.value = status
     users.value = userList
     players.value = playerList
     textures.value = textureList
+    closetItems.value = closetList
+    settings.value = savedSettings || status.settings || settings.value
+    Object.assign(settingsForm, settings.value)
     if (!selectedPlayerName.value && players.value.length) {
       selectPlayer(players.value[0])
     }
@@ -211,6 +261,51 @@ async function uploadTexture() {
   }
 }
 
+async function saveClosetItem() {
+  if (!closetForm.textureHash) {
+    toast.error('请选择要加入衣柜的材质')
+    return
+  }
+  saving.value = 'closet'
+  try {
+    await props.sdk.http.post('/closet', { ...closetForm })
+    Object.assign(closetForm, { userId: '', textureHash: '', itemName: '' })
+    toast.success('衣柜项已保存')
+    await load()
+  }
+  finally {
+    saving.value = ''
+  }
+}
+
+async function deleteClosetItem(item: SkinClosetItem) {
+  saving.value = `closet:${item.id}`
+  try {
+    await props.sdk.http.request(`/closet/${encodeURIComponent(item.id)}`, { method: 'DELETE' })
+    toast.success('衣柜项已删除')
+    await load()
+  }
+  finally {
+    saving.value = ''
+  }
+}
+
+async function saveSettings() {
+  saving.value = 'settings'
+  try {
+    settings.value = await props.sdk.http.request<SkinSettings>('/settings', {
+      method: 'PUT',
+      data: { ...settingsForm },
+    })
+    Object.assign(settingsForm, settings.value)
+    toast.success('皮肤站配置已保存')
+    await load()
+  }
+  finally {
+    saving.value = ''
+  }
+}
+
 async function runMigration() {
   if (!migrationForm.jdbcUrl) {
     toast.error('请填写 JDBC 地址')
@@ -231,6 +326,21 @@ function textureUrl(hash?: string) {
   return hash ? props.sdk.http.url(`/textures/${hash}`) : ''
 }
 
+function textureName(hash?: string) {
+  if (!hash) {
+    return '-'
+  }
+  return textures.value.find(item => item.hash === hash)?.name || hash
+}
+
+function userName(userId?: string) {
+  if (!userId) {
+    return '-'
+  }
+  const user = users.value.find(item => item.id === userId)
+  return user ? `${user.nickname || user.email}` : userId
+}
+
 function dateText(value?: number) {
   return value ? new Date(value).toLocaleString() : '-'
 }
@@ -247,38 +357,61 @@ function fileToBase64(file: File) {
 
 <template>
   <div class="skin-plugin">
-    <div class="summary-grid">
-      <div v-for="item in statCards" :key="item.label" class="summary-card">
-        <span class="summary-icon"><FaIcon :name="item.icon" /></span>
-        <span>{{ item.label }}</span>
-        <strong>{{ item.value }}</strong>
+    <section v-if="currentPage === 'dashboard'" class="dashboard-page">
+      <div class="summary-grid">
+        <div v-for="item in statCards" :key="item.label" class="summary-card">
+          <span class="summary-icon"><FaIcon :name="item.icon" /></span>
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+        </div>
+        <FaButton :loading="loading" class="refresh-button" @click="load">
+          <FaIcon name="i-ri:refresh-line" />
+          刷新
+        </FaButton>
       </div>
-      <FaButton :loading="loading" class="refresh-button" @click="load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
-    </div>
 
-    <div class="tabs">
-      <button type="button" :class="{ active: activeTab === 'players' }" @click="activeTab = 'players'">
-        <FaIcon name="i-ri:gamepad-line" />
-        角色
-      </button>
-      <button type="button" :class="{ active: activeTab === 'textures' }" @click="activeTab = 'textures'">
-        <FaIcon name="i-ri:t-shirt-2-line" />
-        材质
-      </button>
-      <button type="button" :class="{ active: activeTab === 'users' }" @click="activeTab = 'users'">
-        <FaIcon name="i-ri:user-3-line" />
-        用户
-      </button>
-      <button type="button" :class="{ active: activeTab === 'migration' }" @click="activeTab = 'migration'">
-        <FaIcon name="i-ri:database-2-line" />
-        迁移
-      </button>
-    </div>
+      <div class="workbench two-col">
+        <div class="panel">
+          <div class="panel-head">
+            <strong>皮肤站概览</strong>
+            <FaTag variant="secondary">Blessing Skin</FaTag>
+          </div>
+          <div class="metric-list">
+            <div>
+              <span>最多角色数</span>
+              <strong>{{ settings.maxPlayersPerUser <= 0 ? '不限' : `${settings.maxPlayersPerUser} 个 / 用户` }}</strong>
+            </div>
+            <div>
+              <span>公开上传</span>
+              <strong>{{ settings.allowPublicUpload ? '允许' : '关闭' }}</strong>
+            </div>
+            <div>
+              <span>公告</span>
+              <strong>{{ settings.siteNotice || '未设置' }}</strong>
+            </div>
+          </div>
+        </div>
 
-    <section v-if="activeTab === 'players'" class="workbench two-col">
+        <div class="panel">
+          <div class="panel-head">
+            <strong>最近角色</strong>
+            <FaTag variant="secondary">{{ players.length }}</FaTag>
+          </div>
+          <div class="item-list compact">
+            <div v-for="player in players.slice(0, 6)" :key="player.uuid" class="list-row static">
+              <span>
+                <strong>{{ player.name }}</strong>
+                <small>{{ player.skinHash ? '已绑定皮肤' : '未绑定皮肤' }}</small>
+              </span>
+              <small>{{ dateText(player.lastModified) }}</small>
+            </div>
+            <div v-if="!players.length" class="empty-state">暂无角色</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section v-else-if="currentPage === 'players'" class="workbench two-col">
       <div class="panel">
         <div class="panel-head">
           <strong>角色列表</strong>
@@ -303,47 +436,51 @@ function fileToBase64(file: File) {
         </div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head"><strong>创建角色</strong></div>
-        <div class="form-grid">
-          <label>
-            <span>角色名</span>
-            <FaInput v-model="playerForm.name" placeholder="Steve" />
-          </label>
-          <label>
-            <span>所属用户 ID</span>
-            <FaInput v-model="playerForm.ownerId" placeholder="留空则使用当前用户" />
-          </label>
-          <FaButton :loading="saving === 'player'" @click="createPlayer">
-            <FaIcon name="i-ri:add-line" />
-            创建角色
-          </FaButton>
+      <div class="panel stack">
+        <div>
+          <div class="panel-head"><strong>创建角色</strong><span>限制：{{ settings.maxPlayersPerUser <= 0 ? '不限' : `${settings.maxPlayersPerUser} 个 / 用户` }}</span></div>
+          <div class="form-grid">
+            <label>
+              <span>角色名</span>
+              <FaInput v-model="playerForm.name" placeholder="Steve" />
+            </label>
+            <label>
+              <span>所属用户 ID</span>
+              <FaSelect v-model="playerForm.ownerId" clearable :options="userOptions" />
+            </label>
+            <FaButton :loading="saving === 'player'" @click="createPlayer">
+              <FaIcon name="i-ri:add-line" />
+              创建角色
+            </FaButton>
+          </div>
         </div>
 
         <div class="divider" />
 
-        <div class="panel-head"><strong>分配材质</strong><span>{{ selectedPlayerName || '未选择角色' }}</span></div>
-        <div class="form-grid">
-          <label>
-            <span>皮肤</span>
-            <FaSelect v-model="assignForm.skinHash" clearable :options="textureOptions" />
-          </label>
-          <label>
-            <span>披风</span>
-            <FaSelect v-model="assignForm.capeHash" clearable :options="textureOptions" />
-          </label>
-          <FaButton :loading="saving === 'assign'" @click="assignTextures">
-            <FaIcon name="i-ri:save-3-line" />
-            保存绑定
-          </FaButton>
+        <div>
+          <div class="panel-head"><strong>分配材质</strong><span>{{ selectedPlayerName || '未选择角色' }}</span></div>
+          <div class="form-grid">
+            <label>
+              <span>皮肤</span>
+              <FaSelect v-model="assignForm.skinHash" clearable :options="textureOptions" />
+            </label>
+            <label>
+              <span>披风</span>
+              <FaSelect v-model="assignForm.capeHash" clearable :options="textureOptions" />
+            </label>
+            <FaButton :loading="saving === 'assign'" @click="assignTextures">
+              <FaIcon name="i-ri:save-3-line" />
+              保存绑定
+            </FaButton>
+          </div>
         </div>
       </div>
     </section>
 
-    <section v-else-if="activeTab === 'textures'" class="workbench two-col">
+    <section v-else-if="currentPage === 'textures'" class="workbench two-col">
       <div class="panel">
         <div class="panel-head">
-          <strong>材质库</strong>
+          <strong>皮肤库</strong>
           <FaTag variant="secondary">{{ textures.length }}</FaTag>
         </div>
         <div class="texture-grid">
@@ -360,7 +497,7 @@ function fileToBase64(file: File) {
       </div>
 
       <div class="panel">
-        <div class="panel-head"><strong>上传材质</strong></div>
+        <div class="panel-head"><strong>上传材质</strong><span>{{ settings.allowPublicUpload ? '可公开' : '强制私有' }}</span></div>
         <div class="form-grid">
           <label>
             <span>名称</span>
@@ -376,7 +513,7 @@ function fileToBase64(file: File) {
           </label>
           <label>
             <span>上传用户 ID</span>
-            <FaInput v-model="textureForm.uploaderId" placeholder="留空则使用当前用户" />
+            <FaSelect v-model="textureForm.uploaderId" clearable :options="userOptions" />
           </label>
           <label>
             <span>PNG 文件</span>
@@ -384,7 +521,7 @@ function fileToBase64(file: File) {
           </label>
           <label class="switch-row">
             <span>公开材质</span>
-            <FaSwitch v-model="textureForm.publicAccess" />
+            <FaSwitch v-model="textureForm.publicAccess" :disabled="!settings.allowPublicUpload" />
           </label>
           <FaButton :loading="saving === 'texture'" @click="uploadTexture">
             <FaIcon name="i-ri:upload-cloud-2-line" />
@@ -394,48 +531,99 @@ function fileToBase64(file: File) {
       </div>
     </section>
 
-    <section v-else-if="activeTab === 'users'" class="workbench two-col">
+    <section v-else-if="currentPage === 'closet'" class="workbench two-col">
       <div class="panel">
         <div class="panel-head">
-          <strong>皮肤站用户</strong>
-          <FaTag variant="secondary">{{ users.length }}</FaTag>
+          <strong>衣柜列表</strong>
+          <FaTag variant="secondary">{{ closetItems.length }}</FaTag>
         </div>
         <div class="item-list">
-          <div v-for="user in users" :key="user.id" class="list-row static">
+          <div v-for="item in closetItems" :key="item.id" class="list-row static closet-row">
             <span>
-              <strong>{{ user.nickname || user.email }}</strong>
-              <small>{{ user.email }} / {{ user.id }}</small>
+              <strong>{{ item.itemName || textureName(item.textureHash) }}</strong>
+              <small>{{ userName(item.userId) }} / {{ textureName(item.textureHash) }}</small>
             </span>
-            <small>{{ dateText(user.createdAt) }}</small>
+            <FaButton size="sm" variant="outline" :loading="saving === `closet:${item.id}`" @click="deleteClosetItem(item)">
+              <FaIcon name="i-ri:delete-bin-6-line" />
+              删除
+            </FaButton>
           </div>
-          <div v-if="!users.length" class="empty-state">暂无用户</div>
+          <div v-if="!closetItems.length" class="empty-state">暂无衣柜项</div>
         </div>
       </div>
 
       <div class="panel">
-        <div class="panel-head"><strong>创建用户</strong></div>
+        <div class="panel-head"><strong>加入衣柜</strong></div>
         <div class="form-grid">
           <label>
-            <span>邮箱</span>
-            <FaInput v-model="userForm.email" placeholder="skin@example.com" />
+            <span>用户</span>
+            <FaSelect v-model="closetForm.userId" clearable :options="userOptions" />
           </label>
           <label>
-            <span>昵称</span>
-            <FaInput v-model="userForm.nickname" />
+            <span>材质</span>
+            <FaSelect v-model="closetForm.textureHash" :options="textureOptions" />
           </label>
           <label>
-            <span>密码</span>
-            <FaInput v-model="userForm.password" type="password" />
+            <span>显示名称</span>
+            <FaInput v-model="closetForm.itemName" placeholder="留空使用材质名称" />
           </label>
-          <FaButton :loading="saving === 'user'" @click="createUser">
-            <FaIcon name="i-ri:user-add-line" />
-            创建用户
+          <FaButton :loading="saving === 'closet'" @click="saveClosetItem">
+            <FaIcon name="i-ri:add-line" />
+            保存衣柜项
           </FaButton>
         </div>
       </div>
     </section>
 
     <section v-else class="workbench two-col">
+      <div class="panel stack">
+        <div>
+          <div class="panel-head"><strong>皮肤站配置</strong></div>
+          <div class="form-grid">
+            <label>
+              <span>每个用户最多角色数</span>
+              <FaInput v-model.number="settingsForm.maxPlayersPerUser" type="number" placeholder="0 表示不限制" />
+            </label>
+            <label class="switch-row">
+              <span>允许公开上传材质</span>
+              <FaSwitch v-model="settingsForm.allowPublicUpload" />
+            </label>
+            <label>
+              <span>站点公告</span>
+              <FaInput v-model="settingsForm.siteNotice" placeholder="显示在皮肤站仪表盘的简短提示" />
+            </label>
+            <FaButton :loading="saving === 'settings'" @click="saveSettings">
+              <FaIcon name="i-ri:save-3-line" />
+              保存配置
+            </FaButton>
+          </div>
+        </div>
+
+        <div class="divider" />
+
+        <div>
+          <div class="panel-head"><strong>皮肤站用户</strong><FaTag variant="secondary">{{ users.length }}</FaTag></div>
+          <div class="form-grid">
+            <label>
+              <span>邮箱</span>
+              <FaInput v-model="userForm.email" placeholder="skin@example.com" />
+            </label>
+            <label>
+              <span>昵称</span>
+              <FaInput v-model="userForm.nickname" />
+            </label>
+            <label>
+              <span>密码</span>
+              <FaInput v-model="userForm.password" type="password" />
+            </label>
+            <FaButton :loading="saving === 'user'" @click="createUser">
+              <FaIcon name="i-ri:user-add-line" />
+              创建用户
+            </FaButton>
+          </div>
+        </div>
+      </div>
+
       <div class="panel">
         <div class="panel-head"><strong>Blessing Skin 数据迁移</strong></div>
         <div class="form-grid">
@@ -464,10 +652,7 @@ function fileToBase64(file: File) {
             开始迁移
           </FaButton>
         </div>
-      </div>
 
-      <div class="panel">
-        <div class="panel-head"><strong>迁移结果</strong></div>
         <div v-if="migrationReport" class="report-grid">
           <span>用户 {{ migrationReport.users }}</span>
           <span>角色 {{ migrationReport.players }}</span>
@@ -479,7 +664,6 @@ function fileToBase64(file: File) {
           <strong>警告</strong>
           <span v-for="item in migrationReport.warnings" :key="item">{{ item }}</span>
         </div>
-        <div v-if="!migrationReport" class="empty-state">迁移完成后会显示统计和警告信息</div>
       </div>
     </section>
   </div>
@@ -487,6 +671,13 @@ function fileToBase64(file: File) {
 
 <style scoped>
 .skin-plugin {
+  display: grid;
+  gap: 14px;
+}
+
+.dashboard-page,
+.workbench,
+.stack {
   display: grid;
   gap: 14px;
 }
@@ -528,35 +719,6 @@ function fileToBase64(file: File) {
   min-height: 78px;
 }
 
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tabs button {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  height: 36px;
-  padding: 0 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-  color: var(--color-text-2);
-}
-
-.tabs button.active,
-.tabs button:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
-}
-
-.workbench {
-  display: grid;
-  gap: 14px;
-}
-
 .two-col {
   grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
   align-items: start;
@@ -577,7 +739,8 @@ function fileToBase64(file: File) {
 
 .panel-head span,
 .list-row small,
-.texture-card span {
+.texture-card span,
+.metric-list span {
   color: var(--color-text-3);
   font-size: 12px;
 }
@@ -585,9 +748,14 @@ function fileToBase64(file: File) {
 .item-list,
 .form-grid,
 .texture-grid,
-.warning-list {
+.warning-list,
+.metric-list {
   display: grid;
   gap: 10px;
+}
+
+.compact {
+  gap: 8px;
 }
 
 .list-row {
@@ -623,7 +791,12 @@ function fileToBase64(file: File) {
   white-space: nowrap;
 }
 
-.form-grid label {
+.closet-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.form-grid label,
+.metric-list div {
   display: grid;
   gap: 6px;
 }
@@ -632,6 +805,13 @@ function fileToBase64(file: File) {
   color: var(--color-text-2);
   font-size: 12px;
   font-weight: 600;
+}
+
+.metric-list div {
+  padding: 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
 }
 
 .switch-row {

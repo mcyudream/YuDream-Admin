@@ -263,6 +263,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 module.moduleName(),
                 module.sdkVersion(),
                 module.integrity(),
+                module.menuTitle(),
+                module.menuIcon(),
+                module.menuSort(),
                 module.routes().stream().map(this::toInfo).toList()
         );
     }

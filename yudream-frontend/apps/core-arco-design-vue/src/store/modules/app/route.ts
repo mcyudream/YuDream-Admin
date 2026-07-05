@@ -162,8 +162,10 @@ export const useAppRouteStore = defineStore(
     async function loadPluginRoutes(): Promise<RouteRecordMainRaw[]> {
       try {
         const res = await apiPlugin.frontendManifest()
-        const children: RouteRecordRaw[] = []
+        const groups: RouteRecordMainRaw[] = []
+        const legacyChildren: RouteRecordRaw[] = []
         res.data.modules?.forEach((module) => {
+          const children: RouteRecordRaw[] = []
           module.routes?.forEach((route) => {
             const routeName = route.name || `${module.pluginCode}-${route.path}`
             const routeMeta = {
@@ -179,7 +181,7 @@ export const useAppRouteStore = defineStore(
                 sdkVersion: module.sdkVersion || res.data.sdkVersion,
               },
             } as any
-            children.push({
+            const routeRecord = {
               path: route.path,
               name: `${routeName}-layout`,
               component: () => import('@/layouts/index.vue'),
@@ -194,20 +196,37 @@ export const useAppRouteStore = defineStore(
                   breadcrumb: false,
                 },
               }],
-            })
+            }
+            children.push(routeRecord)
           })
+          if (!children.length) {
+            return
+          }
+          if (module.menuTitle) {
+            groups.push({
+              meta: {
+                title: module.menuTitle,
+                icon: module.menuIcon || 'i-ri:puzzle-2-line',
+                sort: module.menuSort ?? 20,
+              },
+              children,
+            })
+          }
+          else {
+            legacyChildren.push(...children)
+          }
         })
-        if (!children.length) {
-          return []
+        if (legacyChildren.length) {
+          groups.push({
+            meta: {
+              title: '插件扩展',
+              icon: 'i-ri:puzzle-2-line',
+              sort: 20,
+            },
+            children: legacyChildren,
+          })
         }
-        return [{
-          meta: {
-            title: '插件扩展',
-            icon: 'i-ri:puzzle-2-line',
-            sort: 20,
-          },
-          children,
-        }]
+        return groups
       }
       catch {
         return []
