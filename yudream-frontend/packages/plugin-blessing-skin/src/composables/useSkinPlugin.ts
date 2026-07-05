@@ -53,6 +53,7 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
   })
   const currentUserId = computed(() => me.value?.userId || sdk.account.userId || '')
   const accountName = computed(() => me.value?.hostUser?.nickname || me.value?.hostUser?.username || sdk.account.username || currentUserId.value)
+  const defaultPlayerName = computed(() => me.value?.defaultPlayerName || '')
 
   const textureOptions = computed(() => textures.value.map(item => ({
     label: `${item.name} (${item.hash.slice(0, 10)})`,
@@ -133,8 +134,17 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
       if (!closetForm.userId && currentUserId.value) {
         closetForm.userId = currentUserId.value
       }
-      if (!selectedPlayerName.value && players.value.length) {
-        selectPlayer(players.value.find(player => !!player.skinHash || !!player.capeHash) || players.value[0])
+      const defaultPlayer = current.defaultPlayerName
+        ? playerList.find(player => player.name === current.defaultPlayerName)
+        : undefined
+      const currentSelectedPlayer = selectedPlayerName.value
+        ? playerList.find(player => player.name === selectedPlayerName.value)
+        : undefined
+      if (defaultPlayer && (!selectedPlayerName.value || !currentSelectedPlayer)) {
+        selectPlayer(defaultPlayer)
+      }
+      else if (!currentSelectedPlayer && players.value.length) {
+        selectPlayer(defaultPlayer || players.value.find(player => !!player.skinHash || !!player.capeHash) || players.value[0])
       }
       if (!selectedTextureHash.value && textures.value.length) {
         selectTexture(textures.value[0])
@@ -246,6 +256,26 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
     try {
       await api.assignTextures(selectedPlayerName.value, { ...assignForm })
       toast.success('材质绑定已保存')
+      await load()
+    }
+    finally {
+      saving.value = ''
+    }
+  }
+
+  async function setDefaultPlayer(player = selectedPlayer.value) {
+    if (!player) {
+      toast.error('请先选择角色')
+      return
+    }
+    saving.value = `default-player:${player.name}`
+    try {
+      const saved = await api.setDefaultPlayer({ name: player.name })
+      if (me.value) {
+        me.value.defaultPlayerName = saved.name
+      }
+      selectPlayer(saved)
+      toast.success('默认角色已切换')
       await load()
     }
     finally {
@@ -484,6 +514,7 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
     canUse,
     currentUserId,
     accountName,
+    defaultPlayerName,
     selectedPlayer,
     selectedTexture,
     selectedClosetItem,
@@ -511,6 +542,7 @@ export function useSkinPlugin(sdk: YuDreamPluginSdk) {
     renamePlayer,
     deletePlayer,
     assignTextures,
+    setDefaultPlayer,
     handleTextureFile,
     uploadTexture,
     saveClosetItem,

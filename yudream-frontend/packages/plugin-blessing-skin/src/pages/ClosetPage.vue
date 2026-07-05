@@ -27,8 +27,12 @@
             :class="{ active: model.selectedClosetId === item.id }"
             @click="model.selectClosetItem(item)"
           >
-            <span class="skin-texture-card__image">
-              <img :src="model.textureUrl(item.textureHash)" alt="">
+            <span class="skin-texture-card__image render">
+              <SkinTexturePreview
+                :texture-url="model.textureUrl(item.textureHash)"
+                :type="closetTexture(item)?.type"
+                :model="closetTexture(item)?.model"
+              />
             </span>
             <span class="skin-texture-card__body">
               <strong>{{ item.itemName || model.textureName(item.textureHash) }}</strong>
@@ -150,10 +154,12 @@
 
 <script setup lang="ts">
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
+import type { SkinClosetItem } from '../types'
 import { computed, ref } from 'vue'
 import { FaButton, FaIcon, FaInput, FaModal, FaTag, FaTooltip } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
+import SkinTexturePreview from '../components/SkinTexturePreview.vue'
 
 const props = defineProps<{
   model: SkinPluginModel
@@ -208,6 +214,10 @@ function openRename() {
   }
   props.model.closetRenameForm.itemName = props.model.selectedClosetItem.itemName || props.model.textureName(props.model.selectedClosetItem.textureHash)
   renameVisible.value = true
+}
+
+function closetTexture(item: SkinClosetItem) {
+  return props.model.textures.find(texture => texture.hash === item.textureHash)
 }
 
 async function submitRename() {

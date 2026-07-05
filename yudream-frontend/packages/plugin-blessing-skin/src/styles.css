@@ -357,6 +357,69 @@
   background-size: 18px 18px;
 }
 
+.skin-texture-card__image.render {
+  height: 168px;
+  background: var(--color-bg-1);
+}
+
+.skin-texture-preview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  justify-items: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 22%, rgba(255, 255, 255, 0.78), transparent 44%),
+    var(--color-bg-1);
+}
+
+.skin-texture-preview__pane {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  justify-items: center;
+}
+
+.skin-texture-preview__label {
+  color: var(--color-text-3);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.skin-texture-preview canvas {
+  max-width: 100%;
+  filter: brightness(1.12) saturate(1.05);
+}
+
+.skin-texture-preview.cape {
+  padding: 18px 22px;
+  gap: 10px;
+}
+
+.skin-texture-preview__cape {
+  display: grid;
+  width: 74px;
+  height: 116px;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--color-bg-2);
+  box-shadow: inset 0 0 0 1px var(--color-border-2);
+}
+
+.skin-texture-preview__cape.back img {
+  transform: scaleX(-1);
+}
+
+.skin-texture-preview__cape img {
+  width: 88%;
+  height: 88%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 .skin-texture-card__image img {
   width: 92%;
   height: 92%;
@@ -370,6 +433,21 @@
   gap: 3px;
 }
 
+.skin-filter-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(128px, 150px)) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.skin-filter-keyword {
+  width: 100%;
+}
+
+.skin-filter-reset {
+  white-space: nowrap;
+}
+
 .skin-texture-card__body strong,
 .skin-role-item strong {
   overflow: hidden;
@@ -378,12 +456,30 @@
 }
 
 .skin-texture-card__body small,
+.skin-texture-card__meta,
 .skin-action-panel span,
 .skin-character-card__meta span,
 .skin-help-text,
 .skin-role-item small {
   color: var(--color-text-3);
   font-size: 12px;
+}
+
+.skin-texture-card__meta {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.skin-texture-card__meta span {
+  display: inline-flex;
+  min-width: 0;
+  gap: 3px;
+  align-items: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .skin-action-panel {
@@ -573,8 +669,6 @@
   border-radius: 6px;
   background: var(--color-bg-1);
   color: var(--color-text-1);
-  cursor: pointer;
-  text-align: left;
 }
 
 .skin-role-item.active,
@@ -583,10 +677,41 @@
   background: var(--color-fill-2);
 }
 
-.skin-role-item span {
+.skin-role-item.is-default {
+  border-color: var(--skin-accent-border);
+  background: var(--skin-accent-soft);
+}
+
+.skin-role-select {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.skin-role-meta {
   display: grid;
   min-width: 0;
   gap: 4px;
+}
+
+.skin-role-badges {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+  color: var(--color-text-3);
+}
+
+.skin-role-default {
+  color: rgb(var(--primary-6));
 }
 
 .skin-inline-form,
@@ -1043,6 +1168,7 @@
   }
 
   .skin-dress-form,
+  .skin-filter-bar,
   .skin-upload-form,
   .skin-collapse .skin-inline-form {
     grid-template-columns: 1fr;

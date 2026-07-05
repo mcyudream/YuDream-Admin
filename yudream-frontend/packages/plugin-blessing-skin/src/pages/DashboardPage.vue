@@ -50,7 +50,7 @@
           />
         </div>
         <div class="skin-current-card__body">
-          <span>当前角色</span>
+          <span>当前默认角色</span>
           <h3>{{ model.selectedPlayer?.name || '还没有角色' }}</h3>
           <p>{{ currentPlayerDescription }}</p>
           <div class="skin-current-card__actions">

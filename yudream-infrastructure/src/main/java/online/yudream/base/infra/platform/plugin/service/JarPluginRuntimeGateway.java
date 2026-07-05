@@ -34,6 +34,7 @@ import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
@@ -189,8 +190,35 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 request.body(),
                 new PluginPrincipal(request.userId(), request.permissions())
         );
-        PluginHttpResponse response = handler.handle(pluginRequest);
+        PluginHttpResponse response;
+        try {
+            response = handler.handle(pluginRequest);
+        } catch (IllegalArgumentException e) {
+            response = PluginHttpResponse.rawJson(400, Map.of("message", messageOrDefault(e, "请求参数不正确")));
+        } catch (RuntimeException e) {
+            Optional<IllegalArgumentException> argumentException = findCause(e, IllegalArgumentException.class);
+            if (argumentException.isPresent()) {
+                response = PluginHttpResponse.rawJson(400, Map.of("message", messageOrDefault(argumentException.get(), "请求参数不正确")));
+            } else {
+                throw e;
+            }
+        }
         return new PluginHttpDispatchResult(response.status(), response.headers(), response.contentType(), response.body(), response.wrapped());
+    }
+
+    private String messageOrDefault(Throwable throwable, String fallback) {
+        return StringUtils.hasText(throwable.getMessage()) ? throwable.getMessage() : fallback;
+    }
+
+    private <T extends Throwable> Optional<T> findCause(Throwable throwable, Class<T> type) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return Optional.of(type.cast(current));
+            }
+            current = current.getCause();
+        }
+        return Optional.empty();
     }
 
     private Stream<Path> jarFiles(Path directory) {

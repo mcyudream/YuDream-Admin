@@ -4,7 +4,7 @@
       <div>
         <span>皮肤库</span>
         <h2>浏览全站材质</h2>
-        <p>选择一个材质查看 3D 效果，保存到衣柜后即可给自己的角色换装。</p>
+        <p>选择一个材质查看 3D 效果，保存到衣柜后即可给默认角色或当前角色换装。</p>
       </div>
       <div class="skin-command-actions">
         <FaButton variant="outline" :loading="model.loading" @click="model.load">
@@ -21,26 +21,60 @@
     <div class="skin-library-layout">
       <SkinPanel title="材质">
         <template #header>
-          <FaTag variant="secondary">{{ model.textures.length }}</FaTag>
+          <FaTag variant="secondary">{{ filteredTextures.length }}/{{ model.textures.length }}</FaTag>
         </template>
+
+        <div class="skin-filter-bar">
+          <FaInput
+            v-model="keyword"
+            type="search"
+            clearable
+            class="skin-filter-keyword"
+            data-testid="skin-texture-keyword"
+            placeholder="搜索名称、Hash 或上传人"
+            @clear="keyword = ''"
+          />
+          <FaSelect v-model="typeFilter" data-testid="skin-texture-type" :options="typeFilterOptions" />
+          <FaSelect v-model="ownerFilter" data-testid="skin-texture-source" :options="ownerFilterOptions" />
+          <FaSelect v-model="sortType" data-testid="skin-texture-sort" :options="sortOptions" />
+          <FaButton v-if="activeFilterCount" variant="outline" class="skin-filter-reset" @click="resetFilters">
+            <FaIcon name="i-ri:filter-off-line" />
+            清空
+          </FaButton>
+        </div>
+
         <div class="skin-card-grid">
           <button
-            v-for="texture in model.textures"
+            v-for="texture in filteredTextures"
             :key="texture.hash"
             type="button"
             class="skin-texture-card"
             :class="{ active: model.selectedTextureHash === texture.hash }"
             @click="model.selectTexture(texture)"
           >
-            <span class="skin-texture-card__image">
-              <img :src="model.textureUrl(texture.hash)" alt="">
+            <span class="skin-texture-card__image render">
+              <SkinTexturePreview
+                :texture-url="model.textureUrl(texture.hash)"
+                :type="texture.type"
+                :model="texture.model"
+              />
             </span>
             <span class="skin-texture-card__body">
               <strong>{{ texture.name }}</strong>
-              <small>{{ texture.type === 'cape' ? '披风' : texture.model === 'slim' ? 'Alex 皮肤' : 'Steve 皮肤' }}</small>
+              <small>{{ textureKind(texture) }} / {{ texture.publicAccess ? '公开' : '私有' }}</small>
+              <span class="skin-texture-card__meta">
+                <span>
+                  <FaIcon name="i-ri:user-3-line" />
+                  {{ model.userName(texture.uploaderId) }}
+                </span>
+                <span>
+                  <FaIcon name="i-ri:hashtag" />
+                  {{ shortHash(texture.hash) }}
+                </span>
+              </span>
             </span>
           </button>
-          <div v-if="!model.textures.length" class="empty-state">暂无材质</div>
+          <div v-if="!filteredTextures.length" class="empty-state">没有匹配的材质</div>
         </div>
       </SkinPanel>
 
@@ -83,7 +117,7 @@
               应用到当前角色
             </FaButton>
           </div>
-          <p v-if="model.canUse && !model.selectedPlayer" class="skin-help-text">先在“我的角色”中选择或创建角色，再一键应用材质。</p>
+          <p v-if="model.canUse && !model.selectedPlayer" class="skin-help-text">先在“我的角色”中选择或设定默认角色，再一键应用材质。</p>
         </div>
       </aside>
     </div>
@@ -121,32 +155,111 @@
 
 <script setup lang="ts">
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
+import type { SkinTexture } from '../types'
 import { computed, ref } from 'vue'
 import { FaButton, FaIcon, FaInput, FaModal, FaSelect, FaSwitch, FaTag } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
+import SkinTexturePreview from '../components/SkinTexturePreview.vue'
 
 const props = defineProps<{
   model: SkinPluginModel
 }>()
 
 const uploadVisible = ref(false)
+const keyword = ref('')
+const typeFilter = ref('all')
+const ownerFilter = ref('all')
+const sortType = ref('new')
 const textureTypeOptions = [
   { label: 'Steve 皮肤', value: 'steve' },
   { label: 'Alex 皮肤', value: 'alex' },
   { label: '披风', value: 'cape' },
 ]
+const typeFilterOptions = [
+  { label: '全部类型', value: 'all' },
+  { label: 'Steve 皮肤', value: 'default' },
+  { label: 'Alex 皮肤', value: 'slim' },
+  { label: '披风', value: 'cape' },
+]
+const ownerFilterOptions = [
+  { label: '全部来源', value: 'all' },
+  { label: '我上传的', value: 'mine' },
+  { label: '公开材质', value: 'public' },
+]
+const sortOptions = [
+  { label: '最近上传', value: 'new' },
+  { label: '最早上传', value: 'old' },
+  { label: '名称排序', value: 'name' },
+]
+const activeFilterCount = computed(() => [
+  keyword.value.trim(),
+  typeFilter.value !== 'all',
+  ownerFilter.value !== 'all',
+].filter(Boolean).length)
+
+const filteredTextures = computed(() => {
+  const words = keyword.value.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  return props.model.textures
+    .filter((texture) => {
+      if (typeFilter.value === 'cape' && texture.type !== 'cape') {
+        return false
+      }
+      if (typeFilter.value === 'slim' && !(texture.type !== 'cape' && texture.model === 'slim')) {
+        return false
+      }
+      if (typeFilter.value === 'default' && !(texture.type !== 'cape' && texture.model !== 'slim')) {
+        return false
+      }
+      if (ownerFilter.value === 'mine' && texture.uploaderId !== props.model.currentUserId) {
+        return false
+      }
+      if (ownerFilter.value === 'public' && !texture.publicAccess) {
+        return false
+      }
+      if (!words.length) {
+        return true
+      }
+      const searchText = [
+        texture.name,
+        texture.hash,
+        textureKind(texture),
+        props.model.userName(texture.uploaderId),
+      ].join(' ').toLowerCase()
+      return words.every(word => searchText.includes(word))
+    })
+    .slice()
+    .sort((left, right) => {
+      if (sortType.value === 'name') {
+        return left.name.localeCompare(right.name)
+      }
+      const leftTime = left.uploadedAt || 0
+      const rightTime = right.uploadedAt || 0
+      return sortType.value === 'old' ? leftTime - rightTime : rightTime - leftTime
+    })
+})
 
 const selectedKind = computed(() => {
   const texture = props.model.selectedTexture
-  if (!texture) {
-    return '-'
-  }
+  return texture ? textureKind(texture) : '-'
+})
+
+function textureKind(texture: SkinTexture) {
   if (texture.type === 'cape') {
     return '披风'
   }
   return texture.model === 'slim' ? 'Alex 皮肤' : 'Steve 皮肤'
-})
+}
+
+function shortHash(hash?: string) {
+  return hash ? hash.slice(0, 10) : '-'
+}
+
+function resetFilters() {
+  keyword.value = ''
+  typeFilter.value = 'all'
+  ownerFilter.value = 'all'
+}
 
 async function submitUpload() {
   await props.model.uploadTexture()
