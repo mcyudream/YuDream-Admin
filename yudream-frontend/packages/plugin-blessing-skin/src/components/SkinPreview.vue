@@ -37,8 +37,8 @@
         :enable-rotate="controls"
         :enable-zoom="controls"
         :enable-pan="false"
-        :global-light="1.05"
-        :camera-light="0.7"
+        :global-light="1.7"
+        :camera-light="1.35"
         :zoom="zoom"
         :background="{ type: 'color', value: backgroundValue }"
       />
@@ -93,9 +93,9 @@ interface RgbColor {
 }
 
 const fallbackBackgrounds: PreviewBackground[] = [
-  { label: '主题', color: '#f5f5f6', value: 0xf5f5f6 },
-  { label: '柔和', color: '#fafafa', value: 0xfafafa },
-  { label: '对比', color: '#e7e7ea', value: 0xe7e7ea },
+  { label: '表面', color: '#f7f7f8', value: 0xf7f7f8 },
+  { label: '柔和', color: '#fbfbfc', value: 0xfbfbfc },
+  { label: '主题', color: '#ececef', value: 0xececef },
 ]
 const backgrounds = ref<PreviewBackground[]>(fallbackBackgrounds)
 const backgroundValue = ref(fallbackBackgrounds[0].value)
@@ -178,19 +178,25 @@ function resolveViewer(): SkinViewer | null {
 
 function syncThemeBackgrounds() {
   const styles = getComputedStyle(document.documentElement)
-  const surface = readThemeColor(styles, '--color-bg-2', { r: 245, g: 245, b: 246 })
-  const fill = readThemeColor(styles, '--color-fill-1', surface)
-  const text = readThemeColor(styles, '--color-text-1', { r: 32, g: 34, b: 37 })
+  const surface = readThemeColor(styles, '--color-bg-1', { r: 247, g: 247, b: 248 })
+  const panel = readThemeColor(styles, '--color-bg-2', surface)
+  const primary = readThemeColor(styles, '--primary-6', { r: 22, g: 93, b: 255 })
   const currentIndex = backgrounds.value.findIndex(item => item.value === backgroundValue.value)
+  const brightenRatio = colorLuminance(surface) < 96 ? 0.1 : 0.72
+  const base = mixColor(surface, { r: 255, g: 255, b: 255 }, brightenRatio)
   const nextBackgrounds = [
-    toPreviewBackground('主题', fill),
-    toPreviewBackground('柔和', mixColor(surface, fill, 0.62)),
-    toPreviewBackground('对比', mixColor(surface, text, 0.12)),
+    toPreviewBackground('表面', base),
+    toPreviewBackground('柔和', mixColor(base, panel, 0.35)),
+    toPreviewBackground('主题', mixColor(base, primary, 0.04)),
   ]
   backgrounds.value = nextBackgrounds
   if (currentIndex >= 0) {
     backgroundValue.value = nextBackgrounds[Math.min(currentIndex, nextBackgrounds.length - 1)].value
   }
+}
+
+function colorLuminance(color: RgbColor): number {
+  return color.r * 0.299 + color.g * 0.587 + color.b * 0.114
 }
 
 function readThemeColor(styles: CSSStyleDeclaration, name: string, fallback: RgbColor): RgbColor {
