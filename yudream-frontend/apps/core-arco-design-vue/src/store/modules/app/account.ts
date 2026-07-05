@@ -20,6 +20,7 @@ function parseStoredItem<T>(key: string): T | null {
 interface AccountSession {
   token: string
   refreshToken?: string
+  userId?: IdValue
   account: string
   avatar: string
   currentDept: DeptItem | null
@@ -37,6 +38,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   // 账号信息
   const token = ref(localStorage.getItem('token') ?? '')
   const refreshToken = ref(localStorage.getItem('refreshToken') ?? '')
+  const userId = ref<IdValue | ''>(localStorage.getItem('userId') ?? '')
   const account = ref(localStorage.getItem('account') ?? '')
   const avatar = ref(localStorage.getItem('avatar') ?? '')
 
@@ -100,6 +102,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
 
   function applyLoginData(user: LoginData) {
     const nextAvatar = toBackendAssetUrl(user.avatar)
+    localStorage.setItem('userId', String(user.userId))
     localStorage.setItem('account', user.username)
     localStorage.setItem('token', user.token)
     if (user.refreshToken) {
@@ -114,6 +117,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     else {
       localStorage.removeItem('avatar')
     }
+    userId.value = user.userId
     account.value = user.username
     token.value = user.token
     refreshToken.value = user.refreshToken || ''
@@ -126,6 +130,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     return {
       token: token.value,
       refreshToken: refreshToken.value,
+      userId: userId.value || undefined,
       account: account.value,
       avatar: avatar.value,
       currentDept: currentDept.value,
@@ -173,6 +178,12 @@ export const useAppAccountStore = defineStore('appAccount', () => {
       localStorage.removeItem('refreshToken')
     }
     localStorage.setItem('account', session.account)
+    if (session.userId !== undefined) {
+      localStorage.setItem('userId', String(session.userId))
+    }
+    else {
+      localStorage.removeItem('userId')
+    }
     if (session.avatar) {
       localStorage.setItem('avatar', session.avatar)
     }
@@ -181,6 +192,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     }
     token.value = session.token
     refreshToken.value = session.refreshToken || ''
+    userId.value = session.userId || ''
     account.value = session.account
     avatar.value = session.avatar
     setCurrentDept(session.currentDept)
@@ -278,10 +290,12 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   // 登出后清除状态
   function logoutCleanStatus() {
     localStorage.removeItem('account')
+    localStorage.removeItem('userId')
     localStorage.removeItem('avatar')
     localStorage.removeItem('refreshToken')
     localStorage.removeItem('currentDept')
     localStorage.removeItem('currentRole')
+    userId.value = ''
     account.value = ''
     avatar.value = ''
     currentDept.value = null
@@ -320,6 +334,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   return {
     token,
     refreshToken,
+    userId,
     account,
     avatar,
     currentDept,

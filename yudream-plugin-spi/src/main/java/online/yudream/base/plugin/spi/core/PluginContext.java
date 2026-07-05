@@ -35,6 +35,8 @@ public interface PluginContext {
 
     void registerHttpHandler(String method, String path, PluginHttpHandler handler);
 
+    void registerHttpController(Object controller);
+
     <T> void registerExtension(Class<T> type, T extension);
 
     <T> Optional<T> getExtension(Class<T> type);

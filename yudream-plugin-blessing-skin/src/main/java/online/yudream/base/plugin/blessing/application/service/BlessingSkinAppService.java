@@ -5,8 +5,11 @@ import online.yudream.base.plugin.blessing.application.cmd.ClosetItemSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreatePlayerCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreateSkinUserCmd;
 import online.yudream.base.plugin.blessing.application.cmd.MigrationCmd;
+import online.yudream.base.plugin.blessing.application.cmd.RenameClosetItemCmd;
+import online.yudream.base.plugin.blessing.application.cmd.RenamePlayerCmd;
 import online.yudream.base.plugin.blessing.application.cmd.SkinSettingsSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.TextureUploadCmd;
+import online.yudream.base.plugin.blessing.application.dto.BlessingSkinSummaryDTO;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinPlayer;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinClosetItem;
 import online.yudream.base.plugin.blessing.domain.aggregate.SkinTexture;
@@ -44,13 +47,17 @@ public class BlessingSkinAppService implements PluginSkinService {
         this.migrationService = migrationService;
     }
 
-    public Object summary() {
-        return new Summary(repository.userCount(), repository.playerCount(), repository.textureCount(),
+    public BlessingSkinSummaryDTO summary() {
+        return new BlessingSkinSummaryDTO(repository.userCount(), repository.playerCount(), repository.textureCount(),
                 repository.closetCount(), repository.optionCount(), settings());
     }
 
     public List<SkinUser> listUsers(int page, int size) {
         return repository.listUsers(page, size);
+    }
+
+    public Optional<SkinUser> findUser(String userId) {
+        return repository.findUserById(userId);
     }
 
     public SkinUser createUser(CreateSkinUserCmd cmd) {
@@ -74,6 +81,10 @@ public class BlessingSkinAppService implements PluginSkinService {
 
     public List<SkinPlayer> listPlayers(int page, int size) {
         return repository.listPlayers(page, size);
+    }
+
+    public List<SkinPlayer> listPlayersByOwner(String ownerId) {
+        return repository.findPlayersByOwner(requireText(ownerId, "用户不能为空"));
     }
 
     public Optional<SkinPlayer> findPlayer(String name) {
@@ -110,22 +121,97 @@ public class BlessingSkinAppService implements PluginSkinService {
         String skinHash = blankToNull(cmd.skinHash());
         String capeHash = blankToNull(cmd.capeHash());
         if (skinHash != null) {
-            requireTexture(skinHash);
+            requireSkinTexture(skinHash);
         }
         if (capeHash != null) {
-            requireTexture(capeHash);
+            requireCapeTexture(capeHash);
         }
         return repository.savePlayer(player.withTextures(skinHash, capeHash));
+    }
+
+    public SkinPlayer assignOwnTextures(String playerName, String ownerId, AssignTextureCmd cmd) {
+        SkinPlayer player = repository.findPlayerByName(playerName)
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
+        String userId = requireText(ownerId, "用户不能为空");
+        if (!player.ownerId().equals(userId)) {
+            throw new IllegalArgumentException("只能操作自己的角色");
+        }
+        String skinHash = blankToNull(cmd.skinHash());
+        String capeHash = blankToNull(cmd.capeHash());
+        if (skinHash != null) {
+            requireOwnTexture(userId, skinHash, "skin");
+        }
+        if (capeHash != null) {
+            requireOwnTexture(userId, capeHash, "cape");
+        }
+        return repository.savePlayer(player.withTextures(skinHash, capeHash));
+    }
+
+    public SkinPlayer renamePlayer(String playerName, RenamePlayerCmd cmd) {
+        SkinPlayer player = repository.findPlayerByName(playerName)
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
+        String newName = requireText(cmd.name(), "角色名不能为空");
+        repository.findPlayerByName(newName)
+                .filter(existing -> !existing.uuid().equals(player.uuid()))
+                .ifPresent(ignored -> {
+                    throw new IllegalArgumentException("角色名已存在");
+                });
+        return repository.savePlayer(player.withName(newName));
+    }
+
+    public SkinPlayer renameOwnPlayer(String playerName, String ownerId, RenamePlayerCmd cmd) {
+        SkinPlayer player = repository.findPlayerByName(playerName)
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
+        if (!player.ownerId().equals(requireText(ownerId, "用户不能为空"))) {
+            throw new IllegalArgumentException("只能操作自己的角色");
+        }
+        return renamePlayer(playerName, cmd);
+    }
+
+    public void deletePlayer(String playerName) {
+        SkinPlayer player = repository.findPlayerByName(playerName)
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
+        repository.deletePlayer(player.uuid());
+    }
+
+    public void deleteOwnPlayer(String playerName, String ownerId) {
+        SkinPlayer player = repository.findPlayerByName(playerName)
+                .orElseThrow(() -> new IllegalArgumentException("角色不存在：" + playerName));
+        if (!player.ownerId().equals(requireText(ownerId, "用户不能为空"))) {
+            throw new IllegalArgumentException("只能操作自己的角色");
+        }
+        repository.deletePlayer(player.uuid());
     }
 
     public List<SkinTexture> listTextures(int page, int size) {
         return repository.listTextures(page, size);
     }
 
+    public List<SkinTexture> listVisibleTextures(String userId, boolean manage, int page, int size) {
+        if (manage) {
+            return listTextures(page, size);
+        }
+        return repository.listTextures(page, size).stream()
+                .filter(texture -> Boolean.TRUE.equals(texture.publicAccess()) || requireText(userId, "用户不能为空").equals(texture.uploaderId()))
+                .toList();
+    }
+
     public SkinTexture uploadTexture(TextureUploadCmd cmd, Long currentUserId) {
+        String uploaderId = currentUserId == null ? "system" : String.valueOf(currentUserId);
+        return saveUploadedTexture(cmd, uploaderId);
+    }
+
+    public SkinTexture uploadOwnTexture(TextureUploadCmd cmd, String ownerId, Long currentUserId) {
+        String userId = requireText(ownerId, "用户不能为空");
+        SkinTexture texture = saveUploadedTexture(cmd, userId);
+        repository.saveClosetItem(userId, texture.hash(), texture.name());
+        return texture;
+    }
+
+    private SkinTexture saveUploadedTexture(TextureUploadCmd cmd, String uploaderId) {
         byte[] bytes = Base64.getDecoder().decode(requireText(cmd.base64(), "材质 base64 不能为空"));
         String hash = HashSupport.sha256(bytes);
-        SkinTextureType type = SkinTextureType.from(hasText(cmd.model()) ? cmd.model() : cmd.type());
+        SkinTextureType type = SkinTextureType.from(hasText(cmd.type()) ? cmd.type() : cmd.model());
         String contentType = hasText(cmd.contentType()) ? cmd.contentType() : "image/png";
         String objectKey = repository.saveTextureFile(hash, bytes, contentType);
         boolean publicAccess = settings().publicUploadEnabled() && (cmd.publicAccess() == null || cmd.publicAccess());
@@ -136,7 +222,7 @@ public class BlessingSkinAppService implements PluginSkinService {
                 type.model(),
                 contentType,
                 (long) bytes.length,
-                hasText(cmd.uploaderId()) ? cmd.uploaderId() : currentUserId == null ? "system" : String.valueOf(currentUserId),
+                requireText(uploaderId, "用户不能为空"),
                 publicAccess,
                 objectKey,
                 null,
@@ -155,8 +241,42 @@ public class BlessingSkinAppService implements PluginSkinService {
         return repository.saveClosetItem(userId, texture.hash(), hasText(cmd.itemName()) ? cmd.itemName().trim() : texture.name());
     }
 
+    public SkinClosetItem saveOwnClosetItem(ClosetItemSaveCmd cmd, String ownerId, Long currentUserId) {
+        String userId = requireText(ownerId, "用户不能为空");
+        String textureHash = requireText(cmd.textureHash(), "材质不能为空");
+        SkinTexture texture = requireTexture(textureHash);
+        if (!Boolean.TRUE.equals(texture.publicAccess()) && !userId.equals(texture.uploaderId())) {
+            throw new IllegalArgumentException("只能收藏公开材质或自己上传的私有材质");
+        }
+        return saveClosetItem(new ClosetItemSaveCmd(userId, texture.hash(), cmd.itemName()), currentUserId);
+    }
+
+    public SkinClosetItem renameClosetItem(String id, RenameClosetItemCmd cmd) {
+        SkinClosetItem item = repository.findClosetItem(requireText(id, "衣柜项不能为空"))
+                .orElseThrow(() -> new IllegalArgumentException("衣柜项不存在"));
+        return repository.saveClosetItem(item.withItemName(requireText(cmd.itemName(), "显示名称不能为空")));
+    }
+
+    public SkinClosetItem renameOwnClosetItem(String id, String userId, RenameClosetItemCmd cmd) {
+        SkinClosetItem item = repository.findClosetItem(requireText(id, "衣柜项不能为空"))
+                .orElseThrow(() -> new IllegalArgumentException("衣柜项不存在"));
+        if (!item.userId().equals(requireText(userId, "用户不能为空"))) {
+            throw new IllegalArgumentException("只能操作自己的衣柜");
+        }
+        return repository.saveClosetItem(item.withItemName(requireText(cmd.itemName(), "显示名称不能为空")));
+    }
+
     public void deleteClosetItem(String id) {
         repository.deleteClosetItem(requireText(id, "衣柜项不能为空"));
+    }
+
+    public void deleteOwnClosetItem(String id, String userId) {
+        SkinClosetItem item = repository.findClosetItem(requireText(id, "衣柜项不能为空"))
+                .orElseThrow(() -> new IllegalArgumentException("衣柜项不存在"));
+        if (!item.userId().equals(requireText(userId, "用户不能为空"))) {
+            throw new IllegalArgumentException("只能操作自己的衣柜");
+        }
+        repository.deleteClosetItem(item.id());
     }
 
     public SkinSiteSettings settings() {
@@ -268,6 +388,29 @@ public class BlessingSkinAppService implements PluginSkinService {
                 .orElseThrow(() -> new IllegalArgumentException("材质不存在：" + hash));
     }
 
+    private SkinTexture requireSkinTexture(String hash) {
+        SkinTexture texture = requireTexture(hash);
+        if (!"skin".equalsIgnoreCase(texture.type())) {
+            throw new IllegalArgumentException("请选择皮肤材质");
+        }
+        return texture;
+    }
+
+    private SkinTexture requireCapeTexture(String hash) {
+        SkinTexture texture = requireTexture(hash);
+        if (!"cape".equalsIgnoreCase(texture.type())) {
+            throw new IllegalArgumentException("请选择披风材质");
+        }
+        return texture;
+    }
+
+    private SkinTexture requireOwnTexture(String userId, String hash, String expectedType) {
+        SkinTexture texture = "cape".equals(expectedType) ? requireCapeTexture(hash) : requireSkinTexture(hash);
+        repository.findClosetByUserAndTexture(userId, hash)
+                .orElseThrow(() -> new IllegalArgumentException("材质不在你的衣柜中"));
+        return texture;
+    }
+
     private String requireText(String value, String message) {
         if (!hasText(value)) {
             throw new IllegalArgumentException(message);
@@ -281,8 +424,5 @@ public class BlessingSkinAppService implements PluginSkinService {
 
     private String blankToNull(String value) {
         return hasText(value) ? value.trim() : null;
-    }
-
-    public record Summary(long users, long players, long textures, long closetItems, long options, SkinSiteSettings settings) {
     }
 }

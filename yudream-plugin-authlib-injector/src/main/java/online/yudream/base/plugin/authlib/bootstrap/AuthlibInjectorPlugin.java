@@ -26,17 +26,22 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
         @PluginPermission(code = AuthlibInjectorPlugin.VIEW_PERMISSION, name = "查看 Authlib", module = "平台插件", description = "查看 Authlib Injector 插件状态"),
         @PluginPermission(code = AuthlibInjectorPlugin.MANAGE_PERMISSION, name = "管理 Authlib", module = "平台插件", description = "管理 Authlib Injector 配置")
 })
-@PluginFrontend(moduleName = "authlibInjector", routes = {
-        @PluginRoute(
-                path = "/platform/plugins/authlib-injector",
-                name = "platform-plugin-authlib-injector",
-                title = "Authlib Injector",
-                icon = "i-ri:key-2-line",
-                component = "authlib-injector/Home",
-                permission = AuthlibInjectorPlugin.VIEW_PERMISSION,
-                sort = 30
-        )
-})
+@PluginFrontend(
+        moduleName = "authlibInjector",
+        menuTitle = "Authlib",
+        menuIcon = "i-ri:key-2-line",
+        menuSort = 18,
+        routes = {
+                @PluginRoute(
+                        path = "/platform/plugins/authlib-injector",
+                        name = "platform-plugin-authlib-injector",
+                        title = "Authlib Injector",
+                        icon = "i-ri:key-2-line",
+                        component = "authlib-injector/Home",
+                        permission = AuthlibInjectorPlugin.VIEW_PERMISSION,
+                        sort = 30
+                )
+        })
 public class AuthlibInjectorPlugin implements YuDreamPlugin {
 
     public static final String CODE = "authlib-injector";

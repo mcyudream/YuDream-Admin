@@ -1,0 +1,12 @@
+{
+  "name": "@yudream/plugin-sdk",
+  "type": "module",
+  "version": "0.0.0",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "vue": "catalog:",
+    "vue-router": "catalog:"
+  }
+}

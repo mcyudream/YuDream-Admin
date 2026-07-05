@@ -113,8 +113,8 @@ class PluginAnnotationRegistrar {
         );
     }
 
-    private void registerHttpEndpoints(YuDreamPlugin plugin, Class<?> pluginClass, PluginContextImpl context) {
-        Class<?> current = pluginClass;
+    void registerHttpEndpoints(Object target, Class<?> targetClass, PluginContextImpl context) {
+        Class<?> current = targetClass;
         while (current != null && current != Object.class) {
             for (Method method : current.getDeclaredMethods()) {
                 PluginHttpEndpoint endpoint = method.getAnnotation(PluginHttpEndpoint.class);
@@ -127,7 +127,7 @@ class PluginAnnotationRegistrar {
                     if (StringUtils.hasText(endpoint.permission())) {
                         context.framework().security().requirePermission(request.principal(), endpoint.permission());
                     }
-                    return invokeEndpoint(plugin, method, request, context, endpoint.wrapResult());
+                    return invokeEndpoint(target, method, request, context, endpoint.wrapResult());
                 });
             }
             current = current.getSuperclass();
@@ -161,9 +161,9 @@ class PluginAnnotationRegistrar {
         }
     }
 
-    private PluginHttpResponse invokeEndpoint(YuDreamPlugin plugin, Method method, PluginHttpRequest request, PluginContext context, boolean wrapResult) {
+    private PluginHttpResponse invokeEndpoint(Object targetInstance, Method method, PluginHttpRequest request, PluginContext context, boolean wrapResult) {
         try {
-            Object target = Modifier.isStatic(method.getModifiers()) ? null : plugin;
+            Object target = Modifier.isStatic(method.getModifiers()) ? null : targetInstance;
             Object result = method.invoke(target, endpointArgs(method, request, context));
             if (result instanceof PluginHttpResponse response) {
                 return wrapResult ? response : response.withWrapped(false);

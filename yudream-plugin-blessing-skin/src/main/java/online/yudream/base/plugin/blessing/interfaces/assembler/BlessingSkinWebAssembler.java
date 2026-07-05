@@ -5,6 +5,8 @@ import online.yudream.base.plugin.blessing.application.cmd.ClosetItemSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreatePlayerCmd;
 import online.yudream.base.plugin.blessing.application.cmd.CreateSkinUserCmd;
 import online.yudream.base.plugin.blessing.application.cmd.MigrationCmd;
+import online.yudream.base.plugin.blessing.application.cmd.RenameClosetItemCmd;
+import online.yudream.base.plugin.blessing.application.cmd.RenamePlayerCmd;
 import online.yudream.base.plugin.blessing.application.cmd.SkinSettingsSaveCmd;
 import online.yudream.base.plugin.blessing.application.cmd.TextureUploadCmd;
 import online.yudream.base.plugin.blessing.interfaces.request.AssignTextureRequest;
@@ -12,6 +14,8 @@ import online.yudream.base.plugin.blessing.interfaces.request.ClosetItemSaveRequ
 import online.yudream.base.plugin.blessing.interfaces.request.CreatePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.CreateSkinUserRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.MigrationRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.RenameClosetItemRequest;
+import online.yudream.base.plugin.blessing.interfaces.request.RenamePlayerRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.SkinSettingsSaveRequest;
 import online.yudream.base.plugin.blessing.interfaces.request.TextureUploadRequest;
 
@@ -25,8 +29,16 @@ public class BlessingSkinWebAssembler {
         return new CreatePlayerCmd(request.name(), request.ownerId());
     }
 
+    public CreatePlayerCmd toCmd(CreatePlayerRequest request, String ownerId) {
+        return new CreatePlayerCmd(request.name(), ownerId);
+    }
+
     public AssignTextureCmd toCmd(AssignTextureRequest request) {
         return new AssignTextureCmd(request.skinHash(), request.capeHash());
+    }
+
+    public RenamePlayerCmd toCmd(RenamePlayerRequest request) {
+        return new RenamePlayerCmd(request.name());
     }
 
     public TextureUploadCmd toCmd(TextureUploadRequest request) {
@@ -36,13 +48,20 @@ public class BlessingSkinWebAssembler {
                 request.model(),
                 request.contentType(),
                 request.base64(),
-                request.publicAccess(),
-                request.uploaderId()
+                request.publicAccess()
         );
     }
 
     public ClosetItemSaveCmd toCmd(ClosetItemSaveRequest request) {
         return new ClosetItemSaveCmd(request.userId(), request.textureHash(), request.itemName());
+    }
+
+    public ClosetItemSaveCmd toCmd(ClosetItemSaveRequest request, String userId) {
+        return new ClosetItemSaveCmd(userId, request.textureHash(), request.itemName());
+    }
+
+    public RenameClosetItemCmd toCmd(RenameClosetItemRequest request) {
+        return new RenameClosetItemCmd(request.itemName());
     }
 
     public SkinSettingsSaveCmd toCmd(SkinSettingsSaveRequest request) {

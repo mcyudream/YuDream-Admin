@@ -2,12 +2,14 @@ package online.yudream.base.application.platform.plugin.assembler;
 
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
@@ -68,6 +70,14 @@ public class PluginAssembler {
                 .component(route.component())
                 .permission(route.permission())
                 .sort(route.sort())
+                .build();
+    }
+
+    public static PluginFrontendAssetDTO toDTO(PluginFrontendAssetInfo asset) {
+        return PluginFrontendAssetDTO.builder()
+                .path(asset.path())
+                .contentType(asset.contentType())
+                .body(asset.body())
                 .build();
     }
 

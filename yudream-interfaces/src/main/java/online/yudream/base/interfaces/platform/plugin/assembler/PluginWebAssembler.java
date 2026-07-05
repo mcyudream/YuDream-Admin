@@ -98,6 +98,16 @@ public class PluginWebAssembler {
         return cmd;
     }
 
+    public static String frontendAssetPath(String pluginCode, HttpServletRequest request) {
+        String prefix = "/api/platform/plugins/" + pluginCode + "/assets";
+        String uri = request.getRequestURI();
+        if (!uri.startsWith(prefix)) {
+            return "";
+        }
+        String path = uri.substring(prefix.length());
+        return path.isBlank() ? "" : path;
+    }
+
     private static Map<String, List<String>> headers(HttpServletRequest request) {
         return Collections.list(request.getHeaderNames()).stream()
                 .collect(Collectors.toMap(name -> name, name -> Collections.list(request.getHeaders(name)), (a, b) -> a));

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.domain.common.exception.BizException;
@@ -96,6 +97,13 @@ public class PluginAppService {
     @Transactional(readOnly = true)
     public PluginFrontendManifestDTO frontendManifest() {
         return PluginAssembler.toManifestDTO(pluginRuntimeGateway.frontendModules());
+    }
+
+    @Transactional(readOnly = true)
+    public PluginFrontendAssetDTO frontendAsset(String code, String assetPath) {
+        return pluginRuntimeGateway.frontendAsset(code, assetPath)
+                .map(PluginAssembler::toDTO)
+                .orElseThrow(() -> new BizException("插件前端资源不存在：" + assetPath));
     }
 
     @Transactional(readOnly = true)

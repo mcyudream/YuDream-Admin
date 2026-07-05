@@ -11,6 +11,19 @@
 
     <artifactId>yudream-plugin-blessing-skin</artifactId>
 
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>../yudream-frontend/packages/plugin-blessing-skin/dist</directory>
+                <targetPath>META-INF/yudream-plugin/frontend/blessing-skin</targetPath>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>online.yudream.base</groupId>

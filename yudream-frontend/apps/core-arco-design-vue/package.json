@@ -17,6 +17,7 @@
     "@fantastic-admin/composables": "workspace:*",
     "@fantastic-admin/settings": "workspace:*",
     "@fantastic-admin/types": "workspace:*",
+    "@yudream/plugin-sdk": "workspace:*",
     "@tdesign-vue-next/chat": "catalog:",
     "@vee-validate/zod": "catalog:",
     "@vueuse/core": "catalog:",
