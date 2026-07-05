@@ -31,8 +31,7 @@
         :skin-options="skinOptions"
         :cape-options="capeOptions"
         :fov="fov"
-        :auto-rotate="rotateEnabled"
-        :auto-rotate-speed="0.8"
+        :auto-rotate="false"
         :animation="animation"
         :enable-rotate="controls"
         :enable-zoom="controls"
@@ -103,15 +102,19 @@ const rotateEnabled = ref(props.autoRotate)
 const animationIndex = ref(0)
 const viewerRef = ref<InstanceType<typeof SkinView3d> | null>(null)
 let themeObserver: MutationObserver | null = null
+let rotateFrame: number | null = null
+let lastRotateTime = 0
 const animations = [
   { label: '待机', create: () => new IdleAnimation() },
   { label: '行走', create: () => new WalkingAnimation() },
   { label: '奔跑', create: () => new RunningAnimation() },
 ]
 const width = computed(() => props.compact ? 220 : 320)
-const height = computed(() => props.compact ? 260 : 360)
-const fov = computed(() => props.compact ? 50 : 48)
-const zoom = computed(() => props.compact ? 0.88 : 0.92)
+const height = computed(() => props.compact ? 270 : 390)
+const fov = computed(() => props.compact ? 48 : 46)
+const zoom = computed(() => props.compact ? 0.86 : 0.84)
+const rotateSpeed = computed(() => props.compact ? 0.55 : 0.42)
+const verticalOffset = computed(() => props.compact ? 1.6 : 2.6)
 const skinOptions = computed<SkinOptions>(() => ({
   model: props.slim ? 'slim' : 'auto-detect',
 }))
@@ -142,27 +145,82 @@ onMounted(() => {
     themeObserver.observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] })
   }
   void applyView()
+  syncRotationLoop()
 })
 
 onBeforeUnmount(() => {
   themeObserver?.disconnect()
   themeObserver = null
+  stopRotationLoop()
 })
 
 watch([viewRotation, rotateEnabled, () => props.skin, () => props.cape], () => {
   void applyView()
+  syncRotationLoop()
 }, { flush: 'post' })
+
+watch(() => props.autoRotate, (value) => {
+  rotateEnabled.value = value
+})
 
 async function applyView() {
   await nextTick()
   const viewer = resolveViewer()
-  if (!viewer || rotateEnabled.value) {
+  if (!viewer) {
     return
   }
-  viewer.playerWrapper.rotation.y = viewRotation.value
-  viewer.controls.target.set(0, 8, 0)
+  configureViewerFrame(viewer)
+  viewer.controls.target.set(0, 4, 0)
   viewer.controls.update()
+  if (!rotateEnabled.value) {
+    viewer.playerWrapper.rotation.y = viewRotation.value
+  }
   viewer.render()
+}
+
+function syncRotationLoop() {
+  if (rotateEnabled.value && hasPreview.value) {
+    startRotationLoop()
+    return
+  }
+  stopRotationLoop()
+}
+
+function startRotationLoop() {
+  if (rotateFrame !== null) {
+    return
+  }
+  lastRotateTime = window.performance.now()
+  const tick = (time: number) => {
+    rotateFrame = null
+    if (!rotateEnabled.value || !hasPreview.value) {
+      return
+    }
+    const viewer = resolveViewer()
+    if (viewer) {
+      const delta = Math.min(time - lastRotateTime, 80) / 1000
+      configureViewerFrame(viewer)
+      viewer.playerWrapper.rotation.y += delta * rotateSpeed.value
+      viewer.controls.target.set(0, 4, 0)
+      viewer.controls.update()
+      viewer.render()
+    }
+    lastRotateTime = time
+    rotateFrame = window.requestAnimationFrame(tick)
+  }
+  rotateFrame = window.requestAnimationFrame(tick)
+}
+
+function stopRotationLoop() {
+  if (rotateFrame === null) {
+    return
+  }
+  window.cancelAnimationFrame(rotateFrame)
+  rotateFrame = null
+}
+
+function configureViewerFrame(viewer: SkinViewer) {
+  viewer.playerWrapper.position.y = verticalOffset.value
 }
 
 function resolveViewer(): SkinViewer | null {
