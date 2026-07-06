@@ -24,6 +24,18 @@ export default defineConfig(({ mode, command }) => {
       host: true,
       port: 9000,
       proxy: {
+        '/v3/api-docs': {
+          target: env.VITE_APP_API_BASEURL,
+          changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
+        },
+        '/swagger-ui': {
+          target: env.VITE_APP_API_BASEURL,
+          changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
+        },
+        '/swagger-ui.html': {
+          target: env.VITE_APP_API_BASEURL,
+          changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
+        },
         '/proxy': {
           target: env.VITE_APP_API_BASEURL,
           changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,

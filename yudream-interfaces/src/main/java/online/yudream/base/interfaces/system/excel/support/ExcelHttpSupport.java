@@ -26,6 +26,19 @@ public final class ExcelHttpSupport {
                 .doWrite(rows == null ? List.of() : rows);
     }
 
+    public static void writeDynamic(HttpServletResponse response, String filename, String sheetName,
+                                    List<List<String>> head, List<List<Object>> rows) throws IOException {
+        String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setHeader("Content-Disposition", "attachment; filename*=UTF-8''" + encoded + ".xlsx");
+        EasyExcel.write(response.getOutputStream())
+                .head(head == null ? List.of() : head)
+                .autoCloseStream(false)
+                .sheet(sheetName)
+                .doWrite(rows == null ? List.of() : rows);
+    }
+
     public static <T> ExcelImportResultRes importRows(MultipartFile file, Class<T> rowClass, Consumer<T> importer) throws IOException {
         List<T> rows = EasyExcel.read(file.getInputStream()).head(rowClass).sheet().doReadSync();
         ExcelImportResultRes result = ExcelImportResultRes.builder().total(rows.size()).build();

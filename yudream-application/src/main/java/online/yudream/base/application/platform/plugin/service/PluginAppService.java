@@ -10,6 +10,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifes
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginHttpEndpointDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
@@ -125,6 +126,13 @@ public class PluginAppService {
         return PluginAssembler.toManifestDTO(pluginRuntimeGateway.frontendModules().stream()
                 .map(module -> applyFrontendSortSetting(module, modules.get(module.pluginCode())))
                 .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<PluginHttpEndpointDTO> httpEndpoints() {
+        return pluginRuntimeGateway.httpEndpoints().stream()
+                .map(PluginAssembler::toDTO)
+                .toList();
     }
 
     @Transactional

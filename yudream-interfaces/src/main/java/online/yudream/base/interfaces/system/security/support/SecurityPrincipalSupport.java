@@ -44,6 +44,10 @@ public class SecurityPrincipalSupport {
         return loginId != null && containsPermission(StpUtil.getPermissionList(), permission);
     }
 
+    public static boolean hasApiKeyPermission(String permission) {
+        return ApiKeyAuthenticationContext.hasPermission(permission);
+    }
+
     private static boolean containsPermission(List<String> permissions, String permission) {
         return permissions != null && (permissions.contains("*") || permissions.contains(permission));
     }

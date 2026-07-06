@@ -1,6 +1,7 @@
 package online.yudream.base.interfaces.platform.plugin.controller;
 
 import jakarta.servlet.http.HttpServletRequest;
+import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
@@ -21,6 +22,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
+@Hidden
 public class PluginDispatchController {
 
     private final PluginAppService pluginAppService;

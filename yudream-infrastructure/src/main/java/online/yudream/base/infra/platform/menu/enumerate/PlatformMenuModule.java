@@ -130,6 +130,12 @@ public enum PlatformMenuModule {
             icon = "i-ri:survey-line", sort = 62)
     FORM,
 
+    @MenuNode(code = "platform:form:designer", name = "表单设计器", type = MenuNodeType.MENU,
+            path = "/platform/form/designer", component = "platform/form/designer.vue",
+            icon = "i-ri:drag-drop-line", sort = 61, visible = false,
+            permission = "platform:form:edit")
+    FORM_DESIGNER,
+
     @MenuNode(code = "platform:form:view", name = "查看动态表单", type = MenuNodeType.BUTTON,
             parentName = "FORM", permission = "platform:form:view")
     FORM_VIEW,
@@ -149,6 +155,10 @@ public enum PlatformMenuModule {
     @MenuNode(code = "platform:form:submission:view", name = "查看表单提交", type = MenuNodeType.BUTTON,
             parentName = "FORM", permission = "platform:form:submission:view")
     FORM_SUBMISSION_VIEW,
+
+    @MenuNode(code = "platform:form:submission:export", name = "导出表单提交", type = MenuNodeType.BUTTON,
+            parentName = "FORM", permission = "platform:form:submission:export")
+    FORM_SUBMISSION_EXPORT,
 
     @MenuNode(code = "platform:form:statistics:view", name = "查看表单统计", type = MenuNodeType.BUTTON,
             parentName = "FORM", permission = "platform:form:statistics:view")

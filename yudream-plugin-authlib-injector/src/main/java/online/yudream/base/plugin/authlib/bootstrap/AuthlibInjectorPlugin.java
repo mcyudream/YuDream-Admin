@@ -5,11 +5,9 @@ import online.yudream.base.plugin.authlib.infrastructure.repository.AuthlibRepos
 import online.yudream.base.plugin.authlib.infrastructure.service.AuthlibCryptoService;
 import online.yudream.base.plugin.authlib.interfaces.http.AuthlibHttpFacade;
 import online.yudream.base.plugin.spi.annotation.PluginDashboardCard;
-import online.yudream.base.plugin.spi.annotation.PluginFrontend;
 import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginPermission;
 import online.yudream.base.plugin.spi.annotation.PluginPermissions;
-import online.yudream.base.plugin.spi.annotation.PluginRoute;
 import online.yudream.base.plugin.spi.annotation.PluginSpec;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -20,30 +18,13 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
         code = AuthlibInjectorPlugin.CODE,
         name = "Authlib Injector",
         version = "1.0.0",
-        description = "基于系统用户与 yudream-skin 角色资料实现 authlib-injector/Yggdrasil 服务端协议。",
+        description = "基于系统用户和 yudream-skin 角色资料实现 authlib-injector/Yggdrasil 服务端协议。",
         dependencies = {"yudream-skin"}
 )
 @PluginPermissions({
         @PluginPermission(code = AuthlibInjectorPlugin.VIEW_PERMISSION, name = "查看 Authlib", module = "平台插件", description = "查看 Authlib Injector 插件状态"),
         @PluginPermission(code = AuthlibInjectorPlugin.MANAGE_PERMISSION, name = "管理 Authlib", module = "平台插件", description = "管理 Authlib Injector 配置")
 })
-@PluginFrontend(
-        moduleName = "authlibInjector",
-        menuTitle = "Authlib",
-        menuIcon = "i-ri:key-2-line",
-        menuSort = 18,
-        routes = {
-                @PluginRoute(
-                        path = "/platform/plugins/authlib-injector",
-                        name = "platform-plugin-authlib-injector",
-                        title = "Authlib Injector",
-                        icon = "i-ri:key-2-line",
-                        component = "authlib-injector/Home",
-                        permission = AuthlibInjectorPlugin.VIEW_PERMISSION,
-                        sort = 30
-                )
-        }
-)
 @PluginDashboardCard(
         code = "api",
         title = "Authlib API",
@@ -51,7 +32,6 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
         icon = "i-ri:key-2-line",
         category = "认证服务",
         component = "authlib-injector/EndpointCard",
-        actionPath = "/platform/plugins/authlib-injector",
         dragPayloadTemplate = "authlib-injector:yggdrasil-server:{encodedUrl}",
         tone = "cyan",
         defaultW = 4,

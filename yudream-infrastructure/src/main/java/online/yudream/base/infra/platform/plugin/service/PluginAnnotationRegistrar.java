@@ -151,7 +151,7 @@ class PluginAnnotationRegistrar {
                 }
                 validateEndpointMethod(method);
                 method.setAccessible(true);
-                context.registerHttpHandler(endpoint.method(), endpoint.path(), request -> {
+                context.registerHttpHandler(endpoint.method(), endpoint.path(), endpoint.permission(), endpoint.wrapResult(), request -> {
                     if (StringUtils.hasText(endpoint.permission())) {
                         context.framework().security().requirePermission(request.principal(), endpoint.permission());
                     }

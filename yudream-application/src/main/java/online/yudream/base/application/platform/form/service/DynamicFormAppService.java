@@ -8,6 +8,7 @@ import online.yudream.base.application.platform.form.dto.DynamicFormDTO;
 import online.yudream.base.application.platform.form.dto.FormFieldStatDTO;
 import online.yudream.base.application.platform.form.dto.FormStatisticsDTO;
 import online.yudream.base.application.platform.form.dto.FormSubmissionDTO;
+import online.yudream.base.application.platform.form.dto.FormSubmissionExportDTO;
 import online.yudream.base.application.platform.form.dto.FormValueCountDTO;
 import online.yudream.base.application.platform.form.query.DynamicFormPageQuery;
 import online.yudream.base.application.platform.form.query.FormSubmissionPageQuery;
@@ -38,6 +39,7 @@ public class DynamicFormAppService {
 
     private static final String CAPABILITY_CODE = "form";
     private static final int STAT_SUBMISSION_LIMIT = 5000;
+    private static final int EXPORT_SUBMISSION_LIMIT = 10000;
 
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final DynamicFormRepo dynamicFormRepo;
@@ -135,6 +137,18 @@ public class DynamicFormAppService {
                 .today(formSubmissionRepo.countByFormIdAndSubmittedAtAfter(formId, todayStart))
                 .last7Days(formSubmissionRepo.countByFormIdAndSubmittedAtAfter(formId, weekStart))
                 .fields(fieldStats(submissions, total))
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public FormSubmissionExportDTO exportSubmissions(Long formId) {
+        ensureEnabled();
+        DynamicForm form = form(formId);
+        return FormSubmissionExportDTO.builder()
+                .form(DynamicFormAssembler.toDTO(form))
+                .submissions(formSubmissionRepo.findByFormId(formId, EXPORT_SUBMISSION_LIMIT).stream()
+                        .map(DynamicFormAssembler::toDTO)
+                        .toList())
                 .build();
     }
 

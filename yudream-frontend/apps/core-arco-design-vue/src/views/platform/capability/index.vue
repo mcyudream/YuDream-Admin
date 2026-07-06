@@ -15,6 +15,37 @@ interface CapabilityConfigField {
   type?: 'text' | 'password' | 'number' | 'textarea'
 }
 
+type AiProviderType = 'OPENAI' | 'OPENAI_COMPATIBLE' | 'KIMI' | 'DEEPSEEK'
+
+interface AiModelDraft {
+  code: string
+  name: string
+  model: string
+  temperature: string
+  reasoningEffort: string
+  thinkingEnabled: boolean
+  extraBody: string
+  kind: string
+  vision: boolean
+}
+
+interface AiProviderDraft {
+  code: string
+  name: string
+  type: AiProviderType
+  baseUrl: string
+  completionsPath: string
+  apiKey: string
+  proxyUrl: string
+  defaultModel: string
+  temperature: string
+  extraBody: string
+  embeddingModelsText: string
+  rerankModelsText: string
+  enabled: boolean
+  models: AiModelDraft[]
+}
+
 const toast = useFaToast()
 
 const loading = ref(false)
@@ -24,11 +55,25 @@ const selectedCode = ref('')
 const configVisible = ref(false)
 const configText = ref('{}')
 const configDraft = ref<Record<string, string>>({})
+const aiProviders = ref<AiProviderDraft[]>([])
 const testMessage = ref('YuDream 平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
 let eventSource: EventSource | null = null
 let websocket: WebSocket | null = null
+
+const aiProviderTypeOptions: { label: string, value: AiProviderType }[] = [
+  { label: 'OpenAI', value: 'OPENAI' },
+  { label: 'OpenAI 兼容', value: 'OPENAI_COMPATIBLE' },
+  { label: 'Kimi', value: 'KIMI' },
+  { label: 'DeepSeek', value: 'DEEPSEEK' },
+]
+
+const aiModelKindOptions = [
+  { label: '对话', value: 'chat' },
+  { label: 'Embedding', value: 'embedding' },
+  { label: 'Rerank', value: 'rerank' },
+]
 
 const groups: CapabilityGroup[] = [
   { type: 'REALTIME', title: '实时通信', icon: 'i-ri:pulse-line' },
@@ -43,10 +88,18 @@ const groups: CapabilityGroup[] = [
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
 const configFields = computed(() => fieldsOf(selected.value?.code))
-const usesStructuredConfig = computed(() => configFields.value.length > 0)
+const isAiConfig = computed(() => selected.value?.code === 'ai')
+const usesStructuredConfig = computed(() => isAiConfig.value || configFields.value.length > 0)
 const dependencyRows = computed(() => dependencyStatus(selected.value))
 const missingDependencies = computed(() => dependencyRows.value.filter(item => !item.enabled))
 const canEnableSelected = computed(() => !selected.value?.enabled && missingDependencies.value.length === 0)
+const aiProviderOptions = computed(() => aiProviders.value.map((provider, index) => ({
+  label: provider.name || provider.code || `供应商 ${index + 1}`,
+  value: provider.code,
+})).filter(item => item.value))
+const aiDefaultModelOptions = computed(() => modelOptions(
+  aiProviders.value.find(provider => provider.code === configDraft.value.defaultProvider) || aiProviders.value[0],
+))
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
@@ -62,6 +115,11 @@ onMounted(load)
 onBeforeUnmount(() => {
   closeSse()
   closeWs()
+})
+watch(() => configDraft.value.defaultProvider, () => {
+  if (isAiConfig.value) {
+    syncAiDefaultModel()
+  }
 })
 
 async function load() {
@@ -104,6 +162,10 @@ function openConfig(item: CapabilityItem) {
     configDraft.value.providers = legacyAiProvidersJson(item.config || {})
     configDraft.value.defaultProvider ||= 'default'
     configDraft.value.defaultModel ||= item.config?.model || 'gpt-4o-mini'
+  }
+  if (item.code === 'ai') {
+    aiProviders.value = parseAiProvidersConfig(configDraft.value)
+    syncAiDefaults()
   }
   configText.value = JSON.stringify(item.config || {}, null, 2)
   configVisible.value = true
@@ -305,18 +367,242 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
   return code ? map[code] || [] : []
 }
 
+function parseAiProvidersConfig(config: Record<string, string>) {
+  try {
+    const parsed = JSON.parse(config.providers || legacyAiProvidersJson(config))
+    if (!Array.isArray(parsed)) {
+      toast.error('AI 供应商配置需要是数组')
+      return [createAiProvider()]
+    }
+    const providers = parsed.map((item, index) => normalizeAiProvider(item, index))
+    return providers.length ? providers : [createAiProvider()]
+  }
+  catch {
+    toast.error('AI 供应商配置格式错误', { description: '已使用默认供应商模板，请检查后保存' })
+    return [createAiProvider()]
+  }
+}
+
+function normalizeAiProvider(raw: unknown, index = 0): AiProviderDraft {
+  const data = objectRecord(raw)
+  const defaultCode = index === 0 ? 'openai' : `provider-${index + 1}`
+  const defaultModel = textValue(data.defaultModel, textValue(data.model, 'gpt-4o-mini'))
+  const rawModels = Array.isArray(data.models) ? data.models : [defaultModel]
+  const models = rawModels.map((item, modelIndex) => normalizeAiModel(item, modelIndex)).filter(model => model.code || model.model)
+  if (!models.length) {
+    models.push(createAiModel(defaultModel))
+  }
+  return {
+    code: textValue(data.code, defaultCode),
+    name: textValue(data.name, defaultCode),
+    type: normalizeAiProviderType(textValue(data.type, 'OPENAI_COMPATIBLE')),
+    baseUrl: textValue(data.baseUrl, 'https://api.openai.com/v1'),
+    completionsPath: textValue(data.completionsPath, '/chat/completions'),
+    apiKey: textValue(data.apiKey),
+    proxyUrl: textValue(data.proxyUrl),
+    defaultModel: textValue(data.defaultModel, models[0]?.code || models[0]?.model || defaultModel),
+    temperature: textValue(data.temperature, '0.4'),
+    extraBody: extraBodyValue(data.extraBody),
+    embeddingModelsText: toTextList(data.embeddingModels).join('\n'),
+    rerankModelsText: toTextList(data.rerankModels).join('\n'),
+    enabled: booleanValue(data.enabled, true),
+    models,
+  }
+}
+
+function normalizeAiModel(raw: unknown, index = 0): AiModelDraft {
+  if (typeof raw === 'string') {
+    return createAiModel(raw)
+  }
+  const data = objectRecord(raw)
+  const model = textValue(data.model, textValue(data.name, textValue(data.code, `model-${index + 1}`)))
+  return {
+    code: textValue(data.code, model),
+    name: textValue(data.name, model),
+    model,
+    temperature: textValue(data.temperature),
+    reasoningEffort: textValue(data.reasoningEffort),
+    thinkingEnabled: booleanValue(data.thinkingEnabled, false),
+    extraBody: extraBodyValue(data.extraBody),
+    kind: textValue(data.kind, 'chat'),
+    vision: booleanValue(data.vision, false),
+  }
+}
+
+function createAiProvider(): AiProviderDraft {
+  return {
+    code: 'openai',
+    name: 'OpenAI',
+    type: 'OPENAI',
+    baseUrl: 'https://api.openai.com/v1',
+    completionsPath: '/chat/completions',
+    apiKey: '',
+    proxyUrl: '',
+    defaultModel: 'gpt-4o-mini',
+    temperature: '0.4',
+    extraBody: '',
+    embeddingModelsText: 'text-embedding-3-small',
+    rerankModelsText: '',
+    enabled: true,
+    models: [createAiModel('gpt-4o-mini', 'GPT-4o mini')],
+  }
+}
+
+function createAiModel(model = 'gpt-4o-mini', name = model): AiModelDraft {
+  return {
+    code: model,
+    name,
+    model,
+    temperature: '',
+    reasoningEffort: '',
+    thinkingEnabled: false,
+    extraBody: '',
+    kind: 'chat',
+    vision: false,
+  }
+}
+
+function addAiProvider() {
+  const index = aiProviders.value.length + 1
+  aiProviders.value.push({
+    ...createAiProvider(),
+    code: `provider-${index}`,
+    name: `供应商 ${index}`,
+    type: 'OPENAI_COMPATIBLE',
+    apiKey: '',
+  })
+  syncAiDefaults()
+}
+
+function removeAiProvider(index: number) {
+  aiProviders.value.splice(index, 1)
+  syncAiDefaults()
+}
+
+function addAiModel(provider: AiProviderDraft) {
+  const model = createAiModel(`model-${provider.models.length + 1}`)
+  provider.models.push(model)
+  provider.defaultModel ||= model.code
+  syncAiDefaults()
+}
+
+function removeAiModel(provider: AiProviderDraft, index: number) {
+  provider.models.splice(index, 1)
+  if (!provider.models.some(model => model.code === provider.defaultModel)) {
+    provider.defaultModel = provider.models[0]?.code || ''
+  }
+  syncAiDefaults()
+}
+
+function modelOptions(provider?: AiProviderDraft) {
+  return (provider?.models || []).map((model, index) => ({
+    label: model.name || model.code || model.model || `模型 ${index + 1}`,
+    value: model.code || model.model,
+  })).filter(item => item.value)
+}
+
+function syncAiDefaults() {
+  const firstProvider = aiProviders.value[0]
+  if (!firstProvider) {
+    configDraft.value.defaultProvider = ''
+    configDraft.value.defaultModel = ''
+    return
+  }
+  if (!aiProviders.value.some(provider => provider.code === configDraft.value.defaultProvider)) {
+    configDraft.value.defaultProvider = firstProvider.code
+  }
+  syncAiDefaultModel()
+}
+
+function syncAiDefaultModel() {
+  const provider = aiProviders.value.find(item => item.code === configDraft.value.defaultProvider) || aiProviders.value[0]
+  if (!provider) {
+    configDraft.value.defaultModel = ''
+    return
+  }
+  const options = modelOptions(provider)
+  if (!options.some(option => option.value === provider.defaultModel)) {
+    provider.defaultModel = options[0]?.value || ''
+  }
+  if (!options.some(option => option.value === configDraft.value.defaultModel)) {
+    configDraft.value.defaultModel = provider.defaultModel || options[0]?.value || ''
+  }
+}
+
+function serializeAiProviders() {
+  return aiProviders.value.map(provider => ({
+    code: provider.code.trim(),
+    name: provider.name.trim(),
+    type: provider.type,
+    baseUrl: provider.baseUrl.trim().replace(/\/+$/, ''),
+    completionsPath: provider.completionsPath.trim() || '/chat/completions',
+    apiKey: provider.apiKey.trim(),
+    proxyUrl: provider.proxyUrl.trim(),
+    defaultModel: provider.defaultModel.trim() || provider.models[0]?.code?.trim() || '',
+    temperature: provider.temperature.trim() || '0.4',
+    extraBody: provider.extraBody.trim(),
+    models: provider.models.map(model => ({
+      code: model.code.trim(),
+      name: model.name.trim(),
+      model: model.model.trim(),
+      temperature: model.temperature.trim(),
+      reasoningEffort: model.reasoningEffort.trim(),
+      thinkingEnabled: model.thinkingEnabled,
+      extraBody: model.extraBody.trim(),
+      kind: model.kind.trim() || 'chat',
+      vision: model.vision,
+    })),
+    embeddingModels: splitModelList(provider.embeddingModelsText),
+    rerankModels: splitModelList(provider.rerankModelsText),
+    enabled: provider.enabled,
+  }))
+}
+
 function normalizedConfig() {
   if (selected.value?.code === 'ai') {
-    try {
-      const providers = JSON.parse(String(configDraft.value.providers || '[]'))
-      if (!Array.isArray(providers)) {
-        toast.error('AI providers 必须是 JSON 数组')
+    syncAiDefaults()
+    const providers = serializeAiProviders()
+    if (!providers.length) {
+      toast.error('请至少配置一个 AI 供应商')
+      return null
+    }
+    const providerCodes = new Set<string>()
+    for (const [index, provider] of providers.entries()) {
+      if (!provider.code) {
+        toast.error(`第 ${index + 1} 个供应商缺少编码`)
         return null
       }
+      if (providerCodes.has(provider.code)) {
+        toast.error(`供应商编码重复：${provider.code}`)
+        return null
+      }
+      providerCodes.add(provider.code)
+      if (!provider.baseUrl) {
+        toast.error(`供应商 ${provider.code} 缺少 API 地址`)
+        return null
+      }
+      if (!provider.models.length) {
+        toast.error(`供应商 ${provider.code} 至少需要一个模型`)
+        return null
+      }
+      for (const model of provider.models) {
+        if (!model.code || !model.model) {
+          toast.error(`供应商 ${provider.code} 存在模型编码或模型名为空`)
+          return null
+        }
+      }
     }
-    catch {
-      toast.error('AI providers 格式错误', { description: '请输入合法 JSON 数组' })
+    const defaultProvider = configDraft.value.defaultProvider?.trim() || providers[0].code
+    const selectedProvider = providers.find(provider => provider.code === defaultProvider) || providers[0]
+    const defaultModel = configDraft.value.defaultModel?.trim() || selectedProvider.defaultModel || selectedProvider.models[0]?.code || ''
+    if (!selectedProvider.models.some(model => model.code === defaultModel || model.model === defaultModel)) {
+      toast.error('默认模型必须属于默认供应商')
       return null
+    }
+    return {
+      providers: JSON.stringify(providers, null, 2),
+      defaultProvider: selectedProvider.code,
+      defaultModel,
     }
   }
   return Object.fromEntries(
@@ -332,6 +618,56 @@ function parseJsonConfig() {
     toast.error('配置格式错误', { description: '请输入合法 JSON 对象' })
     return null
   }
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {}
+}
+
+function textValue(value: unknown, fallback = '') {
+  if (value === null || value === undefined) {
+    return fallback
+  }
+  return String(value)
+}
+
+function booleanValue(value: unknown, fallback: boolean) {
+  if (value === null || value === undefined || value === '') {
+    return fallback
+  }
+  if (typeof value === 'boolean') {
+    return value
+  }
+  return String(value).trim().toLowerCase() === 'true'
+}
+
+function normalizeAiProviderType(value: string): AiProviderType {
+  const normalized = value.trim().replace(/-/g, '_').toUpperCase()
+  return aiProviderTypeOptions.some(item => item.value === normalized) ? normalized as AiProviderType : 'OPENAI_COMPATIBLE'
+}
+
+function extraBodyValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value
+  }
+  return JSON.stringify(value, null, 2)
+}
+
+function toTextList(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map(item => textValue(item).trim()).filter(Boolean)
+  }
+  return splitModelList(textValue(value))
+}
+
+function splitModelList(value: string) {
+  return value
+    .split(/[,，\n\r]/)
+    .map(item => item.trim())
+    .filter(Boolean)
 }
 </script>
 
@@ -502,8 +838,167 @@ function parseJsonConfig() {
       </div>
     </FaPageMain>
 
-    <FaModal v-model="configVisible" title="能力配置" show-cancel-button class="sm:max-w-2xl" @confirm="saveConfig">
-      <div v-if="usesStructuredConfig" class="config-form">
+    <FaModal
+      v-model="configVisible"
+      title="能力配置"
+      show-cancel-button
+      :class="isAiConfig ? 'sm:max-w-6xl' : 'sm:max-w-2xl'"
+      @confirm="saveConfig"
+    >
+      <div v-if="isAiConfig" class="ai-config-editor">
+        <div class="ai-config-toolbar">
+          <label class="config-field">
+            <span>默认供应商</span>
+            <FaSelect
+              v-model="configDraft.defaultProvider"
+              :options="aiProviderOptions"
+              placeholder="选择默认供应商"
+              class="w-full"
+            />
+          </label>
+          <label class="config-field">
+            <span>默认模型</span>
+            <FaSelect
+              v-model="configDraft.defaultModel"
+              :options="aiDefaultModelOptions"
+              placeholder="选择默认模型"
+              class="w-full"
+            />
+          </label>
+          <FaButton variant="outline" class="ai-add-provider" @click="addAiProvider">
+            <FaIcon name="i-ri:add-line" />
+            添加供应商
+          </FaButton>
+        </div>
+
+        <div class="ai-provider-list">
+          <section v-for="(provider, providerIndex) in aiProviders" :key="providerIndex" class="ai-provider-card">
+            <header class="ai-provider-header">
+              <div>
+                <strong>{{ provider.name || provider.code || `供应商 ${providerIndex + 1}` }}</strong>
+                <span>{{ provider.type }} · {{ provider.baseUrl || '未配置 API 地址' }}</span>
+              </div>
+              <div class="ai-provider-actions">
+                <span>启用</span>
+                <FaSwitch v-model="provider.enabled" />
+                <FaButton
+                  size="sm"
+                  variant="ghost"
+                  :disabled="aiProviders.length <= 1"
+                  @click="removeAiProvider(providerIndex)"
+                >
+                  <FaIcon name="i-ri:delete-bin-line" />
+                </FaButton>
+              </div>
+            </header>
+
+            <div class="ai-provider-grid">
+              <label class="config-field">
+                <span>供应商编码</span>
+                <FaInput v-model="provider.code" placeholder="openai" @blur="syncAiDefaults" />
+              </label>
+              <label class="config-field">
+                <span>显示名称</span>
+                <FaInput v-model="provider.name" placeholder="OpenAI" />
+              </label>
+              <label class="config-field">
+                <span>供应商类型</span>
+                <FaSelect v-model="provider.type" :options="aiProviderTypeOptions" class="w-full" />
+              </label>
+              <label class="config-field">
+                <span>默认模型</span>
+                <FaSelect v-model="provider.defaultModel" :options="modelOptions(provider)" class="w-full" />
+              </label>
+              <label class="config-field ai-span-2">
+                <span>API 地址</span>
+                <FaInput v-model="provider.baseUrl" placeholder="https://api.openai.com/v1" />
+              </label>
+              <label class="config-field">
+                <span>补全路径</span>
+                <FaInput v-model="provider.completionsPath" placeholder="/chat/completions" />
+              </label>
+              <label class="config-field">
+                <span>温度</span>
+                <FaInput v-model="provider.temperature" type="number" placeholder="0.4" />
+              </label>
+              <label class="config-field ai-span-2">
+                <span>API Key</span>
+                <FaInput v-model="provider.apiKey" type="password" placeholder="sk-..." />
+              </label>
+              <label class="config-field ai-span-2">
+                <span>代理地址</span>
+                <FaInput v-model="provider.proxyUrl" placeholder="http://127.0.0.1:7890" />
+              </label>
+              <label class="config-field ai-span-2">
+                <span>Embedding 模型</span>
+                <FaTextarea v-model="provider.embeddingModelsText" rows="2" placeholder="每行一个模型编码" />
+              </label>
+              <label class="config-field ai-span-2">
+                <span>Rerank 模型</span>
+                <FaTextarea v-model="provider.rerankModelsText" rows="2" placeholder="每行一个模型编码" />
+              </label>
+              <label class="config-field ai-span-4">
+                <span>供应商额外请求体</span>
+                <FaTextarea v-model="provider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
+              </label>
+            </div>
+
+            <div class="ai-model-panel">
+              <div class="ai-model-title">
+                <span>模型列表</span>
+                <FaButton size="sm" variant="outline" @click="addAiModel(provider)">
+                  <FaIcon name="i-ri:add-line" />
+                  添加模型
+                </FaButton>
+              </div>
+              <div class="ai-model-table">
+                <div class="ai-model-head">
+                  <span>编码</span>
+                  <span>名称</span>
+                  <span>模型名</span>
+                  <span>类型</span>
+                  <span>参数</span>
+                  <span>能力</span>
+                  <span>操作</span>
+                </div>
+                <div v-for="(model, modelIndex) in provider.models" :key="modelIndex" class="ai-model-row">
+                  <FaInput v-model="model.code" placeholder="gpt-4o-mini" @blur="syncAiDefaults" />
+                  <FaInput v-model="model.name" placeholder="GPT-4o mini" />
+                  <FaInput v-model="model.model" placeholder="gpt-4o-mini" />
+                  <FaSelect v-model="model.kind" :options="aiModelKindOptions" class="w-full" />
+                  <div class="ai-model-params">
+                    <FaInput v-model="model.temperature" type="number" placeholder="温度" />
+                    <FaInput v-model="model.reasoningEffort" placeholder="推理强度" />
+                  </div>
+                  <div class="ai-model-switches">
+                    <label>
+                      <span>思考</span>
+                      <FaSwitch v-model="model.thinkingEnabled" />
+                    </label>
+                    <label>
+                      <span>视觉</span>
+                      <FaSwitch v-model="model.vision" />
+                    </label>
+                  </div>
+                  <FaButton
+                    size="sm"
+                    variant="ghost"
+                    :disabled="provider.models.length <= 1"
+                    @click="removeAiModel(provider, modelIndex)"
+                  >
+                    <FaIcon name="i-ri:delete-bin-line" />
+                  </FaButton>
+                  <label class="config-field ai-model-extra">
+                    <span>模型额外请求体</span>
+                    <FaTextarea v-model="model.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div v-else-if="usesStructuredConfig" class="config-form">
         <label v-for="field in configFields" :key="field.key" class="config-field">
           <span>{{ field.label }}</span>
           <FaTextarea
@@ -780,6 +1275,161 @@ function parseJsonConfig() {
   font-weight: 600;
 }
 
+.ai-config-editor {
+  display: grid;
+  gap: 14px;
+  max-height: min(72vh, 820px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.ai-config-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.ai-add-provider {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.ai-provider-list {
+  display: grid;
+  gap: 14px;
+}
+
+.ai-provider-card {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.ai-provider-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.ai-provider-header div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ai-provider-header strong {
+  overflow: hidden;
+  color: var(--color-text-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-provider-header span {
+  overflow-wrap: anywhere;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.ai-provider-actions {
+  display: inline-flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.ai-provider-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ai-span-2 {
+  grid-column: span 2;
+}
+
+.ai-span-4 {
+  grid-column: 1 / -1;
+}
+
+.ai-model-panel {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border-2);
+}
+
+.ai-model-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-1);
+  font-weight: 700;
+}
+
+.ai-model-table {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-model-head,
+.ai-model-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(150px, 1.2fr) minmax(110px, 0.8fr) minmax(190px, 1.2fr) minmax(130px, 0.8fr) 56px;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-model-head {
+  padding: 0 2px;
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ai-model-row {
+  padding: 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.ai-model-params {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.ai-model-switches {
+  display: grid;
+  gap: 6px;
+}
+
+.ai-model-switches label {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.ai-model-extra {
+  grid-column: 1 / -1;
+}
+
 .ok {
   color: rgb(var(--success-6));
 }
@@ -801,6 +1451,38 @@ function parseJsonConfig() {
 
   .detail-actions {
     justify-content: flex-start;
+  }
+
+  .ai-config-toolbar,
+  .ai-provider-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-span-2,
+  .ai-span-4 {
+    grid-column: auto;
+  }
+
+  .ai-provider-header,
+  .ai-model-title {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ai-provider-actions {
+    justify-content: flex-start;
+  }
+
+  .ai-model-head {
+    display: none;
+  }
+
+  .ai-model-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-model-params {
+    grid-template-columns: 1fr;
   }
 }
 </style>

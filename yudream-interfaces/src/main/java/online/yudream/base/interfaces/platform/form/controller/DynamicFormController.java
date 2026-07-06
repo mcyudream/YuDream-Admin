@@ -1,7 +1,9 @@
 package online.yudream.base.interfaces.platform.form.controller;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.form.dto.FormSubmissionExportDTO;
 import online.yudream.base.application.platform.form.query.DynamicFormPageQuery;
 import online.yudream.base.application.platform.form.query.FormSubmissionPageQuery;
 import online.yudream.base.application.platform.form.service.DynamicFormAppService;
@@ -9,10 +11,12 @@ import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.form.assembler.DynamicFormWebAssembler;
+import online.yudream.base.interfaces.platform.form.assembler.FormSubmissionExcelAssembler;
 import online.yudream.base.interfaces.platform.form.request.DynamicFormSaveRequest;
 import online.yudream.base.interfaces.platform.form.res.DynamicFormRes;
 import online.yudream.base.interfaces.platform.form.res.FormStatisticsRes;
 import online.yudream.base.interfaces.platform.form.res.FormSubmissionRes;
+import online.yudream.base.interfaces.system.excel.support.ExcelHttpSupport;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +25,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/platform/forms")
@@ -80,6 +86,19 @@ public class DynamicFormController {
         return Result.ok(DynamicFormWebAssembler.toSubmissionPage(
                 dynamicFormAppService.submissions(DynamicFormWebAssembler.toSubmissionQuery(id, query))
         ));
+    }
+
+    @GetMapping("/{id}/submissions/export")
+    @PermissionRegister(code = "platform:form:submission:export", name = "导出表单提交", module = "平台能力", desc = "导出动态表单提交结果 Excel")
+    public void exportSubmissions(@PathVariable Long id, HttpServletResponse response) throws IOException {
+        FormSubmissionExportDTO export = dynamicFormAppService.exportSubmissions(id);
+        ExcelHttpSupport.writeDynamic(
+                response,
+                FormSubmissionExcelAssembler.filename(export),
+                "提交结果",
+                FormSubmissionExcelAssembler.head(export),
+                FormSubmissionExcelAssembler.rows(export)
+        );
     }
 
     @GetMapping("/{id}/statistics")
