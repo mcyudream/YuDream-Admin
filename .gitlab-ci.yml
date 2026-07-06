@@ -121,12 +121,7 @@ collect:artifacts:
 build-and-push-images:
   stage: build-images
   image: *docker_cli_image
-  services:
-    - name: *docker_dind_image
-      alias: docker
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
     BACKEND_IMAGE: "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA"
     FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
     BACKEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/backend:latest"
