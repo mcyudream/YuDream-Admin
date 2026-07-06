@@ -161,7 +161,7 @@ export function setSettingsLegacy(settingsLegacy: SettingsLegacyOptions) {
 
   // turbo-console-disable-next-line
   console.warn(
-    '[Fantastic-admin]\n\n当前正在使用 v5.x 版本的配置，为了您的使用体验，请复制下方 v6.x 配置到 src/settings.ts 中替换\n',
+    '[YuDream]\n\n当前正在使用 v5.x 版本的配置，为了您的使用体验，请复制下方 v6.x 配置到 src/settings.ts 中替换\n',
     JSON.stringify(diffTwoObj(settingsDefault, result), null, 2),
   )
 

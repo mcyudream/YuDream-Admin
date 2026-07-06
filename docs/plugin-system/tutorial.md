@@ -30,7 +30,7 @@
 最小结构：
 
 ```text
-yudream-plugin-demo/
+yudream-plugins/yudream-plugin-demo/
   pom.xml
   src/main/java/online/yudream/base/plugin/demo/bootstrap/DemoPlugin.java
 ```
@@ -182,13 +182,13 @@ META-INF/yudream-plugin/frontend/demo-plugin/remoteEntry.js
 打包插件：
 
 ```powershell
-mvn -pl yudream-plugin-demo -am -DskipTests package
+mvn -pl yudream-plugins/yudream-plugin-demo -am -DskipTests package
 ```
 
 产物一般位于：
 
 ```text
-yudream-plugin-demo/target/yudream-plugin-demo-1.0-SNAPSHOT.jar
+yudream-plugins/yudream-plugin-demo/target/yudream-plugin-demo-1.0-SNAPSHOT.jar
 ```
 
 在后台“插件管理”中加载 JAR，启用插件后：
@@ -208,4 +208,3 @@ yudream-plugin-demo/target/yudream-plugin-demo-1.0-SNAPSHOT.jar
 - 生产 manifest 是否不依赖 workspace alias。
 - JAR 内是否包含前端 `remoteEntry.js` 和相关 assets。
 - 启用、禁用、卸载后资源是否正确注册和释放。
-

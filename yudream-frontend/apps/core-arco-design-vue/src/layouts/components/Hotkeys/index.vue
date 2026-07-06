@@ -18,7 +18,6 @@ const groupTitleMap = {
 } as const
 
 const itemTitleMap: Record<string, string> = {
-  'global.system': '查看系统信息',
   'global.search': '唤起导航搜索',
   'nav.next': '激活下一个主导航',
   'nav.prev': '激活上一个主导航',

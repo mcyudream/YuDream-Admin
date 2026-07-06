@@ -89,10 +89,8 @@ function setupRoutes(router: Router) {
     else {
       if (to.name !== 'login' && !to.meta?.public) {
         return {
-          name: 'login',
-          query: {
-            redirect: to.fullPath !== appSettingsStore.settings.app.home.fullPath ? to.fullPath : undefined,
-          },
+          name: 'publicSiteHome',
+          replace: true,
         }
       }
     }

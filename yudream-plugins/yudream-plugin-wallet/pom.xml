@@ -9,7 +9,7 @@
         <version>1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>yudream-plugin-yudream-skin</artifactId>
+    <artifactId>yudream-plugin-wallet</artifactId>
 
     <build>
         <resources>
@@ -17,8 +17,8 @@
                 <directory>src/main/resources</directory>
             </resource>
             <resource>
-                <directory>../yudream-frontend/packages/plugin-yudream-skin/dist</directory>
-                <targetPath>META-INF/yudream-plugin/frontend/yudream-skin</targetPath>
+                <directory>../../yudream-frontend/packages/plugin-yudream-wallet/dist</directory>
+                <targetPath>META-INF/yudream-plugin/frontend/yudream-wallet</targetPath>
                 <filtering>false</filtering>
             </resource>
         </resources>

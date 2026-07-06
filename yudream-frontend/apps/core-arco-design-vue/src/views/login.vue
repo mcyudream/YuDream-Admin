@@ -14,6 +14,8 @@ const route = useRoute()
 const router = useRouter()
 const appSettingsStore = useAppSettingsStore()
 
+const loginBanner = computed(() => appSettingsStore.loginBanner || new URL('@/assets/images/login-banner.png', import.meta.url).href)
+
 const redirect = ref(route.query.redirect?.toString() ?? appSettingsStore.settings.app.home.fullPath)
 
 // 布局对齐方式
@@ -57,8 +59,7 @@ function handleLogin() {
   </div>
   <div class="login-box" :class="layoutAlign">
     <div class="login-banner">
-      <img src="@/assets/images/logo.svg" class="rounded h-8 inset-s-4 inset-t-4 absolute">
-      <img src="@/assets/images/login-banner.png" class="banner">
+      <img :src="loginBanner" class="banner">
       <AppCopyright v-if="appSettingsStore.mode === 'pc' && ['left', 'right'].includes(layoutAlign)" class="w-full bottom-0 absolute" />
     </div>
     <div class="login-form flex-col-center">

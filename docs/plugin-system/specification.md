@@ -261,7 +261,7 @@ META-INF/yudream-plugin/frontend/{pluginCode}/assets/*
 后端：
 
 ```powershell
-mvn -pl yudream-plugin-{code} -am -DskipTests package
+mvn -pl yudream-plugins/yudream-plugin-{code} -am -DskipTests package
 mvn -pl yudream-bootstrap -am -DskipTests compile
 ```
 
@@ -282,4 +282,3 @@ pnpm --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pret
 - HTTP 接口权限正确。
 - 前端 remote entry 可加载。
 - 禁用后菜单、路由、接口不再可用。
-

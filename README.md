@@ -17,9 +17,9 @@ yudream-application/            应用层：用例编排、命令、查询、DTO
 yudream-infrastructure/         基础设施层：持久化、外部服务、菜单种子、插件运行时实现
 yudream-interfaces/             接口层：HTTP Controller、请求/响应模型、Web 装配
 yudream-bootstrap/              启动模块：Spring Boot 入口和运行时装配
-yudream-plugin-spi/             插件 SPI：第三方插件唯一允许依赖的主应用契约
-yudream-sample-plugin/          插件样例
-yudream-plugin-*/               内置业务插件
+yudream-plugins/yudream-plugin-spi/     插件 SPI：第三方插件唯一允许依赖的主应用契约
+yudream-plugins/yudream-sample-plugin/  插件样例
+yudream-plugins/yudream-plugin-*/       内置业务插件
 yudream-frontend/               前端 workspace，包含主应用和插件前端包
 docs/                           项目设计文档、计划和规范
 ```
@@ -31,7 +31,7 @@ docs/                           项目设计文档、计划和规范
 ```powershell
 mvn -pl yudream-bootstrap -am -DskipTests compile
 mvn -pl yudream-bootstrap -am spring-boot:run
-mvn -pl yudream-plugin-yudream-skin -am -DskipTests package
+mvn -pl yudream-plugins/yudream-plugin-yudream-skin -am -DskipTests package
 ```
 
 如果本机有多个 JDK，可以在 PowerShell 中临时指定：
@@ -92,11 +92,11 @@ META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js
 
 ## 内置插件
 
-- `yudream-sample-plugin`：最小样例，演示权限、前端路由、HTTP 接口和框架用户服务。
-- `yudream-plugin-wallet`：钱包与资产插件。
-- `yudream-plugin-alipay`：支付宝支付插件。
-- `yudream-plugin-yudream-skin`：皮肤站插件。
-- `yudream-plugin-authlib-injector`：Authlib Injector 兼容插件。
+- `yudream-plugins/yudream-sample-plugin`：最小样例，演示权限、前端路由、HTTP 接口和框架用户服务。
+- `yudream-plugins/yudream-plugin-wallet`：钱包与资产插件。
+- `yudream-plugins/yudream-plugin-alipay`：支付宝支付插件。
+- `yudream-plugins/yudream-plugin-yudream-skin`：皮肤站插件。
+- `yudream-plugins/yudream-plugin-authlib-injector`：Authlib Injector 兼容插件。
 
 样例插件用于学习，不建议在生产部署中启用。
 
@@ -111,7 +111,7 @@ cd yudream-frontend
 pnpm --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pretty false --skipLibCheck --ignoreDeprecations 6.0
 
 # 插件打包
-mvn -pl yudream-plugin-wallet -am -DskipTests package
+mvn -pl yudream-plugins/yudream-plugin-wallet -am -DskipTests package
 ```
 
 ## 编码规范
@@ -121,4 +121,3 @@ mvn -pl yudream-plugin-wallet -am -DskipTests package
 - 不把插件业务页面写进主前端 `apps/*/src/views`，插件页面应放在 `yudream-frontend/packages/plugin-*`。
 - Controller 不直接创建 Cmd/Res，不做复杂映射，使用接口层 Assembler。
 - 新增菜单按钮权限时，同步补充菜单种子和前端 `v-auth`。
-

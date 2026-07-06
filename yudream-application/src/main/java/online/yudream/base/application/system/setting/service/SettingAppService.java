@@ -39,6 +39,7 @@ public class SettingAppService {
     private static final String KEY_SITE_DESCRIPTION = "siteDescription";
     private static final String KEY_LOGO = "logo";
     private static final String KEY_FAVICON = "favicon";
+    private static final String KEY_LOGIN_BANNER = "loginBanner";
     private static final String KEY_COPYRIGHT_COMPANY = "copyrightCompany";
     private static final String KEY_COPYRIGHT_WEBSITE = "copyrightWebsite";
     private static final String KEY_COPYRIGHT_DATES = "copyrightDates";
@@ -108,6 +109,14 @@ public class SettingAppService {
         return toSiteDTO(settings);
     }
 
+    @Transactional
+    public SiteSettingDTO uploadLoginBanner(InputStream inputStream, String originalName, String contentType, long size, Long userId) {
+        String url = uploadImageSetting(KEY_LOGIN_BANNER, "登录页 Banner", inputStream, originalName, contentType, size, userId);
+        Map<String, String> settings = publicSettings();
+        settings.put(KEY_LOGIN_BANNER, url);
+        return toSiteDTO(settings);
+    }
+
     private String uploadImageSetting(String key, String description, InputStream inputStream, String originalName,
                                       String contentType, long size, Long userId) {
         if (!StringUtils.hasText(contentType) || !contentType.toLowerCase().startsWith("image/")) {
@@ -169,6 +178,7 @@ public class SettingAppService {
                 .siteDescription(settings.get(KEY_SITE_DESCRIPTION))
                 .logo(settings.get(KEY_LOGO))
                 .favicon(settings.get(KEY_FAVICON))
+                .loginBanner(settings.get(KEY_LOGIN_BANNER))
                 .copyrightCompany(settings.get(KEY_COPYRIGHT_COMPANY))
                 .copyrightWebsite(settings.get(KEY_COPYRIGHT_WEBSITE))
                 .copyrightDates(settings.get(KEY_COPYRIGHT_DATES))

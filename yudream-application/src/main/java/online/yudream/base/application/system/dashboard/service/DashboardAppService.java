@@ -113,7 +113,8 @@ public class DashboardAppService {
         if (override == null) {
             return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, normalizeSubmittedItems(defaultItems(cards), cards));
         }
-        return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, normalizeSubmittedItems(override.getItems(), cards));
+        List<DashboardLayoutItem> normalized = normalizeSubmittedItems(override.getItems(), cards);
+        return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, appendMissingSystemItems(normalized, cards));
     }
 
     private DashboardLayout mergeLayout(Long ownerId, DashboardLayout defaultLayout, DashboardLayout overrideLayout,
@@ -176,6 +177,50 @@ public class DashboardAppService {
             items.add(new DashboardLayoutItem(card.code(), true, placements));
         }
         return items;
+    }
+
+    private List<DashboardLayoutItem> appendMissingSystemItems(List<DashboardLayoutItem> items, List<DashboardCardDefinition> cards) {
+        List<DashboardLayoutItem> next = new ArrayList<>(items);
+        Set<String> existingCodes = next.stream().map(DashboardLayoutItem::cardCode).collect(Collectors.toSet());
+        Map<String, int[]> columnHeights = currentColumnHeights(next);
+        for (DashboardCardDefinition card : cards) {
+            if (!"SYSTEM".equals(card.source()) || existingCodes.contains(card.code())) {
+                continue;
+            }
+            Map<String, DashboardGridPlacement> placements = new HashMap<>();
+            for (String breakpoint : BREAKPOINTS) {
+                DashboardGridPlacement placement = nextDefaultPlacement(card, breakpoint, columnHeights.get(breakpoint));
+                placements.put(breakpoint, placement);
+            }
+            next.add(new DashboardLayoutItem(card.code(), true, placements));
+            existingCodes.add(card.code());
+        }
+        return normalizeSubmittedItems(next, cards);
+    }
+
+    private Map<String, int[]> currentColumnHeights(List<DashboardLayoutItem> items) {
+        Map<String, int[]> columnHeights = new HashMap<>();
+        for (String breakpoint : BREAKPOINTS) {
+            int columns = BREAKPOINT_COLUMNS.getOrDefault(breakpoint, 12);
+            int[] heights = new int[columns];
+            for (DashboardLayoutItem item : items) {
+                if (!item.visible()) {
+                    continue;
+                }
+                DashboardGridPlacement placement = item.placements().get(breakpoint);
+                if (placement == null) {
+                    continue;
+                }
+                int width = "xs".equals(breakpoint) ? 1 : Math.min(Math.max(placement.w(), 1), columns);
+                int x = "xs".equals(breakpoint) ? 0 : Math.min(Math.max(placement.x(), 0), Math.max(columns - width, 0));
+                int bottom = Math.max(placement.y(), 0) + Math.max(placement.h(), 1);
+                for (int col = x; col < x + width; col++) {
+                    heights[col] = Math.max(heights[col], bottom);
+                }
+            }
+            columnHeights.put(breakpoint, heights);
+        }
+        return columnHeights;
     }
 
     private DashboardGridPlacement defaultPlacement(DashboardCardDefinition card, String breakpoint, int y) {

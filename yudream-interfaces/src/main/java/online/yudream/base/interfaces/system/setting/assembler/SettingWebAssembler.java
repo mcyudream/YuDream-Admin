@@ -33,6 +33,7 @@ public class SettingWebAssembler {
                 .siteDescription(dto.getSiteDescription())
                 .logo(dto.getLogo())
                 .favicon(dto.getFavicon())
+                .loginBanner(dto.getLoginBanner())
                 .copyrightCompany(dto.getCopyrightCompany())
                 .copyrightWebsite(dto.getCopyrightWebsite())
                 .copyrightDates(dto.getCopyrightDates())

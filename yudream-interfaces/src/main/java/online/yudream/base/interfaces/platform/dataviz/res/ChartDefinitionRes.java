@@ -2,7 +2,6 @@ package online.yudream.base.interfaces.platform.dataviz.res;
 
 import lombok.Builder;
 import lombok.Data;
-import online.yudream.base.domain.platform.dataviz.enumerate.ChartType;
 import online.yudream.base.domain.platform.dataviz.valobj.ChartDatasetQuery;
 import online.yudream.base.domain.platform.dataviz.valobj.ChartLayoutConfig;
 
@@ -15,7 +14,7 @@ public class ChartDefinitionRes {
     private Long id;
     private String code;
     private String name;
-    private ChartType chartType;
+    private String chartType;
     private String dataSource;
     private ChartDatasetQuery queryConfig;
     private ChartLayoutConfig layoutConfig;

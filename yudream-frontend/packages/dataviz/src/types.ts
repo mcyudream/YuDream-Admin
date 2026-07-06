@@ -31,6 +31,8 @@ export interface ChartDataset {
   source?: Array<Record<string, unknown> | unknown[]>
   /** 图表系列配置 */
   series?: ChartSeries[]
+  /** ECharts dataZoom 配置 */
+  dataZoom?: unknown[]
   /** 关系图节点（用于 graph 类型） */
   nodes?: ChartNode[]
   /** 关系图边（用于 graph 类型） */

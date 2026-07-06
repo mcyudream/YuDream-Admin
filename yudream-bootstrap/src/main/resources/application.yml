@@ -40,6 +40,10 @@ spring.thymeleaf:
   mode: HTML
   cache: false
 
+spring.servlet.multipart:
+  max-file-size: 10MB
+  max-request-size: 50MB
+
 logging:
   level:
     online.yudream.base: debug
@@ -123,6 +127,7 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_AI_ENABLED:true}
   dataviz:
     enabled: ${PLATFORM_DATAVIZ_ENABLED:true}
+
 
 yudream.storage.s3:
   endpoint: ${S3_ENDPOINT:http://localhost:9000}

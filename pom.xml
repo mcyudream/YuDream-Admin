@@ -9,12 +9,12 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>yudream-plugin-spi</module>
-        <module>yudream-sample-plugin</module>
-        <module>yudream-plugin-wallet</module>
-        <module>yudream-plugin-alipay</module>
-        <module>yudream-plugin-yudream-skin</module>
-        <module>yudream-plugin-authlib-injector</module>
+        <module>yudream-plugins/yudream-plugin-spi</module>
+        <module>yudream-plugins/yudream-sample-plugin</module>
+        <module>yudream-plugins/yudream-plugin-wallet</module>
+        <module>yudream-plugins/yudream-plugin-alipay</module>
+        <module>yudream-plugins/yudream-plugin-yudream-skin</module>
+        <module>yudream-plugins/yudream-plugin-authlib-injector</module>
         <module>yudream-domain</module>
         <module>yudream-application</module>
         <module>yudream-interfaces</module>

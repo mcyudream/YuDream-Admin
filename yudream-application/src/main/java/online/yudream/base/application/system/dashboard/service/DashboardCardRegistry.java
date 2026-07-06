@@ -1,6 +1,9 @@
 package online.yudream.base.application.system.dashboard.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
+import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.capability.service.CapabilityProvider;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.system.dashboard.valobj.DashboardCardDefinition;
@@ -16,7 +19,11 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class DashboardCardRegistry {
 
+    private static final String DATAVIZ_CAPABILITY_CODE = "dataviz";
+
     private final PluginRuntimeGateway pluginRuntimeGateway;
+    private final CapabilityModuleRepo capabilityModuleRepo;
+    private final List<CapabilityProvider> capabilityProviders;
 
     public List<DashboardCardDefinition> allCards() {
         Map<String, DashboardCardDefinition> cards = new LinkedHashMap<>();
@@ -126,7 +133,97 @@ public class DashboardCardRegistry {
                 2,
                 50
         ));
+        if (datavizEnabled()) {
+            cards.add(new DashboardCardDefinition(
+                    "platform.dataviz.capability-stats",
+                    "能力分类统计",
+                    "使用数据可视化能力展示平台能力类型分布。",
+                    "i-ri:bar-chart-2-line",
+                    "平台",
+                    "SYSTEM",
+                    null,
+                    "platform:dataviz:dataset",
+                    "DATAVIZ_CAPABILITY_STATS",
+                    "/platform/capability",
+                    null,
+                    "cyan",
+                    4,
+                    3,
+                    3,
+                    2,
+                    60
+            ));
+            cards.add(new DashboardCardDefinition(
+                    "system.dataviz.user-registration",
+                    "用户注册",
+                    "按日期统计最近 8 天管理端用户注册趋势。",
+                    "i-ri:user-add-line",
+                    "系统",
+                    "SYSTEM",
+                    null,
+                    "platform:dataviz:dataset",
+                    "DATAVIZ_USER_REGISTRATION",
+                    "/system/user",
+                    null,
+                    "blue",
+                    8,
+                    4,
+                    4,
+                    3,
+                    61
+            ));
+            cards.add(new DashboardCardDefinition(
+                    "system.dataviz.dept-created",
+                    "部门新增",
+                    "按日期统计最近 8 天组织部门新增趋势。",
+                    "i-ri:organization-chart",
+                    "系统",
+                    "SYSTEM",
+                    null,
+                    "platform:dataviz:dataset",
+                    "DATAVIZ_DEPT_CREATED",
+                    "/system/dept",
+                    null,
+                    "gray",
+                    4,
+                    4,
+                    3,
+                    3,
+                    62
+            ));
+            cards.add(new DashboardCardDefinition(
+                    "system.dataviz.log-activity",
+                    "接口调用",
+                    "按日期统计最近 8 天接口访问日志趋势。",
+                    "i-ri:file-chart-line",
+                    "监控",
+                    "SYSTEM",
+                    null,
+                    "platform:dataviz:dataset",
+                    "DATAVIZ_LOG_ACTIVITY",
+                    "/system/api-log",
+                    null,
+                    "amber",
+                    4,
+                    4,
+                    3,
+                    3,
+                    63
+            ));
+        }
         return cards;
+    }
+
+    private boolean datavizEnabled() {
+        boolean providerAvailable = capabilityProviders.stream()
+                .map(CapabilityProvider::descriptor)
+                .anyMatch(descriptor -> DATAVIZ_CAPABILITY_CODE.equals(descriptor.code()));
+        if (!providerAvailable) {
+            return false;
+        }
+        return capabilityModuleRepo.findByCode(DATAVIZ_CAPABILITY_CODE)
+                .map(CapabilityModule::enabled)
+                .orElse(false);
     }
 
     private DashboardCardDefinition fromPlugin(PluginDashboardCardInfo card) {
