@@ -23,10 +23,14 @@ export interface ChartDataset {
   id?: string
   /** 数据集名称 */
   label?: string
+  /** 显式指定图表类型 */
+  chartType?: ChartType
   /** 维度定义 */
   dimensions?: string[]
   /** 数据行 */
   source?: Array<Record<string, unknown> | unknown[]>
+  /** 图表系列配置 */
+  series?: ChartSeries[]
   /** 关系图节点（用于 graph 类型） */
   nodes?: ChartNode[]
   /** 关系图边（用于 graph 类型） */
