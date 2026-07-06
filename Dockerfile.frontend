@@ -1,5 +1,5 @@
 # 前端镜像：用 nginx 托管主体前端 dist
-FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nginx:alpine
+FROM nginx:alpine
 
 # 复制主体前端构建产物
 COPY yudream-frontend/apps/core-arco-design-vue/dist /usr/share/nginx/html
