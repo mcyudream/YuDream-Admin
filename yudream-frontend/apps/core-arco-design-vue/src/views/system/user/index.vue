@@ -506,7 +506,7 @@ function importUsers() {
                 multiple
                 :options="section.roleOptions"
                 class="w-full"
-                @update:model-value="setDeptRoleIds(section.deptId, $event)"
+                @update:model-value="setDeptRoleIds(section.deptId, $event as IdValue[])"
               />
               <div v-else class="text-sm text-muted-foreground">
                 该部门暂无可分配角色
@@ -541,7 +541,7 @@ function importUsers() {
                 multiple
                 :options="section.roleOptions"
                 class="w-full"
-                @update:model-value="setDeptRoleIds(section.deptId, $event)"
+                @update:model-value="setDeptRoleIds(section.deptId, $event as IdValue[])"
               />
               <div v-else class="text-sm text-muted-foreground">
                 该部门暂无可分配角色

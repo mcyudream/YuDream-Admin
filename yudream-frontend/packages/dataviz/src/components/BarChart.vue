@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ChartDataset, ChartTheme } from '../types'
+import type { ChartDataset } from '../types'
 import BaseChart from './BaseChart.vue'
 
 const props = defineProps<{

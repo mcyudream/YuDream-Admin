@@ -161,7 +161,7 @@ function render() {
     .attr('width', 24)
     .attr('height', nodeHeight)
     .attr('rx', 4)
-    .attr('fill', (d, i) => theme.colors[i % theme.colors.length])
+    .attr('fill', (_d, i) => theme.colors[i % theme.colors.length])
 
   nodeGroups
     .append('text')

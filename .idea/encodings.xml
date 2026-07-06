@@ -1,6 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/plugins/yudream-frontend/packages/plugin-authlib-injector/dist" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-frontend/packages/plugin-yudream-alipay/dist" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-frontend/packages/plugin-yudream-skin/dist" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-frontend/packages/plugin-yudream-wallet/dist" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-alipay/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-alipay/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-authlib-injector/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-authlib-injector/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-spi/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-spi/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-wallet/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-wallet/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-yudream-skin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-plugin-yudream-skin/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-sample-plugin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/plugins/yudream-sample-plugin/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-application/src/main/java" charset="UTF-8" />
@@ -27,6 +43,18 @@
     <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/java/online/yudream/base/plugin/skin/interfaces/controller/YuDreamSkinPublicController.java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/java/online/yudream/base/plugin/skin/interfaces/controller/YuDreamSkinUserController.java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-alipay/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-alipay/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-authlib-injector/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-authlib-injector/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-spi/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-spi/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-wallet/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-wallet/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-yudream-skin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-yudream-skin/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-sample-plugin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-sample-plugin/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-sample-plugin/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-sample-plugin/src/main/resources" charset="UTF-8" />
   </component>

@@ -13,6 +13,7 @@ export type ChartType =
   | 'heatmap'
   | 'funnel'
   | 'gauge'
+  | 'sankey'
   | 'custom'
 
 /**

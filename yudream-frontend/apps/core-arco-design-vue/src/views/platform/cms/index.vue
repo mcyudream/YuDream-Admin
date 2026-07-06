@@ -732,7 +732,7 @@ function sectionTitle(type: HomeSectionType) {
                 <span class="page-list-card__title">{{ item.title }}</span>
                 <span class="page-list-card__path">/site/{{ item.slug }}</span>
                 <span class="page-list-card__meta">
-                  <FaTag :variant="item.status === 'PUBLISHED' ? 'primary' : 'secondary'">
+                  <FaTag :variant="item.status === 'PUBLISHED' ? 'default' : 'secondary'">
                     {{ item.status === 'PUBLISHED' ? '已发布' : '草稿' }}
                   </FaTag>
                   <span>{{ dateText(item.publishedAt || item.updateTime || item.createTime) || '未发布' }}</span>
@@ -802,14 +802,14 @@ function sectionTitle(type: HomeSectionType) {
                 <FaInput
                   :model-value="splitTerms(pageForm.categories)"
                   placeholder="新闻, 产品, 案例"
-                  @update:model-value="value => updateTerms('categories', value)"
+                  @update:model-value="value => value && updateTerms('categories', value)"
                 />
               </a-form-item>
               <a-form-item label="标签">
                 <FaInput
                   :model-value="splitTerms(pageForm.tags)"
                   placeholder="低代码, CMS, 首页"
-                  @update:model-value="value => updateTerms('tags', value)"
+                  @update:model-value="value => value && updateTerms('tags', value)"
                 />
               </a-form-item>
             </a-form>

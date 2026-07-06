@@ -8,7 +8,7 @@ const props = defineProps<{
   height?: number | string
 }>()
 
-const theme = computed(() => {
+const theme = computed<'light' | 'dark'>(() => {
   if (typeof document === 'undefined') {
     return 'light'
   }

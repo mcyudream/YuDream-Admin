@@ -637,7 +637,7 @@ function executionVariant(status: ExecutionStatus) {
 
     <FaModal v-model="invokeVisible" title="执行 HTTP 调用" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'invoke'" @confirm="invokeConnector">
       <div class="modal-grid">
-        <a-form layout="vertical">
+        <a-form :model="{}" layout="vertical">
           <a-form-item label="请求头 JSON">
             <FaTextarea v-model="invokeForm.headers" rows="5" input-class="font-mono" />
           </a-form-item>
@@ -686,7 +686,7 @@ function executionVariant(status: ExecutionStatus) {
 
     <FaModal v-model="executeVisible" title="执行运行脚本" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'execute'" @confirm="executeScript">
       <div class="modal-grid">
-        <a-form layout="vertical">
+        <a-form :model="{}" layout="vertical">
           <a-form-item label="标准输入">
             <FaTextarea v-model="executeStdin" rows="8" input-class="font-mono" />
           </a-form-item>

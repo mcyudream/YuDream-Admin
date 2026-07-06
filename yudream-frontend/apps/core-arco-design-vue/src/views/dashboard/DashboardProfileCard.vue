@@ -43,7 +43,7 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
         <p>{{ dept || '未选择部门' }} · {{ role || '未选择角色' }}</p>
       </div>
       <FaAvatar
-        :src="avatar"
+        :src="avatar || ''"
         :fallback="displayName.slice(0, 2)"
         class="dashboard-profile__avatar"
       >
