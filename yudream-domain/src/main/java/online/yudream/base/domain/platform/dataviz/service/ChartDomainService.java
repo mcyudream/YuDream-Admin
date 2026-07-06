@@ -3,7 +3,9 @@ package online.yudream.base.domain.platform.dataviz.service;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.dataviz.enumerate.ChartType;
 import online.yudream.base.domain.platform.dataviz.valobj.ChartDatasetQuery;
+import org.springframework.stereotype.Service;
 
+@Service
 public class ChartDomainService {
 
     public void validateDatasetQuery(ChartType chartType, ChartDatasetQuery query) {

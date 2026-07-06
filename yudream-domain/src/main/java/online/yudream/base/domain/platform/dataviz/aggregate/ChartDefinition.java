@@ -49,6 +49,11 @@ public class ChartDefinition extends BaseDomain {
     }
 
     public void update(String name, ChartType chartType, String dataSource,
+                       ChartDatasetQuery queryConfig, ChartLayoutConfig layoutConfig) {
+        update(name, chartType, dataSource, queryConfig, layoutConfig, this.enabled);
+    }
+
+    public void update(String name, ChartType chartType, String dataSource,
                        ChartDatasetQuery queryConfig, ChartLayoutConfig layoutConfig, Boolean enabled) {
         if (name != null && !name.isBlank()) {
             this.name = name.trim();
