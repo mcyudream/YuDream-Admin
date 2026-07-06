@@ -1,5 +1,7 @@
 package online.yudream.base.infra.platform.plugin.service;
 
+import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
@@ -8,7 +10,6 @@ import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
-import online.yudream.base.domain.common.exception.BizException;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -29,6 +30,7 @@ public class PluginContextImpl implements PluginContext {
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
     private final List<PluginDashboardCard> dashboardCards = new ArrayList<>();
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
+    private final List<PluginHttpEndpointInfo> httpEndpoints = new ArrayList<>();
     private final Map<String, PluginHttpHandler> httpHandlers = new ConcurrentHashMap<>();
     private final List<AutoCloseable> disposables = new ArrayList<>();
     private final Set<String> menuKeys = ConcurrentHashMap.newKeySet();
@@ -98,10 +100,15 @@ public class PluginContextImpl implements PluginContext {
 
     @Override
     public void registerHttpHandler(String method, String path, PluginHttpHandler handler) {
+        registerHttpHandler(method, path, "", true, handler);
+    }
+
+    public void registerHttpHandler(String method, String path, String permission, boolean wrapResult, PluginHttpHandler handler) {
         String key = httpKey(method, path);
         if (httpHandlers.putIfAbsent(key, handler) != null) {
             throw new BizException("插件 HTTP 端点重复：" + key);
         }
+        httpEndpoints.add(new PluginHttpEndpointInfo(pluginCode, method, path, permission, wrapResult));
     }
 
     @Override
@@ -139,6 +146,10 @@ public class PluginContextImpl implements PluginContext {
         return List.copyOf(dashboardCards);
     }
 
+    public List<PluginHttpEndpointInfo> httpEndpoints() {
+        return List.copyOf(httpEndpoints);
+    }
+
     public Optional<PluginHttpHandler> findHttpHandler(String method, String path) {
         String normalizedMethod = StringUtils.hasText(method) ? method.trim().toUpperCase(Locale.ROOT) : "*";
         String normalizedPath = normalizePath(path);
@@ -162,6 +173,7 @@ public class PluginContextImpl implements PluginContext {
         capabilities.clear();
         dashboardCards.clear();
         frontendModules.clear();
+        httpEndpoints.clear();
         httpHandlers.clear();
         pluginExtensionRegistry.clear(pluginCode);
         menuKeys.clear();

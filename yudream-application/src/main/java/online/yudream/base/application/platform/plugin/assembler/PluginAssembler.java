@@ -6,6 +6,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDT
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginHttpEndpointDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
@@ -13,6 +14,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 
 import java.util.List;
 
@@ -105,6 +107,17 @@ public class PluginAssembler {
                 .contentType(result.contentType())
                 .body(result.body())
                 .wrapped(result.wrapped())
+                .build();
+    }
+
+    public static PluginHttpEndpointDTO toDTO(PluginHttpEndpointInfo endpoint) {
+        return PluginHttpEndpointDTO.builder()
+                .pluginCode(endpoint.pluginCode())
+                .method(endpoint.method())
+                .path(endpoint.path())
+                .fullPath(endpoint.fullPath())
+                .permission(endpoint.permission())
+                .wrapResult(endpoint.wrapResult())
                 .build();
     }
 }

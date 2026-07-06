@@ -12,6 +12,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInf
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -163,6 +164,17 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .filter(entry -> entry.getValue().isEnabled())
                 .flatMap(entry -> entry.getValue().getContext().dashboardCards().stream()
                         .map(card -> toInfo(entry.getKey(), card)))
+                .toList();
+    }
+
+    @Override
+    public List<PluginHttpEndpointInfo> httpEndpoints() {
+        return holders.values().stream()
+                .filter(PluginRuntimeHolder::isEnabled)
+                .flatMap(holder -> holder.getContext().httpEndpoints().stream())
+                .sorted(Comparator.comparing(PluginHttpEndpointInfo::pluginCode)
+                        .thenComparing(PluginHttpEndpointInfo::path)
+                        .thenComparing(PluginHttpEndpointInfo::method))
                 .toList();
     }
 

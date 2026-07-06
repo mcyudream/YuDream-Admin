@@ -6,19 +6,23 @@ const toast = useFaToast()
 
 const loading = ref(false)
 const saving = ref(false)
+const docTicket = ref('')
+const ticketExpireAt = ref(0)
 
 const form = reactive<ApiDocSettings>({
   enabled: false,
   apiKeyAccessEnabled: false,
   title: 'YuDream Admin API',
-  description: 'YuDream Admin 系统接口文档',
+  description: 'YuDream Admin 系统接口文档。',
   version: '1.0.0',
   openApiPath: '/v3/api-docs',
   swaggerUiPath: '/swagger-ui/index.html',
 })
 
-const swaggerUrl = computed(() => backendEndpoint(form.swaggerUiPath))
-const openApiUrl = computed(() => backendEndpoint(form.openApiPath))
+const openApiUrl = computed(() => withDocTicket(backendEndpoint(form.openApiPath)))
+const swaggerAssetBase = computed(() => backendEndpoint('/swagger-ui').replace(/\/$/, ''))
+const swaggerPreviewReady = computed(() => form.enabled && Boolean(docTicket.value))
+const swaggerPreviewHtml = computed(() => createSwaggerPreviewHtml(openApiUrl.value, swaggerAssetBase.value))
 
 onMounted(loadSettings)
 
@@ -27,6 +31,9 @@ async function loadSettings() {
   try {
     const res = await apiDocs.settings()
     assignForm(res.data)
+    if (form.enabled) {
+      await ensureDocTicket()
+    }
   }
   finally {
     loading.value = false
@@ -38,6 +45,9 @@ async function saveSettings() {
   try {
     const res = await apiDocs.update(form)
     assignForm(res.data)
+    if (form.enabled) {
+      await refreshDocTicket()
+    }
     toast.success('API 文档配置已保存')
   }
   finally {
@@ -56,11 +66,20 @@ function assignForm(data: ApiDocSettings) {
   })
 }
 
-function openSwagger() {
-  window.open(swaggerUrl.value, '_blank', 'noopener,noreferrer')
+async function openSwagger() {
+  const popup = window.open('', '_blank')
+  await ensureDocTicket(true)
+  if (!popup) {
+    toast.error('无法打开 Swagger UI 窗口')
+    return
+  }
+  popup.document.open()
+  popup.document.write(swaggerPreviewHtml.value)
+  popup.document.close()
 }
 
-function openOpenApi() {
+async function openOpenApi() {
+  await ensureDocTicket(true)
   window.open(openApiUrl.value, '_blank', 'noopener,noreferrer')
 }
 
@@ -71,6 +90,86 @@ function backendEndpoint(path: string) {
   }
   const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
   return `${base.replace(/\/$/, '')}${normalized}`
+}
+
+function createSwaggerPreviewHtml(openApi: string, assetBase: string) {
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YuDream Admin API</title>
+  <link rel="stylesheet" href="${assetBase}/swagger-ui.css">
+  <style>
+    html, body, #swagger-ui { margin: 0; min-height: 100%; background: #fff; }
+    .swagger-ui .topbar { display: none; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="${assetBase}/swagger-ui-bundle.js"><\/script>
+  <script src="${assetBase}/swagger-ui-standalone-preset.js"><\/script>
+  <script>
+    window.onload = function () {
+      window.ui = SwaggerUIBundle({
+        url: ${JSON.stringify(openApi)},
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        validatorUrl: null,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: 'StandaloneLayout'
+      })
+    }
+  <\/script>
+</body>
+</html>`
+}
+
+async function ensureDocTicket(force = false) {
+  if (!force && docTicket.value && ticketExpireAt.value > Date.now() + 60_000) {
+    return
+  }
+  await refreshDocTicket()
+}
+
+async function refreshDocTicket() {
+  try {
+    const res = await apiDocs.accessTicket()
+    docTicket.value = res.data.ticket
+    ticketExpireAt.value = Date.now() + Math.max(res.data.expiresIn - 30, 30) * 1000
+  }
+  catch {
+    docTicket.value = ''
+    ticketExpireAt.value = 0
+  }
+}
+
+function withDocTicket(url: string) {
+  if (!docTicket.value) {
+    return url
+  }
+  return appendQuery(url, {
+    doc_ticket: docTicket.value,
+  })
+}
+
+function appendQuery(url: string, params: Record<string, string>) {
+  const [target, hash = ''] = url.split('#')
+  const query = Object.entries(params)
+    .filter(([, value]) => value)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&')
+  if (!query) {
+    return url
+  }
+  const separator = target.includes('?') ? '&' : '?'
+  return `${target}${separator}${query}${hash ? `#${hash}` : ''}`
 }
 </script>
 
@@ -142,7 +241,11 @@ function backendEndpoint(path: string) {
               {{ form.enabled ? '已启用' : '未启用' }}
             </FaTag>
           </div>
-          <iframe v-if="form.enabled" :src="swaggerUrl" title="Swagger UI" />
+          <iframe v-if="swaggerPreviewReady" :srcdoc="swaggerPreviewHtml" title="Swagger UI" />
+          <div v-else-if="form.enabled" class="empty-preview">
+            <FaIcon name="i-ri:loader-4-line" />
+            <span>正在获取 API 文档访问票据</span>
+          </div>
           <div v-else class="empty-preview">
             <FaIcon name="i-ri:file-lock-line" />
             <span>API 文档未启用</span>

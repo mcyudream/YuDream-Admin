@@ -1,3 +1,4 @@
+import type { ExcelBlobResponse } from '@/utils/excel'
 import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
@@ -80,6 +81,7 @@ export default {
   unpublish: (id: number) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/forms/${id}/unpublish`),
   delete: (id: number) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/forms/${id}`),
   submissions: (id: number, params: FormSubmissionPageParams) => systemClient.get<unknown, ApiResponse<PageResult<FormSubmission>>>(`api/platform/forms/${id}/submissions`, { params }),
+  exportSubmissions: (id: number) => systemClient.get<unknown, ExcelBlobResponse>(`api/platform/forms/${id}/submissions/export`, { responseType: 'blob' }),
   statistics: (id: number) => systemClient.get<unknown, ApiResponse<FormStatistics>>(`api/platform/forms/${id}/statistics`),
   publicForm: (code: string) => systemClient.get<unknown, ApiResponse<DynamicForm>>(`api/public/forms/${code}`, { skipTokenRefresh: true }),
   submitPublic: (code: string, data: Record<string, unknown>) => systemClient.post<unknown, ApiResponse<FormSubmission>>(`api/public/forms/${code}/submissions`, { data }, { skipTokenRefresh: true }),

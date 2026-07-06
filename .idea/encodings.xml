@@ -13,5 +13,21 @@
     <file url="file://$PROJECT_DIR$/yudream-infrastructure/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-interfaces/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-interfaces/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-alipay/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-alipay/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-authlib-injector/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-authlib-injector/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-blessing-skin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-blessing-skin/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-spi/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-spi/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-wallet/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-wallet/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/java/online/yudream/base/plugin/skin/interfaces/controller/YuDreamSkinPublicController.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/java/online/yudream/base/plugin/skin/interfaces/controller/YuDreamSkinUserController.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugin-yudream-skin/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-sample-plugin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-sample-plugin/src/main/resources" charset="UTF-8" />
   </component>
 </project>

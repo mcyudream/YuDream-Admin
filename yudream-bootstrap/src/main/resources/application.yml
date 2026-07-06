@@ -45,6 +45,16 @@ logging:
     online.yudream.base: debug
     org.springframework.data.mongodb: info
 
+springdoc:
+  cache:
+    disabled: true
+  swagger-ui:
+    disable-swagger-default-url: true
+    query-config-enabled: true
+    url: /v3/api-docs
+  api-docs:
+    path: /v3/api-docs
+
 # 雪花算法配置
 snowflake:
   data-center-id: ${SNOWFLAKE_DCI:1}
