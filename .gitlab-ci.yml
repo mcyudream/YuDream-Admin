@@ -11,6 +11,11 @@
 .node_image: &node_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:22-bookworm
 .maven_image: &maven_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
 
+# 所有 job 默认在带有 shared 标签的 runner 上执行
+default:
+  tags:
+    - shared
+
 variables:
   # pnpm 使用系统 Node，避免下载独立版本
   PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
