@@ -11,7 +11,7 @@ export interface CopyrightOptions {
 function resolveOptions(options: CopyrightOptions = {}) {
   return {
     edition: options.edition ?? '基础版',
-    website: options.website ?? 'https://fantastic-admin.hurui.me',
+    website: options.website ?? 'https://yudream.example.com',
   }
 }
 
@@ -20,8 +20,8 @@ function createBannerPlugin(options: CopyrightOptions = {}): PluginOption {
 
   return banner(`
 /**
- * 由 Fantastic-admin 提供技术支持
- * Powered by Fantastic-admin
+ * 由 YuDream 提供技术支持
+ * Powered by YuDream
  * ${website}
  */
   `)
@@ -39,7 +39,7 @@ function createTerminalInfoPlugin(options: CopyrightOptions = {}): PluginOption 
       // eslint-disable-next-line no-console
       console.log(
         boxen(
-          `${bold(green(`由 ${bgGreen('Fantastic-admin')} 驱动`))}\n\n${underline(website)}\n\n当前使用：${magenta(edition)}`,
+          `${bold(green(`由 ${bgGreen('YuDream')} 驱动`))}\n\n${underline(website)}\n\n当前使用：${magenta(edition)}`,
           {
             padding: 1,
             margin: 1,
@@ -72,10 +72,10 @@ function createSystemCopyrightPlugin(options: CopyrightOptions = {}): PluginOpti
         code: `
 /* eslint-disable no-console */
 if ((navigator.language).toLowerCase() === 'zh-cn') {
-  console.info('%c由%cFantastic-admin%c驱动%c👉%c${website}', ${JSON.stringify(subStyle)}, ${JSON.stringify(mainStyle)}, ${JSON.stringify(subStyle)}, ${JSON.stringify(iconStyle)}, ${JSON.stringify(linkStyle)})
+  console.info('%c由%cYuDream%c驱动%c👉%c${website}', ${JSON.stringify(subStyle)}, ${JSON.stringify(mainStyle)}, ${JSON.stringify(subStyle)}, ${JSON.stringify(iconStyle)}, ${JSON.stringify(linkStyle)})
 }
 else {
-  console.info('%cPowered by %cFantastic-admin%c%c👉%c${website}', ${JSON.stringify(subStyle)}, ${JSON.stringify(mainStyle)}, ${JSON.stringify(subStyle)}, ${JSON.stringify(iconStyle)}, ${JSON.stringify(linkStyle)})
+  console.info('%cPowered by %cYuDream%c%c👉%c${website}', ${JSON.stringify(subStyle)}, ${JSON.stringify(mainStyle)}, ${JSON.stringify(subStyle)}, ${JSON.stringify(iconStyle)}, ${JSON.stringify(linkStyle)})
 }
 
 ${code}

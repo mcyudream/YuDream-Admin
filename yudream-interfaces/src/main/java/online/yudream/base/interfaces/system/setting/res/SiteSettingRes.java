@@ -15,6 +15,7 @@ public class SiteSettingRes {
     private String siteDescription;
     private String logo;
     private String favicon;
+    private String loginBanner;
     private String copyrightCompany;
     private String copyrightWebsite;
     private String copyrightDates;

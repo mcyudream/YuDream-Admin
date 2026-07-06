@@ -24,9 +24,6 @@ const appMenuStore = useAppMenuStore()
 const mainPage = useAppPage()
 
 useHotkeyBindings({
-  'system.info.open': () => {
-    eventBus.emit('global-system-info-open')
-  },
   'page.reload': () => {
     mainPage.reload()
   },
@@ -124,8 +121,13 @@ const { y } = useScroll(window)
 const { height: fixedContentBeforeAreaHeight } = useElementSize(useTemplateRef('fixedContentBeforeAreaRef'))
 const { height: fixedContentAfterAreaHeight } = useElementSize(useTemplateRef('fixedContentAfterAreaRef'))
 const topbarScrollVisibleOrHidden = ref(false)
-eventBus.on('topbar-scroll-visible-or-hidden', (val) => {
+function handleTopbarScrollVisibleOrHidden(val: boolean) {
   topbarScrollVisibleOrHidden.value = val
+}
+eventBus.on('topbar-scroll-visible-or-hidden', handleTopbarScrollVisibleOrHidden)
+
+onBeforeUnmount(() => {
+  eventBus.off('topbar-scroll-visible-or-hidden', handleTopbarScrollVisibleOrHidden)
 })
 
 </script>

@@ -47,6 +47,7 @@ export interface SiteSetting {
   siteDescription?: string
   logo?: string
   favicon?: string
+  loginBanner?: string
   copyrightCompany?: string
   copyrightWebsite?: string
   copyrightDates?: string
@@ -71,6 +72,9 @@ export default {
   },
   uploadFavicon: (data: FormData) => {
     return settingsApi.post<unknown, { status: 1; error: ''; data: SiteSetting }>('api/system/settings/site/favicon', data)
+  },
+  uploadLoginBanner: (data: FormData) => {
+    return settingsApi.post<unknown, { status: 1; error: ''; data: SiteSetting }>('api/system/settings/site/login-banner', data)
   },
   publicTheme: () => {
     return settingsApi.get<unknown, { status: 1; error: ''; data: ThemeSetting }>('api/settings/theme')

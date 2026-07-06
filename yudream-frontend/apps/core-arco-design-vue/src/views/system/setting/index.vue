@@ -10,12 +10,14 @@ const loading = ref(false)
 const saving = ref(false)
 const logoInput = ref<HTMLInputElement>()
 const faviconInput = ref<HTMLInputElement>()
+const loginBannerInput = ref<HTMLInputElement>()
 
 const form = reactive<SiteSetting>({
   siteName: '',
   siteDescription: '',
   logo: '',
   favicon: '',
+  loginBanner: '',
   copyrightCompany: '',
   copyrightWebsite: '',
   copyrightDates: '',
@@ -53,13 +55,14 @@ function assignForm(data: SiteSetting) {
     siteDescription: data.siteDescription || '',
     logo: toBackendAssetUrl(data.logo),
     favicon: toBackendAssetUrl(data.favicon),
+    loginBanner: toBackendAssetUrl(data.loginBanner),
     copyrightCompany: data.copyrightCompany || '',
     copyrightWebsite: data.copyrightWebsite || '',
     copyrightDates: data.copyrightDates || '',
   })
 }
 
-async function uploadAsset(event: Event, type: 'logo' | 'favicon') {
+async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner') {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -70,10 +73,12 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon') {
   data.append('file', file)
   const res = type === 'logo'
     ? await apiSettings.uploadLogo(data)
-    : await apiSettings.uploadFavicon(data)
+    : type === 'favicon'
+      ? await apiSettings.uploadFavicon(data)
+      : await apiSettings.uploadLoginBanner(data)
   assignForm(res.data)
   await appSettingsStore.loadSiteSettings()
-  toast.success(type === 'logo' ? 'Logo 已更新' : '站点图标已更新')
+  toast.success(type === 'logo' ? 'Logo 已更新' : type === 'favicon' ? '站点图标已更新' : '登录页 Banner 已更新')
 }
 </script>
 
@@ -138,6 +143,21 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon') {
               上传 Favicon
             </FaButton>
             <input ref="faviconInput" type="file" accept="image/*" hidden @change="uploadAsset($event, 'favicon')">
+          </div>
+
+          <div class="asset-panel">
+            <div class="asset-panel__title">
+              登录页 Banner
+            </div>
+            <div class="asset-preview">
+              <img v-if="form.loginBanner" :src="form.loginBanner" alt="登录页 Banner">
+              <FaIcon v-else name="i-ri:image-line" class="size-8 text-muted-foreground" />
+            </div>
+            <FaButton variant="outline" class="w-full" @click="loginBannerInput?.click()">
+              <FaIcon name="i-ri:upload-cloud-2-line" />
+              上传登录页 Banner
+            </FaButton>
+            <input ref="loginBannerInput" type="file" accept="image/*" hidden @change="uploadAsset($event, 'loginBanner')">
           </div>
         </div>
       </div>

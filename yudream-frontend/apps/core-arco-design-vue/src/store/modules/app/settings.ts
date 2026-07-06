@@ -15,6 +15,7 @@ export const useAppSettingsStore = defineStore(
     const siteName = ref(import.meta.env.VITE_APP_TITLE)
     const logo = ref('')
     const favicon = ref('')
+    const loginBanner = ref('')
 
     function normalizeHexColor(value?: string) {
       if (!value) {
@@ -77,6 +78,7 @@ export const useAppSettingsStore = defineStore(
         siteName.value = data.siteName || siteName.value
         logo.value = toBackendAssetUrl(data.logo)
         favicon.value = toBackendAssetUrl(data.favicon)
+        loginBanner.value = toBackendAssetUrl(data.loginBanner)
         if (data.copyrightCompany || data.copyrightWebsite || data.copyrightDates) {
           settings.value.app.copyright.company = data.copyrightCompany || settings.value.app.copyright.company
           settings.value.app.copyright.website = data.copyrightWebsite || settings.value.app.copyright.website
@@ -273,6 +275,7 @@ export const useAppSettingsStore = defineStore(
       siteName,
       logo,
       favicon,
+      loginBanner,
       loadSiteSettings,
       loadThemeSettings,
       saveThemeSettings,

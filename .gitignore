@@ -41,3 +41,4 @@ build/
 
 # Nested repository backups
 .git.bak/
+/plugins/

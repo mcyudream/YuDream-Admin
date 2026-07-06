@@ -15,8 +15,8 @@ public class PluginProperties {
     private boolean enabled = true;
     private List<String> directories = new ArrayList<>(List.of(
             "plugins",
-            "yudream-sample-plugin/target",
-            "yudream-plugin-yudream-skin/target",
-            "yudream-plugin-authlib-injector/target"
+            "yudream-plugins/yudream-sample-plugin/target",
+            "yudream-plugins/yudream-plugin-yudream-skin/target",
+            "yudream-plugins/yudream-plugin-authlib-injector/target"
     ));
 }

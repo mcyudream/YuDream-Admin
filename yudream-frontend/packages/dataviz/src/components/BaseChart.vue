@@ -20,9 +20,16 @@ const props = withDefaults(defineProps<{
 
 const chartRef = ref<HTMLElement | null>(null)
 
+const chartHeight = computed(() => {
+  if (typeof props.height === 'number') {
+    return `${props.height}px`
+  }
+  return /^\d+(\.\d+)?$/.test(props.height) ? `${props.height}px` : props.height
+})
+
 const containerStyle = computed<CSSProperties>(() => ({
   width: '100%',
-  height: typeof props.height === 'number' ? `${props.height}px` : props.height,
+  height: chartHeight.value,
 }))
 
 const option = computed(() => buildEChartsOption(props.dataset, props.theme))

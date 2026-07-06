@@ -2,7 +2,6 @@ import type { HotkeyBinding } from './types'
 import { EXT_HOTKEY_ID, extendGlobalHotkeyBindings, extendScopedHotkeyBindings } from './registry.extend'
 
 export const HOTKEY_ID = {
-  systemInfoOpen: 'system.info.open',
   menuSearchOpen: 'menuSearch.open',
   menuNext: 'menu.next',
   menuPrev: 'menu.prev',
@@ -31,19 +30,6 @@ export const hotkeyIds = Object.values(HOTKEY_ID)
  * 5. 仅局部场景使用的快捷键，也建议在这里定义，再由对应组件按需注册
  */
 export const globalHotkeyBindings: HotkeyBinding[] = [
-  {
-    id: HOTKEY_ID.systemInfoOpen,
-    keys: ['command+i', 'ctrl+i'],
-    help: {
-      group: 'global',
-      titleKey: 'global.system',
-      order: 10,
-      displayKeys: {
-        default: ['Ctrl', 'I'],
-        mac: ['⌘', 'I'],
-      },
-    },
-  },
   {
     id: HOTKEY_ID.menuSearchOpen,
     keys: ['command+k', 'ctrl+k'],

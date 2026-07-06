@@ -21,9 +21,11 @@ const emits = defineEmits<{
 }>()
 
 const appAccountStore = useAppAccountStore()
+const appSettingsStore = useAppSettingsStore()
 const toast = useFaToast()
 
 const title = import.meta.env.VITE_APP_TITLE
+const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/logo.png', import.meta.url).href)
 const loading = ref(false)
 const passkeyLoading = ref(false)
 const type = ref<'password' | 'passkey'>('password')
@@ -89,9 +91,12 @@ function rememberAccount(account: string, remember?: boolean) {
 <template>
   <div class="p-12 flex-col-stretch-center min-h-500px w-full">
     <div class="mb-6 space-y-2">
-      <h3 class="text-4xl font-bold">
-        欢迎使用
-      </h3>
+      <div class="flex items-center gap-3">
+        <img :src="logo" class="h-10 w-10 object-contain rounded">
+        <h3 class="text-4xl font-bold">
+          欢迎使用
+        </h3>
+      </div>
       <p class="text-sm text-muted-foreground lg:text-base">
         {{ title }}
       </p>

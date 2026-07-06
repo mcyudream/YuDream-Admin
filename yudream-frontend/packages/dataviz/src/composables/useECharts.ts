@@ -4,7 +4,7 @@ import type { ChartTheme } from '../types'
 
 type MaybeRef<T> = Ref<T> | T
 import * as echarts from 'echarts'
-import { onUnmounted, unref, watch, watchEffect } from 'vue'
+import { nextTick, onUnmounted, unref, watch, watchEffect } from 'vue'
 import { useResizeObserver } from '@vueuse/core'
 
 /**
@@ -20,6 +20,7 @@ export function useECharts(
   theme: MaybeRef<ChartTheme> = 'light',
 ) {
   let chartInstance: ReturnType<typeof echarts.init> | null = null
+  let resizeFrame = 0
 
   function initChart() {
     const el = elRef.value
@@ -30,6 +31,7 @@ export function useECharts(
     chartInstance?.dispose()
     chartInstance = echarts.init(el, unref(theme) as unknown as string | object)
     chartInstance.setOption(unref(options), true)
+    scheduleResize()
   }
 
   function updateChart() {
@@ -38,10 +40,25 @@ export function useECharts(
       return
     }
     chartInstance.setOption(unref(options), true)
+    scheduleResize()
   }
 
   function resize() {
-    chartInstance?.resize()
+    scheduleResize()
+  }
+
+  async function scheduleResize() {
+    if (!chartInstance) {
+      return
+    }
+    await nextTick()
+    if (resizeFrame) {
+      cancelAnimationFrame(resizeFrame)
+    }
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0
+      chartInstance?.resize()
+    })
   }
 
   useResizeObserver(elRef, resize)
@@ -58,6 +75,9 @@ export function useECharts(
   watch(() => unref(options), updateChart, { deep: true })
 
   onUnmounted(() => {
+    if (resizeFrame) {
+      cancelAnimationFrame(resizeFrame)
+    }
     chartInstance?.dispose()
     chartInstance = null
   })

@@ -125,7 +125,7 @@ import { host, port } from '~console/server-info'
 export function warnKeepAliveComponentNameMissing(filePath) {
   // turbo-console-disable-next-line
   console.warn(
-    '[Fantastic-admin]\n\n该页面组件未设置组件名，会导致保活失效，点击下方链接打开该文件进行检查\n'
+    '[YuDream]\n\n该页面组件未设置组件名，会导致保活失效，点击下方链接打开该文件进行检查\n'
     + '%chttp://' + host + ':' + port + '?path=' + filePath,
     'background:#00DC8250;padding:2px 5px;border-radius:0 3px 3px 0;margin:0 0 5px 0;',
   )

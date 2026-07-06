@@ -6,7 +6,6 @@ import apiDashboard from '@/api/modules/system-dashboard'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
-import DashboardFlowGraphCard from './dashboard/DashboardFlowGraphCard.vue'
 import DashboardModuleCard from './dashboard/DashboardModuleCard.vue'
 import DashboardMonitorCard from './dashboard/DashboardMonitorCard.vue'
 import DashboardPluginStatsCard from './dashboard/DashboardPluginStatsCard.vue'
@@ -60,7 +59,10 @@ const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWid
 
 let grid: GridStack | null = null
 
-const cards = computed(() => layoutMode.value === 'default' ? defaultCards.value : (workspace.value?.cards ?? []))
+const cards = computed(() => {
+  const source = layoutMode.value === 'default' ? defaultCards.value : (workspace.value?.cards ?? [])
+  return source.filter(canViewCard)
+})
 const cardMap = computed(() => new Map(cards.value.map(card => [card.code, card])))
 const activeBreakpoint = computed<DashboardBreakpoint>(() => {
   if (viewportWidth.value < 640) {
@@ -92,6 +94,10 @@ const roleSummary = computed(() => accountStore.currentRole ? `${accountStore.cu
 const deptSummary = computed(() => accountStore.currentDept?.name || '未选择部门')
 const drawerWidth = computed(() => viewportWidth.value < 640 ? '100%' : 460)
 const quickActions = computed(() => preferredMenuActions(menuActions()).slice(0, 8))
+
+function canViewCard(card: DashboardCard) {
+  return !card.permission || accountStore.permissions.includes('*') || accountStore.permissions.includes(card.permission)
+}
 
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
@@ -382,6 +388,10 @@ function openCard(card?: { actionPath?: string }) {
   router.push(card.actionPath)
 }
 
+function openPublicHome() {
+  router.push({ name: 'publicSiteHome' })
+}
+
 function endpointUrl(card?: DashboardCard) {
   const path = card?.actionPath || ''
   if (!path) {
@@ -520,6 +530,11 @@ function resolveCardComponent(card?: DashboardCard) {
       return DashboardCapabilityStatsCard
     case 'PLUGIN_STATS':
       return DashboardPluginStatsCard
+    case 'DATAVIZ_CAPABILITY_STATS':
+    case 'DATAVIZ_USER_REGISTRATION':
+    case 'DATAVIZ_DEPT_CREATED':
+    case 'DATAVIZ_LOG_ACTIVITY':
+      return DashboardChartStatsCard
     case 'ENDPOINT_CARD':
       return DashboardEndpointCard
     default:
@@ -587,6 +602,10 @@ function cardProps(card: DashboardCard) {
           </span>
         </div>
         <div class="dashboard-toolbar">
+          <FaButton v-if="!editMode" variant="outline" size="sm" @click="openPublicHome">
+            <FaIcon name="i-ri:home-4-line" />
+            访问首页
+          </FaButton>
           <FaButton v-if="!editMode" variant="outline" size="sm" :loading="loading" @click="loadWorkspace">
             <FaIcon name="i-ri:refresh-line" />
             刷新
@@ -664,25 +683,12 @@ function cardProps(card: DashboardCard) {
             <component
               v-if="cardMap.get(item.cardCode)"
               :is="resolveCardComponent(cardMap.get(item.cardCode))"
+              :class="{ 'dashboard-card__content--chart': resolveCardComponent(cardMap.get(item.cardCode)) === DashboardChartStatsCard }"
               v-bind="cardProps(cardMap.get(item.cardCode)!)"
             />
           </article>
         </div>
       </div>
-
-      <section class="dataviz-panel">
-        <div class="section-head">
-          <div>
-            <h2>数据可视化演示</h2>
-            <p>通过 Dataviz 组件演示图表与关系图能力。</p>
-          </div>
-          <span>演示卡片</span>
-        </div>
-        <div class="dataviz-grid">
-          <DashboardChartStatsCard :card="{ cardCode: 'dataviz-bar-capability', title: '能力分类统计', description: '按类型展示平台能力分布' }" />
-          <DashboardFlowGraphCard :card="{ cardCode: 'dataviz-graph-demo', title: '关系图谱演示', description: '示例节点与关系网络' }" />
-        </div>
-      </section>
     </div>
 
     <a-drawer v-model:visible="drawerVisible" :width="drawerWidth" title="添加首页卡片" unmount-on-close>
@@ -882,6 +888,10 @@ function cardProps(card: DashboardCard) {
   overflow: auto;
 }
 
+.dashboard-card__content--chart {
+  overflow: hidden;
+}
+
 .dashboard-loading {
   display: flex;
   gap: 8px;
@@ -1043,52 +1053,6 @@ function cardProps(card: DashboardCard) {
 .picker-empty strong {
   font-size: 14px;
   color: var(--color-text-2);
-}
-
-.dataviz-panel {
-  margin-top: 16px;
-  padding: 18px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-2);
-}
-
-.dataviz-panel .section-head {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-
-.dataviz-panel .section-head h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text-1);
-}
-
-.dataviz-panel .section-head p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--color-text-3);
-}
-
-.dataviz-panel .section-head span {
-  font-size: 12px;
-  color: var(--color-text-3);
-}
-
-.dataviz-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-@media (max-width: 1180px) {
-  .dataviz-grid {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (width <= 780px) {

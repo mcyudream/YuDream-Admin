@@ -74,4 +74,15 @@ public class SystemSettingController {
                 file.getSize(),
                 StpUtil.getLoginIdAsLong())));
     }
+
+    @PostMapping("/site/login-banner")
+    @PermissionRegister(code = "system:setting:upload", name = "上传系统资源", module = "系统管理", desc = "上传站点 Logo 和图标")
+    public Result<SiteSettingRes> uploadLoginBanner(@RequestParam("file") MultipartFile file) throws IOException {
+        return Result.ok(SettingWebAssembler.toRes(settingAppService.uploadLoginBanner(
+                file.getInputStream(),
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize(),
+                StpUtil.getLoginIdAsLong())));
+    }
 }

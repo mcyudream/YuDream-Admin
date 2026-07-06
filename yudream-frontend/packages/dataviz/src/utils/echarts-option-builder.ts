@@ -39,6 +39,10 @@ function buildAxis(themeConfig: ChartThemeConfig, gridColor: string) {
 export function buildEChartsOption(dataset: ChartDataset, theme: ChartTheme): EChartsOption {
   const themeConfig = adaptThemeForECharts(theme)
   const type = inferChartType(dataset)
+  const nameDimension = dataset.dimensions?.[0]
+  const valueDimension = dataset.dimensions?.[1]
+  const firstSeriesOption = dataset.series?.[0] ?? {}
+  const hasDataZoom = Array.isArray(dataset.dataZoom) && dataset.dataZoom.length > 0
   const gridColor = typeof themeConfig.grid === 'string'
     ? themeConfig.grid
     : (themeConfig.grid?.borderColor as string) || '#e5e7eb'
@@ -65,14 +69,15 @@ export function buildEChartsOption(dataset: ChartDataset, theme: ChartTheme): EC
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '3%',
+      bottom: hasDataZoom ? 36 : '3%',
       containLabel: true,
       borderColor: gridColor,
     },
     color: themeConfig.color,
+    dataZoom: dataset.dataZoom as EChartsOption['dataZoom'],
     dataset: {
       dimensions: dataset.dimensions,
-      source: dataset.source as unknown as any[],
+      source: (dataset.source ?? []) as unknown as any[],
     },
   }
 
@@ -82,22 +87,29 @@ export function buildEChartsOption(dataset: ChartDataset, theme: ChartTheme): EC
         ...baseOption,
         xAxis: buildAxis(themeConfig, gridColor),
         yAxis: buildAxis(themeConfig, gridColor),
-        series: [{ type: 'line', smooth: true }],
+        series: [{
+          ...firstSeriesOption,
+          type: 'line',
+          smooth: true,
+          encode: { x: nameDimension, y: valueDimension },
+        }],
       }
     case 'bar':
       return {
         ...baseOption,
         xAxis: buildAxis(themeConfig, gridColor),
         yAxis: buildAxis(themeConfig, gridColor),
-        series: [{ type: 'bar' }],
+        series: [{ ...firstSeriesOption, type: 'bar', encode: { x: nameDimension, y: valueDimension } }],
       }
     case 'pie':
       return {
         ...baseOption,
         series: [
           {
+            ...firstSeriesOption,
             type: 'pie',
             radius: ['40%', '70%'],
+            encode: { itemName: nameDimension, value: valueDimension },
             itemStyle: { borderRadius: 8 },
             label: { color: themeConfig.text },
           },

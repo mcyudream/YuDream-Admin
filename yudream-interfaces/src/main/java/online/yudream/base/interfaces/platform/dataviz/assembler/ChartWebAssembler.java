@@ -9,6 +9,8 @@ import online.yudream.base.application.platform.dataviz.dto.ChartNodeDTO;
 import online.yudream.base.application.platform.dataviz.dto.ChartSeriesDTO;
 import online.yudream.base.application.platform.dataviz.query.ChartDataQuery;
 import online.yudream.base.domain.common.PageResult;
+import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.dataviz.enumerate.ChartType;
 import online.yudream.base.interfaces.platform.dataviz.request.ChartDataRequest;
 import online.yudream.base.interfaces.platform.dataviz.request.ChartDefinitionSaveRequest;
 import online.yudream.base.interfaces.platform.dataviz.request.ChartDefinitionUpdateRequest;
@@ -17,6 +19,9 @@ import online.yudream.base.interfaces.platform.dataviz.res.ChartDefinitionRes;
 import online.yudream.base.interfaces.platform.dataviz.res.ChartLinkRes;
 import online.yudream.base.interfaces.platform.dataviz.res.ChartNodeRes;
 import online.yudream.base.interfaces.platform.dataviz.res.ChartSeriesRes;
+
+import java.util.Arrays;
+import java.util.Locale;
 
 public class ChartWebAssembler {
 
@@ -27,7 +32,7 @@ public class ChartWebAssembler {
         ChartDefinitionCreateCmd cmd = new ChartDefinitionCreateCmd();
         cmd.setCode(request.getCode());
         cmd.setName(request.getName());
-        cmd.setChartType(request.getChartType());
+        cmd.setChartType(parseChartType(request.getChartType()));
         cmd.setDataSource(request.getDataSource());
         cmd.setQueryConfig(request.getQueryConfig());
         cmd.setLayoutConfig(request.getLayoutConfig());
@@ -38,7 +43,7 @@ public class ChartWebAssembler {
         ChartDefinitionUpdateCmd cmd = new ChartDefinitionUpdateCmd();
         cmd.setId(id);
         cmd.setName(request.getName());
-        cmd.setChartType(request.getChartType());
+        cmd.setChartType(parseChartType(request.getChartType()));
         cmd.setDataSource(request.getDataSource());
         cmd.setQueryConfig(request.getQueryConfig());
         cmd.setLayoutConfig(request.getLayoutConfig());
@@ -48,7 +53,7 @@ public class ChartWebAssembler {
     public static ChartDataQuery toCmd(ChartDataRequest request) {
         ChartDataQuery query = new ChartDataQuery();
         query.setDefinitionId(request.getDefinitionId());
-        query.setChartType(request.getChartType());
+        query.setChartType(parseChartType(request.getChartType()));
         query.setDatasetQuery(request.getDatasetQuery());
         return query;
     }
@@ -63,7 +68,7 @@ public class ChartWebAssembler {
                 .id(dto.getId())
                 .code(dto.getCode())
                 .name(dto.getName())
-                .chartType(dto.getChartType())
+                .chartType(formatChartType(dto.getChartType()))
                 .dataSource(dto.getDataSource())
                 .queryConfig(dto.getQueryConfig())
                 .layoutConfig(dto.getLayoutConfig())
@@ -75,7 +80,7 @@ public class ChartWebAssembler {
 
     public static ChartDatasetRes toRes(ChartDatasetDTO dto) {
         return ChartDatasetRes.builder()
-                .chartType(dto.getChartType())
+                .chartType(formatChartType(dto.getChartType()))
                 .title(dto.getTitle())
                 .subTitle(dto.getSubTitle())
                 .series(dto.getSeries().stream().map(ChartWebAssembler::toRes).toList())
@@ -107,5 +112,27 @@ public class ChartWebAssembler {
                 .target(dto.getTarget())
                 .value(dto.getValue())
                 .build();
+    }
+
+    private static ChartType parseChartType(String chartType) {
+        if (chartType == null || chartType.isBlank()) {
+            return null;
+        }
+        try {
+            return ChartType.valueOf(chartType.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new BizException("不支持的图表类型：" + chartType + "，可选值：" + supportedChartTypes());
+        }
+    }
+
+    private static String formatChartType(ChartType chartType) {
+        return chartType == null ? null : chartType.name().toLowerCase(Locale.ROOT);
+    }
+
+    private static String supportedChartTypes() {
+        return Arrays.stream(ChartType.values())
+                .map(ChartWebAssembler::formatChartType)
+                .toList()
+                .toString();
     }
 }

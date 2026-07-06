@@ -55,7 +55,7 @@ const onSubmit = form.handleSubmit((values) => {
   <div class="bg-banner" />
   <div class="setup-box">
     <div class="setup-banner">
-      <img src="@/assets/images/logo.svg" class="rounded h-8 inset-s-4 inset-t-4 absolute">
+      <img src="@/assets/images/logo.png" class="rounded h-8 inset-s-4 inset-t-4 absolute">
       <img src="@/assets/images/login-banner.png" class="banner">
     </div>
     <div class="setup-form flex-col-center">
