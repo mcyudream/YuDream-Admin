@@ -630,7 +630,15 @@ function escapeHtml(value: string) {
   border-radius: 7px;
   font-size: 14px;
   font-weight: 750;
+  line-height: 1;
   text-decoration: none;
+}
+
+.site-layout-header__auth a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
 }
 
 .site-layout-header__auth .ghost,

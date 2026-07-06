@@ -21,8 +21,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -43,6 +46,16 @@ public class PluginController {
     @PermissionRegister(code = "platform:plugin:manage", name = "管理插件", module = "平台插件", desc = "扫描、加载、启用、禁用、卸载和删除插件")
     public Result<List<PluginModuleRes>> refresh() {
         return Result.ok(PluginWebAssembler.toResList(pluginAppService.refresh()));
+    }
+
+    @PostMapping("/upload")
+    @PermissionRegister(code = "platform:plugin:manage", name = "上传插件", module = "平台插件", desc = "上传插件 JAR 并替换同编码插件")
+    public Result<List<PluginModuleRes>> upload(@RequestParam("file") MultipartFile file) throws IOException {
+        return Result.ok(PluginWebAssembler.toResList(pluginAppService.upload(
+                file.getInputStream(),
+                file.getOriginalFilename(),
+                file.getSize()
+        )));
     }
 
     @PostMapping("/{code}/load")
