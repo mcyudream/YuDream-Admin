@@ -27,6 +27,10 @@ export interface ChartDataset {
   dimensions?: string[]
   /** 数据行 */
   source?: Array<Record<string, unknown> | unknown[]>
+  /** 关系图节点（用于 graph 类型） */
+  nodes?: ChartNode[]
+  /** 关系图边（用于 graph 类型） */
+  links?: ChartLink[]
 }
 
 /**
@@ -90,8 +94,18 @@ export interface ChartThemeConfig {
   name?: string
   /** 主色板 */
   color?: string[]
+  /** 主色板（语义化别名） */
+  colors?: string[]
   /** 背景色 */
   backgroundColor?: string
+  /** 背景色（语义化别名） */
+  background?: string
+  /** 主文本色 */
+  text?: string
+  /** 次要文本色 */
+  textSecondary?: string
+  /** 网格线颜色或样式 */
+  grid?: string | Record<string, unknown>
   /** 文本样式 */
   textStyle?: Record<string, unknown>
   /** 标题样式 */
