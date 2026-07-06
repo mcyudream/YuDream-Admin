@@ -47,7 +47,7 @@ services:
 
   # 自动监控镜像更新并重启服务
   watchtower:
-    image: containrrr/watchtower
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/ghcr.io/containrrr/watchtower:amd64-1.7.1
     container_name: yudream-watchtower
     restart: unless-stopped
     volumes:

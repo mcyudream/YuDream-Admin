@@ -1,5 +1,5 @@
 # 后端镜像：包含主应用 JAR，插件目录通过挂载注入
-FROM eclipse-temurin:21-jre-jammy
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
