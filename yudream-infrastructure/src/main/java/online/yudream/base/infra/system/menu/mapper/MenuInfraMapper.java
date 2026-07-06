@@ -25,6 +25,7 @@ public class MenuInfraMapper {
         menuDO.setComponent(menu.getComponent());
         menuDO.setLink(menu.getLink());
         menuDO.setSort(menu.getSort());
+        menuDO.setVisible(menu.getVisible());
         menuDO.setPermission(menu.getPermission());
         menuDO.setStatus(menu.getStatus());
         return menuDO;
@@ -43,6 +44,7 @@ public class MenuInfraMapper {
                 .component(menuDO.getComponent())
                 .link(menuDO.getLink())
                 .sort(menuDO.getSort())
+                .visible(menuDO.getVisible())
                 .permission(menuDO.getPermission())
                 .status(menuDO.getStatus())
                 .children(Collections.emptyList())

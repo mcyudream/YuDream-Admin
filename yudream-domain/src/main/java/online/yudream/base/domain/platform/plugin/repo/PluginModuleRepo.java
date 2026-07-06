@@ -12,4 +12,6 @@ public interface PluginModuleRepo {
     Optional<PluginModule> findByCode(String code);
 
     List<PluginModule> findAll();
+
+    void deleteByCode(String code);
 }

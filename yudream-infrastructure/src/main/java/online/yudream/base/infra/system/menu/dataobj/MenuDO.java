@@ -41,6 +41,8 @@ public class MenuDO extends BaseDO {
 
     private Integer sort;
 
+    private Boolean visible;
+
     private String permission;
 
     private MenuStatus status;

@@ -35,6 +35,10 @@
     {
       "key": "plugin-user-ownership-from-session",
       "text": "插件用户侧资源归属必须由后端从当前会话/PluginPrincipal/Sa 上下文推导，前端不得传 uploaderId、ownerId 等可伪造归属字段；如需管理员代操作，应设计独立管理用例和权限。"
+    },
+    {
+      "key": "plugin-remote-style-injection",
+      "text": "Frontend plugin styles used by dashboard cards and runtime pages must be injected through the plugin inline stylesheet (styles.css?inline), and install() must update an existing style tag textContent instead of returning early. Dev fallback and remote reload can keep stale style tags, so do not rely only on component scoped CSS for plugin dashboard cards."
     }
   ],
   "utilities": [

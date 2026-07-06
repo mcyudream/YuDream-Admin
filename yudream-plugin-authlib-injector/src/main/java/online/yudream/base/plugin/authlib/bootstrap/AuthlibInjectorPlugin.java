@@ -4,6 +4,7 @@ import online.yudream.base.plugin.authlib.application.service.AuthlibAppService;
 import online.yudream.base.plugin.authlib.infrastructure.repository.AuthlibRepository;
 import online.yudream.base.plugin.authlib.infrastructure.service.AuthlibCryptoService;
 import online.yudream.base.plugin.authlib.interfaces.http.AuthlibHttpFacade;
+import online.yudream.base.plugin.spi.annotation.PluginDashboardCard;
 import online.yudream.base.plugin.spi.annotation.PluginFrontend;
 import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginPermission;
@@ -19,8 +20,8 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
         code = AuthlibInjectorPlugin.CODE,
         name = "Authlib Injector",
         version = "1.0.0",
-        description = "基于 Blessing Skin 资料实现 authlib-injector/Yggdrasil 服务端协议。",
-        dependencies = {"blessing-skin"}
+        description = "基于系统用户与 yudream-skin 角色资料实现 authlib-injector/Yggdrasil 服务端协议。",
+        dependencies = {"yudream-skin"}
 )
 @PluginPermissions({
         @PluginPermission(code = AuthlibInjectorPlugin.VIEW_PERMISSION, name = "查看 Authlib", module = "平台插件", description = "查看 Authlib Injector 插件状态"),
@@ -41,7 +42,24 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
                         permission = AuthlibInjectorPlugin.VIEW_PERMISSION,
                         sort = 30
                 )
-        })
+        }
+)
+@PluginDashboardCard(
+        code = "api",
+        title = "Authlib API",
+        description = "提供 yudream-skin 角色资料的 Yggdrasil 验证服务地址。",
+        icon = "i-ri:key-2-line",
+        category = "认证服务",
+        component = "authlib-injector/EndpointCard",
+        actionPath = "/platform/plugins/authlib-injector",
+        dragPayloadTemplate = "authlib-injector:yggdrasil-server:{encodedUrl}",
+        tone = "cyan",
+        defaultW = 4,
+        defaultH = 2,
+        minW = 3,
+        minH = 2,
+        sort = 35
+)
 public class AuthlibInjectorPlugin implements YuDreamPlugin {
 
     public static final String CODE = "authlib-injector";

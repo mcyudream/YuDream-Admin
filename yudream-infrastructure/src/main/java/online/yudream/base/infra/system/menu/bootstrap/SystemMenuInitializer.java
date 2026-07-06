@@ -46,7 +46,7 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
         List<Menu> modules = MenuEnumScanner.scan(moduleClasses);
         List<Menu> syncedMenus = menuDomainService.syncMenus(modules, syncMode);
 
-        bindPermissionsToSystemRoles(syncedMenus);
+        bindPermissionsToSystemRoles(modules);
         log.info("System menus initialized, modules={}, syncedMenus={}, syncMode={}", modules.size(), syncedMenus.size(), syncMode);
     }
 
@@ -86,7 +86,11 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
     }
 
     private void collectCodes(Menu menu, List<String> result) {
-        if (menu.getType() == MenuNodeType.MENU || menu.getType() == MenuNodeType.LINK || menu.getType() == MenuNodeType.BUTTON) {
+        if (menu.getType() == MenuNodeType.CATEGORY
+                || menu.getType() == MenuNodeType.LAYOUT
+                || menu.getType() == MenuNodeType.MENU
+                || menu.getType() == MenuNodeType.LINK
+                || menu.getType() == MenuNodeType.BUTTON) {
             result.add(menu.getPermissionCode());
         }
         if (menu.getChildren() != null) {

@@ -54,6 +54,7 @@ catalog:
   filesize: ^11.0.17
   fs-extra: ^11.3.5
   grapesjs: ^0.23.2
+  gridstack: ^12.6.0
   hotkeys-js: ^4.0.4
   http-server: ^14.1.1
   lint-staged: ^17.0.7

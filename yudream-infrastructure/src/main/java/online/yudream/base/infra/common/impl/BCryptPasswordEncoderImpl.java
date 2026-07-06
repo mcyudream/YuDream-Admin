@@ -16,6 +16,15 @@ public class BCryptPasswordEncoderImpl implements PasswordEncoder {
 
     @Override
     public boolean matches(String rawPassword, String encodedPassword) {
-        return delegate.matches(rawPassword, encodedPassword);
+        return delegate.matches(rawPassword, normalize(encodedPassword));
+    }
+
+    private String normalize(String encodedPassword) {
+        if (encodedPassword == null || encodedPassword.isBlank()) {
+            return encodedPassword;
+        }
+        return encodedPassword.startsWith("$2y$")
+                ? "$2a$" + encodedPassword.substring(4)
+                : encodedPassword;
     }
 }

@@ -75,6 +75,11 @@ public @interface MenuNode {
     int sort() default 0;
 
     /**
+     * 是否在导航菜单中显示。隐藏节点仍然会生成路由并参与权限控制。
+     */
+    boolean visible() default true;
+
+    /**
      * 显式权限码；为空时继承 code。
      */
     String permission() default "";

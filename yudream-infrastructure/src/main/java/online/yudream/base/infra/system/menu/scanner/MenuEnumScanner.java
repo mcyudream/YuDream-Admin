@@ -47,6 +47,7 @@ public class MenuEnumScanner {
                 .module(moduleAnno.code())
                 .icon(moduleAnno.icon())
                 .sort(moduleAnno.sort())
+                .permission(moduleAnno.code())
                 .status(MenuStatus.ACTIVE)
                 .children(new ArrayList<>())
                 .build();
@@ -115,6 +116,7 @@ public class MenuEnumScanner {
                 .component(nodeAnno.component())
                 .link(nodeAnno.link())
                 .sort(nodeAnno.sort())
+                .visible(nodeAnno.visible())
                 .permission(StringUtils.hasText(nodeAnno.permission()) ? nodeAnno.permission() : nodeAnno.code())
                 .status(MenuStatus.ACTIVE)
                 .children(new ArrayList<>())

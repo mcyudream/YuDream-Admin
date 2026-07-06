@@ -1,6 +1,7 @@
 package online.yudream.base.plugin.spi.core;
 
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
+import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
@@ -30,6 +31,8 @@ public interface PluginContext {
     void registerPermission(PluginPermissionItem item);
 
     void registerCapability(PluginCapabilityItem item);
+
+    void registerDashboardCard(PluginDashboardCard card);
 
     void registerFrontend(PluginFrontendModule module);
 

@@ -16,7 +16,7 @@ public class PluginProperties {
     private List<String> directories = new ArrayList<>(List.of(
             "plugins",
             "yudream-sample-plugin/target",
-            "yudream-plugin-blessing-skin/target",
+            "yudream-plugin-yudream-skin/target",
             "yudream-plugin-authlib-injector/target"
     ));
 }

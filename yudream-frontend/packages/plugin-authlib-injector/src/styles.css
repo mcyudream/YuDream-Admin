@@ -129,6 +129,95 @@
   font-size: 12px;
 }
 
+.authlib-dashboard-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  margin: 2px 16px 16px;
+  overflow: hidden;
+}
+
+.authlib-dashboard-card__body {
+  display: grid;
+  flex: 1;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.authlib-dashboard-card__desc {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-3);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+}
+
+.authlib-dashboard-card__endpoint {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  align-self: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 11px 12px;
+  color: var(--color-text-1);
+  text-align: left;
+  cursor: copy;
+  background: var(--color-fill-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+}
+
+.authlib-dashboard-card__endpoint:hover {
+  background: var(--color-fill-2);
+  border-color: var(--color-border-3);
+}
+
+.authlib-dashboard-card__endpoint code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.authlib-dashboard-card__endpoint .fa-icon {
+  flex: 0 0 auto;
+  font-size: 15px;
+  color: var(--color-text-3);
+}
+
+.authlib-dashboard-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.authlib-dashboard-card__actions span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
 @media (max-width: 980px) {
   .authlib-hero,
   .authlib-grid {
@@ -146,5 +235,16 @@
   .endpoint-row code {
     width: auto;
     max-width: 100%;
+  }
+}
+
+@container (max-width: 300px) {
+  .authlib-dashboard-card {
+    margin-inline: 14px;
+  }
+
+  .authlib-dashboard-card__actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

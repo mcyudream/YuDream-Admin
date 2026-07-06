@@ -15,7 +15,7 @@ import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinProfile;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinService;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinTexture;
-import online.yudream.base.plugin.spi.system.skin.PluginSkinUser;
+import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -29,7 +29,7 @@ import java.util.UUID;
 
 public class AuthlibAppService {
 
-    private static final String SKIN_PLUGIN_CODE = "blessing-skin";
+    private static final String SKIN_PLUGIN_CODE = "yudream-skin";
     private static final long SESSION_TTL = Duration.ofDays(7).toMillis();
     private static final long JOIN_TTL = Duration.ofMinutes(5).toMillis();
 
@@ -60,6 +60,7 @@ public class AuthlibAppService {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("apiRoot", apiRoot);
         body.put("textureBaseUrl", textureBaseUrl);
+        body.put("accountSource", "system-user");
         body.put("skinPluginEnabled", context.framework().extension(SKIN_PLUGIN_CODE, PluginSkinService.class).isPresent());
         body.put("metadata", metadata());
         body.put("endpoints", List.of(
@@ -80,28 +81,25 @@ public class AuthlibAppService {
     }
 
     public Object authenticate(AuthenticateRequest request) {
-        PluginSkinUser user = skinService().authenticate(request.username(), request.password())
-                .orElseThrow(() -> authError("ForbiddenOperationException", "用户名或密码错误"));
-        if (user.profiles().isEmpty()) {
+        PluginUserProfile user = authenticateSystemUser(request.username(), request.password());
+        List<PluginSkinProfile> profiles = profilesForUser(user);
+        if (profiles.isEmpty()) {
             throw authError("ForbiddenOperationException", "当前账号没有可用角色");
         }
         String clientToken = hasText(request.clientToken()) ? request.clientToken() : UUID.randomUUID().toString();
-        PluginSkinProfile selected = user.profiles().get(0);
+        PluginSkinProfile selected = profiles.get(0);
         AuthSession session = createSession(clientToken, user, selected);
-        return tokenResponse(session, user.profiles(), selected, Boolean.TRUE.equals(request.requestUser()));
+        return tokenResponse(session, profiles, selected, Boolean.TRUE.equals(request.requestUser()));
     }
 
     public Object refresh(RefreshRequest request) {
         AuthSession oldSession = validSession(request.accessToken(), request.clientToken());
-        PluginSkinProfile selected = request.selectedProfile() == null
-                ? skinService().findProfileByUuid(oldSession.selectedProfileId()).orElse(null)
-                : skinService().findProfileByUuid(request.selectedProfile().id()).orElse(null);
-        if (selected == null) {
-            throw authError("ForbiddenOperationException", "角色不存在");
-        }
-        List<PluginSkinProfile> profiles = List.of(selected);
+        List<PluginSkinProfile> profiles = profilesForUser(oldSession.userId());
+        String selectedId = request.selectedProfile() == null ? oldSession.selectedProfileId() : request.selectedProfile().id();
+        PluginSkinProfile selected = findOwnedProfile(profiles, selectedId)
+                .orElseThrow(() -> authError("ForbiddenOperationException", "角色不存在"));
         repository.deleteSession(oldSession.accessToken());
-        AuthSession newSession = new AuthSession(randomToken(), oldSession.clientToken(), oldSession.userId(), oldSession.username(),
+        AuthSession newSession = new AuthSession(randomToken(), oldSession.clientToken(), oldSession.userId(), selected.name(),
                 selected.uuid(), now(), now() + SESSION_TTL);
         repository.saveSession(newSession);
         return tokenResponse(newSession, profiles, selected, Boolean.TRUE.equals(request.requestUser()));
@@ -116,9 +114,8 @@ public class AuthlibAppService {
     }
 
     public void signout(SignoutRequest request) {
-        PluginSkinUser user = skinService().authenticate(request.username(), request.password())
-                .orElseThrow(() -> authError("ForbiddenOperationException", "用户名或密码错误"));
-        repository.findSessionsByUser(user.id()).forEach(session -> repository.deleteSession(session.accessToken()));
+        PluginUserProfile user = authenticateSystemUser(request.username(), request.password());
+        repository.findSessionsByUser(String.valueOf(user.id())).forEach(session -> repository.deleteSession(session.accessToken()));
     }
 
     public void join(JoinRequest request) {
@@ -126,7 +123,7 @@ public class AuthlibAppService {
         if (!session.selectedProfileId().equals(normalizeUuid(request.selectedProfile()))) {
             throw authError("ForbiddenOperationException", "访问令牌与角色不匹配");
         }
-        PluginSkinProfile profile = skinService().findProfileByUuid(session.selectedProfileId())
+        PluginSkinProfile profile = findOwnedProfile(session.userId(), session.selectedProfileId())
                 .orElseThrow(() -> authError("ForbiddenOperationException", "角色不存在"));
         repository.saveJoin(new ServerJoin(
                 request.serverId() + ":" + profile.uuid(),
@@ -139,9 +136,12 @@ public class AuthlibAppService {
     }
 
     public Optional<Object> hasJoined(String username, String serverId, String textureBaseUrl, boolean unsigned) {
+        if (!hasText(username) || !hasText(serverId)) {
+            return Optional.empty();
+        }
         return repository.findJoinsByServer(serverId).stream()
                 .filter(join -> join.expiresAt() != null && join.expiresAt() > now())
-                .filter(join -> join.username().equalsIgnoreCase(username))
+                .filter(join -> username.equalsIgnoreCase(join.username()))
                 .findFirst()
                 .flatMap(join -> skinService().findProfileByUuid(join.profileId()))
                 .map(profile -> profileResponse(profile, textureBaseUrl, unsigned));
@@ -160,12 +160,16 @@ public class AuthlibAppService {
     }
 
     public void setTexture(String accessToken, String uuid, String textureType, TextureBindRequest request) {
-        validSession(accessToken, null);
+        AuthSession session = validSession(accessToken, null);
+        findOwnedProfile(session.userId(), uuid)
+                .orElseThrow(() -> authError("ForbiddenOperationException", "只能操作自己的角色"));
         skinService().setProfileTexture(uuid, textureType, request.hash());
     }
 
     public void clearTexture(String accessToken, String uuid, String textureType) {
-        validSession(accessToken, null);
+        AuthSession session = validSession(accessToken, null);
+        findOwnedProfile(session.userId(), uuid)
+                .orElseThrow(() -> authError("ForbiddenOperationException", "只能操作自己的角色"));
         skinService().clearProfileTexture(uuid, textureType);
     }
 
@@ -180,8 +184,9 @@ public class AuthlibAppService {
         return body;
     }
 
-    private AuthSession createSession(String clientToken, PluginSkinUser user, PluginSkinProfile selected) {
-        AuthSession session = new AuthSession(randomToken(), clientToken, user.id(), selected == null ? user.email() : selected.name(),
+    private AuthSession createSession(String clientToken, PluginUserProfile user, PluginSkinProfile selected) {
+        AuthSession session = new AuthSession(randomToken(), clientToken, String.valueOf(user.id()),
+                selected == null ? user.username() : selected.name(),
                 selected == null ? null : selected.uuid(), now(), now() + SESSION_TTL);
         return repository.saveSession(session);
     }
@@ -266,7 +271,37 @@ public class AuthlibAppService {
 
     private PluginSkinService skinService() {
         return context.framework().extension(SKIN_PLUGIN_CODE, PluginSkinService.class)
-                .orElseThrow(() -> authError("ForbiddenOperationException", "Blessing Skin 插件未启用"));
+                .orElseThrow(() -> authError("ForbiddenOperationException", "yudream-skin 插件未启用"));
+    }
+
+    private PluginUserProfile authenticateSystemUser(String usernameOrEmail, String password) {
+        return context.framework().users().authenticate(usernameOrEmail, password)
+                .orElseThrow(() -> authError("ForbiddenOperationException", "用户名或密码错误"));
+    }
+
+    private List<PluginSkinProfile> profilesForUser(PluginUserProfile user) {
+        return profilesForUser(String.valueOf(user.id()));
+    }
+
+    private List<PluginSkinProfile> profilesForUser(String userId) {
+        if (!hasText(userId)) {
+            return List.of();
+        }
+        return skinService().findProfilesByOwner(userId.trim());
+    }
+
+    private Optional<PluginSkinProfile> findOwnedProfile(String userId, String uuid) {
+        return findOwnedProfile(profilesForUser(userId), uuid);
+    }
+
+    private Optional<PluginSkinProfile> findOwnedProfile(List<PluginSkinProfile> profiles, String uuid) {
+        String normalized = normalizeUuid(uuid);
+        if (normalized == null) {
+            return Optional.empty();
+        }
+        return profiles.stream()
+                .filter(profile -> normalized.equals(normalizeUuid(profile.uuid())))
+                .findFirst();
     }
 
     private String randomToken() {

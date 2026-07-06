@@ -1,0 +1,129 @@
+.alipay-plugin,
+.alipay-page {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.alipay-hero,
+.alipay-panel {
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.alipay-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+}
+
+.alipay-hero span,
+.alipay-panel__head span,
+.alipay-form label > span {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.alipay-hero h2 {
+  margin: 4px 0 8px;
+  color: var(--color-text-1);
+  font-size: 22px;
+}
+
+.alipay-hero p {
+  margin: 0;
+  color: var(--color-text-3);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.alipay-panel {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.alipay-panel__head {
+  display: grid;
+  gap: 4px;
+}
+
+.alipay-panel__head strong {
+  color: var(--color-text-1);
+  font-size: 16px;
+}
+
+.alipay-form {
+  display: grid;
+  gap: 12px;
+}
+
+.alipay-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.alipay-form label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.alipay-form input,
+.alipay-form select,
+.alipay-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  outline: none;
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+}
+
+.alipay-form textarea {
+  resize: vertical;
+}
+
+.alipay-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.alipay-table-wrap {
+  overflow-x: auto;
+}
+
+.alipay-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.alipay-table th,
+.alipay-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-border-2);
+  color: var(--color-text-2);
+  font-size: 13px;
+  text-align: left;
+}
+
+.alipay-code {
+  overflow-wrap: anywhere;
+  color: var(--color-text-1);
+}
+
+@media (max-width: 760px) {
+  .alipay-hero {
+    grid-template-columns: 1fr;
+  }
+}

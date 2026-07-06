@@ -18,6 +18,7 @@ public class UserCreateCmd implements Serializable {
     private String phone;
     private String qq;
     private String password;
+    private String encodedPassword;
     private boolean emailVerified;
     private List<Long> roleIds = new ArrayList<>();
     private List<UserDeptAssignCmd> depts = new ArrayList<>();

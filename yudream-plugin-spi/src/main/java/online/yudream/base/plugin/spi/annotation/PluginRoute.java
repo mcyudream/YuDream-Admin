@@ -17,6 +17,14 @@ public @interface PluginRoute {
 
     String icon() default "";
 
+    String parentPath() default "";
+
+    String parentTitle() default "";
+
+    String parentIcon() default "";
+
+    int parentSort() default 0;
+
     String component();
 
     String permission() default "";

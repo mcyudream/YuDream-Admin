@@ -1,4 +1,7 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
+import * as FantasticAdminComponents from '@fantastic-admin/components'
+import * as Vue from 'vue'
+import * as VueRouter from 'vue-router'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
@@ -46,10 +49,20 @@ declare global {
       version: string
       create: typeof createPluginSdk
     }
+    __YUDREAM_PLUGIN_SHARED__?: {
+      vue: typeof Vue
+      vueRouter: typeof VueRouter
+      components: typeof FantasticAdminComponents
+    }
   }
 }
 
 if (typeof window !== 'undefined') {
+  window.__YUDREAM_PLUGIN_SHARED__ = {
+    vue: Vue,
+    vueRouter: VueRouter,
+    components: FantasticAdminComponents,
+  }
   window.__YUDREAM_PLUGIN_SDK__ = {
     version: YUDREAM_PLUGIN_SDK_VERSION,
     create: createPluginSdk,

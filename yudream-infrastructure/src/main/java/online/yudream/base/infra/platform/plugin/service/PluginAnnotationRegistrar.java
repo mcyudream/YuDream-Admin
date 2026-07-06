@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.plugin.service;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.plugin.spi.annotation.PluginCapability;
 import online.yudream.base.plugin.spi.annotation.PluginConfigEntry;
+import online.yudream.base.plugin.spi.annotation.PluginDashboardCard;
 import online.yudream.base.plugin.spi.annotation.PluginFrontend;
 import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginMenu;
@@ -34,6 +35,7 @@ class PluginAnnotationRegistrar {
         registerPermissions(pluginClass, context);
         registerMenus(pluginClass, context);
         registerCapabilities(pluginClass, context);
+        registerDashboardCards(pluginClass, context);
         registerFrontend(pluginClass, context);
         registerHttpEndpoints(plugin, pluginClass, context);
     }
@@ -84,6 +86,28 @@ class PluginAnnotationRegistrar {
         );
     }
 
+    private void registerDashboardCards(Class<?> pluginClass, PluginContextImpl context) {
+        for (PluginDashboardCard card : pluginClass.getAnnotationsByType(PluginDashboardCard.class)) {
+            context.registerDashboardCard(new online.yudream.base.plugin.spi.dashboard.PluginDashboardCard(
+                    card.code(),
+                    card.title(),
+                    card.description(),
+                    card.icon(),
+                    card.category(),
+                    card.permission(),
+                    card.component(),
+                    card.actionPath(),
+                    card.dragPayloadTemplate(),
+                    card.tone(),
+                    card.defaultW(),
+                    card.defaultH(),
+                    card.minW(),
+                    card.minH(),
+                    card.sort()
+            ));
+        }
+    }
+
     private void registerFrontend(Class<?> pluginClass, PluginContextImpl context) {
         PluginFrontend frontend = pluginClass.getAnnotation(PluginFrontend.class);
         if (frontend == null) {
@@ -107,6 +131,10 @@ class PluginAnnotationRegistrar {
                 route.name(),
                 route.title(),
                 route.icon(),
+                route.parentPath(),
+                route.parentTitle(),
+                route.parentIcon(),
+                route.parentSort(),
                 route.component(),
                 route.permission(),
                 route.sort()

@@ -47,4 +47,10 @@ public class PluginModuleRepoImpl implements PluginModuleRepo {
                 .map(PluginModuleInfraMapper::toDomain)
                 .toList();
     }
+
+    @Override
+    public void deleteByCode(String code) {
+        Query query = Query.query(Criteria.where("code").is(code));
+        mongoTemplate.remove(query, PluginModuleDO.class);
+    }
 }

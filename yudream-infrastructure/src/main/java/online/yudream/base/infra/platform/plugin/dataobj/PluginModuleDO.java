@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendSortSetting;
 import online.yudream.base.infra.common.baseobj.BaseDO;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -31,4 +32,5 @@ public class PluginModuleDO extends BaseDO {
     private String errorMessage;
     private LocalDateTime loadedAt;
     private LocalDateTime enabledAt;
+    private List<PluginFrontendSortSetting> frontendSortSettings;
 }

@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public interface PluginSkinService {
 
-    Optional<PluginSkinUser> authenticate(String usernameOrEmail, String password);
+    List<PluginSkinProfile> findProfilesByOwner(String ownerId);
 
     Optional<PluginSkinProfile> findProfileByName(String name);
 

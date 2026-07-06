@@ -21,6 +21,10 @@ public class PluginFrontendRouteRes implements Serializable {
     private String name;
     private String title;
     private String icon;
+    private String parentPath;
+    private String parentTitle;
+    private String parentIcon;
+    private Integer parentSort;
     private String component;
     private String permission;
     private Integer sort;
