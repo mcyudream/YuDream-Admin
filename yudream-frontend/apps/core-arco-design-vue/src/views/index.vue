@@ -4,7 +4,9 @@ import type { DashboardBreakpoint, DashboardCard, DashboardGridPlacement, Dashbo
 import { nextTick } from 'vue'
 import apiDashboard from '@/api/modules/system-dashboard'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
+import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
+import DashboardFlowGraphCard from './dashboard/DashboardFlowGraphCard.vue'
 import DashboardModuleCard from './dashboard/DashboardModuleCard.vue'
 import DashboardMonitorCard from './dashboard/DashboardMonitorCard.vue'
 import DashboardPluginStatsCard from './dashboard/DashboardPluginStatsCard.vue'
@@ -13,6 +15,8 @@ import DashboardQuickActionsCard from './dashboard/DashboardQuickActionsCard.vue
 import DashboardRemotePluginCard from './dashboard/DashboardRemotePluginCard.vue'
 import { toneIconClass } from './dashboard/tone.ts'
 import 'gridstack/dist/gridstack.min.css'
+
+type DashboardKey = 'administrator' | 'people' | 'content' | 'platform' | 'monitor' | 'personal'
 
 const BREAKPOINTS: DashboardBreakpoint[] = ['lg', 'md', 'sm', 'xs']
 const BREAKPOINT_COLUMNS: Record<DashboardBreakpoint, number> = {
@@ -665,6 +669,20 @@ function cardProps(card: DashboardCard) {
           </article>
         </div>
       </div>
+
+      <section class="dataviz-panel">
+        <div class="section-head">
+          <div>
+            <h2>数据可视化演示</h2>
+            <p>通过 Dataviz 组件演示图表与关系图能力。</p>
+          </div>
+          <span>演示卡片</span>
+        </div>
+        <div class="dataviz-grid">
+          <DashboardChartStatsCard :card="{ cardCode: 'dataviz-bar-capability', title: '能力分类统计', description: '按类型展示平台能力分布' }" />
+          <DashboardFlowGraphCard :card="{ cardCode: 'dataviz-graph-demo', title: '关系图谱演示', description: '示例节点与关系网络' }" />
+        </div>
+      </section>
     </div>
 
     <a-drawer v-model:visible="drawerVisible" :width="drawerWidth" title="添加首页卡片" unmount-on-close>
@@ -1025,6 +1043,52 @@ function cardProps(card: DashboardCard) {
 .picker-empty strong {
   font-size: 14px;
   color: var(--color-text-2);
+}
+
+.dataviz-panel {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.dataviz-panel .section-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.dataviz-panel .section-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text-1);
+}
+
+.dataviz-panel .section-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text-3);
+}
+
+.dataviz-panel .section-head span {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.dataviz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1180px) {
+  .dataviz-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (width <= 780px) {

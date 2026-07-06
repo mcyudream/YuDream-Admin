@@ -21,6 +21,7 @@ catalog:
   '@stylistic/stylelint-config': ^5.0.0
   '@tanstack/vue-table': ^8.21.3
   '@tdesign-vue-next/chat': ^0.5.2
+  '@types/d3': ^7.4.3
   '@types/fs-extra': ^11.0.4
   '@types/node': ^25.9.3
   '@types/nprogress': ^0.2.3
@@ -44,7 +45,9 @@ catalog:
   class-variance-authority: ^0.7.1
   clsx: ^2.1.1
   cz-git: ^1.13.1
+  d3: ^7.9.0
   dayjs: ^1.11.21
+  echarts: ^5.5.0
   defu: ^6.1.7
   eruda: ^3.4.3
   es-toolkit: ^1.47.0
