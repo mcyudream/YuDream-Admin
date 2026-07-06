@@ -112,17 +112,17 @@ yudream.platform.capabilities:
   integration:
     enabled: ${PLATFORM_INTEGRATION_ENABLED:true}
   sse:
-    enabled: ${PLATFORM_SSE_ENABLED:false}
+    enabled: ${PLATFORM_SSE_ENABLED:true}
   websocket:
-    enabled: ${PLATFORM_WEBSOCKET_ENABLED:false}
+    enabled: ${PLATFORM_WEBSOCKET_ENABLED:true}
   rabbitmq:
-    enabled: ${PLATFORM_RABBITMQ_ENABLED:false}
+    enabled: ${PLATFORM_RABBITMQ_ENABLED:true}
   neo4j:
-    enabled: ${PLATFORM_NEO4J_ENABLED:false}
+    enabled: ${PLATFORM_NEO4J_ENABLED:true}
   ai:
     enabled: ${PLATFORM_AI_ENABLED:true}
   dataviz:
-    enabled: ${PLATFORM_DATAVIZ_ENABLED:false}
+    enabled: ${PLATFORM_DATAVIZ_ENABLED:true}
 
 yudream.storage.s3:
   endpoint: ${S3_ENDPOINT:http://localhost:9000}
