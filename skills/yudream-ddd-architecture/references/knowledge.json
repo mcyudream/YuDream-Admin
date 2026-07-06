@@ -1,0 +1,80 @@
+{
+  "rules": [
+    {
+      "key": "controller-no-mapping",
+      "text": "Controller must not create Cmd/Res/ExcelRow, template rows, or private toXxx/parseXxx helpers. Put boundary conversions in interface assembler."
+    },
+    {
+      "key": "application-assembler",
+      "text": "Application service should not accumulate large toDTO/toDomain conversion methods. Put domain-to-DTO mapping in application assembler."
+    },
+    {
+      "key": "normal-chinese-source",
+      "text": "Use normal Chinese strings in source. Do not add Unicode escapes just because PowerShell displays mojibake; fix only actual mojibake in the file."
+    },
+    {
+      "key": "module-commit-chinese",
+      "text": "After completing each independently usable module, verify it, stage only module-related files, and commit immediately with a Chinese commit message. Do not include unrelated local files."
+    },
+    {
+      "key": "platform-capability-optional",
+      "text": "平台能力用于可选项目能力，例如 SSE、WebSocket、MQ、Neo4j、Python Runtime。默认禁用；禁用时不得初始化外部连接、声明中间件资源或强制项目配置外部依赖，启用后由能力配置驱动运行时连接与健康检查。"
+    },
+    {
+      "key": "security-in-system-platform-optional",
+      "text": "接口加密、双 token、API Key、Passkey、OAuth 等安全身份能力归 system 域；SSE、WebSocket、MQ、Neo4j 等可插拔工程能力归 platform 域，并且必须支持动态启停以避免无用中间件冗余。"
+    },
+    {
+      "key": "platform-capability-disable-release",
+      "text": "平台能力禁用时必须同步释放运行时资源，例如关闭 WebSocket/SSE 会话、RabbitMQ 连接工厂、Neo4j Driver 缓存；不能只改 enabled 状态。"
+    },
+    {
+      "key": "platform-capability-menu-filter",
+      "text": "除 platform:capability 能力管理入口外，平台功能菜单应在对应能力关闭时从 /api/menu/routes 隐藏；能力 Provider 必须保持懒初始化，关闭状态不能连接中间件。"
+    },
+    {
+      "key": "plugin-user-ownership-from-session",
+      "text": "插件用户侧资源归属必须由后端从当前会话/PluginPrincipal/Sa 上下文推导，前端不得传 uploaderId、ownerId 等可伪造归属字段；如需管理员代操作，应设计独立管理用例和权限。"
+    },
+    {
+      "key": "plugin-remote-style-injection",
+      "text": "Frontend plugin styles used by dashboard cards and runtime pages must be injected through the plugin inline stylesheet (styles.css?inline), and install() must update an existing style tag textContent instead of returning early. Dev fallback and remote reload can keep stale style tags, so do not rely only on component scoped CSS for plugin dashboard cards."
+    }
+  ],
+  "utilities": [
+    {
+      "key": "frontend-excel-utils",
+      "path": "yudream-frontend/apps/core-arco-design-vue/src/utils/excel.ts",
+      "methods": [
+        "saveExcelResponse(response, fallbackName)",
+        "pickExcelFile(onPick)",
+        "excelForm(file)",
+        "importResultMessage(result)"
+      ],
+      "example": "const res = await apiExcel.exportUsers(params); saveExcelResponse(res, '用户管理.xlsx')"
+    },
+    {
+      "key": "excel-http-support",
+      "path": "yudream-interfaces/src/main/java/online/yudream/base/interfaces/system/excel/support/ExcelHttpSupport.java",
+      "methods": [
+        "write(response, filename, sheetName, rowClass, rows)",
+        "importRows(file, rowClass, importer)"
+      ],
+      "example": "ExcelHttpSupport.write(response, \"用户管理\", \"用户\", UserExcelRow.class, rows);"
+    },
+    {
+      "key": "form-create-arco-designer",
+      "text": "Vue3 + Arco 动态表单优先使用 @form-create/arco-design 和 form-create-designer-arco-design；main.ts 全局 app.use(formCreate) 与 app.use(FcDesigner)，设计器用 fc-designer.getRule/getOption 保存 JSON，公开端用 form-create 渲染并自定义提交按钮。"
+    }
+  ],
+  "pitfalls": [
+    {
+      "key": "role-bound-to-dept",
+      "text": "User role assignment is department-scoped. Frontend and backend must avoid assigning roles outside the user's selected departments."
+    },
+    {
+      "key": "s3-rustfs-bucket-head",
+      "text": "RustFS may reject S3 HeadBucket even when object operations can continue. Do not fail upload only because bucket head check is forbidden."
+    }
+  ]
+}
