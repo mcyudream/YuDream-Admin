@@ -71,6 +71,14 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
+    public Optional<PluginDescriptorInfo> describe(Path jarPath) {
+        if (!pluginProperties.isEnabled()) {
+            return Optional.empty();
+        }
+        return readDescriptor(jarPath);
+    }
+
+    @Override
     public void load(PluginModule module) {
         if (!pluginProperties.isEnabled()) {
             throw new BizException("插件系统未启用");

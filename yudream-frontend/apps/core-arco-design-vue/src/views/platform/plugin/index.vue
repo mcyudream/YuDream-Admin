@@ -7,12 +7,14 @@ import { refreshDynamicRoutes } from '@/router/dynamic'
 const toast = useFaToast()
 const modal = useFaModal()
 const loading = ref(false)
+const uploading = ref(false)
 const manifestLoading = ref(false)
 const actionLoading = ref('')
 const rows = ref<PluginModule[]>([])
 const frontendModules = ref<PluginFrontendModule[]>([])
 const sortDrafts = ref<Record<string, PluginFrontendSortPayload>>({})
 const selectedCode = ref('')
+const uploadInput = ref<HTMLInputElement>()
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
 const selectedFrontendModules = computed(() => {
@@ -60,6 +62,33 @@ async function refresh() {
   }
   finally {
     loading.value = false
+  }
+}
+
+async function uploadJar(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) {
+    return
+  }
+  if (!file.name.toLowerCase().endsWith('.jar')) {
+    toast.error('请选择 .jar 插件文件')
+    return
+  }
+  uploading.value = true
+  try {
+    const data = new FormData()
+    data.append('file', file)
+    const res = await apiPlugin.upload(data)
+    rows.value = res.data
+    syncSelectedCode()
+    await loadFrontendManifest()
+    await refreshDynamicRoutes(router)
+    toast.success('插件 JAR 已上传并扫描')
+  }
+  finally {
+    uploading.value = false
   }
 }
 
@@ -257,6 +286,11 @@ function actionText(action: string) {
           <FaIcon name="i-ri:refresh-line" />
           刷新列表
         </FaButton>
+        <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.click()">
+          <FaIcon name="i-ri:upload-cloud-2-line" />
+          上传 JAR
+        </FaButton>
+        <input ref="uploadInput" type="file" accept=".jar,application/java-archive" hidden @change="uploadJar">
         <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
           <FaIcon name="i-ri:folder-search-line" />
           扫描目录

@@ -12,10 +12,13 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 
 import java.util.List;
 import java.util.Optional;
+import java.nio.file.Path;
 
 public interface PluginRuntimeGateway {
 
     List<PluginDescriptorInfo> discover();
+
+    Optional<PluginDescriptorInfo> describe(Path jarPath);
 
     void load(PluginModule module);
 

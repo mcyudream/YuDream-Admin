@@ -24,11 +24,17 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendSortSetti
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -49,6 +55,9 @@ public class PluginAppService {
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final PermissionDomainService permissionDomainService;
 
+    @Value("${yudream.platform.plugin.upload-directory:plugins}")
+    private String uploadDirectory;
+
     @Transactional
     public List<PluginModuleDTO> list() {
         syncPluginRegistry();
@@ -61,6 +70,38 @@ public class PluginAppService {
     @Transactional
     public List<PluginModuleDTO> refresh() {
         return list();
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> upload(InputStream inputStream, String originalFilename, long size) {
+        if (size <= 0) {
+            throw new BizException("插件 JAR 不能为空");
+        }
+        validateJarFilename(originalFilename);
+        Path directory = uploadDirectory();
+        Path tempFile = null;
+        try {
+            Files.createDirectories(directory);
+            tempFile = Files.createTempFile(directory, ".plugin-upload-", ".tmp");
+            Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+            PluginDescriptorInfo descriptor = pluginRuntimeGateway.describe(tempFile)
+                    .orElseThrow(() -> new BizException("上传文件不是有效的 YuDream 插件 JAR"));
+            PluginModule existing = pluginModuleRepo.findByCode(descriptor.code()).orElse(null);
+            Path target = targetJarPath(directory, descriptorJarFilename(descriptor), existing);
+            replaceExistingPlugin(existing);
+            moveUploadedJar(tempFile, target);
+            tempFile = null;
+            deleteOldJarIfChanged(existing, target);
+            syncPluginRegistry();
+            return pluginModuleRepo.findAll().stream()
+                    .sorted(Comparator.comparing(PluginModule::getCode))
+                    .map(this::toDTO)
+                    .toList();
+        } catch (IOException e) {
+            throw new BizException("插件 JAR 上传失败：" + e.getMessage());
+        } finally {
+            deleteQuietly(tempFile);
+        }
     }
 
     @Transactional
@@ -116,6 +157,7 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
+        deleteJar(module);
         pluginModuleRepo.deleteByCode(module.getCode());
     }
 
@@ -268,6 +310,84 @@ public class PluginAppService {
                     .orElseGet(() -> PluginModule.fromDescriptor(descriptor));
             module.refreshDescriptor(descriptor);
             pluginModuleRepo.save(module);
+        }
+    }
+
+    private void replaceExistingPlugin(PluginModule existing) {
+        if (existing == null) {
+            return;
+        }
+        String code = existing.getCode();
+        if (pluginRuntimeGateway.enabled(code)) {
+            pluginRuntimeGateway.disable(code);
+        }
+        if (pluginRuntimeGateway.loaded(code)) {
+            pluginRuntimeGateway.unload(code);
+        }
+        existing.markUnloaded();
+        pluginModuleRepo.save(existing);
+    }
+
+    private void deleteJar(PluginModule module) {
+        if (!StringUtils.hasText(module.getJarPath())) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(Path.of(module.getJarPath()));
+        } catch (IOException e) {
+            throw new BizException("插件文件删除失败：" + e.getMessage());
+        }
+    }
+
+    private void deleteOldJarIfChanged(PluginModule existing, Path target) throws IOException {
+        if (existing == null || !StringUtils.hasText(existing.getJarPath())) {
+            return;
+        }
+        Path oldPath = Path.of(existing.getJarPath()).toAbsolutePath().normalize();
+        if (!oldPath.equals(target.toAbsolutePath().normalize())) {
+            Files.deleteIfExists(oldPath);
+        }
+    }
+
+    private Path targetJarPath(Path directory, String filename, PluginModule existing) {
+        if (existing != null && StringUtils.hasText(existing.getJarPath())) {
+            return Path.of(existing.getJarPath()).toAbsolutePath().normalize();
+        }
+        return directory.resolve(filename).toAbsolutePath().normalize();
+    }
+
+    private Path uploadDirectory() {
+        return Path.of(uploadDirectory).toAbsolutePath().normalize();
+    }
+
+    private void validateJarFilename(String originalFilename) {
+        String filename = StringUtils.hasText(originalFilename) ? Path.of(originalFilename).getFileName().toString() : "plugin.jar";
+        if (!filename.toLowerCase().endsWith(".jar")) {
+            throw new BizException("仅支持上传 .jar 插件文件");
+        }
+    }
+
+    private String descriptorJarFilename(PluginDescriptorInfo descriptor) {
+        String version = StringUtils.hasText(descriptor.version()) ? descriptor.version() : "latest";
+        return (descriptor.code() + "-" + version + ".jar").replaceAll("[^A-Za-z0-9._-]", "-");
+    }
+
+    private void moveUploadedJar(Path tempFile, Path target) throws IOException {
+        Files.createDirectories(target.getParent());
+        try {
+            Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private void deleteQuietly(Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException ignored) {
         }
     }
 
