@@ -1,8 +1,8 @@
 # YuDream Admin GitLab CI/CD Pipeline
 
-.node_image: &node_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/node:24.15.0-bookworm
+.node_image: &node_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
 .maven_image: &maven_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
-.docker_cli_image: &docker_cli_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/docker:cli
+.docker_cli_image: &docker_cli_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/docker:cli
 .docker_dind_image: &docker_dind_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/docker:dind
 
 default:
