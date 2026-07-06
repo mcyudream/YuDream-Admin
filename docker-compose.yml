@@ -1,0 +1,71 @@
+# YuDream Admin 生产部署编排（不含中间件）
+# 用法：
+#   docker compose pull
+#   docker compose up -d
+#
+# watchtower 会自动检测 GitLab 容器仓库镜像更新并重启对应服务。
+
+services:
+  backend:
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/backend:${TAG:-latest}
+    container_name: yudream-backend
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      # 应用配置，按需覆盖
+      - SERVER_PORT=8080
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
+      - APP_WEB_URL=${APP_WEB_URL:-http://localhost}
+      # 中间件连接信息（示例，按需修改）
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - MONGO_URI=${MONGO_URI:-}
+      - S3_ENDPOINT=${S3_ENDPOINT:-}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_BUCKET=${S3_BUCKET:-}
+    volumes:
+      # 将宿主机 ./plugins 目录挂载到容器，方便单独更新插件 JAR
+      - ./plugins:/app/plugins
+    networks:
+      - yudream
+
+  frontend:
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/frontend:${TAG:-latest}
+    container_name: yudream-frontend
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - yudream
+
+  # 自动监控镜像更新并重启服务
+  watchtower:
+    image: containrrr/watchtower
+    container_name: yudream-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      # 每 300 秒（5 分钟）检查一次更新
+      - WATCHTOWER_POLL_INTERVAL=300
+      # 只监控带 com.centurylinklabs.watchtower.enable=true 标签的容器
+      - WATCHTOWER_LABEL_ENABLE=true
+      # 更新后自动清理旧镜像
+      - WATCHTOWER_CLEANUP=true
+      # 可选：收到更新后先执行 pre-update 命令（如备份）
+      # - WATCHTOWER_LIFECYCLE_HOOKS=true
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - yudream
+
+networks:
+  yudream:
+    driver: bridge
