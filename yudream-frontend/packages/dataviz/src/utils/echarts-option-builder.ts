@@ -6,6 +6,9 @@ import { adaptThemeForECharts } from './theme-adapters'
  * 推断数据集对应的图表类型
  */
 function inferChartType(dataset: ChartDataset): 'line' | 'bar' | 'pie' {
+  if (dataset.chartType) {
+    return dataset.chartType === 'bar' ? 'bar' : dataset.chartType === 'pie' ? 'pie' : 'line'
+  }
   if (dataset.nodes || dataset.links) {
     return 'pie'
   }

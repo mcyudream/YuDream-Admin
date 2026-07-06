@@ -14,6 +14,7 @@ export { useChartTheme, useD3Graph, useECharts } from './composables'
 export * as composables from './composables'
 
 // Components
+export * from './components'
 export * as components from './components'
 
 // Utilities
