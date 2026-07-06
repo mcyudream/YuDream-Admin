@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
+import DashboardFlowGraphCard from './dashboard/DashboardFlowGraphCard.vue'
+
 type DashboardKey = 'administrator' | 'people' | 'content' | 'platform' | 'monitor' | 'personal'
 
 interface DashboardMetric {
@@ -361,6 +364,20 @@ function openAction(action: DashboardAction) {
             </div>
             <span class="placeholder-status">{{ canOpen(item) ? item.status : '无权限' }}</span>
           </button>
+        </div>
+      </section>
+
+      <section class="dataviz-panel">
+        <div class="section-head">
+          <div>
+            <h2>数据可视化演示</h2>
+            <p>通过 Dataviz 组件演示图表与关系图能力。</p>
+          </div>
+          <span>演示卡片</span>
+        </div>
+        <div class="dataviz-grid">
+          <DashboardChartStatsCard :card="{ cardCode: 'dataviz-bar-capability', title: '能力分类统计', description: '按类型展示平台能力分布' }" />
+          <DashboardFlowGraphCard :card="{ cardCode: 'dataviz-graph-demo', title: '关系图谱演示', description: '示例节点与关系网络' }" />
         </div>
       </section>
     </div>
@@ -754,12 +771,29 @@ function openAction(action: DashboardAction) {
   --accent-soft: rgba(71, 85, 105, 0.12);
 }
 
+.dataviz-panel {
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.dataviz-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
 @media (max-width: 1180px) {
   .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dataviz-grid {
     grid-template-columns: 1fr;
   }
 }
