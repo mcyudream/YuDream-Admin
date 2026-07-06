@@ -139,6 +139,9 @@ catalogs:
     grapesjs:
       specifier: ^0.23.2
       version: 0.23.2
+    gridstack:
+      specifier: ^12.6.0
+      version: 12.6.0
     hotkeys-js:
       specifier: ^4.0.4
       version: 4.0.4
@@ -441,6 +444,9 @@ importers:
       grapesjs:
         specifier: 'catalog:'
         version: 0.23.2
+      gridstack:
+        specifier: 'catalog:'
+        version: 12.6.0
       hotkeys-js:
         specifier: 'catalog:'
         version: 4.0.4
@@ -721,7 +727,47 @@ importers:
         specifier: 'catalog:'
         version: 3.3.4(typescript@6.0.3)
 
-  packages/plugin-blessing-skin:
+  packages/plugin-sdk:
+    dependencies:
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.38(typescript@6.0.3)
+      vue-router:
+        specifier: 'catalog:'
+        version: 5.1.0(@vue/compiler-sfc@3.5.38)(pinia@3.0.4(typescript@6.0.3)(vue@3.5.38(typescript@6.0.3)))(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+
+  packages/plugin-yudream-alipay:
+    dependencies:
+      '@fantastic-admin/components':
+        specifier: workspace:*
+        version: link:../components
+      '@yudream/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.38(typescript@6.0.3)
+      vue-router:
+        specifier: 'catalog:'
+        version: 5.1.0(@vue/compiler-sfc@3.5.38)(pinia@3.0.4(typescript@6.0.3)(vue@3.5.38(typescript@6.0.3)))(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: 'catalog:'
+        version: 6.0.7(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+      '@vue/tsconfig':
+        specifier: 'catalog:'
+        version: 0.9.1(typescript@6.0.3)(vue@3.5.38(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.4(typescript@6.0.3)
+
+  packages/plugin-yudream-skin:
     dependencies:
       '@fantastic-admin/components':
         specifier: workspace:*
@@ -755,14 +801,36 @@ importers:
         specifier: 'catalog:'
         version: 3.3.4(typescript@6.0.3)
 
-  packages/plugin-sdk:
+  packages/plugin-yudream-wallet:
     dependencies:
+      '@fantastic-admin/components':
+        specifier: workspace:*
+        version: link:../components
+      '@yudream/plugin-sdk':
+        specifier: workspace:*
+        version: link:../plugin-sdk
       vue:
         specifier: 'catalog:'
         version: 3.5.38(typescript@6.0.3)
       vue-router:
         specifier: 'catalog:'
         version: 5.1.0(@vue/compiler-sfc@3.5.38)(pinia@3.0.4(typescript@6.0.3)(vue@3.5.38(typescript@6.0.3)))(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+    devDependencies:
+      '@vitejs/plugin-vue':
+        specifier: 'catalog:'
+        version: 6.0.7(vite@8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))(vue@3.5.38(typescript@6.0.3))
+      '@vue/tsconfig':
+        specifier: 'catalog:'
+        version: 0.9.1(typescript@6.0.3)(vue@3.5.38(typescript@6.0.3))
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.16(@types/node@25.9.3)(esbuild@0.28.0)(jiti@2.7.0)(sass-embedded@1.100.0)(sass@1.100.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0)
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.4(typescript@6.0.3)
 
   packages/settings:
     dependencies:
@@ -4792,6 +4860,9 @@ packages:
 
   grapesjs@0.23.2:
     resolution: {integrity: sha512-Td2eitWTlrmVRmzrQ1oysY3vqPT0XRuKqYAAog84rKJrHoG7sGOXWwPlPsq0tPLgXYnmL3GPCRy4dYxWp18n4Q==}
+
+  gridstack@12.6.0:
+    resolution: {integrity: sha512-dUrqsormSybFn/2P4Dz8AgprftKD5e/IiV7UmC0XLQU+G+/WtkAeFiCSNLoAGhPDXoJ/O61Xtj3gljY/Ds83yQ==}
 
   gzip-size@6.0.0:
     resolution: {integrity: sha512-ax7ZYomf6jqPTQ4+XCpUGyXKHk5WweS+e05MBO4/y3WJ5RkmPXNKvX+bx1behVILVwr6JSQvZAku021CHPXG3Q==}
@@ -11380,6 +11451,8 @@ snapshots:
       html-entities: 1.4.0
       promise-polyfill: 8.3.0
       underscore: 1.13.8
+
+  gridstack@12.6.0: {}
 
   gzip-size@6.0.0:
     dependencies:

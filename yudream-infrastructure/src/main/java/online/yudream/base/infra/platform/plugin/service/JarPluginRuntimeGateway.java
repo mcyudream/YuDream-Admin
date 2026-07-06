@@ -6,6 +6,7 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
@@ -14,6 +15,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResul
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
+import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendRoute;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
@@ -152,6 +154,15 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .filter(entry -> entry.getValue().isEnabled())
                 .flatMap(entry -> entry.getValue().getContext().frontendModules().stream()
                         .map(module -> toInfo(entry.getKey(), module)))
+                .toList();
+    }
+
+    @Override
+    public List<PluginDashboardCardInfo> dashboardCards() {
+        return holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .flatMap(entry -> entry.getValue().getContext().dashboardCards().stream()
+                        .map(card -> toInfo(entry.getKey(), card)))
                 .toList();
     }
 
@@ -324,9 +335,34 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 route.name(),
                 route.title(),
                 route.icon(),
+                route.parentPath(),
+                route.parentTitle(),
+                route.parentIcon(),
+                route.parentSort(),
                 route.component(),
                 route.permission(),
                 route.sort()
+        );
+    }
+
+    private PluginDashboardCardInfo toInfo(String pluginCode, PluginDashboardCard card) {
+        return new PluginDashboardCardInfo(
+                pluginCode,
+                card.code(),
+                card.title(),
+                card.description(),
+                card.icon(),
+                card.category(),
+                card.permission(),
+                card.component(),
+                card.actionPath(),
+                card.dragPayloadTemplate(),
+                card.tone(),
+                card.defaultW(),
+                card.defaultH(),
+                card.minW(),
+                card.minH(),
+                card.sort()
         );
     }
 

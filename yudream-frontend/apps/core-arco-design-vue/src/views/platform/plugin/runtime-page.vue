@@ -19,6 +19,7 @@ const remoteLoading = ref(false)
 
 const plugin = computed(() => (route.meta.plugin || {}) as PluginRouteMeta)
 const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
+const localDevModules = import.meta.glob<YuDreamPluginFrontendModule & Record<string, any>>('../../../../../../packages/plugin-*/src/index.ts')
 
 watch(plugin, loadRemoteComponent, { immediate: true })
 
@@ -62,13 +63,9 @@ async function loadLocalDevModule(pluginCode: string) {
   if (!import.meta.env.DEV) {
     return null
   }
-  if (pluginCode === 'blessing-skin') {
-    return await import('../../../../../../packages/plugin-blessing-skin/src/index')
-  }
-  if (pluginCode === 'authlib-injector') {
-    return await import('../../../../../../packages/plugin-authlib-injector/src/index')
-  }
-  return null
+  const modulePath = `../../../../../../packages/plugin-${pluginCode}/src/index.ts`
+  const loader = localDevModules[modulePath]
+  return loader ? await loader() : null
 }
 
 async function installPluginModule(module: YuDreamPluginFrontendModule & Record<string, any>) {

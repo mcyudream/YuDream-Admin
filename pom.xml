@@ -11,7 +11,9 @@
     <modules>
         <module>yudream-plugin-spi</module>
         <module>yudream-sample-plugin</module>
-        <module>yudream-plugin-blessing-skin</module>
+        <module>yudream-plugin-wallet</module>
+        <module>yudream-plugin-alipay</module>
+        <module>yudream-plugin-yudream-skin</module>
         <module>yudream-plugin-authlib-injector</module>
         <module>yudream-domain</module>
         <module>yudream-application</module>

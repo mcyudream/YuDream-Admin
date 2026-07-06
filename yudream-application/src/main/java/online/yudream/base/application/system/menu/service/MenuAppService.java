@@ -73,6 +73,7 @@ public class MenuAppService {
                 .component(resolveComponent(cmd.getType(), cmd.getComponent()))
                 .link(cmd.getLink())
                 .sort(cmd.getSort() == null ? 0 : cmd.getSort())
+                .visible(cmd.getVisible() == null || cmd.getVisible())
                 .permission(cmd.getPermission())
                 .status(MenuStatus.ACTIVE)
                 .build();
@@ -94,6 +95,7 @@ public class MenuAppService {
                 resolveComponent(cmd.getType(), cmd.getComponent()),
                 cmd.getLink(),
                 cmd.getSort(),
+                cmd.getVisible() == null || cmd.getVisible(),
                 cmd.getPermission()
         );
         if (cmd.getStatus() == MenuStatus.ACTIVE) {
@@ -240,6 +242,7 @@ public class MenuAppService {
                 .component(menu.getComponent())
                 .link(menu.getLink())
                 .sort(menu.getSort())
+                .visible(menu.getVisible())
                 .permission(menu.getPermission())
                 .status(menu.getStatus())
                 .build();
@@ -250,6 +253,9 @@ public class MenuAppService {
     }
 
     private Map<String, Object> buildGroup(Menu module, Map<String, List<Menu>> childrenMap, Set<String> visibleCodes) {
+        if (!visibleCodes.contains(module.getCode())) {
+            return null;
+        }
         List<Map<String, Object>> children = buildChildren(module.getCode(), childrenMap, visibleCodes);
         if (children.isEmpty()) {
             return null;
@@ -299,21 +305,21 @@ public class MenuAppService {
         if (StringUtils.hasText(menu.getLink())) {
             meta.put("link", menu.getLink());
         }
-        if (menu.getType() == MenuNodeType.MENU || menu.getType() == MenuNodeType.LINK || menu.getType() == MenuNodeType.BUTTON) {
+        if (StringUtils.hasText(menu.getPermissionCode())) {
             meta.put("auth", menu.getPermissionCode());
         }
         if (menu.getSort() != null) {
             meta.put("sort", menu.getSort());
         }
+        if (!menu.isVisibleInMenu()) {
+            meta.put("menu", false);
+        }
         return meta;
     }
 
     private boolean isVisible(Menu menu, Set<String> userPermissions) {
-        if (menu.getType() == MenuNodeType.CATEGORY || menu.getType() == MenuNodeType.LAYOUT) {
-            return true;
-        }
         String permissionCode = menu.getPermissionCode();
-        return userPermissions.contains(permissionCode);
+        return userPermissions.contains("*") || userPermissions.contains(permissionCode);
     }
 
     private boolean platformCapabilityVisible(Menu menu) {

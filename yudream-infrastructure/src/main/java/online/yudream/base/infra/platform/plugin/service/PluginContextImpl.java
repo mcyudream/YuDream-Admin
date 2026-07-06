@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.core.PluginContext;
+import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
@@ -26,12 +27,14 @@ public class PluginContextImpl implements PluginContext {
     private final List<PluginMenuItem> menus = new ArrayList<>();
     private final List<PluginPermissionItem> permissions = new ArrayList<>();
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
+    private final List<PluginDashboardCard> dashboardCards = new ArrayList<>();
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
     private final Map<String, PluginHttpHandler> httpHandlers = new ConcurrentHashMap<>();
     private final List<AutoCloseable> disposables = new ArrayList<>();
     private final Set<String> menuKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> permissionKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> capabilityKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> dashboardCardKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendModuleKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendRouteKeys = ConcurrentHashMap.newKeySet();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
@@ -71,6 +74,13 @@ public class PluginContextImpl implements PluginContext {
         String key = requireText(item.code(), "插件能力编码不能为空");
         ensureUnique(capabilityKeys, key, "插件能力重复：" + key);
         capabilities.add(item);
+    }
+
+    @Override
+    public void registerDashboardCard(PluginDashboardCard card) {
+        String key = requireText(card.code(), "插件首页卡片编码不能为空");
+        ensureUnique(dashboardCardKeys, key, "插件首页卡片重复：" + key);
+        dashboardCards.add(card);
     }
 
     @Override
@@ -125,6 +135,10 @@ public class PluginContextImpl implements PluginContext {
         return List.copyOf(frontendModules);
     }
 
+    public List<PluginDashboardCard> dashboardCards() {
+        return List.copyOf(dashboardCards);
+    }
+
     public Optional<PluginHttpHandler> findHttpHandler(String method, String path) {
         String normalizedMethod = StringUtils.hasText(method) ? method.trim().toUpperCase(Locale.ROOT) : "*";
         String normalizedPath = normalizePath(path);
@@ -146,12 +160,14 @@ public class PluginContextImpl implements PluginContext {
         menus.clear();
         permissions.clear();
         capabilities.clear();
+        dashboardCards.clear();
         frontendModules.clear();
         httpHandlers.clear();
         pluginExtensionRegistry.clear(pluginCode);
         menuKeys.clear();
         permissionKeys.clear();
         capabilityKeys.clear();
+        dashboardCardKeys.clear();
         frontendModuleKeys.clear();
         frontendRouteKeys.clear();
     }

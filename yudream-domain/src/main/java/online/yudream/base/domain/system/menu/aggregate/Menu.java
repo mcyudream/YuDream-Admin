@@ -39,6 +39,9 @@ public class Menu {
 
     private Integer sort;
 
+    @Builder.Default
+    private Boolean visible = true;
+
     private String permission;
 
     @Builder.Default
@@ -60,6 +63,7 @@ public class Menu {
                             String component,
                             String link,
                             Integer sort,
+                            Boolean visible,
                             String permission) {
         this.name = name;
         this.type = type;
@@ -70,7 +74,12 @@ public class Menu {
         this.component = component;
         this.link = link;
         this.sort = sort;
+        this.visible = visible;
         this.permission = permission;
+    }
+
+    public boolean isVisibleInMenu() {
+        return visible == null || visible;
     }
 
     public void activate() {

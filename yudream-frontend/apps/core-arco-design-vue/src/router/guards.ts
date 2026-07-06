@@ -113,6 +113,27 @@ function setupRedirectAuthChildrenRoute(router: Router) {
   })
 }
 
+// 路由级权限兜底。后端动态路由会按权限裁剪；本地隐藏路由也需要同一套 auth 判断。
+function setupRoutePermission(router: Router) {
+  router.beforeEach((to) => {
+    const authValue = to.matched
+      .map(route => route.meta?.auth)
+      .filter(Boolean)
+      .at(-1) ?? to.meta?.auth
+    if (!authValue) {
+      return
+    }
+    const { auth } = useAppAuth()
+    if (!auth(authValue as string | string[])) {
+      return {
+        name: 'notFound',
+        params: { all: to.path.replace(/^\/+/, '').split('/') },
+        replace: true,
+      }
+    }
+  })
+}
+
 // 进度条
 function setupProgress(router: Router) {
   const { isLoading } = useNProgress()
@@ -195,6 +216,7 @@ function setupOther(router: Router) {
 export default function setupGuards(router: Router) {
   setupRoutes(router)
   setupRedirectAuthChildrenRoute(router)
+  setupRoutePermission(router)
   setupProgress(router)
   setupTitle(router)
   setupKeepAlive(router)

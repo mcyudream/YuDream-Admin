@@ -26,5 +26,6 @@ public class MenuCreateRequest implements Serializable {
     private String component;
     private String link;
     private Integer sort;
+    private Boolean visible;
     private String permission;
 }

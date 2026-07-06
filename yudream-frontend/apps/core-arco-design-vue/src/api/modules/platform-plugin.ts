@@ -25,6 +25,10 @@ export interface PluginFrontendRoute {
   name: string
   title: string
   icon?: string
+  parentPath?: string
+  parentTitle?: string
+  parentIcon?: string
+  parentSort?: number
   component?: string
   permission?: string
   sort?: number
@@ -47,6 +51,19 @@ export interface PluginFrontendManifest {
   modules: PluginFrontendModule[]
 }
 
+export interface PluginFrontendRouteSortPayload {
+  path: string
+  name: string
+  sort?: number
+  parentSort?: number
+}
+
+export interface PluginFrontendSortPayload {
+  moduleName?: string
+  menuSort?: number
+  routes: PluginFrontendRouteSortPayload[]
+}
+
 export default {
   list: () => systemClient.get<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins'),
   refresh: () => systemClient.post<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins/refresh'),
@@ -54,7 +71,9 @@ export default {
   enable: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/enable`),
   disable: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/disable`),
   unload: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/unload`),
+  remove: (code: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugins/${code}`),
   frontendManifest: () => systemClient.get<unknown, ApiResponse<PluginFrontendManifest>>('api/platform/plugins/frontend-manifest'),
+  saveFrontendSort: (code: string, data: PluginFrontendSortPayload) => systemClient.put<unknown, ApiResponse<PluginFrontendModule>>(`api/platform/plugins/${code}/frontend-sort`, data),
   request: <T = unknown>(pluginCode: string, path: string, options: { method?: string, data?: unknown } = {}) => {
     return systemClient.request<unknown, ApiResponse<T>>({
       url: `api/plugins/${pluginCode}${path.startsWith('/') ? path : `/${path}`}`,

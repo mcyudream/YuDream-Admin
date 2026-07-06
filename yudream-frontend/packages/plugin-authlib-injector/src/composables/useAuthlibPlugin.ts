@@ -11,7 +11,7 @@ export function useAuthlibPlugin(sdk: YuDreamPluginSdk) {
   const status = ref<AuthlibStatus | null>(null)
 
   const baseUrl = computed(() => absoluteUrl(api.apiUrl('/')).replace(/\/$/, ''))
-  const launcherUrl = computed(() => `${baseUrl.value}/`)
+  const launcherUrl = computed(() => baseUrl.value)
   const statusText = computed(() => status.value ? '已连接' : '待刷新')
   const statusPayload = computed(() => status.value ? JSON.stringify(status.value, null, 2) : '暂无状态数据')
 

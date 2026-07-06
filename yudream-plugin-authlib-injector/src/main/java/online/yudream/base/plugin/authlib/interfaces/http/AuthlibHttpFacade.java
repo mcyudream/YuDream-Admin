@@ -129,11 +129,11 @@ public class AuthlibHttpFacade {
     }
 
     private String apiRoot(PluginHttpRequest request) {
-        return origin(request) + "/api/plugins/authlib-injector/";
+        return origin(request) + "/api/plugins/authlib-injector";
     }
 
     private String textureBaseUrl(PluginHttpRequest request) {
-        return origin(request) + "/api/plugins/blessing-skin/textures";
+        return origin(request) + "/api/plugins/yudream-skin/textures";
     }
 
     private String origin(PluginHttpRequest request) {

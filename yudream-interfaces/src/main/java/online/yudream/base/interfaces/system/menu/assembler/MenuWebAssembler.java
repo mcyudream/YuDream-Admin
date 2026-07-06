@@ -26,6 +26,7 @@ public class MenuWebAssembler {
         cmd.setComponent(request.getComponent());
         cmd.setLink(request.getLink());
         cmd.setSort(request.getSort());
+        cmd.setVisible(request.getVisible());
         cmd.setPermission(request.getPermission());
         return cmd;
     }
@@ -42,6 +43,7 @@ public class MenuWebAssembler {
         cmd.setComponent(request.getComponent());
         cmd.setLink(request.getLink());
         cmd.setSort(request.getSort());
+        cmd.setVisible(request.getVisible());
         cmd.setPermission(request.getPermission());
         cmd.setStatus(request.getStatus());
         return cmd;
@@ -63,6 +65,7 @@ public class MenuWebAssembler {
                 .component(dto.getComponent())
                 .link(dto.getLink())
                 .sort(dto.getSort())
+                .visible(dto.getVisible())
                 .permission(dto.getPermission())
                 .status(dto.getStatus())
                 .children(toResList(dto.getChildren()))

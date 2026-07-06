@@ -14,6 +14,7 @@ import online.yudream.base.domain.system.user.aggregate.Dept;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
+import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
@@ -67,11 +68,12 @@ public class UserManageAppService {
                 .email(toEmail(cmd.getEmail()))
                 .phone(toPhone(cmd.getPhone()))
                 .qq(toQQ(cmd.getQq()))
-                .password(Password.of(cmd.getPassword(), passwordEncoder))
+                .password(toPassword(cmd))
                 .emailVerified(cmd.isEmailVerified())
                 .build();
-        user.replaceDepts(resolveUserDepts(cmd.getDepts()));
-        user.replaceRoles(resolveRoleIds(cmd.getRoleIds()));
+        boolean useDefaultDept = cmd.getDepts() == null || cmd.getDepts().isEmpty();
+        user.replaceDepts(useDefaultDept ? defaultUserDepts() : resolveUserDepts(cmd.getDepts()));
+        user.replaceRoles(defaultRoleIdsIfNecessary(cmd.getRoleIds(), useDefaultDept));
         ensureRolesBelongToUserDepts(user);
         return toDTO(userRepo.save(user));
     }
@@ -155,6 +157,16 @@ public class UserManageAppService {
         return roleIds.stream().distinct().map(RoleID::of).toList();
     }
 
+    private List<RoleID> defaultRoleIdsIfNecessary(List<Long> roleIds, boolean useDefaultDept) {
+        List<RoleID> resolved = resolveRoleIds(roleIds);
+        if (!resolved.isEmpty() || !useDefaultDept) {
+            return resolved;
+        }
+        Role userRole = roleRepo.findBySystemType(SystemRoleType.USER)
+                .orElseThrow(() -> new BizException("普通用户角色未初始化"));
+        return List.of(RoleID.of(userRole.getId()));
+    }
+
     private void ensureRolesBelongToUserDepts(User user) {
         if (user.getRoles() == null || user.getRoles().isEmpty()) {
             return;
@@ -203,6 +215,12 @@ public class UserManageAppService {
                 .toList();
     }
 
+    private List<UserDept> defaultUserDepts() {
+        Dept rootDept = deptRepo.findRoot()
+                .orElseThrow(() -> new BizException("系统根部门未初始化"));
+        return List.of(new UserDept(DeptID.of(rootDept.getId()), true));
+    }
+
     private List<UserManageDTO> toDTOs(List<User> users) {
         if (users == null || users.isEmpty()) {
             return new ArrayList<>();
@@ -234,6 +252,13 @@ public class UserManageAppService {
 
     private Email toEmail(String email) {
         return StringUtils.hasText(email) ? Email.of(email) : null;
+    }
+
+    private Password toPassword(UserCreateCmd cmd) {
+        if (StringUtils.hasText(cmd.getEncodedPassword())) {
+            return Password.fromEncoded(cmd.getEncodedPassword().trim());
+        }
+        return Password.of(cmd.getPassword(), passwordEncoder);
     }
 
     private Phone toPhone(String phone) {

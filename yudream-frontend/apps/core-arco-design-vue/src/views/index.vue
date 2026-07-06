@@ -1,369 +1,702 @@
 <script setup lang="ts">
-type DashboardKey = 'administrator' | 'people' | 'content' | 'platform' | 'monitor' | 'personal'
+import type { GridStack, GridStackNode, GridStackOptions, GridStackWidget } from 'gridstack'
+import type { DashboardBreakpoint, DashboardCard, DashboardGridPlacement, DashboardLayout, DashboardLayoutItem, DashboardWorkspace } from '@/api/modules/system-dashboard'
+import { nextTick } from 'vue'
+import apiDashboard from '@/api/modules/system-dashboard'
+import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
+import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
+import DashboardModuleCard from './dashboard/DashboardModuleCard.vue'
+import DashboardMonitorCard from './dashboard/DashboardMonitorCard.vue'
+import DashboardPluginStatsCard from './dashboard/DashboardPluginStatsCard.vue'
+import DashboardProfileCard from './dashboard/DashboardProfileCard.vue'
+import DashboardQuickActionsCard from './dashboard/DashboardQuickActionsCard.vue'
+import DashboardRemotePluginCard from './dashboard/DashboardRemotePluginCard.vue'
+import { toneIconClass } from './dashboard/tone.ts'
+import 'gridstack/dist/gridstack.min.css'
 
-interface DashboardMetric {
+const BREAKPOINTS: DashboardBreakpoint[] = ['lg', 'md', 'sm', 'xs']
+const BREAKPOINT_COLUMNS: Record<DashboardBreakpoint, number> = {
+  lg: 12,
+  md: 8,
+  sm: 4,
+  xs: 1,
+}
+
+interface DashboardInsight {
   label: string
-  value: string | (() => string)
-  description: string
-  icon: string
-  tone: 'blue' | 'green' | 'amber' | 'rose'
+  value: string
 }
 
 interface DashboardAction {
+  code: string
   title: string
-  description: string
-  icon: string
-  path: string
-  permission?: string
-  status?: string
-}
-
-interface DashboardTemplate {
-  key: DashboardKey
-  title: string
-  subtitle: string
-  icon: string
-  accent: string
-  metrics: DashboardMetric[]
-  primaryActions: DashboardAction[]
-  focus: string[]
-  placeholders: DashboardAction[]
+  description?: string
+  icon?: string
+  category?: string
+  actionPath?: string
+  tone?: string
 }
 
 const router = useRouter()
+const toast = useFaToast()
 const accountStore = useAppAccountStore()
+const menuStore = useAppMenuStore()
 
-const permissions = computed(() => accountStore.permissions || [])
-const currentRole = computed(() => accountStore.currentRole)
-const currentDept = computed(() => accountStore.currentDept)
-const isSuperAdmin = computed(() => currentRole.value?.code === 'super_admin' || permissions.value.includes('*'))
-const permissionCount = computed(() => isSuperAdmin.value ? '全部' : String(permissions.value.length))
-const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
-  month: 'long',
-  day: 'numeric',
-  weekday: 'long',
-}).format(new Date()))
+const loading = ref(false)
+const saving = ref(false)
+const editMode = ref(false)
+const drawerVisible = ref(false)
+const layoutMode = ref<'personal' | 'default'>('personal')
+const workspace = ref<DashboardWorkspace | null>(null)
+const defaultCards = ref<DashboardCard[]>([])
+const defaultLayout = ref<DashboardLayout | null>(null)
+const draftItems = ref<DashboardLayoutItem[]>([])
+const gridRef = ref<HTMLElement | null>(null)
+const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
 
-const dashboardTemplates: Record<DashboardKey, DashboardTemplate> = {
-  administrator: {
-    key: 'administrator',
-    title: '系统总控台',
-    subtitle: '面向超级管理员和系统管理员，聚合人员、权限、安全、平台能力与运行状态。',
-    icon: 'dashboard',
-    accent: 'admin',
-    metrics: [
-      { label: '权限范围', value: () => permissionCount.value, description: '当前角色可访问的权限集合', icon: 'verified_user', tone: 'blue' },
-      { label: '治理模块', value: '4 项', description: '用户、角色、部门、菜单', icon: 'manage_accounts', tone: 'green' },
-      { label: '监控入口', value: '4 处', description: '缓存、接口、登录、在线用户', icon: 'monitoring', tone: 'amber' },
-      { label: '待接入统计', value: '6 类', description: '后续可接真实趋势与告警', icon: 'bar_chart', tone: 'rose' },
-    ],
-    primaryActions: [
-      { title: '用户管理', description: '维护账号、多部门、角色与伪装访问', icon: 'group', path: '/system/user', permission: 'system:user:view', status: '人员' },
-      { title: '角色管理', description: '配置部门下角色与权限范围', icon: 'supervisor_account', path: '/system/role', permission: 'system:role:view', status: '权限' },
-      { title: '安全中心', description: '管理 API 加密、Passkey、OAuth 与 API Key', icon: 'admin_panel_settings', path: '/system/security', permission: 'system:security:view', status: '安全' },
-      { title: '平台能力', description: '启停 SSE、WS、MQ、CMS、AI 等可选能力', icon: 'account_tree', path: '/platform/capability', permission: 'platform:capability:view', status: '能力' },
-    ],
-    focus: ['检查新建角色是否绑定正确部门', '确认高权限账号的 API Key 使用范围', '关注接口异常与登录失败趋势'],
-    placeholders: [
-      { title: '系统设置', description: '站点名称、Logo 与基础信息配置', icon: 'settings', path: '/system/setting', status: '配置' },
-      { title: '菜单管理', description: '维护后台路由、按钮权限与菜单图标', icon: 'menu_open', path: '/system/menu', permission: 'system:menu:view', status: '导航' },
-    ],
-  },
-  people: {
-    key: 'people',
-    title: '组织人员工作台',
-    subtitle: '聚焦成员入离、部门边界、角色授权与日常账号治理。',
-    icon: 'manage_accounts',
-    accent: 'people',
-    metrics: [
-      { label: '成员入口', value: () => hasAnyPermission(['system:user:view']) ? '可用' : '受限', description: '用户生命周期管理', icon: 'group', tone: 'blue' },
-      { label: '部门边界', value: () => hasAnyPermission(['system:dept:view']) ? '可用' : '占位', description: '多部门组织结构', icon: 'business', tone: 'green' },
-      { label: '角色授权', value: () => hasAnyPermission(['system:role:view']) ? '可用' : '占位', description: '按部门分配角色', icon: 'supervisor_account', tone: 'amber' },
-      { label: '模拟访问', value: () => hasAnyPermission(['system:user:impersonate']) ? '已开放' : '未开放', description: '用于排查用户视角问题', icon: 'login', tone: 'rose' },
-    ],
-    primaryActions: [
-      { title: '用户管理', description: '创建用户、维护资料、分配部门与角色', icon: 'group', path: '/system/user', permission: 'system:user:view', status: '核心' },
-      { title: '部门管理', description: '维护组织树、默认部门与导入导出', icon: 'business', path: '/system/dept', permission: 'system:dept:view', status: '组织' },
-      { title: '角色管理', description: '在部门范围内维护角色和权限', icon: 'supervisor_account', path: '/system/role', permission: 'system:role:view', status: '权限' },
-    ],
-    focus: ['新用户先确认默认部门', '跨部门账号需要检查角色来源', '敏感操作前建议使用伪装访问复核'],
-    placeholders: [
-      { title: '人员质量卡片', description: '后续接入未验证邮箱、长期未登录、无默认部门统计', icon: 'checklist', path: '/system/user', status: '占位' },
-      { title: '组织变更流', description: '后续展示部门迁移与授权变更时间线', icon: 'receipt_long', path: '/system/dept', status: '占位' },
-    ],
-  },
-  content: {
-    key: 'content',
-    title: '内容运营工作台',
-    subtitle: '面向 CMS、动态表单、媒体资源和公开站点维护。',
-    icon: 'dashboard_customize',
-    accent: 'content',
-    metrics: [
-      { label: '内容页面', value: () => hasAnyPermission(['platform:cms:view']) ? '可维护' : '占位', description: '页面库与首页构建器', icon: 'article', tone: 'blue' },
-      { label: '动态表单', value: () => hasAnyPermission(['platform:form:view']) ? '可维护' : '占位', description: '设计、发布、统计闭环', icon: 'dynamic_form', tone: 'green' },
-      { label: '媒体资源', value: '待统计', description: 'RustFS/S3 资产库后续接入', icon: 'image', tone: 'amber' },
-      { label: 'AI 辅助', value: () => hasAnyPermission(['platform:ai:generate']) ? '已接入' : '可扩展', description: '构建器智能编辑', icon: 'smart_toy', tone: 'rose' },
-    ],
-    primaryActions: [
-      { title: '内容定制', description: '维护页面库、首页、导航、媒体和公开预览', icon: 'dashboard_customize', path: '/platform/cms', permission: 'platform:cms:view', status: 'CMS' },
-      { title: '动态表单', description: '可视化设计表单、发布链接并查看结果统计', icon: 'dynamic_form', path: '/platform/form', permission: 'platform:form:view', status: '表单' },
-      { title: '站点预览', description: '查看公开站点当前渲染状态', icon: 'open_in_new', path: '/site', status: '公开' },
-    ],
-    focus: ['发布前确认首页布局与导航链接', '表单发布后复制公开链接给业务方', '媒体资产建议补充命名和用途'],
-    placeholders: [
-      { title: '发布质量', description: '后续展示草稿数、未发布页面、表单转化率', icon: 'bar_chart', path: '/platform/cms', status: '占位' },
-      { title: '素材池状态', description: '后续展示容量、最近上传、未引用文件', icon: 'inventory_2', path: '/platform/cms', status: '占位' },
-    ],
-  },
-  platform: {
-    key: 'platform',
-    title: '平台能力工作台',
-    subtitle: '面向动态能力、接口文档、集成调用、文档生成和图数据库。',
-    icon: 'account_tree',
-    accent: 'platform',
-    metrics: [
-      { label: '能力开关', value: () => hasAnyPermission(['platform:capability:view']) ? '可管理' : '受限', description: '按项目启停能力', icon: 'account_tree', tone: 'blue' },
-      { label: '接口文档', value: () => hasAnyPermission(['platform:docs:view']) ? '可查看' : '占位', description: 'API 文档入口', icon: 'description', tone: 'green' },
-      { label: '集成调用', value: () => hasAnyPermission(['platform:integration:view']) ? '可维护' : '占位', description: 'HTTP 与脚本运行记录', icon: 'terminal', tone: 'amber' },
-      { label: '图数据库', value: () => hasAnyPermission(['platform:graph:view']) ? '可维护' : '占位', description: 'Neo4j 连接与查询', icon: 'hub', tone: 'rose' },
-    ],
-    primaryActions: [
-      { title: '能力管理', description: '声明依赖、配置能力并按需启停', icon: 'account_tree', path: '/platform/capability', permission: 'platform:capability:view', status: '运行时' },
-      { title: '集成调用', description: '配置 HTTP 连接器、脚本运行与调用日志', icon: 'terminal', path: '/platform/integration', permission: 'platform:integration:view', status: '集成' },
-      { title: 'API 文档', description: '配置文档入口、安全策略与接口说明', icon: 'description', path: '/platform/api-doc', permission: 'platform:docs:view', status: '文档' },
-      { title: '图数据库', description: '管理 Neo4j 连接、查询和查询日志', icon: 'hub', path: '/platform/graph', permission: 'platform:graph:view', status: '图谱' },
-    ],
-    focus: ['能力启用前先确认依赖能力已启用', '中间件连接只在使用时创建', '集成调用异常优先查看日志'],
-    placeholders: [
-      { title: '文档生成', description: 'Word 模板上传、生成和记录查询', icon: 'docs', path: '/platform/document', permission: 'platform:document:view', status: '模板' },
-      { title: '插件扩展', description: '后续展示动态插件加载、前端模块和权限贡献', icon: 'extension', path: '/platform/capability', status: '占位' },
-    ],
-  },
-  monitor: {
-    key: 'monitor',
-    title: '运行监控工作台',
-    subtitle: '聚合 Redis、接口日志、登录日志与在线用户，适合运维和审计角色。',
-    icon: 'monitoring',
-    accent: 'monitor',
-    metrics: [
-      { label: '在线会话', value: () => hasAnyPermission(['system:monitor:online:view']) ? '可查看' : '受限', description: '会话列表和强制下线', icon: 'groups', tone: 'blue' },
-      { label: '缓存监控', value: () => hasAnyPermission(['system:monitor:redis:view']) ? '可查看' : '占位', description: 'Redis key 与内存状态', icon: 'database', tone: 'green' },
-      { label: '接口日志', value: () => hasAnyPermission(['system:monitor:api-log:view']) ? '可查看' : '占位', description: '请求、耗时、异常', icon: 'plagiarism', tone: 'amber' },
-      { label: '登录日志', value: () => hasAnyPermission(['system:monitor:login-log:view']) ? '可查看' : '占位', description: '登录成功与失败记录', icon: 'login', tone: 'rose' },
-    ],
-    primaryActions: [
-      { title: 'Redis 监控', description: '查看连接、内存、Key 样本和命中率', icon: 'database', path: '/system/redis-monitor', permission: 'system:monitor:redis:view', status: '缓存' },
-      { title: '接口日志', description: '查询请求耗时、状态码、用户和异常', icon: 'plagiarism', path: '/system/api-log', permission: 'system:monitor:api-log:view', status: '接口' },
-      { title: '登录日志', description: '审计账号登录成功、失败和客户端来源', icon: 'login', path: '/system/login-log', permission: 'system:monitor:login-log:view', status: '登录' },
-      { title: '在线用户', description: '查看当前会话并按需强制下线', icon: 'groups', path: '/system/online-user', permission: 'system:monitor:online:view', status: '会话' },
-    ],
-    focus: ['接口日志支持一键清空，清空请求不会再次写入日志', '登录失败异常上升时优先检查安全策略', 'Redis Key 样本只用于排查，不建议暴露敏感命名'],
-    placeholders: [
-      { title: '告警中心', description: '后续接入慢接口、失败登录和缓存异常阈值', icon: 'warning', path: '/system/api-log', status: '占位' },
-      { title: '审计日报', description: '后续生成登录、接口、在线会话日报', icon: 'receipt_long', path: '/system/login-log', status: '占位' },
-    ],
-  },
-  personal: {
-    key: 'personal',
-    title: '个人工作台',
-    subtitle: '展示当前身份、可用入口和后续待办。权限较少时也能有清晰的落点。',
-    icon: 'home',
-    accent: 'personal',
-    metrics: [
-      { label: '当前账号', value: () => accountStore.account || '-', description: '登录用户名', icon: 'person', tone: 'blue' },
-      { label: '当前部门', value: () => currentDept.value?.name || '未选择', description: '请求会按当前部门上下文执行', icon: 'business', tone: 'green' },
-      { label: '当前角色', value: () => currentRole.value?.name || '未选择', description: '菜单和权限来自当前角色', icon: 'supervisor_account', tone: 'amber' },
-      { label: '权限数量', value: () => permissionCount.value, description: '当前可访问功能数', icon: 'verified_user', tone: 'rose' },
-    ],
-    primaryActions: [
-      { title: '公开站点', description: '访问当前发布的站点首页', icon: 'open_in_new', path: '/site', status: '公开' },
-      { title: '内容页面', description: '如果已授权，可进入内容定制工作区', icon: 'dashboard_customize', path: '/platform/cms', permission: 'platform:cms:view', status: '内容' },
-      { title: '动态表单', description: '如果已授权，可进入表单设计和提交统计', icon: 'dynamic_form', path: '/platform/form', permission: 'platform:form:view', status: '表单' },
-    ],
-    focus: ['若菜单较少，请联系管理员确认角色权限', '切换部门或角色后首页会按新上下文重算', '个人资料、头像和 API Key 可从右上角账号菜单维护'],
-    placeholders: [
-      { title: '个人待办', description: '后续可接入审批、草稿、任务和消息提醒', icon: 'checklist', path: '/', status: '占位' },
-      { title: '最近访问', description: '后续记录常用模块和最近操作入口', icon: 'history', path: '/', status: '占位' },
-    ],
-  },
-}
+let grid: GridStack | null = null
 
-const templateKey = computed<DashboardKey>(() => {
-  const roleCode = currentRole.value?.code || ''
-  const roleName = currentRole.value?.name || ''
-  if (isSuperAdmin.value || roleCode === 'admin' || roleName.includes('管理员')) {
-    return 'administrator'
+const cards = computed(() => layoutMode.value === 'default' ? defaultCards.value : (workspace.value?.cards ?? []))
+const cardMap = computed(() => new Map(cards.value.map(card => [card.code, card])))
+const activeBreakpoint = computed<DashboardBreakpoint>(() => {
+  if (viewportWidth.value < 640) {
+    return 'xs'
   }
-  if (hasAnyPermission(['system:monitor:api-log:view', 'system:monitor:login-log:view', 'system:monitor:online:view', 'system:monitor:redis:view'])) {
-    return 'monitor'
+  if (viewportWidth.value < 960) {
+    return 'sm'
   }
-  if (hasAnyPermission(['platform:capability:view', 'platform:integration:view', 'platform:docs:view', 'platform:graph:view', 'platform:document:view'])) {
-    return 'platform'
+  if (viewportWidth.value < 1280) {
+    return 'md'
   }
-  if (hasAnyPermission(['platform:cms:view', 'platform:form:view', 'platform:ai:generate'])) {
-    return 'content'
+  return 'lg'
+})
+const visibleItems = computed(() => draftItems.value.filter(item => item.visible && cardMap.value.has(item.cardCode)))
+const hiddenCards = computed(() => cards.value.filter((card) => {
+  const item = draftItems.value.find(row => row.cardCode === card.code)
+  return !item || !item.visible
+}))
+const hiddenCardGroups = computed(() => {
+  const groups = new Map<string, DashboardCard[]>()
+  for (const card of hiddenCards.value) {
+    const groupName = card.source === 'PLUGIN' ? `插件：${card.pluginCode || '未命名插件'}` : (card.category || '系统')
+    groups.set(groupName, [...(groups.get(groupName) ?? []), card])
   }
-  if (hasAnyPermission(['system:user:view', 'system:dept:view', 'system:role:view'])) {
-    return 'people'
-  }
-  return 'personal'
+  return Array.from(groups.entries()).map(([name, items]) => ({ name, items }))
+})
+const canConfigureDefault = computed(() => accountStore.permissions.includes('*') || accountStore.permissions.includes('system:dashboard:config'))
+const roleSummary = computed(() => accountStore.currentRole ? `${accountStore.currentRole.name} / ${accountStore.currentRole.code}` : '未选择角色')
+const deptSummary = computed(() => accountStore.currentDept?.name || '未选择部门')
+const drawerWidth = computed(() => viewportWidth.value < 640 ? '100%' : 460)
+const quickActions = computed(() => preferredMenuActions(menuActions()).slice(0, 8))
+
+onMounted(async () => {
+  window.addEventListener('resize', handleResize)
+  await loadWorkspace()
 })
 
-const dashboard = computed(() => dashboardTemplates[templateKey.value])
-const visiblePrimaryActions = computed(() => dashboard.value.primaryActions)
-const availableActionCount = computed(() => visiblePrimaryActions.value.filter(action => canOpen(action)).length)
-const roleSummary = computed(() => currentRole.value ? `${currentRole.value.name} / ${currentRole.value.code}` : '未选择角色')
-const deptSummary = computed(() => currentDept.value ? currentDept.value.name : '未选择部门')
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize)
+  destroyGrid()
+})
 
-function hasPermission(permission?: string) {
-  if (!permission) {
-    return true
+watch([activeBreakpoint, editMode, () => visibleItems.value.map(item => item.cardCode).join('|')], async () => {
+  await renderGrid()
+})
+
+async function loadWorkspace() {
+  loading.value = true
+  try {
+    const res = await apiDashboard.workspace()
+    workspace.value = res.data
+    draftItems.value = cloneItems(res.data.effectiveLayout.items)
+    await renderGrid()
   }
-  return isSuperAdmin.value || permissions.value.includes(permission)
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '首页加载失败')
+  }
+  finally {
+    loading.value = false
+  }
 }
 
-function hasAnyPermission(items: string[]) {
-  return isSuperAdmin.value || items.some(item => permissions.value.includes(item))
+function handleResize() {
+  viewportWidth.value = window.innerWidth
 }
 
-function canOpen(action: DashboardAction) {
-  return hasPermission(action.permission)
-}
-
-function metricValue(metric: DashboardMetric) {
-  return typeof metric.value === 'function' ? metric.value() : metric.value
-}
-
-function openAction(action: DashboardAction) {
-  if (!canOpen(action)) {
-    useFaToast().warning('暂无权限', { description: `当前角色缺少 ${action.permission}` })
+async function renderGrid() {
+  await nextTick()
+  destroyGrid()
+  if (!gridRef.value) {
     return
   }
-  router.push(action.path)
+  const options: GridStackOptions = {
+    column: BREAKPOINT_COLUMNS[activeBreakpoint.value],
+    cellHeight: activeBreakpoint.value === 'xs' ? 100 : 108,
+    margin: activeBreakpoint.value === 'xs' ? 10 : 14,
+    float: false,
+    disableDrag: !editMode.value,
+    disableResize: !editMode.value || activeBreakpoint.value === 'xs',
+    resizable: { handles: 'e, se, s, sw, w' },
+    draggable: { handle: '.card-drag-handle' },
+  }
+  const mod = await import('gridstack')
+  grid = mod.GridStack.init(options, gridRef.value)
+  grid.on('change', (_event, nodes) => syncGridNodes(nodes))
+}
+
+function destroyGrid() {
+  if (grid) {
+    grid.destroy(false)
+    grid = null
+  }
+}
+
+function widgetFor(item: DashboardLayoutItem): GridStackWidget {
+  const card = cardMap.value.get(item.cardCode)
+  const placement = placementFor(item)
+  return {
+    x: placement.x,
+    y: placement.y,
+    w: placement.w,
+    h: placement.h,
+    minW: activeBreakpoint.value === 'xs' ? 1 : Math.min(card?.minW || 1, BREAKPOINT_COLUMNS[activeBreakpoint.value]),
+    minH: card?.minH || 2,
+  }
+}
+
+function placementFor(item: DashboardLayoutItem): DashboardGridPlacement {
+  const fallback = item.placements.lg || { x: 0, y: 0, w: 4, h: 3 }
+  const next = item.placements[activeBreakpoint.value] || fallback
+  if (activeBreakpoint.value === 'xs') {
+    return { ...next, x: 0, w: 1 }
+  }
+  return next
+}
+
+function syncGridNodes(nodes?: GridStackNode[]) {
+  if (!editMode.value || !nodes?.length) {
+    return
+  }
+  const breakpoint = activeBreakpoint.value
+  const next = cloneItems(draftItems.value)
+  for (const node of nodes) {
+    const cardCode = node.el?.getAttribute('data-card-code')
+    if (!cardCode) {
+      continue
+    }
+    const item = next.find(row => row.cardCode === cardCode)
+    if (!item) {
+      continue
+    }
+    item.placements[breakpoint] = {
+      x: node.x || 0,
+      y: node.y || 0,
+      w: breakpoint === 'xs' ? 1 : (node.w || 1),
+      h: node.h || 1,
+    }
+  }
+  draftItems.value = next
+}
+
+function startEdit() {
+  layoutMode.value = 'personal'
+  editMode.value = true
+  draftItems.value = cloneItems(workspace.value?.effectiveLayout.items ?? [])
+}
+
+async function startDefaultEdit() {
+  loading.value = true
+  try {
+    const [cardRes, layoutRes] = await Promise.all([
+      apiDashboard.cards(),
+      apiDashboard.defaultLayout(),
+    ])
+    defaultCards.value = cardRes.data
+    defaultLayout.value = layoutRes.data
+    layoutMode.value = 'default'
+    editMode.value = true
+    draftItems.value = cloneItems(layoutRes.data.items ?? [])
+    await renderGrid()
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '默认首页加载失败')
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function cancelEdit() {
+  editMode.value = false
+  drawerVisible.value = false
+  if (layoutMode.value === 'default') {
+    layoutMode.value = 'personal'
+  }
+  draftItems.value = cloneItems(workspace.value?.effectiveLayout.items ?? [])
+}
+
+async function saveLayout() {
+  saving.value = true
+  try {
+    await nextTick()
+    syncAllGridItems()
+    if (layoutMode.value === 'default') {
+      await apiDashboard.saveDefaultLayout({ items: cloneItems(draftItems.value) })
+      toast.success('默认首页已保存')
+      layoutMode.value = 'personal'
+    }
+    else {
+      await apiDashboard.saveMyLayout({ items: cloneItems(draftItems.value) })
+      toast.success('首页布局已保存')
+    }
+    editMode.value = false
+    drawerVisible.value = false
+    await loadWorkspace()
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '保存失败')
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+async function resetLayout() {
+  saving.value = true
+  try {
+    if (layoutMode.value === 'default') {
+      draftItems.value = cloneItems(defaultLayout.value?.items ?? [])
+      toast.success('已恢复为当前默认布局')
+    }
+    else {
+      await apiDashboard.resetMyLayout()
+      toast.success('已恢复默认布局')
+      editMode.value = false
+      drawerVisible.value = false
+      await loadWorkspace()
+    }
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '重置失败')
+  }
+  finally {
+    saving.value = false
+  }
+}
+
+function syncAllGridItems() {
+  if (!grid) {
+    return
+  }
+  syncGridNodes(grid.engine.nodes)
+}
+
+async function addCard(card: DashboardCard) {
+  syncAllGridItems()
+  const existing = draftItems.value.find(item => item.cardCode === card.code)
+  if (existing) {
+    existing.visible = true
+    draftItems.value = cloneItems(draftItems.value)
+    await renderGrid()
+    return
+  }
+  draftItems.value = [
+    ...draftItems.value,
+    {
+      cardCode: card.code,
+      visible: true,
+      placements: defaultPlacements(card, draftItems.value),
+    },
+  ]
+  await renderGrid()
+}
+
+async function hideCard(cardCode: string) {
+  syncAllGridItems()
+  draftItems.value = draftItems.value.map(item => item.cardCode === cardCode ? { ...item, visible: false } : item)
+  await renderGrid()
+}
+
+function defaultPlacements(card: DashboardCard, existingItems: DashboardLayoutItem[]) {
+  const placements: Partial<Record<DashboardBreakpoint, DashboardGridPlacement>> = {}
+  for (const breakpoint of BREAKPOINTS) {
+    const columns = BREAKPOINT_COLUMNS[breakpoint]
+    const width = breakpoint === 'xs' ? 1 : Math.min(card.defaultW || 4, columns)
+    const height = Math.max(card.defaultH || 3, card.minH || 2)
+    const heights = Array.from({ length: columns }).fill(0) as number[]
+    for (const item of existingItems) {
+      if (!item.visible) {
+        continue
+      }
+      const placement = item.placements[breakpoint] || item.placements.lg
+      if (!placement) {
+        continue
+      }
+      const itemWidth = breakpoint === 'xs' ? 1 : Math.min(Math.max(placement.w || 1, 1), columns)
+      const itemX = breakpoint === 'xs' ? 0 : Math.min(Math.max(placement.x || 0, 0), Math.max(columns - itemWidth, 0))
+      const itemBottom = Math.max(placement.y || 0, 0) + Math.max(placement.h || 1, 1)
+      for (let col = itemX; col < itemX + itemWidth; col++) {
+        heights[col] = Math.max(heights[col], itemBottom)
+      }
+    }
+    const slot = lowestSlot(heights, width)
+    placements[breakpoint] = {
+      x: slot.x,
+      y: slot.y,
+      w: width,
+      h: height,
+    }
+  }
+  return placements
+}
+
+function lowestSlot(heights: number[], width: number) {
+  let x = 0
+  let y = Number.MAX_SAFE_INTEGER
+  for (let index = 0; index <= heights.length - width; index++) {
+    const candidateY = Math.max(...heights.slice(index, index + width))
+    if (candidateY < y) {
+      x = index
+      y = candidateY
+    }
+  }
+  return { x, y: y === Number.MAX_SAFE_INTEGER ? 0 : y }
+}
+
+function cloneItems(items: DashboardLayoutItem[]) {
+  return items.map(item => ({
+    cardCode: item.cardCode,
+    visible: item.visible,
+    placements: Object.fromEntries(Object.entries(item.placements || {}).map(([key, placement]) => [key, { ...placement }])),
+  })) as DashboardLayoutItem[]
+}
+
+function openCard(card?: { actionPath?: string }) {
+  if (editMode.value || !card?.actionPath) {
+    return
+  }
+  router.push(card.actionPath)
+}
+
+function endpointUrl(card?: DashboardCard) {
+  const path = card?.actionPath || ''
+  if (!path) {
+    return ''
+  }
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const envBase = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
+  const base = /^https?:\/\//i.test(envBase)
+    ? envBase
+    : `${window.location.origin}${envBase === '/' ? '' : envBase.startsWith('/') ? envBase : `/${envBase}`}`
+  return `${base.replace(/\/$/, '')}${normalizedPath}`.replace(/\/$/, '')
+}
+
+function endpointDragPayload(card?: DashboardCard) {
+  const url = endpointUrl(card)
+  const template = card?.dragPayloadTemplate || '{url}'
+  return template
+    .replaceAll('{encodedUrl}', encodeURIComponent(url))
+    .replaceAll('{url}', url)
+}
+
+async function copyEndpointUrl(card?: DashboardCard) {
+  await navigator.clipboard.writeText(endpointUrl(card))
+  toast.success('API 地址已复制')
+}
+
+function menuActions() {
+  const actions: DashboardAction[] = []
+  for (const group of menuStore.allMenus) {
+    collectMenuActions(group.children ?? [], String(group.meta?.title || ''), actions)
+  }
+  const deduped = new Map<string, DashboardAction>()
+  for (const action of actions) {
+    if (action.actionPath && !deduped.has(action.actionPath)) {
+      deduped.set(action.actionPath, action)
+    }
+  }
+  return Array.from(deduped.values())
+}
+
+function collectMenuActions(menus: any[], category: string, target: DashboardAction[]) {
+  for (const menu of menus) {
+    if (menu.meta?.menu === false) {
+      continue
+    }
+    const children = Array.isArray(menu.children) ? menu.children.filter((child: any) => child.meta?.menu !== false) : []
+    const title = String(menu.meta?.title || '')
+    if (children.length) {
+      collectMenuActions(children, title || category, target)
+      continue
+    }
+    const path = String(menu.path || '')
+    if (!path || path === '/' || !title) {
+      continue
+    }
+    target.push({
+      code: path,
+      title,
+      description: category,
+      category,
+      icon: menu.meta?.icon || 'i-ri:arrow-right-line',
+      actionPath: path,
+      tone: toneForPath(path),
+    })
+  }
+}
+
+function preferredMenuActions(actions: DashboardAction[]) {
+  const preferredPaths = [
+    '/system/user',
+    '/system/online-user',
+    '/system/redis-monitor',
+    '/system/api-log',
+    '/system/login-log',
+    '/platform/capability',
+    '/platform/plugin',
+  ]
+  const byPath = new Map(actions.map(action => [action.actionPath, action]))
+  const preferred = preferredPaths
+    .map(path => byPath.get(path))
+    .filter(Boolean) as DashboardAction[]
+  const preferredSet = new Set(preferred.map(action => action.actionPath))
+  return [
+    ...preferred,
+    ...actions.filter(action => !preferredSet.has(action.actionPath)),
+  ]
+}
+
+function toneForPath(path: string) {
+  if (path.startsWith('/system/')) {
+    return 'blue'
+  }
+  if (path.startsWith('/platform/')) {
+    return 'cyan'
+  }
+  return 'gray'
+}
+
+function moduleInsights(card?: DashboardCard): DashboardInsight[] {
+  if (!card) {
+    return []
+  }
+  return [
+    { label: '来源', value: sourceText(card) },
+    { label: '分类', value: card.category || '未分类' },
+    { label: '访问控制', value: card.permission ? '需要对应权限' : '当前可见' },
+  ]
+}
+
+function sourceText(card?: DashboardCard) {
+  if (!card) {
+    return '-'
+  }
+  return card.source === 'PLUGIN' ? (card.pluginCode || '插件') : '系统'
+}
+
+function displayCardTitle(card?: DashboardCard) {
+  if (card?.component === 'PROFILE_SUMMARY') {
+    return '欢迎回来'
+  }
+  return card?.title || ''
+}
+
+function resolveCardComponent(card?: DashboardCard) {
+  if (card?.source === 'PLUGIN') {
+    return DashboardRemotePluginCard
+  }
+  switch (card?.component) {
+    case 'PROFILE_SUMMARY':
+      return DashboardProfileCard
+    case 'QUICK_ACTIONS':
+      return DashboardQuickActionsCard
+    case 'MONITOR_STATS':
+      return DashboardMonitorCard
+    case 'CAPABILITY_STATS':
+      return DashboardCapabilityStatsCard
+    case 'PLUGIN_STATS':
+      return DashboardPluginStatsCard
+    case 'ENDPOINT_CARD':
+      return DashboardEndpointCard
+    default:
+      return DashboardModuleCard
+  }
+}
+
+function genericCardProps(card: DashboardCard) {
+  const base = {
+    card,
+    onOpen: openCard,
+  }
+  switch (card.component) {
+    case 'PROFILE_SUMMARY':
+      return {
+        ...base,
+        account: accountStore.account,
+        dept: deptSummary.value,
+        role: roleSummary.value,
+        impersonating: accountStore.isImpersonating,
+        impersonatorAccount: accountStore.impersonatorAccount,
+        avatar: accountStore.avatar,
+      }
+    case 'QUICK_ACTIONS':
+      return {
+        ...base,
+        actions: quickActions.value,
+      }
+    case 'MONITOR_STATS':
+      return {
+        ...base,
+        permissions: accountStore.permissions,
+      }
+    case 'CAPABILITY_STATS':
+    case 'PLUGIN_STATS':
+      return base
+    case 'ENDPOINT_CARD':
+      return {
+        ...base,
+        endpointUrl: endpointUrl(card),
+        dragPayload: endpointDragPayload(card),
+        onCopy: () => copyEndpointUrl(card),
+      }
+    default:
+      return {
+        ...base,
+        insights: moduleInsights(card),
+      }
+  }
+}
+
+function cardProps(card: DashboardCard) {
+  return genericCardProps(card)
 }
 </script>
 
 <template>
   <div class="dashboard-page">
-    <div class="dashboard-shell" :class="`accent-${dashboard.accent}`">
-      <header class="dashboard-hero">
-        <div class="hero-main">
-          <div class="hero-icon">
-            <span class="material-symbols-outlined" aria-hidden="true">{{ dashboard.icon }}</span>
-          </div>
-          <div>
-            <p class="hero-date">
-              {{ todayText }}
-            </p>
-            <h1>{{ dashboard.title }}</h1>
-            <p>{{ dashboard.subtitle }}</p>
-          </div>
+    <div class="dashboard-shell">
+      <div class="dashboard-header">
+        <div class="dashboard-greeting">
+          <strong>首页</strong>
+          <span v-if="editMode" class="dashboard-edit-hint">
+            {{ layoutMode === 'default' ? '正在配置所有用户的默认首页' : '正在编辑你的个人首页，可拖拽卡片并调整大小' }}
+          </span>
         </div>
-        <div class="hero-context">
-          <div>
-            <span>账号</span>
-            <strong>{{ accountStore.account || '-' }}</strong>
-          </div>
-          <div>
-            <span>部门</span>
-            <strong>{{ deptSummary }}</strong>
-          </div>
-          <div>
-            <span>角色</span>
-            <strong>{{ roleSummary }}</strong>
-          </div>
-          <div v-if="accountStore.isImpersonating" class="impersonating">
-            <span>伪装访问</span>
-            <strong>来自 {{ accountStore.impersonatorAccount }}</strong>
-          </div>
+        <div class="dashboard-toolbar">
+          <FaButton v-if="!editMode" variant="outline" size="sm" :loading="loading" @click="loadWorkspace">
+            <FaIcon name="i-ri:refresh-line" />
+            刷新
+          </FaButton>
+          <FaButton v-if="!editMode && canConfigureDefault" variant="outline" size="sm" @click="startDefaultEdit">
+            <FaIcon name="i-ri:layout-2-line" />
+            配置默认首页
+          </FaButton>
+          <FaButton v-if="!editMode" size="sm" @click="startEdit">
+            <FaIcon name="i-ri:edit-line" />
+            编辑首页
+          </FaButton>
+          <template v-else>
+            <FaButton variant="outline" size="sm" @click="drawerVisible = true">
+              <FaIcon name="i-ri:add-line" />
+              添加卡片
+            </FaButton>
+            <FaButton variant="ghost" size="sm" @click="cancelEdit">
+              取消
+            </FaButton>
+            <FaButton variant="outline" size="sm" :loading="saving" @click="resetLayout">
+              {{ layoutMode === 'default' ? '撤销调整' : '恢复默认' }}
+            </FaButton>
+            <FaButton size="sm" :loading="saving" @click="saveLayout">
+              <FaIcon name="i-ri:save-3-line" />
+              {{ layoutMode === 'default' ? '保存默认布局' : '保存布局' }}
+            </FaButton>
+          </template>
         </div>
-      </header>
+      </div>
 
-      <section class="metric-grid">
-        <article v-for="metric in dashboard.metrics" :key="metric.label" class="metric-card" :class="`tone-${metric.tone}`">
-          <div class="metric-icon">
-            <span class="material-symbols-outlined" aria-hidden="true">{{ metric.icon }}</span>
-          </div>
-          <div>
-            <span>{{ metric.label }}</span>
-            <strong>{{ metricValue(metric) }}</strong>
-            <p>{{ metric.description }}</p>
-          </div>
-        </article>
-      </section>
+      <div v-if="loading && !workspace" class="dashboard-loading">
+        <FaIcon name="i-ri:loader-4-line" class="animate-spin" />
+        正在加载首页
+      </div>
 
-      <section class="dashboard-grid">
-        <main class="work-panel">
-          <div class="section-head">
-            <div>
-              <h2>核心工作区</h2>
-              <p>根据当前角色和权限推荐最常用入口。</p>
-            </div>
-            <span>{{ availableActionCount }} / {{ visiblePrimaryActions.length }} 可用</span>
-          </div>
-          <div class="action-grid">
-            <button
-              v-for="action in visiblePrimaryActions"
-              :key="action.title"
-              type="button"
-              class="action-card"
-              :class="{ locked: !canOpen(action) }"
-              @click="openAction(action)"
-            >
-              <span class="action-status">{{ canOpen(action) ? action.status : '无权限' }}</span>
-              <span class="action-icon">
-                <span class="material-symbols-outlined" aria-hidden="true">{{ action.icon }}</span>
-              </span>
-              <strong>{{ action.title }}</strong>
-              <p>{{ action.description }}</p>
-            </button>
-          </div>
-        </main>
+      <div v-else ref="gridRef" class="grid-stack dashboard-grid" :class="{ editing: editMode }">
+        <div
+          v-for="item in visibleItems"
+          :key="item.cardCode"
+          class="grid-stack-item"
+          :data-card-code="item.cardCode"
+          v-bind="widgetFor(item)"
+          :gs-x="widgetFor(item).x"
+          :gs-y="widgetFor(item).y"
+          :gs-w="widgetFor(item).w"
+          :gs-h="widgetFor(item).h"
+          :gs-min-w="widgetFor(item).minW"
+          :gs-min-h="widgetFor(item).minH"
+        >
+          <article class="grid-stack-item-content dashboard-card">
+            <header class="dashboard-card__header">
+              <button v-if="editMode" type="button" class="card-drag-handle" title="拖拽卡片">
+                <FaIcon name="i-ri:drag-move-2-line" />
+              </button>
+              <div class="dashboard-card__heading">
+                <span class="dashboard-card__icon" :class="toneIconClass(cardMap.get(item.cardCode)?.tone)">
+                  <FaIcon :name="cardMap.get(item.cardCode)?.icon || 'i-ri:layout-grid-line'" />
+                </span>
+                <div class="dashboard-card__title-block">
+                  <h2>{{ displayCardTitle(cardMap.get(item.cardCode)) }}</h2>
+                </div>
+              </div>
+              <button
+                v-if="editMode"
+                type="button"
+                class="card-hide-button"
+                title="隐藏卡片"
+                @click="hideCard(item.cardCode)"
+              >
+                <FaIcon name="i-ri:eye-off-line" />
+              </button>
+            </header>
 
-        <aside class="side-panel">
-          <div class="section-head compact">
-            <div>
-              <h2>今日关注</h2>
-              <p>先用固定建议占位，后续可接真实任务。</p>
-            </div>
-          </div>
-          <ol class="focus-list">
-            <li v-for="item in dashboard.focus" :key="item">
-              {{ item }}
-            </li>
-          </ol>
-        </aside>
-      </section>
-
-      <section class="placeholder-panel">
-        <div class="section-head">
-          <div>
-            <h2>预留模块</h2>
-            <p>暂时没有实时数据的模块先以占位卡片呈现，避免首页空白。</p>
-          </div>
-          <span>权限驱动布局</span>
+            <component
+              v-if="cardMap.get(item.cardCode)"
+              :is="resolveCardComponent(cardMap.get(item.cardCode))"
+              v-bind="cardProps(cardMap.get(item.cardCode)!)"
+            />
+          </article>
         </div>
-        <div class="placeholder-grid">
-          <button
-            v-for="item in dashboard.placeholders"
-            :key="item.title"
-            type="button"
-            class="placeholder-card"
-            :class="{ locked: !canOpen(item) }"
-            @click="openAction(item)"
-          >
-            <span class="action-icon">
-              <span class="material-symbols-outlined" aria-hidden="true">{{ item.icon }}</span>
+      </div>
+    </div>
+
+    <a-drawer v-model:visible="drawerVisible" :width="drawerWidth" title="添加首页卡片" unmount-on-close>
+      <div class="card-picker">
+        <div v-for="group in hiddenCardGroups" :key="group.name" class="card-picker-group">
+          <div class="card-picker-group__title">
+            <strong>{{ group.name }}</strong>
+            <span>{{ group.items.length }}</span>
+          </div>
+          <button v-for="card in group.items" :key="card.code" type="button" class="picker-card" @click="addCard(card)">
+            <span class="picker-card__icon" :class="toneIconClass(card.tone)">
+              <FaIcon :name="card.icon || 'i-ri:layout-grid-line'" />
             </span>
-            <div>
-              <strong>{{ item.title }}</strong>
-              <p>{{ item.description }}</p>
-            </div>
-            <span class="placeholder-status">{{ canOpen(item) ? item.status : '无权限' }}</span>
+            <span class="picker-card__main">
+              <strong>{{ card.title }}</strong>
+              <small>{{ card.description || card.category }}</small>
+              <span class="picker-card__meta">
+                <em>{{ sourceText(card) }}</em>
+                <em>{{ card.defaultW }} x {{ card.defaultH }}</em>
+              </span>
+            </span>
+            <span class="picker-card__add">
+              <FaIcon name="i-ri:add-line" />
+            </span>
           </button>
         </div>
-      </section>
-    </div>
+        <div v-if="!hiddenCards.length" class="picker-empty">
+          <FaIcon name="i-ri:checkbox-circle-line" />
+          <strong>所有卡片已显示</strong>
+        </div>
+      </div>
+    </a-drawer>
   </div>
 </template>
 
@@ -372,431 +705,351 @@ function openAction(action: DashboardAction) {
   position: absolute;
   inset: 0;
   overflow: auto;
-  background: var(--color-bg-1);
+  background: var(--g-main-area-bg, #f7f8fa);
 }
 
 .dashboard-shell {
-  display: grid;
-  gap: 16px;
-  width: min(1440px, calc(100% - 32px));
+  width: min(1480px, calc(100% - 24px));
+  padding: 16px 0 32px;
   margin: 0 auto;
-  padding: 20px 0 32px;
 }
 
-.dashboard-hero,
-.metric-card,
-.work-panel,
-.side-panel,
-.placeholder-panel,
-.action-card,
-.placeholder-card {
-  border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  background: var(--color-bg-2);
-}
-
-.dashboard-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
-  gap: 20px;
-  padding: 22px;
-  overflow: hidden;
-  position: relative;
-}
-
-.dashboard-hero::before {
-  position: absolute;
-  inset: 0;
-  content: "";
-  pointer-events: none;
-  background: linear-gradient(110deg, var(--accent-soft), transparent 42%);
-}
-
-.hero-main,
-.hero-context {
-  position: relative;
-  z-index: 1;
-}
-
-.hero-main {
+.dashboard-header {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
 }
 
-.hero-icon,
-.metric-icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 8px;
-}
-
-.hero-icon {
-  width: 54px;
-  height: 54px;
-  background: var(--accent);
-  color: white;
-  font-size: 28px;
-}
-
-.material-symbols-outlined {
-  overflow: hidden;
-  font-size: 1em;
-  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24;
-  line-height: 1;
-}
-
-.hero-date {
-  margin: 0 0 6px;
-  color: var(--color-text-3);
-  font-size: 13px;
-}
-
-.dashboard-hero h1,
-.section-head h2 {
-  margin: 0;
-  color: var(--color-text-1);
-}
-
-.dashboard-hero h1 {
-  font-size: 28px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.dashboard-hero p,
-.section-head p,
-.metric-card p,
-.action-card p,
-.placeholder-card p {
-  margin: 0;
-  color: var(--color-text-3);
-}
-
-.dashboard-hero h1 + p {
-  margin-top: 8px;
-  max-width: 760px;
-  line-height: 1.7;
-}
-
-.hero-context {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.dashboard-greeting {
+  display: flex;
   gap: 10px;
-}
-
-.hero-context div {
-  display: grid;
-  gap: 6px;
+  align-items: center;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--color-border-2));
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-bg-2) 84%, white);
 }
 
-.hero-context span,
-.metric-card > div > span,
-.action-status,
-.placeholder-status {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.hero-context strong {
-  overflow: hidden;
+.dashboard-greeting strong {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--color-text-1);
-  font-size: 13px;
+}
+
+.dashboard-edit-hint {
+  overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 13px;
+  color: var(--color-text-3);
   white-space: nowrap;
 }
 
-.hero-context .impersonating {
-  grid-column: 1 / -1;
-  border-color: rgba(245, 63, 63, 0.28);
-  background: rgba(245, 63, 63, 0.08);
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.metric-card {
+.dashboard-toolbar {
   display: flex;
-  gap: 12px;
-  min-height: 118px;
-  padding: 16px;
-}
-
-.metric-icon {
-  width: 38px;
-  height: 38px;
-  font-size: 20px;
-}
-
-.metric-card strong {
-  display: block;
-  margin-top: 6px;
-  color: var(--color-text-1);
-  font-size: 24px;
-  line-height: 1.2;
-}
-
-.metric-card p {
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.tone-blue .metric-icon {
-  background: rgba(22, 93, 255, 0.12);
-  color: #165dff;
-}
-
-.tone-green .metric-icon {
-  background: rgba(0, 180, 42, 0.12);
-  color: #00a870;
-}
-
-.tone-amber .metric-icon {
-  background: rgba(247, 114, 52, 0.13);
-  color: #d25f00;
-}
-
-.tone-rose .metric-icon {
-  background: rgba(245, 63, 63, 0.12);
-  color: #f53f3f;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 16px;
+  min-height: 320px;
+  margin-top: 16px;
 }
 
-.work-panel,
-.side-panel,
-.placeholder-panel {
-  padding: 18px;
-}
-
-.section-head {
+.grid-stack-item-content.dashboard-card {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin-bottom: 14px;
-}
-
-.section-head h2 {
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.section-head p {
-  margin-top: 4px;
-  font-size: 13px;
-}
-
-.section-head > span {
-  flex: 0 0 auto;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: var(--color-fill-2);
-  color: var(--color-text-2);
-  font-size: 12px;
-}
-
-.section-head.compact {
-  margin-bottom: 10px;
-}
-
-.action-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.action-card,
-.placeholder-card {
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease, background 0.2s ease;
-}
-
-.action-card {
-  display: grid;
-  gap: 10px;
-  min-height: 150px;
-  padding: 16px;
-}
-
-.action-card:hover,
-.placeholder-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-1px);
-}
-
-.action-icon {
-  color: var(--accent);
-  font-size: 24px;
-}
-
-.action-card strong,
-.placeholder-card strong {
-  color: var(--color-text-1);
-  font-size: 15px;
-}
-
-.action-card p,
-.placeholder-card p {
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.action-status {
-  justify-self: start;
-  padding: 3px 7px;
-  border-radius: 999px;
-  background: var(--color-fill-2);
-}
-
-.locked {
-  cursor: not-allowed;
-  opacity: 0.58;
-}
-
-.locked:hover {
-  border-color: var(--color-border-2);
-  transform: none;
-}
-
-.focus-list {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.focus-list li {
-  position: relative;
-  padding: 12px 12px 12px 32px;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
+  overflow: hidden;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
   border-radius: 8px;
-  background: var(--color-fill-1);
-  color: var(--color-text-2);
-  font-size: 13px;
-  line-height: 1.6;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
 }
 
-.focus-list li::before {
-  position: absolute;
-  top: 18px;
-  left: 14px;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--accent);
-  content: "";
+.dashboard-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 3px 10px rgb(0 0 0 / 5%);
 }
 
-.placeholder-grid {
+.editing .dashboard-card {
+  cursor: default;
+  outline: 1px dashed var(--color-border-3);
+  outline-offset: -4px;
+}
+
+.dashboard-card__header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 16px 16px 10px;
+}
+
+.dashboard-card__heading {
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.dashboard-card__icon {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
 }
 
-.placeholder-card {
+.dashboard-card__title-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dashboard-card__title-block h2 {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--color-text-1);
+  white-space: nowrap;
+}
+
+.card-drag-handle,
+.card-hide-button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-3);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+}
+
+.editing .card-drag-handle {
+  color: var(--color-text-2);
+  cursor: grab;
+  background: var(--color-fill-2);
+  border-color: var(--color-border-2);
+}
+
+.card-drag-handle:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.card-hide-button:hover,
+.editing .card-drag-handle:hover {
+  color: var(--color-text-1);
+  background: var(--color-fill-2);
+  border-color: var(--color-border-3);
+}
+
+.dashboard-card__content {
+  flex: 1;
+  min-height: 0;
+  margin: 4px 16px 16px;
+  overflow: auto;
+}
+
+.dashboard-loading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  margin-top: 16px;
+  color: var(--color-text-3);
+  background: var(--color-bg-2);
+  border: 1px dashed var(--color-border-2);
+  border-radius: 8px;
+}
+
+.card-picker {
+  display: grid;
+  gap: 18px;
+}
+
+.card-picker-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.card-picker-group__title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.card-picker-group__title strong {
+  min-width: 0;
+  padding-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-2);
+  white-space: nowrap;
+  border-left: 3px solid var(--color-text-1);
+}
+
+.card-picker-group__title span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 12px;
+  color: var(--color-text-3);
+  background: var(--color-fill-2);
+  border-radius: 999px;
+}
+
+.picker-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: center;
-  min-height: 92px;
+  align-items: flex-start;
+  min-width: 0;
   padding: 14px;
+  color: var(--color-text-1);
+  text-align: left;
+  cursor: pointer;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  transition: border-color 0.16s ease, background 0.16s ease;
 }
 
-.placeholder-status {
-  padding: 3px 7px;
-  border-radius: 999px;
+.picker-card:hover {
   background: var(--color-fill-2);
+  border-color: var(--color-border-3);
 }
 
-.accent-admin {
-  --accent: #165dff;
-  --accent-soft: rgba(22, 93, 255, 0.12);
+.picker-card__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
 }
 
-.accent-people {
-  --accent: #00a870;
-  --accent-soft: rgba(0, 180, 42, 0.12);
+.picker-card__main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
 }
 
-.accent-content {
-  --accent: #7b61ff;
-  --accent-soft: rgba(123, 97, 255, 0.12);
+.picker-card__main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
-.accent-platform {
-  --accent: #0e7490;
-  --accent-soft: rgba(14, 116, 144, 0.12);
+.picker-card__main small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-3);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
 }
 
-.accent-monitor {
-  --accent: #d25f00;
-  --accent-soft: rgba(247, 114, 52, 0.13);
+.picker-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
 }
 
-.accent-personal {
-  --accent: #475569;
-  --accent-soft: rgba(71, 85, 105, 0.12);
+.picker-card__meta em {
+  max-width: 100%;
+  padding: 2px 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.2;
+  color: var(--color-text-3);
+  white-space: nowrap;
+  background: var(--color-fill-2);
+  border-radius: 999px;
 }
 
-@media (max-width: 1180px) {
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
+.picker-card__add {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--color-text-3);
 }
 
-@media (max-width: 780px) {
+.picker-empty {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 36px 12px;
+  color: var(--color-text-3);
+  text-align: center;
+  border: 1px dashed var(--color-border-2);
+  border-radius: 10px;
+}
+
+.picker-empty :deep(.fa-icon) {
+  font-size: 28px;
+  color: var(--primary);
+}
+
+.picker-empty strong {
+  font-size: 14px;
+  color: var(--color-text-2);
+}
+
+@media (width <= 780px) {
   .dashboard-shell {
-    width: min(100% - 20px, 1440px);
-    padding-top: 10px;
+    width: min(100% - 16px, 1480px);
+    padding-top: 12px;
   }
 
-  .dashboard-hero,
-  .hero-context,
-  .metric-grid,
-  .action-grid,
-  .placeholder-grid {
-    grid-template-columns: 1fr;
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .hero-main {
-    align-items: flex-start;
+  .dashboard-toolbar {
+    justify-content: flex-start;
+    width: 100%;
   }
+}
 
-  .dashboard-hero {
-    padding: 16px;
-  }
-
-  .dashboard-hero h1 {
-    font-size: 24px;
-  }
-
-  .placeholder-card {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .placeholder-status {
-    grid-column: 2;
-    justify-self: start;
+@media (width <= 480px) {
+  .dashboard-card__title-block h2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    -webkit-box-orient: vertical;
   }
 }
 </style>

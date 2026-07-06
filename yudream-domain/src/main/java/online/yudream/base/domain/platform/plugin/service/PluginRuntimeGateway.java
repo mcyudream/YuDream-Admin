@@ -6,6 +6,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 
 import java.util.List;
@@ -30,6 +31,8 @@ public interface PluginRuntimeGateway {
     List<PluginPermissionInfo> permissions(String code);
 
     List<PluginFrontendModuleInfo> frontendModules();
+
+    List<PluginDashboardCardInfo> dashboardCards();
 
     Optional<PluginFrontendAssetInfo> frontendAsset(String code, String assetPath);
 

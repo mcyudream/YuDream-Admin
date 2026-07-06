@@ -138,14 +138,14 @@ export const useAppRouteStore = defineStore(
     }
     function localizeSystemMonitorRoute(route: any) {
       const titleMap: Record<string, string> = {
-        'Online users': '\u5728\u7ebf\u7528\u6237',
-        'API logs': '\u63a5\u53e3\u65e5\u5fd7',
-        'Login logs': '\u767b\u5f55\u65e5\u5fd7',
+        'Online users': '在线用户',
+        'API logs': '接口日志',
+        'Login logs': '登录日志',
       }
       const pathMap: Record<string, string> = {
-        '/system/online-user': '\u5728\u7ebf\u7528\u6237',
-        '/system/api-log': '\u63a5\u53e3\u65e5\u5fd7',
-        '/system/login-log': '\u767b\u5f55\u65e5\u5fd7',
+        '/system/online-user': '在线用户',
+        '/system/api-log': '接口日志',
+        '/system/login-log': '登录日志',
       }
       if (!route.meta) {
         route.meta = {}
@@ -163,58 +163,40 @@ export const useAppRouteStore = defineStore(
       try {
         const res = await apiPlugin.frontendManifest()
         const groups: RouteRecordMainRaw[] = []
+        const menuGroups = new Map<string, RouteRecordMainRaw>()
+        const parentGroups = new Map<string, RouteRecordRaw>()
         const legacyChildren: RouteRecordRaw[] = []
         res.data.modules?.forEach((module) => {
-          const children: RouteRecordRaw[] = []
           module.routes?.forEach((route) => {
-            const routeName = route.name || `${module.pluginCode}-${route.path}`
-            const routeMeta = {
-              title: route.title,
-              icon: route.icon || 'i-ri:puzzle-2-line',
-              auth: route.permission,
-              sort: route.sort,
-              plugin: {
-                pluginCode: module.pluginCode,
-                component: route.component,
-                entry: module.entry,
-                moduleName: module.moduleName,
-                sdkVersion: module.sdkVersion || res.data.sdkVersion,
-              },
-            } as any
-            const routeRecord = {
-              path: route.path,
-              name: `${routeName}-layout`,
-              component: () => import('@/layouts/index.vue'),
-              meta: routeMeta,
-              children: [{
-                path: '',
-                name: routeName,
-                component: () => import('@/views/platform/plugin/runtime-page.vue'),
-                meta: {
-                  ...routeMeta,
-                  menu: false,
-                  breadcrumb: false,
-                },
-              }],
+            const children = pluginMenuChildren(module, groups, menuGroups, legacyChildren)
+            const menuKey = pluginMenuKey(module)
+            const parentTitle = textValue(route.parentTitle)
+            const parentPath = parentTitle ? pluginParentPath(route) : ''
+            const routeRecord = createPluginRouteRecord(module, route, res.data.sdkVersion)
+            if (!parentTitle || !parentPath) {
+              children.push(routeRecord)
+              return
             }
-            children.push(routeRecord)
+            const parentKey = `${menuKey}:${parentPath}`
+            let parent = parentGroups.get(parentKey)
+            if (!parent) {
+              parent = {
+                path: parentPath,
+                name: `${safeRouteName(menuKey, parentPath)}-directory`,
+                component: () => import('@/layouts/index.vue'),
+                meta: {
+                  title: parentTitle,
+                  icon: textValue(route.parentIcon) || route.icon || 'i-ri:puzzle-2-line',
+                  sort: route.parentSort ?? route.sort,
+                },
+                children: [],
+              }
+              parentGroups.set(parentKey, parent)
+              children.push(parent)
+            }
+            mergeParentMeta(parent, route)
+            parent.children!.push(routeRecord)
           })
-          if (!children.length) {
-            return
-          }
-          if (module.menuTitle) {
-            groups.push({
-              meta: {
-                title: module.menuTitle,
-                icon: module.menuIcon || 'i-ri:puzzle-2-line',
-                sort: module.menuSort ?? 20,
-              },
-              children,
-            })
-          }
-          else {
-            legacyChildren.push(...children)
-          }
         })
         if (legacyChildren.length) {
           groups.push({
@@ -231,6 +213,108 @@ export const useAppRouteStore = defineStore(
       catch {
         return []
       }
+    }
+    function pluginMenuChildren(module: any, groups: RouteRecordMainRaw[], menuGroups: Map<string, RouteRecordMainRaw>, legacyChildren: RouteRecordRaw[]) {
+      const title = textValue(module.menuTitle)
+      if (!title) {
+        return legacyChildren
+      }
+      const key = pluginMenuKey(module)
+      let group = menuGroups.get(key)
+      if (!group) {
+        group = {
+          meta: {
+            title,
+            icon: module.menuIcon || 'i-ri:puzzle-2-line',
+            sort: module.menuSort ?? 20,
+          },
+          children: [],
+        }
+        menuGroups.set(key, group)
+        groups.push(group)
+      }
+      else {
+        mergeMenuMeta(group, module)
+      }
+      return group.children
+    }
+    function mergeMenuMeta(group: RouteRecordMainRaw, module: any) {
+      const icon = textValue(module.menuIcon)
+      if (icon && (!group.meta?.icon || group.meta.icon === 'i-ri:puzzle-2-line')) {
+        group.meta = { ...group.meta, icon }
+      }
+      const sort = module.menuSort
+      if (typeof sort === 'number' && sort > (Number(group.meta?.sort) || 0)) {
+        group.meta = { ...group.meta, sort }
+      }
+    }
+    function mergeParentMeta(parent: RouteRecordRaw, route: any) {
+      const sort = route.parentSort ?? route.sort
+      if (typeof sort === 'number' && sort > (Number(parent.meta?.sort) || 0)) {
+        parent.meta = { ...parent.meta, sort }
+      }
+      const icon = textValue(route.parentIcon) || route.icon
+      if (icon && (!parent.meta?.icon || parent.meta.icon === 'i-ri:puzzle-2-line')) {
+        parent.meta = { ...parent.meta, icon }
+      }
+    }
+    function createPluginRouteRecord(module: any, route: any, sdkVersion?: string): RouteRecordRaw {
+      const routeName = route.name || `${module.pluginCode}-${route.path}`
+      const routeMeta = {
+        title: route.title,
+        icon: route.icon || 'i-ri:puzzle-2-line',
+        auth: route.permission,
+        sort: route.sort,
+        plugin: {
+          pluginCode: module.pluginCode,
+          component: route.component,
+          entry: module.entry,
+          moduleName: module.moduleName,
+          sdkVersion: module.sdkVersion || sdkVersion,
+        },
+      } as any
+      return {
+        path: route.path,
+        name: `${routeName}-layout`,
+        component: () => import('@/layouts/index.vue'),
+        meta: routeMeta,
+        children: [{
+          path: '',
+          name: routeName,
+          component: () => import('@/views/platform/plugin/runtime-page.vue'),
+          meta: {
+            ...routeMeta,
+            menu: false,
+            breadcrumb: false,
+          },
+        }],
+      }
+    }
+    function pluginParentPath(route: any) {
+      const explicit = normalizePluginPath(route.parentPath)
+      if (explicit) {
+        return explicit
+      }
+      const routePath = normalizePluginPath(route.path)
+      const index = routePath.lastIndexOf('/')
+      return index > 0 ? routePath.slice(0, index) : routePath
+    }
+    function normalizePluginPath(path?: string) {
+      const value = textValue(path)
+      if (!value) {
+        return ''
+      }
+      const withSlash = value.startsWith('/') ? value : `/${value}`
+      return withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash
+    }
+    function textValue(value?: string) {
+      return typeof value === 'string' ? value.trim() : ''
+    }
+    function pluginMenuKey(module: any) {
+      return textValue(module.menuTitle) || 'legacy'
+    }
+    function safeRouteName(pluginCode: string, path: string) {
+      return `${pluginCode}-${path}`.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
     }
     async function generateRoutesAtBack() {
       const res = await apiApp.routeList()

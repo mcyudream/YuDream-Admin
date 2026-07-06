@@ -25,6 +25,7 @@ public class PluginModuleInfraMapper {
         dataObj.setErrorMessage(module.getErrorMessage());
         dataObj.setLoadedAt(module.getLoadedAt());
         dataObj.setEnabledAt(module.getEnabledAt());
+        dataObj.setFrontendSortSettings(module.getFrontendSortSettings());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -48,6 +49,7 @@ public class PluginModuleInfraMapper {
                 .errorMessage(dataObj.getErrorMessage())
                 .loadedAt(dataObj.getLoadedAt())
                 .enabledAt(dataObj.getEnabledAt())
+                .frontendSortSettings(dataObj.getFrontendSortSettings())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())

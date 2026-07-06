@@ -50,6 +50,7 @@ public class MenuDomainService {
         List<Menu> synced = new ArrayList<>();
         for (Menu menu : flattened) {
             if (syncMode == SeedSyncMode.MISSING_ONLY && menuRepo.existsByCode(menu.getCode())) {
+                upsertMenuPermission(menu);
                 continue;
             }
             synced.add(syncMenu(menu));
@@ -65,9 +66,6 @@ public class MenuDomainService {
     }
 
     private void upsertMenuPermission(Menu menu) {
-        if (menu.getType() == MenuNodeType.CATEGORY || menu.getType() == MenuNodeType.LAYOUT) {
-            return;
-        }
         String permissionCode = menu.getPermissionCode();
         Permission permission = permissionRepo.findByCode(permissionCode)
                 .orElseGet(() -> Permission.create(permissionCode, menu.getName(), menu.getModule(), "菜单权限"));

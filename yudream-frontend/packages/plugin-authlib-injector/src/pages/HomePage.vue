@@ -4,7 +4,7 @@
       <div>
         <span>Authlib Injector</span>
         <h2>Yggdrasil 认证服务</h2>
-        <p>基于 Blessing Skin 插件提供的角色与材质资料，对外提供 Minecraft 启动器和服务端可使用的认证协议端点。</p>
+        <p>基于系统用户认证与 yudream-skin 角色、材质资料，对外提供 Minecraft 启动器和服务端可使用的认证协议端点。</p>
       </div>
       <div class="hero-actions">
         <FaButton :loading="model.loading" variant="outline" @click="model.load">
