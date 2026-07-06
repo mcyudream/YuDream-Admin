@@ -951,43 +951,72 @@ function splitModelList(value: string) {
                   添加模型
                 </FaButton>
               </div>
-              <div class="ai-model-table">
-                <div class="ai-model-head">
-                  <span>编码</span>
-                  <span>名称</span>
-                  <span>模型名</span>
-                  <span>类型</span>
-                  <span>参数</span>
-                  <span>能力</span>
-                  <span>操作</span>
-                </div>
-                <div v-for="(model, modelIndex) in provider.models" :key="modelIndex" class="ai-model-row">
-                  <FaInput v-model="model.code" placeholder="gpt-4o-mini" @blur="syncAiDefaults" />
-                  <FaInput v-model="model.name" placeholder="GPT-4o mini" />
-                  <FaInput v-model="model.model" placeholder="gpt-4o-mini" />
-                  <FaSelect v-model="model.kind" :options="aiModelKindOptions" class="w-full" />
-                  <div class="ai-model-params">
-                    <FaInput v-model="model.temperature" type="number" placeholder="温度" />
-                    <FaInput v-model="model.reasoningEffort" placeholder="推理强度" />
+              <div class="ai-model-list">
+                <div v-for="(model, modelIndex) in provider.models" :key="modelIndex" class="ai-model-card">
+                  <div class="ai-model-card__head">
+                    <div class="ai-model-card__identity">
+                      <strong>{{ model.name || model.code || `模型 ${modelIndex + 1}` }}</strong>
+                      <span>{{ model.model || '未配置模型名' }}</span>
+                    </div>
+                    <FaButton
+                      size="sm"
+                      variant="ghost"
+                      :disabled="provider.models.length <= 1"
+                      title="删除模型"
+                      @click="removeAiModel(provider, modelIndex)"
+                    >
+                      <FaIcon name="i-ri:delete-bin-line" />
+                    </FaButton>
                   </div>
-                  <div class="ai-model-switches">
-                    <label>
-                      <span>思考</span>
-                      <FaSwitch v-model="model.thinkingEnabled" />
+
+                  <div class="ai-model-basic">
+                    <label class="config-field">
+                      <span>编码</span>
+                      <FaInput v-model="model.code" placeholder="gpt-4o-mini" @blur="syncAiDefaults" />
                     </label>
-                    <label>
-                      <span>视觉</span>
-                      <FaSwitch v-model="model.vision" />
+                    <label class="config-field">
+                      <span>名称</span>
+                      <FaInput v-model="model.name" placeholder="GPT-4o mini" />
+                    </label>
+                    <label class="config-field">
+                      <span>模型名</span>
+                      <FaInput v-model="model.model" placeholder="gpt-4o-mini" />
+                    </label>
+                    <label class="config-field">
+                      <span>类型</span>
+                      <FaSelect v-model="model.kind" :options="aiModelKindOptions" class="w-full" />
                     </label>
                   </div>
-                  <FaButton
-                    size="sm"
-                    variant="ghost"
-                    :disabled="provider.models.length <= 1"
-                    @click="removeAiModel(provider, modelIndex)"
-                  >
-                    <FaIcon name="i-ri:delete-bin-line" />
-                  </FaButton>
+
+                  <div class="ai-model-options">
+                    <div class="ai-model-option-group">
+                      <span class="ai-model-group-title">参数</span>
+                      <div class="ai-model-params">
+                        <label class="config-field">
+                          <span>温度</span>
+                          <FaInput v-model="model.temperature" type="number" placeholder="0.4" />
+                        </label>
+                        <label class="config-field">
+                          <span>推理强度</span>
+                          <FaInput v-model="model.reasoningEffort" placeholder="medium" />
+                        </label>
+                      </div>
+                    </div>
+                    <div class="ai-model-option-group">
+                      <span class="ai-model-group-title">能力</span>
+                      <div class="ai-model-switches">
+                        <label>
+                          <span>思考</span>
+                          <FaSwitch v-model="model.thinkingEnabled" />
+                        </label>
+                        <label>
+                          <span>视觉</span>
+                          <FaSwitch v-model="model.vision" />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
                   <label class="config-field ai-model-extra">
                     <span>模型额外请求体</span>
                     <FaTextarea v-model="model.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
@@ -1379,55 +1408,104 @@ function splitModelList(value: string) {
   font-weight: 700;
 }
 
-.ai-model-table {
+.ai-model-list {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
-.ai-model-head,
-.ai-model-row {
+.ai-model-card {
   display: grid;
-  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) minmax(150px, 1.2fr) minmax(110px, 0.8fr) minmax(190px, 1.2fr) minmax(130px, 0.8fr) 56px;
-  gap: 8px;
-  align-items: center;
-}
-
-.ai-model-head {
-  padding: 0 2px;
-  color: var(--color-text-3);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.ai-model-row {
-  padding: 10px;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-1);
 }
 
+.ai-model-card__head {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.ai-model-card__identity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.ai-model-card__identity strong,
+.ai-model-card__identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-model-card__identity strong {
+  color: var(--color-text-1);
+}
+
+.ai-model-card__identity span {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.ai-model-basic {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.ai-model-options {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 240px);
+  gap: 10px;
+  align-items: end;
+}
+
+.ai-model-option-group {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.ai-model-group-title {
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .ai-model-params {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .ai-model-switches {
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .ai-model-switches label {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   justify-content: space-between;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
   color: var(--color-text-2);
   font-size: 12px;
 }
 
 .ai-model-extra {
-  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .ok {
@@ -1464,7 +1542,8 @@ function splitModelList(value: string) {
   }
 
   .ai-provider-header,
-  .ai-model-title {
+  .ai-model-title,
+  .ai-model-card__head {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1473,15 +1552,10 @@ function splitModelList(value: string) {
     justify-content: flex-start;
   }
 
-  .ai-model-head {
-    display: none;
-  }
-
-  .ai-model-row {
-    grid-template-columns: 1fr;
-  }
-
-  .ai-model-params {
+  .ai-model-basic,
+  .ai-model-options,
+  .ai-model-params,
+  .ai-model-switches {
     grid-template-columns: 1fr;
   }
 }
