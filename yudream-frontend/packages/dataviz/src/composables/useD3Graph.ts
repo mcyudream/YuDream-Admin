@@ -88,7 +88,7 @@ export function useD3Graph(
       .data(nodes)
       .join('circle')
       .attr('r', d => radius(d))
-      .attr('fill', (d, i) => {
+      .attr('fill', (_d, i) => {
         const colors = themeConfig.colors
         return colors.length > 0 ? colors[i % colors.length] : '#3b82f6'
       })

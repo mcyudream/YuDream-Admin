@@ -15,8 +15,6 @@ import DashboardRemotePluginCard from './dashboard/DashboardRemotePluginCard.vue
 import { toneIconClass } from './dashboard/tone.ts'
 import 'gridstack/dist/gridstack.min.css'
 
-type DashboardKey = 'administrator' | 'people' | 'content' | 'platform' | 'monitor' | 'personal'
-
 const BREAKPOINTS: DashboardBreakpoint[] = ['lg', 'md', 'sm', 'xs']
 const BREAKPOINT_COLUMNS: Record<DashboardBreakpoint, number> = {
   lg: 12,

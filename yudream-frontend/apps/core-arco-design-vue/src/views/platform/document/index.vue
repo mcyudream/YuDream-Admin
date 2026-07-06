@@ -444,7 +444,7 @@ function generationVariant(status: GenerationStatus) {
 
     <FaModal v-model="generateVisible" title="生成 Word 文档" show-cancel-button class="sm:max-w-4xl" :confirm-loading="actionLoading === 'generate'" @confirm="generate">
       <div class="generate-grid">
-        <a-form layout="vertical">
+        <a-form :model="{}" layout="vertical">
           <a-form-item label="生成数据 JSON">
             <FaTextarea v-model="generateDataJson" rows="14" input-class="font-mono" />
           </a-form-item>

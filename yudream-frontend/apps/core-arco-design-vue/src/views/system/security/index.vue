@@ -30,7 +30,6 @@ const oauthPane = ref<OAuthPane>('clients')
 const loading = ref(false)
 const savingPolicy = ref(false)
 const creating = ref(false)
-const actionLoading = ref('')
 
 const apiKeyRows = ref<ApiKeyCredential[]>([])
 const oauthClients = ref<OAuthClient[]>([])
@@ -579,7 +578,10 @@ function splitTextarea(value?: string[]) {
   return (value || []).join('\n')
 }
 
-function updateList(target: string[], value: string) {
+function updateList(target: string[], value: string | undefined) {
+  if (value === undefined) {
+    return
+  }
   target.splice(0, target.length, ...value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean))
 }
 
@@ -856,10 +858,10 @@ function normalizeDateTime(value?: string) {
           </a-checkbox-group>
         </a-form-item>
         <a-form-item label="回调地址（一行一个）">
-          <FaTextarea :model-value="splitTextarea(oauthClientForm.redirectUris)" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />
+          <FaTextarea :model-value="splitTextarea(oauthClientForm.redirectUris || [])" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />
         </a-form-item>
         <a-form-item label="授权范围（一行或逗号分隔）">
-          <FaTextarea :model-value="splitTextarea(oauthClientForm.scopes)" rows="3" @update:model-value="value => updateList(oauthClientForm.scopes, value)" />
+          <FaTextarea :model-value="splitTextarea(oauthClientForm.scopes || [])" rows="3" @update:model-value="value => updateList(oauthClientForm.scopes, value)" />
         </a-form-item>
       </a-form>
     </FaModal>
@@ -902,7 +904,7 @@ function normalizeDateTime(value?: string) {
           <FaInput v-model="oauthProviderForm.redirectUri" />
         </a-form-item>
         <a-form-item label="授权范围（一行或逗号分隔）">
-          <FaTextarea :model-value="splitTextarea(oauthProviderForm.scopes)" rows="3" @update:model-value="value => updateList(oauthProviderForm.scopes, value)" />
+          <FaTextarea :model-value="splitTextarea(oauthProviderForm.scopes || [])" rows="3" @update:model-value="value => updateList(oauthProviderForm.scopes, value)" />
         </a-form-item>
       </a-form>
     </FaModal>

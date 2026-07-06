@@ -395,7 +395,7 @@ function queryStatusVariant(status: GraphQueryStatus) {
 
     <FaModal v-model="queryVisible" title="执行 Cypher 查询" show-cancel-button class="sm:max-w-5xl" :confirm-loading="actionLoading === 'query'" @confirm="runQuery">
       <div class="query-grid">
-        <a-form layout="vertical">
+        <a-form :model="{}" layout="vertical">
           <a-form-item label="Cypher">
             <FaTextarea v-model="queryForm.cypher" rows="10" input-class="font-mono" />
           </a-form-item>

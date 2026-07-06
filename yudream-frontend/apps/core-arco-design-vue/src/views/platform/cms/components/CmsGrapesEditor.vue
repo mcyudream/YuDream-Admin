@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type grapesjs from 'grapesjs'
+import type * as grapesjs from 'grapesjs'
 import type { Editor } from 'grapesjs'
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { FileObject } from '@/api/modules/files'
@@ -94,7 +94,8 @@ const rightPanelTabs = computed(() => {
 
 const canvasStats = computed(() => {
   canvasRevision.value
-  if (!editor) {
+  const instance = editor
+  if (!instance) {
     return [
       { label: 'HTML', value: '待加载' },
       { label: 'CSS', value: '待加载' },
@@ -102,9 +103,9 @@ const canvasStats = computed(() => {
     ]
   }
   return [
-    { label: 'HTML', value: `${editor.getHtml().length} 字符` },
-    { label: 'CSS', value: `${editor.getCss().length} 字符` },
-    { label: '项目源', value: `${JSON.stringify(editor.getProjectData()).length} 字符` },
+    { label: 'HTML', value: `${instance.getHtml().length} 字符` },
+    { label: 'CSS', value: `${(instance.getCss() || '').length} 字符` },
+    { label: '项目源', value: `${JSON.stringify(instance.getProjectData()).length} 字符` },
   ]
 })
 
@@ -150,12 +151,12 @@ const aiSenderProps = computed(() => ({
   onFileRemove: (event: CustomEvent<any[]>) => {
     aiAttachments.value = event.detail || []
   },
-}))
+} as any))
 
 const aiMessageProps = {
   avatar: (item: { role?: string }) => item.role === 'user' ? '你' : 'AI',
   name: (item: { role?: string }) => item.role === 'user' ? '你' : 'YuDream AI',
-}
+} as any
 
 function normalizeAiStreamChunk(chunk: SSEChunkData): AiStreamEnvelope<Record<string, any>> {
   const data = (chunk.data || {}) as AiStreamEnvelope<Record<string, any>> & Record<string, any>
@@ -369,7 +370,7 @@ function save() {
   removeLayoutBlocks(editor)
   emit('save', {
     htmlContent: editor.getHtml(),
-    cssContent: editor.getCss(),
+    cssContent: editor.getCss() || '',
     builderProjectJson: JSON.stringify(editor.getProjectData()),
   })
 }
@@ -860,7 +861,7 @@ function registerDynamicTypes(instance: Editor) {
 }
 
 function registerBlocks(instance: Editor) {
-  cmsBlocks().forEach(block => instance.BlockManager.add(block.id, block))
+  cmsBlocks().forEach(block => instance.BlockManager.add(block.id || '', block))
 }
 
 function cmsBlocks(): grapesjs.BlockProperties[] {

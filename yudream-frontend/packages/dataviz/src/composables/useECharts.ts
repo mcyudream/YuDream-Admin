@@ -65,7 +65,6 @@ export function useECharts(
 
   watchEffect(() => {
     const el = elRef.value
-    const _theme = unref(theme)
     if (!el) {
       return
     }

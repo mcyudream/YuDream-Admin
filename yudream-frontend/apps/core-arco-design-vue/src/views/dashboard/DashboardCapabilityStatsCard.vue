@@ -26,7 +26,7 @@ const mainTypes = computed(() => {
   return Array.from(groups.entries())
     .sort((left, right) => right[1] - left[1])
     .slice(0, 3)
-    .map(([type, count]) => `${typeText(type)} ${count}`)
+    .map(([type, count]) => `${typeText(type as CapabilityItem['type'])} ${count}`)
     .join(' / ')
 })
 
