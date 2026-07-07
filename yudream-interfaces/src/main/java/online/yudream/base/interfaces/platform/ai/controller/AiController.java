@@ -10,6 +10,7 @@ import online.yudream.base.interfaces.platform.ai.assembler.AiWebAssembler;
 import online.yudream.base.interfaces.platform.ai.request.CmsPageGenerateRequest;
 import online.yudream.base.interfaces.platform.ai.res.AiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -32,6 +34,9 @@ public class AiController {
 
     private final AiAppService aiAppService;
 
+    @Value("${yudream.platform.ai.client.sse-timeout:10m}")
+    private Duration sseTimeout;
+
     @PostMapping("/cms/pages/generate")
     @PermissionRegister(code = "platform:ai:generate", name = "AI 生成页面", module = "平台能力", desc = "使用 AI 为 CMS 生成页面草稿")
     public Result<CmsPageGenerateRes> generateCmsPage(@Valid @RequestBody CmsPageGenerateRequest request) {
@@ -41,7 +46,7 @@ public class AiController {
     @PostMapping(value = "/cms/pages/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PermissionRegister(code = "platform:ai:generate", name = "AI 流式生成页面", module = "平台能力", desc = "使用 AI 为 CMS 流式生成页面草稿")
     public SseEmitter streamCmsPage(@Valid @RequestBody CmsPageGenerateRequest request) {
-        SseEmitter emitter = new SseEmitter(180_000L);
+        SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
         String traceId = UUID.randomUUID().toString();
         CompletableFuture.runAsync(() -> {
             AtomicBoolean running = new AtomicBoolean(true);
