@@ -1,5 +1,7 @@
 package online.yudream.base.domain.system.user.service;
 
+import online.yudream.base.domain.system.user.valobj.EmailVerifyTarget;
+
 import java.util.Optional;
 
 /**
@@ -7,9 +9,9 @@ import java.util.Optional;
  */
 public interface EmailVerifyTokenProvider {
 
-    String generate(String email);
+    String generate(Long userId, String email);
 
-    Optional<String> validate(String token);
+    Optional<EmailVerifyTarget> validate(String token);
 
     void remove(String token);
 }

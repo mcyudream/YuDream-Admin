@@ -33,6 +33,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -75,7 +76,9 @@ public class UserManageAppService {
         user.replaceDepts(useDefaultDept ? defaultUserDepts() : resolveUserDepts(cmd.getDepts()));
         user.replaceRoles(defaultRoleIdsIfNecessary(cmd.getRoleIds(), useDefaultDept));
         ensureRolesBelongToUserDepts(user);
-        return toDTO(userRepo.save(user));
+        User saved = userRepo.save(user);
+        deleteSameEmailUnverifiedUsers(saved);
+        return toDTO(saved);
     }
 
     @Transactional
@@ -83,7 +86,9 @@ public class UserManageAppService {
         User user = getUser(cmd.getId());
         ensureUserUnique(user.getId(), user.getUsername(), cmd.getEmail(), cmd.getPhone(), cmd.getQq());
         user.updateProfile(cmd.getNickname(), toEmail(cmd.getEmail()), toPhone(cmd.getPhone()), toQQ(cmd.getQq()), cmd.getEmailVerified());
-        return toDTO(userRepo.save(user));
+        User saved = userRepo.save(user);
+        deleteSameEmailUnverifiedUsers(saved);
+        return toDTO(saved);
     }
 
     @Transactional
@@ -133,13 +138,10 @@ public class UserManageAppService {
     }
 
     private void ensureUserUnique(Long excludeId, String username, String email, String phone, String qq) {
-        if (excludeId == null && userRepo.existsByUsername(username)) {
+        if (existsOtherVerifiedByUsername(username, excludeId)) {
             throw new BizException("用户名已存在");
         }
-        if (excludeId != null && userRepo.existsByUsernameExcludeId(username, excludeId)) {
-            throw new BizException("用户名已存在");
-        }
-        if (StringUtils.hasText(email) && userRepo.existsByEmailExcludeId(email, excludeId)) {
+        if (StringUtils.hasText(email) && existsOtherVerifiedByEmail(email, excludeId)) {
             throw new BizException("邮箱已存在");
         }
         if (StringUtils.hasText(phone) && userRepo.existsByPhoneExcludeId(phone, excludeId)) {
@@ -148,6 +150,36 @@ public class UserManageAppService {
         if (StringUtils.hasText(qq) && userRepo.existsByQQExcludeId(qq, excludeId)) {
             throw new BizException("QQ已存在");
         }
+    }
+
+    private boolean existsOtherVerifiedByUsername(String username, Long excludeId) {
+        if (!StringUtils.hasText(username)) {
+            return false;
+        }
+        return userRepo.findByUsernameAll(username).stream()
+                .anyMatch(user -> !Objects.equals(user.getId(), excludeId) && user.isEmailVerified());
+    }
+
+    private boolean existsOtherVerifiedByEmail(String email, Long excludeId) {
+        if (!StringUtils.hasText(email)) {
+            return false;
+        }
+        return userRepo.findByEmailAll(email).stream()
+                .anyMatch(user -> !Objects.equals(user.getId(), excludeId) && user.isEmailVerified());
+    }
+
+    private void deleteSameEmailUnverifiedUsers(User verifiedUser) {
+        if (verifiedUser == null || !verifiedUser.isEmailVerified()
+                || verifiedUser.getEmail() == null || !StringUtils.hasText(verifiedUser.getEmail().getValue())) {
+            return;
+        }
+        List<Long> duplicateIds = userRepo.findByEmailAll(verifiedUser.getEmail().getValue()).stream()
+                .filter(user -> !Objects.equals(user.getId(), verifiedUser.getId()))
+                .filter(user -> !user.isEmailVerified())
+                .map(User::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        userRepo.deleteByIds(duplicateIds);
     }
 
     private List<RoleID> resolveRoleIds(List<Long> roleIds) {

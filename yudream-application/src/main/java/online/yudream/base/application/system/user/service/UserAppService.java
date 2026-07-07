@@ -23,6 +23,7 @@ import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.service.EmailVerifyTokenProvider;
 import online.yudream.base.domain.system.user.service.UserRegisterMailSender;
 import online.yudream.base.domain.system.user.valobj.DeptID;
+import online.yudream.base.domain.system.user.valobj.EmailVerifyTarget;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
@@ -33,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
+import java.util.List;
+import java.util.Objects;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -49,11 +52,7 @@ public class UserAppService {
 
     @Transactional(readOnly = true)
     public User login(UserLoginCmd cmd) {
-        User user = userRepo.findByUsername(cmd.getUsername())
-                .orElseThrow(() -> new BizException("用户名或密码错误"));
-        if (!user.getPassword().matches(cmd.getPassword(), passwordEncoder)) {
-            throw new BizException("用户名或密码错误");
-        }
+        User user = findLoginUser(cmd);
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
         }
@@ -63,11 +62,11 @@ public class UserAppService {
 
     @Transactional
     public UserRegisterDTO register(UserRegisterCmd cmd) {
-        if (userRepo.existsByUsername(cmd.getUsername())) {
+        if (userRepo.existsVerifiedByUsername(cmd.getUsername())) {
             throw new BizException("用户名已存在");
         }
         Email email = Email.of(cmd.getEmail());
-        if (userRepo.existsByEmail(email.getValue())) {
+        if (userRepo.existsVerifiedByEmail(email.getValue())) {
             throw new BizException("邮箱已被注册");
         }
 
@@ -88,7 +87,7 @@ public class UserAppService {
 
         User saved = userRepo.save(user);
 
-        String token = emailVerifyTokenProvider.generate(email.getValue());
+        String token = emailVerifyTokenProvider.generate(saved.getId(), email.getValue());
         userRegisterMailSender.sendVerifyEmail(saved.getUsername(), email.getValue(), token);
 
         log.info("用户注册成功: id={}, username={}, email={}, deptId={}, roleId={}",
@@ -98,14 +97,18 @@ public class UserAppService {
 
     @Transactional
     public void verifyEmail(String token) {
-        String email = emailVerifyTokenProvider.validate(token)
+        EmailVerifyTarget target = emailVerifyTokenProvider.validate(token)
                 .orElseThrow(() -> new BizException("验证链接已过期或无效"));
-        User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new BizException("用户不存在"));
+        User user = resolveEmailVerifyUser(target);
+        String email = userEmail(user);
+        List<User> sameEmailUsers = userRepo.findByEmailAll(email);
+        ensureEmailCanBeVerified(user, sameEmailUsers);
+        ensureUsernameCanBeVerified(user);
         user.verifyEmail();
         userRepo.save(user);
+        int removedCount = deleteSameEmailUnverifiedUsers(user, sameEmailUsers);
         emailVerifyTokenProvider.remove(token);
-        log.info("邮箱验证成功: id={}, email={}", user.getId(), email);
+        log.info("邮箱验证成功: id={}, email={}, removedUnverified={}", user.getId(), email, removedCount);
     }
 
     @Transactional
@@ -119,7 +122,7 @@ public class UserAppService {
             throw new BizException("当前账户未设置邮箱");
         }
         String email = user.getEmail().getValue();
-        String token = emailVerifyTokenProvider.generate(email);
+        String token = emailVerifyTokenProvider.generate(user.getId(), email);
         userRegisterMailSender.sendVerifyEmail(user.getUsername(), email, token);
         log.info("重新发送邮箱验证邮件: id={}, email={}", user.getId(), email);
     }
@@ -173,6 +176,77 @@ public class UserAppService {
 
     public String avatarUrl(User user) {
         return user == null ? null : fileAppService.fileUrl(user.getAvatarFileId());
+    }
+
+    private User findLoginUser(UserLoginCmd cmd) {
+        return userRepo.findByUsernameAll(cmd.getUsername()).stream()
+                .filter(user -> user.getPassword() != null && user.getPassword().matches(cmd.getPassword(), passwordEncoder))
+                .findFirst()
+                .orElseThrow(() -> new BizException("用户名或密码错误"));
+    }
+
+    private User resolveEmailVerifyUser(EmailVerifyTarget target) {
+        if (target.userId() != null) {
+            User user = userRepo.findById(target.userId())
+                    .orElseThrow(() -> new BizException("用户不存在"));
+            String currentEmail = userEmail(user);
+            if (!currentEmail.equalsIgnoreCase(target.email())) {
+                throw new BizException("验证链接已失效，请重新发送验证邮件");
+            }
+            return user;
+        }
+        return resolveLegacyEmailVerifyUser(target.email());
+    }
+
+    private User resolveLegacyEmailVerifyUser(String email) {
+        List<User> users = userRepo.findByEmailAll(email);
+        if (users.isEmpty()) {
+            throw new BizException("用户不存在");
+        }
+        List<User> unverifiedUsers = users.stream()
+                .filter(user -> !user.isEmailVerified())
+                .toList();
+        if (unverifiedUsers.size() == 1) {
+            return unverifiedUsers.get(0);
+        }
+        if (users.size() == 1) {
+            return users.get(0);
+        }
+        throw new BizException("验证链接已失效，请重新发送验证邮件");
+    }
+
+    private String userEmail(User user) {
+        if (user.getEmail() == null || !StringUtils.hasText(user.getEmail().getValue())) {
+            throw new BizException("当前账户未设置邮箱");
+        }
+        return user.getEmail().getValue();
+    }
+
+    private void ensureEmailCanBeVerified(User user, List<User> sameEmailUsers) {
+        boolean usedByOtherVerifiedUser = sameEmailUsers.stream()
+                .anyMatch(candidate -> !Objects.equals(candidate.getId(), user.getId()) && candidate.isEmailVerified());
+        if (usedByOtherVerifiedUser) {
+            throw new BizException("邮箱已被验证用户使用");
+        }
+    }
+
+    private void ensureUsernameCanBeVerified(User user) {
+        boolean usedByOtherVerifiedUser = userRepo.findByUsernameAll(user.getUsername()).stream()
+                .anyMatch(candidate -> !Objects.equals(candidate.getId(), user.getId()) && candidate.isEmailVerified());
+        if (usedByOtherVerifiedUser) {
+            throw new BizException("用户名已被验证用户使用");
+        }
+    }
+
+    private int deleteSameEmailUnverifiedUsers(User verifiedUser, List<User> sameEmailUsers) {
+        List<Long> duplicateIds = sameEmailUsers.stream()
+                .filter(candidate -> !Objects.equals(candidate.getId(), verifiedUser.getId()))
+                .filter(candidate -> !candidate.isEmailVerified())
+                .map(User::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        userRepo.deleteByIds(duplicateIds);
+        return duplicateIds.size();
     }
 
     private UserProfileDTO toProfileDTO(User user) {

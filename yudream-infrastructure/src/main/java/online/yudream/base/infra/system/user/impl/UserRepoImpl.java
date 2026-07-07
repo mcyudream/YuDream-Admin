@@ -8,6 +8,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.infra.system.user.dataobj.UserDO;
 import online.yudream.base.infra.system.user.mapper.UserInfraMapper;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -49,9 +50,19 @@ public class UserRepoImpl implements UserRepo {
     }
 
     @Override
+    public boolean existsVerifiedByUsername(String username) {
+        return existsVerified("username", username);
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         Query query = Query.query(Criteria.where("email").is(email));
         return mongoTemplate.exists(query, UserDO.class);
+    }
+
+    @Override
+    public boolean existsVerifiedByEmail(String email) {
+        return existsVerified("email", email);
     }
 
     @Override
@@ -74,16 +85,22 @@ public class UserRepoImpl implements UserRepo {
 
     @Override
     public Optional<User> findByUsername(String username) {
-        Query query = Query.query(Criteria.where("username").is(username));
-        UserDO userDO = mongoTemplate.findOne(query, UserDO.class);
-        return Optional.ofNullable(UserInfraMapper.toDomain(userDO));
+        return findByUsernameAll(username).stream().findFirst();
+    }
+
+    @Override
+    public List<User> findByUsernameAll(String username) {
+        return findAllByField("username", username);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
-        Query query = Query.query(Criteria.where("email").is(email));
-        UserDO userDO = mongoTemplate.findOne(query, UserDO.class);
-        return Optional.ofNullable(UserInfraMapper.toDomain(userDO));
+        return findByEmailAll(email).stream().findFirst();
+    }
+
+    @Override
+    public List<User> findByEmailAll(String email) {
+        return findAllByField("email", email);
     }
 
     @Override
@@ -101,6 +118,14 @@ public class UserRepoImpl implements UserRepo {
         return mongoTemplate.find(query, UserDO.class).stream()
                 .map(UserInfraMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public void deleteByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        mongoTemplate.remove(Query.query(Criteria.where("id").in(ids)), UserDO.class);
     }
 
     @Override
@@ -187,5 +212,28 @@ public class UserRepoImpl implements UserRepo {
             query.addCriteria(Criteria.where("id").ne(excludeId));
         }
         return mongoTemplate.exists(query, UserDO.class);
+    }
+
+    private boolean existsVerified(String field, String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        Query query = Query.query(Criteria.where(field).is(value).and("emailVerified").is(true));
+        return mongoTemplate.exists(query, UserDO.class);
+    }
+
+    private List<User> findAllByField(String field, String value) {
+        if (!StringUtils.hasText(value)) {
+            return Collections.emptyList();
+        }
+        Query query = Query.query(Criteria.where(field).is(value))
+                .with(Sort.by(
+                        Sort.Order.desc("emailVerified"),
+                        Sort.Order.desc("createTime"),
+                        Sort.Order.desc("id")
+                ));
+        return mongoTemplate.find(query, UserDO.class).stream()
+                .map(UserInfraMapper::toDomain)
+                .toList();
     }
 }
