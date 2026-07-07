@@ -17,4 +17,5 @@ import java.util.List;
 public class PermissionListVO {
 
     private List<String> permissions;
+    private boolean emailVerified;
 }

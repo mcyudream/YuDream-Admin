@@ -211,6 +211,15 @@ function handleLogin() {
   .login-form {
     width: 500px;
     transition: height 0.15s ease;
+
+    :deep(input:is(:autofill, :-webkit-autofill)),
+    :deep(input:is(:autofill, :-webkit-autofill):hover),
+    :deep(input:is(:autofill, :-webkit-autofill):focus) {
+      box-shadow: 0 0 0 1000px oklch(var(--background)) inset !important;
+      caret-color: oklch(var(--foreground));
+      -webkit-text-fill-color: oklch(var(--foreground)) !important;
+      transition: background-color 9999s ease-out, color 9999s ease-out;
+    }
   }
 }
 

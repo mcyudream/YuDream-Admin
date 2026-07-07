@@ -6,6 +6,7 @@ import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
+import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.PermissionRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
@@ -38,6 +39,9 @@ public class PermissionAppService {
     public List<String> getUserPermissions(Long userId) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new BizException("用户不存在"));
+        if (user.getStatus() != UserStatus.ACTIVE || !user.isEmailVerified()) {
+            return List.of();
+        }
 
         Set<String> permissions = new HashSet<>();
         for (RoleID roleId : user.getRoles()) {

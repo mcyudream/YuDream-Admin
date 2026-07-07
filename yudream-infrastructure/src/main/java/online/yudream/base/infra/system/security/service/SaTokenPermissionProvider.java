@@ -6,6 +6,7 @@ import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
+import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
@@ -29,7 +30,7 @@ public class SaTokenPermissionProvider implements StpInterface {
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
         User user = getUser(loginId);
-        if (user == null || user.getRoles() == null) {
+        if (user == null || user.getRoles() == null || user.getStatus() != UserStatus.ACTIVE || !user.isEmailVerified()) {
             return List.of();
         }
         Set<String> permissions = new HashSet<>();
@@ -53,7 +54,7 @@ public class SaTokenPermissionProvider implements StpInterface {
     @Override
     public List<String> getRoleList(Object loginId, String loginType) {
         User user = getUser(loginId);
-        if (user == null || user.getRoles() == null) {
+        if (user == null || user.getRoles() == null || user.getStatus() != UserStatus.ACTIVE || !user.isEmailVerified()) {
             return List.of();
         }
         List<String> roles = new ArrayList<>();

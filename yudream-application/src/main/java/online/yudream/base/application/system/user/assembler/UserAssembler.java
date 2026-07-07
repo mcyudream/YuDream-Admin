@@ -43,6 +43,7 @@ public class UserAssembler {
                 .email(user.getEmail() == null ? null : user.getEmail().getValue())
                 .phone(user.getPhone() == null ? null : user.getPhone().getValue())
                 .qq(user.getQq() == null ? null : user.getQq().getValue())
+                .emailVerified(user.isEmailVerified())
                 .avatarFileId(user.getAvatarFileId())
                 .avatar(avatar)
                 .createTime(user.getCreateTime())

@@ -21,7 +21,10 @@ const routeInfo = useRoute()
 const appSettingsStore = useAppSettingsStore()
 const appKeepAliveStore = useAppKeepAliveStore()
 const appMenuStore = useAppMenuStore()
+const appAccountStore = useAppAccountStore()
 const mainPage = useAppPage()
+const toast = useFaToast()
+const verificationMailSending = ref(false)
 
 useHotkeyBindings({
   'page.reload': () => {
@@ -130,6 +133,17 @@ onBeforeUnmount(() => {
   eventBus.off('topbar-scroll-visible-or-hidden', handleTopbarScrollVisibleOrHidden)
 })
 
+async function resendVerificationEmail() {
+  verificationMailSending.value = true
+  try {
+    await appAccountStore.resendVerificationEmail()
+    toast.success('验证邮件已重新发送')
+  }
+  finally {
+    verificationMailSending.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -168,7 +182,18 @@ onBeforeUnmount(() => {
           }"
         >
           <Topbar :enable="isTopbarEnable" :enable-tabbar="isTabbarEnable" :enable-toolbar="isToolbarEnable" />
-          <div id="fixed-content-before-area" ref="fixedContentBeforeAreaRef" class="shadow-[0_1px_0_0_oklch(var(--border)),0_-1px_0_0_oklch(var(--border))] relative z-1 empty:hidden" />
+          <div id="fixed-content-before-area" ref="fixedContentBeforeAreaRef" class="shadow-[0_1px_0_0_oklch(var(--border)),0_-1px_0_0_oklch(var(--border))] relative z-1 empty:hidden">
+            <div v-if="appAccountStore.isEmailUnverified" class="email-verification-banner">
+              <div class="email-verification-banner__content">
+                <FaIcon name="i-ri:mail-warning-line" />
+                <span>当前账户未验证无法使用其他功能，或者点击重新发送验证邮件</span>
+              </div>
+              <FaButton size="sm" variant="outline" :loading="verificationMailSending" @click="resendVerificationEmail">
+                <FaIcon name="i-ri:mail-send-line" />
+                重新发送验证邮件
+              </FaButton>
+            </div>
+          </div>
         </div>
         <div id="app-content" class="main">
           <RouterView v-slot="{ Component, route }">
@@ -226,6 +251,30 @@ onBeforeUnmount(() => {
   height: 100%;
   margin: 0 auto;
   transition: width 0.3s;
+}
+
+.email-verification-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 8px 16px;
+  color: rgb(var(--warning-7, 245 158 11));
+  background: rgb(var(--warning-1, 255 251 235));
+}
+
+.email-verification-banner__content {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.email-verification-banner__content span {
+  overflow-wrap: anywhere;
 }
 
 .wrapper {
@@ -297,6 +346,13 @@ onBeforeUnmount(() => {
       background-color: oklch(var(--background));
       box-shadow: -1px 0 0 0 oklch(var(--border)), 1px 0 0 0 oklch(var(--border)), 0 -1px 0 0 oklch(var(--border));
     }
+  }
+}
+
+@media (width <= 640px) {
+  .email-verification-banner {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

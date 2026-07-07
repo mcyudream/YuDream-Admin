@@ -57,9 +57,6 @@ public class UserAppService {
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
         }
-        if (!user.isEmailVerified()) {
-            throw new BizException("邮箱未验证，请先验证邮箱");
-        }
         log.info("用户登录成功: id={}, username={}", user.getId(), user.getUsername());
         return user;
     }
@@ -109,6 +106,29 @@ public class UserAppService {
         userRepo.save(user);
         emailVerifyTokenProvider.remove(token);
         log.info("邮箱验证成功: id={}, email={}", user.getId(), email);
+    }
+
+    @Transactional
+    public void resendVerificationEmail(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new BizException("用户不存在"));
+        if (user.isEmailVerified()) {
+            throw new BizException("邮箱已验证，无需重复发送");
+        }
+        if (user.getEmail() == null || !StringUtils.hasText(user.getEmail().getValue())) {
+            throw new BizException("当前账户未设置邮箱");
+        }
+        String email = user.getEmail().getValue();
+        String token = emailVerifyTokenProvider.generate(email);
+        userRegisterMailSender.sendVerifyEmail(user.getUsername(), email, token);
+        log.info("重新发送邮箱验证邮件: id={}, email={}", user.getId(), email);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isEmailVerified(Long userId) {
+        return userRepo.findById(userId)
+                .map(User::isEmailVerified)
+                .orElse(false);
     }
 
     @Transactional(readOnly = true)
@@ -163,6 +183,7 @@ public class UserAppService {
                 .email(user.getEmail() == null ? null : user.getEmail().getValue())
                 .phone(user.getPhone() == null ? null : user.getPhone().getValue())
                 .qq(user.getQq() == null ? null : user.getQq().getValue())
+                .emailVerified(user.isEmailVerified())
                 .avatarFileId(user.getAvatarFileId())
                 .avatar(avatarUrl(user))
                 .createTime(user.getCreateTime())

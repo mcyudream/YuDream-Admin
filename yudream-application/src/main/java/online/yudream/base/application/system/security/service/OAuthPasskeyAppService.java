@@ -243,9 +243,6 @@ public class OAuthPasskeyAppService {
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
         }
-        if (!user.isEmailVerified()) {
-            throw new BizException("邮箱未验证，请先验证邮箱");
-        }
         return user;
     }
 

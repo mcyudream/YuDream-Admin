@@ -19,6 +19,7 @@ export interface LoginData {
   username: string
   nickname?: string
   email?: string
+  emailVerified: boolean
   avatar?: string
   createTime?: string
 }
@@ -170,6 +171,10 @@ export default {
       params: { token },
       skipTokenRefresh: true,
     })
+  },
+
+  resendVerificationEmail: () => {
+    return userApi.post<unknown, { status: 1, error: '', data: null }>('api/user/me/resend-verification-email')
   },
 
   listDepts: () => {

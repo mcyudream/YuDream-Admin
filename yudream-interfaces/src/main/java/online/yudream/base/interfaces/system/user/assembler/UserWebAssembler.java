@@ -102,6 +102,7 @@ public class UserWebAssembler {
                 .email(dto.getEmail())
                 .phone(dto.getPhone())
                 .qq(dto.getQq())
+                .emailVerified(dto.isEmailVerified())
                 .avatar(dto.getAvatar())
                 .avatarFileId(dto.getAvatarFileId())
                 .createTime(dto.getCreateTime())
@@ -153,6 +154,7 @@ public class UserWebAssembler {
                 .username(dto.getUsername())
                 .nickname(dto.getNickname())
                 .email(dto.getEmail())
+                .emailVerified(dto.isEmailVerified())
                 .avatar(dto.getAvatar())
                 .createTime(dto.getCreateTime())
                 .build();
@@ -169,6 +171,7 @@ public class UserWebAssembler {
                 .username(user.getUsername())
                 .nickname(user.getNickname())
                 .email(user.getEmail() == null ? null : user.getEmail().getValue())
+                .emailVerified(user.isEmailVerified())
                 .avatar(avatar)
                 .createTime(user.getCreateTime())
                 .build();
@@ -208,7 +211,14 @@ public class UserWebAssembler {
     }
 
     public static PermissionListVO toPermissionListVO(List<String> permissions) {
-        return PermissionListVO.builder().permissions(permissions).build();
+        return toPermissionListVO(permissions, true);
+    }
+
+    public static PermissionListVO toPermissionListVO(List<String> permissions, boolean emailVerified) {
+        return PermissionListVO.builder()
+                .permissions(permissions)
+                .emailVerified(emailVerified)
+                .build();
     }
 
     public static UserRegisterRes toRegisterRes(UserRegisterDTO dto) {

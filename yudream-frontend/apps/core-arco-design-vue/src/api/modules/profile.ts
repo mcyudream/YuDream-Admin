@@ -6,6 +6,7 @@ export interface UserProfile {
   username: string
   nickname?: string
   email?: string
+  emailVerified: boolean
   phone?: string
   qq?: string
   avatar?: string

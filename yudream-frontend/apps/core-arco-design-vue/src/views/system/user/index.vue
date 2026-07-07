@@ -19,7 +19,7 @@ const rows = ref<UserManageItem[]>([])
 const roles = ref<OptionItem[]>([])
 const depts = ref<DeptManageItem[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string; roleId?: IdValue; deptId?: IdValue; status?: UserStatus }>({
+const search = reactive<{ keyword: string; roleId?: IdValue; deptId?: IdValue; emailVerified?: boolean; status?: UserStatus }>({
   keyword: '',
 })
 
@@ -47,6 +47,10 @@ const statusOptions = [
   { label: '启用', value: 'ACTIVE' },
   { label: '停用', value: 'DISABLED' },
 ]
+const emailVerifiedOptions = [
+  { label: '已验证', value: true },
+  { label: '未验证', value: false },
+]
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
 const roleOptions = computed(() => roles.value.map(item => ({
   label: item.deptName ? `${item.deptName} / ${item.label}` : item.label,
@@ -73,7 +77,7 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
   { id: 'roleNames', header: '角色', width: 220 },
   { id: 'emailVerified', header: '邮箱验证', width: 100, align: 'center' },
   { id: 'status', header: '状态', width: 90, align: 'center' },
-  { id: 'operation', header: '操作', width: 340, align: 'center', fixed: 'right' },
+  { id: 'operation', header: '操作', width: 380, align: 'center', fixed: 'right' },
 ])
 
 onMounted(async () => {
@@ -100,6 +104,7 @@ async function loadUsers() {
       keyword: search.keyword || undefined,
       roleId: search.roleId,
       deptId: search.deptId,
+      emailVerified: search.emailVerified,
       status: search.status,
     })
     rows.value = res.data.records
@@ -114,6 +119,7 @@ function resetSearch() {
   search.keyword = ''
   search.roleId = undefined
   search.deptId = undefined
+  search.emailVerified = undefined
   search.status = undefined
   pagination.page = 1
   loadUsers()
@@ -243,6 +249,18 @@ function confirmDisable(row: UserManageItem) {
   })
 }
 
+function confirmEnable(row: UserManageItem) {
+  modal.confirm({
+    title: '确认信息',
+    content: `确认启用「${row.username}」吗？`,
+    onConfirm: async () => {
+      await apiUser.enable(row.id)
+      toast.success('启用成功')
+      await loadUsers()
+    },
+  })
+}
+
 function onPageChange(page: number) {
   pagination.page = page
   loadUsers()
@@ -318,6 +336,7 @@ async function exportUsers() {
     keyword: search.keyword || undefined,
     roleId: search.roleId,
     deptId: search.deptId,
+    emailVerified: search.emailVerified,
     status: search.status,
   })
   saveExcelResponse(res, '用户管理.xlsx')
@@ -365,6 +384,7 @@ function importUsers() {
             <FaInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
             <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
             <FaSelect v-show="!fold" v-model="search.roleId" :options="roleOptions" placeholder="角色" class="w-full" />
+            <FaSelect v-show="!fold" v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
             <FaSelect v-show="!fold" v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
             <div class="flex gap-2 col-end--1 justify-end">
               <FaButton variant="outline" @click="resetSearch">
@@ -428,7 +448,10 @@ function importUsers() {
             <FaButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row.original)" @click="confirmImpersonate(row.original)">
               伪装
             </FaButton>
-            <FaButton v-auth="'system:user:delete'" variant="destructive" size="sm" :disabled="row.original.status === 'DISABLED'" @click="confirmDisable(row.original)">
+            <FaButton v-if="row.original.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row.original)">
+              启用
+            </FaButton>
+            <FaButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row.original)">
               停用
             </FaButton>
           </div>

@@ -94,6 +94,13 @@ public class UserManageAppService {
     }
 
     @Transactional
+    public void enable(Long id) {
+        User user = getUser(id);
+        user.activate();
+        userRepo.save(user);
+    }
+
+    @Transactional
     public UserManageDTO assignRoles(Long userId, List<Long> roleIds) {
         User user = getUser(userId);
         user.replaceRoles(resolveRoleIds(roleIds));

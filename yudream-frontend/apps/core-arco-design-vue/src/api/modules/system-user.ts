@@ -63,6 +63,7 @@ export default {
   create: (data: UserCreatePayload) => systemClient.post<unknown, ApiResponse<UserManageItem>>('api/system/users', data),
   update: (id: IdValue, data: UserUpdatePayload) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}`, data),
   disable: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/users/${id}`),
+  enable: (id: IdValue) => systemClient.post<unknown, ApiResponse<null>>(`api/system/users/${id}/enable`),
   assignRoles: (id: IdValue, roleIds: IdValue[]) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}/roles`, { roleIds }),
   assignDepts: (id: IdValue, depts: UserDeptAssign[]) => systemClient.put<unknown, ApiResponse<UserManageItem>>(`api/system/users/${id}/depts`, { depts }),
   impersonate: (id: IdValue) => systemClient.post<unknown, ApiResponse<LoginData>>(`api/system/users/${id}/impersonate`),
