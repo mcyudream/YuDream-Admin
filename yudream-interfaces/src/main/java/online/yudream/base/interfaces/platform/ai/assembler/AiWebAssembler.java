@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.ai.cmd.CmsPageGenerateCmd;
 import online.yudream.base.application.platform.ai.dto.AiToolCallDTO;
 import online.yudream.base.application.platform.ai.dto.CmsPageGenerateDTO;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
 import online.yudream.base.interfaces.platform.ai.request.CmsPageGenerateRequest;
 import online.yudream.base.interfaces.platform.ai.res.AiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
@@ -11,6 +12,7 @@ import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 public class AiWebAssembler {
@@ -34,8 +36,23 @@ public class AiWebAssembler {
         cmd.setCurrentHtml(request.getCurrentHtml());
         cmd.setCurrentCss(request.getCurrentCss());
         cmd.setCurrentProjectJson(request.getCurrentProjectJson());
-        cmd.setThinkingEnabled(true);
+        cmd.setCurrentSelectionJson(request.getCurrentSelectionJson());
+        cmd.setCmsVariableContextJson(request.getCmsVariableContextJson());
+        cmd.setThinkingEnabled(request.isThinkingEnabled());
+        cmd.setHistory(toHistory(request.getHistory()));
         return cmd;
+    }
+
+    private static List<AiChatMessage> toHistory(List<CmsPageGenerateRequest.ChatMessage> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        return history.stream()
+                .filter(item -> item != null && StringUtils.hasText(item.getContent()))
+                .map(item -> new AiChatMessage(
+                        StringUtils.hasText(item.getRole()) ? item.getRole() : AiChatMessage.ROLE_USER,
+                        item.getContent()))
+                .toList();
     }
 
     public static CmsPageGenerateRes toRes(CmsPageGenerateDTO dto) {

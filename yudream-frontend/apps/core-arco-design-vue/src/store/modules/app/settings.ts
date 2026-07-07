@@ -13,6 +13,7 @@ export const useAppSettingsStore = defineStore(
 
     // 站点名称（从后端 sysSetting 加载）
     const siteName = ref(import.meta.env.VITE_APP_TITLE)
+    const siteDescription = ref('')
     const logo = ref('')
     const favicon = ref('')
     const loginBanner = ref('')
@@ -76,6 +77,7 @@ export const useAppSettingsStore = defineStore(
         const res = await apiSettings.publicSettings()
         const data = res.data
         siteName.value = data.siteName || siteName.value
+        siteDescription.value = data.siteDescription || siteDescription.value
         logo.value = toBackendAssetUrl(data.logo)
         favicon.value = toBackendAssetUrl(data.favicon)
         loginBanner.value = toBackendAssetUrl(data.loginBanner)
@@ -273,6 +275,7 @@ export const useAppSettingsStore = defineStore(
     return {
       settings,
       siteName,
+      siteDescription,
       logo,
       favicon,
       loginBanner,

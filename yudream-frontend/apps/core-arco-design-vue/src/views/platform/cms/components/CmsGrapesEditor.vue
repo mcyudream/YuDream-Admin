@@ -1,16 +1,19 @@
 <script setup lang="ts">
+import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type * as grapesjs from 'grapesjs'
 import type { Editor } from 'grapesjs'
-import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { FileObject } from '@/api/modules/files'
-import type { AiStreamEnvelope, AiToolCallResult, CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import type { AiStreamEnvelope, AiToolCallResult, CmsChatHistoryMessage, CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import type { CmsAiChatAttachmentMeta, CmsAiChatSession, CmsAiChatSessionSummary } from '@/utils/cms-ai-chat-history'
+import { registerHandler, removeHandler } from '@jboltai/tokui'
 import { Chatbot } from '@tdesign-vue-next/chat'
-import { Select as TSelect, Tooltip as TTooltip } from 'tdesign-vue-next'
+import { Select as TSelect, Switch as TSwitch, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
-import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
+import CmsCodeEditor from './CmsCodeEditor.vue'
+import TokuiBlock from './TokuiBlock.vue'
 import '@tdesign-vue-next/chat/es/style/index.css'
 import 'grapesjs/dist/css/grapes.min.css'
 
@@ -20,12 +23,37 @@ interface GrapesSavePayload {
   builderProjectJson: string
 }
 
-type RightPanelTab = 'ai' | 'layers' | 'traits' | 'styles'
+type RightPanelTab = 'ai' | 'layers' | 'traits' | 'styles' | 'source'
 interface AiModelSelectOption {
   label: string
   value: string
   providerCode?: string
   modelCode?: string
+}
+
+interface CanvasSelectionSnapshot {
+  label: string
+  type?: string
+  tagName?: string
+  selectorHint?: string
+  classes: string[]
+  attributes: Record<string, unknown>
+  styles: Record<string, unknown>
+  text: string
+  html: string
+}
+
+interface AskOption {
+  title: string
+  desc?: string
+}
+
+interface CodeCompletionItem {
+  label: string
+  type?: 'class' | 'constant' | 'enum' | 'function' | 'interface' | 'keyword' | 'namespace' | 'operator' | 'property' | 'text' | 'type' | 'variable'
+  apply?: string
+  detail?: string
+  info?: string
 }
 
 const props = defineProps<{
@@ -46,6 +74,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useFaToast()
+const appSettingsStore = useAppSettingsStore()
 const editorEl = ref<HTMLElement>()
 const blocksEl = ref<HTMLElement>()
 const layersEl = ref<HTMLElement>()
@@ -60,6 +89,7 @@ const chatbotRef = ref<{
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 const aiModel = ref('')
+const aiThinkingEnabled = ref(false)
 const aiAttachments = ref<any[]>([])
 const chatHistorySummaries = ref<CmsAiChatSessionSummary[]>([])
 const selectedChatHistory = ref<CmsAiChatSession | null>(null)
@@ -69,14 +99,22 @@ const chatHistoryOffset = ref(0)
 const chatHistoryLoadedOnce = ref(false)
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
 const canvasRevision = ref(0)
+const selectedSourceCode = ref('')
+const selectedSourceDirty = ref(false)
+const selectedSourceError = ref('')
 const aiSuggestions = [
+  '只优化当前选中的元素',
+  '把选中元素改成更醒目的 CTA',
   '优化首屏视觉，让层次更清晰',
   '新增三列功能卡片并统一按钮样式',
   '根据样图调整版式和配色',
   '优化移动端排版和间距',
 ]
 const reasoningActions = new Set(['reasoning'])
-const silentProgressActions = new Set(['heartbeat'])
+const silentProgressActions = new Set(['heartbeat', 'request', 'subscribed', 'stream-complete', 'complete'])
+// AI 需求澄清：当模型调用 cms.ask.user 时，用 TokUI 渲染的一段可点击选项 DSL。
+const pendingAskDsl = ref('')
+const pendingAskOptions = ref<AskOption[]>([])
 let editor: Editor | null = null
 let pendingAiResult: CmsPageGenerateResult | null = null
 let currentAiSession: CmsAiChatSession | null = null
@@ -86,6 +124,7 @@ const rightPanelTabs = computed(() => {
     { label: '图层', value: 'layers', icon: 'i-ri:stack-line' },
     { label: '属性', value: 'traits', icon: 'i-ri:settings-3-line' },
     { label: '样式', value: 'styles', icon: 'i-ri:palette-line' },
+    { label: '源码', value: 'source', icon: 'i-ri:code-s-slash-line' },
   ]
   return props.aiEnabled
     ? [{ label: 'AI', value: 'ai' as const, icon: 'i-ri:sparkling-2-line' }, ...tabs]
@@ -107,6 +146,177 @@ const canvasStats = computed(() => {
     { label: 'CSS', value: `${(instance.getCss() || '').length} 字符` },
     { label: '项目源', value: `${JSON.stringify(instance.getProjectData()).length} 字符` },
   ]
+})
+
+const selectedCanvasSummary = computed(() => {
+  canvasRevision.value
+  const snapshot = currentSelectionSnapshot()
+  if (!snapshot) {
+    return '未选择元素'
+  }
+  const name = snapshot.label || snapshot.tagName || '元素'
+  const text = compactText(snapshot.text, 24)
+  return text ? `${name}：${text}` : name
+})
+
+const selectedSourceSummary = computed(() => {
+  canvasRevision.value
+  const snapshot = currentSelectionSnapshot()
+  if (!snapshot) {
+    return '未选择'
+  }
+  const tag = snapshot.tagName ? `<${snapshot.tagName}>` : snapshot.type || '元素'
+  const selector = snapshot.selectorHint ? ` · ${snapshot.selectorHint}` : ''
+  return `${tag}${selector}`
+})
+
+const hasSelectedComponent = computed(() => {
+  canvasRevision.value
+  return Boolean(editor?.getSelected())
+})
+
+const cmsVariableContext = computed(() => {
+  const copyright = appSettingsStore.settings.app.copyright
+  const siteName = appSettingsStore.siteName || 'YuDream'
+  const siteDescription = appSettingsStore.siteDescription || ''
+  const logo = appSettingsStore.logo || ''
+  const currentYear = String(new Date().getFullYear())
+  return {
+    syntax: '{{path.to.value}}',
+    usage: '生成 CMS HTML 时优先保留变量占位符，最终由公开站点渲染时替换；不要把站点名称、系统 Logo、版权年份等系统值写死。',
+    variables: [
+      { key: '{{site.name}}', label: '站点名称', example: siteName },
+      { key: '{{site.description}}', label: '站点描述', example: siteDescription || '当前页面摘要或站点描述' },
+      { key: '{{site.logo}}', label: '站点 Logo URL', example: logo, html: '<img src="{{site.logo}}" alt="{{site.name}}">' },
+      { key: '{{system.name}}', label: '系统/站点名称别名', example: siteName },
+      { key: '{{system.description}}', label: '系统描述别名', example: siteDescription || '站点描述' },
+      { key: '{{system.logo}}', label: '系统 Logo URL 别名', example: logo, html: '<img src="{{system.logo}}" alt="{{system.name}}">' },
+      { key: '{{system.currentYear}}', label: '当前年份', example: currentYear },
+      { key: '{{system.copyright.company}}', label: '版权公司', example: copyright.company || '' },
+      { key: '{{system.copyright.website}}', label: '版权网站', example: copyright.website || '' },
+      { key: '{{system.copyright.dates}}', label: '版权年份范围', example: copyright.dates || currentYear },
+      { key: '{{page.title}}', label: '页面标题', example: props.title || '当前页面' },
+      { key: '{{page.summary}}', label: '页面摘要', example: '页面摘要' },
+      { key: '{{auth.welcome}}', label: '登录欢迎语', example: '欢迎回来，用户昵称' },
+      { key: '{{user.nickname}}', label: '当前用户昵称', example: '访客或用户昵称' },
+      { key: '{{navigation.count}}', label: '导航数量', example: '3' },
+      { key: '{{pages.count}}', label: '公开页面数量', example: '6' },
+    ],
+    repeats: [
+      { key: 'data-yb-repeat="navigation"', itemFields: ['{{item.label}}', '{{item.url}}'], description: '重复渲染导航项' },
+      { key: 'data-yb-repeat="pages"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: '重复渲染公开页面卡片' },
+      { key: 'data-yb-repeat="categories"', itemFields: ['{{item.name}}', '{{item.url}}', '{{item.count}}'], description: '重复渲染分类' },
+      { key: 'data-yb-repeat="tags"', itemFields: ['{{item.name}}', '{{item.url}}', '{{item.count}}'], description: '重复渲染标签' },
+    ],
+    visibility: [
+      { key: 'data-visible-when="guest"', description: '仅访客可见' },
+      { key: 'data-visible-when="logged-in"', description: '仅登录用户可见' },
+    ],
+  }
+})
+
+const cmsVariableCount = computed(() => cmsVariableContext.value.variables.length)
+
+const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
+  canvasRevision.value
+  const context = cmsVariableContext.value
+  const snapshot = currentSelectionSnapshot()
+  const tagCompletions = ['section', 'article', 'div', 'header', 'footer', 'main', 'nav', 'h1', 'h2', 'h3', 'p', 'a', 'button', 'img', 'ul', 'li']
+    .map(tag => ({
+      label: tag,
+      type: 'type' as const,
+      apply: `<${tag}></${tag}>`,
+      detail: 'HTML 标签',
+    }))
+  const attributeCompletions: CodeCompletionItem[] = [
+    { label: 'class', type: 'property', apply: 'class=""', detail: 'CSS 类名' },
+    { label: 'id', type: 'property', apply: 'id=""', detail: '元素 ID' },
+    { label: 'href', type: 'property', apply: 'href=""', detail: '链接地址' },
+    { label: 'src', type: 'property', apply: 'src=""', detail: '资源地址' },
+    { label: 'alt', type: 'property', apply: 'alt=""', detail: '图片替代文本' },
+    { label: 'data-yb-repeat', type: 'property', apply: 'data-yb-repeat=""', detail: 'CMS 循环数据' },
+    { label: 'data-visible-when', type: 'property', apply: 'data-visible-when=""', detail: 'CMS 可见条件' },
+  ]
+  const variableCompletions = context.variables.map(item => ({
+    label: item.key,
+    type: 'variable' as const,
+    apply: item.key,
+    detail: item.label,
+    info: item.example ? `示例：${item.example}` : undefined,
+  }))
+  const repeatCompletions = context.repeats.map(item => ({
+    label: item.key,
+    type: 'property' as const,
+    apply: item.key,
+    detail: 'CMS 循环',
+    info: `${item.description}：${item.itemFields.join('、')}`,
+  }))
+  const visibilityCompletions = context.visibility.map(item => ({
+    label: item.key,
+    type: 'property' as const,
+    apply: item.key,
+    detail: item.description,
+  }))
+  const snippetCompletions: CodeCompletionItem[] = [
+    { label: 'section.yb-ai-section', type: 'class', apply: '<section class="yb-ai-section">\n  \n</section>', detail: 'CMS 区块片段' },
+    { label: 'img.site.logo', type: 'variable', apply: '<img src="{{site.logo}}" alt="{{site.name}}">', detail: '系统 Logo 图片' },
+    { label: 'a.cms.link', type: 'type', apply: '<a href="">\n  {{page.title}}\n</a>', detail: '链接片段' },
+    { label: 'repeat.navigation', type: 'property', apply: '<nav data-yb-repeat="navigation">\n  <a href="{{item.url}}">{{item.label}}</a>\n</nav>', detail: '导航循环' },
+    { label: 'visible.guest', type: 'property', apply: '<div data-visible-when="guest">\n  \n</div>', detail: '访客可见' },
+    { label: 'visible.logged-in', type: 'property', apply: '<div data-visible-when="logged-in">\n  \n</div>', detail: '登录用户可见' },
+  ]
+  const currentClassCompletions = (snapshot?.classes || []).map(item => ({
+    label: `.${item}`,
+    type: 'class' as const,
+    apply: item,
+    detail: '当前元素类名',
+  }))
+  return [
+    ...snippetCompletions,
+    ...variableCompletions,
+    ...repeatCompletions,
+    ...visibilityCompletions,
+    ...attributeCompletions,
+    ...currentClassCompletions,
+    ...tagCompletions,
+  ]
+})
+
+const cssSourceCompletions = computed<CodeCompletionItem[]>(() => {
+  canvasRevision.value
+  const snapshot = currentSelectionSnapshot()
+  const selectors: CodeCompletionItem[] = []
+  const id = String(snapshot?.attributes.id || '').trim()
+  if (id) {
+    selectors.push({ label: `#${id}`, type: 'class', apply: `#${cssEscape(id)}`, detail: '当前元素 ID 选择器' })
+  }
+  snapshot?.classes.forEach((item) => {
+    selectors.push({ label: `.${item}`, type: 'class', apply: `.${cssEscape(item)}`, detail: '当前元素类选择器' })
+  })
+  if (snapshot?.tagName) {
+    selectors.push({ label: snapshot.tagName, type: 'type', apply: snapshot.tagName, detail: '当前元素标签选择器' })
+  }
+  return [
+    ...selectors,
+    { label: 'color', type: 'property', apply: 'color: ;', detail: '文本颜色' },
+    { label: 'background', type: 'property', apply: 'background: ;', detail: '背景' },
+    { label: 'display', type: 'property', apply: 'display: ;', detail: '布局方式' },
+    { label: 'grid-template-columns', type: 'property', apply: 'grid-template-columns: ;', detail: '网格列' },
+    { label: 'gap', type: 'property', apply: 'gap: ;', detail: '间距' },
+    { label: 'padding', type: 'property', apply: 'padding: ;', detail: '内边距' },
+    { label: 'margin', type: 'property', apply: 'margin: ;', detail: '外边距' },
+    { label: 'border-radius', type: 'property', apply: 'border-radius: ;', detail: '圆角' },
+  ]
+})
+
+const selectedRelatedCss = computed(() => {
+  canvasRevision.value
+  const snapshot = currentSelectionSnapshot()
+  if (!snapshot) {
+    return '/* 选择画布元素后显示关联 CSS */'
+  }
+  const relatedCss = extractRelatedCss(editor?.getCss() || '', snapshot)
+  return relatedCss ? formatCssText(relatedCss) : '/* 暂未匹配到选中元素的关联 CSS */'
 })
 
 const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
@@ -198,8 +408,11 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
       throw new Error('请输入修改想法或添加样图')
     }
     const attachments = params.attachments || aiAttachments.value
-    startAiHistorySession(prompt, attachments)
-    return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, attachments))
+    pendingAskDsl.value = ''
+    const session = await ensureActiveSession()
+    const history = collectHistoryMessages(session)
+    appendUserTurn(session, prompt, attachments)
+    return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, attachments, history))
   },
   isValidChunk: (chunk: SSEChunkData) => [
     'ai.message',
@@ -221,6 +434,9 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
         return null
       }
       if (reasoningActions.has(action)) {
+        if (!aiThinkingEnabled.value) {
+          return null
+        }
         return trackAiHistoryContent(thinkingChunk(content))
       }
       return trackAiHistoryContent(progressChunk(formatProgress(envelope.action, content)))
@@ -232,6 +448,10 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
       const tool = envelope.payload?.tool
       if (isCanvasTool(tool)) {
         applyAiTool(tool)
+      }
+      if (isAskUserTool(tool)) {
+        showAskUserUi(tool)
+        return trackAiHistoryContent(markdownChunk(`\n\n${tool?.message || '请选择一个方向以便我继续。'}`))
       }
       return trackAiHistoryContent(markdownChunk(formatToolMessage(tool)))
     }
@@ -260,6 +480,7 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
       void finishAiHistorySession('complete')
       return completeChunk
     }
+    clearAiAttachments()
     void finishAiHistorySession('complete')
   },
   onError: (error: Error | Response) => {
@@ -295,6 +516,10 @@ watch(() => props.aiModelOptions, (options) => {
 watch([rightPanelTab, chatHistoryTargetKey], () => {
   if (rightPanelTab.value === 'ai') {
     void loadChatHistory(true)
+    void restoreActiveSession()
+  }
+  if (rightPanelTab.value === 'source') {
+    syncSelectedSource()
   }
 })
 
@@ -331,18 +556,27 @@ onMounted(async () => {
   registerBlocks(editor)
   loadInitialContent(editor)
   removeLayoutBlocks(editor)
+  injectCanvasHighlightStyle(editor)
   editor.on('component:add component:update component:remove style:update undo redo load', () => {
     canvasRevision.value += 1
+    syncSelectedSource()
+  })
+  editor.on('component:selected component:deselected', () => {
+    canvasRevision.value += 1
+    syncSelectedSource(true)
   })
   canvasRevision.value += 1
   await loadMedia()
   aiModel.value = props.aiModelOptions?.[0]?.value || ''
+  registerHandler('pick', onPickOption)
   if (rightPanelTab.value === 'ai') {
     void loadChatHistory(true)
+    void restoreActiveSession()
   }
 })
 
 onBeforeUnmount(() => {
+  removeHandler('pick')
   editor?.destroy()
   editor = null
 })
@@ -391,46 +625,76 @@ function useSuggestion(suggestion: string) {
   chatbotRef.value?.addPrompt?.(suggestion, true)
 }
 
-function startAiHistorySession(prompt: string, attachments: any[] = []) {
-  const id = createHistoryId()
+function sessionStorageId(targetKey = chatHistoryTargetKey.value) {
+  return `session:${targetKey}`
+}
+
+// 一个页面对应一个持久会话：优先复用内存中的当前会话，其次从 IndexedDB 载入，最后新建空会话。
+async function ensureActiveSession(): Promise<CmsAiChatSession> {
+  if (currentAiSession && currentAiSession.targetKey === chatHistoryTargetKey.value) {
+    return currentAiSession
+  }
+  const existing = await getCmsAiChatSession(sessionStorageId())
+  if (existing) {
+    currentAiSession = existing
+    return existing
+  }
+  const now = Date.now()
+  currentAiSession = {
+    id: sessionStorageId(),
+    targetKey: chatHistoryTargetKey.value,
+    targetType: chatHistoryTargetType.value,
+    targetId: chatHistoryTargetId.value,
+    targetLabel: chatHistoryTargetLabel.value,
+    title: chatHistoryTargetLabel.value,
+    preview: '',
+    model: selectedAiModelOption.value?.label || aiModel.value || undefined,
+    thinkingEnabled: aiThinkingEnabled.value,
+    attachments: [],
+    createdAt: now,
+    updatedAt: now,
+    messages: [],
+  }
+  return currentAiSession
+}
+
+// 向当前会话追加一轮对话（1 条用户消息 + 1 条待流式的助手消息）。
+function appendUserTurn(session: CmsAiChatSession, prompt: string, attachments: any[] = []) {
+  const turnId = createHistoryId()
   const now = Date.now()
   const displayPrompt = prompt || `参考样图调整当前页面：${firstImageAttachment(attachments)?.name || '样图'}`
   const attachmentMetas = attachmentMetaList(attachments)
   const attachmentText = attachmentMetas.length
     ? `\n\n附件：${attachmentMetas.map(item => item.name || item.fileType || '文件').join('、')}`
     : ''
-  currentAiSession = {
-    id,
-    targetKey: chatHistoryTargetKey.value,
-    targetType: chatHistoryTargetType.value,
-    targetId: chatHistoryTargetId.value,
-    targetLabel: chatHistoryTargetLabel.value,
-    title: compactText(displayPrompt, 36),
-    preview: compactText(displayPrompt, 120),
-    model: selectedAiModelOption.value?.label || aiModel.value || undefined,
-    thinkingEnabled: true,
-    attachments: attachmentMetas,
-    createdAt: now,
-    updatedAt: now,
-    messages: [
-      {
-        id: `${id}-user`,
-        role: 'user',
-        status: 'complete',
-        content: [
-          {
-            type: 'text',
-            data: `${displayPrompt}${attachmentText}`,
-          },
-        ],
-      } as ChatMessagesData,
-      {
-        id: `${id}-assistant`,
-        role: 'assistant',
-        status: 'streaming',
-        content: [],
-      } as ChatMessagesData,
-    ],
+  session.messages.push(
+    {
+      id: `${turnId}-user`,
+      role: 'user',
+      status: 'complete',
+      content: [
+        {
+          type: 'text',
+          data: `${displayPrompt}${attachmentText}`,
+        },
+      ],
+    } as ChatMessagesData,
+    {
+      id: `${turnId}-assistant`,
+      role: 'assistant',
+      status: 'streaming',
+      content: [],
+    } as ChatMessagesData,
+  )
+  if (!session.title) {
+    session.title = compactText(displayPrompt, 36)
+  }
+  session.preview = compactText(displayPrompt, 120)
+  session.model = selectedAiModelOption.value?.label || aiModel.value || session.model
+  session.thinkingEnabled = aiThinkingEnabled.value
+  session.updatedAt = now
+  if (attachmentMetas.length) {
+    session.attachments = attachmentMetas
   }
 }
 
@@ -461,15 +725,34 @@ async function finishAiHistorySession(status: 'complete' | 'error') {
     return
   }
   const session = currentAiSession
-  currentAiSession = null
   const assistant = session.messages.findLast(item => item.role === 'assistant')
   if (assistant) {
     assistant.status = status
   }
   session.updatedAt = Date.now()
   session.preview = compactText(messageText(assistant), 120) || session.preview
+  // 页面级会话：持久化但保留在内存中，供后续追问累积多轮上下文。
   await saveCmsAiChatSession(session)
   await loadChatHistory(true)
+}
+
+// 把已完成的历史轮次抽取为纯文本消息，供后端注入多轮上下文（不含画布大字段）。
+function collectHistoryMessages(session: CmsAiChatSession, maxTurns = 8): CmsChatHistoryMessage[] {
+  const messages: CmsChatHistoryMessage[] = []
+  for (const message of session.messages) {
+    if (message.role !== 'user' && message.role !== 'assistant') {
+      continue
+    }
+    const text = messageText(message).trim()
+    if (!text) {
+      continue
+    }
+    messages.push({ role: message.role, content: text })
+  }
+  const maxMessages = Math.max(0, maxTurns) * 2
+  return maxMessages > 0 && messages.length > maxMessages
+    ? messages.slice(messages.length - maxMessages)
+    : messages
 }
 
 async function loadChatHistory(reset = false) {
@@ -523,17 +806,35 @@ async function deleteSelectedChatHistory() {
   toast.success('会话记录已删除')
 }
 
+// 把当前页面已持久化的会话恢复到聊天区，实现「一个页面 = 一段可持续的对话」。
+async function restoreActiveSession() {
+  try {
+    const session = await ensureActiveSession()
+    const messages = session.messages.length
+      ? [...aiDefaultMessages.value, ...session.messages]
+      : [...aiDefaultMessages.value]
+    chatbotRef.value?.setMessages?.(messages, 'replace')
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '会话恢复失败')
+  }
+}
+
+// 一键清空当前页面会话，方便重新开始聊天。
 async function clearChatHistory() {
-  if (!chatHistorySummaries.value.length || !window.confirm(`确认删除“${chatHistoryTargetLabel.value}”的全部 AI 会话记录吗？`)) {
+  if (!window.confirm(`确认清空“${chatHistoryTargetLabel.value}”的 AI 对话记录并重新开始吗？`)) {
     return
   }
   await clearCmsAiChatTarget(chatHistoryTargetKey.value)
+  currentAiSession = null
+  pendingAskDsl.value = ''
   selectedChatHistory.value = null
+  chatbotRef.value?.setMessages?.([...aiDefaultMessages.value], 'replace')
   await loadChatHistory(true)
-  toast.success('会话记录已清空')
+  toast.success('对话记录已清空')
 }
 
-function buildAiPayload(prompt: string, attachments: any[] = []) {
+function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsChatHistoryMessage[] = []) {
   if (!editor) {
     throw new Error('构建器未初始化')
   }
@@ -542,6 +843,7 @@ function buildAiPayload(prompt: string, attachments: any[] = []) {
   const modelOption = selectedAiModelOption.value
   return {
     title: props.title || '',
+    siteName: appSettingsStore.siteName || 'YuDream',
     prompt: prompt || `参考样图调整当前页面：${image?.name || '样图'}`,
     pageType: 'GrapesJS 可视化页面',
     style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。不要生成系统导航栏和页脚，它们由站点 Layout 渲染。',
@@ -552,7 +854,429 @@ function buildAiPayload(prompt: string, attachments: any[] = []) {
     currentHtml: editor.getHtml(),
     currentCss: editor.getCss(),
     currentProjectJson: JSON.stringify(editor.getProjectData()),
+    currentSelectionJson: currentSelectionJson(),
+    cmsVariableContextJson: cmsVariableContextJson(),
+    thinkingEnabled: aiThinkingEnabled.value,
+    history,
   }
+}
+
+function currentSelectionJson() {
+  const snapshot = currentSelectionSnapshot()
+  return snapshot ? JSON.stringify(snapshot) : ''
+}
+
+function cmsVariableContextJson() {
+  return JSON.stringify(cmsVariableContext.value)
+}
+
+function currentSelectionSnapshot(): CanvasSelectionSnapshot | null {
+  const component = editor?.getSelected() as any
+  if (!component) {
+    return null
+  }
+  const attributes = normalizeObject(readComponentValue(component, 'getAttributes'))
+  const classes = readComponentClasses(component)
+  const tagName = String(component.get?.('tagName') || '').toLowerCase()
+  const type = String(component.get?.('type') || '')
+  const html = String(component.toHTML?.() || '')
+  const text = component.view?.el?.textContent || stripHtml(html)
+  return {
+    label: String(component.getName?.() || attributes.id || classes[0] || tagName || type || '选中元素'),
+    type,
+    tagName,
+    selectorHint: selectionSelectorHint(tagName, attributes, classes),
+    classes,
+    attributes,
+    styles: normalizeObject(readComponentValue(component, 'getStyle')),
+    text: compactText(text, 600),
+    html: compactText(html, 1400),
+  }
+}
+
+function syncSelectedSource(force = false) {
+  if (!force && rightPanelTab.value !== 'source') {
+    return
+  }
+  if (selectedSourceDirty.value && !force) {
+    return
+  }
+  const component = editor?.getSelected() as any
+  if (!component) {
+    selectedSourceCode.value = ''
+    selectedSourceDirty.value = false
+    selectedSourceError.value = ''
+    return
+  }
+  selectedSourceCode.value = String(component.toHTML?.() || '')
+  selectedSourceDirty.value = false
+  selectedSourceError.value = ''
+}
+
+function markSelectedSourceDirty() {
+  selectedSourceDirty.value = true
+  selectedSourceError.value = ''
+}
+
+function formatSelectedSource() {
+  if (!hasSelectedComponent.value) {
+    toast.warning('请先在画布中选择一个元素')
+    return
+  }
+  const formatted = formatHtmlFragment(selectedSourceCode.value)
+  if (formatted && formatted !== selectedSourceCode.value) {
+    selectedSourceCode.value = formatted
+    markSelectedSourceDirty()
+  }
+}
+
+function applySelectedSource() {
+  const component = editor?.getSelected() as any
+  if (!editor || !component) {
+    toast.warning('请先在画布中选择一个元素')
+    return
+  }
+  const html = selectedSourceCode.value.trim()
+  if (!html) {
+    selectedSourceError.value = '源码不能为空'
+    return
+  }
+  try {
+    const added = replaceComponent(component, html)
+    const next = firstComponent(added)
+    if (next && typeof editor.select === 'function') {
+      editor.select(next)
+    }
+    selectedSourceDirty.value = false
+    selectedSourceError.value = ''
+    canvasRevision.value += 1
+    syncSelectedSource(true)
+    toast.success('选中元素源码已应用')
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : '源码应用失败'
+    selectedSourceError.value = message
+    toast.error('源码应用失败', { description: message })
+  }
+}
+
+function readComponentValue(component: any, method: string) {
+  try {
+    return typeof component?.[method] === 'function' ? component[method]() : {}
+  }
+  catch {
+    return {}
+  }
+}
+
+function readComponentClasses(component: any) {
+  try {
+    const classes = typeof component.getClasses === 'function' ? component.getClasses() : []
+    return Array.isArray(classes) ? classes.map(item => String(item)).filter(Boolean) : []
+  }
+  catch {
+    return []
+  }
+}
+
+function selectionSelectorHint(tagName: string, attributes: Record<string, unknown>, classes: string[]) {
+  const id = String(attributes.id || '').trim()
+  if (id) {
+    return `#${cssEscape(id)}`
+  }
+  if (classes.length) {
+    return `${tagName || ''}.${classes.map(cssEscape).join('.')}`.trim()
+  }
+  return tagName || ''
+}
+
+function formatHtmlFragment(html: string) {
+  const source = html.trim()
+  if (!source || typeof document === 'undefined') {
+    return source
+  }
+  const template = document.createElement('template')
+  template.innerHTML = source
+  const nodes = Array.from(template.content.childNodes)
+  return nodes.map(node => formatHtmlNode(node, 0)).filter(Boolean).join('\n') || source
+}
+
+function formatHtmlNode(node: ChildNode, level: number): string {
+  const indent = '  '.repeat(level)
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = String(node.textContent || '').replace(/\s+/g, ' ').trim()
+    return text ? `${indent}${escapeHtmlText(text)}` : ''
+  }
+  if (node.nodeType === Node.COMMENT_NODE) {
+    return `${indent}<!-- ${String(node.textContent || '').trim()} -->`
+  }
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return ''
+  }
+  const element = node as Element
+  const tag = element.tagName.toLowerCase()
+  const attrs = formatHtmlAttributes(element)
+  const childNodes = Array.from(element.childNodes).filter(item => item.nodeType !== Node.TEXT_NODE || String(item.textContent || '').trim())
+  if (isVoidHtmlTag(tag)) {
+    return `${indent}<${tag}${attrs}>`
+  }
+  if (childNodes.length === 0) {
+    return `${indent}<${tag}${attrs}></${tag}>`
+  }
+  if (childNodes.length === 1 && childNodes[0].nodeType === Node.TEXT_NODE) {
+    return `${indent}<${tag}${attrs}>${escapeHtmlText(String(childNodes[0].textContent || '').replace(/\s+/g, ' ').trim())}</${tag}>`
+  }
+  const children = childNodes.map(child => formatHtmlNode(child, level + 1)).filter(Boolean).join('\n')
+  return `${indent}<${tag}${attrs}>\n${children}\n${indent}</${tag}>`
+}
+
+function formatHtmlAttributes(element: Element) {
+  const attrs = Array.from(element.attributes)
+    .map(attr => attr.value === '' ? attr.name : `${attr.name}="${escapeHtmlAttribute(attr.value)}"`)
+    .join(' ')
+  return attrs ? ` ${attrs}` : ''
+}
+
+function isVoidHtmlTag(tag: string) {
+  return new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']).has(tag)
+}
+
+function escapeHtmlText(value: string) {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function escapeHtmlAttribute(value: string) {
+  return escapeHtmlText(value).replace(/"/g, '&quot;')
+}
+
+function extractRelatedCss(css: string, snapshot: CanvasSelectionSnapshot) {
+  if (!css.trim()) {
+    return ''
+  }
+  const matches = collectMatchingCssRules(css, snapshot)
+  return matches.join('\n\n').trim()
+}
+
+function collectMatchingCssRules(css: string, snapshot: CanvasSelectionSnapshot): string[] {
+  const matches: string[] = []
+  let index = 0
+  while (index < css.length) {
+    const openIndex = findNextCssChar(css, '{', index)
+    if (openIndex < 0) {
+      break
+    }
+    const prelude = css.slice(index, openIndex).trim()
+    const closeIndex = findMatchingCssBrace(css, openIndex)
+    if (closeIndex < 0) {
+      break
+    }
+    const body = css.slice(openIndex + 1, closeIndex)
+    if (prelude.startsWith('@')) {
+      const nestedMatches = collectMatchingCssRules(body, snapshot)
+      if (nestedMatches.length > 0) {
+        matches.push(`${prelude} {\n${indentCssLines(nestedMatches.join('\n\n'))}\n}`)
+      }
+    }
+    else if (cssSelectorPreludeMatches(prelude, snapshot)) {
+      matches.push(`${prelude} {${body}}`)
+    }
+    index = closeIndex + 1
+  }
+  return matches
+}
+
+function cssSelectorPreludeMatches(prelude: string, snapshot: CanvasSelectionSnapshot) {
+  return prelude
+    .split(',')
+    .map(selector => selector.trim())
+    .some(selector => cssSelectorMatchesSnapshot(selector, snapshot))
+}
+
+function cssSelectorMatchesSnapshot(selector: string, snapshot: CanvasSelectionSnapshot) {
+  const normalized = selector
+    .replace(/::?[\w-]+(?:\([^)]*\))?/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!normalized) {
+    return false
+  }
+  const id = String(snapshot.attributes.id || '').trim()
+  if (id && containsCssIdentifier(normalized, `#${id}`)) {
+    return true
+  }
+  if (snapshot.classes.some(item => containsCssIdentifier(normalized, `.${item}`))) {
+    return true
+  }
+  if (snapshot.tagName && new RegExp(`(^|[\\s>+~,(])${escapeRegExp(snapshot.tagName)}(?=$|[\\s.#:[>+~,)])`, 'i').test(normalized)) {
+    return true
+  }
+  if (Object.keys(snapshot.attributes).some(key => key && normalized.includes(`[${key}`))) {
+    return true
+  }
+  return cssElementMatchesSelector(normalized, snapshot)
+}
+
+function cssElementMatchesSelector(selector: string, snapshot: CanvasSelectionSnapshot) {
+  if (typeof document === 'undefined') {
+    return false
+  }
+  try {
+    const element = document.createElement(snapshot.tagName || 'div')
+    const id = String(snapshot.attributes.id || '').trim()
+    if (id) {
+      element.id = id
+    }
+    snapshot.classes.forEach(item => element.classList.add(item))
+    Object.entries(snapshot.attributes).forEach(([key, value]) => {
+      if (key && value !== undefined && value !== null) {
+        element.setAttribute(key, String(value))
+      }
+    })
+    return element.matches(selector)
+  }
+  catch {
+    return false
+  }
+}
+
+function containsCssIdentifier(selector: string, identifier: string) {
+  const raw = escapeRegExp(identifier)
+  const escaped = cssEscape(identifier.slice(1))
+  const prefix = identifier[0] === '#' ? '#' : '\\.'
+  return new RegExp(`(^|[^a-zA-Z0-9_-])(?:${raw}|${prefix}${escapeRegExp(escaped)})(?=$|[^a-zA-Z0-9_-])`).test(selector)
+}
+
+function findNextCssChar(css: string, char: string, from: number) {
+  let quote = ''
+  for (let index = from; index < css.length; index += 1) {
+    const current = css[index]
+    const next = css[index + 1]
+    if (!quote && current === '/' && next === '*') {
+      index = css.indexOf('*/', index + 2)
+      if (index < 0) {
+        return -1
+      }
+      index += 1
+      continue
+    }
+    if (quote) {
+      if (current === '\\') {
+        index += 1
+      }
+      else if (current === quote) {
+        quote = ''
+      }
+      continue
+    }
+    if (current === '"' || current === '\'') {
+      quote = current
+      continue
+    }
+    if (current === char) {
+      return index
+    }
+  }
+  return -1
+}
+
+function findMatchingCssBrace(css: string, openIndex: number) {
+  let depth = 0
+  let quote = ''
+  for (let index = openIndex; index < css.length; index += 1) {
+    const current = css[index]
+    const next = css[index + 1]
+    if (!quote && current === '/' && next === '*') {
+      index = css.indexOf('*/', index + 2)
+      if (index < 0) {
+        return -1
+      }
+      index += 1
+      continue
+    }
+    if (quote) {
+      if (current === '\\') {
+        index += 1
+      }
+      else if (current === quote) {
+        quote = ''
+      }
+      continue
+    }
+    if (current === '"' || current === '\'') {
+      quote = current
+      continue
+    }
+    if (current === '{') {
+      depth += 1
+    }
+    if (current === '}') {
+      depth -= 1
+      if (depth === 0) {
+        return index
+      }
+    }
+  }
+  return -1
+}
+
+function formatCssText(css: string) {
+  let result = ''
+  let indent = 0
+  let quote = ''
+  const appendIndent = () => {
+    result += '  '.repeat(Math.max(indent, 0))
+  }
+  for (let index = 0; index < css.length; index += 1) {
+    const current = css[index]
+    if (quote) {
+      result += current
+      if (current === '\\') {
+        result += css[index + 1] || ''
+        index += 1
+      }
+      else if (current === quote) {
+        quote = ''
+      }
+      continue
+    }
+    if (current === '"' || current === '\'') {
+      quote = current
+      result += current
+      continue
+    }
+    if (current === '{') {
+      result = result.trimEnd()
+      result += ' {\n'
+      indent += 1
+      appendIndent()
+      continue
+    }
+    if (current === '}') {
+      indent -= 1
+      result = result.trimEnd()
+      result += '\n'
+      appendIndent()
+      result += '}\n'
+      continue
+    }
+    if (current === ';') {
+      result += ';\n'
+      appendIndent()
+      continue
+    }
+    if (/\s/.test(current)) {
+      if (!/\s$/.test(result)) {
+        result += ' '
+      }
+      continue
+    }
+    result += current
+  }
+  return result.trim()
+}
+
+function indentCssLines(css: string) {
+  return css.split('\n').map(line => line.trim() ? `  ${line}` : line).join('\n')
 }
 
 async function toAttachmentItem(file: File) {
@@ -609,17 +1333,17 @@ function thinkingChunk(text: string): AIMessageContent {
 function formatProgress(action?: string, content?: string) {
   const safeText = content || '处理中...'
   const safeLabelMap: Record<string, string> = {
-    accepted: '已接收',
-    analysis: '分析',
-    request: '请求',
-    subscribed: '连接',
-    reasoning: '思考',
-    heartbeat: '心跳',
+    'accepted': '已接收',
+    'analysis': '分析',
+    'request': '请求',
+    'subscribed': '连接',
+    'reasoning': '思考',
+    'heartbeat': '心跳',
     'tool-start': '工具',
     'tool-complete': '工具',
     'first-delta': '输出',
     'stream-complete': '汇总',
-    complete: '完成',
+    'complete': '完成',
   }
   return `\n\n> ${safeLabelMap[String(action || '')] || '进度'}：${safeText}`
 }
@@ -633,6 +1357,58 @@ function formatToolMessage(tool?: AiToolCallResult) {
 
 function isCanvasTool(tool?: AiToolCallResult) {
   return tool?.toolName === 'cms.canvas.patch'
+}
+
+function isAskUserTool(tool?: AiToolCallResult) {
+  return tool?.toolName === 'cms.ask.user'
+}
+
+// 展示 AI 的澄清问题与可点击选项（后端已生成 TokUI DSL）。
+function showAskUserUi(tool?: AiToolCallResult) {
+  const dsl = String(tool?.payload?.tokui || '')
+  if (dsl) {
+    pendingAskDsl.value = dsl
+  }
+  pendingAskOptions.value = parseAskOptions(tool?.payload?.options)
+}
+
+// 用户点击某个选项后，作为下一轮消息发送，形成「AI 问 → 用户选 → 继续」的闭环。
+function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
+  const card = element.closest('.tokui-suggestion') as HTMLElement | null
+  const title = card?.querySelector('.tokui-suggestion__title')?.textContent?.trim()
+    || element.textContent?.trim()
+    || ''
+  if (!title) {
+    return
+  }
+  chooseAskOption(title)
+}
+
+function chooseAskOption(title: string) {
+  pendingAskDsl.value = ''
+  pendingAskOptions.value = []
+  chatbotRef.value?.addPrompt?.(title, true)
+}
+
+function parseAskOptions(raw: unknown): AskOption[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw
+    .map((item) => {
+      if (typeof item === 'string') {
+        return { title: item }
+      }
+      if (item && typeof item === 'object') {
+        const record = item as Record<string, unknown>
+        return {
+          title: String(record.title || record.label || '').trim(),
+          desc: String(record.desc || record.description || '').trim() || undefined,
+        }
+      }
+      return { title: '' }
+    })
+    .filter(item => item.title)
 }
 
 function applyAiResult(result: CmsPageGenerateResult) {
@@ -686,13 +1462,210 @@ function applyAiTool(tool?: AiToolCallResult) {
   if (action === 'replace-page' || action === 'set-css') {
     editor.setStyle(String(payload.cssContent || ''))
   }
+  if (action === 'append-css' && payload.cssContent) {
+    appendCanvasCss(String(payload.cssContent))
+  }
   if (action === 'add-html' && payload.htmlContent) {
-    editor.addComponents(String(payload.htmlContent))
+    const added = editor.addComponents(String(payload.htmlContent))
+    highlightAddedComponents(added)
   }
   if (action === 'remove-selector' && payload.selector) {
     editor.getWrapper()?.find(String(payload.selector)).forEach(component => component.remove())
   }
+  if ([
+    'replace-selected',
+    'set-selected-html',
+    'append-to-selected',
+    'prepend-to-selected',
+    'set-selected-text',
+    'set-attributes',
+    'set-styles',
+    'add-class',
+    'remove-class',
+    'remove-selected',
+  ].includes(action)) {
+    applySelectedComponentTool(action, payload)
+  }
   canvasRevision.value += 1
+}
+
+function applySelectedComponentTool(action: string, payload: Record<string, any>) {
+  const component = resolveToolTarget(payload)
+  if (!component) {
+    toast.warning('请先在画布中选择一个元素，AI 才能执行局部操作。')
+    return
+  }
+  if (action === 'replace-selected') {
+    replaceComponent(component, String(payload.htmlContent || ''))
+  }
+  else if (action === 'set-selected-html') {
+    component.components?.(String(payload.htmlContent || ''))
+  }
+  else if (action === 'append-to-selected') {
+    appendToComponent(component, String(payload.htmlContent || ''), false)
+  }
+  else if (action === 'prepend-to-selected') {
+    appendToComponent(component, String(payload.htmlContent || ''), true)
+  }
+  else if (action === 'set-selected-text') {
+    const text = String(payload.textContent || payload.htmlContent || '')
+    component.components?.(escapeHtml(text))
+  }
+  else if (action === 'set-attributes') {
+    const attributes = normalizeObject(payload.attributes)
+    if (Object.keys(attributes).length) {
+      component.addAttributes?.(attributes)
+    }
+  }
+  else if (action === 'set-styles') {
+    const styles = normalizeStylePatch(payload.styles || payload.style)
+    if (Object.keys(styles).length) {
+      component.addStyle?.(styles)
+    }
+  }
+  else if (action === 'add-class') {
+    splitClassNames(payload.className).forEach(name => component.addClass?.(name))
+  }
+  else if (action === 'remove-class') {
+    splitClassNames(payload.className).forEach(name => component.removeClass?.(name))
+  }
+  else if (action === 'remove-selected') {
+    component.remove?.()
+  }
+  highlightComponent(component)
+}
+
+function resolveToolTarget(payload: Record<string, any>) {
+  const selector = String(payload.selector || '').trim()
+  if (selector) {
+    const matched = editor?.getWrapper()?.find(selector) || []
+    if (matched.length > 0) {
+      return matched[0] as any
+    }
+  }
+  return editor?.getSelected() as any
+}
+
+function firstComponent(value: unknown): any {
+  if (Array.isArray(value)) {
+    return value[0]
+  }
+  const models = (value as { models?: unknown[] } | undefined)?.models
+  if (Array.isArray(models)) {
+    return models[0]
+  }
+  return value
+}
+
+function replaceComponent(component: any, html: string) {
+  if (!html.trim()) {
+    return undefined
+  }
+  if (typeof component.replaceWith === 'function') {
+    const next = component.replaceWith(html)
+    highlightAddedComponents(next)
+    return next
+  }
+  const parent = component.parent?.()
+  if (parent?.components) {
+    const index = typeof component.index === 'function' ? component.index() : undefined
+    component.remove?.()
+    const added = parent.components().add(html, typeof index === 'number' ? { at: index } : undefined)
+    highlightAddedComponents(added)
+    return added
+  }
+  return undefined
+}
+
+function appendToComponent(component: any, html: string, prepend: boolean) {
+  if (!html.trim()) {
+    return
+  }
+  const children = component.components?.()
+  const added = children?.add ? children.add(html, prepend ? { at: 0 } : undefined) : component.append?.(html)
+  highlightAddedComponents(added)
+}
+
+function normalizeStylePatch(value: unknown): Record<string, string> {
+  if (typeof value === 'string') {
+    return Object.fromEntries(
+      value.split(';')
+        .map(item => item.trim())
+        .filter(Boolean)
+        .map((item) => {
+          const index = item.indexOf(':')
+          return index > 0 ? [item.slice(0, index).trim(), item.slice(index + 1).trim()] : ['', '']
+        })
+        .filter(([key, item]) => key && item),
+    )
+  }
+  return Object.fromEntries(Object.entries(normalizeObject(value)).map(([key, item]) => [key, String(item)]))
+}
+
+function splitClassNames(value: unknown) {
+  return String(value || '').split(/\s+/).map(item => item.trim()).filter(Boolean)
+}
+
+// 向画布 iframe 注入高亮动画样式（非页面 CSS，不会被导出/保存）。
+function injectCanvasHighlightStyle(instance: Editor) {
+  try {
+    const doc = instance.Canvas.getDocument()
+    if (!doc || doc.getElementById('yb-ai-block-enter-style')) {
+      return
+    }
+    const style = doc.createElement('style')
+    style.id = 'yb-ai-block-enter-style'
+    style.textContent = `
+      @keyframes ybAiBlockEnter {
+        0% { opacity: 0; transform: translateY(16px); }
+        100% { opacity: 1; transform: translateY(0); }
+      }
+      .yb-ai-block-enter {
+        animation: ybAiBlockEnter 0.5s ease-out;
+        outline: 2px solid rgba(59, 130, 246, 0.6);
+        outline-offset: 2px;
+        transition: outline-color 0.9s ease-out;
+      }
+    `
+    doc.head?.appendChild(style)
+  }
+  catch {
+    // 画布尚未就绪时忽略，不影响主流程。
+  }
+}
+
+// 增量追加样式：在现有 CSS 之后拼接新片段，避免整表替换丢失已有样式。
+function appendCanvasCss(css: string) {
+  if (!editor || !css.trim()) {
+    return
+  }
+  const existing = editor.getCss() || ''
+  editor.setStyle(`${existing}\n${css}`.trim())
+}
+
+// 让新追加的区块平滑滚动进入视野，并短暂高亮，营造「一片片生成」的视觉反馈。
+function highlightAddedComponents(added: unknown) {
+  const components = Array.isArray(added) ? added : [added]
+  const first = components[0]
+  highlightComponent(first)
+}
+
+function highlightComponent(component: unknown) {
+  const item = Array.isArray(component) ? component[0] : component
+  const el = (item as { view?: { el?: HTMLElement } } | undefined)?.view?.el
+  if (!el) {
+    return
+  }
+  requestAnimationFrame(() => {
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    catch {
+      el.scrollIntoView()
+    }
+    el.classList.add('yb-ai-block-enter')
+    setTimeout(() => el.classList.remove('yb-ai-block-enter'), 1400)
+  })
 }
 
 function clearAiAttachments() {
@@ -747,6 +1720,28 @@ function attachmentMetaList(attachments: any[]): CmsAiChatAttachmentMeta[] {
 function compactText(value: string, maxLength: number) {
   const text = String(value || '').replace(/\s+/g, ' ').trim()
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
+
+function stripHtml(value: string) {
+  return String(value || '').replace(/<[^>]*>/g, ' ')
+}
+
+function normalizeObject(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {}
+  }
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key, item]) => key && item !== undefined && item !== null && String(item).trim() !== ''),
+  )
+}
+
+function cssEscape(value: string) {
+  return globalThis.CSS?.escape ? globalThis.CSS.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, '\\$&')
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function createHistoryId() {
@@ -1069,9 +2064,15 @@ function escapeAttr(value: string) {
         <FaButton variant="outline" size="sm" @click="command('core:redo')">
           <FaIcon name="i-ri:arrow-go-forward-line" />
         </FaButton>
-        <FaButton variant="outline" size="sm" @click="setDevice('desktop')">桌面</FaButton>
-        <FaButton variant="outline" size="sm" @click="setDevice('tablet')">平板</FaButton>
-        <FaButton variant="outline" size="sm" @click="setDevice('mobile')">手机</FaButton>
+        <FaButton variant="outline" size="sm" @click="setDevice('desktop')">
+          桌面
+        </FaButton>
+        <FaButton variant="outline" size="sm" @click="setDevice('tablet')">
+          平板
+        </FaButton>
+        <FaButton variant="outline" size="sm" @click="setDevice('mobile')">
+          手机
+        </FaButton>
         <FaButton size="sm" @click="save">
           <FaIcon name="i-ri:save-3-line" />
           保存
@@ -1152,8 +2153,21 @@ function escapeAttr(value: string) {
                     />
                   </TTooltip>
                 </div>
+                <label class="ai-thinking-switch">
+                  <TSwitch v-model="aiThinkingEnabled" size="small" />
+                  <span>深度思考</span>
+                </label>
               </template>
             </Chatbot>
+            <section v-if="pendingAskDsl" class="ai-ask" aria-label="AI 需求澄清">
+              <TokuiBlock :dsl="pendingAskDsl" />
+              <div v-if="pendingAskOptions.length" class="ai-ask-options">
+                <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
+                  <strong>{{ option.title }}</strong>
+                  <span v-if="option.desc">{{ option.desc }}</span>
+                </button>
+              </div>
+            </section>
             <section class="ai-history" aria-label="AI 会话记录">
               <div class="ai-history__head">
                 <div>
@@ -1161,8 +2175,12 @@ function escapeAttr(value: string) {
                   <span>{{ chatHistoryTargetLabel }}</span>
                 </div>
                 <div class="ai-history__actions">
-                  <button type="button" :disabled="chatHistoryLoading" @click="loadChatHistory(true)">刷新</button>
-                  <button type="button" :disabled="!chatHistorySummaries.length" @click="clearChatHistory">清空</button>
+                  <button type="button" :disabled="chatHistoryLoading" @click="loadChatHistory(true)">
+                    刷新
+                  </button>
+                  <button type="button" @click="clearChatHistory">
+                    清空并重开
+                  </button>
                 </div>
               </div>
 
@@ -1196,11 +2214,17 @@ function escapeAttr(value: string) {
               <div v-if="selectedChatHistory" class="ai-history__detail">
                 <div class="ai-history__detail-head">
                   <strong>{{ selectedChatHistory.title }}</strong>
-                  <button type="button" @click="selectedChatHistory = null">关闭</button>
+                  <button type="button" @click="selectedChatHistory = null">
+                    关闭
+                  </button>
                 </div>
                 <div class="ai-history__detail-actions">
-                  <button type="button" @click="restoreChatHistory">恢复到聊天区</button>
-                  <button type="button" @click="deleteSelectedChatHistory">删除本条</button>
+                  <button type="button" @click="restoreChatHistory">
+                    恢复到聊天区
+                  </button>
+                  <button type="button" @click="deleteSelectedChatHistory">
+                    删除本条
+                  </button>
                 </div>
                 <article v-for="message in selectedChatHistory.messages" :key="message.id">
                   <strong>{{ roleLabel(message.role) }}</strong>
@@ -1217,6 +2241,8 @@ function escapeAttr(value: string) {
           </div>
 
           <div class="ai-context">
+            <span>选中 {{ selectedCanvasSummary }}</span>
+            <span>变量 {{ cmsVariableCount }} 个</span>
             <span v-for="item in canvasStats" :key="item.label">
               {{ item.label }} {{ item.value }}
             </span>
@@ -1234,6 +2260,61 @@ function escapeAttr(value: string) {
         <section class="right-panel" :class="{ active: rightPanelTab === 'styles' }">
           <h3>样式</h3>
           <div ref="stylesEl" />
+        </section>
+        <section class="right-panel source-panel" :class="{ active: rightPanelTab === 'source' }">
+          <div class="source-panel__head">
+            <div>
+              <h3>源码</h3>
+              <span>{{ selectedSourceSummary }}</span>
+            </div>
+            <div class="source-panel__actions">
+              <FaButton variant="outline" size="sm" :disabled="!hasSelectedComponent" @click="syncSelectedSource(true)">
+                <FaIcon name="i-ri:refresh-line" />
+              </FaButton>
+              <FaButton variant="outline" size="sm" :disabled="!hasSelectedComponent || !selectedSourceCode.trim()" @click="formatSelectedSource">
+                <FaIcon name="i-ri:align-left" />
+                格式化
+              </FaButton>
+              <FaButton size="sm" :disabled="!hasSelectedComponent || !selectedSourceDirty" @click="applySelectedSource">
+                <FaIcon name="i-ri:check-line" />
+                应用
+              </FaButton>
+            </div>
+          </div>
+          <div class="source-panel__body">
+            <section class="source-editor-section source-editor-section--html">
+              <div class="source-editor-section__head">
+                <strong>HTML</strong>
+                <span>支持高亮、补全和源码格式化</span>
+              </div>
+              <CmsCodeEditor
+                v-model="selectedSourceCode"
+                class="source-panel__editor"
+                language="html"
+                :disabled="!hasSelectedComponent"
+                :completions="htmlSourceCompletions"
+                @update:model-value="markSelectedSourceDirty"
+              />
+            </section>
+            <section class="source-editor-section source-editor-section--css">
+              <div class="source-editor-section__head">
+                <strong>关联 CSS</strong>
+                <span>根据当前选择自动匹配</span>
+              </div>
+              <CmsCodeEditor
+                class="source-panel__editor"
+                :model-value="selectedRelatedCss"
+                language="css"
+                disabled
+                :completions="cssSourceCompletions"
+              />
+            </section>
+          </div>
+          <div class="source-panel__status" :class="{ error: selectedSourceError }">
+            <span v-if="selectedSourceError">{{ selectedSourceError }}</span>
+            <span v-else-if="selectedSourceDirty">未应用</span>
+            <span v-else>{{ hasSelectedComponent ? '已同步' : '未选择元素' }}</span>
+          </div>
         </section>
       </aside>
     </div>
@@ -1348,7 +2429,7 @@ function escapeAttr(value: string) {
 
 .right-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
   gap: 4px;
   padding: 4px;
   border: 1px solid #e5e7eb;
@@ -1411,6 +2492,117 @@ function escapeAttr(value: string) {
   font-size: 11px;
 }
 
+.source-panel.active {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: 100%;
+  overflow: hidden;
+}
+
+.source-panel__head,
+.source-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-panel__head {
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.source-panel__head > div:first-child {
+  min-width: 0;
+}
+
+.source-panel__head h3 {
+  margin: 0;
+}
+
+.source-panel__head span {
+  display: block;
+  max-width: 190px;
+  overflow: hidden;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-panel__actions {
+  flex: 0 0 auto;
+}
+
+.source-panel__body {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.source-editor-section {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 6px;
+  min-height: 240px;
+}
+
+.source-editor-section--html {
+  min-height: 360px;
+}
+
+.source-editor-section--css {
+  min-height: 250px;
+}
+
+.source-editor-section__head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.source-editor-section__head strong {
+  color: #0f172a;
+  font-size: 12px;
+}
+
+.source-editor-section__head span {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-panel__editor {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.source-panel__status {
+  min-height: 20px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.source-panel__status.error {
+  color: #dc2626;
+}
+
+.ai-thinking-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .ai-suggestions {
   display: flex;
   gap: 8px;
@@ -1444,6 +2636,55 @@ function escapeAttr(value: string) {
 .ai-suggestions button:hover {
   border-color: #cbd5e1;
   color: #0f172a;
+}
+
+.ai-ask {
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px solid #dbeafe;
+  border-radius: 14px;
+  background: rgba(239, 246, 255, 0.9);
+}
+
+.ai-ask-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ai-ask-options button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background: #fff;
+  color: #1e3a8a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-ask-options button:hover {
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.ai-ask-options strong,
+.ai-ask-options span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-ask-options strong {
+  font-size: 12px;
+}
+
+.ai-ask-options span {
+  color: #64748b;
+  font-size: 11px;
 }
 
 .ai-history {

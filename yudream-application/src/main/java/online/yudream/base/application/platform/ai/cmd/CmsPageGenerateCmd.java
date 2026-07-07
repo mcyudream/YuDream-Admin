@@ -1,6 +1,9 @@
 package online.yudream.base.application.platform.ai.cmd;
 
 import lombok.Data;
+import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
+
+import java.util.List;
 
 @Data
 public class CmsPageGenerateCmd {
@@ -16,5 +19,8 @@ public class CmsPageGenerateCmd {
     private String currentHtml;
     private String currentCss;
     private String currentProjectJson;
+    private String currentSelectionJson;
+    private String cmsVariableContextJson;
     private boolean thinkingEnabled;
+    private List<AiChatMessage> history;
 }

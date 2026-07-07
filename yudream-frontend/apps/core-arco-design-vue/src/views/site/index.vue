@@ -66,11 +66,24 @@ const renderContext = computed(() => {
     ? [{ name: nickname, avatar, url: '/' }]
     : [{ name: '登录', avatar: appSettingsStore.logo, url: '/login' }]
   const pageItems = publishedPages.value.map(toPageItem)
+  const siteInfo = {
+    name: appSettingsStore.siteName || 'YuDream',
+    description: appSettingsStore.siteDescription || home.value?.subtitle || page.value?.summary || '',
+    logo: appSettingsStore.logo || '',
+    favicon: appSettingsStore.favicon || '',
+    loginBanner: appSettingsStore.loginBanner || '',
+    currentYear: String(new Date().getFullYear()),
+  }
+  const copyright = appSettingsStore.settings.app.copyright
   return {
-    site: {
-      name: appSettingsStore.siteName || 'YuDream',
-      description: home.value?.subtitle || page.value?.summary || '',
-      logo: appSettingsStore.logo || '',
+    site: siteInfo,
+    system: {
+      ...siteInfo,
+      copyright: {
+        company: copyright.company || '',
+        website: copyright.website || '',
+        dates: copyright.dates || siteInfo.currentYear,
+      },
     },
     page: {
       title: page.value?.title || home.value?.title || '',

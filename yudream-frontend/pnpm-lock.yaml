@@ -16,6 +16,27 @@ catalogs:
     '@clack/prompts':
       specifier: ^1.5.1
       version: 1.5.1
+    '@codemirror/autocomplete':
+      specifier: ^6.20.3
+      version: 6.20.3
+    '@codemirror/commands':
+      specifier: ^6.10.4
+      version: 6.10.4
+    '@codemirror/lang-css':
+      specifier: ^6.3.1
+      version: 6.3.1
+    '@codemirror/lang-html':
+      specifier: ^6.4.11
+      version: 6.4.11
+    '@codemirror/language':
+      specifier: ^6.12.4
+      version: 6.12.4
+    '@codemirror/state':
+      specifier: ^6.7.0
+      version: 6.7.0
+    '@codemirror/view':
+      specifier: ^6.43.4
+      version: 6.43.4
     '@faker-js/faker':
       specifier: ^10.4.0
       version: 10.4.0
@@ -28,6 +49,9 @@ catalogs:
     '@iconify/vue':
       specifier: ^5.0.1
       version: 5.0.1
+    '@jboltai/tokui':
+      specifier: ^0.1.4
+      version: 0.1.4
     '@lucide/vue':
       specifier: ^1.17.0
       version: 1.17.0
@@ -396,6 +420,27 @@ importers:
 
   apps/core-arco-design-vue:
     dependencies:
+      '@codemirror/autocomplete':
+        specifier: 'catalog:'
+        version: 6.20.3
+      '@codemirror/commands':
+        specifier: 'catalog:'
+        version: 6.10.4
+      '@codemirror/lang-css':
+        specifier: 'catalog:'
+        version: 6.3.1
+      '@codemirror/lang-html':
+        specifier: 'catalog:'
+        version: 6.4.11
+      '@codemirror/language':
+        specifier: 'catalog:'
+        version: 6.12.4
+      '@codemirror/state':
+        specifier: 'catalog:'
+        version: 6.7.0
+      '@codemirror/view':
+        specifier: 'catalog:'
+        version: 6.43.4
       '@fantastic-admin/components':
         specifier: workspace:*
         version: link:../../packages/components
@@ -411,6 +456,9 @@ importers:
       '@form-create/arco-design':
         specifier: 'catalog:'
         version: 3.3.1(vue@3.5.38(typescript@6.0.3))
+      '@jboltai/tokui':
+        specifier: 'catalog:'
+        version: 0.1.4
       '@tdesign-vue-next/chat':
         specifier: 'catalog:'
         version: 0.5.2(omi@7.7.13)(vue@3.5.38(typescript@6.0.3))
@@ -2274,6 +2322,10 @@ packages:
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
     engines: {node: '>=12'}
+
+  '@jboltai/tokui@0.1.4':
+    resolution: {integrity: sha512-ixEonEfvrbtC6nEk3mU6sKNi3l6ZdNYzKeMQ03+pXgYwrrcg8PRq4ntSapKrFkB6Ub6dZS701v3c0XcO+pK9lA==}
+    engines: {node: '>=20'}
 
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
@@ -8656,6 +8708,8 @@ snapshots:
       strip-ansi-cjs: strip-ansi@6.0.1
       wrap-ansi: 8.1.0
       wrap-ansi-cjs: wrap-ansi@7.0.0
+
+  '@jboltai/tokui@0.1.4': {}
 
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:

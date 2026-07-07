@@ -1,6 +1,11 @@
 import type { ApiResponse } from './system-client'
-import systemClient from './system-client'
 import { prepareApiEncryption } from '@/utils/api-encryption'
+import systemClient from './system-client'
+
+export interface CmsChatHistoryMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
 
 export interface CmsPageGeneratePayload {
   title?: string
@@ -15,7 +20,10 @@ export interface CmsPageGeneratePayload {
   currentHtml?: string
   currentCss?: string
   currentProjectJson?: string
+  currentSelectionJson?: string
+  cmsVariableContextJson?: string
   thinkingEnabled?: boolean
+  history?: CmsChatHistoryMessage[]
 }
 
 export interface CmsPageGenerateResult {
