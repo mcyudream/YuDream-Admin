@@ -14,12 +14,14 @@ const toast = useFaToast()
 const { auth } = useAppAuth()
 const appAccountStore = useAppAccountStore()
 
+type EmailVerifiedFilter = 'true' | 'false'
+
 const loading = ref(false)
 const rows = ref<UserManageItem[]>([])
 const roles = ref<OptionItem[]>([])
 const depts = ref<DeptManageItem[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string; roleId?: IdValue; deptId?: IdValue; emailVerified?: boolean; status?: UserStatus }>({
+const search = reactive<{ keyword: string; roleId?: IdValue; deptId?: IdValue; emailVerified?: EmailVerifiedFilter; status?: UserStatus }>({
   keyword: '',
 })
 
@@ -48,8 +50,8 @@ const statusOptions = [
   { label: '停用', value: 'DISABLED' },
 ]
 const emailVerifiedOptions = [
-  { label: '已验证', value: true },
-  { label: '未验证', value: false },
+  { label: '已验证', value: 'true' },
+  { label: '未验证', value: 'false' },
 ]
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
 const roleOptions = computed(() => roles.value.map(item => ({
@@ -104,7 +106,7 @@ async function loadUsers() {
       keyword: search.keyword || undefined,
       roleId: search.roleId,
       deptId: search.deptId,
-      emailVerified: search.emailVerified,
+      emailVerified: resolveEmailVerifiedFilter(),
       status: search.status,
     })
     rows.value = res.data.records
@@ -123,6 +125,16 @@ function resetSearch() {
   search.status = undefined
   pagination.page = 1
   loadUsers()
+}
+
+function resolveEmailVerifiedFilter() {
+  if (search.emailVerified === 'true') {
+    return true
+  }
+  if (search.emailVerified === 'false') {
+    return false
+  }
+  return undefined
 }
 
 function openCreate() {
@@ -336,7 +348,7 @@ async function exportUsers() {
     keyword: search.keyword || undefined,
     roleId: search.roleId,
     deptId: search.deptId,
-    emailVerified: search.emailVerified,
+    emailVerified: resolveEmailVerifiedFilter(),
     status: search.status,
   })
   saveExcelResponse(res, '用户管理.xlsx')
