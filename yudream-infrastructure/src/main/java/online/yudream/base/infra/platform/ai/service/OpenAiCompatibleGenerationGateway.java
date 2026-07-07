@@ -59,8 +59,6 @@ import java.util.function.Consumer;
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
 public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
-    private static final int CONNECT_TIMEOUT = 30000;
-    private static final int READ_TIMEOUT = 180000;
     private static final int ERROR_BODY_LIMIT = 500;
     private static final String REASONING_CONTENT_KEY = "reasoningContent";
     private static final String REASONING_CONTENT_SNAKE_KEY = "reasoning_content";
@@ -68,15 +66,18 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
     private final AiProviderConfigParser providerConfigParser;
     private final List<AiProviderAdapter> providerAdapters;
+    private final AiClientProperties aiClientProperties;
 
     public OpenAiCompatibleGenerationGateway(
             ObjectProvider<AiAgentTool> aiAgentToolProvider,
             AiProviderConfigParser providerConfigParser,
-            List<AiProviderAdapter> providerAdapters
+            List<AiProviderAdapter> providerAdapters,
+            AiClientProperties aiClientProperties
     ) {
         this.aiAgentToolProvider = aiAgentToolProvider;
         this.providerConfigParser = providerConfigParser;
         this.providerAdapters = providerAdapters;
+        this.aiClientProperties = aiClientProperties;
     }
 
     @Override
@@ -151,7 +152,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         }
                     })
                     .doOnComplete(() -> progress(onProgress, "stream-complete", "模型流式输出已完成，正在汇总结果。"))
-                    .blockLast(Duration.ofMillis(READ_TIMEOUT));
+                    .blockLast(aiClientProperties.getReadTimeout());
             log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
             progress(onProgress, "complete", "AI 处理完成。");
             return toResult(content.toString(), toolResults);
@@ -245,8 +246,8 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private RestClient.Builder restClientBuilder(String proxyUrl) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofMillis(CONNECT_TIMEOUT));
-        factory.setReadTimeout(Duration.ofMillis(READ_TIMEOUT));
+        factory.setConnectTimeout(aiClientProperties.getConnectTimeout());
+        factory.setReadTimeout(aiClientProperties.getReadTimeout());
         if (StringUtils.hasText(proxyUrl)) {
             URI uri = parseProxyUri(proxyUrl);
             if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
@@ -264,7 +265,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private WebClient.Builder webClientBuilder(String proxyUrl) {
         HttpClient client = HttpClient.create()
-                .responseTimeout(Duration.ofMillis(READ_TIMEOUT));
+                .responseTimeout(aiClientProperties.getReadTimeout());
         if (StringUtils.hasText(proxyUrl)) {
             URI uri = parseProxyUri(proxyUrl);
             if (!StringUtils.hasText(uri.getHost()) || uri.getPort() <= 0) {
