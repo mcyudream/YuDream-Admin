@@ -94,12 +94,27 @@ const oauthProviderForm = reactive<OAuthProviderPayload>({
   status: 'ACTIVE',
 })
 
-const tabs = [
+const tabOptions = [
   { key: 'policy', label: '安全策略', icon: 'i-ri:shield-check-line' },
   { key: 'apiKey', label: 'API Key', icon: 'i-ri:key-2-line' },
   { key: 'oauth', label: 'OAuth', icon: 'i-ri:login-circle-line' },
   { key: 'passkey', label: 'Passkey', icon: 'i-ri:fingerprint-line' },
 ] as const
+
+const oauthEnabled = computed(() => policy.oauthServerEnabled || policy.oauthClientEnabled)
+
+const tabs = computed(() => tabOptions.filter((tab) => {
+  if (tab.key === 'apiKey') {
+    return policy.apiKeyEnabled
+  }
+  if (tab.key === 'passkey') {
+    return policy.passkeyEnabled
+  }
+  if (tab.key === 'oauth') {
+    return oauthEnabled.value
+  }
+  return true
+}))
 
 const policyCards = computed(() => [
   { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求体和响应体使用 RSA-OAEP + AES-GCM 加密', icon: 'i-ri:lock-password-line' },
@@ -186,6 +201,13 @@ onMounted(async () => {
   await loadFeatureData()
 })
 
+watch([
+  () => policy.apiKeyEnabled,
+  () => policy.passkeyEnabled,
+  () => policy.oauthServerEnabled,
+  () => policy.oauthClientEnabled,
+], syncActiveFeatureTabs)
+
 async function loadPolicy() {
   const res = await apiSecurity.policy()
   Object.assign(policy, res.data)
@@ -202,6 +224,18 @@ async function savePolicy() {
   }
   finally {
     savingPolicy.value = false
+  }
+}
+
+function syncActiveFeatureTabs() {
+  if (!tabs.value.some(tab => tab.key === activeTab.value)) {
+    activeTab.value = 'policy'
+  }
+  if (oauthPane.value === 'clients' && !policy.oauthServerEnabled && policy.oauthClientEnabled) {
+    oauthPane.value = 'providers'
+  }
+  if (oauthPane.value === 'providers' && !policy.oauthClientEnabled && policy.oauthServerEnabled) {
+    oauthPane.value = 'clients'
   }
 }
 
@@ -714,8 +748,8 @@ function normalizeDateTime(value?: string) {
             OAuth
           </div>
           <div class="key-actions">
-            <FaButton :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
-            <FaButton :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
+            <FaButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
+            <FaButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
             <FaButton variant="outline" :disabled="!oauthPaneEnabled()" @click="guardedRefreshOAuth">
               <FaIcon name="i-ri:refresh-line" />
               刷新

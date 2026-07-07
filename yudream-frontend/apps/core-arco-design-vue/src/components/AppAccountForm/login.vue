@@ -3,6 +3,7 @@ import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import * as z from 'zod'
 import apiUser from '@/api/modules/user'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 import { createPasskeyAuthenticationResponse } from '@/utils/webauthn'
 import { FormControl, FormField, FormItem, FormMessage } from '@/ui/shadcn/ui/form'
 
@@ -21,6 +22,7 @@ const emits = defineEmits<{
 }>()
 
 const appAccountStore = useAppAccountStore()
+const appFeatureStore = useAppFeatureStore()
 const appSettingsStore = useAppSettingsStore()
 const toast = useFaToast()
 
@@ -29,6 +31,20 @@ const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/lo
 const loading = ref(false)
 const passkeyLoading = ref(false)
 const type = ref<'password' | 'passkey'>('password')
+const loginTabs = computed(() => [
+  { label: '账号密码登录', value: 'password' },
+  ...(appFeatureStore.passkeyEnabled ? [{ label: 'Passkey 登录', value: 'passkey' }] : []),
+])
+
+onMounted(() => {
+  appFeatureStore.load()
+})
+
+watch(() => appFeatureStore.passkeyEnabled, (enabled) => {
+  if (!enabled && type.value === 'passkey') {
+    type.value = 'password'
+  }
+}, { immediate: true })
 
 const form = useForm({
   validationSchema: toTypedSchema(z.object({
@@ -56,6 +72,11 @@ const onSubmit = form.handleSubmit(async (values) => {
 })
 
 async function loginWithPasskey() {
+  if (!appFeatureStore.passkeyEnabled) {
+    toast.error('Passkey 未启用')
+    type.value = 'password'
+    return
+  }
   const account = form.values.account?.trim()
   if (!account) {
     toast.error('请输入用户名')
@@ -103,10 +124,7 @@ function rememberAccount(account: string, remember?: boolean) {
     </div>
     <div class="mb-4">
       <FaTabs
-        v-model="type" :list="[
-          { label: '账号密码登录', value: 'password' },
-          { label: 'Passkey 登录', value: 'passkey' },
-        ]" class="inline-flex"
+        v-model="type" :list="loginTabs" class="inline-flex"
       />
     </div>
     <form @submit="onSubmit">

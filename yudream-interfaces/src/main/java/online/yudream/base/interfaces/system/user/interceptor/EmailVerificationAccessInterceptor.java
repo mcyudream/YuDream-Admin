@@ -49,6 +49,9 @@ public class EmailVerificationAccessInterceptor implements HandlerInterceptor {
                 || path.equals("/api/system/security/encryption/public-key")) {
             return true;
         }
+        if ("GET".equalsIgnoreCase(method) && path.equals("/api/settings/features")) {
+            return true;
+        }
         if ("GET".equalsIgnoreCase(method) && (path.matches("/api/files/\\d+") || path.matches("/api/files/\\d+/content"))) {
             return true;
         }

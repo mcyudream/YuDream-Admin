@@ -2,6 +2,7 @@ import type { Router } from 'vue-router'
 import { useNProgress } from '@vueuse/integrations/useNProgress'
 import { warnKeepAliveComponentNameMissing } from 'virtual:fantastic-admin/turbo-console'
 import apiSetup from '@/api/modules/setup'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 import { refreshDynamicRoutes } from './dynamic'
 import '@/assets/styles/nprogress.css'
 
@@ -87,9 +88,26 @@ function setupRoutes(router: Router) {
       }
     }
     else {
+      if (to.name === 'setup' || to.name === 'verifyEmail') {
+        return
+      }
+      const appFeatureStore = useAppFeatureStore()
+      await appFeatureStore.load()
+      if ((to.name === 'publicSiteHome' || to.name === 'publicSitePage') && !appFeatureStore.cmsEnabled) {
+        return {
+          name: 'login',
+          replace: true,
+        }
+      }
+      if (to.name === 'publicDynamicForm' && !appFeatureStore.formEnabled) {
+        return {
+          name: 'login',
+          replace: true,
+        }
+      }
       if (to.name !== 'login' && !to.meta?.public) {
         return {
-          name: 'publicSiteHome',
+          name: appFeatureStore.cmsEnabled ? 'publicSiteHome' : 'login',
           replace: true,
         }
       }

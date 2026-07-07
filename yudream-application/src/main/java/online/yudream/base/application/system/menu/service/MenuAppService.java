@@ -41,7 +41,9 @@ public class MenuAppService {
             "platform:integration", "integration",
             "platform:document", "document-template",
             "platform:graph", "neo4j",
-            "platform:cms", "cms"
+            "platform:form", "form",
+            "platform:cms", "cms",
+            "platform:ai:generate", "ai"
     );
 
     private final MenuDomainService menuDomainService;
@@ -323,18 +325,34 @@ public class MenuAppService {
     }
 
     private boolean platformCapabilityVisible(Menu menu) {
-        String capabilityCode = PLATFORM_MENU_CAPABILITIES.entrySet().stream()
-                .filter(entry -> Objects.equals(menu.getCode(), entry.getKey())
-                        || Objects.equals(menu.getParentCode(), entry.getKey()))
-                .map(Map.Entry::getValue)
-                .findFirst()
-                .orElse(null);
+        String capabilityCode = resolvePlatformCapability(menu);
         if (capabilityCode == null) {
             return true;
         }
         return capabilityModuleRepo.findByCode(capabilityCode)
                 .map(module -> Boolean.TRUE.equals(module.getEnabled()))
                 .orElse(false);
+    }
+
+    private String resolvePlatformCapability(Menu menu) {
+        String capabilityCode = PLATFORM_MENU_CAPABILITIES.get(menu.getCode());
+        if (capabilityCode != null) {
+            return capabilityCode;
+        }
+        capabilityCode = PLATFORM_MENU_CAPABILITIES.get(menu.getParentCode());
+        if (capabilityCode != null) {
+            return capabilityCode;
+        }
+        return PLATFORM_MENU_CAPABILITIES.entrySet().stream()
+                .filter(entry -> isDescendantCode(menu.getCode(), entry.getKey())
+                        || isDescendantCode(menu.getParentCode(), entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean isDescendantCode(String code, String parentCode) {
+        return StringUtils.hasText(code) && StringUtils.hasText(parentCode) && code.startsWith(parentCode + ":");
     }
 
     private String resolveComponent(MenuNodeType type, String component) {

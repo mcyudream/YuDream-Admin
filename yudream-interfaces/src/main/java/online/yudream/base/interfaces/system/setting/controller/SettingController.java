@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.setting.service.SettingAppService;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.setting.assembler.SettingWebAssembler;
+import online.yudream.base.interfaces.system.setting.res.FrontendFeatureRes;
 import online.yudream.base.interfaces.system.setting.res.SiteSettingRes;
 import online.yudream.base.interfaces.system.setting.res.ThemeSettingRes;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,5 +29,10 @@ public class SettingController {
     @GetMapping("/theme")
     public Result<ThemeSettingRes> themeSettings() {
         return Result.ok(SettingWebAssembler.toRes(settingAppService.themeSettings()));
+    }
+
+    @GetMapping("/features")
+    public Result<FrontendFeatureRes> frontendFeatures() {
+        return Result.ok(SettingWebAssembler.toRes(settingAppService.frontendFeatures()));
     }
 }
