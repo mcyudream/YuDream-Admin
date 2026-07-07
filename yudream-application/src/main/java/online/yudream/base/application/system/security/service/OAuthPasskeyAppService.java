@@ -37,6 +37,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.security.SecureRandom;
 import java.util.HexFormat;
@@ -195,8 +196,8 @@ public class OAuthPasskeyAppService {
     public User finishPasskeyAuthentication(PasskeyAuthenticationFinishCmd cmd) {
         ensurePasskeyEnabled();
         PasskeyAuthenticationResult result = passkeyCeremonyGateway.finishAuthentication(cmd.getRequestJson(), cmd.getResponseJson());
-        User user = loginUser(result.username());
-        if (!user.getId().equals(result.userId()) || !user.getUsername().equals(cmd.getUsername())) {
+        User user = loginUser(cmd.getUsername());
+        if (!user.getId().equals(result.userId()) || !user.getUsername().equals(result.username())) {
             throw new BizException("Passkey 登录用户不匹配");
         }
         PasskeyCredential credential = passkeyCredentialRepo.findByCredentialId(result.credentialId())
@@ -237,8 +238,13 @@ public class OAuthPasskeyAppService {
         return OAuthProviderRegistration.create(cmd.getCode(), cmd.getName());
     }
 
-    private User loginUser(String username) {
-        User user = userRepo.findByUsername(username)
+    private User loginUser(String account) {
+        if (!StringUtils.hasText(account)) {
+            throw new BizException("账号不能为空");
+        }
+        String normalizedAccount = account.trim();
+        User user = userRepo.findByUsername(normalizedAccount)
+                .or(() -> userRepo.findByEmail(normalizedAccount))
                 .orElseThrow(() -> new BizException("用户不存在或未绑定 Passkey"));
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
