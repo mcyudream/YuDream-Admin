@@ -7,6 +7,7 @@ defineOptions({
 
 const route = useRoute()
 const router = useRouter()
+const appAccountStore = useAppAccountStore()
 
 const loading = ref(true)
 const success = ref(false)
@@ -23,6 +24,7 @@ onMounted(() => {
   apiUser.verifyEmail(token).then(() => {
     loading.value = false
     success.value = true
+    appAccountStore.setEmailVerified(true)
     message.value = '邮箱验证成功，即将跳转到登录页'
     setTimeout(() => {
       router.push({ name: 'login' })

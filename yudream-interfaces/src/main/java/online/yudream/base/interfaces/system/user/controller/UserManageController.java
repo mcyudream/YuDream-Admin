@@ -63,6 +63,13 @@ public class UserManageController {
         return Result.ok();
     }
 
+    @PostMapping("/{id}/enable")
+    @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "编辑用户资料")
+    public Result<Void> enable(@PathVariable Long id) {
+        userManageAppService.enable(id);
+        return Result.ok();
+    }
+
     @PutMapping("/{id}/roles")
     @PermissionRegister(code = "system:user:assign-role", name = "分配用户角色", module = "系统管理", desc = "分配用户角色")
     public Result<UserManageRes> assignRoles(@PathVariable Long id, @Valid @RequestBody UserAssignRolesRequest request) {

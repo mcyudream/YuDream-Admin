@@ -23,6 +23,7 @@ interface AccountSession {
   userId?: IdValue
   account: string
   avatar: string
+  emailVerified: boolean
   currentDept: DeptItem | null
   currentRole: RoleItem | null
 }
@@ -41,6 +42,8 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   const userId = ref<IdValue | ''>(localStorage.getItem('userId') ?? '')
   const account = ref(localStorage.getItem('account') ?? '')
   const avatar = ref(localStorage.getItem('avatar') ?? '')
+  const storedEmailVerified = localStorage.getItem('emailVerified')
+  const emailVerified = ref(storedEmailVerified == null ? true : storedEmailVerified === 'true')
 
   // 当前部门/角色
   const currentDept = ref<DeptItem | null>(parseStoredItem<DeptItem>('currentDept'))
@@ -57,6 +60,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     }
     return false
   })
+  const isEmailUnverified = computed(() => isLogin.value && emailVerified.value === false)
   const isImpersonating = computed(() => !!impersonatorSession.value)
   const impersonatorAccount = computed(() => impersonatorSession.value?.account ?? '')
 
@@ -122,6 +126,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     token.value = user.token
     refreshToken.value = user.refreshToken || ''
     avatar.value = nextAvatar
+    setEmailVerified(user.emailVerified ?? true)
     setCurrentDept(null)
     setCurrentRole(null)
   }
@@ -133,6 +138,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
       userId: userId.value || undefined,
       account: account.value,
       avatar: avatar.value,
+      emailVerified: emailVerified.value,
       currentDept: currentDept.value,
       currentRole: currentRole.value,
     }
@@ -195,6 +201,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     userId.value = session.userId || ''
     account.value = session.account
     avatar.value = session.avatar
+    setEmailVerified(session.emailVerified)
     setCurrentDept(session.currentDept)
     setCurrentRole(session.currentRole)
     clearImpersonatorSession()
@@ -293,11 +300,13 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     localStorage.removeItem('userId')
     localStorage.removeItem('avatar')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('emailVerified')
     localStorage.removeItem('currentDept')
     localStorage.removeItem('currentRole')
     userId.value = ''
     account.value = ''
     avatar.value = ''
+    emailVerified.value = true
     currentDept.value = null
     currentRole.value = null
     permissions.value = []
@@ -311,6 +320,13 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   async function getPermissions() {
     const res = await apiApp.permission()
     permissions.value = res.data.permissions
+    if (typeof res.data.emailVerified === 'boolean') {
+      setEmailVerified(res.data.emailVerified)
+    }
+  }
+
+  async function resendVerificationEmail() {
+    await apiUser.resendVerificationEmail()
   }
 
   // 修改密码
@@ -331,16 +347,23 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     }
   }
 
+  function setEmailVerified(value: boolean) {
+    emailVerified.value = value
+    localStorage.setItem('emailVerified', String(value))
+  }
+
   return {
     token,
     refreshToken,
     userId,
     account,
     avatar,
+    emailVerified,
     currentDept,
     currentRole,
     permissions,
     isLogin,
+    isEmailUnverified,
     isImpersonating,
     impersonatorAccount,
     login,
@@ -355,7 +378,9 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     logout,
     requestLogout,
     getPermissions,
+    resendVerificationEmail,
     editPassword,
     setAvatar,
+    setEmailVerified,
   }
 })

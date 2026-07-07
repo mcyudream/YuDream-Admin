@@ -123,6 +123,12 @@ public class UserController {
         return Result.ok(UserWebAssembler.toProfileRes(userAppService.profile(StpUtil.getLoginIdAsLong())));
     }
 
+    @PostMapping("/me/resend-verification-email")
+    public Result<Void> resendVerificationEmail() {
+        userAppService.resendVerificationEmail(StpUtil.getLoginIdAsLong());
+        return Result.ok();
+    }
+
     @PutMapping("/me/profile")
     public Result<UserProfileRes> updateProfile(@Valid @RequestBody UserProfileUpdateRequest request) {
         return Result.ok(UserWebAssembler.toProfileRes(
@@ -174,6 +180,9 @@ public class UserController {
 
     @GetMapping("/permissions")
     public Result<PermissionListVO> permissions() {
-        return Result.ok(UserWebAssembler.toPermissionListVO(permissionAppService.getUserPermissions(StpUtil.getLoginIdAsLong())));
+        Long userId = StpUtil.getLoginIdAsLong();
+        return Result.ok(UserWebAssembler.toPermissionListVO(
+                permissionAppService.getUserPermissions(userId),
+                userAppService.isEmailVerified(userId)));
     }
 }

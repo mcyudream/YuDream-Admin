@@ -80,10 +80,15 @@ const permissionNameMap = computed(() => new Map(availablePermissions.value.map(
 
 onMounted(async () => {
   await loadProfile()
-  await loadPasskeys()
+  if (!appAccountStore.isEmailUnverified) {
+    await loadPasskeys()
+  }
 })
 
 watch(active, async (tab) => {
+  if (appAccountStore.isEmailUnverified) {
+    return
+  }
   if (tab === 'apiKey') {
     await Promise.allSettled([
       apiKeys.value.length ? Promise.resolve() : loadApiKeys(),
@@ -112,6 +117,7 @@ async function loadProfile() {
       qq: data.qq || '',
     })
     appAccountStore.setAvatar(data.avatar)
+    appAccountStore.setEmailVerified(data.emailVerified)
   }
   finally {
     loading.value = false

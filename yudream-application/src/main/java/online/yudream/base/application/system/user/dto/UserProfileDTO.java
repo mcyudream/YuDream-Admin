@@ -24,6 +24,7 @@ public class UserProfileDTO implements Serializable {
     private String email;
     private String phone;
     private String qq;
+    private boolean emailVerified;
     private String avatar;
     private Long avatarFileId;
     private LocalDateTime createTime;
