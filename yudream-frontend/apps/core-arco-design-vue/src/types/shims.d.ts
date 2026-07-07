@@ -21,3 +21,5 @@ declare module 'form-create-designer-arco-design' {
   const plugin: Plugin
   export default plugin
 }
+
+declare module '@jboltai/tokui/css'

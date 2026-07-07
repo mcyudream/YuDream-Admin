@@ -28,11 +28,15 @@ public class CmsCanvasAiTool implements AiAgentTool {
                 "平台能力",
                 "允许 AI Agent 修改 CMS 构建器画布",
                 Map.of(
-                        "action", "replace-page | set-html | set-css | load-project | add-html | remove-selector",
-                        "htmlContent", "页面主体 HTML",
-                        "cssContent", "页面 CSS",
+                        "action", "replace-page | set-html | set-css | append-css | load-project | add-html | remove-selector | replace-selected | set-selected-html | append-to-selected | prepend-to-selected | set-selected-text | set-attributes | set-styles | add-class | remove-class | remove-selected",
+                        "htmlContent", "页面主体 HTML；add-html 时为要追加到画布末尾的单个区块",
+                        "cssContent", "页面 CSS；append-css 时为要追加的样式片段",
                         "builderProjectJson", "GrapesJS Project JSON",
-                        "selector", "remove-selector 使用的 CSS 选择器"
+                        "selector", "可选 CSS 选择器；为空时 selected 系列动作作用于当前选中元素",
+                        "textContent", "set-selected-text 使用的文本内容",
+                        "attributes", "set-attributes 使用的属性对象",
+                        "styles", "set-styles 使用的样式对象",
+                        "className", "add-class/remove-class 使用的类名"
                 )
         );
     }
@@ -55,6 +59,12 @@ public class CmsCanvasAiTool implements AiAgentTool {
         putIfPresent(payload, "builderProjectJson", args.get("builderProjectJson"));
         putIfPresent(payload, "markdownContent", args.get("markdownContent"));
         putIfPresent(payload, "selector", args.get("selector"));
+        putIfPresent(payload, "textContent", args.get("textContent"));
+        putIfPresent(payload, "attributes", args.get("attributes"));
+        putIfPresent(payload, "styles", args.get("styles"));
+        putIfPresent(payload, "style", args.get("style"));
+        putIfPresent(payload, "className", args.get("className"));
+        putIfPresent(payload, "target", args.get("target"));
         return new AiAgentToolResult(
                 TOOL_NAME,
                 action,
@@ -68,9 +78,20 @@ public class CmsCanvasAiTool implements AiAgentTool {
         return "replace-page".equals(action)
                 || "set-html".equals(action)
                 || "set-css".equals(action)
+                || "append-css".equals(action)
                 || "load-project".equals(action)
                 || "add-html".equals(action)
-                || "remove-selector".equals(action);
+                || "remove-selector".equals(action)
+                || "replace-selected".equals(action)
+                || "set-selected-html".equals(action)
+                || "append-to-selected".equals(action)
+                || "prepend-to-selected".equals(action)
+                || "set-selected-text".equals(action)
+                || "set-attributes".equals(action)
+                || "set-styles".equals(action)
+                || "add-class".equals(action)
+                || "remove-class".equals(action)
+                || "remove-selected".equals(action);
     }
 
     private void putIfPresent(Map<String, Object> target, String key, Object value) {

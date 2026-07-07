@@ -62,7 +62,8 @@ public class AiController {
                         AiWebAssembler.toCmd(request),
                         delta -> send(emitter, AiWebAssembler.toDeltaEvent(traceId, delta)),
                         tool -> {
-                            send(emitter, AiWebAssembler.toProgressEvent(traceId, "tool", "正在更新画布。"));
+                            boolean asking = "cms.ask.user".equals(tool.toolName());
+                            send(emitter, AiWebAssembler.toProgressEvent(traceId, "tool", asking ? "正在向你确认需求。" : "正在更新画布。"));
                             send(emitter, AiWebAssembler.toToolEvent(traceId, tool));
                         },
                         progress -> send(emitter, AiWebAssembler.toProgressEvent(traceId, progress.action(), progress.content()))

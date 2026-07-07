@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
@@ -17,6 +18,9 @@ import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import online.yudream.base.infra.platform.ai.service.provider.ResolvedAiModel;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.model.tool.DefaultToolCallingManager;
@@ -213,6 +217,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, request))
                 .prompt()
                 .system(request.systemPrompt())
+                .messages(historyMessages(request.history()))
                 .user(user -> {
                     user.text(request.userPrompt());
                     imageMedia(request.imageDataUrl()).ifPresent(user::media);
@@ -376,6 +381,29 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         } catch (Exception e) {
             throw new BizException("样图解析失败：" + e.getMessage());
         }
+    }
+
+    private List<Message> historyMessages(List<AiChatMessage> history) {
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+        List<AiChatMessage> valid = history.stream()
+                .filter(item -> item != null && StringUtils.hasText(item.content()))
+                .toList();
+        int maxMessages = Math.max(0, aiClientProperties.getHistoryMaxTurns()) * 2;
+        if (maxMessages > 0 && valid.size() > maxMessages) {
+            valid = valid.subList(valid.size() - maxMessages, valid.size());
+        }
+        List<Message> messages = new ArrayList<>(valid.size());
+        for (AiChatMessage item : valid) {
+            if (item.isAssistant()) {
+                messages.add(new AssistantMessage(item.content().trim()));
+            } else {
+                messages.add(new UserMessage(item.content().trim()));
+            }
+        }
+        log.debug("AI history injected, turns={}, messages={}", messages.size() / 2, messages.size());
+        return messages;
     }
 
     private AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
