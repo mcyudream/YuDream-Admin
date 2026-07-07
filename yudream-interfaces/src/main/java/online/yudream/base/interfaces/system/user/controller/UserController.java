@@ -17,6 +17,8 @@ import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationStartRequest;
 import online.yudream.base.interfaces.system.user.request.UserLoginRequest;
+import online.yudream.base.interfaces.system.user.request.UserPasswordResetEmailRequest;
+import online.yudream.base.interfaces.system.user.request.UserPasswordResetRequest;
 import online.yudream.base.interfaces.system.user.request.UserProfileUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserRegisterRequest;
 import online.yudream.base.interfaces.system.user.request.UserSwitchDeptRequest;
@@ -57,6 +59,18 @@ public class UserController {
     @PostMapping("/register")
     public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request) {
         return Result.ok(UserWebAssembler.toRegisterRes(userAppService.register(UserWebAssembler.toRegisterCmd(request))));
+    }
+
+    @PostMapping("/password-reset/email")
+    public Result<Void> sendPasswordResetEmail(@Valid @RequestBody UserPasswordResetEmailRequest request) {
+        userAppService.sendPasswordResetEmail(UserWebAssembler.toCmd(request));
+        return Result.ok();
+    }
+
+    @PostMapping("/password-reset")
+    public Result<Void> resetPassword(@Valid @RequestBody UserPasswordResetRequest request) {
+        userAppService.resetPassword(UserWebAssembler.toCmd(request));
+        return Result.ok();
     }
 
     @PostMapping("/login")

@@ -62,6 +62,8 @@ public class EmailVerificationAccessInterceptor implements HandlerInterceptor {
                 || path.equals("/api/user/register")
                 || path.equals("/api/user/token/refresh")
                 || path.equals("/api/user/verify-email")
+                || path.equals("/api/user/password-reset/email")
+                || path.equals("/api/user/password-reset")
                 || path.equals("/api/user/passkeys/authentication/options")
                 || path.equals("/api/user/passkeys/authentication")) {
             return true;

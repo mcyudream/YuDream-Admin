@@ -33,6 +33,15 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/reset-password',
+    name: 'resetPassword',
+    component: () => import('@/views/reset-password.vue'),
+    meta: {
+      title: '重置密码',
+      public: true,
+    },
+  },
+  {
     path: '/site',
     name: 'publicSiteHome',
     component: () => import('@/views/site/index.vue'),

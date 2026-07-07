@@ -61,6 +61,13 @@ public class User extends BaseDomain {
         this.emailVerified = true;
     }
 
+    public void resetPassword(Password password) {
+        if (password == null) {
+            throw new BizException("密码不能为空");
+        }
+        this.password = password;
+    }
+
     public void updateProfile(String nickname, Email email, Phone phone, QQ qq, Boolean emailVerified) {
         this.nickname = nickname;
         this.email = email;

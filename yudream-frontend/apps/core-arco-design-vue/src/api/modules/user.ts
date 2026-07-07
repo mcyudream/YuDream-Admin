@@ -173,6 +173,14 @@ export default {
     })
   },
 
+  sendPasswordResetEmail: (data: { account: string }) => {
+    return userApi.post<unknown, { status: 1, error: '', data: null }>('api/user/password-reset/email', data, { skipTokenRefresh: true })
+  },
+
+  resetPassword: (data: { token: string, password: string }) => {
+    return userApi.post<unknown, { status: 1, error: '', data: null }>('api/user/password-reset', data, { skipTokenRefresh: true })
+  },
+
   resendVerificationEmail: () => {
     return userApi.post<unknown, { status: 1, error: '', data: null }>('api/user/me/resend-verification-email')
   },
