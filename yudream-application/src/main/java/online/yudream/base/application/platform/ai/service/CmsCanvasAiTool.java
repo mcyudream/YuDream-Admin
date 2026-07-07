@@ -28,9 +28,10 @@ public class CmsCanvasAiTool implements AiAgentTool {
                 "平台能力",
                 "允许 AI Agent 修改 CMS 构建器画布",
                 Map.of(
-                        "action", "replace-page | set-html | set-css | append-css | load-project | add-html | remove-selector | replace-selected | set-selected-html | append-to-selected | prepend-to-selected | set-selected-text | set-attributes | set-styles | add-class | remove-class | remove-selected",
+                        "action", "replace-page | set-html | set-css | append-css | set-js | append-js | load-project | add-html | remove-selector | replace-selected | set-selected-html | append-to-selected | prepend-to-selected | set-selected-text | set-attributes | set-styles | add-class | remove-class | remove-selected",
                         "htmlContent", "页面主体 HTML；add-html 时为要追加到画布末尾的单个区块",
                         "cssContent", "页面 CSS；append-css 时为要追加的样式片段",
+                        "jsContent", "页面 JavaScript；append-js 时为要追加的脚本片段，不要包含 script 标签",
                         "builderProjectJson", "GrapesJS Project JSON",
                         "selector", "可选 CSS 选择器；为空时 selected 系列动作作用于当前选中元素",
                         "textContent", "set-selected-text 使用的文本内容",
@@ -56,6 +57,7 @@ public class CmsCanvasAiTool implements AiAgentTool {
         putIfPresent(payload, "summary", args.get("summary"));
         putIfPresent(payload, "htmlContent", args.get("htmlContent"));
         putIfPresent(payload, "cssContent", args.get("cssContent"));
+        putIfPresent(payload, "jsContent", args.get("jsContent"));
         putIfPresent(payload, "builderProjectJson", args.get("builderProjectJson"));
         putIfPresent(payload, "markdownContent", args.get("markdownContent"));
         putIfPresent(payload, "selector", args.get("selector"));
@@ -79,6 +81,8 @@ public class CmsCanvasAiTool implements AiAgentTool {
                 || "set-html".equals(action)
                 || "set-css".equals(action)
                 || "append-css".equals(action)
+                || "set-js".equals(action)
+                || "append-js".equals(action)
                 || "load-project".equals(action)
                 || "add-html".equals(action)
                 || "remove-selector".equals(action)

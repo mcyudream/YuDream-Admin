@@ -19,6 +19,7 @@ export interface CmsPageGeneratePayload {
   imageDataUrl?: string
   currentHtml?: string
   currentCss?: string
+  currentJs?: string
   currentProjectJson?: string
   currentSelectionJson?: string
   cmsVariableContextJson?: string
@@ -31,6 +32,7 @@ export interface CmsPageGenerateResult {
   summary?: string
   htmlContent?: string
   cssContent?: string
+  jsContent?: string
   builderProjectJson?: string
   markdownContent?: string
   tools?: AiToolCallResult[]

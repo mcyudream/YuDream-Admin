@@ -73,15 +73,16 @@ public class CmsCanvasAtomicAiTools {
         return new FixedCanvasTool(
                 "cms.canvas.block.add",
                 "追加画布区块",
-                "向 GrapesJS 画布末尾追加一个独立 HTML 区块，可附带本区块 CSS。",
+                "向 GrapesJS 画布末尾追加一个独立 HTML 区块，可附带本区块 CSS/JS。",
                 "add-html",
                 "新区块已追加到画布",
-                List.of("title", "summary", "htmlContent", "cssContent", "markdownContent"),
+                List.of("title", "summary", "htmlContent", "cssContent", "jsContent", "markdownContent"),
                 Map.of(
                         "title", "可选区块标题",
                         "summary", "可选区块摘要",
                         "htmlContent", "要追加到画布末尾的单个区块 HTML",
                         "cssContent", "该区块需要追加的 CSS",
+                        "jsContent", "该区块需要追加的 JavaScript，不要包含 script 标签",
                         "message", "给用户看的简短完成说明"
                 )
         );

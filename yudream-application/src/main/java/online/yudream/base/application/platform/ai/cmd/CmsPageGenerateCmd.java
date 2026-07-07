@@ -18,6 +18,7 @@ public class CmsPageGenerateCmd {
     private String imageDataUrl;
     private String currentHtml;
     private String currentCss;
+    private String currentJs;
     private String currentProjectJson;
     private String currentSelectionJson;
     private String cmsVariableContextJson;

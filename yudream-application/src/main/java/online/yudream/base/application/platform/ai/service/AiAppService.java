@@ -136,13 +136,14 @@ public class AiAppService {
                 工具说明：
                 - web.fetch（模型工具名 web_fetch）：抓取公开网页的标题、描述和正文摘要，用于设计分析，不修改画布。
                 - cms.ask.user（模型工具名 cms_ask_user）：需求不明确时向用户提问并给出可点击选项，等待用户选择，不修改画布。
-                - cms.canvas.patch（模型工具名 cms_canvas_patch）：修改 GrapesJS CMS 画布，action 支持 replace-page、set-html、set-css、append-css、load-project、add-html、remove-selector、replace-selected、set-selected-html、append-to-selected、prepend-to-selected、set-selected-text、set-attributes、set-styles、add-class、remove-class、remove-selected。
+                - cms.canvas.patch（模型工具名 cms_canvas_patch）：修改 GrapesJS CMS 画布，action 支持 replace-page、set-html、set-css、append-css、set-js、append-js、load-project、add-html、remove-selector、replace-selected、set-selected-html、append-to-selected、prepend-to-selected、set-selected-text、set-attributes、set-styles、add-class、remove-class、remove-selected。
                 - 原子画布工具：cms.canvas.selected.text（模型工具名 cms_canvas_selected_text）只改选中文案；cms.canvas.selected.html（cms_canvas_selected_html）只替换选中元素内部 HTML；cms.canvas.selected.style（cms_canvas_selected_style）只改选中样式；cms.canvas.block.add（cms_canvas_block_add）只追加单个区块；cms.canvas.selected.remove（cms_canvas_selected_remove）只删除选中元素。
 
                 cms.canvas.patch 参数要求：
                 - htmlContent 只返回页面主体内容，不要 html/head/body/script，不要系统导航栏或 footer；add-html 时只返回当前这一个区块的 HTML。
                 - cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀；append-css 时只返回本次要新增的样式片段。
-                - builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent 足够完整。
+                - jsContent 只写页面交互 JavaScript，不要包含 script 标签；优先使用 window.__YU_CMS_READY__(() => {}) 或直接执行初始化逻辑，使用 data-yb-* / class 选择器绑定事件；需要访问 CMS 上下文时使用 window.__YU_CMS_CONTEXT__。
+                - builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent/jsContent 足够完整。
                 - title、summary、markdownContent 可以作为辅助字段传给工具。
                 - set-attributes 使用 attributes 对象；set-styles 使用 styles 对象；add-class/remove-class 使用 className。
                 - 如果需要按 CSS 选择器定位，传 selector；否则 selected 系列动作会作用于用户当前选中的画布元素。
@@ -177,6 +178,9 @@ public class AiAppService {
                 当前 CSS：
                 %s
 
+                当前 JavaScript：
+                %s
+
                 当前 GrapesJS Project JSON：
                 %s
 
@@ -197,6 +201,7 @@ public class AiAppService {
                 cmd.isThinkingEnabled() ? "开启" : "关闭",
                 defaultText(cmd.getCurrentHtml(), "无"),
                 defaultText(cmd.getCurrentCss(), "无"),
+                defaultText(cmd.getCurrentJs(), "无"),
                 defaultText(cmd.getCurrentProjectJson(), "无"),
                 defaultText(cmd.getCmsVariableContextJson(), "无"),
                 defaultText(cmd.getCurrentSelectionJson(), "无"),
@@ -245,6 +250,7 @@ public class AiAppService {
     private List<AiAgentToolCall> fallbackToolCalls(CmsPageGenerateDTO dto) {
         if (!StringUtils.hasText(dto.getHtmlContent())
                 && !StringUtils.hasText(dto.getCssContent())
+                && !StringUtils.hasText(dto.getJsContent())
                 && !StringUtils.hasText(dto.getBuilderProjectJson())) {
             return List.of();
         }
@@ -254,6 +260,7 @@ public class AiAppService {
         arguments.put("summary", dto.getSummary());
         arguments.put("htmlContent", dto.getHtmlContent());
         arguments.put("cssContent", dto.getCssContent());
+        arguments.put("jsContent", dto.getJsContent());
         arguments.put("builderProjectJson", dto.getBuilderProjectJson());
         arguments.put("markdownContent", dto.getMarkdownContent());
         return List.of(new AiAgentToolCall(CmsCanvasAiTool.TOOL_NAME, arguments));
