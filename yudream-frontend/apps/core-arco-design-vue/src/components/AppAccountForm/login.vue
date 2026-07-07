@@ -48,7 +48,7 @@ watch(() => appFeatureStore.passkeyEnabled, (enabled) => {
 
 const form = useForm({
   validationSchema: toTypedSchema(z.object({
-    account: z.string().min(1, '请输入用户名'),
+    account: z.string().min(1, '请输入用户名或邮箱'),
     password: z.string().min(1, '请输入密码'),
     remember: z.boolean(),
   })),
@@ -79,7 +79,7 @@ async function loginWithPasskey() {
   }
   const account = form.values.account?.trim()
   if (!account) {
-    toast.error('请输入用户名')
+    toast.error('请输入用户名或邮箱')
     return
   }
   passkeyLoading.value = true
@@ -131,7 +131,7 @@ function rememberAccount(account: string, remember?: boolean) {
       <FormField v-slot="{ componentField, errors }" name="account">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
-            <FaInput type="text" placeholder="用户名" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
+            <FaInput type="text" placeholder="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
               <template #start>
                 <FaIcon name="i-lucide:user" />
               </template>

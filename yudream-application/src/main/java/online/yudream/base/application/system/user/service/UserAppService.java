@@ -38,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -217,10 +218,25 @@ public class UserAppService {
     }
 
     private User findLoginUser(UserLoginCmd cmd) {
-        return userRepo.findByUsernameAll(cmd.getUsername()).stream()
+        String account = cmd == null ? null : cmd.getUsername();
+        if (!StringUtils.hasText(account)) {
+            throw new BizException("用户名或邮箱不能为空");
+        }
+        return loginCandidates(account.trim()).stream()
                 .filter(user -> user.getPassword() != null && user.getPassword().matches(cmd.getPassword(), passwordEncoder))
                 .findFirst()
-                .orElseThrow(() -> new BizException("用户名或密码错误"));
+                .orElseThrow(() -> new BizException("用户名、邮箱或密码错误"));
+    }
+
+    private List<User> loginCandidates(String account) {
+        List<User> users = new ArrayList<>(userRepo.findByUsernameAll(account));
+        for (User emailUser : userRepo.findByEmailAll(account)) {
+            boolean exists = users.stream().anyMatch(user -> Objects.equals(user.getId(), emailUser.getId()));
+            if (!exists) {
+                users.add(emailUser);
+            }
+        }
+        return users;
     }
 
     private User resolveEmailVerifyUser(EmailVerifyTarget target) {
