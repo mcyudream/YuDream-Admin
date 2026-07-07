@@ -12,7 +12,11 @@ public interface UserRepo {
 
     boolean existsByUsername(String username);
 
+    boolean existsVerifiedByUsername(String username);
+
     boolean existsByEmail(String email);
+
+    boolean existsVerifiedByEmail(String email);
 
     boolean existsByQQ(String qq);
 
@@ -20,11 +24,17 @@ public interface UserRepo {
 
     Optional<User> findByUsername(String username);
 
+    List<User> findByUsernameAll(String username);
+
     Optional<User> findByEmail(String email);
+
+    List<User> findByEmailAll(String email);
 
     Optional<User> findById(Long id);
 
     List<User> findByIds(List<Long> ids);
+
+    void deleteByIds(List<Long> ids);
 
     PageResult<User> page(String keyword, Long deptId, Long roleId, Boolean emailVerified, UserStatus status, int page, int size);
 
