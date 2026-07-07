@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.system.user.assembler.UserAssembler;
 import online.yudream.base.application.system.user.cmd.UserLoginCmd;
+import online.yudream.base.application.system.user.cmd.UserPasswordResetCmd;
+import online.yudream.base.application.system.user.cmd.UserPasswordResetEmailCmd;
 import online.yudream.base.application.system.user.cmd.UserProfileUpdateCmd;
 import online.yudream.base.application.system.user.cmd.UserRegisterCmd;
 import online.yudream.base.application.system.user.dto.UserProfileDTO;
@@ -21,9 +23,11 @@ import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.service.EmailVerifyTokenProvider;
+import online.yudream.base.domain.system.user.service.PasswordResetTokenProvider;
 import online.yudream.base.domain.system.user.service.UserRegisterMailSender;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.EmailVerifyTarget;
+import online.yudream.base.domain.system.user.valobj.PasswordResetTarget;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
@@ -36,6 +40,7 @@ import org.springframework.util.StringUtils;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -47,6 +52,7 @@ public class UserAppService {
     private final DeptRepo deptRepo;
     private final PasswordEncoder passwordEncoder;
     private final EmailVerifyTokenProvider emailVerifyTokenProvider;
+    private final PasswordResetTokenProvider passwordResetTokenProvider;
     private final UserRegisterMailSender userRegisterMailSender;
     private final FileAppService fileAppService;
 
@@ -125,6 +131,38 @@ public class UserAppService {
         String token = emailVerifyTokenProvider.generate(user.getId(), email);
         userRegisterMailSender.sendVerifyEmail(user.getUsername(), email, token);
         log.info("重新发送邮箱验证邮件: id={}, email={}", user.getId(), email);
+    }
+
+    @Transactional
+    public void sendPasswordResetEmail(UserPasswordResetEmailCmd cmd) {
+        String account = cmd == null ? null : cmd.getAccount();
+        if (!StringUtils.hasText(account)) {
+            return;
+        }
+        String normalizedAccount = account.trim();
+        Optional<User> user = resolvePasswordResetMailUser(normalizedAccount);
+        if (user.isEmpty()) {
+            log.info("密码重置邮件请求未匹配可重置账号: account={}", normalizedAccount);
+            return;
+        }
+        String email = userEmail(user.get());
+        String token = passwordResetTokenProvider.generate(user.get().getId(), email);
+        userRegisterMailSender.sendPasswordResetEmail(user.get().getUsername(), email, token);
+        log.info("密码重置邮件已发送: id={}, email={}", user.get().getId(), email);
+    }
+
+    @Transactional
+    public void resetPassword(UserPasswordResetCmd cmd) {
+        if (cmd == null || !StringUtils.hasText(cmd.getToken())) {
+            throw new BizException("重置链接已过期或无效");
+        }
+        PasswordResetTarget target = passwordResetTokenProvider.validate(cmd.getToken())
+                .orElseThrow(() -> new BizException("重置链接已过期或无效"));
+        User user = resolvePasswordResetUser(target);
+        user.resetPassword(Password.of(cmd.getPassword(), passwordEncoder));
+        userRepo.save(user);
+        passwordResetTokenProvider.remove(cmd.getToken());
+        log.info("用户密码重置成功: id={}, username={}", user.getId(), user.getUsername());
     }
 
     @Transactional(readOnly = true)
@@ -213,6 +251,45 @@ public class UserAppService {
             return users.get(0);
         }
         throw new BizException("验证链接已失效，请重新发送验证邮件");
+    }
+
+    private Optional<User> resolvePasswordResetMailUser(String account) {
+        Optional<User> byUsername = userRepo.findByUsernameAll(account).stream()
+                .filter(this::canSendPasswordResetMail)
+                .findFirst();
+        if (byUsername.isPresent()) {
+            return byUsername;
+        }
+        return userRepo.findByEmailAll(account).stream()
+                .filter(this::canSendPasswordResetMail)
+                .findFirst();
+    }
+
+    private boolean canSendPasswordResetMail(User user) {
+        return user != null
+                && user.getStatus() == UserStatus.ACTIVE
+                && user.isEmailVerified()
+                && user.getEmail() != null
+                && StringUtils.hasText(user.getEmail().getValue());
+    }
+
+    private User resolvePasswordResetUser(PasswordResetTarget target) {
+        if (target.userId() == null || !StringUtils.hasText(target.email())) {
+            throw new BizException("重置链接已过期或无效");
+        }
+        User user = userRepo.findById(target.userId())
+                .orElseThrow(() -> new BizException("用户不存在"));
+        if (user.getStatus() == UserStatus.DISABLED) {
+            throw new BizException("用户已停用");
+        }
+        if (!user.isEmailVerified()) {
+            throw new BizException("邮箱未验证，无法重置密码");
+        }
+        String currentEmail = userEmail(user);
+        if (!currentEmail.equalsIgnoreCase(target.email())) {
+            throw new BizException("重置链接已失效，请重新发送重置邮件");
+        }
+        return user;
     }
 
     private String userEmail(User user) {

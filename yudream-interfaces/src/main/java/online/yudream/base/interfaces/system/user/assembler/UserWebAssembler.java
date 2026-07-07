@@ -7,6 +7,8 @@ import online.yudream.base.application.system.security.dto.LoginTokenDTO;
 import online.yudream.base.application.system.security.dto.PasskeyAuthenticationOptionsDTO;
 import lombok.NoArgsConstructor;
 import online.yudream.base.application.system.user.cmd.UserLoginCmd;
+import online.yudream.base.application.system.user.cmd.UserPasswordResetCmd;
+import online.yudream.base.application.system.user.cmd.UserPasswordResetEmailCmd;
 import online.yudream.base.application.system.user.cmd.UserProfileUpdateCmd;
 import online.yudream.base.application.system.user.cmd.UserRegisterCmd;
 import online.yudream.base.application.system.user.dto.UserContextVO;
@@ -21,6 +23,8 @@ import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationStartRequest;
 import online.yudream.base.interfaces.system.user.request.UserLoginRequest;
+import online.yudream.base.interfaces.system.user.request.UserPasswordResetEmailRequest;
+import online.yudream.base.interfaces.system.user.request.UserPasswordResetRequest;
 import online.yudream.base.interfaces.system.user.request.UserProfileUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserRegisterRequest;
 import online.yudream.base.interfaces.system.user.request.UserTokenRefreshRequest;
@@ -52,6 +56,19 @@ public class UserWebAssembler {
                 .password(request.getPassword())
                 .nickname(request.getNickname())
                 .build();
+    }
+
+    public static UserPasswordResetEmailCmd toCmd(UserPasswordResetEmailRequest request) {
+        UserPasswordResetEmailCmd cmd = new UserPasswordResetEmailCmd();
+        cmd.setAccount(request.getAccount());
+        return cmd;
+    }
+
+    public static UserPasswordResetCmd toCmd(UserPasswordResetRequest request) {
+        UserPasswordResetCmd cmd = new UserPasswordResetCmd();
+        cmd.setToken(request.getToken());
+        cmd.setPassword(request.getPassword());
+        return cmd;
     }
 
     public static LoginTokenRefreshCmd toCmd(UserTokenRefreshRequest request) {

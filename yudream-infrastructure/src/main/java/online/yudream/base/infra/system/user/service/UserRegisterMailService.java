@@ -42,4 +42,19 @@ public class UserRegisterMailService implements UserRegisterMailSender {
                 .build();
         mailSender.send(message);
     }
+
+    @Override
+    public void sendPasswordResetEmail(String username, String email, String token) {
+        String resetUrl = webUrl + "/reset-password?token=" + token;
+        MailMessage message = MailMessage.builder()
+                .to(List.of(email))
+                .subject("重置密码")
+                .templateId("password-reset")
+                .templateVariables(Map.of(
+                        "username", username,
+                        "resetUrl", resetUrl
+                ))
+                .build();
+        mailSender.send(message);
+    }
 }
