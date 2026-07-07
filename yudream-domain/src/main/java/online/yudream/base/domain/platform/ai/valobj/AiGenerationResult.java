@@ -7,6 +7,7 @@ public record AiGenerationResult(
         String summary,
         String htmlContent,
         String cssContent,
+        String jsContent,
         String builderProjectJson,
         String markdownContent,
         List<AiAgentToolCall> toolCalls,

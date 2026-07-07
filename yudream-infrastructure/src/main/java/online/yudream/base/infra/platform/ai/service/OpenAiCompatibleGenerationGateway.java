@@ -408,7 +408,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
         if (toolResults != null && !toolResults.isEmpty()) {
-            return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", List.of(), List.copyOf(toolResults));
+            return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", "", List.of(), List.copyOf(toolResults));
         }
         return toLegacyResult(content);
     }
@@ -420,6 +420,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 json.getStr("summary", json.getStr("message", "")),
                 json.getStr("htmlContent", ""),
                 json.getStr("cssContent", ""),
+                json.getStr("jsContent", ""),
                 json.getStr("builderProjectJson", ""),
                 json.getStr("markdownContent", ""),
                 toolCalls(json),

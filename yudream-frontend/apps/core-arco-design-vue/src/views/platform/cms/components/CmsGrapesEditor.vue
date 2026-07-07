@@ -20,6 +20,7 @@ import 'grapesjs/dist/css/grapes.min.css'
 interface GrapesSavePayload {
   htmlContent: string
   cssContent: string
+  jsContent: string
   builderProjectJson: string
 }
 
@@ -59,6 +60,7 @@ interface CodeCompletionItem {
 const props = defineProps<{
   htmlContent?: string
   cssContent?: string
+  jsContent?: string
   builderProjectJson?: string
   title?: string
   aiEnabled?: boolean
@@ -102,6 +104,7 @@ const canvasRevision = ref(0)
 const selectedSourceCode = ref('')
 const selectedSourceDirty = ref(false)
 const selectedSourceError = ref('')
+const pageJsContent = ref(props.jsContent || '')
 const aiSuggestions = [
   '只优化当前选中的元素',
   '把选中元素改成更醒目的 CTA',
@@ -138,12 +141,14 @@ const canvasStats = computed(() => {
     return [
       { label: 'HTML', value: '待加载' },
       { label: 'CSS', value: '待加载' },
+      { label: 'JS', value: '待加载' },
       { label: '项目源', value: '待加载' },
     ]
   }
   return [
     { label: 'HTML', value: `${instance.getHtml().length} 字符` },
     { label: 'CSS', value: `${(instance.getCss() || '').length} 字符` },
+    { label: 'JS', value: `${pageJsContent.value.length} 字符` },
     { label: '项目源', value: `${JSON.stringify(instance.getProjectData()).length} 字符` },
   ]
 })
@@ -309,6 +314,40 @@ const cssSourceCompletions = computed<CodeCompletionItem[]>(() => {
   ]
 })
 
+const jsSourceCompletions = computed<CodeCompletionItem[]>(() => {
+  canvasRevision.value
+  const snapshot = currentSelectionSnapshot()
+  const selectors: CodeCompletionItem[] = []
+  const id = String(snapshot?.attributes.id || '').trim()
+  if (id) {
+    selectors.push({
+      label: `query #${id}`,
+      type: 'function',
+      apply: `document.querySelector('#${cssEscape(id)}')`,
+      detail: '当前元素查询',
+    })
+  }
+  snapshot?.classes.forEach((item) => {
+    selectors.push({
+      label: `query .${item}`,
+      type: 'function',
+      apply: `document.querySelector('.${cssEscape(item)}')`,
+      detail: '当前类名查询',
+    })
+  })
+  return [
+    ...selectors,
+    { label: 'cmsContext', type: 'variable', apply: 'window.__YU_CMS_CONTEXT__', detail: 'CMS 运行时上下文' },
+    { label: 'cmsReady', type: 'function', apply: 'window.__YU_CMS_READY__?.(() => {\n  \n})', detail: 'CMS 页面就绪后执行' },
+    { label: 'registerCleanup', type: 'function', apply: 'window.__YU_CMS_REGISTER_CLEANUP__?.(() => {\n  \n})', detail: '注册脚本清理函数' },
+    { label: 'DOMContentLoaded', type: 'function', apply: 'document.addEventListener(\'DOMContentLoaded\', () => {\n  \n})', detail: '页面加载完成' },
+    { label: 'querySelector', type: 'function', apply: 'document.querySelector(\'\')', detail: '查询单个元素' },
+    { label: 'querySelectorAll', type: 'function', apply: 'document.querySelectorAll(\'\').forEach((el) => {\n  \n})', detail: '批量查询元素' },
+    { label: 'addEventListener', type: 'function', apply: 'addEventListener(\'click\', () => {\n  \n})', detail: '绑定事件' },
+    { label: 'classList.toggle', type: 'function', apply: 'classList.toggle(\'is-active\')', detail: '切换类名' },
+  ]
+})
+
 const selectedRelatedCss = computed(() => {
   canvasRevision.value
   const snapshot = currentSelectionSnapshot()
@@ -333,7 +372,7 @@ const aiDefaultMessages = computed<ChatMessagesData[]>(() => [
     content: [
       {
         type: 'markdown',
-        data: '我可以读取当前 GrapesJS 画布、CSS 和项目 JSON，并按你的描述直接修改或增加区块。你也可以附一张样图让我参考。',
+        data: '我可以读取当前 GrapesJS 画布、CSS、JS 和项目 JSON，并按你的描述直接修改或增加区块。你也可以附一张样图让我参考。',
       },
     ],
   },
@@ -523,6 +562,11 @@ watch([rightPanelTab, chatHistoryTargetKey], () => {
   }
 })
 
+watch(pageJsContent, () => {
+  canvasRevision.value += 1
+  syncCanvasJs()
+})
+
 onMounted(async () => {
   const { default: grapes } = await import('grapesjs')
   editor = grapes.init({
@@ -566,6 +610,7 @@ onMounted(async () => {
     syncSelectedSource(true)
   })
   canvasRevision.value += 1
+  syncCanvasJs()
   await loadMedia()
   aiModel.value = props.aiModelOptions?.[0]?.value || ''
   registerHandler('pick', onPickOption)
@@ -605,6 +650,7 @@ function save() {
   emit('save', {
     htmlContent: editor.getHtml(),
     cssContent: editor.getCss() || '',
+    jsContent: stripScriptTags(pageJsContent.value),
     builderProjectJson: JSON.stringify(editor.getProjectData()),
   })
 }
@@ -853,6 +899,7 @@ function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsCha
     imageDataUrl: image?.url || undefined,
     currentHtml: editor.getHtml(),
     currentCss: editor.getCss(),
+    currentJs: pageJsContent.value,
     currentProjectJson: JSON.stringify(editor.getProjectData()),
     currentSelectionJson: currentSelectionJson(),
     cmsVariableContextJson: cmsVariableContextJson(),
@@ -951,6 +998,7 @@ function applySelectedSource() {
     selectedSourceError.value = ''
     canvasRevision.value += 1
     syncSelectedSource(true)
+    syncCanvasJs()
     toast.success('选中元素源码已应用')
   }
   catch (error) {
@@ -1422,6 +1470,9 @@ function applyAiResult(result: CmsPageGenerateResult) {
   if (result.builderProjectJson) {
     try {
       editor.loadProjectData(JSON.parse(result.builderProjectJson))
+      if (result.jsContent) {
+        setCanvasJs(result.jsContent)
+      }
       return
     }
     catch {
@@ -1433,6 +1484,9 @@ function applyAiResult(result: CmsPageGenerateResult) {
   }
   if (result.cssContent) {
     editor.setStyle(result.cssContent)
+  }
+  if (result.jsContent) {
+    setCanvasJs(result.jsContent)
   }
 }
 
@@ -1449,6 +1503,9 @@ function applyAiTool(tool?: AiToolCallResult) {
   if (action === 'load-project' || (action === 'replace-page' && payload.builderProjectJson)) {
     try {
       editor.loadProjectData(JSON.parse(String(payload.builderProjectJson)))
+      if (hasPayloadKey(payload, 'jsContent')) {
+        setCanvasJs(String(payload.jsContent || ''))
+      }
       canvasRevision.value += 1
       return
     }
@@ -1462,12 +1519,21 @@ function applyAiTool(tool?: AiToolCallResult) {
   if (action === 'replace-page' || action === 'set-css') {
     editor.setStyle(String(payload.cssContent || ''))
   }
+  if (action === 'set-js' || (action === 'replace-page' && hasPayloadKey(payload, 'jsContent'))) {
+    setCanvasJs(String(payload.jsContent || ''))
+  }
   if (action === 'append-css' && payload.cssContent) {
     appendCanvasCss(String(payload.cssContent))
+  }
+  if (action === 'append-js' && payload.jsContent) {
+    appendCanvasJs(String(payload.jsContent))
   }
   if (action === 'add-html' && payload.htmlContent) {
     const added = editor.addComponents(String(payload.htmlContent))
     highlightAddedComponents(added)
+  }
+  if (action === 'add-html' && payload.jsContent) {
+    appendCanvasJs(String(payload.jsContent))
   }
   if (action === 'remove-selector' && payload.selector) {
     editor.getWrapper()?.find(String(payload.selector)).forEach(component => component.remove())
@@ -1486,7 +1552,12 @@ function applyAiTool(tool?: AiToolCallResult) {
   ].includes(action)) {
     applySelectedComponentTool(action, payload)
   }
+  syncCanvasJs()
   canvasRevision.value += 1
+}
+
+function hasPayloadKey(payload: Record<string, any>, key: string) {
+  return Object.prototype.hasOwnProperty.call(payload, key)
 }
 
 function applySelectedComponentTool(action: string, payload: Record<string, any>) {
@@ -1641,6 +1712,71 @@ function appendCanvasCss(css: string) {
   }
   const existing = editor.getCss() || ''
   editor.setStyle(`${existing}\n${css}`.trim())
+}
+
+function setCanvasJs(js: string) {
+  pageJsContent.value = stripScriptTags(js)
+  syncCanvasJs()
+}
+
+function appendCanvasJs(js: string) {
+  const clean = stripScriptTags(js)
+  if (!clean.trim()) {
+    return
+  }
+  pageJsContent.value = [pageJsContent.value, clean].filter(item => item.trim()).join('\n\n')
+  syncCanvasJs()
+}
+
+function syncCanvasJs() {
+  if (!editor) {
+    return
+  }
+  try {
+    const doc = editor.Canvas.getDocument()
+    if (!doc) {
+      return
+    }
+    doc.querySelectorAll('script[data-yb-cms-page-script]').forEach(item => item.remove())
+    const code = stripScriptTags(pageJsContent.value).trim()
+    if (!code) {
+      return
+    }
+    const script = doc.createElement('script')
+    script.dataset.ybCmsPageScript = 'true'
+    script.textContent = `
+      window.__YU_CMS_CONTEXT__ = ${JSON.stringify(cmsVariableContext.value)};
+      window.__YU_CMS_DISPOSERS__ = window.__YU_CMS_DISPOSERS__ || [];
+      window.__YU_CMS_DISPOSERS__.splice(0).forEach(function(dispose) {
+        try { dispose(); } catch (error) { console.warn('[YuDream CMS] cleanup failed', error); }
+      });
+      window.__YU_CMS_REGISTER_CLEANUP__ = function(dispose) {
+        if (typeof dispose === 'function') window.__YU_CMS_DISPOSERS__.push(dispose);
+      };
+      window.__YU_CMS_READY__ = function(callback) {
+        if (typeof callback !== 'function') return;
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', callback, { once: true });
+          return;
+        }
+        window.queueMicrotask ? window.queueMicrotask(callback) : setTimeout(callback, 0);
+      };
+      (function() {
+        ${code}
+      })();
+    `
+    doc.body?.appendChild(script)
+  }
+  catch (error) {
+    console.warn('[YuDream CMS] JS preview failed', error)
+  }
+}
+
+function stripScriptTags(value: string) {
+  return String(value || '')
+    .replace(/<script[^>]*>/gi, '')
+    .replace(/<\/script>/gi, '')
+    .trim()
 }
 
 // 让新追加的区块平滑滚动进入视野，并短暂高亮，营造「一片片生成」的视觉反馈。
@@ -2309,6 +2445,18 @@ function escapeAttr(value: string) {
                 :completions="cssSourceCompletions"
               />
             </section>
+            <section class="source-editor-section source-editor-section--js">
+              <div class="source-editor-section__head">
+                <strong>页面 JS</strong>
+                <span>自动注入预览并随页面保存</span>
+              </div>
+              <CmsCodeEditor
+                v-model="pageJsContent"
+                class="source-panel__editor"
+                language="javascript"
+                :completions="jsSourceCompletions"
+              />
+            </section>
           </div>
           <div class="source-panel__status" :class="{ error: selectedSourceError }">
             <span v-if="selectedSourceError">{{ selectedSourceError }}</span>
@@ -2554,6 +2702,10 @@ function escapeAttr(value: string) {
 
 .source-editor-section--css {
   min-height: 250px;
+}
+
+.source-editor-section--js {
+  min-height: 280px;
 }
 
 .source-editor-section__head {

@@ -43,7 +43,7 @@ public class CmsAppService {
         String normalizedSlug = normalizeSlug(cmd.getSlug());
         ensureSlugAvailable(normalizedSlug, page.getId());
         page.update(cmd.getTitle(), normalizedSlug, cmd.getSummary(), cmd.getExcerpt(), cmd.getCoverImageUrl(),
-                cmd.getCategories(), cmd.getTags(), cmd.getMarkdownContent(), cmd.getHtmlContent(), cmd.getCssContent(), cmd.getBuilderProjectJson(), cmd.getSeoTitle(), cmd.getSeoDescription(),
+                cmd.getCategories(), cmd.getTags(), cmd.getMarkdownContent(), cmd.getHtmlContent(), cmd.getCssContent(), cmd.getJsContent(), cmd.getBuilderProjectJson(), cmd.getSeoTitle(), cmd.getSeoDescription(),
                 cmd.getTemplate(), cmd.getStatus());
         return CmsAssembler.toDTO(cmsPageRepo.save(page));
     }

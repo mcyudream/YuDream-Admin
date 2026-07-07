@@ -35,6 +35,7 @@ public class AiWebAssembler {
         cmd.setImageDataUrl(request.getImageDataUrl());
         cmd.setCurrentHtml(request.getCurrentHtml());
         cmd.setCurrentCss(request.getCurrentCss());
+        cmd.setCurrentJs(request.getCurrentJs());
         cmd.setCurrentProjectJson(request.getCurrentProjectJson());
         cmd.setCurrentSelectionJson(request.getCurrentSelectionJson());
         cmd.setCmsVariableContextJson(request.getCmsVariableContextJson());
@@ -61,6 +62,7 @@ public class AiWebAssembler {
                 .summary(dto.getSummary())
                 .htmlContent(dto.getHtmlContent())
                 .cssContent(dto.getCssContent())
+                .jsContent(dto.getJsContent())
                 .builderProjectJson(dto.getBuilderProjectJson())
                 .markdownContent(dto.getMarkdownContent())
                 .tools(dto.getTools() == null ? java.util.List.of() : dto.getTools().stream().map(AiWebAssembler::toToolRes).toList())

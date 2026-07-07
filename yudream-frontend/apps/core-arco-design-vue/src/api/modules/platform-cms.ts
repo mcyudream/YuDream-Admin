@@ -38,6 +38,7 @@ export interface CmsPage {
   markdownContent?: string
   htmlContent?: string
   cssContent?: string
+  jsContent?: string
   builderProjectJson?: string
   seoTitle?: string
   seoDescription?: string
@@ -59,6 +60,7 @@ export interface CmsPagePayload {
   markdownContent?: string
   htmlContent?: string
   cssContent?: string
+  jsContent?: string
   builderProjectJson?: string
   seoTitle?: string
   seoDescription?: string

@@ -59,6 +59,7 @@ const pageForm = reactive<CmsPagePayload>({
   markdownContent: '',
   htmlContent: '',
   cssContent: '',
+  jsContent: '',
   builderProjectJson: '',
   seoTitle: '',
   seoDescription: '',
@@ -118,6 +119,15 @@ const homeCss = computed({
     home.settings = {
       ...(home.settings || {}),
       homeCss: value,
+    }
+  },
+})
+const homeJs = computed({
+  get: () => home.settings?.homeJs || '',
+  set: (value: string) => {
+    home.settings = {
+      ...(home.settings || {}),
+      homeJs: value,
     }
   },
 })
@@ -364,6 +374,7 @@ function selectPage(page: CmsPage) {
     markdownContent: page.markdownContent || '',
     htmlContent: page.htmlContent || '',
     cssContent: page.cssContent || '',
+    jsContent: page.jsContent || '',
     builderProjectJson: page.builderProjectJson || '',
     seoTitle: page.seoTitle || '',
     seoDescription: page.seoDescription || '',
@@ -461,6 +472,7 @@ function resetPageForm() {
     markdownContent: '# 新页面\n\n在这里编写 Markdown 内容。',
     htmlContent: '',
     cssContent: '',
+    jsContent: '',
     builderProjectJson: '',
     seoTitle: '',
     seoDescription: '',
@@ -475,6 +487,7 @@ async function savePage() {
   try {
     const payload = { ...pageForm }
     payload.htmlContent = resolvePageHtmlForSave()
+    payload.jsContent = stripScriptTags(pageForm.jsContent || '')
     const res = selectedPageId.value
       ? await apiCms.updatePage(selectedPageId.value, payload)
       : await apiCms.createPage(payload)
@@ -528,6 +541,7 @@ async function saveHome() {
   saving.value = true
   try {
     homeHtml.value = resolveHomeHtmlForSave()
+    homeJs.value = stripScriptTags(homeJs.value)
     home.settings = {
       ...(home.settings || {}),
       navigationJson: JSON.stringify(navigationItems.value),
@@ -549,18 +563,20 @@ function openGrapesEditor(target: EditorTarget = 'page') {
   grapesEditorVisible.value = true
 }
 
-async function saveGrapesEditor(payload: { htmlContent: string, cssContent: string, builderProjectJson: string }) {
+async function saveGrapesEditor(payload: { htmlContent: string, cssContent: string, jsContent: string, builderProjectJson: string }) {
   grapesEditorVisible.value = false
   await nextTick()
   if (editorTarget.value === 'home') {
     homeHtml.value = payload.htmlContent
     homeCss.value = payload.cssContent
+    homeJs.value = payload.jsContent
     homeProjectJson.value = payload.builderProjectJson
     await saveHome()
     return
   }
   pageForm.htmlContent = payload.htmlContent
   pageForm.cssContent = payload.cssContent
+  pageForm.jsContent = payload.jsContent
   pageForm.builderProjectJson = payload.builderProjectJson
   editorMode.value = 'builder'
   await savePage()
@@ -595,6 +611,13 @@ function stripLayoutBlocks(value?: string) {
   const doc = new DOMParser().parseFromString(`<div>${value}</div>`, 'text/html')
   doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
   return doc.body.firstElementChild?.innerHTML || value
+}
+
+function stripScriptTags(value?: string) {
+  return String(value || '')
+    .replace(/<script[^>]*>/gi, '')
+    .replace(/<\/script>/gi, '')
+    .trim()
 }
 
 function insertVariable(variable: string) {
@@ -778,7 +801,7 @@ function sectionTitle(type: HomeSectionType) {
             <div>
               <span class="builder-entry__status">{{ builderContentStatus }}</span>
               <h2>可视化页面构建器</h2>
-              <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS 和可继续编辑的 Project JSON。</p>
+              <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS、JS 和可继续编辑的 Project JSON。</p>
             </div>
             <div class="builder-entry__actions">
               <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
@@ -866,6 +889,16 @@ function sectionTitle(type: HomeSectionType) {
           </section>
 
           <section>
+            <h3>页面 JS</h3>
+            <FaTextarea
+              v-model="pageForm.jsContent"
+              rows="8"
+              input-class="font-mono"
+              placeholder="document.querySelector(...)"
+            />
+          </section>
+
+          <section>
             <div class="panel-title-row">
               <h3>动态变量</h3>
               <button type="button" @click="showAllVariables = !showAllVariables">
@@ -896,7 +929,7 @@ function sectionTitle(type: HomeSectionType) {
                 <FaIcon name="i-ri:layout-grid-line" />
                 打开首页构建器
               </FaButton>
-              <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeProjectJson = ''">
+              <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
                 <FaIcon name="i-ri:eraser-line" />
                 清空动态内容
               </FaButton>
@@ -1107,6 +1140,7 @@ function sectionTitle(type: HomeSectionType) {
         :title="editorTarget === 'home' ? home.title : pageForm.title"
         :html-content="editorTarget === 'home' ? homeHtml : pageForm.htmlContent"
         :css-content="editorTarget === 'home' ? homeCss : pageForm.cssContent"
+        :js-content="editorTarget === 'home' ? homeJs : pageForm.jsContent"
         :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
         :ai-enabled="aiEnabled"
         :ai-model-options="aiModelOptions"

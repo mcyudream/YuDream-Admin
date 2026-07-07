@@ -23,6 +23,7 @@ public class CmsAssembler {
                 .markdownContent(page.getMarkdownContent())
                 .htmlContent(page.getHtmlContent())
                 .cssContent(page.getCssContent())
+                .jsContent(page.getJsContent())
                 .builderProjectJson(page.getBuilderProjectJson())
                 .seoTitle(page.getSeoTitle())
                 .seoDescription(page.getSeoDescription())

@@ -18,6 +18,7 @@ public class AiAssembler {
                 .summary(result.summary())
                 .htmlContent(result.htmlContent())
                 .cssContent(result.cssContent())
+                .jsContent(result.jsContent())
                 .builderProjectJson(result.builderProjectJson())
                 .markdownContent(result.markdownContent())
                 .build();
@@ -51,6 +52,7 @@ public class AiAssembler {
         dto.setSummary(text(first.getPayload().getOrDefault("summary", dto.getSummary())));
         dto.setHtmlContent(text(first.getPayload().getOrDefault("htmlContent", dto.getHtmlContent())));
         dto.setCssContent(text(first.getPayload().getOrDefault("cssContent", dto.getCssContent())));
+        dto.setJsContent(text(first.getPayload().getOrDefault("jsContent", dto.getJsContent())));
         dto.setBuilderProjectJson(text(first.getPayload().getOrDefault("builderProjectJson", dto.getBuilderProjectJson())));
         dto.setMarkdownContent(text(first.getPayload().getOrDefault("markdownContent", dto.getMarkdownContent())));
     }

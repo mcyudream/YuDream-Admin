@@ -32,6 +32,7 @@ public class CmsPage extends BaseDomain {
     private String markdownContent;
     private String htmlContent;
     private String cssContent;
+    private String jsContent;
     private String builderProjectJson;
     private String seoTitle;
     private String seoDescription;
@@ -49,7 +50,7 @@ public class CmsPage extends BaseDomain {
     }
 
     public void update(String title, String slug, String summary, String excerpt, String coverImageUrl,
-                       List<String> categories, List<String> tags, String markdownContent, String htmlContent, String cssContent, String builderProjectJson, String seoTitle, String seoDescription,
+                       List<String> categories, List<String> tags, String markdownContent, String htmlContent, String cssContent, String jsContent, String builderProjectJson, String seoTitle, String seoDescription,
                        PageTemplate template, PageStatus status) {
         this.title = required(title, "页面标题不能为空");
         this.slug = PageSlug.of(slug).value();
@@ -61,6 +62,7 @@ public class CmsPage extends BaseDomain {
         this.markdownContent = markdownContent;
         this.htmlContent = htmlContent;
         this.cssContent = cssContent;
+        this.jsContent = jsContent;
         this.builderProjectJson = builderProjectJson;
         this.seoTitle = seoTitle;
         this.seoDescription = seoDescription;

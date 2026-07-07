@@ -4,6 +4,7 @@ import { autocompletion, closeBrackets } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { css } from '@codemirror/lang-css'
 import { html } from '@codemirror/lang-html'
+import { javascript } from '@codemirror/lang-javascript'
 import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorState } from '@codemirror/state'
 import { drawSelection, dropCursor, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from '@codemirror/view'
@@ -18,7 +19,7 @@ interface CodeCompletionItem {
 
 const props = withDefaults(defineProps<{
   modelValue: string
-  language?: 'html' | 'css'
+  language?: 'html' | 'css' | 'javascript'
   disabled?: boolean
   completions?: CodeCompletionItem[]
 }>(), {
@@ -89,13 +90,17 @@ const editorTheme = EditorView.theme({
 }, { dark: true })
 
 function languageExtension() {
-  return props.language === 'css'
-    ? css()
-    : html({ autoCloseTags: true, matchClosingTags: true })
+  if (props.language === 'css') {
+    return css()
+  }
+  if (props.language === 'javascript') {
+    return javascript()
+  }
+  return html({ autoCloseTags: true, matchClosingTags: true })
 }
 
 function completionSource(context: CompletionContext): CompletionResult | null {
-  const before = context.matchBefore(/[\w{}<./:"'=-]+$/)
+  const before = context.matchBefore(/[\w${}<./:"'=-]+$/)
   if (!before && !context.explicit) {
     return null
   }
@@ -108,7 +113,7 @@ function completionSource(context: CompletionContext): CompletionResult | null {
       detail: item.detail,
       info: item.info,
     })),
-    validFor: /^[\w{}<./:"'=-]*$/,
+    validFor: /^[\w${}<./:"'=-]*$/,
   }
 }
 

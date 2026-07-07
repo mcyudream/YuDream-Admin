@@ -31,6 +31,8 @@ const slug = computed(() => {
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 const homeCss = computed(() => home.value?.settings?.homeCss || '')
+const homeJs = computed(() => home.value?.settings?.homeJs || '')
+const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : homeJs.value)
 const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url)))
 const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
 const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))
@@ -122,6 +124,16 @@ const renderContext = computed(() => {
 })
 
 watch(() => route.fullPath, load, { immediate: true })
+watch([
+  activeCmsJs,
+  homeHtml,
+  () => page.value?.htmlContent,
+  () => appAccountStore.isLogin,
+], runCmsScript, { flush: 'post' })
+
+let activeCmsScript: HTMLScriptElement | null = null
+
+onBeforeUnmount(cleanupCmsScript)
 
 async function load() {
   loading.value = true
@@ -170,6 +182,7 @@ async function loadPublicPages() {
   catch {
     publishedPages.value = []
   }
+  await runCmsScript()
 }
 
 function queryValue(value: unknown) {
@@ -323,6 +336,66 @@ function sanitizeHtml(value?: string) {
     .replace(/\son\w+="[^"]*"/gi, '')
     .replace(/\son\w+='[^']*'/gi, '')
     .replace(/javascript:/gi, '')
+}
+
+async function runCmsScript() {
+  await nextTick()
+  cleanupCmsScript()
+  const code = stripScriptTags(activeCmsJs.value).trim()
+  if (!code) {
+    return
+  }
+  ;(window as any).__YU_CMS_CONTEXT__ = renderContext.value
+  ;(window as any).__YU_CMS_DISPOSERS__ = []
+  ;(window as any).__YU_CMS_REGISTER_CLEANUP__ = (dispose: unknown) => {
+    if (typeof dispose === 'function') {
+      ;(window as any).__YU_CMS_DISPOSERS__.push(dispose)
+    }
+  }
+  ;(window as any).__YU_CMS_READY__ = (callback: unknown) => {
+    if (typeof callback !== 'function') {
+      return
+    }
+    const readyCallback = callback as () => void
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', readyCallback, { once: true })
+      return
+    }
+    queueMicrotask(readyCallback)
+  }
+  activeCmsScript = document.createElement('script')
+  activeCmsScript.dataset.yuCmsPageScript = 'true'
+  activeCmsScript.textContent = `
+    ;(() => {
+      ${code}
+    })();
+  `
+  document.body.appendChild(activeCmsScript)
+}
+
+function cleanupCmsScript() {
+  const disposers = ((window as any).__YU_CMS_DISPOSERS__ || []) as unknown[]
+  disposers.forEach((dispose) => {
+    try {
+      if (typeof dispose === 'function') {
+        dispose()
+      }
+    }
+    catch (error) {
+      console.warn('[YuDream CMS] cleanup failed', error)
+    }
+  })
+  ;(window as any).__YU_CMS_DISPOSERS__ = []
+  activeCmsScript?.remove()
+  activeCmsScript = null
+  document.querySelectorAll('script[data-yu-cms-page-script]').forEach(item => item.remove())
+}
+
+function stripScriptTags(value: string) {
+  return String(value || '')
+    .replace(/<script[^>]*>/gi, '')
+    .replace(/<\/script>/gi, '')
+    .trim()
 }
 
 function renderVariables(value: string, localContext: Record<string, any> = {}) {
