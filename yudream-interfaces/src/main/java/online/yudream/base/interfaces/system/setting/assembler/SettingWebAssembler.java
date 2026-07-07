@@ -2,10 +2,12 @@ package online.yudream.base.interfaces.system.setting.assembler;
 
 import online.yudream.base.application.system.setting.cmd.SiteSettingUpdateCmd;
 import online.yudream.base.application.system.setting.cmd.ThemeSettingUpdateCmd;
+import online.yudream.base.application.system.setting.dto.FrontendFeatureDTO;
 import online.yudream.base.application.system.setting.dto.SiteSettingDTO;
 import online.yudream.base.application.system.setting.dto.ThemeSettingDTO;
 import online.yudream.base.interfaces.system.setting.request.SiteSettingUpdateRequest;
 import online.yudream.base.interfaces.system.setting.request.ThemeSettingUpdateRequest;
+import online.yudream.base.interfaces.system.setting.res.FrontendFeatureRes;
 import online.yudream.base.interfaces.system.setting.res.SiteSettingRes;
 import online.yudream.base.interfaces.system.setting.res.ThemeSettingRes;
 
@@ -43,6 +45,16 @@ public class SettingWebAssembler {
     public static ThemeSettingRes toRes(ThemeSettingDTO dto) {
         return ThemeSettingRes.builder()
                 .config(dto.getConfig())
+                .build();
+    }
+
+    public static FrontendFeatureRes toRes(FrontendFeatureDTO dto) {
+        return FrontendFeatureRes.builder()
+                .apiKeyEnabled(dto.isApiKeyEnabled())
+                .passkeyEnabled(dto.isPasskeyEnabled())
+                .oauthServerEnabled(dto.isOauthServerEnabled())
+                .oauthClientEnabled(dto.isOauthClientEnabled())
+                .capabilities(dto.getCapabilities())
                 .build();
     }
 }

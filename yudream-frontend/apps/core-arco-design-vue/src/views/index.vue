@@ -3,6 +3,7 @@ import type { GridStack, GridStackNode, GridStackOptions, GridStackWidget } from
 import type { DashboardBreakpoint, DashboardCard, DashboardGridPlacement, DashboardLayout, DashboardLayoutItem, DashboardWorkspace } from '@/api/modules/system-dashboard'
 import { nextTick } from 'vue'
 import apiDashboard from '@/api/modules/system-dashboard'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
@@ -41,6 +42,7 @@ interface DashboardAction {
 const router = useRouter()
 const toast = useFaToast()
 const accountStore = useAppAccountStore()
+const featureStore = useAppFeatureStore()
 const menuStore = useAppMenuStore()
 
 const loading = ref(false)
@@ -99,6 +101,7 @@ function canViewCard(card: DashboardCard) {
 
 onMounted(async () => {
   window.addEventListener('resize', handleResize)
+  featureStore.load()
   await loadWorkspace()
 })
 
@@ -387,6 +390,9 @@ function openCard(card?: { actionPath?: string }) {
 }
 
 function openPublicHome() {
+  if (!featureStore.cmsEnabled) {
+    return
+  }
   router.push({ name: 'publicSiteHome' })
 }
 
@@ -600,7 +606,7 @@ function cardProps(card: DashboardCard) {
           </span>
         </div>
         <div class="dashboard-toolbar">
-          <FaButton v-if="!editMode" variant="outline" size="sm" @click="openPublicHome">
+          <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="outline" size="sm" @click="openPublicHome">
             <FaIcon name="i-ri:home-4-line" />
             访问首页
           </FaButton>

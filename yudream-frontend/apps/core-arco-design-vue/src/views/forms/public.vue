@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DynamicForm } from '@/api/modules/platform-form'
 import apiForm from '@/api/modules/platform-form'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 
 interface FormCreateApi {
   submit: (success: (data: Record<string, unknown>) => void | Promise<void>, fail?: () => void) => Promise<unknown>
@@ -8,6 +9,7 @@ interface FormCreateApi {
 }
 
 const route = useRoute()
+const appFeatureStore = useAppFeatureStore()
 const toast = useFaToast()
 
 const loading = ref(false)
@@ -17,6 +19,7 @@ const form = ref<DynamicForm | null>(null)
 const formApi = shallowRef<FormCreateApi>()
 
 const code = computed(() => String(route.params.code || ''))
+const brandHref = computed(() => appFeatureStore.cmsEnabled ? '/site' : '/login')
 const rules = computed(() => parseJsonArray(form.value?.schemaJson))
 const options = computed(() => {
   const option = parseJsonObject(form.value?.optionJson)
@@ -34,7 +37,10 @@ const options = computed(() => {
   }
 })
 
-onMounted(load)
+onMounted(async () => {
+  await appFeatureStore.load()
+  await load()
+})
 
 watch(code, load)
 
@@ -98,7 +104,7 @@ function parseJsonObject(value?: string) {
   <main class="public-form-page">
     <section class="public-form-shell">
       <header class="public-form-header">
-        <a href="/site" class="brand-link">YuDream</a>
+        <a :href="brandHref" class="brand-link">YuDream</a>
         <span>动态表单</span>
       </header>
 

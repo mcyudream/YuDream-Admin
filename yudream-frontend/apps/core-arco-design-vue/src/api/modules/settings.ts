@@ -57,9 +57,20 @@ export interface ThemeSetting {
   config: Record<string, any>
 }
 
+export interface FrontendFeature {
+  apiKeyEnabled: boolean
+  passkeyEnabled: boolean
+  oauthServerEnabled: boolean
+  oauthClientEnabled: boolean
+  capabilities: Record<string, boolean>
+}
+
 export default {
   publicSettings: () => {
     return settingsApi.get<unknown, { status: 1; error: ''; data: SiteSetting }>('api/settings/public')
+  },
+  features: () => {
+    return settingsApi.get<unknown, { status: 1; error: ''; data: FrontendFeature }>('api/settings/features')
   },
   site: () => {
     return settingsApi.get<unknown, { status: 1; error: ''; data: SiteSetting }>('api/system/settings/site')

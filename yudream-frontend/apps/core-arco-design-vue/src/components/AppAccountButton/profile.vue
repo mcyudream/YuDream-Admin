@@ -4,6 +4,7 @@ import type { PermissionItem } from '@/api/modules/system-role'
 import EditPassword from '@/components/AppAccountForm/edit-password.vue'
 import apiProfile from '@/api/modules/profile'
 import apiRole from '@/api/modules/system-role'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { createPasskeyRegistrationResponse } from '@/utils/webauthn'
 
@@ -12,6 +13,7 @@ type ProfileTab = 'profile' | 'security' | 'apiKey'
 const modal = useFaModal()
 const toast = useFaToast()
 const appAccountStore = useAppAccountStore()
+const appFeatureStore = useAppFeatureStore()
 
 const active = ref<ProfileTab>('profile')
 const loading = ref(false)
@@ -45,11 +47,16 @@ const apiKeyForm = reactive<ApiKeyCreatePayload>({
   expireTime: '',
 })
 
-const tabs: { key: ProfileTab, title: string, description: string, icon: string }[] = [
+const tabs = computed<{ key: ProfileTab, title: string, description: string, icon: string }[]>(() => [
   { key: 'profile', title: '个人资料', description: '头像、昵称和联系方式', icon: 'i-ri:user-3-line' },
-  { key: 'security', title: '登录安全', description: '密码和 Passkey 凭据', icon: 'i-ri:shield-keyhole-line' },
-  { key: 'apiKey', title: 'API Key', description: '用户级访问密钥', icon: 'i-ri:key-2-line' },
-]
+  {
+    key: 'security',
+    title: '登录安全',
+    description: appFeatureStore.passkeyEnabled ? '密码和 Passkey 凭据' : '账号密码安全',
+    icon: 'i-ri:shield-keyhole-line',
+  },
+  ...(appFeatureStore.apiKeyEnabled ? [{ key: 'apiKey' as const, title: 'API Key', description: '用户级访问密钥', icon: 'i-ri:key-2-line' }] : []),
+])
 
 const permissionGroups = computed(() => {
   const ownedPermissions = appAccountStore.permissions
@@ -79,8 +86,9 @@ const permissionSelectOptions = computed(() => Object.entries(permissionGroups.v
 const permissionNameMap = computed(() => new Map(availablePermissions.value.map(item => [item.code, item.name])))
 
 onMounted(async () => {
+  await appFeatureStore.load()
   await loadProfile()
-  if (!appAccountStore.isEmailUnverified) {
+  if (!appAccountStore.isEmailUnverified && appFeatureStore.passkeyEnabled) {
     await loadPasskeys()
   }
 })
@@ -90,13 +98,34 @@ watch(active, async (tab) => {
     return
   }
   if (tab === 'apiKey') {
+    if (!appFeatureStore.apiKeyEnabled) {
+      active.value = 'profile'
+      return
+    }
     await Promise.allSettled([
       apiKeys.value.length ? Promise.resolve() : loadApiKeys(),
       availablePermissions.value.length ? Promise.resolve() : loadPermissions(),
     ])
   }
-  if (tab === 'security' && !passkeys.value.length) {
+  if (tab === 'security' && appFeatureStore.passkeyEnabled && !passkeys.value.length) {
     await loadPasskeys()
+  }
+})
+
+watch(() => appFeatureStore.apiKeyEnabled, (enabled) => {
+  if (!enabled) {
+    apiKeys.value = []
+    availablePermissions.value = []
+    apiKeySearch.total = 0
+    if (active.value === 'apiKey') {
+      active.value = 'profile'
+    }
+  }
+})
+
+watch(() => appFeatureStore.passkeyEnabled, (enabled) => {
+  if (!enabled) {
+    passkeys.value = []
   }
 })
 
@@ -125,6 +154,10 @@ async function loadProfile() {
 }
 
 async function loadPasskeys() {
+  if (!appFeatureStore.passkeyEnabled) {
+    passkeys.value = []
+    return
+  }
   loadingPasskeys.value = true
   try {
     const res = await apiProfile.passkeys()
@@ -136,6 +169,11 @@ async function loadPasskeys() {
 }
 
 async function loadApiKeys() {
+  if (!appFeatureStore.apiKeyEnabled) {
+    apiKeys.value = []
+    apiKeySearch.total = 0
+    return
+  }
   loadingApiKeys.value = true
   try {
     const res = await apiProfile.apiKeys({
@@ -152,6 +190,10 @@ async function loadApiKeys() {
 }
 
 async function loadPermissions() {
+  if (!appFeatureStore.apiKeyEnabled) {
+    availablePermissions.value = []
+    return
+  }
   loadingPermissions.value = true
   try {
     if (!appAccountStore.permissions.length) {
@@ -202,6 +244,9 @@ async function uploadAvatar(event: Event) {
 }
 
 async function bindPasskey() {
+  if (!appFeatureStore.passkeyEnabled) {
+    return
+  }
   bindingPasskey.value = true
   try {
     const deviceNameInput = window.prompt('请输入设备名称', `${profile.value.username} 的 Passkey`)
@@ -237,6 +282,9 @@ function confirmRevokePasskey(row: PasskeyCredential) {
 }
 
 async function createApiKey() {
+  if (!appFeatureStore.apiKeyEnabled) {
+    return
+  }
   const selectedPermissions = selectedApiKeyPermissions()
   if (!apiKeyForm.name.trim()) {
     toast.error('请输入 API Key 名称')
@@ -387,7 +435,7 @@ function dateText(value?: string) {
 
         <div class="security-layout">
           <EditPassword />
-          <section class="inner-panel">
+          <section v-if="appFeatureStore.passkeyEnabled" class="inner-panel">
             <div class="panel-head">
               <div>
                 <h3>Passkey 凭据</h3>
@@ -861,7 +909,7 @@ function dateText(value?: string) {
   }
 
   .profile-nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
   }
 
   .form-grid,

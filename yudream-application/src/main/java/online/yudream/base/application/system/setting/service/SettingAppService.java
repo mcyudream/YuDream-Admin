@@ -7,9 +7,14 @@ import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.setting.cmd.SiteSettingUpdateCmd;
 import online.yudream.base.application.system.setting.cmd.ThemeSettingUpdateCmd;
+import online.yudream.base.application.system.setting.dto.FrontendFeatureDTO;
 import online.yudream.base.application.system.setting.dto.SiteSettingDTO;
 import online.yudream.base.application.system.setting.dto.ThemeSettingDTO;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
+import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
+import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
 import online.yudream.base.domain.system.setting.enumerate.SettingType;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
@@ -19,6 +24,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,6 +38,8 @@ public class SettingAppService {
     private final SettingRepo settingRepo;
     private final FileAppService fileAppService;
     private final ObjectMapper objectMapper;
+    private final ApiSecurityPolicyRepo apiSecurityPolicyRepo;
+    private final CapabilityModuleRepo capabilityModuleRepo;
 
     private static final String CATEGORY_SITE = "site";
     private static final String CATEGORY_THEME = "theme";
@@ -68,6 +76,18 @@ public class SettingAppService {
     public ThemeSettingDTO themeSettings() {
         return ThemeSettingDTO.builder()
                 .config(readThemeConfig())
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public FrontendFeatureDTO frontendFeatures() {
+        ApiSecurityPolicy policy = apiSecurityPolicyRepo.findDefault().orElse(ApiSecurityPolicy.createDefault());
+        return FrontendFeatureDTO.builder()
+                .apiKeyEnabled(policy.isApiKeyEnabled())
+                .passkeyEnabled(policy.isPasskeyEnabled())
+                .oauthServerEnabled(policy.isOauthServerEnabled())
+                .oauthClientEnabled(policy.isOauthClientEnabled())
+                .capabilities(capabilityStatusMap())
                 .build();
     }
 
@@ -183,5 +203,16 @@ public class SettingAppService {
                 .copyrightWebsite(settings.get(KEY_COPYRIGHT_WEBSITE))
                 .copyrightDates(settings.get(KEY_COPYRIGHT_DATES))
                 .build();
+    }
+
+    private Map<String, Boolean> capabilityStatusMap() {
+        Map<String, Boolean> result = new LinkedHashMap<>();
+        for (CapabilityModule module : capabilityModuleRepo.findAll()) {
+            if (module == null || !StringUtils.hasText(module.getCode())) {
+                continue;
+            }
+            result.put(module.getCode(), module.enabled());
+        }
+        return result;
     }
 }

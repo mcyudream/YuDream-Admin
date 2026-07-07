@@ -69,6 +69,7 @@ declare global {
   const unref: typeof import('vue').unref
   const useAppAccountStore: typeof import('../store/modules/app/account').useAppAccountStore
   const useAppAuth: typeof import('../composables/app/auth').useAppAuth
+  const useAppFeatureStore: typeof import('../store/modules/app/features').useAppFeatureStore
   const useAppKeepAliveStore: typeof import('../store/modules/app/keepAlive').useAppKeepAliveStore
   const useAppMenu: typeof import('../composables/app/menu').useAppMenu
   const useAppMenuStore: typeof import('../store/modules/app/menu').useAppMenuStore
