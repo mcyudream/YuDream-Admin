@@ -335,11 +335,14 @@ public class MenuAppService {
     }
 
     private String resolvePlatformCapability(Menu menu) {
-        String capabilityCode = PLATFORM_MENU_CAPABILITIES.get(menu.getCode());
+        if (menu == null) {
+            return null;
+        }
+        String capabilityCode = platformCapabilityOf(menu.getCode());
         if (capabilityCode != null) {
             return capabilityCode;
         }
-        capabilityCode = PLATFORM_MENU_CAPABILITIES.get(menu.getParentCode());
+        capabilityCode = platformCapabilityOf(menu.getParentCode());
         if (capabilityCode != null) {
             return capabilityCode;
         }
@@ -349,6 +352,10 @@ public class MenuAppService {
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse(null);
+    }
+
+    private String platformCapabilityOf(String menuCode) {
+        return StringUtils.hasText(menuCode) ? PLATFORM_MENU_CAPABILITIES.get(menuCode) : null;
     }
 
     private boolean isDescendantCode(String code, String parentCode) {
