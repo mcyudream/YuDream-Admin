@@ -121,6 +121,8 @@ const pendingAskOptions = ref<AskOption[]>([])
 let editor: Editor | null = null
 let pendingAiResult: CmsPageGenerateResult | null = null
 let currentAiSession: CmsAiChatSession | null = null
+let canvasRefreshTimer: ReturnType<typeof setTimeout> | null = null
+let selectedSourceSyncTimer: ReturnType<typeof setTimeout> | null = null
 
 const rightPanelTabs = computed(() => {
   const tabs: { label: string, value: RightPanelTab, icon: string }[] = [
@@ -149,11 +151,14 @@ const canvasStats = computed(() => {
     { label: 'HTML', value: `${instance.getHtml().length} 字符` },
     { label: 'CSS', value: `${(instance.getCss() || '').length} 字符` },
     { label: 'JS', value: `${pageJsContent.value.length} 字符` },
-    { label: '项目源', value: `${JSON.stringify(instance.getProjectData()).length} 字符` },
+    { label: '项目源', value: '保存时生成' },
   ]
 })
 
 const selectedCanvasSummary = computed(() => {
+  if (rightPanelTab.value !== 'ai') {
+    return '未选择元素'
+  }
   canvasRevision.value
   const snapshot = currentSelectionSnapshot()
   if (!snapshot) {
@@ -165,6 +170,9 @@ const selectedCanvasSummary = computed(() => {
 })
 
 const selectedSourceSummary = computed(() => {
+  if (rightPanelTab.value !== 'source') {
+    return '未选择'
+  }
   canvasRevision.value
   const snapshot = currentSelectionSnapshot()
   if (!snapshot) {
@@ -223,6 +231,9 @@ const cmsVariableContext = computed(() => {
 const cmsVariableCount = computed(() => cmsVariableContext.value.variables.length)
 
 const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
+  if (rightPanelTab.value !== 'source') {
+    return []
+  }
   canvasRevision.value
   const context = cmsVariableContext.value
   const snapshot = currentSelectionSnapshot()
@@ -288,6 +299,9 @@ const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
 })
 
 const cssSourceCompletions = computed<CodeCompletionItem[]>(() => {
+  if (rightPanelTab.value !== 'source') {
+    return []
+  }
   canvasRevision.value
   const snapshot = currentSelectionSnapshot()
   const selectors: CodeCompletionItem[] = []
@@ -315,6 +329,9 @@ const cssSourceCompletions = computed<CodeCompletionItem[]>(() => {
 })
 
 const jsSourceCompletions = computed<CodeCompletionItem[]>(() => {
+  if (rightPanelTab.value !== 'source') {
+    return []
+  }
   canvasRevision.value
   const snapshot = currentSelectionSnapshot()
   const selectors: CodeCompletionItem[] = []
@@ -349,6 +366,9 @@ const jsSourceCompletions = computed<CodeCompletionItem[]>(() => {
 })
 
 const selectedRelatedCss = computed(() => {
+  if (rightPanelTab.value !== 'source') {
+    return '/* 打开源码面板后显示关联 CSS */'
+  }
   canvasRevision.value
   const snapshot = currentSelectionSnapshot()
   if (!snapshot) {
@@ -601,11 +621,16 @@ onMounted(async () => {
   loadInitialContent(editor)
   removeLayoutBlocks(editor)
   injectCanvasHighlightStyle(editor)
-  editor.on('component:add component:update component:remove style:update undo redo load', () => {
-    canvasRevision.value += 1
-    syncSelectedSource()
+  editor.on('component:add component:remove style:update undo redo load', () => {
+    scheduleCanvasRefresh(80)
+    scheduleSelectedSourceSync(80)
+  })
+  editor.on('component:update', () => {
+    scheduleCanvasRefresh(220)
+    scheduleSelectedSourceSync(220)
   })
   editor.on('component:selected component:deselected', () => {
+    clearScheduledCanvasWork()
     canvasRevision.value += 1
     syncSelectedSource(true)
   })
@@ -621,6 +646,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  clearScheduledCanvasWork()
   removeHandler('pick')
   editor?.destroy()
   editor = null
@@ -639,6 +665,40 @@ function loadInitialContent(instance: Editor) {
   instance.setComponents(props.htmlContent || starterHtml())
   if (props.cssContent) {
     instance.setStyle(props.cssContent)
+  }
+}
+
+function scheduleCanvasRefresh(delay = 160) {
+  if (canvasRefreshTimer) {
+    clearTimeout(canvasRefreshTimer)
+  }
+  canvasRefreshTimer = setTimeout(() => {
+    canvasRefreshTimer = null
+    canvasRevision.value += 1
+  }, delay)
+}
+
+function scheduleSelectedSourceSync(delay = 160) {
+  if (rightPanelTab.value !== 'source' || selectedSourceDirty.value) {
+    return
+  }
+  if (selectedSourceSyncTimer) {
+    clearTimeout(selectedSourceSyncTimer)
+  }
+  selectedSourceSyncTimer = setTimeout(() => {
+    selectedSourceSyncTimer = null
+    syncSelectedSource()
+  }, delay)
+}
+
+function clearScheduledCanvasWork() {
+  if (canvasRefreshTimer) {
+    clearTimeout(canvasRefreshTimer)
+    canvasRefreshTimer = null
+  }
+  if (selectedSourceSyncTimer) {
+    clearTimeout(selectedSourceSyncTimer)
+    selectedSourceSyncTimer = null
   }
 }
 

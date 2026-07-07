@@ -537,7 +537,7 @@ function confirmPublish() {
   })
 }
 
-async function saveHome() {
+async function persistHome(successMessage = '首页已保存') {
   saving.value = true
   try {
     homeHtml.value = resolveHomeHtmlForSave()
@@ -551,11 +551,36 @@ async function saveHome() {
       sections: home.sections,
       settings: home.settings || {},
     })
-    toast.success('首页已保存')
+    toast.success(successMessage)
   }
   finally {
     saving.value = false
   }
+}
+
+async function saveHome() {
+  await persistHome()
+}
+
+function confirmToggleHomePublish() {
+  const nextPublished = !home.published
+  modal.confirm({
+    title: nextPublished ? '发布首页' : '取消发布首页',
+    content: nextPublished
+      ? '发布后公开站点首页将可以访问，确认发布首页吗？'
+      : '取消发布后公开站点首页将显示“首页未发布”，确认取消发布吗？',
+    onConfirm: async () => {
+      const previous = home.published
+      home.published = nextPublished
+      try {
+        await persistHome(nextPublished ? '首页已发布' : '已取消发布首页')
+      }
+      catch (error) {
+        home.published = previous
+        throw error
+      }
+    },
+  })
 }
 
 function openGrapesEditor(target: EditorTarget = 'page') {
@@ -721,7 +746,11 @@ function sectionTitle(type: HomeSectionType) {
         <FaIcon name="i-ri:save-3-line" />
         {{ activeTab === 'navigation' ? '保存导航' : '保存首页' }}
       </FaButton>
-      <FaButton v-else v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
+      <FaButton v-if="activeTab === 'home' || activeTab === 'navigation'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
+        <FaIcon :name="home.published ? 'i-ri:inbox-unarchive-line' : 'i-ri:send-plane-line'" />
+        {{ home.published ? '取消发布首页' : '发布首页' }}
+      </FaButton>
+      <FaButton v-if="activeTab === 'media'" v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
         <FaIcon name="i-ri:upload-cloud-2-line" />
         上传媒体
       </FaButton>
@@ -991,7 +1020,12 @@ function sectionTitle(type: HomeSectionType) {
                 <FaInput v-model="home.heroImageUrl" />
               </a-form-item>
               <a-form-item label="发布首页">
-                <FaSwitch v-model="home.published" />
+                <div class="home-publish-field">
+                  <FaSwitch v-model="home.published" />
+                  <FaTag :variant="home.published ? 'default' : 'secondary'">
+                    {{ home.published ? '已发布' : '未发布' }}
+                  </FaTag>
+                </div>
               </a-form-item>
             </a-form>
           </section>
@@ -1161,6 +1195,7 @@ function sectionTitle(type: HomeSectionType) {
 .editor-mode,
 .block-toolbar,
 .publish-actions,
+.home-publish-field,
 .builder-block__head,
 .builder-entry__actions {
   display: flex;
