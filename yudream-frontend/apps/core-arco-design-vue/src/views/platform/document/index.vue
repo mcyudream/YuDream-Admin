@@ -291,10 +291,6 @@ function generationVariant(status: GenerationStatus) {
 <template>
   <div>
     <FaPageHeader title="Word 模板" class="mb-0">
-      <FaButton v-auth="'platform:document:view'" variant="outline" :loading="loading" @click="load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
       <FaButton v-if="activeTab === 'templates'" v-auth="'platform:document:edit'" @click="pickCreateFile">
         <FaIcon name="i-ri:upload-cloud-2-line" />
         上传模板

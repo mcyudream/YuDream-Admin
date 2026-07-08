@@ -6,10 +6,6 @@
         <p>{{ server?.currentSeason?.name || '当前周目未设置' }}</p>
       </div>
       <div class="mc-actions">
-        <FaButton :loading="model.saving" variant="outline" @click="model.refreshStatus()">
-          <FaIcon name="i-ri:radar-line" />
-          刷新状态
-        </FaButton>
         <a class="mc-button" href="/platform/plugins/minecraft-server">
           <FaIcon name="i-ri:list-check" />
           列表

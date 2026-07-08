@@ -302,16 +302,6 @@ async function syncPasskeyState() {
   await loadPasskeys()
 }
 
-async function refreshOAuthPane() {
-  if (oauthPane.value === 'clients' && !policy.oauthServerEnabled) {
-    return
-  }
-  if (oauthPane.value === 'providers' && !policy.oauthClientEnabled) {
-    return
-  }
-  await loadOAuth()
-}
-
 function oauthPaneEnabled() {
   return oauthPane.value === 'clients' ? policy.oauthServerEnabled : policy.oauthClientEnabled
 }
@@ -363,10 +353,6 @@ function guardedOpenOAuthProvider(row?: OAuthProvider) {
     return
   }
   openOAuthProvider(row)
-}
-
-async function guardedRefreshOAuth() {
-  await refreshOAuthPane()
 }
 
 async function loadPasskeys() {
@@ -750,10 +736,6 @@ function normalizeDateTime(value?: string) {
           <div class="key-actions">
             <FaButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
             <FaButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
-            <FaButton variant="outline" :disabled="!oauthPaneEnabled()" @click="guardedRefreshOAuth">
-              <FaIcon name="i-ri:refresh-line" />
-              刷新
-            </FaButton>
             <FaButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
               <FaIcon name="i-ri:add-line" />
               新增客户端

@@ -6,10 +6,6 @@
         <h2>按币种查看用户余额</h2>
         <p>选择一个币种后查看用户余额，并可进行管理员入账或扣账。</p>
       </div>
-      <FaButton :loading="model.loading" variant="outline" @click="model.load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </section>
 
     <WalletPanel title="筛选" eyebrow="Filter">

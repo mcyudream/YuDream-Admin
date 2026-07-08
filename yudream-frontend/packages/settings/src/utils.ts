@@ -83,7 +83,6 @@ export function setSettingsLegacy(settingsLegacy: SettingsLegacyOptions) {
       breadcrumb: true,
       navSearch: true,
       fullscreen: false,
-      pageReload: false,
       colorScheme: false,
     },
     navSearch: {
@@ -149,7 +148,6 @@ export function setSettingsLegacy(settingsLegacy: SettingsLegacyOptions) {
         hotkeys: settingsLegacy.navSearch?.enableHotkeys,
       },
       fullscreen: settingsLegacy.toolbar?.fullscreen,
-      pageReload: settingsLegacy.toolbar?.pageReload,
       colorScheme: settingsLegacy.toolbar?.colorScheme,
     },
     page: {

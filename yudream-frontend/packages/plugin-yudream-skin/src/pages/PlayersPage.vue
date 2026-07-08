@@ -6,10 +6,6 @@
         <h2>{{ model.selectedPlayerName || (isManagement ? '管理皮肤角色' : '管理 Minecraft 角色') }}</h2>
         <p>{{ isManagement ? '维护皮肤侧角色、归属用户与角色外观绑定。' : '角色属于当前账号，默认角色会作为皮肤库与衣柜一键应用的目标。' }}</p>
       </div>
-      <FaButton variant="outline" :loading="model.loading" @click="model.load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </div>
 
     <div class="skin-player-layout">

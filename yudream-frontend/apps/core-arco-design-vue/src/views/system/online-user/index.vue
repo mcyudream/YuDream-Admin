@@ -117,10 +117,6 @@ async function exportOnlineUsers() {
             <FaButton variant="outline" @click="resetSearch">
               &#37325;&#32622;
             </FaButton>
-            <FaButton :loading="loading" @click="load">
-              <FaIcon name="i-ri:refresh-line" />
-              &#21047;&#26032;
-            </FaButton>
           </div>
         </div>
       </FaSearchBar>

@@ -53,7 +53,6 @@ const settingsDefault: RequiredDeep<SettingsOptions> = {
       hotkeys: true,
     },
     fullscreen: false,
-    pageReload: false,
     colorScheme: false,
   },
   page: {

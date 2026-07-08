@@ -682,10 +682,6 @@ function splitModelList(value: string) {
     <FaPageMain>
       <div class="capability-toolbar">
         <FaInput v-model="testMessage" placeholder="测试消息内容" class="min-w-0 flex-1" />
-        <FaButton :loading="loading" @click="load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
       </div>
 
       <div class="summary-grid">

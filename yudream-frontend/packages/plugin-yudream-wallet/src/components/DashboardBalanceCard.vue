@@ -110,10 +110,6 @@ function openCard() {
       </div>
 
       <div class="wallet-dashboard-card__actions">
-        <FaButton size="sm" variant="outline" @click="load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
         <FaButton v-if="card?.actionPath" size="sm" @click="openCard">
           <FaIcon name="i-ri:wallet-3-line" />
           打开钱包

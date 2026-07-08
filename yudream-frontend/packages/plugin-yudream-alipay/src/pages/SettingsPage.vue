@@ -6,10 +6,6 @@
         <h2>官方 API 配置</h2>
         <p>配置 AppId、应用私钥、支付宝公钥和回调地址，启用后会作为钱包充值渠道出现。</p>
       </div>
-      <FaButton :loading="loading" variant="outline" @click="load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </section>
 
     <AlipayPanel title="接口配置" eyebrow="Config">

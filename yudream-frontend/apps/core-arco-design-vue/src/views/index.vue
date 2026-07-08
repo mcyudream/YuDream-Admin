@@ -610,10 +610,6 @@ function cardProps(card: DashboardCard) {
             <FaIcon name="i-ri:home-4-line" />
             访问首页
           </FaButton>
-          <FaButton v-if="!editMode" variant="outline" size="sm" :loading="loading" @click="loadWorkspace">
-            <FaIcon name="i-ri:refresh-line" />
-            刷新
-          </FaButton>
           <FaButton v-if="!editMode && canConfigureDefault" variant="outline" size="sm" @click="startDefaultEdit">
             <FaIcon name="i-ri:layout-2-line" />
             配置默认首页

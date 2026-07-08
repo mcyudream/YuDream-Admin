@@ -6,10 +6,6 @@
         <p>维护服务器信息、线路地址、Markdown 描述和周目继承规则。</p>
       </div>
       <div class="mc-actions">
-        <FaButton :loading="model.loading" variant="outline" @click="model.load(true)">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
         <FaButton type="button" @click="model.newServer">
           <FaIcon name="i-ri:add-line" />
           新建

@@ -79,14 +79,8 @@ function ttlText(ttl?: number) {
 
     <FaPageMain>
       <FaSearchBar>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,420px)_auto] md:items-center">
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,420px)] md:items-center">
           <FaInput v-model="pattern" clearable placeholder="Key &#21305;&#37197;&#65292;&#20363;&#22914; yudream:*" @keydown.enter="load" @clear="load" />
-          <div class="flex gap-2 md:justify-end">
-            <FaButton :loading="loading" @click="load">
-              <FaIcon name="i-ri:refresh-line" />
-              &#21047;&#26032;
-            </FaButton>
-          </div>
         </div>
       </FaSearchBar>
 

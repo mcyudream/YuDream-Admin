@@ -104,10 +104,6 @@ function formatValue(value: unknown) {
           <FaIcon name="i-ri:file-excel-2-line" />
           导出
         </FaButton>
-        <FaButton variant="outline" :disabled="!formId" :loading="loading" @click="load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
       </div>
     </div>
 

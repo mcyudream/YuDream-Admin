@@ -5,7 +5,6 @@ const appSettingsStore = useAppSettingsStore()
 const appMenuStore = useAppMenuStore()
 
 const saving = ref(false)
-const loading = ref(false)
 const colorPresets = ['#18181b', '#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c']
 
 const themeRadius = computed<number[]>({
@@ -16,17 +15,6 @@ const themeRadius = computed<number[]>({
 watch(() => appSettingsStore.settings.menu.mode, (value) => {
   appMenuStore.setActived(value === 'single' ? 0 : route.fullPath)
 })
-
-async function refreshTheme() {
-  loading.value = true
-  try {
-    await appSettingsStore.loadThemeSettings()
-    toast.success('\u4e3b\u9898\u914d\u7f6e\u5df2\u5237\u65b0')
-  }
-  finally {
-    loading.value = false
-  }
-}
 
 async function saveTheme() {
   saving.value = true
@@ -50,10 +38,6 @@ async function saveTheme() {
           &#20445;&#23384;&#21518;&#20889;&#20837;&#21518;&#31471;&#20027;&#39064;&#37197;&#32622;&#65292;&#21047;&#26032;&#25110;&#37325;&#26032;&#30331;&#24405;&#21518;&#20173;&#20250;&#29983;&#25928;&#12290;
         </div>
         <div class="flex items-center gap-2">
-          <FaButton variant="outline" :loading="loading" @click="refreshTheme">
-            <FaIcon name="i-ri:refresh-line" />
-            &#21047;&#26032;
-          </FaButton>
           <FaButton :loading="saving" @click="saveTheme">
             <FaIcon name="i-ri:save-3-line" />
             &#20445;&#23384;&#35774;&#32622;
@@ -61,7 +45,7 @@ async function saveTheme() {
         </div>
       </div>
 
-      <div v-loading="loading" class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <section class="theme-section">
           <div class="theme-section__title">
             &#20027;&#39064;
@@ -257,13 +241,6 @@ async function saveTheme() {
               &#20840;&#23631;
             </div>
             <FaSwitch v-model="appSettingsStore.settings.toolbar.fullscreen" />
-          </div>
-          <div class="setting-item">
-            <div class="label">
-              <FaIcon name="i-iconoir:refresh-double" />
-              &#39029;&#38754;&#21047;&#26032;
-            </div>
-            <FaSwitch v-model="appSettingsStore.settings.toolbar.pageReload" />
           </div>
           <div class="setting-item">
             <div class="label">

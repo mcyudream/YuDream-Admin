@@ -282,10 +282,6 @@ function actionText(action: string) {
 
     <FaPageMain>
       <div class="plugin-toolbar">
-        <FaButton :loading="loading" @click="load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新列表
-        </FaButton>
         <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.click()">
           <FaIcon name="i-ri:upload-cloud-2-line" />
           上传 JAR

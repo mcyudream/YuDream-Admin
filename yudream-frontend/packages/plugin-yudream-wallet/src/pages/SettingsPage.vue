@@ -6,10 +6,6 @@
         <h2>币种配置</h2>
         <p>维护人民币和积分类币种，默认币种也可以改名，并可单独开启或关闭转账。</p>
       </div>
-      <FaButton :loading="model.loading" variant="outline" @click="model.load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </section>
 
     <WalletPanel title="币种表格" eyebrow="Assets">

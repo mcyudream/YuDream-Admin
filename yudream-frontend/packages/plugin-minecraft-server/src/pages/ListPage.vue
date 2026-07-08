@@ -6,10 +6,6 @@
         <p>查看服务器在线状态、线路地址和当前周目。</p>
       </div>
       <div class="mc-actions">
-        <FaButton :loading="model.loading" variant="outline" @click="model.load()">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
         <a v-if="model.canManage" class="mc-button" href="/platform/plugins/minecraft-server/admin">
           <FaIcon name="i-ri:settings-3-line" />
           管理
@@ -41,9 +37,6 @@
             <FaIcon name="i-ri:file-info-line" />
             详情
           </a>
-          <button type="button" class="mc-icon-button" title="刷新状态" @click="model.refreshStatus(server)">
-            <FaIcon name="i-ri:radar-line" />
-          </button>
         </div>
       </article>
       <McPanel v-if="!model.servers.length" title="暂无服务器" eyebrow="Empty">
@@ -54,7 +47,7 @@
 </template>
 
 <script setup lang="ts">
-import { FaButton, FaIcon } from '@fantastic-admin/components'
+import { FaIcon } from '@fantastic-admin/components'
 import McPanel from '../components/McPanel.vue'
 import StatusPill from '../components/StatusPill.vue'
 import type { MinecraftServerPluginModel } from '../composables/useMinecraftServerPlugin'

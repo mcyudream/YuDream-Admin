@@ -118,10 +118,6 @@ function resolveRemoteComponent(module: YuDreamPluginFrontendModule & Record<str
           <h2>{{ remoteLoading ? '正在加载插件前端' : '插件前端不可用' }}</h2>
           <p>{{ remoteLoading ? '正在获取远程入口并解析页面组件。' : remoteError }}</p>
         </div>
-        <FaButton v-if="!remoteLoading" variant="outline" @click="loadRemoteComponent">
-          <FaIcon name="i-ri:refresh-line" />
-          重试
-        </FaButton>
       </div>
     </FaPageMain>
   </div>

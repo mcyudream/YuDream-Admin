@@ -6,10 +6,6 @@
         <h2>选择支付渠道</h2>
         <p>当前仅支持电脑网页支付，实际到账金额按钱包设置中的充值比例计算。</p>
       </div>
-      <FaButton :loading="model.loading" variant="outline" @click="model.load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </section>
 
     <WalletPanel v-if="model.hasRecharge" title="创建充值订单" eyebrow="Recharge">
