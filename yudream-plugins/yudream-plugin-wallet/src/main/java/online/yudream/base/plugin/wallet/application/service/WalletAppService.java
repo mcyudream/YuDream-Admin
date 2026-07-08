@@ -207,7 +207,7 @@ public class WalletAppService implements PluginWalletService {
                 .filter(item -> item.info().code().equalsIgnoreCase(requireText(cmd.channelCode(), "支付渠道不能为空")))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("支付渠道不可用：" + cmd.channelCode()));
-        String productType = hasText(cmd.productType()) ? cmd.productType().trim().toUpperCase() : settings.defaultProductType();
+        String productType = resolveProductType(cmd.productType(), settings.defaultProductType(), channel.info().productTypes());
         PluginPaymentCreateResult result = channel.createRecharge(new PluginPaymentCreateRequest(
                 requireText(cmd.userId(), "用户不能为空"),
                 asset.code(),
@@ -470,6 +470,29 @@ public class WalletAppService implements PluginWalletService {
     private WalletPaymentChannelDTO toDTO(PluginPaymentChannelInfo channel) {
         return new WalletPaymentChannelDTO(channel.code(), channel.name(), channel.icon(), channel.description(),
                 channel.enabled(), channel.productTypes());
+    }
+
+    private String resolveProductType(String requested, String defaultProductType, List<String> supportedProductTypes) {
+        String productType = hasText(requested)
+                ? requested.trim().toUpperCase()
+                : (hasText(defaultProductType) ? defaultProductType.trim().toUpperCase() : null);
+        List<String> supported = supportedProductTypes == null ? List.of() : supportedProductTypes.stream()
+                .filter(this::hasText)
+                .map(item -> item.trim().toUpperCase())
+                .toList();
+        if (supported.isEmpty()) {
+            return productType;
+        }
+        if (!hasText(productType)) {
+            return supported.get(0);
+        }
+        if (supported.contains(productType)) {
+            return productType;
+        }
+        if (!hasText(requested)) {
+            return supported.contains("PAGE") ? "PAGE" : supported.get(0);
+        }
+        throw new IllegalArgumentException("支付渠道不支持该支付产品：" + productType);
     }
 
     private BigDecimal requirePayAmount(BigDecimal amount) {

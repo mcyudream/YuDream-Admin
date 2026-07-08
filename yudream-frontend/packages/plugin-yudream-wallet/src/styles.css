@@ -253,22 +253,6 @@
   font-size: 18px;
 }
 
-.wallet-payload-box {
-  max-height: 220px;
-  overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.wallet-payload-box code {
-  overflow-wrap: anywhere;
-  color: var(--color-text-2);
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
 .wallet-filter-bar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

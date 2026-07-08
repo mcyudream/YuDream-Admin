@@ -238,15 +238,17 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     }
     saving.value = true
     try {
+      rechargeResult.value = null
       rechargeResult.value = await api.createRecharge({
         userId: sdk.account.userId,
         channelCode: rechargeForm.channelCode,
         assetCode: rechargeForm.assetCode,
         payAmount: rechargeForm.payAmount,
-        productType: rechargeForm.productType || rechargeOptions.value?.defaultProductType || 'PAGE',
+        productType: 'PAGE',
         remark: rechargeForm.remark.trim() || undefined,
       })
-      toast.success('充值订单已创建')
+      toast.success('订单已创建，正在跳转支付宝')
+      return rechargeResult.value
     }
     finally {
       saving.value = false
@@ -319,7 +321,7 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
   async function loadRechargeSettings() {
     const settings = await api.rechargeSettings()
     rechargeSettingsForm.enabled = settings.enabled
-    rechargeSettingsForm.defaultProductType = settings.defaultProductType || 'PAGE'
+    rechargeSettingsForm.defaultProductType = 'PAGE'
     rechargeSettingsForm.rules = settings.rules.map(rule => ({
       assetCode: rule.assetCode,
       enabled: rule.enabled,
@@ -334,7 +336,7 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     try {
       await api.saveRechargeSettings({
         enabled: rechargeSettingsForm.enabled,
-        defaultProductType: rechargeSettingsForm.defaultProductType,
+        defaultProductType: 'PAGE',
         rules: rechargeSettingsForm.rules.map(rule => ({
           assetCode: rule.assetCode,
           enabled: rule.enabled,
@@ -423,7 +425,7 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
       rechargeForm.assetCode = rechargeableAssets.value[0]?.code || ''
     }
     const channel = paymentChannels.value.find(item => item.code === rechargeForm.channelCode)
-    const defaultProductType = rechargeOptions.value?.defaultProductType || 'PAGE'
+    const defaultProductType = 'PAGE'
     if (!rechargeForm.productType || (channel && !channel.productTypes.includes(rechargeForm.productType))) {
       rechargeForm.productType = channel?.productTypes.includes(defaultProductType) ? defaultProductType : channel?.productTypes[0] || defaultProductType
     }
