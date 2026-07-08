@@ -44,7 +44,7 @@ build:frontend-plugins:
     - pnpm install --frozen-lockfile
     - |
       PLUGIN_FILTERS=""
-      while read -r plugin; do
+      while IFS= read -r plugin || [ -n "$plugin" ]; do
         [ -z "$plugin" ] && continue
         pom="../yudream-plugins/$plugin/pom.xml"
         frontend_pkg=$(grep -oE 'yudream-frontend/packages/[^/]+' "$pom" | head -1 | sed 's|yudream-frontend/packages/||')
@@ -72,7 +72,7 @@ build:backend:
   script:
     - |
       PLUGIN_MODULES=""
-      while read -r plugin; do
+      while IFS= read -r plugin || [ -n "$plugin" ]; do
         [ -z "$plugin" ] && continue
         PLUGIN_MODULES="$PLUGIN_MODULES,yudream-plugins/$plugin"
       done < ci/plugins.list
