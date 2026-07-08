@@ -40,6 +40,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -179,17 +180,22 @@ public class ActivityProofAppService {
                 .filter(value -> value != null && !value.isBlank())
                 .map(String::trim)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        Map<String, PlayerStudentMapping> mappings = repository.mappings(serverId, 1, MAX_SCAN_SIZE).stream()
-                .collect(Collectors.toMap(PlayerStudentMapping::playerId, Function.identity(), (first, second) -> first, LinkedHashMap::new));
+        List<PlayerStudentMapping> mappingRows = repository.mappings(serverId, 1, MAX_SCAN_SIZE);
+        Map<String, PlayerStudentMapping> mappingsByPlayerId = mappingRows.stream()
+                .filter(item -> hasText(item.playerId()))
+                .collect(Collectors.toMap(item -> normalizeKey(item.playerId()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
+        Map<String, PlayerStudentMapping> mappingsByPlayerName = mappingRows.stream()
+                .filter(item -> hasText(item.playerName()))
+                .collect(Collectors.toMap(item -> normalizeKey(item.playerName()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
         List<PluginStudentInfoProfile> students = studentInfoService()
                 .map(service -> service.studentInfos(null, 1, MAX_SCAN_SIZE))
                 .orElseGet(List::of);
         Map<String, PluginStudentInfoProfile> studentsByNo = students.stream()
                 .filter(item -> item.studentNo() != null && !item.studentNo().isBlank())
-                .collect(Collectors.toMap(PluginStudentInfoProfile::studentNo, Function.identity(), (first, second) -> first, LinkedHashMap::new));
+                .collect(Collectors.toMap(item -> normalizeKey(item.studentNo()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
         Map<String, PluginStudentInfoProfile> studentsByName = students.stream()
                 .filter(item -> item.studentName() != null && !item.studentName().isBlank())
-                .collect(Collectors.toMap(PluginStudentInfoProfile::studentName, Function.identity(), (first, second) -> first, LinkedHashMap::new));
+                .collect(Collectors.toMap(item -> normalizeKey(item.studentName()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
 
         long minMillis = Math.max(minOnlineMinutes == null ? 0 : minOnlineMinutes, 0) * 60_000L;
         List<ActivityProofParticipantDTO> result = new ArrayList<>();
@@ -202,7 +208,7 @@ public class ActivityProofAppService {
             if (effectiveMillis < minMillis) {
                 continue;
             }
-            PlayerStudentMapping mapping = mappings.get(activity.playerId());
+            PlayerStudentMapping mapping = resolveMapping(activity, mappingsByPlayerId, mappingsByPlayerName);
             PluginStudentInfoProfile profile = resolveStudent(activity, mapping, studentsByNo, studentsByName);
             result.add(toParticipant(index++, activity, mapping, profile, effectiveMillis));
         }
@@ -241,17 +247,27 @@ public class ActivityProofAppService {
                                                     Map<String, PluginStudentInfoProfile> studentsByNo,
                                                     Map<String, PluginStudentInfoProfile> studentsByName) {
         if (mapping != null) {
-            PluginStudentInfoProfile profile = studentsByNo.get(mapping.studentNo());
+            PluginStudentInfoProfile profile = studentsByNo.get(normalizeKey(mapping.studentNo()));
             if (profile != null) {
                 return profile;
             }
             return studentInfoService().flatMap(service -> service.findStudentInfoByStudentNo(mapping.studentNo())).orElse(null);
         }
-        PluginStudentInfoProfile byPlayerId = studentsByNo.get(activity.playerId());
+        PluginStudentInfoProfile byPlayerId = studentsByNo.get(normalizeKey(activity.playerId()));
         if (byPlayerId != null) {
             return byPlayerId;
         }
-        return studentsByName.get(activity.playerName());
+        return studentsByName.get(normalizeKey(activity.playerName()));
+    }
+
+    private PlayerStudentMapping resolveMapping(PluginMinecraftPlayerActivity activity,
+                                                Map<String, PlayerStudentMapping> mappingsByPlayerId,
+                                                Map<String, PlayerStudentMapping> mappingsByPlayerName) {
+        PlayerStudentMapping mapping = mappingsByPlayerId.get(normalizeKey(activity.playerId()));
+        if (mapping != null) {
+            return mapping;
+        }
+        return mappingsByPlayerName.get(normalizeKey(activity.playerName()));
     }
 
     private ActivityProofParticipantDTO toParticipant(int index, PluginMinecraftPlayerActivity activity,
@@ -410,6 +426,14 @@ public class ActivityProofAppService {
 
     private String text(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String normalizeKey(String value) {
+        return text(value).toLowerCase(Locale.ROOT);
     }
 
     private Long requireTemplateId(Long value) {

@@ -375,6 +375,9 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
         if (path == null || path.isBlank()) {
             return null;
         }
+        if (data.containsKey(path)) {
+            return data.get(path);
+        }
         if ("this".equals(path) || "item".equals(path)) {
             return data.get(path);
         }
