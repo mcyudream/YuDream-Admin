@@ -94,6 +94,11 @@ public class WalletController {
         return http.transactions(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/my/transactions", permission = WalletPlugin.USER_PERMISSION)
+    public PluginHttpResponse myTransactions(PluginHttpRequest request) {
+        return http.myTransactions(request);
+    }
+
     @PluginHttpEndpoint(method = "GET", path = "/transactions/by-business-no", permission = WalletPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse transactionByBusinessNo(PluginHttpRequest request) {
         return http.transactionByBusinessNo(request);

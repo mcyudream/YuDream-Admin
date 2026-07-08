@@ -20,6 +20,7 @@ export function createWalletApi(sdk: YuDreamPluginSdk) {
     adminBalances: (assetCode?: string) => sdk.http.get<WalletBalance[]>(`/admin/balances${query({ page: 1, size: 200, assetCode })}`),
     userBalances: (userId: string) => sdk.http.get<WalletBalance[]>(`/users/${encodeURIComponent(userId)}/balances`),
     transactions: (filters?: Record<string, string>) => sdk.http.get<WalletTransaction[]>(`/transactions${query({ page: 1, size: 200, ...filters })}`),
+    myTransactions: (filters?: Record<string, string>) => sdk.http.get<WalletTransaction[]>(`/my/transactions${query({ page: 1, size: 200, ...filters })}`),
     saveAsset: (data: Record<string, unknown>) => sdk.http.post<WalletAsset>('/assets', data),
     deleteAsset: (assetCode: string) => sdk.http.request(`/assets/${encodeURIComponent(assetCode)}`, { method: 'DELETE' }),
     rechargeOptions: () => sdk.http.get<WalletRechargeOptions>('/recharge/options'),

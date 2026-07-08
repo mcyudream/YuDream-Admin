@@ -15,6 +15,8 @@ public interface PluginWalletService {
 
     List<PluginWalletBalance> balances(String userId);
 
+    List<PluginWalletBalance> listBalances(String assetCode, int page, int size);
+
     PluginWalletBalance balance(String userId, String assetCode);
 
     PluginWalletTransaction credit(PluginWalletChangeRequest request);
@@ -22,6 +24,8 @@ public interface PluginWalletService {
     PluginWalletTransaction debit(PluginWalletChangeRequest request);
 
     PluginWalletTransaction transfer(PluginWalletTransferRequest request);
+
+    List<PluginWalletTransaction> transactions(PluginWalletTransactionQuery query);
 
     Optional<PluginWalletTransaction> findTransactionByBusinessNo(String businessNo);
 }

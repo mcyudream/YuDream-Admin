@@ -171,6 +171,27 @@ public class WalletHttpFacade {
                         firstQuery(request, "type"),
                         firstQuery(request, "source"),
                         userId,
+                        longQuery(request, "startAt"),
+                        longQuery(request, "endAt"),
+                        page(request),
+                        size(request)
+                ).stream()
+                .map(transaction -> assembler.toRes(transaction, userOf(transaction.fromUserId()), userOf(transaction.toUserId())))
+                .toList());
+    }
+
+    public PluginHttpResponse myTransactions(PluginHttpRequest request) {
+        Long principalUserId = request.principal().userId();
+        if (principalUserId == null) {
+            throw new IllegalArgumentException("请先登录");
+        }
+        return PluginHttpResponse.ok(appService.transactions(
+                        firstQuery(request, "assetCode"),
+                        firstQuery(request, "type"),
+                        firstQuery(request, "source"),
+                        String.valueOf(principalUserId),
+                        longQuery(request, "startAt"),
+                        longQuery(request, "endAt"),
                         page(request),
                         size(request)
                 ).stream()
@@ -197,6 +218,11 @@ public class WalletHttpFacade {
     private int intQuery(PluginHttpRequest request, String key, int defaultValue) {
         List<String> values = request.query().get(key);
         return values == null || values.isEmpty() ? defaultValue : Integer.parseInt(values.get(0));
+    }
+
+    private Long longQuery(PluginHttpRequest request, String key) {
+        List<String> values = request.query().get(key);
+        return values == null || values.isEmpty() || values.get(0).isBlank() ? null : Long.parseLong(values.get(0));
     }
 
     private String firstQuery(PluginHttpRequest request, String key) {
