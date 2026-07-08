@@ -14,6 +14,6 @@ public class WordGenerateCmd implements Serializable {
     private static final long serialVersionUID = 1L;
 
     private Long templateId;
-    private Map<String, String> data = new HashMap<>();
+    private Map<String, Object> data = new HashMap<>();
     private Long operatorId;
 }

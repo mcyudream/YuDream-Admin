@@ -23,14 +23,14 @@ public class WordGenerationRecord extends BaseDomain {
     private String templateCode;
     private Long outputFileId;
     private String outputFilename;
-    private Map<String, String> data;
+    private Map<String, Object> data;
     private GenerationStatus status;
     private String errorMessage;
     private Long operatorId;
     private LocalDateTime generatedAt;
 
     public static WordGenerationRecord success(Long templateId, String templateCode, Long outputFileId,
-                                                String outputFilename, Map<String, String> data, Long operatorId) {
+                                                String outputFilename, Map<String, Object> data, Long operatorId) {
         return WordGenerationRecord.builder()
                 .templateId(templateId)
                 .templateCode(templateCode)
@@ -43,7 +43,7 @@ public class WordGenerationRecord extends BaseDomain {
                 .build();
     }
 
-    public static WordGenerationRecord failed(Long templateId, String templateCode, Map<String, String> data,
+    public static WordGenerationRecord failed(Long templateId, String templateCode, Map<String, Object> data,
                                               String errorMessage, Long operatorId) {
         return WordGenerationRecord.builder()
                 .templateId(templateId)

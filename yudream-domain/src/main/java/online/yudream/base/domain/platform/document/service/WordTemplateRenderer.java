@@ -7,5 +7,5 @@ import java.util.Map;
 
 public interface WordTemplateRenderer {
 
-    RenderedDocument render(InputStream templateInputStream, Map<String, String> data);
+    RenderedDocument render(InputStream templateInputStream, Map<String, Object> data);
 }

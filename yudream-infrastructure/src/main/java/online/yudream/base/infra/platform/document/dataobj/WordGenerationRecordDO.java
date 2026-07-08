@@ -18,7 +18,7 @@ public class WordGenerationRecordDO extends BaseDO {
     private String templateCode;
     private Long outputFileId;
     private String outputFilename;
-    private Map<String, String> data = new HashMap<>();
+    private Map<String, Object> data = new HashMap<>();
     private GenerationStatus status;
     private String errorMessage;
     private Long operatorId;
