@@ -2,13 +2,16 @@ package online.yudream.base.interfaces.system.security.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.security.service.OAuthPasskeyAppService;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.assembler.ApiSecurityWebAssembler;
+import online.yudream.base.interfaces.system.security.assembler.PasskeyWebAssembler;
 import online.yudream.base.interfaces.system.security.request.PasskeyRegistrationFinishRequest;
 import online.yudream.base.interfaces.system.security.res.PasskeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyRegistrationOptionsRes;
+import online.yudream.base.interfaces.system.security.support.PasskeyRelyingPartySupport;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,17 +37,20 @@ public class UserPasskeyController {
     }
 
     @PostMapping("/registration/options")
-    public Result<PasskeyRegistrationOptionsRes> startRegistration() {
+    public Result<PasskeyRegistrationOptionsRes> startRegistration(HttpServletRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
         return Result.ok(ApiSecurityWebAssembler.toRes(oauthPasskeyAppService.startPasskeyRegistration(
-                ApiSecurityWebAssembler.toPasskeyRegistrationStartCmd(userId))));
+                PasskeyWebAssembler.toRegistrationStartCmd(userId, PasskeyRelyingPartySupport.from(request)))));
     }
 
     @PostMapping("/registration")
-    public Result<PasskeyCredentialRes> finishRegistration(@Valid @RequestBody PasskeyRegistrationFinishRequest request) {
+    public Result<PasskeyCredentialRes> finishRegistration(
+            @Valid @RequestBody PasskeyRegistrationFinishRequest request,
+            HttpServletRequest httpRequest
+    ) {
         Long userId = StpUtil.getLoginIdAsLong();
         return Result.ok(ApiSecurityWebAssembler.toRes(oauthPasskeyAppService.finishPasskeyRegistration(
-                ApiSecurityWebAssembler.toPasskeyRegistrationFinishCmd(userId, request))));
+                PasskeyWebAssembler.toRegistrationFinishCmd(userId, request, PasskeyRelyingPartySupport.from(httpRequest)))));
     }
 
     @PostMapping("/{id}/revoke")

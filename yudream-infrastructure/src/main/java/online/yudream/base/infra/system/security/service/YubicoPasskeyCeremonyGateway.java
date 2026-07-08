@@ -30,6 +30,7 @@ import online.yudream.base.domain.system.security.valobj.PasskeyAuthenticationOp
 import online.yudream.base.domain.system.security.valobj.PasskeyAuthenticationResult;
 import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationOptions;
 import online.yudream.base.domain.system.security.valobj.PasskeyRegistrationResult;
+import online.yudream.base.domain.system.security.valobj.PasskeyRelyingPartyContext;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import org.springframework.stereotype.Service;
@@ -45,21 +46,19 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
 
-    private static final String RP_ID = "localhost";
-    private static final String RP_NAME = "YuDream Admin";
-    private static final Set<String> ORIGINS = Set.of(
-            "http://localhost:9002",
-            "http://localhost:8080",
-            "http://127.0.0.1:9002"
-    );
-
     private final UserRepo userRepo;
     private final PasskeyCredentialRepo passkeyCredentialRepo;
 
     @Override
-    public PasskeyRegistrationOptions startRegistration(Long userId, String username, String displayName, List<PasskeyCredential> existingCredentials) {
+    public PasskeyRegistrationOptions startRegistration(
+            PasskeyRelyingPartyContext relyingParty,
+            Long userId,
+            String username,
+            String displayName,
+            List<PasskeyCredential> existingCredentials
+    ) {
         try {
-            PublicKeyCredentialCreationOptions request = relyingParty().startRegistration(StartRegistrationOptions.builder()
+            PublicKeyCredentialCreationOptions request = relyingParty(relyingParty).startRegistration(StartRegistrationOptions.builder()
                     .user(UserIdentity.builder()
                             .name(username)
                             .displayName(displayName)
@@ -74,10 +73,10 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
     }
 
     @Override
-    public PasskeyRegistrationResult finishRegistration(String requestJson, String responseJson) {
+    public PasskeyRegistrationResult finishRegistration(PasskeyRelyingPartyContext relyingParty, String requestJson, String responseJson) {
         try {
             PublicKeyCredentialCreationOptions request = PublicKeyCredentialCreationOptions.fromJson(requestJson);
-            RegistrationResult result = relyingParty().finishRegistration(FinishRegistrationOptions.builder()
+            RegistrationResult result = relyingParty(relyingParty).finishRegistration(FinishRegistrationOptions.builder()
                     .request(request)
                     .response(PublicKeyCredential.parseRegistrationResponseJson(responseJson))
                     .build());
@@ -99,9 +98,9 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
     }
 
     @Override
-    public PasskeyAuthenticationOptions startAuthentication(String username) {
+    public PasskeyAuthenticationOptions startAuthentication(PasskeyRelyingPartyContext relyingParty, String username) {
         try {
-            AssertionRequest request = relyingParty().startAssertion(StartAssertionOptions.builder()
+            AssertionRequest request = relyingParty(relyingParty).startAssertion(StartAssertionOptions.builder()
                     .username(username)
                     .build());
             return new PasskeyAuthenticationOptions(request.toJson(), request.toCredentialsGetJson());
@@ -112,10 +111,10 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
     }
 
     @Override
-    public PasskeyAuthenticationResult finishAuthentication(String requestJson, String responseJson) {
+    public PasskeyAuthenticationResult finishAuthentication(PasskeyRelyingPartyContext relyingParty, String requestJson, String responseJson) {
         try {
             AssertionRequest request = AssertionRequest.fromJson(requestJson);
-            AssertionResult result = relyingParty().finishAssertion(FinishAssertionOptions.builder()
+            AssertionResult result = relyingParty(relyingParty).finishAssertion(FinishAssertionOptions.builder()
                     .request(request)
                     .response(PublicKeyCredential.parseAssertionResponseJson(responseJson))
                     .build());
@@ -142,11 +141,11 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
         }
     }
 
-    private RelyingParty relyingParty() {
+    private RelyingParty relyingParty(PasskeyRelyingPartyContext relyingParty) {
         return RelyingParty.builder()
-                .identity(RelyingPartyIdentity.builder().id(RP_ID).name(RP_NAME).build())
+                .identity(RelyingPartyIdentity.builder().id(relyingParty.rpId()).name(relyingParty.rpName()).build())
                 .credentialRepository(new Repository())
-                .origins(ORIGINS)
+                .origins(Set.of(relyingParty.origin()))
                 .allowUntrustedAttestation(true)
                 .build();
     }
