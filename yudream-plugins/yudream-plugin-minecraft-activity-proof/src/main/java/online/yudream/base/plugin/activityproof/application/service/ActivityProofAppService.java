@@ -52,6 +52,7 @@ public class ActivityProofAppService {
     private static final String MINECRAFT_PLUGIN = "minecraft-server";
     private static final String STUDENT_INFO_PLUGIN = "yudream-student-info";
     private static final String DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private static final int SCAN_PAGE_SIZE = 200;
     private static final int MAX_SCAN_SIZE = 1000;
 
     private final ActivityProofRepository repository;
@@ -111,7 +112,11 @@ public class ActivityProofAppService {
     }
 
     public List<ActivityProofMappingDTO> mappings(String serverId, int page, int size) {
-        return repository.mappings(serverId, safePage(page), safeSize(size)).stream()
+        int safePage = safePage(page);
+        int safeSize = safeSize(size);
+        return allMappings(serverId).stream()
+                .skip((long) (safePage - 1) * safeSize)
+                .limit(safeSize)
                 .map(this::toDTO)
                 .toList();
     }
@@ -180,16 +185,14 @@ public class ActivityProofAppService {
                 .filter(value -> value != null && !value.isBlank())
                 .map(String::trim)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        List<PlayerStudentMapping> mappingRows = repository.mappings(serverId, 1, MAX_SCAN_SIZE);
+        List<PlayerStudentMapping> mappingRows = allMappings(serverId);
         Map<String, PlayerStudentMapping> mappingsByPlayerId = mappingRows.stream()
                 .filter(item -> hasText(item.playerId()))
                 .collect(Collectors.toMap(item -> normalizeKey(item.playerId()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
         Map<String, PlayerStudentMapping> mappingsByPlayerName = mappingRows.stream()
                 .filter(item -> hasText(item.playerName()))
                 .collect(Collectors.toMap(item -> normalizeKey(item.playerName()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
-        List<PluginStudentInfoProfile> students = studentInfoService()
-                .map(service -> service.studentInfos(null, 1, MAX_SCAN_SIZE))
-                .orElseGet(List::of);
+        List<PluginStudentInfoProfile> students = allStudents();
         Map<String, PluginStudentInfoProfile> studentsByNo = students.stream()
                 .filter(item -> item.studentNo() != null && !item.studentNo().isBlank())
                 .collect(Collectors.toMap(item -> normalizeKey(item.studentNo()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
@@ -200,7 +203,7 @@ public class ActivityProofAppService {
         long minMillis = Math.max(minOnlineMinutes == null ? 0 : minOnlineMinutes, 0) * 60_000L;
         List<ActivityProofParticipantDTO> result = new ArrayList<>();
         int index = 1;
-        for (PluginMinecraftPlayerActivity activity : minecraft().minecraftPlayerActivities(serverId, 1, MAX_SCAN_SIZE)) {
+        for (PluginMinecraftPlayerActivity activity : allMinecraftActivities(serverId)) {
             if (!selected.isEmpty() && !selected.contains(activity.playerId())) {
                 continue;
             }
@@ -240,6 +243,49 @@ public class ActivityProofAppService {
                 item.totalAfkMillis(),
                 item.effectiveOnlineMillis()
         );
+    }
+
+    private List<PlayerStudentMapping> allMappings(String serverId) {
+        List<PlayerStudentMapping> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<PlayerStudentMapping> batch = repository.mappings(serverId, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<PluginStudentInfoProfile> allStudents() {
+        Optional<PluginStudentInfoService> service = studentInfoService();
+        if (service.isEmpty()) {
+            return List.of();
+        }
+        List<PluginStudentInfoProfile> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<PluginStudentInfoProfile> batch = service.get().studentInfos(null, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<PluginMinecraftPlayerActivity> allMinecraftActivities(String serverId) {
+        List<PluginMinecraftPlayerActivity> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<PluginMinecraftPlayerActivity> batch = minecraft().minecraftPlayerActivities(serverId, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
     }
 
     private PluginStudentInfoProfile resolveStudent(PluginMinecraftPlayerActivity activity,

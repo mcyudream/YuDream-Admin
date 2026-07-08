@@ -43,6 +43,8 @@ import java.util.stream.Collectors;
 
 public class WalletAppService implements PluginWalletService {
 
+    private static final int SCAN_PAGE_SIZE = 200;
+
     private final WalletRepository repository;
     private final FrameworkServices framework;
     private final WalletAppAssembler assembler = new WalletAppAssembler();
@@ -78,7 +80,7 @@ public class WalletAppService implements PluginWalletService {
 
     @Override
     public List<PluginWalletAsset> assets() {
-        return listAssets(1, 200);
+        return allAssets().stream().map(assembler::toSpi).toList();
     }
 
     @Override
@@ -252,14 +254,20 @@ public class WalletAppService implements PluginWalletService {
     public List<PluginWalletBalance> listBalances(String assetCode, int page, int size) {
         initializeDefaults();
         List<WalletBalance> items = hasText(assetCode)
-                ? repository.findBalancesByAsset(assetCode, page, size)
-                : repository.listBalances(page, size);
-        return items.stream().map(assembler::toSpi).toList();
+                ? allBalancesByAsset(assetCode)
+                : allBalances();
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        return items.stream()
+                .skip((long) (safePage - 1) * safeSize)
+                .limit(safeSize)
+                .map(assembler::toSpi)
+                .toList();
     }
 
     public Map<String, Map<String, BigDecimal>> historicalIncomeTotals() {
         initializeDefaults();
-        return repository.listTransactions(1, transactionFetchSize()).stream()
+        return allTransactions().stream()
                 .filter(transaction -> transaction.type() == WalletTransactionType.CREDIT)
                 .filter(transaction -> hasText(transaction.toUserId()))
                 .filter(transaction -> hasText(transaction.assetCode()))
@@ -288,7 +296,13 @@ public class WalletAppService implements PluginWalletService {
     }
 
     public List<PluginWalletTransaction> transactions(int page, int size) {
-        return repository.listTransactions(page, size).stream().map(assembler::toSpi).toList();
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        return allTransactions().stream()
+                .skip((long) (safePage - 1) * safeSize)
+                .limit(safeSize)
+                .map(assembler::toSpi)
+                .toList();
     }
 
     public List<PluginWalletTransaction> transactions(String assetCode, String type, String source, String userId, int page, int size) {
@@ -298,7 +312,7 @@ public class WalletAppService implements PluginWalletService {
     public List<PluginWalletTransaction> transactions(String assetCode, String type, String source, String userId, Long startAt, Long endAt, int page, int size) {
         int safePage = Math.max(page, 1);
         int safeSize = Math.max(size, 1);
-        return repository.listTransactions(1, transactionFetchSize()).stream()
+        return allTransactions().stream()
                 .filter(item -> !hasText(assetCode) || item.assetCode().equalsIgnoreCase(assetCode.trim()))
                 .filter(item -> !hasText(type) || item.type().name().equalsIgnoreCase(type.trim()))
                 .filter(item -> !hasText(source) || item.source().equalsIgnoreCase(source.trim()))
@@ -490,9 +504,61 @@ public class WalletAppService implements PluginWalletService {
     }
 
     private List<WalletAsset> moneyAssets() {
-        return repository.listAssets(1, 500).stream()
+        return allAssets().stream()
                 .filter(WalletAsset::money)
                 .toList();
+    }
+
+    private List<WalletAsset> allAssets() {
+        List<WalletAsset> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<WalletAsset> batch = repository.listAssets(page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<WalletBalance> allBalances() {
+        List<WalletBalance> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<WalletBalance> batch = repository.listBalances(page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<WalletBalance> allBalancesByAsset(String assetCode) {
+        List<WalletBalance> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<WalletBalance> batch = repository.findBalancesByAsset(assetCode, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<WalletTransaction> allTransactions() {
+        List<WalletTransaction> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<WalletTransaction> batch = repository.listTransactions(page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
     }
 
     private List<PluginPaymentChannel> paymentChannels() {
@@ -574,11 +640,4 @@ public class WalletAppService implements PluginWalletService {
         return !"MINECRAFT_SEASON".equals(transaction.source());
     }
 
-    private int transactionFetchSize() {
-        long count = repository.transactionCount();
-        if (count <= 0) {
-            return 1;
-        }
-        return (int) Math.min(count, Integer.MAX_VALUE);
-    }
 }

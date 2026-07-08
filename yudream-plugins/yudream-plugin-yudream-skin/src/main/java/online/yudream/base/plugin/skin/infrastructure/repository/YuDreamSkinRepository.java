@@ -18,6 +18,7 @@ import java.util.Optional;
 
 public class YuDreamSkinRepository {
 
+    private static final int SCAN_PAGE_SIZE = 200;
     private static final String USERS = "users";
     private static final String PLAYERS = "players";
     private static final String TEXTURES = "textures";
@@ -73,7 +74,11 @@ public class YuDreamSkinRepository {
     }
 
     public List<SkinPlayer> findPlayersByOwner(String ownerId) {
-        return documents.findByField(PLAYERS, "ownerId", ownerId, 1, 200).stream().map(this::toPlayer).toList();
+        return findAllByField(PLAYERS, "ownerId", ownerId).stream().map(this::toPlayer).toList();
+    }
+
+    public List<SkinPlayer> findPlayersByOwner(String ownerId, int page, int size) {
+        return documents.findByField(PLAYERS, "ownerId", ownerId, page, size).stream().map(this::toPlayer).toList();
     }
 
     public List<SkinPlayer> listPlayers(int page, int size) {
@@ -155,7 +160,7 @@ public class YuDreamSkinRepository {
     }
 
     public List<SkinClosetItem> findClosetByTexture(String textureHash) {
-        return documents.findByField(CLOSET, "textureHash", textureHash, 1, 10000).stream().map(this::toClosetItem).toList();
+        return findAllByField(CLOSET, "textureHash", textureHash).stream().map(this::toClosetItem).toList();
     }
 
     public void deleteClosetItem(String id) {
@@ -248,6 +253,19 @@ public class YuDreamSkinRepository {
         document.put("migratedTid", texture.migratedTid());
         document.put("uploadedAt", texture.uploadedAt());
         return document;
+    }
+
+    private List<Map<String, Object>> findAllByField(String collection, String field, Object value) {
+        List<Map<String, Object>> records = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<Map<String, Object>> batch = documents.findByField(collection, field, value, page, SCAN_PAGE_SIZE);
+            records.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return records;
+            }
+            page++;
+        }
     }
 
     private SkinUser toUser(Map<String, Object> document) {

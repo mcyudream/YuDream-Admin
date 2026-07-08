@@ -1,23 +1,25 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 import type { MigrationStatus, SkinClosetItem, SkinMe, SkinPlayer, SkinSettings, SkinSummary, SkinTexture } from '../types'
 
+const PAGE_SIZE = 200
+
 export function createSkinApi(sdk: YuDreamPluginSdk) {
   return {
     status: () => sdk.http.get<SkinSummary>('/status'),
     me: () => sdk.http.get<SkinMe>('/me'),
-    players: () => sdk.http.get<SkinPlayer[]>('/me/players?page=1&size=100'),
-    adminPlayers: () => sdk.http.get<SkinPlayer[]>('/admin/players?page=1&size=100'),
-    textures: () => sdk.http.get<SkinTexture[]>('/textures?page=1&size=100'),
+    players: () => getAllPages<SkinPlayer>(sdk, '/me/players'),
+    adminPlayers: () => getAllPages<SkinPlayer>(sdk, '/admin/players'),
+    textures: () => getAllPages<SkinTexture>(sdk, '/textures'),
     adminTextures: async () => {
       try {
-        return await sdk.http.get<SkinTexture[]>('/admin/textures?page=1&size=100')
+        return await getAllPages<SkinTexture>(sdk, '/admin/textures')
       }
       catch {
-        return sdk.http.get<SkinTexture[]>('/textures?page=1&size=100')
+        return getAllPages<SkinTexture>(sdk, '/textures')
       }
     },
-    closet: () => sdk.http.get<SkinClosetItem[]>('/me/closet?page=1&size=200'),
-    adminCloset: () => sdk.http.get<SkinClosetItem[]>('/admin/closet?page=1&size=200'),
+    closet: () => getAllPages<SkinClosetItem>(sdk, '/me/closet'),
+    adminCloset: () => getAllPages<SkinClosetItem>(sdk, '/admin/closet'),
     settings: () => sdk.http.get<SkinSettings>('/settings'),
     createPlayer: (data: Record<string, unknown>) => sdk.http.post<SkinPlayer>('/me/players', data),
     createAdminPlayer: (data: Record<string, unknown>) => sdk.http.post<SkinPlayer>('/admin/players', data),
@@ -43,5 +45,18 @@ export function createSkinApi(sdk: YuDreamPluginSdk) {
     migrationEventsUrl: () => sdk.http.url('/migration/blessing-skin/events'),
     pluginUrl: (path = '/') => sdk.http.url(path),
     textureUrl: (hash?: string) => (hash ? sdk.http.url(`/textures/${hash}`) : ''),
+  }
+}
+
+async function getAllPages<T>(sdk: YuDreamPluginSdk, path: string) {
+  const records: T[] = []
+  let page = 1
+  while (true) {
+    const batch = await sdk.http.get<T[]>(`${path}?page=${page}&size=${PAGE_SIZE}`)
+    records.push(...batch)
+    if (batch.length < PAGE_SIZE) {
+      return records
+    }
+    page += 1
   }
 }

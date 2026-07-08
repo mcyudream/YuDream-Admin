@@ -28,7 +28,8 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
     private static final String STATUS_SNAPSHOTS = "status-snapshots";
     private static final String OPERATIONS = "season-operations";
     private static final String PLAYER_ACTIVITIES = "player-activities";
-    private static final int SNAPSHOT_SCAN_PAGE_SIZE = 1000;
+    private static final int SERVER_SCAN_PAGE_SIZE = 200;
+    private static final int SNAPSHOT_SCAN_PAGE_SIZE = 200;
     private static final int SNAPSHOT_SCAN_MAX_PAGES = 10;
     private static final int DELETE_SCAN_PAGE_SIZE = 200;
 
@@ -50,10 +51,12 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
 
     @Override
     public List<MinecraftServer> list(int page, int size, boolean includeDisabled) {
-        return documents.findAll(SERVERS, page, size).stream()
-                .map(this::toServer)
-                .filter(server -> includeDisabled || server.enabled())
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        return allServers(includeDisabled).stream()
                 .sorted(java.util.Comparator.comparingInt(MinecraftServer::sort).thenComparing(MinecraftServer::name))
+                .skip((long) (safePage - 1) * safeSize)
+                .limit(safeSize)
                 .toList();
     }
 
@@ -62,7 +65,7 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
         if (includeDisabled) {
             return documents.count(SERVERS);
         }
-        return list(1, 1000, false).size();
+        return allServers(false).size();
     }
 
     @Override
@@ -158,6 +161,22 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
         document.put("createdAt", server.createdAt());
         document.put("updatedAt", server.updatedAt());
         return document;
+    }
+
+    private List<MinecraftServer> allServers(boolean includeDisabled) {
+        List<MinecraftServer> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<Map<String, Object>> rows = documents.findAll(SERVERS, page, SERVER_SCAN_PAGE_SIZE);
+            result.addAll(rows.stream()
+                    .map(this::toServer)
+                    .filter(server -> includeDisabled || server.enabled())
+                    .toList());
+            if (rows.size() < SERVER_SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
     }
 
     private void deleteByServerId(String collection, String serverId) {

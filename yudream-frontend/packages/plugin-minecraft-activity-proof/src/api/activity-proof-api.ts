@@ -10,6 +10,8 @@ import type {
 } from '../types'
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
+const PAGE_SIZE = 200
+
 export function createActivityProofApi(sdk: YuDreamPluginSdk) {
   function query(params: Record<string, string | number | boolean | undefined>) {
     const search = new URLSearchParams()
@@ -22,14 +24,27 @@ export function createActivityProofApi(sdk: YuDreamPluginSdk) {
     return value ? `?${value}` : ''
   }
 
+  async function getAllPages<T>(path: string, params: Record<string, string | number | boolean | undefined> = {}) {
+    const records: T[] = []
+    let page = 1
+    while (true) {
+      const batch = await sdk.http.get<T[]>(`${path}${query({ ...params, page, size: PAGE_SIZE })}`)
+      records.push(...batch)
+      if (batch.length < PAGE_SIZE) {
+        return records
+      }
+      page += 1
+    }
+  }
+
   return {
     status: () => sdk.http.get<ActivityProofStatus>('/status'),
     servers: () => sdk.http.get<ActivityProofServer[]>('/servers'),
-    templates: (keyword = '', page = 1, size = 100) => sdk.http.get<ActivityProofTemplate[]>(`/templates${query({ keyword, page, size })}`),
+    templates: (keyword = '') => getAllPages<ActivityProofTemplate>('/templates', { keyword }),
     settings: () => sdk.http.get<ActivityProofSettings>('/settings'),
     saveSettings: (data: Record<string, unknown>) => sdk.http.request<ActivityProofSettings>('/settings', { method: 'PUT', data }),
     selectTemplate: (templateId: number) => sdk.http.request<ActivityProofSettings>('/template', { method: 'PUT', data: { templateId } }),
-    mappings: (serverId: string, page = 1, size = 1000) => sdk.http.get<ActivityProofMapping[]>(`/mappings${query({ serverId, page, size })}`),
+    mappings: (serverId: string) => getAllPages<ActivityProofMapping>('/mappings', { serverId }),
     saveMapping: (data: Record<string, unknown>) => sdk.http.request<ActivityProofMapping>('/mappings', { method: 'PUT', data }),
     deleteMapping: (id: string) => sdk.http.request(`/mappings/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     participants: (serverId: string, minOnlineMinutes: number, includeAfk: boolean) => sdk.http.get<ActivityProofParticipant[]>(`/participants${query({ serverId, minOnlineMinutes, includeAfk })}`),
