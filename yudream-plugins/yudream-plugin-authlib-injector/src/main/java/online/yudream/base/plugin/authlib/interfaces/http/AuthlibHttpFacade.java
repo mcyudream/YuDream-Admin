@@ -28,7 +28,7 @@ public class AuthlibHttpFacade {
     }
 
     public PluginHttpResponse metadata(PluginHttpRequest request) {
-        return ali(request, PluginHttpResponse.rawJson(200, appService.metadata()));
+        return ali(request, PluginHttpResponse.rawJson(200, appService.metadata(apiRoot(request), textureBaseUrl(request))));
     }
 
     public PluginHttpResponse status(PluginHttpRequest request) {
@@ -137,13 +137,14 @@ public class AuthlibHttpFacade {
     }
 
     private String origin(PluginHttpRequest request) {
-        String proto = header(request, "x-forwarded-proto");
-        if (proto == null) {
-            proto = "http";
-        }
+        String proto = firstForwardedValue(header(request, "x-forwarded-proto"));
         String host = header(request, "x-forwarded-host");
         if (host == null) {
             host = header(request, "host");
+        }
+        host = firstForwardedValue(host);
+        if (proto == null) {
+            proto = localHost(host) ? "http" : "https";
         }
         return proto + "://" + (host == null ? "localhost:8080" : host);
     }
@@ -155,6 +156,25 @@ public class AuthlibHttpFacade {
             }
         }
         return null;
+    }
+
+    private String firstForwardedValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.split(",")[0].trim();
+    }
+
+    private boolean localHost(String host) {
+        if (host == null || host.isBlank()) {
+            return true;
+        }
+        String value = host.toLowerCase(Locale.ROOT);
+        int portIndex = value.indexOf(':');
+        if (portIndex > -1) {
+            value = value.substring(0, portIndex);
+        }
+        return "localhost".equals(value) || "127.0.0.1".equals(value) || "::1".equals(value);
     }
 
     private String bearerToken(PluginHttpRequest request) {

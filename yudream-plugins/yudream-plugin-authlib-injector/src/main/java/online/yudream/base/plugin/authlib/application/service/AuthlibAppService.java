@@ -18,6 +18,7 @@ import online.yudream.base.plugin.spi.system.skin.PluginSkinTexture;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 
 import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -43,26 +44,28 @@ public class AuthlibAppService {
         this.cryptoService = cryptoService;
     }
 
-    public Object metadata() {
+    public Object metadata(String apiRoot, String textureBaseUrl) {
         Map<String, Object> body = new LinkedHashMap<>();
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("serverName", "YuDream Authlib Injector");
         meta.put("implementationName", "YuDream Authlib Injector Plugin");
         meta.put("implementationVersion", "1.0.0");
-        meta.put("links", Map.of("homepage", "https://yudream.online"));
+        meta.put("links", Map.of("homepage", publicHomepage(apiRoot)));
         body.put("meta", meta);
-        body.put("skinDomains", List.of(".localhost", "localhost", "127.0.0.1"));
+        body.put("skinDomains", skinDomains(textureBaseUrl));
         body.put("signaturePublickey", cryptoService.publicKeyPem());
         return body;
     }
 
     public Object status(String apiRoot, String textureBaseUrl) {
+        String normalizedApiRoot = stripTrailingSlash(apiRoot);
+        String normalizedTextureBaseUrl = stripTrailingSlash(textureBaseUrl);
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("apiRoot", apiRoot);
-        body.put("textureBaseUrl", textureBaseUrl);
+        body.put("apiRoot", normalizedApiRoot);
+        body.put("textureBaseUrl", normalizedTextureBaseUrl);
         body.put("accountSource", "system-user");
         body.put("skinPluginEnabled", context.framework().extension(SKIN_PLUGIN_CODE, PluginSkinService.class).isPresent());
-        body.put("metadata", metadata());
+        body.put("metadata", metadata(normalizedApiRoot, normalizedTextureBaseUrl));
         body.put("endpoints", List.of(
                 "GET /",
                 "POST /authserver/authenticate",
@@ -182,6 +185,58 @@ public class AuthlibAppService {
         body.put("error", exception.error());
         body.put("errorMessage", exception.getMessage());
         return body;
+    }
+
+    private String publicHomepage(String apiRoot) {
+        return originOf(apiRoot).orElseGet(() -> stripTrailingSlash(apiRoot));
+    }
+
+    private List<String> skinDomains(String textureBaseUrl) {
+        return originHost(textureBaseUrl)
+                .map(host -> {
+                    if ("localhost".equalsIgnoreCase(host)) {
+                        return List.of(".localhost", "localhost", "127.0.0.1");
+                    }
+                    return List.of(host);
+                })
+                .orElseGet(() -> List.of("localhost", "127.0.0.1"));
+    }
+
+    private Optional<String> originOf(String url) {
+        try {
+            URI uri = URI.create(stripTrailingSlash(url));
+            if (!hasText(uri.getScheme()) || !hasText(uri.getHost())) {
+                return Optional.empty();
+            }
+            int port = uri.getPort();
+            String origin = uri.getScheme() + "://" + uri.getHost();
+            if (port > 0) {
+                origin += ":" + port;
+            }
+            return Optional.of(origin);
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<String> originHost(String url) {
+        try {
+            URI uri = URI.create(stripTrailingSlash(url));
+            return hasText(uri.getHost()) ? Optional.of(uri.getHost()) : Optional.empty();
+        } catch (IllegalArgumentException e) {
+            return Optional.empty();
+        }
+    }
+
+    private String stripTrailingSlash(String value) {
+        if (value == null) {
+            return "";
+        }
+        String result = value.trim();
+        while (result.endsWith("/") && result.length() > 1) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private AuthSession createSession(String clientToken, PluginUserProfile user, PluginSkinProfile selected) {
