@@ -161,6 +161,9 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     if (source === 'TRANSFER') {
       return '用户转账'
     }
+    if (source === 'MINECRAFT_SEASON') {
+      return '周目继承'
+    }
     return source || '-'
   }
 
@@ -187,6 +190,9 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
       syncRechargeForm()
       if (canManage.value) {
         await Promise.all([loadAdminBalances(), loadTransactions(), loadRechargeSettings()])
+      }
+      else {
+        transactions.value = await api.myTransactions()
       }
     }
     finally {
