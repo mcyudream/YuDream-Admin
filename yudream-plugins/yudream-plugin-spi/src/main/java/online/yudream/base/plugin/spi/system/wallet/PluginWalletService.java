@@ -15,7 +15,9 @@ public interface PluginWalletService {
 
     List<PluginWalletBalance> balances(String userId);
 
-    List<PluginWalletBalance> listBalances(String assetCode, int page, int size);
+    default List<PluginWalletBalance> listBalances(String assetCode, int page, int size) {
+        throw new UnsupportedOperationException("当前钱包插件版本不支持余额列表查询，请更新钱包插件后重试");
+    }
 
     PluginWalletBalance balance(String userId, String assetCode);
 
@@ -25,7 +27,9 @@ public interface PluginWalletService {
 
     PluginWalletTransaction transfer(PluginWalletTransferRequest request);
 
-    List<PluginWalletTransaction> transactions(PluginWalletTransactionQuery query);
+    default List<PluginWalletTransaction> transactions(PluginWalletTransactionQuery query) {
+        throw new UnsupportedOperationException("当前钱包插件版本不支持交易记录查询，请更新钱包插件后重试");
+    }
 
     Optional<PluginWalletTransaction> findTransactionByBusinessNo(String businessNo);
 }
