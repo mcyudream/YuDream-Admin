@@ -1,5 +1,5 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
-import type { EconomyRecord, InheritanceRule, MinecraftEndpoint, MinecraftServer, SeasonForm, SeasonOperation, ServerForm } from '../types'
+import type { EconomyRecord, InheritanceRule, MinecraftEndpoint, MinecraftServer, PlayerActivity, SeasonForm, SeasonOperation, ServerForm, TimeValue } from '../types'
 import { useFaToast } from '@fantastic-admin/components'
 import { computed, reactive, ref } from 'vue'
 import { createMinecraftApi } from '../api/minecraft-api'
@@ -11,11 +11,16 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   const toast = useFaToast()
   const loading = ref(false)
   const saving = ref(false)
+  const walletEnabled = ref(true)
   const servers = ref<MinecraftServer[]>([])
   const selectedId = ref('')
   const previewOperation = ref<SeasonOperation | null>(null)
   const operations = ref<SeasonOperation[]>([])
   const records = ref<EconomyRecord[]>([])
+  const playerActivities = ref<PlayerActivity[]>([])
+  const recordsPager = reactive({ page: 1, size: 20, hasNext: false })
+  const operationsPager = reactive({ page: 1, size: 10, hasNext: false })
+  const playerActivitiesPager = reactive({ page: 1, size: 20, hasNext: false })
 
   const serverForm = reactive<ServerForm>({
     id: '',
@@ -44,9 +49,13 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   async function load(includeDisabled = canManage.value) {
     loading.value = true
     try {
+      await loadEconomyStatus()
       servers.value = await api.list(includeDisabled)
       if (!selectedId.value || !servers.value.some(server => server.id === selectedId.value)) {
         selectedId.value = servers.value[0]?.id || ''
+        recordsPager.page = 1
+        operationsPager.page = 1
+        playerActivitiesPager.page = 1
       }
       if (selectedId.value) {
         await loadSideData(selectedId.value)
@@ -57,19 +66,90 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     }
   }
 
+  async function loadEconomyStatus() {
+    try {
+      const status = await api.economyStatus()
+      walletEnabled.value = status.walletEnabled !== false
+    }
+    catch {
+      walletEnabled.value = false
+    }
+    if (!walletEnabled.value) {
+      clearWalletData()
+    }
+  }
+
+  function clearWalletData() {
+    records.value = []
+    operations.value = []
+    previewOperation.value = null
+    recordsPager.page = 1
+    operationsPager.page = 1
+    recordsPager.hasNext = false
+    operationsPager.hasNext = false
+  }
+
   async function selectServer(id: string) {
     selectedId.value = id
     previewOperation.value = null
+    recordsPager.page = 1
+    operationsPager.page = 1
+    playerActivitiesPager.page = 1
     await loadSideData(id)
   }
 
   async function loadSideData(id: string) {
     const detail = await api.detail(id)
     replaceServer(detail)
-    records.value = await api.myRecords(id)
-    if (canManage.value) {
-      operations.value = await api.operations(id)
+    if (walletEnabled.value) {
+      await loadRecords(id)
     }
+    else {
+      clearWalletData()
+    }
+    if (canManage.value) {
+      await Promise.all([
+        walletEnabled.value ? loadOperations(id) : Promise.resolve(),
+        loadPlayerActivities(id),
+      ])
+    }
+    else {
+      playerActivities.value = []
+      playerActivitiesPager.hasNext = false
+    }
+  }
+
+  async function loadRecords(serverId = selectedId.value) {
+    if (!serverId || !walletEnabled.value) {
+      records.value = []
+      recordsPager.hasNext = false
+      return
+    }
+    const items = await api.myRecords(serverId, recordsPager.page, recordsPager.size)
+    recordsPager.hasNext = items.length >= recordsPager.size
+    records.value = items
+  }
+
+  async function loadOperations(serverId = selectedId.value) {
+    if (!serverId || !walletEnabled.value) {
+      operations.value = []
+      operationsPager.hasNext = false
+      return
+    }
+    const items = await api.operations(serverId, operationsPager.page, operationsPager.size)
+    operationsPager.hasNext = items.length >= operationsPager.size
+    operations.value = items
+  }
+
+  async function loadPlayerActivities(serverId = selectedId.value) {
+    if (!serverId || !canManage.value) {
+      playerActivities.value = []
+      playerActivitiesPager.hasNext = false
+      return
+    }
+    const items = await api.playerActivities(serverId, playerActivitiesPager.page, playerActivitiesPager.size)
+    playerActivitiesPager.hasNext = items.length >= playerActivitiesPager.size
+    playerActivities.value = items
   }
 
   function newServer() {
@@ -155,6 +235,10 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   }
 
   async function previewSeason() {
+    if (!walletEnabled.value) {
+      toast.warning('钱包插件未启用，周目货币继承已关闭')
+      return
+    }
     const target = selectedServer.value
     if (!target) {
       toast.warning('请先选择服务器')
@@ -171,6 +255,10 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   }
 
   async function openSeason() {
+    if (!walletEnabled.value) {
+      toast.warning('钱包插件未启用，周目货币继承已关闭')
+      return
+    }
     const target = selectedServer.value
     if (!target) {
       return
@@ -178,7 +266,10 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     saving.value = true
     try {
       previewOperation.value = await api.openSeason(target.id, seasonPayload())
-      toast.success('新周目已开启，余额增扣流水已记录')
+      toast.success('新周目已开启，余额重置流水已记录')
+      recordsPager.page = 1
+      operationsPager.page = 1
+      playerActivitiesPager.page = 1
       await loadSideData(target.id)
     }
     finally {
@@ -187,11 +278,18 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   }
 
   async function rollbackOperation(operation: SeasonOperation) {
+    if (!walletEnabled.value) {
+      toast.warning('钱包插件未启用，周目货币继承已关闭')
+      return
+    }
     saving.value = true
     try {
       previewOperation.value = await api.rollbackOperation(operation.id)
       toast.success('周目操作已撤回，反向流水已记录')
       if (selectedId.value) {
+        recordsPager.page = 1
+        operationsPager.page = 1
+        playerActivitiesPager.page = 1
         await loadSideData(selectedId.value)
       }
     }
@@ -220,11 +318,12 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     return number.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
   }
 
-  function formatTime(value?: number) {
-    if (!value) {
+  function formatTime(value?: TimeValue) {
+    const timestamp = normalizeTime(value)
+    if (!timestamp) {
       return '-'
     }
-    return new Date(value).toLocaleString('zh-CN', { hour12: false })
+    return new Date(timestamp).toLocaleString('zh-CN', { hour12: false })
   }
 
   function statusText(status?: string) {
@@ -248,10 +347,10 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
 
   function directionText(direction?: string) {
     if (direction === 'CREDIT') {
-      return '入账'
+      return '补入'
     }
     if (direction === 'DEBIT') {
-      return '扣账'
+      return '扣除'
     }
     return '不变'
   }
@@ -259,6 +358,83 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   function endpointAddress(endpoint: MinecraftEndpoint) {
     const port = endpointPortPayload(endpoint)
     return port ? `${endpoint.host}:${port}` : `${endpoint.host}（自动/SRV）`
+  }
+
+  async function copyServerId(id?: string) {
+    const value = id || selectedServer.value?.id || serverForm.id
+    if (!value) {
+      toast.warning('当前服务器还没有 ID')
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(value)
+      toast.success('服务器 ID 已复制')
+    }
+    catch {
+      toast.warning(`服务器 ID：${value}`)
+    }
+  }
+
+  async function nextRecordsPage() {
+    if (!walletEnabled.value || !recordsPager.hasNext) {
+      return
+    }
+    recordsPager.page += 1
+    await loadRecords()
+  }
+
+  async function prevRecordsPage() {
+    if (!walletEnabled.value || recordsPager.page <= 1) {
+      return
+    }
+    recordsPager.page -= 1
+    await loadRecords()
+  }
+
+  async function nextOperationsPage() {
+    if (!walletEnabled.value || !operationsPager.hasNext) {
+      return
+    }
+    operationsPager.page += 1
+    await loadOperations()
+  }
+
+  async function prevOperationsPage() {
+    if (!walletEnabled.value || operationsPager.page <= 1) {
+      return
+    }
+    operationsPager.page -= 1
+    await loadOperations()
+  }
+
+  async function nextPlayerActivitiesPage() {
+    if (!playerActivitiesPager.hasNext) {
+      return
+    }
+    playerActivitiesPager.page += 1
+    await loadPlayerActivities()
+  }
+
+  async function prevPlayerActivitiesPage() {
+    if (playerActivitiesPager.page <= 1) {
+      return
+    }
+    playerActivitiesPager.page -= 1
+    await loadPlayerActivities()
+  }
+
+  function formatDuration(value?: number) {
+    const totalSeconds = Math.max(Math.floor(Number(value || 0) / 1000), 0)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    }
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`
+    }
+    return `${seconds}s`
   }
 
   function seasonPayload() {
@@ -289,12 +465,17 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   return reactive({
     loading,
     saving,
+    walletEnabled,
     servers,
     selectedId,
     selectedServer,
     previewOperation,
     operations,
     records,
+    playerActivities,
+    recordsPager,
+    operationsPager,
+    playerActivitiesPager,
     serverForm,
     seasonForm,
     canManage,
@@ -302,6 +483,10 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     maxCount,
     latestOperation,
     load,
+    loadEconomyStatus,
+    loadRecords,
+    loadOperations,
+    loadPlayerActivities,
     selectServer,
     newServer,
     editServer,
@@ -309,6 +494,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     removeEndpoint,
     saveServer,
     refreshStatus,
+    copyServerId,
     previewSeason,
     openSeason,
     rollbackOperation,
@@ -320,6 +506,13 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     statusText,
     directionText,
     endpointAddress,
+    formatDuration,
+    nextRecordsPage,
+    prevRecordsPage,
+    nextOperationsPage,
+    prevOperationsPage,
+    nextPlayerActivitiesPage,
+    prevPlayerActivitiesPage,
   })
 }
 
@@ -329,6 +522,45 @@ function endpointPortPayload(endpoint: MinecraftEndpoint) {
     return undefined
   }
   return port
+}
+
+function normalizeTime(value: TimeValue) {
+  if (value == null || value === '') {
+    return 0
+  }
+  if (value instanceof Date) {
+    return validTimestamp(value.getTime())
+  }
+  if (Array.isArray(value)) {
+    return normalizeDateArray(value)
+  }
+  if (typeof value === 'number') {
+    return validTimestamp(value)
+  }
+  const text = value.trim()
+  if (!text) {
+    return 0
+  }
+  const numeric = Number(text)
+  if (Number.isFinite(numeric)) {
+    return validTimestamp(numeric)
+  }
+  return validTimestamp(Date.parse(text))
+}
+
+function normalizeDateArray(value: number[]) {
+  if (value.length < 3) {
+    return 0
+  }
+  const [year, month, day, hour = 0, minute = 0, second = 0, nano = 0] = value
+  return validTimestamp(new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1000000)).getTime())
+}
+
+function validTimestamp(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0
+  }
+  return value < 10000000000 ? value * 1000 : value
 }
 
 function blankEndpoint(sort = 0): MinecraftEndpoint {

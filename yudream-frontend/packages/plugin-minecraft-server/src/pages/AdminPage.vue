@@ -30,6 +30,7 @@
             <strong>{{ server.name }}</strong>
             <span>{{ server.currentSeason?.name || '暂无周目' }}</span>
             <StatusPill :status="server.status?.status" />
+            <code class="mc-server-id">{{ server.id }}</code>
           </button>
         </div>
       </McPanel>
@@ -52,6 +53,14 @@
                 <option :value="false">停用</option>
               </select>
             </label>
+          </div>
+
+          <div v-if="model.serverForm.id" class="mc-id-row">
+            <span>服务器 ID</span>
+            <code>{{ model.serverForm.id }}</code>
+            <button type="button" class="mc-icon-button" title="复制服务器 ID" @click="model.copyServerId(model.serverForm.id)">
+              <FaIcon name="i-ri:file-copy-line" />
+            </button>
           </div>
 
           <div class="mc-section-title">
@@ -98,7 +107,7 @@
       </McPanel>
     </div>
 
-    <div class="mc-season-layout">
+    <div v-if="model.walletEnabled" class="mc-season-layout">
       <McPanel title="开启新周目" eyebrow="Season">
         <form class="mc-form" @submit.prevent="model.previewSeason">
           <div class="mc-form-grid">
@@ -140,13 +149,13 @@
               <tr>
                 <th>用户</th>
                 <th>币种</th>
-                <th>真实累计</th>
-                <th>继承金额</th>
-                <th>本周目入账</th>
-                <th>当前周目累计</th>
-                <th>下周目继承</th>
+                <th>历史总额</th>
+                <th>继承可用</th>
+                <th>本周目充值</th>
+                <th>本周目可使用</th>
+                <th>下周目可使用</th>
                 <th>当前余额</th>
-                <th>增扣</th>
+                <th>重置差额</th>
               </tr>
             </thead>
             <tbody>
@@ -172,7 +181,7 @@
       </McPanel>
     </div>
 
-    <McPanel title="周目操作记录" eyebrow="Operations">
+    <McPanel v-if="model.walletEnabled" title="周目操作记录" eyebrow="Operations">
       <div class="mc-table-wrap">
         <table class="mc-table">
           <thead>
@@ -210,6 +219,17 @@
             </tr>
           </tbody>
         </table>
+      </div>
+      <div class="mc-pagination">
+        <FaButton size="sm" variant="outline" :disabled="model.operationsPager.page <= 1" @click="model.prevOperationsPage">
+          <FaIcon name="i-ri:arrow-left-s-line" />
+          上一页
+        </FaButton>
+        <span>第 {{ model.operationsPager.page }} 页</span>
+        <FaButton size="sm" variant="outline" :disabled="!model.operationsPager.hasNext" @click="model.nextOperationsPage">
+          下一页
+          <FaIcon name="i-ri:arrow-right-s-line" />
+        </FaButton>
       </div>
     </McPanel>
   </section>
