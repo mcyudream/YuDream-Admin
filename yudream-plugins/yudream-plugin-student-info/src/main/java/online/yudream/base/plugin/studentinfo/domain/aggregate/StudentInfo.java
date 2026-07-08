@@ -4,6 +4,7 @@ import java.util.Locale;
 
 public record StudentInfo(
         String userId,
+        String studentName,
         String studentNo,
         String className,
         String college,
@@ -12,16 +13,21 @@ public record StudentInfo(
 ) {
 
     private static final int USER_ID_MAX_LENGTH = 64;
+    private static final int STUDENT_NAME_MAX_LENGTH = 40;
     private static final int STUDENT_NO_MAX_LENGTH = 64;
     private static final int CLASS_NAME_MAX_LENGTH = 80;
     private static final int COLLEGE_MAX_LENGTH = 80;
 
     public StudentInfo {
         userId = requireText(userId, "用户不能为空");
+        studentName = trimToNull(studentName);
         studentNo = requireText(studentNo, "学号不能为空");
         className = requireText(className, "班级不能为空");
         college = requireText(college, "学院不能为空");
         requireMax(userId, USER_ID_MAX_LENGTH, "用户 ID");
+        if (studentName != null) {
+            requireMax(studentName, STUDENT_NAME_MAX_LENGTH, "姓名");
+        }
         requireMax(studentNo, STUDENT_NO_MAX_LENGTH, "学号");
         requireMax(className, CLASS_NAME_MAX_LENGTH, "班级");
         requireMax(college, COLLEGE_MAX_LENGTH, "学院");
@@ -34,13 +40,13 @@ public record StudentInfo(
         }
     }
 
-    public static StudentInfo create(String userId, String studentNo, String className, String college) {
+    public static StudentInfo create(String userId, String studentName, String studentNo, String className, String college) {
         long now = System.currentTimeMillis();
-        return new StudentInfo(userId, studentNo, className, college, now, now);
+        return new StudentInfo(userId, requireText(studentName, "姓名不能为空"), studentNo, className, college, now, now);
     }
 
-    public StudentInfo update(String studentNo, String className, String college) {
-        return new StudentInfo(userId, studentNo, className, college, createdAt, System.currentTimeMillis());
+    public StudentInfo update(String studentName, String studentNo, String className, String college) {
+        return new StudentInfo(userId, requireText(studentName, "姓名不能为空"), studentNo, className, college, createdAt, System.currentTimeMillis());
     }
 
     public boolean matches(String keyword, String collegeFilter, String classNameFilter) {
@@ -55,6 +61,7 @@ public record StudentInfo(
         }
         String value = keyword.trim().toLowerCase(Locale.ROOT);
         return userId.toLowerCase(Locale.ROOT).contains(value)
+                || contains(studentName, value)
                 || studentNo.toLowerCase(Locale.ROOT).contains(value)
                 || className.toLowerCase(Locale.ROOT).contains(value)
                 || college.toLowerCase(Locale.ROOT).contains(value);
@@ -64,7 +71,14 @@ public record StudentInfo(
         if (!hasText(expected)) {
             return true;
         }
+        if (!hasText(source)) {
+            return false;
+        }
         return source.toLowerCase(Locale.ROOT).contains(expected.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     private static String requireText(String value, String message) {

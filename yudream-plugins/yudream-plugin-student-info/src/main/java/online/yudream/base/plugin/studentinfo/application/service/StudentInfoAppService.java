@@ -23,8 +23,8 @@ public class StudentInfoAppService {
         String userId = requireText(cmd.userId(), "用户不能为空");
         StudentInfo existing = repository.findByUserId(userId).orElse(null);
         StudentInfo candidate = existing == null
-                ? StudentInfo.create(userId, cmd.studentNo(), cmd.className(), cmd.college())
-                : existing.update(cmd.studentNo(), cmd.className(), cmd.college());
+                ? StudentInfo.create(userId, cmd.studentName(), cmd.studentNo(), cmd.className(), cmd.college())
+                : existing.update(cmd.studentName(), cmd.studentNo(), cmd.className(), cmd.college());
         repository.findByStudentNo(candidate.studentNo())
                 .filter(item -> !item.userId().equals(candidate.userId()))
                 .ifPresent(item -> {

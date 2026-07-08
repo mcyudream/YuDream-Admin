@@ -10,10 +10,11 @@ public class StudentInfoWebAssembler {
 
     public StudentInfoSaveCmd toCmd(StudentInfoSaveRequest request, String userId) {
         StudentInfoSaveRequest safeRequest = request == null
-                ? new StudentInfoSaveRequest(null, null, null, null)
+                ? new StudentInfoSaveRequest(null, null, null, null, null)
                 : request;
         return new StudentInfoSaveCmd(
                 userId,
+                safeRequest.studentName(),
                 safeRequest.studentNo(),
                 safeRequest.className(),
                 safeRequest.college()
@@ -22,10 +23,11 @@ public class StudentInfoWebAssembler {
 
     public StudentInfoSaveCmd toAdminCmd(StudentInfoSaveRequest request) {
         StudentInfoSaveRequest safeRequest = request == null
-                ? new StudentInfoSaveRequest(null, null, null, null)
+                ? new StudentInfoSaveRequest(null, null, null, null, null)
                 : request;
         return new StudentInfoSaveCmd(
                 safeRequest.userId(),
+                safeRequest.studentName(),
                 safeRequest.studentNo(),
                 safeRequest.className(),
                 safeRequest.college()
@@ -38,6 +40,7 @@ public class StudentInfoWebAssembler {
                 username(user),
                 nickname(user),
                 email(user),
+                dto.studentName(),
                 dto.studentNo(),
                 dto.className(),
                 dto.college(),
@@ -52,6 +55,7 @@ public class StudentInfoWebAssembler {
                 username(user),
                 nickname(user),
                 email(user),
+                null,
                 null,
                 null,
                 null,

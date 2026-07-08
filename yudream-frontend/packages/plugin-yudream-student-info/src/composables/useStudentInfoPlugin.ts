@@ -22,12 +22,14 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
   })
   const profileForm = reactive<StudentProfileForm>({
     userId: sdk.account.userId,
+    studentName: '',
     studentNo: '',
     className: '',
     college: '',
   })
   const adminForm = reactive<StudentProfileForm>({
     userId: '',
+    studentName: '',
     studentNo: '',
     className: '',
     college: '',
@@ -36,7 +38,7 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
 
   const canManage = computed(() => sdk.account.permissions.includes('*') || sdk.account.permissions.includes(MANAGE_PERMISSION))
   const accountName = computed(() => sdk.account.username || `用户 ${sdk.account.userId}`)
-  const profileReady = computed(() => !!profile.value?.studentNo && !!profile.value?.className && !!profile.value?.college)
+  const profileReady = computed(() => !!profile.value?.studentName && !!profile.value?.studentNo && !!profile.value?.className && !!profile.value?.college)
 
   async function load() {
     loading.value = true
@@ -61,6 +63,7 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
     saving.value = true
     try {
       profile.value = await api.saveMe({
+        studentName: profileForm.studentName.trim(),
         studentNo: profileForm.studentNo.trim(),
         className: profileForm.className.trim(),
         college: profileForm.college.trim(),
@@ -114,6 +117,7 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
     editingUserId.value = row.userId
     Object.assign(adminForm, {
       userId: row.userId,
+      studentName: row.studentName || '',
       studentNo: row.studentNo || '',
       className: row.className || '',
       college: row.college || '',
@@ -124,6 +128,7 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
     editingUserId.value = ''
     Object.assign(adminForm, {
       userId: '',
+      studentName: '',
       studentNo: '',
       className: '',
       college: '',
@@ -142,6 +147,7 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
     try {
       const saved = await api.saveProfile({
         userId: adminForm.userId.trim(),
+        studentName: adminForm.studentName.trim(),
         studentNo: adminForm.studentNo.trim(),
         className: adminForm.className.trim(),
         college: adminForm.college.trim(),
@@ -180,14 +186,15 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
 
   function syncProfileForm(nextProfile: StudentProfile | null) {
     profileForm.userId = sdk.account.userId
+    profileForm.studentName = nextProfile?.studentName || ''
     profileForm.studentNo = nextProfile?.studentNo || ''
     profileForm.className = nextProfile?.className || ''
     profileForm.college = nextProfile?.college || ''
   }
 
   function validProfileForm(form: StudentProfileForm) {
-    if (!form.studentNo.trim() || !form.className.trim() || !form.college.trim()) {
-      toast.warning('请填写学号、班级和学院')
+    if (!form.studentName.trim() || !form.studentNo.trim() || !form.className.trim() || !form.college.trim()) {
+      toast.warning('请填写姓名、学号、班级和学院')
       return false
     }
     return true
@@ -201,7 +208,7 @@ export function useStudentInfoPlugin(sdk: YuDreamPluginSdk) {
   }
 
   function profileStatus(row?: StudentProfile | null) {
-    return row?.studentNo && row?.className && row?.college ? '已完善' : '未填写'
+    return row?.studentName && row?.studentNo && row?.className && row?.college ? '已完善' : '未填写'
   }
 
   function formatTime(value?: TimeValue) {

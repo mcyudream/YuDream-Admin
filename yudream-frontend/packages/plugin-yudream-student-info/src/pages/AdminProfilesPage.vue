@@ -46,6 +46,7 @@
             <thead>
               <tr>
                 <th>用户</th>
+                <th>姓名</th>
                 <th>学号</th>
                 <th>班级</th>
                 <th>学院</th>
@@ -59,6 +60,7 @@
                   <strong>{{ model.displayName(row) }}</strong>
                   <span>ID {{ row.userId }}{{ row.email ? ` / ${row.email}` : '' }}</span>
                 </td>
+                <td class="wrap-cell">{{ row.studentName || '-' }}</td>
                 <td>{{ row.studentNo }}</td>
                 <td class="wrap-cell">{{ row.className }}</td>
                 <td class="wrap-cell">{{ row.college }}</td>
@@ -75,7 +77,7 @@
                 </td>
               </tr>
               <tr v-if="!model.profiles.length">
-                <td colspan="6">
+                <td colspan="7">
                   <div class="student-info-empty">暂无学生档案</div>
                 </td>
               </tr>
@@ -100,6 +102,10 @@
           <label>
             <span>用户 ID</span>
             <input v-model="model.adminForm.userId" :disabled="!!model.editingUserId" autocomplete="off">
+          </label>
+          <label>
+            <span>姓名</span>
+            <input v-model="model.adminForm.studentName" autocomplete="off" maxlength="40">
           </label>
           <label>
             <span>学号</span>
