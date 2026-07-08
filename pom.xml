@@ -15,6 +15,7 @@
         <module>yudream-plugins/yudream-plugin-alipay</module>
         <module>yudream-plugins/yudream-plugin-yudream-skin</module>
         <module>yudream-plugins/yudream-plugin-authlib-injector</module>
+        <module>yudream-plugins/yudream-plugin-minecraft-server</module>
         <module>yudream-domain</module>
         <module>yudream-application</module>
         <module>yudream-interfaces</module>

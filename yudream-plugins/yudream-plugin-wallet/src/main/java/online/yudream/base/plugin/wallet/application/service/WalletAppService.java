@@ -5,6 +5,7 @@ import online.yudream.base.plugin.spi.system.wallet.PluginWalletBalance;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletChangeRequest;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletService;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletTransaction;
+import online.yudream.base.plugin.spi.system.wallet.PluginWalletTransactionQuery;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletTransferRequest;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.payment.PluginPaymentChannel;
@@ -246,6 +247,7 @@ public class WalletAppService implements PluginWalletService {
         return assembler.toSpi(balanceOf(requireText(userId, "用户不能为空"), asset));
     }
 
+    @Override
     public List<PluginWalletBalance> listBalances(String assetCode, int page, int size) {
         initializeDefaults();
         List<WalletBalance> items = hasText(assetCode)
@@ -254,16 +256,39 @@ public class WalletAppService implements PluginWalletService {
         return items.stream().map(assembler::toSpi).toList();
     }
 
+    @Override
+    public List<PluginWalletTransaction> transactions(PluginWalletTransactionQuery query) {
+        PluginWalletTransactionQuery safeQuery = query == null
+                ? new PluginWalletTransactionQuery(null, null, null, null, null, null, 1, 20)
+                : query;
+        return transactions(
+                safeQuery.assetCode(),
+                safeQuery.type(),
+                safeQuery.source(),
+                safeQuery.userId(),
+                safeQuery.startAt(),
+                safeQuery.endAt(),
+                safeQuery.page(),
+                safeQuery.size()
+        );
+    }
+
     public List<PluginWalletTransaction> transactions(int page, int size) {
         return repository.listTransactions(page, size).stream().map(assembler::toSpi).toList();
     }
 
     public List<PluginWalletTransaction> transactions(String assetCode, String type, String source, String userId, int page, int size) {
+        return transactions(assetCode, type, source, userId, null, null, page, size);
+    }
+
+    public List<PluginWalletTransaction> transactions(String assetCode, String type, String source, String userId, Long startAt, Long endAt, int page, int size) {
         return repository.listTransactions(1, 1000).stream()
                 .filter(item -> !hasText(assetCode) || item.assetCode().equalsIgnoreCase(assetCode.trim()))
                 .filter(item -> !hasText(type) || item.type().name().equalsIgnoreCase(type.trim()))
                 .filter(item -> !hasText(source) || item.source().equalsIgnoreCase(source.trim()))
                 .filter(item -> !hasText(userId) || userId.trim().equals(item.fromUserId()) || userId.trim().equals(item.toUserId()))
+                .filter(item -> startAt == null || item.createdAt() >= startAt)
+                .filter(item -> endAt == null || item.createdAt() < endAt)
                 .skip((long) Math.max(page - 1, 0) * Math.max(size, 1))
                 .limit(Math.max(size, 1))
                 .map(assembler::toSpi)

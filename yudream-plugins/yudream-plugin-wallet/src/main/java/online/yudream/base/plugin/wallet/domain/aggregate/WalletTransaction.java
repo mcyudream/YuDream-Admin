@@ -54,6 +54,9 @@ public record WalletTransaction(
         if (value.startsWith("wallet-admin-")) {
             return "ADMIN";
         }
+        if (value.startsWith("mc-season:") || value.startsWith("mc-season-rollback:") || value.startsWith("mc-season-partial-rollback:")) {
+            return "MINECRAFT_SEASON";
+        }
         return fallback;
     }
 }
