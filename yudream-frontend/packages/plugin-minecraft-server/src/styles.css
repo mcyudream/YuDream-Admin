@@ -176,6 +176,19 @@
 .mc-line.detail {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 14px;
+}
+
+.mc-line-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.mc-line-main strong {
+  white-space: nowrap;
 }
 
 .mc-line code {
@@ -275,6 +288,40 @@
 .mc-admin-list span:not(.mc-status) {
   color: var(--mc-muted);
   font-size: 12px;
+}
+
+.mc-admin-list .mc-server-id {
+  grid-column: 1 / -1;
+}
+
+.mc-server-id,
+.mc-id-row code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
+  border-radius: 4px;
+  background: #eef2f7;
+  color: var(--mc-primary-dark);
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.mc-id-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--mc-border);
+  border-radius: 6px;
+  background: var(--mc-surface-soft);
+}
+
+.mc-id-row span {
+  color: var(--mc-muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .mc-form {
@@ -465,6 +512,36 @@
   font-weight: 800;
 }
 
+.duration-cell {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mc-subtle {
+  margin-top: 3px;
+  color: var(--mc-muted);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.mc-afk-pill {
+  display: inline-flex;
+  min-width: 54px;
+  justify-content: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  color: var(--mc-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mc-afk-pill.active {
+  background: #fff6db;
+  color: #9a6400;
+}
+
 .wrap-cell {
   max-width: 260px;
   white-space: normal;
@@ -506,6 +583,20 @@
   padding: 12px;
 }
 
+.mc-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.mc-pagination span {
+  color: var(--mc-muted);
+  font-size: 13px;
+}
+
 @media (max-width: 1120px) {
   .mc-admin-layout,
   .mc-season-layout {
@@ -534,7 +625,21 @@
     grid-template-columns: 1fr;
   }
 
+  .mc-line-main {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
   .mc-endpoint-row {
     grid-template-columns: 1fr;
+  }
+
+  .mc-id-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .mc-id-row span,
+  .mc-id-row code {
+    grid-column: 1 / -1;
   }
 }

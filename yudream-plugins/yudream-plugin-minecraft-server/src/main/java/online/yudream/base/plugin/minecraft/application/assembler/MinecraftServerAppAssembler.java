@@ -4,10 +4,12 @@ import online.yudream.base.plugin.minecraft.application.dto.MinecraftEndpointSta
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftInheritanceRuleDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonAdjustmentDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonOperationDTO;
+import online.yudream.base.plugin.minecraft.application.dto.MinecraftPlayerActivityDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerStatusDTO;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftSeasonOperation;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftServer;
+import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftPlayerActivity;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftEndpointStatus;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftInheritanceRule;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftSeasonAdjustment;
@@ -94,6 +96,23 @@ public class MinecraftServerAppAssembler {
                 adjustment.ruleLabel(),
                 adjustment.walletTransactionId(),
                 adjustment.rollbackTransactionId()
+        );
+    }
+
+    public MinecraftPlayerActivityDTO toDTO(MinecraftPlayerActivity activity, long now) {
+        return new MinecraftPlayerActivityDTO(
+                activity.serverId(),
+                activity.playerId(),
+                activity.playerName(),
+                activity.online(),
+                activity.afk(),
+                activity.totalOnlineMillisAt(now),
+                activity.totalAfkMillisAt(now),
+                activity.currentOnlineSince(),
+                activity.currentAfkSince(),
+                activity.lastJoinedAt(),
+                activity.lastQuitAt(),
+                activity.updatedAt()
         );
     }
 

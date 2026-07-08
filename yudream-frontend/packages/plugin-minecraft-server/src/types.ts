@@ -13,8 +13,8 @@ export interface MinecraftSeason {
   id?: string
   name: string
   description?: string
-  startedAt?: number
-  endedAt?: number
+  startedAt?: TimeValue
+  endedAt?: TimeValue
   current: boolean
   sort: number
 }
@@ -29,7 +29,7 @@ export interface MinecraftEndpointStatus {
   ping?: number
   motd?: string
   errorMessage?: string
-  checkedAt: number
+  checkedAt: TimeValue
 }
 
 export interface MinecraftServerStatus {
@@ -38,7 +38,7 @@ export interface MinecraftServerStatus {
   onlinePlayers: number
   maxPlayers: number
   endpoints: MinecraftEndpointStatus[]
-  checkedAt: number
+  checkedAt: TimeValue
 }
 
 export interface MinecraftServer {
@@ -51,8 +51,8 @@ export interface MinecraftServer {
   seasons: MinecraftSeason[]
   currentSeason?: MinecraftSeason
   status?: MinecraftServerStatus
-  createdAt: number
-  updatedAt: number
+  createdAt: TimeValue
+  updatedAt: TimeValue
 }
 
 export interface InheritanceRule {
@@ -90,8 +90,8 @@ export interface SeasonOperation {
   adjustments: SeasonAdjustment[]
   operatorUserId?: string
   remark?: string
-  createdAt: number
-  rolledBackAt?: number
+  createdAt: TimeValue
+  rolledBackAt?: TimeValue
 }
 
 export interface EconomyRecord {
@@ -103,7 +103,22 @@ export interface EconomyRecord {
   amount: string | number
   businessNo?: string
   remark?: string
-  createdAt: number
+  createdAt: TimeValue
+}
+
+export interface PlayerActivity {
+  serverId: string
+  playerId: string
+  playerName: string
+  online: boolean
+  afk: boolean
+  totalOnlineMillis: number
+  totalAfkMillis: number
+  currentOnlineSince?: TimeValue
+  currentAfkSince?: TimeValue
+  lastJoinedAt?: TimeValue
+  lastQuitAt?: TimeValue
+  updatedAt: TimeValue
 }
 
 export interface ServerForm {
@@ -123,3 +138,5 @@ export interface SeasonForm {
   remark: string
   rules: InheritanceRule[]
 }
+
+export type TimeValue = number | string | number[] | Date | null | undefined

@@ -1,5 +1,6 @@
 package online.yudream.base.plugin.minecraft.interfaces.assembler;
 
+import online.yudream.base.plugin.minecraft.application.cmd.MinecraftPlayerEventCmd;
 import online.yudream.base.plugin.minecraft.application.cmd.MinecraftSeasonOpenCmd;
 import online.yudream.base.plugin.minecraft.application.cmd.MinecraftServerSaveCmd;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftEconomyRecordDTO;
@@ -7,8 +8,10 @@ import online.yudream.base.plugin.minecraft.application.dto.MinecraftEndpointSta
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftInheritanceRuleDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonAdjustmentDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonOperationDTO;
+import online.yudream.base.plugin.minecraft.application.dto.MinecraftPlayerActivityDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerStatusDTO;
+import online.yudream.base.plugin.minecraft.interfaces.request.MinecraftPlayerEventRequest;
 import online.yudream.base.plugin.minecraft.interfaces.request.MinecraftSeasonOpenRequest;
 import online.yudream.base.plugin.minecraft.interfaces.request.MinecraftServerSaveRequest;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftEconomyRecordRes;
@@ -16,6 +19,7 @@ import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftEndpointStat
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftInheritanceRuleRes;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftSeasonAdjustmentRes;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftSeasonOperationRes;
+import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftPlayerActivityRes;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftServerRes;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftServerStatusRes;
 
@@ -40,6 +44,14 @@ public class MinecraftServerWebAssembler {
                 request.startedAt(),
                 request.remark(),
                 request.rules() == null ? java.util.List.of() : request.rules().stream().map(this::toCmd).toList()
+        );
+    }
+
+    public MinecraftPlayerEventCmd toCmd(MinecraftPlayerEventRequest request) {
+        return new MinecraftPlayerEventCmd(
+                textOr(request.playerId(), request.uuid()),
+                textOr(request.playerName(), request.name()),
+                request.eventAt()
         );
     }
 
@@ -86,6 +98,12 @@ public class MinecraftServerWebAssembler {
                 dto.amount(), dto.businessNo(), dto.remark(), dto.createdAt());
     }
 
+    public MinecraftPlayerActivityRes toRes(MinecraftPlayerActivityDTO dto) {
+        return new MinecraftPlayerActivityRes(dto.serverId(), dto.playerId(), dto.playerName(), dto.online(), dto.afk(),
+                dto.totalOnlineMillis(), dto.totalAfkMillis(), dto.currentOnlineSince(), dto.currentAfkSince(),
+                dto.lastJoinedAt(), dto.lastQuitAt(), dto.updatedAt());
+    }
+
     private MinecraftServerSaveCmd.Endpoint toCmd(MinecraftServerSaveRequest.Endpoint request) {
         return new MinecraftServerSaveCmd.Endpoint(request.id(), request.name(), request.host(), request.port(),
                 request.edition(), request.primaryLine(), request.enabled(), request.sort());
@@ -123,5 +141,9 @@ public class MinecraftServerWebAssembler {
         return new MinecraftSeasonAdjustmentRes(dto.userId(), dto.assetCode(), dto.inheritedAmount(), dto.seasonIncomeAmount(),
                 dto.seasonTotalAmount(), dto.realTotalIncomeAmount(), dto.nextInheritedAmount(), dto.walletBalanceBefore(),
                 dto.deltaAmount(), dto.direction(), dto.ruleLabel(), dto.walletTransactionId(), dto.rollbackTransactionId());
+    }
+
+    private String textOr(String first, String second) {
+        return first == null || first.isBlank() ? second : first;
     }
 }
