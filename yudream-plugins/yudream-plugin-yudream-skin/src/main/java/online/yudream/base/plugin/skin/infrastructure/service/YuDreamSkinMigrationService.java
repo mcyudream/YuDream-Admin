@@ -98,8 +98,11 @@ public class YuDreamSkinMigrationService {
         List<String> warnings = new ArrayList<>();
         Map<Long, String> userIdByUid = new HashMap<>();
         Map<Long, String> textureHashByTid = new HashMap<>();
+        Map<Long, String> playerUuidByPid = new HashMap<>();
+        Map<String, String> playerUuidByName = new HashMap<>();
         Map<String, byte[]> textureArchive = textureArchive(request, warnings, logger);
         try (Connection connection = DriverManager.getConnection(jdbcUrl, request.username(), request.password())) {
+            loadPlayerUuids(connection, playerUuidByPid, playerUuidByName, warnings, logger);
             logger.accept("已连接 Blessing Skin MySQL 数据库");
             logger.accept("开始迁移用户");
             int users = migrateUsers(connection, userIdByUid, warnings, logger);
@@ -108,7 +111,7 @@ public class YuDreamSkinMigrationService {
             int textures = migrateTextures(connection, request.textureBaseDir(), textureArchive, userIdByUid, textureHashByTid, warnings);
             logger.accept("材质迁移完成：" + textures);
             logger.accept("开始迁移角色");
-            int players = migratePlayers(connection, userIdByUid, textureHashByTid, warnings);
+            int players = migratePlayers(connection, userIdByUid, textureHashByTid, playerUuidByPid, playerUuidByName, warnings);
             logger.accept("角色迁移完成：" + players);
             logger.accept("开始迁移衣柜");
             int closet = migrateCloset(connection, userIdByUid, textureHashByTid, warnings);
@@ -193,7 +196,8 @@ public class YuDreamSkinMigrationService {
         return count;
     }
 
-    private int migratePlayers(Connection connection, Map<Long, String> userIdByUid, Map<Long, String> textureHashByTid, List<String> warnings) throws Exception {
+    private int migratePlayers(Connection connection, Map<Long, String> userIdByUid, Map<Long, String> textureHashByTid,
+                               Map<Long, String> playerUuidByPid, Map<String, String> playerUuidByName, List<String> warnings) throws Exception {
         int count = 0;
         try (Statement statement = connection.createStatement();
              ResultSet rs = statement.executeQuery("select * from players")) {
@@ -212,8 +216,9 @@ public class YuDreamSkinMigrationService {
                 }
                 String skinHash = textureHashByTid.get(longValue(rs, "tid_skin", 0L));
                 String capeHash = textureHashByTid.get(longValue(rs, "tid_cape", 0L));
+                String uuid = resolvePlayerUuid(rs, pid, name, playerUuidByPid, playerUuidByName, warnings);
                 repository.savePlayer(new SkinPlayer(
-                        HashSupport.playerUuid(name),
+                        uuid,
                         ownerId,
                         name,
                         name.toLowerCase(Locale.ROOT),
@@ -226,6 +231,55 @@ public class YuDreamSkinMigrationService {
             }
         }
         return count;
+    }
+
+    private void loadPlayerUuids(Connection connection, Map<Long, String> playerUuidByPid, Map<String, String> playerUuidByName,
+                                 List<String> warnings, Consumer<String> logger) {
+        try {
+            if (!hasTable(connection, "uuid")) {
+                logger.accept("未发现 Blessing Skin uuid 表，角色 UUID 将按名称生成");
+                return;
+            }
+            int count = 0;
+            try (Statement statement = connection.createStatement();
+                 ResultSet rs = statement.executeQuery("select * from uuid")) {
+                while (rs.next()) {
+                    String uuid = normalizePlayerUuid(firstString(rs, "uuid", "player_uuid", "profile_uuid"));
+                    if (!hasText(uuid)) {
+                        warnings.add("跳过缺少有效 UUID 的旧 uuid 表记录 id=" + longValue(rs, "id", 0L));
+                        continue;
+                    }
+                    Long pid = nullableLong(rs, "pid");
+                    if (pid != null && pid > 0) {
+                        playerUuidByPid.putIfAbsent(pid, uuid);
+                    }
+                    String name = firstString(rs, "name", "player_name");
+                    if (hasText(name)) {
+                        playerUuidByName.putIfAbsent(lowerKey(name), uuid);
+                    }
+                    count++;
+                }
+            }
+            logger.accept("已读取 Blessing Skin 旧角色 UUID：" + count);
+        } catch (Exception e) {
+            warnings.add("旧角色 UUID 表读取失败，将按角色名生成 UUID：" + e.getMessage());
+        }
+    }
+
+    private String resolvePlayerUuid(ResultSet rs, long pid, String name, Map<Long, String> playerUuidByPid,
+                                     Map<String, String> playerUuidByName, List<String> warnings) throws Exception {
+        String uuid = normalizePlayerUuid(firstString(rs, "uuid", "player_uuid", "profile_uuid"));
+        if (!hasText(uuid)) {
+            uuid = playerUuidByPid.get(pid);
+        }
+        if (!hasText(uuid)) {
+            uuid = playerUuidByName.get(lowerKey(name));
+        }
+        if (hasText(uuid)) {
+            return uuid;
+        }
+        warnings.add("未找到旧角色 UUID，已按名称生成新 UUID：pid=" + pid + " name=" + name);
+        return HashSupport.playerUuid(name);
     }
 
     private int migrateCloset(Connection connection, Map<Long, String> userIdByUid, Map<Long, String> textureHashByTid, List<String> warnings) {
@@ -486,6 +540,14 @@ public class YuDreamSkinMigrationService {
         return hasColumn(rs, name) ? rs.getInt(name) : defaultValue;
     }
 
+    private Long nullableLong(ResultSet rs, String name) throws Exception {
+        if (!hasColumn(rs, name)) {
+            return null;
+        }
+        long value = rs.getLong(name);
+        return rs.wasNull() ? null : value;
+    }
+
     private Long millis(ResultSet rs, String name) throws Exception {
         if (!hasColumn(rs, name) || rs.getTimestamp(name) == null) {
             return Instant.now().toEpochMilli();
@@ -501,6 +563,30 @@ public class YuDreamSkinMigrationService {
             }
         }
         return false;
+    }
+
+    private boolean hasTable(Connection connection, String tableName) throws Exception {
+        try (ResultSet rs = connection.getMetaData().getTables(connection.getCatalog(), null, tableName, null)) {
+            if (rs.next()) {
+                return true;
+            }
+        }
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("show tables like '" + tableName.replace("'", "''") + "'")) {
+            return rs.next();
+        }
+    }
+
+    private String normalizePlayerUuid(String uuid) {
+        if (!hasText(uuid)) {
+            return null;
+        }
+        String normalized = uuid.trim().replace("-", "").toLowerCase(Locale.ROOT);
+        return normalized.matches("[0-9a-f]{32}") ? normalized : null;
+    }
+
+    private String lowerKey(String value) {
+        return value == null ? null : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private static final class MigrationTask implements PluginSseStream {

@@ -12,6 +12,7 @@ import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import java.io.ByteArrayInputStream;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -60,7 +61,7 @@ public class YuDreamSkinRepository {
     }
 
     public SkinPlayer savePlayer(SkinPlayer player) {
-        return toPlayer(documents.save(PLAYERS, player.uuid(), playerDocument(player)));
+        return toPlayer(documents.save(PLAYERS, normalizeUuid(player.uuid()), playerDocument(player)));
     }
 
     public Optional<SkinPlayer> findPlayerByUuid(String uuid) {
@@ -346,7 +347,7 @@ public class YuDreamSkinRepository {
     }
 
     private String normalizeUuid(String uuid) {
-        return uuid == null ? null : uuid.replace("-", "");
+        return uuid == null ? null : uuid.replace("-", "").toLowerCase(Locale.ROOT);
     }
 
     private String closetId(String userId, String textureHash) {
