@@ -18,6 +18,8 @@ public interface FrameworkServices {
 
     PluginFileStore files(String pluginCode);
 
+    Optional<String> setting(String key);
+
     <T> Optional<T> extension(String pluginCode, Class<T> type);
 
     <T> List<T> extensions(Class<T> type);

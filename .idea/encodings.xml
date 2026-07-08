@@ -25,6 +25,7 @@
     <file url="file://$PROJECT_DIR$/yudream-bootstrap/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-domain/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-domain/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-frontend/packages/plugin-minecraft-server/dist" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-infrastructure/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-infrastructure/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-interfaces/src/main/java" charset="UTF-8" />
@@ -47,6 +48,8 @@
     <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-alipay/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-authlib-injector/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-authlib-injector/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-minecraft-server/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-minecraft-server/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-spi/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-spi/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/yudream-plugins/yudream-plugin-wallet/src/main/java" charset="UTF-8" />

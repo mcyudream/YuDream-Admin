@@ -1,5 +1,8 @@
 name: Deploy Example
 
+env:
+  NPM_CONFIG_REGISTRY: https://registry.npmmirror.com
+
 on:
   push:
     branches: [main]
@@ -26,6 +29,9 @@ jobs:
         name: Install pnpm
         with:
           run_install: false
+
+      - name: Configure pnpm registry
+        run: pnpm config set registry "$NPM_CONFIG_REGISTRY"
 
       - name: Get pnpm store directory
         shell: bash
