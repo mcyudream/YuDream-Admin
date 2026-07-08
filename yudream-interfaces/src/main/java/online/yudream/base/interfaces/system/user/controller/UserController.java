@@ -13,6 +13,8 @@ import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserContextAppService;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.system.security.assembler.PasskeyWebAssembler;
+import online.yudream.base.interfaces.system.security.support.PasskeyRelyingPartySupport;
 import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationStartRequest;
@@ -94,14 +96,19 @@ public class UserController {
     }
 
     @PostMapping("/passkeys/authentication/options")
-    public Result<PasskeyAuthenticationOptionsRes> startPasskeyAuthentication(@Valid @RequestBody PasskeyAuthenticationStartRequest request) {
-        return Result.ok(UserWebAssembler.toRes(oauthPasskeyAppService.startPasskeyAuthentication(UserWebAssembler.toCmd(request))));
+    public Result<PasskeyAuthenticationOptionsRes> startPasskeyAuthentication(
+            @Valid @RequestBody PasskeyAuthenticationStartRequest request,
+            HttpServletRequest httpRequest
+    ) {
+        return Result.ok(UserWebAssembler.toRes(oauthPasskeyAppService.startPasskeyAuthentication(
+                PasskeyWebAssembler.toAuthenticationStartCmd(request, PasskeyRelyingPartySupport.from(httpRequest)))));
     }
 
     @PostMapping("/passkeys/authentication")
     public Result<UserLoginRes> finishPasskeyAuthentication(@Valid @RequestBody PasskeyAuthenticationFinishRequest request, HttpServletRequest httpRequest) {
         try {
-            User user = oauthPasskeyAppService.finishPasskeyAuthentication(UserWebAssembler.toCmd(request));
+            User user = oauthPasskeyAppService.finishPasskeyAuthentication(
+                    PasskeyWebAssembler.toAuthenticationFinishCmd(request, PasskeyRelyingPartySupport.from(httpRequest)));
             LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
             UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
             recordLoginLog(request.getUsername(), httpRequest, user, true, "passkey success", res.getToken());

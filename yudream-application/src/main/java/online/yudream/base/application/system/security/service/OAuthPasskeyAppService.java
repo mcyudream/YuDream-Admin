@@ -152,6 +152,7 @@ public class OAuthPasskeyAppService {
         ensurePasskeyEnabled();
         User user = userRepo.findById(cmd.getUserId()).orElseThrow(() -> new BizException("用户不存在"));
         PasskeyRegistrationOptions options = passkeyCeremonyGateway.startRegistration(
+                cmd.getRelyingParty(),
                 user.getId(),
                 user.getUsername(),
                 user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname(),
@@ -167,7 +168,11 @@ public class OAuthPasskeyAppService {
     public PasskeyCredentialDTO finishPasskeyRegistration(PasskeyRegistrationFinishCmd cmd) {
         ensurePasskeyEnabled();
         User user = userRepo.findById(cmd.getUserId()).orElseThrow(() -> new BizException("用户不存在"));
-        PasskeyRegistrationResult result = passkeyCeremonyGateway.finishRegistration(cmd.getRequestJson(), cmd.getResponseJson());
+        PasskeyRegistrationResult result = passkeyCeremonyGateway.finishRegistration(
+                cmd.getRelyingParty(),
+                cmd.getRequestJson(),
+                cmd.getResponseJson()
+        );
         if (passkeyCredentialRepo.findByCredentialId(result.credentialId()).isPresent()) {
             throw new BizException("Passkey 凭据已存在");
         }
@@ -185,7 +190,7 @@ public class OAuthPasskeyAppService {
         if (!hasActivePasskey) {
             throw new BizException("当前账号未绑定可用 Passkey");
         }
-        PasskeyAuthenticationOptions options = passkeyCeremonyGateway.startAuthentication(user.getUsername());
+        PasskeyAuthenticationOptions options = passkeyCeremonyGateway.startAuthentication(cmd.getRelyingParty(), user.getUsername());
         return PasskeyAuthenticationOptionsDTO.builder()
                 .requestJson(options.requestJson())
                 .publicKeyJson(options.publicKeyJson())
@@ -195,7 +200,11 @@ public class OAuthPasskeyAppService {
     @Transactional
     public User finishPasskeyAuthentication(PasskeyAuthenticationFinishCmd cmd) {
         ensurePasskeyEnabled();
-        PasskeyAuthenticationResult result = passkeyCeremonyGateway.finishAuthentication(cmd.getRequestJson(), cmd.getResponseJson());
+        PasskeyAuthenticationResult result = passkeyCeremonyGateway.finishAuthentication(
+                cmd.getRelyingParty(),
+                cmd.getRequestJson(),
+                cmd.getResponseJson()
+        );
         User user = loginUser(cmd.getUsername());
         if (!user.getId().equals(result.userId()) || !user.getUsername().equals(result.username())) {
             throw new BizException("Passkey 登录用户不匹配");
