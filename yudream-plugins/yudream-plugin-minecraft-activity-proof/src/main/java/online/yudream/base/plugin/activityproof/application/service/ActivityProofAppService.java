@@ -293,8 +293,33 @@ public class ActivityProofAppService {
         data.put("serverName", server.name());
         data.put("currentSeasonName", server.currentSeasonName());
         data.put("participantCount", participants.size());
-        data.put("participants", participants.stream().map(ActivityProofParticipantDTO::templateData).toList());
+        List<Map<String, Object>> participantData = participants.stream().map(ActivityProofParticipantDTO::templateData).toList();
+        data.put("participants", participantData);
+        data.put("participantRows", participantRows(participantData));
         return data;
+    }
+
+    private List<Map<String, Object>> participantRows(List<Map<String, Object>> participants) {
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int index = 0; index < participants.size(); index += 2) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            Map<String, Object> left = participants.get(index);
+            Map<String, Object> right = index + 1 < participants.size() ? participants.get(index + 1) : Map.of();
+            row.put("left", left);
+            row.put("right", right);
+            row.put("l", compactParticipant(left));
+            row.put("r", compactParticipant(right));
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private Map<String, Object> compactParticipant(Map<String, Object> participant) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("name", participant.getOrDefault("name", ""));
+        value.put("class", participant.getOrDefault("className", ""));
+        value.put("no", participant.getOrDefault("studentNo", ""));
+        return value;
     }
 
     private long effectiveMillis(PluginMinecraftPlayerActivity activity, Boolean includeAfk) {

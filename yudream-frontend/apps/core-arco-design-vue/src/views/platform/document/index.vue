@@ -360,9 +360,13 @@ function generationVariant(status: GenerationStatus) {
           </article>
 
           <article class="guide-section">
-            <h3>4. 名单表自动追加</h3>
-            <p>活动证明这类名单表可以不写循环。表头包含“姓名”和“学号”时，传入 <code>participantTableAppend: true</code> 后会自动填充空位；空位满了会复制最后一行继续追加。</p>
-            <p>推荐表头：<code>姓名 / 专业班级 / 学号 / 空列 / 姓名 / 专业班级 / 学号</code>。</p>
+            <h3>4. 双栏名单循环</h3>
+            <p>活动证明提供 <code>participantRows</code>，每一行包含 <code>left</code> 和 <code>right</code> 两个成员，适合双栏名单表。</p>
+            <pre v-pre><code>{{#participantRows}}
+{{l.name}} {{l.class}} {{l.no}}
+{{r.name}} {{r.class}} {{r.no}}
+{{/participantRows}}</code></pre>
+            <p><code>l/r</code> 是短别名，便于放进窄表格；同一数据也保留 <code>left.studentName</code>、<code>right.studentNo</code> 等完整字段。</p>
           </article>
         </div>
 
@@ -380,6 +384,25 @@ function generationVariant(status: GenerationStatus) {
   "currentSeasonName": "第 1 周目",
   "participantCount": 2,
   "participantTableAppend": true,
+  "participantRows": [
+    {
+      "left": {
+        "studentName": "张三",
+        "className": "计科2401",
+        "studentNo": "5120240001"
+      },
+      "l": {
+        "name": "张三",
+        "class": "计科2401",
+        "no": "5120240001"
+      },
+      "r": {
+        "name": "李四",
+        "class": "软工2402",
+        "no": "5120240002"
+      }
+    }
+  ],
   "participants": [
     {
       "index": 1,
@@ -399,7 +422,7 @@ function generationVariant(status: GenerationStatus) {
             <ul>
               <li>“占位符 JSON”用于记录模板变量说明，也会作为手动生成时的默认 JSON；真实替换以生成数据为准。</li>
               <li>变量名建议只用字母、数字、下划线、点和短横线，避免中文变量名。</li>
-              <li>循环开始和结束标记建议放在表格行内，避免跨多个不连续表格。</li>
+              <li>双栏名单建议把循环开始和结束标记单独放一行，中间放一条变量行；渲染后会删除标记行并复制变量行。</li>
               <li>需要给活动证明使用的模板，先在这里上传并保持“启用”，再到学生信息下的“活动证明导出”选择。</li>
             </ul>
           </section>
