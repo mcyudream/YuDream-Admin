@@ -18,7 +18,7 @@ defineProps<{
         <span :class="{ ok: model.status?.dependencies.minecraftReady }">MC</span>
         <span :class="{ ok: model.status?.dependencies.studentInfoReady }">学生</span>
         <span :class="{ ok: model.status?.dependencies.wordTemplateReady }">模板能力</span>
-        <span :class="{ ok: model.settings?.templateReady }">模板文件</span>
+        <span :class="{ ok: model.settings?.templateReady }">模板</span>
       </div>
     </section>
 
@@ -27,7 +27,7 @@ defineProps<{
       <span v-if="!model.status.dependencies.minecraftReady">请先启用 Minecraft 服务器插件。</span>
       <span v-else-if="!model.status.dependencies.studentInfoReady">请先启用学生信息插件。</span>
       <span v-else-if="!model.status.dependencies.wordTemplateReady">请先在能力管理中启用 Word 模板能力。</span>
-      <span v-else-if="!model.settings?.templateReady">请先上传 Word 模板文件。</span>
+      <span v-else-if="!model.settings?.templateReady">请选择 Word 模板。</span>
     </section>
 
     <section class="proof-grid">
@@ -84,13 +84,20 @@ defineProps<{
 
       <ProofPanel title="模板和默认值" eyebrow="Template">
         <div class="proof-template">
-          <strong>{{ model.settings?.templateFilename || '未上传模板' }}</strong>
-          <span>{{ model.settings?.templateUpdatedAt ? model.formatTime(model.settings.templateUpdatedAt) : '等待上传 .docx' }}</span>
-          <label class="proof-upload">
-            <span class="i-ri:upload-2-line" />
-            上传模板
-            <input type="file" accept=".docx" :disabled="model.uploading" @change="model.uploadTemplate(($event.target as HTMLInputElement).files?.[0])">
+          <strong>{{ model.selectedTemplate?.name || model.settings?.templateName || '未选择模板' }}</strong>
+          <span>{{ model.selectedTemplate?.originalFilename || model.settings?.templateFilename || '请在 Word 模板能力中维护模板' }}</span>
+          <label>
+            <span>Word 模板</span>
+            <select v-model="model.settingsForm.templateId" :disabled="model.saving" @change="model.selectTemplate">
+              <option value="">请选择模板</option>
+              <option v-for="template in model.templates" :key="template.id" :value="template.id">
+                {{ template.name }} / {{ template.code }}
+              </option>
+            </select>
           </label>
+          <button class="proof-secondary" type="button" @click="model.reloadTemplates">
+            刷新模板
+          </button>
         </div>
         <form class="proof-form compact" @submit.prevent="model.saveSettings">
           <label>

@@ -11,11 +11,22 @@ export interface ActivityProofDependencies {
 
 export interface ActivityProofSettings {
   templateReady: boolean
+  templateId: number | null
+  templateCode: string
+  templateName: string
   templateFilename: string
   templateUpdatedAt: TimeValue
   defaultActivityName: string
   defaultCollege: string
   defaultIssuer: string
+  updatedAt: TimeValue
+}
+
+export interface ActivityProofTemplate {
+  id: number
+  code: string
+  name: string
+  originalFilename: string
   updatedAt: TimeValue
 }
 

@@ -5,6 +5,7 @@ import type {
   ActivityProofServer,
   ActivityProofSettings,
   ActivityProofStatus,
+  ActivityProofTemplate,
   ExportForm,
 } from '../types'
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
@@ -24,9 +25,10 @@ export function createActivityProofApi(sdk: YuDreamPluginSdk) {
   return {
     status: () => sdk.http.get<ActivityProofStatus>('/status'),
     servers: () => sdk.http.get<ActivityProofServer[]>('/servers'),
+    templates: (keyword = '', page = 1, size = 100) => sdk.http.get<ActivityProofTemplate[]>(`/templates${query({ keyword, page, size })}`),
     settings: () => sdk.http.get<ActivityProofSettings>('/settings'),
     saveSettings: (data: Record<string, unknown>) => sdk.http.request<ActivityProofSettings>('/settings', { method: 'PUT', data }),
-    uploadTemplate: (data: Record<string, unknown>) => sdk.http.request<ActivityProofSettings>('/template', { method: 'PUT', data }),
+    selectTemplate: (templateId: number) => sdk.http.request<ActivityProofSettings>('/template', { method: 'PUT', data: { templateId } }),
     mappings: (serverId: string, page = 1, size = 1000) => sdk.http.get<ActivityProofMapping[]>(`/mappings${query({ serverId, page, size })}`),
     saveMapping: (data: Record<string, unknown>) => sdk.http.request<ActivityProofMapping>('/mappings', { method: 'PUT', data }),
     deleteMapping: (id: string) => sdk.http.request(`/mappings/${encodeURIComponent(id)}`, { method: 'DELETE' }),

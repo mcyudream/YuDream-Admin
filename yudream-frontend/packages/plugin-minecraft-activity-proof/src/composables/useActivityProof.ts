@@ -5,6 +5,7 @@ import type {
   ActivityProofServer,
   ActivityProofSettings,
   ActivityProofStatus,
+  ActivityProofTemplate,
   ExportForm,
   TimeValue,
 } from '../types'
@@ -18,10 +19,10 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   const toast = useFaToast()
   const loading = ref(false)
   const saving = ref(false)
-  const uploading = ref(false)
   const exporting = ref(false)
   const status = ref<ActivityProofStatus | null>(null)
   const settings = ref<ActivityProofSettings | null>(null)
+  const templates = ref<ActivityProofTemplate[]>([])
   const servers = ref<ActivityProofServer[]>([])
   const participants = ref<ActivityProofParticipant[]>([])
   const mappings = ref<ActivityProofMapping[]>([])
@@ -31,6 +32,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   const mappingInputs = reactive<Record<string, string>>({})
 
   const settingsForm = reactive({
+    templateId: '' as number | '',
     defaultActivityName: '',
     defaultCollege: '',
     defaultIssuer: '',
@@ -49,6 +51,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
 
   const ready = computed(() => !!status.value?.dependencies.minecraftReady && !!status.value?.dependencies.studentInfoReady && !!status.value?.dependencies.wordTemplateReady && !!status.value?.settings.templateReady)
   const selectedServer = computed(() => servers.value.find(item => item.id === selectedServerId.value) || null)
+  const selectedTemplate = computed(() => templates.value.find(item => item.id === Number(settingsForm.templateId)) || null)
   const unmatchedCount = computed(() => participants.value.filter(item => !item.matched).length)
   const selectedCount = computed(() => selectedPlayerIds.value.length || participants.value.length)
 
@@ -61,6 +64,12 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
       exports.value = nextExports
       syncSettingsForm(nextStatus.settings)
       syncExportDefaults(nextStatus.settings)
+      if (nextStatus.dependencies.wordTemplateReady) {
+        templates.value = await api.templates()
+      }
+      else {
+        templates.value = []
+      }
       if (!nextStatus.dependencies.minecraftReady) {
         servers.value = []
         selectedServerId.value = ''
@@ -104,10 +113,17 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   async function saveSettings() {
     saving.value = true
     try {
-      settings.value = await api.saveSettings({ ...settingsForm })
+      const templateId = toTemplateId(settingsForm.templateId)
+      settings.value = await api.saveSettings({
+        defaultActivityName: settingsForm.defaultActivityName,
+        defaultCollege: settingsForm.defaultCollege,
+        defaultIssuer: settingsForm.defaultIssuer,
+        templateId,
+      })
       if (status.value) {
         status.value.settings = settings.value
       }
+      syncSettingsForm(settings.value)
       syncExportDefaults(settings.value)
       toast.success('默认信息已保存')
     }
@@ -116,29 +132,31 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
     }
   }
 
-  async function uploadTemplate(file?: File) {
-    if (!file) {
+  async function reloadTemplates() {
+    if (!status.value?.dependencies.wordTemplateReady) {
+      templates.value = []
       return
     }
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-      toast.warning('请选择 .docx 模板文件')
+    templates.value = await api.templates()
+    toast.success('模板列表已刷新')
+  }
+
+  async function selectTemplate() {
+    const templateId = toTemplateId(settingsForm.templateId)
+    if (!templateId) {
       return
     }
-    uploading.value = true
+    saving.value = true
     try {
-      const contentBase64 = await fileToBase64(file)
-      settings.value = await api.uploadTemplate({
-        filename: file.name,
-        contentType: file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        contentBase64,
-      })
+      settings.value = await api.selectTemplate(templateId)
       if (status.value) {
         status.value.settings = settings.value
       }
-      toast.success('模板已上传')
+      syncSettingsForm(settings.value)
+      toast.success('模板已选择')
     }
     finally {
-      uploading.value = false
+      saving.value = false
     }
   }
 
@@ -211,7 +229,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
       return
     }
     if (!settings.value?.templateReady) {
-      toast.warning('请先上传 Word 模板')
+      toast.warning('请选择 Word 模板')
       return
     }
     exporting.value = true
@@ -237,6 +255,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   }
 
   function syncSettingsForm(nextSettings: ActivityProofSettings) {
+    settingsForm.templateId = nextSettings.templateId || ''
     settingsForm.defaultActivityName = nextSettings.defaultActivityName || ''
     settingsForm.defaultCollege = nextSettings.defaultCollege || ''
     settingsForm.defaultIssuer = nextSettings.defaultIssuer || ''
@@ -260,10 +279,10 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   return reactive({
     loading,
     saving,
-    uploading,
     exporting,
     status,
     settings,
+    templates,
     servers,
     participants,
     mappings,
@@ -275,12 +294,14 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
     exportForm,
     ready,
     selectedServer,
+    selectedTemplate,
     unmatchedCount,
     selectedCount,
     load,
     reloadServerData,
+    reloadTemplates,
+    selectTemplate,
     saveSettings,
-    uploadTemplate,
     bindStudent,
     deleteMapping,
     togglePlayer,
@@ -293,18 +314,17 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   })
 }
 
-function fileToBase64(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
 function todayText() {
   const date = new Date()
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
+}
+
+function toTemplateId(value: number | '') {
+  if (value === '') {
+    return null
+  }
+  const id = Number(value)
+  return Number.isFinite(id) && id > 0 ? id : null
 }
 
 function normalizeTime(value: TimeValue) {

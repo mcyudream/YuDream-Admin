@@ -29,14 +29,19 @@ public class ActivityProofController {
         return http.settings();
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/templates", permission = MinecraftActivityProofPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse templates(PluginHttpRequest request) {
+        return http.templates(request);
+    }
+
     @PluginHttpEndpoint(method = "PUT", path = "/settings", permission = MinecraftActivityProofPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse saveSettings(PluginHttpRequest request) {
         return http.saveSettings(request);
     }
 
     @PluginHttpEndpoint(method = "PUT", path = "/template", permission = MinecraftActivityProofPlugin.MANAGE_PERMISSION)
-    public PluginHttpResponse uploadTemplate(PluginHttpRequest request) {
-        return http.uploadTemplate(request);
+    public PluginHttpResponse selectTemplate(PluginHttpRequest request) {
+        return http.selectTemplate(request);
     }
 
     @PluginHttpEndpoint(method = "GET", path = "/mappings", permission = MinecraftActivityProofPlugin.MANAGE_PERMISSION)

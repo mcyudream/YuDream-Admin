@@ -6,7 +6,7 @@ import online.yudream.base.plugin.activityproof.interfaces.assembler.ActivityPro
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofExportRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofMappingSaveRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofSettingsSaveRequest;
-import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofTemplateUploadRequest;
+import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofTemplateSelectRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
@@ -41,14 +41,18 @@ public class ActivityProofHttpFacade {
         return PluginHttpResponse.ok(appService.settings());
     }
 
+    public PluginHttpResponse templates(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.templates(firstQuery(request, "keyword"), page(request), size(request)));
+    }
+
     public PluginHttpResponse saveSettings(PluginHttpRequest request) {
         ActivityProofSettingsSaveRequest body = JsonSupport.read(request.body(), ActivityProofSettingsSaveRequest.class);
         return PluginHttpResponse.ok(appService.saveSettings(assembler.toCmd(body)));
     }
 
-    public PluginHttpResponse uploadTemplate(PluginHttpRequest request) {
-        ActivityProofTemplateUploadRequest body = JsonSupport.read(request.body(), ActivityProofTemplateUploadRequest.class);
-        return PluginHttpResponse.ok(appService.uploadTemplate(assembler.toCmd(body)));
+    public PluginHttpResponse selectTemplate(PluginHttpRequest request) {
+        ActivityProofTemplateSelectRequest body = JsonSupport.read(request.body(), ActivityProofTemplateSelectRequest.class);
+        return PluginHttpResponse.ok(appService.selectTemplate(assembler.toCmd(body)));
     }
 
     public PluginHttpResponse mappings(PluginHttpRequest request) {
