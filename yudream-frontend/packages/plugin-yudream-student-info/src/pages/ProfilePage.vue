@@ -20,6 +20,10 @@
       <StudentInfoPanel title="学籍信息" eyebrow="Profile">
         <form class="student-info-form" @submit.prevent="model.saveMine">
           <label>
+            <span>姓名</span>
+            <input v-model="model.profileForm.studentName" autocomplete="off" maxlength="40">
+          </label>
+          <label>
             <span>学号</span>
             <input v-model="model.profileForm.studentNo" autocomplete="off" maxlength="64">
           </label>
@@ -42,6 +46,10 @@
 
       <StudentInfoPanel title="当前记录" eyebrow="Snapshot">
         <dl class="student-info-detail">
+          <div>
+            <dt>姓名</dt>
+            <dd>{{ model.profile?.studentName || '-' }}</dd>
+          </div>
           <div>
             <dt>学号</dt>
             <dd>{{ model.profile?.studentNo || '-' }}</dd>

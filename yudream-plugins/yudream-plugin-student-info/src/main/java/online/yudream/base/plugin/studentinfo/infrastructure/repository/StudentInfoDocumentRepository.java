@@ -66,6 +66,7 @@ public class StudentInfoDocumentRepository implements StudentInfoRepository {
     private Map<String, Object> profileDocument(StudentInfo info) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("userId", info.userId());
+        document.put("studentName", info.studentName());
         document.put("studentNo", info.studentNo());
         document.put("className", info.className());
         document.put("college", info.college());
@@ -77,6 +78,7 @@ public class StudentInfoDocumentRepository implements StudentInfoRepository {
     private StudentInfo toProfile(Map<String, Object> document) {
         return new StudentInfo(
                 string(document, "userId", "id"),
+                string(document, "studentName", "name"),
                 string(document, "studentNo"),
                 string(document, "className"),
                 string(document, "college"),

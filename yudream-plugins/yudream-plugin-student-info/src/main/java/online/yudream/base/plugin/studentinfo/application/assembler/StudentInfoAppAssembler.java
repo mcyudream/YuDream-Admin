@@ -8,6 +8,7 @@ public class StudentInfoAppAssembler {
     public StudentInfoDTO toDTO(StudentInfo info) {
         return new StudentInfoDTO(
                 info.userId(),
+                info.studentName(),
                 info.studentNo(),
                 info.className(),
                 info.college(),

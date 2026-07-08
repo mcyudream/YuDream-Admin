@@ -5,6 +5,7 @@ public record StudentInfoRes(
         String username,
         String nickname,
         String email,
+        String studentName,
         String studentNo,
         String className,
         String college,

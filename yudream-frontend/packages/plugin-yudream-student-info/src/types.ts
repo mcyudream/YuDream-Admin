@@ -3,6 +3,7 @@ export interface StudentProfile {
   username?: string
   nickname?: string
   email?: string
+  studentName?: string | null
   studentNo?: string | null
   className?: string | null
   college?: string | null
@@ -16,6 +17,7 @@ export interface StudentInfoSummary {
 
 export interface StudentProfileForm {
   userId: string
+  studentName: string
   studentNo: string
   className: string
   college: string
