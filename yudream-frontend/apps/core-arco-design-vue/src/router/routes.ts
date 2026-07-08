@@ -42,6 +42,15 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/pay/result',
+    name: 'payResult',
+    component: () => import('@/views/pay-result.vue'),
+    meta: {
+      title: '支付结果',
+      public: true,
+    },
+  },
+  {
     path: '/site',
     name: 'publicSiteHome',
     component: () => import('@/views/site/index.vue'),

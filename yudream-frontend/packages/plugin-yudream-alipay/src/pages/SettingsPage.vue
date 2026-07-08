@@ -117,23 +117,25 @@ const toast = useFaToast()
 const loading = ref(false)
 const saving = ref(false)
 const orders = ref<AlipayOrder[]>([])
-const form = reactive<AlipayConfig>({
+const DEFAULT_GATEWAY_URL = 'https://openapi.alipay.com/gateway.do'
+
+const form = reactive<AlipayConfig>(withDefaultConfig({
   appId: '',
   privateKey: '',
   alipayPublicKey: '',
-  gatewayUrl: 'https://openapi.alipay.com/gateway.do',
+  gatewayUrl: DEFAULT_GATEWAY_URL,
   notifyUrl: '',
   returnUrl: '',
   signType: 'RSA2',
   charset: 'UTF-8',
   enabled: false,
-})
+}))
 
 async function load() {
   loading.value = true
   try {
     const [config, nextOrders] = await Promise.all([api.config(), api.orders()])
-    Object.assign(form, config)
+    Object.assign(form, withDefaultConfig(config))
     orders.value = nextOrders
   }
   finally {
@@ -144,12 +146,28 @@ async function load() {
 async function save() {
   saving.value = true
   try {
-    const saved = await api.saveConfig({ ...form })
-    Object.assign(form, saved)
+    const payload = withDefaultConfig({ ...form })
+    Object.assign(form, payload)
+    const saved = await api.saveConfig(payload)
+    Object.assign(form, withDefaultConfig(saved))
     toast.success('支付宝配置已保存')
   }
   finally {
     saving.value = false
+  }
+}
+
+function withDefaultConfig(config: Partial<AlipayConfig>): AlipayConfig {
+  return {
+    appId: config.appId || '',
+    privateKey: config.privateKey || '',
+    alipayPublicKey: config.alipayPublicKey || '',
+    gatewayUrl: config.gatewayUrl || DEFAULT_GATEWAY_URL,
+    notifyUrl: config.notifyUrl || '',
+    returnUrl: config.returnUrl || '',
+    signType: config.signType || 'RSA2',
+    charset: config.charset || 'UTF-8',
+    enabled: config.enabled ?? false,
   }
 }
 

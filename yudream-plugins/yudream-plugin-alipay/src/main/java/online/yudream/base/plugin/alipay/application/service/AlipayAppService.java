@@ -11,6 +11,7 @@ import online.yudream.base.plugin.alipay.domain.enumerate.AlipayProductType;
 import online.yudream.base.plugin.alipay.domain.valobj.AlipayConfig;
 import online.yudream.base.plugin.alipay.infrastructure.repository.AlipayRepository;
 import online.yudream.base.plugin.alipay.infrastructure.service.AlipayGatewayService;
+import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletAsset;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletChangeRequest;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletService;
@@ -32,24 +33,32 @@ public class AlipayAppService {
     private static final AlipayProductType SUPPORTED_PRODUCT_TYPE = AlipayProductType.PAGE;
     private static final String TRADE_SUCCESS = "TRADE_SUCCESS";
     private static final String TRADE_FINISHED = "TRADE_FINISHED";
+    private static final String APP_WEB_URL_SETTING = "app.web-url";
+    private static final String APP_BASE_URL_SETTING = "app.base-url";
+    private static final String NOTIFY_PATH = "/api/plugins/yudream-alipay/notify";
+    private static final String RETURN_PATH = "/pay/result";
 
     private final AlipayRepository repository;
     private final AlipayGatewayService gatewayService;
     private final PluginWalletService walletService;
+    private final FrameworkServices frameworkServices;
     private final AlipayAppAssembler assembler = new AlipayAppAssembler();
 
-    public AlipayAppService(AlipayRepository repository, AlipayGatewayService gatewayService, PluginWalletService walletService) {
+    public AlipayAppService(AlipayRepository repository, AlipayGatewayService gatewayService,
+                            PluginWalletService walletService, FrameworkServices frameworkServices) {
         this.repository = repository;
         this.gatewayService = gatewayService;
         this.walletService = walletService;
+        this.frameworkServices = frameworkServices;
     }
 
     public AlipayConfig config() {
-        return repository.config().withoutSecrets();
+        return effectiveConfig(repository.config()).withoutSecrets();
     }
 
     public AlipayConfig saveConfig(AlipayConfigSaveCmd cmd) {
-        return repository.saveConfig(assembler.merge(repository.config(), cmd)).withoutSecrets();
+        AlipayConfig config = storageConfig(assembler.merge(repository.config(), cmd));
+        return effectiveConfig(repository.saveConfig(config)).withoutSecrets();
     }
 
     public PluginPaymentChannelInfo channelInfo() {
@@ -65,7 +74,7 @@ public class AlipayAppService {
 
     public boolean channelEnabled() {
         try {
-            repository.config().ensureUsable();
+            effectiveConfig(repository.config()).ensureUsable();
             return true;
         } catch (IllegalArgumentException ignored) {
             return false;
@@ -99,7 +108,7 @@ public class AlipayAppService {
     }
 
     public AlipayRechargeCreateDTO createRecharge(AlipayRechargeCreateCmd cmd, Long currentUserId) {
-        AlipayConfig config = repository.config();
+        AlipayConfig config = effectiveConfig(repository.config());
         config.ensureUsable();
         String userId = ownerId(cmd.userId(), currentUserId);
         String assetCode = assetCode(cmd.assetCode());
@@ -122,7 +131,7 @@ public class AlipayAppService {
         if (params == null || params.isEmpty()) {
             return new AlipayNotifyResultDTO(false, "支付宝通知参数为空", null, null);
         }
-        AlipayConfig config = repository.config();
+        AlipayConfig config = effectiveConfig(repository.config());
         if (!gatewayService.verifyNotify(config, params)) {
             return new AlipayNotifyResultDTO(false, "支付宝通知验签失败", params.get("out_trade_no"), params.get("trade_no"));
         }
@@ -155,6 +164,84 @@ public class AlipayAppService {
 
     public List<AlipayRechargeOrder> listOrders(int page, int size) {
         return repository.listOrders(page, size);
+    }
+
+    private AlipayConfig effectiveConfig(AlipayConfig config) {
+        AlipayConfig normalized = config == null ? AlipayConfig.defaults() : config.normalized();
+        return new AlipayConfig(
+                normalized.appId(),
+                normalized.privateKey(),
+                normalized.alipayPublicKey(),
+                normalized.gatewayUrl(),
+                effectiveCallbackUrl(normalized.notifyUrl(), NOTIFY_PATH),
+                effectiveCallbackUrl(normalized.returnUrl(), RETURN_PATH),
+                normalized.signType(),
+                normalized.charset(),
+                normalized.enabled()
+        ).normalized();
+    }
+
+    private AlipayConfig storageConfig(AlipayConfig config) {
+        AlipayConfig normalized = config == null ? AlipayConfig.defaults() : config.normalized();
+        return new AlipayConfig(
+                normalized.appId(),
+                normalized.privateKey(),
+                normalized.alipayPublicKey(),
+                normalized.gatewayUrl(),
+                storageCallbackUrl(normalized.notifyUrl(), NOTIFY_PATH),
+                storageCallbackUrl(normalized.returnUrl(), RETURN_PATH),
+                normalized.signType(),
+                normalized.charset(),
+                normalized.enabled()
+        ).normalized();
+    }
+
+    private String effectiveCallbackUrl(String configuredUrl, String path) {
+        String defaultUrl = defaultCallbackUrl(path);
+        if (!hasText(defaultUrl)) {
+            return configuredUrl;
+        }
+        if (!hasText(configuredUrl) || isDefaultCallbackUrl(configuredUrl, path, defaultUrl)) {
+            return defaultUrl;
+        }
+        return configuredUrl.trim();
+    }
+
+    private String storageCallbackUrl(String configuredUrl, String path) {
+        String defaultUrl = defaultCallbackUrl(path);
+        if (!hasText(configuredUrl) || isDefaultCallbackUrl(configuredUrl, path, defaultUrl)) {
+            return null;
+        }
+        return configuredUrl.trim();
+    }
+
+    private String defaultCallbackUrl(String path) {
+        return publicWebUrl()
+                .map(baseUrl -> baseUrl + path)
+                .orElse(null);
+    }
+
+    private Optional<String> publicWebUrl() {
+        return frameworkServices.setting(APP_WEB_URL_SETTING)
+                .or(() -> frameworkServices.setting(APP_BASE_URL_SETTING))
+                .map(this::stripTrailingSlash)
+                .filter(this::hasText);
+    }
+
+    private boolean isDefaultCallbackUrl(String value, String path, String defaultUrl) {
+        String text = value == null ? "" : value.trim();
+        return text.equals(path) || text.equals(defaultUrl);
+    }
+
+    private String stripTrailingSlash(String value) {
+        if (value == null) {
+            return "";
+        }
+        String result = value.trim();
+        while (result.endsWith("/") && result.length() > 1) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
     }
 
     private void ensureMoneyAsset(String assetCode) {
@@ -226,5 +313,9 @@ public class AlipayAppService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 }
