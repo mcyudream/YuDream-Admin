@@ -7,10 +7,6 @@
         <p>基于系统用户认证与 yudream-skin 角色、材质资料，对外提供 Minecraft 启动器和服务端可使用的认证协议端点。</p>
       </div>
       <div class="hero-actions">
-        <FaButton :loading="model.loading" variant="outline" @click="model.load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新状态
-        </FaButton>
         <FaButton @click="model.copy(model.launcherUrl)">
           <FaIcon name="i-ri:file-copy-line" />
           复制 API 地址

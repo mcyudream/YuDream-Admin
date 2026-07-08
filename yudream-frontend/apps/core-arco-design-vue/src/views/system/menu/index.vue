@@ -338,9 +338,6 @@ function importMenus() {
           <FaButton v-auth="'system:menu:delete'" variant="ghost" size="sm" title="删除菜单" :disabled="!selectedMenu || selectedMenu.status === 'DISABLED'" @click="confirmDisable()">
             <FaIcon name="i-ri:delete-bin-line" />
           </FaButton>
-          <FaButton variant="ghost" size="sm" title="刷新" @click="loadTree">
-            <FaIcon name="i-ri:refresh-line" />
-          </FaButton>
         </div>
       </div>
 
@@ -448,9 +445,6 @@ function importMenus() {
       <section class="menu-section">
         <div class="menu-section__header">
           <h2>按钮权限列表</h2>
-          <FaButton variant="ghost" size="sm" title="刷新" @click="loadTree">
-            <FaIcon name="i-ri:refresh-line" />
-          </FaButton>
         </div>
 
         <FaTable

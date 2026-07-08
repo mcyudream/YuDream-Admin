@@ -6,10 +6,6 @@
         <h2>钱包账务记录</h2>
         <p>按币种、来源、进出账类型和用户筛选系统流水。</p>
       </div>
-      <FaButton :loading="model.loading" variant="outline" @click="model.load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </section>
 
     <WalletPanel title="筛选" eyebrow="Filter">

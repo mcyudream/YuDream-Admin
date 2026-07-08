@@ -4,7 +4,7 @@
       <strong>{{ title }}</strong>
       <div v-if="controls" class="skin-preview__actions">
         <button type="button" :class="{ active: rotateEnabled }" title="旋转" @click="rotateEnabled = !rotateEnabled">
-          <span class="i-ri:refresh-line" />
+          <span class="i-ri:anticlockwise-2-line" />
         </button>
         <button type="button" title="切换动作" @click="nextAnimation">
           {{ animationLabel }}

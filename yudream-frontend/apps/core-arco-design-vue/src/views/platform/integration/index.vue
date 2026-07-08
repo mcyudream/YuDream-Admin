@@ -420,10 +420,6 @@ function executionVariant(status: ExecutionStatus) {
 <template>
   <div>
     <FaPageHeader title="集成调用" class="mb-0">
-      <FaButton v-auth="'platform:integration:view'" variant="outline" :loading="loading" @click="load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
       <FaButton v-if="activeTab === 'connectors'" v-auth="'platform:integration:edit'" @click="openCreateConnector">
         <FaIcon name="i-ri:add-line" />
         新增连接器

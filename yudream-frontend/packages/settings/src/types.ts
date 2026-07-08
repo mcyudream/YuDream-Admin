@@ -261,12 +261,6 @@ export interface ToolbarSettings {
    */
   fullscreen?: boolean
   /**
-   * 页面刷新
-   * @description 控制是否启用页面刷新功能
-   * @default false
-   */
-  pageReload?: boolean
-  /**
    * 颜色主题
    * @description 控制是否启用颜色主题切换功能
    * @default false
@@ -361,7 +355,6 @@ export interface SettingsLegacyOptions {
     breadcrumb?: boolean
     navSearch?: boolean
     fullscreen?: boolean
-    pageReload?: boolean
     colorScheme?: boolean
   }
   navSearch?: {

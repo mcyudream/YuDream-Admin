@@ -4,7 +4,7 @@
       <span>继承规则按币种通配和累计金额区间匹配，区间必须从 0 连续覆盖到无上限。</span>
       <div>
         <button type="button" class="mc-icon-button" title="恢复默认规则" @click="model.resetRules">
-          <FaIcon name="i-ri:refresh-line" />
+          <FaIcon name="i-ri:restart-line" />
         </button>
         <button type="button" class="mc-icon-button" title="新增规则" @click="model.addRule">
           <FaIcon name="i-ri:add-line" />

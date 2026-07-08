@@ -6,10 +6,6 @@
         <h2>资产、余额和流水</h2>
         <p>维护人民币和积分类资产，处理管理员入账、扣账，并查看钱包流水。</p>
       </div>
-      <FaButton :loading="model.loading" variant="outline" @click="model.load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
     </section>
 
     <div class="wallet-layout">

@@ -167,10 +167,6 @@ function dateText(value?: string) {
 <template>
   <div>
     <FaPageHeader title="动态表单" class="mb-0">
-      <FaButton v-auth="'platform:form:view'" variant="outline" :loading="loading" @click="load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
       <FaButton v-auth="'platform:form:edit'" @click="openCreate">
         <FaIcon name="i-ri:add-line" />
         新建表单

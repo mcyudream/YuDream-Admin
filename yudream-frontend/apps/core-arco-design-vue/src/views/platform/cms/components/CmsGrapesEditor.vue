@@ -2288,9 +2288,6 @@ function escapeAttr(value: string) {
         <section>
           <div class="media-head">
             <h3>媒体</h3>
-            <FaButton size="sm" variant="outline" :loading="loadingMedia" @click="loadMedia">
-              <FaIcon name="i-ri:refresh-line" />
-            </FaButton>
           </div>
           <div class="media-actions">
             <FaButton size="sm" @click="pickMedia">
@@ -2371,9 +2368,6 @@ function escapeAttr(value: string) {
                   <span>{{ chatHistoryTargetLabel }}</span>
                 </div>
                 <div class="ai-history__actions">
-                  <button type="button" :disabled="chatHistoryLoading" @click="loadChatHistory(true)">
-                    刷新
-                  </button>
                   <button type="button" @click="clearChatHistory">
                     清空并重开
                   </button>
@@ -2464,9 +2458,6 @@ function escapeAttr(value: string) {
               <span>{{ selectedSourceSummary }}</span>
             </div>
             <div class="source-panel__actions">
-              <FaButton variant="outline" size="sm" :disabled="!hasSelectedComponent" @click="syncSelectedSource(true)">
-                <FaIcon name="i-ri:refresh-line" />
-              </FaButton>
               <FaButton variant="outline" size="sm" :disabled="!hasSelectedComponent || !selectedSourceCode.trim()" @click="formatSelectedSource">
                 <FaIcon name="i-ri:align-left" />
                 格式化

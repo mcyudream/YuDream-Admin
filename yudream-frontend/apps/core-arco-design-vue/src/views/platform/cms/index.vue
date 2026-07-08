@@ -224,19 +224,6 @@ onMounted(async () => {
   await loadPages()
 })
 
-async function refreshActiveTab() {
-  await loadAiCapability()
-  if (activeTab.value === 'pages') {
-    await loadPages()
-  }
-  else if (activeTab.value === 'media') {
-    await loadMedia()
-  }
-  else {
-    await loadHome()
-  }
-}
-
 async function loadAiCapability() {
   try {
     const res = await apiCapability.list()
@@ -734,10 +721,6 @@ function sectionTitle(type: HomeSectionType) {
 <template>
   <div class="cms-workbench">
     <FaPageHeader title="内容站点" class="cms-header">
-      <FaButton variant="outline" :loading="loading" @click="refreshActiveTab">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
       <FaButton v-if="activeTab === 'pages'" v-auth="'platform:cms:edit'" :loading="saving" @click="savePage">
         <FaIcon name="i-ri:save-3-line" />
         保存页面
@@ -1130,10 +1113,6 @@ function sectionTitle(type: HomeSectionType) {
           </div>
           <div class="media-actions">
             <FaInput v-model="mediaSearch.keyword" clearable placeholder="搜索文件名" class="w-64" @keydown.enter="loadMedia" @clear="loadMedia" />
-            <FaButton variant="outline" :loading="loading" @click="loadMedia">
-              <FaIcon name="i-ri:refresh-line" />
-              刷新
-            </FaButton>
             <FaButton v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
               <FaIcon name="i-ri:upload-cloud-2-line" />
               上传

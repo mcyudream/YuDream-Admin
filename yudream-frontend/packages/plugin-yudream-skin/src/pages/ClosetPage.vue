@@ -6,11 +6,6 @@
         <h2>{{ model.selectedClosetItem?.itemName || '收藏的材质' }}</h2>
         <p>衣柜只展示当前账号可使用的材质，选中后可以预览、重命名或应用到角色。</p>
       </div>
-      <FaTooltip text="刷新衣柜" side="bottom">
-        <FaButton variant="outline" size="icon" :loading="model.loading" aria-label="刷新衣柜" @click="model.load">
-          <FaIcon name="i-ri:refresh-line" />
-        </FaButton>
-      </FaTooltip>
     </div>
 
     <div class="skin-library-layout">

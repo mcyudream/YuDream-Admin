@@ -103,10 +103,6 @@ function openCard() {
       </div>
 
       <div class="skin-dashboard-card__actions">
-        <FaButton size="sm" variant="outline" @click="load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
         <FaButton v-if="card?.actionPath" size="sm" @click="openCard">
           <FaIcon name="i-ri:arrow-right-line" />
           管理角色

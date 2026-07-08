@@ -15,7 +15,6 @@ const appSettingsStore = useAppSettingsStore()
 const appTabbarStore = useAppTabbarStore()
 
 const tabbar = useAppTabbar()
-const mainPage = useAppPage()
 
 const keys = useMagicKeys({ reactive: true })
 
@@ -86,12 +85,6 @@ function tabbarScrollTip() {
 function contextMenuItems(routeItem: TabbarRecordRaw) {
   return [
     [
-      {
-        label: '重新加载',
-        icon: 'i-ri:refresh-line',
-        disabled: routeItem.tabId !== activedTabId.value,
-        handle: () => mainPage.reload(),
-      },
       {
         label: '关闭标签页',
         icon: 'i-ri:close-line',

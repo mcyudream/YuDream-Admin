@@ -11,10 +11,6 @@
           <FaIcon name="i-ri:bank-card-line" />
           充值
         </a>
-        <FaButton :loading="model.loading" variant="outline" @click="model.load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
       </div>
     </section>
 

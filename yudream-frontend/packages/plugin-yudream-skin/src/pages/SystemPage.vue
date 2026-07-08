@@ -111,7 +111,7 @@ function stateText(state: string) {
         <div class="migration-log__head">
           <strong>{{ stateText(model.migrationStatus.state) }}</strong>
           <FaButton v-if="model.migrationStatus.running" variant="outline" @click="model.openMigrationLog">
-            <FaIcon name="i-ri:refresh-line" />
+            <FaIcon name="i-ri:links-line" />
             重新连接
           </FaButton>
         </div>

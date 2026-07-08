@@ -7,15 +7,6 @@
         <p>{{ heroDescription }}</p>
       </div>
       <div class="skin-dashboard-hero__actions">
-        <FaButton
-          variant="outline"
-          class="skin-icon-button"
-          title="刷新数据"
-          :loading="model.loading"
-          @click="model.load"
-        >
-          <FaIcon name="i-ri:refresh-line" />
-        </FaButton>
         <a class="skin-primary-link" href="/platform/plugins/yudream-skin/players">
           <FaIcon name="i-ri:gamepad-line" />
           我的角色
@@ -121,7 +112,7 @@
 <script setup lang="ts">
 import type { SkinPluginModel } from '../composables/useSkinPlugin'
 import { computed } from 'vue'
-import { FaButton, FaIcon } from '@fantastic-admin/components'
+import { FaIcon } from '@fantastic-admin/components'
 import SkinPanel from '../components/SkinPanel.vue'
 import SkinPreview from '../components/SkinPreview.vue'
 import SkinTexturePreview from '../components/SkinTexturePreview.vue'

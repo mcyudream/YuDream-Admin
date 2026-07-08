@@ -7,10 +7,6 @@
         <p>{{ isManagement ? '维护皮肤、披风材质与公开状态，上传后的材质可用于角色外观。' : '选择一个材质查看 3D 效果，保存到衣柜后即可给默认角色或当前角色换装。' }}</p>
       </div>
       <div class="skin-command-actions">
-        <FaButton variant="outline" :loading="model.loading" @click="model.load">
-          <FaIcon name="i-ri:refresh-line" />
-          刷新
-        </FaButton>
         <FaButton v-if="model.canUse" @click="uploadVisible = true">
           <FaIcon name="i-ri:upload-cloud-2-line" />
           上传材质

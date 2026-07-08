@@ -452,10 +452,6 @@ function dateText(value?: string) {
                 <p>管理已经绑定到当前账号的设备凭据。</p>
               </div>
               <div class="panel-actions">
-                <FaButton variant="outline" :loading="loadingPasskeys" @click="loadPasskeys">
-                  <FaIcon name="i-ri:refresh-line" />
-                  刷新
-                </FaButton>
                 <FaButton :loading="bindingPasskey" @click="bindPasskey">
                   <FaIcon name="i-ri:fingerprint-line" />
                   绑定
@@ -494,10 +490,6 @@ function dateText(value?: string) {
             <h2>API Key</h2>
             <p>创建只属于当前用户的访问密钥，权限不能超过你的账号权限。</p>
           </div>
-          <FaButton variant="outline" :loading="loadingApiKeys" @click="loadApiKeys">
-            <FaIcon name="i-ri:refresh-line" />
-            刷新
-          </FaButton>
         </div>
 
         <div v-if="createdApiKeyPlaintext" class="secret-once">

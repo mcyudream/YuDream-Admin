@@ -16,7 +16,7 @@ const appSettingsStore = useAppSettingsStore()
 
 const toolbarTools = {
   'left-side': ['breadcrumb'],
-  'right-side': ['menuSearch', 'fullscreen', 'pageReload', 'colorScheme'],
+  'right-side': ['menuSearch', 'fullscreen', 'colorScheme'],
 } satisfies Record<typeof props.mode, (keyof ToolbarSettings)[]>
 
 const tools = computed(() => toolbarTools[props.mode])

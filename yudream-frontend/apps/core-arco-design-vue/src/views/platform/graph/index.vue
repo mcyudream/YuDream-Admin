@@ -256,10 +256,6 @@ function queryStatusVariant(status: GraphQueryStatus) {
 <template>
   <div>
     <FaPageHeader title="图数据库" class="mb-0">
-      <FaButton v-auth="'platform:graph:view'" variant="outline" :loading="loading" @click="load">
-        <FaIcon name="i-ri:refresh-line" />
-        刷新
-      </FaButton>
       <FaButton v-if="activeTab === 'connections'" v-auth="'platform:graph:edit'" @click="openCreate">
         <FaIcon name="i-ri:add-line" />
         新增连接

@@ -89,7 +89,6 @@ const isToolbarEnable = computed(() => {
     toolbar.breadcrumb,
     toolbar.menuSearch,
     toolbar.fullscreen,
-    toolbar.pageReload,
     toolbar.colorScheme,
   ].some((item) => {
     if (typeof item === 'boolean') {
