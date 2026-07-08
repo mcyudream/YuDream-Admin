@@ -542,7 +542,7 @@ function importMenus() {
           </a-grid-item>
           <a-grid-item v-if="form.type === 'LINK'">
             <a-form-item label="外链地址">
-              <FaInput v-model="form.link" placeholder="https://yudream.example.com" class="w-full" />
+              <FaInput v-model="form.link" placeholder="https://www.yudream.online" class="w-full" />
             </a-form-item>
           </a-grid-item>
           <a-grid-item v-if="form.type !== 'CATEGORY' && form.type !== 'LAYOUT'">

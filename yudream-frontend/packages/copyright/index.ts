@@ -11,7 +11,7 @@ export interface CopyrightOptions {
 function resolveOptions(options: CopyrightOptions = {}) {
   return {
     edition: options.edition ?? '基础版',
-    website: options.website ?? 'https://yudream.example.com',
+    website: options.website ?? 'https://www.yudream.online',
   }
 }
 
