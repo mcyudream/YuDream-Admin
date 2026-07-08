@@ -42,3 +42,4 @@ build/
 # Nested repository backups
 .git.bak/
 /plugins/
+/.idea/jsLibraryMappings.xml
