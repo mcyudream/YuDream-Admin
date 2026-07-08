@@ -611,10 +611,11 @@ function escapeHtml(value: string) {
 .site-layout-header {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 1000;
   border-bottom: 1px solid #e5e7eb;
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(12px);
+  isolation: isolate;
 }
 
 .site-layout-header__bar {
@@ -682,16 +683,25 @@ function escapeHtml(value: string) {
 
 .site-nav-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
+  top: 100%;
+  left: -8px;
   z-index: 20;
   display: none;
   min-width: 168px;
-  padding: 6px;
+  padding: 14px 8px 8px;
+  border-radius: 10px;
+  isolation: isolate;
+}
+
+.site-nav-dropdown::before {
+  position: absolute;
+  inset: 8px 0 0;
+  z-index: -1;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+  content: "";
 }
 
 .site-nav-item:hover .site-nav-dropdown,
@@ -701,6 +711,7 @@ function escapeHtml(value: string) {
 }
 
 .site-nav-dropdown a {
+  position: relative;
   display: flex;
   white-space: nowrap;
 }
@@ -810,6 +821,8 @@ function escapeHtml(value: string) {
 }
 
 .site-layout-frame {
+  position: relative;
+  z-index: 1;
   display: flex;
   min-height: calc(100vh - 63px);
 }
@@ -857,6 +870,8 @@ function escapeHtml(value: string) {
 }
 
 .site-layout-footer {
+  position: relative;
+  z-index: 1;
   padding: 36px 0;
   border-top: 1px solid #e5e7eb;
   background: #fff;
@@ -1095,7 +1110,9 @@ function escapeHtml(value: string) {
 
 @media (max-width: 760px) {
   .site-layout-header {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
   }
 
   .site-layout-header__bar {
