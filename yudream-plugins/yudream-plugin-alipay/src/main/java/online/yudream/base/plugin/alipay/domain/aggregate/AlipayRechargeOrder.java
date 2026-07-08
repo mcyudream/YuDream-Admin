@@ -38,7 +38,7 @@ public record AlipayRechargeOrder(
                 requireAmount(walletAmount == null ? payAmount : walletAmount, "到账金额必须大于 0"),
                 hasText(subject) ? subject.trim() : "钱包充值",
                 trimToNull(body),
-                productType == null ? AlipayProductType.APP : productType,
+                productType == null ? AlipayProductType.PAGE : productType,
                 AlipayOrderStatus.CREATED,
                 null,
                 null,

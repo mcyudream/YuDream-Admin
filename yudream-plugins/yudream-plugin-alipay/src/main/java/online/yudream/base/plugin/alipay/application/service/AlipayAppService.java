@@ -20,7 +20,6 @@ import online.yudream.base.plugin.spi.system.payment.PluginPaymentCreateRequest;
 import online.yudream.base.plugin.spi.system.payment.PluginPaymentCreateResult;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +29,7 @@ public class AlipayAppService {
 
     public static final String CHANNEL_CODE = "alipay";
     public static final String CHANNEL_NAME = "支付宝";
+    private static final AlipayProductType SUPPORTED_PRODUCT_TYPE = AlipayProductType.PAGE;
     private static final String TRADE_SUCCESS = "TRADE_SUCCESS";
     private static final String TRADE_FINISHED = "TRADE_FINISHED";
 
@@ -59,7 +59,7 @@ public class AlipayAppService {
                 "i-ri:alipay-line",
                 "支付宝官方收款 API",
                 channelEnabled(),
-                Arrays.stream(AlipayProductType.values()).map(Enum::name).toList()
+                List.of(SUPPORTED_PRODUCT_TYPE.name())
         );
     }
 
@@ -195,13 +195,18 @@ public class AlipayAppService {
 
     private AlipayProductType productType(String productType) {
         if (productType == null || productType.isBlank()) {
-            return AlipayProductType.APP;
+            return SUPPORTED_PRODUCT_TYPE;
         }
+        AlipayProductType value;
         try {
-            return AlipayProductType.valueOf(productType.trim().toUpperCase(Locale.ROOT));
+            value = AlipayProductType.valueOf(productType.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("不支持的支付宝支付产品：" + productType);
         }
+        if (value != SUPPORTED_PRODUCT_TYPE) {
+            throw new IllegalArgumentException("支付宝充值当前仅支持电脑网页支付");
+        }
+        return value;
     }
 
     private String payloadType(AlipayProductType productType) {

@@ -131,15 +131,6 @@
               <option :value="false">停用</option>
             </select>
           </label>
-          <label>
-            <span>默认支付产品</span>
-            <select v-model="model.rechargeSettingsForm.defaultProductType">
-              <option value="PAGE">电脑网页支付</option>
-              <option value="WAP">手机网页支付</option>
-              <option value="FACE_TO_FACE">当面付二维码</option>
-              <option value="APP">App 支付</option>
-            </select>
-          </label>
         </div>
         <div class="wallet-table-wrap">
           <table class="wallet-table">
