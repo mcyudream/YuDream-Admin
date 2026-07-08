@@ -62,9 +62,10 @@ public class UserManageAppService {
 
     @Transactional
     public UserManageDTO create(UserCreateCmd cmd) {
-        ensureUserUnique(null, cmd.getUsername(), cmd.getEmail(), cmd.getPhone(), cmd.getQq());
+        String username = normalizeUsername(cmd.getUsername(), true);
+        ensureUserUnique(null, username, cmd.getEmail(), cmd.getPhone(), cmd.getQq());
         User user = User.builder()
-                .username(cmd.getUsername())
+                .username(username)
                 .nickname(cmd.getNickname())
                 .email(toEmail(cmd.getEmail()))
                 .phone(toPhone(cmd.getPhone()))
@@ -84,7 +85,12 @@ public class UserManageAppService {
     @Transactional
     public UserManageDTO update(UserUpdateCmd cmd) {
         User user = getUser(cmd.getId());
-        ensureUserUnique(user.getId(), user.getUsername(), cmd.getEmail(), cmd.getPhone(), cmd.getQq());
+        String username = normalizeUsername(cmd.getUsername(), false);
+        ensureUserUnique(user.getId(), username == null ? user.getUsername() : username, cmd.getEmail(), cmd.getPhone(), cmd.getQq());
+        if (username != null && !Objects.equals(username, user.getUsername())) {
+            ensureUsernameNotTaken(username, user.getId());
+            user.changeUsername(username);
+        }
         user.updateProfile(cmd.getNickname(), toEmail(cmd.getEmail()), toPhone(cmd.getPhone()), toQQ(cmd.getQq()), cmd.getEmailVerified());
         User saved = userRepo.save(user);
         deleteSameEmailUnverifiedUsers(saved);
@@ -166,6 +172,22 @@ public class UserManageAppService {
         }
         return userRepo.findByEmailAll(email).stream()
                 .anyMatch(user -> !Objects.equals(user.getId(), excludeId) && user.isEmailVerified());
+    }
+
+    private void ensureUsernameNotTaken(String username, Long excludeId) {
+        if (userRepo.existsByUsernameExcludeId(username, excludeId)) {
+            throw new BizException("用户名已存在");
+        }
+    }
+
+    private String normalizeUsername(String username, boolean required) {
+        if (!StringUtils.hasText(username)) {
+            if (required || username != null) {
+                throw new BizException("用户名不能为空");
+            }
+            return null;
+        }
+        return username.trim();
     }
 
     private void deleteSameEmailUnverifiedUsers(User verifiedUser) {

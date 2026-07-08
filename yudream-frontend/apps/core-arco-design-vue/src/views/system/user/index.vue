@@ -178,13 +178,17 @@ function openEdit(row: UserManageItem) {
 
 async function saveForm() {
   if (editing.value) {
-    await apiUser.update(editing.value.id, {
+    const updateRes = await apiUser.update(editing.value.id, {
+      username: form.username,
       nickname: form.nickname,
       email: form.email,
       phone: form.phone,
       qq: form.qq,
       emailVerified: form.emailVerified,
     })
+    if (sameId(updateRes.data.id, appAccountStore.userId)) {
+      appAccountStore.setAccount(updateRes.data.username)
+    }
     const deptsPayload = canAssignDept.value ? buildDeptPayload() : []
     if (canAssignDept.value && !sameDeptAssigns(deptsPayload, editing.value)) {
       await apiUser.assignDepts(editing.value.id, deptsPayload)
@@ -483,7 +487,7 @@ function importUsers() {
     <FaModal v-model="formVisible" :title="editing ? '编辑用户' : '新增用户'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <a-form :model="form" layout="vertical">
         <a-grid :cols="2" :col-gap="16">
-          <a-grid-item v-if="!editing">
+          <a-grid-item>
             <a-form-item label="用户名" required>
               <FaInput v-model="form.username" class="w-full" />
             </a-form-item>

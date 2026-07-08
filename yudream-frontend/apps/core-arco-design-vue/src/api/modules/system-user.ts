@@ -51,6 +51,7 @@ export interface UserCreatePayload {
 }
 
 export interface UserUpdatePayload {
+  username?: string
   nickname?: string
   email?: string
   phone?: string

@@ -51,6 +51,7 @@ public class UserManageWebAssembler {
     public static UserUpdateCmd toCmd(Long id, UserUpdateRequest request) {
         UserUpdateCmd cmd = new UserUpdateCmd();
         cmd.setId(id);
+        cmd.setUsername(request.getUsername());
         cmd.setNickname(request.getNickname());
         cmd.setEmail(request.getEmail());
         cmd.setPhone(request.getPhone());

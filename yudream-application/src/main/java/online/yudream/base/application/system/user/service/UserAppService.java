@@ -184,10 +184,15 @@ public class UserAppService {
     public UserProfileDTO updateProfile(Long userId, UserProfileUpdateCmd cmd) {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new BizException("用户不存在"));
+        String username = normalizeUsername(cmd.getUsername(), false);
         Email email = StringUtils.hasText(cmd.getEmail()) ? Email.of(cmd.getEmail().trim()) : null;
         Phone phone = StringUtils.hasText(cmd.getPhone()) ? Phone.of(cmd.getPhone().trim()) : null;
         QQ qq = StringUtils.hasText(cmd.getQq()) ? QQ.of(cmd.getQq().trim()) : null;
 
+        if (StringUtils.hasText(username) && !Objects.equals(username, user.getUsername())) {
+            ensureUsernameUnique(username, userId);
+            user.changeUsername(username);
+        }
         if (email != null && userRepo.existsByEmailExcludeId(email.getValue(), userId)) {
             throw new BizException("邮箱已被使用");
         }
@@ -329,6 +334,22 @@ public class UserAppService {
         if (usedByOtherVerifiedUser) {
             throw new BizException("用户名已被验证用户使用");
         }
+    }
+
+    private void ensureUsernameUnique(String username, Long excludeId) {
+        if (userRepo.existsByUsernameExcludeId(username, excludeId)) {
+            throw new BizException("用户名已存在");
+        }
+    }
+
+    private String normalizeUsername(String username, boolean required) {
+        if (!StringUtils.hasText(username)) {
+            if (required || username != null) {
+                throw new BizException("用户名不能为空");
+            }
+            return null;
+        }
+        return username.trim();
     }
 
     private int deleteSameEmailUnverifiedUsers(User verifiedUser, List<User> sameEmailUsers) {

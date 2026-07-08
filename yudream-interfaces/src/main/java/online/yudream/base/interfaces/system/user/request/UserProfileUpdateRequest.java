@@ -6,6 +6,8 @@ import lombok.Data;
 @Data
 public class UserProfileUpdateRequest {
 
+    private String username;
+
     private String nickname;
 
     @Email(message = "邮箱格式不正确")

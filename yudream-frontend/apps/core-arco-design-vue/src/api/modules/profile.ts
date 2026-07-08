@@ -16,6 +16,7 @@ export interface UserProfile {
 }
 
 export interface UserProfilePayload {
+  username?: string
   nickname?: string
   email?: string
   phone?: string

@@ -68,6 +68,13 @@ public class User extends BaseDomain {
         this.password = password;
     }
 
+    public void changeUsername(String username) {
+        if (username == null || username.isBlank()) {
+            throw new BizException("用户名不能为空");
+        }
+        this.username = username.trim();
+    }
+
     public void updateProfile(String nickname, Email email, Phone phone, QQ qq, Boolean emailVerified) {
         this.nickname = nickname;
         this.email = email;

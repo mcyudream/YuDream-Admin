@@ -11,6 +11,7 @@ public class UserProfileUpdateCmd implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private String username;
     private String nickname;
     private String email;
     private String phone;
