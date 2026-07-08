@@ -32,7 +32,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   const mappingInputs = reactive<Record<string, string>>({})
 
   const settingsForm = reactive({
-    templateId: '' as number | '',
+    templateId: '',
     defaultActivityName: '',
     defaultCollege: '',
     defaultIssuer: '',
@@ -51,7 +51,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
 
   const ready = computed(() => !!status.value?.dependencies.minecraftReady && !!status.value?.dependencies.studentInfoReady && !!status.value?.dependencies.wordTemplateReady && !!status.value?.settings.templateReady)
   const selectedServer = computed(() => servers.value.find(item => item.id === selectedServerId.value) || null)
-  const selectedTemplate = computed(() => templates.value.find(item => item.id === Number(settingsForm.templateId)) || null)
+  const selectedTemplate = computed(() => templates.value.find(item => item.id === settingsForm.templateId) || null)
   const unmatchedCount = computed(() => participants.value.filter(item => !item.matched).length)
   const selectedCount = computed(() => selectedPlayerIds.value.length || participants.value.length)
 
@@ -319,12 +319,11 @@ function todayText() {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
 }
 
-function toTemplateId(value: number | '') {
-  if (value === '') {
+function toTemplateId(value: string) {
+  if (!value.trim()) {
     return null
   }
-  const id = Number(value)
-  return Number.isFinite(id) && id > 0 ? id : null
+  return value.trim()
 }
 
 function normalizeTime(value: TimeValue) {

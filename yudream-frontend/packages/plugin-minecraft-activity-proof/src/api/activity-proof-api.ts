@@ -43,7 +43,7 @@ export function createActivityProofApi(sdk: YuDreamPluginSdk) {
     templates: (keyword = '') => getAllPages<ActivityProofTemplate>('/templates', { keyword }),
     settings: () => sdk.http.get<ActivityProofSettings>('/settings'),
     saveSettings: (data: Record<string, unknown>) => sdk.http.request<ActivityProofSettings>('/settings', { method: 'PUT', data }),
-    selectTemplate: (templateId: number) => sdk.http.request<ActivityProofSettings>('/template', { method: 'PUT', data: { templateId } }),
+    selectTemplate: (templateId: string) => sdk.http.request<ActivityProofSettings>('/template', { method: 'PUT', data: { templateId } }),
     mappings: (serverId: string) => getAllPages<ActivityProofMapping>('/mappings', { serverId }),
     saveMapping: (data: Record<string, unknown>) => sdk.http.request<ActivityProofMapping>('/mappings', { method: 'PUT', data }),
     deleteMapping: (id: string) => sdk.http.request(`/mappings/${encodeURIComponent(id)}`, { method: 'DELETE' }),
