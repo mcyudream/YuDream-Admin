@@ -22,6 +22,8 @@ import online.yudream.base.plugin.spi.system.document.PluginWordTemplateSummary;
 import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftPlayerActivity;
 import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftServer;
 import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftService;
+import online.yudream.base.plugin.spi.system.skin.PluginSkinProfile;
+import online.yudream.base.plugin.spi.system.skin.PluginSkinService;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoProfile;
@@ -51,6 +53,7 @@ public class ActivityProofAppService {
 
     private static final String MINECRAFT_PLUGIN = "minecraft-server";
     private static final String STUDENT_INFO_PLUGIN = "yudream-student-info";
+    private static final String SKIN_PLUGIN = "yudream-skin";
     private static final String DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private static final int SCAN_PAGE_SIZE = 200;
     private static final int MAX_SCAN_SIZE = 1000;
@@ -193,6 +196,9 @@ public class ActivityProofAppService {
                 .filter(item -> hasText(item.playerName()))
                 .collect(Collectors.toMap(item -> normalizeKey(item.playerName()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
         List<PluginStudentInfoProfile> students = allStudents();
+        Map<String, PluginStudentInfoProfile> studentsByUserId = students.stream()
+                .filter(item -> hasText(item.userId()))
+                .collect(Collectors.toMap(item -> normalizeKey(item.userId()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
         Map<String, PluginStudentInfoProfile> studentsByNo = students.stream()
                 .filter(item -> item.studentNo() != null && !item.studentNo().isBlank())
                 .collect(Collectors.toMap(item -> normalizeKey(item.studentNo()), Function.identity(), (first, second) -> first, LinkedHashMap::new));
@@ -212,7 +218,7 @@ public class ActivityProofAppService {
                 continue;
             }
             PlayerStudentMapping mapping = resolveMapping(activity, mappingsByPlayerId, mappingsByPlayerName);
-            PluginStudentInfoProfile profile = resolveStudent(activity, mapping, studentsByNo, studentsByName);
+            PluginStudentInfoProfile profile = resolveStudent(activity, mapping, studentsByUserId, studentsByNo, studentsByName);
             result.add(toParticipant(index++, activity, mapping, profile, effectiveMillis));
         }
         List<ActivityProofParticipantDTO> sorted = result.stream()
@@ -290,6 +296,7 @@ public class ActivityProofAppService {
 
     private PluginStudentInfoProfile resolveStudent(PluginMinecraftPlayerActivity activity,
                                                     PlayerStudentMapping mapping,
+                                                    Map<String, PluginStudentInfoProfile> studentsByUserId,
                                                     Map<String, PluginStudentInfoProfile> studentsByNo,
                                                     Map<String, PluginStudentInfoProfile> studentsByName) {
         if (mapping != null) {
@@ -299,11 +306,46 @@ public class ActivityProofAppService {
             }
             return studentInfoService().flatMap(service -> service.findStudentInfoByStudentNo(mapping.studentNo())).orElse(null);
         }
+        PluginStudentInfoProfile bySkinOwner = resolveStudentBySkinOwner(activity, studentsByUserId);
+        if (bySkinOwner != null) {
+            return bySkinOwner;
+        }
         PluginStudentInfoProfile byPlayerId = studentsByNo.get(normalizeKey(activity.playerId()));
         if (byPlayerId != null) {
             return byPlayerId;
         }
         return studentsByName.get(normalizeKey(activity.playerName()));
+    }
+
+    private PluginStudentInfoProfile resolveStudentBySkinOwner(PluginMinecraftPlayerActivity activity,
+                                                               Map<String, PluginStudentInfoProfile> studentsByUserId) {
+        Optional<PluginSkinProfile> profile = skinProfile(activity);
+        if (profile.isEmpty() || !hasText(profile.get().ownerId())) {
+            return null;
+        }
+        String ownerId = profile.get().ownerId().trim();
+        PluginStudentInfoProfile cached = studentsByUserId.get(normalizeKey(ownerId));
+        if (cached != null) {
+            return cached;
+        }
+        return studentInfoService().flatMap(service -> service.findStudentInfoByUserId(ownerId)).orElse(null);
+    }
+
+    private Optional<PluginSkinProfile> skinProfile(PluginMinecraftPlayerActivity activity) {
+        Optional<PluginSkinService> service = skinService();
+        if (service.isEmpty()) {
+            return Optional.empty();
+        }
+        if (hasText(activity.playerId())) {
+            Optional<PluginSkinProfile> byUuid = service.get().findProfileByUuid(normalizeUuid(activity.playerId()));
+            if (byUuid.isPresent()) {
+                return byUuid;
+            }
+        }
+        if (hasText(activity.playerName())) {
+            return service.get().findProfileByName(activity.playerName().trim());
+        }
+        return Optional.empty();
     }
 
     private PlayerStudentMapping resolveMapping(PluginMinecraftPlayerActivity activity,
@@ -403,6 +445,10 @@ public class ActivityProofAppService {
         return framework == null ? Optional.empty() : framework.extension(STUDENT_INFO_PLUGIN, PluginStudentInfoService.class);
     }
 
+    private Optional<PluginSkinService> skinService() {
+        return framework == null ? Optional.empty() : framework.extension(SKIN_PLUGIN, PluginSkinService.class);
+    }
+
     private boolean wordTemplateEnabled() {
         return framework != null && framework.wordTemplates() != null && framework.wordTemplates().enabled();
     }
@@ -480,6 +526,10 @@ public class ActivityProofAppService {
 
     private String normalizeKey(String value) {
         return text(value).toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeUuid(String uuid) {
+        return uuid == null ? null : uuid.trim().replace("-", "").toLowerCase(Locale.ROOT);
     }
 
     private Long requireTemplateId(Long value) {
