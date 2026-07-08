@@ -1,0 +1,273 @@
+.student-info-plugin,
+.student-info-page {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.student-info-hero,
+.student-info-panel {
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.student-info-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 18px;
+}
+
+.student-info-hero span,
+.student-info-panel__head span,
+.student-info-form label > span,
+.student-info-filter label > span,
+.student-info-detail dt,
+.student-info-table th,
+.student-info-table td span {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.student-info-hero h2 {
+  overflow-wrap: anywhere;
+  margin: 4px 0 0;
+  color: var(--color-text-1);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.student-info-badges,
+.student-info-actions,
+.student-info-row-actions,
+.student-info-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.student-info-tag,
+.student-info-link-button {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.student-info-tag {
+  border: 1px solid var(--color-border-2);
+  background: var(--color-fill-1);
+  color: var(--color-text-2);
+}
+
+.student-info-tag.success {
+  border-color: rgba(31, 156, 103, 0.4);
+  background: rgba(31, 156, 103, 0.1);
+  color: rgb(31, 126, 84);
+}
+
+.student-info-tag.muted {
+  color: var(--color-text-3);
+}
+
+.student-info-link-button {
+  border: 1px solid rgb(var(--primary-5));
+  background: rgb(var(--primary-6));
+  color: #fff;
+  text-decoration: none;
+}
+
+.student-info-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.7fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.student-info-layout.wide-left {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
+}
+
+.student-info-panel {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  padding: 16px;
+}
+
+.student-info-panel__head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.student-info-panel__head > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.student-info-panel__head strong {
+  color: var(--color-text-1);
+  font-size: 16px;
+}
+
+.student-info-form,
+.student-info-filter {
+  display: grid;
+  gap: 12px;
+}
+
+.student-info-filter {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)) auto;
+  align-items: end;
+}
+
+.student-info-form label,
+.student-info-filter label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.student-info-form input,
+.student-info-filter input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  outline: none;
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+}
+
+.student-info-form input:disabled {
+  background: var(--color-fill-1);
+  color: var(--color-text-3);
+  cursor: not-allowed;
+}
+
+.student-info-detail {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.student-info-detail div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.student-info-detail div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.student-info-detail dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text-1);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.student-info-table-wrap {
+  overflow-x: auto;
+  min-width: 0;
+}
+
+.student-info-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.student-info-table th,
+.student-info-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-border-2);
+  color: var(--color-text-2);
+  font-size: 13px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.student-info-table th {
+  font-weight: 500;
+}
+
+.student-info-table td strong,
+.student-info-table td span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.student-info-table td strong {
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.student-info-table .wrap-cell {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+}
+
+.student-info-empty {
+  display: grid;
+  min-height: 48px;
+  place-items: center;
+  color: var(--color-text-3);
+  font-size: 13px;
+}
+
+.student-info-pagination {
+  justify-content: flex-end;
+}
+
+.student-info-pagination span {
+  color: var(--color-text-3);
+  font-size: 13px;
+}
+
+@media (max-width: 980px) {
+  .student-info-hero,
+  .student-info-layout,
+  .student-info-layout.wide-left {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .student-info-hero,
+  .student-info-panel__head {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .student-info-panel__head {
+    flex-direction: column;
+  }
+
+  .student-info-filter {
+    grid-template-columns: 1fr;
+  }
+
+  .student-info-table {
+    min-width: 680px;
+  }
+}
