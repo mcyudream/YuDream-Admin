@@ -18,6 +18,8 @@ import online.yudream.base.plugin.wallet.interfaces.res.WalletBalanceRes;
 import online.yudream.base.plugin.wallet.interfaces.res.WalletTransactionRes;
 import online.yudream.base.plugin.wallet.interfaces.res.WalletUserRes;
 
+import java.math.BigDecimal;
+
 public class WalletWebAssembler {
 
     public WalletAssetSaveCmd toCmd(WalletAssetSaveRequest request) {
@@ -66,7 +68,12 @@ public class WalletWebAssembler {
     }
 
     public WalletBalanceRes toRes(PluginWalletBalance balance, WalletUserRes user) {
-        return new WalletBalanceRes(balance.userId(), user, balance.assetCode(), balance.balance(), balance.updatedAt());
+        return toRes(balance, user, BigDecimal.ZERO);
+    }
+
+    public WalletBalanceRes toRes(PluginWalletBalance balance, WalletUserRes user, BigDecimal historicalTotalAmount) {
+        return new WalletBalanceRes(balance.userId(), user, balance.assetCode(), balance.balance(), balance.updatedAt(),
+                historicalTotalAmount == null ? BigDecimal.ZERO : historicalTotalAmount);
     }
 
     public WalletTransactionRes toRes(PluginWalletTransaction transaction) {

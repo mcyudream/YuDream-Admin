@@ -30,6 +30,7 @@
             <option value="ADMIN">管理员</option>
             <option value="TRANSFER">用户转账</option>
             <option value="ALIPAY">支付宝</option>
+            <option value="MINECRAFT_SEASON">周目继承</option>
           </select>
         </label>
         <label>
@@ -46,7 +47,7 @@
           <input v-model="model.transactionFilters.user" placeholder="ID / 用户名 / 邮箱">
         </label>
         <div class="wallet-actions">
-          <FaButton type="button" @click="model.loadTransactions">
+          <FaButton type="button" @click="model.applyTransactionFilters">
             <FaIcon name="i-ri:filter-3-line" />
             筛选
           </FaButton>
@@ -59,6 +60,17 @@
 
     <WalletPanel title="流水列表" eyebrow="Transactions">
       <TransactionList :model="model" :items="model.transactions" />
+      <div class="wallet-pagination">
+        <FaButton size="sm" variant="outline" :disabled="model.transactionPager.page <= 1" @click="model.prevTransactionPage">
+          <FaIcon name="i-ri:arrow-left-s-line" />
+          上一页
+        </FaButton>
+        <span>第 {{ model.transactionPager.page }} 页</span>
+        <FaButton size="sm" variant="outline" :disabled="!model.transactionPager.hasNext" @click="model.nextTransactionPage">
+          下一页
+          <FaIcon name="i-ri:arrow-right-s-line" />
+        </FaButton>
+      </div>
     </WalletPanel>
   </section>
 </template>

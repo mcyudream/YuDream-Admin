@@ -1,5 +1,5 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
-import type { AssetForm, BalanceChangeForm, RechargeForm, RechargeSettingsForm, TransactionFilters, TransferForm, WalletAsset, WalletBalance, WalletPaymentChannel, WalletRechargeOptions, WalletRechargeResult, WalletRechargeRule, WalletSummary, WalletTransaction, WalletUser } from '../types'
+import type { AssetForm, BalanceChangeForm, RechargeForm, RechargeSettingsForm, TimeValue, TransactionFilters, TransferForm, WalletAsset, WalletBalance, WalletPaymentChannel, WalletRechargeOptions, WalletRechargeResult, WalletRechargeRule, WalletSummary, WalletTransaction, WalletUser } from '../types'
 import { useFaToast } from '@fantastic-admin/components'
 import { computed, reactive, ref } from 'vue'
 import { createWalletApi } from '../api/wallet-api'
@@ -20,6 +20,8 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
   const rechargeResult = ref<WalletRechargeResult | null>(null)
   const selectedAssetCode = ref('CNY')
   const selectedBalanceAssetCode = ref('CNY')
+  const balancePager = reactive({ page: 1, size: 20, hasNext: false })
+  const transactionPager = reactive({ page: 1, size: 20, hasNext: false })
 
   const transferForm = reactive<TransferForm>({
     toAccount: '',
@@ -87,7 +89,6 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     const order = new Map(assets.value.map((asset, index) => [asset.code, index]))
     return [...balances.value].sort((a, b) => (order.get(a.assetCode) ?? 99) - (order.get(b.assetCode) ?? 99))
   })
-  const recentTransactions = computed(() => transactions.value.slice(0, 8))
 
   function assetName(assetCode?: string) {
     if (!assetCode) {
@@ -131,11 +132,12 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     })
   }
 
-  function formatTime(value?: number) {
-    if (!value) {
+  function formatTime(value?: TimeValue) {
+    const timestamp = normalizeTime(value)
+    if (!timestamp) {
       return '-'
     }
-    return new Date(value).toLocaleString('zh-CN', { hour12: false })
+    return new Date(timestamp).toLocaleString('zh-CN', { hour12: false })
   }
 
   function transactionLabel(type?: string) {
@@ -192,7 +194,7 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
         await Promise.all([loadAdminBalances(), loadTransactions(), loadRechargeSettings()])
       }
       else {
-        transactions.value = await api.myTransactions()
+        await loadMyTransactions()
       }
     }
     finally {
@@ -394,20 +396,36 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
   }
 
   async function loadAdminBalances() {
-    adminBalances.value = await api.adminBalances(selectedBalanceAssetCode.value)
+    const items = await api.adminBalances(selectedBalanceAssetCode.value, balancePager.page, balancePager.size)
+    balancePager.hasNext = items.length >= balancePager.size
+    adminBalances.value = items
   }
 
   async function loadTransactions() {
-    transactions.value = await api.transactions({
+    const items = await api.transactions({
       assetCode: transactionFilters.assetCode,
       source: transactionFilters.source,
       type: transactionFilters.type,
       user: transactionFilters.user.trim(),
-    })
+    }, transactionPager.page, transactionPager.size)
+    transactionPager.hasNext = items.length >= transactionPager.size
+    transactions.value = items
+  }
+
+  async function applyTransactionFilters() {
+    transactionPager.page = 1
+    await loadTransactions()
+  }
+
+  async function loadMyTransactions() {
+    const items = await api.myTransactions(undefined, transactionPager.page, transactionPager.size)
+    transactionPager.hasNext = items.length >= transactionPager.size
+    transactions.value = items
   }
 
   async function applyBalanceAsset(assetCode: string) {
     selectedBalanceAssetCode.value = assetCode
+    balancePager.page = 1
     await loadAdminBalances()
   }
 
@@ -416,7 +434,40 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     transactionFilters.source = ''
     transactionFilters.type = ''
     transactionFilters.user = ''
+    transactionPager.page = 1
     await loadTransactions()
+  }
+
+  async function nextBalancePage() {
+    if (!balancePager.hasNext) {
+      return
+    }
+    balancePager.page += 1
+    await loadAdminBalances()
+  }
+
+  async function prevBalancePage() {
+    if (balancePager.page <= 1) {
+      return
+    }
+    balancePager.page -= 1
+    await loadAdminBalances()
+  }
+
+  async function nextTransactionPage() {
+    if (!transactionPager.hasNext) {
+      return
+    }
+    transactionPager.page += 1
+    await (canManage.value ? loadTransactions() : loadMyTransactions())
+  }
+
+  async function prevTransactionPage() {
+    if (transactionPager.page <= 1) {
+      return
+    }
+    transactionPager.page -= 1
+    await (canManage.value ? loadTransactions() : loadMyTransactions())
   }
 
   function rechargeRule(assetCode?: string): WalletRechargeRule | undefined {
@@ -449,6 +500,8 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     rechargeResult,
     selectedAssetCode,
     selectedBalanceAssetCode,
+    balancePager,
+    transactionPager,
     transferForm,
     rechargeForm,
     rechargeSettingsForm,
@@ -464,7 +517,6 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     hasRecharge,
     estimatedWalletAmount,
     sortedBalances,
-    recentTransactions,
     assetName,
     assetSymbol,
     balanceOf,
@@ -478,7 +530,12 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     loadTransactions,
     loadRechargeSettings,
     applyBalanceAsset,
+    applyTransactionFilters,
     resetTransactionFilters,
+    nextBalancePage,
+    prevBalancePage,
+    nextTransactionPage,
+    prevTransactionPage,
     submitTransfer,
     submitRecharge,
     editAsset,
@@ -488,6 +545,45 @@ export function useWalletPlugin(sdk: YuDreamPluginSdk) {
     saveRechargeSettings,
     changeBalance,
   })
+}
+
+function normalizeTime(value: TimeValue) {
+  if (value == null || value === '') {
+    return 0
+  }
+  if (value instanceof Date) {
+    return validTimestamp(value.getTime())
+  }
+  if (Array.isArray(value)) {
+    return normalizeDateArray(value)
+  }
+  if (typeof value === 'number') {
+    return validTimestamp(value)
+  }
+  const text = value.trim()
+  if (!text) {
+    return 0
+  }
+  const numeric = Number(text)
+  if (Number.isFinite(numeric)) {
+    return validTimestamp(numeric)
+  }
+  return validTimestamp(Date.parse(text))
+}
+
+function normalizeDateArray(value: number[]) {
+  if (value.length < 3) {
+    return 0
+  }
+  const [year, month, day, hour = 0, minute = 0, second = 0, nano = 0] = value
+  return validTimestamp(new Date(year, month - 1, day, hour, minute, second, Math.floor(nano / 1000000)).getTime())
+}
+
+function validTimestamp(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0
+  }
+  return value < 10000000000 ? value * 1000 : value
 }
 
 export type WalletPluginModel = ReturnType<typeof useWalletPlugin>

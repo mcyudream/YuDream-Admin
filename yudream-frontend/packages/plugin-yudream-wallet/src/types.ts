@@ -22,7 +22,8 @@ export interface WalletBalance {
   user?: WalletUser
   assetCode: string
   balance: number | string
-  updatedAt: number
+  updatedAt: TimeValue
+  historicalTotalAmount?: number | string
 }
 
 export interface WalletTransaction {
@@ -40,7 +41,7 @@ export interface WalletTransaction {
   fromBalanceAfter?: number | string
   toBalanceAfter?: number | string
   remark?: string
-  createdAt: number
+  createdAt: TimeValue
 }
 
 export interface WalletSummary {
@@ -87,7 +88,7 @@ export interface WalletRechargeResult {
   status: string
   payloadType: string
   payPayload: string
-  createdAt: number
+  createdAt: TimeValue
 }
 
 export interface AssetForm {
@@ -143,3 +144,5 @@ export interface TransactionFilters {
   type: string
   user: string
 }
+
+export type TimeValue = number | string | number[] | Date | null | undefined
