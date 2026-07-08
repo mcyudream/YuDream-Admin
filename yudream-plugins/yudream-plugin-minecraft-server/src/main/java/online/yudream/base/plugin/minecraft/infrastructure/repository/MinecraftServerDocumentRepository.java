@@ -2,6 +2,7 @@ package online.yudream.base.plugin.minecraft.infrastructure.repository;
 
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftSeasonOperation;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftServer;
+import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftPlayerActivity;
 import online.yudream.base.plugin.minecraft.domain.enumerate.MinecraftEdition;
 import online.yudream.base.plugin.minecraft.domain.enumerate.MinecraftSeasonOperationStatus;
 import online.yudream.base.plugin.minecraft.domain.repo.MinecraftServerRepository;
@@ -24,6 +25,7 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
     private static final String SERVERS = "servers";
     private static final String STATUSES = "statuses";
     private static final String OPERATIONS = "season-operations";
+    private static final String PLAYER_ACTIVITIES = "player-activities";
 
     private final PluginDocumentStore documents;
 
@@ -91,6 +93,25 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
         return rows.stream()
                 .map(this::toOperation)
                 .sorted(java.util.Comparator.comparingLong(MinecraftSeasonOperation::createdAt).reversed())
+                .toList();
+    }
+
+    @Override
+    public MinecraftPlayerActivity savePlayerActivity(MinecraftPlayerActivity activity) {
+        return toPlayerActivity(documents.save(PLAYER_ACTIVITIES, activity.id(), playerActivityDocument(activity)));
+    }
+
+    @Override
+    public Optional<MinecraftPlayerActivity> findPlayerActivity(String serverId, String playerId) {
+        return documents.findById(PLAYER_ACTIVITIES, MinecraftPlayerActivity.id(serverId, playerId)).map(this::toPlayerActivity);
+    }
+
+    @Override
+    public List<MinecraftPlayerActivity> listPlayerActivities(String serverId, int page, int size) {
+        return documents.findByField(PLAYER_ACTIVITIES, "serverId", serverId, page, size).stream()
+                .map(this::toPlayerActivity)
+                .sorted(java.util.Comparator.comparing(MinecraftPlayerActivity::online).reversed()
+                        .thenComparing(java.util.Comparator.comparingLong(MinecraftPlayerActivity::updatedAt).reversed()))
                 .toList();
     }
 
@@ -173,6 +194,23 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
         document.put("remark", operation.remark());
         document.put("createdAt", operation.createdAt());
         document.put("rolledBackAt", operation.rolledBackAt());
+        return document;
+    }
+
+    private Map<String, Object> playerActivityDocument(MinecraftPlayerActivity activity) {
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("id", activity.id());
+        document.put("serverId", activity.serverId());
+        document.put("playerId", activity.playerId());
+        document.put("playerName", activity.playerName());
+        document.put("totalOnlineMillis", activity.totalOnlineMillis());
+        document.put("totalAfkMillis", activity.totalAfkMillis());
+        document.put("currentOnlineSince", activity.currentOnlineSince());
+        document.put("currentAfkSince", activity.currentAfkSince());
+        document.put("lastJoinedAt", activity.lastJoinedAt());
+        document.put("lastQuitAt", activity.lastQuitAt());
+        document.put("createdAt", activity.createdAt());
+        document.put("updatedAt", activity.updatedAt());
         return document;
     }
 
@@ -325,6 +363,23 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
                 string(document, "ruleLabel"),
                 string(document, "walletTransactionId"),
                 string(document, "rollbackTransactionId")
+        );
+    }
+
+    private MinecraftPlayerActivity toPlayerActivity(Map<String, Object> document) {
+        return new MinecraftPlayerActivity(
+                string(document, "id"),
+                string(document, "serverId"),
+                string(document, "playerId"),
+                string(document, "playerName"),
+                number(document, "totalOnlineMillis", 0L),
+                number(document, "totalAfkMillis", 0L),
+                nullableNumber(document, "currentOnlineSince"),
+                nullableNumber(document, "currentAfkSince"),
+                nullableNumber(document, "lastJoinedAt"),
+                nullableNumber(document, "lastQuitAt"),
+                number(document, "createdAt", 0L),
+                number(document, "updatedAt", 0L)
         );
     }
 

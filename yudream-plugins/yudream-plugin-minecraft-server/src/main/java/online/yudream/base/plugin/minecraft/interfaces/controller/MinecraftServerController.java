@@ -39,6 +39,11 @@ public class MinecraftServerController {
         return http.refreshStatus(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/economy/status", permission = MinecraftServerPlugin.VIEW_PERMISSION)
+    public PluginHttpResponse economyStatus(PluginHttpRequest request) {
+        return http.economyStatus();
+    }
+
     @PluginHttpEndpoint(method = "POST", path = "/servers/{serverId}/seasons/preview", permission = MinecraftServerPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse previewOpenSeason(PluginHttpRequest request) {
         return http.previewOpenSeason(request);
@@ -62,5 +67,30 @@ public class MinecraftServerController {
     @PluginHttpEndpoint(method = "GET", path = "/servers/{serverId}/my-records", permission = MinecraftServerPlugin.VIEW_PERMISSION)
     public PluginHttpResponse myRecords(PluginHttpRequest request) {
         return http.myRecords(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/servers/{serverId}/players", permission = MinecraftServerPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse playerActivities(PluginHttpRequest request) {
+        return http.playerActivities(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/servers/{serverId}/players/join", permission = MinecraftServerPlugin.REPORT_PERMISSION)
+    public PluginHttpResponse playerJoin(PluginHttpRequest request) {
+        return http.playerJoin(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/servers/{serverId}/players/quit", permission = MinecraftServerPlugin.REPORT_PERMISSION)
+    public PluginHttpResponse playerQuit(PluginHttpRequest request) {
+        return http.playerQuit(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/servers/{serverId}/players/afk/start", permission = MinecraftServerPlugin.REPORT_PERMISSION)
+    public PluginHttpResponse playerAfkStart(PluginHttpRequest request) {
+        return http.playerAfkStart(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/servers/{serverId}/players/afk/end", permission = MinecraftServerPlugin.REPORT_PERMISSION)
+    public PluginHttpResponse playerAfkEnd(PluginHttpRequest request) {
+        return http.playerAfkEnd(request);
     }
 }

@@ -1,13 +1,16 @@
 package online.yudream.base.plugin.minecraft.application.service;
 
 import online.yudream.base.plugin.minecraft.application.assembler.MinecraftServerAppAssembler;
+import online.yudream.base.plugin.minecraft.application.cmd.MinecraftPlayerEventCmd;
 import online.yudream.base.plugin.minecraft.application.cmd.MinecraftSeasonOpenCmd;
 import online.yudream.base.plugin.minecraft.application.cmd.MinecraftServerSaveCmd;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftEconomyRecordDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonOperationDTO;
+import online.yudream.base.plugin.minecraft.application.dto.MinecraftPlayerActivityDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerDTO;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftSeasonOperation;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftServer;
+import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftPlayerActivity;
 import online.yudream.base.plugin.minecraft.domain.enumerate.MinecraftEdition;
 import online.yudream.base.plugin.minecraft.domain.enumerate.MinecraftSeasonOperationStatus;
 import online.yudream.base.plugin.minecraft.domain.repo.MinecraftServerRepository;
@@ -94,6 +97,10 @@ public class MinecraftServerAppService {
         return repository.saveStatus(MinecraftServerStatus.from(server.id(), statuses));
     }
 
+    public boolean walletEnabled() {
+        return walletOrNull() != null;
+    }
+
     public MinecraftSeasonOperationDTO previewOpenSeason(String serverId, MinecraftSeasonOpenCmd cmd, String operatorUserId) {
         MinecraftSeasonOperation operation = buildSeasonOperation(requireServer(serverId), cmd, operatorUserId);
         return assembler.toDTO(operation, realIncomeTotals(wallet()));
@@ -124,23 +131,31 @@ public class MinecraftServerAppService {
         return assembler.toDTO(rolledBack, realIncomeTotals(wallet()));
     }
 
-    public List<MinecraftSeasonOperationDTO> operations(String serverId) {
-        return repository.listOperations(serverId, 1, 100).stream()
-                .map(operation -> assembler.toDTO(operation, realIncomeTotals(wallet())))
+    public List<MinecraftSeasonOperationDTO> operations(String serverId, int page, int size) {
+        PluginWalletService wallet = walletOrNull();
+        Map<String, BigDecimal> realIncomeTotals = wallet == null ? Map.of() : realIncomeTotals(wallet);
+        return repository.listOperations(serverId, safePage(page), safeSize(size)).stream()
+                .map(operation -> assembler.toDTO(operation, realIncomeTotals))
                 .toList();
     }
 
-    public List<MinecraftEconomyRecordDTO> userRecords(String serverId, String userId) {
+    public List<MinecraftEconomyRecordDTO> userRecords(String serverId, String userId, int page, int size) {
         MinecraftServer server = requireServer(serverId);
         MinecraftServerSeason currentSeason = server.currentSeason();
         Long startAt = currentSeason == null ? null : currentSeason.startedAt();
-        List<MinecraftEconomyRecordDTO> walletRecords = wallet().transactions(new PluginWalletTransactionQuery(
-                        null, null, null, requireText(userId, "用户不能为空"), startAt, null, 1, 200
-                )).stream()
-                .map(transaction -> new MinecraftEconomyRecordDTO(transaction.id(), "WALLET", transaction.source(), transaction.type(),
-                        transaction.assetCode(), transaction.amount(), transaction.businessNo(), transaction.remark(), transaction.createdAt()))
-                .toList();
-        List<MinecraftEconomyRecordDTO> seasonRecords = repository.listOperations(serverId, 1, 100).stream()
+        int safePage = safePage(page);
+        int safeSize = safeSize(size);
+        int fetchSize = safePage * safeSize;
+        PluginWalletService wallet = walletOrNull();
+        List<MinecraftEconomyRecordDTO> walletRecords = wallet == null
+                ? List.of()
+                : wallet.transactions(new PluginWalletTransactionQuery(
+                                null, null, null, requireText(userId, "用户不能为空"), startAt, null, 1, fetchSize
+                        )).stream()
+                        .map(transaction -> new MinecraftEconomyRecordDTO(transaction.id(), "WALLET", transaction.source(), transaction.type(),
+                                transaction.assetCode(), transaction.amount(), transaction.businessNo(), transaction.remark(), transaction.createdAt()))
+                        .toList();
+        List<MinecraftEconomyRecordDTO> seasonRecords = repository.listOperations(serverId, 1, fetchSize).stream()
                 .flatMap(operation -> operation.adjustments().stream()
                         .filter(adjustment -> userId.equals(adjustment.userId()))
                         .map(adjustment -> new MinecraftEconomyRecordDTO(
@@ -157,6 +172,40 @@ public class MinecraftServerAppService {
                 .toList();
         return java.util.stream.Stream.concat(walletRecords.stream(), seasonRecords.stream())
                 .sorted(Comparator.comparingLong(MinecraftEconomyRecordDTO::createdAt).reversed())
+                .skip((long) (safePage - 1) * safeSize)
+                .limit(safeSize)
+                .toList();
+    }
+
+    public MinecraftPlayerActivityDTO recordJoin(String serverId, MinecraftPlayerEventCmd cmd) {
+        requireServer(serverId);
+        MinecraftPlayerActivity activity = activity(serverId, cmd).join(cmd.playerName(), eventAt(cmd));
+        return assembler.toDTO(repository.savePlayerActivity(activity), System.currentTimeMillis());
+    }
+
+    public MinecraftPlayerActivityDTO recordQuit(String serverId, MinecraftPlayerEventCmd cmd) {
+        requireServer(serverId);
+        MinecraftPlayerActivity activity = activity(serverId, cmd).quit(cmd.playerName(), eventAt(cmd));
+        return assembler.toDTO(repository.savePlayerActivity(activity), System.currentTimeMillis());
+    }
+
+    public MinecraftPlayerActivityDTO recordAfkStart(String serverId, MinecraftPlayerEventCmd cmd) {
+        requireServer(serverId);
+        MinecraftPlayerActivity activity = activity(serverId, cmd).startAfk(cmd.playerName(), eventAt(cmd));
+        return assembler.toDTO(repository.savePlayerActivity(activity), System.currentTimeMillis());
+    }
+
+    public MinecraftPlayerActivityDTO recordAfkEnd(String serverId, MinecraftPlayerEventCmd cmd) {
+        requireServer(serverId);
+        MinecraftPlayerActivity activity = activity(serverId, cmd).endAfk(cmd.playerName(), eventAt(cmd));
+        return assembler.toDTO(repository.savePlayerActivity(activity), System.currentTimeMillis());
+    }
+
+    public List<MinecraftPlayerActivityDTO> playerActivities(String serverId, int page, int size) {
+        requireServer(serverId);
+        long now = System.currentTimeMillis();
+        return repository.listPlayerActivities(serverId, safePage(page), safeSize(size)).stream()
+                .map(activity -> assembler.toDTO(activity, now))
                 .toList();
     }
 
@@ -191,9 +240,8 @@ public class MinecraftServerAppService {
         Map<String, BigDecimal> inherited = inheritedTotals(server.id(), currentSeason == null ? null : currentSeason.id());
 
         LinkedHashSet<String> keys = new LinkedHashSet<>();
-        keys.addAll(balances.keySet());
-        keys.addAll(seasonIncome.keySet());
         keys.addAll(inherited.keySet());
+        keys.addAll(seasonIncome.keySet());
 
         return keys.stream()
                 .map(key -> {
@@ -212,7 +260,7 @@ public class MinecraftServerAppService {
                     BigDecimal walletBalance = balances.getOrDefault(key, BigDecimal.ZERO.setScale(asset.scale()));
                     BigDecimal delta = nextInherited.subtract(walletBalance);
                     return new MinecraftSeasonAdjustment(userId, assetCode, inheritedAmount, incomeAmount, seasonTotal,
-                            nextInherited, walletBalance, delta, direction(delta), rule.assetPattern() + " " + rule.rangeLabel() + " x " + rule.inheritRate(), null, null);
+                            nextInherited, walletBalance, delta, direction(delta), "可使用 " + rule.assetPattern() + " " + rule.rangeLabel() + " x " + rule.inheritRate(), null, null);
                 })
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(MinecraftSeasonAdjustment::userId).thenComparing(MinecraftSeasonAdjustment::assetCode))
@@ -231,8 +279,8 @@ public class MinecraftServerAppService {
                 }
                 String businessNo = "mc-season:" + operation.id() + ":" + adjustment.userId() + ":" + adjustment.assetCode();
                 PluginWalletTransaction transaction = delta.signum() > 0
-                        ? wallet.credit(new PluginWalletChangeRequest(adjustment.userId(), adjustment.assetCode(), delta, businessNo, "周目继承入账：" + operation.toSeasonName()))
-                        : wallet.debit(new PluginWalletChangeRequest(adjustment.userId(), adjustment.assetCode(), delta.abs(), businessNo, "周目继承扣账：" + operation.toSeasonName()));
+                        ? wallet.credit(new PluginWalletChangeRequest(adjustment.userId(), adjustment.assetCode(), delta, businessNo, resetRemark(operation, adjustment)))
+                        : wallet.debit(new PluginWalletChangeRequest(adjustment.userId(), adjustment.assetCode(), delta.abs(), businessNo, resetRemark(operation, adjustment)));
                 applied.add(adjustment.withWalletTransaction(transaction.id()));
             }
             return List.copyOf(applied);
@@ -280,6 +328,28 @@ public class MinecraftServerAppService {
         return List.copyOf(results);
     }
 
+    private MinecraftPlayerActivity activity(String serverId, MinecraftPlayerEventCmd cmd) {
+        String playerId = requireText(cmd.playerId(), "玩家 ID 不能为空");
+        long eventAt = eventAt(cmd);
+        return repository.findPlayerActivity(serverId, playerId)
+                .orElseGet(() -> MinecraftPlayerActivity.empty(serverId, playerId, cmd.playerName(), eventAt));
+    }
+
+    private long eventAt(MinecraftPlayerEventCmd cmd) {
+        Long value = cmd.eventAt();
+        long now = System.currentTimeMillis();
+        if (value == null || value <= 0) {
+            return now;
+        }
+        return value < 10_000_000_000L ? value * 1000 : value;
+    }
+
+    private String resetRemark(MinecraftSeasonOperation operation, MinecraftSeasonAdjustment adjustment) {
+        return "周目余额重置：" + operation.toSeasonName()
+                + "，本周目可使用 " + adjustment.seasonTotalAmount()
+                + "，下周目可使用 " + adjustment.nextInheritedAmount();
+    }
+
     private MinecraftServer openSeasonOnServer(MinecraftServer server, MinecraftSeasonOperation operation, MinecraftSeasonOpenCmd cmd) {
         long startedAt = cmd.startedAt() == null ? System.currentTimeMillis() : cmd.startedAt();
         List<MinecraftServerSeason> nextSeasons = new ArrayList<>();
@@ -316,10 +386,24 @@ public class MinecraftServerAppService {
     }
 
     private Map<String, BigDecimal> incomeTotals(PluginWalletService wallet, Long startAt, Long endAt) {
-        return wallet.transactions(new PluginWalletTransactionQuery(null, "CREDIT", null, null, startAt, endAt, 1, 5000)).stream()
+        return walletTransactions(wallet, startAt, endAt).stream()
                 .filter(this::isSeasonIncomeSource)
                 .collect(Collectors.groupingBy(transaction -> key(transaction.toUserId(), transaction.assetCode()),
                         Collectors.mapping(PluginWalletTransaction::amount, Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))));
+    }
+
+    private List<PluginWalletTransaction> walletTransactions(PluginWalletService wallet, Long startAt, Long endAt) {
+        List<PluginWalletTransaction> results = new ArrayList<>();
+        int page = 1;
+        int size = 5000;
+        while (true) {
+            List<PluginWalletTransaction> items = wallet.transactions(new PluginWalletTransactionQuery(null, "CREDIT", null, null, startAt, endAt, page, size));
+            results.addAll(items);
+            if (items.size() < size) {
+                return results;
+            }
+            page++;
+        }
     }
 
     private Map<String, BigDecimal> realIncomeTotals(PluginWalletService wallet) {
@@ -436,6 +520,10 @@ public class MinecraftServerAppService {
                 .orElseThrow(() -> new IllegalStateException("钱包插件未启用，无法执行周目货币继承"));
     }
 
+    private PluginWalletService walletOrNull() {
+        return framework.extension("yudream-wallet", PluginWalletService.class).orElse(null);
+    }
+
     private BigDecimal scale(BigDecimal value, int scale) {
         return value.setScale(Math.max(scale, 0), RoundingMode.DOWN);
     }
@@ -448,6 +536,14 @@ public class MinecraftServerAppService {
             return "DEBIT";
         }
         return "NONE";
+    }
+
+    private int safePage(int page) {
+        return Math.max(page, 1);
+    }
+
+    private int safeSize(int size) {
+        return Math.max(Math.min(size, 100), 1);
     }
 
     private String key(String userId, String assetCode) {
