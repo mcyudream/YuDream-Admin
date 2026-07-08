@@ -115,7 +115,13 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
 
             List<CTRow> templateRows = new ArrayList<>();
             for (int cursor = index; cursor <= endIndex; cursor++) {
-                templateRows.add((CTRow) table.getRows().get(cursor).getCtRow().copy());
+                XWPFTableRow templateRow = table.getRows().get(cursor);
+                if (!loopMarkerOnlyRow(templateRow, collectionKey)) {
+                    templateRows.add((CTRow) templateRow.getCtRow().copy());
+                }
+            }
+            if (templateRows.isEmpty()) {
+                templateRows.add((CTRow) row.getCtRow().copy());
             }
             for (int cursor = endIndex; cursor >= index; cursor--) {
                 table.removeRow(cursor);
@@ -125,10 +131,12 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
             for (Object item : asList(resolve(data, collectionKey))) {
                 Map<String, Object> scopedData = scopedData(data, item);
                 for (CTRow templateRow : templateRows) {
-                    XWPFTableRow inserted = new XWPFTableRow((CTRow) templateRow.copy(), table);
-                    table.addRow(inserted, insertAt++);
-                    removeLoopMarkers(inserted, collectionKey);
-                    replaceRow(inserted, scopedData);
+                    XWPFTableRow inserted = table.insertNewTableRow(insertAt);
+                    inserted.getCtRow().set((CTRow) templateRow.copy());
+                    XWPFTableRow target = new XWPFTableRow(inserted.getCtRow(), table);
+                    removeLoopMarkers(target, collectionKey);
+                    replaceRow(target, scopedData);
+                    insertAt++;
                 }
             }
             index = insertAt;
@@ -148,8 +156,8 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
     }
 
     private void removeLoopMarkers(XWPFTableRow row, String collectionKey) {
-        Pattern start = Pattern.compile("\\{\\{#\\s*" + Pattern.quote(collectionKey) + "\\s*}}");
-        Pattern end = Pattern.compile("\\{\\{/\\s*" + Pattern.quote(collectionKey) + "\\s*}}");
+        Pattern start = loopStartPattern(collectionKey);
+        Pattern end = loopEndPattern(collectionKey);
         for (XWPFTableCell cell : row.getTableCells()) {
             for (XWPFParagraph paragraph : cell.getParagraphs()) {
                 String text = paragraph.getText();
@@ -162,6 +170,23 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
                 }
             }
         }
+    }
+
+    private boolean loopMarkerOnlyRow(XWPFTableRow row, String collectionKey) {
+        String text = rowText(row);
+        String cleaned = loopEndPattern(collectionKey)
+                .matcher(loopStartPattern(collectionKey).matcher(text).replaceAll(""))
+                .replaceAll("")
+                .trim();
+        return cleaned.isBlank();
+    }
+
+    private Pattern loopStartPattern(String collectionKey) {
+        return Pattern.compile("\\{\\{#\\s*" + Pattern.quote(collectionKey) + "\\s*}}");
+    }
+
+    private Pattern loopEndPattern(String collectionKey) {
+        return Pattern.compile("\\{\\{/\\s*" + Pattern.quote(collectionKey) + "\\s*}}");
     }
 
     private String replaceInlineLoops(String text, Map<String, Object> data) {
@@ -209,11 +234,20 @@ public class DocxWordTemplateRenderer implements WordTemplateRenderer {
             return;
         }
         for (XWPFTable table : tables) {
-            if (isParticipantTable(table)) {
+            if (isParticipantTable(table) && !hasLoopMarkers(table)) {
                 appendParticipants(table, participants);
                 return;
             }
         }
+    }
+
+    private boolean hasLoopMarkers(XWPFTable table) {
+        for (XWPFTableRow row : table.getRows()) {
+            if (LOOP_START.matcher(rowText(row)).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isParticipantTable(XWPFTable table) {
