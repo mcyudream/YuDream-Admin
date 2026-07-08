@@ -62,7 +62,8 @@ public class AlipayPlugin implements YuDreamPlugin {
         AlipayAppService appService = new AlipayAppService(
                 new AlipayRepository(context.documents()),
                 new AlipayGatewayService(),
-                walletService
+                walletService,
+                context.framework()
         );
         context.registerExtension(PluginPaymentChannel.class, new AlipayPaymentChannel(appService));
         context.registerHttpController(new AlipayController(new AlipayHttpFacade(appService)));
