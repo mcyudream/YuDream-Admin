@@ -7,6 +7,7 @@ public record WalletBalanceRes(
         WalletUserRes user,
         String assetCode,
         BigDecimal balance,
-        long updatedAt
+        long updatedAt,
+        BigDecimal historicalTotalAmount
 ) {
 }

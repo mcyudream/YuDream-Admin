@@ -41,6 +41,10 @@
       "text": "Frontend plugin styles used by dashboard cards and runtime pages must be injected through the plugin inline stylesheet (styles.css?inline), and install() must update an existing style tag textContent instead of returning early. Dev fallback and remote reload can keep stale style tags, so do not rely only on component scoped CSS for plugin dashboard cards."
     },
     {
+      "key": "record-list-pagination",
+      "text": "Record-style lists that can grow without a small fixed bound, such as operation records, transactions, logs, audit rows, and import histories, must expose page/size in plugin HTTP APIs and show frontend pagination instead of loading a fixed 100/200 rows."
+    },
+    {
       "key": "authlib-ali-metadata",
       "text": "Authlib Injector service endpoint stays under /api/plugins/authlib-injector. Derive meta.links, skinDomains, and ALI from the current public request/texture URL; do not replace the authlib service address with the skin texture/yggdrasil path unless explicitly requested."
     }

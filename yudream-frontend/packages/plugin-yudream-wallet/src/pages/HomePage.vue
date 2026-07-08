@@ -70,8 +70,19 @@
       </WalletPanel>
     </div>
 
-    <WalletPanel v-if="model.canManage" title="最近流水" eyebrow="Transactions">
-      <TransactionList :model="model" :items="model.recentTransactions" />
+    <WalletPanel title="钱包流水" eyebrow="Transactions">
+      <TransactionList :model="model" :items="model.transactions" />
+      <div class="wallet-pagination">
+        <FaButton size="sm" variant="outline" :disabled="model.transactionPager.page <= 1" @click="model.prevTransactionPage">
+          <FaIcon name="i-ri:arrow-left-s-line" />
+          上一页
+        </FaButton>
+        <span>第 {{ model.transactionPager.page }} 页</span>
+        <FaButton size="sm" variant="outline" :disabled="!model.transactionPager.hasNext" @click="model.nextTransactionPage">
+          下一页
+          <FaIcon name="i-ri:arrow-right-s-line" />
+        </FaButton>
+      </div>
     </WalletPanel>
   </section>
 </template>

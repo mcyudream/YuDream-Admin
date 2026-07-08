@@ -35,6 +35,7 @@
                 <th>邮箱</th>
                 <th>币种</th>
                 <th>余额</th>
+                <th>历史总额</th>
                 <th>更新时间</th>
               </tr>
             </thead>
@@ -44,15 +45,27 @@
                 <td class="wrap-cell">{{ item.user?.email || '-' }}</td>
                 <td>{{ model.assetName(item.assetCode) }}</td>
                 <td class="amount-cell">{{ model.assetSymbol(item.assetCode) }}{{ model.formatAmount(item.balance, item.assetCode) }}</td>
+                <td class="amount-cell muted">{{ model.assetSymbol(item.assetCode) }}{{ model.formatAmount(item.historicalTotalAmount, item.assetCode) }}</td>
                 <td>{{ model.formatTime(item.updatedAt) }}</td>
               </tr>
               <tr v-if="!model.adminBalances.length">
-                <td colspan="5">
+                <td colspan="6">
                   <div class="wallet-empty compact">暂无余额记录</div>
                 </td>
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="wallet-pagination">
+          <FaButton size="sm" variant="outline" :disabled="model.balancePager.page <= 1" @click="model.prevBalancePage">
+            <FaIcon name="i-ri:arrow-left-s-line" />
+            上一页
+          </FaButton>
+          <span>第 {{ model.balancePager.page }} 页</span>
+          <FaButton size="sm" variant="outline" :disabled="!model.balancePager.hasNext" @click="model.nextBalancePage">
+            下一页
+            <FaIcon name="i-ri:arrow-right-s-line" />
+          </FaButton>
         </div>
       </WalletPanel>
 

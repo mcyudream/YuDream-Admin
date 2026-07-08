@@ -16,6 +16,9 @@
       <span class="wallet-card-meta">
         {{ balance.assetCode }} · {{ model.formatTime(balance.updatedAt) }}
       </span>
+      <span class="wallet-card-stat">
+        历史总额 {{ model.assetSymbol(balance.assetCode) }}{{ model.formatAmount(balance.historicalTotalAmount, balance.assetCode) }}
+      </span>
     </button>
 
     <div v-if="!model.sortedBalances.length" class="wallet-empty">

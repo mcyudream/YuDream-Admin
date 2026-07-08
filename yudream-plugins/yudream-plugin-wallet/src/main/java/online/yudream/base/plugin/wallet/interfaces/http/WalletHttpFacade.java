@@ -4,6 +4,7 @@ import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
+import online.yudream.base.plugin.spi.system.wallet.PluginWalletBalance;
 import online.yudream.base.plugin.wallet.bootstrap.WalletPlugin;
 import online.yudream.base.plugin.wallet.application.service.WalletAppService;
 import online.yudream.base.plugin.wallet.application.cmd.WalletTransferCmd;
@@ -14,7 +15,9 @@ import online.yudream.base.plugin.wallet.interfaces.request.WalletChangeRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletRechargeCreateRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletRechargeSettingsSaveRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletTransferRequest;
+import online.yudream.base.plugin.wallet.interfaces.res.WalletBalanceRes;
 
+import java.math.BigDecimal;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -107,27 +110,21 @@ public class WalletHttpFacade {
             }
             userId = String.valueOf(principalUserId);
         }
-        return PluginHttpResponse.ok(appService.balances(userId).stream()
-                .map(balance -> assembler.toRes(balance, userOf(balance.userId())))
-                .toList());
+        return PluginHttpResponse.ok(balanceResponses(appService.balances(userId)));
     }
 
     public PluginHttpResponse adminBalances(PluginHttpRequest request) {
         String assetCode = firstQuery(request, "assetCode");
-        return PluginHttpResponse.ok(appService.listBalances(assetCode, page(request), size(request)).stream()
-                .map(balance -> assembler.toRes(balance, userOf(balance.userId())))
-                .toList());
+        return PluginHttpResponse.ok(balanceResponses(appService.listBalances(assetCode, page(request), size(request))));
     }
 
     public PluginHttpResponse userBalances(PluginHttpRequest request) {
-        return PluginHttpResponse.ok(appService.balances(pathSegment(request.path(), 1)).stream()
-                .map(balance -> assembler.toRes(balance, userOf(balance.userId())))
-                .toList());
+        return PluginHttpResponse.ok(balanceResponses(appService.balances(pathSegment(request.path(), 1))));
     }
 
     public PluginHttpResponse userBalance(PluginHttpRequest request) {
         var balance = appService.balance(pathSegment(request.path(), 1), pathSegment(request.path(), 3));
-        return PluginHttpResponse.ok(assembler.toRes(balance, userOf(balance.userId())));
+        return PluginHttpResponse.ok(balanceResponse(balance, appService.historicalIncomeTotals()));
     }
 
     public PluginHttpResponse credit(PluginHttpRequest request) {
@@ -213,6 +210,25 @@ public class WalletHttpFacade {
 
     private int size(PluginHttpRequest request) {
         return intQuery(request, "size", 20);
+    }
+
+    private List<WalletBalanceRes> balanceResponses(List<PluginWalletBalance> balances) {
+        Map<String, Map<String, BigDecimal>> historicalTotals = appService.historicalIncomeTotals();
+        return balances.stream()
+                .map(balance -> balanceResponse(balance, historicalTotals))
+                .toList();
+    }
+
+    private WalletBalanceRes balanceResponse(PluginWalletBalance balance, Map<String, Map<String, BigDecimal>> historicalTotals) {
+        return assembler.toRes(balance, userOf(balance.userId()), historicalTotal(historicalTotals, balance));
+    }
+
+    private BigDecimal historicalTotal(Map<String, Map<String, BigDecimal>> historicalTotals, PluginWalletBalance balance) {
+        Map<String, BigDecimal> userTotals = historicalTotals.get(balance.userId());
+        if (userTotals == null) {
+            return BigDecimal.ZERO;
+        }
+        return userTotals.getOrDefault(balance.assetCode(), BigDecimal.ZERO);
     }
 
     private int intQuery(PluginHttpRequest request, String key, int defaultValue) {

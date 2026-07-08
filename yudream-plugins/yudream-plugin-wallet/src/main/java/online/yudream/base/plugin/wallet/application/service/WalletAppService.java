@@ -27,6 +27,7 @@ import online.yudream.base.plugin.wallet.application.dto.WalletSummaryDTO;
 import online.yudream.base.plugin.wallet.domain.aggregate.WalletAsset;
 import online.yudream.base.plugin.wallet.domain.aggregate.WalletBalance;
 import online.yudream.base.plugin.wallet.domain.aggregate.WalletTransaction;
+import online.yudream.base.plugin.wallet.domain.enumerate.WalletTransactionType;
 import online.yudream.base.plugin.wallet.domain.valobj.WalletDefaults;
 import online.yudream.base.plugin.wallet.domain.valobj.WalletRechargeRule;
 import online.yudream.base.plugin.wallet.domain.valobj.WalletRechargeSettings;
@@ -256,6 +257,19 @@ public class WalletAppService implements PluginWalletService {
         return items.stream().map(assembler::toSpi).toList();
     }
 
+    public Map<String, Map<String, BigDecimal>> historicalIncomeTotals() {
+        initializeDefaults();
+        return repository.listTransactions(1, transactionFetchSize()).stream()
+                .filter(transaction -> transaction.type() == WalletTransactionType.CREDIT)
+                .filter(transaction -> hasText(transaction.toUserId()))
+                .filter(transaction -> hasText(transaction.assetCode()))
+                .filter(this::isHistoricalIncomeSource)
+                .collect(Collectors.groupingBy(WalletTransaction::toUserId,
+                        Collectors.groupingBy(WalletTransaction::assetCode,
+                                Collectors.mapping(WalletTransaction::amount,
+                                        Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)))));
+    }
+
     @Override
     public List<PluginWalletTransaction> transactions(PluginWalletTransactionQuery query) {
         PluginWalletTransactionQuery safeQuery = query == null
@@ -282,15 +296,17 @@ public class WalletAppService implements PluginWalletService {
     }
 
     public List<PluginWalletTransaction> transactions(String assetCode, String type, String source, String userId, Long startAt, Long endAt, int page, int size) {
-        return repository.listTransactions(1, 1000).stream()
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        return repository.listTransactions(1, transactionFetchSize()).stream()
                 .filter(item -> !hasText(assetCode) || item.assetCode().equalsIgnoreCase(assetCode.trim()))
                 .filter(item -> !hasText(type) || item.type().name().equalsIgnoreCase(type.trim()))
                 .filter(item -> !hasText(source) || item.source().equalsIgnoreCase(source.trim()))
                 .filter(item -> !hasText(userId) || userId.trim().equals(item.fromUserId()) || userId.trim().equals(item.toUserId()))
                 .filter(item -> startAt == null || item.createdAt() >= startAt)
                 .filter(item -> endAt == null || item.createdAt() < endAt)
-                .skip((long) Math.max(page - 1, 0) * Math.max(size, 1))
-                .limit(Math.max(size, 1))
+                .skip((long) (safePage - 1) * safeSize)
+                .limit(safeSize)
                 .map(assembler::toSpi)
                 .toList();
     }
@@ -552,5 +568,17 @@ public class WalletAppService implements PluginWalletService {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private boolean isHistoricalIncomeSource(WalletTransaction transaction) {
+        return !"MINECRAFT_SEASON".equals(transaction.source());
+    }
+
+    private int transactionFetchSize() {
+        long count = repository.transactionCount();
+        if (count <= 0) {
+            return 1;
+        }
+        return (int) Math.min(count, Integer.MAX_VALUE);
     }
 }
