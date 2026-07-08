@@ -34,6 +34,12 @@ mvn -pl yudream-bootstrap -am spring-boot:run
 mvn -pl yudream-plugins/yudream-plugin-yudream-skin -am -DskipTests package
 ```
 
+CI 和国内网络环境可使用仓库内 Maven 配置：
+
+```powershell
+mvn -s ci/maven-settings.xml -pl yudream-bootstrap -am -DskipTests compile
+```
+
 如果本机有多个 JDK，可以在 PowerShell 中临时指定：
 
 ```powershell
@@ -85,6 +91,8 @@ pnpm --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pret
 META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js
 ```
 
+插件前端包位于 `yudream-frontend/packages/plugin-*`。生产构建时应通过 `@yudream/plugin-sdk/vite-shared` 提供的 `yuDreamPluginSharedAliases()` 复用宿主运行时的 Vue、Vue Router 和 Fantastic Admin 组件，不要在 remote entry 中保留 `@yudream/plugin-sdk`、`vue`、`@fantastic-admin/components` 等裸模块导入，否则浏览器直接加载远程 ESM 时会因为缺少 import map 而失败。
+
 更多细节见：
 
 - [插件开发教程](docs/plugin-system/tutorial.md)
@@ -97,8 +105,31 @@ META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js
 - `yudream-plugins/yudream-plugin-alipay`：支付宝支付插件。
 - `yudream-plugins/yudream-plugin-yudream-skin`：皮肤站插件。
 - `yudream-plugins/yudream-plugin-authlib-injector`：Authlib Injector 兼容插件。
+- `yudream-plugins/yudream-plugin-minecraft-server`：Minecraft 服务器管理插件，支持服务器线路、在线状态、周目货币继承、玩家在线时长和挂机时长统计。
 
 样例插件用于学习，不建议在生产部署中启用。
+
+## CI/CD
+
+GitLab CI 使用国内镜像源构建：
+
+- Node 镜像、Maven 镜像和 Docker CLI 镜像使用国内镜像地址。
+- pnpm / npm registry 使用 `https://registry.npmmirror.com`。
+- Maven 使用 `ci/maven-settings.xml`，默认走阿里云 Maven 公共仓库。
+
+CI 不会自动构建根 `pom.xml` 中的所有插件，而是读取 `ci/plugins.list` 作为内置插件构建白名单。新增内置插件时需要同步：
+
+```text
+ci/plugins.list
+```
+
+该文件每行一个插件目录名，例如：
+
+```text
+yudream-plugin-minecraft-server
+```
+
+CI 会先构建这些插件对应的前端包，再在后端阶段把 `yudream-plugins/{plugin}` 加入 Maven `-pl` 列表，并将 `yudream-frontend/packages/plugin-*/dist` 复制进插件 JAR。
 
 ## 常用验证
 
@@ -106,12 +137,21 @@ META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js
 # 后端编译
 mvn -pl yudream-bootstrap -am -DskipTests compile
 
+# 国内镜像配置下的后端编译
+mvn -s ci/maven-settings.xml -pl yudream-bootstrap -am -DskipTests compile
+
 # 前端类型检查
 cd yudream-frontend
 pnpm --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pretty false --skipLibCheck --ignoreDeprecations 6.0
 
 # 插件打包
 mvn -pl yudream-plugins/yudream-plugin-wallet -am -DskipTests package
+
+# Minecraft 服务器插件前端和 JAR
+cd yudream-frontend
+pnpm --config.engine-strict=false --filter @yudream/plugin-minecraft-server run build
+cd ..
+mvn -s ci/maven-settings.xml -pl yudream-plugins/yudream-plugin-minecraft-server -am -DskipTests package
 ```
 
 ## 编码规范
