@@ -28,7 +28,7 @@
           <div v-for="endpoint in server.endpoints" :key="endpoint.id || endpoint.host" class="mc-line detail">
             <div>
               <strong>{{ endpoint.name }}</strong>
-              <code>{{ endpoint.host }}:{{ endpoint.port }}</code>
+              <code>{{ model.endpointAddress(endpoint) }}</code>
             </div>
             <StatusPill :status="endpointStatus(endpoint.id)?.status" />
             <span>{{ endpoint.edition }}</span>

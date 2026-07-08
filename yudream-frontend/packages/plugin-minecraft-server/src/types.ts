@@ -2,7 +2,7 @@ export interface MinecraftEndpoint {
   id?: string
   name: string
   host: string
-  port: number
+  port?: number | string | null
   edition: 'JAVA' | 'BEDROCK' | string
   primaryLine: boolean
   enabled: boolean

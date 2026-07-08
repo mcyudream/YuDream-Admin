@@ -26,11 +26,15 @@ public record MinecraftServerEndpoint(
     }
 
     public String address() {
-        return host + ":" + port;
+        return automaticPort() ? host : host + ":" + port;
+    }
+
+    public boolean automaticPort() {
+        return port <= 0;
     }
 
     public String cacheKey() {
-        return edition.name() + ":" + host.toLowerCase(Locale.ROOT) + ":" + port;
+        return edition.name() + ":" + host.toLowerCase(Locale.ROOT) + ":" + (automaticPort() ? "AUTO" : port);
     }
 
     private static String normalizeId(String value) {
@@ -54,7 +58,7 @@ public record MinecraftServerEndpoint(
 
     private static int normalizePort(int value, MinecraftEdition edition) {
         if (value <= 0) {
-            return edition.defaultPort();
+            return edition == MinecraftEdition.JAVA ? 0 : edition.defaultPort();
         }
         if (value > 65535) {
             throw new IllegalArgumentException("服务器线路端口必须在 1-65535 之间");

@@ -90,7 +90,10 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     serverForm.descriptionMarkdown = server.descriptionMarkdown || ''
     serverForm.enabled = server.enabled
     serverForm.sort = server.sort
-    serverForm.endpoints = server.endpoints.map(endpoint => ({ ...endpoint }))
+    serverForm.endpoints = server.endpoints.map(endpoint => ({
+      ...endpoint,
+      port: endpoint.port && Number(endpoint.port) > 0 ? endpoint.port : undefined,
+    }))
     serverForm.seasons = server.seasons.map(season => ({ ...season }))
   }
 
@@ -122,7 +125,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
         endpoints: serverForm.endpoints.map((endpoint, index) => ({
           ...endpoint,
           sort: index * 10,
-          port: Number(endpoint.port || (endpoint.edition === 'BEDROCK' ? 19132 : 25565)),
+          port: endpointPortPayload(endpoint),
         })),
       })
       replaceServer(saved)
@@ -253,6 +256,11 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     return '不变'
   }
 
+  function endpointAddress(endpoint: MinecraftEndpoint) {
+    const port = endpointPortPayload(endpoint)
+    return port ? `${endpoint.host}:${port}` : `${endpoint.host}（自动/SRV）`
+  }
+
   function seasonPayload() {
     return {
       name: seasonForm.name.trim(),
@@ -311,14 +319,23 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     formatTime,
     statusText,
     directionText,
+    endpointAddress,
   })
+}
+
+function endpointPortPayload(endpoint: MinecraftEndpoint) {
+  const port = Number(endpoint.port)
+  if (!Number.isFinite(port) || port <= 0) {
+    return undefined
+  }
+  return port
 }
 
 function blankEndpoint(sort = 0): MinecraftEndpoint {
   return {
     name: sort === 0 ? '主线' : '备用线路',
     host: '',
-    port: 25565,
+    port: undefined,
     edition: 'JAVA',
     primaryLine: sort === 0,
     enabled: true,

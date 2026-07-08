@@ -64,7 +64,7 @@
             <div v-for="(endpoint, index) in model.serverForm.endpoints" :key="index" class="mc-endpoint-row">
               <input v-model="endpoint.name" placeholder="线路名称">
               <input v-model="endpoint.host" placeholder="IP 或域名">
-              <input v-model.number="endpoint.port" type="number" min="1" max="65535" placeholder="端口">
+              <input v-model.number="endpoint.port" type="number" min="1" max="65535" placeholder="端口（留空自动/SRV）">
               <select v-model="endpoint.edition">
                 <option value="JAVA">Java</option>
                 <option value="BEDROCK">基岩版</option>

@@ -33,7 +33,7 @@
         <div class="mc-line-list">
           <div v-for="endpoint in server.endpoints" :key="endpoint.id || endpoint.host" class="mc-line">
             <span>{{ endpoint.name }}</span>
-            <code>{{ endpoint.host }}:{{ endpoint.port }}</code>
+            <code>{{ model.endpointAddress(endpoint) }}</code>
           </div>
         </div>
         <div class="mc-card-actions">
