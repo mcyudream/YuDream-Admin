@@ -15,15 +15,15 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
 
     @Override
     public OpenAiChatOptions chatOptions(AiProviderEndpoint provider, AiModelEndpoint model, AiGenerationRequest request) {
+        Map<String, Object> extraBody = extraBody(provider, model, request);
+        applyProviderDefaults(provider, model, request, extraBody);
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
                 .model(model.modelName())
                 .temperature(temperature(provider, model));
-        String reasoningEffort = firstText(model.reasoningEffort(), "");
+        String reasoningEffort = reasoningEffort(provider, model, request, extraBody);
         if (StringUtils.hasText(reasoningEffort)) {
             builder.reasoningEffort(reasoningEffort);
         }
-        Map<String, Object> extraBody = extraBody(provider, model, request);
-        applyProviderDefaults(provider, model, request, extraBody);
         if (!extraBody.isEmpty()) {
             builder.extraBody(extraBody);
         }
@@ -43,6 +43,15 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
         result.putAll(parseExtraBody(provider.extraBody(), provider, model, request));
         result.putAll(parseExtraBody(model.extraBody(), provider, model, request));
         return result;
+    }
+
+    protected String reasoningEffort(
+            AiProviderEndpoint provider,
+            AiModelEndpoint model,
+            AiGenerationRequest request,
+            Map<String, Object> extraBody
+    ) {
+        return firstText(model.reasoningEffort(), "");
     }
 
     protected Map<String, Object> thinking(String type) {

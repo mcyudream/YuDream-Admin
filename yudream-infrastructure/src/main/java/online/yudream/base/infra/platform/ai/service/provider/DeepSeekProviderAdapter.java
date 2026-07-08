@@ -22,8 +22,30 @@ public class DeepSeekProviderAdapter extends AbstractOpenAiCompatibleProviderAda
             AiGenerationRequest request,
             Map<String, Object> extraBody
     ) {
-        if (Boolean.TRUE.equals(model.thinkingEnabled()) && !extraBody.containsKey("thinking")) {
-            extraBody.put("thinking", thinking("enabled"));
+        if (request.toolCallingEnabled()) {
+            extraBody.put("thinking", thinking("disabled"));
+            return;
         }
+        if (!extraBody.containsKey("thinking")) {
+            extraBody.put("thinking", thinking(Boolean.TRUE.equals(model.thinkingEnabled()) ? "enabled" : "disabled"));
+        }
+    }
+
+    @Override
+    protected String reasoningEffort(
+            AiProviderEndpoint provider,
+            AiModelEndpoint model,
+            AiGenerationRequest request,
+            Map<String, Object> extraBody
+    ) {
+        return thinkingEnabled(extraBody.get("thinking")) ? firstText(model.reasoningEffort(), "") : "";
+    }
+
+    private boolean thinkingEnabled(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Object type = map.get("type");
+            return "enabled".equalsIgnoreCase(type == null ? "" : String.valueOf(type));
+        }
+        return false;
     }
 }

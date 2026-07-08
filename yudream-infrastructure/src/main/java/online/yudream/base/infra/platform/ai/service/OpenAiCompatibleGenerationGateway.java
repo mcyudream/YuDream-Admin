@@ -40,8 +40,10 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.transport.ProxyProvider;
 
@@ -214,7 +216,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, request))
+        List<ToolCallback> callbacks = toolCallbacks(toolResults, onTool, onProgress);
+        AiGenerationRequest effectiveRequest = request.withToolCallingEnabled(!callbacks.isEmpty());
+        ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, effectiveRequest))
                 .prompt()
                 .system(request.systemPrompt())
                 .messages(historyMessages(request.history()))
@@ -222,7 +226,6 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     user.text(request.userPrompt());
                     imageMedia(request.imageDataUrl()).ifPresent(user::media);
                 });
-        List<ToolCallback> callbacks = toolCallbacks(toolResults, onTool, onProgress);
         if (!callbacks.isEmpty()) {
             log.debug("AI tool callbacks registered, count={}, names={}",
                     callbacks.size(),
@@ -551,6 +554,10 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     }
 
     private String explainException(Exception e) {
+        String responseError = explainResponseException(e);
+        if (StringUtils.hasText(responseError)) {
+            return responseError;
+        }
         String message = e.getMessage();
         if (!StringUtils.hasText(message)) {
             return e.getClass().getSimpleName();
@@ -560,6 +567,84 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             return "目标地址返回 HTML 页面，请确认 baseUrl 填的是 API 根地址，例如 https://api.openai.com/v1";
         }
         return normalized.length() > ERROR_BODY_LIMIT ? normalized.substring(0, ERROR_BODY_LIMIT) + "..." : normalized;
+    }
+
+    private String explainResponseException(Throwable error) {
+        if (error == null) {
+            return "";
+        }
+        if (error instanceof WebClientResponseException e) {
+            return httpError(e.getStatusCode().value(), e.getStatusText(), e.getResponseBodyAsString(), e.getMessage());
+        }
+        if (error instanceof RestClientResponseException e) {
+            return httpError(e.getStatusCode().value(), e.getStatusText(), e.getResponseBodyAsString(), e.getMessage());
+        }
+        String cause = explainResponseException(error.getCause());
+        if (StringUtils.hasText(cause)) {
+            return cause;
+        }
+        for (Throwable suppressed : error.getSuppressed()) {
+            String suppressedError = explainResponseException(suppressed);
+            if (StringUtils.hasText(suppressedError)) {
+                return suppressedError;
+            }
+        }
+        return "";
+    }
+
+    private String httpError(int status, String statusText, String body, String fallback) {
+        String detail = explainResponseBody(body);
+        if (!StringUtils.hasText(detail)) {
+            detail = normalizeErrorText(fallback);
+        }
+        String title = "HTTP " + status + (StringUtils.hasText(statusText) ? " " + statusText.trim() : "");
+        if (!StringUtils.hasText(detail)) {
+            return title;
+        }
+        return title + "：" + limitErrorText(detail);
+    }
+
+    private String explainResponseBody(String body) {
+        if (!StringUtils.hasText(body)) {
+            return "";
+        }
+        if (looksLikeHtml(body)) {
+            return "目标地址返回 HTML 页面，请确认 baseUrl 填的是 API 根地址，例如 https://api.openai.com/v1";
+        }
+        try {
+            JSONObject json = JSONUtil.parseObj(body);
+            JSONObject error = json.getJSONObject("error");
+            if (error != null) {
+                return firstText(error.getStr("message"), error.toString());
+            }
+            return firstText(json.getStr("message"), json.getStr("error"), body);
+        } catch (Exception ignored) {
+            return normalizeErrorText(body);
+        }
+    }
+
+    private String normalizeErrorText(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        return value.replaceAll("\\s+", " ").trim();
+    }
+
+    private String limitErrorText(String value) {
+        String normalized = normalizeErrorText(value);
+        return normalized.length() > ERROR_BODY_LIMIT ? normalized.substring(0, ERROR_BODY_LIMIT) + "..." : normalized;
+    }
+
+    private String firstText(String... values) {
+        if (values == null) {
+            return "";
+        }
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     private boolean looksLikeHtml(String body) {
