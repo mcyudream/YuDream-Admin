@@ -16,7 +16,8 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
         code = MinecraftActivityProofPlugin.CODE,
         name = "minecraft-activity-proof",
         version = "1.0.0",
-        description = "联动 Minecraft 在线记录与学生信息，按 Word 模板导出活动证明。"
+        description = "联动 Minecraft 在线记录与学生信息，按 Word 模板导出活动证明。",
+        dependencies = { "minecraft-server", "yudream-student-info" }
 )
 @PluginPermissions({
         @PluginPermission(code = MinecraftActivityProofPlugin.VIEW_PERMISSION, name = "查看 MC 活动证明", module = "平台插件", description = "查看活动证明导出状态和记录"),
