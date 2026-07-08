@@ -86,6 +86,11 @@
   color: var(--mc-danger);
 }
 
+.mc-danger-button {
+  border-color: #f1b7b3 !important;
+  color: var(--mc-danger) !important;
+}
+
 .mc-panel {
   padding: 16px;
   border: 1px solid var(--mc-border);

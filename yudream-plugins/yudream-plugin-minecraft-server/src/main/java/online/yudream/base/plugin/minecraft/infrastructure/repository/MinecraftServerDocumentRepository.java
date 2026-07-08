@@ -30,6 +30,7 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
     private static final String PLAYER_ACTIVITIES = "player-activities";
     private static final int SNAPSHOT_SCAN_PAGE_SIZE = 1000;
     private static final int SNAPSHOT_SCAN_MAX_PAGES = 10;
+    private static final int DELETE_SCAN_PAGE_SIZE = 200;
 
     private final PluginDocumentStore documents;
 
@@ -67,6 +68,10 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
     @Override
     public void delete(String id) {
         documents.delete(SERVERS, id);
+        documents.delete(STATUSES, id);
+        deleteByServerId(STATUS_SNAPSHOTS, id);
+        deleteByServerId(OPERATIONS, id);
+        deleteByServerId(PLAYER_ACTIVITIES, id);
     }
 
     @Override
@@ -153,6 +158,16 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
         document.put("createdAt", server.createdAt());
         document.put("updatedAt", server.updatedAt());
         return document;
+    }
+
+    private void deleteByServerId(String collection, String serverId) {
+        while (true) {
+            List<Map<String, Object>> rows = documents.findByField(collection, "serverId", serverId, 1, DELETE_SCAN_PAGE_SIZE);
+            if (rows.isEmpty()) {
+                return;
+            }
+            rows.forEach(row -> documents.delete(collection, string(row, "id")));
+        }
     }
 
     private Map<String, Object> endpointDocument(MinecraftServerEndpoint endpoint) {

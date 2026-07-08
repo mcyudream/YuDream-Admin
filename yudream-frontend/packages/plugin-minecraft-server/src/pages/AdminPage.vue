@@ -94,6 +94,17 @@
           <MarkdownEditor v-model="model.serverForm.descriptionMarkdown" />
 
           <div class="mc-actions end">
+            <FaButton
+              v-if="model.serverForm.id"
+              class="mc-danger-button"
+              :loading="model.saving"
+              type="button"
+              variant="outline"
+              @click="confirmDeleteCurrent"
+            >
+              <FaIcon name="i-ri:delete-bin-line" />
+              删除服务器
+            </FaButton>
             <FaButton :loading="model.saving" type="submit">
               <FaIcon name="i-ri:save-3-line" />
               保存服务器
@@ -233,7 +244,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { FaButton, FaIcon } from '@fantastic-admin/components'
+import { FaButton, FaIcon, useFaModal } from '@fantastic-admin/components'
 import InheritanceRulesEditor from '../components/InheritanceRulesEditor.vue'
 import MarkdownEditor from '../components/MarkdownEditor.vue'
 import McPanel from '../components/McPanel.vue'
@@ -243,6 +254,20 @@ import type { MinecraftServerPluginModel } from '../composables/useMinecraftServ
 const props = defineProps<{
   model: MinecraftServerPluginModel
 }>()
+
+const modal = useFaModal()
+
+function confirmDeleteCurrent() {
+  const server = props.model.servers.find(item => item.id === props.model.serverForm.id)
+  if (!server) {
+    return
+  }
+  modal.confirm({
+    title: '删除服务器',
+    content: `确认删除服务器「${server.name}」吗？相关状态、周目操作和玩家在线记录也会一起删除。`,
+    onConfirm: () => props.model.deleteServer(server),
+  })
+}
 
 onMounted(() => {
   if (props.model.selectedServer) {
