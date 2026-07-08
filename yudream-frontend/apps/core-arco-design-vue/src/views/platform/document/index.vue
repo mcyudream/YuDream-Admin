@@ -266,11 +266,27 @@ function parseJson(value: string, label: string) {
 }
 
 function defaultGenerateData(row: WordTemplate) {
-  const result: Record<string, string> = {}
+  const result: WordGenerateData = {}
   Object.entries(row.placeholders || {}).forEach(([key, label]) => {
-    result[key] = label || ''
+    assignSampleValue(result, key, label || '')
   })
   return result
+}
+
+function assignSampleValue(target: WordGenerateData, key: string, value: string) {
+  const parts = key.split('.').map(item => item.trim()).filter(Boolean)
+  if (!parts.length) {
+    return
+  }
+  let cursor = target
+  parts.slice(0, -1).forEach((part) => {
+    const current = cursor[part]
+    if (!current || Array.isArray(current) || typeof current !== 'object') {
+      cursor[part] = {}
+    }
+    cursor = cursor[part] as WordGenerateData
+  })
+  cursor[parts[parts.length - 1]] = value
 }
 
 function openFile(url?: string) {
@@ -367,10 +383,27 @@ function generationVariant(status: GenerationStatus) {
 {{r.name}} {{r.class}} {{r.no}}
 {{/participantRows}}</code></pre>
             <p><code>l/r</code> 是短别名，便于放进窄表格；同一数据也保留 <code>left.studentName</code>、<code>right.studentNo</code> 等完整字段。</p>
+            <p>手动生成时不要只在根节点写 <code>"l.name"</code> 或 <code>"r.name"</code>；双栏名单要放进 <code>participantRows</code> 数组，每个数组项里再写 <code>l</code> 和 <code>r</code> 对象。</p>
           </article>
         </div>
 
         <div class="guide-detail-grid">
+          <section class="guide-section">
+            <h3>占位符 JSON 示例</h3>
+            <pre v-pre><code>{
+  "proofNo": "证明编号",
+  "activityName": "活动名称",
+  "activityDate": "活动日期",
+  "collegeName": "学院名称",
+  "issuer": "落款单位",
+  "issueDate": "出具日期",
+  "participantRows": "双栏名单行数组",
+  "participants": "单人名单数组",
+  "student.name": "嵌套变量示例：{{student.name}}"
+}</code></pre>
+            <p>这里是变量说明和手动生成默认值；点路径会自动转成嵌套 JSON。循环内的 <code>l.name</code>、<code>r.name</code> 需要写在模板循环里，最终数据由活动证明导出自动组装。</p>
+          </section>
+
           <section class="guide-section">
             <h3>活动证明常用数据</h3>
             <pre v-pre><code>{
@@ -421,6 +454,7 @@ function generationVariant(status: GenerationStatus) {
             <h3>维护建议</h3>
             <ul>
               <li>“占位符 JSON”用于记录模板变量说明，也会作为手动生成时的默认 JSON；真实替换以生成数据为准。</li>
+              <li>模板里可以写 <code v-pre>{{student.name}}</code> 这种点路径；生成数据应填写为 <code>{ "student": { "name": "张三" } }</code> 这种嵌套结构。</li>
               <li>变量名建议只用字母、数字、下划线、点和短横线，避免中文变量名。</li>
               <li>双栏名单建议把循环开始和结束标记单独放一行，中间放一条变量行；渲染后会删除标记行并复制变量行。</li>
               <li>需要给活动证明使用的模板，先在这里上传并保持“启用”，再到学生信息下的“活动证明导出”选择。</li>
