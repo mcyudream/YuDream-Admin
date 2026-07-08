@@ -12,6 +12,7 @@
         <module>yudream-plugins/yudream-plugin-spi</module>
         <module>yudream-plugins/yudream-sample-plugin</module>
         <module>yudream-plugins/yudream-plugin-wallet</module>
+        <module>yudream-plugins/yudream-plugin-student-info</module>
         <module>yudream-plugins/yudream-plugin-alipay</module>
         <module>yudream-plugins/yudream-plugin-yudream-skin</module>
         <module>yudream-plugins/yudream-plugin-authlib-injector</module>
