@@ -11,6 +11,7 @@ public class UserUpdateRequest implements Serializable {
     @Serial
     private static final long serialVersionUID = 1L;
 
+    private String username;
     private String nickname;
     @Email(message = "邮箱格式不正确")
     private String email;

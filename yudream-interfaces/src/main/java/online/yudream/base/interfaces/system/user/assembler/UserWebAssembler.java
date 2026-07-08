@@ -93,6 +93,7 @@ public class UserWebAssembler {
 
     public static UserProfileUpdateCmd toProfileUpdateCmd(UserProfileUpdateRequest request) {
         UserProfileUpdateCmd cmd = new UserProfileUpdateCmd();
+        cmd.setUsername(request.getUsername());
         cmd.setNickname(request.getNickname());
         cmd.setEmail(request.getEmail());
         cmd.setPhone(request.getPhone());

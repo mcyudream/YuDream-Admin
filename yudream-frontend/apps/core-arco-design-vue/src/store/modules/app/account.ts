@@ -347,6 +347,16 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     }
   }
 
+  function setAccount(value?: string) {
+    account.value = value || ''
+    if (account.value) {
+      localStorage.setItem('account', account.value)
+    }
+    else {
+      localStorage.removeItem('account')
+    }
+  }
+
   function setEmailVerified(value: boolean) {
     emailVerified.value = value
     localStorage.setItem('emailVerified', String(value))
@@ -381,6 +391,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     resendVerificationEmail,
     editPassword,
     setAvatar,
+    setAccount,
     setEmailVerified,
   }
 })

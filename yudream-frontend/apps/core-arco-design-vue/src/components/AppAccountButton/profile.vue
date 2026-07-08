@@ -31,6 +31,7 @@ const apiKeySearch = reactive({ keyword: '', page: 1, size: 20, total: 0 })
 const createdApiKeyPlaintext = ref('')
 
 const form = reactive<UserProfilePayload>({
+  username: '',
   nickname: '',
   email: '',
   phone: '',
@@ -140,11 +141,13 @@ async function loadProfile() {
       createTime: data.createTime || '',
     }
     Object.assign(form, {
+      username: data.username || '',
       nickname: data.nickname || '',
       email: data.email || '',
       phone: data.phone || '',
       qq: data.qq || '',
     })
+    appAccountStore.setAccount(data.username)
     appAccountStore.setAvatar(data.avatar)
     appAccountStore.setEmailVerified(data.emailVerified)
   }
@@ -211,12 +214,16 @@ async function saveProfile() {
   saving.value = true
   try {
     const res = await apiProfile.update(form)
+    profile.value.username = res.data.username
     Object.assign(form, {
+      username: res.data.username || '',
       nickname: res.data.nickname || '',
       email: res.data.email || '',
       phone: res.data.phone || '',
       qq: res.data.qq || '',
     })
+    appAccountStore.setAccount(res.data.username)
+    appAccountStore.setEmailVerified(res.data.emailVerified)
     toast.success('资料已保存')
   }
   finally {
@@ -410,6 +417,9 @@ function dateText(value?: string) {
         </div>
 
         <a-form :model="form" layout="vertical" class="form-grid">
+          <a-form-item label="用户名" required>
+            <FaInput v-model="form.username" placeholder="请输入用户名" />
+          </a-form-item>
           <a-form-item label="昵称">
             <FaInput v-model="form.nickname" placeholder="请输入昵称" />
           </a-form-item>
