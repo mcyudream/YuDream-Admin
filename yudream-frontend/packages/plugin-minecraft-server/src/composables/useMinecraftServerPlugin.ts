@@ -391,6 +391,37 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     }
   }
 
+  async function deleteServer(server?: MinecraftServer) {
+    const target = server || selectedServer.value
+    if (!target) {
+      return
+    }
+    saving.value = true
+    try {
+      await api.remove(target.id)
+      servers.value = servers.value.filter(item => item.id !== target.id)
+      if (selectedId.value === target.id) {
+        const next = servers.value[0]
+        selectedId.value = next?.id || ''
+        clearSideData()
+        if (next) {
+          editServer(next)
+          await loadSideData(next.id)
+        }
+        else {
+          newServer()
+        }
+      }
+      else if (serverForm.id === target.id) {
+        newServer()
+      }
+      toast.success('服务器已删除')
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
   async function nextRecordsPage() {
     if (!walletEnabled.value || !recordsPager.hasNext) {
       return
@@ -478,6 +509,14 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     }
   }
 
+  function clearSideData() {
+    statusHistory.value = []
+    playerActivities.value = []
+    playerActivitiesPager.page = 1
+    playerActivitiesPager.hasNext = false
+    clearWalletData()
+  }
+
   return reactive({
     loading,
     saving,
@@ -511,6 +550,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     addEndpoint,
     removeEndpoint,
     saveServer,
+    deleteServer,
     refreshStatus,
     copyServerId,
     previewSeason,
