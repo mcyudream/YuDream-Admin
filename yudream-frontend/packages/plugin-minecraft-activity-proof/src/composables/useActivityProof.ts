@@ -47,7 +47,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
     includeAfk: false,
   })
 
-  const ready = computed(() => !!status.value?.dependencies.minecraftReady && !!status.value?.dependencies.studentInfoReady && !!status.value?.settings.templateReady)
+  const ready = computed(() => !!status.value?.dependencies.minecraftReady && !!status.value?.dependencies.studentInfoReady && !!status.value?.dependencies.wordTemplateReady && !!status.value?.settings.templateReady)
   const selectedServer = computed(() => servers.value.find(item => item.id === selectedServerId.value) || null)
   const unmatchedCount = computed(() => participants.value.filter(item => !item.matched).length)
   const selectedCount = computed(() => selectedPlayerIds.value.length || participants.value.length)
@@ -55,13 +55,22 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   async function load() {
     loading.value = true
     try {
-      const [nextStatus, nextServers, nextExports] = await Promise.all([api.status(), api.servers(), api.exports()])
+      const [nextStatus, nextExports] = await Promise.all([api.status(), api.exports()])
       status.value = nextStatus
       settings.value = nextStatus.settings
-      servers.value = nextServers
       exports.value = nextExports
       syncSettingsForm(nextStatus.settings)
       syncExportDefaults(nextStatus.settings)
+      if (!nextStatus.dependencies.minecraftReady) {
+        servers.value = []
+        selectedServerId.value = ''
+        participants.value = []
+        mappings.value = []
+        selectedPlayerIds.value = []
+        return
+      }
+      const nextServers = await api.servers()
+      servers.value = nextServers
       if (!selectedServerId.value && nextServers.length) {
         selectedServerId.value = nextServers[0].id
       }
@@ -75,7 +84,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   }
 
   async function reloadServerData() {
-    if (!selectedServerId.value) {
+    if (!status.value?.dependencies.minecraftReady || !selectedServerId.value) {
       participants.value = []
       mappings.value = []
       return
@@ -185,6 +194,18 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   }
 
   async function exportWord() {
+    if (!status.value?.dependencies.minecraftReady) {
+      toast.warning('请先启用 Minecraft 服务器插件')
+      return
+    }
+    if (!status.value?.dependencies.studentInfoReady) {
+      toast.warning('请先启用学生信息插件')
+      return
+    }
+    if (!status.value?.dependencies.wordTemplateReady) {
+      toast.warning('请先在能力管理中启用 Word 模板能力')
+      return
+    }
     if (!selectedServerId.value) {
       toast.warning('请选择服务器')
       return

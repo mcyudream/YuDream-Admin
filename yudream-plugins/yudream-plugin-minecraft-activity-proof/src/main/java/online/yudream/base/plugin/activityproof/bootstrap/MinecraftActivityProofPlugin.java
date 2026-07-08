@@ -24,13 +24,13 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 })
 @PluginFrontend(
         moduleName = "minecraftActivityProof",
-        menuTitle = "MC 活动证明",
-        menuIcon = "i-ri:file-word-2-line",
-        menuSort = 48,
+        menuTitle = "学生信息",
+        menuIcon = "i-ri:id-card-line",
+        menuSort = 35,
         routes = {
                 @PluginRoute(
-                        path = "/platform/plugins/minecraft-activity-proof",
-                        name = "platform-plugin-minecraft-activity-proof",
+                        path = "/platform/plugins/yudream-student-info/activity-proof",
+                        name = "platform-plugin-yudream-student-info-activity-proof",
                         title = "活动证明导出",
                         icon = "i-ri:file-word-2-line",
                         component = "minecraft-activity-proof/Export",

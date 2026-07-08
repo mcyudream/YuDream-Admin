@@ -71,7 +71,7 @@ public class ActivityProofAppService {
         return new ActivityProofDependencyDTO(
                 minecraftService().isPresent(),
                 studentInfoService().isPresent(),
-                framework != null && framework.wordTemplates() != null
+                wordTemplateEnabled()
         );
     }
 
@@ -129,6 +129,9 @@ public class ActivityProofAppService {
         ActivityProofSettings settings = repository.settings();
         if (!settings.hasTemplate()) {
             throw new IllegalArgumentException("请先上传 Word 模板");
+        }
+        if (!wordTemplateEnabled()) {
+            throw new IllegalArgumentException("Word 模板能力未启用，请先在能力管理中启用 document-template");
         }
         String serverId = requireText(cmd.serverId(), "服务器不能为空");
         PluginMinecraftServer server = minecraft().minecraftServer(serverId)
@@ -304,6 +307,10 @@ public class ActivityProofAppService {
 
     private Optional<PluginStudentInfoService> studentInfoService() {
         return framework == null ? Optional.empty() : framework.extension(STUDENT_INFO_PLUGIN, PluginStudentInfoService.class);
+    }
+
+    private boolean wordTemplateEnabled() {
+        return framework != null && framework.wordTemplates() != null && framework.wordTemplates().enabled();
     }
 
     private byte[] readFile(String objectKey) {
