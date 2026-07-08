@@ -127,6 +127,7 @@
 
 .proof-form input,
 .proof-form select,
+.proof-template select,
 .proof-map-form input {
   width: 100%;
   min-height: 36px;
@@ -193,6 +194,14 @@
   display: grid;
   gap: 8px;
   padding: 16px;
+}
+
+.proof-template label {
+  display: grid;
+  gap: 6px;
+  color: #546171;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .proof-template strong {

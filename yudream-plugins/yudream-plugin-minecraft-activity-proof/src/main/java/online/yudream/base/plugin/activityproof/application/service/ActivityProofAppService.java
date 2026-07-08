@@ -3,7 +3,7 @@ package online.yudream.base.plugin.activityproof.application.service;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofExportCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofMappingSaveCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofSettingsSaveCmd;
-import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofTemplateUploadCmd;
+import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofTemplateSelectCmd;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofDependencyDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofExportDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofMappingDTO;
@@ -11,12 +11,14 @@ import online.yudream.base.plugin.activityproof.application.dto.ActivityProofPar
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofServerDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofSettingsDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofStatusDTO;
+import online.yudream.base.plugin.activityproof.application.dto.ActivityProofTemplateDTO;
 import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofExportRecord;
 import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofSettings;
 import online.yudream.base.plugin.activityproof.domain.aggregate.PlayerStudentMapping;
 import online.yudream.base.plugin.activityproof.domain.repo.ActivityProofRepository;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.document.PluginRenderedDocument;
+import online.yudream.base.plugin.spi.system.document.PluginWordTemplateSummary;
 import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftPlayerActivity;
 import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftServer;
 import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftService;
@@ -26,7 +28,6 @@ import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoProfil
 import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoService;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -34,7 +35,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -82,15 +82,23 @@ public class ActivityProofAppService {
     public ActivityProofSettingsDTO saveSettings(ActivityProofSettingsSaveCmd cmd) {
         ActivityProofSettings settings = repository.settings()
                 .withDefaults(cmd.defaultActivityName(), cmd.defaultCollege(), cmd.defaultIssuer(), System.currentTimeMillis());
+        if (cmd.templateId() != null) {
+            settings = withTemplate(settings, cmd.templateId());
+        }
         return toDTO(repository.saveSettings(settings));
     }
 
-    public ActivityProofSettingsDTO uploadTemplate(ActivityProofTemplateUploadCmd cmd) {
-        String filename = requireDocxFilename(cmd.filename());
-        byte[] content = decodeBase64(cmd.contentBase64(), "模板文件不能为空");
-        String objectKey = files.put("templates/activity-proof-template.docx",
-                new ByteArrayInputStream(content), content.length, contentType(cmd.contentType()));
-        ActivityProofSettings settings = repository.settings().withTemplate(objectKey, filename, System.currentTimeMillis());
+    public List<ActivityProofTemplateDTO> templates(String keyword, int page, int size) {
+        if (!wordTemplateEnabled()) {
+            return List.of();
+        }
+        return framework.wordTemplates().templates(keyword, safePage(page), safeSize(size)).stream()
+                .map(this::toDTO)
+                .toList();
+    }
+
+    public ActivityProofSettingsDTO selectTemplate(ActivityProofTemplateSelectCmd cmd) {
+        ActivityProofSettings settings = withTemplate(repository.settings(), requireTemplateId(cmd.templateId()));
         return toDTO(repository.saveSettings(settings));
     }
 
@@ -128,7 +136,7 @@ public class ActivityProofAppService {
     public ActivityProofExportDTO export(ActivityProofExportCmd cmd, String operatorUserId) {
         ActivityProofSettings settings = repository.settings();
         if (!settings.hasTemplate()) {
-            throw new IllegalArgumentException("请先上传 Word 模板");
+            throw new IllegalArgumentException("请选择 Word 模板");
         }
         if (!wordTemplateEnabled()) {
             throw new IllegalArgumentException("Word 模板能力未启用，请先在能力管理中启用 document-template");
@@ -140,9 +148,8 @@ public class ActivityProofAppService {
         if (participants.isEmpty()) {
             throw new IllegalArgumentException("没有可导出的玩家记录");
         }
-        byte[] templateContent = readFile(settings.templateObjectKey());
         Map<String, Object> data = buildTemplateData(cmd, server, settings, participants);
-        PluginRenderedDocument rendered = framework.wordTemplates().render(templateContent, data);
+        PluginRenderedDocument rendered = framework.wordTemplates().render(settings.templateId(), data);
         String recordId = UUID.randomUUID().toString();
         String filename = outputFilename(cmd.activityName(), recordId);
         String objectKey = files.put("exports/" + recordId + ".docx",
@@ -313,17 +320,22 @@ public class ActivityProofAppService {
         return framework != null && framework.wordTemplates() != null && framework.wordTemplates().enabled();
     }
 
-    private byte[] readFile(String objectKey) {
-        try (var inputStream = files.get(objectKey).inputStream()) {
-            return inputStream.readAllBytes();
-        } catch (IOException e) {
-            throw new IllegalArgumentException("文件读取失败：" + e.getMessage(), e);
-        }
+    private ActivityProofSettings withTemplate(ActivityProofSettings settings, Long templateId) {
+        PluginWordTemplateSummary template = framework.wordTemplates().template(templateId)
+                .orElseThrow(() -> new IllegalArgumentException("Word 模板不存在或已停用"));
+        return settings.withTemplate(template.id(), template.code(), template.name(), template.originalFilename(),
+                template.updatedAt(), System.currentTimeMillis());
     }
 
     private ActivityProofSettingsDTO toDTO(ActivityProofSettings settings) {
-        return new ActivityProofSettingsDTO(settings.hasTemplate(), settings.templateFilename(), settings.templateUpdatedAt(),
+        return new ActivityProofSettingsDTO(settings.hasTemplate(), settings.templateId(), settings.templateCode(), settings.templateName(),
+                settings.templateFilename(), settings.templateUpdatedAt(),
                 settings.defaultActivityName(), settings.defaultCollege(), settings.defaultIssuer(), settings.updatedAt());
+    }
+
+    private ActivityProofTemplateDTO toDTO(PluginWordTemplateSummary template) {
+        return new ActivityProofTemplateDTO(template.id(), template.code(), template.name(),
+                template.originalFilename(), template.updatedAt());
     }
 
     private ActivityProofMappingDTO toDTO(PlayerStudentMapping mapping) {
@@ -335,26 +347,6 @@ public class ActivityProofAppService {
         return new ActivityProofExportDTO(record.id(), record.serverId(), record.serverName(), record.activityName(),
                 record.outputFilename(), "/exports/" + encode(record.id()) + "/download",
                 record.participantCount(), record.unmatchedCount(), record.operatorUserId(), record.generatedAt());
-    }
-
-    private String requireDocxFilename(String filename) {
-        String value = requireText(filename, "模板文件名不能为空");
-        if (!value.toLowerCase(java.util.Locale.ROOT).endsWith(".docx")) {
-            throw new IllegalArgumentException("模板文件必须是 .docx 格式");
-        }
-        return value;
-    }
-
-    private byte[] decodeBase64(String value, String message) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(message);
-        }
-        String content = value.contains(",") ? value.substring(value.indexOf(',') + 1) : value;
-        return Base64.getDecoder().decode(content);
-    }
-
-    private String contentType(String value) {
-        return value == null || value.isBlank() ? DOCX_CONTENT_TYPE : value.trim();
     }
 
     private int safePage(int page) {
@@ -393,6 +385,13 @@ public class ActivityProofAppService {
 
     private String text(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private Long requireTemplateId(Long value) {
+        if (value == null) {
+            throw new IllegalArgumentException("请选择 Word 模板");
+        }
+        return value;
     }
 
     private String requireText(String value, String message) {

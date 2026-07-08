@@ -2,7 +2,9 @@ package online.yudream.base.plugin.activityproof.domain.aggregate;
 
 public record ActivityProofSettings(
         String id,
-        String templateObjectKey,
+        Long templateId,
+        String templateCode,
+        String templateName,
         String templateFilename,
         long templateUpdatedAt,
         String defaultActivityName,
@@ -13,21 +15,22 @@ public record ActivityProofSettings(
     public static final String ID = "default";
 
     public static ActivityProofSettings empty() {
-        return new ActivityProofSettings(ID, null, null, 0, "", "", "", 0);
+        return new ActivityProofSettings(ID, null, "", "", "", 0, "", "", "", 0);
     }
 
-    public ActivityProofSettings withTemplate(String objectKey, String filename, long updatedAt) {
-        return new ActivityProofSettings(ID, objectKey, filename, updatedAt,
+    public ActivityProofSettings withTemplate(Long templateId, String templateCode, String templateName,
+                                              String filename, long templateUpdatedAt, long updatedAt) {
+        return new ActivityProofSettings(ID, templateId, text(templateCode), text(templateName), text(filename), templateUpdatedAt,
                 defaultActivityName, defaultCollege, defaultIssuer, updatedAt);
     }
 
     public ActivityProofSettings withDefaults(String activityName, String college, String issuer, long updatedAt) {
-        return new ActivityProofSettings(ID, templateObjectKey, templateFilename, templateUpdatedAt,
+        return new ActivityProofSettings(ID, templateId, templateCode, templateName, templateFilename, templateUpdatedAt,
                 text(activityName), text(college), text(issuer), updatedAt);
     }
 
     public boolean hasTemplate() {
-        return templateObjectKey != null && !templateObjectKey.isBlank();
+        return templateId != null;
     }
 
     private static String text(String value) {

@@ -79,7 +79,9 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
     private Map<String, Object> settingsDocument(ActivityProofSettings settings) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("id", ActivityProofSettings.ID);
-        document.put("templateObjectKey", settings.templateObjectKey());
+        document.put("templateId", settings.templateId());
+        document.put("templateCode", settings.templateCode());
+        document.put("templateName", settings.templateName());
         document.put("templateFilename", settings.templateFilename());
         document.put("templateUpdatedAt", settings.templateUpdatedAt());
         document.put("defaultActivityName", settings.defaultActivityName());
@@ -119,7 +121,9 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
     private ActivityProofSettings toSettings(Map<String, Object> document) {
         return new ActivityProofSettings(
                 string(document, "id"),
-                string(document, "templateObjectKey"),
+                longObject(document, "templateId"),
+                string(document, "templateCode"),
+                string(document, "templateName"),
                 string(document, "templateFilename"),
                 number(document, "templateUpdatedAt", 0),
                 string(document, "defaultActivityName"),
@@ -167,6 +171,14 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
             return number.longValue();
         }
         return value == null || String.valueOf(value).isBlank() ? defaultValue : Long.parseLong(String.valueOf(value));
+    }
+
+    private Long longObject(Map<String, Object> document, String key) {
+        Object value = document.get(key);
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return value == null || String.valueOf(value).isBlank() ? null : Long.parseLong(String.valueOf(value));
     }
 
     private int integer(Map<String, Object> document, String key, int defaultValue) {
