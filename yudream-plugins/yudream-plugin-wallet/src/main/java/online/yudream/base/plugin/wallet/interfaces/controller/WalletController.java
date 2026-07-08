@@ -74,6 +74,11 @@ public class WalletController {
         return http.userBalance(request);
     }
 
+    @PluginHttpEndpoint(method = "POST", path = "/game/balance", permission = WalletPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse gameBalance(PluginHttpRequest request) {
+        return http.gameBalance(request);
+    }
+
     @PluginHttpEndpoint(method = "POST", path = "/balances/credit", permission = WalletPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse credit(PluginHttpRequest request) {
         return http.credit(request);
@@ -82,6 +87,16 @@ public class WalletController {
     @PluginHttpEndpoint(method = "POST", path = "/balances/debit", permission = WalletPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse debit(PluginHttpRequest request) {
         return http.debit(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/game/credit", permission = WalletPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse gameCredit(PluginHttpRequest request) {
+        return http.gameCredit(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/game/debit", permission = WalletPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse gameDebit(PluginHttpRequest request) {
+        return http.gameDebit(request);
     }
 
     @PluginHttpEndpoint(method = "POST", path = "/balances/transfer", permission = WalletPlugin.USER_PERMISSION)

@@ -3,8 +3,11 @@ package online.yudream.base.plugin.wallet.interfaces.http;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
+import online.yudream.base.plugin.spi.system.skin.PluginSkinProfile;
+import online.yudream.base.plugin.spi.system.skin.PluginSkinService;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletBalance;
+import online.yudream.base.plugin.spi.system.wallet.PluginWalletTransaction;
 import online.yudream.base.plugin.wallet.bootstrap.WalletPlugin;
 import online.yudream.base.plugin.wallet.application.service.WalletAppService;
 import online.yudream.base.plugin.wallet.application.cmd.WalletTransferCmd;
@@ -12,10 +15,13 @@ import online.yudream.base.plugin.wallet.infrastructure.support.JsonSupport;
 import online.yudream.base.plugin.wallet.interfaces.assembler.WalletWebAssembler;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletAssetSaveRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletChangeRequest;
+import online.yudream.base.plugin.wallet.interfaces.request.WalletGamePlayerRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletRechargeCreateRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletRechargeSettingsSaveRequest;
 import online.yudream.base.plugin.wallet.interfaces.request.WalletTransferRequest;
 import online.yudream.base.plugin.wallet.interfaces.res.WalletBalanceRes;
+import online.yudream.base.plugin.wallet.interfaces.res.WalletGameBalanceRes;
+import online.yudream.base.plugin.wallet.interfaces.res.WalletGameTransactionRes;
 
 import java.math.BigDecimal;
 import java.net.URLDecoder;
@@ -127,6 +133,15 @@ public class WalletHttpFacade {
         return PluginHttpResponse.ok(balanceResponse(balance, appService.historicalIncomeTotals()));
     }
 
+    public PluginHttpResponse gameBalance(PluginHttpRequest request) {
+        WalletGamePlayerRequest body = JsonSupport.read(request.body(), WalletGamePlayerRequest.class);
+        GameUser user = resolveGameUser(body);
+        return PluginHttpResponse.ok(gameBalanceResponse(
+                appService.balance(user.userId(), body.assetCode()),
+                user
+        ));
+    }
+
     public PluginHttpResponse credit(PluginHttpRequest request) {
         WalletChangeRequest body = JsonSupport.read(request.body(), WalletChangeRequest.class);
         return PluginHttpResponse.ok(assembler.toRes(appService.credit(assembler.toCmd(body))));
@@ -135,6 +150,32 @@ public class WalletHttpFacade {
     public PluginHttpResponse debit(PluginHttpRequest request) {
         WalletChangeRequest body = JsonSupport.read(request.body(), WalletChangeRequest.class);
         return PluginHttpResponse.ok(assembler.toRes(appService.debit(assembler.toCmd(body))));
+    }
+
+    public PluginHttpResponse gameCredit(PluginHttpRequest request) {
+        WalletGamePlayerRequest body = JsonSupport.read(request.body(), WalletGamePlayerRequest.class);
+        GameUser user = resolveGameUser(body);
+        PluginWalletTransaction transaction = appService.credit(new online.yudream.base.plugin.wallet.application.cmd.WalletChangeCmd(
+                user.userId(),
+                body.assetCode(),
+                body.amount(),
+                body.businessNo(),
+                body.remark()
+        ));
+        return PluginHttpResponse.ok(gameTransactionResponse(transaction, user));
+    }
+
+    public PluginHttpResponse gameDebit(PluginHttpRequest request) {
+        WalletGamePlayerRequest body = JsonSupport.read(request.body(), WalletGamePlayerRequest.class);
+        GameUser user = resolveGameUser(body);
+        PluginWalletTransaction transaction = appService.debit(new online.yudream.base.plugin.wallet.application.cmd.WalletChangeCmd(
+                user.userId(),
+                body.assetCode(),
+                body.amount(),
+                body.businessNo(),
+                body.remark()
+        ));
+        return PluginHttpResponse.ok(gameTransactionResponse(transaction, user));
     }
 
     public PluginHttpResponse transfer(PluginHttpRequest request) {
@@ -223,6 +264,37 @@ public class WalletHttpFacade {
         return assembler.toRes(balance, userOf(balance.userId()), historicalTotal(historicalTotals, balance));
     }
 
+    private WalletGameBalanceRes gameBalanceResponse(PluginWalletBalance balance, GameUser user) {
+        return new WalletGameBalanceRes(
+                balance.userId(),
+                user.playerName(),
+                user.playerUuid(),
+                balance.assetCode(),
+                balance.balance(),
+                balance.updatedAt()
+        );
+    }
+
+    private WalletGameTransactionRes gameTransactionResponse(PluginWalletTransaction transaction, GameUser user) {
+        BigDecimal balanceAfter = "DEBIT".equals(transaction.type())
+                ? transaction.fromBalanceAfter()
+                : transaction.toBalanceAfter();
+        return new WalletGameTransactionRes(
+                transaction.id(),
+                transaction.businessNo(),
+                transaction.type(),
+                transaction.source(),
+                user.userId(),
+                user.playerName(),
+                user.playerUuid(),
+                transaction.assetCode(),
+                transaction.amount(),
+                balanceAfter,
+                transaction.remark(),
+                transaction.createdAt()
+        );
+    }
+
     private BigDecimal historicalTotal(Map<String, Map<String, BigDecimal>> historicalTotals, PluginWalletBalance balance) {
         Map<String, BigDecimal> userTotals = historicalTotals.get(balance.userId());
         if (userTotals == null) {
@@ -290,6 +362,52 @@ public class WalletHttpFacade {
         return value.contains("@") ? Optional.empty() : framework.users().findByEmail(value);
     }
 
+    private GameUser resolveGameUser(WalletGamePlayerRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("玩家钱包请求不能为空");
+        }
+        String mode = hasText(request.matchMode()) ? request.matchMode().trim().toLowerCase() : "auto";
+        Optional<PluginSkinProfile> profile = Optional.empty();
+        if (!"name".equals(mode) && hasText(request.playerUuid())) {
+            profile = skinProfileByUuid(request.playerUuid());
+        }
+        if (profile.isEmpty() && !"uuid".equals(mode) && hasText(request.playerName())) {
+            profile = skinProfileByName(request.playerName());
+        }
+        if (profile.isPresent() && hasText(profile.get().ownerId())) {
+            return new GameUser(profile.get().ownerId(), profile.get().name(), profile.get().uuid());
+        }
+        String fallback = firstText(request.playerName(), request.playerUuid());
+        String userId = resolveUserId(fallback, "玩家未绑定网站用户");
+        return new GameUser(userId, request.playerName(), request.playerUuid());
+    }
+
+    private Optional<PluginSkinProfile> skinProfileByName(String playerName) {
+        if (!hasText(playerName)) {
+            return Optional.empty();
+        }
+        return skinService().flatMap(service -> service.findProfileByName(playerName.trim()));
+    }
+
+    private Optional<PluginSkinProfile> skinProfileByUuid(String playerUuid) {
+        if (!hasText(playerUuid)) {
+            return Optional.empty();
+        }
+        return skinService().flatMap(service -> service.findProfileByUuid(normalizeUuid(playerUuid)));
+    }
+
+    private Optional<PluginSkinService> skinService() {
+        return framework == null ? Optional.empty() : framework.extension("yudream-skin", PluginSkinService.class);
+    }
+
+    private String normalizeUuid(String uuid) {
+        return uuid == null ? null : uuid.trim().replace("-", "");
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     private online.yudream.base.plugin.wallet.interfaces.res.WalletUserRes userOf(String userId) {
         if (userId == null || userId.isBlank()) {
             return null;
@@ -324,5 +442,8 @@ public class WalletHttpFacade {
 
     private String decode(String value) {
         return value == null ? null : URLDecoder.decode(value, StandardCharsets.UTF_8);
+    }
+
+    private record GameUser(String userId, String playerName, String playerUuid) {
     }
 }
