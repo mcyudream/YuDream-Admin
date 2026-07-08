@@ -16,7 +16,7 @@ public class WordGenerationRecordDTO {
     private Long outputFileId;
     private String outputFileUrl;
     private String outputFilename;
-    private Map<String, String> data;
+    private Map<String, Object> data;
     private GenerationStatus status;
     private String errorMessage;
     private Long operatorId;

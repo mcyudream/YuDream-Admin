@@ -7,5 +7,5 @@ import java.util.Map;
 
 @Data
 public class WordGenerateRequest {
-    private Map<String, String> data = new HashMap<>();
+    private Map<String, Object> data = new HashMap<>();
 }

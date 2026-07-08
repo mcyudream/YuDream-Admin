@@ -3,6 +3,7 @@ import systemClient from './system-client'
 
 export type TemplateStatus = 'ACTIVE' | 'DISABLED'
 export type GenerationStatus = 'SUCCESS' | 'FAILED'
+export type WordGenerateData = Record<string, unknown>
 
 export interface DocumentPageParams {
   page: number
@@ -39,7 +40,7 @@ export interface WordGenerationRecord {
   outputFileId?: number
   outputFileUrl?: string
   outputFilename?: string
-  data: Record<string, string>
+  data: WordGenerateData
   status: GenerationStatus
   errorMessage?: string
   operatorId?: number
@@ -64,7 +65,7 @@ export default {
   disableTemplate: (id: number) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/documents/word-templates/${id}`)
   },
-  generate: (id: number, data: Record<string, string>) => {
+  generate: (id: number, data: WordGenerateData) => {
     return systemClient.post<unknown, ApiResponse<WordGenerationRecord>>(`api/platform/documents/word-templates/${id}/generate`, { data })
   },
   pageRecords: (params: DocumentPageParams) => {

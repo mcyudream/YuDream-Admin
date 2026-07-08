@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@fantastic-admin/components'
-import type { GenerationStatus, TemplateStatus, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
+import type { GenerationStatus, TemplateStatus, WordGenerateData, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
 import apiDocument from '@/api/modules/platform-document'
 
 const modal = useFaModal()
@@ -241,7 +241,7 @@ function parseJson(value: string, label: string) {
       toast.error(`${label}必须是 JSON 对象`)
       return null
     }
-    return parsed as Record<string, string>
+    return parsed as WordGenerateData
   }
   catch {
     toast.error(`${label}格式错误`, { description: '请输入合法 JSON 对象' })
