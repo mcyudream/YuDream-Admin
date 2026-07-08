@@ -155,7 +155,7 @@ function openEdit(row: WordTemplate) {
 }
 
 async function saveForm() {
-  const placeholders = parseJson(placeholdersJson.value, '占位符')
+  const placeholders = parsePlaceholdersJson(placeholdersJson.value)
   if (!placeholders) {
     return
   }
@@ -234,6 +234,22 @@ async function generate() {
   }
 }
 
+function parsePlaceholdersJson(value: string) {
+  const parsed = parseJson(value, '占位符')
+  if (!parsed) {
+    return null
+  }
+  const result: Record<string, string> = {}
+  for (const [key, item] of Object.entries(parsed)) {
+    if (item != null && typeof item !== 'string') {
+      toast.error('占位符说明必须是字符串', { description: `请检查 ${key}` })
+      return null
+    }
+    result[key] = item || ''
+  }
+  return result
+}
+
 function parseJson(value: string, label: string) {
   try {
     const parsed = value ? JSON.parse(value) : {}
@@ -306,6 +322,89 @@ function generationVariant(status: GenerationStatus) {
           <span>{{ tab.label }}</span>
         </button>
       </div>
+
+      <section v-if="activeTab === 'templates'" class="template-guide" aria-label="Word 模板写法教程">
+        <header class="template-guide-header">
+          <div>
+            <span class="guide-eyebrow">Template Guide</span>
+            <h2>Word 模板写法教程</h2>
+          </div>
+          <p>在 Word 文档里写变量和循环，上传到这里维护；业务插件只需要选择已启用的模板。</p>
+        </header>
+
+        <div class="guide-grid">
+          <article class="guide-section">
+            <h3>1. 基础变量</h3>
+            <p>正文、表格、页眉和页脚都支持变量替换。变量名来自生成数据 JSON。</p>
+            <div class="guide-code-row">
+              <code v-pre>{{activityName}}</code>
+              <code>${activityName}</code>
+              <code v-pre>{{student.name}}</code>
+            </div>
+            <p>点路径会读取嵌套对象，例如 <code v-pre>{{student.name}}</code> 对应 <code>student.name</code>。</p>
+          </article>
+
+          <article class="guide-section">
+            <h3>2. 表格行循环</h3>
+            <p>需要复制 Word 表格行时，在开始行写集合标记，在结束行写关闭标记，中间行会按集合数据重复。</p>
+            <pre v-pre><code>{{#participants}}
+{{index}}  {{studentName}}  {{className}}  {{studentNo}}
+{{/participants}}</code></pre>
+            <p>循环里的字段会优先读取当前成员，也可以用 <code v-pre>{{item.studentName}}</code> 明确访问当前成员。</p>
+          </article>
+
+          <article class="guide-section">
+            <h3>3. 段落内循环</h3>
+            <p>如果只想在同一段文字里拼接名单，可以把循环写在一个段落中。</p>
+            <pre v-pre><code>参与成员：{{#participants}}{{studentName}}、{{/participants}}</code></pre>
+          </article>
+
+          <article class="guide-section">
+            <h3>4. 名单表自动追加</h3>
+            <p>活动证明这类名单表可以不写循环。表头包含“姓名”和“学号”时，传入 <code>participantTableAppend: true</code> 后会自动填充空位；空位满了会复制最后一行继续追加。</p>
+            <p>推荐表头：<code>姓名 / 专业班级 / 学号 / 空列 / 姓名 / 专业班级 / 学号</code>。</p>
+          </article>
+        </div>
+
+        <div class="guide-detail-grid">
+          <section class="guide-section">
+            <h3>活动证明常用数据</h3>
+            <pre v-pre><code>{
+  "proofNo": "NO.202607080001",
+  "activityName": "Minecraft 星空社活动",
+  "activityDate": "2026年7月8日",
+  "college": "计算机科学与技术学院",
+  "issuer": "Minecraft 星空社",
+  "issueDate": "2026年7月8日",
+  "serverName": "生存服",
+  "currentSeasonName": "第 1 周目",
+  "participantCount": 2,
+  "participantTableAppend": true,
+  "participants": [
+    {
+      "index": 1,
+      "studentName": "张三",
+      "className": "计科2401",
+      "studentNo": "5120240001",
+      "college": "计算机科学与技术学院",
+      "playerName": "Steve",
+      "effectiveOnlineMillis": 7200000
+    }
+  ]
+}</code></pre>
+          </section>
+
+          <section class="guide-section guide-notes">
+            <h3>维护建议</h3>
+            <ul>
+              <li>“占位符 JSON”用于记录模板变量说明，也会作为手动生成时的默认 JSON；真实替换以生成数据为准。</li>
+              <li>变量名建议只用字母、数字、下划线、点和短横线，避免中文变量名。</li>
+              <li>循环开始和结束标记建议放在表格行内，避免跨多个不连续表格。</li>
+              <li>需要给活动证明使用的模板，先在这里上传并保持“启用”，再到学生信息下的“活动证明导出”选择。</li>
+            </ul>
+          </section>
+        </div>
+      </section>
 
       <FaSearchBar>
         <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
@@ -486,6 +585,125 @@ function generationVariant(status: GenerationStatus) {
   color: rgb(var(--primary-6));
 }
 
+.template-guide {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--color-bg-2), var(--color-fill-1));
+}
+
+.template-guide-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 420px);
+  gap: 16px;
+  align-items: end;
+}
+
+.template-guide-header h2,
+.guide-section h3 {
+  margin: 0;
+  color: var(--color-text-1);
+}
+
+.template-guide-header h2 {
+  margin-top: 4px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.template-guide-header p,
+.guide-section p,
+.guide-notes li {
+  margin: 0;
+  color: var(--color-text-2);
+  line-height: 1.7;
+}
+
+.guide-eyebrow {
+  color: rgb(var(--primary-6));
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.guide-grid,
+.guide-detail-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.guide-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.guide-detail-grid {
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+}
+
+.guide-section {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.guide-section h3 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.guide-section code {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 2px 6px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 5px;
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.guide-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guide-section pre {
+  max-width: 100%;
+  overflow: auto;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: #15181d;
+  color: #f4f7fb;
+}
+
+.guide-section pre code {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  line-height: 1.6;
+  white-space: pre;
+}
+
+.guide-notes ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .placeholder-tags,
 .table-actions {
   display: inline-flex;
@@ -530,6 +748,12 @@ function generationVariant(status: GenerationStatus) {
 }
 
 @media (max-width: 900px) {
+  .template-guide-header,
+  .guide-grid,
+  .guide-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   .generate-grid {
     grid-template-columns: 1fr;
   }
