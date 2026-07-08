@@ -21,6 +21,8 @@ import java.util.Map;
 
 public class AuthlibHttpFacade {
 
+    private static final String API_LOCATION = "/api/plugins/authlib-injector";
+
     private final AuthlibAppService appService;
 
     public AuthlibHttpFacade(AuthlibAppService appService) {
@@ -124,12 +126,12 @@ public class AuthlibHttpFacade {
 
     private PluginHttpResponse ali(PluginHttpRequest request, PluginHttpResponse response) {
         Map<String, String> headers = new LinkedHashMap<>(response.headers());
-        headers.put("X-Authlib-Injector-API-Location", apiRoot(request));
+        headers.put("X-Authlib-Injector-API-Location", API_LOCATION);
         return new PluginHttpResponse(response.status(), headers, response.contentType(), response.body(), response.wrapped());
     }
 
     private String apiRoot(PluginHttpRequest request) {
-        return origin(request) + "/api/plugins/authlib-injector";
+        return origin(request) + API_LOCATION;
     }
 
     private String textureBaseUrl(PluginHttpRequest request) {

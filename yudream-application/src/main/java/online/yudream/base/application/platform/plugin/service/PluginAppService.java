@@ -177,6 +177,11 @@ public class PluginAppService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public boolean enabled(String code) {
+        return StringUtils.hasText(code) && pluginRuntimeGateway.enabled(code.trim());
+    }
+
     @Transactional
     public PluginFrontendModuleDTO saveFrontendSort(String code, PluginFrontendSortSaveCmd cmd) {
         PluginModule module = module(code);
