@@ -2,6 +2,7 @@ package online.yudream.base.plugin.minecraft.domain.repo;
 
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftServer;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftSeasonOperation;
+import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftPlayerActivity;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerStatus;
 
 import java.util.List;
@@ -28,4 +29,10 @@ public interface MinecraftServerRepository {
     Optional<MinecraftSeasonOperation> findOperation(String operationId);
 
     List<MinecraftSeasonOperation> listOperations(String serverId, int page, int size);
+
+    MinecraftPlayerActivity savePlayerActivity(MinecraftPlayerActivity activity);
+
+    Optional<MinecraftPlayerActivity> findPlayerActivity(String serverId, String playerId);
+
+    List<MinecraftPlayerActivity> listPlayerActivities(String serverId, int page, int size);
 }

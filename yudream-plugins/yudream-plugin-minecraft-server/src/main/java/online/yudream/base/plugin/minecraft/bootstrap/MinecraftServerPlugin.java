@@ -21,7 +21,8 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 )
 @PluginPermissions({
         @PluginPermission(code = MinecraftServerPlugin.VIEW_PERMISSION, name = "查看 MC 服务器", module = "平台插件", description = "查看 Minecraft 服务器列表、详情与在线状态"),
-        @PluginPermission(code = MinecraftServerPlugin.MANAGE_PERMISSION, name = "管理 MC 服务器", module = "平台插件", description = "维护 Minecraft 服务器、线路地址和周目信息")
+        @PluginPermission(code = MinecraftServerPlugin.MANAGE_PERMISSION, name = "管理 MC 服务器", module = "平台插件", description = "维护 Minecraft 服务器、线路地址和周目信息"),
+        @PluginPermission(code = MinecraftServerPlugin.REPORT_PERMISSION, name = "上报 MC 玩家事件", module = "平台插件", description = "Minecraft 服务器插件上报玩家加入、退出和挂机事件")
 })
 @PluginFrontend(
         moduleName = "minecraftServer",
@@ -63,6 +64,7 @@ public class MinecraftServerPlugin implements YuDreamPlugin {
     public static final String CODE = "minecraft-server";
     public static final String VIEW_PERMISSION = "plugin:minecraft-server:view";
     public static final String MANAGE_PERMISSION = "plugin:minecraft-server:manage";
+    public static final String REPORT_PERMISSION = "plugin:minecraft-server:report";
 
     @Override
     public void onEnable(PluginContext context) {

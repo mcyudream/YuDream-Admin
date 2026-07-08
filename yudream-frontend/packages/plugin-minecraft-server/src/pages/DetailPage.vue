@@ -26,7 +26,7 @@
         </div>
         <div class="mc-line-list">
           <div v-for="endpoint in server.endpoints" :key="endpoint.id || endpoint.host" class="mc-line detail">
-            <div>
+            <div class="mc-line-main">
               <strong>{{ endpoint.name }}</strong>
               <code>{{ model.endpointAddress(endpoint) }}</code>
             </div>
@@ -41,7 +41,7 @@
         <MarkdownPreview :content="server.descriptionMarkdown" />
       </McPanel>
 
-      <McPanel title="我的操作记录" eyebrow="Records">
+      <McPanel v-if="model.walletEnabled" title="我的操作记录" eyebrow="Records">
         <div class="mc-table-wrap">
           <table class="mc-table">
             <thead>
@@ -66,6 +66,67 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div class="mc-pagination">
+          <FaButton size="sm" variant="outline" :disabled="model.recordsPager.page <= 1" @click="model.prevRecordsPage">
+            <FaIcon name="i-ri:arrow-left-s-line" />
+            上一页
+          </FaButton>
+          <span>第 {{ model.recordsPager.page }} 页</span>
+          <FaButton size="sm" variant="outline" :disabled="!model.recordsPager.hasNext" @click="model.nextRecordsPage">
+            下一页
+            <FaIcon name="i-ri:arrow-right-s-line" />
+          </FaButton>
+        </div>
+      </McPanel>
+
+      <McPanel v-if="model.canManage" title="玩家时长统计" eyebrow="Players">
+        <div class="mc-table-wrap">
+          <table class="mc-table">
+            <thead>
+              <tr>
+                <th>玩家</th>
+                <th>状态</th>
+                <th>挂机</th>
+                <th>累计在线</th>
+                <th>累计挂机</th>
+                <th>最近加入</th>
+                <th>最近退出</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="player in model.playerActivities" :key="player.playerId">
+                <td>
+                  <strong>{{ player.playerName || player.playerId }}</strong>
+                  <div class="mc-subtle">{{ player.playerId }}</div>
+                </td>
+                <td><StatusPill :status="player.online ? 'ONLINE' : 'OFFLINE'" /></td>
+                <td>
+                  <span class="mc-afk-pill" :class="{ active: player.afk }">
+                    {{ player.afk ? '挂机中' : '-' }}
+                  </span>
+                </td>
+                <td class="duration-cell">{{ model.formatDuration(player.totalOnlineMillis) }}</td>
+                <td class="duration-cell">{{ model.formatDuration(player.totalAfkMillis) }}</td>
+                <td>{{ model.formatTime(player.lastJoinedAt) }}</td>
+                <td>{{ model.formatTime(player.lastQuitAt) }}</td>
+              </tr>
+              <tr v-if="!model.playerActivities.length">
+                <td colspan="7"><div class="mc-empty compact">暂无玩家时长统计</div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mc-pagination">
+          <FaButton size="sm" variant="outline" :disabled="model.playerActivitiesPager.page <= 1" @click="model.prevPlayerActivitiesPage">
+            <FaIcon name="i-ri:arrow-left-s-line" />
+            上一页
+          </FaButton>
+          <span>第 {{ model.playerActivitiesPager.page }} 页</span>
+          <FaButton size="sm" variant="outline" :disabled="!model.playerActivitiesPager.hasNext" @click="model.nextPlayerActivitiesPage">
+            下一页
+            <FaIcon name="i-ri:arrow-right-s-line" />
+          </FaButton>
         </div>
       </McPanel>
     </div>
