@@ -70,7 +70,7 @@ public class ActivityProofAppService {
     }
 
     public ActivityProofStatusDTO status() {
-        return new ActivityProofStatusDTO(dependencies(), toDTO(repository.settings()));
+        return new ActivityProofStatusDTO(dependencies(), toDTO(currentSettings()));
     }
 
     public ActivityProofDependencyDTO dependencies() {
@@ -82,7 +82,7 @@ public class ActivityProofAppService {
     }
 
     public ActivityProofSettingsDTO settings() {
-        return toDTO(repository.settings());
+        return toDTO(currentSettings());
     }
 
     public ActivityProofSettingsDTO saveSettings(ActivityProofSettingsSaveCmd cmd) {
@@ -90,6 +90,8 @@ public class ActivityProofAppService {
                 .withDefaults(cmd.defaultActivityName(), cmd.defaultCollege(), cmd.defaultIssuer(), System.currentTimeMillis());
         if (cmd.templateId() != null) {
             settings = withTemplate(settings, cmd.templateId());
+        } else {
+            settings = refreshTemplate(settings);
         }
         return toDTO(repository.saveSettings(settings));
     }
@@ -144,7 +146,7 @@ public class ActivityProofAppService {
     }
 
     public ActivityProofExportDTO export(ActivityProofExportCmd cmd, String operatorUserId) {
-        ActivityProofSettings settings = repository.settings();
+        ActivityProofSettings settings = currentSettings();
         if (!settings.hasTemplate()) {
             throw new IllegalArgumentException("请选择 Word 模板");
         }
@@ -484,9 +486,32 @@ public class ActivityProofAppService {
         return framework != null && framework.wordTemplates() != null && framework.wordTemplates().enabled();
     }
 
+    private ActivityProofSettings currentSettings() {
+        ActivityProofSettings settings = repository.settings();
+        ActivityProofSettings refreshed = refreshTemplate(settings);
+        return refreshed == settings ? settings : repository.saveSettings(refreshed);
+    }
+
+    private ActivityProofSettings refreshTemplate(ActivityProofSettings settings) {
+        if (settings == null || !settings.hasTemplate() || !wordTemplateEnabled()) {
+            return settings;
+        }
+        Optional<PluginWordTemplateSummary> byId = framework.wordTemplates().template(settings.templateId());
+        if (byId.isPresent()) {
+            return withTemplateSummary(settings, byId.get());
+        }
+        Optional<PluginWordTemplateSummary> byCode = framework.wordTemplates().templateByCode(settings.templateCode());
+        return byCode.map(template -> withTemplateSummary(settings, template)).orElse(settings);
+    }
+
     private ActivityProofSettings withTemplate(ActivityProofSettings settings, Long templateId) {
         PluginWordTemplateSummary template = framework.wordTemplates().template(templateId)
+                .or(() -> framework.wordTemplates().templateByCode(settings.templateCode()))
                 .orElseThrow(() -> new IllegalArgumentException("Word 模板不存在或已停用"));
+        return withTemplateSummary(settings, template);
+    }
+
+    private ActivityProofSettings withTemplateSummary(ActivityProofSettings settings, PluginWordTemplateSummary template) {
         return settings.withTemplate(template.id(), template.code(), template.name(), template.originalFilename(),
                 template.updatedAt(), System.currentTimeMillis());
     }
