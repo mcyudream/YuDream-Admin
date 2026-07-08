@@ -18,6 +18,10 @@ public interface PluginWordTemplateService {
         return Optional.empty();
     }
 
+    default Optional<PluginWordTemplateSummary> templateByCode(String code) {
+        return Optional.empty();
+    }
+
     PluginRenderedDocument render(byte[] templateContent, Map<String, Object> data);
 
     default PluginRenderedDocument render(Long templateId, Map<String, Object> data) {

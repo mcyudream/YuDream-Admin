@@ -91,6 +91,11 @@ public class DefaultFrameworkServices implements FrameworkServices {
             }
 
             @Override
+            public Optional<PluginWordTemplateSummary> templateByCode(String code) {
+                return wordTemplateByCode(code);
+            }
+
+            @Override
             public PluginRenderedDocument render(Long templateId, Map<String, Object> data) {
                 return renderWordTemplate(templateId, data);
             }
@@ -154,6 +159,16 @@ public class DefaultFrameworkServices implements FrameworkServices {
         }
         ensureWordTemplateEnabled();
         return wordTemplateRepo.findById(id)
+                .filter(this::activeTemplate)
+                .map(this::toSummary);
+    }
+
+    private Optional<PluginWordTemplateSummary> wordTemplateByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return Optional.empty();
+        }
+        ensureWordTemplateEnabled();
+        return wordTemplateRepo.findByCode(code.trim())
                 .filter(this::activeTemplate)
                 .map(this::toSummary);
     }
