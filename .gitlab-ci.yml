@@ -11,6 +11,9 @@ default:
 variables:
   PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  MAVEN_SETTINGS_PATH: "ci/maven-settings.xml"
+  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+  COREPACK_NPM_REGISTRY: "https://registry.npmmirror.com"
   FRONTEND_DIR: "yudream-frontend"
 
 cache:
@@ -31,7 +34,9 @@ build:frontend-plugins:
   stage: build-frontend-plugins
   image: *node_image
   before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
     - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
     - node -v
     - pnpm -v
   script:
@@ -71,8 +76,8 @@ build:backend:
         [ -z "$plugin" ] && continue
         PLUGIN_MODULES="$PLUGIN_MODULES,yudream-plugins/$plugin"
       done < ci/plugins.list
-      echo "mvn clean install -pl yudream-bootstrap$PLUGIN_MODULES -am -DskipTests -B -e"
-      mvn clean install -pl "yudream-bootstrap$PLUGIN_MODULES" -am -DskipTests -B -e
+      echo "mvn -s $MAVEN_SETTINGS_PATH clean install -pl yudream-bootstrap$PLUGIN_MODULES -am -DskipTests -B -e"
+      mvn -s "$MAVEN_SETTINGS_PATH" clean install -pl "yudream-bootstrap$PLUGIN_MODULES" -am -DskipTests -B -e
   artifacts:
     name: "backend-jars-${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -84,7 +89,9 @@ build:frontend-main:
   stage: build-frontend-main
   image: *node_image
   before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
     - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
     - node -v
     - pnpm -v
   script:
