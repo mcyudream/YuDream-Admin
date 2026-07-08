@@ -55,6 +55,7 @@ public class ActivityProofAppService {
     private static final String MINECRAFT_PLUGIN = "minecraft-server";
     private static final String STUDENT_INFO_PLUGIN = "yudream-student-info";
     private static final String SKIN_PLUGIN = "yudream-skin";
+    private static final String DEFAULT_TEMPLATE_CODE = "minecraft_activity_proof_v1";
     private static final String DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
     private static final int SCAN_PAGE_SIZE = 200;
     private static final int MAX_SCAN_SIZE = 1000;
@@ -88,7 +89,7 @@ public class ActivityProofAppService {
     public ActivityProofSettingsDTO saveSettings(ActivityProofSettingsSaveCmd cmd) {
         ActivityProofSettings settings = repository.settings()
                 .withDefaults(cmd.defaultActivityName(), cmd.defaultCollege(), cmd.defaultIssuer(), System.currentTimeMillis());
-        if (cmd.templateId() != null) {
+        if (hasText(cmd.templateId())) {
             settings = withTemplate(settings, cmd.templateId());
         } else {
             settings = refreshTemplate(settings);
@@ -106,7 +107,7 @@ public class ActivityProofAppService {
     }
 
     public ActivityProofSettingsDTO selectTemplate(ActivityProofTemplateSelectCmd cmd) {
-        ActivityProofSettings settings = withTemplate(repository.settings(), requireTemplateId(cmd.templateId()));
+        ActivityProofSettings settings = withTemplate(repository.settings(), cmd.templateId());
         return toDTO(repository.saveSettings(settings));
     }
 
@@ -498,15 +499,17 @@ public class ActivityProofAppService {
         }
         Optional<PluginWordTemplateSummary> byId = framework.wordTemplates().template(settings.templateId());
         if (byId.isPresent()) {
-            return withTemplateSummary(settings, byId.get());
+            return sameTemplate(settings, byId.get()) ? settings : withTemplateSummary(settings, byId.get());
         }
-        Optional<PluginWordTemplateSummary> byCode = framework.wordTemplates().templateByCode(settings.templateCode());
-        return byCode.map(template -> withTemplateSummary(settings, template)).orElse(settings);
+        return findTemplateByCode(firstText(settings.templateCode(), DEFAULT_TEMPLATE_CODE))
+                .map(template -> sameTemplate(settings, template) ? settings : withTemplateSummary(settings, template))
+                .orElse(settings);
     }
 
-    private ActivityProofSettings withTemplate(ActivityProofSettings settings, Long templateId) {
-        PluginWordTemplateSummary template = framework.wordTemplates().template(templateId)
-                .or(() -> framework.wordTemplates().templateByCode(settings.templateCode()))
+    private ActivityProofSettings withTemplate(ActivityProofSettings settings, String templateId) {
+        Long id = requireTemplateId(templateId);
+        PluginWordTemplateSummary template = framework.wordTemplates().template(id)
+                .or(() -> findTemplateByCode(firstText(settings.templateCode(), DEFAULT_TEMPLATE_CODE)))
                 .orElseThrow(() -> new IllegalArgumentException("Word 模板不存在或已停用"));
         return withTemplateSummary(settings, template);
     }
@@ -516,14 +519,43 @@ public class ActivityProofAppService {
                 template.updatedAt(), System.currentTimeMillis());
     }
 
+    private Optional<PluginWordTemplateSummary> findTemplateByCode(String code) {
+        if (!hasText(code) || !wordTemplateEnabled()) {
+            return Optional.empty();
+        }
+        String normalized = normalizeKey(code);
+        int page = 1;
+        while (true) {
+            List<PluginWordTemplateSummary> batch = framework.wordTemplates().templates(code, page, SCAN_PAGE_SIZE);
+            Optional<PluginWordTemplateSummary> matched = batch.stream()
+                    .filter(template -> normalized.equals(normalizeKey(template.code())))
+                    .findFirst();
+            if (matched.isPresent() || batch.size() < SCAN_PAGE_SIZE) {
+                return matched;
+            }
+            page++;
+        }
+    }
+
+    private boolean sameTemplate(ActivityProofSettings settings, PluginWordTemplateSummary template) {
+        return settings != null
+                && template != null
+                && settings.templateId() != null
+                && settings.templateId().equals(template.id())
+                && text(settings.templateCode()).equals(text(template.code()))
+                && text(settings.templateName()).equals(text(template.name()))
+                && text(settings.templateFilename()).equals(text(template.originalFilename()))
+                && settings.templateUpdatedAt() == template.updatedAt();
+    }
+
     private ActivityProofSettingsDTO toDTO(ActivityProofSettings settings) {
-        return new ActivityProofSettingsDTO(settings.hasTemplate(), settings.templateId(), settings.templateCode(), settings.templateName(),
+        return new ActivityProofSettingsDTO(settings.hasTemplate(), stringId(settings.templateId()), settings.templateCode(), settings.templateName(),
                 settings.templateFilename(), settings.templateUpdatedAt(),
                 settings.defaultActivityName(), settings.defaultCollege(), settings.defaultIssuer(), settings.updatedAt());
     }
 
     private ActivityProofTemplateDTO toDTO(PluginWordTemplateSummary template) {
-        return new ActivityProofTemplateDTO(template.id(), template.code(), template.name(),
+        return new ActivityProofTemplateDTO(stringId(template.id()), template.code(), template.name(),
                 template.originalFilename(), template.updatedAt());
     }
 
@@ -588,11 +620,19 @@ public class ActivityProofAppService {
         return uuid == null ? null : uuid.trim().replace("-", "").toLowerCase(Locale.ROOT);
     }
 
-    private Long requireTemplateId(Long value) {
-        if (value == null) {
+    private String stringId(Long value) {
+        return value == null ? "" : String.valueOf(value);
+    }
+
+    private Long requireTemplateId(String value) {
+        if (!hasText(value)) {
             throw new IllegalArgumentException("请选择 Word 模板");
         }
-        return value;
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid Word template ID: " + value);
+        }
     }
 
     private String requireText(String value, String message) {

@@ -4,6 +4,6 @@ public record ActivityProofSettingsSaveCmd(
         String defaultActivityName,
         String defaultCollege,
         String defaultIssuer,
-        Long templateId
+        String templateId
 ) {
 }

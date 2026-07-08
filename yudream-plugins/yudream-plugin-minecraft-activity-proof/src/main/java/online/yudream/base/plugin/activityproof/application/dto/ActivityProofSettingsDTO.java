@@ -2,7 +2,7 @@ package online.yudream.base.plugin.activityproof.application.dto;
 
 public record ActivityProofSettingsDTO(
         boolean templateReady,
-        Long templateId,
+        String templateId,
         String templateCode,
         String templateName,
         String templateFilename,

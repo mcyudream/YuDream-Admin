@@ -11,7 +11,7 @@ export interface ActivityProofDependencies {
 
 export interface ActivityProofSettings {
   templateReady: boolean
-  templateId: number | null
+  templateId: string
   templateCode: string
   templateName: string
   templateFilename: string
@@ -23,7 +23,7 @@ export interface ActivityProofSettings {
 }
 
 export interface ActivityProofTemplate {
-  id: number
+  id: string
   code: string
   name: string
   originalFilename: string
