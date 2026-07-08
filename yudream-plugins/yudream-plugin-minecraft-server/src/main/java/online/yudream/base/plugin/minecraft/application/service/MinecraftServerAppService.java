@@ -24,6 +24,9 @@ import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerStatus;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftStatusSnapshot;
 import online.yudream.base.plugin.minecraft.infrastructure.service.MinecraftStatusService;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
+import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftPlayerActivity;
+import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftServer;
+import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftService;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletAsset;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletBalance;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletChangeRequest;
@@ -41,10 +44,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-public class MinecraftServerAppService {
+public class MinecraftServerAppService implements PluginMinecraftService {
 
     private static final long DEFAULT_HISTORY_WINDOW_MILLIS = 24L * 60 * 60 * 1000;
     private static final int DEFAULT_HISTORY_LIMIT = 144;
@@ -235,6 +239,60 @@ public class MinecraftServerAppService {
         return repository.listPlayerActivities(serverId, safePage(page), safeSize(size)).stream()
                 .map(activity -> assembler.toDTO(activity, now))
                 .toList();
+    }
+
+    @Override
+    public List<PluginMinecraftServer> minecraftServers(boolean includeDisabled) {
+        return listServers(includeDisabled, false).stream()
+                .map(this::toPluginServer)
+                .toList();
+    }
+
+    @Override
+    public Optional<PluginMinecraftServer> minecraftServer(String serverId) {
+        if (serverId == null || serverId.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(toPluginServer(detail(serverId, false)));
+    }
+
+    @Override
+    public List<PluginMinecraftPlayerActivity> minecraftPlayerActivities(String serverId, int page, int size) {
+        return playerActivities(serverId, page, size).stream()
+                .map(this::toPluginActivity)
+                .toList();
+    }
+
+    private PluginMinecraftServer toPluginServer(MinecraftServerDTO dto) {
+        MinecraftServerDTO.SeasonDTO season = dto.currentSeason();
+        return new PluginMinecraftServer(
+                dto.id(),
+                dto.name(),
+                dto.descriptionMarkdown(),
+                dto.enabled(),
+                season == null ? null : season.id(),
+                season == null ? null : season.name(),
+                season == null ? null : season.startedAt(),
+                dto.createdAt(),
+                dto.updatedAt()
+        );
+    }
+
+    private PluginMinecraftPlayerActivity toPluginActivity(MinecraftPlayerActivityDTO dto) {
+        return new PluginMinecraftPlayerActivity(
+                dto.serverId(),
+                dto.playerId(),
+                dto.playerName(),
+                dto.online(),
+                dto.afk(),
+                dto.totalOnlineMillis(),
+                dto.totalAfkMillis(),
+                dto.currentOnlineSince(),
+                dto.currentAfkSince(),
+                dto.lastJoinedAt(),
+                dto.lastQuitAt(),
+                dto.updatedAt()
+        );
     }
 
     private MinecraftSeasonOperation buildSeasonOperation(MinecraftServer server, MinecraftSeasonOpenCmd cmd, String operatorUserId) {

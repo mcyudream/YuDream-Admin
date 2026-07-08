@@ -1,5 +1,7 @@
 package online.yudream.base.plugin.studentinfo.application.service;
 
+import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoProfile;
+import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoService;
 import online.yudream.base.plugin.studentinfo.application.assembler.StudentInfoAppAssembler;
 import online.yudream.base.plugin.studentinfo.application.cmd.StudentInfoSaveCmd;
 import online.yudream.base.plugin.studentinfo.application.dto.StudentInfoDTO;
@@ -10,7 +12,7 @@ import online.yudream.base.plugin.studentinfo.domain.repo.StudentInfoRepository;
 import java.util.List;
 import java.util.Optional;
 
-public class StudentInfoAppService {
+public class StudentInfoAppService implements PluginStudentInfoService {
 
     private final StudentInfoRepository repository;
     private final StudentInfoAppAssembler assembler = new StudentInfoAppAssembler();
@@ -40,6 +42,13 @@ public class StudentInfoAppService {
         return repository.findByUserId(userId.trim()).map(assembler::toDTO);
     }
 
+    public Optional<StudentInfoDTO> findByStudentNo(String studentNo) {
+        if (studentNo == null || studentNo.isBlank()) {
+            return Optional.empty();
+        }
+        return repository.findByStudentNo(studentNo.trim()).map(assembler::toDTO);
+    }
+
     public List<StudentInfoDTO> list(StudentInfoQuery query) {
         StudentInfoQuery safeQuery = query == null
                 ? new StudentInfoQuery(null, null, null, 1, 20)
@@ -58,6 +67,35 @@ public class StudentInfoAppService {
 
     public void delete(String userId) {
         repository.delete(requireText(userId, "用户不能为空"));
+    }
+
+    @Override
+    public Optional<PluginStudentInfoProfile> findStudentInfoByUserId(String userId) {
+        return findByUserId(userId).map(this::toPluginProfile);
+    }
+
+    @Override
+    public Optional<PluginStudentInfoProfile> findStudentInfoByStudentNo(String studentNo) {
+        return findByStudentNo(studentNo).map(this::toPluginProfile);
+    }
+
+    @Override
+    public List<PluginStudentInfoProfile> studentInfos(String keyword, int page, int size) {
+        return list(new StudentInfoQuery(keyword, null, null, page, size)).stream()
+                .map(this::toPluginProfile)
+                .toList();
+    }
+
+    private PluginStudentInfoProfile toPluginProfile(StudentInfoDTO dto) {
+        return new PluginStudentInfoProfile(
+                dto.userId(),
+                dto.studentName(),
+                dto.studentNo(),
+                dto.className(),
+                dto.college(),
+                dto.createdAt(),
+                dto.updatedAt()
+        );
     }
 
     private String requireText(String value, String message) {

@@ -13,6 +13,7 @@ import online.yudream.base.plugin.spi.annotation.PluginRoute;
 import online.yudream.base.plugin.spi.annotation.PluginSpec;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
+import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftService;
 
 @PluginSpec(
         code = MinecraftServerPlugin.CODE,
@@ -78,6 +79,7 @@ public class MinecraftServerPlugin implements YuDreamPlugin {
         MinecraftStatusScheduler statusScheduler = new MinecraftStatusScheduler(appService);
         statusScheduler.start();
         context.onDispose(statusScheduler);
+        context.registerExtension(PluginMinecraftService.class, appService);
         context.registerHttpController(new MinecraftServerController(new MinecraftServerHttpFacade(appService)));
     }
 }
