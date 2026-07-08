@@ -28,6 +28,7 @@ import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoProfile;
 import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoService;
+import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 
 import java.io.ByteArrayInputStream;
 import java.net.URLEncoder;
@@ -310,6 +311,10 @@ public class ActivityProofAppService {
         if (bySkinOwner != null) {
             return bySkinOwner;
         }
+        PluginStudentInfoProfile byUser = resolveStudentByUser(activity, studentsByUserId);
+        if (byUser != null) {
+            return byUser;
+        }
         PluginStudentInfoProfile byPlayerId = studentsByNo.get(normalizeKey(activity.playerId()));
         if (byPlayerId != null) {
             return byPlayerId;
@@ -329,6 +334,32 @@ public class ActivityProofAppService {
             return cached;
         }
         return studentInfoService().flatMap(service -> service.findStudentInfoByUserId(ownerId)).orElse(null);
+    }
+
+    private PluginStudentInfoProfile resolveStudentByUser(PluginMinecraftPlayerActivity activity,
+                                                          Map<String, PluginStudentInfoProfile> studentsByUserId) {
+        Optional<PluginUserProfile> user = userProfile(activity);
+        if (user.isEmpty() || user.get().id() == null) {
+            return null;
+        }
+        String userId = String.valueOf(user.get().id());
+        PluginStudentInfoProfile cached = studentsByUserId.get(normalizeKey(userId));
+        if (cached != null) {
+            return cached;
+        }
+        return studentInfoService().flatMap(service -> service.findStudentInfoByUserId(userId)).orElse(null);
+    }
+
+    private Optional<PluginUserProfile> userProfile(PluginMinecraftPlayerActivity activity) {
+        if (framework == null || framework.users() == null || !hasText(activity.playerName())) {
+            return Optional.empty();
+        }
+        String playerName = activity.playerName().trim();
+        Optional<PluginUserProfile> byUsername = framework.users().findByUsername(playerName);
+        if (byUsername.isPresent()) {
+            return byUsername;
+        }
+        return playerName.contains("@") ? framework.users().findByEmail(playerName) : Optional.empty();
     }
 
     private Optional<PluginSkinProfile> skinProfile(PluginMinecraftPlayerActivity activity) {
