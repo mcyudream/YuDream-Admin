@@ -8,6 +8,7 @@ import online.yudream.base.plugin.minecraft.application.dto.MinecraftEconomyReco
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonOperationDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftPlayerActivityDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerDTO;
+import online.yudream.base.plugin.minecraft.application.dto.MinecraftStatusSnapshotDTO;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftSeasonOperation;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftServer;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftPlayerActivity;
@@ -20,6 +21,7 @@ import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftSeasonAdjustm
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerEndpoint;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerSeason;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerStatus;
+import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftStatusSnapshot;
 import online.yudream.base.plugin.minecraft.infrastructure.service.MinecraftStatusService;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.wallet.PluginWalletAsset;
@@ -43,6 +45,10 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class MinecraftServerAppService {
+
+    private static final long DEFAULT_HISTORY_WINDOW_MILLIS = 24L * 60 * 60 * 1000;
+    private static final int DEFAULT_HISTORY_LIMIT = 144;
+    private static final int MAX_HISTORY_LIMIT = 288;
 
     private final MinecraftServerRepository repository;
     private final MinecraftStatusService statusService;
@@ -94,7 +100,29 @@ public class MinecraftServerAppService {
         List<MinecraftEndpointStatus> statuses = server.endpoints().stream()
                 .map(statusService::ping)
                 .toList();
-        return repository.saveStatus(MinecraftServerStatus.from(server.id(), statuses));
+        MinecraftServerStatus status = repository.saveStatus(MinecraftServerStatus.from(server.id(), statuses));
+        repository.saveStatusSnapshot(MinecraftStatusSnapshot.from(status));
+        return status;
+    }
+
+    public void refreshEnabledServers() {
+        for (MinecraftServer server : repository.list(1, 200, false)) {
+            try {
+                refreshStatus(server.id());
+            } catch (RuntimeException ignored) {
+            }
+        }
+    }
+
+    public List<MinecraftStatusSnapshotDTO> statusHistory(String serverId, Long since, int limit) {
+        requireServer(serverId);
+        long from = since == null || since <= 0
+                ? System.currentTimeMillis() - DEFAULT_HISTORY_WINDOW_MILLIS
+                : normalizeTimestamp(since);
+        int safeLimit = Math.max(Math.min(limit <= 0 ? DEFAULT_HISTORY_LIMIT : limit, MAX_HISTORY_LIMIT), 1);
+        return repository.listStatusSnapshots(serverId, from, safeLimit).stream()
+                .map(assembler::toDTO)
+                .toList();
     }
 
     public boolean walletEnabled() {
@@ -337,6 +365,10 @@ public class MinecraftServerAppService {
 
     private long eventAt(MinecraftPlayerEventCmd cmd) {
         Long value = cmd.eventAt();
+        return normalizeTimestamp(value);
+    }
+
+    private long normalizeTimestamp(Long value) {
         long now = System.currentTimeMillis();
         if (value == null || value <= 0) {
             return now;

@@ -33,6 +33,10 @@
         </div>
       </McPanel>
 
+      <McPanel title="在线人数趋势" eyebrow="Trend">
+        <OnlineTrendChart :items="model.statusHistory" :max-players="server.status?.maxPlayers" :format-time="model.formatTime" />
+      </McPanel>
+
       <McPanel title="服务器说明" eyebrow="Markdown">
         <MarkdownPreview :content="server.descriptionMarkdown" />
       </McPanel>
@@ -137,6 +141,7 @@ import { computed } from 'vue'
 import { FaButton, FaIcon } from '@fantastic-admin/components'
 import MarkdownPreview from '../components/MarkdownPreview.vue'
 import McPanel from '../components/McPanel.vue'
+import OnlineTrendChart from '../components/OnlineTrendChart.vue'
 import StatusPill from '../components/StatusPill.vue'
 import type { MinecraftServerPluginModel } from '../composables/useMinecraftServerPlugin'
 

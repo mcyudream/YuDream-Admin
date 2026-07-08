@@ -46,6 +46,12 @@ public class MinecraftServerHttpFacade {
         return PluginHttpResponse.ok(assembler.toRes(appService.detail(pathSegment(request.path(), 1), true)));
     }
 
+    public PluginHttpResponse statusHistory(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.statusHistory(pathSegment(request.path(), 1), longQuery(request, "since"), intQuery(request, "limit", 0)).stream()
+                .map(assembler::toRes)
+                .toList());
+    }
+
     public PluginHttpResponse economyStatus() {
         return PluginHttpResponse.ok(Map.of("walletEnabled", appService.walletEnabled()));
     }
@@ -120,6 +126,11 @@ public class MinecraftServerHttpFacade {
     private int intQuery(PluginHttpRequest request, String key, int defaultValue) {
         java.util.List<String> values = request.query().get(key);
         return values == null || values.isEmpty() || values.get(0).isBlank() ? defaultValue : Integer.parseInt(values.get(0));
+    }
+
+    private Long longQuery(PluginHttpRequest request, String key) {
+        java.util.List<String> values = request.query().get(key);
+        return values == null || values.isEmpty() || values.get(0).isBlank() ? null : Long.parseLong(values.get(0));
     }
 
     private String pathSegment(String path, int index) {

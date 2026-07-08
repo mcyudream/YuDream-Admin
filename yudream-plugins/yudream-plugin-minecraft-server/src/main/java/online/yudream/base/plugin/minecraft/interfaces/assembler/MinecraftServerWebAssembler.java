@@ -11,6 +11,7 @@ import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonOpera
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftPlayerActivityDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerStatusDTO;
+import online.yudream.base.plugin.minecraft.application.dto.MinecraftStatusSnapshotDTO;
 import online.yudream.base.plugin.minecraft.interfaces.request.MinecraftPlayerEventRequest;
 import online.yudream.base.plugin.minecraft.interfaces.request.MinecraftSeasonOpenRequest;
 import online.yudream.base.plugin.minecraft.interfaces.request.MinecraftServerSaveRequest;
@@ -22,6 +23,7 @@ import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftSeasonOperat
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftPlayerActivityRes;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftServerRes;
 import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftServerStatusRes;
+import online.yudream.base.plugin.minecraft.interfaces.res.MinecraftStatusSnapshotRes;
 
 public class MinecraftServerWebAssembler {
 
@@ -74,6 +76,11 @@ public class MinecraftServerWebAssembler {
     public MinecraftServerStatusRes toRes(MinecraftServerStatusDTO dto) {
         return new MinecraftServerStatusRes(dto.serverId(), dto.status(), dto.onlinePlayers(), dto.maxPlayers(),
                 dto.endpoints().stream().map(this::toRes).toList(), dto.checkedAt());
+    }
+
+    public MinecraftStatusSnapshotRes toRes(MinecraftStatusSnapshotDTO dto) {
+        return new MinecraftStatusSnapshotRes(dto.id(), dto.serverId(), dto.status(), dto.onlinePlayers(),
+                dto.maxPlayers(), dto.checkedAt());
     }
 
     public MinecraftSeasonOperationRes toRes(MinecraftSeasonOperationDTO dto) {

@@ -1,10 +1,12 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
-import type { EconomyRecord, InheritanceRule, MinecraftEndpoint, MinecraftServer, PlayerActivity, SeasonForm, SeasonOperation, ServerForm, TimeValue } from '../types'
+import type { EconomyRecord, InheritanceRule, MinecraftEndpoint, MinecraftServer, MinecraftStatusSnapshot, PlayerActivity, SeasonForm, SeasonOperation, ServerForm, TimeValue } from '../types'
 import { useFaToast } from '@fantastic-admin/components'
 import { computed, reactive, ref } from 'vue'
 import { createMinecraftApi } from '../api/minecraft-api'
 
 const MANAGE_PERMISSION = 'plugin:minecraft-server:manage'
+const STATUS_HISTORY_WINDOW = 24 * 60 * 60 * 1000
+const STATUS_HISTORY_LIMIT = 144
 
 export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   const api = createMinecraftApi(sdk)
@@ -17,6 +19,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   const previewOperation = ref<SeasonOperation | null>(null)
   const operations = ref<SeasonOperation[]>([])
   const records = ref<EconomyRecord[]>([])
+  const statusHistory = ref<MinecraftStatusSnapshot[]>([])
   const playerActivities = ref<PlayerActivity[]>([])
   const recordsPager = reactive({ page: 1, size: 20, hasNext: false })
   const operationsPager = reactive({ page: 1, size: 10, hasNext: false })
@@ -53,6 +56,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
       servers.value = await api.list(includeDisabled)
       if (!selectedId.value || !servers.value.some(server => server.id === selectedId.value)) {
         selectedId.value = servers.value[0]?.id || ''
+        statusHistory.value = []
         recordsPager.page = 1
         operationsPager.page = 1
         playerActivitiesPager.page = 1
@@ -101,6 +105,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
   async function loadSideData(id: string) {
     const detail = await api.detail(id)
     replaceServer(detail)
+    await loadStatusHistory(id)
     if (walletEnabled.value) {
       await loadRecords(id)
     }
@@ -139,6 +144,14 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     const items = await api.operations(serverId, operationsPager.page, operationsPager.size)
     operationsPager.hasNext = items.length >= operationsPager.size
     operations.value = items
+  }
+
+  async function loadStatusHistory(serverId = selectedId.value) {
+    if (!serverId) {
+      statusHistory.value = []
+      return
+    }
+    statusHistory.value = await api.statusHistory(serverId, Date.now() - STATUS_HISTORY_WINDOW, STATUS_HISTORY_LIMIT)
   }
 
   async function loadPlayerActivities(serverId = selectedId.value) {
@@ -227,6 +240,9 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     try {
       const refreshed = await api.detail(target.id, true)
       replaceServer(refreshed)
+      if (target.id === selectedId.value) {
+        await loadStatusHistory(target.id)
+      }
       toast.success('状态已刷新')
     }
     finally {
@@ -472,6 +488,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     previewOperation,
     operations,
     records,
+    statusHistory,
     playerActivities,
     recordsPager,
     operationsPager,
@@ -486,6 +503,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     loadEconomyStatus,
     loadRecords,
     loadOperations,
+    loadStatusHistory,
     loadPlayerActivities,
     selectServer,
     newServer,

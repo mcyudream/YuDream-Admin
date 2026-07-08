@@ -41,6 +41,15 @@ export interface MinecraftServerStatus {
   checkedAt: TimeValue
 }
 
+export interface MinecraftStatusSnapshot {
+  id: string
+  serverId: string
+  status: 'ONLINE' | 'OFFLINE' | string
+  onlinePlayers: number
+  maxPlayers: number
+  checkedAt: TimeValue
+}
+
 export interface MinecraftServer {
   id: string
   name: string

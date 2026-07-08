@@ -1,5 +1,5 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
-import type { EconomyRecord, MinecraftServer, PlayerActivity, SeasonOperation } from '../types'
+import type { EconomyRecord, MinecraftServer, MinecraftStatusSnapshot, PlayerActivity, SeasonOperation } from '../types'
 
 export function createMinecraftApi(sdk: YuDreamPluginSdk) {
   function query(params: Record<string, string | number | boolean | undefined>) {
@@ -19,6 +19,7 @@ export function createMinecraftApi(sdk: YuDreamPluginSdk) {
     save: (data: Record<string, unknown>) => sdk.http.post<MinecraftServer>('/servers', data),
     remove: (id: string) => sdk.http.request(`/servers/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     refreshStatus: (id: string) => sdk.http.post<MinecraftServer>(`/servers/${encodeURIComponent(id)}/status/refresh`),
+    statusHistory: (id: string, since?: number, limit?: number) => sdk.http.get<MinecraftStatusSnapshot[]>(`/servers/${encodeURIComponent(id)}/status/history${query({ since, limit })}`),
     economyStatus: () => sdk.http.get<{ walletEnabled: boolean }>('/economy/status'),
     previewSeason: (id: string, data: Record<string, unknown>) => sdk.http.post<SeasonOperation>(`/servers/${encodeURIComponent(id)}/seasons/preview`, data),
     openSeason: (id: string, data: Record<string, unknown>) => sdk.http.post<SeasonOperation>(`/servers/${encodeURIComponent(id)}/seasons/open`, data),
