@@ -50,7 +50,13 @@ public class AuthlibAppService {
         meta.put("serverName", "YuDream Authlib Injector");
         meta.put("implementationName", "YuDream Authlib Injector Plugin");
         meta.put("implementationVersion", "1.0.0");
-        meta.put("links", Map.of("homepage", publicHomepage(apiRoot)));
+        meta.put("links", links(apiRoot));
+        meta.put("feature.non_email_login", true);
+        meta.put("feature.legacy_skin_api", false);
+        meta.put("feature.no_mojang_namespace", false);
+        meta.put("feature.enable_mojang_anti_features", false);
+        meta.put("feature.enable_profile_key", false);
+        meta.put("feature.username_check", false);
         body.put("meta", meta);
         body.put("skinDomains", skinDomains(textureBaseUrl));
         body.put("signaturePublickey", cryptoService.publicKeyPem());
@@ -189,6 +195,14 @@ public class AuthlibAppService {
 
     private String publicHomepage(String apiRoot) {
         return originOf(apiRoot).orElseGet(() -> stripTrailingSlash(apiRoot));
+    }
+
+    private Map<String, String> links(String apiRoot) {
+        String homepage = publicHomepage(apiRoot);
+        Map<String, String> links = new LinkedHashMap<>();
+        links.put("homepage", homepage);
+        links.put("register", homepage + "/login");
+        return links;
     }
 
     private List<String> skinDomains(String textureBaseUrl) {
