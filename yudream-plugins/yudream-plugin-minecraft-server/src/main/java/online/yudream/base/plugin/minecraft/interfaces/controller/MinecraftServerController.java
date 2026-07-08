@@ -39,6 +39,11 @@ public class MinecraftServerController {
         return http.refreshStatus(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/servers/{serverId}/status/history", permission = MinecraftServerPlugin.VIEW_PERMISSION)
+    public PluginHttpResponse statusHistory(PluginHttpRequest request) {
+        return http.statusHistory(request);
+    }
+
     @PluginHttpEndpoint(method = "GET", path = "/economy/status", permission = MinecraftServerPlugin.VIEW_PERMISSION)
     public PluginHttpResponse economyStatus(PluginHttpRequest request) {
         return http.economyStatus();

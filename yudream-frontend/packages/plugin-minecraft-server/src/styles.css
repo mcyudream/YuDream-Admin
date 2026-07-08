@@ -573,6 +573,92 @@
   font-size: 28px;
 }
 
+.mc-trend-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mc-trend-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mc-trend-summary div {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--mc-border);
+  border-radius: 6px;
+  background: var(--mc-surface-soft);
+}
+
+.mc-trend-summary span {
+  display: block;
+  color: var(--mc-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mc-trend-summary strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mc-chart-frame {
+  min-width: 0;
+  padding: 10px 10px 8px;
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mc-trend-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 32 / 11;
+}
+
+.mc-trend-grid {
+  stroke: #dce4e2;
+  stroke-width: 1;
+}
+
+.mc-trend-axis {
+  fill: var(--mc-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.mc-trend-area {
+  fill: rgba(31, 138, 85, 0.14);
+}
+
+.mc-trend-line {
+  fill: none;
+  stroke: var(--mc-primary);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.mc-trend-dot {
+  fill: #fff;
+  stroke: var(--mc-primary);
+  stroke-width: 2;
+}
+
+.mc-trend-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--mc-muted);
+  font-size: 12px;
+}
+
 .mc-empty {
   padding: 28px;
   color: var(--mc-muted);
@@ -617,6 +703,7 @@
   }
 
   .mc-form-grid,
+  .mc-trend-summary,
   .mc-markdown {
     grid-template-columns: 1fr;
   }

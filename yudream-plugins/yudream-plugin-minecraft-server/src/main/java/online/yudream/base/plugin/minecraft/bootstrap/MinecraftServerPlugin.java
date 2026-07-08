@@ -2,6 +2,7 @@ package online.yudream.base.plugin.minecraft.bootstrap;
 
 import online.yudream.base.plugin.minecraft.application.service.MinecraftServerAppService;
 import online.yudream.base.plugin.minecraft.infrastructure.repository.MinecraftServerDocumentRepository;
+import online.yudream.base.plugin.minecraft.infrastructure.service.MinecraftStatusScheduler;
 import online.yudream.base.plugin.minecraft.infrastructure.service.MinecraftStatusService;
 import online.yudream.base.plugin.minecraft.interfaces.controller.MinecraftServerController;
 import online.yudream.base.plugin.minecraft.interfaces.http.MinecraftServerHttpFacade;
@@ -74,6 +75,9 @@ public class MinecraftServerPlugin implements YuDreamPlugin {
                 statusService,
                 context.framework()
         );
+        MinecraftStatusScheduler statusScheduler = new MinecraftStatusScheduler(appService);
+        statusScheduler.start();
+        context.onDispose(statusScheduler);
         context.registerHttpController(new MinecraftServerController(new MinecraftServerHttpFacade(appService)));
     }
 }

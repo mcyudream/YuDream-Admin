@@ -7,6 +7,7 @@ import online.yudream.base.plugin.minecraft.application.dto.MinecraftSeasonOpera
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftPlayerActivityDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerDTO;
 import online.yudream.base.plugin.minecraft.application.dto.MinecraftServerStatusDTO;
+import online.yudream.base.plugin.minecraft.application.dto.MinecraftStatusSnapshotDTO;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftSeasonOperation;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftServer;
 import online.yudream.base.plugin.minecraft.domain.aggregate.MinecraftPlayerActivity;
@@ -16,6 +17,7 @@ import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftSeasonAdjustm
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerEndpoint;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerSeason;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerStatus;
+import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftStatusSnapshot;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -51,6 +53,11 @@ public class MinecraftServerAppAssembler {
     public MinecraftServerStatusDTO toDTO(MinecraftServerStatus status) {
         return new MinecraftServerStatusDTO(status.serverId(), status.status(), status.onlinePlayers(), status.maxPlayers(),
                 status.endpoints().stream().map(this::toDTO).toList(), status.checkedAt());
+    }
+
+    public MinecraftStatusSnapshotDTO toDTO(MinecraftStatusSnapshot snapshot) {
+        return new MinecraftStatusSnapshotDTO(snapshot.id(), snapshot.serverId(), snapshot.status(),
+                snapshot.onlinePlayers(), snapshot.maxPlayers(), snapshot.checkedAt());
     }
 
     public MinecraftEndpointStatusDTO toDTO(MinecraftEndpointStatus status) {

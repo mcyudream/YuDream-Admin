@@ -12,6 +12,7 @@ import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftSeasonAdjustm
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerEndpoint;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerSeason;
 import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftServerStatus;
+import online.yudream.base.plugin.minecraft.domain.valobj.MinecraftStatusSnapshot;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 
 import java.math.BigDecimal;
@@ -24,8 +25,11 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
 
     private static final String SERVERS = "servers";
     private static final String STATUSES = "statuses";
+    private static final String STATUS_SNAPSHOTS = "status-snapshots";
     private static final String OPERATIONS = "season-operations";
     private static final String PLAYER_ACTIVITIES = "player-activities";
+    private static final int SNAPSHOT_SCAN_PAGE_SIZE = 1000;
+    private static final int SNAPSHOT_SCAN_MAX_PAGES = 10;
 
     private final PluginDocumentStore documents;
 
@@ -73,6 +77,28 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
     @Override
     public Optional<MinecraftServerStatus> findStatus(String serverId) {
         return documents.findById(STATUSES, serverId).map(this::toStatus);
+    }
+
+    @Override
+    public MinecraftStatusSnapshot saveStatusSnapshot(MinecraftStatusSnapshot snapshot) {
+        return toStatusSnapshot(documents.save(STATUS_SNAPSHOTS, snapshot.id(), statusSnapshotDocument(snapshot)));
+    }
+
+    @Override
+    public List<MinecraftStatusSnapshot> listStatusSnapshots(String serverId, long since, int limit) {
+        List<MinecraftStatusSnapshot> snapshots = new java.util.ArrayList<>();
+        for (int page = 1; page <= SNAPSHOT_SCAN_MAX_PAGES; page++) {
+            List<Map<String, Object>> rows = documents.findByField(STATUS_SNAPSHOTS, "serverId", serverId, page, SNAPSHOT_SCAN_PAGE_SIZE);
+            snapshots.addAll(rows.stream().map(this::toStatusSnapshot).filter(item -> item.checkedAt() >= since).toList());
+            if (rows.size() < SNAPSHOT_SCAN_PAGE_SIZE) {
+                break;
+            }
+        }
+        List<MinecraftStatusSnapshot> sorted = snapshots.stream()
+                .sorted(java.util.Comparator.comparingLong(MinecraftStatusSnapshot::checkedAt))
+                .toList();
+        int safeLimit = Math.max(limit, 1);
+        return sorted.size() <= safeLimit ? sorted : sorted.subList(sorted.size() - safeLimit, sorted.size());
     }
 
     @Override
@@ -177,6 +203,17 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
         document.put("motd", status.motd());
         document.put("errorMessage", status.errorMessage());
         document.put("checkedAt", status.checkedAt());
+        return document;
+    }
+
+    private Map<String, Object> statusSnapshotDocument(MinecraftStatusSnapshot snapshot) {
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("id", snapshot.id());
+        document.put("serverId", snapshot.serverId());
+        document.put("status", snapshot.status());
+        document.put("onlinePlayers", snapshot.onlinePlayers());
+        document.put("maxPlayers", snapshot.maxPlayers());
+        document.put("checkedAt", snapshot.checkedAt());
         return document;
     }
 
@@ -312,6 +349,17 @@ public class MinecraftServerDocumentRepository implements MinecraftServerReposit
                 nullableNumber(document, "ping"),
                 string(document, "motd"),
                 string(document, "errorMessage"),
+                number(document, "checkedAt", 0L)
+        );
+    }
+
+    private MinecraftStatusSnapshot toStatusSnapshot(Map<String, Object> document) {
+        return new MinecraftStatusSnapshot(
+                string(document, "id"),
+                string(document, "serverId"),
+                string(document, "status"),
+                integer(document, "onlinePlayers", 0),
+                integer(document, "maxPlayers", 0),
                 number(document, "checkedAt", 0L)
         );
     }
