@@ -152,5 +152,3 @@ build-and-push-images:
     - docker push "$BACKEND_IMAGE_LATEST"
     - docker push "$FRONTEND_IMAGE"
     - docker push "$FRONTEND_IMAGE_LATEST"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "master" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "develop"'
