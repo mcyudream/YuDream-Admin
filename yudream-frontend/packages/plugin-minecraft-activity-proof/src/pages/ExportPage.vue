@@ -17,8 +17,17 @@ defineProps<{
       <div class="proof-state">
         <span :class="{ ok: model.status?.dependencies.minecraftReady }">MC</span>
         <span :class="{ ok: model.status?.dependencies.studentInfoReady }">学生</span>
-        <span :class="{ ok: model.settings?.templateReady }">模板</span>
+        <span :class="{ ok: model.status?.dependencies.wordTemplateReady }">模板能力</span>
+        <span :class="{ ok: model.settings?.templateReady }">模板文件</span>
       </div>
+    </section>
+
+    <section v-if="model.status && !model.ready" class="proof-warning">
+      <span class="i-ri:error-warning-line" />
+      <span v-if="!model.status.dependencies.minecraftReady">请先启用 Minecraft 服务器插件。</span>
+      <span v-else-if="!model.status.dependencies.studentInfoReady">请先启用学生信息插件。</span>
+      <span v-else-if="!model.status.dependencies.wordTemplateReady">请先在能力管理中启用 Word 模板能力。</span>
+      <span v-else-if="!model.settings?.templateReady">请先上传 Word 模板文件。</span>
     </section>
 
     <section class="proof-grid">

@@ -54,6 +54,19 @@
   color: #166956;
 }
 
+.proof-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 14px;
+  border: 1px solid #e6c774;
+  border-radius: 8px;
+  background: #fff8e6;
+  color: #735319;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .proof-grid {
   display: grid;
   grid-template-columns: minmax(320px, 1.1fr) minmax(300px, .9fr);
