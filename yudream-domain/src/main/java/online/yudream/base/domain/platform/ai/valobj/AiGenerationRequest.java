@@ -10,7 +10,8 @@ public record AiGenerationRequest(
         String providerCode,
         String modelCode,
         Map<String, String> config,
-        List<AiChatMessage> history
+        List<AiChatMessage> history,
+        boolean toolCallingEnabled
 ) {
     public AiGenerationRequest(
             String systemPrompt,
@@ -20,10 +21,26 @@ public record AiGenerationRequest(
             String modelCode,
             Map<String, String> config
     ) {
-        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, List.of());
+        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, List.of(), false);
+    }
+
+    public AiGenerationRequest(
+            String systemPrompt,
+            String userPrompt,
+            String imageDataUrl,
+            String providerCode,
+            String modelCode,
+            Map<String, String> config,
+            List<AiChatMessage> history
+    ) {
+        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history, false);
     }
 
     public List<AiChatMessage> history() {
         return history == null ? List.of() : history;
+    }
+
+    public AiGenerationRequest withToolCallingEnabled(boolean enabled) {
+        return new AiGenerationRequest(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history(), enabled);
     }
 }
