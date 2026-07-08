@@ -47,6 +47,10 @@
     {
       "key": "authlib-ali-metadata",
       "text": "Authlib Injector service endpoint stays under /api/plugins/authlib-injector. Derive meta.links, skinDomains, and ALI from the current public request/texture URL; do not replace the authlib service address with the skin texture/yggdrasil path unless explicitly requested."
+    },
+    {
+      "key": "plugin-document-store-pagination",
+      "text": "PluginDocumentStore caps page size at 200; plugin backend all-list scans and cross-plugin aggregations must loop pages with a <=200 page size instead of requesting 1000/10000, and frontend plugin bundles must be rebuilt because dist is ignored but packaged into plugin JARs."
     }
   ],
   "utilities": [

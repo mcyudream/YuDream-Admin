@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public class StudentInfoDocumentRepository implements StudentInfoRepository {
 
+    private static final int SCAN_PAGE_SIZE = 200;
     private static final String PROFILES = "profiles";
 
     private final PluginDocumentStore documents;
@@ -44,13 +45,18 @@ public class StudentInfoDocumentRepository implements StudentInfoRepository {
 
     @Override
     public List<StudentInfo> listAll() {
-        long total = count();
-        if (total <= 0) {
-            return List.of();
+        List<StudentInfo> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<StudentInfo> batch = documents.findAll(PROFILES, page, SCAN_PAGE_SIZE).stream()
+                    .map(this::toProfile)
+                    .toList();
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
         }
-        return documents.findAll(PROFILES, 1, (int) Math.min(total, Integer.MAX_VALUE)).stream()
-                .map(this::toProfile)
-                .toList();
     }
 
     @Override

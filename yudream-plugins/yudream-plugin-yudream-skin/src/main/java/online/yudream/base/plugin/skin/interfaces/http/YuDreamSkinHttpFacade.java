@@ -72,7 +72,7 @@ public class YuDreamSkinHttpFacade {
     }
 
     public PluginHttpResponse myPlayers(PluginHttpRequest request) {
-        return PluginHttpResponse.ok(appService.listPlayersByOwner(ownerId(request)).stream()
+        return PluginHttpResponse.ok(appService.listPlayersByOwner(ownerId(request), page(request), size(request)).stream()
                 .map(player -> assembler.toRes(player, this::ownerProfile))
                 .toList());
     }

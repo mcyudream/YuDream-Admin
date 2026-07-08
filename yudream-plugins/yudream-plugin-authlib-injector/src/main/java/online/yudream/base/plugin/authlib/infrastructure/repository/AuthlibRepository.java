@@ -12,6 +12,7 @@ import java.util.Optional;
 
 public class AuthlibRepository {
 
+    private static final int SCAN_PAGE_SIZE = 200;
     private static final String SESSIONS = "sessions";
     private static final String JOINS = "joins";
     private static final String SETTINGS = "settings";
@@ -31,7 +32,7 @@ public class AuthlibRepository {
     }
 
     public List<AuthSession> findSessionsByUser(String userId) {
-        return documents.findByField(SESSIONS, "userId", userId, 1, 200).stream().map(this::toSession).toList();
+        return findAllByField(SESSIONS, "userId", userId).stream().map(this::toSession).toList();
     }
 
     public void deleteSession(String accessToken) {
@@ -43,7 +44,7 @@ public class AuthlibRepository {
     }
 
     public List<ServerJoin> findJoinsByServer(String serverId) {
-        return documents.findByField(JOINS, "serverId", serverId, 1, 200).stream().map(this::toJoin).toList();
+        return findAllByField(JOINS, "serverId", serverId).stream().map(this::toJoin).toList();
     }
 
     public Optional<AuthlibKeyPair> keyPair() {
@@ -78,6 +79,19 @@ public class AuthlibRepository {
         document.put("accessToken", join.accessToken());
         document.put("expiresAt", join.expiresAt());
         return document;
+    }
+
+    private List<Map<String, Object>> findAllByField(String collection, String field, Object value) {
+        List<Map<String, Object>> records = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<Map<String, Object>> batch = documents.findByField(collection, field, value, page, SCAN_PAGE_SIZE);
+            records.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return records;
+            }
+            page++;
+        }
     }
 
     private AuthSession toSession(Map<String, Object> document) {

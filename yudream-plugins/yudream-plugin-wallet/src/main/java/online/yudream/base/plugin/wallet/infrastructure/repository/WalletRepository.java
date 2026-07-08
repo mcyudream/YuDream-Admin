@@ -16,6 +16,7 @@ import java.util.Optional;
 
 public class WalletRepository {
 
+    private static final int SCAN_PAGE_SIZE = 200;
     private static final String ASSETS = "assets";
     private static final String BALANCES = "balances";
     private static final String TRANSACTIONS = "transactions";
@@ -63,7 +64,7 @@ public class WalletRepository {
     }
 
     public List<WalletBalance> findBalancesByUser(String userId) {
-        return documents.findByField(BALANCES, "userId", userId, 1, 200).stream().map(this::toBalance).toList();
+        return findAllByField(BALANCES, "userId", userId).stream().map(this::toBalance).toList();
     }
 
     public List<WalletBalance> listBalances(int page, int size) {
@@ -178,6 +179,19 @@ public class WalletRepository {
         document.put("minPayAmount", string(rule.minPayAmount()));
         document.put("maxPayAmount", string(rule.maxPayAmount()));
         return document;
+    }
+
+    private List<Map<String, Object>> findAllByField(String collection, String field, Object value) {
+        List<Map<String, Object>> records = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<Map<String, Object>> batch = documents.findByField(collection, field, value, page, SCAN_PAGE_SIZE);
+            records.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return records;
+            }
+            page++;
+        }
     }
 
     private WalletAsset toAsset(Map<String, Object> document) {

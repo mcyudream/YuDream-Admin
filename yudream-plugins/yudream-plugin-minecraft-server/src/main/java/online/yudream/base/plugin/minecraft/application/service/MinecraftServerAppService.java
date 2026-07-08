@@ -53,6 +53,7 @@ public class MinecraftServerAppService implements PluginMinecraftService {
     private static final long DEFAULT_HISTORY_WINDOW_MILLIS = 24L * 60 * 60 * 1000;
     private static final int DEFAULT_HISTORY_LIMIT = 144;
     private static final int MAX_HISTORY_LIMIT = 288;
+    private static final int SCAN_PAGE_SIZE = 200;
 
     private final MinecraftServerRepository repository;
     private final MinecraftStatusService statusService;
@@ -66,7 +67,7 @@ public class MinecraftServerAppService implements PluginMinecraftService {
     }
 
     public List<MinecraftServerDTO> listServers(boolean includeDisabled, boolean refreshStatus) {
-        return repository.list(1, 200, includeDisabled).stream()
+        return allServers(includeDisabled).stream()
                 .map(server -> assembler.toDTO(server, refreshStatus ? refreshStatus(server.id()) : repository.findStatus(server.id()).orElse(null)))
                 .toList();
     }
@@ -110,7 +111,7 @@ public class MinecraftServerAppService implements PluginMinecraftService {
     }
 
     public void refreshEnabledServers() {
-        for (MinecraftServer server : repository.list(1, 200, false)) {
+        for (MinecraftServer server : allServers(false)) {
             try {
                 refreshStatus(server.id());
             } catch (RuntimeException ignored) {
@@ -187,7 +188,7 @@ public class MinecraftServerAppService implements PluginMinecraftService {
                         .map(transaction -> new MinecraftEconomyRecordDTO(transaction.id(), "WALLET", transaction.source(), transaction.type(),
                                 transaction.assetCode(), transaction.amount(), transaction.businessNo(), transaction.remark(), transaction.createdAt()))
                         .toList();
-        List<MinecraftEconomyRecordDTO> seasonRecords = repository.listOperations(serverId, 1, fetchSize).stream()
+        List<MinecraftEconomyRecordDTO> seasonRecords = allOperations(serverId).stream()
                 .flatMap(operation -> operation.adjustments().stream()
                         .filter(adjustment -> userId.equals(adjustment.userId()))
                         .map(adjustment -> new MinecraftEconomyRecordDTO(
@@ -468,8 +469,16 @@ public class MinecraftServerAppService implements PluginMinecraftService {
     private Map<String, BigDecimal> balances(PluginWalletService wallet, Map<String, PluginWalletAsset> assets) {
         Map<String, BigDecimal> results = new HashMap<>();
         for (String assetCode : assets.keySet()) {
-            for (PluginWalletBalance balance : wallet.listBalances(assetCode, 1, 5000)) {
-                results.put(key(balance.userId(), balance.assetCode()), balance.balance());
+            int page = 1;
+            while (true) {
+                List<PluginWalletBalance> balances = wallet.listBalances(assetCode, page, SCAN_PAGE_SIZE);
+                for (PluginWalletBalance balance : balances) {
+                    results.put(key(balance.userId(), balance.assetCode()), balance.balance());
+                }
+                if (balances.size() < SCAN_PAGE_SIZE) {
+                    break;
+                }
+                page++;
             }
         }
         return results;
@@ -485,11 +494,10 @@ public class MinecraftServerAppService implements PluginMinecraftService {
     private List<PluginWalletTransaction> walletTransactions(PluginWalletService wallet, Long startAt, Long endAt) {
         List<PluginWalletTransaction> results = new ArrayList<>();
         int page = 1;
-        int size = 5000;
         while (true) {
-            List<PluginWalletTransaction> items = wallet.transactions(new PluginWalletTransactionQuery(null, "CREDIT", null, null, startAt, endAt, page, size));
+            List<PluginWalletTransaction> items = wallet.transactions(new PluginWalletTransactionQuery(null, "CREDIT", null, null, startAt, endAt, page, SCAN_PAGE_SIZE));
             results.addAll(items);
-            if (items.size() < size) {
+            if (items.size() < SCAN_PAGE_SIZE) {
                 return results;
             }
             page++;
@@ -504,7 +512,7 @@ public class MinecraftServerAppService implements PluginMinecraftService {
         if (seasonId == null) {
             return Map.of();
         }
-        return repository.listOperations(serverId, 1, 500).stream()
+        return allOperations(serverId).stream()
                 .filter(operation -> operation.status() == MinecraftSeasonOperationStatus.APPLIED)
                 .filter(operation -> seasonId.equals(operation.toSeasonId()))
                 .findFirst()
@@ -605,6 +613,32 @@ public class MinecraftServerAppService implements PluginMinecraftService {
                 .orElseThrow(() -> new IllegalArgumentException("服务器不存在：" + serverId));
     }
 
+    private List<MinecraftServer> allServers(boolean includeDisabled) {
+        List<MinecraftServer> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<MinecraftServer> batch = repository.list(page, SCAN_PAGE_SIZE, includeDisabled);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<MinecraftSeasonOperation> allOperations(String serverId) {
+        List<MinecraftSeasonOperation> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<MinecraftSeasonOperation> batch = repository.listOperations(serverId, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
     private PluginWalletService wallet() {
         return framework.extension("yudream-wallet", PluginWalletService.class)
                 .orElseThrow(() -> new IllegalStateException("钱包插件未启用，无法执行周目货币继承"));
@@ -633,7 +667,7 @@ public class MinecraftServerAppService implements PluginMinecraftService {
     }
 
     private int safeSize(int size) {
-        return Math.max(Math.min(size, 100), 1);
+        return Math.max(Math.min(size, SCAN_PAGE_SIZE), 1);
     }
 
     private String key(String userId, String assetCode) {

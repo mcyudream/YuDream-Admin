@@ -36,6 +36,8 @@ import java.util.Optional;
 
 public class YuDreamSkinAppService implements PluginSkinService {
 
+    private static final int SCAN_PAGE_SIZE = 200;
+
     private final YuDreamSkinRepository repository;
     private final YuDreamSkinMigrationService migrationService;
 
@@ -67,6 +69,10 @@ public class YuDreamSkinAppService implements PluginSkinService {
 
     public List<SkinPlayer> listPlayersByOwner(String ownerId) {
         return repository.findPlayersByOwner(requireText(ownerId, "用户不能为空"));
+    }
+
+    public List<SkinPlayer> listPlayersByOwner(String ownerId, int page, int size) {
+        return repository.findPlayersByOwner(requireText(ownerId, "用户不能为空"), page, size);
     }
 
     public Optional<SkinPlayer> findPlayer(String name) {
@@ -202,9 +208,32 @@ public class YuDreamSkinAppService implements PluginSkinService {
         if (manage) {
             return listTextures(page, size);
         }
-        return repository.listTextures(page, size).stream()
-                .filter(texture -> Boolean.TRUE.equals(texture.publicAccess()) || requireText(userId, "用户不能为空").equals(texture.uploaderId()))
-                .toList();
+        String owner = requireText(userId, "用户不能为空");
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.max(size, 1);
+        int start = (safePage - 1) * safeSize;
+        List<SkinTexture> result = new java.util.ArrayList<>();
+        int visibleIndex = 0;
+        int sourcePage = 1;
+        while (true) {
+            List<SkinTexture> batch = repository.listTextures(sourcePage, SCAN_PAGE_SIZE);
+            for (SkinTexture texture : batch) {
+                if (!visibleTo(texture, owner)) {
+                    continue;
+                }
+                if (visibleIndex++ < start) {
+                    continue;
+                }
+                result.add(texture);
+                if (result.size() >= safeSize) {
+                    return result;
+                }
+            }
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            sourcePage++;
+        }
     }
 
     public SkinTexture uploadTexture(TextureUploadCmd cmd, Long currentUserId) {
@@ -222,7 +251,7 @@ public class YuDreamSkinAppService implements PluginSkinService {
     public void deleteTexture(String hash) {
         SkinTexture texture = requireTexture(requireText(hash, "材质不能为空"));
         repository.findClosetByTexture(texture.hash()).forEach(item -> repository.deleteClosetItem(item.id()));
-        repository.listPlayers(1, 10000).stream()
+        allPlayers().stream()
                 .filter(player -> texture.hash().equals(player.skinHash()) || texture.hash().equals(player.capeHash()))
                 .forEach(player -> repository.savePlayer(player.withTextures(
                         texture.hash().equals(player.skinHash()) ? null : player.skinHash(),
@@ -447,6 +476,23 @@ public class YuDreamSkinAppService implements PluginSkinService {
         repository.findClosetByUserAndTexture(userId, hash)
                 .orElseThrow(() -> new IllegalArgumentException("材质不在你的衣柜中"));
         return texture;
+    }
+
+    private List<SkinPlayer> allPlayers() {
+        List<SkinPlayer> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<SkinPlayer> batch = repository.listPlayers(page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private boolean visibleTo(SkinTexture texture, String userId) {
+        return Boolean.TRUE.equals(texture.publicAccess()) || userId.equals(texture.uploaderId());
     }
 
     private String requireText(String value, String message) {
