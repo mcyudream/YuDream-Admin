@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteSortSetting;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendSortSetting;
 import online.yudream.base.domain.platform.plugin.valobj.PluginMenuOverrideInfo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
@@ -104,6 +106,76 @@ public class PluginMenuProjectionService {
                 .filter(pluginCode -> !enabledCodes.contains(pluginCode))
                 .distinct()
                 .forEach(this::markUnavailable);
+    }
+
+    public void updateSorts(String pluginCode,
+                            PluginFrontendModuleInfo module,
+                            PluginFrontendSortSetting setting) {
+        requireText(pluginCode, "插件编码");
+        if (module == null || setting == null || !Objects.equals(module.moduleName(), setting.moduleName())) {
+            throw new BizException("插件前端排序配置与模块不匹配");
+        }
+
+        List<SortUpdate> updates = new ArrayList<>();
+        Menu moduleMenu = requireAvailableProjection(pluginCode, "module:" + module.moduleName());
+        addSortUpdate(updates, moduleMenu, setting.menuSort());
+
+        Map<String, Integer> routeSorts = new LinkedHashMap<>();
+        Map<String, Integer> parentSorts = new LinkedHashMap<>();
+        for (PluginFrontendRouteSortSetting routeSetting : setting.routes()) {
+            PluginFrontendRouteInfo route = module.routes().stream()
+                    .filter(routeSetting::matches)
+                    .findFirst()
+                    .orElseThrow(() -> new BizException("插件菜单路由不存在"));
+            String routeKey = "route:" + module.moduleName() + ":"
+                    + requireText(route.name(), "插件前端路由名称");
+            putConsistentSort(routeSorts, routeKey, routeSetting.sort(), "插件菜单路由排序冲突: ");
+
+            String parentPath = normalizeOptionalText(route.parentPath());
+            if (parentPath != null && routeSetting.parentSort() != null) {
+                String parentKey = "parent:" + module.moduleName() + ":" + parentPath;
+                putConsistentSort(parentSorts, parentKey, routeSetting.parentSort(), "插件菜单父目录排序冲突: ");
+            }
+        }
+        routeSorts.forEach((registrationKey, sort) ->
+                addSortUpdate(updates, requireAvailableProjection(pluginCode, registrationKey), sort));
+        parentSorts.forEach((registrationKey, sort) ->
+                addSortUpdate(updates, requireAvailableProjection(pluginCode, registrationKey), sort));
+
+        updates.forEach(update -> {
+            if (!Objects.equals(update.menu().getSort(), update.sort())) {
+                update.menu().setSort(update.sort());
+                menuRepo.save(update.menu());
+            }
+        });
+    }
+
+    private Menu requireAvailableProjection(String pluginCode, String registrationKey) {
+        Menu menu = menuRepo.findByPluginCodeAndRegistrationKey(pluginCode, registrationKey)
+                .orElseThrow(() -> new BizException("插件菜单投影不存在: " + registrationKey));
+        if (!menu.isAvailableForRuntime() || menu.getStatus() == MenuStatus.DISABLED) {
+            throw new BizException("插件菜单投影不可用: " + registrationKey);
+        }
+        return menu;
+    }
+
+    private void addSortUpdate(List<SortUpdate> updates, Menu menu, Integer sort) {
+        if (sort != null) {
+            updates.add(new SortUpdate(menu, sort));
+        }
+    }
+
+    private void putConsistentSort(Map<String, Integer> sorts,
+                                   String registrationKey,
+                                   Integer sort,
+                                   String conflictMessage) {
+        if (sort == null) {
+            return;
+        }
+        Integer existing = sorts.putIfAbsent(registrationKey, sort);
+        if (existing != null && !Objects.equals(existing, sort)) {
+            throw new BizException(conflictMessage + registrationKey);
+        }
     }
 
     public List<PluginFrontendModuleInfo> applyOverrides(List<PluginFrontendModuleInfo> modules) {
@@ -354,5 +426,8 @@ public class PluginMenuProjectionService {
     private record RoutePlan(String registrationKey,
                              String parentPath,
                              PluginFrontendRouteInfo route) {
+    }
+
+    private record SortUpdate(Menu menu, Integer sort) {
     }
 }

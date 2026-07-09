@@ -209,9 +209,13 @@ public class PluginAppService {
         PluginModule module = module(code);
         PluginFrontendModuleInfo frontendModule = currentFrontendModule(code, cmd.getModuleName());
         PluginFrontendSortSetting setting = toSortSetting(frontendModule, cmd);
+        pluginMenuProjectionService.updateSorts(code, frontendModule, setting);
         module.saveFrontendSortSetting(setting);
         pluginModuleRepo.save(module);
-        return PluginAssembler.toDTO(applyFrontendSortSetting(frontendModule, module));
+        return pluginMenuProjectionService.applyOverrides(List.of(frontendModule)).stream()
+                .findFirst()
+                .map(PluginAssembler::toDTO)
+                .orElseThrow(() -> new BizException("插件菜单投影不可用"));
     }
 
     @Transactional(readOnly = true)
