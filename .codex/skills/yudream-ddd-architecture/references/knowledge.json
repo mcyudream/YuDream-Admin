@@ -91,6 +91,10 @@
     {
       "key": "s3-rustfs-bucket-head",
       "text": "RustFS may reject S3 HeadBucket even when object operations can continue. Do not fail upload only because bucket head check is forbidden."
+    },
+    {
+      "key": "form-create-upload-runtime",
+      "text": "form-create designer rules are persisted as JSON, so function props such as upload onSuccess/customRequest are lost. Public/runtime dynamic form rendering must re-inject upload handlers, normalize backend file URLs for previews, and provide a public form-scoped upload endpoint instead of relying on the login-only common file upload API."
     }
   ]
 }

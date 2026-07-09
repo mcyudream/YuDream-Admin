@@ -2,9 +2,9 @@
 import type { DynamicForm } from '@/api/modules/platform-form'
 import apiForm from '@/api/modules/platform-form'
 import { useAppFeatureStore } from '@/store/modules/app/features'
+import DynamicFormRenderer from '@/views/platform/form/components/DynamicFormRenderer.vue'
 
-interface FormCreateApi {
-  submit: (success: (data: Record<string, unknown>) => void | Promise<void>, fail?: () => void) => Promise<unknown>
+interface DynamicFormRendererExpose {
   resetFields?: () => void
 }
 
@@ -16,26 +16,10 @@ const loading = ref(false)
 const submitting = ref(false)
 const submitted = ref(false)
 const form = ref<DynamicForm | null>(null)
-const formApi = shallowRef<FormCreateApi>()
+const rendererRef = ref<DynamicFormRendererExpose>()
 
 const code = computed(() => String(route.params.code || ''))
 const brandHref = computed(() => appFeatureStore.cmsEnabled ? '/site' : '/login')
-const rules = computed(() => parseJsonArray(form.value?.schemaJson))
-const options = computed(() => {
-  const option = parseJsonObject(form.value?.optionJson)
-  const formOption = option.form && typeof option.form === 'object' && !Array.isArray(option.form)
-    ? option.form as Record<string, unknown>
-    : {}
-  return {
-    ...option,
-    form: {
-      ...formOption,
-      layout: 'vertical',
-    },
-    submitBtn: false,
-    resetBtn: false,
-  }
-})
 
 onMounted(async () => {
   await appFeatureStore.load()
@@ -59,44 +43,24 @@ async function load() {
   }
 }
 
-async function submit() {
-  if (!formApi.value || !form.value) {
+async function submit(data: Record<string, unknown>) {
+  if (!form.value) {
     return
   }
   submitting.value = true
   try {
-    await formApi.value.submit(async (data) => {
-      await apiForm.submitPublic(form.value!.code, data)
-      submitted.value = true
-      toast.success('提交成功')
-      formApi.value?.resetFields?.()
-    }, () => {
-      toast.error('请检查表单必填项')
-    })
+    await apiForm.submitPublic(form.value.code, data)
+    submitted.value = true
+    toast.success('提交成功')
+    rendererRef.value?.resetFields?.()
   }
   finally {
     submitting.value = false
   }
 }
 
-function parseJsonArray(value?: string) {
-  try {
-    const parsed = value ? JSON.parse(value) : []
-    return Array.isArray(parsed) ? parsed : []
-  }
-  catch {
-    return []
-  }
-}
-
-function parseJsonObject(value?: string) {
-  try {
-    const parsed = value ? JSON.parse(value) : {}
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-  }
-  catch {
-    return {}
-  }
+function invalid() {
+  toast.error('请检查表单必填项')
 }
 </script>
 
@@ -113,19 +77,14 @@ function parseJsonObject(value?: string) {
           正在加载表单...
         </div>
         <template v-else-if="form">
-          <div class="form-title">
-            <h1>{{ form.name }}</h1>
-            <p v-if="form.description">{{ form.description }}</p>
-          </div>
-          <div v-if="submitted" class="success-banner">
-            已收到你的提交。
-          </div>
-          <form-create v-model:api="formApi" :rule="rules" :option="options" />
-          <div class="submit-row">
-            <FaButton size="lg" :loading="submitting" @click="submit">
-              提交
-            </FaButton>
-          </div>
+          <DynamicFormRenderer
+            ref="rendererRef"
+            :form="form"
+            :submitted="submitted"
+            :submitting="submitting"
+            @invalid="invalid"
+            @submit="submit"
+          />
         </template>
         <div v-else class="public-state">
           表单不存在或尚未发布。
@@ -175,42 +134,11 @@ function parseJsonObject(value?: string) {
   box-shadow: 0 24px 70px rgba(21, 31, 48, 0.1);
 }
 
-.form-title {
-  display: grid;
-  gap: 8px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #edf0f5;
-}
-
-.form-title h1 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.form-title p {
-  margin: 0;
-  color: #667085;
-}
-
-.success-banner {
-  padding: 10px 12px;
-  border: 1px solid rgba(0, 180, 42, 0.2);
-  border-radius: 6px;
-  background: rgba(0, 180, 42, 0.08);
-  color: #147a2e;
-}
-
 .public-state {
   display: grid;
   min-height: 260px;
   place-items: center;
   color: #667085;
-}
-
-.submit-row {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 4px;
 }
 
 @media (max-width: 640px) {

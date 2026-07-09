@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn } from '@fantastic-admin/components'
-import type { FormSubmission } from '@/api/modules/platform-form'
+import type { DynamicForm, FormSubmission } from '@/api/modules/platform-form'
 import apiForm from '@/api/modules/platform-form'
 import { saveExcelResponse } from '@/utils/excel'
+import DynamicFormRenderer from './DynamicFormRenderer.vue'
 
 const props = defineProps<{
+  form?: DynamicForm | null
   formId?: string | null
   formName?: string
   embedded?: boolean
@@ -12,16 +14,24 @@ const props = defineProps<{
 
 const loading = ref(false)
 const exporting = ref(false)
+const detailVisible = ref(false)
+const detailRow = ref<FormSubmission | null>(null)
 const rows = ref<FormSubmission[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 
-const columns = computed<TableColumn<FormSubmission>[]>(() => [
-  { accessorKey: 'id', header: '提交 ID', width: 170, fixed: 'left' },
-  { id: 'data', header: '提交内容', width: 560 },
-  { accessorKey: 'submitterId', header: '提交用户', width: 140 },
-  { accessorKey: 'submitterIp', header: '来源 IP', width: 160 },
-  { accessorKey: 'submittedAt', header: '提交时间', width: 180 },
-])
+const columns = computed<TableColumn<FormSubmission>[]>(() => {
+  const base: TableColumn<FormSubmission>[] = [
+    { accessorKey: 'id', header: '提交 ID', width: 170, fixed: 'left' },
+    { id: 'data', header: '提交内容', width: 560 },
+    { accessorKey: 'submitterId', header: '提交用户', width: 140 },
+    { accessorKey: 'submitterIp', header: '来源 IP', width: 160 },
+    { accessorKey: 'submittedAt', header: '提交时间', width: 180 },
+  ]
+  if (props.form) {
+    base.push({ id: 'operation', header: '操作', width: 100, align: 'center', fixed: 'right' })
+  }
+  return base
+})
 
 watch(() => props.formId, () => {
   pagination.page = 1
@@ -73,6 +83,11 @@ function onSizeChange(size: number) {
   load()
 }
 
+function openDetail(row: FormSubmission) {
+  detailRow.value = row
+  detailVisible.value = true
+}
+
 function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 19) : '-'
 }
@@ -111,7 +126,7 @@ function formatValue(value: unknown) {
       v-loading="loading"
       row-key="id"
       table-root-class="rounded-lg overflow-hidden"
-      table-class="min-w-[1100px]"
+      table-class="min-w-[1200px]"
       border
       stripe
       column-visibility
@@ -130,6 +145,9 @@ function formatValue(value: unknown) {
       <template #cell-submittedAt="{ row }">
         {{ dateText(row.original.submittedAt) }}
       </template>
+      <template #cell-operation="{ row }">
+        <FaButton v-if="form" size="sm" variant="outline" @click="openDetail(row.original)">查看</FaButton>
+      </template>
     </FaTable>
 
     <FaPagination
@@ -140,6 +158,12 @@ function formatValue(value: unknown) {
       @page-change="onPageChange"
       @size-change="onSizeChange"
     />
+
+    <FaModal v-model="detailVisible" :title="form ? `${form.name} / 提交详情` : '提交详情'" class="sm:max-w-4xl">
+      <section v-if="form && detailRow" class="submission-detail">
+        <DynamicFormRenderer :form="form" :model-value="detailRow.data" readonly />
+      </section>
+    </FaModal>
   </section>
 </template>
 
@@ -206,6 +230,12 @@ function formatValue(value: unknown) {
 .data-pairs b {
   color: var(--color-text-1);
   font-weight: 600;
+}
+
+.submission-detail {
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 @media (max-width: 720px) {
