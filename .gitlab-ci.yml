@@ -1,4 +1,4 @@
-# YuDream Admin GitLab CI/CD Pipeline
+# YuDream Admin Core GitLab CI/CD Pipeline
 
 .node_image: &node_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
 .maven_image: &maven_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
@@ -29,65 +29,23 @@ cache:
   policy: pull-push
 
 stages:
-  - build-frontend-plugins
   - build-backend
   - build-frontend-main
+  - publish-packages
   - artifacts
   - build-images
-
-build:frontend-plugins:
-  stage: build-frontend-plugins
-  image: *node_image
-  before_script:
-    - npm config set registry "$NPM_CONFIG_REGISTRY"
-    - corepack enable && corepack prepare pnpm@11.9.0 --activate
-    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
-    - node -v
-    - pnpm -v
-  script:
-    - cd "$FRONTEND_DIR"
-    - pnpm install --frozen-lockfile
-    - |
-      PLUGIN_FILTERS=""
-      while IFS= read -r plugin || [ -n "$plugin" ]; do
-        [ -z "$plugin" ] && continue
-        pom="../yudream-plugins/$plugin/pom.xml"
-        frontend_pkg=$(grep -oE 'yudream-frontend/packages/[^/]+' "$pom" | head -1 | sed 's|yudream-frontend/packages/||')
-        if [ -z "$frontend_pkg" ]; then
-          echo "WARN: cannot resolve frontend package for $plugin, skip"
-          continue
-        fi
-        echo "$plugin -> @yudream/$frontend_pkg"
-        PLUGIN_FILTERS="$PLUGIN_FILTERS --filter @yudream/$frontend_pkg"
-      done < ../ci/plugins.list
-      echo "pnpm$PLUGIN_FILTERS run build"
-      pnpm $PLUGIN_FILTERS run build
-  artifacts:
-    name: "frontend-plugin-dists-${CI_COMMIT_SHORT_SHA}"
-    paths:
-      - yudream-frontend/packages/plugin-*/dist/
-    expire_in: 2 hours
 
 build:backend:
   stage: build-backend
   image: *maven_image
-  needs:
-    - job: build:frontend-plugins
-      artifacts: true
   script:
-    - |
-      PLUGIN_MODULES=""
-      while IFS= read -r plugin || [ -n "$plugin" ]; do
-        [ -z "$plugin" ] && continue
-        PLUGIN_MODULES="$PLUGIN_MODULES,yudream-plugins/$plugin"
-      done < ci/plugins.list
-      echo "mvn -s $MAVEN_SETTINGS_PATH clean install -pl yudream-bootstrap$PLUGIN_MODULES -am -DskipTests -B -e"
-      mvn -s "$MAVEN_SETTINGS_PATH" clean install -pl "yudream-bootstrap$PLUGIN_MODULES" -am -DskipTests -B -e
+    - echo "mvn -s $MAVEN_SETTINGS_PATH clean install -pl yudream-bootstrap -am -DskipTests -B -e"
+    - mvn -s "$MAVEN_SETTINGS_PATH" clean install -pl yudream-bootstrap -am -DskipTests -B -e
   artifacts:
-    name: "backend-jars-${CI_COMMIT_SHORT_SHA}"
+    name: "core-backend-${CI_COMMIT_SHORT_SHA}"
     paths:
       - yudream-bootstrap/target/*.jar
-      - yudream-plugins/*/target/*.jar
+      - yudream-plugins/yudream-plugin-spi/target/*.jar
     expire_in: 1 week
 
 build:frontend-main:
@@ -104,10 +62,46 @@ build:frontend-main:
     - pnpm install --frozen-lockfile
     - pnpm --filter @fantastic-admin/core-arco-design-vue run build
   artifacts:
-    name: "frontend-main-dist-${CI_COMMIT_SHORT_SHA}"
+    name: "core-frontend-${CI_COMMIT_SHORT_SHA}"
     paths:
       - yudream-frontend/apps/core-arco-design-vue/dist/
     expire_in: 1 week
+
+publish:maven-plugin-spi:
+  stage: publish-packages
+  image: *maven_image
+  script:
+    - |
+      GITLAB_MAVEN_REGISTRY="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/maven"
+      echo "Deploy yudream-plugin-spi to $GITLAB_MAVEN_REGISTRY"
+      mvn -s ci/maven-settings-gitlab.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests -DaltDeploymentRepository=gitlab-maven::default::$GITLAB_MAVEN_REGISTRY deploy -B -e
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+
+publish:npm-plugin-sdk:
+  stage: publish-packages
+  image: *node_image
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+    - node -v
+    - pnpm -v
+  script:
+    - cd "$FRONTEND_DIR"
+    - pnpm install --frozen-lockfile
+    - pnpm --filter @yudream/plugin-sdk run build
+    - |
+      REGISTRY_HOST=$(echo "$CI_API_V4_URL" | sed -E 's#^https?://##')
+      cat > .npmrc <<EOF
+      @yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/
+      //$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN
+      always-auth=true
+      EOF
+    - cd packages/plugin-sdk
+    - pnpm publish --no-git-checks --registry "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
 
 collect:artifacts:
   stage: artifacts
@@ -118,13 +112,13 @@ collect:artifacts:
     - job: build:frontend-main
       artifacts: true
   script:
-    - mkdir -p dist/backend dist/frontend dist/plugins
+    - mkdir -p dist/backend dist/frontend dist/contracts
     - cp yudream-bootstrap/target/*.jar dist/backend/ || true
+    - cp yudream-plugins/yudream-plugin-spi/target/*.jar dist/contracts/ || true
     - cp -r yudream-frontend/apps/core-arco-design-vue/dist dist/frontend/ || true
-    - cp yudream-plugins/*/target/*.jar dist/plugins/ || true
     - ls -R dist
   artifacts:
-    name: "yudream-admin-${CI_COMMIT_SHORT_SHA}"
+    name: "yudream-admin-core-${CI_COMMIT_SHORT_SHA}"
     paths:
       - dist/
     expire_in: 1 week

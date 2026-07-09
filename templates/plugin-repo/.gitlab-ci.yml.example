@@ -1,0 +1,32 @@
+stages:
+  - build-frontend
+  - package-plugin
+
+variables:
+  PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
+  NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
+  COREPACK_NPM_REGISTRY: "https://registry.npmmirror.com"
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+
+build:frontend:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
+  stage: build-frontend
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+  script:
+    - pnpm install --frozen-lockfile
+    - pnpm --filter @yudream/plugin-your-plugin run build
+  artifacts:
+    paths:
+      - yudream-frontend/packages/plugin-your-plugin/dist/
+
+package:plugin:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
+  stage: package-plugin
+  script:
+    - mvn -s settings.xml clean package -pl yudream-plugins/yudream-plugin-your-plugin -am -DskipTests -B -e
+  artifacts:
+    paths:
+      - yudream-plugins/yudream-plugin-your-plugin/target/*.jar
