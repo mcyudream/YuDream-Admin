@@ -53,4 +53,13 @@ public record PluginFrontendModuleInfo(
         status = status == null ? MenuStatus.ACTIVE : status;
         menuType = menuType == null ? MenuNodeType.CATEGORY : menuType;
     }
+
+    public PluginFrontendModuleInfo withSortOverrides(Integer overriddenMenuSort,
+                                                      List<PluginFrontendRouteInfo> overriddenRoutes) {
+        return new PluginFrontendModuleInfo(
+                pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon,
+                overriddenMenuSort, overriddenRoutes, parentCode, visible, status, menuCode, menuType,
+                menuModule, menuPath, menuComponent, menuLink, menuPermission
+        );
+    }
 }

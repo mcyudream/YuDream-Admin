@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
@@ -22,8 +23,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -171,16 +170,6 @@ class PluginMenuLifecycleTest {
     }
 
     @Test
-    void failedEnableCleanupUsesIndependentTransaction() throws Exception {
-        Transactional transaction = PluginMenuProjectionService.class
-                .getMethod("markUnavailable", String.class)
-                .getAnnotation(Transactional.class);
-
-        assertThat(transaction).isNotNull();
-        assertThat(transaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
-    }
-
-    @Test
     void failureAfterRuntimeEnableDisablesRuntimeAndHidesMenus() {
         InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
         PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
@@ -198,6 +187,41 @@ class PluginMenuLifecycleTest {
         assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
                 .extracting(Menu::getRuntimeAvailable)
                 .containsOnly(false);
+    }
+
+    @Test
+    void failedEnableRetriesTransientMenuCleanupUntilAllMenusAreUnavailable() {
+        FailOnceMenuRepo menuRepo = new FailOnceMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        menuRepo.failNextSave();
+        PluginAppService realProjectionService = appService(projectionService);
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new IllegalStateException("enable failed")).when(pluginRuntimeGateway).enable(module);
+
+        assertThatThrownBy(() -> realProjectionService.enable(PLUGIN_CODE))
+                .hasMessageContaining("插件启用失败");
+
+        assertThat(menuRepo.getFailedSaves()).isEqualTo(1);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
+    void failedEnablePersistsCleanupFailureInDiagnostics() {
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new IllegalStateException("enable failed")).when(pluginRuntimeGateway).enable(module);
+        doThrow(new IllegalStateException("mongo unavailable"))
+                .when(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
+
+        assertThatThrownBy(() -> service.enable(PLUGIN_CODE))
+                .hasMessageContaining("插件启用失败");
+
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ERROR);
+        assertThat(module.getErrorMessage()).contains("菜单清理失败", "mongo unavailable");
     }
 
     @Test
@@ -244,8 +268,9 @@ class PluginMenuLifecycleTest {
 
         service.disable(PLUGIN_CODE);
 
-        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService);
+        InOrder order = inOrder(pluginRuntimeGateway, pluginModuleRepo, pluginMenuProjectionService);
         order.verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        order.verify(pluginModuleRepo).save(module);
         order.verify(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
     }
 
@@ -255,9 +280,73 @@ class PluginMenuLifecycleTest {
 
         service.unload(PLUGIN_CODE);
 
-        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService);
+        InOrder order = inOrder(pluginRuntimeGateway, pluginModuleRepo, pluginMenuProjectionService);
         order.verify(pluginRuntimeGateway).unload(PLUGIN_CODE);
+        order.verify(pluginModuleRepo).save(module);
         order.verify(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
+    }
+
+    @Test
+    void disableRetriesTransientMenuCleanupAfterPersistingDisabledState() {
+        FailOnceMenuRepo menuRepo = new FailOnceMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        menuRepo.failNextSave();
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        appService(projectionService).disable(PLUGIN_CODE);
+
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.DISABLED);
+        assertThat(menuRepo.getFailedSaves()).isEqualTo(1);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
+    void unloadRetriesTransientMenuCleanupAfterPersistingUnloadedState() {
+        FailOnceMenuRepo menuRepo = new FailOnceMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        menuRepo.failNextSave();
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        appService(projectionService).unload(PLUGIN_CODE);
+
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.INSTALLED);
+        assertThat(menuRepo.getFailedSaves()).isEqualTo(1);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
+    void listReconcilesMenusForPluginsThatAreNotRuntimeEnabled() {
+        module.markDisabled();
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        when(pluginRuntimeGateway.discover()).thenReturn(List.of());
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+
+        appService(new PluginMenuProjectionService(menuRepo)).list();
+
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
+    void listReconcilesOrphanedPluginMenusWithoutAModuleRecord() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        when(pluginRuntimeGateway.discover()).thenReturn(List.of());
+        when(pluginModuleRepo.findAll()).thenReturn(List.of());
+
+        appService(new PluginMenuProjectionService(menuRepo)).list();
+
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
     }
 
     @Test
@@ -442,6 +531,36 @@ class PluginMenuLifecycleTest {
         assertThat(manifest.getModules().getFirst().getRoutes()).isEmpty();
     }
 
+    @Test
+    void routeMovedToSystemParentDoesNotExposeStalePluginDirectoryMetadata() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        Menu parentMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "parent:" + MODULE_NAME + ":/wallet"
+        ).orElseThrow();
+        parentMenu.setParentCode("system:platform");
+        parentMenu.setVisible(false);
+        menuRepo.save(parentMenu);
+        Menu routeMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletTransactions"
+        ).orElseThrow();
+        routeMenu.setParentCode("system:dashboard");
+        menuRepo.save(routeMenu);
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+
+        PluginFrontendRouteDTO route = appService(new PluginMenuProjectionService(menuRepo))
+                .frontendManifest().getModules().getFirst().getRoutes().getFirst();
+
+        assertThat(route.getParentCode()).isEqualTo("system:dashboard");
+        assertThat(route.getParentMenuCode()).isNull();
+        assertThat(route.getParentParentCode()).isNull();
+        assertThat(route.getParentPath()).isNull();
+        assertThat(route.getParentVisible()).isNull();
+        assertThat(route.getParentStatus()).isNull();
+    }
+
     private void stubEnable() {
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
         when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -565,6 +684,31 @@ class PluginMenuLifecycleTest {
         @Override
         public long count() {
             return menus.size();
+        }
+    }
+
+    private static class FailOnceMenuRepo extends InMemoryMenuRepo {
+
+        private boolean failNextSave;
+        private int failedSaves;
+
+        void failNextSave() {
+            failNextSave = true;
+        }
+
+        int getFailedSaves() {
+            return failedSaves;
+        }
+
+        @Override
+        public Menu save(Menu menu) {
+            if (failNextSave) {
+                failNextSave = false;
+                failedSaves++;
+                menu.setRuntimeAvailable(true);
+                throw new IllegalStateException("transient mongo failure");
+            }
+            return super.save(menu);
         }
     }
 }

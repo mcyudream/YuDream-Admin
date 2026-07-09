@@ -53,4 +53,13 @@ public record PluginFrontendRouteInfo(
         status = status == null ? MenuStatus.ACTIVE : status;
         type = type == null ? MenuNodeType.MENU : type;
     }
+
+    public PluginFrontendRouteInfo withSortOverrides(Integer overriddenParentSort, Integer overriddenSort) {
+        return new PluginFrontendRouteInfo(
+                path, name, title, icon, parentPath, parentTitle, parentIcon, overriddenParentSort,
+                component, permission, overriddenSort, parentCode, visible, status, menuCode, type,
+                module, link, parentMenuCode, parentParentCode, parentType, parentModule, parentComponent,
+                parentLink, parentPermission, parentVisible, parentStatus
+        );
+    }
 }
