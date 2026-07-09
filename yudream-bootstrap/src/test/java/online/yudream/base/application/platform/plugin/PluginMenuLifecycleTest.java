@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -137,6 +138,48 @@ class PluginMenuLifecycleTest {
         order.verify(pluginMenuProjectionService).project(dependencyCode, List.of(dependencyFrontend));
         order.verify(pluginRuntimeGateway).enable(module);
         order.verify(pluginMenuProjectionService).project(PLUGIN_CODE, List.of(frontendModule));
+    }
+
+    @Test
+    void dependencyProjectionFailureCleansDependencyRuntimeAndMenus() throws Exception {
+        String dependencyCode = "yudream-ledger";
+        Path dependencyJar = Files.createFile(tempDir.resolve("ledger-failure.jar"));
+        PluginModule dependency = PluginModule.builder()
+                .code(dependencyCode)
+                .name("账本插件")
+                .pluginVersion("1.0.0")
+                .jarPath(dependencyJar.toString())
+                .dependencies(List.of())
+                .build();
+        dependency.markEnabled();
+        module.setDependencies(List.of(dependencyCode));
+        PluginFrontendModuleInfo dependencyFrontend = new PluginFrontendModuleInfo(
+                dependencyCode,
+                "/api/platform/plugins/yudream-ledger/assets/remoteEntry.js",
+                "ledgerAdmin",
+                "1.0.0",
+                "sha256-ledger",
+                List.of()
+        );
+        InMemoryMenuRepo menuRepo = new InMemoryMenuRepo();
+        new PluginMenuProjectionService(menuRepo).project(dependencyCode, List.of(dependencyFrontend));
+        PluginMenuProjectionService failingProjection = new FailingProjectionService(menuRepo, dependencyCode);
+        PluginAppService realProjectionService = appService(failingProjection);
+        Set<String> runtimeEnabled = statefulRuntimeEnable();
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module, dependency));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule, dependencyFrontend));
+        when(pluginRuntimeGateway.permissions(any())).thenReturn(List.of());
+
+        assertThatThrownBy(() -> realProjectionService.enable(PLUGIN_CODE))
+                .hasMessageContaining("插件启用失败");
+
+        assertThat(dependency.getStatus()).isEqualTo(PluginStatus.ERROR);
+        assertThat(dependency.getErrorMessage()).contains("projection failed");
+        assertThat(runtimeEnabled).doesNotContain(dependencyCode);
+        assertThat(menuRepo.findByPluginCode(dependencyCode))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
     }
 
     @Test
@@ -248,7 +291,9 @@ class PluginMenuLifecycleTest {
     @Test
     void unprojectedRuntimeModuleIsExcludedFromFrontendManifest() {
         PluginMenuProjectionService projectionService = new PluginMenuProjectionService(new InMemoryMenuRepo());
+        module.markEnabled();
         when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
         PluginAppService realProjectionService = new PluginAppService(
                 pluginModuleRepo,
@@ -260,6 +305,36 @@ class PluginMenuLifecycleTest {
         PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
 
         assertThat(manifest.getModules()).isEmpty();
+    }
+
+    @Test
+    void runtimeEnabledModuleWithPersistedErrorIsExcludedFromManifest() {
+        module.markError("broken state");
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+
+        PluginFrontendManifestDTO manifest = appService(new PluginMenuProjectionService(menuRepo)).frontendManifest();
+
+        assertThat(manifest.getModules()).isEmpty();
+    }
+
+    @Test
+    void explicitEnableRepairsAlreadyRunningModuleStatePermissionsAndProjection() {
+        module.markError("stale error");
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginRuntimeGateway.permissions(PLUGIN_CODE)).thenReturn(List.of());
+
+        service.enable(PLUGIN_CODE);
+
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
+        assertThat(module.getErrorMessage()).isNull();
+        verify(permissionDomainService).upsertManualPermissions(List.of());
+        verify(pluginMenuProjectionService).project(PLUGIN_CODE, List.of(frontendModule));
+        verify(pluginModuleRepo).save(module);
     }
 
     @Test
@@ -350,6 +425,46 @@ class PluginMenuLifecycleTest {
     }
 
     @Test
+    void listSelfHealsZombieRuntimeAfterDisableAndCleanupExhaustion() {
+        module.markEnabled();
+        FailOnceMenuRepo menuRepo = new FailOnceMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        menuRepo.failNextSaves(3);
+        Set<String> runtimeEnabled = new HashSet<>();
+        runtimeEnabled.add(PLUGIN_CODE);
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE))
+                .thenAnswer(invocation -> runtimeEnabled.contains(PLUGIN_CODE));
+        AtomicInteger disableAttempts = new AtomicInteger();
+        doAnswer(invocation -> {
+            if (disableAttempts.getAndIncrement() == 0) {
+                throw new IllegalStateException("runtime disable failed");
+            }
+            runtimeEnabled.remove(invocation.<String>getArgument(0));
+            return null;
+        }).when(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.discover()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> appService(projectionService).disable(PLUGIN_CODE))
+                .hasMessageContaining("runtime disable failed");
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.DISABLED);
+        assertThat(runtimeEnabled).contains(PLUGIN_CODE);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(true);
+
+        appService(projectionService).list();
+
+        assertThat(runtimeEnabled).doesNotContain(PLUGIN_CODE);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
     void deleteRetainsPluginMenuProjectionRecordsAsUnavailable() {
         when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
         when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
@@ -418,7 +533,9 @@ class PluginMenuLifecycleTest {
         menuRepo.save(routeMenu);
         projectionService.markUnavailable(PLUGIN_CODE);
         projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        module.markEnabled();
         when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
         PluginAppService realProjectionService = new PluginAppService(
                 pluginModuleRepo,
@@ -481,6 +598,7 @@ class PluginMenuLifecycleTest {
                 route("/wallet/reports", "walletReports")
         ));
         projectionService.project(PLUGIN_CODE, List.of(moduleWithTwoRoutes));
+        module.markEnabled();
         Menu disabled = menuRepo.findByPluginCodeAndRegistrationKey(
                 PLUGIN_CODE,
                 "route:" + MODULE_NAME + ":walletReports"
@@ -494,6 +612,7 @@ class PluginMenuLifecycleTest {
         invisible.setVisible(false);
         menuRepo.save(invisible);
         when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(moduleWithTwoRoutes));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
         PluginAppService realProjectionService = new PluginAppService(
                 pluginModuleRepo,
@@ -514,6 +633,7 @@ class PluginMenuLifecycleTest {
     @Test
     void disabledPluginDirectoryExcludesRoutesStillAttachedToIt() {
         InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        module.markEnabled();
         PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
         Menu parentMenu = menuRepo.findByPluginCodeAndRegistrationKey(
                 PLUGIN_CODE,
@@ -523,6 +643,7 @@ class PluginMenuLifecycleTest {
         parentMenu.disable();
         menuRepo.save(parentMenu);
         when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
 
         PluginFrontendManifestDTO manifest = appService(projectionService).frontendManifest();
@@ -534,6 +655,7 @@ class PluginMenuLifecycleTest {
     @Test
     void routeMovedToSystemParentDoesNotExposeStalePluginDirectoryMetadata() {
         InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        module.markEnabled();
         Menu parentMenu = menuRepo.findByPluginCodeAndRegistrationKey(
                 PLUGIN_CODE,
                 "parent:" + MODULE_NAME + ":/wallet"
@@ -548,6 +670,7 @@ class PluginMenuLifecycleTest {
         routeMenu.setParentCode("system:dashboard");
         menuRepo.save(routeMenu);
         when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
 
         PluginFrontendRouteDTO route = appService(new PluginMenuProjectionService(menuRepo))
@@ -689,11 +812,15 @@ class PluginMenuLifecycleTest {
 
     private static class FailOnceMenuRepo extends InMemoryMenuRepo {
 
-        private boolean failNextSave;
+        private int remainingFailures;
         private int failedSaves;
 
         void failNextSave() {
-            failNextSave = true;
+            failNextSaves(1);
+        }
+
+        void failNextSaves(int count) {
+            remainingFailures = count;
         }
 
         int getFailedSaves() {
@@ -702,13 +829,33 @@ class PluginMenuLifecycleTest {
 
         @Override
         public Menu save(Menu menu) {
-            if (failNextSave) {
-                failNextSave = false;
+            if (remainingFailures > 0) {
+                remainingFailures--;
                 failedSaves++;
                 menu.setRuntimeAvailable(true);
                 throw new IllegalStateException("transient mongo failure");
             }
             return super.save(menu);
+        }
+    }
+
+    private static class FailingProjectionService extends PluginMenuProjectionService {
+
+        private final String failingPluginCode;
+        private boolean fail = true;
+
+        FailingProjectionService(MenuRepo menuRepo, String failingPluginCode) {
+            super(menuRepo);
+            this.failingPluginCode = failingPluginCode;
+        }
+
+        @Override
+        public void project(String pluginCode, List<PluginFrontendModuleInfo> modules) {
+            super.project(pluginCode, modules);
+            if (fail && failingPluginCode.equals(pluginCode)) {
+                fail = false;
+                throw new IllegalStateException("projection failed");
+            }
         }
     }
 }

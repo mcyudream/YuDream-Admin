@@ -65,11 +65,7 @@ public class PluginAppService {
     public List<PluginModuleDTO> list() {
         syncPluginRegistry();
         List<PluginModule> modules = pluginModuleRepo.findAll();
-        Set<String> runtimeEnabledCodes = modules.stream()
-                .filter(module -> pluginRuntimeGateway.enabled(module.getCode()))
-                .map(PluginModule::getCode)
-                .collect(Collectors.toSet());
-        reconcileUnavailableMenusExcept(runtimeEnabledCodes);
+        reconcileRuntimeHealth(modules);
         return modules.stream()
                 .sorted(Comparator.comparing(PluginModule::getCode))
                 .map(this::toDTO)
@@ -143,13 +139,21 @@ public class PluginAppService {
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO disable(String code) {
         PluginModule module = module(code);
-        pluginRuntimeGateway.disable(code);
+        RuntimeException runtimeFailure = null;
+        try {
+            pluginRuntimeGateway.disable(code);
+        } catch (RuntimeException e) {
+            runtimeFailure = e;
+        }
         module.markDisabled();
         PluginModule saved = pluginModuleRepo.save(module);
         reconcileUnavailableMenus(code);
+        if (runtimeFailure != null) {
+            throw new BizException("插件禁用失败：" + rootMessage(runtimeFailure));
+        }
         return toDTO(saved);
     }
 
@@ -182,6 +186,7 @@ public class PluginAppService {
         Map<String, PluginModule> modules = pluginModuleRepo.findAll().stream()
                 .collect(Collectors.toMap(PluginModule::getCode, Function.identity(), (left, right) -> left));
         List<PluginFrontendModuleInfo> runtimeModules = pluginRuntimeGateway.frontendModules().stream()
+                .filter(module -> healthy(modules.get(module.pluginCode()), module.pluginCode()))
                 .map(module -> applyFrontendSortSetting(module, modules.get(module.pluginCode())))
                 .toList();
         return PluginAssembler.toManifestDTO(pluginMenuProjectionService.applyOverrides(runtimeModules));
@@ -232,6 +237,7 @@ public class PluginAppService {
         Set<String> visiting = new HashSet<>();
         for (PluginModule module : modules.values().stream().sorted(Comparator.comparing(PluginModule::getCode)).toList()) {
             if (!module.enabled()) {
+                disableZombieRuntime(module.getCode());
                 reconcileUnavailableMenus(module.getCode());
                 continue;
             }
@@ -270,9 +276,10 @@ public class PluginAppService {
             return module;
         }
         if (pluginRuntimeGateway.enabled(code)) {
-            projectRuntimeMenus(code);
+            PluginModule repaired = enableOwnRuntime(module);
             enabled.add(code);
-            return module;
+            modules.put(code, repaired);
+            return repaired;
         }
         if (!visiting.add(code)) {
             throw new BizException("插件依赖存在循环：" + code);
@@ -282,15 +289,7 @@ public class PluginAppService {
                 throw new BizException("插件 JAR 不存在：" + module.getJarPath());
             }
             enableDependencies(module, modules, enabled, visiting);
-            if (!pluginRuntimeGateway.loaded(code)) {
-                pluginRuntimeGateway.load(module);
-                module.markLoaded();
-            }
-            pluginRuntimeGateway.enable(module);
-            syncPluginPermissions(code);
-            module.markEnabled();
-            PluginModule saved = pluginModuleRepo.save(module);
-            projectRuntimeMenus(code);
+            PluginModule saved = enableOwnRuntime(module);
             enabled.add(code);
             modules.put(code, saved);
             return saved;
@@ -305,14 +304,10 @@ public class PluginAppService {
             if (dependency == null) {
                 throw new BizException("插件依赖不存在：" + dependencyCode);
             }
-            if (pluginRuntimeGateway.enabled(dependencyCode)) {
-                if (enabled.add(dependencyCode)) {
-                    projectRuntimeMenus(dependencyCode);
-                }
-            } else {
-                if (!dependency.enabled()) {
-                    throw new BizException("请先启用插件依赖：" + dependency.getName());
-                }
+            if (!dependency.enabled()) {
+                throw new BizException("请先启用插件依赖：" + dependency.getName());
+            }
+            if (!enabled.contains(dependencyCode)) {
                 enableRuntimeWithDependencies(dependency, modules, enabled, visiting);
             }
             if (!pluginRuntimeGateway.enabled(dependencyCode)) {
@@ -492,6 +487,56 @@ public class PluginAppService {
                 log.warn("Failed to reconcile inactive plugin menus on attempt {}/{}: {}",
                         attempt, MENU_CLEANUP_ATTEMPTS, rootMessage(cleanupError));
             }
+        }
+    }
+
+    private PluginModule enableOwnRuntime(PluginModule module) {
+        String code = module.getCode();
+        try {
+            if (!pluginRuntimeGateway.loaded(code)) {
+                pluginRuntimeGateway.load(module);
+                module.markLoaded();
+            }
+            if (!pluginRuntimeGateway.enabled(code)) {
+                pluginRuntimeGateway.enable(module);
+            }
+            syncPluginPermissions(code);
+            module.markEnabled();
+            PluginModule saved = pluginModuleRepo.save(module);
+            projectRuntimeMenus(code);
+            return saved;
+        } catch (Exception e) {
+            String failure = rootMessage(e);
+            String cleanupFailure = cleanupFailedEnable(code);
+            markError(module, appendCleanupFailure(failure, cleanupFailure));
+            throw e;
+        }
+    }
+
+    private void reconcileRuntimeHealth(List<PluginModule> modules) {
+        Set<String> healthyCodes = new HashSet<>();
+        for (PluginModule module : modules) {
+            String code = module.getCode();
+            if (healthy(module, code)) {
+                healthyCodes.add(code);
+            } else {
+                disableZombieRuntime(code);
+            }
+        }
+        reconcileUnavailableMenusExcept(healthyCodes);
+    }
+
+    private boolean healthy(PluginModule module, String code) {
+        return module != null && module.enabled() && pluginRuntimeGateway.enabled(code);
+    }
+
+    private void disableZombieRuntime(String code) {
+        try {
+            if (pluginRuntimeGateway.enabled(code)) {
+                pluginRuntimeGateway.disable(code);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Failed to disable unhealthy plugin runtime {}: {}", code, rootMessage(e));
         }
     }
 

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMenuOverrideInfo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuSource;
@@ -132,27 +133,7 @@ public class PluginMenuProjectionService {
     private PluginFrontendModuleInfo overriddenModule(PluginFrontendModuleInfo module,
                                                        Menu moduleMenu,
                                                        List<PluginFrontendRouteInfo> routes) {
-        return new PluginFrontendModuleInfo(
-                    module.pluginCode(),
-                    module.entry(),
-                    module.moduleName(),
-                    module.sdkVersion(),
-                    module.integrity(),
-                    moduleMenu.getName(),
-                    moduleMenu.getIcon(),
-                    moduleMenu.getSort(),
-                    routes,
-                    moduleMenu.getParentCode(),
-                    moduleMenu.getVisible(),
-                    moduleMenu.getStatus(),
-                    moduleMenu.getCode(),
-                    moduleMenu.getType(),
-                    moduleMenu.getModule(),
-                    moduleMenu.getPath(),
-                    moduleMenu.getComponent(),
-                    moduleMenu.getLink(),
-                    moduleMenu.getPermission()
-        );
+        return PluginFrontendModuleInfo.withMenuOverride(module, menuOverride(moduleMenu), routes);
     }
 
     private PluginFrontendRouteInfo applyRouteOverride(PluginFrontendModuleInfo module,
@@ -178,35 +159,29 @@ public class PluginMenuProjectionService {
     private PluginFrontendRouteInfo overriddenRoute(PluginFrontendRouteInfo route,
                                                       Menu routeMenu,
                                                       Menu parentMenu) {
-        return new PluginFrontendRouteInfo(
-                routeMenu.getPath(),
-                route.name(),
-                routeMenu.getName(),
-                routeMenu.getIcon(),
-                parentMenu == null ? null : parentMenu.getPath(),
-                parentMenu == null ? null : parentMenu.getName(),
-                parentMenu == null ? null : parentMenu.getIcon(),
-                parentMenu == null ? null : parentMenu.getSort(),
-                routeMenu.getComponent(),
-                routeMenu.getPermission(),
-                routeMenu.getSort(),
-                routeMenu.getParentCode(),
-                routeMenu.getVisible(),
-                routeMenu.getStatus(),
-                routeMenu.getCode(),
-                routeMenu.getType(),
-                routeMenu.getModule(),
-                routeMenu.getLink(),
-                parentMenu == null ? null : parentMenu.getCode(),
-                parentMenu == null ? null : parentMenu.getParentCode(),
-                parentMenu == null ? null : parentMenu.getType(),
-                parentMenu == null ? null : parentMenu.getModule(),
-                parentMenu == null ? null : parentMenu.getComponent(),
-                parentMenu == null ? null : parentMenu.getLink(),
-                parentMenu == null ? null : parentMenu.getPermission(),
-                parentMenu == null ? null : parentMenu.getVisible(),
-                parentMenu == null ? null : parentMenu.getStatus()
+        return PluginFrontendRouteInfo.withMenuOverrides(
+                route,
+                menuOverride(routeMenu),
+                parentMenu == null ? null : menuOverride(parentMenu)
         );
+    }
+
+    private PluginMenuOverrideInfo menuOverride(Menu menu) {
+        return PluginMenuOverrideInfo.builder()
+                .code(menu.getCode())
+                .name(menu.getName())
+                .type(menu.getType())
+                .parentCode(menu.getParentCode())
+                .module(menu.getModule())
+                .icon(menu.getIcon())
+                .path(menu.getPath())
+                .component(menu.getComponent())
+                .link(menu.getLink())
+                .sort(menu.getSort())
+                .visible(menu.getVisible())
+                .permission(menu.getPermission())
+                .status(menu.getStatus())
+                .build();
     }
 
     private boolean enabled(Menu menu) {
