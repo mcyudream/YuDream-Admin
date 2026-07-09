@@ -37,6 +37,13 @@ async function loadRemoteComponent() {
   try {
     const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
     await mountPluginModule(module)
+    if (!remoteComponent.value) {
+      const localModule = await loadLocalDevModule(plugin.value.pluginCode)
+      if (localModule) {
+        remoteError.value = ''
+        await mountPluginModule(localModule)
+      }
+    }
   }
   catch (error: any) {
     const module = await loadLocalDevModule(plugin.value.pluginCode)
