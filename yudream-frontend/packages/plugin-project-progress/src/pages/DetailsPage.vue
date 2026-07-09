@@ -3,6 +3,7 @@ import type { ProjectProgressModel } from '../composables/useProjectProgress'
 import type { ProjectWorkDetail } from '../types'
 import { computed, ref } from 'vue'
 import PeoplePicker from '../components/PeoplePicker.vue'
+import EvidenceFileList from '../components/EvidenceFileList.vue'
 
 const props = defineProps<{
   model: ProjectProgressModel
@@ -73,6 +74,10 @@ async function saveDetail() {
           <template #cell="{ record }">
             <strong>{{ record.title }}</strong>
             <div class="pp-table-sub">{{ record.description || '暂无说明' }}</div>
+            <div v-if="record.acceptanceSummary || record.acceptanceFiles.length" class="pp-material-box mt-3">
+              <p>{{ record.acceptanceSummary || '暂无验收说明' }}</p>
+              <EvidenceFileList :model="model" :files="record.acceptanceFiles" compact />
+            </div>
           </template>
         </a-table-column>
         <a-table-column title="状态" :width="150">

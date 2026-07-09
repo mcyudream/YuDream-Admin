@@ -2,7 +2,9 @@ import type {
   ProjectDeptOption,
   ProjectAcceptanceRecord,
   ProjectCheckIn,
+  ProjectMemberStats,
   ProjectMinecraftServerOption,
+  ProjectPersonalStats,
   ProjectProgressEvent,
   ProjectProgressProject,
   ProjectProgressStatus,
@@ -41,6 +43,8 @@ export function createProjectProgressApi(sdk: YuDreamPluginSdk) {
   return {
     status: () => sdk.http.get<ProjectProgressStatus>('/status'),
     projects: () => getAllPages<ProjectProgressProject>('/projects'),
+    personalStats: () => sdk.http.get<ProjectPersonalStats>('/statistics/me'),
+    projectMemberStats: (projectId: string) => getAllPages<ProjectMemberStats>(`/projects/${encodeURIComponent(projectId)}/member-statistics`),
     users: (keyword?: string, deptId?: string) => getAllPages<ProjectUserOption>('/users', { keyword, deptId }),
     usersPage: (keyword?: string, deptId?: string, page = 1, size = 10) => sdk.http.get<ProjectUserOption[]>(`/users${query({ keyword, deptId, page, size })}`),
     resolveUsers: (ids: string[]) => ids.length
@@ -70,5 +74,7 @@ export function createProjectProgressApi(sdk: YuDreamPluginSdk) {
     reject: (detailId: string, data: Record<string, unknown>) => sdk.http.post<ProjectAcceptanceRecord>(`/details/${encodeURIComponent(detailId)}/reject`, data),
     acceptanceRecords: (detailId: string) => getAllPages<ProjectAcceptanceRecord>(`/details/${encodeURIComponent(detailId)}/acceptance-records`),
     events: (projectId: string, since?: number) => getAllPages<ProjectProgressEvent>(`/projects/${encodeURIComponent(projectId)}/events`, { since }),
+    previewFile: (objectKey: string) => sdk.http.blob(`/files/download${query({ key: objectKey, disposition: 'inline' })}`),
+    downloadFile: (objectKey: string) => sdk.http.blob(`/files/download${query({ key: objectKey, disposition: 'attachment' })}`),
   }
 }

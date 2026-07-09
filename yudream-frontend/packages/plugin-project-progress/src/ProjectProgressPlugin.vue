@@ -7,6 +7,7 @@ import AcceptancePage from './pages/AcceptancePage.vue'
 import CheckInsPage from './pages/CheckInsPage.vue'
 import DashboardPage from './pages/DashboardPage.vue'
 import DetailsPage from './pages/DetailsPage.vue'
+import MemberStatsPage from './pages/MemberStatsPage.vue'
 import MyTasksPage from './pages/MyTasksPage.vue'
 import ProjectsPage from './pages/ProjectsPage.vue'
 import SettingsPage from './pages/SettingsPage.vue'
@@ -39,6 +40,9 @@ const pageName = computed(() => {
   if (component.endsWith('/Acceptance')) {
     return 'acceptance'
   }
+  if (component.endsWith('/Members')) {
+    return 'members'
+  }
   if (component.endsWith('/Settings')) {
     return 'settings'
   }
@@ -63,6 +67,9 @@ const page = computed(() => {
   }
   if (pageName.value === 'acceptance') {
     return AcceptancePage
+  }
+  if (pageName.value === 'members') {
+    return MemberStatsPage
   }
   if (pageName.value === 'settings') {
     return SettingsPage

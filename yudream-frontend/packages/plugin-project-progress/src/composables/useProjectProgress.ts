@@ -3,8 +3,11 @@ import type {
   DetailForm,
   ProjectCheckIn,
   ProjectDeptOption,
+  ProjectFileEvidence,
   ProjectForm,
+  ProjectMemberStats,
   ProjectMinecraftServerOption,
+  ProjectPersonalStats,
   ProjectProgressEvent,
   ProjectProgressProject,
   ProjectProgressStatus,
@@ -12,7 +15,7 @@ import type {
   ProjectUserOption,
   ProjectWorkDetail,
 } from '../types'
-import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
+import type { YuDreamPluginBlobResponse, YuDreamPluginSdk } from '@yudream/plugin-sdk'
 import { useFaToast } from '@fantastic-admin/components'
 import { computed, reactive, ref } from 'vue'
 import { createProjectProgressApi } from '../api/project-progress-api'
@@ -32,6 +35,8 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const pendingAcceptance = ref<ProjectWorkDetail[]>([])
   const checkIns = ref<ProjectCheckIn[]>([])
   const events = ref<ProjectProgressEvent[]>([])
+  const personalStats = ref<ProjectPersonalStats | null>(null)
+  const memberStats = ref<ProjectMemberStats[]>([])
   const departments = ref<ProjectDeptOption[]>([])
   const minecraftServers = ref<ProjectMinecraftServerOption[]>([])
   const usersById = ref<Record<string, ProjectUserOption>>({})
@@ -118,6 +123,10 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       await loadAcceptance()
       return
     }
+    if (page === 'members') {
+      await loadMemberStats()
+      return
+    }
     await load()
   }
 
@@ -148,14 +157,16 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   async function loadMyTasks() {
     loading.value = true
     try {
-      const [nextStatus, nextProjects, nextMyTasks] = await Promise.all([
+      const [nextStatus, nextProjects, nextMyTasks, nextPersonalStats] = await Promise.all([
         api.status(),
         api.projects(),
         api.myTasks(),
+        api.personalStats(),
       ])
       status.value = nextStatus
       projects.value = nextProjects
       myTasks.value = nextMyTasks
+      personalStats.value = nextPersonalStats
       await resolveProjectUsers(nextProjects)
       await resolveDetailUsers(myTasks.value)
       if (!selectedDetailId.value && myTasks.value.length) {
@@ -170,16 +181,18 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   async function loadTaskCenter() {
     loading.value = true
     try {
-      const [nextStatus, nextProjects, nextClaimableTasks, nextMyTasks] = await Promise.all([
+      const [nextStatus, nextProjects, nextClaimableTasks, nextMyTasks, nextPersonalStats] = await Promise.all([
         api.status(),
         api.projects(),
         api.claimableTasks(),
         api.myTasks(),
+        api.personalStats(),
       ])
       status.value = nextStatus
       projects.value = nextProjects
       claimableTasks.value = nextClaimableTasks
       myTasks.value = nextMyTasks
+      personalStats.value = nextPersonalStats
       await Promise.all([
         resolveProjectUsers(nextProjects),
         resolveDetailUsers([...nextClaimableTasks, ...nextMyTasks]),
@@ -207,6 +220,34 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       await resolveProjectUsers(nextProjects)
       await resolveDetailUsers(pendingAcceptance.value)
       selectedAcceptanceId.value = selectedAcceptanceId.value || pendingAcceptance.value[0]?.id || ''
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function loadMemberStats(projectId = selectedProjectId.value) {
+    loading.value = true
+    try {
+      const [nextStatus, nextProjects] = await Promise.all([
+        api.status(),
+        api.projects(),
+      ])
+      status.value = nextStatus
+      projects.value = nextProjects
+      await resolveProjectUsers(nextProjects)
+      if (!projectId && nextProjects.length) {
+        selectProject(nextProjects[0])
+        projectId = nextProjects[0].id
+      }
+      else if (projectId) {
+        const project = nextProjects.find(item => item.id === projectId)
+        if (project) {
+          selectProject(project)
+        }
+      }
+      memberStats.value = projectId ? await api.projectMemberStats(projectId) : []
+      await resolveUsers(memberStats.value.map(item => item.userId))
     }
     finally {
       loading.value = false
@@ -477,6 +518,51 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     await resolveUsers(checkIns.value.map(item => item.userId))
   }
 
+  function canPreviewEvidence(file: ProjectFileEvidence) {
+    return file.image || file.contentType?.startsWith('image/') || file.contentType === 'application/pdf' || file.contentType?.startsWith('text/')
+  }
+
+  async function previewEvidence(file: ProjectFileEvidence) {
+    if (typeof window === 'undefined') {
+      return
+    }
+    const previewWindow = window.open('about:blank', '_blank')
+    if (!previewWindow) {
+      toast.warning('浏览器阻止了预览窗口，请允许弹窗后重试')
+      return
+    }
+    previewWindow.opener = null
+    previewWindow.document.title = file.filename || '验收材料预览'
+    previewWindow.document.body.textContent = '正在加载预览...'
+    saving.value = true
+    try {
+      const response = await api.previewFile(file.objectKey)
+      const url = URL.createObjectURL(response.data)
+      previewWindow.location.href = url
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    }
+    catch (error) {
+      previewWindow.close()
+      toast.warning(errorMessage(error))
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
+  async function downloadEvidence(file: ProjectFileEvidence) {
+    saving.value = true
+    try {
+      saveBlobResponse(await api.downloadFile(file.objectKey), file.filename || 'evidence-file')
+    }
+    catch (error) {
+      toast.warning(errorMessage(error))
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
   async function searchUsers(keyword = '', deptId = '') {
     const users = await api.users(keyword, deptId)
     rememberUsers(users)
@@ -697,6 +783,16 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return `${Math.floor(value / 60000)} 分钟`
   }
 
+  function formatFileSize(value: number) {
+    if (!value) {
+      return '-'
+    }
+    if (value < 1024 * 1024) {
+      return `${Math.max(1, Math.round(value / 1024))} KB`
+    }
+    return `${(value / 1024 / 1024).toFixed(1)} MB`
+  }
+
   function projectName(projectId: string) {
     return projects.value.find(item => item.id === projectId)?.name || '未知项目'
   }
@@ -741,6 +837,8 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     pendingAcceptance,
     checkIns,
     events,
+    personalStats,
+    memberStats,
     departments,
     minecraftServers,
     usersById,
@@ -763,6 +861,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     loadPage,
     load,
     loadTaskCenter,
+    loadMemberStats,
     reloadProjectData,
     loadMyTasks,
     loadAcceptance,
@@ -782,6 +881,9 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     submitAcceptance,
     review,
     loadProjectCheckIns,
+    canPreviewEvidence,
+    previewEvidence,
+    downloadEvidence,
     newProject,
     newDetail,
     searchUsers,
@@ -799,6 +901,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     projectMemberCount,
     formatTime,
     minutes,
+    formatFileSize,
     projectName,
     serverLabel,
     canProjectMinecraftCheckIn,
@@ -906,6 +1009,41 @@ function fileToBase64(file: File) {
     reader.onerror = () => reject(reader.error || new Error('文件读取失败'))
     reader.readAsDataURL(file)
   })
+}
+
+function saveBlobResponse(response: YuDreamPluginBlobResponse, fallbackName: string) {
+  if (typeof document === 'undefined') {
+    return
+  }
+  const filename = resolveFilename(header(response.headers, 'content-disposition'), fallbackName)
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function header(headers: Record<string, string>, name: string) {
+  return Object.entries(headers || {}).find(([key]) => key.toLowerCase() === name)?.[1]
+}
+
+function resolveFilename(disposition: string | undefined, fallbackName: string) {
+  if (!disposition) {
+    return fallbackName
+  }
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+  const match = disposition.match(/filename="?([^";]+)"?/i)
+  return match?.[1] ? decodeURIComponent(match[1]) : fallbackName
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : '文件下载失败'
 }
 
 export type ProjectProgressModel = ReturnType<typeof useProjectProgress>

@@ -174,6 +174,8 @@ function userDepartmentText(user: ProjectUserOption) {
       :title="title"
       class="pp-picker-modal"
       content-class="pp-picker-modal-body"
+      maximize
+      maximizable
       :close-on-click-overlay="false"
       :show-confirm-button="false"
       show-cancel-button

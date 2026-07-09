@@ -69,6 +69,21 @@ public class ProjectProgressController {
         return http.details(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/projects/{projectId}/member-statistics", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse memberStatistics(PluginHttpRequest request) {
+        return http.memberStatistics(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/statistics/me", permission = ProjectProgressPlugin.CHECK_IN_PERMISSION)
+    public PluginHttpResponse personalStatistics(PluginHttpRequest request) {
+        return http.personalStatistics(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/files/download", permission = ProjectProgressPlugin.VIEW_PERMISSION)
+    public PluginHttpResponse downloadFile(PluginHttpRequest request) {
+        return http.downloadFile(request);
+    }
+
     @PluginHttpEndpoint(method = "POST", path = "/projects/{projectId}/details", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse createDetail(PluginHttpRequest request) {
         return http.createDetail(request);
