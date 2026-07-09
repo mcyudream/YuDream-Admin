@@ -18,6 +18,7 @@
         <module>yudream-plugins/yudream-plugin-authlib-injector</module>
         <module>yudream-plugins/yudream-plugin-minecraft-server</module>
         <module>yudream-plugins/yudream-plugin-minecraft-activity-proof</module>
+        <module>yudream-plugins/yudream-plugin-project-progress</module>
         <module>yudream-domain</module>
         <module>yudream-application</module>
         <module>yudream-interfaces</module>
