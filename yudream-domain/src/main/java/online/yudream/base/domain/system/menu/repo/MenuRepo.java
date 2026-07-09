@@ -14,7 +14,11 @@ public interface MenuRepo {
 
     Optional<Menu> findByCode(String code);
 
+    Optional<Menu> findByPluginCodeAndRegistrationKey(String pluginCode, String registrationKey);
+
     List<Menu> findAll();
+
+    List<Menu> findByPluginCode(String pluginCode);
 
     List<Menu> findByTypeIn(List<online.yudream.base.domain.system.menu.enumerate.MenuNodeType> types);
 

@@ -48,9 +48,25 @@ public class MenuRepoImpl implements MenuRepo {
     }
 
     @Override
+    public Optional<Menu> findByPluginCodeAndRegistrationKey(String pluginCode, String registrationKey) {
+        Query query = Query.query(Criteria.where("pluginCode").is(pluginCode)
+                .and("pluginRegistrationKey").is(registrationKey));
+        MenuDO menuDO = mongoTemplate.findOne(query, MenuDO.class);
+        return Optional.ofNullable(MenuInfraMapper.toDomain(menuDO));
+    }
+
+    @Override
     public List<Menu> findAll() {
         List<MenuDO> list = mongoTemplate.findAll(MenuDO.class);
         return list.stream()
+                .map(MenuInfraMapper::toDomain)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Menu> findByPluginCode(String pluginCode) {
+        Query query = Query.query(Criteria.where("pluginCode").is(pluginCode));
+        return mongoTemplate.find(query, MenuDO.class).stream()
                 .map(MenuInfraMapper::toDomain)
                 .collect(Collectors.toList());
     }
