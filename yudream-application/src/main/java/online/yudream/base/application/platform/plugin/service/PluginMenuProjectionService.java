@@ -18,7 +18,9 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +76,100 @@ public class PluginMenuProjectionService {
                     menu.setRuntimeAvailable(false);
                     menuRepo.save(menu);
                 });
+    }
+
+    public void markUnavailable(String pluginCode) {
+        menuRepo.findByPluginCode(pluginCode).forEach(menu -> {
+            menu.setRuntimeAvailable(false);
+            menuRepo.save(menu);
+        });
+    }
+
+    public List<PluginFrontendModuleInfo> applyOverrides(List<PluginFrontendModuleInfo> modules) {
+        List<PluginFrontendModuleInfo> overridden = new ArrayList<>();
+        for (PluginFrontendModuleInfo module : modules == null ? List.<PluginFrontendModuleInfo>of() : modules) {
+            Map<String, Menu> menus = menuRepo.findByPluginCode(module.pluginCode()).stream()
+                    .filter(menu -> StringUtils.hasText(menu.getPluginRegistrationKey()))
+                    .collect(Collectors.toMap(
+                            Menu::getPluginRegistrationKey,
+                            menu -> menu,
+                            (left, right) -> left
+                    ));
+            Menu moduleMenu = menus.get("module:" + module.moduleName());
+            if (!enabled(moduleMenu)) {
+                continue;
+            }
+
+            List<PluginFrontendRouteInfo> routes = module.routes().stream()
+                    .map(route -> applyRouteOverride(module, route, menus))
+                    .filter(Objects::nonNull)
+                    .toList();
+            overridden.add(new PluginFrontendModuleInfo(
+                    module.pluginCode(),
+                    module.entry(),
+                    module.moduleName(),
+                    module.sdkVersion(),
+                    module.integrity(),
+                    moduleMenu.getName(),
+                    moduleMenu.getIcon(),
+                    moduleMenu.getSort(),
+                    routes,
+                    moduleMenu.getParentCode(),
+                    moduleMenu.getVisible(),
+                    moduleMenu.getStatus()
+            ));
+        }
+        return List.copyOf(overridden);
+    }
+
+    private PluginFrontendRouteInfo applyRouteOverride(PluginFrontendModuleInfo module,
+                                                        PluginFrontendRouteInfo route,
+                                                        Map<String, Menu> menus) {
+        Menu routeMenu = menus.get("route:" + module.moduleName() + ":" + route.name());
+        if (!enabled(routeMenu)) {
+            return null;
+        }
+
+        String parentPath = route.parentPath();
+        String parentTitle = route.parentTitle();
+        String parentIcon = route.parentIcon();
+        Integer parentSort = route.parentSort();
+        String declaredParentPath = normalizeOptionalText(route.parentPath());
+        if (declaredParentPath != null) {
+            Menu parentMenu = menus.get("parent:" + module.moduleName() + ":" + declaredParentPath);
+            if (parentMenu != null && Objects.equals(routeMenu.getParentCode(), parentMenu.getCode())) {
+                if (!enabled(parentMenu)) {
+                    return null;
+                }
+                parentPath = parentMenu.getPath();
+                parentTitle = parentMenu.getName();
+                parentIcon = parentMenu.getIcon();
+                parentSort = parentMenu.getSort();
+            }
+        }
+
+        return new PluginFrontendRouteInfo(
+                routeMenu.getPath(),
+                route.name(),
+                routeMenu.getName(),
+                routeMenu.getIcon(),
+                parentPath,
+                parentTitle,
+                parentIcon,
+                parentSort,
+                routeMenu.getComponent(),
+                routeMenu.getPermission(),
+                routeMenu.getSort(),
+                routeMenu.getParentCode(),
+                routeMenu.getVisible(),
+                routeMenu.getStatus()
+        );
+    }
+
+    private boolean enabled(Menu menu) {
+        return menu != null
+                && menu.isAvailableForRuntime()
+                && menu.getStatus() != MenuStatus.DISABLED;
     }
 
     private ProjectionPlan validate(String pluginCode, List<PluginFrontendModuleInfo> modules) {

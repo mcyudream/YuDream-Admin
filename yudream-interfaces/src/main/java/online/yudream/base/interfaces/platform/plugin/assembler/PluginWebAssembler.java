@@ -67,6 +67,9 @@ public class PluginWebAssembler {
                 .menuTitle(dto.getMenuTitle())
                 .menuIcon(dto.getMenuIcon())
                 .menuSort(dto.getMenuSort())
+                .parentCode(dto.getParentCode())
+                .visible(dto.getVisible())
+                .status(dto.getStatus())
                 .routes(dto.getRoutes().stream().map(PluginWebAssembler::toRes).toList())
                 .build();
     }
@@ -84,6 +87,9 @@ public class PluginWebAssembler {
                 .component(dto.getComponent())
                 .permission(dto.getPermission())
                 .sort(dto.getSort())
+                .parentCode(dto.getParentCode())
+                .visible(dto.getVisible())
+                .status(dto.getStatus())
                 .build();
     }
 

@@ -59,6 +59,9 @@ public class PluginAssembler {
                 .menuTitle(module.menuTitle())
                 .menuIcon(module.menuIcon())
                 .menuSort(module.menuSort())
+                .parentCode(module.parentCode())
+                .visible(module.visible())
+                .status(module.status())
                 .routes(module.routes().stream().map(PluginAssembler::toDTO).toList())
                 .build();
     }
@@ -76,6 +79,9 @@ public class PluginAssembler {
                 .component(route.component())
                 .permission(route.permission())
                 .sort(route.sort())
+                .parentCode(route.parentCode())
+                .visible(route.visible())
+                .status(route.status())
                 .build();
     }
 
