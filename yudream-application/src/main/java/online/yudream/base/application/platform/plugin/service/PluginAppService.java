@@ -35,6 +35,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -50,6 +51,7 @@ public class PluginAppService {
 
     private static final String LEGACY_SKIN_PLUGIN_CODE = "blessing-skin";
     private static final String YUDREAM_SKIN_PLUGIN_CODE = "yudream-skin";
+    private static final int MENU_CLEANUP_ATTEMPTS = 3;
 
     private final PluginModuleRepo pluginModuleRepo;
     private final PluginRuntimeGateway pluginRuntimeGateway;
@@ -62,7 +64,13 @@ public class PluginAppService {
     @Transactional
     public List<PluginModuleDTO> list() {
         syncPluginRegistry();
-        return pluginModuleRepo.findAll().stream()
+        List<PluginModule> modules = pluginModuleRepo.findAll();
+        Set<String> runtimeEnabledCodes = modules.stream()
+                .filter(module -> pluginRuntimeGateway.enabled(module.getCode()))
+                .map(PluginModule::getCode)
+                .collect(Collectors.toSet());
+        reconcileUnavailableMenusExcept(runtimeEnabledCodes);
+        return modules.stream()
                 .sorted(Comparator.comparing(PluginModule::getCode))
                 .map(this::toDTO)
                 .toList();
@@ -118,7 +126,7 @@ public class PluginAppService {
         }
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO enable(String code) {
         Map<String, PluginModule> modules = modulesByCode();
         PluginModule module = modules.get(code);
@@ -128,9 +136,10 @@ public class PluginAppService {
         try {
             return toDTO(enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>()));
         } catch (Exception e) {
-            cleanupFailedEnable(module.getCode());
-            markError(module, e);
-            throw new BizException("插件启用失败：" + rootMessage(e));
+            String failure = rootMessage(e);
+            String cleanupFailure = cleanupFailedEnable(module.getCode());
+            markError(module, appendCleanupFailure(failure, cleanupFailure));
+            throw new BizException("插件启用失败：" + failure);
         }
     }
 
@@ -138,18 +147,20 @@ public class PluginAppService {
     public PluginModuleDTO disable(String code) {
         PluginModule module = module(code);
         pluginRuntimeGateway.disable(code);
-        pluginMenuProjectionService.markUnavailable(code);
         module.markDisabled();
-        return toDTO(pluginModuleRepo.save(module));
+        PluginModule saved = pluginModuleRepo.save(module);
+        reconcileUnavailableMenus(code);
+        return toDTO(saved);
     }
 
     @Transactional
     public PluginModuleDTO unload(String code) {
         PluginModule module = module(code);
         pluginRuntimeGateway.unload(code);
-        pluginMenuProjectionService.markUnavailable(code);
         module.markUnloaded();
-        return toDTO(pluginModuleRepo.save(module));
+        PluginModule saved = pluginModuleRepo.save(module);
+        reconcileUnavailableMenus(code);
+        return toDTO(saved);
     }
 
     @Transactional
@@ -161,7 +172,7 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
-        pluginMenuProjectionService.markUnavailable(code);
+        reconcileUnavailableMenus(code);
         deleteJar(module);
         pluginModuleRepo.deleteByCode(module.getCode());
     }
@@ -221,6 +232,7 @@ public class PluginAppService {
         Set<String> visiting = new HashSet<>();
         for (PluginModule module : modules.values().stream().sorted(Comparator.comparing(PluginModule::getCode)).toList()) {
             if (!module.enabled()) {
+                reconcileUnavailableMenus(module.getCode());
                 continue;
             }
             restoreEnabledModule(module, modules, restored, visiting);
@@ -245,8 +257,9 @@ public class PluginAppService {
             restored.add(code);
         } catch (Exception e) {
             log.warn("Failed to restore plugin {}", code, e);
-            cleanupFailedEnable(code);
-            markError(module, e);
+            String failure = rootMessage(e);
+            String cleanupFailure = cleanupFailedEnable(code);
+            markError(module, appendCleanupFailure(failure, cleanupFailure));
         }
     }
 
@@ -325,7 +338,7 @@ public class PluginAppService {
             if (pluginRuntimeGateway.loaded(LEGACY_SKIN_PLUGIN_CODE)) {
                 pluginRuntimeGateway.unload(LEGACY_SKIN_PLUGIN_CODE);
             }
-            pluginMenuProjectionService.markUnavailable(LEGACY_SKIN_PLUGIN_CODE);
+            reconcileUnavailableMenus(LEGACY_SKIN_PLUGIN_CODE);
             pluginModuleRepo.deleteByCode(LEGACY_SKIN_PLUGIN_CODE);
             log.info("Migrated plugin record from {} to {}", LEGACY_SKIN_PLUGIN_CODE, YUDREAM_SKIN_PLUGIN_CODE);
         });
@@ -351,9 +364,9 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
-        pluginMenuProjectionService.markUnavailable(code);
         existing.markUnloaded();
         pluginModuleRepo.save(existing);
+        reconcileUnavailableMenus(code);
     }
 
     private void deleteJar(PluginModule module) {
@@ -438,19 +451,52 @@ public class PluginAppService {
         pluginMenuProjectionService.project(code, modules);
     }
 
-    private void cleanupFailedEnable(String code) {
+    private String cleanupFailedEnable(String code) {
+        List<String> failures = new ArrayList<>();
         try {
             if (pluginRuntimeGateway.enabled(code)) {
                 pluginRuntimeGateway.disable(code);
             }
         } catch (Exception cleanupError) {
             log.warn("Failed to disable plugin runtime after enable failure: {}", code, cleanupError);
+            failures.add("运行时禁用失败：" + rootMessage(cleanupError));
         }
-        try {
-            pluginMenuProjectionService.markUnavailable(code);
-        } catch (Exception cleanupError) {
-            log.warn("Failed to hide plugin menus after enable failure: {}", code, cleanupError);
+        String menuFailure = reconcileUnavailableMenus(code);
+        if (menuFailure != null) {
+            failures.add(menuFailure);
         }
+        return failures.isEmpty() ? null : String.join("；", failures);
+    }
+
+    private String reconcileUnavailableMenus(String code) {
+        RuntimeException lastFailure = null;
+        for (int attempt = 1; attempt <= MENU_CLEANUP_ATTEMPTS; attempt++) {
+            try {
+                pluginMenuProjectionService.markUnavailable(code);
+                return null;
+            } catch (RuntimeException cleanupError) {
+                lastFailure = cleanupError;
+                log.warn("Failed to hide plugin menus for {} on attempt {}/{}: {}",
+                        code, attempt, MENU_CLEANUP_ATTEMPTS, rootMessage(cleanupError));
+            }
+        }
+        return "菜单清理失败：" + rootMessage(lastFailure);
+    }
+
+    private void reconcileUnavailableMenusExcept(Set<String> runtimeEnabledCodes) {
+        for (int attempt = 1; attempt <= MENU_CLEANUP_ATTEMPTS; attempt++) {
+            try {
+                pluginMenuProjectionService.markUnavailableExcept(runtimeEnabledCodes);
+                return;
+            } catch (RuntimeException cleanupError) {
+                log.warn("Failed to reconcile inactive plugin menus on attempt {}/{}: {}",
+                        attempt, MENU_CLEANUP_ATTEMPTS, rootMessage(cleanupError));
+            }
+        }
+    }
+
+    private String appendCleanupFailure(String failure, String cleanupFailure) {
+        return cleanupFailure == null ? failure : failure + "；" + cleanupFailure;
     }
 
     private PluginFrontendModuleInfo currentFrontendModule(String code, String moduleName) {
@@ -496,26 +542,9 @@ public class PluginAppService {
         if (setting == null) {
             return module;
         }
-        return new PluginFrontendModuleInfo(
-                module.pluginCode(),
-                module.entry(),
-                module.moduleName(),
-                module.sdkVersion(),
-                module.integrity(),
-                module.menuTitle(),
-                module.menuIcon(),
+        return module.withSortOverrides(
                 setting.menuSort() == null ? module.menuSort() : setting.menuSort(),
-                module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList(),
-                module.parentCode(),
-                module.visible(),
-                module.status(),
-                module.menuCode(),
-                module.menuType(),
-                module.menuModule(),
-                module.menuPath(),
-                module.menuComponent(),
-                module.menuLink(),
-                module.menuPermission()
+                module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList()
         );
     }
 
@@ -524,34 +553,9 @@ public class PluginAppService {
         if (routeSetting == null) {
             return route;
         }
-        return new PluginFrontendRouteInfo(
-                route.path(),
-                route.name(),
-                route.title(),
-                route.icon(),
-                route.parentPath(),
-                route.parentTitle(),
-                route.parentIcon(),
+        return route.withSortOverrides(
                 routeSetting.parentSort() == null ? route.parentSort() : routeSetting.parentSort(),
-                route.component(),
-                route.permission(),
-                routeSetting.sort() == null ? route.sort() : routeSetting.sort(),
-                route.parentCode(),
-                route.visible(),
-                route.status(),
-                route.menuCode(),
-                route.type(),
-                route.module(),
-                route.link(),
-                route.parentMenuCode(),
-                route.parentParentCode(),
-                route.parentType(),
-                route.parentModule(),
-                route.parentComponent(),
-                route.parentLink(),
-                route.parentPermission(),
-                route.parentVisible(),
-                route.parentStatus()
+                routeSetting.sort() == null ? route.sort() : routeSetting.sort()
         );
     }
 

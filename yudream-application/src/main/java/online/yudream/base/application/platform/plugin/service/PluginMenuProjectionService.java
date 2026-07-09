@@ -10,8 +10,6 @@ import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -80,12 +78,31 @@ public class PluginMenuProjectionService {
                 });
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markUnavailable(String pluginCode) {
         menuRepo.findByPluginCode(pluginCode).forEach(menu -> {
+            if (Boolean.FALSE.equals(menu.getRuntimeAvailable())) {
+                return;
+            }
+            Boolean previous = menu.getRuntimeAvailable();
             menu.setRuntimeAvailable(false);
-            menuRepo.save(menu);
+            try {
+                menuRepo.save(menu);
+            } catch (RuntimeException e) {
+                menu.setRuntimeAvailable(previous);
+                throw e;
+            }
         });
+    }
+
+    public void markUnavailableExcept(Set<String> runtimeEnabledPluginCodes) {
+        Set<String> enabledCodes = runtimeEnabledPluginCodes == null ? Set.of() : runtimeEnabledPluginCodes;
+        menuRepo.findAll().stream()
+                .filter(Menu::isPluginMenu)
+                .map(Menu::getPluginCode)
+                .filter(StringUtils::hasText)
+                .filter(pluginCode -> !enabledCodes.contains(pluginCode))
+                .distinct()
+                .forEach(this::markUnavailable);
     }
 
     public List<PluginFrontendModuleInfo> applyOverrides(List<PluginFrontendModuleInfo> modules) {
@@ -107,7 +124,15 @@ public class PluginMenuProjectionService {
                     .map(route -> applyRouteOverride(module, route, menus))
                     .filter(Objects::nonNull)
                     .toList();
-            overridden.add(new PluginFrontendModuleInfo(
+            overridden.add(overriddenModule(module, moduleMenu, routes));
+        }
+        return List.copyOf(overridden);
+    }
+
+    private PluginFrontendModuleInfo overriddenModule(PluginFrontendModuleInfo module,
+                                                       Menu moduleMenu,
+                                                       List<PluginFrontendRouteInfo> routes) {
+        return new PluginFrontendModuleInfo(
                     module.pluginCode(),
                     module.entry(),
                     module.moduleName(),
@@ -127,9 +152,7 @@ public class PluginMenuProjectionService {
                     moduleMenu.getComponent(),
                     moduleMenu.getLink(),
                     moduleMenu.getPermission()
-            ));
-        }
-        return List.copyOf(overridden);
+        );
     }
 
     private PluginFrontendRouteInfo applyRouteOverride(PluginFrontendModuleInfo module,
@@ -140,34 +163,30 @@ public class PluginMenuProjectionService {
             return null;
         }
 
-        String parentPath = route.parentPath();
-        String parentTitle = route.parentTitle();
-        String parentIcon = route.parentIcon();
-        Integer parentSort = route.parentSort();
-        Menu parentMenu = null;
-        String declaredParentPath = normalizeOptionalText(route.parentPath());
-        if (declaredParentPath != null) {
-            parentMenu = menus.get("parent:" + module.moduleName() + ":" + declaredParentPath);
-            if (parentMenu != null) {
-                parentPath = parentMenu.getPath();
-                parentTitle = parentMenu.getName();
-                parentIcon = parentMenu.getIcon();
-                parentSort = parentMenu.getSort();
-                if (Objects.equals(routeMenu.getParentCode(), parentMenu.getCode()) && !enabled(parentMenu)) {
-                    return null;
-                }
-            }
+        Menu parentMenu = menus.values().stream()
+                .filter(menu -> Objects.equals(routeMenu.getParentCode(), menu.getCode()))
+                .filter(menu -> menu.getPluginRegistrationKey().startsWith("parent:"))
+                .findFirst()
+                .orElse(null);
+        if (parentMenu != null && !enabled(parentMenu)) {
+            return null;
         }
 
+        return overriddenRoute(route, routeMenu, parentMenu);
+    }
+
+    private PluginFrontendRouteInfo overriddenRoute(PluginFrontendRouteInfo route,
+                                                      Menu routeMenu,
+                                                      Menu parentMenu) {
         return new PluginFrontendRouteInfo(
                 routeMenu.getPath(),
                 route.name(),
                 routeMenu.getName(),
                 routeMenu.getIcon(),
-                parentPath,
-                parentTitle,
-                parentIcon,
-                parentSort,
+                parentMenu == null ? null : parentMenu.getPath(),
+                parentMenu == null ? null : parentMenu.getName(),
+                parentMenu == null ? null : parentMenu.getIcon(),
+                parentMenu == null ? null : parentMenu.getSort(),
                 routeMenu.getComponent(),
                 routeMenu.getPermission(),
                 routeMenu.getSort(),
