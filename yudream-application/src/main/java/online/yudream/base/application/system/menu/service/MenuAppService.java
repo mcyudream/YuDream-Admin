@@ -53,6 +53,7 @@ public class MenuAppService {
     @Transactional(readOnly = true)
     public List<MenuManageDTO> tree(MenuTreeQuery query) {
         List<Menu> menus = menuRepo.findAll().stream()
+                .filter(Menu::isAvailableForRuntime)
                 .filter(menu -> matchesQuery(menu, query))
                 .toList();
         return buildManageTree(menus.stream().map(this::toDTO).toList());
@@ -126,6 +127,7 @@ public class MenuAppService {
     public List<Map<String, Object>> buildRouteTree(Collection<String> userPermissions) {
         Set<String> permissionSet = userPermissions == null ? Collections.emptySet() : new HashSet<>(userPermissions);
         List<Menu> allMenus = menuDomainService.findActiveMenus().stream()
+                .filter(menu -> !menu.isPluginMenu())
                 .filter(this::platformCapabilityVisible)
                 .toList();
 
@@ -247,6 +249,10 @@ public class MenuAppService {
                 .visible(menu.getVisible())
                 .permission(menu.getPermission())
                 .status(menu.getStatus())
+                .source(menu.getSource())
+                .pluginCode(menu.getPluginCode())
+                .pluginModuleName(menu.getPluginModuleName())
+                .runtimeAvailable(menu.getRuntimeAvailable())
                 .build();
     }
 

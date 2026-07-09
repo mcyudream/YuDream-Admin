@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.system.menu.res;
 import lombok.Builder;
 import lombok.Data;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 
 import java.util.ArrayList;
@@ -25,6 +26,10 @@ public class MenuManageRes {
     private Boolean visible;
     private String permission;
     private MenuStatus status;
+    private MenuSource source;
+    private String pluginCode;
+    private String pluginModuleName;
+    private Boolean runtimeAvailable;
 
     @Builder.Default
     private List<MenuManageRes> children = new ArrayList<>();

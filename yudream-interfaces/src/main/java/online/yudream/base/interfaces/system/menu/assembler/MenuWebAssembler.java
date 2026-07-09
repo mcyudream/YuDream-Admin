@@ -68,6 +68,10 @@ public class MenuWebAssembler {
                 .visible(dto.getVisible())
                 .permission(dto.getPermission())
                 .status(dto.getStatus())
+                .source(dto.getSource())
+                .pluginCode(dto.getPluginCode())
+                .pluginModuleName(dto.getPluginModuleName())
+                .runtimeAvailable(dto.getRuntimeAvailable())
                 .children(toResList(dto.getChildren()))
                 .build();
     }
