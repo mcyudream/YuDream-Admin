@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -27,6 +28,9 @@ public class PluginFrontendModuleDTO implements Serializable {
     private String menuTitle;
     private String menuIcon;
     private Integer menuSort;
+    private String parentCode;
+    private Boolean visible;
+    private MenuStatus status;
 
     @Builder.Default
     private List<PluginFrontendRouteDTO> routes = new ArrayList<>();

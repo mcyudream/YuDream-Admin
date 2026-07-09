@@ -54,6 +54,7 @@ public class PluginAppService {
     private final PluginModuleRepo pluginModuleRepo;
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final PermissionDomainService permissionDomainService;
+    private final PluginMenuProjectionService pluginMenuProjectionService;
 
     @Value("${yudream.platform.plugin.upload-directory:plugins}")
     private String uploadDirectory;
@@ -136,6 +137,7 @@ public class PluginAppService {
     public PluginModuleDTO disable(String code) {
         PluginModule module = module(code);
         pluginRuntimeGateway.disable(code);
+        pluginMenuProjectionService.markUnavailable(code);
         module.markDisabled();
         return toDTO(pluginModuleRepo.save(module));
     }
@@ -144,6 +146,7 @@ public class PluginAppService {
     public PluginModuleDTO unload(String code) {
         PluginModule module = module(code);
         pluginRuntimeGateway.unload(code);
+        pluginMenuProjectionService.markUnavailable(code);
         module.markUnloaded();
         return toDTO(pluginModuleRepo.save(module));
     }
@@ -157,6 +160,7 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
+        pluginMenuProjectionService.markUnavailable(code);
         deleteJar(module);
         pluginModuleRepo.deleteByCode(module.getCode());
     }
@@ -165,9 +169,10 @@ public class PluginAppService {
     public PluginFrontendManifestDTO frontendManifest() {
         Map<String, PluginModule> modules = pluginModuleRepo.findAll().stream()
                 .collect(Collectors.toMap(PluginModule::getCode, Function.identity(), (left, right) -> left));
-        return PluginAssembler.toManifestDTO(pluginRuntimeGateway.frontendModules().stream()
+        List<PluginFrontendModuleInfo> runtimeModules = pluginRuntimeGateway.frontendModules().stream()
                 .map(module -> applyFrontendSortSetting(module, modules.get(module.pluginCode())))
-                .toList());
+                .toList();
+        return PluginAssembler.toManifestDTO(pluginMenuProjectionService.applyOverrides(runtimeModules));
     }
 
     @Transactional(readOnly = true)
@@ -223,7 +228,7 @@ public class PluginAppService {
 
     private void restoreEnabledModule(PluginModule module, Map<String, PluginModule> modules, Set<String> restored, Set<String> visiting) {
         String code = module.getCode();
-        if (restored.contains(code) || pluginRuntimeGateway.enabled(code)) {
+        if (restored.contains(code)) {
             restored.add(code);
             return;
         }
@@ -231,7 +236,11 @@ public class PluginAppService {
             return;
         }
         try {
-            enableRuntimeWithDependencies(module, modules, restored, visiting);
+            if (pluginRuntimeGateway.enabled(code)) {
+                projectRuntimeMenus(code);
+            } else {
+                enableRuntimeWithDependencies(module, modules, restored, visiting);
+            }
             restored.add(code);
         } catch (Exception e) {
             log.warn("Failed to restore plugin {}", code, e);
@@ -241,7 +250,12 @@ public class PluginAppService {
 
     private PluginModule enableRuntimeWithDependencies(PluginModule module, Map<String, PluginModule> modules, Set<String> enabled, Set<String> visiting) {
         String code = module.getCode();
-        if (enabled.contains(code) || pluginRuntimeGateway.enabled(code)) {
+        if (enabled.contains(code)) {
+            enabled.add(code);
+            return module;
+        }
+        if (pluginRuntimeGateway.enabled(code)) {
+            projectRuntimeMenus(code);
             enabled.add(code);
             return module;
         }
@@ -261,6 +275,7 @@ public class PluginAppService {
             syncPluginPermissions(code);
             module.markEnabled();
             PluginModule saved = pluginModuleRepo.save(module);
+            projectRuntimeMenus(code);
             enabled.add(code);
             modules.put(code, saved);
             return saved;
@@ -275,7 +290,11 @@ public class PluginAppService {
             if (dependency == null) {
                 throw new BizException("插件依赖不存在：" + dependencyCode);
             }
-            if (!pluginRuntimeGateway.enabled(dependencyCode)) {
+            if (pluginRuntimeGateway.enabled(dependencyCode)) {
+                if (enabled.add(dependencyCode)) {
+                    projectRuntimeMenus(dependencyCode);
+                }
+            } else {
                 if (!dependency.enabled()) {
                     throw new BizException("请先启用插件依赖：" + dependency.getName());
                 }
@@ -304,6 +323,7 @@ public class PluginAppService {
             if (pluginRuntimeGateway.loaded(LEGACY_SKIN_PLUGIN_CODE)) {
                 pluginRuntimeGateway.unload(LEGACY_SKIN_PLUGIN_CODE);
             }
+            pluginMenuProjectionService.markUnavailable(LEGACY_SKIN_PLUGIN_CODE);
             pluginModuleRepo.deleteByCode(LEGACY_SKIN_PLUGIN_CODE);
             log.info("Migrated plugin record from {} to {}", LEGACY_SKIN_PLUGIN_CODE, YUDREAM_SKIN_PLUGIN_CODE);
         });
@@ -329,6 +349,7 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
+        pluginMenuProjectionService.markUnavailable(code);
         existing.markUnloaded();
         pluginModuleRepo.save(existing);
     }
@@ -408,6 +429,13 @@ public class PluginAppService {
         permissionDomainService.upsertManualPermissions(metas);
     }
 
+    private void projectRuntimeMenus(String code) {
+        List<PluginFrontendModuleInfo> modules = pluginRuntimeGateway.frontendModules().stream()
+                .filter(module -> code.equals(module.pluginCode()))
+                .toList();
+        pluginMenuProjectionService.project(code, modules);
+    }
+
     private PluginFrontendModuleInfo currentFrontendModule(String code, String moduleName) {
         List<PluginFrontendModuleInfo> modules = pluginRuntimeGateway.frontendModules().stream()
                 .filter(module -> module.pluginCode().equals(code))
@@ -460,7 +488,10 @@ public class PluginAppService {
                 module.menuTitle(),
                 module.menuIcon(),
                 setting.menuSort() == null ? module.menuSort() : setting.menuSort(),
-                module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList()
+                module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList(),
+                module.parentCode(),
+                module.visible(),
+                module.status()
         );
     }
 
@@ -480,7 +511,10 @@ public class PluginAppService {
                 routeSetting.parentSort() == null ? route.parentSort() : routeSetting.parentSort(),
                 route.component(),
                 route.permission(),
-                routeSetting.sort() == null ? route.sort() : routeSetting.sort()
+                routeSetting.sort() == null ? route.sort() : routeSetting.sort(),
+                route.parentCode(),
+                route.visible(),
+                route.status()
         );
     }
 

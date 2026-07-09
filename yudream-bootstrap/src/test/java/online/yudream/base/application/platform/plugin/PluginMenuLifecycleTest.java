@@ -1,0 +1,394 @@
+package online.yudream.base.application.platform.plugin;
+
+import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
+import online.yudream.base.application.platform.plugin.service.PluginAppService;
+import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
+import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
+import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
+import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
+import online.yudream.base.domain.system.menu.aggregate.Menu;
+import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
+import online.yudream.base.domain.system.menu.repo.MenuRepo;
+import online.yudream.base.domain.system.user.service.PermissionDomainService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class PluginMenuLifecycleTest {
+
+    private static final String PLUGIN_CODE = "yudream-wallet";
+    private static final String MODULE_NAME = "walletAdmin";
+
+    @TempDir
+    Path tempDir;
+
+    @Mock
+    private PluginModuleRepo pluginModuleRepo;
+
+    @Mock
+    private PluginRuntimeGateway pluginRuntimeGateway;
+
+    @Mock
+    private PermissionDomainService permissionDomainService;
+
+    @Mock
+    private PluginMenuProjectionService pluginMenuProjectionService;
+
+    private PluginModule module;
+    private PluginFrontendModuleInfo frontendModule;
+    private PluginAppService service;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        Path jar = Files.createFile(tempDir.resolve("wallet.jar"));
+        module = PluginModule.builder()
+                .code(PLUGIN_CODE)
+                .name("钱包插件")
+                .pluginVersion("1.0.0")
+                .jarPath(jar.toString())
+                .dependencies(List.of())
+                .build();
+        frontendModule = frontendModule();
+        service = new PluginAppService(
+                pluginModuleRepo,
+                pluginRuntimeGateway,
+                permissionDomainService,
+                pluginMenuProjectionService
+        );
+    }
+
+    @Test
+    void enableProjectsMenusAfterRuntimeEnableSucceeds() {
+        stubEnable();
+
+        service.enable(PLUGIN_CODE);
+
+        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService);
+        order.verify(pluginRuntimeGateway).enable(module);
+        order.verify(pluginMenuProjectionService).project(PLUGIN_CODE, List.of(frontendModule));
+    }
+
+    @Test
+    void enablingDependencyProjectsItsMenusAfterRuntimeEnableSucceeds() throws Exception {
+        String dependencyCode = "yudream-ledger";
+        Path dependencyJar = Files.createFile(tempDir.resolve("ledger.jar"));
+        PluginModule dependency = PluginModule.builder()
+                .code(dependencyCode)
+                .name("账本插件")
+                .pluginVersion("1.0.0")
+                .jarPath(dependencyJar.toString())
+                .dependencies(List.of())
+                .build();
+        dependency.markEnabled();
+        module.setDependencies(List.of(dependencyCode));
+        PluginFrontendModuleInfo dependencyFrontend = new PluginFrontendModuleInfo(
+                dependencyCode,
+                "/api/platform/plugins/yudream-ledger/assets/remoteEntry.js",
+                "ledgerAdmin",
+                "1.0.0",
+                "sha256-ledger",
+                List.of()
+        );
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module, dependency));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule, dependencyFrontend));
+        when(pluginRuntimeGateway.permissions(any())).thenReturn(List.of());
+        Set<String> runtimeEnabled = new HashSet<>();
+        doAnswer(invocation -> {
+            runtimeEnabled.add(invocation.<PluginModule>getArgument(0).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).enable(any());
+        when(pluginRuntimeGateway.enabled(any())).thenAnswer(invocation -> runtimeEnabled.contains(invocation.getArgument(0)));
+
+        service.enable(PLUGIN_CODE);
+
+        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService);
+        order.verify(pluginRuntimeGateway).enable(dependency);
+        order.verify(pluginMenuProjectionService).project(dependencyCode, List.of(dependencyFrontend));
+        order.verify(pluginRuntimeGateway).enable(module);
+        order.verify(pluginMenuProjectionService).project(PLUGIN_CODE, List.of(frontendModule));
+    }
+
+    @Test
+    void failedEnableDoesNotExposeMenus() {
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        doThrow(new IllegalStateException("enable failed")).when(pluginRuntimeGateway).enable(module);
+
+        assertThatThrownBy(() -> service.enable(PLUGIN_CODE))
+                .hasMessageContaining("插件启用失败");
+
+        verify(pluginMenuProjectionService, never()).project(any(), any());
+    }
+
+    @Test
+    void unprojectedRuntimeModuleIsExcludedFromFrontendManifest() {
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(new InMemoryMenuRepo());
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        PluginAppService realProjectionService = new PluginAppService(
+                pluginModuleRepo,
+                pluginRuntimeGateway,
+                permissionDomainService,
+                projectionService
+        );
+
+        PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
+
+        assertThat(manifest.getModules()).isEmpty();
+    }
+
+    @Test
+    void disableMarksPluginMenusUnavailable() {
+        stubModuleLookup();
+
+        service.disable(PLUGIN_CODE);
+
+        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService);
+        order.verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        order.verify(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
+    }
+
+    @Test
+    void unloadMarksPluginMenusUnavailable() {
+        stubModuleLookup();
+
+        service.unload(PLUGIN_CODE);
+
+        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService);
+        order.verify(pluginRuntimeGateway).unload(PLUGIN_CODE);
+        order.verify(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
+    }
+
+    @Test
+    void deleteRetainsPluginMenuProjectionRecordsAsUnavailable() {
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
+        when(pluginRuntimeGateway.loaded(PLUGIN_CODE)).thenReturn(true);
+
+        service.delete(PLUGIN_CODE);
+
+        InOrder order = inOrder(pluginRuntimeGateway, pluginMenuProjectionService, pluginModuleRepo);
+        order.verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        order.verify(pluginRuntimeGateway).unload(PLUGIN_CODE);
+        order.verify(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
+        order.verify(pluginModuleRepo).deleteByCode(PLUGIN_CODE);
+    }
+
+    @Test
+    void reinstallAppliesPersistedOverridesToFrontendManifest() {
+        InMemoryMenuRepo menuRepo = new InMemoryMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        Menu moduleMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "module:" + MODULE_NAME
+        ).orElseThrow();
+        moduleMenu.setName("自定义钱包中心");
+        moduleMenu.setIcon("custom-wallet");
+        moduleMenu.setSort(88);
+        menuRepo.save(moduleMenu);
+        Menu routeMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletTransactions"
+        ).orElseThrow();
+        routeMenu.setName("自定义交易记录");
+        routeMenu.setPath("/custom-transactions");
+        routeMenu.setComponent("custom/transactions/index");
+        routeMenu.setIcon("custom-icon");
+        routeMenu.setPermission("custom:transaction:list");
+        routeMenu.setParentCode("system:dashboard");
+        routeMenu.setSort(91);
+        routeMenu.setVisible(false);
+        menuRepo.save(routeMenu);
+        projectionService.markUnavailable(PLUGIN_CODE);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        PluginAppService realProjectionService = new PluginAppService(
+                pluginModuleRepo,
+                pluginRuntimeGateway,
+                permissionDomainService,
+                projectionService
+        );
+
+        PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
+
+        assertThat(manifest.getModules().getFirst().getMenuTitle()).isEqualTo("自定义钱包中心");
+        assertThat(manifest.getModules().getFirst().getMenuIcon()).isEqualTo("custom-wallet");
+        assertThat(manifest.getModules().getFirst().getMenuSort()).isEqualTo(88);
+        PluginFrontendRouteDTO route = manifest.getModules().getFirst().getRoutes().getFirst();
+        assertThat(route.getTitle()).isEqualTo("自定义交易记录");
+        assertThat(route.getPath()).isEqualTo("/custom-transactions");
+        assertThat(route.getComponent()).isEqualTo("custom/transactions/index");
+        assertThat(route.getIcon()).isEqualTo("custom-icon");
+        assertThat(route.getPermission()).isEqualTo("custom:transaction:list");
+        assertThat(route.getParentCode()).isEqualTo("system:dashboard");
+        assertThat(route.getSort()).isEqualTo(91);
+        assertThat(route.getVisible()).isFalse();
+        assertThat(route.getStatus()).isEqualTo(MenuStatus.ACTIVE);
+    }
+
+    @Test
+    void disabledMenuIsExcludedAndInvisibleMenuRemainsRoutable() {
+        InMemoryMenuRepo menuRepo = new InMemoryMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        PluginFrontendModuleInfo moduleWithTwoRoutes = frontendModule(List.of(
+                route("/wallet/transactions", "walletTransactions"),
+                route("/wallet/reports", "walletReports")
+        ));
+        projectionService.project(PLUGIN_CODE, List.of(moduleWithTwoRoutes));
+        Menu disabled = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletReports"
+        ).orElseThrow();
+        disabled.disable();
+        menuRepo.save(disabled);
+        Menu invisible = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletTransactions"
+        ).orElseThrow();
+        invisible.setVisible(false);
+        menuRepo.save(invisible);
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(moduleWithTwoRoutes));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        PluginAppService realProjectionService = new PluginAppService(
+                pluginModuleRepo,
+                pluginRuntimeGateway,
+                permissionDomainService,
+                projectionService
+        );
+
+        PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
+
+        assertThat(manifest.getModules()).hasSize(1);
+        assertThat(manifest.getModules().getFirst().getRoutes())
+                .extracting(PluginFrontendRouteDTO::getName)
+                .containsExactly("walletTransactions");
+        assertThat(manifest.getModules().getFirst().getRoutes().getFirst().getVisible()).isFalse();
+    }
+
+    private void stubEnable() {
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginRuntimeGateway.permissions(PLUGIN_CODE)).thenReturn(List.of());
+    }
+
+    private void stubModuleLookup() {
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private PluginFrontendModuleInfo frontendModule() {
+        return frontendModule(List.of(route("/wallet/transactions", "walletTransactions")));
+    }
+
+    private PluginFrontendModuleInfo frontendModule(List<PluginFrontendRouteInfo> routes) {
+        return new PluginFrontendModuleInfo(
+                PLUGIN_CODE,
+                "/api/platform/plugins/yudream-wallet/assets/remoteEntry.js",
+                MODULE_NAME,
+                "1.0.0",
+                "sha256-test",
+                "钱包中心",
+                "wallet",
+                20,
+                routes
+        );
+    }
+
+    private PluginFrontendRouteInfo route(String path, String name) {
+        return new PluginFrontendRouteInfo(
+                path,
+                name,
+                name,
+                "list",
+                "/wallet",
+                "钱包管理",
+                "folder",
+                10,
+                "wallet/transactions/index",
+                "wallet:transaction:list",
+                30
+        );
+    }
+
+    private static class InMemoryMenuRepo implements MenuRepo {
+
+        private final Map<String, Menu> menus = new LinkedHashMap<>();
+
+        @Override
+        public Menu save(Menu menu) {
+            menus.put(menu.getCode(), menu);
+            return menu;
+        }
+
+        @Override
+        public Optional<Menu> findByCode(String code) {
+            return Optional.ofNullable(menus.get(code));
+        }
+
+        @Override
+        public Optional<Menu> findByPluginCodeAndRegistrationKey(String pluginCode, String registrationKey) {
+            return findByPluginCode(pluginCode).stream()
+                    .filter(menu -> registrationKey.equals(menu.getPluginRegistrationKey()))
+                    .findFirst();
+        }
+
+        @Override
+        public List<Menu> findAll() {
+            return List.copyOf(menus.values());
+        }
+
+        @Override
+        public List<Menu> findByPluginCode(String pluginCode) {
+            return menus.values().stream()
+                    .filter(Menu::isPluginMenu)
+                    .filter(menu -> pluginCode.equals(menu.getPluginCode()))
+                    .toList();
+        }
+
+        @Override
+        public List<Menu> findByTypeIn(List<MenuNodeType> types) {
+            return menus.values().stream().filter(menu -> types.contains(menu.getType())).toList();
+        }
+
+        @Override
+        public boolean existsByCode(String code) {
+            return menus.containsKey(code);
+        }
+
+        @Override
+        public long count() {
+            return menus.size();
+        }
+    }
+}
