@@ -35,7 +35,7 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
                         title = "活动证明导出",
                         icon = "i-ri:file-word-2-line",
                         component = "minecraft-activity-proof/Export",
-                        permission = MinecraftActivityProofPlugin.MANAGE_PERMISSION,
+                        permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION,
                         sort = 10
                 )
         }
@@ -45,6 +45,8 @@ public class MinecraftActivityProofPlugin implements YuDreamPlugin {
     public static final String CODE = "minecraft-activity-proof";
     public static final String VIEW_PERMISSION = "plugin:minecraft-activity-proof:view";
     public static final String MANAGE_PERMISSION = "plugin:minecraft-activity-proof:manage";
+    public static final String ACCESS_VIEW_PERMISSION = "plugin:yudream-student-info:view";
+    public static final String ACCESS_MANAGE_PERMISSION = "plugin:yudream-student-info:manage";
 
     @Override
     public void onEnable(PluginContext context) {
