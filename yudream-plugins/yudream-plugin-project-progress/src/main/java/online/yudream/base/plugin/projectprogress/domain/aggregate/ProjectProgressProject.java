@@ -34,6 +34,7 @@ public record ProjectProgressProject(
         description = text(description);
         managerUserIds = normalizeIds(managerUserIds);
         memberUserIds = normalizeIds(memberUserIds);
+        memberUserIds = mergeIds(memberUserIds, managerUserIds);
         statuses = normalizeStatuses(statuses);
         defaultStatusCode = normalizeStatusCode(defaultStatusCode);
         doneStatusCode = normalizeStatusCode(doneStatusCode);
@@ -84,6 +85,16 @@ public record ProjectProgressProject(
         return managerUserIds.contains(userId);
     }
 
+    public ProjectProgressProject withMembers(List<String> userIds) {
+        List<String> nextMembers = mergeIds(memberUserIds, userIds);
+        if (nextMembers.equals(memberUserIds)) {
+            return this;
+        }
+        return new ProjectProgressProject(id, name, description, managerUserIds, nextMembers, statuses,
+                defaultStatusCode, doneStatusCode, reworkStatusCode, minCheckInIntervalMinutes, allowedCheckInTypes,
+                minecraftPolicy, enabled, createdAt, System.currentTimeMillis());
+    }
+
     public static List<ProjectStatusOption> defaultStatuses() {
         return List.of(
                 new ProjectStatusOption("TODO", "未完成", false, 10),
@@ -114,6 +125,23 @@ public record ProjectProgressProject(
                         java.util.stream.Collectors.toCollection(LinkedHashSet::new),
                         List::copyOf
                 ));
+    }
+
+    private static List<String> mergeIds(List<String> values, List<String> additions) {
+        LinkedHashSet<String> result = new LinkedHashSet<>();
+        if (values != null) {
+            values.stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::trim)
+                    .forEach(result::add);
+        }
+        if (additions != null) {
+            additions.stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::trim)
+                    .forEach(result::add);
+        }
+        return List.copyOf(result);
     }
 
     private static void ensureStatusExists(List<ProjectStatusOption> statuses, String code, String message) {

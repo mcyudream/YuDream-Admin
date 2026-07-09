@@ -47,7 +47,7 @@ defineProps<{
             @click="model.selectProject(project); model.reloadProjectData()"
           >
             <strong>{{ project.name }}</strong>
-            <span>{{ project.enabled ? '启用' : '停用' }} · {{ project.memberUserIds.length }} 名成员</span>
+            <span>{{ project.enabled ? '启用' : '停用' }} · {{ model.projectMemberCount(project) }} 名成员</span>
           </button>
           <div v-if="!model.projects.length" class="pp-empty">暂无项目</div>
         </div>

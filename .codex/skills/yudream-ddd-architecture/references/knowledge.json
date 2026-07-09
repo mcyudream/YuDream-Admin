@@ -67,6 +67,10 @@
     {
       "key": "project-progress-checkin-natural-period",
       "text": "Project progress check-in frequency is a natural time bucket, not a rolling interval. For 1440 minutes, count at least one check-in per local calendar day 00:00-24:00; manual check-ins may repeat, while automatic Minecraft check-ins should dedupe within the current bucket."
+    },
+    {
+      "key": "project-progress-members-and-cascade",
+      "text": "Project progress managers count as project members. Assigning, randomly assigning, publishing assigned tasks, or claiming a detail must add assignees to the project member set. Deleting a project or detail must cascade related details, check-ins, acceptance records, and progress events."
     }
   ],
   "utilities": [
