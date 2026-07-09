@@ -69,8 +69,8 @@ function routeId() {
   if (!value) {
     return null
   }
-  const id = Number(value)
-  if (!Number.isInteger(id) || id <= 0) {
+  const id = String(value).trim()
+  if (!/^[1-9]\d*$/.test(id)) {
     toast.error('表单 ID 不正确')
     router.replace('/platform/form/designer')
     return null

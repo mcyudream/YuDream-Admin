@@ -4,7 +4,7 @@ import systemClient from './system-client'
 export type PluginStatus = 'INSTALLED' | 'LOADED' | 'ENABLED' | 'DISABLED' | 'ERROR'
 
 export interface PluginModule {
-  id?: number
+  id?: string
   code: string
   name: string
   version?: string

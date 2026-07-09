@@ -27,7 +27,7 @@ export interface HomeSection {
 }
 
 export interface CmsPage {
-  id: number
+  id: string
   title: string
   slug: string
   summary?: string
@@ -69,7 +69,7 @@ export interface CmsPagePayload {
 }
 
 export interface HomePageLayout {
-  id?: number
+  id?: string
   title?: string
   subtitle?: string
   theme?: string
@@ -88,16 +88,16 @@ export default {
   createPage: (data: CmsPagePayload) => {
     return systemClient.post<unknown, ApiResponse<CmsPage>>('api/platform/cms/pages', data)
   },
-  updatePage: (id: number, data: CmsPagePayload) => {
+  updatePage: (id: string, data: CmsPagePayload) => {
     return systemClient.put<unknown, ApiResponse<CmsPage>>(`api/platform/cms/pages/${id}`, data)
   },
-  deletePage: (id: number) => {
+  deletePage: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/cms/pages/${id}`)
   },
-  publish: (id: number) => {
+  publish: (id: string) => {
     return systemClient.post<unknown, ApiResponse<void>>(`api/platform/cms/pages/${id}/publish`)
   },
-  unpublish: (id: number) => {
+  unpublish: (id: string) => {
     return systemClient.post<unknown, ApiResponse<void>>(`api/platform/cms/pages/${id}/unpublish`)
   },
   home: () => {

@@ -51,6 +51,10 @@
     {
       "key": "plugin-document-store-pagination",
       "text": "PluginDocumentStore caps page size at 200; plugin backend all-list scans and cross-plugin aggregations must loop pages with a <=200 page size instead of requesting 1000/10000, and frontend plugin bundles must be rebuilt because dist is ignored but packaged into plugin JARs."
+    },
+    {
+      "key": "long-id-string-boundary",
+      "text": "Java Long/Snowflake IDs must cross JSON, plugin HTTP, SDK, and TypeScript boundaries as strings. Do not expose them as frontend number fields or call Number(id), otherwise JavaScript precision loss will make selects/saves query the wrong backend record."
     }
   ],
   "utilities": [

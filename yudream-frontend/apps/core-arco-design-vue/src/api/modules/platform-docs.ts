@@ -2,7 +2,7 @@ import type { ApiResponse } from './system-client'
 import systemClient from './system-client'
 
 export interface ApiDocSettings {
-  id?: number | string
+  id?: string
   enabled: boolean
   apiKeyAccessEnabled: boolean
   title: string

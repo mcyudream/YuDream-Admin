@@ -29,7 +29,7 @@ export interface PasskeyAuthenticationOptions {
   publicKeyJson: string
 }
 
-export type IdValue = string | number
+export type IdValue = string
 
 interface RegisterData {
   username: string

@@ -5,7 +5,7 @@ import apiForm from '@/api/modules/platform-form'
 import { saveExcelResponse } from '@/utils/excel'
 
 const props = defineProps<{
-  formId?: number | null
+  formId?: string | null
   formName?: string
   embedded?: boolean
 }>()

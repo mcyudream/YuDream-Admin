@@ -18,7 +18,7 @@ export interface SkinSummary {
 export interface SkinMe {
   userId: string
   hostUser?: {
-    id: number | string
+    id: string
     username: string
     nickname?: string
     email?: string
@@ -34,7 +34,7 @@ export interface SkinUser {
   id: string
   email: string
   nickname: string
-  migratedUid?: number
+  migratedUid?: string
   createdAt?: number
 }
 

@@ -19,9 +19,9 @@ export interface DashboardLayoutItem {
 }
 
 export interface DashboardLayout {
-  id?: number | string
+  id?: string
   ownerType: DashboardOwnerType
-  ownerId?: number | string
+  ownerId?: string
   items: DashboardLayoutItem[]
   createTime?: string
   updateTime?: string

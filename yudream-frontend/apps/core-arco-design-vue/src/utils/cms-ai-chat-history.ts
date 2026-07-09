@@ -36,7 +36,7 @@ export interface CmsAiChatSessionPage {
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
-export function cmsAiChatTargetKey(type: string, id: string | number | undefined | null) {
+export function cmsAiChatTargetKey(type: string, id: string | undefined | null) {
   return `${type || 'page'}:${String(id || 'draft')}`
 }
 
