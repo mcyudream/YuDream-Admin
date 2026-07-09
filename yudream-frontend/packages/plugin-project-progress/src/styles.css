@@ -592,6 +592,123 @@
   text-align: right;
 }
 
+.pp-evidence-trigger {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pp-evidence-modal {
+  width: min(1120px, calc(100vw - 32px));
+}
+
+.pp-evidence-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.pp-evidence-summary strong {
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.pp-evidence-summary span {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pp-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pp-evidence-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.pp-evidence-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pp-evidence-card-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.pp-evidence-card-title strong,
+.pp-evidence-card-title span {
+  display: block;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.pp-evidence-card-title strong {
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.pp-evidence-card-title span {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pp-evidence-preview,
+.pp-evidence-placeholder {
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.pp-evidence-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.pp-evidence-image,
+.pp-evidence-frame {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pp-evidence-image {
+  min-height: 220px;
+  cursor: zoom-in;
+  object-fit: contain;
+  background: #fff;
+}
+
+.pp-evidence-frame {
+  min-height: 220px;
+  border: 0;
+}
+
 .pp-file-list {
   display: flex;
   flex-direction: column;
@@ -772,6 +889,7 @@
   .pp-grid,
   .pp-metrics,
   .pp-stat-grid,
+  .pp-evidence-grid,
   .pp-form-row,
   .pp-form-row.two,
   .pp-form-grid.two,

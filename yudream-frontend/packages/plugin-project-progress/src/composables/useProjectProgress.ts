@@ -45,6 +45,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const selectedAcceptanceId = ref('')
   const evidenceFile = ref<File | null>(null)
   const evidenceFiles = ref<Array<{ name: string, size: number, status?: 'uploading' | 'success' | 'error', progress?: number, file?: File }>>([])
+  const evidencePreviewUrls = ref<Record<string, string>>({})
 
   const projectForm = reactive<ProjectForm>({
     name: '',
@@ -522,6 +523,23 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return file.image || file.contentType?.startsWith('image/') || file.contentType === 'application/pdf' || file.contentType?.startsWith('text/')
   }
 
+  async function evidencePreviewUrl(file: ProjectFileEvidence) {
+    if (!canPreviewEvidence(file)) {
+      return ''
+    }
+    const cached = evidencePreviewUrls.value[file.objectKey]
+    if (cached) {
+      return cached
+    }
+    const response = await api.previewFile(file.objectKey)
+    const url = URL.createObjectURL(response.data)
+    evidencePreviewUrls.value = {
+      ...evidencePreviewUrls.value,
+      [file.objectKey]: url,
+    }
+    return url
+  }
+
   async function previewEvidence(file: ProjectFileEvidence) {
     if (typeof window === 'undefined') {
       return
@@ -534,19 +552,16 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     previewWindow.opener = null
     previewWindow.document.title = file.filename || '验收材料预览'
     previewWindow.document.body.textContent = '正在加载预览...'
-    saving.value = true
     try {
-      const response = await api.previewFile(file.objectKey)
-      const url = URL.createObjectURL(response.data)
+      const url = await evidencePreviewUrl(file)
+      if (!url) {
+        throw new Error('当前附件暂不支持预览')
+      }
       previewWindow.location.href = url
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
     }
     catch (error) {
       previewWindow.close()
       toast.warning(errorMessage(error))
-    }
-    finally {
-      saving.value = false
     }
   }
 
@@ -858,6 +873,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     evidenceFile,
     evidenceFiles,
     acceptanceFiles,
+    evidencePreviewUrls,
     loadPage,
     load,
     loadTaskCenter,
@@ -881,6 +897,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     submitAcceptance,
     review,
     loadProjectCheckIns,
+    evidencePreviewUrl,
     canPreviewEvidence,
     previewEvidence,
     downloadEvidence,
