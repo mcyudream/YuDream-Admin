@@ -32,6 +32,7 @@ export const useAppRouteStore = defineStore(
         })
         returnRoutes.forEach((item) => {
           if (item.children) {
+            item.redirect ||= resolveFirstVisibleChildPath(item.children)
             item.children = deleteMiddleRouteComponent(item.children)
           }
           return item
@@ -44,6 +45,7 @@ export const useAppRouteStore = defineStore(
       const routes = [...systemRoutesRaw]
       routes.forEach((item) => {
         if (item.children) {
+          item.redirect ||= resolveFirstVisibleChildPath(item.children)
           item.children = deleteMiddleRouteComponent(item.children)
         }
       })
@@ -54,6 +56,7 @@ export const useAppRouteStore = defineStore(
       const res: RouteRecordRaw[] = []
       routes.forEach((route) => {
         if (route.children?.length) {
+          route.redirect ||= resolveFirstVisibleChildPath(route.children)
           delete route.component
           route.children = deleteMiddleRouteComponent(route.children)
         }
@@ -63,6 +66,24 @@ export const useAppRouteStore = defineStore(
         res.push(route)
       })
       return res
+    }
+    // 中间目录节点没有实际页面时，访问目录路径应进入第一个可见子页面，避免内容区空白。
+    function resolveFirstVisibleChildPath(routes: RouteRecordRaw[]): string | undefined {
+      for (const route of routes) {
+        if (route.meta?.menu === false) {
+          continue
+        }
+        if (route.children?.length) {
+          const childPath = resolveFirstVisibleChildPath(route.children)
+          if (childPath) {
+            return childPath
+          }
+        }
+        if (typeof route.path === 'string' && route.path) {
+          return route.path
+        }
+      }
+      return undefined
     }
 
     // 路由匹配器
