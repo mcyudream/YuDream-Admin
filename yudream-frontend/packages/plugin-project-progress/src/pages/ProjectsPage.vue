@@ -93,7 +93,7 @@ async function saveProject() {
         </a-table-column>
         <a-table-column title="成员" :width="90">
           <template #cell="{ record }">
-            {{ record.memberUserIds.length }} 人
+            {{ model.projectMemberCount(record) }} 人
           </template>
         </a-table-column>
         <a-table-column title="打卡方式" :width="220">

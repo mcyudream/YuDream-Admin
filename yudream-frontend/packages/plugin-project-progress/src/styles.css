@@ -269,16 +269,27 @@
   color: inherit !important;
 }
 
+.pp-picker-modal {
+  width: min(960px, calc(100vw - 48px));
+}
+
+.pp-picker-modal-body {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 .pp-picker-layout {
   display: grid;
-  min-height: 420px;
-  grid-template-columns: 260px minmax(0, 1fr);
+  height: min(620px, calc(100vh - 220px));
+  min-height: 440px;
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 .pp-dept-pane,
 .pp-user-pane {
+  min-width: 0;
   overflow: auto;
-  padding: 12px;
+  padding: 14px;
 }
 
 .pp-dept-pane {
@@ -474,10 +485,94 @@
   gap: 6px;
 }
 
-.pp-dept-row .arco-btn:first-child {
+.pp-dept-name {
   min-width: 0;
   flex: 1;
   justify-content: flex-start;
+  overflow: hidden;
+  text-align: left;
+}
+
+.pp-dept-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pp-dept-all {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.pp-pane-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.pp-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 320px;
+}
+
+.pp-user-card {
+  display: grid;
+  width: 100%;
+  height: auto;
+  min-height: 72px;
+  grid-template-columns: 28px minmax(180px, 1fr) minmax(140px, 0.75fr);
+  gap: 12px;
+  align-items: center;
+  justify-content: stretch;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  color: #0f172a;
+  text-align: left;
+  white-space: normal;
+}
+
+.pp-user-card:hover,
+.pp-user-card.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.pp-user-main {
+  min-width: 0;
+}
+
+.pp-user-main strong,
+.pp-user-main span,
+.pp-user-depts {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.pp-user-main strong {
+  display: block;
+  color: #0f172a;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.pp-user-main span,
+.pp-user-depts {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pp-user-depts {
+  text-align: right;
 }
 
 .pp-picker-table {
@@ -555,6 +650,8 @@
   }
 
   .pp-picker-layout {
+    height: auto;
+    min-height: 0;
     grid-template-columns: 1fr;
   }
 

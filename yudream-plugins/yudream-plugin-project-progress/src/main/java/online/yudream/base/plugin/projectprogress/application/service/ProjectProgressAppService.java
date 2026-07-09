@@ -183,6 +183,7 @@ public class ProjectProgressAppService {
         ProjectWorkDetail detail = ProjectWorkDetail.create(project.id(), cmd.title(), cmd.description(), statusCode, assignmentMode,
                 intValue(cmd.requiredAssigneeCount(), 1), candidatePool(cmd.candidateUserIds(), project, assignmentMode),
                 cmd.assigneeUserIds(), cmd.acceptorUserIds(), cmd.dueAt());
+        project = ensureProjectMembers(project, detail.assigneeUserIds());
         ProjectWorkDetail saved = repository.saveDetail(detail);
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已创建", Map.of("title", saved.title()));
         return assembler.toDTO(saved);
@@ -196,6 +197,7 @@ public class ProjectProgressAppService {
         ProjectWorkDetail saved = repository.saveDetail(existing.update(cmd.title(), cmd.description(), statusCode, assignmentMode,
                 intValue(cmd.requiredAssigneeCount(), existing.requiredAssigneeCount()), candidatePool(cmd.candidateUserIds(), project, assignmentMode),
                 cmd.assigneeUserIds(), cmd.acceptorUserIds(), cmd.published(), cmd.dueAt()));
+        project = ensureProjectMembers(project, saved.assigneeUserIds());
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已更新", Map.of("title", saved.title()));
         return assembler.toDTO(saved);
     }
@@ -212,6 +214,7 @@ public class ProjectProgressAppService {
         if (detail.assignmentMode() == ProjectAssignmentMode.RANDOM && assignees.isEmpty()) {
             assignees = assignmentService.randomAssignees(emptyToMembers(detail.candidateUserIds(), project), detail.requiredAssigneeCount());
         }
+        project = ensureProjectMembers(project, assignees);
         ProjectWorkDetail saved = repository.saveDetail(detail.publish(assignees));
         safeNotifyAssigned(project, saved, assignees);
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_PUBLISHED, "工作细节已发布", Map.of("title", saved.title()));
@@ -222,6 +225,7 @@ public class ProjectProgressAppService {
         ProjectWorkDetail detail = requireDetail(detailId);
         ProjectProgressProject project = requireProject(detail.projectId());
         List<String> assignees = assignmentService.randomAssignees(emptyToMembers(detail.candidateUserIds(), project), detail.requiredAssigneeCount());
+        project = ensureProjectMembers(project, assignees);
         ProjectWorkDetail saved = repository.saveDetail(detail.assign(assignees));
         safeNotifyAssigned(project, saved, assignees);
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_ASSIGNED, "工作细节已随机分配", Map.of("assigneeUserIds", assignees));
@@ -235,6 +239,7 @@ public class ProjectProgressAppService {
             throw new IllegalArgumentException("项目未启用，暂不能认领任务");
         }
         ProjectWorkDetail saved = repository.saveDetail(detail.claim(userId));
+        project = ensureProjectMembers(project, saved.assigneeUserIds());
         safeNotifyAssigned(project, saved, List.of(userId));
         event(project.id(), saved.id(), userId, ProjectProgressEventType.DETAIL_CLAIMED, "工作细节已认领", Map.of("userId", userId));
         return assembler.toDTO(saved);
@@ -558,6 +563,11 @@ public class ProjectProgressAppService {
             result.add(0, owner);
         }
         return result.stream().distinct().toList();
+    }
+
+    private ProjectProgressProject ensureProjectMembers(ProjectProgressProject project, List<String> userIds) {
+        ProjectProgressProject nextProject = project.withMembers(userIds);
+        return nextProject == project ? project : repository.saveProject(nextProject);
     }
 
     private List<String> projectParticipants(ProjectProgressProject project) {

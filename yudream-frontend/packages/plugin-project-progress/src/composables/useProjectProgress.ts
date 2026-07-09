@@ -304,6 +304,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
         ? await api.updateDetail(selectedDetailId.value, payload)
         : await api.createDetail(selectedProjectId.value, payload)
       upsert(details.value, saved)
+      syncProjectMembersFromDetail(saved)
       selectDetail(saved)
       toast.success('工作细节已保存')
     }
@@ -316,6 +317,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     const saved = await action(() => api.publishDetail(detail.id), '工作细节已发布')
     if (saved) {
       upsert(details.value, saved)
+      syncProjectMembersFromDetail(saved)
       fillDetailForm(saved)
     }
   }
@@ -324,6 +326,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     const saved = await action(() => api.randomAssign(detail.id), '任务已随机分配')
     if (saved) {
       upsert(details.value, saved)
+      syncProjectMembersFromDetail(saved)
       fillDetailForm(saved)
     }
   }
@@ -334,6 +337,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       claimableTasks.value = claimableTasks.value.filter(item => item.id !== saved.id)
       upsert(myTasks.value, saved)
       upsert(details.value, saved)
+      syncProjectMembersFromDetail(saved)
     }
   }
 
@@ -663,6 +667,23 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return detail.candidateUserIds.length ? '指定人员认领' : '公开认领'
   }
 
+  function projectMemberIds(project: ProjectProgressProject) {
+    return unique([...project.managerUserIds, ...project.memberUserIds])
+  }
+
+  function projectMemberCount(project: ProjectProgressProject) {
+    return projectMemberIds(project).length
+  }
+
+  function syncProjectMembersFromDetail(detail: ProjectWorkDetail) {
+    const project = projects.value.find(item => item.id === detail.projectId)
+    if (!project || !detail.assigneeUserIds.length) {
+      return
+    }
+    project.memberUserIds = unique([...project.memberUserIds, ...project.managerUserIds, ...detail.assigneeUserIds])
+    void resolveUsers(project.memberUserIds)
+  }
+
   function formatTime(value?: number | string | null) {
     const timestamp = toTimestamp(value)
     if (!timestamp) {
@@ -775,6 +796,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     statusLabel,
     detailStatusLabel,
     assignmentLabel,
+    projectMemberCount,
     formatTime,
     minutes,
     projectName,

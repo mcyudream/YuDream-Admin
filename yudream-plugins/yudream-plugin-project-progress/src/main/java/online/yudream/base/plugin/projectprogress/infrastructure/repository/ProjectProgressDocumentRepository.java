@@ -58,6 +58,10 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
 
     @Override
     public void deleteProject(String projectId) {
+        deleteByField(DETAILS, "projectId", projectId);
+        deleteByField(CHECK_INS, "projectId", projectId);
+        deleteByField(ACCEPTANCE, "projectId", projectId);
+        deleteByField(EVENTS, "projectId", projectId);
         documents.delete(PROJECTS, projectId);
     }
 
@@ -113,6 +117,9 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
 
     @Override
     public void deleteDetail(String detailId) {
+        deleteByField(CHECK_INS, "detailId", detailId);
+        deleteByField(ACCEPTANCE, "detailId", detailId);
+        deleteByField(EVENTS, "detailId", detailId);
         documents.delete(DETAILS, detailId);
     }
 
@@ -216,6 +223,19 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
                 return result;
             }
             page++;
+        }
+    }
+
+    private void deleteByField(String collection, String field, String value) {
+        while (true) {
+            List<Map<String, Object>> batch = documents.findByField(collection, field, value, 1, SCAN_PAGE_SIZE);
+            if (batch.isEmpty()) {
+                return;
+            }
+            batch.stream()
+                    .map(document -> string(document, "id"))
+                    .filter(id -> id != null && !id.isBlank())
+                    .forEach(id -> documents.delete(collection, id));
         }
     }
 
