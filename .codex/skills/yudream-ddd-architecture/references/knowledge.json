@@ -91,6 +91,10 @@
     {
       "key": "core-frontend-workspace-no-business-plugins",
       "text": "Once official business plugins are migrated to yudream-admin-plugins, the core frontend pnpm workspace should keep only shared host packages such as components, plugin-sdk, dataviz, settings, and types. Do not keep packages/plugin-* in the default workspace manifest, or core install/build will still be implicitly coupled to migrated plugin source."
+    },
+    {
+      "key": "frontend-generated-dts-shared-package-rename",
+      "text": "When shared frontend packages are renamed, update both source imports and generated auto-import/components d.ts references in core-arco-design-vue, otherwise CI vue-tsc may report missing modules and downstream implicit-any errors even if most source files already use the new package name."
     }
   ],
   "utilities": [
