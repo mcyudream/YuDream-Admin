@@ -7,6 +7,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleD
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
@@ -355,6 +356,58 @@ class PluginMenuLifecycleTest {
     }
 
     @Test
+    void saveFrontendSortClearsModuleOverrideToDeclarationDefault() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginAppService projectionBackedService = sortReadyService(menuRepo);
+
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, sortCommand());
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, PluginFrontendSortSaveCmd.builder()
+                .moduleName(MODULE_NAME)
+                .routes(List.of(routeSortCommand(102, 103)))
+                .build());
+
+        PluginFrontendModuleDTO refreshed = projectionBackedService.frontendManifest().getModules().getFirst();
+        assertThat(refreshed.getMenuSort()).isEqualTo(20);
+        assertThat(refreshed.getRoutes().getFirst().getSort()).isEqualTo(102);
+    }
+
+    @Test
+    void saveFrontendSortOmittedRouteResetsRouteAndParentToDeclarationDefaults() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginAppService projectionBackedService = sortReadyService(menuRepo);
+
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, sortCommand());
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, PluginFrontendSortSaveCmd.builder()
+                .moduleName(MODULE_NAME)
+                .menuSort(101)
+                .routes(List.of())
+                .build());
+
+        PluginFrontendRouteDTO refreshed = projectionBackedService.frontendManifest()
+                .getModules().getFirst().getRoutes().getFirst();
+        assertThat(refreshed.getSort()).isEqualTo(30);
+        assertThat(refreshed.getParentSort()).isEqualTo(10);
+    }
+
+    @Test
+    void saveFrontendSortNullRouteSortsResetToDeclarationDefaults() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginAppService projectionBackedService = sortReadyService(menuRepo);
+
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, sortCommand());
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, PluginFrontendSortSaveCmd.builder()
+                .moduleName(MODULE_NAME)
+                .menuSort(101)
+                .routes(List.of(routeSortCommand(null, null)))
+                .build());
+
+        PluginFrontendRouteDTO refreshed = projectionBackedService.frontendManifest()
+                .getModules().getFirst().getRoutes().getFirst();
+        assertThat(refreshed.getSort()).isEqualTo(30);
+        assertThat(refreshed.getParentSort()).isEqualTo(10);
+    }
+
+    @Test
     void saveFrontendSortRejectsMissingProjectedRouteWithoutPartialUpdates() {
         InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
         Menu moduleMenu = menuRepo.findByPluginCodeAndRegistrationKey(
@@ -554,6 +607,32 @@ class PluginMenuLifecycleTest {
         order.verify(pluginRuntimeGateway).unload(PLUGIN_CODE);
         order.verify(pluginMenuProjectionService).markUnavailable(PLUGIN_CODE);
         order.verify(pluginModuleRepo).deleteByCode(PLUGIN_CODE);
+    }
+
+    @Test
+    void deleteStopsBeforeRemovingJarOrModuleWhenMenuCleanupExhaustsRetries() {
+        module.markEnabled();
+        FailOnceMenuRepo menuRepo = new FailOnceMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        projectionService.project(PLUGIN_CODE, List.of(frontendModule));
+        menuRepo.failNextSaves(3);
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
+        when(pluginRuntimeGateway.loaded(PLUGIN_CODE)).thenReturn(true);
+
+        assertThatThrownBy(() -> appService(projectionService).delete(PLUGIN_CODE))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("菜单清理失败");
+
+        assertThat(Path.of(module.getJarPath())).exists();
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(true);
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.INSTALLED);
+        verify(pluginModuleRepo).save(module);
+        verify(pluginModuleRepo, never()).deleteByCode(PLUGIN_CODE);
+        assertThat(pluginModuleRepo.findByCode(PLUGIN_CODE)).contains(module);
     }
 
     @Test

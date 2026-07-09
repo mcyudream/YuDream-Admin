@@ -167,7 +167,7 @@ public class PluginAppService {
         return toDTO(saved);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BizException.class)
     public void delete(String code) {
         PluginModule module = module(code);
         if (pluginRuntimeGateway.enabled(code)) {
@@ -176,7 +176,12 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
-        reconcileUnavailableMenus(code);
+        module.markUnloaded();
+        pluginModuleRepo.save(module);
+        String menuFailure = reconcileUnavailableMenus(code);
+        if (menuFailure != null) {
+            throw new BizException(menuFailure);
+        }
         deleteJar(module);
         pluginModuleRepo.deleteByCode(module.getCode());
     }
@@ -209,10 +214,11 @@ public class PluginAppService {
         PluginModule module = module(code);
         PluginFrontendModuleInfo frontendModule = currentFrontendModule(code, cmd.getModuleName());
         PluginFrontendSortSetting setting = toSortSetting(frontendModule, cmd);
-        pluginMenuProjectionService.updateSorts(code, frontendModule, setting);
+        PluginFrontendModuleInfo effectiveModule = applyFrontendSortSetting(frontendModule, setting);
+        pluginMenuProjectionService.updateSorts(code, effectiveModule, setting);
         module.saveFrontendSortSetting(setting);
         pluginModuleRepo.save(module);
-        return pluginMenuProjectionService.applyOverrides(List.of(frontendModule)).stream()
+        return pluginMenuProjectionService.applyOverrides(List.of(effectiveModule)).stream()
                 .findFirst()
                 .map(PluginAssembler::toDTO)
                 .orElseThrow(() -> new BizException("插件菜单投影不可用"));
@@ -591,6 +597,11 @@ public class PluginAppService {
         if (setting == null) {
             return module;
         }
+        return applyFrontendSortSetting(module, setting);
+    }
+
+    private PluginFrontendModuleInfo applyFrontendSortSetting(PluginFrontendModuleInfo module,
+                                                               PluginFrontendSortSetting setting) {
         return module.withSortOverrides(
                 setting.menuSort() == null ? module.menuSort() : setting.menuSort(),
                 module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList()

@@ -115,26 +115,23 @@ public class PluginMenuProjectionService {
         if (module == null || setting == null || !Objects.equals(module.moduleName(), setting.moduleName())) {
             throw new BizException("插件前端排序配置与模块不匹配");
         }
+        validateSortConflicts(module, setting);
 
         List<SortUpdate> updates = new ArrayList<>();
         Menu moduleMenu = requireAvailableProjection(pluginCode, "module:" + module.moduleName());
-        addSortUpdate(updates, moduleMenu, setting.menuSort());
+        addSortUpdate(updates, moduleMenu, module.menuSort());
 
         Map<String, Integer> routeSorts = new LinkedHashMap<>();
         Map<String, Integer> parentSorts = new LinkedHashMap<>();
-        for (PluginFrontendRouteSortSetting routeSetting : setting.routes()) {
-            PluginFrontendRouteInfo route = module.routes().stream()
-                    .filter(routeSetting::matches)
-                    .findFirst()
-                    .orElseThrow(() -> new BizException("插件菜单路由不存在"));
+        for (PluginFrontendRouteInfo route : module.routes()) {
             String routeKey = "route:" + module.moduleName() + ":"
                     + requireText(route.name(), "插件前端路由名称");
-            putConsistentSort(routeSorts, routeKey, routeSetting.sort(), "插件菜单路由排序冲突: ");
+            putConsistentSort(routeSorts, routeKey, route.sort(), "插件菜单路由排序冲突: ");
 
             String parentPath = normalizeOptionalText(route.parentPath());
-            if (parentPath != null && routeSetting.parentSort() != null) {
+            if (parentPath != null) {
                 String parentKey = "parent:" + module.moduleName() + ":" + parentPath;
-                putConsistentSort(parentSorts, parentKey, routeSetting.parentSort(), "插件菜单父目录排序冲突: ");
+                putConsistentSort(parentSorts, parentKey, route.parentSort(), "插件菜单父目录排序冲突: ");
             }
         }
         routeSorts.forEach((registrationKey, sort) ->
@@ -148,6 +145,26 @@ public class PluginMenuProjectionService {
                 menuRepo.save(update.menu());
             }
         });
+    }
+
+    private void validateSortConflicts(PluginFrontendModuleInfo module, PluginFrontendSortSetting setting) {
+        Map<String, Integer> routeSorts = new LinkedHashMap<>();
+        Map<String, Integer> parentSorts = new LinkedHashMap<>();
+        for (PluginFrontendRouteSortSetting routeSetting : setting.routes()) {
+            PluginFrontendRouteInfo route = module.routes().stream()
+                    .filter(routeSetting::matches)
+                    .findFirst()
+                    .orElseThrow(() -> new BizException("插件菜单路由不存在"));
+            String routeKey = "route:" + module.moduleName() + ":"
+                    + requireText(route.name(), "插件前端路由名称");
+            putConsistentSort(routeSorts, routeKey, routeSetting.sort(), "插件菜单路由排序冲突: ");
+
+            String parentPath = normalizeOptionalText(route.parentPath());
+            if (parentPath != null) {
+                String parentKey = "parent:" + module.moduleName() + ":" + parentPath;
+                putConsistentSort(parentSorts, parentKey, routeSetting.parentSort(), "插件菜单父目录排序冲突: ");
+            }
+        }
     }
 
     private Menu requireAvailableProjection(String pluginCode, String registrationKey) {
