@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.infra.common.baseobj.BaseDO;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -46,4 +47,14 @@ public class MenuDO extends BaseDO {
     private String permission;
 
     private MenuStatus status;
+
+    private MenuSource source;
+
+    private String pluginCode;
+
+    private String pluginModuleName;
+
+    private String pluginRegistrationKey;
+
+    private Boolean runtimeAvailable;
 }

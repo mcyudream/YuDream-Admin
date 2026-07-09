@@ -2,6 +2,7 @@ package online.yudream.base.infra.system.menu.mapper;
 
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
+import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.infra.system.menu.dataobj.MenuDO;
 
 import java.util.Collections;
@@ -28,6 +29,11 @@ public class MenuInfraMapper {
         menuDO.setVisible(menu.getVisible());
         menuDO.setPermission(menu.getPermission());
         menuDO.setStatus(menu.getStatus());
+        menuDO.setSource(menu.getSource());
+        menuDO.setPluginCode(menu.getPluginCode());
+        menuDO.setPluginModuleName(menu.getPluginModuleName());
+        menuDO.setPluginRegistrationKey(menu.getPluginRegistrationKey());
+        menuDO.setRuntimeAvailable(menu.getRuntimeAvailable());
         return menuDO;
     }
 
@@ -47,6 +53,11 @@ public class MenuInfraMapper {
                 .visible(menuDO.getVisible())
                 .permission(menuDO.getPermission())
                 .status(menuDO.getStatus())
+                .source(menuDO.getSource() == null ? MenuSource.SYSTEM : menuDO.getSource())
+                .pluginCode(menuDO.getPluginCode())
+                .pluginModuleName(menuDO.getPluginModuleName())
+                .pluginRegistrationKey(menuDO.getPluginRegistrationKey())
+                .runtimeAvailable(menuDO.getRuntimeAvailable())
                 .children(Collections.emptyList())
                 .build();
     }
