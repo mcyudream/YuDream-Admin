@@ -45,3 +45,5 @@ build/
 /.idea/jsLibraryMappings.xml
 /ci.txt
 /artifacts/
+.m2/
+npm-publish-dist/

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { DynamicForm, FormSubmission } from '@/api/modules/platform-form'
 import apiForm from '@/api/modules/platform-form'
 import { saveExcelResponse } from '@/utils/excel'

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { GenerationStatus, TemplateStatus, WordGenerateData, WordGenerationRecord, WordTemplate, WordTemplatePayload } from '@/api/modules/platform-document'
 import apiDocument from '@/api/modules/platform-document'
 

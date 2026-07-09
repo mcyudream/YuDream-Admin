@@ -1,6 +1,6 @@
 import type { PluginOption } from 'vite'
 import process from 'node:process'
-import { ComponentsAutoImports as FantasticAdminComponentsAutoImports, ComponentsResolver as FantasticAdminComponentsResolver, ComponentsType as FantasticAdminComponentsType } from '@fantastic-admin/components/resolver'
+import { ComponentsAutoImports as FantasticAdminComponentsAutoImports, ComponentsResolver as FantasticAdminComponentsResolver, ComponentsType as FantasticAdminComponentsType } from '@yudream/components/resolver'
 import { ComposablesAutoImports as FantasticAdminComposablesAutoImports } from '@fantastic-admin/composables/resolver'
 import { createCopyrightPlugins as createFantasticAdminCopyrightPlugins } from '@fantastic-admin/copyright'
 import VitePluginSvgSpritemap from '@spiriit/vite-plugin-svg-spritemap'
