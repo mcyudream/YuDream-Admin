@@ -36,6 +36,9 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
         const res = await apiPlugin.request<T>(pluginCode, path, { method: 'POST', data })
         return res.data
       },
+      async blob(path: string, options = {}) {
+        return apiPlugin.blob(pluginCode, path, options)
+      },
       url(path: string) {
         const normalized = path.startsWith('/') ? path : `/${path}`
         return toBackendAssetUrl(`/api/plugins/${pluginCode}${normalized}`)

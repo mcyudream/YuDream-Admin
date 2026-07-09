@@ -1,6 +1,11 @@
 import type { ApiResponse } from './system-client'
 import systemClient from './system-client'
 
+export interface PluginBlobResponse {
+  data: Blob
+  headers: Record<string, string>
+}
+
 export type PluginStatus = 'INSTALLED' | 'LOADED' | 'ENABLED' | 'DISABLED' | 'ERROR'
 
 export interface PluginModule {
@@ -82,4 +87,32 @@ export default {
       data: options.data,
     })
   },
+  blob: async (pluginCode: string, path: string, options: { method?: string, data?: unknown } = {}) => {
+    const response = await systemClient.request<unknown, PluginBlobResponse>({
+      url: `api/plugins/${pluginCode}${path.startsWith('/') ? path : `/${path}`}`,
+      method: options.method || 'GET',
+      data: options.data,
+      responseType: 'blob',
+    })
+    await rejectJsonBlob(response)
+    return response
+  },
+}
+
+async function rejectJsonBlob(response: PluginBlobResponse) {
+  const contentType = String(response.headers?.['content-type'] || '')
+  if (!contentType.includes('application/json')) {
+    return
+  }
+  const text = await response.data.text()
+  try {
+    const result = JSON.parse(text) as { message?: string }
+    throw new Error(result.message || '文件下载失败')
+  }
+  catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(text || '文件下载失败')
+    }
+    throw error
+  }
 }
