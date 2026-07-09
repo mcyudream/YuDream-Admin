@@ -1,16 +1,18 @@
 package online.yudream.base.application.platform.plugin;
 
+import online.yudream.base.application.platform.plugin.cmd.PluginFrontendRouteSortSaveCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginFrontendSortSaveCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
-import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
@@ -335,6 +337,81 @@ class PluginMenuLifecycleTest {
         verify(permissionDomainService).upsertManualPermissions(List.of());
         verify(pluginMenuProjectionService).project(PLUGIN_CODE, List.of(frontendModule));
         verify(pluginModuleRepo).save(module);
+    }
+
+    @Test
+    void saveFrontendSortUpdatesProjectedMenusUsedByRefreshedManifest() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginAppService projectionBackedService = sortReadyService(menuRepo);
+
+        projectionBackedService.saveFrontendSort(PLUGIN_CODE, sortCommand());
+        PluginFrontendManifestDTO refreshed = projectionBackedService.frontendManifest();
+
+        assertThat(refreshed.getModules().getFirst().getMenuSort()).isEqualTo(101);
+        PluginFrontendRouteDTO route = refreshed.getModules().getFirst().getRoutes().getFirst();
+        assertThat(route.getSort()).isEqualTo(102);
+        assertThat(route.getParentSort()).isEqualTo(103);
+        assertThat(projectionBackedService.frontendManifest().getModules().getFirst().getMenuSort()).isEqualTo(101);
+    }
+
+    @Test
+    void saveFrontendSortRejectsMissingProjectedRouteWithoutPartialUpdates() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        Menu moduleMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "module:" + MODULE_NAME
+        ).orElseThrow();
+        menuRepo.removeByRegistrationKey("route:" + MODULE_NAME + ":walletTransactions");
+        PluginAppService projectionBackedService = sortValidationService(menuRepo);
+
+        assertThatThrownBy(() -> projectionBackedService.saveFrontendSort(PLUGIN_CODE, sortCommand()))
+                .hasMessageContaining("插件菜单投影不存在");
+
+        assertThat(moduleMenu.getSort()).isEqualTo(20);
+    }
+
+    @Test
+    void saveFrontendSortRejectsUnavailableProjectedRouteWithoutPartialUpdates() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        Menu moduleMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "module:" + MODULE_NAME
+        ).orElseThrow();
+        Menu routeMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletTransactions"
+        ).orElseThrow();
+        routeMenu.setRuntimeAvailable(false);
+        menuRepo.save(routeMenu);
+        PluginAppService projectionBackedService = sortValidationService(menuRepo);
+
+        assertThatThrownBy(() -> projectionBackedService.saveFrontendSort(PLUGIN_CODE, sortCommand()))
+                .hasMessageContaining("插件菜单投影不可用");
+
+        assertThat(moduleMenu.getSort()).isEqualTo(20);
+    }
+
+    @Test
+    void saveFrontendSortRejectsConflictingDuplicateRouteSortsWithoutPartialUpdates() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        Menu moduleMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "module:" + MODULE_NAME
+        ).orElseThrow();
+        PluginAppService projectionBackedService = sortValidationService(menuRepo);
+        PluginFrontendSortSaveCmd command = PluginFrontendSortSaveCmd.builder()
+                .moduleName(MODULE_NAME)
+                .menuSort(101)
+                .routes(List.of(
+                        routeSortCommand(102, 103),
+                        routeSortCommand(202, 103)
+                ))
+                .build();
+
+        assertThatThrownBy(() -> projectionBackedService.saveFrontendSort(PLUGIN_CODE, command))
+                .hasMessageContaining("插件菜单路由排序冲突");
+
+        assertThat(moduleMenu.getSort()).isEqualTo(20);
     }
 
     @Test
@@ -705,6 +782,38 @@ class PluginMenuLifecycleTest {
         );
     }
 
+    private PluginAppService sortReadyService(InMemoryMenuRepo menuRepo) {
+        module.markEnabled();
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        return appService(new PluginMenuProjectionService(menuRepo));
+    }
+
+    private PluginAppService sortValidationService(InMemoryMenuRepo menuRepo) {
+        when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        return appService(new PluginMenuProjectionService(menuRepo));
+    }
+
+    private PluginFrontendSortSaveCmd sortCommand() {
+        return PluginFrontendSortSaveCmd.builder()
+                .moduleName(MODULE_NAME)
+                .menuSort(101)
+                .routes(List.of(routeSortCommand(102, 103)))
+                .build();
+    }
+
+    private PluginFrontendRouteSortSaveCmd routeSortCommand(Integer sort, Integer parentSort) {
+        return PluginFrontendRouteSortSaveCmd.builder()
+                .name("walletTransactions")
+                .sort(sort)
+                .parentSort(parentSort)
+                .build();
+    }
+
     private InMemoryMenuRepo projectedMenus(PluginFrontendModuleInfo declaration) {
         InMemoryMenuRepo menuRepo = new InMemoryMenuRepo();
         new PluginMenuProjectionService(menuRepo).project(PLUGIN_CODE, List.of(declaration));
@@ -807,6 +916,10 @@ class PluginMenuLifecycleTest {
         @Override
         public long count() {
             return menus.size();
+        }
+
+        void removeByRegistrationKey(String registrationKey) {
+            menus.values().removeIf(menu -> registrationKey.equals(menu.getPluginRegistrationKey()));
         }
     }
 
