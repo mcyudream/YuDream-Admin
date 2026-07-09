@@ -407,7 +407,7 @@ function importUsers() {
       >
         <template #toolbar>
           <FaSearchBar class="w-full">
-            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
               <FaInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
               <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
               <FaSelect v-model="search.roleId" :options="roleOptions" placeholder="角色" class="w-full" />
