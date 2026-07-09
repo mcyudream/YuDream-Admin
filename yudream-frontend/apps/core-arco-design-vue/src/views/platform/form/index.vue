@@ -193,28 +193,6 @@ function dateText(value?: string) {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaSearchBar>
-        <template #default="{ fold, toggle }">
-          <div class="form-search">
-            <FaInput v-model="search.keyword" clearable placeholder="表单名称 / 编码 / 描述" @keydown.enter="load" @clear="load" />
-            <FaSelect v-show="!fold" v-model="search.status" :options="statusOptions" placeholder="状态" />
-            <div class="search-actions">
-              <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-              <FaButton :loading="loading" @click="load">
-                <FaIcon name="i-ri:search-line" />
-                查询
-              </FaButton>
-              <FaButton variant="ghost" @click="toggle">
-                {{ fold ? '展开' : '收起' }}
-                <FaIcon :name="fold ? 'i-ep:caret-bottom' : 'i-ep:caret-top'" />
-              </FaButton>
-            </div>
-          </div>
-        </template>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-loading="loading"
         row-key="id"
@@ -226,6 +204,21 @@ function dateText(value?: string) {
         :columns="tableColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_220px_auto] md:items-center">
+              <FaInput v-model="search.keyword" clearable placeholder="表单名称 / 编码 / 描述" @keydown.enter="load" @clear="load" />
+              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
+                <FaButton :loading="loading" @click="load">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-status="{ row }">
           <FaTag :variant="statusVariant(row.original.status)">
             {{ statusText(row.original.status) }}
@@ -314,22 +307,10 @@ function dateText(value?: string) {
 </template>
 
 <style scoped>
-.form-search {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(160px, 220px) auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.search-actions,
 .table-actions {
   display: flex;
   gap: 8px;
   align-items: center;
-}
-
-.search-actions {
-  justify-content: flex-end;
 }
 
 .table-actions {
@@ -413,7 +394,6 @@ function dateText(value?: string) {
 }
 
 @media (max-width: 900px) {
-  .form-search,
   .stat-grid {
     grid-template-columns: 1fr;
   }

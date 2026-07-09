@@ -463,23 +463,6 @@ function generationVariant(status: GenerationStatus) {
         </div>
       </section>
 
-      <FaSearchBar>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-          <FaInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
-          <div class="flex gap-2 md:justify-end">
-            <FaButton variant="outline" @click="resetSearch">
-              重置
-            </FaButton>
-            <FaButton :loading="loading" @click="load">
-              <FaIcon name="i-ri:search-line" />
-              筛选
-            </FaButton>
-          </div>
-        </div>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-if="activeTab === 'templates'"
         v-loading="loading"
@@ -492,6 +475,22 @@ function generationVariant(status: GenerationStatus) {
         :columns="templateColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
+              <FaInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  重置
+                </FaButton>
+                <FaButton :loading="loading" @click="load">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-placeholders="{ row }">
           <div class="placeholder-tags">
             <FaTag v-for="(_, key) in row.original.placeholders || {}" :key="key" variant="secondary">
@@ -541,6 +540,22 @@ function generationVariant(status: GenerationStatus) {
         :columns="recordColumns"
         :data="recordRows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
+              <FaInput v-model="search.keyword" clearable placeholder="模板名称 / 编码 / 文件名" @keydown.enter="load" @clear="load" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  重置
+                </FaButton>
+                <FaButton :loading="loading" @click="load">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-status="{ row }">
           <FaTag :variant="generationVariant(row.original.status)">
             {{ generationText(row.original.status) }}

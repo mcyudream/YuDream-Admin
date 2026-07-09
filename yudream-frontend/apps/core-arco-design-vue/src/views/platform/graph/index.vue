@@ -270,21 +270,6 @@ function queryStatusVariant(status: GraphQueryStatus) {
         </button>
       </div>
 
-      <FaSearchBar>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
-          <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / Cypher" @keydown.enter="load" @clear="load" />
-          <div class="flex gap-2 md:justify-end">
-            <FaButton variant="outline" @click="resetSearch">重置</FaButton>
-            <FaButton :loading="loading" @click="load">
-              <FaIcon name="i-ri:search-line" />
-              筛选
-            </FaButton>
-          </div>
-        </div>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-if="activeTab === 'connections'"
         v-loading="loading"
@@ -297,6 +282,20 @@ function queryStatusVariant(status: GraphQueryStatus) {
         :columns="connectionColumns"
         :data="connectionRows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
+              <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / Cypher" @keydown.enter="load" @clear="load" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
+                <FaButton :loading="loading" @click="load">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-status="{ row }">
           <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
         </template>
@@ -340,6 +339,20 @@ function queryStatusVariant(status: GraphQueryStatus) {
         :columns="logColumns"
         :data="logRows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_auto] md:items-center">
+              <FaInput v-model="search.keyword" clearable placeholder="名称 / 编码 / 地址 / Cypher" @keydown.enter="load" @clear="load" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">重置</FaButton>
+                <FaButton :loading="loading" @click="load">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-status="{ row }">
           <FaTag :variant="queryStatusVariant(row.original.status)">{{ queryStatusText(row.original.status) }}</FaTag>
         </template>

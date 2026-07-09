@@ -394,33 +394,6 @@ function importUsers() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaSearchBar>
-        <template #default="{ fold, toggle }">
-          <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
-            <FaInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
-            <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-            <FaSelect v-show="!fold" v-model="search.roleId" :options="roleOptions" placeholder="角色" class="w-full" />
-            <FaSelect v-show="!fold" v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
-            <FaSelect v-show="!fold" v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-            <div class="flex gap-2 col-end--1 justify-end">
-              <FaButton variant="outline" @click="resetSearch">
-                重置
-              </FaButton>
-              <FaButton @click="loadUsers">
-                <FaIcon name="i-ri:search-line" />
-                筛选
-              </FaButton>
-              <FaButton variant="ghost" @click="toggle">
-                {{ fold ? '展开' : '收起' }}
-                <FaIcon :name="fold ? 'i-ep:caret-bottom' : 'i-ep:caret-top'" />
-              </FaButton>
-            </div>
-          </div>
-        </template>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-loading="loading"
         row-key="id"
@@ -432,6 +405,26 @@ function importUsers() {
         :columns="tableColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+              <FaInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
+              <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
+              <FaSelect v-model="search.roleId" :options="roleOptions" placeholder="角色" class="w-full" />
+              <FaSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
+              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+              <div class="flex gap-2 col-end--1 justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  重置
+                </FaButton>
+                <FaButton @click="loadUsers">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-deptNames="{ row }">
           <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
             <FaTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">

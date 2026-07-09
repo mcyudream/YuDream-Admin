@@ -952,7 +952,7 @@ defineExpose({
 
 <template>
   <div :class="cn('flex flex-col gap-2', props.class)">
-    <div v-if="hasToolbar" class="flex gap-2 items-center">
+    <div v-if="hasToolbar" class="flex flex-wrap gap-2 items-center">
       <div class="flex flex-1 gap-2 min-w-0 items-center">
         <slot name="toolbar" :table="table" />
       </div>
