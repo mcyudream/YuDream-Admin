@@ -91,7 +91,7 @@
           <div class="mc-section-title">
             <strong>Markdown 描述</strong>
           </div>
-          <MarkdownEditor v-model="model.serverForm.descriptionMarkdown" />
+          <MarkdownEditor v-model="model.serverForm.descriptionMarkdown" :upload-image="model.uploadMarkdownImage" />
 
           <div class="mc-actions end">
             <FaButton

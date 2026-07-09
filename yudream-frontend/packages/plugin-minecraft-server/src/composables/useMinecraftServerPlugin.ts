@@ -517,6 +517,28 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     clearWalletData()
   }
 
+  async function uploadMarkdownImage(file: File) {
+    if (!file.type.startsWith('image/')) {
+      throw new Error('请选择图片文件')
+    }
+    if (!sdk.files?.uploadImage) {
+      throw new Error('当前宿主未提供文件上传能力')
+    }
+    const uploaded = await sdk.files.uploadImage(file, {
+      module: 'minecraft-server',
+      publicAccess: true,
+    })
+    const url = uploaded.assetUrl || sdk.files.assetUrl(uploaded.url)
+    if (!url) {
+      throw new Error('图片上传后未返回访问地址')
+    }
+    return {
+      url,
+      alt: uploaded.originalName || file.name,
+      title: uploaded.originalName || file.name,
+    }
+  }
+
   return reactive({
     loading,
     saving,
@@ -564,6 +586,7 @@ export function useMinecraftServerPlugin(sdk: YuDreamPluginSdk) {
     statusText,
     directionText,
     endpointAddress,
+    uploadMarkdownImage,
     formatDuration,
     nextRecordsPage,
     prevRecordsPage,

@@ -357,8 +357,7 @@
 .mc-table input,
 .mc-table select,
 .mc-endpoint-row input,
-.mc-endpoint-row select,
-.mc-markdown textarea {
+.mc-endpoint-row select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--mc-border);
@@ -379,8 +378,7 @@
   padding: 0 10px;
 }
 
-.mc-form textarea,
-.mc-markdown textarea {
+.mc-form textarea {
   padding: 10px;
   resize: vertical;
 }
@@ -424,9 +422,23 @@
 }
 
 .mc-markdown {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px;
+  display: block;
+  min-width: 0;
+}
+
+.mc-markdown .md-editor {
+  overflow: hidden;
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+}
+
+.mc-markdown .md-editor-toolbar-wrapper {
+  border-bottom-color: var(--mc-border);
+}
+
+.mc-markdown .md-editor-input,
+.mc-markdown .md-editor-preview-wrapper {
+  background: #fff;
 }
 
 .mc-markdown__preview,
@@ -439,7 +451,19 @@
 }
 
 .mc-markdown-preview {
+  overflow: hidden;
   min-height: 120px;
+}
+
+.mc-markdown-preview.md-editor {
+  border: 1px solid var(--mc-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mc-markdown-preview .md-editor-preview-wrapper {
+  padding: 0;
+  background: transparent;
 }
 
 .mc-markdown__preview h1,

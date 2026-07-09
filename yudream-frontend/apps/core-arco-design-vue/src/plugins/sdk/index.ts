@@ -2,6 +2,7 @@ import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 import * as FantasticAdminComponents from '@fantastic-admin/components'
 import * as Vue from 'vue'
 import * as VueRouter from 'vue-router'
+import apiFiles from '@/api/modules/files'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
@@ -39,6 +40,20 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
         const normalized = path.startsWith('/') ? path : `/${path}`
         return toBackendAssetUrl(`/api/plugins/${pluginCode}${normalized}`)
       },
+    },
+    files: {
+      async uploadImage(file, options = {}) {
+        const data = new FormData()
+        data.append('file', file)
+        data.append('module', options.module || pluginCode || 'plugin')
+        data.append('publicAccess', String(options.publicAccess ?? true))
+        const res = await apiFiles.upload(data)
+        return {
+          ...res.data,
+          assetUrl: toBackendAssetUrl(res.data.url),
+        }
+      },
+      assetUrl: toBackendAssetUrl,
     },
   }
 }

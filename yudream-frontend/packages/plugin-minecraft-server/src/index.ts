@@ -1,4 +1,5 @@
 import { defineYuDreamPlugin } from '@yudream/plugin-sdk'
+import markdownEditorStyles from 'md-editor-v3/lib/style.css?inline'
 import minecraftStyles from './styles.css?inline'
 import MinecraftServerPlugin from './MinecraftServerPlugin.vue'
 
@@ -26,7 +27,7 @@ export function install() {
     style.id = id
     document.head.appendChild(style)
   }
-  style.textContent = minecraftStyles
+  style.textContent = `${markdownEditorStyles}\n${minecraftStyles}`
 }
 
 export default defineYuDreamPlugin({

@@ -1,91 +1,86 @@
 <script setup lang="ts">
+import type { UploadImgEvent } from 'md-editor-v3'
+import { useFaToast } from '@fantastic-admin/components'
+import { MdEditor } from 'md-editor-v3'
 import { computed } from 'vue'
+
+type UploadImageResult = string | {
+  url: string
+  alt?: string
+  title?: string
+}
+
+interface MarkdownUploadImage {
+  url: string
+  alt: string
+  title: string
+}
 
 const props = defineProps<{
   modelValue: string
+  uploadImage?: (file: File) => Promise<UploadImageResult>
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
 }>()
 
-const previewHtml = computed(() => markdownPreview(props.modelValue || ''))
+const toast = useFaToast()
 
-function update(value: string) {
-  emit('update:modelValue', value)
-}
+const editorValue = computed({
+  get: () => props.modelValue || '',
+  set: value => emit('update:modelValue', value),
+})
 
-function markdownPreview(markdown: string) {
-  const lines = escapeHtml(markdown).split(/\r?\n/)
-  const html: string[] = []
-  let inList = false
-  for (const rawLine of lines) {
-    const line = rawLine.trim()
-    if (!line) {
-      if (inList) {
-        html.push('</ul>')
-        inList = false
-      }
-      continue
-    }
-    if (line.startsWith('### ')) {
-      closeList()
-      html.push(`<h3>${inline(line.slice(4))}</h3>`)
-    }
-    else if (line.startsWith('## ')) {
-      closeList()
-      html.push(`<h2>${inline(line.slice(3))}</h2>`)
-    }
-    else if (line.startsWith('# ')) {
-      closeList()
-      html.push(`<h1>${inline(line.slice(2))}</h1>`)
-    }
-    else if (line.startsWith('- ')) {
-      if (!inList) {
-        html.push('<ul>')
-        inList = true
-      }
-      html.push(`<li>${inline(line.slice(2))}</li>`)
-    }
-    else {
-      closeList()
-      html.push(`<p>${inline(line)}</p>`)
-    }
+const handleUploadImg: UploadImgEvent = async (files, callback) => {
+  if (!props.uploadImage) {
+    callback([])
+    return
   }
-  closeList()
-  return html.join('')
-
-  function closeList() {
-    if (inList) {
-      html.push('</ul>')
-      inList = false
-    }
+  try {
+    const urls = await Promise.all(files.map(uploadMarkdownImage))
+    callback(urls)
+    toast.success('图片已上传')
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '图片上传失败')
+    callback([])
   }
 }
 
-function inline(value: string) {
-  return value
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`(.*?)`/g, '<code>$1</code>')
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (char) => {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      '\'': '&#39;',
+async function uploadMarkdownImage(file: File): Promise<MarkdownUploadImage> {
+  if (!props.uploadImage) {
+    throw new Error('当前插件未接入图片上传')
+  }
+  if (!file.type.startsWith('image/')) {
+    throw new Error('请选择图片文件')
+  }
+  const result = await props.uploadImage(file)
+  if (typeof result === 'string') {
+    return {
+      url: result,
+      alt: file.name,
+      title: file.name,
     }
-    return map[char] || char
-  })
+  }
+  return {
+    url: result.url,
+    alt: result.alt || file.name,
+    title: result.title || result.alt || file.name,
+  }
 }
 </script>
 
 <template>
   <div class="mc-markdown">
-    <textarea :value="modelValue" rows="14" @input="update(($event.target as HTMLTextAreaElement).value)" />
-    <article class="mc-markdown__preview" v-html="previewHtml" />
+    <MdEditor
+      v-model="editorValue"
+      language="zh-CN"
+      preview-theme="github"
+      code-theme="github"
+      :no-upload-img="!uploadImage"
+      :style="{ height: '460px' }"
+      @on-upload-img="handleUploadImg"
+    />
   </div>
 </template>
