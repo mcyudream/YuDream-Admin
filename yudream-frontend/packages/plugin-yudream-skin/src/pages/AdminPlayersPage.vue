@@ -200,35 +200,6 @@ function shortHash(hash?: string) {
 
 <template>
   <div class="skin-admin-table-page">
-    <FaSearchBar>
-      <template #default="{ fold, toggle }">
-        <div class="skin-admin-filter-grid">
-          <FaInput v-model="search.keyword" clearable placeholder="角色名 / UUID / 材质 / 用户" class="skin-admin-filter-grid__keyword" @keydown.enter="pagination.page = 1" @clear="pagination.page = 1" />
-          <FaInput v-model="search.ownerId" clearable placeholder="系统用户 ID / 昵称 / 用户名" class="skin-admin-filter-grid__select" @keydown.enter="pagination.page = 1" @clear="pagination.page = 1" />
-          <FaSelect v-if="!fold" v-model="search.status" :options="statusOptions" class="skin-admin-filter-grid__select" />
-          <div class="skin-admin-filter-grid__actions">
-            <FaButton variant="outline" @click="resetSearch">
-              重置
-            </FaButton>
-            <FaButton @click="pagination.page = 1">
-              <FaIcon name="i-ri:search-line" />
-              筛选
-            </FaButton>
-            <FaButton variant="ghost" @click="toggle">
-              {{ fold ? '展开' : '收起' }}
-              <FaIcon :name="fold ? 'i-ep:caret-bottom' : 'i-ep:caret-top'" />
-            </FaButton>
-            <FaButton @click="openCreate">
-              <FaIcon name="i-ri:add-line" />
-              新增角色
-            </FaButton>
-          </div>
-        </div>
-      </template>
-    </FaSearchBar>
-
-    <div class="mx--4 my-3 border-t border-t-dashed" />
-
     <FaTable
       row-key="uuid"
       table-root-class="skin-admin-player-table-root rounded-lg"
@@ -239,6 +210,28 @@ function shortHash(hash?: string) {
       :columns="tableColumns"
       :data="pagedRows"
     >
+      <template #toolbar>
+        <FaSearchBar class="w-full">
+          <div class="skin-admin-filter-grid">
+            <FaInput v-model="search.keyword" clearable placeholder="角色名 / UUID / 材质 / 用户" class="skin-admin-filter-grid__keyword" @keydown.enter="pagination.page = 1" @clear="pagination.page = 1" />
+            <FaInput v-model="search.ownerId" clearable placeholder="系统用户 ID / 昵称 / 用户名" class="skin-admin-filter-grid__select" @keydown.enter="pagination.page = 1" @clear="pagination.page = 1" />
+            <FaSelect v-model="search.status" :options="statusOptions" class="skin-admin-filter-grid__select" />
+            <div class="skin-admin-filter-grid__actions">
+              <FaButton variant="outline" @click="resetSearch">
+                重置
+              </FaButton>
+              <FaButton @click="pagination.page = 1">
+                <FaIcon name="i-ri:search-line" />
+                筛选
+              </FaButton>
+              <FaButton @click="openCreate">
+                <FaIcon name="i-ri:add-line" />
+                新增角色
+              </FaButton>
+            </div>
+          </div>
+        </FaSearchBar>
+      </template>
       <template #cell-name="{ row }">
         <span class="skin-admin-texture-name" :title="row.original.name">{{ row.original.name }}</span>
       </template>

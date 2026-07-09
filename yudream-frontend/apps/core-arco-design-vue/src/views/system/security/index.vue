@@ -679,12 +679,6 @@ function normalizeDateTime(value?: string) {
             API Key
           </div>
           <div class="key-actions">
-            <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" class="w-56" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
-            <FaButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</FaButton>
-            <FaButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
-              <FaIcon name="i-ri:search-line" />
-              筛选
-            </FaButton>
             <FaButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
               <FaIcon name="i-ri:key-2-line" />
               创建
@@ -702,6 +696,20 @@ function normalizeDateTime(value?: string) {
           :columns="apiKeyColumns"
           :data="apiKeyRows"
         >
+          <template #toolbar>
+            <FaSearchBar class="w-full">
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
+                <FaInput v-model="search.keyword" clearable placeholder="名称 / 前缀" :disabled="!policy.apiKeyEnabled" @keydown.enter="guardedLoadApiKeys" @clear="guardedLoadApiKeys" />
+                <div class="flex gap-2 md:justify-end">
+                  <FaButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</FaButton>
+                  <FaButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
+                    <FaIcon name="i-ri:search-line" />
+                    筛选
+                  </FaButton>
+                </div>
+              </div>
+            </FaSearchBar>
+          </template>
           <template #cell-permissions="{ row }">
             <div class="tag-row">
               <FaTag v-for="item in row.original.permissions.slice(0, 3)" :key="item" variant="secondary">
@@ -787,15 +795,21 @@ function normalizeDateTime(value?: string) {
             <FaIcon name="i-ri:fingerprint-line" />
             Passkey 凭据
           </div>
-          <div class="key-actions">
-            <FaInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" class="w-56" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
-            <FaButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
-              <FaIcon name="i-ri:search-line" />
-              查询
-            </FaButton>
-          </div>
         </div>
         <FaTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
+          <template #toolbar>
+            <FaSearchBar class="w-full">
+              <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
+                <FaInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
+                <div class="flex gap-2 md:justify-end">
+                  <FaButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
+                    <FaIcon name="i-ri:search-line" />
+                    筛选
+                  </FaButton>
+                </div>
+              </div>
+            </FaSearchBar>
+          </template>
           <template #cell-status="{ row }">
             <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
           </template>

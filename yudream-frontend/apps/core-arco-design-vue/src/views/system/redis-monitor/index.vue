@@ -78,12 +78,6 @@ function ttlText(ttl?: number) {
     <FaPageHeader title="Redis &#30417;&#25511;" class="mb-0" />
 
     <FaPageMain>
-      <FaSearchBar>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,420px)] md:items-center">
-          <FaInput v-model="pattern" clearable placeholder="Key &#21305;&#37197;&#65292;&#20363;&#22914; yudream:*" @keydown.enter="load" @clear="load" />
-        </div>
-      </FaSearchBar>
-
       <div class="monitor-summary">
         <div v-for="item in stats" :key="item.label" class="summary-item">
           <div class="summary-icon" :class="{ ok: item.tone === 'ok', bad: item.tone === 'bad' }">
@@ -128,6 +122,19 @@ function ttlText(ttl?: number) {
             :columns="keyColumns"
             :data="data.keys"
           >
+            <template #toolbar>
+              <FaSearchBar class="w-full">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,420px)_auto] md:items-center">
+                  <FaInput v-model="pattern" clearable placeholder="Key &#21305;&#37197;&#65292;&#20363;&#22914; yudream:*" @keydown.enter="load" @clear="load" />
+                  <div class="flex gap-2 md:justify-end">
+                    <FaButton :loading="loading" @click="load">
+                      <FaIcon name="i-ri:search-line" />
+                      &#31579;&#36873;
+                    </FaButton>
+                  </div>
+                </div>
+              </FaSearchBar>
+            </template>
             <template #cell-key="{ row }">
               <code>{{ row.original.key }}</code>
             </template>
