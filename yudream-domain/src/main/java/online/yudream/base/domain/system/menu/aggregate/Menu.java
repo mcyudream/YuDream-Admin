@@ -98,7 +98,7 @@ public class Menu {
         return source == MenuSource.PLUGIN;
     }
 
-    public boolean isRuntimeAvailable() {
+    public boolean isAvailableForRuntime() {
         return !isPluginMenu() || Boolean.TRUE.equals(runtimeAvailable);
     }
 
