@@ -3,6 +3,7 @@ package online.yudream.base.infra.system.menu.impl;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import online.yudream.base.infra.system.menu.dataobj.MenuDO;
 import online.yudream.base.infra.system.menu.mapper.MenuInfraMapper;
@@ -49,7 +50,8 @@ public class MenuRepoImpl implements MenuRepo {
 
     @Override
     public Optional<Menu> findByPluginCodeAndRegistrationKey(String pluginCode, String registrationKey) {
-        Query query = Query.query(Criteria.where("pluginCode").is(pluginCode)
+        Query query = Query.query(Criteria.where("source").is(MenuSource.PLUGIN)
+                .and("pluginCode").is(pluginCode)
                 .and("pluginRegistrationKey").is(registrationKey));
         MenuDO menuDO = mongoTemplate.findOne(query, MenuDO.class);
         return Optional.ofNullable(MenuInfraMapper.toDomain(menuDO));
@@ -65,7 +67,8 @@ public class MenuRepoImpl implements MenuRepo {
 
     @Override
     public List<Menu> findByPluginCode(String pluginCode) {
-        Query query = Query.query(Criteria.where("pluginCode").is(pluginCode));
+        Query query = Query.query(Criteria.where("source").is(MenuSource.PLUGIN)
+                .and("pluginCode").is(pluginCode));
         return mongoTemplate.find(query, MenuDO.class).stream()
                 .map(MenuInfraMapper::toDomain)
                 .collect(Collectors.toList());
