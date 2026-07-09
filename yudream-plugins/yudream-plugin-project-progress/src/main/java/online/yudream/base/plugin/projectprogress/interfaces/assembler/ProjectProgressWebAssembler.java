@@ -7,7 +7,9 @@ import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgres
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectAcceptanceDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectCheckInDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectDeptOptionDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectMemberStatsDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectMinecraftServerOptionDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectPersonalStatsDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressEventDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressProjectDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressStatusDTO;
@@ -20,7 +22,9 @@ import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProg
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectAcceptanceRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectCheckInRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectDeptOptionRes;
+import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectMemberStatsRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectMinecraftServerOptionRes;
+import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectPersonalStatsRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressEventRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressProjectRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressStatusRes;
@@ -110,6 +114,17 @@ public class ProjectProgressWebAssembler {
     public ProjectAcceptanceRes toRes(ProjectAcceptanceDTO dto) {
         return new ProjectAcceptanceRes(dto.id(), dto.projectId(), dto.detailId(), dto.operatorUserId(), dto.result(),
                 dto.fromStatusCode(), dto.toStatusCode(), dto.reason(), dto.createdAt());
+    }
+
+    public ProjectPersonalStatsRes toRes(ProjectPersonalStatsDTO dto) {
+        return new ProjectPersonalStatsRes(dto.userId(), dto.assignedDetails(), dto.completedDetails(),
+                dto.pendingAcceptanceDetails(), dto.acceptedReviews(), dto.rejectedReviews(), dto.checkIns());
+    }
+
+    public ProjectMemberStatsRes toRes(ProjectMemberStatsDTO dto) {
+        return new ProjectMemberStatsRes(dto.projectId(), dto.userId(), dto.assignedDetails(), dto.completedDetails(),
+                dto.pendingAcceptanceDetails(), dto.acceptedReviews(), dto.rejectedReviews(), dto.checkIns(),
+                dto.lastActivityAt());
     }
 
     public ProjectProgressEventRes toRes(ProjectProgressEventDTO dto) {

@@ -95,6 +95,15 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
                         sort = 50
                 ),
                 @PluginRoute(
+                        path = "/platform/plugins/project-progress/members",
+                        name = "platform-plugin-project-progress-members",
+                        title = "成员统计",
+                        icon = "i-ri:team-line",
+                        component = "project-progress/Members",
+                        permission = ProjectProgressPlugin.MANAGE_PERMISSION,
+                        sort = 55
+                ),
+                @PluginRoute(
                         path = "/platform/plugins/project-progress/settings",
                         name = "platform-plugin-project-progress-settings",
                         title = "插件设置",

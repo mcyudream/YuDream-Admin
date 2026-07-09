@@ -63,6 +63,14 @@ export interface ProjectProgressProject {
   updatedAt: number
 }
 
+export interface ProjectFileEvidence {
+  objectKey: string
+  filename: string
+  contentType: string
+  size: number
+  image: boolean
+}
+
 export interface ProjectWorkDetail {
   id: string
   projectId: string
@@ -77,13 +85,7 @@ export interface ProjectWorkDetail {
   published: boolean
   pendingAcceptance: boolean
   acceptanceSummary: string
-  acceptanceFiles: Array<{
-    objectKey: string
-    filename: string
-    contentType: string
-    size: number
-    image: boolean
-  }>
+  acceptanceFiles: ProjectFileEvidence[]
   dueAt?: number | null
   createdAt: number
   updatedAt: number
@@ -96,13 +98,7 @@ export interface ProjectCheckIn {
   userId: string
   type: string
   summary: string
-  files: Array<{
-    objectKey: string
-    filename: string
-    contentType: string
-    size: number
-    image: boolean
-  }>
+  files: ProjectFileEvidence[]
   location?: {
     address: string
     latitude?: number
@@ -129,6 +125,21 @@ export interface ProjectAcceptanceRecord {
   toStatusCode: string
   reason: string
   createdAt: number
+}
+
+export interface ProjectPersonalStats {
+  userId: string
+  assignedDetails: number
+  completedDetails: number
+  pendingAcceptanceDetails: number
+  acceptedReviews: number
+  rejectedReviews: number
+  checkIns: number
+}
+
+export interface ProjectMemberStats extends ProjectPersonalStats {
+  projectId: string
+  lastActivityAt: number
 }
 
 export interface ProjectProgressEvent {

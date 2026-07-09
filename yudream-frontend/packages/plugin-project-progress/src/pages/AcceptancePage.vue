@@ -2,6 +2,7 @@
 import type { ProjectProgressModel } from '../composables/useProjectProgress'
 import type { ProjectWorkDetail } from '../types'
 import { ref } from 'vue'
+import EvidenceFileList from '../components/EvidenceFileList.vue'
 
 const props = defineProps<{
   model: ProjectProgressModel
@@ -26,9 +27,6 @@ async function submitReview() {
   reviewVisible.value = false
 }
 
-function acceptanceFileNames(detail: ProjectWorkDetail) {
-  return detail.acceptanceFiles?.length ? detail.acceptanceFiles.map(file => file.filename).join('、') : '未上传附件'
-}
 </script>
 
 <template>
@@ -80,9 +78,9 @@ function acceptanceFileNames(detail: ProjectWorkDetail) {
           </a-table-column>
           <a-table-column title="验收材料" :width="260">
             <template #cell="{ record }">
-              <strong>{{ record.acceptanceSummary || '无说明' }}</strong>
-              <div class="pp-table-sub">
-                {{ acceptanceFileNames(record) }}
+              <div class="pp-material-box">
+                <p>{{ record.acceptanceSummary || '暂无验收说明' }}</p>
+                <EvidenceFileList :model="model" :files="record.acceptanceFiles" compact />
               </div>
             </template>
           </a-table-column>

@@ -8,7 +8,10 @@ import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgres
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectAcceptanceDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectCheckInDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectDeptOptionDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectMemberStatsDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectMinecraftServerOptionDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectPersonalStatsDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressDownloadDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressEventDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressProjectDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressStatusDTO;
@@ -46,6 +49,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -369,6 +373,35 @@ public class ProjectProgressAppService {
         return repository.listEvents(projectId, since, safePage(page), safeSize(size)).stream().map(assembler::toDTO).toList();
     }
 
+    public ProjectPersonalStatsDTO personalStats(String userId) {
+        String safeUserId = requireText(userId, "请先登录");
+        MemberStatsCounter counter = new MemberStatsCounter("", safeUserId);
+        for (ProjectProgressProject project : allProjects()) {
+            collectMemberStats(project, safeUserId, counter);
+        }
+        return new ProjectPersonalStatsDTO(safeUserId, counter.assignedDetails, counter.completedDetails,
+                counter.pendingAcceptanceDetails, counter.acceptedReviews, counter.rejectedReviews, counter.checkIns);
+    }
+
+    public List<ProjectMemberStatsDTO> projectMemberStats(String projectId) {
+        ProjectProgressProject project = requireProject(projectId);
+        Map<String, MemberStatsCounter> counters = new LinkedHashMap<>();
+        projectParticipants(project).forEach(userId -> counters.put(userId, new MemberStatsCounter(project.id(), userId)));
+        for (ProjectWorkDetail detail : allDetails(project.id())) {
+            detail.assigneeUserIds().forEach(userId -> counters.computeIfAbsent(userId, value -> new MemberStatsCounter(project.id(), value)));
+        }
+        collectProjectMemberStats(project, counters);
+        return counters.values().stream()
+                .map(MemberStatsCounter::toDTO)
+                .toList();
+    }
+
+    public ProjectProgressDownloadDTO downloadFile(String objectKey) {
+        String safeObjectKey = requireText(objectKey, "文件标识不能为空");
+        ProjectFileEvidence evidence = findEvidence(safeObjectKey);
+        return new ProjectProgressDownloadDTO(evidence.filename(), evidence.contentType(), files.get(evidence.objectKey()));
+    }
+
     public ProjectProgressEventStream eventStream() {
         return eventStream;
     }
@@ -597,6 +630,160 @@ public class ProjectProgressAppService {
                 .map(ProjectStatusOption::code)
                 .findFirst()
                 .orElse(detail.statusCode());
+    }
+
+    private void collectMemberStats(ProjectProgressProject project, String userId, MemberStatsCounter counter) {
+        List<ProjectWorkDetail> projectDetails = allDetails(project.id());
+        for (ProjectWorkDetail detail : projectDetails) {
+            if (!detail.assignedTo(userId)) {
+                continue;
+            }
+            counter.assignedDetails++;
+            counter.lastActivityAt = Math.max(counter.lastActivityAt, detail.updatedAt());
+            if (detail.statusCode().equals(project.doneStatusCode())) {
+                counter.completedDetails++;
+            }
+            if (detail.pendingAcceptance()) {
+                counter.pendingAcceptanceDetails++;
+            }
+            for (ProjectAcceptanceRecord record : allAcceptanceRecords(detail.id())) {
+                if (record.result() == ProjectAcceptanceResult.ACCEPTED) {
+                    counter.acceptedReviews++;
+                } else if (record.result() == ProjectAcceptanceResult.REJECTED) {
+                    counter.rejectedReviews++;
+                }
+                counter.lastActivityAt = Math.max(counter.lastActivityAt, record.createdAt());
+            }
+        }
+        for (ProjectCheckInRecord record : allProjectCheckIns(project.id())) {
+            if (userId.equals(record.userId())) {
+                counter.checkIns++;
+                counter.lastActivityAt = Math.max(counter.lastActivityAt, record.createdAt());
+            }
+        }
+    }
+
+    private void collectProjectMemberStats(ProjectProgressProject project, Map<String, MemberStatsCounter> counters) {
+        for (ProjectWorkDetail detail : allDetails(project.id())) {
+            for (String userId : detail.assigneeUserIds()) {
+                MemberStatsCounter counter = counters.computeIfAbsent(userId, value -> new MemberStatsCounter(project.id(), value));
+                counter.assignedDetails++;
+                counter.lastActivityAt = Math.max(counter.lastActivityAt, detail.updatedAt());
+                if (detail.statusCode().equals(project.doneStatusCode())) {
+                    counter.completedDetails++;
+                }
+                if (detail.pendingAcceptance()) {
+                    counter.pendingAcceptanceDetails++;
+                }
+                for (ProjectAcceptanceRecord record : allAcceptanceRecords(detail.id())) {
+                    if (record.result() == ProjectAcceptanceResult.ACCEPTED) {
+                        counter.acceptedReviews++;
+                    } else if (record.result() == ProjectAcceptanceResult.REJECTED) {
+                        counter.rejectedReviews++;
+                    }
+                    counter.lastActivityAt = Math.max(counter.lastActivityAt, record.createdAt());
+                }
+            }
+        }
+        for (ProjectCheckInRecord record : allProjectCheckIns(project.id())) {
+            MemberStatsCounter counter = counters.computeIfAbsent(record.userId(), value -> new MemberStatsCounter(project.id(), value));
+            counter.checkIns++;
+            counter.lastActivityAt = Math.max(counter.lastActivityAt, record.createdAt());
+        }
+    }
+
+    private ProjectFileEvidence findEvidence(String objectKey) {
+        for (ProjectProgressProject project : allProjects()) {
+            for (ProjectWorkDetail detail : allDetails(project.id())) {
+                for (ProjectFileEvidence file : detail.acceptanceFiles()) {
+                    if (objectKey.equals(file.objectKey())) {
+                        return file;
+                    }
+                }
+            }
+            for (ProjectCheckInRecord record : allProjectCheckIns(project.id())) {
+                for (ProjectFileEvidence file : record.files()) {
+                    if (objectKey.equals(file.objectKey())) {
+                        return file;
+                    }
+                }
+            }
+        }
+        throw new IllegalArgumentException("文件不存在或未关联到项目进度记录");
+    }
+
+    private List<ProjectProgressProject> allProjects() {
+        List<ProjectProgressProject> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<ProjectProgressProject> batch = repository.listProjects(page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<ProjectWorkDetail> allDetails(String projectId) {
+        List<ProjectWorkDetail> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<ProjectWorkDetail> batch = repository.listDetails(projectId, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<ProjectAcceptanceRecord> allAcceptanceRecords(String detailId) {
+        List<ProjectAcceptanceRecord> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<ProjectAcceptanceRecord> batch = repository.listAcceptanceRecords(detailId, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private List<ProjectCheckInRecord> allProjectCheckIns(String projectId) {
+        List<ProjectCheckInRecord> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<ProjectCheckInRecord> batch = repository.listProjectCheckIns(projectId, page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private static final class MemberStatsCounter {
+        private final String projectId;
+        private final String userId;
+        private int assignedDetails;
+        private int completedDetails;
+        private int pendingAcceptanceDetails;
+        private int acceptedReviews;
+        private int rejectedReviews;
+        private int checkIns;
+        private long lastActivityAt;
+
+        private MemberStatsCounter(String projectId, String userId) {
+            this.projectId = projectId;
+            this.userId = userId;
+        }
+
+        private ProjectMemberStatsDTO toDTO() {
+            return new ProjectMemberStatsDTO(projectId, userId, assignedDetails, completedDetails,
+                    pendingAcceptanceDetails, acceptedReviews, rejectedReviews, checkIns, lastActivityAt);
+        }
     }
 
     private int safePage(int page) {

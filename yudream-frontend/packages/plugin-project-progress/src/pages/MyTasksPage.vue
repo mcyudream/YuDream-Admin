@@ -4,6 +4,7 @@ import type { ProjectWorkDetail } from '../types'
 import { FaButton, FaFileUpload, FaModal, FaTextarea } from '@fantastic-admin/components'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import EvidenceFileList from '../components/EvidenceFileList.vue'
 
 const props = defineProps<{
   model: ProjectProgressModel
@@ -51,6 +52,35 @@ function localUploadRequest() {
     </section>
 
     <section class="pp-panel">
+      <div class="pp-stat-grid">
+        <article class="pp-stat-card">
+          <span>分配细分</span>
+          <strong>{{ model.personalStats?.assignedDetails || 0 }}</strong>
+        </article>
+        <article class="pp-stat-card">
+          <span>已完成细分</span>
+          <strong>{{ model.personalStats?.completedDetails || 0 }}</strong>
+        </article>
+        <article class="pp-stat-card">
+          <span>待验收</span>
+          <strong>{{ model.personalStats?.pendingAcceptanceDetails || 0 }}</strong>
+        </article>
+        <article class="pp-stat-card">
+          <span>验收通过</span>
+          <strong>{{ model.personalStats?.acceptedReviews || 0 }}</strong>
+        </article>
+        <article class="pp-stat-card">
+          <span>退回返工</span>
+          <strong>{{ model.personalStats?.rejectedReviews || 0 }}</strong>
+        </article>
+        <article class="pp-stat-card">
+          <span>项目打卡</span>
+          <strong>{{ model.personalStats?.checkIns || 0 }}</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="pp-panel">
       <header class="pp-panel-head">
         <div>
           <h3>已分配任务</h3>
@@ -68,6 +98,10 @@ function localUploadRequest() {
             <template #cell="{ record }">
               <strong>{{ record.title }}</strong>
               <div class="pp-table-sub">{{ record.description || '暂无说明' }}</div>
+              <div v-if="record.acceptanceSummary || record.acceptanceFiles.length" class="pp-material-box mt-3">
+                <p>{{ record.acceptanceSummary || '暂无验收说明' }}</p>
+                <EvidenceFileList :model="model" :files="record.acceptanceFiles" compact />
+              </div>
             </template>
           </a-table-column>
           <a-table-column title="状态" :width="170">

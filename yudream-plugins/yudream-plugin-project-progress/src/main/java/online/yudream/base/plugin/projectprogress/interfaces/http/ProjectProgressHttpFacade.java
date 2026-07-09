@@ -1,5 +1,6 @@
 package online.yudream.base.plugin.projectprogress.interfaces.http;
 
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressDownloadDTO;
 import online.yudream.base.plugin.projectprogress.application.service.ProjectProgressAppService;
 import online.yudream.base.plugin.projectprogress.infrastructure.support.JsonSupport;
 import online.yudream.base.plugin.projectprogress.interfaces.assembler.ProjectProgressWebAssembler;
@@ -10,7 +11,9 @@ import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProg
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 
+import java.io.IOException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
@@ -74,6 +77,18 @@ public class ProjectProgressHttpFacade {
 
     public PluginHttpResponse details(PluginHttpRequest request) {
         return PluginHttpResponse.ok(appService.details(pathSegment(request.path(), 1), page(request), size(request)).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse memberStatistics(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.projectMemberStats(pathSegment(request.path(), 1)).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse personalStatistics(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(assembler.toRes(appService.personalStats(currentUserId(request))));
+    }
+
+    public PluginHttpResponse downloadFile(PluginHttpRequest request) {
+        return downloadResponse(appService.downloadFile(stringQuery(request, "key")), stringQuery(request, "disposition"));
     }
 
     public PluginHttpResponse createDetail(PluginHttpRequest request) {
@@ -170,6 +185,25 @@ public class ProjectProgressHttpFacade {
 
     public PluginHttpResponse eventStream() {
         return new PluginHttpResponse(200, Map.of("Cache-Control", "no-cache"), "text/event-stream", appService.eventStream(), false);
+    }
+
+    private PluginHttpResponse downloadResponse(ProjectProgressDownloadDTO download, String disposition) {
+        String safeDisposition = "inline".equalsIgnoreCase(disposition) ? "inline" : "attachment";
+        try (var inputStream = download.file().inputStream()) {
+            byte[] bytes = inputStream.readAllBytes();
+            return new PluginHttpResponse(
+                    200,
+                    Map.of(
+                            "Content-Disposition", safeDisposition + "; filename*=UTF-8''" + URLEncoder.encode(download.filename(), StandardCharsets.UTF_8),
+                            "Cache-Control", "no-cache"
+                    ),
+                    download.contentType() == null || download.contentType().isBlank() ? "application/octet-stream" : download.contentType(),
+                    bytes,
+                    false
+            );
+        } catch (IOException e) {
+            return PluginHttpResponse.rawJson(500, Map.of("message", "文件读取失败：" + e.getMessage()));
+        }
     }
 
     private String currentUserId(PluginHttpRequest request) {

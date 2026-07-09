@@ -71,6 +71,10 @@
     {
       "key": "project-progress-members-and-cascade",
       "text": "Project progress managers count as project members. Assigning, randomly assigning, publishing assigned tasks, or claiming a detail must add assignees to the project member set. Deleting a project or detail must cascade related details, check-ins, acceptance records, and progress events."
+    },
+    {
+      "key": "project-progress-evidence-stats",
+      "text": "Project progress acceptance evidence must be stored as ProjectFileEvidence, shown with summary on completed/detail/review views, and previewed/downloaded through authenticated SDK blob calls rather than raw object keys or direct URLs. Personal/member stats count assigned details, done-status completed details, pending acceptance details, accepted/rejected acceptance records for assigned details, and project-level check-ins."
     }
   ],
   "utilities": [
