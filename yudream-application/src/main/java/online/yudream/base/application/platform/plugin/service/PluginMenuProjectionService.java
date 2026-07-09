@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
@@ -9,11 +10,12 @@ import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,52 +26,101 @@ public class PluginMenuProjectionService {
 
     private final MenuRepo menuRepo;
 
-    @Transactional
     public void project(String pluginCode, List<PluginFrontendModuleInfo> modules) {
-        requireText(pluginCode, "pluginCode");
-        Set<String> currentRegistrationKeys = new HashSet<>();
+        ProjectionPlan plan = validate(pluginCode, modules);
 
-        for (PluginFrontendModuleInfo module : modules == null ? List.<PluginFrontendModuleInfo>of() : modules) {
-            String moduleName = requireText(module.moduleName(), "moduleName");
-            String moduleKey = "module:" + moduleName;
-            registerKey(currentRegistrationKeys, moduleKey);
-            Menu moduleMenu = sync(pluginCode, moduleName, moduleKey, moduleDefaults(pluginCode, module, moduleKey));
+        for (ModulePlan modulePlan : plan.modules()) {
+            Menu moduleMenu = sync(
+                    pluginCode,
+                    modulePlan.moduleName(),
+                    modulePlan.registrationKey(),
+                    moduleDefaults(pluginCode, modulePlan)
+            );
 
             Map<String, Menu> parentMenus = new HashMap<>();
-            for (PluginFrontendRouteInfo route : module.routes()) {
+            for (RoutePlan routePlan : modulePlan.routes()) {
                 String defaultParentCode = moduleMenu.getCode();
-                if (StringUtils.hasText(route.parentPath())) {
-                    Menu parentMenu = parentMenus.computeIfAbsent(route.parentPath(), parentPath -> {
-                        String parentKey = "parent:" + moduleName + ":" + parentPath;
-                        registerKey(currentRegistrationKeys, parentKey);
+                if (routePlan.parentPath() != null) {
+                    Menu parentMenu = parentMenus.computeIfAbsent(routePlan.parentPath(), parentPath -> {
+                        ParentDeclaration parent = modulePlan.parents().get(parentPath);
                         return sync(
                                 pluginCode,
-                                moduleName,
-                                parentKey,
-                                parentDefaults(pluginCode, moduleName, parentKey, moduleMenu.getCode(), route)
+                                modulePlan.moduleName(),
+                                parent.registrationKey(),
+                                parentDefaults(pluginCode, modulePlan.moduleName(), moduleMenu.getCode(), parent)
                         );
                     });
                     defaultParentCode = parentMenu.getCode();
                 }
 
-                String routeName = requireText(route.name(), "routeName");
-                String routeKey = "route:" + moduleName + ":" + routeName;
-                registerKey(currentRegistrationKeys, routeKey);
                 sync(
                         pluginCode,
-                        moduleName,
-                        routeKey,
-                        routeDefaults(pluginCode, moduleName, routeKey, defaultParentCode, route)
+                        modulePlan.moduleName(),
+                        routePlan.registrationKey(),
+                        routeDefaults(
+                                pluginCode,
+                                modulePlan.moduleName(),
+                                routePlan.registrationKey(),
+                                defaultParentCode,
+                                routePlan.route()
+                        )
                 );
             }
         }
 
         menuRepo.findByPluginCode(pluginCode).stream()
-                .filter(menu -> !currentRegistrationKeys.contains(menu.getPluginRegistrationKey()))
+                .filter(menu -> !plan.registrationKeys().contains(menu.getPluginRegistrationKey()))
                 .forEach(menu -> {
                     menu.setRuntimeAvailable(false);
                     menuRepo.save(menu);
                 });
+    }
+
+    private ProjectionPlan validate(String pluginCode, List<PluginFrontendModuleInfo> modules) {
+        requireText(pluginCode, "插件编码");
+        Set<String> registrationKeys = new HashSet<>();
+        List<ModulePlan> modulePlans = new ArrayList<>();
+
+        for (PluginFrontendModuleInfo module : modules == null ? List.<PluginFrontendModuleInfo>of() : modules) {
+            if (module == null) {
+                throw new BizException("插件前端模块声明不能为空");
+            }
+            String moduleName = requireText(module.moduleName(), "插件前端模块名称");
+            String moduleKey = "module:" + moduleName;
+            registerKey(registrationKeys, moduleKey);
+
+            Map<String, ParentDeclaration> parents = new LinkedHashMap<>();
+            List<RoutePlan> routePlans = new ArrayList<>();
+            for (PluginFrontendRouteInfo route : module.routes()) {
+                if (route == null) {
+                    throw new BizException("插件前端路由声明不能为空");
+                }
+                String parentPath = normalizeOptionalText(route.parentPath());
+                if (parentPath != null) {
+                    String parentKey = "parent:" + moduleName + ":" + parentPath;
+                    ParentDeclaration candidate = new ParentDeclaration(
+                            parentKey,
+                            parentPath,
+                            normalizeOptionalText(route.parentTitle()),
+                            normalizeOptionalText(route.parentIcon()),
+                            defaultSort(route.parentSort())
+                    );
+                    ParentDeclaration existing = parents.putIfAbsent(parentPath, candidate);
+                    if (existing == null) {
+                        registerKey(registrationKeys, parentKey);
+                    } else if (!existing.equals(candidate)) {
+                        throw new BizException("插件菜单父目录声明冲突: " + parentKey);
+                    }
+                }
+
+                String routeName = requireText(route.name(), "插件前端路由名称");
+                String routeKey = "route:" + moduleName + ":" + routeName;
+                registerKey(registrationKeys, routeKey);
+                routePlans.add(new RoutePlan(routeKey, parentPath, route));
+            }
+            modulePlans.add(new ModulePlan(moduleName, moduleKey, module, Map.copyOf(parents), List.copyOf(routePlans)));
+        }
+        return new ProjectionPlan(Set.copyOf(registrationKeys), List.copyOf(modulePlans));
     }
 
     private Menu sync(String pluginCode,
@@ -86,14 +137,13 @@ public class PluginMenuProjectionService {
         return menuRepo.save(menu);
     }
 
-    private Menu moduleDefaults(String pluginCode,
-                                PluginFrontendModuleInfo module,
-                                String registrationKey) {
+    private Menu moduleDefaults(String pluginCode, ModulePlan plan) {
+        PluginFrontendModuleInfo module = plan.module();
         return Menu.builder()
-                .code(menuCode(pluginCode, registrationKey))
-                .name(defaultText(module.menuTitle(), module.moduleName()))
+                .code(menuCode(pluginCode, plan.registrationKey()))
+                .name(defaultText(module.menuTitle(), plan.moduleName()))
                 .type(MenuNodeType.CATEGORY)
-                .module(module.moduleName())
+                .module(plan.moduleName())
                 .icon(module.menuIcon())
                 .sort(defaultSort(module.menuSort()))
                 .visible(true)
@@ -103,19 +153,18 @@ public class PluginMenuProjectionService {
 
     private Menu parentDefaults(String pluginCode,
                                 String moduleName,
-                                String registrationKey,
                                 String parentCode,
-                                PluginFrontendRouteInfo route) {
+                                ParentDeclaration parent) {
         return Menu.builder()
-                .code(menuCode(pluginCode, registrationKey))
-                .name(defaultText(route.parentTitle(), route.parentPath()))
+                .code(menuCode(pluginCode, parent.registrationKey()))
+                .name(defaultText(parent.title(), parent.path()))
                 .type(MenuNodeType.LAYOUT)
                 .parentCode(parentCode)
                 .module(moduleName)
-                .icon(route.parentIcon())
-                .path(route.parentPath())
+                .icon(parent.icon())
+                .path(parent.path())
                 .component("Layout")
-                .sort(defaultSort(route.parentSort()))
+                .sort(parent.sort())
                 .visible(true)
                 .status(MenuStatus.ACTIVE)
                 .build();
@@ -156,14 +205,40 @@ public class PluginMenuProjectionService {
 
     private String requireText(String value, String field) {
         if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(field + " must not be blank");
+            throw new BizException(field + "不能为空");
         }
-        return value;
+        return value.trim();
     }
 
     private void registerKey(Set<String> keys, String registrationKey) {
         if (!keys.add(registrationKey)) {
-            throw new IllegalArgumentException("Duplicate plugin menu registration key: " + registrationKey);
+            throw new BizException("插件菜单注册标识重复: " + registrationKey);
         }
+    }
+
+    private String normalizeOptionalText(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private record ProjectionPlan(Set<String> registrationKeys, List<ModulePlan> modules) {
+    }
+
+    private record ModulePlan(String moduleName,
+                              String registrationKey,
+                              PluginFrontendModuleInfo module,
+                              Map<String, ParentDeclaration> parents,
+                              List<RoutePlan> routes) {
+    }
+
+    private record ParentDeclaration(String registrationKey,
+                                     String path,
+                                     String title,
+                                     String icon,
+                                     int sort) {
+    }
+
+    private record RoutePlan(String registrationKey,
+                             String parentPath,
+                             PluginFrontendRouteInfo route) {
     }
 }

@@ -8,6 +8,7 @@ import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.infra.common.baseobj.BaseDO;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
@@ -19,6 +20,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "sysMenu")
+@CompoundIndex(
+        name = "uk_plugin_menu_registration",
+        def = "{'source': 1, 'pluginCode': 1, 'pluginRegistrationKey': 1}",
+        unique = true,
+        partialFilter = "{'source': 'PLUGIN'}"
+)
 public class MenuDO extends BaseDO {
 
     @Indexed(unique = true)
