@@ -151,9 +151,15 @@ package:plugins:
     - mkdir -p "$PACKAGE_MAVEN_REPO"
     - mvn -s settings.xml "-Dmaven.repo.local=$PACKAGE_MAVEN_REPO" clean package -DskipTests -B -e
     - sh ci/verify-plugin-jar-assets.sh
+    - rm -rf dist/plugins
+    - mkdir -p dist/plugins
+    - |
+      . ./ci/lib/plugin-jar-selection.sh
+      copy_final_plugin_jars "$PWD" "$PWD/dist/plugins"
+    - ls -R dist/plugins
   artifacts:
     paths:
-      - yudream-plugins/*/target/*.jar
+      - dist/plugins/*.jar
 
 publish:plugin-jars:
   image: alpine:3.20
