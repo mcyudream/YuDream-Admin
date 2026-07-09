@@ -1,10 +1,12 @@
 package online.yudream.base.interfaces.platform.plugin.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
+import online.yudream.base.application.system.user.service.PermissionAppService;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
@@ -26,6 +28,7 @@ import java.util.List;
 public class PluginDispatchController {
 
     private final PluginAppService pluginAppService;
+    private final PermissionAppService permissionAppService;
 
     @RequestMapping({"/api/plugins/{code}", "/api/plugins/{code}/**"})
     public ResponseEntity<Object> dispatch(
@@ -106,9 +109,14 @@ public class PluginDispatchController {
     }
 
     private SecurityPrincipalSupport.SecurityPrincipal principal() {
-        if (!SecurityPrincipalSupport.hasAnyAuthentication()) {
+        if (SecurityPrincipalSupport.hasApiKeyAuthentication()) {
+            return SecurityPrincipalSupport.current();
+        }
+        Object loginId = StpUtil.getLoginIdDefaultNull();
+        if (loginId == null) {
             return new SecurityPrincipalSupport.SecurityPrincipal(null, List.of());
         }
-        return SecurityPrincipalSupport.current();
+        Long userId = Long.valueOf(String.valueOf(loginId));
+        return new SecurityPrincipalSupport.SecurityPrincipal(userId, permissionAppService.getUserPermissions(userId));
     }
 }

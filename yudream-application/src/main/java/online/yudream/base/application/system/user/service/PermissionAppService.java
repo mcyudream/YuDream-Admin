@@ -7,7 +7,6 @@ import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
-import online.yudream.base.domain.system.user.repo.PermissionRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
@@ -28,9 +27,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PermissionAppService {
 
+    private static final String ALL_PERMISSION = "*";
+
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
-    private final PermissionRepo permissionRepo;
 
     /**
      * 获取用户拥有的全部权限码（汇总所有角色）。
@@ -50,10 +50,7 @@ public class PermissionAppService {
                 continue;
             }
             if (role.getSystemType() == SystemRoleType.SUPER_ADMIN) {
-                return permissionRepo.findActive().stream()
-                        .map(permission -> permission.getId().getCode())
-                        .distinct()
-                        .toList();
+                return List.of(ALL_PERMISSION);
             }
             if (role.getPermissions() == null) {
                 continue;

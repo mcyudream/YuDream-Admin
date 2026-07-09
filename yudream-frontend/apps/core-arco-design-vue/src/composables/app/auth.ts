@@ -3,7 +3,7 @@ export function useAppAuth() {
     const appSettingsStore = useAppSettingsStore()
     const appAccountStore = useAppAccountStore()
     if (appSettingsStore.settings.app.account.auth) {
-      return appAccountStore.permissions.includes(permission)
+      return appAccountStore.permissions.includes('*') || appAccountStore.permissions.includes(permission)
     }
     else {
       return true
