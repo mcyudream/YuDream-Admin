@@ -116,7 +116,8 @@ public class ProjectProgressHttpFacade {
     }
 
     public PluginHttpResponse submitAcceptance(PluginHttpRequest request) {
-        return PluginHttpResponse.ok(assembler.toRes(appService.submitAcceptance(pathSegment(request.path(), 1), currentUserId(request))));
+        ProjectProgressCheckInRequest body = JsonSupport.read(request.body(), ProjectProgressCheckInRequest.class);
+        return PluginHttpResponse.ok(assembler.toRes(appService.submitAcceptance(pathSegment(request.path(), 1), assembler.toCmd(body), currentUserId(request))));
     }
 
     public PluginHttpResponse projectCheckIns(PluginHttpRequest request) {

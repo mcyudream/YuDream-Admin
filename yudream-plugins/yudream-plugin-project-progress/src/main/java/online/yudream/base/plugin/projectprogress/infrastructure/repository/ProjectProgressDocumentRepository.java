@@ -253,6 +253,8 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
         document.put("acceptorUserIds", detail.acceptorUserIds());
         document.put("published", detail.published());
         document.put("pendingAcceptance", detail.pendingAcceptance());
+        document.put("acceptanceSummary", detail.acceptanceSummary());
+        document.put("acceptanceFiles", detail.acceptanceFiles().stream().map(this::fileDocument).toList());
         document.put("dueAt", detail.dueAt());
         document.put("createdAt", detail.createdAt());
         document.put("updatedAt", detail.updatedAt());
@@ -389,6 +391,8 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
                 stringList(document.get("acceptorUserIds")),
                 bool(document, "published", false),
                 bool(document, "pendingAcceptance", false),
+                string(document, "acceptanceSummary"),
+                fileList(document.get("acceptanceFiles")),
                 longObject(document, "dueAt"),
                 number(document, "createdAt", 0),
                 number(document, "updatedAt", 0)

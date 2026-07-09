@@ -33,7 +33,8 @@ public class ProjectProgressAppAssembler {
         return new ProjectWorkDetailDTO(detail.id(), detail.projectId(), detail.title(), detail.description(),
                 detail.statusCode(), detail.assignmentMode().name(), detail.requiredAssigneeCount(),
                 detail.candidateUserIds(), detail.assigneeUserIds(), detail.acceptorUserIds(), detail.published(),
-                detail.pendingAcceptance(), detail.dueAt(), detail.createdAt(), detail.updatedAt());
+                detail.pendingAcceptance(), detail.acceptanceSummary(), detail.acceptanceFiles().stream().map(this::toDetailFileDTO).toList(),
+                detail.dueAt(), detail.createdAt(), detail.updatedAt());
     }
 
     public ProjectCheckInDTO toDTO(ProjectCheckInRecord record) {
@@ -63,5 +64,9 @@ public class ProjectProgressAppAssembler {
 
     private ProjectCheckInDTO.FileEvidenceDTO toDTO(ProjectFileEvidence file) {
         return new ProjectCheckInDTO.FileEvidenceDTO(file.objectKey(), file.filename(), file.contentType(), file.size(), file.image());
+    }
+
+    private ProjectWorkDetailDTO.FileEvidenceDTO toDetailFileDTO(ProjectFileEvidence file) {
+        return new ProjectWorkDetailDTO.FileEvidenceDTO(file.objectKey(), file.filename(), file.contentType(), file.size(), file.image());
     }
 }

@@ -25,6 +25,10 @@ async function submitReview() {
   await props.model.review(reviewingDetail.value, accepted.value)
   reviewVisible.value = false
 }
+
+function acceptanceFileNames(detail: ProjectWorkDetail) {
+  return detail.acceptanceFiles?.length ? detail.acceptanceFiles.map(file => file.filename).join('、') : '未上传附件'
+}
 </script>
 
 <template>
@@ -72,6 +76,14 @@ async function submitReview() {
                   {{ model.userLabel(user) }}
                 </a-tag>
               </a-space>
+            </template>
+          </a-table-column>
+          <a-table-column title="验收材料" :width="260">
+            <template #cell="{ record }">
+              <strong>{{ record.acceptanceSummary || '无说明' }}</strong>
+              <div class="pp-table-sub">
+                {{ acceptanceFileNames(record) }}
+              </div>
             </template>
           </a-table-column>
           <a-table-column title="截止时间" :width="170">

@@ -15,8 +15,12 @@ public record ProjectWorkDetailDTO(
         List<String> acceptorUserIds,
         boolean published,
         boolean pendingAcceptance,
+        String acceptanceSummary,
+        List<FileEvidenceDTO> acceptanceFiles,
         Long dueAt,
         long createdAt,
         long updatedAt
 ) {
+    public record FileEvidenceDTO(String objectKey, String filename, String contentType, long size, boolean image) {
+    }
 }

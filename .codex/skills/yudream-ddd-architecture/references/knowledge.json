@@ -63,6 +63,10 @@
     {
       "key": "plugin-picker-framework-components",
       "text": "插件前端涉及人员、部门、服务器等选择器时，不得让用户手输或辨认内部 ID；优先复用宿主 UI 框架组件，如 Arco Modal/Table/Select/Tag，并用名称、账号、部门、服务器名等业务标签展示。"
+    },
+    {
+      "key": "project-progress-checkin-natural-period",
+      "text": "Project progress check-in frequency is a natural time bucket, not a rolling interval. For 1440 minutes, count at least one check-in per local calendar day 00:00-24:00; manual check-ins may repeat, while automatic Minecraft check-ins should dedupe within the current bucket."
     }
   ],
   "utilities": [

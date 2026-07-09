@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type { ProjectProgressModel } from '../composables/useProjectProgress'
+import type { ProjectWorkDetail } from '../types'
+import { FaButton, FaFileUpload, FaModal, FaTextarea } from '@fantastic-admin/components'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps<{
@@ -7,10 +10,33 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const submitVisible = ref(false)
+const submittingDetail = ref<ProjectWorkDetail | null>(null)
 
 async function goCheckIn(projectId: string) {
   await props.model.selectProjectById(projectId)
   await router.push({ name: 'platform-plugin-project-progress-check-ins' })
+}
+
+function openSubmitAcceptance(detail: ProjectWorkDetail) {
+  props.model.acceptanceSubmitForm.summary = ''
+  props.model.acceptanceFiles = []
+  submittingDetail.value = detail
+  submitVisible.value = true
+}
+
+async function confirmSubmitAcceptance() {
+  if (!submittingDetail.value) {
+    return
+  }
+  const ok = await props.model.submitAcceptance(submittingDetail.value)
+  if (ok) {
+    submitVisible.value = false
+  }
+}
+
+function localUploadRequest() {
+  return Promise.resolve({})
 }
 </script>
 
@@ -81,7 +107,7 @@ async function goCheckIn(projectId: string) {
                   type="primary"
                   :disabled="!model.canSubmitAcceptance(record)"
                   :loading="model.saving"
-                  @click="model.submitAcceptance(record)"
+                  @click="openSubmitAcceptance(record)"
                 >
                   提交验收
                 </a-button>
@@ -92,5 +118,35 @@ async function goCheckIn(projectId: string) {
       </a-table>
       <a-empty v-if="!model.myTasks.length" description="暂无分配给你的任务" />
     </section>
+
+    <FaModal
+      v-model="submitVisible"
+      title="提交验收"
+      class="max-w-[640px]"
+      :show-confirm-button="false"
+      show-cancel-button
+      cancel-button-text="取消"
+    >
+      <div class="pp-form">
+        <label>
+          <span>验收说明</span>
+          <FaTextarea v-model="model.acceptanceSubmitForm.summary" placeholder="说明完成内容、交付位置或需要验收的重点" class="w-full" />
+        </label>
+        <label>
+          <span>验收附件</span>
+          <FaFileUpload
+            v-model="model.acceptanceFiles"
+            multiple
+            :max="6"
+            :http-request="localUploadRequest"
+            description="拖放或点击上传图片/文件"
+          />
+        </label>
+      </div>
+      <template #footer>
+        <FaButton variant="outline" @click="submitVisible = false">取消</FaButton>
+        <FaButton :loading="model.saving" @click="confirmSubmitAcceptance">提交验收</FaButton>
+      </template>
+    </FaModal>
   </section>
 </template>

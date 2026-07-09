@@ -42,6 +42,7 @@ export function createProjectProgressApi(sdk: YuDreamPluginSdk) {
     status: () => sdk.http.get<ProjectProgressStatus>('/status'),
     projects: () => getAllPages<ProjectProgressProject>('/projects'),
     users: (keyword?: string, deptId?: string) => getAllPages<ProjectUserOption>('/users', { keyword, deptId }),
+    usersPage: (keyword?: string, deptId?: string, page = 1, size = 10) => sdk.http.get<ProjectUserOption[]>(`/users${query({ keyword, deptId, page, size })}`),
     resolveUsers: (ids: string[]) => ids.length
       ? sdk.http.get<ProjectUserOption[]>(`/users/resolve${query({ ids: ids.join(',') })}`)
       : Promise.resolve([]),
@@ -60,7 +61,7 @@ export function createProjectProgressApi(sdk: YuDreamPluginSdk) {
     claimableTasks: () => getAllPages<ProjectWorkDetail>('/tasks/claimable'),
     myTasks: () => getAllPages<ProjectWorkDetail>('/my-tasks'),
     pendingAcceptance: () => getAllPages<ProjectWorkDetail>('/acceptance/pending'),
-    submitAcceptance: (detailId: string) => sdk.http.post<ProjectWorkDetail>(`/details/${encodeURIComponent(detailId)}/submit-acceptance`),
+    submitAcceptance: (detailId: string, data: Record<string, unknown>) => sdk.http.post<ProjectWorkDetail>(`/details/${encodeURIComponent(detailId)}/submit-acceptance`, data),
     projectCheckIns: (projectId: string) => getAllPages<ProjectCheckIn>(`/projects/${encodeURIComponent(projectId)}/check-ins`),
     createProjectCheckIn: (projectId: string, data: Record<string, unknown>) => sdk.http.post<ProjectCheckIn>(`/projects/${encodeURIComponent(projectId)}/check-ins`, data),
     projectMinecraftCheckIn: (projectId: string) => sdk.http.post<ProjectCheckIn>(`/projects/${encodeURIComponent(projectId)}/check-ins/minecraft`),

@@ -2,6 +2,7 @@
 import type { ProjectProgressModel } from '../composables/useProjectProgress'
 import type { ProjectProgressProject } from '../types'
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import PeoplePicker from '../components/PeoplePicker.vue'
 
 const props = defineProps<{
@@ -9,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const modalVisible = ref(false)
+const router = useRouter()
 
 const modalTitle = computed(() => props.model.selectedProjectId ? '编辑项目' : '新建项目')
 
@@ -37,6 +39,7 @@ async function editProject(project: ProjectProgressProject) {
 
 async function openProject(project: ProjectProgressProject) {
   await props.model.selectProjectById(project.id)
+  await router.push({ name: 'platform-plugin-project-progress-details' })
 }
 
 async function saveProject() {
@@ -196,8 +199,9 @@ async function saveProject() {
         </div>
 
         <div class="pp-form-grid two">
-          <a-form-item label="最小打卡间隔（分钟）">
+          <a-form-item label="打卡周期（分钟）">
             <a-input-number v-model="model.projectForm.minCheckInIntervalMinutes" :min="0" />
+            <p class="pp-help">1440 表示每天 00:00-24:00 至少打卡一次；480 表示每天每 8 小时一个打卡周期。0 表示不限制周期。</p>
           </a-form-item>
           <a-form-item label="允许打卡方式">
             <a-checkbox-group v-model="model.projectForm.allowedCheckInTypes">

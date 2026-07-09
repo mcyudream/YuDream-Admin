@@ -380,6 +380,12 @@
   font-size: 13px;
 }
 
+.pp-table-wrap {
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
 .pp-table th,
 .pp-table td {
   border-bottom: 1px solid #e2e8f0;
@@ -392,6 +398,19 @@
   color: #475569;
   font-weight: 600;
   background: #f8fafc;
+}
+
+.pp-table tbody tr {
+  cursor: default;
+}
+
+.pp-table-wrap .pp-table tbody tr {
+  cursor: pointer;
+}
+
+.pp-select-col {
+  width: 44px;
+  text-align: center !important;
 }
 
 .pp-arco-table {
@@ -473,6 +492,10 @@
   background: #f8fafc;
   padding: 9px;
   color: #334155;
+}
+
+.mt-3 {
+  margin-top: 12px;
 }
 
 .pp-progress-line {
