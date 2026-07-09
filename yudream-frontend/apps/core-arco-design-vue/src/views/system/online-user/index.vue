@@ -110,19 +110,6 @@ async function exportOnlineUsers() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaSearchBar>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
-          <FaInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
-          <div class="flex gap-2 md:justify-end">
-            <FaButton variant="outline" @click="resetSearch">
-              &#37325;&#32622;
-            </FaButton>
-          </div>
-        </div>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-loading="loading"
         row-key="token"
@@ -134,6 +121,18 @@ async function exportOnlineUsers() {
         :columns="tableColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
+              <FaInput v-model="keyword" clearable placeholder="&#29992;&#25143;&#21517; / &#26165;&#31216; / &#20250;&#35805;&#26631;&#35782;" @keydown.enter="load" @clear="load" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  &#37325;&#32622;
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #empty>
           <div class="empty-state">
             &#26242;&#26080;&#22312;&#32447;&#20250;&#35805;&#65292;&#35831;&#30830;&#35748;&#24050;&#37325;&#21551;&#21518;&#31471;&#24182;&#37325;&#26032;&#30331;&#24405;

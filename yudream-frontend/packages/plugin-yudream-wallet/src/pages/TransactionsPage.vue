@@ -42,13 +42,13 @@
           <span>用户</span>
           <input v-model="model.transactionFilters.user" placeholder="ID / 用户名 / 邮箱">
         </label>
-        <div class="wallet-actions">
+        <div class="wallet-actions wallet-filter-actions">
+          <FaButton variant="outline" type="button" @click="model.resetTransactionFilters">
+            重置
+          </FaButton>
           <FaButton type="button" @click="model.applyTransactionFilters">
             <FaIcon name="i-ri:filter-3-line" />
             筛选
-          </FaButton>
-          <FaButton variant="outline" type="button" @click="model.resetTransactionFilters">
-            重置
           </FaButton>
         </div>
       </div>

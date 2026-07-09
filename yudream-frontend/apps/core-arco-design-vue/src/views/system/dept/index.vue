@@ -176,26 +176,6 @@ function importDepts() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaSearchBar :show-toggle="false">
-        <template #default>
-          <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
-            <FaInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
-            <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-            <div class="flex gap-2 col-end--1 justify-end">
-              <FaButton variant="outline" @click="resetSearch">
-                重置
-              </FaButton>
-              <FaButton @click="loadTree">
-                <FaIcon name="i-ri:search-line" />
-                筛选
-              </FaButton>
-            </div>
-          </div>
-        </template>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-loading="loading"
         row-key="id"
@@ -209,6 +189,23 @@ function importDepts() {
         :columns="tableColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+              <FaInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
+              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+              <div class="flex gap-2 col-end--1 justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  重置
+                </FaButton>
+                <FaButton @click="loadTree">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-systemDept="{ row }">
           <FaTag :variant="row.original.systemDept ? 'default' : 'secondary'">
             {{ row.original.systemDept ? '系统部门' : '普通部门' }}

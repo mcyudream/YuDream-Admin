@@ -145,31 +145,6 @@ function formatSize(size?: number) {
 
 <template>
   <div class="skin-admin-table-page">
-    <FaSearchBar>
-      <template #default="{ fold, toggle }">
-        <div class="skin-admin-filter-grid">
-          <FaInput v-model="search.keyword" clearable placeholder="名称 / Hash / 上传人" class="skin-admin-filter-grid__keyword" @keydown.enter="pagination.page = 1" @clear="pagination.page = 1" />
-          <FaSelect v-model="search.type" :options="typeOptions" class="skin-admin-filter-grid__select" />
-          <FaSelect v-if="!fold" v-model="search.visibility" :options="visibilityOptions" class="skin-admin-filter-grid__select" />
-          <div class="skin-admin-filter-grid__actions">
-            <FaButton variant="outline" @click="resetSearch">
-              重置
-            </FaButton>
-            <FaButton @click="pagination.page = 1">
-              <FaIcon name="i-ri:search-line" />
-              筛选
-            </FaButton>
-            <FaButton variant="ghost" @click="toggle">
-              {{ fold ? '展开' : '收起' }}
-              <FaIcon :name="fold ? 'i-ep:caret-bottom' : 'i-ep:caret-top'" />
-            </FaButton>
-          </div>
-        </div>
-      </template>
-    </FaSearchBar>
-
-    <div class="mx--4 my-3 border-t border-t-dashed" />
-
     <FaTable
       row-key="hash"
       table-root-class="skin-admin-texture-table-root rounded-lg"
@@ -180,6 +155,24 @@ function formatSize(size?: number) {
       :columns="tableColumns"
       :data="pagedRows"
     >
+      <template #toolbar>
+        <FaSearchBar class="w-full">
+          <div class="skin-admin-filter-grid">
+            <FaInput v-model="search.keyword" clearable placeholder="名称 / Hash / 上传人" class="skin-admin-filter-grid__keyword" @keydown.enter="pagination.page = 1" @clear="pagination.page = 1" />
+            <FaSelect v-model="search.type" :options="typeOptions" class="skin-admin-filter-grid__select" />
+            <FaSelect v-model="search.visibility" :options="visibilityOptions" class="skin-admin-filter-grid__select" />
+            <div class="skin-admin-filter-grid__actions">
+              <FaButton variant="outline" @click="resetSearch">
+                重置
+              </FaButton>
+              <FaButton @click="pagination.page = 1">
+                <FaIcon name="i-ri:search-line" />
+                筛选
+              </FaButton>
+            </div>
+          </div>
+        </FaSearchBar>
+      </template>
       <template #cell-preview="{ row }">
         <div class="skin-admin-texture-preview" aria-hidden="true">
           <SkinTexturePreview
