@@ -1,13 +1,33 @@
 # YuDream Admin Core
 
-这是 YuDream Admin 的核心仓整理版，职责聚焦在：
+## Readiness Audit
+
+```powershell
+& 'C:/Program Files/Git/bin/sh.exe' ci/verify-core-split-readiness.sh
+```
+
+## Staging Guide
+
+- [docs/repository-split/staging-boundaries.md](docs/repository-split/staging-boundaries.md)
+- `ci/stage-core-contract-split.sh`
+- `ci/stage-core-host-cleanup.sh`
+
+## Remote Evidence
+
+```powershell
+& 'C:/Program Files/Git/bin/sh.exe' ci/verify-core-remote-release-evidence.sh
+```
+
+- [docs/repository-split/remote-release-evidence.md](docs/repository-split/remote-release-evidence.md)
+
+这是 YuDream Admin 的主体仓，当前职责聚焦在：
 
 - 核心后端模块
-- 核心前端模块
+- 核心前端宿主模块
 - 插件运行时
 - 插件契约发布
 
-业务插件未来应逐步迁移到独立插件仓，不再和核心仓共用同一条构建与发布链路。
+官方业务插件已经按默认方向迁移到独立插件仓，不再和主体仓共用同一条业务插件构建链路。
 
 ## 当前目录结构
 
@@ -18,17 +38,21 @@ yudream-infrastructure/             核心基础设施层与插件运行时
 yudream-interfaces/                 核心接口层
 yudream-bootstrap/                  核心启动模块
 yudream-plugins/yudream-plugin-spi/ 插件 SPI 契约模块
-yudream-frontend/                   核心前端与插件 SDK
+yudream-plugins/yudream-sample-plugin/ 样例插件
+yudream-frontend/                   核心前端宿主与共享插件 SDK
 plugins/                            运行时外部插件 JAR 目录
-ci/                                 核心 CI 配置
-docs/repository-split/              拆仓说明
+ci/                                 核心 CI 校验脚本
+docs/repository-split/              分仓说明
 templates/plugin-repo/              独立插件仓模板
 ```
 
-说明：
+## 当前边界
 
-- `yudream-plugins/` 下其他业务插件源码目前仍留在工作区中作为迁移缓冲，但已不再属于根 Maven reactor
-- 核心 GitLab CI 也不再负责构建业务插件前端与业务插件 JAR
+- 已迁移的官方业务插件源码不再保留在主体仓活跃路径中
+- 主体仓前端不会再从本地 `packages/plugin-*` 自动发现业务插件源码
+- 核心 GitLab CI 不再负责构建业务插件前端和业务插件 JAR
+- 业务插件默认以外部 JAR 形式放入 `plugins/` 目录，由宿主运行时加载
+- 主体仓 CI 现在会在分支和 tag 上直接验证拆分边界；发布任务仍然只在 tag 流水线执行
 
 ## 核心构建
 
@@ -46,20 +70,29 @@ pnpm install
 pnpm --filter @fantastic-admin/core-arco-design-vue build
 ```
 
-## 私有包发布
+## 对外发布的契约包
 
-当前核心仓负责发布两个给独立插件仓消费的私有包：
+主体仓当前负责发布给独立插件仓消费的契约包：
 
 - Maven: `online.yudream.base:yudream-plugin-spi`
 - npm: `@yudream/plugin-sdk`
+- npm: `@yudream/components`
 
-具体见：
+默认策略：
 
-- [GitLab 私有包发布说明](/D:/code/yudream-admim/docs/plugin-system/gitlab-private-packages.md)
+- Maven 契约继续发布到核心仓 GitLab Maven Registry
+- npm 契约默认面向 npmjs
+- GitLab npm 私包发布改为显式开关 `GITLAB_NPM_PUBLISH_ENABLED=true` 时才执行
+
+相关说明：
+
+- [GitLab 私有包发布说明](docs/plugin-system/gitlab-private-packages.md)
+- [npmjs 公网包发布说明](docs/plugin-system/npmjs-public-packages.md)
+- [契约发布校验](docs/plugin-system/contract-validation.md)
 
 ## 插件运行时
 
-核心运行时默认只扫描：
+宿主运行时默认只扫描：
 
 ```text
 plugins/
@@ -67,19 +100,17 @@ plugins/
 
 独立插件仓构建出的 JAR 应复制或挂载到该目录，再由核心系统加载。
 
-具体见：
+相关说明：
 
-- [外部插件目录说明](/D:/code/yudream-admim/plugins/README.md)
+- [外部插件目录说明](plugins/README.md)
 
-## 拆仓说明
+## 独立插件仓入口
 
-当前推荐的仓库拆分方式见：
+如果你要继续开发官方业务插件，优先使用独立插件仓路线：
 
-- [拆仓说明](/D:/code/yudream-admim/docs/repository-split/README.md)
-
-如果你要马上新建插件仓，可直接参考：
-
-- [插件仓模板说明](/D:/code/yudream-admim/templates/plugin-repo/README.md)
-- [插件仓 CI 模板](/D:/code/yudream-admim/templates/plugin-repo/.gitlab-ci.yml.example)
-- [插件仓 Maven 设置模板](/D:/code/yudream-admim/templates/plugin-repo/settings.xml.example)
-- [插件仓 npm 设置模板](/D:/code/yudream-admim/templates/plugin-repo/.npmrc.example)
+- [分仓说明](docs/repository-split/README.md)
+- [插件仓模板说明](templates/plugin-repo/README.md)
+- [插件仓 CI 模板](templates/plugin-repo/.gitlab-ci.yml.example)
+- [插件仓 Maven 设置模板](templates/plugin-repo/settings.xml.example)
+- [插件仓 npm 设置模板](templates/plugin-repo/.npmrc.example)
+- [插件仓 pnpm workspace 模板](templates/plugin-repo/pnpm-workspace.yaml.example)

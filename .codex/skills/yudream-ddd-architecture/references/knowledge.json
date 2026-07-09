@@ -78,7 +78,7 @@
     },
     {
       "key": "plugin-dev-runtime-prefer-local-source",
-      "text": "In frontend DEV mode, plugin runtime pages must try the workspace package source (packages/plugin-*/src/index.ts) before remoteEntry.js. Otherwise stale packaged remote assets can hide current local plugin changes and make browser verification misleading."
+      "text": "After official business plugins are split into a standalone repository, the core host frontend must not auto-glob packages/plugin-*/src/index.ts in DEV mode. Default behavior should load remoteEntry.js from backend plugin assets; any cross-repo local debugging bridge must be explicit and must not make the core workspace depend on migrated plugin source."
     },
     {
       "key": "plugin-gitlab-private-packages",
@@ -87,6 +87,10 @@
     {
       "key": "core-repo-no-business-plugin-reactor",
       "text": "The core repository root Maven reactor and GitLab CI must only build core modules plus yudream-plugin-spi. Business plugin modules may remain temporarily in the workspace for migration, but they should be treated as external repositories and runtime plugins loaded from the plugins/ directory instead of being part of the default core build."
+    },
+    {
+      "key": "core-frontend-workspace-no-business-plugins",
+      "text": "Once official business plugins are migrated to yudream-admin-plugins, the core frontend pnpm workspace should keep only shared host packages such as components, plugin-sdk, dataviz, settings, and types. Do not keep packages/plugin-* in the default workspace manifest, or core install/build will still be implicitly coupled to migrated plugin source."
     }
   ],
   "utilities": [
