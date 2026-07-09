@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.plugin;
 
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
@@ -15,12 +16,16 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +42,9 @@ class PluginMenuProjectionServiceTest {
     @BeforeEach
     void setUp() {
         service = new PluginMenuProjectionService(menuRepo);
+    }
+
+    private void stubDefaultRepo() {
         when(menuRepo.findByPluginCode(PLUGIN_CODE)).thenReturn(List.of());
         when(menuRepo.findByPluginCodeAndRegistrationKey(any(), any())).thenReturn(Optional.empty());
         when(menuRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -44,6 +52,7 @@ class PluginMenuProjectionServiceTest {
 
     @Test
     void createsModuleParentAndRouteMenusFromFrontendDeclaration() {
+        stubDefaultRepo();
         service.project(PLUGIN_CODE, List.of(module(route(
                 "/wallet/transactions",
                 "walletTransactions",
@@ -80,6 +89,7 @@ class PluginMenuProjectionServiceTest {
 
     @Test
     void keepsEditedFieldsWhenTheSameRegistrationReturns() {
+        stubDefaultRepo();
         Menu edited = Menu.builder()
                 .code("plugin:yudream-wallet:route:walletAdmin:walletTransactions")
                 .name("自定义名称")
@@ -133,6 +143,7 @@ class PluginMenuProjectionServiceTest {
 
     @Test
     void marksRemovedDeclarationsUnavailableWithoutDeletingThem() {
+        stubDefaultRepo();
         Menu current = pluginMenu("route:" + MODULE_NAME + ":walletTransactions", true);
         Menu removed = pluginMenu("route:" + MODULE_NAME + ":walletReports", true);
         when(menuRepo.findByPluginCode(PLUGIN_CODE)).thenReturn(List.of(current, removed));
@@ -156,6 +167,7 @@ class PluginMenuProjectionServiceTest {
 
     @Test
     void preservesAParentThatPointsToASystemMenu() {
+        stubDefaultRepo();
         Menu edited = pluginMenu("route:" + MODULE_NAME + ":walletTransactions", false);
         edited.setParentCode("system:dashboard");
         when(menuRepo.findByPluginCodeAndRegistrationKey(
@@ -176,7 +188,109 @@ class PluginMenuProjectionServiceTest {
         assertThat(edited.getRuntimeAvailable()).isTrue();
     }
 
+    @Test
+    void rejectsConflictingParentDeclarationsBeforeAnyWrite() {
+        PluginFrontendRouteInfo first = route(
+                "/wallet/transactions",
+                "walletTransactions",
+                "交易记录",
+                " /wallet ",
+                "钱包管理"
+        );
+        PluginFrontendRouteInfo conflicting = new PluginFrontendRouteInfo(
+                "/wallet/reports",
+                "walletReports",
+                "钱包报表",
+                "list",
+                "/wallet",
+                "其他目录",
+                "folder",
+                10,
+                "wallet/reports/index",
+                "wallet:report:list",
+                40
+        );
+
+        assertThatThrownBy(() -> service.project(
+                PLUGIN_CODE,
+                List.of(module(List.of(conflicting, first)))
+        )).isInstanceOf(BizException.class)
+                .hasMessageContaining("父目录声明冲突");
+
+        verifyNoInteractions(menuRepo);
+    }
+
+    @Test
+    void rejectsDuplicateRouteRegistrationBeforeAnyWrite() {
+        PluginFrontendRouteInfo duplicate = route(
+                "/wallet/reports",
+                "walletTransactions",
+                "钱包报表",
+                null,
+                null
+        );
+
+        assertThatThrownBy(() -> service.project(
+                PLUGIN_CODE,
+                List.of(module(List.of(
+                        route("/wallet/transactions", "walletTransactions", "交易记录", null, null),
+                        duplicate
+                )))
+        )).isInstanceOf(BizException.class)
+                .hasMessageContaining("注册标识重复");
+
+        verifyNoInteractions(menuRepo);
+    }
+
+    @Test
+    void retryAfterMidReconciliationFailureConvergesToTheCompleteProjection() {
+        FailingMenuRepo repo = new FailingMenuRepo();
+        Menu removed = pluginMenu("route:" + MODULE_NAME + ":removed", true);
+        repo.put(removed);
+        repo.failOnceOnSave(2);
+        PluginMenuProjectionService retryableService = new PluginMenuProjectionService(repo);
+        PluginFrontendModuleInfo declaration = module(route(
+                "/wallet/transactions",
+                "walletTransactions",
+                "交易记录",
+                null,
+                null
+        ));
+
+        assertThatThrownBy(() -> retryableService.project(PLUGIN_CODE, List.of(declaration)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(repo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "module:" + MODULE_NAME
+        )).isPresent();
+        assertThat(repo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletTransactions"
+        )).isEmpty();
+        assertThat(removed.getRuntimeAvailable()).isTrue();
+
+        retryableService.project(PLUGIN_CODE, List.of(declaration));
+
+        assertThat(repo.findByPluginCode(PLUGIN_CODE)).hasSize(3);
+        assertThat(repo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "module:" + MODULE_NAME
+        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(true);
+        assertThat(repo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":walletTransactions"
+        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(true);
+        assertThat(repo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "route:" + MODULE_NAME + ":removed"
+        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(false);
+    }
+
     private PluginFrontendModuleInfo module(PluginFrontendRouteInfo route) {
+        return module(List.of(route));
+    }
+
+    private PluginFrontendModuleInfo module(List<PluginFrontendRouteInfo> routes) {
         return new PluginFrontendModuleInfo(
                 PLUGIN_CODE,
                 "/plugins/wallet/remoteEntry.js",
@@ -186,7 +300,7 @@ class PluginMenuProjectionServiceTest {
                 "钱包中心",
                 "wallet",
                 20,
-                List.of(route)
+                routes
         );
     }
 
@@ -234,5 +348,73 @@ class PluginMenuProjectionServiceTest {
         assertThat(menu.getPluginModuleName()).isEqualTo(MODULE_NAME);
         assertThat(menu.getPluginRegistrationKey()).isEqualTo(registrationKey);
         assertThat(menu.getRuntimeAvailable()).isTrue();
+    }
+
+    private static class FailingMenuRepo implements MenuRepo {
+
+        private final Map<String, Menu> menus = new LinkedHashMap<>();
+        private int saveCount;
+        private int failingSave = -1;
+
+        void put(Menu menu) {
+            menus.put(menu.getCode(), menu);
+        }
+
+        void failOnceOnSave(int saveNumber) {
+            failingSave = saveNumber;
+        }
+
+        @Override
+        public Menu save(Menu menu) {
+            saveCount++;
+            if (saveCount == failingSave) {
+                failingSave = -1;
+                throw new IllegalStateException("simulated persistence failure");
+            }
+            menus.put(menu.getCode(), menu);
+            return menu;
+        }
+
+        @Override
+        public Optional<Menu> findByCode(String code) {
+            return Optional.ofNullable(menus.get(code));
+        }
+
+        @Override
+        public Optional<Menu> findByPluginCodeAndRegistrationKey(String pluginCode, String registrationKey) {
+            return findByPluginCode(pluginCode).stream()
+                    .filter(menu -> registrationKey.equals(menu.getPluginRegistrationKey()))
+                    .findFirst();
+        }
+
+        @Override
+        public List<Menu> findAll() {
+            return List.copyOf(menus.values());
+        }
+
+        @Override
+        public List<Menu> findByPluginCode(String pluginCode) {
+            return menus.values().stream()
+                    .filter(Menu::isPluginMenu)
+                    .filter(menu -> pluginCode.equals(menu.getPluginCode()))
+                    .toList();
+        }
+
+        @Override
+        public List<Menu> findByTypeIn(List<MenuNodeType> types) {
+            return menus.values().stream()
+                    .filter(menu -> types.contains(menu.getType()))
+                    .toList();
+        }
+
+        @Override
+        public boolean existsByCode(String code) {
+            return menus.containsKey(code);
+        }
+
+        @Override
+        public long count() {
+            return menus.size();
+        }
     }
 }
