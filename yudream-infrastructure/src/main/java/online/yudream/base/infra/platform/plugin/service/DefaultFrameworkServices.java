@@ -18,6 +18,7 @@ import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.document.PluginRenderedDocument;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateSummary;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateService;
+import online.yudream.base.plugin.spi.system.mail.PluginMailService;
 import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
@@ -45,6 +46,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
 
     private final PluginUserService pluginUserService;
     private final PluginSecurityService pluginSecurityService;
+    private final PluginMailService pluginMailService;
     private final MongoTemplate mongoTemplate;
     private final ObjectStorage objectStorage;
     private final WordTemplateRenderer wordTemplateRenderer;
@@ -65,6 +67,11 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginSecurityService security() {
         return pluginSecurityService;
+    }
+
+    @Override
+    public PluginMailService mail() {
+        return pluginMailService;
     }
 
     @Override
