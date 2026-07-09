@@ -67,7 +67,7 @@ public class ProjectProgressAppService {
     }
 
     public ProjectProgressProjectDTO createProject(ProjectProgressProjectSaveCmd cmd, String operatorUserId) {
-        ProjectProgressProject project = ProjectProgressProject.create(cmd.name(), cmd.description(), cmd.managerUserIds(),
+        ProjectProgressProject project = ProjectProgressProject.create(cmd.name(), cmd.description(), managers(cmd.managerUserIds(), operatorUserId),
                 cmd.memberUserIds(), statuses(cmd.statuses()), cmd.defaultStatusCode(), cmd.doneStatusCode(),
                 cmd.reworkStatusCode(), intValue(cmd.minCheckInIntervalMinutes(), 0), checkInTypes(cmd.allowedCheckInTypes()),
                 minecraftPolicy(cmd.minecraftPolicy()), cmd.enabled() == null || cmd.enabled());
@@ -78,7 +78,7 @@ public class ProjectProgressAppService {
 
     public ProjectProgressProjectDTO updateProject(String projectId, ProjectProgressProjectSaveCmd cmd, String operatorUserId) {
         ProjectProgressProject existing = requireProject(projectId);
-        ProjectProgressProject saved = repository.saveProject(existing.update(cmd.name(), cmd.description(), cmd.managerUserIds(),
+        ProjectProgressProject saved = repository.saveProject(existing.update(cmd.name(), cmd.description(), managers(cmd.managerUserIds(), operatorUserId),
                 cmd.memberUserIds(), statuses(cmd.statuses()), cmd.defaultStatusCode(), cmd.doneStatusCode(),
                 cmd.reworkStatusCode(), intValue(cmd.minCheckInIntervalMinutes(), 0), checkInTypes(cmd.allowedCheckInTypes()),
                 minecraftPolicy(cmd.minecraftPolicy()), cmd.enabled() == null || cmd.enabled()));
@@ -108,11 +108,20 @@ public class ProjectProgressAppService {
                 .toList();
     }
 
+    public List<ProjectWorkDetailDTO> claimableTasks(String userId, int page, int size) {
+        String safeUserId = requireText(userId, "请先登录");
+        return repository.listClaimableDetails(safeUserId, safePage(page), safeSize(size)).stream()
+                .filter(detail -> repository.findProject(detail.projectId()).map(ProjectProgressProject::enabled).orElse(false))
+                .map(assembler::toDTO)
+                .toList();
+    }
+
     public ProjectWorkDetailDTO createDetail(String projectId, ProjectProgressDetailSaveCmd cmd, String operatorUserId) {
         ProjectProgressProject project = requireProject(projectId);
+        ProjectAssignmentMode assignmentMode = ProjectAssignmentMode.of(cmd.assignmentMode());
         ProjectWorkDetail detail = ProjectWorkDetail.create(project.id(), cmd.title(), cmd.description(),
-                firstText(cmd.statusCode(), project.defaultStatusCode()), ProjectAssignmentMode.of(cmd.assignmentMode()),
-                intValue(cmd.requiredAssigneeCount(), 1), emptyToMembers(cmd.candidateUserIds(), project),
+                firstText(cmd.statusCode(), project.defaultStatusCode()), assignmentMode,
+                intValue(cmd.requiredAssigneeCount(), 1), candidatePool(cmd.candidateUserIds(), project, assignmentMode),
                 cmd.assigneeUserIds(), cmd.acceptorUserIds(), cmd.dueAt());
         ProjectWorkDetail saved = repository.saveDetail(detail);
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已创建", Map.of("title", saved.title()));
@@ -122,9 +131,10 @@ public class ProjectProgressAppService {
     public ProjectWorkDetailDTO updateDetail(String detailId, ProjectProgressDetailSaveCmd cmd, String operatorUserId) {
         ProjectWorkDetail existing = requireDetail(detailId);
         ProjectProgressProject project = requireProject(existing.projectId());
+        ProjectAssignmentMode assignmentMode = ProjectAssignmentMode.of(cmd.assignmentMode());
         ProjectWorkDetail saved = repository.saveDetail(existing.update(cmd.title(), cmd.description(),
-                firstText(cmd.statusCode(), existing.statusCode()), ProjectAssignmentMode.of(cmd.assignmentMode()),
-                intValue(cmd.requiredAssigneeCount(), existing.requiredAssigneeCount()), emptyToMembers(cmd.candidateUserIds(), project),
+                firstText(cmd.statusCode(), existing.statusCode()), assignmentMode,
+                intValue(cmd.requiredAssigneeCount(), existing.requiredAssigneeCount()), candidatePool(cmd.candidateUserIds(), project, assignmentMode),
                 cmd.assigneeUserIds(), cmd.acceptorUserIds(), cmd.published(), cmd.dueAt()));
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已更新", Map.of("title", saved.title()));
         return assembler.toDTO(saved);
@@ -161,8 +171,8 @@ public class ProjectProgressAppService {
     public ProjectWorkDetailDTO claim(String detailId, String userId) {
         ProjectWorkDetail detail = requireDetail(detailId);
         ProjectProgressProject project = requireProject(detail.projectId());
-        if (!project.containsMember(userId)) {
-            throw new IllegalArgumentException("当前用户不是项目成员，不能认领任务");
+        if (!project.enabled()) {
+            throw new IllegalArgumentException("项目未启用，暂不能认领任务");
         }
         ProjectWorkDetail saved = repository.saveDetail(detail.claim(userId));
         safeNotifyAssigned(project, saved, List.of(userId));
@@ -381,6 +391,28 @@ public class ProjectProgressAppService {
 
     private List<String> emptyToMembers(List<String> candidates, ProjectProgressProject project) {
         return candidates == null || candidates.isEmpty() ? project.memberUserIds() : candidates;
+    }
+
+    private List<String> candidatePool(List<String> candidates, ProjectProgressProject project, ProjectAssignmentMode assignmentMode) {
+        if (candidates != null && !candidates.isEmpty()) {
+            return candidates;
+        }
+        return assignmentMode == ProjectAssignmentMode.RANDOM ? project.memberUserIds() : List.of();
+    }
+
+    private List<String> managers(List<String> managerUserIds, String operatorUserId) {
+        String owner = requireText(operatorUserId, "请先登录");
+        List<String> result = new java.util.ArrayList<>();
+        if (managerUserIds != null) {
+            managerUserIds.stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::trim)
+                    .forEach(result::add);
+        }
+        if (!result.contains(owner)) {
+            result.add(0, owner);
+        }
+        return result.stream().distinct().toList();
     }
 
     private int safePage(int page) {

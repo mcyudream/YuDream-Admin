@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage.vue'
 import MyTasksPage from './pages/MyTasksPage.vue'
 import ProjectsPage from './pages/ProjectsPage.vue'
 import SettingsPage from './pages/SettingsPage.vue'
+import TaskCenterPage from './pages/TaskCenterPage.vue'
 
 const props = defineProps<{
   sdk: YuDreamPluginSdk
@@ -21,6 +22,9 @@ const pageName = computed(() => {
   const component = (props.route?.meta?.plugin as { component?: string } | undefined)?.component || ''
   if (component.endsWith('/Projects')) {
     return 'projects'
+  }
+  if (component.endsWith('/TaskCenter')) {
+    return 'task-center'
   }
   if (component.endsWith('/MyTasks')) {
     return 'my-tasks'
@@ -40,6 +44,9 @@ const pageName = computed(() => {
 const page = computed(() => {
   if (pageName.value === 'projects') {
     return ProjectsPage
+  }
+  if (pageName.value === 'task-center') {
+    return TaskCenterPage
   }
   if (pageName.value === 'my-tasks') {
     return MyTasksPage

@@ -70,6 +70,12 @@ public record ProjectWorkDetail(
 
     public ProjectWorkDetail claim(String userId) {
         String safeUserId = requireText(userId, "认领用户不能为空");
+        if (!published) {
+            throw new IllegalArgumentException("任务发布后才可以认领");
+        }
+        if (assignmentMode != ProjectAssignmentMode.CLAIM) {
+            throw new IllegalArgumentException("该工作细节不支持自主认领");
+        }
         if (assigneeUserIds.contains(safeUserId)) {
             return this;
         }
@@ -83,6 +89,16 @@ public record ProjectWorkDetail(
         nextAssignees.add(safeUserId);
         return new ProjectWorkDetail(id, projectId, title, description, statusCode, assignmentMode, requiredAssigneeCount,
                 candidateUserIds, normalizeIds(nextAssignees), acceptorUserIds, true, dueAt, createdAt, System.currentTimeMillis());
+    }
+
+    public boolean claimableBy(String userId) {
+        String safeUserId = text(userId);
+        return !safeUserId.isBlank()
+                && published
+                && assignmentMode == ProjectAssignmentMode.CLAIM
+                && !assigneeUserIds.contains(safeUserId)
+                && assigneeUserIds.size() < requiredAssigneeCount
+                && (candidateUserIds.isEmpty() || candidateUserIds.contains(safeUserId));
     }
 
     public ProjectWorkDetail withStatus(String nextStatusCode) {

@@ -27,6 +27,8 @@ public interface ProjectProgressRepository {
 
     List<ProjectWorkDetail> listDetailsByAssignee(String userId, int page, int size);
 
+    List<ProjectWorkDetail> listClaimableDetails(String userId, int page, int size);
+
     List<ProjectWorkDetail> listPendingAcceptance(String userId, int page, int size);
 
     void deleteDetail(String detailId);
