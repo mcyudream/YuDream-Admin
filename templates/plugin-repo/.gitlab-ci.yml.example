@@ -116,7 +116,7 @@ package:plugins:
   image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
   stage: package-plugin
   script:
-    - echo "Using core Maven registry: $CORE_MAVEN_REGISTRY"
+    - 'echo "Using core Maven registry: $CORE_MAVEN_REGISTRY"'
     - |
       cat > settings.xml <<EOF
       <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
