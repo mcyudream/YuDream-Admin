@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
 import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStatus, UserUpdatePayload } from '@/api/modules/system-user'
