@@ -1,163 +1,85 @@
-# YuDream Admin
+# YuDream Admin Core
 
-YuDream Admin 是一个基于 Spring Boot 3、Java 21、DDD 分层和 Fantastic Admin Vue 前端的可扩展管理平台。项目核心目标是把系统能力、平台能力和业务插件分开：主应用提供用户、权限、菜单、配置、监控、文档、CMS、动态表单等基础能力，插件通过稳定 SPI 接入菜单、权限、HTTP 接口、前端页面、首页卡片和框架服务。
+这是 YuDream Admin 的核心仓整理版，职责聚焦在：
 
-## 技术栈
+- 核心后端模块
+- 核心前端模块
+- 插件运行时
+- 插件契约发布
 
-- 后端：Java 21、Spring Boot 3.5、Sa-Token、MapStruct、Lombok、EasyExcel、Springdoc、Spring AI
-- 前端：Vue 3、Vite、TypeScript、Arco Design Vue、Fantastic Admin、pnpm workspace
-- 插件：独立 Maven 模块 + `yudream-plugin-spi` 编译期契约 + 运行时 JAR 加载
-- 架构：DDD 四层结构，插件和主应用通过 SPI 端口交互
+业务插件未来应逐步迁移到独立插件仓，不再和核心仓共用同一条构建与发布链路。
 
-## 模块结构
+## 当前目录结构
 
 ```text
-yudream-domain/                 领域层：聚合、值对象、枚举、领域仓储接口、领域服务
-yudream-application/            应用层：用例编排、命令、查询、DTO、应用装配
-yudream-infrastructure/         基础设施层：持久化、外部服务、菜单种子、插件运行时实现
-yudream-interfaces/             接口层：HTTP Controller、请求/响应模型、Web 装配
-yudream-bootstrap/              启动模块：Spring Boot 入口和运行时装配
-yudream-plugins/yudream-plugin-spi/     插件 SPI：第三方插件唯一允许依赖的主应用契约
-yudream-plugins/yudream-sample-plugin/  插件样例
-yudream-plugins/yudream-plugin-*/       内置业务插件
-yudream-frontend/               前端 workspace，包含主应用和插件前端包
-docs/                           项目设计文档、计划和规范
+yudream-domain/                     核心领域层
+yudream-application/                核心应用层
+yudream-infrastructure/             核心基础设施层与插件运行时
+yudream-interfaces/                 核心接口层
+yudream-bootstrap/                  核心启动模块
+yudream-plugins/yudream-plugin-spi/ 插件 SPI 契约模块
+yudream-frontend/                   核心前端与插件 SDK
+plugins/                            运行时外部插件 JAR 目录
+ci/                                 核心 CI 配置
+docs/repository-split/              拆仓说明
+templates/plugin-repo/              独立插件仓模板
 ```
 
-## 后端开发
+说明：
 
-推荐使用 JDK 21。根目录是 Maven 聚合工程，常用命令：
+- `yudream-plugins/` 下其他业务插件源码目前仍留在工作区中作为迁移缓冲，但已不再属于根 Maven reactor
+- 核心 GitLab CI 也不再负责构建业务插件前端与业务插件 JAR
 
-```powershell
-mvn -pl yudream-bootstrap -am -DskipTests compile
-mvn -pl yudream-bootstrap -am spring-boot:run
-mvn -pl yudream-plugins/yudream-plugin-yudream-skin -am -DskipTests package
-```
+## 核心构建
 
-CI 和国内网络环境可使用仓库内 Maven 配置：
-
-```powershell
-mvn -s ci/maven-settings.xml -pl yudream-bootstrap -am -DskipTests compile
-```
-
-如果本机有多个 JDK，可以在 PowerShell 中临时指定：
-
-```powershell
-$env:JAVA_HOME='C:/Users/SiberianHusky/.jdks/ms-21.0.10'
-$env:Path="$env:JAVA_HOME/bin;$env:Path"
-```
-
-配置文件参考根目录 `.env.template`、`yudream-bootstrap/src/main/resources` 和实际运行环境变量。提交前至少运行：
+后端：
 
 ```powershell
 mvn -pl yudream-bootstrap -am -DskipTests compile
 ```
 
-## 前端开发
-
-前端位于 `yudream-frontend`，包管理器为 pnpm。
+前端：
 
 ```powershell
 cd yudream-frontend
 pnpm install
-pnpm dev
-pnpm --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pretty false --skipLibCheck --ignoreDeprecations 6.0
+pnpm --filter @fantastic-admin/core-arco-design-vue build
 ```
 
-当前 workspace 配置了 `engineStrict`，建议使用 `package.json` 中声明的 Node 版本范围。开发环境默认应用为 `apps/core-arco-design-vue`。
+## 私有包发布
 
-## 架构约定
+当前核心仓负责发布两个给独立插件仓消费的私有包：
 
-后端遵循四层 DDD：
+- Maven: `online.yudream.base:yudream-plugin-spi`
+- npm: `@yudream/plugin-sdk`
 
-- `domain` 只表达业务概念和规则，不依赖 Web、Spring MVC、持久化实现。
-- `application` 负责用例编排，不接收接口层 Request，不返回接口层 Response。
-- `infrastructure` 负责技术适配，不向应用层泄漏 DO、Mapper、第三方 SDK 细节。
-- `interfaces` 只做 HTTP 边界，Controller 不写业务规则，不手写大段转换逻辑。
+具体见：
 
-菜单、权限、系统种子和插件注册都应通过领域/应用服务完成，避免在 Controller 或启动类里散落业务逻辑。
+- [GitLab 私有包发布说明](/D:/code/yudream-admim/docs/plugin-system/gitlab-private-packages.md)
 
-## 插件系统
+## 插件运行时
 
-插件只依赖 `yudream-plugin-spi`，通过注解和 `PluginContext` 注册能力。插件 HTTP 接口统一挂载在：
+核心运行时默认只扫描：
 
 ```text
-/api/plugins/{pluginCode}/**
+plugins/
 ```
 
-插件前端生产形态是 ESM remote entry，打包进插件 JAR：
+独立插件仓构建出的 JAR 应复制或挂载到该目录，再由核心系统加载。
 
-```text
-META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js
-```
+具体见：
 
-插件前端包位于 `yudream-frontend/packages/plugin-*`。生产构建时应通过 `@yudream/plugin-sdk/vite-shared` 提供的 `yuDreamPluginSharedAliases()` 复用宿主运行时的 Vue、Vue Router 和 Fantastic Admin 组件，不要在 remote entry 中保留 `@yudream/plugin-sdk`、`vue`、`@fantastic-admin/components` 等裸模块导入，否则浏览器直接加载远程 ESM 时会因为缺少 import map 而失败。
+- [外部插件目录说明](/D:/code/yudream-admim/plugins/README.md)
 
-更多细节见：
+## 拆仓说明
 
-- [插件开发教程](docs/plugin-system/tutorial.md)
-- [插件开发规范](docs/plugin-system/specification.md)
+当前推荐的仓库拆分方式见：
 
-## 内置插件
+- [拆仓说明](/D:/code/yudream-admim/docs/repository-split/README.md)
 
-- `yudream-plugins/yudream-sample-plugin`：最小样例，演示权限、前端路由、HTTP 接口和框架用户服务。
-- `yudream-plugins/yudream-plugin-wallet`：钱包与资产插件。
-- `yudream-plugins/yudream-plugin-alipay`：支付宝支付插件。
-- `yudream-plugins/yudream-plugin-yudream-skin`：皮肤站插件。
-- `yudream-plugins/yudream-plugin-authlib-injector`：Authlib Injector 兼容插件。
-- `yudream-plugins/yudream-plugin-minecraft-server`：Minecraft 服务器管理插件，支持服务器线路、在线状态、周目货币继承、玩家在线时长和挂机时长统计。
+如果你要马上新建插件仓，可直接参考：
 
-样例插件用于学习，不建议在生产部署中启用。
-
-## CI/CD
-
-GitLab CI 使用国内镜像源构建：
-
-- Node 镜像、Maven 镜像和 Docker CLI 镜像使用国内镜像地址。
-- pnpm / npm registry 使用 `https://registry.npmmirror.com`。
-- Maven 使用 `ci/maven-settings.xml`，默认走阿里云 Maven 公共仓库。
-
-CI 不会自动构建根 `pom.xml` 中的所有插件，而是读取 `ci/plugins.list` 作为内置插件构建白名单。新增内置插件时需要同步：
-
-```text
-ci/plugins.list
-```
-
-该文件每行一个插件目录名，例如：
-
-```text
-yudream-plugin-minecraft-server
-```
-
-CI 会先构建这些插件对应的前端包，再在后端阶段把 `yudream-plugins/{plugin}` 加入 Maven `-pl` 列表，并将 `yudream-frontend/packages/plugin-*/dist` 复制进插件 JAR。
-
-## 常用验证
-
-```powershell
-# 后端编译
-mvn -pl yudream-bootstrap -am -DskipTests compile
-
-# 国内镜像配置下的后端编译
-mvn -s ci/maven-settings.xml -pl yudream-bootstrap -am -DskipTests compile
-
-# 前端类型检查
-cd yudream-frontend
-pnpm --filter @fantastic-admin/core-arco-design-vue exec vue-tsc --noEmit --pretty false --skipLibCheck --ignoreDeprecations 6.0
-
-# 插件打包
-mvn -pl yudream-plugins/yudream-plugin-wallet -am -DskipTests package
-
-# Minecraft 服务器插件前端和 JAR
-cd yudream-frontend
-pnpm --config.engine-strict=false --filter @yudream/plugin-minecraft-server run build
-cd ..
-mvn -s ci/maven-settings.xml -pl yudream-plugins/yudream-plugin-minecraft-server -am -DskipTests package
-```
-
-## 编码规范
-
-- 所有源码文件使用 UTF-8。
-- 中文文案直接写正常中文，不使用 Unicode 转义。
-- 不把插件业务页面写进主前端 `apps/*/src/views`，插件页面应放在 `yudream-frontend/packages/plugin-*`。
-- Controller 不直接创建 Cmd/Res，不做复杂映射，使用接口层 Assembler。
-- 新增菜单按钮权限时，同步补充菜单种子和前端 `v-auth`。
+- [插件仓模板说明](/D:/code/yudream-admim/templates/plugin-repo/README.md)
+- [插件仓 CI 模板](/D:/code/yudream-admim/templates/plugin-repo/.gitlab-ci.yml.example)
+- [插件仓 Maven 设置模板](/D:/code/yudream-admim/templates/plugin-repo/settings.xml.example)
+- [插件仓 npm 设置模板](/D:/code/yudream-admim/templates/plugin-repo/.npmrc.example)

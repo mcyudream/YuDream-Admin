@@ -1,0 +1,3 @@
+@yudream:registry=https://gitlab.example.com/api/v4/projects/CORE_PROJECT_ID/packages/npm/
+//gitlab.example.com/api/v4/projects/CORE_PROJECT_ID/packages/npm/:_authToken=${NPM_TOKEN}
+always-auth=true
