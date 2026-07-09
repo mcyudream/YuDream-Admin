@@ -75,6 +75,10 @@
     {
       "key": "project-progress-evidence-stats",
       "text": "Project progress acceptance evidence must be stored as ProjectFileEvidence, shown with summary on completed/detail/review views, and previewed/downloaded through authenticated SDK blob calls rather than raw object keys or direct URLs. Personal/member stats count assigned details, done-status completed details, pending acceptance details, accepted/rejected acceptance records for assigned details, and project-level check-ins."
+    },
+    {
+      "key": "plugin-dev-runtime-prefer-local-source",
+      "text": "In frontend DEV mode, plugin runtime pages must try the workspace package source (packages/plugin-*/src/index.ts) before remoteEntry.js. Otherwise stale packaged remote assets can hide current local plugin changes and make browser verification misleading."
     }
   ],
   "utilities": [

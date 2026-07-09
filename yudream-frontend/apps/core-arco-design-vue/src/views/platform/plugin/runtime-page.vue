@@ -32,16 +32,22 @@ async function loadRemoteComponent() {
     return
   }
 
-  const entry = plugin.value.entry || `/api/platform/plugins/${plugin.value.pluginCode}/assets/remoteEntry.js`
   remoteLoading.value = true
   try {
+    const localModule = await loadLocalDevModule(plugin.value.pluginCode)
+    if (localModule) {
+      await mountPluginModule(localModule)
+      return
+    }
+
+    const entry = plugin.value.entry || `/api/platform/plugins/${plugin.value.pluginCode}/assets/remoteEntry.js`
     const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
     await mountPluginModule(module)
     if (!remoteComponent.value) {
-      const localModule = await loadLocalDevModule(plugin.value.pluginCode)
-      if (localModule) {
+      const fallbackModule = await loadLocalDevModule(plugin.value.pluginCode)
+      if (fallbackModule) {
         remoteError.value = ''
-        await mountPluginModule(localModule)
+        await mountPluginModule(fallbackModule)
       }
     }
   }
