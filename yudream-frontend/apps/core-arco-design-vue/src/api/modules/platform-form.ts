@@ -1,4 +1,5 @@
 import type { ExcelBlobResponse } from '@/utils/excel'
+import type { FileObject } from './files'
 import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
@@ -84,5 +85,6 @@ export default {
   exportSubmissions: (id: string) => systemClient.get<unknown, ExcelBlobResponse>(`api/platform/forms/${id}/submissions/export`, { responseType: 'blob' }),
   statistics: (id: string) => systemClient.get<unknown, ApiResponse<FormStatistics>>(`api/platform/forms/${id}/statistics`),
   publicForm: (code: string) => systemClient.get<unknown, ApiResponse<DynamicForm>>(`api/public/forms/${code}`, { skipTokenRefresh: true }),
+  uploadPublicFile: (code: string, data: FormData) => systemClient.post<unknown, ApiResponse<FileObject>>(`api/public/forms/${code}/files`, data, { skipTokenRefresh: true }),
   submitPublic: (code: string, data: Record<string, unknown>) => systemClient.post<unknown, ApiResponse<FormSubmission>>(`api/public/forms/${code}/submissions`, { data }, { skipTokenRefresh: true }),
 }

@@ -2,6 +2,7 @@
 import type { TableColumn } from '@fantastic-admin/components'
 import type { DynamicForm, DynamicFormStatus, FormStatistics } from '@/api/modules/platform-form'
 import apiForm from '@/api/modules/platform-form'
+import DynamicFormRenderer from './components/DynamicFormRenderer.vue'
 import FormSubmissionPanel from './components/FormSubmissionPanel.vue'
 
 const router = useRouter()
@@ -9,10 +10,13 @@ const modal = useFaModal()
 const toast = useFaToast()
 
 const loading = ref(false)
+const previewLoading = ref(false)
 const statisticsLoading = ref(false)
 const actionLoading = ref('')
 const rows = ref<DynamicForm[]>([])
 const selected = ref<DynamicForm | null>(null)
+const previewForm = ref<DynamicForm | null>(null)
+const previewVisible = ref(false)
 const submissionVisible = ref(false)
 const statisticsVisible = ref(false)
 const statistics = ref<FormStatistics | null>(null)
@@ -34,7 +38,7 @@ const tableColumns = computed<TableColumn<DynamicForm>[]>(() => [
   { id: 'allowAnonymous', header: '公开填写', width: 110, align: 'center' },
   { accessorKey: 'publishedAt', header: '发布时间', width: 180 },
   { accessorKey: 'updateTime', header: '更新时间', width: 180 },
-  { id: 'operation', header: '操作', width: 420, align: 'center', fixed: 'right' },
+  { id: 'operation', header: '操作', width: 470, align: 'center', fixed: 'right' },
 ])
 
 onMounted(load)
@@ -80,6 +84,21 @@ function openCreate() {
 
 function openDesigner(row: DynamicForm) {
   router.push({ path: '/platform/form/designer', query: { id: String(row.id) } })
+}
+
+async function openPreview(row: DynamicForm) {
+  selected.value = row
+  previewForm.value = row
+  previewVisible.value = true
+  previewLoading.value = true
+  try {
+    const res = await apiForm.detail(row.id)
+    previewForm.value = res.data
+    selected.value = res.data
+  }
+  finally {
+    previewLoading.value = false
+  }
 }
 
 function openSubmissions(row: DynamicForm) {
@@ -223,6 +242,7 @@ function dateText(value?: string) {
         </template>
         <template #cell-operation="{ row }">
           <div class="table-actions">
+            <FaButton v-auth="'platform:form:view'" size="sm" variant="outline" @click="openPreview(row.original)">查看</FaButton>
             <FaButton v-auth="'platform:form:edit'" size="sm" variant="outline" @click="openDesigner(row.original)">设计</FaButton>
             <FaButton v-auth="'platform:form:submission:view'" size="sm" variant="outline" @click="openSubmissions(row.original)">提交结果</FaButton>
             <FaButton v-auth="'platform:form:statistics:view'" size="sm" variant="ghost" @click="openStatistics(row.original)">统计</FaButton>
@@ -248,8 +268,14 @@ function dateText(value?: string) {
       />
     </FaPageMain>
 
+    <FaModal v-model="previewVisible" :title="previewForm ? `${previewForm.name} / 表单详情` : '表单详情'" class="sm:max-w-4xl">
+      <section v-loading="previewLoading" class="preview-panel">
+        <DynamicFormRenderer v-if="previewForm" :form="previewForm" readonly />
+      </section>
+    </FaModal>
+
     <FaModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
-      <FormSubmissionPanel :form-id="selected?.id" :form-name="selected?.name" embedded />
+      <FormSubmissionPanel :form="selected" :form-id="selected?.id" :form-name="selected?.name" embedded />
     </FaModal>
 
     <FaModal v-model="statisticsVisible" :title="selected ? `${selected.name} / 结果统计` : '结果统计'" class="sm:max-w-4xl">
@@ -309,6 +335,12 @@ function dateText(value?: string) {
 .table-actions {
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.preview-panel {
+  max-height: min(70vh, 720px);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .statistics-panel {

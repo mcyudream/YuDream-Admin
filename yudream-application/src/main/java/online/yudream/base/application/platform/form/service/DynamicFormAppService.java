@@ -12,6 +12,8 @@ import online.yudream.base.application.platform.form.dto.FormSubmissionExportDTO
 import online.yudream.base.application.platform.form.dto.FormValueCountDTO;
 import online.yudream.base.application.platform.form.query.DynamicFormPageQuery;
 import online.yudream.base.application.platform.form.query.FormSubmissionPageQuery;
+import online.yudream.base.application.system.file.dto.FileObjectDTO;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -24,6 +26,7 @@ import online.yudream.base.domain.platform.form.valobj.FormCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -44,6 +47,7 @@ public class DynamicFormAppService {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final DynamicFormRepo dynamicFormRepo;
     private final FormSubmissionRepo formSubmissionRepo;
+    private final FileAppService fileAppService;
 
     @Transactional(readOnly = true)
     public PageResult<DynamicFormDTO> page(DynamicFormPageQuery query) {
@@ -94,24 +98,25 @@ public class DynamicFormAppService {
     @Transactional(readOnly = true)
     public DynamicFormDTO publicForm(String code) {
         ensureEnabled();
-        DynamicForm form = dynamicFormRepo.findByCode(FormCode.of(code).value())
-                .orElseThrow(() -> new BizException("表单不存在"));
-        if (form.getStatus() != DynamicFormStatus.PUBLISHED) {
-            throw new BizException("表单未发布");
-        }
-        return DynamicFormAssembler.toDTO(form);
+        return DynamicFormAssembler.toDTO(publishedForm(code));
     }
 
     @Transactional
     public FormSubmissionDTO submit(FormSubmitCmd cmd) {
         ensureEnabled();
-        DynamicForm form = dynamicFormRepo.findByCode(FormCode.of(cmd.getCode()).value())
-                .orElseThrow(() -> new BizException("表单不存在"));
-        if (!Boolean.TRUE.equals(form.getAllowAnonymous()) && cmd.getSubmitterId() == null) {
-            throw new BizException("该表单需要登录后填写");
-        }
+        DynamicForm form = publishedForm(cmd.getCode());
+        ensureSubmitAllowed(form, cmd.getSubmitterId());
         FormSubmission submission = FormSubmission.create(form, cmd.getData(), cmd.getSubmitterId(), cmd.getSubmitterIp());
         return DynamicFormAssembler.toDTO(formSubmissionRepo.save(submission));
+    }
+
+    @Transactional
+    public FileObjectDTO uploadPublicFile(String code, InputStream inputStream, String originalName,
+                                          String contentType, long size, Long submitterId) {
+        ensureEnabled();
+        DynamicForm form = publishedForm(code);
+        ensureSubmitAllowed(form, submitterId);
+        return fileAppService.upload(inputStream, originalName, contentType, size, "dynamic-form", submitterId, false);
     }
 
     @Transactional(readOnly = true)
@@ -160,6 +165,21 @@ public class DynamicFormAppService {
 
     private DynamicForm form(Long id) {
         return dynamicFormRepo.findById(id).orElseThrow(() -> new BizException("表单不存在"));
+    }
+
+    private DynamicForm publishedForm(String code) {
+        DynamicForm form = dynamicFormRepo.findByCode(FormCode.of(code).value())
+                .orElseThrow(() -> new BizException("表单不存在"));
+        if (form.getStatus() != DynamicFormStatus.PUBLISHED) {
+            throw new BizException("表单未发布");
+        }
+        return form;
+    }
+
+    private void ensureSubmitAllowed(DynamicForm form, Long submitterId) {
+        if (!Boolean.TRUE.equals(form.getAllowAnonymous()) && submitterId == null) {
+            throw new BizException("该表单需要登录后填写");
+        }
     }
 
     private void ensureCodeAvailable(String code, Long currentId) {

@@ -268,7 +268,7 @@ function defaultOptions() {
     </FaPageMain>
 
     <FaModal v-model="submissionVisible" :title="selected ? `${selected.name} / 提交结果` : '提交结果'" class="sm:max-w-6xl">
-      <FormSubmissionPanel :form-id="selected?.id" :form-name="selected?.name" embedded />
+      <FormSubmissionPanel :form="selected" :form-id="selected?.id" :form-name="selected?.name" embedded />
     </FaModal>
   </div>
 </template>

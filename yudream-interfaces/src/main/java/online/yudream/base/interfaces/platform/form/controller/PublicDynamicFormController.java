@@ -9,12 +9,18 @@ import online.yudream.base.interfaces.platform.form.assembler.DynamicFormWebAsse
 import online.yudream.base.interfaces.platform.form.request.FormSubmitRequest;
 import online.yudream.base.interfaces.platform.form.res.DynamicFormRes;
 import online.yudream.base.interfaces.platform.form.res.FormSubmissionRes;
+import online.yudream.base.interfaces.system.file.assembler.FileWebAssembler;
+import online.yudream.base.interfaces.system.file.res.FileObjectRes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 
 @RestController
 @RequestMapping("/api/public/forms")
@@ -33,6 +39,19 @@ public class PublicDynamicFormController {
         Long submitterId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
         return Result.ok(DynamicFormWebAssembler.toRes(dynamicFormAppService.submit(
                 DynamicFormWebAssembler.toCmd(code, request, submitterId, clientIp(httpRequest))
+        )));
+    }
+
+    @PostMapping("/{code}/files")
+    public Result<FileObjectRes> upload(@PathVariable String code, @RequestParam("file") MultipartFile file) throws IOException {
+        Long submitterId = StpUtil.isLogin() ? StpUtil.getLoginIdAsLong() : null;
+        return Result.ok(FileWebAssembler.toRes(dynamicFormAppService.uploadPublicFile(
+                code,
+                file.getInputStream(),
+                file.getOriginalFilename(),
+                file.getContentType(),
+                file.getSize(),
+                submitterId
         )));
     }
 
