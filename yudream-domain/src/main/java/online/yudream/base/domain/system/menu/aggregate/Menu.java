@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
+import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 
 import java.util.ArrayList;
@@ -48,6 +49,17 @@ public class Menu {
     private MenuStatus status = MenuStatus.ACTIVE;
 
     @Builder.Default
+    private MenuSource source = MenuSource.SYSTEM;
+
+    private String pluginCode;
+
+    private String pluginModuleName;
+
+    private String pluginRegistrationKey;
+
+    private Boolean runtimeAvailable;
+
+    @Builder.Default
     private List<Menu> children = new ArrayList<>();
 
     public String getPermissionCode() {
@@ -80,6 +92,14 @@ public class Menu {
 
     public boolean isVisibleInMenu() {
         return visible == null || visible;
+    }
+
+    public boolean isPluginMenu() {
+        return source == MenuSource.PLUGIN;
+    }
+
+    public boolean isRuntimeAvailable() {
+        return !isPluginMenu() || Boolean.TRUE.equals(runtimeAvailable);
     }
 
     public void activate() {
