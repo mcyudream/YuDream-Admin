@@ -27,13 +27,13 @@
           <span>班级</span>
           <input v-model="model.filters.className" autocomplete="off">
         </label>
-        <div class="student-info-actions">
+        <div class="student-info-actions student-info-filter-actions">
+          <FaButton variant="outline" type="button" @click="model.resetFilters">
+            重置
+          </FaButton>
           <FaButton type="submit">
             <FaIcon name="i-ri:search-line" />
             查询
-          </FaButton>
-          <FaButton variant="outline" type="button" @click="model.resetFilters">
-            重置
           </FaButton>
         </div>
       </form>

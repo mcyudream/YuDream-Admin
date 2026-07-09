@@ -138,24 +138,6 @@ async function clearApiLogs() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaSearchBar>
-        <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_220px_auto] md:items-center">
-          <FaInput v-model="search.keyword" clearable placeholder="&#25509;&#21475;&#22320;&#22336; / IP / &#35831;&#27714;&#26041;&#24335;" @keydown.enter="load" @clear="load" />
-          <FaSelect v-model="search.success" :options="successOptions" placeholder="&#29366;&#24577;" />
-          <div class="flex gap-2 md:justify-end">
-            <FaButton variant="outline" @click="resetSearch">
-              &#37325;&#32622;
-            </FaButton>
-            <FaButton :loading="loading" @click="load">
-              <FaIcon name="i-ri:search-line" />
-              &#31579;&#36873;
-            </FaButton>
-          </div>
-        </div>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-loading="loading"
         row-key="id"
@@ -167,6 +149,23 @@ async function clearApiLogs() {
         :columns="tableColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,1fr)_220px_auto] md:items-center">
+              <FaInput v-model="search.keyword" clearable placeholder="&#25509;&#21475;&#22320;&#22336; / IP / &#35831;&#27714;&#26041;&#24335;" @keydown.enter="load" @clear="load" />
+              <FaSelect v-model="search.success" :options="successOptions" placeholder="&#29366;&#24577;" />
+              <div class="flex gap-2 md:justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  &#37325;&#32622;
+                </FaButton>
+                <FaButton :loading="loading" @click="load">
+                  <FaIcon name="i-ri:search-line" />
+                  &#31579;&#36873;
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-success="{ row }">
           <FaTag :variant="row.original.success ? 'default' : 'destructive'">
             {{ row.original.success ? successText : failText }}

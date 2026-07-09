@@ -205,31 +205,6 @@ function importRoles() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaSearchBar>
-        <template #default="{ fold, toggle }">
-          <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
-            <FaInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
-            <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-            <FaSelect v-show="!fold" v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
-            <div class="flex gap-2 col-end--1 justify-end">
-              <FaButton variant="outline" @click="resetSearch">
-                重置
-              </FaButton>
-              <FaButton @click="loadRoles">
-                <FaIcon name="i-ri:search-line" />
-                筛选
-              </FaButton>
-              <FaButton variant="ghost" @click="toggle">
-                {{ fold ? '展开' : '收起' }}
-                <FaIcon :name="fold ? 'i-ep:caret-bottom' : 'i-ep:caret-top'" />
-              </FaButton>
-            </div>
-          </div>
-        </template>
-      </FaSearchBar>
-
-      <div class="mx--4 my-3 border-t border-t-dashed" />
-
       <FaTable
         v-loading="loading"
         row-key="id"
@@ -241,6 +216,24 @@ function importRoles() {
         :columns="tableColumns"
         :data="rows"
       >
+        <template #toolbar>
+          <FaSearchBar class="w-full">
+            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
+              <FaInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
+              <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
+              <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
+              <div class="flex gap-2 col-end--1 justify-end">
+                <FaButton variant="outline" @click="resetSearch">
+                  重置
+                </FaButton>
+                <FaButton @click="loadRoles">
+                  <FaIcon name="i-ri:search-line" />
+                  筛选
+                </FaButton>
+              </div>
+            </div>
+          </FaSearchBar>
+        </template>
         <template #cell-systemRole="{ row }">
           <FaTag :variant="row.original.systemRole ? 'default' : 'secondary'">
             {{ row.original.systemRole ? '系统角色' : '自定义' }}

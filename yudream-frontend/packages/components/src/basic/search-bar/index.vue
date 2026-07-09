@@ -11,7 +11,7 @@ withDefaults(
     background?: boolean
   }>(),
   {
-    showToggle: true,
+    showToggle: false,
     background: false,
   },
 )

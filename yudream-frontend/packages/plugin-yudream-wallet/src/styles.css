@@ -171,6 +171,10 @@
   align-items: center;
 }
 
+.wallet-filter-actions {
+  justify-content: flex-end;
+}
+
 .wallet-nav-button {
   display: inline-flex;
   gap: 6px;

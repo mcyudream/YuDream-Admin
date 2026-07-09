@@ -49,6 +49,10 @@
   align-items: center;
 }
 
+.student-info-filter-actions {
+  justify-content: flex-end;
+}
+
 .student-info-tag,
 .student-info-link-button {
   display: inline-flex;
