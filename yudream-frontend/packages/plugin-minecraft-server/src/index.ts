@@ -16,6 +16,12 @@ export const routes = {
   'minecraft-server/Admin': Admin,
 }
 
+export {
+  List as 'minecraft-server/List',
+  Detail as 'minecraft-server/Detail',
+  Admin as 'minecraft-server/Admin',
+}
+
 export function install() {
   if (typeof document === 'undefined') {
     return
