@@ -45,12 +45,14 @@ grep -q 'sh ci/verify-doc-independence.sh' templates/plugin-repo/.gitlab-ci.yml.
 grep -q 'sh ci/verify-plugin-maven-boundary.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify plugin maven boundary"
 grep -q 'sh ci/verify-plugin-publish-pipeline.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify plugin publish pipeline"
 grep -q 'sh ci/verify-plugin-jar-assets.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify plugin jar assets"
+grep -q 'copy_final_plugin_jars "\$PWD" "\$PWD/dist/plugins"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must flatten final plugin jars into dist/plugins"
 grep -q 'sh ci/publish-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must publish plugin jars"
 grep -q 'sh ci/verify-published-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify published plugin jars"
 grep -q 'PACKAGE_MAVEN_REPO' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI package job must use a dedicated clean Maven local repository"
 grep -Eq '^[[:space:]]*-[[:space:]]+yudream-frontend/packages/plugin-\*/package\.json$' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must restrict frontend job discovery to plugin packages"
 grep -q 'pnpm -r --filter=@yudream/plugin-\* run build' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI frontend build must explicitly filter @yudream/plugin-* packages"
 grep -Eq '^[[:space:]]*-[[:space:]]+yudream-frontend/packages/plugin-\*/dist/$' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI artifacts must stay limited to plugin package dist outputs"
+grep -Eq '^[[:space:]]*-[[:space:]]+dist/plugins/\*\.jar$' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must export flat plugin jars from dist/plugins"
 if grep -Eq '^[[:space:]]*-[[:space:]]+yudream-frontend/packages/\*/package\.json$' templates/plugin-repo/.gitlab-ci.yml.example; then
   fail "template CI must not use yudream-frontend/packages/*/package.json"
 fi
