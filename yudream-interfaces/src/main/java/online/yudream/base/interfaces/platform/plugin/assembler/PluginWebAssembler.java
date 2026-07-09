@@ -70,6 +70,13 @@ public class PluginWebAssembler {
                 .parentCode(dto.getParentCode())
                 .visible(dto.getVisible())
                 .status(dto.getStatus())
+                .menuCode(dto.getMenuCode())
+                .menuType(dto.getMenuType())
+                .menuModule(dto.getMenuModule())
+                .menuPath(dto.getMenuPath())
+                .menuComponent(dto.getMenuComponent())
+                .menuLink(dto.getMenuLink())
+                .menuPermission(dto.getMenuPermission())
                 .routes(dto.getRoutes().stream().map(PluginWebAssembler::toRes).toList())
                 .build();
     }
@@ -90,6 +97,19 @@ public class PluginWebAssembler {
                 .parentCode(dto.getParentCode())
                 .visible(dto.getVisible())
                 .status(dto.getStatus())
+                .menuCode(dto.getMenuCode())
+                .type(dto.getType())
+                .module(dto.getModule())
+                .link(dto.getLink())
+                .parentMenuCode(dto.getParentMenuCode())
+                .parentParentCode(dto.getParentParentCode())
+                .parentType(dto.getParentType())
+                .parentModule(dto.getParentModule())
+                .parentComponent(dto.getParentComponent())
+                .parentLink(dto.getParentLink())
+                .parentPermission(dto.getParentPermission())
+                .parentVisible(dto.getParentVisible())
+                .parentStatus(dto.getParentStatus())
                 .build();
     }
 

@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 
 import java.io.Serial;
@@ -31,6 +32,13 @@ public class PluginFrontendModuleRes implements Serializable {
     private String parentCode;
     private Boolean visible;
     private MenuStatus status;
+    private String menuCode;
+    private MenuNodeType menuType;
+    private String menuModule;
+    private String menuPath;
+    private String menuComponent;
+    private String menuLink;
+    private String menuPermission;
 
     @Builder.Default
     private List<PluginFrontendRouteRes> routes = new ArrayList<>();

@@ -128,6 +128,7 @@ public class PluginAppService {
         try {
             return toDTO(enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>()));
         } catch (Exception e) {
+            cleanupFailedEnable(module.getCode());
             markError(module, e);
             throw new BizException("插件启用失败：" + rootMessage(e));
         }
@@ -244,6 +245,7 @@ public class PluginAppService {
             restored.add(code);
         } catch (Exception e) {
             log.warn("Failed to restore plugin {}", code, e);
+            cleanupFailedEnable(code);
             markError(module, e);
         }
     }
@@ -436,6 +438,21 @@ public class PluginAppService {
         pluginMenuProjectionService.project(code, modules);
     }
 
+    private void cleanupFailedEnable(String code) {
+        try {
+            if (pluginRuntimeGateway.enabled(code)) {
+                pluginRuntimeGateway.disable(code);
+            }
+        } catch (Exception cleanupError) {
+            log.warn("Failed to disable plugin runtime after enable failure: {}", code, cleanupError);
+        }
+        try {
+            pluginMenuProjectionService.markUnavailable(code);
+        } catch (Exception cleanupError) {
+            log.warn("Failed to hide plugin menus after enable failure: {}", code, cleanupError);
+        }
+    }
+
     private PluginFrontendModuleInfo currentFrontendModule(String code, String moduleName) {
         List<PluginFrontendModuleInfo> modules = pluginRuntimeGateway.frontendModules().stream()
                 .filter(module -> module.pluginCode().equals(code))
@@ -491,7 +508,14 @@ public class PluginAppService {
                 module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList(),
                 module.parentCode(),
                 module.visible(),
-                module.status()
+                module.status(),
+                module.menuCode(),
+                module.menuType(),
+                module.menuModule(),
+                module.menuPath(),
+                module.menuComponent(),
+                module.menuLink(),
+                module.menuPermission()
         );
     }
 
@@ -514,7 +538,20 @@ public class PluginAppService {
                 routeSetting.sort() == null ? route.sort() : routeSetting.sort(),
                 route.parentCode(),
                 route.visible(),
-                route.status()
+                route.status(),
+                route.menuCode(),
+                route.type(),
+                route.module(),
+                route.link(),
+                route.parentMenuCode(),
+                route.parentParentCode(),
+                route.parentType(),
+                route.parentModule(),
+                route.parentComponent(),
+                route.parentLink(),
+                route.parentPermission(),
+                route.parentVisible(),
+                route.parentStatus()
         );
     }
 

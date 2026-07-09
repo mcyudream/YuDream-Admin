@@ -62,6 +62,13 @@ public class PluginAssembler {
                 .parentCode(module.parentCode())
                 .visible(module.visible())
                 .status(module.status())
+                .menuCode(module.menuCode())
+                .menuType(module.menuType())
+                .menuModule(module.menuModule())
+                .menuPath(module.menuPath())
+                .menuComponent(module.menuComponent())
+                .menuLink(module.menuLink())
+                .menuPermission(module.menuPermission())
                 .routes(module.routes().stream().map(PluginAssembler::toDTO).toList())
                 .build();
     }
@@ -82,6 +89,19 @@ public class PluginAssembler {
                 .parentCode(route.parentCode())
                 .visible(route.visible())
                 .status(route.status())
+                .menuCode(route.menuCode())
+                .type(route.type())
+                .module(route.module())
+                .link(route.link())
+                .parentMenuCode(route.parentMenuCode())
+                .parentParentCode(route.parentParentCode())
+                .parentType(route.parentType())
+                .parentModule(route.parentModule())
+                .parentComponent(route.parentComponent())
+                .parentLink(route.parentLink())
+                .parentPermission(route.parentPermission())
+                .parentVisible(route.parentVisible())
+                .parentStatus(route.parentStatus())
                 .build();
     }
 
