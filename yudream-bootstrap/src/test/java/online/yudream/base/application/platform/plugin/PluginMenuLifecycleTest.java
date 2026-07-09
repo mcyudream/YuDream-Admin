@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.plugin;
 
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
@@ -21,11 +22,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,8 +37,8 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -149,6 +152,76 @@ class PluginMenuLifecycleTest {
     }
 
     @Test
+    void failedEnableMarksPreExistingMenusUnavailable() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        PluginAppService realProjectionService = appService(projectionService);
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        doThrow(new IllegalStateException("enable failed")).when(pluginRuntimeGateway).enable(module);
+
+        assertThatThrownBy(() -> realProjectionService.enable(PLUGIN_CODE))
+                .hasMessageContaining("插件启用失败");
+
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+        assertThat(realProjectionService.frontendManifest().getModules()).isEmpty();
+    }
+
+    @Test
+    void failedEnableCleanupUsesIndependentTransaction() throws Exception {
+        Transactional transaction = PluginMenuProjectionService.class
+                .getMethod("markUnavailable", String.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transaction).isNotNull();
+        assertThat(transaction.propagation()).isEqualTo(Propagation.REQUIRES_NEW);
+    }
+
+    @Test
+    void failureAfterRuntimeEnableDisablesRuntimeAndHidesMenus() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        PluginAppService realProjectionService = appService(projectionService);
+        Set<String> runtimeEnabled = statefulRuntimeEnable();
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.permissions(PLUGIN_CODE)).thenThrow(new IllegalStateException("permission failed"));
+
+        assertThatThrownBy(() -> realProjectionService.enable(PLUGIN_CODE))
+                .hasMessageContaining("插件启用失败");
+
+        verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        assertThat(runtimeEnabled).doesNotContain(PLUGIN_CODE);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
+    void restoreFailureDisablesRuntimeAndHidesPreExistingMenus() {
+        module.markEnabled();
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        PluginAppService realProjectionService = appService(projectionService);
+        Set<String> runtimeEnabled = statefulRuntimeEnable();
+        when(pluginRuntimeGateway.discover()).thenReturn(List.of());
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(pluginRuntimeGateway.permissions(PLUGIN_CODE)).thenThrow(new IllegalStateException("permission failed"));
+
+        realProjectionService.restoreEnabledPlugins();
+
+        verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        assertThat(runtimeEnabled).doesNotContain(PLUGIN_CODE);
+        assertThat(menuRepo.findByPluginCode(PLUGIN_CODE))
+                .extracting(Menu::getRuntimeAvailable)
+                .containsOnly(false);
+    }
+
+    @Test
     void unprojectedRuntimeModuleIsExcludedFromFrontendManifest() {
         PluginMenuProjectionService projectionService = new PluginMenuProjectionService(new InMemoryMenuRepo());
         when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
@@ -214,7 +287,31 @@ class PluginMenuLifecycleTest {
         moduleMenu.setName("自定义钱包中心");
         moduleMenu.setIcon("custom-wallet");
         moduleMenu.setSort(88);
+        moduleMenu.setType(MenuNodeType.LAYOUT);
+        moduleMenu.setParentCode("system:platform");
+        moduleMenu.setModule("custom-wallet-module");
+        moduleMenu.setPath("/custom-wallet");
+        moduleMenu.setComponent("CustomWalletLayout");
+        moduleMenu.setLink("https://wallet.example.test");
+        moduleMenu.setPermission("custom:wallet:access");
+        moduleMenu.setVisible(false);
         menuRepo.save(moduleMenu);
+        Menu parentMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "parent:" + MODULE_NAME + ":/wallet"
+        ).orElseThrow();
+        parentMenu.setName("自定义钱包目录");
+        parentMenu.setType(MenuNodeType.LINK);
+        parentMenu.setParentCode("system:dashboard");
+        parentMenu.setModule("custom-wallet-directory");
+        parentMenu.setIcon("custom-directory-icon");
+        parentMenu.setPath("/custom-wallet-directory");
+        parentMenu.setComponent("CustomDirectoryLayout");
+        parentMenu.setLink("https://directory.example.test");
+        parentMenu.setPermission("custom:directory:access");
+        parentMenu.setSort(89);
+        parentMenu.setVisible(false);
+        menuRepo.save(parentMenu);
         Menu routeMenu = menuRepo.findByPluginCodeAndRegistrationKey(
                 PLUGIN_CODE,
                 "route:" + MODULE_NAME + ":walletTransactions"
@@ -224,7 +321,9 @@ class PluginMenuLifecycleTest {
         routeMenu.setComponent("custom/transactions/index");
         routeMenu.setIcon("custom-icon");
         routeMenu.setPermission("custom:transaction:list");
-        routeMenu.setParentCode("system:dashboard");
+        routeMenu.setType(MenuNodeType.LINK);
+        routeMenu.setModule("custom-wallet-page");
+        routeMenu.setLink("https://transactions.example.test");
         routeMenu.setSort(91);
         routeMenu.setVisible(false);
         menuRepo.save(routeMenu);
@@ -241,19 +340,47 @@ class PluginMenuLifecycleTest {
 
         PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
 
-        assertThat(manifest.getModules().getFirst().getMenuTitle()).isEqualTo("自定义钱包中心");
-        assertThat(manifest.getModules().getFirst().getMenuIcon()).isEqualTo("custom-wallet");
-        assertThat(manifest.getModules().getFirst().getMenuSort()).isEqualTo(88);
+        PluginFrontendModuleDTO frontend = manifest.getModules().getFirst();
+        assertThat(frontend.getMenuTitle()).isEqualTo("自定义钱包中心");
+        assertThat(frontend.getMenuIcon()).isEqualTo("custom-wallet");
+        assertThat(frontend.getMenuSort()).isEqualTo(88);
+        assertThat(frontend.getMenuCode()).isEqualTo(moduleMenu.getCode());
+        assertThat(frontend.getMenuType()).isEqualTo(MenuNodeType.LAYOUT);
+        assertThat(frontend.getParentCode()).isEqualTo("system:platform");
+        assertThat(frontend.getMenuModule()).isEqualTo("custom-wallet-module");
+        assertThat(frontend.getMenuPath()).isEqualTo("/custom-wallet");
+        assertThat(frontend.getMenuComponent()).isEqualTo("CustomWalletLayout");
+        assertThat(frontend.getMenuLink()).isEqualTo("https://wallet.example.test");
+        assertThat(frontend.getMenuPermission()).isEqualTo("custom:wallet:access");
+        assertThat(frontend.getVisible()).isFalse();
+        assertThat(frontend.getStatus()).isEqualTo(MenuStatus.ACTIVE);
         PluginFrontendRouteDTO route = manifest.getModules().getFirst().getRoutes().getFirst();
         assertThat(route.getTitle()).isEqualTo("自定义交易记录");
         assertThat(route.getPath()).isEqualTo("/custom-transactions");
         assertThat(route.getComponent()).isEqualTo("custom/transactions/index");
         assertThat(route.getIcon()).isEqualTo("custom-icon");
         assertThat(route.getPermission()).isEqualTo("custom:transaction:list");
-        assertThat(route.getParentCode()).isEqualTo("system:dashboard");
+        assertThat(route.getMenuCode()).isEqualTo(routeMenu.getCode());
+        assertThat(route.getType()).isEqualTo(MenuNodeType.LINK);
+        assertThat(route.getModule()).isEqualTo("custom-wallet-page");
+        assertThat(route.getLink()).isEqualTo("https://transactions.example.test");
+        assertThat(route.getParentCode()).isEqualTo(parentMenu.getCode());
         assertThat(route.getSort()).isEqualTo(91);
         assertThat(route.getVisible()).isFalse();
         assertThat(route.getStatus()).isEqualTo(MenuStatus.ACTIVE);
+        assertThat(route.getParentMenuCode()).isEqualTo(parentMenu.getCode());
+        assertThat(route.getParentParentCode()).isEqualTo("system:dashboard");
+        assertThat(route.getParentTitle()).isEqualTo("自定义钱包目录");
+        assertThat(route.getParentType()).isEqualTo(MenuNodeType.LINK);
+        assertThat(route.getParentModule()).isEqualTo("custom-wallet-directory");
+        assertThat(route.getParentPath()).isEqualTo("/custom-wallet-directory");
+        assertThat(route.getParentComponent()).isEqualTo("CustomDirectoryLayout");
+        assertThat(route.getParentLink()).isEqualTo("https://directory.example.test");
+        assertThat(route.getParentPermission()).isEqualTo("custom:directory:access");
+        assertThat(route.getParentIcon()).isEqualTo("custom-directory-icon");
+        assertThat(route.getParentSort()).isEqualTo(89);
+        assertThat(route.getParentVisible()).isFalse();
+        assertThat(route.getParentStatus()).isEqualTo(MenuStatus.ACTIVE);
     }
 
     @Test
@@ -295,6 +422,26 @@ class PluginMenuLifecycleTest {
         assertThat(manifest.getModules().getFirst().getRoutes().getFirst().getVisible()).isFalse();
     }
 
+    @Test
+    void disabledPluginDirectoryExcludesRoutesStillAttachedToIt() {
+        InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(menuRepo);
+        Menu parentMenu = menuRepo.findByPluginCodeAndRegistrationKey(
+                PLUGIN_CODE,
+                "parent:" + MODULE_NAME + ":/wallet"
+        ).orElseThrow();
+        parentMenu.setParentCode("system:dashboard");
+        parentMenu.disable();
+        menuRepo.save(parentMenu);
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of(frontendModule));
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+
+        PluginFrontendManifestDTO manifest = appService(projectionService).frontendManifest();
+
+        assertThat(manifest.getModules()).hasSize(1);
+        assertThat(manifest.getModules().getFirst().getRoutes()).isEmpty();
+    }
+
     private void stubEnable() {
         when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
         when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -305,6 +452,35 @@ class PluginMenuLifecycleTest {
     private void stubModuleLookup() {
         when(pluginModuleRepo.findByCode(PLUGIN_CODE)).thenReturn(Optional.of(module));
         when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private PluginAppService appService(PluginMenuProjectionService projectionService) {
+        return new PluginAppService(
+                pluginModuleRepo,
+                pluginRuntimeGateway,
+                permissionDomainService,
+                projectionService
+        );
+    }
+
+    private InMemoryMenuRepo projectedMenus(PluginFrontendModuleInfo declaration) {
+        InMemoryMenuRepo menuRepo = new InMemoryMenuRepo();
+        new PluginMenuProjectionService(menuRepo).project(PLUGIN_CODE, List.of(declaration));
+        return menuRepo;
+    }
+
+    private Set<String> statefulRuntimeEnable() {
+        Set<String> runtimeEnabled = new HashSet<>();
+        doAnswer(invocation -> {
+            runtimeEnabled.add(invocation.<PluginModule>getArgument(0).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).enable(any());
+        doAnswer(invocation -> {
+            runtimeEnabled.remove(invocation.<String>getArgument(0));
+            return null;
+        }).when(pluginRuntimeGateway).disable(any());
+        when(pluginRuntimeGateway.enabled(any())).thenAnswer(invocation -> runtimeEnabled.contains(invocation.getArgument(0)));
+        return runtimeEnabled;
     }
 
     private PluginFrontendModuleInfo frontendModule() {

@@ -10,6 +10,8 @@ import online.yudream.base.domain.system.menu.enumerate.MenuSource;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -78,6 +80,7 @@ public class PluginMenuProjectionService {
                 });
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void markUnavailable(String pluginCode) {
         menuRepo.findByPluginCode(pluginCode).forEach(menu -> {
             menu.setRuntimeAvailable(false);
@@ -116,7 +119,14 @@ public class PluginMenuProjectionService {
                     routes,
                     moduleMenu.getParentCode(),
                     moduleMenu.getVisible(),
-                    moduleMenu.getStatus()
+                    moduleMenu.getStatus(),
+                    moduleMenu.getCode(),
+                    moduleMenu.getType(),
+                    moduleMenu.getModule(),
+                    moduleMenu.getPath(),
+                    moduleMenu.getComponent(),
+                    moduleMenu.getLink(),
+                    moduleMenu.getPermission()
             ));
         }
         return List.copyOf(overridden);
@@ -134,17 +144,18 @@ public class PluginMenuProjectionService {
         String parentTitle = route.parentTitle();
         String parentIcon = route.parentIcon();
         Integer parentSort = route.parentSort();
+        Menu parentMenu = null;
         String declaredParentPath = normalizeOptionalText(route.parentPath());
         if (declaredParentPath != null) {
-            Menu parentMenu = menus.get("parent:" + module.moduleName() + ":" + declaredParentPath);
-            if (parentMenu != null && Objects.equals(routeMenu.getParentCode(), parentMenu.getCode())) {
-                if (!enabled(parentMenu)) {
-                    return null;
-                }
+            parentMenu = menus.get("parent:" + module.moduleName() + ":" + declaredParentPath);
+            if (parentMenu != null) {
                 parentPath = parentMenu.getPath();
                 parentTitle = parentMenu.getName();
                 parentIcon = parentMenu.getIcon();
                 parentSort = parentMenu.getSort();
+                if (Objects.equals(routeMenu.getParentCode(), parentMenu.getCode()) && !enabled(parentMenu)) {
+                    return null;
+                }
             }
         }
 
@@ -162,7 +173,20 @@ public class PluginMenuProjectionService {
                 routeMenu.getSort(),
                 routeMenu.getParentCode(),
                 routeMenu.getVisible(),
-                routeMenu.getStatus()
+                routeMenu.getStatus(),
+                routeMenu.getCode(),
+                routeMenu.getType(),
+                routeMenu.getModule(),
+                routeMenu.getLink(),
+                parentMenu == null ? null : parentMenu.getCode(),
+                parentMenu == null ? null : parentMenu.getParentCode(),
+                parentMenu == null ? null : parentMenu.getType(),
+                parentMenu == null ? null : parentMenu.getModule(),
+                parentMenu == null ? null : parentMenu.getComponent(),
+                parentMenu == null ? null : parentMenu.getLink(),
+                parentMenu == null ? null : parentMenu.getPermission(),
+                parentMenu == null ? null : parentMenu.getVisible(),
+                parentMenu == null ? null : parentMenu.getStatus()
         );
     }
 
