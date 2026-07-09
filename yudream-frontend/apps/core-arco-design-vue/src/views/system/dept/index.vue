@@ -191,7 +191,7 @@ function importDepts() {
       >
         <template #toolbar>
           <FaSearchBar class="w-full">
-            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
               <FaInput v-model="search.keyword" clearable placeholder="部门名称 / 描述" class="w-full" @keydown.enter="loadTree" @clear="loadTree" />
               <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
               <div class="flex gap-2 col-end--1 justify-end">

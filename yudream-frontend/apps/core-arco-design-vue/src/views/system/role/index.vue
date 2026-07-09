@@ -218,7 +218,7 @@ function importRoles() {
       >
         <template #toolbar>
           <FaSearchBar class="w-full">
-            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(260px,1fr))]">
+            <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
               <FaInput v-model="search.keyword" clearable placeholder="角色名称 / 编码" class="w-full" @keydown.enter="loadRoles" @clear="loadRoles" />
               <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
               <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
