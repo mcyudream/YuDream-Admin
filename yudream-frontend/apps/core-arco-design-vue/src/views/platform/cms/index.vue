@@ -45,7 +45,7 @@ const aiCapability = ref<CapabilityItem>()
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
 const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
-const selectedPageId = ref<number | null>(null)
+const selectedPageId = ref<string | null>(null)
 const showAllVariables = ref(false)
 
 const pageForm = reactive<CmsPagePayload>({

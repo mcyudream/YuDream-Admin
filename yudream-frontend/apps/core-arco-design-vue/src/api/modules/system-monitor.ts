@@ -27,7 +27,7 @@ export interface RedisMonitor {
 
 export interface OnlineUser {
   token: string
-  userId?: number
+  userId?: string
   username?: string
   nickname?: string
   email?: string
@@ -37,7 +37,7 @@ export interface OnlineUser {
 }
 
 export interface ApiLog {
-  id: number
+  id: string
   method: string
   path: string
   query?: string
@@ -45,7 +45,7 @@ export interface ApiLog {
   status?: number
   costMs?: number
   success?: boolean
-  loginId?: number
+  loginId?: string
   username?: string
   nickname?: string
   ip?: string
@@ -55,9 +55,9 @@ export interface ApiLog {
 }
 
 export interface LoginLog {
-  id: number
+  id: string
   username: string
-  userId?: number
+  userId?: string
   success?: boolean
   message?: string
   ip?: string

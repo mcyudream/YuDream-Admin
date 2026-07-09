@@ -12,10 +12,10 @@ export interface DocumentPageParams {
 }
 
 export interface WordTemplate {
-  id: number
+  id: string
   name: string
   code: string
-  templateFileId: number
+  templateFileId: string
   templateFileUrl?: string
   originalFilename?: string
   placeholders: Record<string, string>
@@ -34,16 +34,16 @@ export interface WordTemplatePayload {
 }
 
 export interface WordGenerationRecord {
-  id: number
-  templateId: number
+  id: string
+  templateId: string
   templateCode: string
-  outputFileId?: number
+  outputFileId?: string
   outputFileUrl?: string
   outputFilename?: string
   data: WordGenerateData
   status: GenerationStatus
   errorMessage?: string
-  operatorId?: number
+  operatorId?: string
   generatedAt?: string
 }
 
@@ -54,18 +54,18 @@ export default {
   uploadTemplate: (file: File, meta: WordTemplatePayload) => {
     return systemClient.post<unknown, ApiResponse<WordTemplate>>('api/platform/documents/word-templates', templateForm(file, meta))
   },
-  updateTemplate: (id: number, data: WordTemplatePayload) => {
+  updateTemplate: (id: string, data: WordTemplatePayload) => {
     return systemClient.put<unknown, ApiResponse<WordTemplate>>(`api/platform/documents/word-templates/${id}`, data)
   },
-  replaceTemplateFile: (id: number, file: File) => {
+  replaceTemplateFile: (id: string, file: File) => {
     const form = new FormData()
     form.append('file', file)
     return systemClient.put<unknown, ApiResponse<WordTemplate>>(`api/platform/documents/word-templates/${id}/file`, form)
   },
-  disableTemplate: (id: number) => {
+  disableTemplate: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/documents/word-templates/${id}`)
   },
-  generate: (id: number, data: WordGenerateData) => {
+  generate: (id: string, data: WordGenerateData) => {
     return systemClient.post<unknown, ApiResponse<WordGenerationRecord>>(`api/platform/documents/word-templates/${id}/generate`, { data })
   },
   pageRecords: (params: DocumentPageParams) => {

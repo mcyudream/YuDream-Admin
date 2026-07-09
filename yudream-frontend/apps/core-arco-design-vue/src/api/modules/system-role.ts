@@ -4,7 +4,7 @@ import systemClient from './system-client'
 export type RoleStatus = 'ACTIVE' | 'DEPRECATED'
 export type RoleLevel = 'SUPER_ADMIN' | 'ADMIN' | 'USER' | 'GUEST'
 
-export type IdValue = string | number
+export type IdValue = string
 
 export interface OptionItem {
   id: IdValue

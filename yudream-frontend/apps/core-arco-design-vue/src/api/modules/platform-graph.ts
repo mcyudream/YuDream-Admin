@@ -11,7 +11,7 @@ export interface GraphPageParams {
 }
 
 export interface GraphConnection {
-  id: number
+  id: string
   name: string
   code: string
   uri: string
@@ -38,8 +38,8 @@ export interface GraphQueryPayload {
 }
 
 export interface GraphQueryLog {
-  id: number
-  connectionId: number
+  id: string
+  connectionId: string
   connectionCode: string
   cypher: string
   params: Record<string, any>
@@ -58,16 +58,16 @@ export default {
   createConnection: (data: GraphConnectionPayload) => {
     return systemClient.post<unknown, ApiResponse<GraphConnection>>('api/platform/graph/connections', data)
   },
-  updateConnection: (id: number, data: GraphConnectionPayload) => {
+  updateConnection: (id: string, data: GraphConnectionPayload) => {
     return systemClient.put<unknown, ApiResponse<GraphConnection>>(`api/platform/graph/connections/${id}`, data)
   },
-  disableConnection: (id: number) => {
+  disableConnection: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/graph/connections/${id}`)
   },
-  testConnection: (id: number) => {
+  testConnection: (id: string) => {
     return systemClient.post<unknown, ApiResponse<GraphQueryLog>>(`api/platform/graph/connections/${id}/test`)
   },
-  query: (id: number, data: GraphQueryPayload) => {
+  query: (id: string, data: GraphQueryPayload) => {
     return systemClient.post<unknown, ApiResponse<GraphQueryLog>>(`api/platform/graph/connections/${id}/query`, data)
   },
   pageLogs: (params: GraphPageParams) => {

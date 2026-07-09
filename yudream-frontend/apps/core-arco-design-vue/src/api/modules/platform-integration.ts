@@ -13,7 +13,7 @@ export interface IntegrationPageParams {
 }
 
 export interface HttpConnector {
-  id: number
+  id: string
   name: string
   code: string
   url: string
@@ -48,8 +48,8 @@ export interface HttpInvokePayload {
 }
 
 export interface HttpInvocationLog {
-  id: number
-  connectorId: number
+  id: string
+  connectorId: string
   connectorCode: string
   url: string
   method: HttpMethodType
@@ -64,7 +64,7 @@ export interface HttpInvocationLog {
 }
 
 export interface RuntimeScript {
-  id: number
+  id: string
   name: string
   code: string
   language: RuntimeLanguage
@@ -87,8 +87,8 @@ export interface RuntimeScriptPayload {
 }
 
 export interface RuntimeExecutionLog {
-  id: number
-  scriptId: number
+  id: string
+  scriptId: string
   scriptCode: string
   language: RuntimeLanguage
   stdin?: string
@@ -108,13 +108,13 @@ export default {
   createConnector: (data: HttpConnectorPayload) => {
     return systemClient.post<unknown, ApiResponse<HttpConnector>>('api/platform/integration/http-connectors', data)
   },
-  updateConnector: (id: number, data: HttpConnectorPayload) => {
+  updateConnector: (id: string, data: HttpConnectorPayload) => {
     return systemClient.put<unknown, ApiResponse<HttpConnector>>(`api/platform/integration/http-connectors/${id}`, data)
   },
-  disableConnector: (id: number) => {
+  disableConnector: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/integration/http-connectors/${id}`)
   },
-  invokeConnector: (id: number, data: HttpInvokePayload) => {
+  invokeConnector: (id: string, data: HttpInvokePayload) => {
     return systemClient.post<unknown, ApiResponse<HttpInvocationLog>>(`api/platform/integration/http-connectors/${id}/invoke`, data)
   },
   pageHttpLogs: (params: IntegrationPageParams) => {
@@ -126,13 +126,13 @@ export default {
   createScript: (data: RuntimeScriptPayload) => {
     return systemClient.post<unknown, ApiResponse<RuntimeScript>>('api/platform/integration/runtime-scripts', data)
   },
-  updateScript: (id: number, data: RuntimeScriptPayload) => {
+  updateScript: (id: string, data: RuntimeScriptPayload) => {
     return systemClient.put<unknown, ApiResponse<RuntimeScript>>(`api/platform/integration/runtime-scripts/${id}`, data)
   },
-  disableScript: (id: number) => {
+  disableScript: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/integration/runtime-scripts/${id}`)
   },
-  executeScript: (id: number, stdin?: string) => {
+  executeScript: (id: string, stdin?: string) => {
     return systemClient.post<unknown, ApiResponse<RuntimeExecutionLog>>(`api/platform/integration/runtime-scripts/${id}/execute`, { stdin })
   },
   pageRuntimeLogs: (params: IntegrationPageParams) => {

@@ -2,7 +2,7 @@ import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export interface UserProfile {
-  id: string | number
+  id: string
   username: string
   nickname?: string
   email?: string
@@ -10,7 +10,7 @@ export interface UserProfile {
   phone?: string
   qq?: string
   avatar?: string
-  avatarFileId?: string | number
+  avatarFileId?: string
   createTime?: string
   updateTime?: string
 }
@@ -26,8 +26,8 @@ export interface UserProfilePayload {
 export type PasskeyStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
 
 export interface PasskeyCredential {
-  id: string | number
-  userId: string | number
+  id: string
+  userId: string
   credentialId: string
   deviceName?: string
   status: PasskeyStatus
@@ -51,11 +51,11 @@ export interface PasskeyRegistrationFinishPayload {
 export type CredentialStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
 
 export interface ApiKeyCredential {
-  id: string | number
+  id: string
   name: string
   keyPrefix: string
   maskedValue: string
-  creatorUserId: string | number
+  creatorUserId: string
   permissions: string[]
   expireTime?: string
   status: CredentialStatus
@@ -88,8 +88,8 @@ export default {
   passkeys: () => systemClient.get<unknown, ApiResponse<PasskeyCredential[]>>('api/user/me/passkeys'),
   startPasskeyRegistration: () => systemClient.post<unknown, ApiResponse<PasskeyRegistrationOptions>>('api/user/me/passkeys/registration/options'),
   finishPasskeyRegistration: (data: PasskeyRegistrationFinishPayload) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>('api/user/me/passkeys/registration', data),
-  revokePasskey: (id: string | number) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>(`api/user/me/passkeys/${id}/revoke`),
+  revokePasskey: (id: string) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>(`api/user/me/passkeys/${id}/revoke`),
   apiKeys: (params: ApiKeyPageParams) => systemClient.get<unknown, ApiResponse<PageResult<ApiKeyCredential>>>('api/user/me/api-keys', { params }),
   createApiKey: (data: ApiKeyCreatePayload) => systemClient.post<unknown, ApiResponse<ApiKeyCreateResult>>('api/user/me/api-keys', data),
-  revokeApiKey: (id: string | number) => systemClient.post<unknown, ApiResponse<ApiKeyCredential>>(`api/user/me/api-keys/${id}/revoke`),
+  revokeApiKey: (id: string) => systemClient.post<unknown, ApiResponse<ApiKeyCredential>>(`api/user/me/api-keys/${id}/revoke`),
 }

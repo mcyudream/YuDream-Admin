@@ -2,7 +2,7 @@ import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export interface FileObject {
-  id: number
+  id: string
   originalName?: string
   contentType?: string
   size?: number

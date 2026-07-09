@@ -3,7 +3,7 @@ import type { LoginData } from './user'
 import systemClient from './system-client'
 
 export type UserStatus = 'ACTIVE' | 'DISABLED'
-export type IdValue = string | number
+export type IdValue = string
 
 export interface UserDeptAssign {
   deptId: IdValue

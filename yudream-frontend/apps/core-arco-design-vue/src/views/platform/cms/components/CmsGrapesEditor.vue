@@ -66,7 +66,7 @@ const props = defineProps<{
   aiEnabled?: boolean
   aiModelOptions?: AiModelSelectOption[]
   historyTargetType?: 'page' | 'home'
-  historyTargetId?: string | number | null
+  historyTargetId?: string | null
   historyTargetLabel?: string
 }>()
 
