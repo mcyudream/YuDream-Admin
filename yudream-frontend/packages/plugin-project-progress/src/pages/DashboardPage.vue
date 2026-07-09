@@ -47,7 +47,7 @@ defineProps<{
             @click="model.selectProject(project); model.reloadProjectData()"
           >
             <strong>{{ project.name }}</strong>
-            <span>{{ project.enabled ? '启用' : '停用' }} · {{ project.memberUserIds.length }} 成员</span>
+            <span>{{ project.enabled ? '启用' : '停用' }} · {{ project.memberUserIds.length }} 名成员</span>
           </button>
           <div v-if="!model.projects.length" class="pp-empty">暂无项目</div>
         </div>
@@ -69,9 +69,23 @@ defineProps<{
           <tbody>
             <tr v-for="detail in model.details" :key="detail.id">
               <td>{{ detail.title }}</td>
-              <td>{{ detail.statusCode }}</td>
-              <td>{{ detail.assigneeUserIds.join(', ') || '-' }}</td>
-              <td>{{ detail.acceptorUserIds.join(', ') || '-' }}</td>
+              <td>{{ model.statusLabel(detail.statusCode) }}</td>
+              <td>
+                <div class="pp-chip-list">
+                  <span v-if="!detail.assigneeUserIds.length" class="pp-muted">未分配</span>
+                  <span v-for="user in model.userOptionsForIds(detail.assigneeUserIds)" :key="user.id" class="pp-chip">
+                    {{ model.userLabel(user) }}
+                  </span>
+                </div>
+              </td>
+              <td>
+                <div class="pp-chip-list">
+                  <span v-if="!detail.acceptorUserIds.length" class="pp-muted">项目负责人</span>
+                  <span v-for="user in model.userOptionsForIds(detail.acceptorUserIds)" :key="user.id" class="pp-chip">
+                    {{ model.userLabel(user) }}
+                  </span>
+                </div>
+              </td>
             </tr>
             <tr v-if="!model.details.length">
               <td colspan="4">

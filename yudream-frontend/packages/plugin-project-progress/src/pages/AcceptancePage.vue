@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { ProjectProgressModel } from '../composables/useProjectProgress'
+import { computed } from 'vue'
 import ProgressPanel from '../components/ProgressPanel.vue'
 
-defineProps<{
+const props = defineProps<{
   model: ProjectProgressModel
 }>()
+
+const selectedDetail = computed(() => props.model.pendingAcceptance.find(item => item.id === props.model.selectedAcceptanceId) || null)
 </script>
 
 <template>
@@ -28,35 +31,34 @@ defineProps<{
             @click="model.selectedAcceptanceId = detail.id"
           >
             <strong>{{ detail.title }}</strong>
-            <span>{{ detail.statusCode }} · {{ detail.assigneeUserIds.join(', ') || '未分配' }}</span>
+            <span>
+              {{ model.statusLabel(detail.statusCode) }} ·
+              {{ detail.assigneeUserIds.length ? model.userOptionsForIds(detail.assigneeUserIds).map(model.userLabel).join('、') : '未分配' }}
+            </span>
           </button>
           <div v-if="!model.pendingAcceptance.length" class="pp-empty">暂无待验收任务</div>
         </div>
       </ProgressPanel>
 
-      <ProgressPanel title="验收处理">
+      <ProgressPanel title="验收处理" :subtle="selectedDetail?.title || '请选择任务'">
         <form class="pp-form" @submit.prevent>
           <label>
             <span>处理说明</span>
-            <textarea v-model="model.acceptanceForm.reason" rows="5" />
-          </label>
-          <label>
-            <span>目标状态（可选）</span>
-            <input v-model="model.acceptanceForm.toStatusCode" autocomplete="off">
+            <textarea v-model="model.acceptanceForm.reason" rows="5" placeholder="通过说明或返工原因" />
           </label>
           <div class="pp-actions">
             <button
               class="pp-primary"
               type="button"
-              :disabled="!model.selectedAcceptanceId"
-              @click="model.review(model.pendingAcceptance.find(item => item.id === model.selectedAcceptanceId)!, true)"
+              :disabled="!selectedDetail"
+              @click="selectedDetail && model.review(selectedDetail, true)"
             >
               通过
             </button>
             <button
               type="button"
-              :disabled="!model.selectedAcceptanceId"
-              @click="model.review(model.pendingAcceptance.find(item => item.id === model.selectedAcceptanceId)!, false)"
+              :disabled="!selectedDetail"
+              @click="selectedDetail && model.review(selectedDetail, false)"
             >
               退回返工
             </button>

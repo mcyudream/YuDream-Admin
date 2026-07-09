@@ -1,16 +1,21 @@
 import type {
   DetailForm,
   ProjectCheckIn,
+  ProjectDeptOption,
   ProjectForm,
   ProjectProgressEvent,
   ProjectProgressProject,
   ProjectProgressStatus,
+  ProjectStatusOption,
+  ProjectUserOption,
   ProjectWorkDetail,
 } from '../types'
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 import { useFaToast } from '@fantastic-admin/components'
 import { computed, reactive, ref } from 'vue'
 import { createProjectProgressApi } from '../api/project-progress-api'
+
+const DEFAULT_STATUSES_TEXT = 'TODO,未完成,false,10\nREVIEWING,复审中,false,20\nREPAIRING,修缮中,false,30\nDONE,完成,true,40'
 
 export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const api = createProjectProgressApi(sdk)
@@ -25,6 +30,8 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const pendingAcceptance = ref<ProjectWorkDetail[]>([])
   const checkIns = ref<ProjectCheckIn[]>([])
   const events = ref<ProjectProgressEvent[]>([])
+  const departments = ref<ProjectDeptOption[]>([])
+  const usersById = ref<Record<string, ProjectUserOption>>({})
   const selectedProjectId = ref('')
   const selectedDetailId = ref('')
   const selectedAcceptanceId = ref('')
@@ -33,9 +40,9 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const projectForm = reactive<ProjectForm>({
     name: '',
     description: '',
-    managerUserIds: '',
-    memberUserIds: '',
-    statusesText: 'TODO,未完成,false,10\nREVIEWING,复审中,false,20\nREPAIRING,修缮中,false,30\nDONE,完成,true,40',
+    managerUserIds: [],
+    memberUserIds: [],
+    statusesText: DEFAULT_STATUSES_TEXT,
     defaultStatusCode: 'TODO',
     doneStatusCode: 'DONE',
     reworkStatusCode: 'REPAIRING',
@@ -56,10 +63,11 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     description: '',
     statusCode: 'TODO',
     assignmentMode: 'CLAIM',
+    candidateScope: 'ALL',
     requiredAssigneeCount: 1,
-    candidateUserIds: '',
-    assigneeUserIds: '',
-    acceptorUserIds: '',
+    candidateUserIds: [],
+    assigneeUserIds: [],
+    acceptorUserIds: [],
     dueAt: '',
   })
 
@@ -78,6 +86,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
 
   const selectedProject = computed(() => projects.value.find(item => item.id === selectedProjectId.value) || null)
   const selectedDetail = computed(() => details.value.find(item => item.id === selectedDetailId.value) || myTasks.value.find(item => item.id === selectedDetailId.value) || claimableTasks.value.find(item => item.id === selectedDetailId.value) || null)
+  const projectStatusOptions = computed(() => selectedProject.value?.statuses || parseStatuses(projectForm.statusesText))
   const completion = computed(() => {
     const doneCode = selectedProject.value?.doneStatusCode
     if (!details.value.length || !doneCode) {
@@ -108,6 +117,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       const [nextStatus, nextProjects] = await Promise.all([api.status(), api.projects()])
       status.value = nextStatus
       projects.value = nextProjects
+      await resolveProjectUsers(nextProjects)
       if (!selectedProjectId.value && nextProjects.length) {
         selectProject(nextProjects[0])
       }
@@ -124,6 +134,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     loading.value = true
     try {
       myTasks.value = await api.myTasks()
+      await resolveDetailUsers(myTasks.value)
       if (!selectedDetailId.value && myTasks.value.length) {
         selectedDetailId.value = myTasks.value[0].id
       }
@@ -149,6 +160,10 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       projects.value = nextProjects
       claimableTasks.value = nextClaimableTasks
       myTasks.value = nextMyTasks
+      await Promise.all([
+        resolveProjectUsers(nextProjects),
+        resolveDetailUsers([...nextClaimableTasks, ...nextMyTasks]),
+      ])
       if (!selectedDetailId.value) {
         selectedDetailId.value = nextMyTasks[0]?.id || nextClaimableTasks[0]?.id || ''
       }
@@ -165,6 +180,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     loading.value = true
     try {
       pendingAcceptance.value = await api.pendingAcceptance()
+      await resolveDetailUsers(pendingAcceptance.value)
       selectedAcceptanceId.value = selectedAcceptanceId.value || pendingAcceptance.value[0]?.id || ''
     }
     finally {
@@ -184,6 +200,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     ])
     details.value = nextDetails
     events.value = nextEvents
+    await resolveDetailUsers(nextDetails)
     selectedDetailId.value = selectedDetailId.value || nextDetails[0]?.id || ''
   }
 
@@ -256,6 +273,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     const saved = await action(() => api.publishDetail(detail.id), '工作细节已发布')
     if (saved) {
       upsert(details.value, saved)
+      fillDetailForm(saved)
     }
   }
 
@@ -263,6 +281,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     const saved = await action(() => api.randomAssign(detail.id), '任务已随机分配')
     if (saved) {
       upsert(details.value, saved)
+      fillDetailForm(saved)
     }
   }
 
@@ -337,6 +356,29 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     checkIns.value = await api.checkIns(detailId)
   }
 
+  async function searchUsers(keyword = '', deptId = '') {
+    const users = await api.users(keyword, deptId)
+    rememberUsers(users)
+    return users
+  }
+
+  async function resolveUsers(ids: string[]) {
+    const missing = unique(ids).filter(id => !usersById.value[id])
+    if (!missing.length) {
+      return
+    }
+    rememberUsers(await api.resolveUsers(missing))
+  }
+
+  async function loadDepartments(keyword = '') {
+    departments.value = await api.departments(keyword)
+    return departments.value
+  }
+
+  async function loadDepartmentUsers(deptId: string) {
+    return searchUsers('', deptId)
+  }
+
   async function action<T>(fn: () => Promise<T>, success: string) {
     saving.value = true
     try {
@@ -364,8 +406,8 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   function fillProjectForm(project: ProjectProgressProject) {
     projectForm.name = project.name
     projectForm.description = project.description
-    projectForm.managerUserIds = project.managerUserIds.join(',')
-    projectForm.memberUserIds = project.memberUserIds.join(',')
+    projectForm.managerUserIds = [...project.managerUserIds]
+    projectForm.memberUserIds = [...project.memberUserIds]
     projectForm.statusesText = project.statuses.map(item => `${item.code},${item.label},${item.terminal},${item.sort}`).join('\n')
     projectForm.defaultStatusCode = project.defaultStatusCode
     projectForm.doneStatusCode = project.doneStatusCode
@@ -374,6 +416,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     projectForm.allowedCheckInTypes = [...project.allowedCheckInTypes]
     projectForm.minecraftPolicy = { ...project.minecraftPolicy }
     projectForm.enabled = project.enabled
+    void resolveUsers([...project.managerUserIds, ...project.memberUserIds])
   }
 
   function fillDetailForm(detail: ProjectWorkDetail) {
@@ -381,19 +424,23 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     detailForm.description = detail.description
     detailForm.statusCode = detail.statusCode
     detailForm.assignmentMode = detail.assignmentMode
+    detailForm.candidateScope = detail.assignmentMode === 'RANDOM' && detail.candidateUserIds.length === 0
+      ? 'PROJECT_MEMBERS'
+      : detail.candidateUserIds.length === 0 ? 'ALL' : 'SELECTED'
     detailForm.requiredAssigneeCount = detail.requiredAssigneeCount
-    detailForm.candidateUserIds = detail.candidateUserIds.join(',')
-    detailForm.assigneeUserIds = detail.assigneeUserIds.join(',')
-    detailForm.acceptorUserIds = detail.acceptorUserIds.join(',')
+    detailForm.candidateUserIds = [...detail.candidateUserIds]
+    detailForm.assigneeUserIds = [...detail.assigneeUserIds]
+    detailForm.acceptorUserIds = [...detail.acceptorUserIds]
     detailForm.dueAt = detail.dueAt ? new Date(detail.dueAt).toISOString().slice(0, 16) : ''
+    void resolveUsers([...detail.candidateUserIds, ...detail.assigneeUserIds, ...detail.acceptorUserIds])
   }
 
   function projectPayload() {
     return {
       name: projectForm.name,
       description: projectForm.description,
-      managerUserIds: splitIds(projectForm.managerUserIds),
-      memberUserIds: splitIds(projectForm.memberUserIds),
+      managerUserIds: unique(projectForm.managerUserIds),
+      memberUserIds: unique(projectForm.memberUserIds),
       statuses: parseStatuses(projectForm.statusesText),
       defaultStatusCode: projectForm.defaultStatusCode,
       doneStatusCode: projectForm.doneStatusCode,
@@ -412,11 +459,75 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       statusCode: detailForm.statusCode,
       assignmentMode: detailForm.assignmentMode,
       requiredAssigneeCount: detailForm.requiredAssigneeCount,
-      candidateUserIds: splitIds(detailForm.candidateUserIds),
-      assigneeUserIds: splitIds(detailForm.assigneeUserIds),
-      acceptorUserIds: splitIds(detailForm.acceptorUserIds),
+      candidateUserIds: detailCandidateUserIds(),
+      assigneeUserIds: unique(detailForm.assigneeUserIds),
+      acceptorUserIds: unique(detailForm.acceptorUserIds),
       dueAt: detailForm.dueAt ? new Date(detailForm.dueAt).getTime() : null,
     }
+  }
+
+  function detailCandidateUserIds() {
+    if (detailForm.assignmentMode === 'CLAIM' && detailForm.candidateScope === 'ALL') {
+      return []
+    }
+    if (detailForm.assignmentMode === 'RANDOM' && detailForm.candidateScope === 'PROJECT_MEMBERS') {
+      return []
+    }
+    return unique(detailForm.candidateUserIds)
+  }
+
+  function rememberUsers(users: ProjectUserOption[]) {
+    if (!users.length) {
+      return
+    }
+    const next = { ...usersById.value }
+    users.forEach((user) => {
+      next[user.id] = user
+    })
+    usersById.value = next
+  }
+
+  function userOptionsForIds(ids: string[]) {
+    return unique(ids).map(id => usersById.value[id] || {
+      id,
+      username: '',
+      nickname: '加载中',
+      email: '',
+      avatar: '',
+      status: '',
+      deptIds: [],
+      deptNames: [],
+    })
+  }
+
+  function userLabel(user?: ProjectUserOption | null) {
+    if (!user) {
+      return '未知用户'
+    }
+    return user.nickname || user.username || user.email || '未知用户'
+  }
+
+  function userMeta(user?: ProjectUserOption | null) {
+    if (!user) {
+      return ''
+    }
+    const account = user.username || user.email
+    const dept = user.deptNames?.join(' / ')
+    return [account, dept].filter(Boolean).join(' · ')
+  }
+
+  function statusLabel(code?: string | null) {
+    if (!code) {
+      return '-'
+    }
+    return projectStatusOptions.value.find(item => item.code === code)?.label || code
+  }
+
+  function assignmentLabel(detail: ProjectWorkDetail) {
+    if (detail.assignmentMode === 'RANDOM') {
+      return detail.candidateUserIds.length ? '指定人员随机' : '项目成员随机'
+    }
+    return detail.candidateUserIds.length ? '指定人员认领' : '公开认领'
   }
 
   function formatTime(value?: number | null) {
@@ -428,12 +539,20 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   }
 
   function projectName(projectId: string) {
-    return projects.value.find(item => item.id === projectId)?.name || projectId
+    return projects.value.find(item => item.id === projectId)?.name || '未知项目'
   }
 
   function canMinecraftCheckIn(detail: ProjectWorkDetail) {
     const project = projects.value.find(item => item.id === detail.projectId)
     return !!project?.minecraftPolicy.enabled && project.allowedCheckInTypes.includes('MINECRAFT_ONLINE')
+  }
+
+  async function resolveProjectUsers(items: ProjectProgressProject[]) {
+    await resolveUsers(items.flatMap(item => [...item.managerUserIds, ...item.memberUserIds]))
+  }
+
+  async function resolveDetailUsers(items: ProjectWorkDetail[]) {
+    await resolveUsers(items.flatMap(item => [...item.candidateUserIds, ...item.assigneeUserIds, ...item.acceptorUserIds]))
   }
 
   return reactive({
@@ -447,11 +566,14 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     pendingAcceptance,
     checkIns,
     events,
+    departments,
+    usersById,
     selectedProjectId,
     selectedDetailId,
     selectedAcceptanceId,
     selectedProject,
     selectedDetail,
+    projectStatusOptions,
     completion,
     projectForm,
     detailForm,
@@ -478,6 +600,15 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     review,
     newProject,
     newDetail,
+    searchUsers,
+    resolveUsers,
+    loadDepartments,
+    loadDepartmentUsers,
+    userOptionsForIds,
+    userLabel,
+    userMeta,
+    statusLabel,
+    assignmentLabel,
     formatTime,
     minutes,
     projectName,
@@ -489,9 +620,9 @@ function defaultProjectForm(): ProjectForm {
   return {
     name: '',
     description: '',
-    managerUserIds: '',
-    memberUserIds: '',
-    statusesText: 'TODO,未完成,false,10\nREVIEWING,复审中,false,20\nREPAIRING,修缮中,false,30\nDONE,完成,true,40',
+    managerUserIds: [],
+    memberUserIds: [],
+    statusesText: DEFAULT_STATUSES_TEXT,
     defaultStatusCode: 'TODO',
     doneStatusCode: 'DONE',
     reworkStatusCode: 'REPAIRING',
@@ -514,26 +645,33 @@ function defaultDetailForm(statusCode: string): DetailForm {
     description: '',
     statusCode,
     assignmentMode: 'CLAIM',
+    candidateScope: 'ALL',
     requiredAssigneeCount: 1,
-    candidateUserIds: '',
-    assigneeUserIds: '',
-    acceptorUserIds: '',
+    candidateUserIds: [],
+    assigneeUserIds: [],
+    acceptorUserIds: [],
     dueAt: '',
   }
 }
 
-function splitIds(value: string) {
-  return value.split(/[,，\s]+/).map(item => item.trim()).filter(Boolean)
+function unique(values: string[]) {
+  return Array.from(new Set(values.map(item => item.trim()).filter(Boolean)))
 }
 
-function parseStatuses(value: string) {
-  return value.split('\n')
+function parseStatuses(value: string): ProjectStatusOption[] {
+  const result = value.split('\n')
     .map(line => line.trim())
     .filter(Boolean)
-    .map((line) => {
-      const [code, label, terminal = 'false', sort = '0'] = line.split(',').map(item => item.trim())
-      return { code, label, terminal: terminal === 'true', sort: Number(sort) || 0 }
+    .map((line, index) => {
+      const [code, label, terminal = 'false', sort = String((index + 1) * 10)] = line.split(',').map(item => item.trim())
+      return {
+        code: (code || `STATUS_${index + 1}`).toUpperCase(),
+        label: label || code || `状态 ${index + 1}`,
+        terminal: terminal === 'true',
+        sort: Number(sort) || (index + 1) * 10,
+      }
     })
+  return result.length ? result : parseStatuses(DEFAULT_STATUSES_TEXT)
 }
 
 function upsert<T extends { id: string }>(items: T[], item: T) {

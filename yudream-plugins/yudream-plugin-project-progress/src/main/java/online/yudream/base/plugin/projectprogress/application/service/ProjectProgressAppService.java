@@ -7,9 +7,11 @@ import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgres
 import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgressProjectSaveCmd;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectAcceptanceDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectCheckInDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectDeptOptionDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressEventDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressProjectDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressStatusDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectUserOptionDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectWorkDetailDTO;
 import online.yudream.base.plugin.projectprogress.domain.aggregate.ProjectAcceptanceRecord;
 import online.yudream.base.plugin.projectprogress.domain.aggregate.ProjectCheckInRecord;
@@ -29,11 +31,17 @@ import online.yudream.base.plugin.projectprogress.domain.valobj.ProjectMinecraft
 import online.yudream.base.plugin.projectprogress.domain.valobj.ProjectStatusOption;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
+import online.yudream.base.plugin.spi.system.user.PluginDeptOption;
+import online.yudream.base.plugin.spi.system.user.PluginUserDept;
+import online.yudream.base.plugin.spi.system.user.PluginUserOption;
+import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class ProjectProgressAppService {
 
@@ -41,6 +49,7 @@ public class ProjectProgressAppService {
 
     private final ProjectProgressRepository repository;
     private final PluginFileStore files;
+    private final FrameworkServices framework;
     private final ProjectProgressNotificationService notifications;
     private final ProjectProgressMinecraftService minecraft;
     private final ProjectProgressEventStream eventStream = new ProjectProgressEventStream();
@@ -50,6 +59,7 @@ public class ProjectProgressAppService {
     public ProjectProgressAppService(ProjectProgressRepository repository, PluginFileStore files, FrameworkServices framework) {
         this.repository = repository;
         this.files = files;
+        this.framework = framework;
         this.notifications = new ProjectProgressNotificationService(framework);
         this.minecraft = new ProjectProgressMinecraftService(framework);
     }
@@ -60,6 +70,43 @@ public class ProjectProgressAppService {
 
     public List<ProjectProgressProjectDTO> projects(int page, int size) {
         return repository.listProjects(safePage(page), safeSize(size)).stream().map(assembler::toDTO).toList();
+    }
+
+    public List<ProjectUserOptionDTO> searchUsers(String keyword, String deptId, int page, int size) {
+        if (framework == null || framework.users() == null) {
+            return List.of();
+        }
+        Long safeDeptId = parseLongOrNull(deptId);
+        return framework.users().searchUsers(keyword, safeDeptId, safePage(page), safeSize(size)).stream()
+                .map(this::toUserOptionDTO)
+                .toList();
+    }
+
+    public List<ProjectUserOptionDTO> usersByIds(List<String> userIds) {
+        if (framework == null || framework.users() == null || userIds == null || userIds.isEmpty()) {
+            return List.of();
+        }
+        List<ProjectUserOptionDTO> result = new ArrayList<>();
+        for (String userId : userIds) {
+            Long id = parseLongOrNull(userId);
+            if (id == null) {
+                continue;
+            }
+            framework.users().findById(id)
+                    .map(this::toUserOptionDTO)
+                    .ifPresent(result::add);
+        }
+        return result.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+    }
+
+    public List<ProjectDeptOptionDTO> departments(String keyword) {
+        if (framework == null || framework.users() == null) {
+            return List.of();
+        }
+        return framework.users().listDepartments(keyword).stream().map(this::toDeptOptionDTO).toList();
     }
 
     public ProjectProgressProjectDTO project(String projectId) {
@@ -389,6 +436,24 @@ public class ProjectProgressAppService {
                 Boolean.TRUE.equals(policy.autoCheckInEnabled()));
     }
 
+    private ProjectUserOptionDTO toUserOptionDTO(PluginUserOption user) {
+        return new ProjectUserOptionDTO(user.id(), user.username(), user.nickname(), user.email(), user.avatar(),
+                user.status(), user.deptIds() == null ? List.of() : user.deptIds(),
+                user.deptNames() == null ? List.of() : user.deptNames());
+    }
+
+    private ProjectUserOptionDTO toUserOptionDTO(PluginUserProfile user) {
+        List<PluginUserDept> depts = framework.users().listDepartments(user.id());
+        return new ProjectUserOptionDTO(String.valueOf(user.id()), user.username(), user.nickname(), user.email(),
+                user.avatar(), user.status(), depts.stream().map(dept -> String.valueOf(dept.id())).toList(),
+                depts.stream().map(PluginUserDept::name).toList());
+    }
+
+    private ProjectDeptOptionDTO toDeptOptionDTO(PluginDeptOption dept) {
+        return new ProjectDeptOptionDTO(dept.id(), dept.name(), dept.parentId(), dept.status(),
+                dept.children() == null ? List.of() : dept.children().stream().map(this::toDeptOptionDTO).toList());
+    }
+
     private List<String> emptyToMembers(List<String> candidates, ProjectProgressProject project) {
         return candidates == null || candidates.isEmpty() ? project.memberUserIds() : candidates;
     }
@@ -433,6 +498,17 @@ public class ProjectProgressAppService {
 
     private String sanitize(String filename) {
         return filename == null ? "file" : filename.replaceAll("[\\\\/:*?\"<>|]", "_");
+    }
+
+    private Long parseLongOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private String requireText(String value, String message) {

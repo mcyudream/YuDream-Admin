@@ -3,6 +3,25 @@ export interface ProjectProgressStatus {
   mailReady: boolean
 }
 
+export interface ProjectUserOption {
+  id: string
+  username: string
+  nickname?: string
+  email?: string
+  avatar?: string
+  status?: string
+  deptIds: string[]
+  deptNames: string[]
+}
+
+export interface ProjectDeptOption {
+  id: string
+  name: string
+  parentId?: string | null
+  status?: string
+  children: ProjectDeptOption[]
+}
+
 export interface ProjectStatusOption {
   code: string
   label: string
@@ -109,8 +128,8 @@ export interface ProjectProgressEvent {
 export interface ProjectForm {
   name: string
   description: string
-  managerUserIds: string
-  memberUserIds: string
+  managerUserIds: string[]
+  memberUserIds: string[]
   statusesText: string
   defaultStatusCode: string
   doneStatusCode: string
@@ -126,9 +145,10 @@ export interface DetailForm {
   description: string
   statusCode: string
   assignmentMode: 'CLAIM' | 'RANDOM'
+  candidateScope: 'ALL' | 'SELECTED' | 'PROJECT_MEMBERS'
   requiredAssigneeCount: number
-  candidateUserIds: string
-  assigneeUserIds: string
-  acceptorUserIds: string
+  candidateUserIds: string[]
+  assigneeUserIds: string[]
+  acceptorUserIds: string[]
   dueAt: string
 }

@@ -55,6 +55,10 @@
     {
       "key": "long-id-string-boundary",
       "text": "Java Long/Snowflake IDs must cross JSON, plugin HTTP, SDK, and TypeScript boundaries as strings. Do not expose them as frontend number fields or call Number(id), otherwise JavaScript precision loss will make selects/saves query the wrong backend record."
+    },
+    {
+      "key": "plugin-people-picker-no-manual-id",
+      "text": "插件前端涉及人员、部门选择时，不得暴露用户 ID 输入框；用后端 picker API 搜索/解析用户并以姓名、用户名、邮箱标签展示，历史 ID 只允许作为搜索兼容入口。"
     }
   ],
   "utilities": [
