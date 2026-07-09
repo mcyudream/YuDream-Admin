@@ -91,7 +91,11 @@ public class ProjectProgressWebAssembler {
     public ProjectWorkDetailRes toRes(ProjectWorkDetailDTO dto) {
         return new ProjectWorkDetailRes(dto.id(), dto.projectId(), dto.title(), dto.description(), dto.statusCode(),
                 dto.assignmentMode(), dto.requiredAssigneeCount(), dto.candidateUserIds(), dto.assigneeUserIds(),
-                dto.acceptorUserIds(), dto.published(), dto.pendingAcceptance(), dto.dueAt(), dto.createdAt(), dto.updatedAt());
+                dto.acceptorUserIds(), dto.published(), dto.pendingAcceptance(), dto.acceptanceSummary(),
+                dto.acceptanceFiles().stream()
+                        .map(file -> new ProjectWorkDetailRes.FileEvidenceRes(file.objectKey(), file.filename(), file.contentType(), file.size(), file.image()))
+                        .toList(),
+                dto.dueAt(), dto.createdAt(), dto.updatedAt());
     }
 
     public ProjectCheckInRes toRes(ProjectCheckInDTO dto) {

@@ -76,6 +76,14 @@ export interface ProjectWorkDetail {
   acceptorUserIds: string[]
   published: boolean
   pendingAcceptance: boolean
+  acceptanceSummary: string
+  acceptanceFiles: Array<{
+    objectKey: string
+    filename: string
+    contentType: string
+    size: number
+    image: boolean
+  }>
   dueAt?: number | null
   createdAt: number
   updatedAt: number
@@ -160,4 +168,8 @@ export interface DetailForm {
   assigneeUserIds: string[]
   acceptorUserIds: string[]
   dueAt: string
+}
+
+export interface AcceptanceSubmitForm {
+  summary: string
 }

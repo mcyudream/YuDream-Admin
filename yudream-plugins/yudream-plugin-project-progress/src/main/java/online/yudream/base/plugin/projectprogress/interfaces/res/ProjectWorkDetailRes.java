@@ -15,8 +15,12 @@ public record ProjectWorkDetailRes(
         List<String> acceptorUserIds,
         boolean published,
         boolean pendingAcceptance,
+        String acceptanceSummary,
+        List<FileEvidenceRes> acceptanceFiles,
         Long dueAt,
         long createdAt,
         long updatedAt
 ) {
+    public record FileEvidenceRes(String objectKey, String filename, String contentType, long size, boolean image) {
+    }
 }

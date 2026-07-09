@@ -40,6 +40,10 @@ import online.yudream.base.plugin.spi.system.user.PluginUserOption;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 
 import java.io.ByteArrayInputStream;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -236,7 +240,7 @@ public class ProjectProgressAppService {
         return assembler.toDTO(saved);
     }
 
-    public ProjectWorkDetailDTO submitAcceptance(String detailId, String operatorUserId) {
+    public ProjectWorkDetailDTO submitAcceptance(String detailId, ProjectProgressCheckInCmd cmd, String operatorUserId) {
         ProjectWorkDetail detail = requireDetail(detailId);
         ProjectProgressProject project = requireProject(detail.projectId());
         String safeUserId = requireText(operatorUserId, "请先登录");
@@ -246,7 +250,9 @@ public class ProjectProgressAppService {
         if (detail.statusCode().equals(project.doneStatusCode())) {
             throw new IllegalArgumentException("已完成的细节不能重复提交验收");
         }
-        ProjectWorkDetail saved = repository.saveDetail(detail.submitAcceptance(reviewingStatusCode(project, detail)));
+        ProjectWorkDetail saved = repository.saveDetail(detail.submitAcceptance(reviewingStatusCode(project, detail),
+                cmd == null ? null : cmd.summary(),
+                fileEvidence(project.id(), "acceptance-" + detail.id(), safeUserId, cmd == null ? null : cmd.files())));
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已提交验收", Map.of("title", saved.title()));
         return assembler.toDTO(saved);
     }
@@ -313,7 +319,9 @@ public class ProjectProgressAppService {
         List<ProjectCheckInDTO> result = new ArrayList<>();
         for (String userId : projectParticipants(project)) {
             try {
-                result.add(projectMinecraftCheckIn(project.id(), userId));
+                if (!hasProjectCheckInInCurrentPeriod(project, userId)) {
+                    result.add(projectMinecraftCheckIn(project.id(), userId));
+                }
             } catch (RuntimeException ignored) {
             }
         }
@@ -368,12 +376,6 @@ public class ProjectProgressAppService {
         if (!detail.assignedTo(safeUserId)) {
             throw new IllegalArgumentException("当前用户不是该工作细节负责人");
         }
-        repository.latestCheckIn(detail.id(), safeUserId).ifPresent(latest -> {
-            long intervalMillis = project.minCheckInIntervalMinutes() * 60_000L;
-            if (intervalMillis > 0 && System.currentTimeMillis() - latest.createdAt() < intervalMillis) {
-                throw new IllegalArgumentException("未达到项目要求的最小打卡间隔");
-            }
-        });
     }
 
     private void ensureCanProjectCheckIn(ProjectProgressProject project, String userId, ProjectCheckInType type) {
@@ -387,12 +389,25 @@ public class ProjectProgressAppService {
         if (!project.containsMember(safeUserId)) {
             throw new IllegalArgumentException("当前用户不是该项目成员，不能打卡");
         }
-        repository.latestProjectCheckIn(project.id(), safeUserId).ifPresent(latest -> {
-            long intervalMillis = project.minCheckInIntervalMinutes() * 60_000L;
-            if (intervalMillis > 0 && System.currentTimeMillis() - latest.createdAt() < intervalMillis) {
-                throw new IllegalArgumentException("未达到项目要求的最小打卡间隔");
-            }
-        });
+    }
+
+    private boolean hasProjectCheckInInCurrentPeriod(ProjectProgressProject project, String userId) {
+        long periodStart = currentCheckInPeriodStart(project.minCheckInIntervalMinutes());
+        return periodStart > 0 && repository.latestProjectCheckIn(project.id(), userId)
+                .map(latest -> latest.createdAt() >= periodStart)
+                .orElse(false);
+    }
+
+    private long currentCheckInPeriodStart(int periodMinutes) {
+        if (periodMinutes <= 0) {
+            return 0;
+        }
+        ZoneId zone = ZoneId.systemDefault();
+        ZonedDateTime now = ZonedDateTime.now(zone);
+        ZonedDateTime dayStart = LocalDate.now(zone).atStartOfDay(zone);
+        long elapsedMinutes = ChronoUnit.MINUTES.between(dayStart, now);
+        long periodIndex = elapsedMinutes / periodMinutes;
+        return dayStart.plusMinutes(periodIndex * (long) periodMinutes).toInstant().toEpochMilli();
     }
 
     private void ensureCanAccept(ProjectWorkDetail detail, ProjectProgressProject project, String operatorUserId) {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProjectProgressModel } from '../composables/useProjectProgress'
 import type { ProjectCheckIn } from '../types'
+import { FaFileUpload } from '@fantastic-admin/components'
 import { computed, watch } from 'vue'
 
 const props = defineProps<{
@@ -38,6 +39,10 @@ async function selectProject(projectId: unknown) {
 
 function fileNames(files: ProjectCheckIn['files']) {
   return files.map(file => file.filename).join('、')
+}
+
+function localUploadRequest() {
+  return Promise.resolve({})
 }
 </script>
 
@@ -85,24 +90,23 @@ function fileNames(files: ProjectCheckIn['files']) {
             <a-textarea v-model="model.checkInForm.summary" :auto-size="{ minRows: 3, maxRows: 5 }" />
           </a-form-item>
           <a-form-item v-if="model.checkInForm.type !== 'LOCATION'" label="上传证明">
-            <input
-              class="pp-native-file"
-              type="file"
-              @change="model.evidenceFile = ($event.target as HTMLInputElement).files?.[0] || null"
-            >
+            <FaFileUpload
+              v-model="model.evidenceFiles"
+              :max="1"
+              :http-request="localUploadRequest"
+              description="拖放或点击选择打卡证明"
+            />
           </a-form-item>
           <template v-if="model.checkInForm.type === 'LOCATION'">
             <a-form-item label="地址">
-              <a-input v-model="model.checkInForm.address" />
+              <a-input v-model="model.checkInForm.address" placeholder="定位后可补充地点说明" />
             </a-form-item>
-            <div class="pp-form-grid two">
-              <a-form-item label="纬度">
-                <a-input v-model="model.checkInForm.latitude" />
-              </a-form-item>
-              <a-form-item label="经度">
-                <a-input v-model="model.checkInForm.longitude" />
-              </a-form-item>
-            </div>
+            <a-space>
+              <a-button :loading="model.saving" @click="model.useCurrentLocation">获取当前位置</a-button>
+              <span class="pp-muted">
+                {{ model.checkInForm.latitude && model.checkInForm.longitude ? `${model.checkInForm.latitude}, ${model.checkInForm.longitude}` : '尚未获取定位' }}
+              </span>
+            </a-space>
           </template>
           <a-space>
             <a-button

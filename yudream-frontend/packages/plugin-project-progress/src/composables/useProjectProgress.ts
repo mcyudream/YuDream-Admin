@@ -1,4 +1,5 @@
 import type {
+  AcceptanceSubmitForm,
   DetailForm,
   ProjectCheckIn,
   ProjectDeptOption,
@@ -38,6 +39,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const selectedDetailId = ref('')
   const selectedAcceptanceId = ref('')
   const evidenceFile = ref<File | null>(null)
+  const evidenceFiles = ref<Array<{ name: string, size: number, status?: 'uploading' | 'success' | 'error', progress?: number, file?: File }>>([])
 
   const projectForm = reactive<ProjectForm>({
     name: '',
@@ -48,7 +50,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     defaultStatusCode: 'TODO',
     doneStatusCode: 'DONE',
     reworkStatusCode: 'REPAIRING',
-    minCheckInIntervalMinutes: 0,
+    minCheckInIntervalMinutes: 1440,
     allowedCheckInTypes: ['IMAGE', 'FILE', 'LOCATION'],
     minecraftPolicy: {
       enabled: false,
@@ -86,6 +88,11 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     toStatusCode: '',
   })
 
+  const acceptanceSubmitForm = reactive<AcceptanceSubmitForm>({
+    summary: '',
+  })
+  const acceptanceFiles = ref<Array<{ name: string, size: number, status?: 'uploading' | 'success' | 'error', progress?: number, file?: File }>>([])
+
   const selectedProject = computed(() => projects.value.find(item => item.id === selectedProjectId.value) || null)
   const selectedDetail = computed(() => details.value.find(item => item.id === selectedDetailId.value) || myTasks.value.find(item => item.id === selectedDetailId.value) || claimableTasks.value.find(item => item.id === selectedDetailId.value) || null)
   const projectStatusOptions = computed(() => selectedProject.value?.statuses || parseStatuses(projectForm.statusesText))
@@ -96,6 +103,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     }
     return Math.round((details.value.filter(item => item.statusCode === doneCode).length / details.value.length) * 100)
   })
+  const recentEvents = computed(() => events.value.slice(0, 20))
 
   async function loadPage(page: string) {
     if (page === 'task-center') {
@@ -335,13 +343,17 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       toast.warning('请先选择项目')
       return
     }
-    const files = evidenceFile.value
-      ? [{
-          filename: evidenceFile.value.name,
-          contentType: evidenceFile.value.type || 'application/octet-stream',
-          base64: await fileToBase64(evidenceFile.value),
+    const selectedFiles = evidenceFiles.value.map(item => item.file).filter((file): file is File => !!file)
+    if (!selectedFiles.length && evidenceFile.value) {
+      selectedFiles.push(evidenceFile.value)
+    }
+    const files = selectedFiles.length
+      ? await Promise.all(selectedFiles.map(async file => ({
+          filename: file.name,
+          contentType: file.type || 'application/octet-stream',
+          base64: await fileToBase64(file),
           image: checkInForm.type === 'IMAGE',
-        }]
+        })))
       : []
     const record = await action(() => api.createProjectCheckIn(projectId, {
       type: checkInForm.type,
@@ -356,7 +368,38 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
         : null,
     }), '项目打卡已提交')
     if (record) {
+      evidenceFile.value = null
+      evidenceFiles.value = []
       await loadProjectCheckIns(projectId)
+    }
+  }
+
+  async function useCurrentLocation() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast.warning('当前浏览器不支持定位')
+      return
+    }
+    saving.value = true
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 12000,
+          maximumAge: 30000,
+        })
+      })
+      const latitude = Number(position.coords.latitude.toFixed(6))
+      const longitude = Number(position.coords.longitude.toFixed(6))
+      checkInForm.latitude = String(latitude)
+      checkInForm.longitude = String(longitude)
+      checkInForm.address = checkInForm.address || `浏览器定位：${latitude}, ${longitude}`
+      toast.success('定位已获取')
+    }
+    catch {
+      toast.error('定位失败，请允许浏览器定位权限后重试')
+    }
+    finally {
+      saving.value = false
     }
   }
 
@@ -395,12 +438,34 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   }
 
   async function submitAcceptance(detail: ProjectWorkDetail) {
-    const saved = await action(() => api.submitAcceptance(detail.id), '任务已提交验收')
+    if (!acceptanceSubmitForm.summary.trim()) {
+      toast.warning('请填写验收说明')
+      return false
+    }
+    const files = acceptanceFiles.value.filter(item => item.file)
+    if (!files.length) {
+      toast.warning('请上传验收附件')
+      return false
+    }
+    const payloadFiles = await Promise.all(files.map(async item => ({
+      filename: item.file!.name,
+      contentType: item.file!.type || 'application/octet-stream',
+      base64: await fileToBase64(item.file!),
+      image: item.file!.type.startsWith('image/'),
+    })))
+    const saved = await action(() => api.submitAcceptance(detail.id, {
+      summary: acceptanceSubmitForm.summary,
+      files: payloadFiles,
+    }), '任务已提交验收')
     if (saved) {
       upsert(myTasks.value, saved)
       upsert(details.value, saved)
       selectedDetailId.value = saved.id
+      acceptanceSubmitForm.summary = ''
+      acceptanceFiles.value = []
+      return true
     }
+    return false
   }
 
   async function loadProjectCheckIns(projectId = selectedProjectId.value) {
@@ -410,6 +475,12 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
 
   async function searchUsers(keyword = '', deptId = '') {
     const users = await api.users(keyword, deptId)
+    rememberUsers(users)
+    return users
+  }
+
+  async function searchUsersPage(keyword = '', deptId = '', page = 1, size = 10) {
+    const users = await api.usersPage(keyword, deptId, page, size)
     rememberUsers(users)
     return users
   }
@@ -519,7 +590,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       candidateUserIds: detailCandidateUserIds(),
       assigneeUserIds: unique(detailForm.assigneeUserIds),
       acceptorUserIds: unique(detailForm.acceptorUserIds),
-      dueAt: detailForm.dueAt ? new Date(detailForm.dueAt).getTime() : null,
+      dueAt: toTimestamp(detailForm.dueAt),
     }
   }
 
@@ -592,8 +663,13 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return detail.candidateUserIds.length ? '指定人员认领' : '公开认领'
   }
 
-  function formatTime(value?: number | null) {
-    return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '-'
+  function formatTime(value?: number | string | null) {
+    const timestamp = toTimestamp(value)
+    if (!timestamp) {
+      return '-'
+    }
+    const date = new Date(timestamp)
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString('zh-CN', { hour12: false })
   }
 
   function minutes(value: number) {
@@ -654,11 +730,15 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     selectedDetail,
     projectStatusOptions,
     completion,
+    recentEvents,
     projectForm,
     detailForm,
     checkInForm,
     acceptanceForm,
+    acceptanceSubmitForm,
     evidenceFile,
+    evidenceFiles,
+    acceptanceFiles,
     loadPage,
     load,
     loadTaskCenter,
@@ -675,6 +755,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     randomAssign,
     claim,
     submitCheckIn,
+    useCurrentLocation,
     minecraftCheckIn,
     autoMinecraftCheckIns,
     submitAcceptance,
@@ -683,6 +764,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     newProject,
     newDetail,
     searchUsers,
+    searchUsersPage,
     resolveUsers,
     loadDepartments,
     loadDepartmentUsers,
@@ -713,7 +795,7 @@ function defaultProjectForm(): ProjectForm {
     defaultStatusCode: 'TODO',
     doneStatusCode: 'DONE',
     reworkStatusCode: 'REPAIRING',
-    minCheckInIntervalMinutes: 0,
+    minCheckInIntervalMinutes: 1440,
     allowedCheckInTypes: ['IMAGE', 'FILE', 'LOCATION'],
     minecraftPolicy: {
       enabled: false,
@@ -777,6 +859,18 @@ function confirmText(message: string) {
 function toNumber(value: string) {
   const number = Number(value)
   return Number.isFinite(number) ? number : undefined
+}
+
+function toTimestamp(value?: number | string | null) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null
+  }
+  const normalized = value.includes(' ') ? value.replace(' ', 'T') : value
+  const timestamp = new Date(normalized).getTime()
+  return Number.isFinite(timestamp) ? timestamp : null
 }
 
 function fileToBase64(file: File) {

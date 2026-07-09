@@ -97,13 +97,13 @@ defineProps<{
       </ProgressPanel>
     </section>
 
-    <ProgressPanel title="实时动态" subtle="最近项目事件">
+    <ProgressPanel title="实时动态" subtle="最近 20 条项目事件">
       <div class="pp-feed">
-        <article v-for="event in model.events" :key="event.id">
+        <article v-for="event in model.recentEvents" :key="event.id">
           <strong>{{ event.message }}</strong>
           <span>{{ event.type }} · {{ model.formatTime(event.createdAt) }}</span>
         </article>
-        <div v-if="!model.events.length" class="pp-empty">暂无动态</div>
+        <div v-if="!model.recentEvents.length" class="pp-empty">暂无动态</div>
       </div>
     </ProgressPanel>
   </section>
