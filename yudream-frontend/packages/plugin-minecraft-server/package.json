@@ -16,6 +16,7 @@
   "dependencies": {
     "@fantastic-admin/components": "workspace:*",
     "@yudream/plugin-sdk": "workspace:*",
+    "md-editor-v3": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:"
   },

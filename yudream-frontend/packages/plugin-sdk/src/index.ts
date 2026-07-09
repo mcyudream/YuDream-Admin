@@ -8,6 +8,27 @@ export interface YuDreamPluginHttpClient {
   url: (path: string) => string
 }
 
+export interface YuDreamPluginFileObject {
+  id: string
+  originalName?: string
+  contentType?: string
+  size?: number
+  module?: string
+  url?: string
+  assetUrl?: string
+  createTime?: string
+}
+
+export interface YuDreamPluginFileUploadOptions {
+  module?: string
+  publicAccess?: boolean
+}
+
+export interface YuDreamPluginFilesClient {
+  uploadImage: (file: File, options?: YuDreamPluginFileUploadOptions) => Promise<YuDreamPluginFileObject>
+  assetUrl: (url?: string) => string
+}
+
 export interface YuDreamPluginAccount {
   userId: string
   username: string
@@ -22,6 +43,7 @@ export interface YuDreamPluginSdk {
   pluginCode: string
   account: YuDreamPluginAccount
   http: YuDreamPluginHttpClient
+  files: YuDreamPluginFilesClient
 }
 
 export interface YuDreamPluginPageProps {
