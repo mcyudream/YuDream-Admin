@@ -21,7 +21,7 @@
     "@codemirror/language": "catalog:",
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",
-    "@fantastic-admin/components": "workspace:*",
+    "@yudream/components": "workspace:*",
     "@fantastic-admin/composables": "workspace:*",
     "@fantastic-admin/settings": "workspace:*",
     "@fantastic-admin/types": "workspace:*",

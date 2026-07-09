@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { MenuManageItem, MenuNodeType, MenuPayload, MenuStatus } from '@/api/modules/system-menu'
 import apiExcel from '@/api/modules/system-excel'
 import apiMenu from '@/api/modules/system-menu'
