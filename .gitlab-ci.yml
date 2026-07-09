@@ -172,11 +172,10 @@ publish:npm-plugin-sdk:
     - pnpm --filter @yudream/plugin-sdk run build
     - |
       REGISTRY_HOST=$(echo "$CI_API_V4_URL" | sed -E 's#^https?://##')
-      cat > .npmrc <<EOF
-      @yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/
-      //$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN
-      always-auth=true
-      EOF
+      printf '%s\n' \
+        "@yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/" \
+        "//$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN" \
+        'always-auth=true' > .npmrc
     - cd packages/plugin-sdk
     - pnpm publish --no-git-checks --registry "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/"
   rules:
@@ -197,11 +196,10 @@ publish:npm-components:
     - pnpm --filter @yudream/components run build
     - |
       REGISTRY_HOST=$(echo "$CI_API_V4_URL" | sed -E 's#^https?://##')
-      cat > .npmrc <<EOF
-      @yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/
-      //$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN
-      always-auth=true
-      EOF
+      printf '%s\n' \
+        "@yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/" \
+        "//$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN" \
+        'always-auth=true' > .npmrc
     - cd packages/components
     - pnpm publish --no-git-checks --registry "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/"
   rules:
@@ -226,11 +224,10 @@ publish:npmjs-plugin-sdk:
     - pnpm install --frozen-lockfile
     - pnpm --filter @yudream/plugin-sdk run build
     - |
-      cat > .npmrc <<EOF
-      registry=$NPMJS_REGISTRY
-      @yudream:registry=$NPMJS_REGISTRY
-      //registry.npmjs.org/:_authToken=$NPM_TOKEN
-      EOF
+      printf '%s\n' \
+        "registry=$NPMJS_REGISTRY" \
+        "@yudream:registry=$NPMJS_REGISTRY" \
+        "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
     - cd packages/plugin-sdk
     - pnpm publish --no-git-checks --access public --registry "$NPMJS_REGISTRY"
   rules:
@@ -255,11 +252,10 @@ publish:npmjs-components:
     - pnpm install --frozen-lockfile
     - pnpm --filter @yudream/components run build
     - |
-      cat > .npmrc <<EOF
-      registry=$NPMJS_REGISTRY
-      @yudream:registry=$NPMJS_REGISTRY
-      //registry.npmjs.org/:_authToken=$NPM_TOKEN
-      EOF
+      printf '%s\n' \
+        "registry=$NPMJS_REGISTRY" \
+        "@yudream:registry=$NPMJS_REGISTRY" \
+        "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
     - cd packages/components
     - pnpm publish --no-git-checks --access public --registry "$NPMJS_REGISTRY"
   rules:

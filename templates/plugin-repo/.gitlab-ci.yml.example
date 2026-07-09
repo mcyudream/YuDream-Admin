@@ -96,15 +96,13 @@ build:frontend:
       if [ -n "$CORE_NPM_REGISTRY" ]; then
         PACKAGE_TOKEN="${CORE_PACKAGE_TOKEN:-$CI_JOB_TOKEN}"
         REGISTRY_HOST=$(echo "$CORE_NPM_REGISTRY" | sed -E 's#^https?://##')
-        cat > .npmrc <<EOF
-        @yudream:registry=$CORE_NPM_REGISTRY
-        //$REGISTRY_HOST:_authToken=$PACKAGE_TOKEN
-        always-auth=true
-        EOF
+        printf '%s\n' \
+          "@yudream:registry=$CORE_NPM_REGISTRY" \
+          "//$REGISTRY_HOST:_authToken=$PACKAGE_TOKEN" \
+          "always-auth=true" > .npmrc
       else
-        cat > .npmrc <<EOF
-        @yudream:registry=$YUDREAM_NPM_REGISTRY
-        EOF
+        printf '%s\n' \
+          "@yudream:registry=$YUDREAM_NPM_REGISTRY" > .npmrc
       fi
     - pnpm install --frozen-lockfile
     - pnpm -r --filter=@yudream/plugin-* run build
@@ -118,33 +116,32 @@ package:plugins:
   script:
     - 'echo "Using core Maven registry: $CORE_MAVEN_REGISTRY"'
     - |
-      cat > settings.xml <<EOF
-      <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-          <servers>
-              <server>
-                  <id>gitlab-maven</id>
-                  <username>${CORE_PACKAGE_USER}</username>
-                  <password>${CORE_PACKAGE_TOKEN:-$CI_JOB_TOKEN}</password>
-              </server>
-          </servers>
-          <profiles>
-              <profile>
-                  <id>gitlab-private</id>
-                  <repositories>
-                      <repository>
-                          <id>gitlab-maven</id>
-                          <url>${CORE_MAVEN_REGISTRY}</url>
-                      </repository>
-                  </repositories>
-              </profile>
-          </profiles>
-          <activeProfiles>
-              <activeProfile>gitlab-private</activeProfile>
-          </activeProfiles>
-      </settings>
-      EOF
+      printf '%s\n' \
+        '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' \
+        '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' \
+        '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">' \
+        '    <servers>' \
+        '        <server>' \
+        '            <id>gitlab-maven</id>' \
+        "            <username>${CORE_PACKAGE_USER}</username>" \
+        "            <password>${CORE_PACKAGE_TOKEN:-$CI_JOB_TOKEN}</password>" \
+        '        </server>' \
+        '    </servers>' \
+        '    <profiles>' \
+        '        <profile>' \
+        '            <id>gitlab-private</id>' \
+        '            <repositories>' \
+        '                <repository>' \
+        '                    <id>gitlab-maven</id>' \
+        "                    <url>${CORE_MAVEN_REGISTRY}</url>" \
+        '                </repository>' \
+        '            </repositories>' \
+        '        </profile>' \
+        '    </profiles>' \
+        '    <activeProfiles>' \
+        '        <activeProfile>gitlab-private</activeProfile>' \
+        '    </activeProfiles>' \
+        '</settings>' > settings.xml
     - |
       if [ -z "$CORE_MAVEN_REGISTRY" ]; then
         echo "CORE_MAVEN_REGISTRY is required for plugin repo package job"
