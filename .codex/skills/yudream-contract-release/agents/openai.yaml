@@ -1,0 +1,4 @@
+interface:
+  display_name: "YuDream Contract Release"
+  short_description: "Release SPI/SDK/components and sync plugin repo deps."
+  default_prompt: "Use $yudream-contract-release to bump SPI/SDK versions, publish a core release tag, and update yudream-admin-plugins dependencies."
