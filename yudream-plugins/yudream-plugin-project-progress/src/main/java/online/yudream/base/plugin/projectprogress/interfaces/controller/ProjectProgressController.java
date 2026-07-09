@@ -39,6 +39,11 @@ public class ProjectProgressController {
         return http.departments(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/minecraft/servers", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse minecraftServers(PluginHttpRequest request) {
+        return http.minecraftServers(request);
+    }
+
     @PluginHttpEndpoint(method = "POST", path = "/projects", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse createProject(PluginHttpRequest request) {
         return http.createProject(request);
@@ -107,6 +112,26 @@ public class ProjectProgressController {
     @PluginHttpEndpoint(method = "GET", path = "/acceptance/pending", permission = ProjectProgressPlugin.ACCEPT_PERMISSION)
     public PluginHttpResponse pendingAcceptance(PluginHttpRequest request) {
         return http.pendingAcceptance(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/details/{detailId}/submit-acceptance", permission = ProjectProgressPlugin.CHECK_IN_PERMISSION)
+    public PluginHttpResponse submitAcceptance(PluginHttpRequest request) {
+        return http.submitAcceptance(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/projects/{projectId}/check-ins", permission = ProjectProgressPlugin.VIEW_PERMISSION)
+    public PluginHttpResponse projectCheckIns(PluginHttpRequest request) {
+        return http.projectCheckIns(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/projects/{projectId}/check-ins", permission = ProjectProgressPlugin.CHECK_IN_PERMISSION)
+    public PluginHttpResponse createProjectCheckIn(PluginHttpRequest request) {
+        return http.createProjectCheckIn(request);
+    }
+
+    @PluginHttpEndpoint(method = "POST", path = "/projects/{projectId}/check-ins/minecraft", permission = ProjectProgressPlugin.CHECK_IN_PERMISSION)
+    public PluginHttpResponse projectMinecraftCheckIn(PluginHttpRequest request) {
+        return http.projectMinecraftCheckIn(request);
     }
 
     @PluginHttpEndpoint(method = "GET", path = "/details/{detailId}/check-ins", permission = ProjectProgressPlugin.VIEW_PERMISSION)

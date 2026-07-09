@@ -24,12 +24,12 @@ public record ProjectCheckInRecord(
     public ProjectCheckInRecord {
         id = requireText(id, "打卡记录 ID 不能为空");
         projectId = requireText(projectId, "项目 ID 不能为空");
-        detailId = requireText(detailId, "工作细节 ID 不能为空");
+        detailId = text(detailId);
         userId = requireText(userId, "打卡用户不能为空");
         if (type == null) {
             throw new IllegalArgumentException("打卡类型不能为空");
         }
-        summary = summary == null ? "" : summary.trim();
+        summary = text(summary);
         files = files == null ? List.of() : List.copyOf(files);
     }
 
@@ -38,6 +38,10 @@ public record ProjectCheckInRecord(
                                               ProjectLocationEvidence location, ProjectMinecraftEvidence minecraft) {
         return new ProjectCheckInRecord(UUID.randomUUID().toString(), projectId, detailId, userId, type, summary,
                 files, location, minecraft, System.currentTimeMillis());
+    }
+
+    private static String text(String value) {
+        return value == null ? "" : value.trim();
     }
 
     private static String requireText(String value, String message) {

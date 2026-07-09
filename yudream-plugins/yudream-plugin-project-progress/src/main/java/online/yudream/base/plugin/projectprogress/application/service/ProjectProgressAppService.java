@@ -8,6 +8,7 @@ import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgres
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectAcceptanceDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectCheckInDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectDeptOptionDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectMinecraftServerOptionDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressEventDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressProjectDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressStatusDTO;
@@ -30,6 +31,8 @@ import online.yudream.base.plugin.projectprogress.domain.valobj.ProjectMinecraft
 import online.yudream.base.plugin.projectprogress.domain.valobj.ProjectMinecraftPolicy;
 import online.yudream.base.plugin.projectprogress.domain.valobj.ProjectStatusOption;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
+import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftServer;
+import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftService;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.user.PluginDeptOption;
 import online.yudream.base.plugin.spi.system.user.PluginUserDept;
@@ -40,12 +43,14 @@ import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
 public class ProjectProgressAppService {
 
     private static final int SCAN_PAGE_SIZE = 200;
+    private static final String MINECRAFT_PLUGIN = "minecraft-server";
 
     private final ProjectProgressRepository repository;
     private final PluginFileStore files;
@@ -72,6 +77,10 @@ public class ProjectProgressAppService {
         return repository.listProjects(safePage(page), safeSize(size)).stream().map(assembler::toDTO).toList();
     }
 
+    public ProjectProgressProjectDTO project(String projectId) {
+        return assembler.toDTO(requireProject(projectId));
+    }
+
     public List<ProjectUserOptionDTO> searchUsers(String keyword, String deptId, int page, int size) {
         if (framework == null || framework.users() == null) {
             return List.of();
@@ -92,14 +101,9 @@ public class ProjectProgressAppService {
             if (id == null) {
                 continue;
             }
-            framework.users().findById(id)
-                    .map(this::toUserOptionDTO)
-                    .ifPresent(result::add);
+            framework.users().findById(id).map(this::toUserOptionDTO).ifPresent(result::add);
         }
-        return result.stream()
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+        return result.stream().filter(Objects::nonNull).distinct().toList();
     }
 
     public List<ProjectDeptOptionDTO> departments(String keyword) {
@@ -109,8 +113,13 @@ public class ProjectProgressAppService {
         return framework.users().listDepartments(keyword).stream().map(this::toDeptOptionDTO).toList();
     }
 
-    public ProjectProgressProjectDTO project(String projectId) {
-        return assembler.toDTO(requireProject(projectId));
+    public List<ProjectMinecraftServerOptionDTO> minecraftServers(boolean includeDisabled) {
+        if (framework == null) {
+            return List.of();
+        }
+        return framework.extension(MINECRAFT_PLUGIN, PluginMinecraftService.class)
+                .map(service -> service.minecraftServers(includeDisabled).stream().map(this::toMinecraftServerOptionDTO).toList())
+                .orElseGet(List::of);
     }
 
     public ProjectProgressProjectDTO createProject(ProjectProgressProjectSaveCmd cmd, String operatorUserId) {
@@ -166,8 +175,8 @@ public class ProjectProgressAppService {
     public ProjectWorkDetailDTO createDetail(String projectId, ProjectProgressDetailSaveCmd cmd, String operatorUserId) {
         ProjectProgressProject project = requireProject(projectId);
         ProjectAssignmentMode assignmentMode = ProjectAssignmentMode.of(cmd.assignmentMode());
-        ProjectWorkDetail detail = ProjectWorkDetail.create(project.id(), cmd.title(), cmd.description(),
-                firstText(cmd.statusCode(), project.defaultStatusCode()), assignmentMode,
+        String statusCode = editableDetailStatus(project, firstText(cmd.statusCode(), project.defaultStatusCode()), null);
+        ProjectWorkDetail detail = ProjectWorkDetail.create(project.id(), cmd.title(), cmd.description(), statusCode, assignmentMode,
                 intValue(cmd.requiredAssigneeCount(), 1), candidatePool(cmd.candidateUserIds(), project, assignmentMode),
                 cmd.assigneeUserIds(), cmd.acceptorUserIds(), cmd.dueAt());
         ProjectWorkDetail saved = repository.saveDetail(detail);
@@ -179,8 +188,8 @@ public class ProjectProgressAppService {
         ProjectWorkDetail existing = requireDetail(detailId);
         ProjectProgressProject project = requireProject(existing.projectId());
         ProjectAssignmentMode assignmentMode = ProjectAssignmentMode.of(cmd.assignmentMode());
-        ProjectWorkDetail saved = repository.saveDetail(existing.update(cmd.title(), cmd.description(),
-                firstText(cmd.statusCode(), existing.statusCode()), assignmentMode,
+        String statusCode = editableDetailStatus(project, firstText(cmd.statusCode(), existing.statusCode()), existing.statusCode());
+        ProjectWorkDetail saved = repository.saveDetail(existing.update(cmd.title(), cmd.description(), statusCode, assignmentMode,
                 intValue(cmd.requiredAssigneeCount(), existing.requiredAssigneeCount()), candidatePool(cmd.candidateUserIds(), project, assignmentMode),
                 cmd.assigneeUserIds(), cmd.acceptorUserIds(), cmd.published(), cmd.dueAt()));
         event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已更新", Map.of("title", saved.title()));
@@ -227,9 +236,29 @@ public class ProjectProgressAppService {
         return assembler.toDTO(saved);
     }
 
+    public ProjectWorkDetailDTO submitAcceptance(String detailId, String operatorUserId) {
+        ProjectWorkDetail detail = requireDetail(detailId);
+        ProjectProgressProject project = requireProject(detail.projectId());
+        String safeUserId = requireText(operatorUserId, "请先登录");
+        if (!detail.assignedTo(safeUserId) && !project.canManage(safeUserId)) {
+            throw new IllegalArgumentException("当前用户不是该工作细节负责人，不能提交验收");
+        }
+        if (detail.statusCode().equals(project.doneStatusCode())) {
+            throw new IllegalArgumentException("已完成的细节不能重复提交验收");
+        }
+        ProjectWorkDetail saved = repository.saveDetail(detail.submitAcceptance(reviewingStatusCode(project, detail)));
+        event(project.id(), saved.id(), operatorUserId, ProjectProgressEventType.DETAIL_SAVED, "工作细节已提交验收", Map.of("title", saved.title()));
+        return assembler.toDTO(saved);
+    }
+
     public List<ProjectCheckInDTO> checkIns(String detailId, int page, int size) {
         requireDetail(detailId);
         return repository.listCheckIns(detailId, safePage(page), safeSize(size)).stream().map(assembler::toDTO).toList();
+    }
+
+    public List<ProjectCheckInDTO> projectCheckIns(String projectId, int page, int size) {
+        requireProject(projectId);
+        return repository.listProjectCheckIns(projectId, safePage(page), safeSize(size)).stream().map(assembler::toDTO).toList();
     }
 
     public ProjectCheckInDTO checkIn(String detailId, ProjectProgressCheckInCmd cmd, String userId) {
@@ -240,7 +269,18 @@ public class ProjectProgressAppService {
         ProjectCheckInRecord saved = repository.saveCheckIn(ProjectCheckInRecord.create(project.id(), detail.id(), userId,
                 type, cmd.summary(), fileEvidence(project.id(), detail.id(), userId, cmd.files()),
                 location(cmd.location()), null));
-        event(project.id(), detail.id(), userId, ProjectProgressEventType.CHECK_IN_CREATED, "用户已打卡", Map.of("type", type.name()));
+        event(project.id(), detail.id(), userId, ProjectProgressEventType.CHECK_IN_CREATED, "用户已完成细节打卡", Map.of("type", type.name()));
+        return assembler.toDTO(saved);
+    }
+
+    public ProjectCheckInDTO projectCheckIn(String projectId, ProjectProgressCheckInCmd cmd, String userId) {
+        ProjectProgressProject project = requireProject(projectId);
+        ProjectCheckInType type = ProjectCheckInType.of(cmd.type());
+        ensureCanProjectCheckIn(project, userId, type);
+        ProjectCheckInRecord saved = repository.saveCheckIn(ProjectCheckInRecord.create(project.id(), "", userId,
+                type, cmd.summary(), fileEvidence(project.id(), "", userId, cmd.files()),
+                location(cmd.location()), null));
+        event(project.id(), "", userId, ProjectProgressEventType.CHECK_IN_CREATED, "用户已完成项目打卡", Map.of("type", type.name()));
         return assembler.toDTO(saved);
     }
 
@@ -255,18 +295,26 @@ public class ProjectProgressAppService {
         return assembler.toDTO(saved);
     }
 
+    public ProjectCheckInDTO projectMinecraftCheckIn(String projectId, String userId) {
+        ProjectProgressProject project = requireProject(projectId);
+        ensureCanProjectCheckIn(project, userId, ProjectCheckInType.MINECRAFT_ONLINE);
+        ProjectMinecraftEvidence evidence = minecraft.requireEvidence(project.minecraftPolicy(), userId);
+        ProjectCheckInRecord saved = repository.saveCheckIn(ProjectCheckInRecord.create(project.id(), "", userId,
+                ProjectCheckInType.MINECRAFT_ONLINE, "Minecraft 在线时长自动打卡", List.of(), null, evidence));
+        event(project.id(), "", userId, ProjectProgressEventType.MINECRAFT_CHECK_IN_CREATED, "Minecraft 在线时长打卡已生成", Map.of("userId", userId));
+        return assembler.toDTO(saved);
+    }
+
     public List<ProjectCheckInDTO> autoMinecraftCheckIns(String projectId) {
         ProjectProgressProject project = requireProject(projectId);
         if (!project.minecraftPolicy().enabled() || !project.minecraftPolicy().autoCheckInEnabled()) {
             throw new IllegalArgumentException("该项目未启用 Minecraft 自动打卡");
         }
-        List<ProjectCheckInDTO> result = new java.util.ArrayList<>();
-        for (ProjectWorkDetail detail : allDetails(project.id())) {
-            for (String userId : detail.assigneeUserIds()) {
-                try {
-                    result.add(minecraftCheckIn(detail.id(), userId));
-                } catch (RuntimeException ignored) {
-                }
+        List<ProjectCheckInDTO> result = new ArrayList<>();
+        for (String userId : projectParticipants(project)) {
+            try {
+                result.add(projectMinecraftCheckIn(project.id(), userId));
+            } catch (RuntimeException ignored) {
             }
         }
         return result;
@@ -277,11 +325,10 @@ public class ProjectProgressAppService {
         ProjectProgressProject project = requireProject(detail.projectId());
         ensureCanAccept(detail, project, operatorUserId);
         String fromStatus = detail.statusCode();
-        String toStatus = firstText(cmd.toStatusCode(), project.doneStatusCode());
-        ProjectWorkDetail saved = repository.saveDetail(detail.withStatus(toStatus));
+        ProjectWorkDetail saved = repository.saveDetail(detail.accept(project.doneStatusCode()));
         ProjectAcceptanceRecord record = repository.saveAcceptanceRecord(ProjectAcceptanceRecord.create(project.id(), detail.id(),
                 operatorUserId, ProjectAcceptanceResult.ACCEPTED, fromStatus, saved.statusCode(), cmd.reason()));
-        event(project.id(), detail.id(), operatorUserId, ProjectProgressEventType.DETAIL_ACCEPTED, "工作细节已验收通过", Map.of("toStatusCode", toStatus));
+        event(project.id(), detail.id(), operatorUserId, ProjectProgressEventType.DETAIL_ACCEPTED, "工作细节验收通过", Map.of("toStatusCode", saved.statusCode()));
         return assembler.toDTO(record);
     }
 
@@ -290,12 +337,12 @@ public class ProjectProgressAppService {
         ProjectProgressProject project = requireProject(detail.projectId());
         ensureCanAccept(detail, project, operatorUserId);
         String fromStatus = detail.statusCode();
-        String toStatus = firstText(cmd.toStatusCode(), firstText(project.reworkStatusCode(), project.defaultStatusCode()));
-        ProjectWorkDetail saved = repository.saveDetail(detail.withStatus(toStatus));
+        String toStatus = firstText(project.reworkStatusCode(), project.defaultStatusCode());
+        ProjectWorkDetail saved = repository.saveDetail(detail.reject(toStatus));
         safeNotifyRework(project, saved, detail.assigneeUserIds(), cmd.reason());
         ProjectAcceptanceRecord record = repository.saveAcceptanceRecord(ProjectAcceptanceRecord.create(project.id(), detail.id(),
                 operatorUserId, ProjectAcceptanceResult.REJECTED, fromStatus, saved.statusCode(), cmd.reason()));
-        event(project.id(), detail.id(), operatorUserId, ProjectProgressEventType.DETAIL_REJECTED, "工作细节验收未通过", Map.of("toStatusCode", toStatus));
+        event(project.id(), detail.id(), operatorUserId, ProjectProgressEventType.DETAIL_REJECTED, "工作细节验收未通过", Map.of("toStatusCode", saved.statusCode()));
         return assembler.toDTO(record);
     }
 
@@ -329,8 +376,33 @@ public class ProjectProgressAppService {
         });
     }
 
+    private void ensureCanProjectCheckIn(ProjectProgressProject project, String userId, ProjectCheckInType type) {
+        String safeUserId = requireText(userId, "请先登录");
+        if (!project.enabled()) {
+            throw new IllegalArgumentException("项目未启用，暂不能打卡");
+        }
+        if (!project.allows(type)) {
+            throw new IllegalArgumentException("项目未允许该打卡方式：" + type.name());
+        }
+        if (!project.containsMember(safeUserId)) {
+            throw new IllegalArgumentException("当前用户不是该项目成员，不能打卡");
+        }
+        repository.latestProjectCheckIn(project.id(), safeUserId).ifPresent(latest -> {
+            long intervalMillis = project.minCheckInIntervalMinutes() * 60_000L;
+            if (intervalMillis > 0 && System.currentTimeMillis() - latest.createdAt() < intervalMillis) {
+                throw new IllegalArgumentException("未达到项目要求的最小打卡间隔");
+            }
+        });
+    }
+
     private void ensureCanAccept(ProjectWorkDetail detail, ProjectProgressProject project, String operatorUserId) {
         String safeUserId = requireText(operatorUserId, "请先登录");
+        if (!detail.pendingAcceptance()) {
+            throw new IllegalArgumentException("该工作细节尚未提交验收");
+        }
+        if (detail.statusCode().equals(project.doneStatusCode())) {
+            throw new IllegalArgumentException("已完成的工作细节不能再次验收");
+        }
         if (!detail.canAccept(safeUserId, project)) {
             throw new IllegalArgumentException("当前用户没有验收该工作细节的权限");
         }
@@ -340,13 +412,14 @@ public class ProjectProgressAppService {
         if (items == null || items.isEmpty()) {
             return List.of();
         }
-        List<ProjectFileEvidence> result = new java.util.ArrayList<>();
+        List<ProjectFileEvidence> result = new ArrayList<>();
         int index = 0;
         for (ProjectProgressCheckInCmd.FileEvidence item : items) {
             byte[] content = decodeBase64(item.base64());
             String filename = firstText(item.filename(), "evidence-" + index);
             String contentType = firstText(item.contentType(), "application/octet-stream");
-            String objectKey = "check-ins/" + projectId + "/" + detailId + "/" + userId + "/" + System.currentTimeMillis() + "-" + index + "-" + sanitize(filename);
+            String scope = detailId == null || detailId.isBlank() ? "project" : detailId;
+            String objectKey = "check-ins/" + projectId + "/" + scope + "/" + userId + "/" + System.currentTimeMillis() + "-" + index + "-" + sanitize(filename);
             files.put(objectKey, new ByteArrayInputStream(content), content.length, contentType);
             result.add(new ProjectFileEvidence(objectKey, filename, contentType, content.length, Boolean.TRUE.equals(item.image())));
             index++;
@@ -398,19 +471,6 @@ public class ProjectProgressAppService {
                 .orElseThrow(() -> new IllegalArgumentException("工作细节不存在：" + detailId));
     }
 
-    private List<ProjectWorkDetail> allDetails(String projectId) {
-        List<ProjectWorkDetail> result = new java.util.ArrayList<>();
-        int page = 1;
-        while (true) {
-            List<ProjectWorkDetail> batch = repository.listDetails(projectId, page, SCAN_PAGE_SIZE);
-            result.addAll(batch);
-            if (batch.size() < SCAN_PAGE_SIZE) {
-                return result;
-            }
-            page++;
-        }
-    }
-
     private List<ProjectStatusOption> statuses(List<ProjectProgressProjectSaveCmd.Status> statuses) {
         if (statuses == null || statuses.isEmpty()) {
             return ProjectProgressProject.defaultStatuses();
@@ -454,6 +514,11 @@ public class ProjectProgressAppService {
                 dept.children() == null ? List.of() : dept.children().stream().map(this::toDeptOptionDTO).toList());
     }
 
+    private ProjectMinecraftServerOptionDTO toMinecraftServerOptionDTO(PluginMinecraftServer server) {
+        return new ProjectMinecraftServerOptionDTO(server.id(), server.name(), server.enabled(),
+                server.currentSeasonId(), server.currentSeasonName());
+    }
+
     private List<String> emptyToMembers(List<String> candidates, ProjectProgressProject project) {
         return candidates == null || candidates.isEmpty() ? project.memberUserIds() : candidates;
     }
@@ -467,7 +532,7 @@ public class ProjectProgressAppService {
 
     private List<String> managers(List<String> managerUserIds, String operatorUserId) {
         String owner = requireText(operatorUserId, "请先登录");
-        List<String> result = new java.util.ArrayList<>();
+        List<String> result = new ArrayList<>();
         if (managerUserIds != null) {
             managerUserIds.stream()
                     .filter(value -> value != null && !value.isBlank())
@@ -478,6 +543,35 @@ public class ProjectProgressAppService {
             result.add(0, owner);
         }
         return result.stream().distinct().toList();
+    }
+
+    private List<String> projectParticipants(ProjectProgressProject project) {
+        List<String> result = new ArrayList<>();
+        result.addAll(project.managerUserIds());
+        result.addAll(project.memberUserIds());
+        return result.stream().filter(value -> value != null && !value.isBlank()).distinct().toList();
+    }
+
+    private String editableDetailStatus(ProjectProgressProject project, String requestedStatus, String existingStatus) {
+        String status = requireText(requestedStatus, "状态不能为空").toUpperCase();
+        boolean existingDone = existingStatus != null && existingStatus.equalsIgnoreCase(project.doneStatusCode());
+        if (status.equals(project.doneStatusCode()) && !existingDone) {
+            throw new IllegalArgumentException("完成状态只能通过验收通过产生");
+        }
+        return status;
+    }
+
+    private String reviewingStatusCode(ProjectProgressProject project, ProjectWorkDetail detail) {
+        return project.statuses().stream()
+                .filter(status -> !status.code().equals(project.doneStatusCode()))
+                .filter(status -> status.code().equalsIgnoreCase("REVIEWING")
+                        || status.label().contains("验收")
+                        || status.label().contains("复审")
+                        || status.label().contains("审核")
+                        || status.code().toLowerCase(Locale.ROOT).contains("review"))
+                .map(ProjectStatusOption::code)
+                .findFirst()
+                .orElse(detail.statusCode());
     }
 
     private int safePage(int page) {

@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import type { ProjectProgressModel } from '../composables/useProjectProgress'
-import ProgressPanel from '../components/ProgressPanel.vue'
+import { useRouter } from 'vue-router'
 
-defineProps<{
+const props = defineProps<{
   model: ProjectProgressModel
 }>()
+
+const router = useRouter()
+
+async function goCheckIn(projectId: string) {
+  await props.model.selectProjectById(projectId)
+  await router.push({ name: 'platform-plugin-project-progress-check-ins' })
+}
 </script>
 
 <template>
   <section class="pp-page">
     <section class="pp-toolbar">
       <div>
-        <span>Task Center</span>
+        <span>任务认领</span>
         <h2>任务中心</h2>
       </div>
-      <button type="button" :disabled="model.loading" @click="model.loadTaskCenter">
-        刷新
-      </button>
+      <a-button :loading="model.loading" @click="model.loadTaskCenter">刷新</a-button>
     </section>
 
     <div class="pp-metrics">
@@ -38,77 +43,110 @@ defineProps<{
       </article>
     </div>
 
-    <ProgressPanel title="可认领任务" subtle="公开任务可直接认领；指定候选人的任务只会对候选人显示">
-      <table class="pp-table">
-        <thead>
-          <tr>
-            <th>项目</th>
-            <th>任务</th>
-            <th>名额</th>
-            <th>截止时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="task in model.claimableTasks" :key="task.id">
-            <td>{{ model.projectName(task.projectId) }}</td>
-            <td>
-              <strong>{{ task.title }}</strong>
-              <span>{{ task.description || '暂无说明' }}</span>
-            </td>
-            <td>{{ task.assigneeUserIds.length }} / {{ task.requiredAssigneeCount }}</td>
-            <td>{{ model.formatTime(task.dueAt) }}</td>
-            <td>
-              <button class="pp-primary" type="button" :disabled="model.saving" @click="model.claim(task)">
+    <section class="pp-panel">
+      <header class="pp-panel-head">
+        <div>
+          <h3>可认领任务</h3>
+          <span>公开任务可直接认领，指定候选人的任务只会对候选人显示</span>
+        </div>
+      </header>
+      <a-table :data="model.claimableTasks" :pagination="false" row-key="id">
+        <template #columns>
+          <a-table-column title="项目" :width="180">
+            <template #cell="{ record }">
+              {{ model.projectName(record.projectId) }}
+            </template>
+          </a-table-column>
+          <a-table-column title="任务">
+            <template #cell="{ record }">
+              <strong>{{ record.title }}</strong>
+              <div class="pp-table-sub">{{ record.description || '暂无说明' }}</div>
+            </template>
+          </a-table-column>
+          <a-table-column title="名额" :width="110">
+            <template #cell="{ record }">
+              {{ record.assigneeUserIds.length }} / {{ record.requiredAssigneeCount }}
+            </template>
+          </a-table-column>
+          <a-table-column title="截止时间" :width="170">
+            <template #cell="{ record }">
+              {{ model.formatTime(record.dueAt) }}
+            </template>
+          </a-table-column>
+          <a-table-column title="操作" :width="120">
+            <template #cell="{ record }">
+              <a-button type="primary" :loading="model.saving" @click="model.claim(record)">
                 认领
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!model.claimableTasks.length">
-            <td colspan="5">
-              <div class="pp-empty">暂无可认领任务</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </ProgressPanel>
+              </a-button>
+            </template>
+          </a-table-column>
+        </template>
+      </a-table>
+      <a-empty v-if="!model.claimableTasks.length" description="暂无可认领任务" />
+    </section>
 
-    <ProgressPanel title="我的任务" subtle="认领或分配给你的任务会出现在这里，可直接进入打卡动作">
-      <table class="pp-table">
-        <thead>
-          <tr>
-            <th>项目</th>
-            <th>任务</th>
-            <th>状态</th>
-            <th>截止时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="task in model.myTasks" :key="task.id">
-            <td>{{ model.projectName(task.projectId) }}</td>
-            <td>
-              <strong>{{ task.title }}</strong>
-              <span>{{ task.description || '暂无说明' }}</span>
-            </td>
-            <td>{{ model.statusLabel(task.statusCode) }}</td>
-            <td>{{ model.formatTime(task.dueAt) }}</td>
-            <td>
-              <button type="button" @click="model.selectDetail(task)">
-                查看打卡
-              </button>
-              <button v-if="model.canMinecraftCheckIn(task)" type="button" @click="model.minecraftCheckIn(task)">
-                MC 打卡
-              </button>
-            </td>
-          </tr>
-          <tr v-if="!model.myTasks.length">
-            <td colspan="5">
-              <div class="pp-empty">你还没有负责的任务</div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </ProgressPanel>
+    <section class="pp-panel">
+      <header class="pp-panel-head">
+        <div>
+          <h3>我的任务</h3>
+          <span>打卡按项目记录，任务完成必须先提交验收</span>
+        </div>
+      </header>
+      <a-table :data="model.myTasks" :pagination="false" row-key="id">
+        <template #columns>
+          <a-table-column title="项目" :width="180">
+            <template #cell="{ record }">
+              {{ model.projectName(record.projectId) }}
+            </template>
+          </a-table-column>
+          <a-table-column title="任务">
+            <template #cell="{ record }">
+              <strong>{{ record.title }}</strong>
+              <div class="pp-table-sub">{{ record.description || '暂无说明' }}</div>
+            </template>
+          </a-table-column>
+          <a-table-column title="状态" :width="170">
+            <template #cell="{ record }">
+              <a-space wrap>
+                <a-tag :color="record.pendingAcceptance ? 'orange' : 'arcoblue'">
+                  {{ model.detailStatusLabel(record) }}
+                </a-tag>
+                <a-tag v-if="record.pendingAcceptance" color="orange">待验收</a-tag>
+              </a-space>
+            </template>
+          </a-table-column>
+          <a-table-column title="截止时间" :width="170">
+            <template #cell="{ record }">
+              {{ model.formatTime(record.dueAt) }}
+            </template>
+          </a-table-column>
+          <a-table-column title="操作" :width="280" fixed="right">
+            <template #cell="{ record }">
+              <a-space>
+                <a-button type="text" @click="goCheckIn(record.projectId)">
+                  项目打卡
+                </a-button>
+                <a-button
+                  v-if="model.canMinecraftCheckIn(record)"
+                  type="text"
+                  @click="model.minecraftCheckIn(record.projectId)"
+                >
+                  MC 打卡
+                </a-button>
+                <a-button
+                  type="primary"
+                  :disabled="!model.canSubmitAcceptance(record)"
+                  :loading="model.saving"
+                  @click="model.submitAcceptance(record)"
+                >
+                  提交验收
+                </a-button>
+              </a-space>
+            </template>
+          </a-table-column>
+        </template>
+      </a-table>
+      <a-empty v-if="!model.myTasks.length" description="你还没有负责的任务" />
+    </section>
   </section>
 </template>

@@ -50,6 +50,15 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
                         sort = 20
                 ),
                 @PluginRoute(
+                        path = "/platform/plugins/project-progress/details",
+                        name = "platform-plugin-project-progress-details",
+                        title = "工作细节",
+                        icon = "i-ri:list-check-3",
+                        component = "project-progress/Details",
+                        permission = ProjectProgressPlugin.MANAGE_PERMISSION,
+                        sort = 22
+                ),
+                @PluginRoute(
                         path = "/platform/plugins/project-progress/task-center",
                         name = "platform-plugin-project-progress-task-center",
                         title = "任务中心",

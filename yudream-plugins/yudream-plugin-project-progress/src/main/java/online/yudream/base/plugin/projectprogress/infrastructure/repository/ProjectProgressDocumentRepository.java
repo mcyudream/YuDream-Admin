@@ -103,6 +103,7 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
     public List<ProjectWorkDetail> listPendingAcceptance(String userId, int page, int size) {
         return allDetails().stream()
                 .filter(ProjectWorkDetail::published)
+                .filter(ProjectWorkDetail::pendingAcceptance)
                 .filter(detail -> detail.acceptorUserIds().isEmpty() || detail.acceptorUserIds().contains(userId))
                 .sorted(Comparator.comparingLong(ProjectWorkDetail::updatedAt).reversed())
                 .skip((long) (page - 1) * size)
@@ -131,6 +132,21 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
     @Override
     public Optional<ProjectCheckInRecord> latestCheckIn(String detailId, String userId) {
         return allCheckIns(detailId).stream()
+                .filter(record -> userId.equals(record.userId()))
+                .max(Comparator.comparingLong(ProjectCheckInRecord::createdAt));
+    }
+
+    @Override
+    public List<ProjectCheckInRecord> listProjectCheckIns(String projectId, int page, int size) {
+        return documents.findByField(CHECK_INS, "projectId", projectId, page, size).stream()
+                .map(this::toCheckIn)
+                .sorted(Comparator.comparingLong(ProjectCheckInRecord::createdAt).reversed())
+                .toList();
+    }
+
+    @Override
+    public Optional<ProjectCheckInRecord> latestProjectCheckIn(String projectId, String userId) {
+        return allProjectCheckIns(projectId).stream()
                 .filter(record -> userId.equals(record.userId()))
                 .max(Comparator.comparingLong(ProjectCheckInRecord::createdAt));
     }
@@ -189,6 +205,20 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
         }
     }
 
+    private List<ProjectCheckInRecord> allProjectCheckIns(String projectId) {
+        List<ProjectCheckInRecord> result = new java.util.ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<ProjectCheckInRecord> batch = documents.findByField(CHECK_INS, "projectId", projectId, page, SCAN_PAGE_SIZE)
+                    .stream().map(this::toCheckIn).toList();
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
     private Map<String, Object> projectDocument(ProjectProgressProject project) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("id", project.id());
@@ -222,6 +252,7 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
         document.put("assigneeUserIds", detail.assigneeUserIds());
         document.put("acceptorUserIds", detail.acceptorUserIds());
         document.put("published", detail.published());
+        document.put("pendingAcceptance", detail.pendingAcceptance());
         document.put("dueAt", detail.dueAt());
         document.put("createdAt", detail.createdAt());
         document.put("updatedAt", detail.updatedAt());
@@ -357,6 +388,7 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
                 stringList(document.get("assigneeUserIds")),
                 stringList(document.get("acceptorUserIds")),
                 bool(document, "published", false),
+                bool(document, "pendingAcceptance", false),
                 longObject(document, "dueAt"),
                 number(document, "createdAt", 0),
                 number(document, "updatedAt", 0)

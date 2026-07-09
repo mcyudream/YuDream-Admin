@@ -39,6 +39,10 @@ public interface ProjectProgressRepository {
 
     Optional<ProjectCheckInRecord> latestCheckIn(String detailId, String userId);
 
+    List<ProjectCheckInRecord> listProjectCheckIns(String projectId, int page, int size);
+
+    Optional<ProjectCheckInRecord> latestProjectCheckIn(String projectId, String userId);
+
     ProjectAcceptanceRecord saveAcceptanceRecord(ProjectAcceptanceRecord record);
 
     List<ProjectAcceptanceRecord> listAcceptanceRecords(String detailId, int page, int size);

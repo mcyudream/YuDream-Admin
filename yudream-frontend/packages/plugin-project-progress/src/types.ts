@@ -22,6 +22,14 @@ export interface ProjectDeptOption {
   children: ProjectDeptOption[]
 }
 
+export interface ProjectMinecraftServerOption {
+  id: string
+  name: string
+  enabled: boolean
+  currentSeasonId?: string
+  currentSeasonName?: string
+}
+
 export interface ProjectStatusOption {
   code: string
   label: string
@@ -67,6 +75,7 @@ export interface ProjectWorkDetail {
   assigneeUserIds: string[]
   acceptorUserIds: string[]
   published: boolean
+  pendingAcceptance: boolean
   dueAt?: number | null
   createdAt: number
   updatedAt: number

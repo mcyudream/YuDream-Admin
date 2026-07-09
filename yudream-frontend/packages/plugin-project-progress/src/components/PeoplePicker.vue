@@ -33,7 +33,7 @@ const selectedSet = computed(() => new Set(props.modelValue || []))
 const departments = computed(() => flattenDepartments(props.model.departments || []))
 const activeDeptName = computed(() => departments.value.find(item => item.dept.id === selectedDeptId.value)?.dept.name || '全部人员')
 
-watch(() => props.modelValue.join(','), value => {
+watch(() => (props.modelValue || []).join(','), (value) => {
   if (value) {
     void props.model.resolveUsers(props.modelValue)
   }
@@ -46,10 +46,6 @@ async function showPicker() {
     refreshDepartments(),
     props.model.resolveUsers(props.modelValue),
   ])
-}
-
-function closePicker() {
-  open.value = false
 }
 
 async function refreshUsers() {
@@ -94,7 +90,7 @@ async function addDepartment(dept: ProjectDeptOption) {
 function toggleUser(user: ProjectUserOption) {
   if (!props.multiple) {
     updateSelection([user.id])
-    closePicker()
+    open.value = false
     return
   }
   if (selectedSet.value.has(user.id)) {
@@ -122,94 +118,116 @@ function flattenDepartments(items: ProjectDeptOption[], level = 0): Array<{ dept
 
 <template>
   <div class="pp-picker">
-    <div class="pp-picker-field">
-      <div class="pp-chip-list">
-        <span v-if="!selectedUsers.length" class="pp-muted">{{ placeholder }}</span>
-        <span v-for="user in selectedUsers" :key="user.id" class="pp-chip">
+    <div class="pp-picker-field arco-picker-field">
+      <a-space wrap>
+        <a-tag
+          v-for="user in selectedUsers"
+          :key="user.id"
+          closable
+          @close="removeUser(user.id)"
+        >
           {{ model.userLabel(user) }}
-          <button type="button" title="移除" @click="removeUser(user.id)">×</button>
-        </span>
-      </div>
-      <button type="button" @click="showPicker">
+        </a-tag>
+        <span v-if="!selectedUsers.length" class="pp-muted">{{ placeholder }}</span>
+      </a-space>
+      <a-button type="outline" @click="showPicker">
         {{ selectedUsers.length ? '调整人员' : placeholder }}
-      </button>
+      </a-button>
     </div>
 
-    <div v-if="open" class="pp-modal-mask" @click.self="closePicker">
-      <section class="pp-modal">
-        <header class="pp-modal-head">
-          <div>
-            <h3>{{ title }}</h3>
-            <span>{{ activeDeptName }} · 已选 {{ selectedUsers.length }} 人</span>
-          </div>
-          <button type="button" title="关闭" @click="closePicker">×</button>
-        </header>
+    <a-modal
+      v-model:visible="open"
+      :title="title"
+      :width="920"
+      :mask-closable="false"
+      unmount-on-close
+    >
+      <div class="pp-picker-summary">
+        <span>{{ activeDeptName }}</span>
+        <a-tag color="arcoblue">已选 {{ selectedUsers.length }} 人</a-tag>
+      </div>
 
-        <div class="pp-picker-layout">
-          <aside v-if="allowDepartments" class="pp-dept-pane">
-            <div class="pp-search">
-              <input
-                v-model="departmentKeyword"
-                placeholder="搜索部门"
-                @keydown.enter.prevent="refreshDepartments"
+      <div class="pp-picker-layout">
+        <aside v-if="allowDepartments" class="pp-dept-pane">
+          <a-input-search
+            v-model="departmentKeyword"
+            placeholder="搜索部门"
+            :loading="loadingDepartments"
+            @search="refreshDepartments"
+            @press-enter="refreshDepartments"
+          />
+          <a-button
+            long
+            :type="!selectedDeptId ? 'primary' : 'text'"
+            class="pp-dept-button"
+            @click="chooseDepartment('')"
+          >
+            全部人员
+          </a-button>
+          <a-spin :loading="loadingDepartments">
+            <div class="pp-dept-list">
+              <div
+                v-for="item in departments"
+                :key="item.dept.id"
+                class="pp-dept-row"
+                :style="{ paddingLeft: `${8 + item.level * 16}px` }"
               >
-              <button type="button" :disabled="loadingDepartments" @click="refreshDepartments">搜索</button>
-            </div>
-            <button
-              type="button"
-              class="pp-dept-item"
-              :class="{ active: !selectedDeptId }"
-              @click="chooseDepartment('')"
-            >
-              全部人员
-            </button>
-            <button
-              v-for="item in departments"
-              :key="item.dept.id"
-              type="button"
-              class="pp-dept-item"
-              :class="{ active: selectedDeptId === item.dept.id }"
-              :style="{ paddingLeft: `${12 + item.level * 16}px` }"
-              @click="chooseDepartment(item.dept.id)"
-            >
-              <span>{{ item.dept.name }}</span>
-              <small @click.stop="addDepartment(item.dept)">全选</small>
-            </button>
-          </aside>
-
-          <main class="pp-user-pane">
-            <div class="pp-search">
-              <input
-                v-model="keyword"
-                placeholder="搜索姓名、用户名、邮箱，或粘贴旧用户 ID"
-                @keydown.enter.prevent="refreshUsers"
-              >
-              <button type="button" :disabled="loadingUsers" @click="refreshUsers">搜索</button>
-            </div>
-
-            <div class="pp-user-results">
-              <button
-                v-for="user in searchResults"
-                :key="user.id"
-                type="button"
-                class="pp-user-option"
-                :class="{ active: selectedSet.has(user.id) }"
-                @click="toggleUser(user)"
-              >
-                <strong>{{ model.userLabel(user) }}</strong>
-                <span>{{ model.userMeta(user) || '暂无账号信息' }}</span>
-              </button>
-              <div v-if="!searchResults.length" class="pp-empty">
-                {{ loadingUsers ? '正在加载人员' : '没有找到匹配人员' }}
+                <a-button
+                  :type="selectedDeptId === item.dept.id ? 'primary' : 'text'"
+                  @click="chooseDepartment(item.dept.id)"
+                >
+                  {{ item.dept.name }}
+                </a-button>
+                <a-button type="text" size="mini" @click="addDepartment(item.dept)">
+                  全选
+                </a-button>
               </div>
             </div>
-          </main>
-        </div>
+          </a-spin>
+        </aside>
 
-        <footer class="pp-modal-foot">
-          <button type="button" @click="closePicker">完成</button>
-        </footer>
-      </section>
-    </div>
+        <main class="pp-user-pane">
+          <a-input-search
+            v-model="keyword"
+            placeholder="搜索姓名、用户名或邮箱"
+            :loading="loadingUsers"
+            @search="refreshUsers"
+            @press-enter="refreshUsers"
+          />
+          <a-table
+            class="pp-picker-table"
+            :data="searchResults"
+            :loading="loadingUsers"
+            :pagination="false"
+            row-key="id"
+            size="small"
+          >
+            <template #columns>
+              <a-table-column title="" :width="54">
+                <template #cell="{ record }">
+                  <a-checkbox :model-value="selectedSet.has(record.id)" @change="toggleUser(record)" />
+                </template>
+              </a-table-column>
+              <a-table-column title="人员">
+                <template #cell="{ record }">
+                  <strong>{{ model.userLabel(record) }}</strong>
+                  <div class="pp-table-sub">{{ model.userMeta(record) || '暂无账号信息' }}</div>
+                </template>
+              </a-table-column>
+              <a-table-column title="部门" :width="220">
+                <template #cell="{ record }">
+                  <span>{{ record.deptNames?.join(' / ') || '-' }}</span>
+                </template>
+              </a-table-column>
+            </template>
+          </a-table>
+          <a-empty v-if="!loadingUsers && !searchResults.length" description="没有找到匹配人员" />
+        </main>
+      </div>
+
+      <template #footer>
+        <a-button @click="open = false">完成</a-button>
+      </template>
+    </a-modal>
   </div>
 </template>

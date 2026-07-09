@@ -3,6 +3,7 @@ import type {
   ProjectCheckIn,
   ProjectDeptOption,
   ProjectForm,
+  ProjectMinecraftServerOption,
   ProjectProgressEvent,
   ProjectProgressProject,
   ProjectProgressStatus,
@@ -31,6 +32,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const checkIns = ref<ProjectCheckIn[]>([])
   const events = ref<ProjectProgressEvent[]>([])
   const departments = ref<ProjectDeptOption[]>([])
+  const minecraftServers = ref<ProjectMinecraftServerOption[]>([])
   const usersById = ref<Record<string, ProjectUserOption>>({})
   const selectedProjectId = ref('')
   const selectedDetailId = ref('')
@@ -114,9 +116,14 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   async function load() {
     loading.value = true
     try {
-      const [nextStatus, nextProjects] = await Promise.all([api.status(), api.projects()])
+      const [nextStatus, nextProjects, nextMinecraftServers] = await Promise.all([
+        api.status(),
+        api.projects(),
+        api.minecraftServers(),
+      ])
       status.value = nextStatus
       projects.value = nextProjects
+      minecraftServers.value = nextMinecraftServers
       await resolveProjectUsers(nextProjects)
       if (!selectedProjectId.value && nextProjects.length) {
         selectProject(nextProjects[0])
@@ -133,13 +140,18 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   async function loadMyTasks() {
     loading.value = true
     try {
-      myTasks.value = await api.myTasks()
+      const [nextStatus, nextProjects, nextMyTasks] = await Promise.all([
+        api.status(),
+        api.projects(),
+        api.myTasks(),
+      ])
+      status.value = nextStatus
+      projects.value = nextProjects
+      myTasks.value = nextMyTasks
+      await resolveProjectUsers(nextProjects)
       await resolveDetailUsers(myTasks.value)
       if (!selectedDetailId.value && myTasks.value.length) {
         selectedDetailId.value = myTasks.value[0].id
-      }
-      if (selectedDetailId.value) {
-        await loadCheckIns(selectedDetailId.value)
       }
     }
     finally {
@@ -167,9 +179,6 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
       if (!selectedDetailId.value) {
         selectedDetailId.value = nextMyTasks[0]?.id || nextClaimableTasks[0]?.id || ''
       }
-      if (selectedDetailId.value && nextMyTasks.some(item => item.id === selectedDetailId.value)) {
-        await loadCheckIns(selectedDetailId.value)
-      }
     }
     finally {
       loading.value = false
@@ -179,7 +188,15 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   async function loadAcceptance() {
     loading.value = true
     try {
-      pendingAcceptance.value = await api.pendingAcceptance()
+      const [nextStatus, nextProjects, nextPendingAcceptance] = await Promise.all([
+        api.status(),
+        api.projects(),
+        api.pendingAcceptance(),
+      ])
+      status.value = nextStatus
+      projects.value = nextProjects
+      pendingAcceptance.value = nextPendingAcceptance
+      await resolveProjectUsers(nextProjects)
       await resolveDetailUsers(pendingAcceptance.value)
       selectedAcceptanceId.value = selectedAcceptanceId.value || pendingAcceptance.value[0]?.id || ''
     }
@@ -192,15 +209,19 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     if (!selectedProjectId.value) {
       details.value = []
       events.value = []
+      checkIns.value = []
       return
     }
-    const [nextDetails, nextEvents] = await Promise.all([
+    const [nextDetails, nextEvents, nextCheckIns] = await Promise.all([
       api.details(selectedProjectId.value),
       api.events(selectedProjectId.value),
+      api.projectCheckIns(selectedProjectId.value),
     ])
     details.value = nextDetails
     events.value = nextEvents
+    checkIns.value = nextCheckIns
     await resolveDetailUsers(nextDetails)
+    await resolveUsers(nextCheckIns.map(item => item.userId))
     selectedDetailId.value = selectedDetailId.value || nextDetails[0]?.id || ''
   }
 
@@ -209,10 +230,24 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     fillProjectForm(project)
   }
 
+  async function selectProjectById(projectId: string) {
+    if (!projectId) {
+      selectedProjectId.value = ''
+      await reloadProjectData()
+      return
+    }
+    const project = projects.value.find(item => item.id === projectId)
+    if (!project) {
+      selectedProjectId.value = projectId
+      return
+    }
+    selectProject(project)
+    await reloadProjectData()
+  }
+
   function selectDetail(detail: ProjectWorkDetail) {
     selectedDetailId.value = detail.id
     fillDetailForm(detail)
-    void loadCheckIns(detail.id)
   }
 
   async function saveProject() {
@@ -295,8 +330,9 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   }
 
   async function submitCheckIn() {
-    if (!selectedDetail.value) {
-      toast.warning('请选择工作细节')
+    const projectId = selectedProjectId.value
+    if (!projectId) {
+      toast.warning('请先选择项目')
       return
     }
     const files = evidenceFile.value
@@ -307,7 +343,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
           image: checkInForm.type === 'IMAGE',
         }]
       : []
-    const record = await action(() => api.createCheckIn(selectedDetail.value!.id, {
+    const record = await action(() => api.createProjectCheckIn(projectId, {
       type: checkInForm.type,
       summary: checkInForm.summary,
       files,
@@ -316,28 +352,34 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
             address: checkInForm.address,
             latitude: toNumber(checkInForm.latitude),
             longitude: toNumber(checkInForm.longitude),
-          }
+        }
         : null,
-    }), '打卡已提交')
+    }), '项目打卡已提交')
     if (record) {
-      await loadCheckIns(selectedDetail.value.id)
+      await loadProjectCheckIns(projectId)
     }
   }
 
-  async function minecraftCheckIn(detail: ProjectWorkDetail) {
-    const record = await action(() => api.minecraftCheckIn(detail.id), 'Minecraft 在线时长打卡已生成')
+  async function minecraftCheckIn(projectId = selectedProjectId.value) {
+    if (!projectId) {
+      toast.warning('请先选择项目')
+      return
+    }
+    const record = await action(() => api.projectMinecraftCheckIn(projectId), 'Minecraft 在线时长打卡已生成')
     if (record) {
-      selectedDetailId.value = detail.id
-      await loadCheckIns(detail.id)
+      selectedProjectId.value = projectId
+      await loadProjectCheckIns(projectId)
     }
   }
 
   async function autoMinecraftCheckIns() {
-    if (!selectedProjectId.value) {
+    const projectId = selectedProjectId.value
+    if (!projectId) {
       toast.warning('请先选择项目')
       return
     }
-    await action(() => api.autoMinecraftCheckIns(selectedProjectId.value), '自动打卡检查已完成')
+    await action(() => api.autoMinecraftCheckIns(projectId), '自动打卡检查已完成')
+    await loadProjectCheckIns(projectId)
   }
 
   async function review(detail: ProjectWorkDetail, accepted: boolean) {
@@ -352,8 +394,18 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     }
   }
 
-  async function loadCheckIns(detailId: string) {
-    checkIns.value = await api.checkIns(detailId)
+  async function submitAcceptance(detail: ProjectWorkDetail) {
+    const saved = await action(() => api.submitAcceptance(detail.id), '任务已提交验收')
+    if (saved) {
+      upsert(myTasks.value, saved)
+      upsert(details.value, saved)
+      selectedDetailId.value = saved.id
+    }
+  }
+
+  async function loadProjectCheckIns(projectId = selectedProjectId.value) {
+    checkIns.value = projectId ? await api.projectCheckIns(projectId) : []
+    await resolveUsers(checkIns.value.map(item => item.userId))
   }
 
   async function searchUsers(keyword = '', deptId = '') {
@@ -377,6 +429,11 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
 
   async function loadDepartmentUsers(deptId: string) {
     return searchUsers('', deptId)
+  }
+
+  async function loadMinecraftServers(includeDisabled = false) {
+    minecraftServers.value = await api.minecraftServers(includeDisabled)
+    return minecraftServers.value
   }
 
   async function action<T>(fn: () => Promise<T>, success: string) {
@@ -523,6 +580,11 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return projectStatusOptions.value.find(item => item.code === code)?.label || code
   }
 
+  function detailStatusLabel(detail: ProjectWorkDetail) {
+    const project = projects.value.find(item => item.id === detail.projectId)
+    return project?.statuses.find(item => item.code === detail.statusCode)?.label || statusLabel(detail.statusCode)
+  }
+
   function assignmentLabel(detail: ProjectWorkDetail) {
     if (detail.assignmentMode === 'RANDOM') {
       return detail.candidateUserIds.length ? '指定人员随机' : '项目成员随机'
@@ -542,9 +604,25 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return projects.value.find(item => item.id === projectId)?.name || '未知项目'
   }
 
-  function canMinecraftCheckIn(detail: ProjectWorkDetail) {
-    const project = projects.value.find(item => item.id === detail.projectId)
+  function serverLabel(serverId?: string | null) {
+    if (!serverId) {
+      return '未选择服务器'
+    }
+    return minecraftServers.value.find(item => item.id === serverId)?.name || '已选择服务器'
+  }
+
+  function canProjectMinecraftCheckIn(projectId = selectedProjectId.value) {
+    const project = projects.value.find(item => item.id === projectId)
     return !!project?.minecraftPolicy.enabled && project.allowedCheckInTypes.includes('MINECRAFT_ONLINE')
+  }
+
+  function canMinecraftCheckIn(detail: ProjectWorkDetail) {
+    return canProjectMinecraftCheckIn(detail.projectId)
+  }
+
+  function canSubmitAcceptance(detail: ProjectWorkDetail) {
+    const project = projects.value.find(item => item.id === detail.projectId)
+    return !!project && detail.published && !detail.pendingAcceptance && detail.statusCode !== project.doneStatusCode
   }
 
   async function resolveProjectUsers(items: ProjectProgressProject[]) {
@@ -567,6 +645,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     checkIns,
     events,
     departments,
+    minecraftServers,
     usersById,
     selectedProjectId,
     selectedDetailId,
@@ -587,6 +666,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     loadMyTasks,
     loadAcceptance,
     selectProject,
+    selectProjectById,
     selectDetail,
     saveProject,
     deleteProject,
@@ -597,22 +677,29 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     submitCheckIn,
     minecraftCheckIn,
     autoMinecraftCheckIns,
+    submitAcceptance,
     review,
+    loadProjectCheckIns,
     newProject,
     newDetail,
     searchUsers,
     resolveUsers,
     loadDepartments,
     loadDepartmentUsers,
+    loadMinecraftServers,
     userOptionsForIds,
     userLabel,
     userMeta,
     statusLabel,
+    detailStatusLabel,
     assignmentLabel,
     formatTime,
     minutes,
     projectName,
+    serverLabel,
+    canProjectMinecraftCheckIn,
     canMinecraftCheckIn,
+    canSubmitAcceptance,
   })
 }
 
