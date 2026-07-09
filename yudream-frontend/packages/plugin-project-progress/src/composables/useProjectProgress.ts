@@ -20,6 +20,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   const status = ref<ProjectProgressStatus | null>(null)
   const projects = ref<ProjectProgressProject[]>([])
   const details = ref<ProjectWorkDetail[]>([])
+  const claimableTasks = ref<ProjectWorkDetail[]>([])
   const myTasks = ref<ProjectWorkDetail[]>([])
   const pendingAcceptance = ref<ProjectWorkDetail[]>([])
   const checkIns = ref<ProjectCheckIn[]>([])
@@ -76,7 +77,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   })
 
   const selectedProject = computed(() => projects.value.find(item => item.id === selectedProjectId.value) || null)
-  const selectedDetail = computed(() => details.value.find(item => item.id === selectedDetailId.value) || myTasks.value.find(item => item.id === selectedDetailId.value) || null)
+  const selectedDetail = computed(() => details.value.find(item => item.id === selectedDetailId.value) || myTasks.value.find(item => item.id === selectedDetailId.value) || claimableTasks.value.find(item => item.id === selectedDetailId.value) || null)
   const completion = computed(() => {
     const doneCode = selectedProject.value?.doneStatusCode
     if (!details.value.length || !doneCode) {
@@ -86,6 +87,10 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   })
 
   async function loadPage(page: string) {
+    if (page === 'task-center') {
+      await loadTaskCenter()
+      return
+    }
     if (page === 'my-tasks') {
       await loadMyTasks()
       return
@@ -123,6 +128,31 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
         selectedDetailId.value = myTasks.value[0].id
       }
       if (selectedDetailId.value) {
+        await loadCheckIns(selectedDetailId.value)
+      }
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function loadTaskCenter() {
+    loading.value = true
+    try {
+      const [nextStatus, nextProjects, nextClaimableTasks, nextMyTasks] = await Promise.all([
+        api.status(),
+        api.projects(),
+        api.claimableTasks(),
+        api.myTasks(),
+      ])
+      status.value = nextStatus
+      projects.value = nextProjects
+      claimableTasks.value = nextClaimableTasks
+      myTasks.value = nextMyTasks
+      if (!selectedDetailId.value) {
+        selectedDetailId.value = nextMyTasks[0]?.id || nextClaimableTasks[0]?.id || ''
+      }
+      if (selectedDetailId.value && nextMyTasks.some(item => item.id === selectedDetailId.value)) {
         await loadCheckIns(selectedDetailId.value)
       }
     }
@@ -239,6 +269,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
   async function claim(detail: ProjectWorkDetail) {
     const saved = await action(() => api.claim(detail.id), '任务已认领')
     if (saved) {
+      claimableTasks.value = claimableTasks.value.filter(item => item.id !== saved.id)
       upsert(myTasks.value, saved)
       upsert(details.value, saved)
     }
@@ -396,12 +427,22 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     return `${Math.floor(value / 60000)} 分钟`
   }
 
+  function projectName(projectId: string) {
+    return projects.value.find(item => item.id === projectId)?.name || projectId
+  }
+
+  function canMinecraftCheckIn(detail: ProjectWorkDetail) {
+    const project = projects.value.find(item => item.id === detail.projectId)
+    return !!project?.minecraftPolicy.enabled && project.allowedCheckInTypes.includes('MINECRAFT_ONLINE')
+  }
+
   return reactive({
     loading,
     saving,
     status,
     projects,
     details,
+    claimableTasks,
     myTasks,
     pendingAcceptance,
     checkIns,
@@ -419,6 +460,7 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     evidenceFile,
     loadPage,
     load,
+    loadTaskCenter,
     reloadProjectData,
     loadMyTasks,
     loadAcceptance,
@@ -438,6 +480,8 @@ export function useProjectProgress(sdk: YuDreamPluginSdk) {
     newDetail,
     formatTime,
     minutes,
+    projectName,
+    canMinecraftCheckIn,
   })
 }
 

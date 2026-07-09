@@ -48,6 +48,7 @@ export function createProjectProgressApi(sdk: YuDreamPluginSdk) {
     publishDetail: (id: string) => sdk.http.post<ProjectWorkDetail>(`/details/${encodeURIComponent(id)}/publish`),
     randomAssign: (id: string) => sdk.http.post<ProjectWorkDetail>(`/details/${encodeURIComponent(id)}/random-assign`),
     claim: (id: string) => sdk.http.post<ProjectWorkDetail>(`/details/${encodeURIComponent(id)}/claim`),
+    claimableTasks: () => getAllPages<ProjectWorkDetail>('/tasks/claimable'),
     myTasks: () => getAllPages<ProjectWorkDetail>('/my-tasks'),
     pendingAcceptance: () => getAllPages<ProjectWorkDetail>('/acceptance/pending'),
     checkIns: (detailId: string) => getAllPages<ProjectCheckIn>(`/details/${encodeURIComponent(detailId)}/check-ins`),

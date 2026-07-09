@@ -90,6 +90,16 @@ public class ProjectProgressDocumentRepository implements ProjectProgressReposit
     }
 
     @Override
+    public List<ProjectWorkDetail> listClaimableDetails(String userId, int page, int size) {
+        return allDetails().stream()
+                .filter(detail -> detail.claimableBy(userId))
+                .sorted(Comparator.comparingLong(ProjectWorkDetail::updatedAt).reversed())
+                .skip((long) (page - 1) * size)
+                .limit(size)
+                .toList();
+    }
+
+    @Override
     public List<ProjectWorkDetail> listPendingAcceptance(String userId, int page, int size) {
         return allDetails().stream()
                 .filter(ProjectWorkDetail::published)

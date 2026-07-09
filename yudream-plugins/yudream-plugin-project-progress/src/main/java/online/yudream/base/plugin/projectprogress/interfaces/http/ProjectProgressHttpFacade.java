@@ -85,6 +85,10 @@ public class ProjectProgressHttpFacade {
         return PluginHttpResponse.ok(appService.myTasks(currentUserId(request), page(request), size(request)).stream().map(assembler::toRes).toList());
     }
 
+    public PluginHttpResponse claimableTasks(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.claimableTasks(currentUserId(request), page(request), size(request)).stream().map(assembler::toRes).toList());
+    }
+
     public PluginHttpResponse pendingAcceptance(PluginHttpRequest request) {
         return PluginHttpResponse.ok(appService.pendingAcceptance(currentUserId(request), page(request), size(request)).stream().map(assembler::toRes).toList());
     }

@@ -4,6 +4,7 @@ import ProjectProgressPlugin from './ProjectProgressPlugin.vue'
 
 export const Dashboard = ProjectProgressPlugin
 export const Projects = ProjectProgressPlugin
+export const TaskCenter = ProjectProgressPlugin
 export const MyTasks = ProjectProgressPlugin
 export const CheckIns = ProjectProgressPlugin
 export const Acceptance = ProjectProgressPlugin
@@ -12,16 +13,28 @@ export const Settings = ProjectProgressPlugin
 export const routes = {
   Dashboard,
   Projects,
+  TaskCenter,
   MyTasks,
   CheckIns,
   Acceptance,
   Settings,
   'project-progress/Dashboard': Dashboard,
   'project-progress/Projects': Projects,
+  'project-progress/TaskCenter': TaskCenter,
   'project-progress/MyTasks': MyTasks,
   'project-progress/CheckIns': CheckIns,
   'project-progress/Acceptance': Acceptance,
   'project-progress/Settings': Settings,
+}
+
+export {
+  Dashboard as 'project-progress/Dashboard',
+  Projects as 'project-progress/Projects',
+  TaskCenter as 'project-progress/TaskCenter',
+  MyTasks as 'project-progress/MyTasks',
+  CheckIns as 'project-progress/CheckIns',
+  Acceptance as 'project-progress/Acceptance',
+  Settings as 'project-progress/Settings',
 }
 
 export function install() {

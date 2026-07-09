@@ -84,6 +84,11 @@ public class ProjectProgressController {
         return http.myTasks(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/tasks/claimable", permission = ProjectProgressPlugin.CHECK_IN_PERMISSION)
+    public PluginHttpResponse claimableTasks(PluginHttpRequest request) {
+        return http.claimableTasks(request);
+    }
+
     @PluginHttpEndpoint(method = "GET", path = "/acceptance/pending", permission = ProjectProgressPlugin.ACCEPT_PERMISSION)
     public PluginHttpResponse pendingAcceptance(PluginHttpRequest request) {
         return http.pendingAcceptance(request);
