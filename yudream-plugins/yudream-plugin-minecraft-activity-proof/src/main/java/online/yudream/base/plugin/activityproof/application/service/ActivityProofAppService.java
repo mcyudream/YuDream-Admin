@@ -3,8 +3,10 @@ package online.yudream.base.plugin.activityproof.application.service;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofExportCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofMappingSaveCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofSettingsSaveCmd;
+import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofStampedPdfUploadCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofTemplateSelectCmd;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofDependencyDTO;
+import online.yudream.base.plugin.activityproof.application.dto.ActivityProofDownloadDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofExportDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofMappingDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofParticipantDTO;
@@ -13,6 +15,7 @@ import online.yudream.base.plugin.activityproof.application.dto.ActivityProofSet
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofStatusDTO;
 import online.yudream.base.plugin.activityproof.application.dto.ActivityProofTemplateDTO;
 import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofExportRecord;
+import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofParticipantSnapshot;
 import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofSettings;
 import online.yudream.base.plugin.activityproof.domain.aggregate.PlayerStudentMapping;
 import online.yudream.base.plugin.activityproof.domain.repo.ActivityProofRepository;
@@ -25,7 +28,6 @@ import online.yudream.base.plugin.spi.system.minecraft.PluginMinecraftService;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinProfile;
 import online.yudream.base.plugin.spi.system.skin.PluginSkinService;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
-import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoProfile;
 import online.yudream.base.plugin.spi.system.studentinfo.PluginStudentInfoService;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
@@ -38,6 +40,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -57,6 +60,7 @@ public class ActivityProofAppService {
     private static final String SKIN_PLUGIN = "yudream-skin";
     private static final String DEFAULT_TEMPLATE_CODE = "minecraft_activity_proof_v1";
     private static final String DOCX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private static final String PDF_CONTENT_TYPE = "application/pdf";
     private static final int SCAN_PAGE_SIZE = 200;
     private static final int MAX_SCAN_SIZE = 1000;
 
@@ -170,7 +174,8 @@ public class ActivityProofAppService {
                 rendered.contentType() == null ? DOCX_CONTENT_TYPE : rendered.contentType());
         long unmatchedCount = participants.stream().filter(item -> !item.matched()).count();
         ActivityProofExportRecord record = ActivityProofExportRecord.create(server.id(), server.name(), text(cmd.activityName()),
-                objectKey, filename, participants.size(), (int) unmatchedCount, operatorUserId);
+                objectKey, filename, participants.size(), (int) unmatchedCount, operatorUserId,
+                participants.stream().map(this::snapshot).toList());
         return toDTO(repository.saveExportRecord(record));
     }
 
@@ -180,10 +185,160 @@ public class ActivityProofAppService {
                 .toList();
     }
 
-    public PluginStoredFile download(String id) {
-        ActivityProofExportRecord record = repository.exportRecord(requireText(id, "导出记录不能为空"))
+    public List<ActivityProofExportDTO> myStampedExportRecords(String userId) {
+        String safeUserId = requireText(userId, "请先登录");
+        String studentNo = studentInfoService()
+                .flatMap(service -> service.findStudentInfoByUserId(safeUserId))
+                .map(PluginStudentInfoProfile::studentNo)
+                .orElse("");
+        return allExportRecords().stream()
+                .filter(ActivityProofExportRecord::hasStampedPdf)
+                .filter(record -> record.containsParticipant(safeUserId, studentNo))
+                .map(record -> toDTO(record, true))
+                .toList();
+    }
+
+    public ActivityProofExportDTO uploadStampedPdf(ActivityProofStampedPdfUploadCmd cmd) {
+        ActivityProofExportRecord record = exportRecord(cmd.id());
+        byte[] content = decodeBase64(cmd.base64());
+        if (content.length == 0) {
+            throw new IllegalArgumentException("PDF 文件不能为空");
+        }
+        ensurePdfContent(content);
+        String filename = pdfFilename(cmd.filename(), record);
+        String contentType = pdfContentType(cmd.contentType(), filename);
+        String objectKey = "stamped-pdf/" + record.id() + ".pdf";
+        files.put(objectKey, new ByteArrayInputStream(content), content.length, contentType);
+        ActivityProofExportRecord saved = repository.saveExportRecord(record.withStampedPdf(
+                objectKey,
+                filename,
+                contentType,
+                content.length,
+                System.currentTimeMillis()
+        ));
+        return toDTO(saved);
+    }
+
+    public void deleteExportRecord(String id) {
+        ActivityProofExportRecord record = exportRecord(id);
+        deleteFileQuietly(record.outputObjectKey());
+        deleteFileQuietly(record.stampedPdfObjectKey());
+        repository.deleteExportRecord(record.id());
+    }
+
+    public ActivityProofDownloadDTO downloadWord(String id) {
+        ActivityProofExportRecord record = exportRecord(id);
+        return new ActivityProofDownloadDTO(record.outputFilename(), DOCX_CONTENT_TYPE, files.get(record.outputObjectKey()));
+    }
+
+    public ActivityProofDownloadDTO downloadStampedPdf(String id) {
+        ActivityProofExportRecord record = stampedExportRecord(id);
+        return new ActivityProofDownloadDTO(record.stampedPdfFilename(), PDF_CONTENT_TYPE, files.get(record.stampedPdfObjectKey()));
+    }
+
+    public ActivityProofDownloadDTO downloadMyStampedPdf(String id, String userId) {
+        String safeUserId = requireText(userId, "请先登录");
+        ActivityProofExportRecord record = stampedExportRecord(id);
+        String studentNo = studentInfoService()
+                .flatMap(service -> service.findStudentInfoByUserId(safeUserId))
+                .map(PluginStudentInfoProfile::studentNo)
+                .orElse("");
+        if (!record.containsParticipant(safeUserId, studentNo)) {
+            throw new IllegalArgumentException("该盖章证明不属于当前用户");
+        }
+        return new ActivityProofDownloadDTO(record.stampedPdfFilename(), PDF_CONTENT_TYPE, files.get(record.stampedPdfObjectKey()));
+    }
+
+    private List<ActivityProofExportRecord> allExportRecords() {
+        List<ActivityProofExportRecord> result = new ArrayList<>();
+        int page = 1;
+        while (true) {
+            List<ActivityProofExportRecord> batch = repository.exportRecords(page, SCAN_PAGE_SIZE);
+            result.addAll(batch);
+            if (batch.size() < SCAN_PAGE_SIZE) {
+                return result;
+            }
+            page++;
+        }
+    }
+
+    private ActivityProofExportRecord exportRecord(String id) {
+        return repository.exportRecord(requireText(id, "导出记录不能为空"))
                 .orElseThrow(() -> new IllegalArgumentException("导出记录不存在"));
-        return files.get(record.outputObjectKey());
+    }
+
+    private ActivityProofExportRecord stampedExportRecord(String id) {
+        ActivityProofExportRecord record = exportRecord(id);
+        if (!record.hasStampedPdf()) {
+            throw new IllegalArgumentException("该导出记录还没有上传盖章 PDF");
+        }
+        return record;
+    }
+
+    private ActivityProofParticipantSnapshot snapshot(ActivityProofParticipantDTO participant) {
+        return new ActivityProofParticipantSnapshot(
+                participant.userId(),
+                participant.studentName(),
+                participant.studentNo(),
+                participant.className(),
+                participant.college(),
+                participant.playerId(),
+                participant.playerName()
+        );
+    }
+
+    private byte[] decodeBase64(String value) {
+        String safeValue = requireText(value, "PDF 内容不能为空");
+        int commaIndex = safeValue.indexOf(',');
+        if (commaIndex >= 0) {
+            safeValue = safeValue.substring(commaIndex + 1);
+        }
+        try {
+            return Base64.getDecoder().decode(safeValue);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("PDF 内容不是有效的 Base64", e);
+        }
+    }
+
+    private String pdfFilename(String filename, ActivityProofExportRecord record) {
+        String value = hasText(filename) ? filename.trim() : record.outputFilename().replaceAll("(?i)\\.docx$", ".pdf");
+        value = value.replaceAll("[\\\\/:*?\"<>|]", "_");
+        if (!value.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            value = value + ".pdf";
+        }
+        return value;
+    }
+
+    private String pdfContentType(String contentType, String filename) {
+        String value = text(contentType);
+        if (value.isBlank()) {
+            return PDF_CONTENT_TYPE;
+        }
+        if (!PDF_CONTENT_TYPE.equalsIgnoreCase(value) && !filename.toLowerCase(Locale.ROOT).endsWith(".pdf")) {
+            throw new IllegalArgumentException("仅支持上传 PDF 文件");
+        }
+        return PDF_CONTENT_TYPE;
+    }
+
+    private void ensurePdfContent(byte[] content) {
+        if (content.length < 5
+                || content[0] != '%'
+                || content[1] != 'P'
+                || content[2] != 'D'
+                || content[3] != 'F'
+                || content[4] != '-') {
+            throw new IllegalArgumentException("仅支持上传 PDF 文件");
+        }
+    }
+
+    private void deleteFileQuietly(String objectKey) {
+        if (!hasText(objectKey)) {
+            return;
+        }
+        try {
+            files.delete(objectKey);
+        } catch (RuntimeException ignored) {
+        }
     }
 
     private List<ActivityProofParticipantDTO> buildParticipants(String serverId, Integer minOnlineMinutes,
@@ -241,6 +396,7 @@ public class ActivityProofAppService {
         return new ActivityProofParticipantDTO(
                 index,
                 item.serverId(),
+                item.userId(),
                 item.playerId(),
                 item.playerName(),
                 item.studentName(),
@@ -399,6 +555,7 @@ public class ActivityProofAppService {
         return new ActivityProofParticipantDTO(
                 index,
                 activity.serverId(),
+                matched ? profile.userId() : "",
                 activity.playerId(),
                 activity.playerName(),
                 matched ? profile.studentName() : activity.playerName(),
@@ -565,9 +722,26 @@ public class ActivityProofAppService {
     }
 
     private ActivityProofExportDTO toDTO(ActivityProofExportRecord record) {
+        return toDTO(record, false);
+    }
+
+    private ActivityProofExportDTO toDTO(ActivityProofExportRecord record, boolean mine) {
         return new ActivityProofExportDTO(record.id(), record.serverId(), record.serverName(), record.activityName(),
-                record.outputFilename(), "/exports/" + encode(record.id()) + "/download",
-                record.participantCount(), record.unmatchedCount(), record.operatorUserId(), record.generatedAt());
+                record.outputFilename(), mine ? "" : "/exports/" + encode(record.id()) + "/download",
+                record.participantCount(), record.unmatchedCount(), record.operatorUserId(), record.generatedAt(),
+                record.hasStampedPdf(),
+                record.stampedPdfFilename(),
+                stampedPdfDownloadPath(record, mine),
+                record.stampedPdfSize(),
+                record.stampedPdfUploadedAt());
+    }
+
+    private String stampedPdfDownloadPath(ActivityProofExportRecord record, boolean mine) {
+        if (!record.hasStampedPdf()) {
+            return "";
+        }
+        String prefix = mine ? "/me/exports/" : "/exports/";
+        return prefix + encode(record.id()) + "/stamped-pdf/download";
     }
 
     private int safePage(int page) {

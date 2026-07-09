@@ -8,6 +8,7 @@ import java.util.Map;
 public record ActivityProofParticipantDTO(
         int index,
         String serverId,
+        String userId,
         String playerId,
         String playerName,
         String studentName,
@@ -23,6 +24,7 @@ public record ActivityProofParticipantDTO(
     public Map<String, Object> templateData() {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("index", index);
+        data.put("userId", userId);
         data.put("name", studentName == null || studentName.isBlank() ? playerName : studentName);
         data.put("studentName", studentName);
         data.put("studentNo", studentNo);

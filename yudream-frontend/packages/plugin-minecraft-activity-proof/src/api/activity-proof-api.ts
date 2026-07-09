@@ -50,6 +50,9 @@ export function createActivityProofApi(sdk: YuDreamPluginSdk) {
     participants: (serverId: string, minOnlineMinutes: number, includeAfk: boolean) => sdk.http.get<ActivityProofParticipant[]>(`/participants${query({ serverId, minOnlineMinutes, includeAfk })}`),
     exportWord: (data: ExportForm & { serverId: string, selectedPlayerIds: string[] }) => sdk.http.post<ActivityProofExportRecord>('/exports', data),
     exports: (page = 1, size = 20) => sdk.http.get<ActivityProofExportRecord[]>(`/exports${query({ page, size })}`),
+    myExports: (page = 1, size = 20) => sdk.http.get<ActivityProofExportRecord[]>(`/me/exports${query({ page, size })}`),
+    uploadStampedPdf: (id: string, data: Record<string, unknown>) => sdk.http.request<ActivityProofExportRecord>(`/exports/${encodeURIComponent(id)}/stamped-pdf`, { method: 'PUT', data }),
+    deleteExport: (id: string) => sdk.http.request(`/exports/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     downloadUrl: (path: string) => sdk.http.url(path),
   }
 }

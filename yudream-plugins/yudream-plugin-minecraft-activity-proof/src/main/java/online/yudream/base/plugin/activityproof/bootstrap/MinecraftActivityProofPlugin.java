@@ -37,6 +37,24 @@ import online.yudream.base.plugin.spi.core.YuDreamPlugin;
                         component = "minecraft-activity-proof/Export",
                         permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION,
                         sort = 10
+                ),
+                @PluginRoute(
+                        path = "/platform/plugins/yudream-student-info/activity-proof/records",
+                        name = "platform-plugin-yudream-student-info-activity-proof-records",
+                        title = "活动证明记录",
+                        icon = "i-ri:file-list-3-line",
+                        component = "minecraft-activity-proof/Records",
+                        permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION,
+                        sort = 11
+                ),
+                @PluginRoute(
+                        path = "/platform/plugins/yudream-student-info/my-activity-proofs",
+                        name = "platform-plugin-yudream-student-info-my-activity-proofs",
+                        title = "我的活动证明",
+                        icon = "i-ri:verified-badge-line",
+                        component = "minecraft-activity-proof/Mine",
+                        permission = MinecraftActivityProofPlugin.ACCESS_USER_PERMISSION,
+                        sort = 12
                 )
         }
 )
@@ -46,6 +64,7 @@ public class MinecraftActivityProofPlugin implements YuDreamPlugin {
     public static final String VIEW_PERMISSION = "plugin:minecraft-activity-proof:view";
     public static final String MANAGE_PERMISSION = "plugin:minecraft-activity-proof:manage";
     public static final String ACCESS_VIEW_PERMISSION = "plugin:yudream-student-info:view";
+    public static final String ACCESS_USER_PERMISSION = "plugin:yudream-student-info:user";
     public static final String ACCESS_MANAGE_PERMISSION = "plugin:yudream-student-info:manage";
 
     @Override

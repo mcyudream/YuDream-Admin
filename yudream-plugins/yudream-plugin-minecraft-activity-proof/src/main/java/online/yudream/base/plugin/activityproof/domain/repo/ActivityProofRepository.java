@@ -26,4 +26,6 @@ public interface ActivityProofRepository {
     Optional<ActivityProofExportRecord> exportRecord(String id);
 
     List<ActivityProofExportRecord> exportRecords(int page, int size);
+
+    void deleteExportRecord(String id);
 }

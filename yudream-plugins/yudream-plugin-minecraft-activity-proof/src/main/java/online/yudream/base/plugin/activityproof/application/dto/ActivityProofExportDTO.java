@@ -10,6 +10,11 @@ public record ActivityProofExportDTO(
         int participantCount,
         int unmatchedCount,
         String operatorUserId,
-        long generatedAt
+        long generatedAt,
+        boolean stampedPdfReady,
+        String stampedPdfFilename,
+        String stampedPdfDownloadPath,
+        long stampedPdfSize,
+        long stampedPdfUploadedAt
 ) {
 }

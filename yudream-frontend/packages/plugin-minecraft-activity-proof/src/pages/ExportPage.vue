@@ -175,7 +175,7 @@ defineProps<{
       </div>
     </ProofPanel>
 
-    <section class="proof-grid bottom">
+    <section class="proof-grid single">
       <ProofPanel title="已保存映射" eyebrow="Mappings">
         <div class="proof-list">
           <article v-for="row in model.mappings" :key="row.id">
@@ -186,19 +186,6 @@ defineProps<{
             <button type="button" @click="model.deleteMapping(row)">删除</button>
           </article>
           <div v-if="!model.mappings.length" class="proof-empty">暂无手动映射</div>
-        </div>
-      </ProofPanel>
-
-      <ProofPanel title="导出记录" eyebrow="History">
-        <div class="proof-list">
-          <article v-for="row in model.exports" :key="row.id">
-            <div>
-              <strong>{{ row.outputFilename }}</strong>
-              <span>{{ row.participantCount }} 人 / {{ model.formatTime(row.generatedAt) }}</span>
-            </div>
-            <button type="button" @click="model.openDownload(row)">下载</button>
-          </article>
-          <div v-if="!model.exports.length" class="proof-empty">暂无导出记录</div>
         </div>
       </ProofPanel>
     </section>

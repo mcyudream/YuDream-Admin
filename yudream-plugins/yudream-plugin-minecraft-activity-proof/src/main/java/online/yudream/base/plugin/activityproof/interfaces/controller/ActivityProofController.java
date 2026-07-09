@@ -74,8 +74,33 @@ public class ActivityProofController {
         return http.exports(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/me/exports", permission = MinecraftActivityProofPlugin.ACCESS_USER_PERMISSION)
+    public PluginHttpResponse myExports(PluginHttpRequest request) {
+        return http.myExports(request);
+    }
+
+    @PluginHttpEndpoint(method = "PUT", path = "/exports/{id}/stamped-pdf", permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION)
+    public PluginHttpResponse uploadStampedPdf(PluginHttpRequest request) {
+        return http.uploadStampedPdf(request);
+    }
+
+    @PluginHttpEndpoint(method = "DELETE", path = "/exports/{id}", permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION)
+    public PluginHttpResponse deleteExport(PluginHttpRequest request) {
+        return http.deleteExport(request);
+    }
+
     @PluginHttpEndpoint(method = "GET", path = "/exports/{id}/download", permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION, wrapResult = false)
     public PluginHttpResponse download(PluginHttpRequest request) {
         return http.download(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/exports/{id}/stamped-pdf/download", permission = MinecraftActivityProofPlugin.ACCESS_MANAGE_PERMISSION, wrapResult = false)
+    public PluginHttpResponse downloadStampedPdf(PluginHttpRequest request) {
+        return http.downloadStampedPdf(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/me/exports/{id}/stamped-pdf/download", permission = MinecraftActivityProofPlugin.ACCESS_USER_PERMISSION, wrapResult = false)
+    public PluginHttpResponse downloadMyStampedPdf(PluginHttpRequest request) {
+        return http.downloadMyStampedPdf(request);
     }
 }

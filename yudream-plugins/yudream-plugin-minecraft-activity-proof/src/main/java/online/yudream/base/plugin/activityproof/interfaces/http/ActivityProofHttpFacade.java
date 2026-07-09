@@ -1,15 +1,16 @@
 package online.yudream.base.plugin.activityproof.interfaces.http;
 
+import online.yudream.base.plugin.activityproof.application.dto.ActivityProofDownloadDTO;
 import online.yudream.base.plugin.activityproof.application.service.ActivityProofAppService;
 import online.yudream.base.plugin.activityproof.infrastructure.support.JsonSupport;
 import online.yudream.base.plugin.activityproof.interfaces.assembler.ActivityProofWebAssembler;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofExportRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofMappingSaveRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofSettingsSaveRequest;
+import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofStampedPdfUploadRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofTemplateSelectRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
-import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -86,18 +87,42 @@ public class ActivityProofHttpFacade {
         return PluginHttpResponse.ok(appService.exportRecords(page(request), size(request)));
     }
 
+    public PluginHttpResponse myExports(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.myStampedExportRecords(currentUserId(request)));
+    }
+
+    public PluginHttpResponse uploadStampedPdf(PluginHttpRequest request) {
+        ActivityProofStampedPdfUploadRequest body = JsonSupport.read(request.body(), ActivityProofStampedPdfUploadRequest.class);
+        return PluginHttpResponse.ok(appService.uploadStampedPdf(assembler.toCmd(pathSegment(request.path(), 1), body)));
+    }
+
+    public PluginHttpResponse deleteExport(PluginHttpRequest request) {
+        appService.deleteExportRecord(pathSegment(request.path(), 1));
+        return PluginHttpResponse.ok(Map.of("deleted", true));
+    }
+
     public PluginHttpResponse download(PluginHttpRequest request) {
-        PluginStoredFile file = appService.download(pathSegment(request.path(), 1));
-        try (var inputStream = file.inputStream()) {
+        return downloadResponse(appService.downloadWord(pathSegment(request.path(), 1)), DOCX_CONTENT_TYPE);
+    }
+
+    public PluginHttpResponse downloadStampedPdf(PluginHttpRequest request) {
+        return downloadResponse(appService.downloadStampedPdf(pathSegment(request.path(), 1)), "application/pdf");
+    }
+
+    public PluginHttpResponse downloadMyStampedPdf(PluginHttpRequest request) {
+        return downloadResponse(appService.downloadMyStampedPdf(pathSegment(request.path(), 2), currentUserId(request)), "application/pdf");
+    }
+
+    private PluginHttpResponse downloadResponse(ActivityProofDownloadDTO download, String defaultContentType) {
+        try (var inputStream = download.file().inputStream()) {
             byte[] bytes = inputStream.readAllBytes();
-            String filename = file.objectKey() == null ? "activity-proof.docx" : file.objectKey().replace("exports/", "");
             return new PluginHttpResponse(
                     200,
                     Map.of(
-                            "Content-Disposition", "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8),
+                            "Content-Disposition", "attachment; filename*=UTF-8''" + URLEncoder.encode(download.filename(), StandardCharsets.UTF_8),
                             "Cache-Control", "no-cache"
                     ),
-                    file.contentType() == null ? DOCX_CONTENT_TYPE : file.contentType(),
+                    download.contentType() == null || download.contentType().isBlank() ? defaultContentType : download.contentType(),
                     bytes,
                     false
             );
