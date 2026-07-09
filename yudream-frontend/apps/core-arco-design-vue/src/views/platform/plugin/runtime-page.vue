@@ -19,7 +19,6 @@ const remoteLoading = ref(false)
 
 const plugin = computed(() => (route.meta.plugin || {}) as PluginRouteMeta)
 const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
-const localDevModules = import.meta.glob<YuDreamPluginFrontendModule & Record<string, any>>('../../../../../../packages/plugin-*/src/index.ts')
 
 watch(plugin, loadRemoteComponent, { immediate: true })
 
@@ -34,30 +33,12 @@ async function loadRemoteComponent() {
 
   remoteLoading.value = true
   try {
-    const localModule = await loadLocalDevModule(plugin.value.pluginCode)
-    if (localModule) {
-      await mountPluginModule(localModule)
-      return
-    }
-
     const entry = plugin.value.entry || `/api/platform/plugins/${plugin.value.pluginCode}/assets/remoteEntry.js`
     const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
     await mountPluginModule(module)
-    if (!remoteComponent.value) {
-      const fallbackModule = await loadLocalDevModule(plugin.value.pluginCode)
-      if (fallbackModule) {
-        remoteError.value = ''
-        await mountPluginModule(fallbackModule)
-      }
-    }
   }
   catch (error: any) {
-    const module = await loadLocalDevModule(plugin.value.pluginCode)
-    if (module) {
-      await mountPluginModule(module)
-      return
-    }
-    remoteError.value = error?.message || '远程组件加载失败'
+    remoteError.value = resolveLoadError(error)
   }
   finally {
     remoteLoading.value = false
@@ -70,15 +51,6 @@ async function mountPluginModule(module: YuDreamPluginFrontendModule & Record<st
   if (!remoteComponent.value) {
     remoteError.value = `远程入口未导出组件：${plugin.value.component || '-'}`
   }
-}
-
-async function loadLocalDevModule(pluginCode: string) {
-  if (!import.meta.env.DEV) {
-    return null
-  }
-  const modulePath = `../../../../../../packages/plugin-${pluginCode}/src/index.ts`
-  const loader = localDevModules[modulePath]
-  return loader ? await loader() : null
 }
 
 async function installPluginModule(module: YuDreamPluginFrontendModule & Record<string, any>) {
@@ -109,6 +81,14 @@ function resolveRemoteComponent(module: YuDreamPluginFrontendModule & Record<str
     return resolveRemoteComponent(module.default as YuDreamPluginFrontendModule & Record<string, any>)
   }
   return (module.default as Component) || null
+}
+
+function resolveLoadError(error: any) {
+  const detail = error?.message ? `：${error.message}` : ''
+  if (import.meta.env.DEV) {
+    return `插件前端加载失败，请确认插件已在独立插件仓完成构建，并将插件 JAR 放入后端 plugins 目录${detail}`
+  }
+  return `远程插件加载失败${detail}`
 }
 </script>
 

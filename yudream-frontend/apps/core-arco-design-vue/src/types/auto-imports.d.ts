@@ -81,10 +81,10 @@ declare global {
   const useAttrs: typeof import('vue').useAttrs
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
-  const useFaDrawer: typeof import('@fantastic-admin/components').useFaDrawer
-  const useFaImagePreview: typeof import('@fantastic-admin/components').useFaImagePreview
-  const useFaModal: typeof import('@fantastic-admin/components').useFaModal
-  const useFaToast: typeof import('@fantastic-admin/components').useFaToast
+  const useFaDrawer: typeof import('@yudream/components').useFaDrawer
+  const useFaImagePreview: typeof import('@yudream/components').useFaImagePreview
+  const useFaModal: typeof import('@yudream/components').useFaModal
+  const useFaToast: typeof import('@yudream/components').useFaToast
   const useId: typeof import('vue').useId
   const useLink: typeof import('vue-router').useLink
   const useModel: typeof import('vue').useModel
