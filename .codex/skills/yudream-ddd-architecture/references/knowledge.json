@@ -59,6 +59,10 @@
     {
       "key": "plugin-people-picker-no-manual-id",
       "text": "插件前端涉及人员、部门选择时，不得暴露用户 ID 输入框；用后端 picker API 搜索/解析用户并以姓名、用户名、邮箱标签展示，历史 ID 只允许作为搜索兼容入口。"
+    },
+    {
+      "key": "plugin-picker-framework-components",
+      "text": "插件前端涉及人员、部门、服务器等选择器时，不得让用户手输或辨认内部 ID；优先复用宿主 UI 框架组件，如 Arco Modal/Table/Select/Tag，并用名称、账号、部门、服务器名等业务标签展示。"
     }
   ],
   "utilities": [

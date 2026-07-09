@@ -33,7 +33,7 @@ public class ProjectProgressAppAssembler {
         return new ProjectWorkDetailDTO(detail.id(), detail.projectId(), detail.title(), detail.description(),
                 detail.statusCode(), detail.assignmentMode().name(), detail.requiredAssigneeCount(),
                 detail.candidateUserIds(), detail.assigneeUserIds(), detail.acceptorUserIds(), detail.published(),
-                detail.dueAt(), detail.createdAt(), detail.updatedAt());
+                detail.pendingAcceptance(), detail.dueAt(), detail.createdAt(), detail.updatedAt());
     }
 
     public ProjectCheckInDTO toDTO(ProjectCheckInRecord record) {

@@ -14,6 +14,7 @@ public record ProjectWorkDetailRes(
         List<String> assigneeUserIds,
         List<String> acceptorUserIds,
         boolean published,
+        boolean pendingAcceptance,
         Long dueAt,
         long createdAt,
         long updatedAt

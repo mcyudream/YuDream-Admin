@@ -11,7 +11,7 @@ defineProps<{
   <section class="pp-page">
     <section class="pp-toolbar">
       <div>
-        <span>Settings</span>
+        <span>联动状态</span>
         <h2>插件状态</h2>
       </div>
       <button type="button" @click="model.load">刷新状态</button>

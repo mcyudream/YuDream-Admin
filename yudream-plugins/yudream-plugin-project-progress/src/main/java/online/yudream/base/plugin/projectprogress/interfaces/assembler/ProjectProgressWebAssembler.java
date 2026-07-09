@@ -7,6 +7,7 @@ import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgres
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectAcceptanceDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectCheckInDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectDeptOptionDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectMinecraftServerOptionDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressEventDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressProjectDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressStatusDTO;
@@ -19,6 +20,7 @@ import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProg
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectAcceptanceRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectCheckInRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectDeptOptionRes;
+import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectMinecraftServerOptionRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressEventRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressProjectRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressStatusRes;
@@ -71,6 +73,11 @@ public class ProjectProgressWebAssembler {
                 dto.children() == null ? java.util.List.of() : dto.children().stream().map(this::toRes).toList());
     }
 
+    public ProjectMinecraftServerOptionRes toRes(ProjectMinecraftServerOptionDTO dto) {
+        return new ProjectMinecraftServerOptionRes(dto.id(), dto.name(), dto.enabled(),
+                dto.currentSeasonId(), dto.currentSeasonName());
+    }
+
     public ProjectProgressProjectRes toRes(ProjectProgressProjectDTO dto) {
         return new ProjectProgressProjectRes(dto.id(), dto.name(), dto.description(), dto.managerUserIds(), dto.memberUserIds(),
                 dto.statuses().stream().map(item -> new ProjectProgressProjectRes.StatusRes(item.code(), item.label(), item.terminal(), item.sort())).toList(),
@@ -84,7 +91,7 @@ public class ProjectProgressWebAssembler {
     public ProjectWorkDetailRes toRes(ProjectWorkDetailDTO dto) {
         return new ProjectWorkDetailRes(dto.id(), dto.projectId(), dto.title(), dto.description(), dto.statusCode(),
                 dto.assignmentMode(), dto.requiredAssigneeCount(), dto.candidateUserIds(), dto.assigneeUserIds(),
-                dto.acceptorUserIds(), dto.published(), dto.dueAt(), dto.createdAt(), dto.updatedAt());
+                dto.acceptorUserIds(), dto.published(), dto.pendingAcceptance(), dto.dueAt(), dto.createdAt(), dto.updatedAt());
     }
 
     public ProjectCheckInRes toRes(ProjectCheckInDTO dto) {

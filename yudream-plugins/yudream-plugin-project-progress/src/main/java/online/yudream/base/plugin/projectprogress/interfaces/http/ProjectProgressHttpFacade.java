@@ -46,6 +46,13 @@ public class ProjectProgressHttpFacade {
         return PluginHttpResponse.ok(appService.departments(stringQuery(request, "keyword")).stream().map(assembler::toRes).toList());
     }
 
+    public PluginHttpResponse minecraftServers(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.minecraftServers(booleanQuery(request, "includeDisabled", false))
+                .stream()
+                .map(assembler::toRes)
+                .toList());
+    }
+
     public PluginHttpResponse createProject(PluginHttpRequest request) {
         ProjectProgressProjectSaveRequest body = JsonSupport.read(request.body(), ProjectProgressProjectSaveRequest.class);
         return PluginHttpResponse.ok(assembler.toRes(appService.createProject(assembler.toCmd(body), currentUserId(request))));
@@ -106,6 +113,23 @@ public class ProjectProgressHttpFacade {
 
     public PluginHttpResponse pendingAcceptance(PluginHttpRequest request) {
         return PluginHttpResponse.ok(appService.pendingAcceptance(currentUserId(request), page(request), size(request)).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse submitAcceptance(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(assembler.toRes(appService.submitAcceptance(pathSegment(request.path(), 1), currentUserId(request))));
+    }
+
+    public PluginHttpResponse projectCheckIns(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.projectCheckIns(pathSegment(request.path(), 1), page(request), size(request)).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse createProjectCheckIn(PluginHttpRequest request) {
+        ProjectProgressCheckInRequest body = JsonSupport.read(request.body(), ProjectProgressCheckInRequest.class);
+        return PluginHttpResponse.ok(assembler.toRes(appService.projectCheckIn(pathSegment(request.path(), 1), assembler.toCmd(body), currentUserId(request))));
+    }
+
+    public PluginHttpResponse projectMinecraftCheckIn(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(assembler.toRes(appService.projectMinecraftCheckIn(pathSegment(request.path(), 1), currentUserId(request))));
     }
 
     public PluginHttpResponse checkIns(PluginHttpRequest request) {
@@ -170,6 +194,13 @@ public class ProjectProgressHttpFacade {
     private Long longQuery(PluginHttpRequest request, String key) {
         java.util.List<String> values = request.query().get(key);
         return values == null || values.isEmpty() || values.get(0).isBlank() ? null : Long.parseLong(values.get(0));
+    }
+
+    private boolean booleanQuery(PluginHttpRequest request, String key, boolean defaultValue) {
+        java.util.List<String> values = request.query().get(key);
+        return values == null || values.isEmpty() || values.get(0).isBlank()
+                ? defaultValue
+                : Boolean.parseBoolean(values.get(0));
     }
 
     private String stringQuery(PluginHttpRequest request, String key) {

@@ -18,6 +18,7 @@ public record ProjectWorkDetail(
         List<String> assigneeUserIds,
         List<String> acceptorUserIds,
         boolean published,
+        boolean pendingAcceptance,
         Long dueAt,
         long createdAt,
         long updatedAt
@@ -43,7 +44,7 @@ public record ProjectWorkDetail(
         long now = System.currentTimeMillis();
         return new ProjectWorkDetail(UUID.randomUUID().toString(), projectId, title, description, statusCode,
                 assignmentMode, requiredAssigneeCount, candidateUserIds, assigneeUserIds, acceptorUserIds,
-                false, dueAt, now, now);
+                false, false, dueAt, now, now);
     }
 
     public ProjectWorkDetail update(String title, String description, String statusCode, ProjectAssignmentMode assignmentMode,
@@ -51,13 +52,13 @@ public record ProjectWorkDetail(
                                     List<String> acceptorUserIds, Boolean published, Long dueAt) {
         return new ProjectWorkDetail(id, projectId, title, description, statusCode, assignmentMode, requiredAssigneeCount,
                 candidateUserIds, assigneeUserIds, acceptorUserIds, published == null ? this.published : published,
-                dueAt, createdAt, System.currentTimeMillis());
+                pendingAcceptance, dueAt, createdAt, System.currentTimeMillis());
     }
 
     public ProjectWorkDetail publish(List<String> assignees) {
         return new ProjectWorkDetail(id, projectId, title, description, statusCode, assignmentMode, requiredAssigneeCount,
                 candidateUserIds, assignees == null ? assigneeUserIds : assignees, acceptorUserIds, true,
-                dueAt, createdAt, System.currentTimeMillis());
+                pendingAcceptance, dueAt, createdAt, System.currentTimeMillis());
     }
 
     public ProjectWorkDetail assign(List<String> assignees) {
@@ -65,7 +66,8 @@ public record ProjectWorkDetail(
             throw new IllegalArgumentException("分配用户不能为空");
         }
         return new ProjectWorkDetail(id, projectId, title, description, statusCode, assignmentMode, requiredAssigneeCount,
-                candidateUserIds, assignees, acceptorUserIds, true, dueAt, createdAt, System.currentTimeMillis());
+                candidateUserIds, assignees, acceptorUserIds, true, pendingAcceptance, dueAt, createdAt,
+                System.currentTimeMillis());
     }
 
     public ProjectWorkDetail claim(String userId) {
@@ -88,7 +90,32 @@ public record ProjectWorkDetail(
         List<String> nextAssignees = new java.util.ArrayList<>(assigneeUserIds);
         nextAssignees.add(safeUserId);
         return new ProjectWorkDetail(id, projectId, title, description, statusCode, assignmentMode, requiredAssigneeCount,
-                candidateUserIds, normalizeIds(nextAssignees), acceptorUserIds, true, dueAt, createdAt, System.currentTimeMillis());
+                candidateUserIds, normalizeIds(nextAssignees), acceptorUserIds, true, pendingAcceptance, dueAt,
+                createdAt, System.currentTimeMillis());
+    }
+
+    public ProjectWorkDetail submitAcceptance(String reviewingStatusCode) {
+        if (!published) {
+            throw new IllegalArgumentException("任务发布后才可以提交验收");
+        }
+        if (assigneeUserIds.isEmpty()) {
+            throw new IllegalArgumentException("任务尚未分配负责人，不能提交验收");
+        }
+        return new ProjectWorkDetail(id, projectId, title, description, requireText(reviewingStatusCode, "验收状态不能为空"),
+                assignmentMode, requiredAssigneeCount, candidateUserIds, assigneeUserIds, acceptorUserIds, published,
+                true, dueAt, createdAt, System.currentTimeMillis());
+    }
+
+    public ProjectWorkDetail accept(String doneStatusCode) {
+        return new ProjectWorkDetail(id, projectId, title, description, requireText(doneStatusCode, "完成状态不能为空"),
+                assignmentMode, requiredAssigneeCount, candidateUserIds, assigneeUserIds, acceptorUserIds, published,
+                false, dueAt, createdAt, System.currentTimeMillis());
+    }
+
+    public ProjectWorkDetail reject(String resetStatusCode) {
+        return new ProjectWorkDetail(id, projectId, title, description, requireText(resetStatusCode, "重置状态不能为空"),
+                assignmentMode, requiredAssigneeCount, candidateUserIds, assigneeUserIds, acceptorUserIds, published,
+                false, dueAt, createdAt, System.currentTimeMillis());
     }
 
     public boolean claimableBy(String userId) {
@@ -104,7 +131,7 @@ public record ProjectWorkDetail(
     public ProjectWorkDetail withStatus(String nextStatusCode) {
         return new ProjectWorkDetail(id, projectId, title, description, requireText(nextStatusCode, "状态不能为空"),
                 assignmentMode, requiredAssigneeCount, candidateUserIds, assigneeUserIds, acceptorUserIds,
-                published, dueAt, createdAt, System.currentTimeMillis());
+                published, pendingAcceptance, dueAt, createdAt, System.currentTimeMillis());
     }
 
     public boolean canAccept(String userId, ProjectProgressProject project) {

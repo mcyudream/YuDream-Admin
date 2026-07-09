@@ -6,6 +6,7 @@ import { useProjectProgress } from './composables/useProjectProgress'
 import AcceptancePage from './pages/AcceptancePage.vue'
 import CheckInsPage from './pages/CheckInsPage.vue'
 import DashboardPage from './pages/DashboardPage.vue'
+import DetailsPage from './pages/DetailsPage.vue'
 import MyTasksPage from './pages/MyTasksPage.vue'
 import ProjectsPage from './pages/ProjectsPage.vue'
 import SettingsPage from './pages/SettingsPage.vue'
@@ -22,6 +23,9 @@ const pageName = computed(() => {
   const component = (props.route?.meta?.plugin as { component?: string } | undefined)?.component || ''
   if (component.endsWith('/Projects')) {
     return 'projects'
+  }
+  if (component.endsWith('/Details')) {
+    return 'details'
   }
   if (component.endsWith('/TaskCenter')) {
     return 'task-center'
@@ -44,6 +48,9 @@ const pageName = computed(() => {
 const page = computed(() => {
   if (pageName.value === 'projects') {
     return ProjectsPage
+  }
+  if (pageName.value === 'details') {
+    return DetailsPage
   }
   if (pageName.value === 'task-center') {
     return TaskCenterPage

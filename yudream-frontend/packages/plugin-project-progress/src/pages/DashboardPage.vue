@@ -11,7 +11,7 @@ defineProps<{
   <section class="pp-page">
     <section class="pp-toolbar">
       <div>
-        <span>Project Monitor</span>
+        <span>实时进度</span>
         <h2>项目进度看板</h2>
       </div>
       <button type="button" @click="model.load">刷新</button>
