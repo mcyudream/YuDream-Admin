@@ -41,6 +41,7 @@ export interface ActivityProofServer {
 export interface ActivityProofParticipant {
   index: number
   serverId: string
+  userId: string
   playerId: string
   playerName: string
   studentName: string
@@ -75,6 +76,11 @@ export interface ActivityProofExportRecord {
   unmatchedCount: number
   operatorUserId: string
   generatedAt: TimeValue
+  stampedPdfReady: boolean
+  stampedPdfFilename: string
+  stampedPdfDownloadPath: string
+  stampedPdfSize: number
+  stampedPdfUploadedAt: TimeValue
 }
 
 export interface ExportForm {

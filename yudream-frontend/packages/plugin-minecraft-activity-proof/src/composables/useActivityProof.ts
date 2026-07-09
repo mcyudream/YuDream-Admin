@@ -27,6 +27,7 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   const participants = ref<ActivityProofParticipant[]>([])
   const mappings = ref<ActivityProofMapping[]>([])
   const exports = ref<ActivityProofExportRecord[]>([])
+  const myExports = ref<ActivityProofExportRecord[]>([])
   const selectedServerId = ref('')
   const selectedPlayerIds = ref<string[]>([])
   const mappingInputs = reactive<Record<string, string>>({})
@@ -54,14 +55,26 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   const selectedTemplate = computed(() => templates.value.find(item => item.id === settingsForm.templateId) || null)
   const unmatchedCount = computed(() => participants.value.filter(item => !item.matched).length)
   const selectedCount = computed(() => selectedPlayerIds.value.length || participants.value.length)
+  const canManage = computed(() => sdk.account.permissions.includes('*') || sdk.account.permissions.includes('plugin:yudream-student-info:manage'))
+
+  async function loadPage(page: 'export' | 'records' | 'mine') {
+    if (page === 'records') {
+      await loadRecords()
+      return
+    }
+    if (page === 'mine') {
+      await loadMine()
+      return
+    }
+    await load()
+  }
 
   async function load() {
     loading.value = true
     try {
-      const [nextStatus, nextExports] = await Promise.all([api.status(), api.exports()])
+      const nextStatus = await api.status()
       status.value = nextStatus
       settings.value = nextStatus.settings
-      exports.value = nextExports
       syncSettingsForm(nextStatus.settings)
       syncExportDefaults(nextStatus.settings)
       if (nextStatus.dependencies.wordTemplateReady) {
@@ -86,6 +99,26 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
       if (selectedServerId.value) {
         await reloadServerData()
       }
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function loadRecords() {
+    loading.value = true
+    try {
+      exports.value = await api.exports()
+    }
+    finally {
+      loading.value = false
+    }
+  }
+
+  async function loadMine() {
+    loading.value = true
+    try {
+      myExports.value = await api.myExports()
     }
     finally {
       loading.value = false
@@ -249,8 +282,55 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
   }
 
   function openDownload(record: ActivityProofExportRecord) {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && record.downloadPath) {
       window.open(api.downloadUrl(record.downloadPath), '_blank')
+    }
+  }
+
+  function openStampedPdf(record: ActivityProofExportRecord) {
+    if (typeof window !== 'undefined' && record.stampedPdfDownloadPath) {
+      window.open(api.downloadUrl(record.stampedPdfDownloadPath), '_blank')
+    }
+  }
+
+  async function uploadStampedPdf(record: ActivityProofExportRecord, event: Event) {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) {
+      return
+    }
+    if (file.type && file.type !== 'application/pdf') {
+      toast.warning('请上传 PDF 文件')
+      return
+    }
+    saving.value = true
+    try {
+      const nextRecord = await api.uploadStampedPdf(record.id, {
+        filename: file.name,
+        contentType: file.type || 'application/pdf',
+        base64: await fileToBase64(file),
+      })
+      exports.value = exports.value.map(item => item.id === nextRecord.id ? nextRecord : item)
+      toast.success('盖章 PDF 已上传')
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
+  async function deleteExportRecord(record: ActivityProofExportRecord) {
+    if (typeof window !== 'undefined' && !window.confirm(`确定删除「${record.outputFilename}」吗？`)) {
+      return
+    }
+    saving.value = true
+    try {
+      await api.deleteExport(record.id)
+      exports.value = exports.value.filter(item => item.id !== record.id)
+      toast.success('导出记录已删除')
+    }
+    finally {
+      saving.value = false
     }
   }
 
@@ -276,6 +356,16 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
     return `${Math.floor(value / 60000)} 分钟`
   }
 
+  function formatFileSize(value: number) {
+    if (!value) {
+      return '-'
+    }
+    if (value < 1024 * 1024) {
+      return `${Math.max(1, Math.round(value / 1024))} KB`
+    }
+    return `${(value / 1024 / 1024).toFixed(1)} MB`
+  }
+
   return reactive({
     loading,
     saving,
@@ -287,17 +377,22 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
     participants,
     mappings,
     exports,
+    myExports,
     selectedServerId,
     selectedPlayerIds,
     mappingInputs,
     settingsForm,
     exportForm,
     ready,
+    canManage,
     selectedServer,
     selectedTemplate,
     unmatchedCount,
     selectedCount,
+    loadPage,
     load,
+    loadRecords,
+    loadMine,
     reloadServerData,
     reloadTemplates,
     selectTemplate,
@@ -309,8 +404,25 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
     clearSelection,
     exportWord,
     openDownload,
+    openStampedPdf,
+    uploadStampedPdf,
+    deleteExportRecord,
     formatTime,
+    formatFileSize,
     minutes,
+  })
+}
+
+function fileToBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const value = String(reader.result || '')
+      const commaIndex = value.indexOf(',')
+      resolve(commaIndex >= 0 ? value.slice(commaIndex + 1) : value)
+    }
+    reader.onerror = () => reject(reader.error || new Error('文件读取失败'))
+    reader.readAsDataURL(file)
   })
 }
 

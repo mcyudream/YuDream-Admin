@@ -3,10 +3,16 @@ import activityProofStyles from './styles.css?inline'
 import ActivityProofPlugin from './ActivityProofPlugin.vue'
 
 export const Export = ActivityProofPlugin
+export const Records = ActivityProofPlugin
+export const Mine = ActivityProofPlugin
 
 export const routes = {
   Export,
+  Records,
+  Mine,
   'minecraft-activity-proof/Export': Export,
+  'minecraft-activity-proof/Records': Records,
+  'minecraft-activity-proof/Mine': Mine,
 }
 
 export function install() {

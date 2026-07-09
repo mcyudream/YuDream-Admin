@@ -3,10 +3,12 @@ package online.yudream.base.plugin.activityproof.interfaces.assembler;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofExportCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofMappingSaveCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofSettingsSaveCmd;
+import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofStampedPdfUploadCmd;
 import online.yudream.base.plugin.activityproof.application.cmd.ActivityProofTemplateSelectCmd;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofExportRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofMappingSaveRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofSettingsSaveRequest;
+import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofStampedPdfUploadRequest;
 import online.yudream.base.plugin.activityproof.interfaces.request.ActivityProofTemplateSelectRequest;
 
 public class ActivityProofWebAssembler {
@@ -36,5 +38,9 @@ public class ActivityProofWebAssembler {
                 request.includeAfk(),
                 request.selectedPlayerIds()
         );
+    }
+
+    public ActivityProofStampedPdfUploadCmd toCmd(String id, ActivityProofStampedPdfUploadRequest request) {
+        return new ActivityProofStampedPdfUploadCmd(id, request.filename(), request.contentType(), request.base64());
     }
 }

@@ -1,6 +1,7 @@
 package online.yudream.base.plugin.activityproof.infrastructure.repository;
 
 import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofExportRecord;
+import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofParticipantSnapshot;
 import online.yudream.base.plugin.activityproof.domain.aggregate.ActivityProofSettings;
 import online.yudream.base.plugin.activityproof.domain.aggregate.PlayerStudentMapping;
 import online.yudream.base.plugin.activityproof.domain.repo.ActivityProofRepository;
@@ -76,6 +77,11 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
                 .toList();
     }
 
+    @Override
+    public void deleteExportRecord(String id) {
+        documents.delete(EXPORTS, id);
+    }
+
     private Map<String, Object> settingsDocument(ActivityProofSettings settings) {
         Map<String, Object> document = new LinkedHashMap<>();
         document.put("id", ActivityProofSettings.ID);
@@ -115,6 +121,24 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
         document.put("unmatchedCount", record.unmatchedCount());
         document.put("operatorUserId", record.operatorUserId());
         document.put("generatedAt", record.generatedAt());
+        document.put("stampedPdfObjectKey", record.stampedPdfObjectKey());
+        document.put("stampedPdfFilename", record.stampedPdfFilename());
+        document.put("stampedPdfContentType", record.stampedPdfContentType());
+        document.put("stampedPdfSize", record.stampedPdfSize());
+        document.put("stampedPdfUploadedAt", record.stampedPdfUploadedAt());
+        document.put("participants", record.participants().stream().map(this::snapshotDocument).toList());
+        return document;
+    }
+
+    private Map<String, Object> snapshotDocument(ActivityProofParticipantSnapshot snapshot) {
+        Map<String, Object> document = new LinkedHashMap<>();
+        document.put("userId", snapshot.userId());
+        document.put("studentName", snapshot.studentName());
+        document.put("studentNo", snapshot.studentNo());
+        document.put("className", snapshot.className());
+        document.put("college", snapshot.college());
+        document.put("playerId", snapshot.playerId());
+        document.put("playerName", snapshot.playerName());
         return document;
     }
 
@@ -156,16 +180,44 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
                 integer(document, "participantCount", 0),
                 integer(document, "unmatchedCount", 0),
                 string(document, "operatorUserId"),
-                number(document, "generatedAt", 0)
+                number(document, "generatedAt", 0),
+                string(document, "stampedPdfObjectKey"),
+                string(document, "stampedPdfFilename"),
+                string(document, "stampedPdfContentType"),
+                number(document, "stampedPdfSize", 0),
+                number(document, "stampedPdfUploadedAt", 0),
+                snapshots(document.get("participants"))
         );
     }
 
-    private String string(Map<String, Object> document, String key) {
+    private List<ActivityProofParticipantSnapshot> snapshots(Object value) {
+        if (!(value instanceof List<?> rows)) {
+            return List.of();
+        }
+        return rows.stream()
+                .filter(row -> row instanceof Map<?, ?>)
+                .map(row -> toSnapshot((Map<?, ?>) row))
+                .toList();
+    }
+
+    private ActivityProofParticipantSnapshot toSnapshot(Map<?, ?> document) {
+        return new ActivityProofParticipantSnapshot(
+                string(document, "userId"),
+                string(document, "studentName"),
+                string(document, "studentNo"),
+                string(document, "className"),
+                string(document, "college"),
+                string(document, "playerId"),
+                string(document, "playerName")
+        );
+    }
+
+    private String string(Map<?, ?> document, String key) {
         Object value = document.get(key);
         return value == null ? "" : String.valueOf(value);
     }
 
-    private long number(Map<String, Object> document, String key, long defaultValue) {
+    private long number(Map<?, ?> document, String key, long defaultValue) {
         Object value = document.get(key);
         if (value instanceof Number number) {
             return number.longValue();
@@ -173,7 +225,7 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
         return value == null || String.valueOf(value).isBlank() ? defaultValue : Long.parseLong(String.valueOf(value));
     }
 
-    private Long longObject(Map<String, Object> document, String key) {
+    private Long longObject(Map<?, ?> document, String key) {
         Object value = document.get(key);
         if (value instanceof Number number) {
             return number.longValue();
@@ -181,7 +233,7 @@ public class ActivityProofDocumentRepository implements ActivityProofRepository 
         return value == null || String.valueOf(value).isBlank() ? null : Long.parseLong(String.valueOf(value));
     }
 
-    private int integer(Map<String, Object> document, String key, int defaultValue) {
+    private int integer(Map<?, ?> document, String key, int defaultValue) {
         Object value = document.get(key);
         if (value instanceof Number number) {
             return number.intValue();
