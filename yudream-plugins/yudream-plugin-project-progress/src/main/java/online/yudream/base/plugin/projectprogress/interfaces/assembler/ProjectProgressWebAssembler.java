@@ -6,9 +6,11 @@ import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgres
 import online.yudream.base.plugin.projectprogress.application.cmd.ProjectProgressProjectSaveCmd;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectAcceptanceDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectCheckInDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectDeptOptionDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressEventDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressProjectDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectProgressStatusDTO;
+import online.yudream.base.plugin.projectprogress.application.dto.ProjectUserOptionDTO;
 import online.yudream.base.plugin.projectprogress.application.dto.ProjectWorkDetailDTO;
 import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProgressAcceptanceRequest;
 import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProgressCheckInRequest;
@@ -16,9 +18,11 @@ import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProg
 import online.yudream.base.plugin.projectprogress.interfaces.request.ProjectProgressProjectSaveRequest;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectAcceptanceRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectCheckInRes;
+import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectDeptOptionRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressEventRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressProjectRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectProgressStatusRes;
+import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectUserOptionRes;
 import online.yudream.base.plugin.projectprogress.interfaces.res.ProjectWorkDetailRes;
 
 public class ProjectProgressWebAssembler {
@@ -55,6 +59,16 @@ public class ProjectProgressWebAssembler {
 
     public ProjectProgressStatusRes toRes(ProjectProgressStatusDTO dto) {
         return new ProjectProgressStatusRes(dto.minecraftReady(), dto.mailReady());
+    }
+
+    public ProjectUserOptionRes toRes(ProjectUserOptionDTO dto) {
+        return new ProjectUserOptionRes(dto.id(), dto.username(), dto.nickname(), dto.email(), dto.avatar(),
+                dto.status(), dto.deptIds(), dto.deptNames());
+    }
+
+    public ProjectDeptOptionRes toRes(ProjectDeptOptionDTO dto) {
+        return new ProjectDeptOptionRes(dto.id(), dto.name(), dto.parentId(), dto.status(),
+                dto.children() == null ? java.util.List.of() : dto.children().stream().map(this::toRes).toList());
     }
 
     public ProjectProgressProjectRes toRes(ProjectProgressProjectDTO dto) {

@@ -38,7 +38,7 @@ defineProps<{
       </article>
     </div>
 
-    <ProgressPanel title="可认领任务" subtle="公开任务直接认领；限制候选人的任务只对候选人显示">
+    <ProgressPanel title="可认领任务" subtle="公开任务可直接认领；指定候选人的任务只会对候选人显示">
       <table class="pp-table">
         <thead>
           <tr>
@@ -91,7 +91,7 @@ defineProps<{
               <strong>{{ task.title }}</strong>
               <span>{{ task.description || '暂无说明' }}</span>
             </td>
-            <td>{{ task.statusCode }}</td>
+            <td>{{ model.statusLabel(task.statusCode) }}</td>
             <td>{{ model.formatTime(task.dueAt) }}</td>
             <td>
               <button type="button" @click="model.selectDetail(task)">

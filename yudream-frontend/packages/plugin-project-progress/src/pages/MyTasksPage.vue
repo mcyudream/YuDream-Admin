@@ -17,7 +17,7 @@ defineProps<{
       <button type="button" @click="model.loadMyTasks">刷新</button>
     </section>
 
-    <ProgressPanel title="已分配任务" subtle="选择任务后可在打卡记录页提交证据">
+    <ProgressPanel title="已分配任务" subtle="选择任务后可在打卡页提交证据">
       <table class="pp-table">
         <thead>
           <tr>
@@ -32,14 +32,14 @@ defineProps<{
           <tr v-for="task in model.myTasks" :key="task.id">
             <td>
               <strong>{{ task.title }}</strong>
-              <span>{{ task.description }}</span>
+              <span>{{ task.description || '暂无说明' }}</span>
             </td>
-            <td>{{ task.statusCode }}</td>
-            <td>{{ task.assignmentMode }}</td>
+            <td>{{ model.statusLabel(task.statusCode) }}</td>
+            <td>{{ model.assignmentLabel(task) }}</td>
             <td>{{ model.formatTime(task.dueAt) }}</td>
             <td>
               <button type="button" @click="model.selectDetail(task)">查看打卡</button>
-              <button type="button" @click="model.minecraftCheckIn(task)">MC 打卡</button>
+              <button v-if="model.canMinecraftCheckIn(task)" type="button" @click="model.minecraftCheckIn(task)">MC 打卡</button>
             </td>
           </tr>
           <tr v-if="!model.myTasks.length">

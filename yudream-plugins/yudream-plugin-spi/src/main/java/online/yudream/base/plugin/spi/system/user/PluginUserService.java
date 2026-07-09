@@ -15,6 +15,10 @@ public interface PluginUserService {
 
     Optional<PluginUserProfile> findByEmail(String email);
 
+    List<PluginUserOption> searchUsers(String keyword, Long deptId, int page, int size);
+
+    List<PluginDeptOption> listDepartments(String keyword);
+
     List<PluginUserRole> listRoles(Long userId);
 
     List<PluginUserDept> listDepartments(Long userId);

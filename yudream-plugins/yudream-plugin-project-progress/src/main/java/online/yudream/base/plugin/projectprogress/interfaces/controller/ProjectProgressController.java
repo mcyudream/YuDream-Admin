@@ -24,6 +24,21 @@ public class ProjectProgressController {
         return http.projects(request);
     }
 
+    @PluginHttpEndpoint(method = "GET", path = "/users", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse users(PluginHttpRequest request) {
+        return http.users(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/users/resolve", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse resolveUsers(PluginHttpRequest request) {
+        return http.resolveUsers(request);
+    }
+
+    @PluginHttpEndpoint(method = "GET", path = "/departments", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
+    public PluginHttpResponse departments(PluginHttpRequest request) {
+        return http.departments(request);
+    }
+
     @PluginHttpEndpoint(method = "POST", path = "/projects", permission = ProjectProgressPlugin.MANAGE_PERMISSION)
     public PluginHttpResponse createProject(PluginHttpRequest request) {
         return http.createProject(request);

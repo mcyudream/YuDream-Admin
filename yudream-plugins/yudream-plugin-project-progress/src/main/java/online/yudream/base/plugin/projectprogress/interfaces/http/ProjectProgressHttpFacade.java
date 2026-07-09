@@ -12,6 +12,8 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class ProjectProgressHttpFacade {
@@ -29,6 +31,19 @@ public class ProjectProgressHttpFacade {
 
     public PluginHttpResponse projects(PluginHttpRequest request) {
         return PluginHttpResponse.ok(appService.projects(page(request), size(request)).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse users(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.searchUsers(stringQuery(request, "keyword"), stringQuery(request, "deptId"),
+                page(request), size(request)).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse resolveUsers(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.usersByIds(listQuery(request, "ids")).stream().map(assembler::toRes).toList());
+    }
+
+    public PluginHttpResponse departments(PluginHttpRequest request) {
+        return PluginHttpResponse.ok(appService.departments(stringQuery(request, "keyword")).stream().map(assembler::toRes).toList());
     }
 
     public PluginHttpResponse createProject(PluginHttpRequest request) {
@@ -155,6 +170,24 @@ public class ProjectProgressHttpFacade {
     private Long longQuery(PluginHttpRequest request, String key) {
         java.util.List<String> values = request.query().get(key);
         return values == null || values.isEmpty() || values.get(0).isBlank() ? null : Long.parseLong(values.get(0));
+    }
+
+    private String stringQuery(PluginHttpRequest request, String key) {
+        java.util.List<String> values = request.query().get(key);
+        return values == null || values.isEmpty() || values.get(0).isBlank() ? null : values.get(0).trim();
+    }
+
+    private List<String> listQuery(PluginHttpRequest request, String key) {
+        java.util.List<String> values = request.query().get(key);
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        return values.stream()
+                .flatMap(value -> Arrays.stream(value.split(",")))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .distinct()
+                .toList();
     }
 
     private String pathSegment(String path, int index) {

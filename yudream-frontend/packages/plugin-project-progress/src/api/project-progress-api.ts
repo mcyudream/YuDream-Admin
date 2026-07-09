@@ -1,9 +1,11 @@
 import type {
+  ProjectDeptOption,
   ProjectAcceptanceRecord,
   ProjectCheckIn,
   ProjectProgressEvent,
   ProjectProgressProject,
   ProjectProgressStatus,
+  ProjectUserOption,
   ProjectWorkDetail,
 } from '../types'
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
@@ -38,6 +40,11 @@ export function createProjectProgressApi(sdk: YuDreamPluginSdk) {
   return {
     status: () => sdk.http.get<ProjectProgressStatus>('/status'),
     projects: () => getAllPages<ProjectProgressProject>('/projects'),
+    users: (keyword?: string, deptId?: string) => getAllPages<ProjectUserOption>('/users', { keyword, deptId }),
+    resolveUsers: (ids: string[]) => ids.length
+      ? sdk.http.get<ProjectUserOption[]>(`/users/resolve${query({ ids: ids.join(',') })}`)
+      : Promise.resolve([]),
+    departments: (keyword?: string) => sdk.http.get<ProjectDeptOption[]>(`/departments${query({ keyword })}`),
     createProject: (data: Record<string, unknown>) => sdk.http.post<ProjectProgressProject>('/projects', data),
     updateProject: (id: string, data: Record<string, unknown>) => sdk.http.request<ProjectProgressProject>(`/projects/${encodeURIComponent(id)}`, { method: 'PUT', data }),
     deleteProject: (id: string) => sdk.http.request(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE' }),
