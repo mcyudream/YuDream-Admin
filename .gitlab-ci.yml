@@ -124,8 +124,6 @@ publish:maven-plugin-spi:
 verify:maven-plugin-spi:
   stage: verify-packages
   image: *maven_image
-  needs:
-    - job: publish:maven-plugin-spi
   script:
     - sh ci/verify-plugin-spi-registry.sh
   rules:
@@ -134,9 +132,6 @@ verify:maven-plugin-spi:
 verify:gitlab-npm-contracts:
   stage: verify-packages
   image: *node_image
-  needs:
-    - job: publish:npm-plugin-sdk
-    - job: publish:npm-components
   before_script:
     - npm config set registry "$NPM_CONFIG_REGISTRY"
     - corepack enable && corepack prepare pnpm@11.9.0 --activate
@@ -151,9 +146,6 @@ verify:gitlab-npm-contracts:
 verify:npmjs-contracts:
   stage: verify-packages
   image: *node_image
-  needs:
-    - job: publish:npmjs-plugin-sdk
-    - job: publish:npmjs-components
   before_script:
     - npm config set registry "$NPM_CONFIG_REGISTRY"
     - corepack enable && corepack prepare pnpm@11.9.0 --activate
@@ -276,11 +268,9 @@ publish:npmjs-components:
 collect:artifacts:
   stage: artifacts
   image: *node_image
-  needs:
-    - job: build:backend
-      artifacts: true
-    - job: build:frontend-main
-      artifacts: true
+  dependencies:
+    - build:backend
+    - build:frontend-main
   script:
     - mkdir -p dist/backend dist/frontend dist/contracts
     - cp yudream-bootstrap/target/*.jar dist/backend/ || true
@@ -302,11 +292,9 @@ build-and-push-images:
     FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
     BACKEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/backend:latest"
     FRONTEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/frontend:latest"
-  needs:
-    - job: build:backend
-      artifacts: true
-    - job: build:frontend-main
-      artifacts: true
+  dependencies:
+    - build:backend
+    - build:frontend-main
   before_script:
     - docker info
   script:

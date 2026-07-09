@@ -115,13 +115,6 @@ build:frontend:
 package:plugins:
   image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
   stage: package-plugin
-  needs:
-    - job: build:frontend
-      optional: true
-      artifacts: true
-    - job: validate:core-maven-registry
-    - job: validate:plugin-maven-boundary
-    - job: validate:core-npm-contracts
   script:
     - echo "Using core Maven registry: $CORE_MAVEN_REGISTRY"
     - |
@@ -168,9 +161,8 @@ package:plugins:
 publish:plugin-jars:
   image: alpine:3.20
   stage: publish-plugin
-  needs:
-    - job: package:plugins
-      artifacts: true
+  dependencies:
+    - package:plugins
   before_script:
     - apk add --no-cache curl
   script:
@@ -181,10 +173,8 @@ publish:plugin-jars:
 verify:published-plugin-jars:
   image: alpine:3.20
   stage: verify-publish
-  needs:
-    - job: package:plugins
-      artifacts: true
-    - job: publish:plugin-jars
+  dependencies:
+    - package:plugins
   before_script:
     - apk add --no-cache curl
   script:
