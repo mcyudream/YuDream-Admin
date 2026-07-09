@@ -61,7 +61,7 @@ export default defineConfig(({ mode, command }) => {
     plugins: createVitePlugins(mode, command === 'build'),
     optimizeDeps: {
       exclude: [
-        '@fantastic-admin/components',
+        '@yudream/components',
         '@fantastic-admin/composables',
       ],
     },
