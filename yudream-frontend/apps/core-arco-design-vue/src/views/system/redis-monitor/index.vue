@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { RedisKeySample, RedisMonitor } from '@/api/modules/system-monitor'
 import apiMonitor from '@/api/modules/system-monitor'
 

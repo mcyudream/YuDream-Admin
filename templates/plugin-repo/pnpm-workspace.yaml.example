@@ -1,0 +1,18 @@
+packages:
+  - packages/plugin-*
+catalog:
+  '@types/node': ^25.9.3
+  '@vitejs/plugin-vue': ^6.0.7
+  '@vue/tsconfig': ^0.9.1
+  '@yudream/components': 1.0.0-snapshot
+  '@yudream/plugin-sdk': 1.0.1-snapshot
+  typescript: ^6.0.3
+  vite: ^8.0.16
+  vue: ^3.5.38
+  vue-router: ^5.1.0
+  vue-tsc: ^3.3.4
+allowBuilds:
+  vue-demi: true
+minimumReleaseAgeExclude:
+  - '@yudream/components@1.0.0-snapshot'
+  - '@yudream/plugin-sdk@1.0.1-snapshot'

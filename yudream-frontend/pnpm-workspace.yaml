@@ -9,7 +9,15 @@ verifyDepsBeforeRun: prompt
 
 packages:
   - apps/*
-  - packages/*
+  - packages/components
+  - packages/composables
+  - packages/copyright
+  - packages/dataviz
+  - packages/iconify-tools
+  - packages/plugin-sdk
+  - packages/settings
+  - packages/themes
+  - packages/types
 catalog:
   '@antfu/eslint-config': ^9.0.0
   '@clack/prompts': ^1.5.1
@@ -119,7 +127,6 @@ catalog:
   vue-sonner: ^2.0.9
   vue-tsc: ^3.3.4
   zod: ^4.4.3
-  vue-skinview3d: ^0.3.1
   '@jboltai/tokui': ^0.1.4
   md-editor-v3: 6.5.3
 catalogs:

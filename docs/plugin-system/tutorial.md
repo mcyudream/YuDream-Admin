@@ -2,6 +2,13 @@
 
 本文面向插件开发者，说明如何从零创建一个 YuDream 插件，并接入权限、HTTP 接口、前端页面和主系统能力。
 
+## 0. 仓库默认规则
+
+- 官方业务插件默认在独立仓 `yudream-admin-plugins` 中开发。
+- `core` 仓默认保留宿主运行时、`yudream-plugin-spi`、共享前端包、样例插件与迁移期兼容层。
+- 本文里的 `yudream-plugins/yudream-plugin-demo/`、`yudream-frontend/packages/plugin-demo/` 都是“当前插件仓内部的相对路径”示例，不表示应把官方业务插件源码放回 `core` 仓。
+- 分仓背景可参考 [standalone-plugin-repo-default.md](./standalone-plugin-repo-default.md)。
+
 ## 1. 插件能做什么
 
 插件可以向主系统注册：
@@ -34,6 +41,8 @@ yudream-plugins/yudream-plugin-demo/
   pom.xml
   src/main/java/online/yudream/base/plugin/demo/bootstrap/DemoPlugin.java
 ```
+
+如果你在做官方业务插件，上面的目录默认应创建在独立插件仓 `yudream-admin-plugins` 中。
 
 业务插件推荐结构：
 
@@ -152,6 +161,8 @@ yudream-frontend/packages/plugin-demo/
   src/types.ts
 ```
 
+这个路径同样是相对“当前插件仓”而言；官方业务插件默认位于独立插件仓，而不是 `core` 仓。
+
 生产形态需要构建出 ESM remote entry，并打进插件 JAR：
 
 ```text
@@ -184,6 +195,8 @@ META-INF/yudream-plugin/frontend/demo-plugin/remoteEntry.js
 ```powershell
 mvn -pl yudream-plugins/yudream-plugin-demo -am -DskipTests package
 ```
+
+如果你在构建官方业务插件，这条命令默认应在 `yudream-admin-plugins` 仓根目录执行。
 
 产物一般位于：
 

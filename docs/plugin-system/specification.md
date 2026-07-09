@@ -21,6 +21,13 @@
 
 需要调用主系统能力时，通过 `FrameworkServices` 或新增 SPI 端口完成。
 
+### 官方业务插件仓位规则
+
+- 官方业务插件默认放在独立仓 `yudream-admin-plugins`，而不是继续回填到 `core` 仓。
+- `core` 仓默认保留宿主运行时、`yudream-plugin-spi`、共享前端包、样例插件与迁移期兼容层。
+- 本文中出现的 `yudream-plugins/yudream-plugin-{code}`、`yudream-frontend/packages/plugin-{code}` 都表示“当前插件仓内部的相对路径”，不表示必须放回主体仓。
+- 分仓默认规则见 [standalone-plugin-repo-default.md](./standalone-plugin-repo-default.md)。
+
 ## 2. 命名规范
 
 - 插件编码使用小写短横线：`yudream-skin`、`yudream-wallet`。
@@ -158,11 +165,13 @@ plugin:{code}:manage
 yudream-frontend/apps/*/src/views
 ```
 
-本地开发目录：
+本地开发目录（相对当前插件仓根目录）：
 
 ```text
 yudream-frontend/packages/plugin-{code}/
 ```
+
+对于官方业务插件，这个目录默认位于独立插件仓 `yudream-admin-plugins`；`core` 仓只保留样例插件或迁移期兼容层。
 
 推荐结构：
 
@@ -257,6 +266,8 @@ META-INF/yudream-plugin/frontend/{pluginCode}/assets/*
 - 与系统用户身份模型对齐，不新增平行账号体系。
 
 ## 15. 验证清单
+
+以下命令以“当前插件仓根目录”为工作目录；如果是官方业务插件，默认应在 `yudream-admin-plugins` 中执行。
 
 后端：
 

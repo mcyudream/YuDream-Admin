@@ -1,5 +1,5 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
-import * as FantasticAdminComponents from '@fantastic-admin/components'
+import * as FantasticAdminComponents from '@yudream/components'
 import * as Vue from 'vue'
 import * as VueRouter from 'vue-router'
 import apiFiles from '@/api/modules/files'

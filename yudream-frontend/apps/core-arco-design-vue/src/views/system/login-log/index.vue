@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { LoginLog } from '@/api/modules/system-monitor'
 import apiExcel from '@/api/modules/system-excel'
 import apiMonitor from '@/api/modules/system-monitor'

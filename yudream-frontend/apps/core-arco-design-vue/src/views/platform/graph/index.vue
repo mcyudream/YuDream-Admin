@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import type { GraphConnection, GraphConnectionPayload, GraphConnectionStatus, GraphQueryLog, GraphQueryStatus } from '@/api/modules/platform-graph'
 import apiGraph from '@/api/modules/platform-graph'
 
