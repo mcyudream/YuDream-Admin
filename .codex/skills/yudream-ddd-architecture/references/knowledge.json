@@ -95,6 +95,10 @@
     {
       "key": "form-create-upload-runtime",
       "text": "form-create designer rules are persisted as JSON, so function props such as upload onSuccess/customRequest are lost. Public/runtime dynamic form rendering must re-inject upload handlers, normalize backend file URLs for previews, and provide a public form-scoped upload endpoint instead of relying on the login-only common file upload API."
+    },
+    {
+      "key": "plugin-authenticated-blob-download",
+      "text": "受保护的插件下载不能用 window.open 裸 URL；Sa-Token 只读请求头时浏览器直开不会带 Authorization。插件前端应通过宿主 SDK 的 blob/responseType=blob 请求下载，并从 Content-Disposition 解析文件名。"
     }
   ]
 }

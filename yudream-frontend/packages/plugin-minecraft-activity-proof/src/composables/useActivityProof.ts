@@ -9,7 +9,7 @@ import type {
   ExportForm,
   TimeValue,
 } from '../types'
-import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
+import type { YuDreamPluginBlobResponse, YuDreamPluginSdk } from '@yudream/plugin-sdk'
 import { useFaToast } from '@fantastic-admin/components'
 import { computed, reactive, ref } from 'vue'
 import { createActivityProofApi } from '../api/activity-proof-api'
@@ -274,22 +274,35 @@ export function useActivityProof(sdk: YuDreamPluginSdk) {
       })
       exports.value = [record, ...exports.value.filter(item => item.id !== record.id)]
       toast.success('活动证明已生成')
-      openDownload(record)
+      await openDownload(record)
     }
     finally {
       exporting.value = false
     }
   }
 
-  function openDownload(record: ActivityProofExportRecord) {
-    if (typeof window !== 'undefined' && record.downloadPath) {
-      window.open(api.downloadUrl(record.downloadPath), '_blank')
-    }
+  async function openDownload(record: ActivityProofExportRecord) {
+    await downloadFile(record.downloadPath, record.outputFilename || 'activity-proof.docx')
   }
 
-  function openStampedPdf(record: ActivityProofExportRecord) {
-    if (typeof window !== 'undefined' && record.stampedPdfDownloadPath) {
-      window.open(api.downloadUrl(record.stampedPdfDownloadPath), '_blank')
+  async function openStampedPdf(record: ActivityProofExportRecord) {
+    await downloadFile(record.stampedPdfDownloadPath, record.stampedPdfFilename || 'activity-proof.pdf')
+  }
+
+  async function downloadFile(path: string, fallbackName: string) {
+    if (!path) {
+      toast.warning('暂无可下载文件')
+      return
+    }
+    saving.value = true
+    try {
+      saveBlobResponse(await api.download(path), fallbackName)
+    }
+    catch (error) {
+      toast.warning(errorMessage(error))
+    }
+    finally {
+      saving.value = false
     }
   }
 
@@ -424,6 +437,41 @@ function fileToBase64(file: File) {
     reader.onerror = () => reject(reader.error || new Error('文件读取失败'))
     reader.readAsDataURL(file)
   })
+}
+
+function saveBlobResponse(response: YuDreamPluginBlobResponse, fallbackName: string) {
+  if (typeof document === 'undefined') {
+    return
+  }
+  const filename = resolveFilename(header(response.headers, 'content-disposition'), fallbackName)
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+function header(headers: Record<string, string>, name: string) {
+  return Object.entries(headers || {}).find(([key]) => key.toLowerCase() === name)?.[1]
+}
+
+function resolveFilename(disposition: string | undefined, fallbackName: string) {
+  if (!disposition) {
+    return fallbackName
+  }
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1])
+  }
+  const match = disposition.match(/filename="?([^";]+)"?/i)
+  return match?.[1] ? decodeURIComponent(match[1]) : fallbackName
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : '文件下载失败'
 }
 
 function todayText() {

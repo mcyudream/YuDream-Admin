@@ -63,9 +63,9 @@ public class MinecraftActivityProofPlugin implements YuDreamPlugin {
     public static final String CODE = "minecraft-activity-proof";
     public static final String VIEW_PERMISSION = "plugin:minecraft-activity-proof:view";
     public static final String MANAGE_PERMISSION = "plugin:minecraft-activity-proof:manage";
-    public static final String ACCESS_VIEW_PERMISSION = "plugin:yudream-student-info:view";
+    public static final String ACCESS_VIEW_PERMISSION = VIEW_PERMISSION;
     public static final String ACCESS_USER_PERMISSION = "plugin:yudream-student-info:user";
-    public static final String ACCESS_MANAGE_PERMISSION = "plugin:yudream-student-info:manage";
+    public static final String ACCESS_MANAGE_PERMISSION = MANAGE_PERMISSION;
 
     @Override
     public void onEnable(PluginContext context) {

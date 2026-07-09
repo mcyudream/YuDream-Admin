@@ -53,6 +53,7 @@ export function createActivityProofApi(sdk: YuDreamPluginSdk) {
     myExports: (page = 1, size = 20) => sdk.http.get<ActivityProofExportRecord[]>(`/me/exports${query({ page, size })}`),
     uploadStampedPdf: (id: string, data: Record<string, unknown>) => sdk.http.request<ActivityProofExportRecord>(`/exports/${encodeURIComponent(id)}/stamped-pdf`, { method: 'PUT', data }),
     deleteExport: (id: string) => sdk.http.request(`/exports/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    download: (path: string) => sdk.http.blob(path),
     downloadUrl: (path: string) => sdk.http.url(path),
   }
 }

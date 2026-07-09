@@ -5,7 +5,13 @@ export interface YuDreamPluginHttpClient {
   request: <T = unknown>(path: string, options?: { method?: string, data?: unknown }) => Promise<T>
   get: <T = unknown>(path: string) => Promise<T>
   post: <T = unknown>(path: string, data?: unknown) => Promise<T>
+  blob: (path: string, options?: { method?: string, data?: unknown }) => Promise<YuDreamPluginBlobResponse>
   url: (path: string) => string
+}
+
+export interface YuDreamPluginBlobResponse {
+  data: Blob
+  headers: Record<string, string>
 }
 
 export interface YuDreamPluginFileObject {
