@@ -1,7 +1,20 @@
 {
-  "name": "@fantastic-admin/components",
+  "name": "@yudream/components",
   "type": "module",
-  "version": "0.0.0",
+  "version": "1.0.0-snapshot",
+  "files": [
+    "src",
+    "resolver.ts"
+  ],
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "build": "vue-tsc -p tsconfig.json --noEmit",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit --pretty false"
+  },
   "imports": {
     "#utils": "./src/utils.ts"
   },
@@ -39,5 +52,12 @@
     "tailwind-merge": "catalog:",
     "vue-input-otp": "catalog:",
     "vue-sonner": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:"
   }
 }

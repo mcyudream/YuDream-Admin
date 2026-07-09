@@ -1,18 +1,29 @@
 {
   "name": "@yudream/plugin-sdk",
   "type": "module",
-  "version": "1.0.0-snapshot",
+  "version": "1.0.1-snapshot",
   "files": [
-    "src"
+    "src",
+    "vite-shared.js",
+    "vite-shared.d.ts"
   ],
   "types": "./src/index.ts",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json --noEmit",
+    "sync:vite-shared": "node ./scripts/sync-vite-shared.mjs",
+    "build": "pnpm run sync:vite-shared && tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm run sync:vite-shared",
     "typecheck": "tsc -p tsconfig.json --noEmit --pretty false"
   },
   "exports": {
     ".": "./src/index.ts",
-    "./vite-shared": "./src/vite-shared.ts"
+    "./vite-shared": {
+      "types": "./vite-shared.d.ts",
+      "default": "./vite-shared.js"
+    }
   },
   "peerDependencies": {
     "vue": "catalog:",
