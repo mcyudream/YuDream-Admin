@@ -8,7 +8,6 @@ export {}
 declare global {
   const EffectScope: typeof import('vue').EffectScope
   const acceptHMRUpdate: typeof import('pinia').acceptHMRUpdate
-  const buildPluginRouteTree: typeof import('../store/modules/app/plugin-route-tree').buildPluginRouteTree
   const computed: typeof import('vue').computed
   const createApp: typeof import('vue').createApp
   const createPinia: typeof import('pinia').createPinia
@@ -23,6 +22,7 @@ declare global {
   const getCurrentScope: typeof import('vue').getCurrentScope
   const getCurrentWatcher: typeof import('vue').getCurrentWatcher
   const h: typeof import('vue').h
+  const indexPluginRuntimeModules: typeof import('../store/modules/app/plugin-route-runtime').indexPluginRuntimeModules
   const inject: typeof import('vue').inject
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
@@ -52,12 +52,12 @@ declare global {
   const onUnmounted: typeof import('vue').onUnmounted
   const onUpdated: typeof import('vue').onUpdated
   const onWatcherCleanup: typeof import('vue').onWatcherCleanup
-  const partitionPluginRouteTree: typeof import('../store/modules/app/plugin-route-tree').partitionPluginRouteTree
   const provide: typeof import('vue').provide
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
   const resolveComponent: typeof import('vue').resolveComponent
+  const resolvePluginRuntimeRoute: typeof import('../store/modules/app/plugin-route-runtime').resolvePluginRuntimeRoute
   const setActivePinia: typeof import('pinia').setActivePinia
   const setMapStoreSuffix: typeof import('pinia').setMapStoreSuffix
   const shallowReactive: typeof import('vue').shallowReactive
@@ -107,6 +107,6 @@ declare global {
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
   // @ts-ignore
-  export type { PluginRouteTreeNodeKind, PluginRouteTreeNode, PartitionedPluginRouteTree } from '../store/modules/app/plugin-route-tree'
-  import('../store/modules/app/plugin-route-tree')
+  export type { PluginRuntimeRouteMeta } from '../store/modules/app/plugin-route-runtime'
+  import('../store/modules/app/plugin-route-runtime')
 }

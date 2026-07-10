@@ -98,7 +98,7 @@
     },
     {
       "key": "plugin-frontend-default-parent",
-      "text": "跨插件前端菜单必须通过 PluginFrontend.parentCode 声明默认父菜单编码；投影仅在首次创建时写入，已有菜单的用户父级配置不得被插件重投影覆盖。不要按菜单标题、依赖或路由路径推断跨插件层级。"
+      "text": "插件菜单声明只用于首次初始化，以及 SYSTEM_SEED_MENU_SYNC_MODE=MISSING_ONLY 时按 Menu.code 补回缺失记录；首次初始化必须以插件记录中的持久化标记判断，不能用当前菜单是否存在来猜测。已有菜单和权限必须零写入，create-missing 遇到并发唯一键竞争后必须按 code 重读收敛。PluginFrontend.parentCode 指向共享父菜单时，不创建消费插件自己的模块目录，路由直接挂到该父级。启用只恢复 exact pluginCode 记录，停用/卸载/删除只隐藏 exact pluginCode 记录，禁止递归影响子菜单；隐藏持久化失败必须向调用方报错。系统菜单和插件菜单允许互相作为父级，生命周期只看节点自身 pluginCode。无显式权限的 CATEGORY/LAYOUT 是结构节点，应随有权限的子路由进入路由树，但显式父权限仍必须生效。插件专用排序接口/UI 禁止作为第二套菜单配置源。frontend-manifest 只提供远程模块加载元数据，菜单树、Layout、名称、图标、路由、权限、父级、显隐和状态统一以 /api/menu/routes 的持久化菜单为准；manifest 暂时不可用时仍应让 runtime-page 使用插件默认 remoteEntry。"
     },
     {
       "key": "plugin-menu-top-nav-match",

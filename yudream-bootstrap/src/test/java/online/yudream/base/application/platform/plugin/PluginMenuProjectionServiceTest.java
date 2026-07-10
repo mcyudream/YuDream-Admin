@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -45,8 +46,6 @@ class PluginMenuProjectionServiceTest {
     }
 
     private void stubDefaultRepo() {
-        when(menuRepo.findByPluginCode(PLUGIN_CODE)).thenReturn(List.of());
-        when(menuRepo.findByPluginCodeAndRegistrationKey(any(), any())).thenReturn(Optional.empty());
         when(menuRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
@@ -76,6 +75,7 @@ class PluginMenuProjectionServiceTest {
         assertThat(parent.getType()).isEqualTo(MenuNodeType.LAYOUT);
         assertThat(parent.getParentCode()).isEqualTo(module.getCode());
         assertThat(parent.getPath()).isEqualTo("/wallet");
+        assertThat(parent.getComponent()).isEqualTo("Layout");
         assertOwnership(parent, "parent:" + MODULE_NAME + ":/wallet");
 
         Menu route = menuByKey(saved, "route:" + MODULE_NAME + ":walletTransactions");
@@ -88,8 +88,14 @@ class PluginMenuProjectionServiceTest {
     }
 
     @Test
-    void keepsEditedFieldsWhenTheSameRegistrationReturns() {
-        stubDefaultRepo();
+    void existingMenuCodeIsNeverOverwrittenByADeclaration() {
+        FailingMenuRepo repo = new FailingMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);
+        repo.put(pluginMenu("module:" + MODULE_NAME, true));
+        Menu layout = pluginMenu("parent:" + MODULE_NAME + ":/wallet", true);
+        layout.setType(MenuNodeType.LAYOUT);
+        layout.setComponent("CustomLayout");
+        repo.put(layout);
         Menu edited = Menu.builder()
                 .code("plugin:yudream-wallet:route:walletAdmin:walletTransactions")
                 .name("自定义名称")
@@ -110,12 +116,10 @@ class PluginMenuProjectionServiceTest {
                 .pluginRegistrationKey("route:" + MODULE_NAME + ":walletTransactions")
                 .runtimeAvailable(false)
                 .build();
-        when(menuRepo.findByPluginCodeAndRegistrationKey(
-                PLUGIN_CODE,
-                "route:" + MODULE_NAME + ":walletTransactions"
-        )).thenReturn(Optional.of(edited));
+        repo.put(edited);
 
-        service.project(PLUGIN_CODE, List.of(module(route(
+        projectionService.restoreAvailable(PLUGIN_CODE);
+        projectionService.project(PLUGIN_CODE, List.of(module(route(
                 "/wallet/transactions",
                 "walletTransactions",
                 "交易记录",
@@ -136,23 +140,24 @@ class PluginMenuProjectionServiceTest {
         assertThat(edited.getPermission()).isEqualTo("custom:permission");
         assertThat(edited.getStatus()).isEqualTo(MenuStatus.DISABLED);
         assertThat(edited.getSource()).isEqualTo(MenuSource.PLUGIN);
-        assertThat(edited.getPluginCode()).isEqualTo(PLUGIN_CODE);
-        assertThat(edited.getPluginModuleName()).isEqualTo(MODULE_NAME);
-        assertThat(edited.getRuntimeAvailable()).isTrue();
+        assertThat(edited.getPluginCode()).isEqualTo("old-plugin-code");
+        assertThat(edited.getPluginModuleName()).isEqualTo("old-module");
+        assertThat(edited.getRuntimeAvailable()).isFalse();
+        assertThat(repo.findByCode(edited.getCode())).containsSame(edited);
+        assertThat(repo.getSaveCount()).isZero();
     }
 
     @Test
-    void marksRemovedDeclarationsUnavailableWithoutDeletingThem() {
-        stubDefaultRepo();
+    void removedDeclarationDoesNotHidePersistedMenu() {
+        FailingMenuRepo repo = new FailingMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);
+        repo.put(pluginMenu("module:" + MODULE_NAME, true));
         Menu current = pluginMenu("route:" + MODULE_NAME + ":walletTransactions", true);
         Menu removed = pluginMenu("route:" + MODULE_NAME + ":walletReports", true);
-        when(menuRepo.findByPluginCode(PLUGIN_CODE)).thenReturn(List.of(current, removed));
-        when(menuRepo.findByPluginCodeAndRegistrationKey(
-                PLUGIN_CODE,
-                "route:" + MODULE_NAME + ":walletTransactions"
-        )).thenReturn(Optional.of(current));
+        repo.put(current);
+        repo.put(removed);
 
-        service.project(PLUGIN_CODE, List.of(module(route(
+        projectionService.project(PLUGIN_CODE, List.of(module(route(
                 "/wallet/transactions",
                 "walletTransactions",
                 "交易记录",
@@ -161,21 +166,103 @@ class PluginMenuProjectionServiceTest {
         ))));
 
         assertThat(current.getRuntimeAvailable()).isTrue();
-        assertThat(removed.getRuntimeAvailable()).isFalse();
-        verify(menuRepo).save(removed);
+        assertThat(removed.getRuntimeAvailable()).isTrue();
+        assertThat(repo.getSaveCount()).isZero();
+    }
+
+    @Test
+    void enablingRestoresAllHistoricalMenusOwnedByExactPluginCode() {
+        FailingMenuRepo repo = new FailingMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);
+        repo.put(pluginMenu("module:" + MODULE_NAME, true));
+        repo.put(pluginMenu("route:" + MODULE_NAME + ":walletTransactions", true));
+        Menu historical = pluginMenu("route:" + MODULE_NAME + ":walletReports", false);
+        historical.setParentCode("system:dashboard");
+        historical.setComponent("custom/reports");
+        repo.put(historical);
+
+        projectionService.restoreAvailable(PLUGIN_CODE);
+
+        assertThat(historical.getRuntimeAvailable()).isTrue();
+        assertThat(historical.getParentCode()).isEqualTo("system:dashboard");
+        assertThat(historical.getComponent()).isEqualTo("custom/reports");
+        assertThat(repo.getSaveCount()).isEqualTo(1);
+    }
+
+    @Test
+    void disablingPluginOnlyHidesMenusWithExactPluginCodeAndDoesNotRecurse() {
+        FailingMenuRepo repo = new FailingMenuRepo();
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);
+        Menu ownerDirectory = pluginMenu("module:" + MODULE_NAME, true);
+        repo.put(ownerDirectory);
+        Menu foreignChild = Menu.builder()
+                .code("plugin:yudream-alipay:route:alipayAdmin:settings")
+                .source(MenuSource.PLUGIN)
+                .pluginCode("yudream-alipay")
+                .parentCode(ownerDirectory.getCode())
+                .runtimeAvailable(true)
+                .build();
+        repo.put(foreignChild);
+
+        projectionService.markUnavailable(PLUGIN_CODE);
+
+        assertThat(ownerDirectory.getRuntimeAvailable()).isFalse();
+        assertThat(foreignChild.getRuntimeAvailable()).isTrue();
+        assertThat(repo.getSaveCount()).isEqualTo(1);
+    }
+
+    @Test
+    void sharedPluginParentDoesNotCreateAnotherModuleMenu() {
+        String sharedParentCode = "plugin:yudream-wallet:module:yudreamWallet";
+        FailingMenuRepo repo = new FailingMenuRepo();
+        Menu sharedParent = Menu.builder()
+                .code(sharedParentCode)
+                .source(MenuSource.PLUGIN)
+                .pluginCode("yudream-wallet")
+                .runtimeAvailable(true)
+                .build();
+        repo.put(sharedParent);
+        PluginFrontendModuleInfo consumer = new PluginFrontendModuleInfo(
+                "yudream-alipay",
+                "/plugins/alipay/remoteEntry.js",
+                "yudreamAlipay",
+                "1.0.0",
+                "",
+                "钱包中心",
+                "wallet",
+                20,
+                List.of(route(
+                        "/wallet/alipay",
+                        "alipaySettings",
+                        "支付宝配置",
+                        null,
+                        null
+                )),
+                sharedParentCode,
+                true,
+                MenuStatus.ACTIVE
+        );
+
+        new PluginMenuProjectionService(repo).project("yudream-alipay", List.of(consumer));
+
+        assertThat(repo.findByCode("plugin:yudream-alipay:module:yudreamAlipay")).isEmpty();
+        assertThat(repo.findByCode("plugin:yudream-alipay:route:yudreamAlipay:alipaySettings"))
+                .get()
+                .extracting(Menu::getParentCode)
+                .isEqualTo(sharedParentCode);
+        assertThat(repo.findAll()).hasSize(2);
     }
 
     @Test
     void preservesAParentThatPointsToASystemMenu() {
-        stubDefaultRepo();
+        FailingMenuRepo repo = new FailingMenuRepo();
         Menu edited = pluginMenu("route:" + MODULE_NAME + ":walletTransactions", false);
         edited.setParentCode("system:dashboard");
-        when(menuRepo.findByPluginCodeAndRegistrationKey(
-                PLUGIN_CODE,
-                "route:" + MODULE_NAME + ":walletTransactions"
-        )).thenReturn(Optional.of(edited));
+        repo.put(edited);
 
-        service.project(PLUGIN_CODE, List.of(module(route(
+        PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);
+        projectionService.restoreAvailable(PLUGIN_CODE);
+        projectionService.project(PLUGIN_CODE, List.of(module(route(
                 "/wallet/transactions",
                 "walletTransactions",
                 "交易记录",
@@ -283,7 +370,21 @@ class PluginMenuProjectionServiceTest {
         assertThat(repo.findByPluginCodeAndRegistrationKey(
                 PLUGIN_CODE,
                 "route:" + MODULE_NAME + ":removed"
-        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(false);
+        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(true);
+    }
+
+    @Test
+    void concurrentInsertOfTheSameMenuCodeConvergesWithoutFailingEnable() {
+        String moduleCode = "plugin:" + PLUGIN_CODE + ":module:" + MODULE_NAME;
+        Menu winner = pluginMenu("module:" + MODULE_NAME, true);
+        when(menuRepo.findByCode(moduleCode))
+                .thenReturn(Optional.empty(), Optional.of(winner));
+        when(menuRepo.save(any())).thenThrow(new IllegalStateException("duplicate key"));
+
+        assertThatCode(() -> service.project(PLUGIN_CODE, List.of(module(List.of()))))
+                .doesNotThrowAnyException();
+
+        verify(menuRepo).save(any(Menu.class));
     }
 
     private PluginFrontendModuleInfo module(PluginFrontendRouteInfo route) {
@@ -362,6 +463,10 @@ class PluginMenuProjectionServiceTest {
 
         void failOnceOnSave(int saveNumber) {
             failingSave = saveNumber;
+        }
+
+        int getSaveCount() {
+            return saveCount;
         }
 
         @Override

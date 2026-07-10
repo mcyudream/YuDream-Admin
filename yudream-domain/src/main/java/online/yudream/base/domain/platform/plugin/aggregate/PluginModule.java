@@ -8,12 +8,9 @@ import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
-import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendSortSetting;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -33,7 +30,7 @@ public class PluginModule extends BaseDomain {
     private String errorMessage;
     private LocalDateTime loadedAt;
     private LocalDateTime enabledAt;
-    private List<PluginFrontendSortSetting> frontendSortSettings;
+    private Boolean menusInitialized;
 
     public static PluginModule fromDescriptor(PluginDescriptorInfo descriptor) {
         return PluginModule.builder()
@@ -88,34 +85,16 @@ public class PluginModule extends BaseDomain {
         this.errorMessage = message;
     }
 
-    public PluginFrontendSortSetting frontendSortSetting(String moduleName) {
-        String target = normalize(moduleName);
-        return (frontendSortSettings == null ? List.<PluginFrontendSortSetting>of() : frontendSortSettings).stream()
-                .filter(setting -> Objects.equals(normalize(setting.moduleName()), target))
-                .findFirst()
-                .orElse(null);
+    public boolean menusInitialized() {
+        return Boolean.TRUE.equals(menusInitialized);
     }
 
-    public void saveFrontendSortSetting(PluginFrontendSortSetting setting) {
-        if (setting == null) {
-            return;
-        }
-        String target = normalize(setting.moduleName());
-        List<PluginFrontendSortSetting> next = new ArrayList<>();
-        for (PluginFrontendSortSetting item : frontendSortSettings == null ? List.<PluginFrontendSortSetting>of() : frontendSortSettings) {
-            if (!Objects.equals(normalize(item.moduleName()), target)) {
-                next.add(item);
-            }
-        }
-        next.add(setting);
-        this.frontendSortSettings = next;
+    public void markMenusInitialized() {
+        this.menusInitialized = true;
     }
 
     public boolean enabled() {
         return this.status == PluginStatus.ENABLED;
     }
 
-    private static String normalize(String value) {
-        return value == null ? "" : value.trim();
-    }
 }
