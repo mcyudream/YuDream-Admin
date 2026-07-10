@@ -126,8 +126,10 @@ public class ReactorSatoriApiGateway implements SatoriApiGateway, SatoriInternal
     private <T> SatoriBidiPage<T> bidiPage(SatoriApiContext c, String method, Object body, Class<T> type) { return execute(c, method, body, mapper.getTypeFactory().constructParametricType(SatoriBidiPage.class, type), true); }
     private <T> T execute(SatoriApiContext context, String method, Object body, Class<T> type, boolean accountHeaders) { return execute(context, method, body, mapper.constructType(type), accountHeaders); }
     private <T> T execute(SatoriApiContext context, String method, Object body, JavaType type, boolean accountHeaders) {
-        WebClient.RequestBodySpec request = client(context, accountHeaders).post().uri("/v1/" + method);
-        if (body != null) request.contentType(MediaType.APPLICATION_JSON).bodyValue(body);
+        WebClient.RequestHeadersSpec<?> request = client(context, accountHeaders).post().uri("/v1/" + method)
+                .contentType(MediaType.APPLICATION_JSON)
+                // Some Satori adapters parse every POST body, including login.get.
+                .bodyValue(body == null ? Map.of() : body);
         String response = request.retrieve().onStatus(s -> s.isError(), r -> r.bodyToMono(String.class).map(text -> SatoriHttpErrorMapper.toException(r.statusCode(), text))).bodyToMono(String.class).block(REQUEST_TIMEOUT);
         if (type.getRawClass() == Void.class || response == null || response.isBlank()) return null;
         return read(response, type);
