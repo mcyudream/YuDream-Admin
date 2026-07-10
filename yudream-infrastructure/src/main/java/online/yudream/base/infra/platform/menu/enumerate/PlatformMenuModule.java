@@ -24,6 +24,14 @@ public enum PlatformMenuModule {
             parentName = "SATORI", permission = "platform:satori:connect")
     SATORI_CONNECT,
 
+    @MenuNode(code = "platform:satori:send", name = "发送 Satori 消息", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:send")
+    SATORI_SEND,
+
+    @MenuNode(code = "platform:satori:internal", name = "调用 Satori 原生接口", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:internal")
+    SATORI_INTERNAL,
+
     @MenuNode(code = "platform:render:use", name = "渲染消息图片", type = MenuNodeType.BUTTON,
             parentName = "SATORI", permission = "platform:render:use")
     RENDER_USE,
