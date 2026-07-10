@@ -1,0 +1,20 @@
+{
+  "sn": "9007199254740993",
+  "id": "evt-1",
+  "type": "message-created",
+  "platform": "discord",
+  "self_id": "9223372036854775806",
+  "timestamp": 1710000000000,
+  "argv": { "name": "echo", "arguments": ["hello"], "options": { "silent": true } },
+  "button": { "id": "approve" },
+  "channel": { "id": "10000000000000000001", "type": 0, "name": "general", "parent_id": "parent-1" },
+  "guild": { "id": "10000000000000000002", "name": "YuDream", "avatar": "https://example.test/guild.png" },
+  "login": { "platform": "discord", "self_id": "9223372036854775806", "user": { "id": "9223372036854775806", "name": "bot", "is_bot": true }, "status": 1, "adapter": "discord", "features": ["message.create"] },
+  "member": { "user": { "id": "10000000000000000003", "name": "member" }, "nick": "成员", "avatar": "https://example.test/member.png", "joined_at": 1700000000000 },
+  "message": { "id": "9223372036854775805", "content": "<at id=\"42\"/> hello", "channel": { "id": "10000000000000000001", "type": 0 }, "guild": { "id": "10000000000000000002", "name": "YuDream" }, "member": { "nick": "成员" }, "user": { "id": "10000000000000000005", "name": "sender" }, "created_at": 1710000000000 },
+  "operator": { "id": "10000000000000000006", "name": "operator" },
+  "role": { "id": "10000000000000000004", "name": "管理员", "color": 16711680, "position": 10 },
+  "user": { "id": "10000000000000000005", "name": "sender", "nick": "发送者", "avatar": "https://example.test/user.png", "is_bot": false },
+  "_type": "discord:interaction",
+  "_data": { "interaction_id": "10000000000000000007" }
+}
