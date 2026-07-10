@@ -22,8 +22,12 @@ export class BrowserPool {
   }
 
   async healthy(): Promise<boolean> {
-    const browser = await this.getBrowser();
-    return browser.isConnected();
+    try {
+      const browser = await this.getBrowser();
+      return browser.isConnected();
+    } catch {
+      return false;
+    }
   }
 
   async close(): Promise<void> {

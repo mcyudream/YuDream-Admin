@@ -10,6 +10,7 @@ import online.yudream.base.infra.platform.satori.mapper.SatoriInfraMapper;
 import online.yudream.base.infra.platform.satori.service.AesGcmSatoriCredentialCipher;
 import online.yudream.base.infra.platform.satori.bootstrap.SatoriIndexInitializer;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriLoginDO;
+import online.yudream.base.infra.platform.satori.dataobj.SatoriEventCursorDO;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.index.IndexDefinition;
@@ -72,10 +73,13 @@ class SatoriPersistenceMappingTest {
         MongoTemplate mongoTemplate = mock(MongoTemplate.class);
         IndexOperations loginIndexes = mock(IndexOperations.class);
         IndexOperations eventIndexes = mock(IndexOperations.class);
+        IndexOperations cursorIndexes = mock(IndexOperations.class);
         when(mongoTemplate.indexOps(SatoriLoginDO.class)).thenReturn(loginIndexes);
         when(mongoTemplate.indexOps(SatoriEventRecordDO.class)).thenReturn(eventIndexes);
+        when(mongoTemplate.indexOps(SatoriEventCursorDO.class)).thenReturn(cursorIndexes);
         when(loginIndexes.ensureIndex(any(IndexDefinition.class))).thenReturn("satori_login_unique");
         when(eventIndexes.ensureIndex(any(IndexDefinition.class))).thenReturn("satori_event_idempotency", "satori_event_expire_at");
+        when(cursorIndexes.ensureIndex(any(IndexDefinition.class))).thenReturn("satori_event_cursor_connection");
 
         new SatoriIndexInitializer(mongoTemplate).onApplicationEvent(null);
 
@@ -89,5 +93,9 @@ class SatoriPersistenceMappingTest {
         assertThat(events.getAllValues().get(0).getIndexOptions()).containsEntry("unique", true);
         assertThat(events.getAllValues().get(1).getIndexKeys()).containsEntry("expireAt", 1);
         assertThat(events.getAllValues().get(1).getIndexOptions()).containsEntry("expireAfterSeconds", 0L);
+        org.mockito.ArgumentCaptor<IndexDefinition> cursor = org.mockito.ArgumentCaptor.forClass(IndexDefinition.class);
+        org.mockito.Mockito.verify(cursorIndexes).ensureIndex(cursor.capture());
+        assertThat(cursor.getValue().getIndexKeys()).containsEntry("connectionId", 1);
+        assertThat(cursor.getValue().getIndexOptions()).containsEntry("unique", true);
     }
 }
