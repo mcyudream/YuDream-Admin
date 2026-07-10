@@ -61,9 +61,9 @@ cat > "$SETTINGS_FILE" <<'EOF'
   </servers>
   <mirrors>
     <mirror>
-      <id>nexus-public</id>
-      <mirrorOf>*</mirrorOf>
-      <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>
+      <id>aliyun-public</id>
+      <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
+      <url>https://maven.aliyun.com/repository/public</url>
     </mirror>
   </mirrors>
 </settings>

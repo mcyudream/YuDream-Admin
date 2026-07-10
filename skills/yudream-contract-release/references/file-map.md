@@ -46,6 +46,6 @@ Validation jobs worth running before release:
 ## Registry Selection
 
 - All contract packages publish only to `nexus.yudream.online`.
-- Maven resolves from `maven-public` and deploys to `maven-releases` or `maven-snapshots`.
+- YuDream Maven contracts resolve from `maven-public` and deploy to `maven-releases` or `maven-snapshots`; third-party dependencies and Maven plugins resolve from the Aliyun public repository.
 - The `@yudream` npm scope publishes to and resolves from `npm-public`.
 - Publishing and authenticated verification require `NEXUS_USERNAME` and `NEXUS_PASSWORD`.

@@ -152,7 +152,7 @@ templates/plugin-repo/                 独立插件仓模板
 
 - `yudream-plugin-spi` release -> Nexus `maven-releases`
 - `yudream-plugin-spi` snapshot -> Nexus `maven-snapshots`
-- Maven 统一拉取 -> Nexus `maven-public`
+- YuDream Maven 制品拉取 -> Nexus `maven-public`；第三方依赖和 Maven 插件 -> 阿里云公共仓库
 - `@yudream/plugin-sdk`、`@yudream/components` 发布和拉取 -> Nexus `npm-public`
 
 GitLab 只负责源码托管、CI 流水线和 CI artifacts，不再作为 Maven/npm/Generic Package Registry。npmjs 发布链路也已废弃。

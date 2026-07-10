@@ -39,27 +39,13 @@ cat > "$SETTINGS_FILE" <<EOF
         </server>
     </servers>
 
-    <profiles>
-        <profile>
-            <id>nexus</id>
-            <repositories>
-                <repository>
-                    <id>nexus-public</id>
-                    <url>${PACKAGE_REGISTRY_URL}</url>
-                </repository>
-            </repositories>
-            <pluginRepositories>
-                <pluginRepository>
-                    <id>nexus-public</id>
-                    <url>${PACKAGE_REGISTRY_URL}</url>
-                </pluginRepository>
-            </pluginRepositories>
-        </profile>
-    </profiles>
-
-    <activeProfiles>
-        <activeProfile>nexus</activeProfile>
-    </activeProfiles>
+    <mirrors>
+        <mirror>
+            <id>aliyun-public</id>
+            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
+            <url>https://maven.aliyun.com/repository/public</url>
+        </mirror>
+    </mirrors>
 </settings>
 EOF
 
@@ -69,6 +55,7 @@ mvn -s "$SETTINGS_FILE" \
   -N \
   "-Dmaven.repo.local=$VERIFY_REPO" \
   "-Dartifact=online.yudream.base:yudream-plugin-spi:${SPI_VERSION}" \
+  "-DremoteRepositories=nexus-public::default::${PACKAGE_REGISTRY_URL}" \
   -Dtransitive=false \
   org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get \
   -B -ntp

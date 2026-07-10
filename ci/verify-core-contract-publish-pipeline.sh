@@ -47,6 +47,15 @@ require_pattern 'maven-settings-nexus.xml' "core CI must deploy Maven contracts 
 require_pattern 'NEXUS_MAVEN_PUBLIC_URL' "core CI must configure the Nexus maven-public read endpoint"
 grep -q '<url>https://nexus.yudream.online/repository/maven-public/</url>' ci/maven-settings-nexus.xml \
   || fail "Nexus Maven settings must support anonymous local reads without CI-only variables"
+if grep -q '<mirrorOf>\*</mirrorOf>' ci/maven-settings-nexus.xml ci/maven-settings.xml; then
+  fail "core Maven settings must not mirror third-party dependencies through Nexus"
+fi
+grep -q 'https://maven.aliyun.com/repository/public' ci/maven-settings-nexus.xml \
+  || fail "core Maven settings must resolve third-party dependencies from Aliyun"
+grep -q 'external:\*,!nexus-public,!nexus-releases,!nexus-snapshots' ci/maven-settings-nexus.xml \
+  || fail "core Maven settings must exclude YuDream Nexus repositories from the Aliyun mirror"
+grep -q 'remoteRepositories=nexus-public' ci/verify-plugin-spi-registry.sh \
+  || fail "SPI verification must explicitly resolve the YuDream artifact from Nexus"
 
 echo "[verify-core-contract-publish-pipeline] checking Nexus npm publish/verify jobs"
 require_pattern '^publish:npm-plugin-sdk:$' "core CI must publish @yudream/plugin-sdk to Nexus"

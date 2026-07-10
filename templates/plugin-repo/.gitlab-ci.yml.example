@@ -114,11 +114,25 @@ package:plugins:
         '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">' \
         '    <mirrors>' \
         '        <mirror>' \
-        '            <id>nexus-public</id>' \
-        '            <mirrorOf>*</mirrorOf>' \
-        '            <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' \
+        '            <id>aliyun-public</id>' \
+        '            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>' \
+        '            <url>https://maven.aliyun.com/repository/public</url>' \
         '        </mirror>' \
         '    </mirrors>' \
+        '    <profiles>' \
+        '        <profile>' \
+        '            <id>yudream-repositories</id>' \
+        '            <repositories>' \
+        '                <repository>' \
+        '                    <id>nexus-public</id>' \
+        '                    <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' \
+        '                </repository>' \
+        '            </repositories>' \
+        '        </profile>' \
+        '    </profiles>' \
+        '    <activeProfiles>' \
+        '        <activeProfile>yudream-repositories</activeProfile>' \
+        '    </activeProfiles>' \
         '</settings>' > settings.xml
     - |
       if [ -z "$NEXUS_MAVEN_PUBLIC_URL" ]; then

@@ -21,9 +21,23 @@
     </servers>
     <mirrors>
         <mirror>
-            <id>nexus-public</id>
-            <mirrorOf>*</mirrorOf>
-            <url>https://nexus.yudream.online/repository/maven-public/</url>
+            <id>aliyun-public</id>
+            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
+            <url>https://maven.aliyun.com/repository/public</url>
         </mirror>
     </mirrors>
+    <profiles>
+        <profile>
+            <id>yudream-repositories</id>
+            <repositories>
+                <repository>
+                    <id>nexus-public</id>
+                    <url>https://nexus.yudream.online/repository/maven-public/</url>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>yudream-repositories</activeProfile>
+    </activeProfiles>
 </settings>

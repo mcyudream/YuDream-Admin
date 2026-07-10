@@ -12,7 +12,8 @@ GitLab 当前只承担：
 
 | 用途 | 仓库 | 地址 |
 | --- | --- | --- |
-| Maven 统一拉取 | `maven-public` | `https://nexus.yudream.online/repository/maven-public/` |
+| YuDream Maven 制品拉取 | `maven-public` | `https://nexus.yudream.online/repository/maven-public/` |
+| 第三方 Maven 依赖与插件 | 阿里云公共仓库 | `https://maven.aliyun.com/repository/public` |
 | Maven release 发布 | `maven-releases` | `https://nexus.yudream.online/repository/maven-releases/` |
 | Maven snapshot 发布 | `maven-snapshots` | `https://nexus.yudream.online/repository/maven-snapshots/` |
 | `@yudream` npm 发布和拉取 | `npm-public` | `https://nexus.yudream.online/repository/npm-public/` |
@@ -34,17 +35,31 @@ GitLab 当前只承担：
 </dependency>
 ```
 
-`settings.xml` 中的拉取仓库统一指向 `maven-public`：
+`settings.xml` 将通用外部依赖镜像到阿里云，并把 Nexus 保留为 YuDream 制品仓库：
 
 ```xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
     <mirrors>
         <mirror>
-            <id>nexus-public</id>
-            <mirrorOf>*</mirrorOf>
-            <url>https://nexus.yudream.online/repository/maven-public/</url>
+            <id>aliyun-public</id>
+            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
+            <url>https://maven.aliyun.com/repository/public</url>
         </mirror>
     </mirrors>
+    <profiles>
+        <profile>
+            <id>yudream-repositories</id>
+            <repositories>
+                <repository>
+                    <id>nexus-public</id>
+                    <url>https://nexus.yudream.online/repository/maven-public/</url>
+                </repository>
+            </repositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>yudream-repositories</activeProfile>
+    </activeProfiles>
 </settings>
 ```
 

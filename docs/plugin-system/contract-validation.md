@@ -7,7 +7,7 @@
 
 ## 统一仓库约定
 
-- Maven 拉取统一使用 `https://nexus.yudream.online/repository/maven-public/`
+- YuDream Maven 契约从 `https://nexus.yudream.online/repository/maven-public/` 拉取，第三方依赖和 Maven 插件从阿里云公共仓库拉取
 - Maven release 发布到 `https://nexus.yudream.online/repository/maven-releases/`
 - Maven snapshot 发布到 `https://nexus.yudream.online/repository/maven-snapshots/`
 - `@yudream/plugin-sdk` 与 `@yudream/components` 的发布和拉取统一使用 `https://nexus.yudream.online/repository/npm-public/`
@@ -58,7 +58,7 @@
 & 'C:/Program Files/Git/bin/sh.exe' ci/verify-core-maven-registry.sh
 ```
 
-在空白本地 Maven 仓中，通过 Nexus `maven-public` 重新解析
+在空白本地 Maven 仓中，从阿里云解析 Maven 插件，并通过 Nexus `maven-public` 重新解析 YuDream 契约
 `online.yudream.base:yudream-plugin-spi`。
 
 ### 2. npm 契约

@@ -47,7 +47,7 @@
 2. 在新仓 GitLab CI variables 中配置受保护、掩码的发布凭据，并保护 `v*` tag：
    - `NEXUS_USERNAME`
    - `NEXUS_PASSWORD`
-3. Maven 契约统一从 Nexus `maven-public` 拉取，插件 JAR 统一发布到 `maven-releases`
+3. YuDream Maven 契约从 Nexus `maven-public` 拉取，第三方依赖从阿里云公共仓库拉取，插件 JAR 发布到 `maven-releases`
 4. 让插件仓只依赖正式发布的：
    - Maven: `online.yudream.base:yudream-plugin-spi`
    - npm: `@yudream/plugin-sdk`

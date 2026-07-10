@@ -19,7 +19,6 @@ cd "$ROOT_DIR"
 if ! git status --short -- \
   .gitignore \
   .gitlab-ci.yml \
-  .npmrc.npmjs.example \
   .codex/skills/yudream-contract-release \
   .codex/skills/yudream-ddd-architecture/references/knowledge.json \
   README.md \
@@ -42,7 +41,6 @@ if [ "$DRY_RUN" = "true" ]; then
   git add -A -n -- \
     .gitignore \
     .gitlab-ci.yml \
-    .npmrc.npmjs.example \
     .codex/skills/yudream-contract-release \
     .codex/skills/yudream-ddd-architecture/references/knowledge.json \
     README.md \
@@ -59,7 +57,6 @@ else
   git add -A -- \
     .gitignore \
     .gitlab-ci.yml \
-    .npmrc.npmjs.example \
     .codex/skills/yudream-contract-release \
     .codex/skills/yudream-ddd-architecture/references/knowledge.json \
     README.md \
