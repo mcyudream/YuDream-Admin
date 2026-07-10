@@ -243,11 +243,9 @@ build-and-push-images:
     FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
     BACKEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/backend:latest"
     FRONTEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/frontend:latest"
-  needs:
-    - job: build:backend
-      artifacts: true
-    - job: build:frontend-main
-      artifacts: true
+  dependencies:
+    - build:backend
+    - build:frontend-main
   before_script:
     - docker info
   script:
