@@ -1,24 +1,16 @@
 package online.yudream.base.domain.platform.satori.model;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonValue;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * Satori v1 协议资源的不可变 JSON 边界模型。
- *
- * <p>平台标识符、游标与 WebSocket 序号始终使用 {@link String}，避免 JavaScript
- * 安全整数范围外的值发生精度损失。调用端应使用 SNAKE_CASE JSON 命名策略。</p>
+ * Satori v1 协议资源的不可变领域模型。
+ * <p>平台标识符、游标与 WebSocket 序号始终使用 {@link String}，避免 JavaScript 安全整数范围外的值发生精度损失。</p>
  */
 public final class SatoriModels {
 
@@ -114,64 +106,52 @@ public final class SatoriModels {
     public record SatoriButton(String id) {
     }
 
-    public record SatoriMeta(JsonNode value) {
-        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
-        public SatoriMeta(JsonNode value) {
-            this.value = value == null ? JsonNodeFactory.instance.objectNode() : value.deepCopy();
+    public record SatoriMeta(
+            String impl,
+            String protocolVersion,
+            String adapter,
+            List<String> features,
+            Map<String, Object> extraFields
+    ) {
+        private static final Set<String> RESERVED_FIELDS = Set.of("impl", "protocol_version", "adapter", "features");
+
+        public SatoriMeta {
+            features = features == null ? List.of() : List.copyOf(features);
+            extraFields = immutableMap(extraFields);
         }
 
-        @JsonValue
-        public JsonNode value() {
-            return value;
-        }
-
-        @JsonIgnore
-        public String impl() {
-            return text("impl");
-        }
-
-        @JsonIgnore
-        public String protocolVersion() {
-            return text("protocol_version");
-        }
-
-        @JsonIgnore
-        public String adapter() {
-            return text("adapter");
-        }
-
-        @JsonIgnore
-        public List<String> features() {
-            JsonNode featureValues = value.path("features");
-            if (!featureValues.isArray()) {
-                return List.of();
+        public static SatoriMeta of(String impl, String protocolVersion, String adapter, List<String> features,
+                                    Map<String, Object> fields) {
+            Map<String, Object> extras = new LinkedHashMap<>();
+            if (fields != null) {
+                fields.forEach((key, value) -> {
+                    if (!RESERVED_FIELDS.contains(key)) {
+                        extras.put(key, value);
+                    }
+                });
             }
-            List<String> values = new ArrayList<>();
-            featureValues.forEach(item -> values.add(item.asText()));
-            return List.copyOf(values);
+            return new SatoriMeta(impl, protocolVersion, adapter, features, extras);
         }
 
-        @JsonIgnore
-        public Map<String, JsonNode> extraFields() {
-            if (!value.isObject()) {
+        private static Map<String, Object> immutableMap(Map<String, Object> source) {
+            if (source == null || source.isEmpty()) {
                 return Map.of();
             }
-            Map<String, JsonNode> extras = new LinkedHashMap<>();
-            value.fields().forEachRemaining(entry -> {
-                if (!Set.of("impl", "protocol_version", "adapter", "features").contains(entry.getKey())) {
-                    extras.put(entry.getKey(), entry.getValue().deepCopy());
-                }
-            });
-            return Map.copyOf(extras);
+            Map<String, Object> copy = new LinkedHashMap<>();
+            source.forEach((key, value) -> copy.put(key, immutableValue(value)));
+            return Map.copyOf(copy);
         }
 
-        private String text(String name) {
-            JsonNode field = value.get(name);
-            return field == null || field.isNull() ? null : field.asText();
+        private static Object immutableValue(Object value) {
+            if (value instanceof Map<?, ?> map) {
+                Map<String, Object> copy = new LinkedHashMap<>();
+                map.forEach((key, nestedValue) -> copy.put(String.valueOf(key), immutableValue(nestedValue)));
+                return Map.copyOf(copy);
+            }
+            if (value instanceof List<?> list) {
+                return list.stream().map(SatoriMeta::immutableValue).toList();
+            }
+            return value;
         }
-    }
-
-    /** 用于资源夹具和内部测试的聚合视图，不属于 Satori HTTP API。 */
-    public record SatoriResourceBundle(SatoriFriend friend, SatoriEmoji emoji, SatoriMeta meta) {
     }
 }

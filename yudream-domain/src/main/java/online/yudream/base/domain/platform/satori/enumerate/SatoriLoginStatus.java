@@ -1,8 +1,5 @@
 package online.yudream.base.domain.platform.satori.enumerate;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
-
 /** Satori 登录状态。 */
 public enum SatoriLoginStatus {
     OFFLINE(0),
@@ -17,12 +14,10 @@ public enum SatoriLoginStatus {
         this.value = value;
     }
 
-    @JsonValue
     public int value() {
         return value;
     }
 
-    @JsonCreator
     public static SatoriLoginStatus fromValue(int value) {
         for (SatoriLoginStatus status : values()) {
             if (status.value == value) {
