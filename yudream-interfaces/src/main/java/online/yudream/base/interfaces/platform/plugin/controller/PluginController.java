@@ -8,8 +8,6 @@ import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
-import online.yudream.base.interfaces.platform.plugin.request.PluginFrontendSortSaveRequest;
-import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
@@ -18,8 +16,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -92,12 +88,6 @@ public class PluginController {
     @GetMapping("/frontend-manifest")
     public Result<PluginFrontendManifestRes> frontendManifest() {
         return Result.ok(PluginWebAssembler.toRes(pluginAppService.frontendManifest()));
-    }
-
-    @PutMapping("/{code}/frontend-sort")
-    @PermissionRegister(code = "platform:plugin:manage", name = "配置插件菜单", module = "平台插件", desc = "配置插件前端菜单和路由排序")
-    public Result<PluginFrontendModuleRes> saveFrontendSort(@PathVariable String code, @RequestBody PluginFrontendSortSaveRequest request) {
-        return Result.ok(PluginWebAssembler.toRes(pluginAppService.saveFrontendSort(code, PluginWebAssembler.toCmd(request))));
     }
 
     @GetMapping("/{code}/assets/**")

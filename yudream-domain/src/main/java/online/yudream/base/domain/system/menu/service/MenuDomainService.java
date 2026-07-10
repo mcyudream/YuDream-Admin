@@ -50,7 +50,6 @@ public class MenuDomainService {
         List<Menu> synced = new ArrayList<>();
         for (Menu menu : flattened) {
             if (syncMode == SeedSyncMode.MISSING_ONLY && menuRepo.existsByCode(menu.getCode())) {
-                upsertMenuPermission(menu);
                 continue;
             }
             synced.add(syncMenu(menu));

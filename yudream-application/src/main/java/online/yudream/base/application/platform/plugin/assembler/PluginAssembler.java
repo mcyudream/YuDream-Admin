@@ -45,7 +45,17 @@ public class PluginAssembler {
     public static PluginFrontendManifestDTO toManifestDTO(List<PluginFrontendModuleInfo> modules) {
         return PluginFrontendManifestDTO.builder()
                 .sdkVersion("1.0.0")
-                .modules(modules == null ? List.of() : modules.stream().map(PluginAssembler::toDTO).toList())
+                .modules(modules == null ? List.of() : modules.stream().map(PluginAssembler::toRuntimeDTO).toList())
+                .build();
+    }
+
+    private static PluginFrontendModuleDTO toRuntimeDTO(PluginFrontendModuleInfo module) {
+        return PluginFrontendModuleDTO.builder()
+                .pluginCode(module.pluginCode())
+                .entry(module.entry())
+                .moduleName(module.moduleName())
+                .sdkVersion(module.sdkVersion())
+                .integrity(module.integrity())
                 .build();
     }
 

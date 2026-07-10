@@ -69,7 +69,7 @@ public class MenuAppService {
         if (menuRepo.existsByCode(cmd.getCode())) {
             throw new BizException("菜单编码已存在");
         }
-        ensureParentAllowed(MenuSource.SYSTEM, cmd.getParentCode());
+        ensureParentExists(cmd.getParentCode());
         Menu menu = Menu.builder()
                 .code(cmd.getCode())
                 .name(cmd.getName())
@@ -92,7 +92,7 @@ public class MenuAppService {
     @Transactional
     public MenuManageDTO update(MenuUpdateCmd cmd) {
         Menu menu = getMenu(cmd.getCode());
-        ensureParentAllowed(menu.isPluginMenu() ? MenuSource.PLUGIN : MenuSource.SYSTEM, cmd.getParentCode());
+        ensureParentExists(cmd.getParentCode());
         ensureNoParentCycle(menu.getCode(), cmd.getParentCode());
         menu.updateBasic(
                 cmd.getName(),
@@ -141,7 +141,7 @@ public class MenuAppService {
             persistedMenus.forEach(menu -> allMenuMap.putIfAbsent(menu.getCode(), menu));
         }
         List<Menu> allMenus = activeMenus.stream()
-                .filter(menu -> !menu.isPluginMenu())
+                .filter(Menu::isAvailableForRuntime)
                 .filter(this::platformCapabilityVisible)
                 .toList();
         Set<String> routeMenuCodes = allMenus.stream()
@@ -152,16 +152,17 @@ public class MenuAppService {
                 .filter(m -> isVisible(m, permissionSet))
                 .map(Menu::getCode)
                 .collect(Collectors.toSet());
+        includeStructuralRouteAncestors(visibleCodes, allMenuMap, routeMenuCodes, permissionSet);
 
         Map<String, List<Menu>> childrenMap = new HashMap<>();
         for (Menu menu : allMenus) {
-            String parentCode = resolveSystemParentCode(menu, allMenuMap, routeMenuCodes);
+            String parentCode = resolveRouteParentCode(menu, allMenuMap, routeMenuCodes);
             childrenMap.computeIfAbsent(parentCode, k -> new ArrayList<>()).add(menu);
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (Menu menu : allMenus) {
-            if (resolveSystemParentCode(menu, allMenuMap, routeMenuCodes) != null) {
+            if (resolveRouteParentCode(menu, allMenuMap, routeMenuCodes) != null) {
                 continue;
             }
             Map<String, Object> root = menu.getType() == MenuNodeType.CATEGORY
@@ -207,16 +208,13 @@ public class MenuAppService {
         return StringUtils.hasText(value) && value.contains(keyword);
     }
 
-    private void ensureParentAllowed(MenuSource source, String parentCode) {
+    private void ensureParentExists(String parentCode) {
         if (!StringUtils.hasText(parentCode)) {
             return;
         }
         Menu parent = menuRepo.findByCode(parentCode).orElse(null);
         if (parent == null) {
             throw new BizException("上级菜单不存在");
-        }
-        if (source != MenuSource.PLUGIN && parent.isPluginMenu()) {
-            throw new BizException("系统菜单不能挂载到插件菜单下");
         }
     }
 
@@ -278,9 +276,9 @@ public class MenuAppService {
         return null;
     }
 
-    private String resolveSystemParentCode(Menu menu,
-                                           Map<String, Menu> allMenuMap,
-                                           Set<String> routeMenuCodes) {
+    private String resolveRouteParentCode(Menu menu,
+                                          Map<String, Menu> allMenuMap,
+                                          Set<String> routeMenuCodes) {
         String cursor = blankToNull(menu.getParentCode());
         Set<String> visited = new HashSet<>();
         while (cursor != null && visited.add(cursor)) {
@@ -288,12 +286,38 @@ public class MenuAppService {
             if (parent == null) {
                 return null;
             }
-            if (!parent.isPluginMenu() && routeMenuCodes.contains(parent.getCode())) {
+            if (routeMenuCodes.contains(parent.getCode())) {
                 return parent.getCode();
             }
             cursor = blankToNull(parent.getParentCode());
         }
         return null;
+    }
+
+    private void includeStructuralRouteAncestors(Set<String> visibleCodes,
+                                                   Map<String, Menu> allMenuMap,
+                                                   Set<String> routeMenuCodes,
+                                                   Set<String> userPermissions) {
+        for (String code : List.copyOf(visibleCodes)) {
+            Menu menu = allMenuMap.get(code);
+            String cursor = menu == null ? null : blankToNull(menu.getParentCode());
+            Set<String> visited = new HashSet<>();
+            while (cursor != null && visited.add(cursor)) {
+                Menu parent = allMenuMap.get(cursor);
+                if (parent == null) {
+                    break;
+                }
+                if (!routeMenuCodes.contains(cursor)) {
+                    cursor = blankToNull(parent.getParentCode());
+                    continue;
+                }
+                if (StringUtils.hasText(parent.getPermission()) && !isVisible(parent, userPermissions)) {
+                    break;
+                }
+                visibleCodes.add(cursor);
+                cursor = blankToNull(parent.getParentCode());
+            }
+        }
     }
 
     private void ensureNoParentCycle(String code, String parentCode) {
@@ -455,6 +479,10 @@ public class MenuAppService {
         }
         if (!menu.isVisibleInMenu()) {
             meta.put("menu", false);
+        }
+        if (menu.isPluginMenu()) {
+            meta.put("pluginCode", menu.getPluginCode());
+            meta.put("pluginModuleName", menu.getPluginModuleName());
         }
         return meta;
     }

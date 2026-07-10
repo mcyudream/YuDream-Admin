@@ -140,7 +140,7 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
-    void staticRouteTreeNeverReturnsPluginMenus() {
+    void routeTreeIncludesAvailablePluginMenusWithRuntimeMetadata() {
         Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
         Menu systemChild = systemMenu("system:tools:audit", systemParent.getCode(), MenuNodeType.MENU);
         Menu pluginChild = pluginMenu("plugin:wallet:home", systemParent.getCode(), true);
@@ -153,15 +153,98 @@ class MenuAppServicePluginMenuTest {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
             assertThat(children).extracting(child -> child.get("name"))
-                    .containsExactly(systemChild.getCode());
+                    .containsExactly(pluginChild.getCode(), systemChild.getCode());
             @SuppressWarnings("unchecked")
-            Map<String, Object> meta = (Map<String, Object>) children.getFirst().get("meta");
+            Map<String, Object> meta = (Map<String, Object>) children.get(1).get("meta");
             assertThat(meta.get("menuCode")).isEqualTo(systemChild.getCode());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> pluginMeta = (Map<String, Object>) children.getFirst().get("meta");
+            assertThat(pluginMeta.get("pluginCode")).isEqualTo("wallet");
+            assertThat(pluginMeta.get("pluginModuleName")).isEqualTo("wallet-admin");
         });
     }
 
     @Test
-    void staticRouteTreeClimbsPastLegacyPluginParentToSystemAncestor() {
+    void routePermissionIncludesPluginStructuralAncestorsWithoutSyntheticPermissions() {
+        Menu module = pluginMenu("plugin:wallet:module:walletAdmin", null, true);
+        module.setType(MenuNodeType.CATEGORY);
+        module.setPermission(null);
+        Menu layout = pluginMenu("plugin:wallet:parent:walletAdmin:/wallet", module.getCode(), true);
+        layout.setType(MenuNodeType.LAYOUT);
+        layout.setPath("/wallet");
+        layout.setComponent("Layout");
+        layout.setPermission(null);
+        Menu route = pluginMenu("plugin:wallet:route:walletAdmin:transactions", layout.getCode(), true);
+        route.setType(MenuNodeType.MENU);
+        route.setPath("/wallet/transactions");
+        route.setComponent("wallet/Transactions");
+        route.setPermission("plugin:wallet:transaction:list");
+        List<Menu> menus = List.of(module, layout, route);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("plugin:wallet:transaction:list"));
+
+        assertThat(routes).singleElement().satisfies(root -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> layouts = (List<Map<String, Object>>) root.get("children");
+            assertThat(layouts).singleElement().satisfies(layoutRoute -> {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> pages = (List<Map<String, Object>>) layoutRoute.get("children");
+                assertThat(pages).extracting(page -> page.get("name")).containsExactly(route.getCode());
+            });
+        });
+    }
+
+    @Test
+    void routeTreeExcludesOnlyTheUnavailablePluginNodeNotItsMovedChildren() {
+        Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        Menu unavailableOwner = pluginMenu("plugin:wallet:tools", systemParent.getCode(), false);
+        unavailableOwner.setType(MenuNodeType.LAYOUT);
+        Menu movedChild = pluginMenu("plugin:report:wallet", systemParent.getCode(), true);
+        movedChild.setPluginCode("report");
+        movedChild.setPluginModuleName("report-admin");
+        movedChild.setComponent("report/Wallet");
+        when(menuRepo.findAll()).thenReturn(List.of(systemParent, unavailableOwner, movedChild));
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(systemParent, unavailableOwner, movedChild));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
+            assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(movedChild.getCode());
+        });
+    }
+
+    @Test
+    void routePermissionSkipsUnavailablePluginAncestorForForeignPluginChild() {
+        Menu systemRoot = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        systemRoot.setPermission(null);
+        Menu unavailableParent = pluginMenu("plugin:wallet:module:walletAdmin", systemRoot.getCode(), false);
+        unavailableParent.setType(MenuNodeType.CATEGORY);
+        Menu foreignChild = pluginMenu("plugin:alipay:route:alipayAdmin:settings", unavailableParent.getCode(), true);
+        foreignChild.setPluginCode("alipay");
+        foreignChild.setType(MenuNodeType.MENU);
+        foreignChild.setPath("/platform/plugins/alipay/settings");
+        foreignChild.setComponent("alipay/Settings");
+        foreignChild.setPermission("plugin:alipay:settings:view");
+        List<Menu> menus = List.of(systemRoot, unavailableParent, foreignChild);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("plugin:alipay:settings:view"));
+
+        assertThat(routes).singleElement().satisfies(root -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) root.get("children");
+            assertThat(children).extracting(child -> child.get("name")).containsExactly(foreignChild.getCode());
+        });
+    }
+
+    @Test
+    void routeTreeKeepsPersistedPluginLayoutAndItsSystemChild() {
         Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
         Menu pluginParent = pluginMenu("plugin:wallet:tools", systemParent.getCode(), true);
         pluginParent.setType(MenuNodeType.LAYOUT);
@@ -176,6 +259,10 @@ class MenuAppServicePluginMenuTest {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
             assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(pluginParent.getCode());
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> nested = (List<Map<String, Object>>) children.getFirst().get("children");
+            assertThat(nested).extracting(child -> child.get("name"))
                     .containsExactly(legacySystemChild.getCode());
         });
     }
@@ -232,7 +319,7 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
-    void staticRouteTreeNormalizesLegacySystemMenuWithoutSystemAncestorToRoot() {
+    void routeTreeKeepsPluginRootWithItsPersistedSystemChild() {
         Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
         pluginParent.setType(MenuNodeType.CATEGORY);
         Menu legacySystemChild = systemMenu(
@@ -242,12 +329,16 @@ class MenuAppServicePluginMenuTest {
 
         List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
 
-        assertThat(routes).singleElement().satisfies(route ->
-                assertThat(route.get("name")).isEqualTo(legacySystemChild.getCode()));
+        assertThat(routes).singleElement().satisfies(route -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) route.get("children");
+            assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(legacySystemChild.getCode());
+        });
     }
 
     @Test
-    void createSystemMenuRejectsPluginParent() {
+    void createSystemMenuAllowsPluginParentWithoutChangingOwnership() {
         Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
         when(menuRepo.existsByCode("system:report")).thenReturn(false);
         when(menuRepo.findByCode(pluginParent.getCode())).thenReturn(Optional.of(pluginParent));
@@ -256,14 +347,17 @@ class MenuAppServicePluginMenuTest {
         cmd.setName("系统报表");
         cmd.setType(MenuNodeType.MENU);
         cmd.setParentCode(pluginParent.getCode());
+        when(menuDomainService.syncMenu(any(Menu.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> service.create(cmd))
-                .isInstanceOf(BizException.class)
-                .hasMessage("系统菜单不能挂载到插件菜单下");
+        MenuManageDTO created = service.create(cmd);
+
+        assertThat(created.getParentCode()).isEqualTo(pluginParent.getCode());
+        assertThat(created.getSource()).isEqualTo(MenuSource.SYSTEM);
+        assertThat(created.getPluginCode()).isNull();
     }
 
     @Test
-    void updateSystemMenuRejectsPluginParent() {
+    void updateSystemMenuAllowsPluginParentWithoutChangingOwnership() {
         Menu systemMenu = systemMenu("system:report", null, MenuNodeType.MENU);
         Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
         when(menuRepo.findByCode(systemMenu.getCode())).thenReturn(Optional.of(systemMenu));
@@ -273,10 +367,13 @@ class MenuAppServicePluginMenuTest {
         cmd.setName("系统报表");
         cmd.setType(MenuNodeType.MENU);
         cmd.setParentCode(pluginParent.getCode());
+        when(menuDomainService.syncMenu(any(Menu.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> service.update(cmd))
-                .isInstanceOf(BizException.class)
-                .hasMessage("系统菜单不能挂载到插件菜单下");
+        MenuManageDTO updated = service.update(cmd);
+
+        assertThat(updated.getParentCode()).isEqualTo(pluginParent.getCode());
+        assertThat(updated.getSource()).isEqualTo(MenuSource.SYSTEM);
+        assertThat(updated.getPluginCode()).isNull();
     }
 
     @Test

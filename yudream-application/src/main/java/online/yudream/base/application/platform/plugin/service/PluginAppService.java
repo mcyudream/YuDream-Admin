@@ -3,12 +3,9 @@ package online.yudream.base.application.platform.plugin.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
-import online.yudream.base.application.platform.plugin.cmd.PluginFrontendRouteSortSaveCmd;
-import online.yudream.base.application.platform.plugin.cmd.PluginFrontendSortSaveCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
-import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpEndpointDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
@@ -18,11 +15,9 @@ import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
-import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
-import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteSortSetting;
-import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendSortSetting;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
+import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -60,6 +55,9 @@ public class PluginAppService {
 
     @Value("${yudream.platform.plugin.upload-directory:plugins}")
     private String uploadDirectory;
+
+    @Value("${yudream.system.seed.menu.sync-mode:MISSING_ONLY}")
+    private SeedSyncMode menuSeedSyncMode = SeedSyncMode.MISSING_ONLY;
 
     @Transactional
     public List<PluginModuleDTO> list() {
@@ -150,20 +148,24 @@ public class PluginAppService {
         }
         module.markDisabled();
         PluginModule saved = pluginModuleRepo.save(module);
-        reconcileUnavailableMenus(code);
-        if (runtimeFailure != null) {
-            throw new BizException("插件禁用失败：" + rootMessage(runtimeFailure));
+        String menuFailure = reconcileUnavailableMenus(code);
+        if (runtimeFailure != null || menuFailure != null) {
+            String failure = runtimeFailure == null ? menuFailure : rootMessage(runtimeFailure);
+            throw new BizException("插件禁用失败：" + appendCleanupFailure(failure, runtimeFailure == null ? null : menuFailure));
         }
         return toDTO(saved);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO unload(String code) {
         PluginModule module = module(code);
         pluginRuntimeGateway.unload(code);
         module.markUnloaded();
         PluginModule saved = pluginModuleRepo.save(module);
-        reconcileUnavailableMenus(code);
+        String menuFailure = reconcileUnavailableMenus(code);
+        if (menuFailure != null) {
+            throw new BizException("插件卸载失败：" + menuFailure);
+        }
         return toDTO(saved);
     }
 
@@ -192,9 +194,8 @@ public class PluginAppService {
                 .collect(Collectors.toMap(PluginModule::getCode, Function.identity(), (left, right) -> left));
         List<PluginFrontendModuleInfo> runtimeModules = pluginRuntimeGateway.frontendModules().stream()
                 .filter(module -> healthy(modules.get(module.pluginCode()), module.pluginCode()))
-                .map(module -> applyFrontendSortSetting(module, modules.get(module.pluginCode())))
                 .toList();
-        return PluginAssembler.toManifestDTO(pluginMenuProjectionService.applyOverrides(runtimeModules));
+        return PluginAssembler.toManifestDTO(runtimeModules);
     }
 
     @Transactional(readOnly = true)
@@ -207,21 +208,6 @@ public class PluginAppService {
     @Transactional(readOnly = true)
     public boolean enabled(String code) {
         return StringUtils.hasText(code) && pluginRuntimeGateway.enabled(code.trim());
-    }
-
-    @Transactional
-    public PluginFrontendModuleDTO saveFrontendSort(String code, PluginFrontendSortSaveCmd cmd) {
-        PluginModule module = module(code);
-        PluginFrontendModuleInfo frontendModule = currentFrontendModule(code, cmd.getModuleName());
-        PluginFrontendSortSetting setting = toSortSetting(frontendModule, cmd);
-        PluginFrontendModuleInfo effectiveModule = applyFrontendSortSetting(frontendModule, setting);
-        pluginMenuProjectionService.updateSorts(code, effectiveModule, setting);
-        module.saveFrontendSortSetting(setting);
-        pluginModuleRepo.save(module);
-        return pluginMenuProjectionService.applyOverrides(List.of(effectiveModule)).stream()
-                .findFirst()
-                .map(PluginAssembler::toDTO)
-                .orElseThrow(() -> new BizException("插件菜单投影不可用"));
     }
 
     @Transactional(readOnly = true)
@@ -248,7 +234,10 @@ public class PluginAppService {
         for (PluginModule module : modules.values().stream().sorted(Comparator.comparing(PluginModule::getCode)).toList()) {
             if (!module.enabled()) {
                 disableZombieRuntime(module.getCode());
-                reconcileUnavailableMenus(module.getCode());
+                String menuFailure = reconcileUnavailableMenus(module.getCode());
+                if (menuFailure != null) {
+                    markError(module, menuFailure);
+                }
                 continue;
             }
             restoreEnabledModule(module, modules, restored, visiting);
@@ -266,7 +255,7 @@ public class PluginAppService {
         }
         try {
             if (pluginRuntimeGateway.enabled(code)) {
-                projectRuntimeMenus(code);
+                projectRuntimeMenus(module);
             } else {
                 enableRuntimeWithDependencies(module, modules, restored, visiting);
             }
@@ -449,11 +438,20 @@ public class PluginAppService {
         permissionDomainService.upsertManualPermissions(metas);
     }
 
-    private void projectRuntimeMenus(String code) {
+    private PluginModule projectRuntimeMenus(PluginModule module) {
+        String code = module.getCode();
         List<PluginFrontendModuleInfo> modules = pluginRuntimeGateway.frontendModules().stream()
-                .filter(module -> code.equals(module.pluginCode()))
+                .filter(frontendModule -> code.equals(frontendModule.pluginCode()))
                 .toList();
-        pluginMenuProjectionService.project(code, modules);
+        pluginMenuProjectionService.restoreAvailable(code);
+        if (!module.menusInitialized() || menuSeedSyncMode == SeedSyncMode.MISSING_ONLY) {
+            pluginMenuProjectionService.project(code, modules);
+            if (!module.menusInitialized()) {
+                module.markMenusInitialized();
+                return pluginModuleRepo.save(module);
+            }
+        }
+        return module;
     }
 
     private String cleanupFailedEnable(String code) {
@@ -488,18 +486,6 @@ public class PluginAppService {
         return "菜单清理失败：" + rootMessage(lastFailure);
     }
 
-    private void reconcileUnavailableMenusExcept(Set<String> runtimeEnabledCodes) {
-        for (int attempt = 1; attempt <= MENU_CLEANUP_ATTEMPTS; attempt++) {
-            try {
-                pluginMenuProjectionService.markUnavailableExcept(runtimeEnabledCodes);
-                return;
-            } catch (RuntimeException cleanupError) {
-                log.warn("Failed to reconcile inactive plugin menus on attempt {}/{}: {}",
-                        attempt, MENU_CLEANUP_ATTEMPTS, rootMessage(cleanupError));
-            }
-        }
-    }
-
     private PluginModule enableOwnRuntime(PluginModule module) {
         String code = module.getCode();
         try {
@@ -513,8 +499,7 @@ public class PluginAppService {
             syncPluginPermissions(code);
             module.markEnabled();
             PluginModule saved = pluginModuleRepo.save(module);
-            projectRuntimeMenus(code);
-            return saved;
+            return projectRuntimeMenus(saved);
         } catch (Exception e) {
             String failure = rootMessage(e);
             String cleanupFailure = cleanupFailedEnable(code);
@@ -524,16 +509,12 @@ public class PluginAppService {
     }
 
     private void reconcileRuntimeHealth(List<PluginModule> modules) {
-        Set<String> healthyCodes = new HashSet<>();
         for (PluginModule module : modules) {
             String code = module.getCode();
-            if (healthy(module, code)) {
-                healthyCodes.add(code);
-            } else {
+            if (!healthy(module, code)) {
                 disableZombieRuntime(code);
             }
         }
-        reconcileUnavailableMenusExcept(healthyCodes);
     }
 
     private boolean healthy(PluginModule module, String code) {
@@ -552,79 +533,6 @@ public class PluginAppService {
 
     private String appendCleanupFailure(String failure, String cleanupFailure) {
         return cleanupFailure == null ? failure : failure + "；" + cleanupFailure;
-    }
-
-    private PluginFrontendModuleInfo currentFrontendModule(String code, String moduleName) {
-        List<PluginFrontendModuleInfo> modules = pluginRuntimeGateway.frontendModules().stream()
-                .filter(module -> module.pluginCode().equals(code))
-                .toList();
-        if (modules.isEmpty()) {
-            throw new BizException("插件未启用，暂无注册菜单路由");
-        }
-        String target = normalize(moduleName);
-        if (!target.isEmpty()) {
-            return modules.stream()
-                    .filter(module -> normalize(module.moduleName()).equals(target))
-                    .findFirst()
-                    .orElseThrow(() -> new BizException("插件前端模块不存在：" + moduleName));
-        }
-        if (modules.size() == 1) {
-            return modules.get(0);
-        }
-        throw new BizException("请指定插件前端模块");
-    }
-
-    private PluginFrontendSortSetting toSortSetting(PluginFrontendModuleInfo module, PluginFrontendSortSaveCmd cmd) {
-        List<PluginFrontendRouteSortSetting> routes = (cmd.getRoutes() == null ? List.<PluginFrontendRouteSortSaveCmd>of() : cmd.getRoutes()).stream()
-                .map(route -> toRouteSortSetting(module, route))
-                .toList();
-        return new PluginFrontendSortSetting(module.moduleName(), cmd.getMenuSort(), routes);
-    }
-
-    private PluginFrontendRouteSortSetting toRouteSortSetting(PluginFrontendModuleInfo module, PluginFrontendRouteSortSaveCmd cmd) {
-        PluginFrontendRouteInfo route = module.routes().stream()
-                .filter(item -> same(item.path(), cmd.getPath()) || same(item.name(), cmd.getName()))
-                .findFirst()
-                .orElseThrow(() -> new BizException("插件菜单路由不存在：" + (cmd.getPath() == null ? cmd.getName() : cmd.getPath())));
-        return new PluginFrontendRouteSortSetting(route.path(), route.name(), cmd.getSort(), cmd.getParentSort());
-    }
-
-    private PluginFrontendModuleInfo applyFrontendSortSetting(PluginFrontendModuleInfo module, PluginModule pluginModule) {
-        if (pluginModule == null) {
-            return module;
-        }
-        PluginFrontendSortSetting setting = pluginModule.frontendSortSetting(module.moduleName());
-        if (setting == null) {
-            return module;
-        }
-        return applyFrontendSortSetting(module, setting);
-    }
-
-    private PluginFrontendModuleInfo applyFrontendSortSetting(PluginFrontendModuleInfo module,
-                                                               PluginFrontendSortSetting setting) {
-        return module.withSortOverrides(
-                setting.menuSort() == null ? module.menuSort() : setting.menuSort(),
-                module.routes().stream().map(route -> applyRouteSortSetting(route, setting)).toList()
-        );
-    }
-
-    private PluginFrontendRouteInfo applyRouteSortSetting(PluginFrontendRouteInfo route, PluginFrontendSortSetting setting) {
-        PluginFrontendRouteSortSetting routeSetting = setting.routeSetting(route);
-        if (routeSetting == null) {
-            return route;
-        }
-        return route.withSortOverrides(
-                routeSetting.parentSort() == null ? route.parentSort() : routeSetting.parentSort(),
-                routeSetting.sort() == null ? route.sort() : routeSetting.sort()
-        );
-    }
-
-    private static boolean same(String left, String right) {
-        return left != null && !left.isBlank() && left.equals(right);
-    }
-
-    private static String normalize(String value) {
-        return value == null ? "" : value.trim();
     }
 
     private PermissionMeta toPermissionMeta(PluginPermissionInfo permission) {

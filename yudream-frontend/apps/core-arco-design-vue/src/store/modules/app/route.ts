@@ -1,11 +1,12 @@
 import type { RouteRecordMainRaw } from '@fantastic-admin/types'
 import type { RouteRecordRaw, RouterMatcher } from 'vue-router'
+import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
 import { cloneDeep } from 'es-toolkit'
 import { createRouterMatcher } from 'vue-router'
 import apiApp from '@/api/modules/app'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { systemRoutes as systemRoutesRaw } from '@/router/routes'
-import { buildPluginRouteTree, partitionPluginRouteTree, type PluginRouteTreeNode } from './plugin-route-tree'
+import { indexPluginRuntimeModules, resolvePluginRuntimeRoute } from './plugin-route-runtime'
 
 export const useAppRouteStore = defineStore(
   'appRoute',
@@ -129,11 +130,24 @@ export const useAppRouteStore = defineStore(
       isGenerate.value = true
     }
     // 格式化后端路由数据
-    function formatBackRoutes(routes: any, views = import.meta.glob('@/views/**/*.vue')): RouteRecordMainRaw[] {
+    function formatBackRoutes(
+      routes: any,
+      pluginModules: Map<string, PluginFrontendModule>,
+      pluginSdkVersion?: string,
+      views = import.meta.glob('@/views/**/*.vue'),
+    ): RouteRecordMainRaw[] {
       return routes.map((route: any) => {
         localizeSystemMonitorRoute(route)
         const originalComponent = route.component
-        if (typeof route.component === 'string') {
+        const pluginRuntime = resolvePluginRuntimeRoute(route.meta, originalComponent, pluginModules, pluginSdkVersion)
+        if (pluginRuntime) {
+          route.component = () => import('@/views/platform/plugin/runtime-page.vue')
+          route.meta = {
+            ...route.meta,
+            plugin: pluginRuntime,
+          }
+        }
+        else if (typeof route.component === 'string') {
           switch (route.component) {
             case 'Layout':
               route.component = () => import('@/layouts/index.vue')
@@ -162,7 +176,7 @@ export const useAppRouteStore = defineStore(
           }]
         }
         if (route.children) {
-          route.children = formatBackRoutes(route.children, views)
+          route.children = formatBackRoutes(route.children, pluginModules, pluginSdkVersion, views)
         }
         return route
       })
@@ -190,120 +204,33 @@ export const useAppRouteStore = defineStore(
       }
     }
     // 生成路由（后端获取）
-    async function loadPluginRoutes(staticRoutes: RouteRecordMainRaw[]): Promise<RouteRecordMainRaw[]> {
+    async function loadPluginRuntimeManifest() {
       try {
         const res = await apiPlugin.frontendManifest()
-        const staticRouteMap = indexRoutesByMenuCode(staticRoutes)
-        const pluginTree = partitionPluginRouteTree(
-          buildPluginRouteTree(res.data.modules || []),
-          new Set(staticRouteMap.keys()),
-        )
-        pluginTree.staticChildren.forEach((nodes, parentCode) => {
-          const parent = staticRouteMap.get(parentCode)
-          if (!parent) {
-            return
-          }
-          parent.children ||= []
-          parent.children.push(...nodes.map(node => createPluginTreeRoute(node, res.data.sdkVersion)))
-        })
-        return pluginTree.roots.map(node => createPluginTreeRoute(node, res.data.sdkVersion)) as RouteRecordMainRaw[]
+        return {
+          modules: indexPluginRuntimeModules(res.data.modules || []),
+          sdkVersion: res.data.sdkVersion,
+        }
       }
       catch {
-        return []
+        return {
+          modules: new Map<string, PluginFrontendModule>(),
+          sdkVersion: undefined,
+        }
       }
-    }
-    function indexRoutesByMenuCode(routes: RouteRecordMainRaw[]) {
-      const index = new Map<string, RouteRecordRaw>()
-      const visit = (items: RouteRecordRaw[]) => {
-        items.forEach((route) => {
-          const menuCode = textValue((route.meta as any)?.menuCode)
-          if (menuCode) {
-            index.set(menuCode, route)
-          }
-          if (route.children) {
-            visit(route.children)
-          }
-        })
-      }
-      visit(routes as RouteRecordRaw[])
-      return index
-    }
-    function createPluginTreeRoute(node: PluginRouteTreeNode, sdkVersion?: string): RouteRecordRaw {
-      if (node.kind === 'route' && node.route) {
-        return createPluginRouteRecord(node.module, node.route, sdkVersion, node.visible)
-      }
-      return {
-        path: pluginDirectoryPath(node),
-        name: `${safeRouteName(node.code, 'directory')}-directory`,
-        component: () => import('@/layouts/index.vue'),
-        meta: {
-          title: node.title,
-          icon: node.icon || 'i-ri:puzzle-2-line',
-          sort: node.sort,
-          ...(node.visible ? {} : { menu: false }),
-        },
-        children: node.children.map(child => createPluginTreeRoute(child, sdkVersion)),
-      }
-    }
-    function createPluginRouteRecord(module: any, route: any, sdkVersion?: string, visible = true): RouteRecordRaw {
-      const routeName = route.name || `${module.pluginCode}-${route.path}`
-      const routeMeta = {
-        title: route.title,
-        icon: route.icon || 'i-ri:puzzle-2-line',
-        auth: route.permission,
-        sort: route.sort,
-        ...(visible ? {} : { menu: false }),
-        plugin: {
-          pluginCode: module.pluginCode,
-          component: route.component,
-          entry: module.entry,
-          moduleName: module.moduleName,
-          sdkVersion: module.sdkVersion || sdkVersion,
-        },
-      } as any
-      return {
-        path: route.path,
-        name: `${routeName}-layout`,
-        component: () => import('@/layouts/index.vue'),
-        meta: routeMeta,
-        children: [{
-          path: '',
-          name: routeName,
-          component: () => import('@/views/platform/plugin/runtime-page.vue'),
-          meta: {
-            ...routeMeta,
-            menu: false,
-            breadcrumb: false,
-          },
-        }],
-      }
-    }
-    function pluginDirectoryPath(node: PluginRouteTreeNode) {
-      const configuredPath = node.kind === 'parent'
-        ? normalizePluginPath(node.route?.parentPath)
-        : normalizePluginPath(node.module.menuPath)
-      return configuredPath || `/plugin-menu/${safeRouteName(node.code, 'directory')}`
-    }
-    function normalizePluginPath(path?: string) {
-      const value = textValue(path)
-      if (!value) {
-        return ''
-      }
-      const withSlash = value.startsWith('/') ? value : `/${value}`
-      return withSlash.length > 1 ? withSlash.replace(/\/+$/, '') : withSlash
-    }
-    function textValue(value?: string) {
-      return typeof value === 'string' ? value.trim() : ''
-    }
-    function safeRouteName(pluginCode: string, path: string) {
-      return `${pluginCode}-${path}`.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
     }
     async function generateRoutesAtBack() {
-      const res = await apiApp.routeList()
-      const staticRoutes = formatBackRoutes(res.data) as any
-      const pluginRoutes = await loadPluginRoutes(staticRoutes)
+      const [res, pluginManifest] = await Promise.all([
+        apiApp.routeList(),
+        loadPluginRuntimeManifest(),
+      ])
+      const staticRoutes = formatBackRoutes(
+        res.data,
+        pluginManifest.modules,
+        pluginManifest.sdkVersion,
+      ) as any
         // 设置 routes 数据
-      routesRaw.value = sortAsyncRoutes([...staticRoutes, ...pluginRoutes] as any)
+      routesRaw.value = sortAsyncRoutes(staticRoutes)
         // 创建路由匹配器
       const routes: RouteRecordRaw[] = []
       routesRaw.value.forEach((route) => {

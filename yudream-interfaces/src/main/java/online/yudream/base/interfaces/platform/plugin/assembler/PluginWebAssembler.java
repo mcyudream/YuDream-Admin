@@ -1,15 +1,11 @@
 package online.yudream.base.interfaces.platform.plugin.assembler;
 
 import jakarta.servlet.http.HttpServletRequest;
-import online.yudream.base.application.platform.plugin.cmd.PluginFrontendRouteSortSaveCmd;
-import online.yudream.base.application.platform.plugin.cmd.PluginFrontendSortSaveCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
-import online.yudream.base.interfaces.platform.plugin.request.PluginFrontendRouteSortSaveRequest;
-import online.yudream.base.interfaces.platform.plugin.request.PluginFrontendSortSaveRequest;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendRouteRes;
@@ -110,25 +106,6 @@ public class PluginWebAssembler {
                 .parentPermission(dto.getParentPermission())
                 .parentVisible(dto.getParentVisible())
                 .parentStatus(dto.getParentStatus())
-                .build();
-    }
-
-    public static PluginFrontendSortSaveCmd toCmd(PluginFrontendSortSaveRequest request) {
-        return PluginFrontendSortSaveCmd.builder()
-                .moduleName(request.getModuleName())
-                .menuSort(request.getMenuSort())
-                .routes(request.getRoutes() == null
-                        ? List.of()
-                        : request.getRoutes().stream().map(PluginWebAssembler::toCmd).toList())
-                .build();
-    }
-
-    private static PluginFrontendRouteSortSaveCmd toCmd(PluginFrontendRouteSortSaveRequest request) {
-        return PluginFrontendRouteSortSaveCmd.builder()
-                .path(request.getPath())
-                .name(request.getName())
-                .sort(request.getSort())
-                .parentSort(request.getParentSort())
                 .build();
     }
 

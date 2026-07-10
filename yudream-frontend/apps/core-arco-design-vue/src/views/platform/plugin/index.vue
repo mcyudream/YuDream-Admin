@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PluginFrontendModule, PluginFrontendSortPayload, PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
+import type { PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
 import apiPlugin from '@/api/modules/platform-plugin'
 import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
@@ -8,21 +8,12 @@ const toast = useFaToast()
 const modal = useFaModal()
 const loading = ref(false)
 const uploading = ref(false)
-const manifestLoading = ref(false)
 const actionLoading = ref('')
 const rows = ref<PluginModule[]>([])
-const frontendModules = ref<PluginFrontendModule[]>([])
-const sortDrafts = ref<Record<string, PluginFrontendSortPayload>>({})
 const selectedCode = ref('')
 const uploadInput = ref<HTMLInputElement>()
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
-const selectedFrontendModules = computed(() => {
-  if (!selected.value) {
-    return []
-  }
-  return frontendModules.value.filter(module => module.pluginCode === selected.value?.code)
-})
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const loaded = rows.value.filter(item => item.loaded).length
@@ -43,7 +34,6 @@ async function load() {
     const res = await apiPlugin.list()
     rows.value = res.data
     syncSelectedCode()
-    await loadFrontendManifest()
   }
   finally {
     loading.value = false
@@ -56,7 +46,6 @@ async function refresh() {
     const res = await apiPlugin.refresh()
     rows.value = res.data
     syncSelectedCode()
-    await loadFrontendManifest()
     await refreshDynamicRoutes(router)
     toast.success('插件目录已扫描')
   }
@@ -83,7 +72,6 @@ async function uploadJar(event: Event) {
     const res = await apiPlugin.upload(data)
     rows.value = res.data
     syncSelectedCode()
-    await loadFrontendManifest()
     await refreshDynamicRoutes(router)
     toast.success('插件 JAR 已上传并扫描')
   }
@@ -98,7 +86,6 @@ async function runAction(code: string, action: 'load' | 'enable' | 'disable' | '
     const res = await apiPlugin[action](code)
     replaceItem(res.data)
     if (['enable', 'disable', 'unload'].includes(action)) {
-      await loadFrontendManifest()
       await refreshDynamicRoutes(router)
     }
     toast.success(actionText(action))
@@ -121,7 +108,6 @@ function confirmRemove(item = selected.value) {
         await apiPlugin.remove(item.code)
         rows.value = rows.value.filter(row => row.code !== item.code)
         syncSelectedCode()
-        await loadFrontendManifest()
         await refreshDynamicRoutes(router)
         toast.success('插件记录已删除')
       }
@@ -137,103 +123,6 @@ function replaceItem(item: PluginModule) {
   if (index >= 0) {
     rows.value[index] = item
   }
-}
-
-async function loadFrontendManifest() {
-  manifestLoading.value = true
-  try {
-    const res = await apiPlugin.frontendManifest()
-    frontendModules.value = res.data.modules || []
-    syncSortDrafts()
-  }
-  finally {
-    manifestLoading.value = false
-  }
-}
-
-function moduleKey(module: PluginFrontendModule) {
-  return `${module.pluginCode}:${module.moduleName || ''}`
-}
-
-function createSortPayload(module: PluginFrontendModule): PluginFrontendSortPayload {
-  return {
-    moduleName: module.moduleName,
-    menuSort: module.menuSort ?? 0,
-    routes: (module.routes || []).map(route => ({
-      path: route.path,
-      name: route.name,
-      sort: route.sort ?? 0,
-      parentSort: route.parentSort ?? 0,
-    })),
-  }
-}
-
-function syncSortDrafts() {
-  const next: Record<string, PluginFrontendSortPayload> = {}
-  for (const module of frontendModules.value) {
-    const key = moduleKey(module)
-    next[key] = sortDrafts.value[key] || createSortPayload(module)
-  }
-  sortDrafts.value = next
-}
-
-function sortDraft(module: PluginFrontendModule) {
-  const key = moduleKey(module)
-  if (!sortDrafts.value[key]) {
-    sortDrafts.value = {
-      ...sortDrafts.value,
-      [key]: createSortPayload(module),
-    }
-  }
-  return sortDrafts.value[key]
-}
-
-function resetSortDraft(module: PluginFrontendModule) {
-  sortDrafts.value = {
-    ...sortDrafts.value,
-    [moduleKey(module)]: createSortPayload(module),
-  }
-}
-
-async function saveFrontendSort(module: PluginFrontendModule) {
-  actionLoading.value = `${module.pluginCode}:frontend-sort:${module.moduleName || ''}`
-  try {
-    const res = await apiPlugin.saveFrontendSort(module.pluginCode, normalizeSortPayload(sortDraft(module)))
-    replaceFrontendModule(res.data)
-    syncSortDrafts()
-    await refreshDynamicRoutes(router)
-    toast.success('菜单排序已保存')
-  }
-  finally {
-    actionLoading.value = ''
-  }
-}
-
-function replaceFrontendModule(module: PluginFrontendModule) {
-  const index = frontendModules.value.findIndex(item => item.pluginCode === module.pluginCode && item.moduleName === module.moduleName)
-  if (index >= 0) {
-    frontendModules.value[index] = module
-  }
-  else {
-    frontendModules.value.push(module)
-  }
-}
-
-function normalizeSortPayload(payload: PluginFrontendSortPayload): PluginFrontendSortPayload {
-  return {
-    moduleName: payload.moduleName,
-    menuSort: normalizeSort(payload.menuSort),
-    routes: payload.routes.map(route => ({
-      path: route.path,
-      name: route.name,
-      sort: normalizeSort(route.sort),
-      parentSort: normalizeSort(route.parentSort),
-    })),
-  }
-}
-
-function normalizeSort(value: unknown) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
 function syncSelectedCode() {
@@ -363,74 +252,6 @@ function actionText(action: string) {
 
           <div v-if="selected.errorMessage" class="error-panel">
             {{ selected.errorMessage }}
-          </div>
-
-          <div class="frontend-menu-panel">
-            <div class="section-title">注册菜单路由</div>
-            <div v-if="manifestLoading" class="menu-empty">
-              正在读取插件菜单
-            </div>
-            <template v-else-if="selectedFrontendModules.length">
-              <div v-for="module in selectedFrontendModules" :key="moduleKey(module)" class="frontend-module">
-                <div class="frontend-module__header">
-                  <div>
-                    <strong>{{ module.menuTitle || module.moduleName || module.pluginCode }}</strong>
-                    <span>{{ module.moduleName || '-' }}</span>
-                  </div>
-                  <label class="sort-field">
-                    <span>顶层排序</span>
-                    <input v-model.number="sortDraft(module).menuSort" type="number">
-                  </label>
-                </div>
-
-                <div class="route-table">
-                  <div class="route-row route-head">
-                    <span>路由</span>
-                    <span>组件</span>
-                    <span>目录排序</span>
-                    <span>页面排序</span>
-                  </div>
-                  <div v-for="(route, routeIndex) in module.routes" :key="route.name || route.path" class="route-row">
-                    <div class="route-title">
-                      <strong>{{ route.title }}</strong>
-                      <small>{{ route.path }}</small>
-                      <em v-if="route.parentTitle">{{ route.parentTitle }}</em>
-                    </div>
-                    <span class="route-component">{{ route.component || '-' }}</span>
-                    <input
-                      v-if="route.parentTitle"
-                      v-model.number="sortDraft(module).routes[routeIndex].parentSort"
-                      class="route-sort-input"
-                      type="number"
-                    >
-                    <span v-else class="route-empty">-</span>
-                    <input
-                      v-model.number="sortDraft(module).routes[routeIndex].sort"
-                      class="route-sort-input"
-                      type="number"
-                    >
-                  </div>
-                </div>
-
-                <div class="frontend-menu-actions">
-                  <FaButton variant="outline" size="sm" @click="resetSortDraft(module)">
-                    恢复注册值
-                  </FaButton>
-                  <FaButton
-                    v-auth="'platform:plugin:manage'"
-                    size="sm"
-                    :loading="actionLoading === `${module.pluginCode}:frontend-sort:${module.moduleName || ''}`"
-                    @click="saveFrontendSort(module)"
-                  >
-                    <FaIcon name="i-ri:save-3-line" />
-                    保存排序
-                  </FaButton>
-                </div>
-              </div>
-            </template>
-            <div v-else class="menu-empty">
-              当前插件暂无已注册的前端菜单。启用插件后可在这里查看并调整排序。
-            </div>
           </div>
 
           <div class="detail-actions">
@@ -630,7 +451,6 @@ function actionText(action: string) {
 }
 
 .dependency-panel,
-.frontend-menu-panel,
 .detail-actions {
   margin-top: 16px;
 }
@@ -655,148 +475,6 @@ function actionText(action: string) {
   border-radius: 6px;
   background: rgb(var(--danger-1));
   color: rgb(var(--danger-6));
-}
-
-.frontend-menu-panel {
-  min-width: 0;
-}
-
-.frontend-module {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.frontend-module + .frontend-module {
-  margin-top: 12px;
-}
-
-.frontend-module__header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  min-width: 0;
-}
-
-.frontend-module__header div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.frontend-module__header strong {
-  overflow: hidden;
-  color: var(--color-text-1);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.frontend-module__header span,
-.route-title small,
-.route-title em,
-.route-component,
-.route-empty {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.sort-field {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 8px;
-  align-items: center;
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.sort-field input,
-.route-sort-input {
-  width: 82px;
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-  color: var(--color-text-1);
-}
-
-.route-table {
-  display: grid;
-  min-width: 0;
-  overflow-x: auto;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-}
-
-.route-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 1.4fr) minmax(150px, 1fr) 92px 92px;
-  gap: 10px;
-  align-items: center;
-  min-width: 620px;
-  padding: 9px 10px;
-  border-top: 1px solid var(--color-border-2);
-}
-
-.route-row:first-child {
-  border-top: 0;
-}
-
-.route-head {
-  background: var(--color-fill-2);
-  color: var(--color-text-3);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.route-title {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  min-width: 0;
-  align-items: center;
-}
-
-.route-title strong {
-  max-width: 100%;
-  overflow: hidden;
-  color: var(--color-text-1);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.route-title small,
-.route-title em,
-.route-component {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.route-title em {
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: var(--color-fill-2);
-  font-style: normal;
-}
-
-.frontend-menu-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.menu-empty {
-  padding: 24px 12px;
-  border: 1px dashed var(--color-border-2);
-  border-radius: 6px;
-  color: var(--color-text-3);
-  text-align: center;
 }
 
 .empty-state {
