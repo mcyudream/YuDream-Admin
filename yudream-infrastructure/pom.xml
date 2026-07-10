@@ -20,6 +20,10 @@
     <dependencies>
         <dependency>
             <groupId>online.yudream.base</groupId>
+            <artifactId>yudream-application</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>online.yudream.base</groupId>
             <artifactId>yudream-domain</artifactId>
         </dependency>
         <dependency>
