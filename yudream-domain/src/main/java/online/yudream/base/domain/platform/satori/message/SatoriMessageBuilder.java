@@ -26,7 +26,6 @@ public final class SatoriMessageBuilder {
     }
 
     public SatoriMessageBuilder element(String name, Map<String, String> attributes, List<SatoriElement> children) {
-        validateStandardElementRequiredAttributes(name, attributes);
         elements.add(SatoriElement.element(name, attributes, children));
         return this;
     }
@@ -202,44 +201,6 @@ public final class SatoriMessageBuilder {
     private static void validatePairs(String... pairs) {
         if (pairs.length % 2 != 0) {
             throw new IllegalArgumentException("Satori attributes must be supplied in pairs");
-        }
-    }
-
-    private static void validateStandardElementRequiredAttributes(String name, Map<String, String> attributes) {
-        if (attributes == null) {
-            attributes = Map.of();
-        }
-        switch (name) {
-            case "sharp" -> requireAttribute(attributes, "id");
-            case "a" -> requireAttribute(attributes, "href");
-            case "img", "audio", "video", "file" -> requireAttribute(attributes, "src");
-            case "button" -> validateButtonAttributes(attributes);
-            default -> {
-                // The remaining standard elements have no required attributes.
-            }
-        }
-    }
-
-    private static void validateButtonAttributes(Map<String, String> attributes) {
-        String type = attributes.get("type");
-        if (type == null) {
-            return;
-        }
-        if (type.isBlank()) {
-            throw new IllegalArgumentException("Satori button type must not be blank");
-        }
-        switch (type) {
-            case "action" -> requireAttribute(attributes, "id");
-            case "link" -> requireAttribute(attributes, "href");
-            case "input" -> requireAttribute(attributes, "text");
-            default -> throw new IllegalArgumentException("Unsupported Satori button type: " + type);
-        }
-    }
-
-    private static void requireAttribute(Map<String, String> attributes, String name) {
-        String value = attributes.get(name);
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException("Satori required attribute must not be blank: " + name);
         }
     }
 

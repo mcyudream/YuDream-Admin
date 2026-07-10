@@ -132,6 +132,10 @@ class SatoriMessageEncoderTest {
         assertThatThrownBy(() -> SatoriMessageBuilder.create().element(
                 "button", Map.of("type", "link"), List.of()
         )).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriElement.element("img", Map.of(), List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriElement.element("button", Map.of("type", "link"), List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
 
         SatoriMessage optionalAttributesOmitted = SatoriMessageBuilder.create()
                 .at(null, null)
