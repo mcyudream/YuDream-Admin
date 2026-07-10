@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.net.URI;
 import java.time.Duration;
@@ -30,13 +31,20 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
         if (request == null || !StringUtils.hasText(request.content())) {
             throw new BizException("渲染内容不能为空");
         }
-        JsonNode response = client().post()
-                .uri("/v1/render/" + request.sourceType().name().toLowerCase())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(payload(request))
-                .retrieve()
-                .bodyToMono(JsonNode.class)
-                .block(timeout());
+        JsonNode response;
+        try {
+            response = client().post()
+                    .uri("/v1/render/" + request.sourceType().name().toLowerCase())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(payload(request))
+                    .retrieve()
+                    .bodyToMono(JsonNode.class)
+                    .block(timeout());
+        } catch (WebClientResponseException exception) {
+            throw new BizException("渲染服务请求失败（HTTP " + exception.getStatusCode().value() + "）：" + responseMessage(exception));
+        } catch (RuntimeException exception) {
+            throw new BizException("渲染服务不可用：" + exception.getMessage());
+        }
         if (response == null || !response.hasNonNull("data")) {
             throw new BizException("渲染服务未返回图片数据");
         }
@@ -77,13 +85,27 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
 
     private Map<String, Object> payload(RenderRequest request) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("content", request.content());
+        switch (request.sourceType()) {
+            case HTML -> payload.put("html", request.content());
+            case MARKDOWN -> payload.put("markdown", request.content());
+            case URL -> payload.put("url", request.content());
+        }
         if (request.width() != null) payload.put("width", request.width());
         if (request.maxHeight() != null) payload.put("maxHeight", request.maxHeight());
         if (request.transparent() != null) payload.put("transparent", request.transparent());
         if (StringUtils.hasText(request.format())) payload.put("format", request.format());
         if (request.options() != null && !request.options().isEmpty()) payload.put("options", request.options());
         return payload;
+    }
+
+    private String responseMessage(WebClientResponseException exception) {
+        try {
+            JsonNode body = objectMapper.readTree(exception.getResponseBodyAsString());
+            return body.path("message").asText("渲染服务未提供错误详情");
+        } catch (Exception ignored) {
+            String body = exception.getResponseBodyAsString();
+            return body == null || body.isBlank() ? "渲染服务未提供错误详情" : body.substring(0, Math.min(256, body.length()));
+        }
     }
 
     private Duration timeout() {
