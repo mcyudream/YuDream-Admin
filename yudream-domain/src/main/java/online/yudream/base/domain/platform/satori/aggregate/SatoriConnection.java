@@ -21,22 +21,28 @@ public class SatoriConnection extends BaseDomain {
 
     private String name;
     private String baseUrl;
+    private String platform;
+    private String userId;
     @ToString.Exclude
     private String token;
     private boolean enabled;
 
-    public static SatoriConnection create(String name, String baseUrl, String token) {
+    public static SatoriConnection create(String name, String baseUrl, String platform, String userId, String token) {
         return SatoriConnection.builder()
                 .name(required(name, "连接名称不能为空"))
                 .baseUrl(normalizeBaseUrl(baseUrl))
+                .platform(required(platform, "Satori 平台不能为空"))
+                .userId(required(userId, "Satori 用户 ID 不能为空"))
                 .token(required(token, "连接令牌不能为空"))
                 .enabled(true)
                 .build();
     }
 
-    public void update(String name, String baseUrl, String token) {
+    public void update(String name, String baseUrl, String platform, String userId, String token) {
         this.name = required(name, "连接名称不能为空");
         this.baseUrl = normalizeBaseUrl(baseUrl);
+        this.platform = required(platform, "Satori 平台不能为空");
+        this.userId = required(userId, "Satori 用户 ID 不能为空");
         if (token != null && !token.isBlank()) {
             this.token = token.trim();
         }

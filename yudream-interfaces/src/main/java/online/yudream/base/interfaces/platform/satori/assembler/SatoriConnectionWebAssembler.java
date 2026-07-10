@@ -19,6 +19,8 @@ public final class SatoriConnectionWebAssembler {
         SatoriConnectionCreateCmd cmd = new SatoriConnectionCreateCmd();
         cmd.setName(request.getName());
         cmd.setBaseUrl(request.getBaseUrl());
+        cmd.setPlatform(request.getPlatform());
+        cmd.setUserId(request.getUserId());
         cmd.setToken(request.getToken());
         return cmd;
     }
@@ -28,6 +30,8 @@ public final class SatoriConnectionWebAssembler {
         cmd.setId(id);
         cmd.setName(request.getName());
         cmd.setBaseUrl(request.getBaseUrl());
+        cmd.setPlatform(request.getPlatform());
+        cmd.setUserId(request.getUserId());
         cmd.setToken(request.getToken());
         return cmd;
     }
@@ -50,6 +54,8 @@ public final class SatoriConnectionWebAssembler {
                 .id(dto.getId() == null ? null : String.valueOf(dto.getId()))
                 .name(dto.getName())
                 .baseUrl(dto.getBaseUrl())
+                .platform(dto.getPlatform())
+                .userId(dto.getUserId())
                 .enabled(dto.isEnabled())
                 .credentialConfigured(dto.isCredentialConfigured())
                 .createTime(dto.getCreateTime())
@@ -60,8 +66,9 @@ public final class SatoriConnectionWebAssembler {
     public static SatoriConnectionTestRes toRes(SatoriConnectionTestDTO dto) {
         return SatoriConnectionTestRes.builder()
                 .success(dto.isSuccess())
-                .impl(dto.getImpl())
-                .protocolVersion(dto.getProtocolVersion())
+                .platform(dto.getPlatform())
+                .userId(dto.getUserId())
+                .status(dto.getStatus())
                 .adapter(dto.getAdapter())
                 .features(dto.getFeatures())
                 .testedAt(dto.getTestedAt())

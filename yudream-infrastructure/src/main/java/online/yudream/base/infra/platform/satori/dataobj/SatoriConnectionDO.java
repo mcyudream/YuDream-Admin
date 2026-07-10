@@ -15,6 +15,8 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class SatoriConnectionDO extends BaseDO {
     private String name;
     private String baseUrl;
+    private String platform;
+    private String userId;
     private String encryptedToken;
     private boolean enabled;
 }

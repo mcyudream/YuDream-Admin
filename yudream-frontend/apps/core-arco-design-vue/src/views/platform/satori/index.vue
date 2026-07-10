@@ -13,12 +13,14 @@ const composerMode = ref<'TEXT' | 'MARKDOWN' | 'HTML'>('MARKDOWN')
 const previewUrl = ref('')
 const formVisible = ref(false)
 const editing = ref<SatoriConnection | null>(null)
-const form = reactive<SatoriConnectionPayload>({ name: '', baseUrl: 'http://localhost:5500', token: '' })
+const form = reactive<SatoriConnectionPayload>({ name: '', baseUrl: 'http://localhost:5500', platform: '', userId: '', token: '' })
 const composer = reactive({ content: '# 消息预览\n\n支持 **Markdown** 与 HTML 渲染。', width: 720, transparent: false })
 
 const columns = [
   { accessorKey: 'name', header: '连接名称', width: 190 },
   { accessorKey: 'baseUrl', header: 'Satori 地址', width: 300 },
+  { accessorKey: 'platform', header: '平台', width: 120 },
+  { accessorKey: 'userId', header: '机器人 ID', width: 160 },
   { id: 'credential', header: '凭证', width: 100 },
   { id: 'status', header: '状态', width: 100 },
   { id: 'updated', header: '更新时间', width: 180 },
@@ -39,13 +41,13 @@ async function load() {
 
 function openCreate() {
   editing.value = null
-  Object.assign(form, { name: '', baseUrl: 'http://localhost:5500', token: '' })
+  Object.assign(form, { name: '', baseUrl: 'http://localhost:5500', platform: '', userId: '', token: '' })
   formVisible.value = true
 }
 
 function openEdit(row: SatoriConnection) {
   editing.value = row
-  Object.assign(form, { name: row.name, baseUrl: row.baseUrl, token: '' })
+  Object.assign(form, { name: row.name, baseUrl: row.baseUrl, platform: row.platform, userId: row.userId, token: '' })
   formVisible.value = true
 }
 
@@ -73,7 +75,7 @@ async function test(row: SatoriConnection) {
   actionKey.value = `${row.id}:test`
   try {
     const result = await apiSatori.testConnection(row.id)
-    toast.success('连接可用', { description: `${result.data.impl || 'Satori'} / ${result.data.protocolVersion || '-'}` })
+    toast.success('连接可用', { description: `${result.data.platform}:${result.data.userId} / ${result.data.status || result.data.adapter || 'ready'}` })
   }
   finally { actionKey.value = '' }
 }
@@ -123,7 +125,7 @@ function dateText(value?: string) { return value ? value.replace('T', ' ').slice
         </section>
       </div>
     </FaPageMain>
-    <FaModal v-model="formVisible" :title="editing ? '编辑 Satori 连接' : '新增 Satori 连接'" show-cancel-button @confirm="save"><a-form :model="form" layout="vertical"><a-form-item label="名称" required><FaInput v-model="form.name" /></a-form-item><a-form-item label="Satori 地址" required><FaInput v-model="form.baseUrl" placeholder="https://satori.example.com" /></a-form-item><a-form-item label="令牌" :required="!editing"><FaInput v-model="form.token" type="password" :placeholder="editing ? '留空保持原令牌' : 'Bearer Token'" /></a-form-item></a-form></FaModal>
+    <FaModal v-model="formVisible" :title="editing ? '编辑 Satori 连接' : '新增 Satori 连接'" show-cancel-button @confirm="save"><a-form :model="form" layout="vertical"><a-form-item label="名称" required><FaInput v-model="form.name" /></a-form-item><a-form-item label="Satori 地址" required><FaInput v-model="form.baseUrl" placeholder="https://satori.example.com" /></a-form-item><a-form-item label="Satori Platform" required><FaInput v-model="form.platform" placeholder="例如 discord、qq" /></a-form-item><a-form-item label="Satori User ID" required><FaInput v-model="form.userId" placeholder="机器人自身账号 ID" /></a-form-item><a-form-item label="令牌" :required="!editing"><FaInput v-model="form.token" type="password" :placeholder="editing ? '留空保持原令牌' : 'Bearer Token'" /></a-form-item></a-form></FaModal>
   </div>
 </template>
 

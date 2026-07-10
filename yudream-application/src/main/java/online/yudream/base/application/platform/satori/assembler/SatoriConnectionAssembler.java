@@ -4,7 +4,7 @@ import online.yudream.base.application.platform.satori.dto.SatoriConnectionDTO;
 import online.yudream.base.application.platform.satori.dto.SatoriConnectionTestDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
-import online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriMeta;
+import online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriLogin;
 
 import java.time.LocalDateTime;
 
@@ -20,6 +20,8 @@ public final class SatoriConnectionAssembler {
                 .id(connection.getId())
                 .name(connection.getName())
                 .baseUrl(connection.getBaseUrl())
+                .platform(connection.getPlatform())
+                .userId(connection.getUserId())
                 .enabled(connection.enabled())
                 .credentialConfigured(connection.getToken() != null && !connection.getToken().isBlank())
                 .createTime(connection.getCreateTime())
@@ -32,13 +34,14 @@ public final class SatoriConnectionAssembler {
                 result.getTotal(), result.getPage(), result.getSize());
     }
 
-    public static SatoriConnectionTestDTO toTestDTO(SatoriMeta meta) {
+    public static SatoriConnectionTestDTO toTestDTO(SatoriConnection connection, SatoriLogin login) {
         return SatoriConnectionTestDTO.builder()
                 .success(true)
-                .impl(meta.impl())
-                .protocolVersion(meta.protocolVersion())
-                .adapter(meta.adapter())
-                .features(meta.features())
+                .platform(connection.getPlatform())
+                .userId(connection.getUserId())
+                .status(login == null || login.status() == null ? null : login.status().name())
+                .adapter(login == null ? null : login.adapter())
+                .features(login == null ? java.util.List.of() : login.features())
                 .testedAt(LocalDateTime.now())
                 .build();
     }
