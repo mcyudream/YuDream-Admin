@@ -809,6 +809,33 @@ class PluginMenuLifecycleTest {
     }
 
     @Test
+    void projectsModuleWithDeclaredCrossPluginParent() {
+        String studentInfoModuleCode = "plugin:yudream-student-info:module:yudreamStudentInfo";
+        PluginFrontendModuleInfo activityProofModule = new PluginFrontendModuleInfo(
+                "minecraft-activity-proof",
+                "/api/platform/plugins/minecraft-activity-proof/assets/remoteEntry.js",
+                "minecraftActivityProof",
+                "1.0.0",
+                "sha256-test",
+                "学生信息",
+                "i-ri:id-card-line",
+                35,
+                List.of(),
+                studentInfoModuleCode,
+                true,
+                MenuStatus.ACTIVE
+        );
+        InMemoryMenuRepo menuRepo = new InMemoryMenuRepo();
+
+        new PluginMenuProjectionService(menuRepo).project("minecraft-activity-proof", List.of(activityProofModule));
+
+        assertThat(menuRepo.findByPluginCodeAndRegistrationKey(
+                "minecraft-activity-proof",
+                "module:minecraftActivityProof"
+        )).get().extracting(Menu::getParentCode).isEqualTo(studentInfoModuleCode);
+    }
+
+    @Test
     void routeMovedToSystemParentDoesNotExposeStalePluginDirectoryMetadata() {
         InMemoryMenuRepo menuRepo = projectedMenus(frontendModule);
         module.markEnabled();

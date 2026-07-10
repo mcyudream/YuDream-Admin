@@ -279,6 +279,7 @@ public class PluginContextImpl implements PluginContext {
                 module.menuTitle(),
                 module.menuIcon(),
                 module.menuSort(),
+                module.parentCode(),
                 module.routes()
         );
     }
