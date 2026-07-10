@@ -35,21 +35,18 @@ GitLab 当前只承担：
 </dependency>
 ```
 
-`settings.xml` 将通用外部依赖镜像到阿里云，并把 Nexus 保留为 YuDream 制品仓库：
+`settings.xml` 将阿里云放在前面，Nexus 作为 YuDream 制品与缺失依赖的后备仓库：
 
 ```xml
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
-    <mirrors>
-        <mirror>
-            <id>aliyun-public</id>
-            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
-            <url>https://maven.aliyun.com/repository/public</url>
-        </mirror>
-    </mirrors>
     <profiles>
         <profile>
             <id>yudream-repositories</id>
             <repositories>
+                <repository>
+                    <id>aliyun-public</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                </repository>
                 <repository>
                     <id>nexus-public</id>
                     <url>https://nexus.yudream.online/repository/maven-public/</url>

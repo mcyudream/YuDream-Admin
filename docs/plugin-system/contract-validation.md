@@ -7,7 +7,7 @@
 
 ## 统一仓库约定
 
-- YuDream Maven 契约从 `https://nexus.yudream.online/repository/maven-public/` 拉取，第三方依赖和 Maven 插件从阿里云公共仓库拉取
+- 通用 Maven 依赖和插件优先从阿里云公共仓库拉取，未命中时回退 `https://nexus.yudream.online/repository/maven-public/`；YuDream Maven 契约最终从 Nexus 拉取
 - Maven release 发布到 `https://nexus.yudream.online/repository/maven-releases/`
 - Maven snapshot 发布到 `https://nexus.yudream.online/repository/maven-snapshots/`
 - `@yudream/plugin-sdk` 与 `@yudream/components` 的发布和拉取统一使用 `https://nexus.yudream.online/repository/npm-public/`

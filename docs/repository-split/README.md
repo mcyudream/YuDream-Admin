@@ -15,7 +15,7 @@
 4. 主体仓 CI 会在分支和 tag 上直接校验拆分边界
 5. 主体仓发布件中：
    - `yudream-plugin-spi` 的 release 发布到 Nexus `maven-releases`，snapshot 发布到 `maven-snapshots`
-   - YuDream Maven 契约从 Nexus `maven-public` 拉取，第三方 Maven 依赖从阿里云公共仓库拉取
+   - 通用 Maven 依赖和插件优先从阿里云公共仓库拉取，未命中时回退 Nexus；YuDream Maven 契约最终从 Nexus `maven-public` 拉取
    - `@yudream/plugin-sdk`、`@yudream/components` 统一通过 Nexus `npm-public` 发布和拉取
 6. 插件仓只消费正式发布的契约包，不再依赖主体仓 `root parent` 或本地共享源码
 7. 插件仓前端 workspace 只允许 `packages/plugin-*`

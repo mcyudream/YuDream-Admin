@@ -9,22 +9,29 @@
             <password>${env.NEXUS_PASSWORD}</password>
         </server>
     </servers>
-    <mirrors>
-        <mirror>
-            <id>aliyun-public</id>
-            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
-            <url>https://maven.aliyun.com/repository/public</url>
-        </mirror>
-    </mirrors>
     <profiles>
         <profile>
             <id>yudream-repositories</id>
             <repositories>
                 <repository>
+                    <id>aliyun-public</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                </repository>
+                <repository>
                     <id>nexus-public</id>
                     <url>https://nexus.yudream.online/repository/maven-public/</url>
                 </repository>
             </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>aliyun-plugin</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                </pluginRepository>
+                <pluginRepository>
+                    <id>nexus-plugin</id>
+                    <url>https://nexus.yudream.online/repository/maven-public/</url>
+                </pluginRepository>
+            </pluginRepositories>
         </profile>
     </profiles>
     <activeProfiles>

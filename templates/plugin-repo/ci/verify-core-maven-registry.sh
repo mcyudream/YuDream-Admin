@@ -24,13 +24,24 @@ cat > "$SETTINGS_FILE" <<EOF
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-    <mirrors>
-        <mirror>
-            <id>aliyun-public</id>
-            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
-            <url>https://maven.aliyun.com/repository/public</url>
-        </mirror>
-    </mirrors>
+    <profiles>
+        <profile>
+            <id>aliyun-plugins</id>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>aliyun-plugin</id>
+                    <url>https://maven.aliyun.com/repository/public</url>
+                </pluginRepository>
+                <pluginRepository>
+                    <id>nexus-plugin</id>
+                    <url>$NEXUS_MAVEN_PUBLIC_URL</url>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
+    <activeProfiles>
+        <activeProfile>aliyun-plugins</activeProfile>
+    </activeProfiles>
 </settings>
 EOF
 
