@@ -47,3 +47,7 @@ build/
 /artifacts/
 .m2/
 npm-publish-dist/
+
+# Standalone headless render service
+/yudream-render-server/node_modules/
+/yudream-render-server/dist/

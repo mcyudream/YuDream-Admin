@@ -23,6 +23,9 @@ import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
+import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
+import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
@@ -47,6 +50,8 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final PluginUserService pluginUserService;
     private final PluginSecurityService pluginSecurityService;
     private final PluginMailService pluginMailService;
+    private final PluginMessagingFrameworkService pluginMessagingFrameworkService;
+    private final PluginRenderFrameworkService pluginRenderFrameworkService;
     private final MongoTemplate mongoTemplate;
     private final ObjectStorage objectStorage;
     private final WordTemplateRenderer wordTemplateRenderer;
@@ -117,6 +122,21 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginFileStore files(String pluginCode) {
         return fileStores.computeIfAbsent(pluginCode, code -> new ObjectStoragePluginFileStore(code, objectStorage));
+    }
+
+    @Override
+    public PluginMessagingService messaging() {
+        return pluginMessagingFrameworkService;
+    }
+
+    @Override
+    public PluginSatoriRawService satoriRaw() {
+        return pluginMessagingFrameworkService;
+    }
+
+    @Override
+    public PluginRenderService render() {
+        return pluginRenderFrameworkService;
     }
 
     @Override

@@ -127,11 +127,20 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_AI_ENABLED:true}
   dataviz:
     enabled: ${PLATFORM_DATAVIZ_ENABLED:true}
+  satori:
+    enabled: ${PLATFORM_SATORI_ENABLED:true}
+  message-render:
+    enabled: ${PLATFORM_MESSAGE_RENDER_ENABLED:true}
 
 yudream.platform.ai.client:
   connect-timeout: ${PLATFORM_AI_CONNECT_TIMEOUT:30s}
   read-timeout: ${PLATFORM_AI_READ_TIMEOUT:10m}
   sse-timeout: ${PLATFORM_AI_SSE_TIMEOUT:10m}
+
+yudream.platform.render:
+  base-url: ${MESSAGE_RENDER_BASE_URL:http://localhost:3000}
+  token: ${MESSAGE_RENDER_TOKEN:}
+  timeout: ${MESSAGE_RENDER_TIMEOUT:30s}
 
 yudream.storage.s3:
   endpoint: ${S3_ENDPOINT:http://localhost:9000}
