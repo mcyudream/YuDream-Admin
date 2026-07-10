@@ -10,8 +10,8 @@ default:
 
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
-    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_TAG =~ /[pdv]/
+    - when: never
 
 variables:
   PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
@@ -48,12 +48,16 @@ validate:repo-split:
   image: alpine:3.20
   script:
     - sh ci/verify-core-plugin-decoupling.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 validate:contract-packages:
   stage: validate-boundary
   image: alpine:3.20
   script:
     - sh ci/verify-contract-packages.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 validate:contract-package-tarballs:
   stage: validate-boundary
@@ -66,24 +70,32 @@ validate:contract-package-tarballs:
     - pnpm -v
   script:
     - sh ci/verify-contract-package-tarballs.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 validate:contract-publish-pipeline:
   stage: validate-boundary
   image: alpine:3.20
   script:
     - sh ci/verify-core-contract-publish-pipeline.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 validate:plugin-repo-template:
   stage: validate-boundary
   image: alpine:3.20
   script:
     - sh ci/verify-plugin-repo-template.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 validate:docs:
   stage: validate-boundary
   image: alpine:3.20
   script:
     - sh ci/verify-doc-independence.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 build:backend:
   stage: build-backend
@@ -97,6 +109,8 @@ build:backend:
       - yudream-bootstrap/target/*.jar
       - yudream-plugins/yudream-plugin-spi/target/*.jar
     expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[dv]/
 
 build:frontend-main:
   stage: build-frontend-main
@@ -116,6 +130,8 @@ build:frontend-main:
     paths:
       - yudream-frontend/apps/core-arco-design-vue/dist/
     expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[dv]/
 
 publish:maven-plugin-spi:
   stage: publish-packages
@@ -124,7 +140,7 @@ publish:maven-plugin-spi:
     - echo "Deploy yudream-plugin-spi to Nexus"
     - mvn -s ci/maven-settings-nexus.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests deploy -B -ntp -e
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 verify:maven-plugin-spi:
   stage: verify-packages
@@ -132,7 +148,7 @@ verify:maven-plugin-spi:
   script:
     - sh ci/verify-plugin-spi-registry.sh
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 verify:npm-contracts:
   stage: verify-packages
@@ -146,7 +162,7 @@ verify:npm-contracts:
   script:
     - VERIFY_NPM_REGISTRY="$NEXUS_NPM_PUBLIC_URL" sh ci/verify-published-npm-contracts.sh
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-plugin-sdk:
   stage: publish-packages
@@ -171,7 +187,7 @@ publish:npm-plugin-sdk:
     - cd packages/plugin-sdk
     - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-components:
   stage: publish-packages
@@ -196,7 +212,7 @@ publish:npm-components:
     - cd packages/components
     - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_COMMIT_TAG =~ /[pv]/
 
 collect:artifacts:
   stage: artifacts
@@ -215,6 +231,8 @@ collect:artifacts:
     paths:
       - dist/
     expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_TAG =~ /[dv]/
 
 build-and-push-images:
   stage: build-images
@@ -240,4 +258,4 @@ build-and-push-images:
     - docker push "$FRONTEND_IMAGE"
     - docker push "$FRONTEND_IMAGE_LATEST"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_COMMIT_TAG =~ /[dv]/

@@ -74,7 +74,8 @@ require_pattern 'NEXUS_USERNAME' "core CI must use the shared Nexus username"
 require_pattern 'NEXUS_PASSWORD' "core CI must use the shared Nexus password"
 
 echo "[verify-core-contract-publish-pipeline] checking publish rules"
-require_pattern '\$CI_COMMIT_TAG =~ /\^v/' "core CI publish/verify jobs must stay tag-gated"
+require_pattern '\$CI_COMMIT_TAG =~ /\[pv\]/' "contract publish/verify jobs must use p/v tag rules"
+require_pattern '\$CI_COMMIT_TAG =~ /\[dv\]/' "build and Docker jobs must use d/v tag rules"
 
 if grep -Eq 'packages/(maven|npm)|publish:npmjs-|verify:(gitlab-npm|npmjs)|GITLAB_NPM_PUBLISH_ENABLED|NPMJS_PUBLISH_ENABLED|NPM_TOKEN' .gitlab-ci.yml; then
   fail "core CI must not publish contracts to GitLab Package Registry or npmjs"
