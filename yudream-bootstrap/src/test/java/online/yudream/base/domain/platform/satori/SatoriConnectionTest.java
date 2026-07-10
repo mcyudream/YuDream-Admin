@@ -3,10 +3,12 @@ package online.yudream.base.domain.platform.satori;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriEventRecord;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriLogin;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SatoriConnectionTest {
 
@@ -23,6 +25,13 @@ class SatoriConnectionTest {
         assertThat(connection.enabled()).isFalse();
         connection.enable();
         assertThat(connection.enabled()).isTrue();
+    }
+
+    @Test
+    void shouldRejectCredentialsEmbeddedInSatoriUrl() {
+        assertThatThrownBy(() -> SatoriConnection.create("Bot", "https://operator:secret@satori.example.com/v1", "token"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("HTTP");
     }
 
     @Test

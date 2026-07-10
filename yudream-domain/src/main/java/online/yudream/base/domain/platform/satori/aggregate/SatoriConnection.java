@@ -59,7 +59,7 @@ public class SatoriConnection extends BaseDomain {
         try {
             URI uri = new URI(normalized);
             if (("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme()))
-                    && uri.getHost() != null && uri.getQuery() == null && uri.getFragment() == null) {
+                    && uri.getHost() != null && uri.getUserInfo() == null && uri.getQuery() == null && uri.getFragment() == null) {
                 String path = uri.getPath() == null ? "" : uri.getPath().replaceAll("/+$", "");
                 return new URI(uri.getScheme().toLowerCase(), uri.getUserInfo(), uri.getHost().toLowerCase(), uri.getPort(),
                         path.isEmpty() ? null : path, null, null).toString();
