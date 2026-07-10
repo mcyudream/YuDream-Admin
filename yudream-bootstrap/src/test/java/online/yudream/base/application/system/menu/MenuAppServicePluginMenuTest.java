@@ -154,6 +154,9 @@ class MenuAppServicePluginMenuTest {
             List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
             assertThat(children).extracting(child -> child.get("name"))
                     .containsExactly(systemChild.getCode());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> meta = (Map<String, Object>) children.getFirst().get("meta");
+            assertThat(meta.get("menuCode")).isEqualTo(systemChild.getCode());
         });
     }
 

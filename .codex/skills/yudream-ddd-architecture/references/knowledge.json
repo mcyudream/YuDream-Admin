@@ -99,6 +99,10 @@
     {
       "key": "plugin-frontend-default-parent",
       "text": "跨插件前端菜单必须通过 PluginFrontend.parentCode 声明默认父菜单编码；投影仅在首次创建时写入，已有菜单的用户父级配置不得被插件重投影覆盖。不要按菜单标题、依赖或路由路径推断跨插件层级。"
+    },
+    {
+      "key": "plugin-menu-top-nav-match",
+      "text": "Top-level menu activation must score every menu group: exact route match wins, otherwise the longest segment-boundary prefix wins. Never select the first prefix match because plugin route namespaces can overlap across configured parents."
     }
   ],
   "utilities": [

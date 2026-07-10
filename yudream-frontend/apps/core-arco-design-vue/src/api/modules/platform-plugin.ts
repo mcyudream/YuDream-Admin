@@ -37,6 +37,22 @@ export interface PluginFrontendRoute {
   component?: string
   permission?: string
   sort?: number
+  parentCode?: string
+  visible?: boolean
+  status?: 'ACTIVE' | 'DISABLED'
+  menuCode?: string
+  type?: 'CATEGORY' | 'LAYOUT' | 'MENU' | 'LINK' | 'BUTTON'
+  module?: string
+  link?: string
+  parentMenuCode?: string
+  parentParentCode?: string
+  parentType?: 'CATEGORY' | 'LAYOUT' | 'MENU' | 'LINK' | 'BUTTON'
+  parentModule?: string
+  parentComponent?: string
+  parentLink?: string
+  parentPermission?: string
+  parentVisible?: boolean
+  parentStatus?: 'ACTIVE' | 'DISABLED'
 }
 
 export interface PluginFrontendModule {
@@ -48,6 +64,16 @@ export interface PluginFrontendModule {
   menuTitle?: string
   menuIcon?: string
   menuSort?: number
+  parentCode?: string
+  visible?: boolean
+  status?: 'ACTIVE' | 'DISABLED'
+  menuCode?: string
+  menuType?: 'CATEGORY' | 'LAYOUT' | 'MENU' | 'LINK' | 'BUTTON'
+  menuModule?: string
+  menuPath?: string
+  menuComponent?: string
+  menuLink?: string
+  menuPermission?: string
   routes: PluginFrontendRoute[]
 }
 

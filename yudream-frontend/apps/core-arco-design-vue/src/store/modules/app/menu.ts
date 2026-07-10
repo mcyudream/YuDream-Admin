@@ -2,6 +2,7 @@ import type { MenuRecordMainRaw, MenuRecordRaw, RouteRecordMainRaw } from '@fant
 import type { RouteRecordRaw } from 'vue-router'
 import { cloneDeep } from 'es-toolkit'
 import { resolveRoutePath } from '@/utils'
+import { findBestMenuGroupIndex } from './menu-match'
 
 export const useAppMenuStore = defineStore(
   'appMenu',
@@ -174,16 +175,6 @@ export const useAppMenuStore = defineStore(
       return res
     }
     // 设置主导航
-    function isPathInMenus(menus: MenuRecordRaw[], path: string) {
-      let flag = false
-      flag = menus.some((item) => {
-        if (item.children) {
-          return isPathInMenus(item.children, path)
-        }
-        return path.indexOf(`${item.path}/`) === 0 || path === item.path
-      })
-      return flag
-    }
     function setActived(indexOrPath: number | string) {
       if (typeof indexOrPath === 'number') {
         // 如果是 number 类型，则认为是主导航的索引
@@ -191,7 +182,7 @@ export const useAppMenuStore = defineStore(
       }
       else {
         // 如果是 string 类型，则认为是路由，需要查找对应的主导航索引
-        const findIndex = allMenus.value.findIndex(item => isPathInMenus(item.children, indexOrPath))
+        const findIndex = findBestMenuGroupIndex(allMenus.value, indexOrPath)
         if (findIndex >= 0) {
           actived.value = findIndex
         }

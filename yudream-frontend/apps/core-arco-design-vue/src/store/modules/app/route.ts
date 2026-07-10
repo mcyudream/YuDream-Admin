@@ -5,6 +5,7 @@ import { createRouterMatcher } from 'vue-router'
 import apiApp from '@/api/modules/app'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { systemRoutes as systemRoutesRaw } from '@/router/routes'
+import { buildPluginRouteTree, partitionPluginRouteTree, type PluginRouteTreeNode } from './plugin-route-tree'
 
 export const useAppRouteStore = defineStore(
   'appRoute',
@@ -32,7 +33,9 @@ export const useAppRouteStore = defineStore(
         })
         returnRoutes.forEach((item) => {
           if (item.children) {
-            item.redirect ||= resolveFirstVisibleChildPath(item.children)
+            if (!hasDefaultPageChild(item.children)) {
+              item.redirect ||= resolveFirstVisibleChildPath(item.children)
+            }
             item.children = deleteMiddleRouteComponent(item.children)
           }
           return item
@@ -45,7 +48,9 @@ export const useAppRouteStore = defineStore(
       const routes = [...systemRoutesRaw]
       routes.forEach((item) => {
         if (item.children) {
-          item.redirect ||= resolveFirstVisibleChildPath(item.children)
+          if (!hasDefaultPageChild(item.children)) {
+            item.redirect ||= resolveFirstVisibleChildPath(item.children)
+          }
           item.children = deleteMiddleRouteComponent(item.children)
         }
       })
@@ -56,7 +61,9 @@ export const useAppRouteStore = defineStore(
       const res: RouteRecordRaw[] = []
       routes.forEach((route) => {
         if (route.children?.length) {
-          route.redirect ||= resolveFirstVisibleChildPath(route.children)
+          if (!hasDefaultPageChild(route.children)) {
+            route.redirect ||= resolveFirstVisibleChildPath(route.children)
+          }
           delete route.component
           route.children = deleteMiddleRouteComponent(route.children)
         }
@@ -66,6 +73,9 @@ export const useAppRouteStore = defineStore(
         res.push(route)
       })
       return res
+    }
+    function hasDefaultPageChild(routes: RouteRecordRaw[]) {
+      return routes.some(route => route.path === '')
     }
     // 中间目录节点没有实际页面时，访问目录路径应进入第一个可见子页面，避免内容区空白。
     function resolveFirstVisibleChildPath(routes: RouteRecordRaw[]): string | undefined {
@@ -180,112 +190,69 @@ export const useAppRouteStore = defineStore(
       }
     }
     // 生成路由（后端获取）
-    async function loadPluginRoutes(): Promise<RouteRecordMainRaw[]> {
+    async function loadPluginRoutes(staticRoutes: RouteRecordMainRaw[]): Promise<RouteRecordMainRaw[]> {
       try {
         const res = await apiPlugin.frontendManifest()
-        const groups: RouteRecordMainRaw[] = []
-        const menuGroups = new Map<string, RouteRecordMainRaw>()
-        const parentGroups = new Map<string, RouteRecordRaw>()
-        const legacyChildren: RouteRecordRaw[] = []
-        res.data.modules?.forEach((module) => {
-          module.routes?.forEach((route) => {
-            const children = pluginMenuChildren(module, groups, menuGroups, legacyChildren)
-            const menuKey = pluginMenuKey(module)
-            const parentTitle = textValue(route.parentTitle)
-            const parentPath = parentTitle ? pluginParentPath(route) : ''
-            const routeRecord = createPluginRouteRecord(module, route, res.data.sdkVersion)
-            if (!parentTitle || !parentPath) {
-              children.push(routeRecord)
-              return
-            }
-            const parentKey = `${menuKey}:${parentPath}`
-            let parent = parentGroups.get(parentKey)
-            if (!parent) {
-              parent = {
-                path: parentPath,
-                name: `${safeRouteName(menuKey, parentPath)}-directory`,
-                component: () => import('@/layouts/index.vue'),
-                meta: {
-                  title: parentTitle,
-                  icon: textValue(route.parentIcon) || route.icon || 'i-ri:puzzle-2-line',
-                  sort: route.parentSort ?? route.sort,
-                },
-                children: [],
-              }
-              parentGroups.set(parentKey, parent)
-              children.push(parent)
-            }
-            mergeParentMeta(parent, route)
-            parent.children!.push(routeRecord)
-          })
+        const staticRouteMap = indexRoutesByMenuCode(staticRoutes)
+        const pluginTree = partitionPluginRouteTree(
+          buildPluginRouteTree(res.data.modules || []),
+          new Set(staticRouteMap.keys()),
+        )
+        pluginTree.staticChildren.forEach((nodes, parentCode) => {
+          const parent = staticRouteMap.get(parentCode)
+          if (!parent) {
+            return
+          }
+          parent.children ||= []
+          parent.children.push(...nodes.map(node => createPluginTreeRoute(node, res.data.sdkVersion)))
         })
-        if (legacyChildren.length) {
-          groups.push({
-            meta: {
-              title: '插件扩展',
-              icon: 'i-ri:puzzle-2-line',
-              sort: 20,
-            },
-            children: legacyChildren,
-          })
-        }
-        return groups
+        return pluginTree.roots.map(node => createPluginTreeRoute(node, res.data.sdkVersion))
       }
       catch {
         return []
       }
     }
-    function pluginMenuChildren(module: any, groups: RouteRecordMainRaw[], menuGroups: Map<string, RouteRecordMainRaw>, legacyChildren: RouteRecordRaw[]) {
-      const title = textValue(module.menuTitle)
-      if (!title) {
-        return legacyChildren
+    function indexRoutesByMenuCode(routes: RouteRecordMainRaw[]) {
+      const index = new Map<string, RouteRecordRaw>()
+      const visit = (items: RouteRecordRaw[]) => {
+        items.forEach((route) => {
+          const menuCode = textValue((route.meta as any)?.menuCode)
+          if (menuCode) {
+            index.set(menuCode, route)
+          }
+          if (route.children) {
+            visit(route.children)
+          }
+        })
       }
-      const key = pluginMenuKey(module)
-      let group = menuGroups.get(key)
-      if (!group) {
-        group = {
-          meta: {
-            title,
-            icon: module.menuIcon || 'i-ri:puzzle-2-line',
-            sort: module.menuSort ?? 20,
-          },
-          children: [],
-        }
-        menuGroups.set(key, group)
-        groups.push(group)
-      }
-      else {
-        mergeMenuMeta(group, module)
-      }
-      return group.children
+      visit(routes as RouteRecordRaw[])
+      return index
     }
-    function mergeMenuMeta(group: RouteRecordMainRaw, module: any) {
-      const icon = textValue(module.menuIcon)
-      if (icon && (!group.meta?.icon || group.meta.icon === 'i-ri:puzzle-2-line')) {
-        group.meta = { ...group.meta, icon }
+    function createPluginTreeRoute(node: PluginRouteTreeNode, sdkVersion?: string): RouteRecordRaw {
+      if (node.kind === 'route' && node.route) {
+        return createPluginRouteRecord(node.module, node.route, sdkVersion, node.visible)
       }
-      const sort = module.menuSort
-      if (typeof sort === 'number' && sort > (Number(group.meta?.sort) || 0)) {
-        group.meta = { ...group.meta, sort }
-      }
-    }
-    function mergeParentMeta(parent: RouteRecordRaw, route: any) {
-      const sort = route.parentSort ?? route.sort
-      if (typeof sort === 'number' && sort > (Number(parent.meta?.sort) || 0)) {
-        parent.meta = { ...parent.meta, sort }
-      }
-      const icon = textValue(route.parentIcon) || route.icon
-      if (icon && (!parent.meta?.icon || parent.meta.icon === 'i-ri:puzzle-2-line')) {
-        parent.meta = { ...parent.meta, icon }
+      return {
+        path: pluginDirectoryPath(node),
+        name: `${safeRouteName(node.code, 'directory')}-directory`,
+        component: () => import('@/layouts/index.vue'),
+        meta: {
+          title: node.title,
+          icon: node.icon || 'i-ri:puzzle-2-line',
+          sort: node.sort,
+          ...(node.visible ? {} : { menu: false }),
+        },
+        children: node.children.map(child => createPluginTreeRoute(child, sdkVersion)),
       }
     }
-    function createPluginRouteRecord(module: any, route: any, sdkVersion?: string): RouteRecordRaw {
+    function createPluginRouteRecord(module: any, route: any, sdkVersion?: string, visible = true): RouteRecordRaw {
       const routeName = route.name || `${module.pluginCode}-${route.path}`
       const routeMeta = {
         title: route.title,
         icon: route.icon || 'i-ri:puzzle-2-line',
         auth: route.permission,
         sort: route.sort,
+        ...(visible ? {} : { menu: false }),
         plugin: {
           pluginCode: module.pluginCode,
           component: route.component,
@@ -311,14 +278,11 @@ export const useAppRouteStore = defineStore(
         }],
       }
     }
-    function pluginParentPath(route: any) {
-      const explicit = normalizePluginPath(route.parentPath)
-      if (explicit) {
-        return explicit
-      }
-      const routePath = normalizePluginPath(route.path)
-      const index = routePath.lastIndexOf('/')
-      return index > 0 ? routePath.slice(0, index) : routePath
+    function pluginDirectoryPath(node: PluginRouteTreeNode) {
+      const configuredPath = node.kind === 'parent'
+        ? normalizePluginPath(node.route?.parentPath)
+        : normalizePluginPath(node.module.menuPath)
+      return configuredPath || `/plugin-menu/${safeRouteName(node.code, 'directory')}`
     }
     function normalizePluginPath(path?: string) {
       const value = textValue(path)
@@ -339,9 +303,10 @@ export const useAppRouteStore = defineStore(
     }
     async function generateRoutesAtBack() {
       const res = await apiApp.routeList()
-      const pluginRoutes = await loadPluginRoutes()
+      const staticRoutes = formatBackRoutes(res.data) as any
+      const pluginRoutes = await loadPluginRoutes(staticRoutes)
         // 设置 routes 数据
-      routesRaw.value = sortAsyncRoutes([...(formatBackRoutes(res.data) as any), ...pluginRoutes] as any)
+      routesRaw.value = sortAsyncRoutes([...staticRoutes, ...pluginRoutes] as any)
         // 创建路由匹配器
       const routes: RouteRecordRaw[] = []
       routesRaw.value.forEach((route) => {
