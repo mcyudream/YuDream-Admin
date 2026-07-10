@@ -6,6 +6,8 @@ import online.yudream.base.domain.platform.satori.message.SatoriMessageBuilder;
 import online.yudream.base.domain.platform.satori.service.SatoriMessageEncoder;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -85,5 +87,97 @@ class SatoriMessageEncoderTest {
                 .isInstanceOf(UnsupportedOperationException.class);
         assertThatThrownBy(() -> node.attributes().put("size", "sm"))
                 .isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @Test
+    void shouldRejectMissingRequiredAttributesAndAllowOptionalAttributesToBeOmitted() {
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().sharp(null, "General"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().sharp(" ", "General"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().a(null, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().a(" ", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().img(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().audio(" "))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().video(null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().file(" ", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().buttonAction(null, null, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().buttonLink(" ", null, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().buttonInput(null, null, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().at(" ", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().emoji(null, " "))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().img("https://example.test/image.png", " "))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().message(" ", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().author(null, " ", List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().element("a", Map.of(), List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().element("img", Map.of("src", " "), List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().element("sharp", Map.of("name", "General"), List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SatoriMessageBuilder.create().element(
+                "button", Map.of("type", "link"), List.of()
+        )).isInstanceOf(IllegalArgumentException.class);
+
+        SatoriMessage optionalAttributesOmitted = SatoriMessageBuilder.create()
+                .at(null, null)
+                .emoji(null, null)
+                .img("https://example.test/image.png", null)
+                .message(null, List.of())
+                .quote(null, List.of())
+                .author(null, null, List.of())
+                .build();
+
+        assertThat(encoder.encode(optionalAttributesOmitted))
+                .isEqualTo("<at/><emoji/><img src=\"https://example.test/image.png\"/><message/><quote/><author/>");
+    }
+
+    @Test
+    void shouldSnapshotElementAndMessageCollections() {
+        Map<String, String> sourceAttributes = new LinkedHashMap<>();
+        sourceAttributes.put("size", "lg");
+        List<SatoriElement> sourceChildren = new ArrayList<>(List.of(SatoriElement.text("original")));
+        SatoriElement.Node node = SatoriElement.element("kook:card", sourceAttributes, sourceChildren);
+
+        sourceAttributes.put("size", "sm");
+        sourceAttributes.put("theme", "primary");
+        sourceChildren.add(SatoriElement.text("later"));
+
+        List<SatoriElement> sourceElements = new ArrayList<>(List.of(node));
+        SatoriMessage message = new SatoriMessage(sourceElements);
+        sourceElements.add(SatoriElement.text("unexpected"));
+
+        assertThat(node.attributes()).containsExactly(Map.entry("size", "lg"));
+        assertThat(node.children()).containsExactly(SatoriElement.text("original"));
+        assertThat(message.elements()).containsExactly(node);
+    }
+
+    @Test
+    void shouldEncodeButtonsWithTheirTypeSpecificRequiredAttributes() {
+        SatoriMessage message = SatoriMessageBuilder.create()
+                .buttonAction("approve", "success", List.of(SatoriElement.text("Approve")))
+                .buttonLink("https://example.test", null, List.of(SatoriElement.text("Open")))
+                .buttonInput("/help", "secondary", List.of(SatoriElement.text("Fill")))
+                .build();
+
+        assertThat(encoder.encode(message)).isEqualTo(
+                "<button type=\"action\" id=\"approve\" theme=\"success\">Approve</button>"
+                        + "<button type=\"link\" href=\"https://example.test\">Open</button>"
+                        + "<button type=\"input\" text=\"/help\" theme=\"secondary\">Fill</button>"
+        );
     }
 }
