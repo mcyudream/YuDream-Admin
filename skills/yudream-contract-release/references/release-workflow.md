@@ -6,6 +6,7 @@ Use this checklist when the user asks to release contract packages or to sync do
 
 1. Read the live current versions from:
    - `yudream-plugins/yudream-plugin-spi/pom.xml`
+   - `pom.xml` -> `yudream.plugin.spi.version`
    - `yudream-frontend/packages/plugin-sdk/package.json`
    - `yudream-frontend/packages/components/package.json`
 2. Confirm which packages must move for the requested change.
@@ -17,7 +18,7 @@ Use this checklist when the user asks to release contract packages or to sync do
 
 ## 2. Update Versions In The Core Repo
 
-Edit only the contract package versions that are part of the release.
+Edit only the contract package versions that are part of the release. When releasing SPI, update both its artifact version and the core root `yudream.plugin.spi.version` consumer property to the same value.
 
 Typical locations:
 
@@ -30,7 +31,7 @@ Then run targeted checks.
 ### Suggested Core Validation Commands
 
 ```powershell
-mvn -s ci/maven-settings.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests package -B -ntp
+mvn -s ci/maven-settings-nexus.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests package -B -ntp
 ```
 
 ```powershell
@@ -59,17 +60,16 @@ Recommended report items:
 
 - core commit SHA;
 - pushed tag name;
-- whether GitLab npm, npmjs, or both npm publish paths are expected.
+- Nexus Maven and npm repository paths used by the release.
 
 ## 4. Wait For Package Publishing And Verification
 
 Watch the tag pipeline and confirm the relevant jobs:
 
 - SPI publish: `publish:maven-plugin-spi`
-- GitLab npm publish: `publish:npm-plugin-sdk`, `publish:npm-components`
-- npmjs publish: `publish:npmjs-plugin-sdk`, `publish:npmjs-components`
+- Nexus npm publish: `publish:npm-plugin-sdk`, `publish:npm-components`
 - SPI verify: `verify:maven-plugin-spi`
-- npm verify: `verify:gitlab-npm-contracts` or `verify:npmjs-contracts`
+- npm verify: `verify:npm-contracts`
 
 Do not update `yudream-admin-plugins` until the needed packages are verifiably available.
 
@@ -98,10 +98,9 @@ sh ci/verify-plugin-repo-readiness.sh
 
 ## 6. Common Failure Checks
 
-- Missing npm publish permission: confirm `NPM_TOKEN` and the package scope ownership.
-- GitLab npm verification fails: confirm `GITLAB_NPM_PUBLISH_ENABLED=true` on the tag pipeline.
+- Missing Nexus publish permission: confirm `NEXUS_USERNAME`, `NEXUS_PASSWORD`, and repository privileges.
 - Plugin repo still resolves old versions: ensure `pnpm-workspace.yaml` changed and `pnpm-lock.yaml` was regenerated.
-- SPI consumers still resolve old artifacts: confirm the root property in the plugin repo `pom.xml` actually changed and that the target version exists in GitLab Maven.
+- SPI consumers still resolve old artifacts: confirm the root property in the plugin repo `pom.xml` changed and the target version exists in Nexus Maven.
 
 ## 7. Completion Standard
 

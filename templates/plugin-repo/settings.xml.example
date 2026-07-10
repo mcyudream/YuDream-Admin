@@ -1,33 +1,25 @@
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-    <servers>
-        <server>
-            <id>gitlab-maven</id>
-            <username>${env.CORE_PACKAGE_USER}</username>
-            <password>${env.CORE_PACKAGE_TOKEN}</password>
-        </server>
-    </servers>
-
     <profiles>
         <profile>
-            <id>gitlab-private</id>
+            <id>nexus</id>
             <repositories>
                 <repository>
-                    <id>gitlab-maven</id>
-                    <url>https://gitlab.example.com/api/v4/projects/CORE_PROJECT_ID/packages/maven</url>
+                    <id>nexus-public</id>
+                    <url>https://nexus.yudream.online/repository/maven-public/</url>
                 </repository>
             </repositories>
             <pluginRepositories>
                 <pluginRepository>
-                    <id>gitlab-maven</id>
-                    <url>https://gitlab.example.com/api/v4/projects/CORE_PROJECT_ID/packages/maven</url>
+                    <id>nexus-public</id>
+                    <url>https://nexus.yudream.online/repository/maven-public/</url>
                 </pluginRepository>
             </pluginRepositories>
         </profile>
     </profiles>
 
     <activeProfiles>
-        <activeProfile>gitlab-private</activeProfile>
+        <activeProfile>nexus</activeProfile>
     </activeProfiles>
 </settings>

@@ -8,7 +8,7 @@ select_flat_plugin_jars() {
     return 1
   fi
 
-  find "$flat_dir" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' ! -name '*-shaded.jar' | sort
+  find "$flat_dir" -maxdepth 1 -type f -name '*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' ! -name 'original-*.jar' | sort
 }
 
 select_target_plugin_jars() {

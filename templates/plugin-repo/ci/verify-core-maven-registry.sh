@@ -1,20 +1,17 @@
 #!/usr/bin/env sh
 set -eu
 
-CORE_MAVEN_REGISTRY="${CORE_MAVEN_REGISTRY:-https://gitlab.example.com/api/v4/projects/CORE_PROJECT_ID/packages/maven}"
-SPI_VERSION="${YUDREAM_PLUGIN_SPI_VERSION:-1.0-SNAPSHOT}"
-PACKAGE_USER="${CORE_PACKAGE_USER:-gitlab-ci-token}"
-
-if [ -n "${CORE_PACKAGE_TOKEN:-}" ]; then
-  PACKAGE_TOKEN="$CORE_PACKAGE_TOKEN"
-elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-  PACKAGE_TOKEN="$CI_JOB_TOKEN"
-else
-  echo "CORE_PACKAGE_TOKEN or CI_JOB_TOKEN is required to verify the core Maven registry"
-  exit 1
-fi
-
+NEXUS_MAVEN_PUBLIC_URL="${NEXUS_MAVEN_PUBLIC_URL:-https://nexus.yudream.online/repository/maven-public}"
 WORK_ROOT="${CI_PROJECT_DIR:-$(pwd)}"
+if [ -n "${YUDREAM_PLUGIN_SPI_VERSION:-}" ]; then
+  SPI_VERSION="$YUDREAM_PLUGIN_SPI_VERSION"
+else
+  SPI_VERSION=$(sed -n 's#.*<yudream\.plugin\.spi\.version>\([^<]*\)</yudream\.plugin\.spi\.version>.*#\1#p' "$WORK_ROOT/pom.xml" | head -n 1)
+fi
+[ -n "$SPI_VERSION" ] || {
+  echo "unable to resolve yudream.plugin.spi.version from $WORK_ROOT/pom.xml"
+  exit 1
+}
 VERIFY_REPO="${VERIFY_MAVEN_REPO:-$WORK_ROOT/.m2/verify-repository}"
 SETTINGS_FILE="$(mktemp "${TMPDIR:-/tmp}/verify-core-maven-XXXXXX.xml")"
 
@@ -27,35 +24,13 @@ cat > "$SETTINGS_FILE" <<EOF
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
-    <servers>
-        <server>
-            <id>gitlab-maven</id>
-            <username>${PACKAGE_USER}</username>
-            <password>${PACKAGE_TOKEN}</password>
-        </server>
-    </servers>
-
-    <profiles>
-        <profile>
-            <id>gitlab-private</id>
-            <repositories>
-                <repository>
-                    <id>gitlab-maven</id>
-                    <url>${CORE_MAVEN_REGISTRY}</url>
-                </repository>
-            </repositories>
-            <pluginRepositories>
-                <pluginRepository>
-                    <id>gitlab-maven</id>
-                    <url>${CORE_MAVEN_REGISTRY}</url>
-                </pluginRepository>
-            </pluginRepositories>
-        </profile>
-    </profiles>
-
-    <activeProfiles>
-        <activeProfile>gitlab-private</activeProfile>
-    </activeProfiles>
+    <mirrors>
+        <mirror>
+            <id>nexus-public</id>
+            <mirrorOf>*</mirrorOf>
+            <url>${NEXUS_MAVEN_PUBLIC_URL}</url>
+        </mirror>
+    </mirrors>
 </settings>
 EOF
 

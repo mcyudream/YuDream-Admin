@@ -64,8 +64,29 @@ if grep -Eq '^[[:space:]]*-[[:space:]]+packages/\*$' templates/plugin-repo/pnpm-
 fi
 
 echo "[verify-plugin-repo-template] checking npm registry example"
-grep -q '^registry=https://registry.npmjs.org/$' templates/plugin-repo/.npmrc.example || fail "template .npmrc must default to npmjs registry"
-grep -q '^@yudream:registry=https://registry.npmjs.org/$' templates/plugin-repo/.npmrc.example || fail "template .npmrc must default @yudream scope to npmjs registry"
+grep -q '^registry=https://registry.npmjs.org/$' templates/plugin-repo/.npmrc.example || fail "template .npmrc must keep a public registry for third-party packages"
+grep -q '^@yudream:registry=https://nexus.yudream.online/repository/npm-public/$' templates/plugin-repo/.npmrc.example || fail "template @yudream scope must use Nexus npm-public"
+grep -q "'@yudream/components': 1.0.0$" templates/plugin-repo/pnpm-workspace.yaml.example || fail "template must consume stable @yudream/components 1.0.0"
+grep -q "'@yudream/plugin-sdk': 1.0.1$" templates/plugin-repo/pnpm-workspace.yaml.example || fail "template must consume stable @yudream/plugin-sdk 1.0.1"
+grep -q 'NEXUS_MAVEN_PUBLIC_URL: "https://nexus.yudream.online/repository/maven-public/"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must use Nexus maven-public"
+grep -q 'NEXUS_NPM_PUBLIC_URL: "https://nexus.yudream.online/repository/npm-public/"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must use Nexus npm-public"
+grep -q 'NEXUS_USERNAME' templates/plugin-repo/ci/publish-plugin-jars.sh || fail "template publishing must require NEXUS_USERNAME"
+grep -q 'NEXUS_PASSWORD' templates/plugin-repo/ci/publish-plugin-jars.sh || fail "template publishing must require NEXUS_PASSWORD"
+if grep -Eq 'NEXUS_(USERNAME|PASSWORD)' templates/plugin-repo/ci/verify-core-maven-registry.sh templates/plugin-repo/ci/verify-core-npm-contracts.sh templates/plugin-repo/ci/verify-published-plugin-jars.sh; then
+  fail "template read and verification paths must not require protected publish credentials"
+fi
+grep -q 'yudream\.plugin\.spi\.version' templates/plugin-repo/ci/verify-core-maven-registry.sh || fail "template Maven verification must derive the SPI version from the plugin root POM"
+if grep -q 'YUDREAM_PLUGIN_SPI_VERSION:-1.0-SNAPSHOT' templates/plugin-repo/ci/verify-core-maven-registry.sh; then
+  fail "template Maven verification must not default to a hard-coded SPI snapshot"
+fi
+if grep -R -Eq 'gitlab-maven|gitlab\.example\.com/api/v4/projects|CI_JOB_TOKEN|CORE_PACKAGE_(USER|TOKEN)' \
+  templates/plugin-repo/.gitlab-ci.yml.example \
+  templates/plugin-repo/.npmrc.example \
+  templates/plugin-repo/settings.xml.example \
+  templates/plugin-repo/ci/verify-core-maven-registry.sh \
+  templates/plugin-repo/ci/verify-core-npm-contracts.sh; then
+  fail "plugin repository templates must use only Nexus package endpoints and credentials"
+fi
 
 echo "[verify-plugin-repo-template] checking template docs for local absolute paths"
 if grep -R -n -E '(/D:/code|D:/code|D:\\code\\|C:/Users/|C:\\Users\\|\.jdks/)' templates/plugin-repo/README.md templates/plugin-repo/docs >/dev/null 2>&1; then

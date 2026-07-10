@@ -6,11 +6,11 @@
 
     <groupId>online.yudream.base</groupId>
     <artifactId>yudream-plugin-spi</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <packaging>jar</packaging>
 
     <name>YuDream Plugin SPI</name>
-    <description>Stable YuDream plugin compile-time contract published to GitLab Maven Package Registry.</description>
+    <description>Stable YuDream plugin compile-time contract published to Nexus.</description>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -21,12 +21,12 @@
 
     <distributionManagement>
         <repository>
-            <id>gitlab-maven</id>
-            <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+            <id>nexus-releases</id>
+            <url>${env.NEXUS_MAVEN_RELEASES_URL}</url>
         </repository>
         <snapshotRepository>
-            <id>gitlab-maven</id>
-            <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+            <id>nexus-snapshots</id>
+            <url>${env.NEXUS_MAVEN_SNAPSHOTS_URL}</url>
         </snapshotRepository>
     </distributionManagement>
 

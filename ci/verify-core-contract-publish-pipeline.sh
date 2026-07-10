@@ -23,6 +23,9 @@ require_pattern() {
 echo "[verify-core-contract-publish-pipeline] checking required verification scripts"
 require_file "ci/verify-plugin-spi-registry.sh"
 require_file "ci/verify-published-npm-contracts.sh"
+require_file "ci/verify-core-remote-release-evidence.sh"
+require_file "ci/maven-settings-nexus.xml"
+[ ! -e ".npmrc.npmjs.example" ] || fail "legacy npmjs publish configuration must be removed"
 
 echo "[verify-core-contract-publish-pipeline] checking stage layout"
 require_pattern '^[[:space:]]*-[[:space:]]\+publish-packages$' "core CI must keep publish-packages stage"
@@ -32,22 +35,39 @@ echo "[verify-core-contract-publish-pipeline] checking Maven publish/verify jobs
 require_pattern '^publish:maven-plugin-spi:$' "core CI must publish yudream-plugin-spi"
 require_pattern '^verify:maven-plugin-spi:$' "core CI must verify published yudream-plugin-spi"
 require_pattern 'sh ci/verify-plugin-spi-registry.sh' "core CI must call ci/verify-plugin-spi-registry.sh after Maven publish"
+grep -q 'SPI_POM' ci/verify-plugin-spi-registry.sh \
+  || fail "SPI registry verification must resolve the version from the SPI POM"
+if grep -q 'help:evaluate' ci/verify-plugin-spi-registry.sh; then
+  fail "SPI registry verification must not resolve its version through an unconfigured Maven repository"
+fi
+if grep -q '1.0-SNAPSHOT' ci/verify-plugin-spi-registry.sh; then
+  fail "SPI registry verification must not default to a hard-coded snapshot version"
+fi
+require_pattern 'maven-settings-nexus.xml' "core CI must deploy Maven contracts with Nexus settings"
+require_pattern 'NEXUS_MAVEN_PUBLIC_URL' "core CI must configure the Nexus maven-public read endpoint"
+grep -q '<url>https://nexus.yudream.online/repository/maven-public/</url>' ci/maven-settings-nexus.xml \
+  || fail "Nexus Maven settings must support anonymous local reads without CI-only variables"
 
-echo "[verify-core-contract-publish-pipeline] checking GitLab npm publish/verify jobs"
-require_pattern '^publish:npm-plugin-sdk:$' "core CI must publish @yudream/plugin-sdk to GitLab npm"
-require_pattern '^publish:npm-components:$' "core CI must publish @yudream/components to GitLab npm"
-require_pattern '^verify:gitlab-npm-contracts:$' "core CI must verify GitLab npm published contracts"
-require_pattern 'VERIFY_NPM_REGISTRY="\$CI_API_V4_URL/projects/\$CI_PROJECT_ID/packages/npm/" CI_JOB_TOKEN="\$CI_JOB_TOKEN" sh ci/verify-published-npm-contracts.sh' "core CI must re-install published GitLab npm contracts from project registry"
-
-echo "[verify-core-contract-publish-pipeline] checking npmjs publish/verify jobs"
-require_pattern '^publish:npmjs-plugin-sdk:$' "core CI must publish @yudream/plugin-sdk to npmjs"
-require_pattern '^publish:npmjs-components:$' "core CI must publish @yudream/components to npmjs"
-require_pattern '^verify:npmjs-contracts:$' "core CI must verify npmjs published contracts"
-require_pattern 'VERIFY_NPM_REGISTRY="\$NPMJS_REGISTRY" VERIFY_NPM_TOKEN="\$NPM_TOKEN" sh ci/verify-published-npm-contracts.sh' "core CI must re-install published npmjs contracts from npmjs"
+echo "[verify-core-contract-publish-pipeline] checking Nexus npm publish/verify jobs"
+require_pattern '^publish:npm-plugin-sdk:$' "core CI must publish @yudream/plugin-sdk to Nexus"
+require_pattern '^publish:npm-components:$' "core CI must publish @yudream/components to Nexus"
+require_pattern '^verify:npm-contracts:$' "core CI must verify Nexus npm contracts"
+require_pattern 'VERIFY_NPM_REGISTRY="\$NEXUS_NPM_PUBLIC_URL" sh ci/verify-published-npm-contracts.sh' "core CI must re-install npm contracts from Nexus npm-public"
+require_pattern 'pnpm publish --no-git-checks --registry "\$NEXUS_NPM_PUBLIC_URL"' "core CI must publish npm contracts to Nexus npm-public"
+require_pattern 'NEXUS_USERNAME' "core CI must use the shared Nexus username"
+require_pattern 'NEXUS_PASSWORD' "core CI must use the shared Nexus password"
 
 echo "[verify-core-contract-publish-pipeline] checking publish rules"
 require_pattern '\$CI_COMMIT_TAG =~ /\^v/' "core CI publish/verify jobs must stay tag-gated"
-require_pattern 'GITLAB_NPM_PUBLISH_ENABLED == "true"' "core CI GitLab npm publish chain must stay behind explicit flag"
-require_pattern 'NPMJS_PUBLISH_ENABLED == "true"' "core CI npmjs publish chain must stay behind explicit flag"
+
+if grep -Eq 'packages/(maven|npm)|publish:npmjs-|verify:(gitlab-npm|npmjs)|GITLAB_NPM_PUBLISH_ENABLED|NPMJS_PUBLISH_ENABLED|NPM_TOKEN' .gitlab-ci.yml; then
+  fail "core CI must not publish contracts to GitLab Package Registry or npmjs"
+fi
+
+grep -q 'verify:npm-contracts' ci/verify-core-remote-release-evidence.sh \
+  || fail "remote release evidence must require the Nexus npm verification job"
+if grep -Eq 'EXPECT_(GITLAB_NPM|NPMJS)_PUBLISH|publish:npmjs-|verify:(gitlab-npm|npmjs)' ci/verify-core-remote-release-evidence.sh; then
+  fail "remote release evidence must not require legacy GitLab npm or npmjs jobs"
+fi
 
 echo "[verify-core-contract-publish-pipeline] OK"

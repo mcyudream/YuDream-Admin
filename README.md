@@ -150,14 +150,17 @@ templates/plugin-repo/                 独立插件仓模板
 
 默认发布的契约路径：
 
-- `yudream-plugin-spi` -> GitLab Maven Registry
-- `@yudream/plugin-sdk` -> npmjs / 可选 GitLab npm Registry
-- `@yudream/components` -> npmjs / 可选 GitLab npm Registry
+- `yudream-plugin-spi` release -> Nexus `maven-releases`
+- `yudream-plugin-spi` snapshot -> Nexus `maven-snapshots`
+- Maven 统一拉取 -> Nexus `maven-public`
+- `@yudream/plugin-sdk`、`@yudream/components` 发布和拉取 -> Nexus `npm-public`
+
+GitLab 只负责源码托管、CI 流水线和 CI artifacts，不再作为 Maven/npm/Generic Package Registry。npmjs 发布链路也已废弃。
 
 相关文档：
 
-- [GitLab 私有包发布说明](docs/plugin-system/gitlab-private-packages.md)
-- [npmjs 公网包发布说明](docs/plugin-system/npmjs-public-packages.md)
+- [GitLab 私有包迁移说明（已废弃）](docs/plugin-system/gitlab-private-packages.md)
+- [npmjs 发布迁移说明（已废弃）](docs/plugin-system/npmjs-public-packages.md)
 - [契约发布校验](docs/plugin-system/contract-validation.md)
 
 ## 文档导航

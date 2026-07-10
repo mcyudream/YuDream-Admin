@@ -10,71 +10,91 @@ fail() {
   exit 1
 }
 
-PACKAGE_NAME="${PLUGIN_GENERIC_PACKAGE_NAME:-yudream-admin-plugins}"
+REPOSITORY_URL="${NEXUS_MAVEN_RELEASES_URL:-https://nexus.yudream.online/repository/maven-releases}"
+PUBLIC_URL="${NEXUS_MAVEN_PUBLIC_URL:-https://nexus.yudream.online/repository/maven-public}"
 PACKAGE_VERSION="${PLUGIN_PACKAGE_VERSION:-${CI_COMMIT_TAG:-}}"
-API_BASE="${CI_API_V4_URL:-}"
-PROJECT_ID="${CI_PROJECT_ID:-}"
 DRY_RUN="${DRY_RUN:-}"
+PACKAGE_VERSION=${PACKAGE_VERSION#v}
 
-if [ -z "$API_BASE" ]; then
-  fail "CI_API_V4_URL is required"
-fi
-
-if [ -z "$PROJECT_ID" ]; then
-  fail "CI_PROJECT_ID is required"
-fi
-
-if [ -z "$PACKAGE_VERSION" ]; then
-  fail "CI_COMMIT_TAG or PLUGIN_PACKAGE_VERSION is required"
-fi
-
-if [ -z "$DRY_RUN" ] && [ -z "${CI_JOB_TOKEN:-}" ]; then
-  fail "CI_JOB_TOKEN is required unless DRY_RUN is set"
+[ -n "$PACKAGE_VERSION" ] || fail "CI_COMMIT_TAG or PLUGIN_PACKAGE_VERSION is required"
+if [ -z "$DRY_RUN" ]; then
+  [ -n "${NEXUS_USERNAME:-}" ] || fail "NEXUS_USERNAME is required"
+  [ -n "${NEXUS_PASSWORD:-}" ] || fail "NEXUS_PASSWORD is required"
 fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT INT TERM
-
 JAR_LIST="$TMP_DIR/jars.txt"
 MANIFEST_PATH="$TMP_DIR/plugins.manifest.tsv"
 CHECKSUM_PATH="$TMP_DIR/sha256sum.txt"
+SETTINGS_FILE="$TMP_DIR/settings.xml"
 
-: > "$JAR_LIST"
-if ! write_final_plugin_jars "$ROOT_DIR" "$JAR_LIST"; then
-  fail "no plugin jars found under yudream-plugins/*/target"
-fi
-
+write_final_plugin_jars "$ROOT_DIR" "$JAR_LIST" || fail "no plugin jars found under dist/plugins or yudream-plugins/*/target"
 : > "$MANIFEST_PATH"
 : > "$CHECKSUM_PATH"
 
-while IFS= read -r jar_path; do
-  file_name=$(basename "$jar_path")
-  sha256=$(sha256sum "$jar_path" | awk '{print $1}')
-  printf '%s  %s\n' "$sha256" "$file_name" >> "$CHECKSUM_PATH"
-  printf '%s\t%s\t%s\n' "$file_name" "$sha256" "$jar_path" >> "$MANIFEST_PATH"
-done < "$JAR_LIST"
+resolve_artifact_id() {
+  file_name=$(basename "$1")
+  for module_dir in "$ROOT_DIR"/yudream-plugins/*; do
+    [ -d "$module_dir" ] || continue
+    artifact_id=$(basename "$module_dir")
+    case "$file_name" in
+      "$artifact_id"-*.jar) printf '%s\n' "$artifact_id"; return 0 ;;
+    esac
+  done
+  return 1
+}
 
-PACKAGE_BASE_URL="$API_BASE/projects/$PROJECT_ID/packages/generic/$PACKAGE_NAME/$PACKAGE_VERSION"
+cat > "$SETTINGS_FILE" <<'EOF'
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <servers>
+    <server>
+      <id>nexus-releases</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+    <server>
+      <id>nexus-public</id>
+      <username>${env.NEXUS_USERNAME}</username>
+      <password>${env.NEXUS_PASSWORD}</password>
+    </server>
+  </servers>
+  <mirrors>
+    <mirror>
+      <id>nexus-public</id>
+      <mirrorOf>*</mirrorOf>
+      <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>
+    </mirror>
+  </mirrors>
+</settings>
+EOF
 
-upload_file() {
-  source_path=$1
-  target_name=$2
-  target_url="$PACKAGE_BASE_URL/$target_name"
-
+deploy_file() {
+  file_path=$1
+  artifact_id=$2
+  packaging=$3
+  shift 3
   if [ -n "$DRY_RUN" ]; then
-    echo "[publish-plugin-jars] dry-run upload $source_path -> $target_url"
+    echo "[publish-plugin-jars] dry-run deploy online.yudream.plugins:${artifact_id}:${PACKAGE_VERSION}:${packaging}"
     return 0
   fi
-
-  echo "[publish-plugin-jars] uploading $target_name"
-  curl --fail --location --header "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$source_path" "$target_url"
+  NEXUS_MAVEN_PUBLIC_URL="$PUBLIC_URL" mvn -s "$SETTINGS_FILE" -N org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file \
+    "-DrepositoryId=nexus-releases" "-Durl=$REPOSITORY_URL" \
+    "-DgroupId=online.yudream.plugins" "-DartifactId=$artifact_id" \
+    "-Dversion=$PACKAGE_VERSION" "-Dpackaging=$packaging" "-Dfile=$file_path" \
+    -DgeneratePom=true "$@" -B -ntp
 }
 
 while IFS= read -r jar_path; do
-  upload_file "$jar_path" "$(basename "$jar_path")"
+  artifact_id=$(resolve_artifact_id "$jar_path") || fail "unable to map plugin jar to artifactId: $jar_path"
+  sha256=$(sha256sum "$jar_path" | awk '{print $1}')
+  deployed_name="${artifact_id}-${PACKAGE_VERSION}.jar"
+  printf '%s  %s\n' "$sha256" "$deployed_name" >> "$CHECKSUM_PATH"
+  printf '%s\t%s\t%s\t%s\n' "$artifact_id" "$PACKAGE_VERSION" "$sha256" "$deployed_name" >> "$MANIFEST_PATH"
+  deploy_file "$jar_path" "$artifact_id" jar
 done < "$JAR_LIST"
 
-upload_file "$CHECKSUM_PATH" "sha256sum.txt"
-upload_file "$MANIFEST_PATH" "plugins.manifest.tsv"
+deploy_file "$MANIFEST_PATH" plugin-catalog tsv \
+  "-Dfiles=$CHECKSUM_PATH" -Dclassifiers=sha256 -Dtypes=txt
 
-echo "[publish-plugin-jars] published package: $PACKAGE_BASE_URL"
+echo "[publish-plugin-jars] published Maven version $PACKAGE_VERSION to $REPOSITORY_URL"

@@ -13,18 +13,7 @@ if ! command -v pnpm >/dev/null 2>&1; then
   fail "pnpm is required"
 fi
 
-TARGET_REGISTRY="${CORE_NPM_REGISTRY:-}"
-if [ -z "$TARGET_REGISTRY" ]; then
-  TARGET_REGISTRY="${YUDREAM_NPM_REGISTRY:-https://registry.npmjs.org/}"
-fi
-
-if [ -n "${CORE_PACKAGE_TOKEN:-}" ]; then
-  PACKAGE_TOKEN="$CORE_PACKAGE_TOKEN"
-elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-  PACKAGE_TOKEN="$CI_JOB_TOKEN"
-else
-  PACKAGE_TOKEN=""
-fi
+TARGET_REGISTRY="${NEXUS_NPM_PUBLIC_URL:-https://nexus.yudream.online/repository/npm-public/}"
 
 SDK_VERSION=$(sed -n "s/^  '@yudream\\/plugin-sdk': //p" yudream-frontend/pnpm-workspace.yaml | head -n 1)
 COMPONENTS_VERSION=$(sed -n "s/^  '@yudream\\/components': //p" yudream-frontend/pnpm-workspace.yaml | head -n 1)
@@ -54,19 +43,11 @@ cat > "$VERIFY_DIR/package.json" <<EOF
 }
 EOF
 
-REGISTRY_HOST=$(printf '%s' "$TARGET_REGISTRY" | sed -E 's#^https?://##' | sed 's#/$##')
 cat > "$VERIFY_DIR/.npmrc" <<EOF
 registry=https://registry.npmjs.org/
 @yudream:registry=${TARGET_REGISTRY}
 strict-peer-dependencies=false
 EOF
-
-if [ -n "$PACKAGE_TOKEN" ] && [ "$TARGET_REGISTRY" != "https://registry.npmjs.org/" ] && [ "$TARGET_REGISTRY" != "http://registry.npmjs.org/" ]; then
-  cat >> "$VERIFY_DIR/.npmrc" <<EOF
-//${REGISTRY_HOST}/:_authToken=${PACKAGE_TOKEN}
-always-auth=true
-EOF
-fi
 
 echo "[verify-core-npm-contracts] installing @yudream/plugin-sdk@${SDK_VERSION} from ${TARGET_REGISTRY}"
 echo "[verify-core-npm-contracts] installing @yudream/components@${COMPONENTS_VERSION} from ${TARGET_REGISTRY}"

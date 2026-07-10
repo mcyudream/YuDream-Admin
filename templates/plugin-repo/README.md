@@ -44,16 +44,15 @@
 ## 使用建议
 
 1. 复制模板到新仓根目录
-2. 将 `CORE_PROJECT_ID` 与 `gitlab.example.com` 替换为真实值
-3. 优先在核心仓配置 CI Job Token allowlist，让新插件仓可以直接使用自身 `CI_JOB_TOKEN` 读取核心 Maven 包
-4. 如果没有 allowlist，再在新仓 GitLab CI variables 中配置：
-   - `CORE_PACKAGE_USER`
-   - `CORE_PACKAGE_TOKEN`
-5. 让插件仓只依赖正式发布的：
+2. 在新仓 GitLab CI variables 中配置受保护、掩码的发布凭据，并保护 `v*` tag：
+   - `NEXUS_USERNAME`
+   - `NEXUS_PASSWORD`
+3. Maven 契约统一从 Nexus `maven-public` 拉取，插件 JAR 统一发布到 `maven-releases`
+4. 让插件仓只依赖正式发布的：
    - Maven: `online.yudream.base:yudream-plugin-spi`
    - npm: `@yudream/plugin-sdk`
    - npm: `@yudream/components`
-6. 默认 npm 来源优先使用 npmjs；只有在你明确仍要消费私有 npm registry 时，才覆盖 `CORE_NPM_REGISTRY`
-7. 前端 workspace 只保留 `packages/plugin-*`，不要恢复成 `packages/*`
-8. 插件仓 CI 的前端构建入口也只匹配 `yudream-frontend/packages/plugin-*/package.json`
-9. 共享包只使用公开入口，例如 `@yudream/plugin-sdk`、`@yudream/plugin-sdk/vite-shared`，不要依赖 `src/*` 内部路径
+5. 第三方 npm 包继续使用公共源，`@yudream` scope 统一从 Nexus `npm-public` 拉取
+6. 前端 workspace 只保留 `packages/plugin-*`，不要恢复成 `packages/*`
+7. 插件仓 CI 的前端构建入口也只匹配 `yudream-frontend/packages/plugin-*/package.json`
+8. 共享包只使用公开入口，例如 `@yudream/plugin-sdk`、`@yudream/plugin-sdk/vite-shared`，不要依赖 `src/*` 内部路径

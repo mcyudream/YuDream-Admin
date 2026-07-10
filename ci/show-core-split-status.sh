@@ -8,10 +8,14 @@ git status --short -- \
   .gitignore \
   .gitlab-ci.yml \
   .npmrc.npmjs.example \
+  .codex/skills/yudream-contract-release \
+  .codex/skills/yudream-ddd-architecture/references/knowledge.json \
   README.md \
   ci \
   docs/plugin-system \
   docs/repository-split \
+  pom.xml \
+  skills/yudream-contract-release \
   templates/plugin-repo \
   yudream-plugins/yudream-plugin-spi/pom.xml \
   yudream-frontend/packages/plugin-sdk \

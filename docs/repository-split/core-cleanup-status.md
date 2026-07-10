@@ -9,8 +9,9 @@
 - 宿主前端运行时不再从本地 `packages/plugin-*` 自动发现官方业务插件源码
 - 主体仓与插件仓都已接入边界校验脚本
 - 主体仓活跃路径中已移除迁移后的官方业务插件前后端源码目录
-- `yudream-plugin-spi` 已发布到核心仓 GitLab Maven Registry 项目级 endpoint
-- 核心仓已将 `yudream-admin-plugins` 加入 CI Job Token allowlist
+- `yudream-plugin-spi` 统一发布到 Nexus `maven-releases` / `maven-snapshots`，并通过 `maven-public` 回读
+- `@yudream/plugin-sdk` 与 `@yudream/components` 统一通过 Nexus `npm-public` 发布和拉取
+- GitLab Package Registry、npmjs 和 CI Job Token 包读取链路已废弃；GitLab 只保留源码、CI 和 CI artifacts
 - 主体仓模板自检已接入 CI，防止插件仓模板漂回旧形态
 
 ## 已从主体仓活跃路径移除的官方业务插件

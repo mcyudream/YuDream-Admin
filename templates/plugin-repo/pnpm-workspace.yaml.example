@@ -4,8 +4,8 @@ catalog:
   '@types/node': ^25.9.3
   '@vitejs/plugin-vue': ^6.0.7
   '@vue/tsconfig': ^0.9.1
-  '@yudream/components': 1.0.0-snapshot
-  '@yudream/plugin-sdk': 1.0.1-snapshot
+  '@yudream/components': 1.0.0
+  '@yudream/plugin-sdk': 1.0.1
   typescript: ^6.0.3
   vite: ^8.0.16
   vue: ^3.5.38
@@ -14,5 +14,5 @@ catalog:
 allowBuilds:
   vue-demi: true
 minimumReleaseAgeExclude:
-  - '@yudream/components@1.0.0-snapshot'
-  - '@yudream/plugin-sdk@1.0.1-snapshot'
+  - '@yudream/components@1.0.0'
+  - '@yudream/plugin-sdk@1.0.1'

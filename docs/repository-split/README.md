@@ -14,12 +14,15 @@
 3. 主体仓 pnpm workspace 不再纳入业务插件前端包
 4. 主体仓 CI 会在分支和 tag 上直接校验拆分边界
 5. 主体仓发布件中：
-   - `yudream-plugin-spi` 默认发布到核心仓 GitLab Maven Registry
-   - `@yudream/plugin-sdk`、`@yudream/components` 默认面向 npmjs
+   - `yudream-plugin-spi` 的 release 发布到 Nexus `maven-releases`，snapshot 发布到 `maven-snapshots`
+   - Maven 依赖统一从 Nexus `maven-public` 拉取
+   - `@yudream/plugin-sdk`、`@yudream/components` 统一通过 Nexus `npm-public` 发布和拉取
 6. 插件仓只消费正式发布的契约包，不再依赖主体仓 `root parent` 或本地共享源码
 7. 插件仓前端 workspace 只允许 `packages/plugin-*`
 8. 插件仓会自动校验最终 JAR 内存在 `META-INF/yudream-plugin/frontend/*/remoteEntry.js`
-9. 插件仓 tag 流水线可把插件 JAR 发布到本仓自己的 GitLab Generic Package Registry
+9. 插件仓 tag 流水线把插件 JAR 发布到 Nexus `maven-releases`
+
+GitLab 只负责源码托管、CI 流水线和 CI artifacts。GitLab Package Registry 与 npmjs 发布/拉取路径均已废弃。
 
 ## 推荐仓库布局
 

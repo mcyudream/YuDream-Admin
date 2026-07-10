@@ -16,15 +16,15 @@ stages:
 
 variables:
   PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
+  NEXUS_BASE_URL: "https://nexus.yudream.online"
+  NEXUS_MAVEN_PUBLIC_URL: "https://nexus.yudream.online/repository/maven-public/"
+  NEXUS_MAVEN_RELEASES_URL: "https://nexus.yudream.online/repository/maven-releases"
+  NEXUS_NPM_PUBLIC_URL: "https://nexus.yudream.online/repository/npm-public/"
   NPM_CONFIG_REGISTRY: "https://registry.npmjs.org/"
   COREPACK_NPM_REGISTRY: "https://registry.npmjs.org/"
-  YUDREAM_NPM_REGISTRY: "https://registry.npmjs.org/"
+  YUDREAM_NPM_REGISTRY: "$NEXUS_NPM_PUBLIC_URL"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
   PACKAGE_MAVEN_REPO: "$CI_PROJECT_DIR/.m2/package-repository"
-  CORE_MAVEN_REGISTRY: "https://gitlab.example.com/api/v4/projects/CORE_PROJECT_ID/packages/maven"
-  CORE_NPM_REGISTRY: ""
-  CORE_PACKAGE_USER: "gitlab-ci-token"
-  CORE_PACKAGE_TOKEN: ""
 
 cache:
   key: "${CI_COMMIT_REF_SLUG}"
@@ -93,17 +93,9 @@ build:frontend:
   script:
     - cd yudream-frontend
     - |
-      if [ -n "$CORE_NPM_REGISTRY" ]; then
-        PACKAGE_TOKEN="${CORE_PACKAGE_TOKEN:-$CI_JOB_TOKEN}"
-        REGISTRY_HOST=$(echo "$CORE_NPM_REGISTRY" | sed -E 's#^https?://##')
-        printf '%s\n' \
-          "@yudream:registry=$CORE_NPM_REGISTRY" \
-          "//$REGISTRY_HOST:_authToken=$PACKAGE_TOKEN" \
-          "always-auth=true" > .npmrc
-      else
-        printf '%s\n' \
-          "@yudream:registry=$YUDREAM_NPM_REGISTRY" > .npmrc
-      fi
+      printf '%s\n' \
+        "registry=$NPM_CONFIG_REGISTRY" \
+        "@yudream:registry=$NEXUS_NPM_PUBLIC_URL" > .npmrc
     - pnpm install --frozen-lockfile
     - pnpm -r --filter=@yudream/plugin-* run build
   artifacts:
@@ -114,37 +106,23 @@ package:plugins:
   image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
   stage: package-plugin
   script:
-    - 'echo "Using core Maven registry: $CORE_MAVEN_REGISTRY"'
+    - 'echo "Using Nexus Maven registry: $NEXUS_MAVEN_PUBLIC_URL"'
     - |
       printf '%s\n' \
         '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' \
         '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' \
         '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">' \
-        '    <servers>' \
-        '        <server>' \
-        '            <id>gitlab-maven</id>' \
-        "            <username>${CORE_PACKAGE_USER}</username>" \
-        "            <password>${CORE_PACKAGE_TOKEN:-$CI_JOB_TOKEN}</password>" \
-        '        </server>' \
-        '    </servers>' \
-        '    <profiles>' \
-        '        <profile>' \
-        '            <id>gitlab-private</id>' \
-        '            <repositories>' \
-        '                <repository>' \
-        '                    <id>gitlab-maven</id>' \
-        "                    <url>${CORE_MAVEN_REGISTRY}</url>" \
-        '                </repository>' \
-        '            </repositories>' \
-        '        </profile>' \
-        '    </profiles>' \
-        '    <activeProfiles>' \
-        '        <activeProfile>gitlab-private</activeProfile>' \
-        '    </activeProfiles>' \
+        '    <mirrors>' \
+        '        <mirror>' \
+        '            <id>nexus-public</id>' \
+        '            <mirrorOf>*</mirrorOf>' \
+        '            <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' \
+        '        </mirror>' \
+        '    </mirrors>' \
         '</settings>' > settings.xml
     - |
-      if [ -z "$CORE_MAVEN_REGISTRY" ]; then
-        echo "CORE_MAVEN_REGISTRY is required for plugin repo package job"
+      if [ -z "$NEXUS_MAVEN_PUBLIC_URL" ]; then
+        echo "NEXUS_MAVEN_PUBLIC_URL is required"
         exit 1
       fi
     - rm -rf "$PACKAGE_MAVEN_REPO"
@@ -160,26 +138,23 @@ package:plugins:
   artifacts:
     paths:
       - dist/plugins/*.jar
+    expire_in: 1 week
 
 publish:plugin-jars:
-  image: alpine:3.20
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
   stage: publish-plugin
   dependencies:
     - package:plugins
-  before_script:
-    - apk add --no-cache curl
   script:
     - sh ci/publish-plugin-jars.sh
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
 verify:published-plugin-jars:
-  image: alpine:3.20
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
   stage: verify-publish
   dependencies:
     - package:plugins
-  before_script:
-    - apk add --no-cache curl
   script:
     - sh ci/verify-published-plugin-jars.sh
   rules:
