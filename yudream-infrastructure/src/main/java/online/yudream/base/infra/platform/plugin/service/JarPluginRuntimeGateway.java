@@ -14,6 +14,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchReque
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
+import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
@@ -345,7 +346,10 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 module.menuTitle(),
                 module.menuIcon(),
                 module.menuSort(),
-                module.routes().stream().map(this::toInfo).toList()
+                module.routes().stream().map(this::toInfo).toList(),
+                module.parentCode(),
+                true,
+                MenuStatus.ACTIVE
         );
     }
 

@@ -346,6 +346,7 @@ public class PluginMenuProjectionService {
                 .code(menuCode(pluginCode, plan.registrationKey()))
                 .name(defaultText(module.menuTitle(), plan.moduleName()))
                 .type(MenuNodeType.CATEGORY)
+                .parentCode(blankToNull(module.parentCode()))
                 .module(plan.moduleName())
                 .icon(module.menuIcon())
                 .sort(defaultSort(module.menuSort()))
@@ -404,6 +405,10 @@ public class PluginMenuProjectionService {
 
     private int defaultSort(Integer sort) {
         return sort == null ? 0 : sort;
+    }
+
+    private String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
     }
 
     private String requireText(String value, String field) {

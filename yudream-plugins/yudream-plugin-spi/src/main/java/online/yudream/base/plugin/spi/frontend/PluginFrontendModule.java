@@ -10,10 +10,17 @@ public record PluginFrontendModule(
         String menuTitle,
         String menuIcon,
         Integer menuSort,
+        String parentCode,
         List<PluginFrontendRoute> routes
 ) {
     public PluginFrontendModule(String entry, String moduleName, String sdkVersion, String integrity, List<PluginFrontendRoute> routes) {
-        this(entry, moduleName, sdkVersion, integrity, "", "", 0, routes);
+        this(entry, moduleName, sdkVersion, integrity, "", "", 0, "", routes);
+    }
+
+    public PluginFrontendModule(String entry, String moduleName, String sdkVersion, String integrity,
+                                String menuTitle, String menuIcon, Integer menuSort,
+                                List<PluginFrontendRoute> routes) {
+        this(entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon, menuSort, "", routes);
     }
 
     public PluginFrontendModule {

@@ -23,5 +23,7 @@ public @interface PluginFrontend {
 
     int menuSort() default 0;
 
+    String parentCode() default "";
+
     PluginRoute[] routes() default {};
 }
