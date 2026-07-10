@@ -7,7 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Satori 标准元素的安全构造器。
+ * Safe builder for standard Satori message elements.
  */
 public final class SatoriMessageBuilder {
 
@@ -26,24 +26,25 @@ public final class SatoriMessageBuilder {
     }
 
     public SatoriMessageBuilder element(String name, Map<String, String> attributes, List<SatoriElement> children) {
+        validateStandardElementRequiredAttributes(name, attributes);
         elements.add(SatoriElement.element(name, attributes, children));
         return this;
     }
 
     public SatoriMessageBuilder at(String id, String name) {
-        return element("at", attributes("id", id, "name", name), List.of());
+        return element("at", optionalAttributes("id", id, "name", name), List.of());
     }
 
     public SatoriMessageBuilder sharp(String id, String name) {
-        return element("sharp", attributes("id", id, "name", name), List.of());
+        return element("sharp", requiredAndOptionalAttributes("id", id, "name", name), List.of());
     }
 
     public SatoriMessageBuilder emoji(String id, String name) {
-        return element("emoji", attributes("id", id, "name", name), List.of());
+        return element("emoji", optionalAttributes("id", id, "name", name), List.of());
     }
 
     public SatoriMessageBuilder a(String href, List<SatoriElement> children) {
-        return element("a", attributes("href", href), children);
+        return element("a", requiredAttributes("href", href), children);
     }
 
     public SatoriMessageBuilder img(String src) {
@@ -51,19 +52,19 @@ public final class SatoriMessageBuilder {
     }
 
     public SatoriMessageBuilder img(String src, String title) {
-        return element("img", attributes("src", src, "title", title), List.of());
+        return element("img", requiredAndOptionalAttributes("src", src, "title", title), List.of());
     }
 
     public SatoriMessageBuilder audio(String src) {
-        return element("audio", attributes("src", src), List.of());
+        return element("audio", requiredAttributes("src", src), List.of());
     }
 
     public SatoriMessageBuilder video(String src) {
-        return element("video", attributes("src", src), List.of());
+        return element("video", requiredAttributes("src", src), List.of());
     }
 
     public SatoriMessageBuilder file(String src, String title) {
-        return element("file", attributes("src", src, "title", title), List.of());
+        return element("file", requiredAndOptionalAttributes("src", src, "title", title), List.of());
     }
 
     public SatoriMessageBuilder strong(List<SatoriElement> children) {
@@ -107,37 +108,146 @@ public final class SatoriMessageBuilder {
     }
 
     public SatoriMessageBuilder message(String id, List<SatoriElement> children) {
-        return element("message", attributes("id", id), children);
+        return element("message", optionalAttributes("id", id), children);
     }
 
     public SatoriMessageBuilder quote(String id, List<SatoriElement> children) {
-        return element("quote", attributes("id", id), children);
+        return element("quote", optionalAttributes("id", id), children);
     }
 
     public SatoriMessageBuilder author(String id, String name, List<SatoriElement> children) {
-        return element("author", attributes("id", id, "name", name), children);
+        return element("author", optionalAttributes("id", id, "name", name), children);
     }
 
     public SatoriMessageBuilder button(String id, String title, List<SatoriElement> children) {
-        return element("button", attributes("id", id, "title", title), children);
+        return element("button", optionalAttributes("id", id, "title", title), children);
+    }
+
+    public SatoriMessageBuilder buttonAction(String id, String theme, List<SatoriElement> children) {
+        return element("button", buttonAttributes("id", id, theme), children);
+    }
+
+    public SatoriMessageBuilder buttonLink(String href, String theme, List<SatoriElement> children) {
+        return element("button", buttonAttributes("href", href, theme, "link"), children);
+    }
+
+    public SatoriMessageBuilder buttonInput(String text, String theme, List<SatoriElement> children) {
+        return element("button", buttonAttributes("text", text, theme, "input"), children);
     }
 
     public SatoriMessage build() {
         return new SatoriMessage(elements);
     }
 
-    private static Map<String, String> attributes(String... pairs) {
-        if (pairs.length % 2 != 0) {
-            throw new IllegalArgumentException("Satori 属性必须成对提供");
-        }
+    private static Map<String, String> requiredAttributes(String... pairs) {
         Map<String, String> attributes = new LinkedHashMap<>();
+        addRequiredAttributes(attributes, pairs);
+        return attributes;
+    }
+
+    private static Map<String, String> optionalAttributes(String... pairs) {
+        Map<String, String> attributes = new LinkedHashMap<>();
+        addOptionalAttributes(attributes, pairs);
+        return attributes;
+    }
+
+    private static Map<String, String> requiredAndOptionalAttributes(
+            String requiredName,
+            String requiredValue,
+            String... optionalPairs
+    ) {
+        Map<String, String> attributes = new LinkedHashMap<>();
+        addRequiredAttributes(attributes, requiredName, requiredValue);
+        addOptionalAttributes(attributes, optionalPairs);
+        return attributes;
+    }
+
+    private static Map<String, String> buttonAttributes(String valueName, String value, String theme) {
+        return buttonAttributes(valueName, value, theme, "action");
+    }
+
+    private static Map<String, String> buttonAttributes(String valueName, String value, String theme, String type) {
+        Map<String, String> attributes = requiredAttributes("type", type, valueName, value);
+        addOptionalAttributes(attributes, "theme", theme);
+        return attributes;
+    }
+
+    private static void addRequiredAttributes(Map<String, String> attributes, String... pairs) {
+        validatePairs(pairs);
         for (int index = 0; index < pairs.length; index += 2) {
-            String key = Objects.requireNonNull(pairs[index], "Satori 属性名不能为空");
+            String key = requireAttributeName(pairs[index]);
             String value = pairs[index + 1];
-            if (value != null) {
-                attributes.put(key, value);
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("Satori required attribute must not be blank: " + key);
+            }
+            attributes.put(key, value);
+        }
+    }
+
+    private static void addOptionalAttributes(Map<String, String> attributes, String... pairs) {
+        validatePairs(pairs);
+        for (int index = 0; index < pairs.length; index += 2) {
+            String key = requireAttributeName(pairs[index]);
+            String value = pairs[index + 1];
+            if (value == null) {
+                continue;
+            }
+            if (value.isBlank()) {
+                throw new IllegalArgumentException("Satori optional attribute must not be blank: " + key);
+            }
+            attributes.put(key, value);
+        }
+    }
+
+    private static void validatePairs(String... pairs) {
+        if (pairs.length % 2 != 0) {
+            throw new IllegalArgumentException("Satori attributes must be supplied in pairs");
+        }
+    }
+
+    private static void validateStandardElementRequiredAttributes(String name, Map<String, String> attributes) {
+        if (attributes == null) {
+            attributes = Map.of();
+        }
+        switch (name) {
+            case "sharp" -> requireAttribute(attributes, "id");
+            case "a" -> requireAttribute(attributes, "href");
+            case "img", "audio", "video", "file" -> requireAttribute(attributes, "src");
+            case "button" -> validateButtonAttributes(attributes);
+            default -> {
+                // The remaining standard elements have no required attributes.
             }
         }
-        return attributes;
+    }
+
+    private static void validateButtonAttributes(Map<String, String> attributes) {
+        String type = attributes.get("type");
+        if (type == null) {
+            return;
+        }
+        if (type.isBlank()) {
+            throw new IllegalArgumentException("Satori button type must not be blank");
+        }
+        switch (type) {
+            case "action" -> requireAttribute(attributes, "id");
+            case "link" -> requireAttribute(attributes, "href");
+            case "input" -> requireAttribute(attributes, "text");
+            default -> throw new IllegalArgumentException("Unsupported Satori button type: " + type);
+        }
+    }
+
+    private static void requireAttribute(Map<String, String> attributes, String name) {
+        String value = attributes.get(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Satori required attribute must not be blank: " + name);
+        }
+    }
+
+    private static String requireAttributeName(String value) {
+        String name = Objects.requireNonNull(value, "Satori attribute name must not be null");
+        if (name.isBlank()) {
+            throw new IllegalArgumentException("Satori attribute name must not be blank");
+        }
+        return name;
     }
 }
