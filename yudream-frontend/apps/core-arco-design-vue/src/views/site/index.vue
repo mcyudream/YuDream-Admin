@@ -151,12 +151,12 @@ async function load() {
       catch {
         home.value = null
       }
-      document.title = `${res.data.seoTitle || res.data.title} - YuDream`
+      document.title = `${res.data.seoTitle || res.data.title} - ${appSettingsStore.siteName}`
     }
     else {
       const res = await apiCms.publicHome()
       home.value = res.data
-      document.title = `${res.data.title || '站点首页'} - YuDream`
+      document.title = `${res.data.title || '站点首页'} - ${appSettingsStore.siteName}`
     }
     await loadPublicPages()
   }

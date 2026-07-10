@@ -26,7 +26,6 @@ const appFeatureStore = useAppFeatureStore()
 const appSettingsStore = useAppSettingsStore()
 const toast = useFaToast()
 
-const title = import.meta.env.VITE_APP_TITLE
 const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/logo.png', import.meta.url).href)
 const loading = ref(false)
 const passkeyLoading = ref(false)
@@ -119,7 +118,7 @@ function rememberAccount(account: string, remember?: boolean) {
         </h3>
       </div>
       <p class="text-sm text-muted-foreground lg:text-base">
-        {{ title }}
+        {{ appSettingsStore.siteName }}
       </p>
     </div>
     <div class="mb-4">

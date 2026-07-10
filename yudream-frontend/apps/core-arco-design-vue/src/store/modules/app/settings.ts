@@ -12,7 +12,7 @@ export const useAppSettingsStore = defineStore(
     const settings = ref(cloneDeep(settingsDefault))
 
     // 站点名称（从后端 sysSetting 加载）
-    const siteName = ref(import.meta.env.VITE_APP_TITLE)
+    const siteName = ref('管理系统')
     const siteDescription = ref('')
     const logo = ref('')
     const favicon = ref('')
