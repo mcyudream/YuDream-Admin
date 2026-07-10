@@ -26,6 +26,7 @@ import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.security.PluginPrincipal;
+import online.yudream.base.plugin.spi.system.messaging.PluginEvent;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -185,6 +186,13 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                         .thenComparing(PluginHttpEndpointInfo::path)
                         .thenComparing(PluginHttpEndpointInfo::method))
                 .toList();
+    }
+
+    public void publishSatoriEvent(PluginEvent event) {
+        holders.values().stream()
+                .filter(PluginRuntimeHolder::isEnabled)
+                .map(PluginRuntimeHolder::getContext)
+                .forEach(context -> context.interactionRegistry().publish(event, "internal".equals(event.type())));
     }
 
     @Override
