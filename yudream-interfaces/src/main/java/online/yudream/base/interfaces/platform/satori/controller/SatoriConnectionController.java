@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.satori.service.SatoriConnectionAppService;
 import online.yudream.base.application.platform.satori.service.MessageDeliveryAppService;
+import online.yudream.base.application.platform.satori.service.SatoriOperationLogAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -16,6 +17,7 @@ import online.yudream.base.interfaces.platform.satori.request.SatoriConnectionUp
 import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionTestRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriMessageSendRes;
+import online.yudream.base.interfaces.platform.satori.res.SatoriOperationLogRes;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class SatoriConnectionController {
     private final SatoriConnectionAppService connectionAppService;
     private final MessageDeliveryAppService messageDeliveryAppService;
+    private final SatoriOperationLogAppService operationLogAppService;
 
     @GetMapping
     @PermissionRegister(code = "platform:satori:view", name = "查看 Satori 连接", module = "Satori 平台", desc = "查看 Satori 连接列表")
@@ -70,6 +73,14 @@ public class SatoriConnectionController {
     @PermissionRegister(code = "platform:satori:connect", name = "测试 Satori 连接", module = "Satori 平台", desc = "请求 Satori Meta 验证连接")
     public Result<SatoriConnectionTestRes> test(@PathVariable Long id) {
         return Result.ok(SatoriConnectionWebAssembler.toRes(connectionAppService.test(id)));
+    }
+
+    @GetMapping("/{id}/logs")
+    @PermissionRegister(code = "platform:satori:view", name = "查看 Satori 日志", module = "Satori 平台", desc = "查看 Satori 连接运行日志")
+    public Result<PageResult<SatoriOperationLogRes>> logs(@PathVariable Long id,
+                                                           @RequestParam(defaultValue = "1") int page,
+                                                           @RequestParam(defaultValue = "50") int size) {
+        return Result.ok(SatoriConnectionWebAssembler.toLogRes(operationLogAppService.page(id, page, size)));
     }
 
     @PostMapping("/{id}/messages")

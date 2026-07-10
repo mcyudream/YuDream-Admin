@@ -18,6 +18,7 @@ import online.yudream.base.domain.platform.satori.service.SatoriInternalGateway;
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.InternalRequest;
 import online.yudream.base.application.platform.satori.cmd.SatoriInternalInvokeCmd;
 import online.yudream.base.domain.platform.satori.service.SatoriEventGateway;
+import online.yudream.base.domain.platform.satori.service.SatoriOperationLogger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,12 +35,15 @@ public class SatoriConnectionAppService {
     private final SatoriInternalGateway internalGateway;
     private final SatoriEventGateway eventGateway;
     private final CapabilityAppService capabilityAppService;
+    private final SatoriOperationLogger operationLogger;
 
     @Transactional
     public SatoriConnectionDTO create(SatoriConnectionCreateCmd cmd) {
         ensureEnabled();
-        return SatoriConnectionAssembler.toDTO(connectionRepo.save(SatoriConnection.create(cmd.getName(), cmd.getBaseUrl(),
-                cmd.getPlatform(), cmd.getUserId(), cmd.getToken())));
+        SatoriConnection saved = connectionRepo.save(SatoriConnection.create(cmd.getName(), cmd.getBaseUrl(),
+                cmd.getPlatform(), cmd.getUserId(), cmd.getToken()));
+        operationLogger.info(saved.getId(), "CONNECTION", "created", "连接已创建");
+        return SatoriConnectionAssembler.toDTO(saved);
     }
 
     @Transactional
@@ -47,7 +51,9 @@ public class SatoriConnectionAppService {
         ensureEnabled();
         SatoriConnection connection = connection(cmd.getId());
         connection.update(cmd.getName(), cmd.getBaseUrl(), cmd.getPlatform(), cmd.getUserId(), cmd.getToken());
-        return SatoriConnectionAssembler.toDTO(connectionRepo.save(connection));
+        SatoriConnection saved = connectionRepo.save(connection);
+        operationLogger.info(saved.getId(), "CONNECTION", "updated", "连接配置已更新");
+        return SatoriConnectionAssembler.toDTO(saved);
     }
 
     @Transactional(readOnly = true)
@@ -64,6 +70,7 @@ public class SatoriConnectionAppService {
         connection.enable();
         SatoriConnection saved = connectionRepo.save(connection);
         eventGateway.connect(saved.getId());
+        operationLogger.info(saved.getId(), "CONNECTION", "enabled", "连接已启用，正在建立 WebSocket 会话");
         return SatoriConnectionAssembler.toDTO(saved);
     }
 
@@ -74,6 +81,7 @@ public class SatoriConnectionAppService {
         connection.disable();
         SatoriConnection saved = connectionRepo.save(connection);
         eventGateway.close(saved.getId());
+        operationLogger.info(saved.getId(), "CONNECTION", "disabled", "连接已停用，WebSocket 会话已关闭");
         return SatoriConnectionAssembler.toDTO(saved);
     }
 
@@ -84,7 +92,14 @@ public class SatoriConnectionAppService {
         if (!connection.enabled()) {
             throw new BizException("Satori 连接未启用");
         }
-        return SatoriConnectionAssembler.toTestDTO(connection, apiGateway.loginGet(contextOf(connection)));
+        try {
+            var result = SatoriConnectionAssembler.toTestDTO(connection, apiGateway.loginGet(contextOf(connection)));
+            operationLogger.info(connection.getId(), "HTTP", "login.get", "连接测试成功");
+            return result;
+        } catch (RuntimeException exception) {
+            operationLogger.error(connection.getId(), "HTTP", "login.get", exception.getMessage());
+            throw exception;
+        }
     }
 
     @Transactional(readOnly = true)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SatoriConnection, SatoriConnectionPayload } from '@/api/modules/platform-satori'
+import type { SatoriConnection, SatoriConnectionPayload, SatoriOperationLog } from '@/api/modules/platform-satori'
 import apiSatori from '@/api/modules/platform-satori'
 
 const toast = useFaToast()
@@ -13,6 +13,10 @@ const composerMode = ref<'TEXT' | 'MARKDOWN' | 'HTML'>('MARKDOWN')
 const previewUrl = ref('')
 const formVisible = ref(false)
 const editing = ref<SatoriConnection | null>(null)
+const logVisible = ref(false)
+const logLoading = ref(false)
+const logConnection = ref<SatoriConnection | null>(null)
+const logs = ref<SatoriOperationLog[]>([])
 const form = reactive<SatoriConnectionPayload>({ name: '', baseUrl: 'http://localhost:5500', platform: '', userId: '', token: '' })
 const composer = reactive({ content: '# 消息预览\n\n支持 **Markdown** 与 HTML 渲染。', width: 720, transparent: false })
 
@@ -80,6 +84,17 @@ async function test(row: SatoriConnection) {
   finally { actionKey.value = '' }
 }
 
+async function openLogs(row: SatoriConnection) {
+  logConnection.value = row
+  logVisible.value = true
+  logLoading.value = true
+  try {
+    const result = await apiSatori.pageConnectionLogs(row.id, { page: 1, size: 100 })
+    logs.value = result.data.records
+  }
+  finally { logLoading.value = false }
+}
+
 async function renderPreview() {
   if (previewUrl.value) URL.revokeObjectURL(previewUrl.value)
   const response = await apiSatori.render({
@@ -113,7 +128,7 @@ function dateText(value?: string) { return value ? value.replace('T', ' ').slice
             <template #cell-credential="{ row }"><FaTag :variant="row.original.credentialConfigured ? 'default' : 'secondary'">{{ row.original.credentialConfigured ? '已配置' : '未配置' }}</FaTag></template>
             <template #cell-status="{ row }"><FaTag :variant="row.original.enabled ? 'default' : 'secondary'">{{ row.original.enabled ? '已启用' : '已停用' }}</FaTag></template>
             <template #cell-updated="{ row }">{{ dateText(row.original.updateTime) }}</template>
-            <template #cell-actions="{ row }"><div class="actions"><FaButton size="sm" variant="outline" :loading="actionKey === `${row.original.id}:test`" @click="test(row.original)"><FaIcon name="i-ri:plug-line" /></FaButton><FaButton size="sm" variant="ghost" @click="openEdit(row.original)"><FaIcon name="i-ri:edit-line" /></FaButton><FaButton size="sm" :loading="actionKey === `${row.original.id}:toggle`" :variant="row.original.enabled ? 'ghost' : 'outline'" @click="confirmToggle(row.original)"><FaIcon :name="row.original.enabled ? 'i-ri:pause-line' : 'i-ri:play-line'" /></FaButton></div></template>
+            <template #cell-actions="{ row }"><div class="actions"><FaButton size="sm" variant="ghost" @click="openLogs(row.original)"><FaIcon name="i-ri:file-list-3-line" /></FaButton><FaButton size="sm" variant="outline" :loading="actionKey === `${row.original.id}:test`" @click="test(row.original)"><FaIcon name="i-ri:plug-line" /></FaButton><FaButton size="sm" variant="ghost" @click="openEdit(row.original)"><FaIcon name="i-ri:edit-line" /></FaButton><FaButton size="sm" :loading="actionKey === `${row.original.id}:toggle`" :variant="row.original.enabled ? 'ghost' : 'outline'" @click="confirmToggle(row.original)"><FaIcon :name="row.original.enabled ? 'i-ri:pause-line' : 'i-ri:play-line'" /></FaButton></div></template>
           </FaTable>
           <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="load" @size-change="load" />
         </section>
@@ -126,6 +141,7 @@ function dateText(value?: string) { return value ? value.replace('T', ' ').slice
       </div>
     </FaPageMain>
     <FaModal v-model="formVisible" :title="editing ? '编辑 Satori 连接' : '新增 Satori 连接'" show-cancel-button @confirm="save"><a-form :model="form" layout="vertical"><a-form-item label="名称" required><FaInput v-model="form.name" /></a-form-item><a-form-item label="Satori 地址" required><FaInput v-model="form.baseUrl" placeholder="https://satori.example.com" /></a-form-item><a-form-item label="Satori Platform" required><FaInput v-model="form.platform" placeholder="例如 discord、qq" /></a-form-item><a-form-item label="Satori User ID" required><FaInput v-model="form.userId" placeholder="机器人自身账号 ID" /></a-form-item><a-form-item label="令牌" :required="!editing"><FaInput v-model="form.token" type="password" :placeholder="editing ? '留空保持原令牌' : 'Bearer Token'" /></a-form-item></a-form></FaModal>
+    <FaModal v-model="logVisible" :title="`${logConnection?.name || 'Satori'} 运行日志`" :show-cancel-button="false" @confirm="logVisible = false"><div v-loading="logLoading" class="log-list"><div v-for="log in logs" :key="log.id" class="log-row"><FaTag :variant="log.level === 'ERROR' ? 'danger' : log.level === 'WARN' ? 'warning' : 'secondary'">{{ log.level }}</FaTag><span class="log-time">{{ dateText(log.occurredAt) }}</span><strong>{{ log.category }}/{{ log.action }}</strong><span>{{ log.detail || '-' }}</span></div><span v-if="!logLoading && !logs.length">暂无运行日志</span></div></FaModal>
   </div>
 </template>
 
@@ -134,5 +150,6 @@ function dateText(value?: string) { return value ? value.replace('T', ' ').slice
 .workspace, .composer { min-width: 0; }
 .composer { display: grid; gap: 12px; border: 1px solid var(--color-border-2); padding: 14px; border-radius: 6px; background: var(--color-bg-2); }
 .composer-head, .render-controls, .actions { display: flex; gap: 8px; align-items: center; }
+.log-list { display: grid; gap: 8px; max-height: 520px; overflow: auto; }.log-row { display: grid; grid-template-columns: auto 150px 160px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--color-border-2); background: var(--color-fill-1); font-size: 12px; }.log-time { color: var(--color-text-3); }
 .composer-head { justify-content: space-between; }.composer h2 { margin: 0; font-size: 16px; }.segmented { display: inline-flex; border: 1px solid var(--color-border-2); border-radius: 6px; overflow: hidden; }.segmented button { height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 11px; }.segmented button.active { background: rgb(var(--primary-6)); color: white; }.render-controls { flex-wrap: wrap; justify-content: space-between; }.render-controls :deep(.arco-form-item) { margin: 0; }.preview { display: grid; place-items: center; min-height: 180px; overflow: auto; border: 1px dashed var(--color-border-2); background: var(--color-fill-1); color: var(--color-text-3); }.preview img { display: block; max-width: 100%; height: auto; }.actions { justify-content: center; } @media (max-width: 1100px) { .console-grid { grid-template-columns: 1fr; } }
 </style>

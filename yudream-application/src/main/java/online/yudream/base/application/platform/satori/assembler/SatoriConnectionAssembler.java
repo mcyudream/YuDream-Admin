@@ -2,8 +2,10 @@ package online.yudream.base.application.platform.satori.assembler;
 
 import online.yudream.base.application.platform.satori.dto.SatoriConnectionDTO;
 import online.yudream.base.application.platform.satori.dto.SatoriConnectionTestDTO;
+import online.yudream.base.application.platform.satori.dto.SatoriOperationLogDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
+import online.yudream.base.domain.platform.satori.aggregate.SatoriOperationLog;
 import online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriLogin;
 
 import java.time.LocalDateTime;
@@ -44,5 +46,15 @@ public final class SatoriConnectionAssembler {
                 .features(login == null ? java.util.List.of() : login.features())
                 .testedAt(LocalDateTime.now())
                 .build();
+    }
+
+    public static SatoriOperationLogDTO toLogDTO(SatoriOperationLog log) {
+        return SatoriOperationLogDTO.builder().id(log.getId()).level(log.getLevel()).category(log.getCategory())
+                .action(log.getAction()).detail(log.getDetail()).occurredAt(log.getOccurredAt()).build();
+    }
+
+    public static PageResult<SatoriOperationLogDTO> toLogDTO(PageResult<SatoriOperationLog> result) {
+        return new PageResult<>(result.getRecords().stream().map(SatoriConnectionAssembler::toLogDTO).toList(),
+                result.getTotal(), result.getPage(), result.getSize());
     }
 }

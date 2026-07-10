@@ -4,11 +4,13 @@ import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriEventCursor;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriEventRecord;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriLogin;
+import online.yudream.base.domain.platform.satori.aggregate.SatoriOperationLog;
 import online.yudream.base.domain.platform.satori.service.SatoriCredentialCipher;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriConnectionDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventCursorDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventRecordDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriLoginDO;
+import online.yudream.base.infra.platform.satori.dataobj.SatoriOperationLogDO;
 
 public final class SatoriInfraMapper {
     private SatoriInfraMapper() { }
@@ -49,6 +51,26 @@ public final class SatoriInfraMapper {
         return SatoriLogin.builder().id(source.getId()).version(source.getVersion()).createTime(source.getCreateTime()).updateTime(source.getUpdateTime())
                 .connectionId(source.getConnectionId()).platform(source.getPlatform()).userId(source.getUserId()).status(source.getStatus())
                 .adapter(source.getAdapter()).features(source.getFeatures()).build();
+    }
+
+    public static SatoriOperationLogDO toDataObj(SatoriOperationLog source) {
+        if (source == null) return null;
+        SatoriOperationLogDO target = new SatoriOperationLogDO();
+        copyBase(source, target);
+        target.setConnectionId(source.getConnectionId());
+        target.setLevel(source.getLevel());
+        target.setCategory(source.getCategory());
+        target.setAction(source.getAction());
+        target.setDetail(source.getDetail());
+        target.setOccurredAt(source.getOccurredAt());
+        return target;
+    }
+
+    public static SatoriOperationLog toDomain(SatoriOperationLogDO source) {
+        if (source == null) return null;
+        return SatoriOperationLog.builder().id(source.getId()).version(source.getVersion()).createTime(source.getCreateTime())
+                .updateTime(source.getUpdateTime()).connectionId(source.getConnectionId()).level(source.getLevel())
+                .category(source.getCategory()).action(source.getAction()).detail(source.getDetail()).occurredAt(source.getOccurredAt()).build();
     }
 
     public static SatoriEventRecordDO toDataObj(SatoriEventRecord source) {
