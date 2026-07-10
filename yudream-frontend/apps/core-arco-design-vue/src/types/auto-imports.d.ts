@@ -16,7 +16,9 @@ declare global {
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
   const effectScope: typeof import('vue').effectScope
+  const filterBackendMenuTreeByAuth: typeof import('../store/modules/app/route-auth').filterBackendMenuTreeByAuth
   const findBestMenuGroupIndex: typeof import('../store/modules/app/menu-match').findBestMenuGroupIndex
+  const flattenBackendRouteGroups: typeof import('../store/modules/app/route-auth').flattenBackendRouteGroups
   const getActivePinia: typeof import('pinia').getActivePinia
   const getCurrentInstance: typeof import('vue').getCurrentInstance
   const getCurrentScope: typeof import('vue').getCurrentScope
@@ -64,6 +66,7 @@ declare global {
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
   const storeToRefs: typeof import('pinia').storeToRefs
+  const stripBackendStructuralAuth: typeof import('../store/modules/app/route-auth').stripBackendStructuralAuth
   const toRaw: typeof import('vue').toRaw
   const toRef: typeof import('vue').toRef
   const toRefs: typeof import('vue').toRefs
@@ -109,4 +112,7 @@ declare global {
   // @ts-ignore
   export type { PluginRuntimeRouteMeta } from '../store/modules/app/plugin-route-runtime'
   import('../store/modules/app/plugin-route-runtime')
+  // @ts-ignore
+  export type { RouteAuthValue, AuthRouteNode } from '../store/modules/app/route-auth'
+  import('../store/modules/app/route-auth')
 }
