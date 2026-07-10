@@ -198,6 +198,114 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
+    void routePermissionIncludesSystemStructuralAncestorsWithExplicitPermissions() {
+        Menu root = systemMenu("system:root", null, MenuNodeType.CATEGORY);
+        root.setPermission("system:root:view");
+        Menu category = systemMenu("system:reports", root.getCode(), MenuNodeType.CATEGORY);
+        category.setPermission("system:reports:view");
+        Menu route = systemMenu("system:reports:audit", category.getCode(), MenuNodeType.MENU);
+        route.setPermission("system:audit:view");
+        List<Menu> menus = List.of(root, category, route);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("system:audit:view"));
+
+        assertThat(routes).singleElement().satisfies(rootRoute -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> categories = (List<Map<String, Object>>) rootRoute.get("children");
+            assertThat(categories).singleElement().satisfies(categoryRoute -> {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> pages = (List<Map<String, Object>>) categoryRoute.get("children");
+                assertThat(pages).extracting(page -> page.get("name")).containsExactly(route.getCode());
+            });
+        });
+    }
+
+    @Test
+    void routePermissionIncludesPluginRouteUnderSystemAncestorsWithExplicitPermissions() {
+        Menu root = systemMenu("system:root", null, MenuNodeType.CATEGORY);
+        root.setPermission("system:root:view");
+        Menu category = systemMenu("system:tools", root.getCode(), MenuNodeType.CATEGORY);
+        category.setPermission("system:tools:view");
+        Menu pluginRoute = pluginMenu("plugin:wallet:route:walletAdmin:home", category.getCode(), true);
+        pluginRoute.setPermission("plugin:wallet:home:view");
+        List<Menu> menus = List.of(root, category, pluginRoute);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("plugin:wallet:home:view"));
+
+        assertThat(routes).singleElement().satisfies(rootRoute -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> categories = (List<Map<String, Object>>) rootRoute.get("children");
+            assertThat(categories).singleElement().satisfies(categoryRoute -> {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> pages = (List<Map<String, Object>>) categoryRoute.get("children");
+                assertThat(pages).extracting(page -> page.get("name")).containsExactly(pluginRoute.getCode());
+            });
+        });
+    }
+
+    @Test
+    void routePermissionExcludesUnauthorizedSiblingWhileIncludingSharedAncestors() {
+        Menu root = systemMenu("system:root", null, MenuNodeType.CATEGORY);
+        root.setPermission("system:root:view");
+        Menu allowed = systemMenu("system:allowed", root.getCode(), MenuNodeType.MENU);
+        allowed.setPermission("system:allowed:view");
+        Menu denied = systemMenu("system:denied", root.getCode(), MenuNodeType.MENU);
+        denied.setPermission("system:denied:view");
+        List<Menu> menus = List.of(root, allowed, denied);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("system:allowed:view"));
+
+        assertThat(routes).singleElement().satisfies(rootRoute -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> pages = (List<Map<String, Object>>) rootRoute.get("children");
+            assertThat(pages).extracting(page -> page.get("name")).containsExactly(allowed.getCode());
+        });
+    }
+
+    @Test
+    void buttonPermissionIncludesItsOwningRouteAndStructuralAncestors() {
+        Menu root = systemMenu("system:root", null, MenuNodeType.CATEGORY);
+        root.setPermission("system:root:view");
+        Menu route = systemMenu("system:users", root.getCode(), MenuNodeType.MENU);
+        route.setPermission("system:users:view");
+        Menu button = systemMenu("system:users:create", route.getCode(), MenuNodeType.BUTTON);
+        button.setPermission("system:users:create");
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(root, route));
+        when(menuRepo.findAll()).thenReturn(List.of(root, route, button));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("system:users:create"));
+
+        assertThat(routes).singleElement().satisfies(rootRoute -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> pages = (List<Map<String, Object>>) rootRoute.get("children");
+            assertThat(pages).extracting(page -> page.get("name")).containsExactly(route.getCode());
+        });
+    }
+
+    @Test
+    void unavailablePluginButtonDoesNotAuthorizeItsOwningRoute() {
+        Menu root = systemMenu("system:root", null, MenuNodeType.CATEGORY);
+        root.setPermission("system:root:view");
+        Menu route = pluginMenu("plugin:wallet:route:walletAdmin:users", root.getCode(), true);
+        route.setPermission("plugin:wallet:users:view");
+        Menu button = pluginMenu("plugin:wallet:button:walletAdmin:users:create", route.getCode(), false);
+        button.setType(MenuNodeType.BUTTON);
+        button.setPermission("plugin:wallet:users:create");
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(root, route));
+        when(menuRepo.findAll()).thenReturn(List.of(root, route, button));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("plugin:wallet:users:create"));
+
+        assertThat(routes).isEmpty();
+    }
+
+    @Test
     void routeTreeExcludesOnlyTheUnavailablePluginNodeNotItsMovedChildren() {
         Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
         Menu unavailableOwner = pluginMenu("plugin:wallet:tools", systemParent.getCode(), false);

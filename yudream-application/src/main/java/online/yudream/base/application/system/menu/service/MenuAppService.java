@@ -159,7 +159,17 @@ public class MenuAppService {
                 .filter(m -> isVisible(m, permissionSet))
                 .map(Menu::getCode)
                 .collect(Collectors.toSet());
-        includeStructuralRouteAncestors(visibleCodes, allMenuMap, routeMenuCodes, permissionSet);
+        if (persistedMenus != null) {
+            persistedMenus.stream()
+                    .filter(menu -> menu.getType() == MenuNodeType.BUTTON)
+                    .filter(menu -> menu.getStatus() == MenuStatus.ACTIVE)
+                    .filter(Menu::isAvailableForRuntime)
+                    .filter(this::platformCapabilityVisible)
+                    .filter(menu -> isVisible(menu, permissionSet))
+                    .map(Menu::getCode)
+                    .forEach(visibleCodes::add);
+        }
+        includeStructuralRouteAncestors(visibleCodes, allMenuMap, routeMenuCodes);
 
         Map<String, List<Menu>> childrenMap = new HashMap<>();
         for (Menu menu : allMenus) {
@@ -303,8 +313,7 @@ public class MenuAppService {
 
     private void includeStructuralRouteAncestors(Set<String> visibleCodes,
                                                    Map<String, Menu> allMenuMap,
-                                                   Set<String> routeMenuCodes,
-                                                   Set<String> userPermissions) {
+                                                   Set<String> routeMenuCodes) {
         for (String code : List.copyOf(visibleCodes)) {
             Menu menu = allMenuMap.get(code);
             String cursor = menu == null ? null : blankToNull(menu.getParentCode());
@@ -317,9 +326,6 @@ public class MenuAppService {
                 if (!routeMenuCodes.contains(cursor)) {
                     cursor = blankToNull(parent.getParentCode());
                     continue;
-                }
-                if (StringUtils.hasText(parent.getPermission()) && !isVisible(parent, userPermissions)) {
-                    break;
                 }
                 visibleCodes.add(cursor);
                 cursor = blankToNull(parent.getParentCode());

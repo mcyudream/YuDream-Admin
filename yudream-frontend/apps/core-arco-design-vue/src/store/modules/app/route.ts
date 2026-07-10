@@ -1,16 +1,19 @@
 import type { RouteRecordMainRaw } from '@fantastic-admin/types'
 import type { RouteRecordRaw, RouterMatcher } from 'vue-router'
 import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
+import type { AuthRouteNode } from './route-auth'
 import { cloneDeep } from 'es-toolkit'
 import { createRouterMatcher } from 'vue-router'
 import apiApp from '@/api/modules/app'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { systemRoutes as systemRoutesRaw } from '@/router/routes'
 import { indexPluginRuntimeModules, resolvePluginRuntimeRoute } from './plugin-route-runtime'
+import { flattenBackendRouteGroups, stripBackendStructuralAuth } from './route-auth'
 
 export const useAppRouteStore = defineStore(
   'appRoute',
   () => {
+    const appSettingsStore = useAppSettingsStore()
     const isGenerate = ref(false)
     // 原始路由
     const routesRaw = ref<RouteRecordMainRaw[]>([])
@@ -23,14 +26,20 @@ export const useAppRouteStore = defineStore(
       if (routesRaw.value) {
         routesRaw.value.forEach((item) => {
           const tmpRoutes = cloneDeep(item.children) as RouteRecordRaw[]
-          tmpRoutes.map((v) => {
-            if (!v.meta) {
-              v.meta = {}
-            }
-            v.meta.auth = item.meta?.auth ?? v.meta?.auth
-            return v
-          })
-          returnRoutes.push(...tmpRoutes)
+          if (appSettingsStore.settings.app.routeBaseOn === 'backend') {
+            returnRoutes.push(...flattenBackendRouteGroups([
+              { children: tmpRoutes as unknown as AuthRouteNode[] },
+            ]) as RouteRecordRaw[])
+          }
+          else {
+            tmpRoutes.forEach((v) => {
+              if (!v.meta) {
+                v.meta = {}
+              }
+              v.meta.auth = item.meta?.auth ?? v.meta?.auth
+            })
+            returnRoutes.push(...tmpRoutes)
+          }
         })
         returnRoutes.forEach((item) => {
           if (item.children) {
@@ -225,7 +234,7 @@ export const useAppRouteStore = defineStore(
         loadPluginRuntimeManifest(),
       ])
       const staticRoutes = formatBackRoutes(
-        res.data,
+        stripBackendStructuralAuth(res.data),
         pluginManifest.modules,
         pluginManifest.sdkVersion,
       ) as any
