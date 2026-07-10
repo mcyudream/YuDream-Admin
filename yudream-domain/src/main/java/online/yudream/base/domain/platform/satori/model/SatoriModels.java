@@ -1,10 +1,18 @@
 package online.yudream.base.domain.platform.satori.model;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Satori v1 协议资源的不可变 JSON 边界模型。
@@ -98,9 +106,60 @@ public final class SatoriModels {
     public record SatoriButton(String id) {
     }
 
-    public record SatoriMeta(String protocolVersion, String adapter, List<String> features) {
-        public SatoriMeta {
-            features = features == null ? List.of() : List.copyOf(features);
+    public record SatoriMeta(JsonNode value) {
+        @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
+        public SatoriMeta(JsonNode value) {
+            this.value = value == null ? JsonNodeFactory.instance.objectNode() : value.deepCopy();
+        }
+
+        @JsonValue
+        public JsonNode value() {
+            return value;
+        }
+
+        @JsonIgnore
+        public String impl() {
+            return text("impl");
+        }
+
+        @JsonIgnore
+        public String protocolVersion() {
+            return text("protocol_version");
+        }
+
+        @JsonIgnore
+        public String adapter() {
+            return text("adapter");
+        }
+
+        @JsonIgnore
+        public List<String> features() {
+            JsonNode featureValues = value.path("features");
+            if (!featureValues.isArray()) {
+                return List.of();
+            }
+            List<String> values = new ArrayList<>();
+            featureValues.forEach(item -> values.add(item.asText()));
+            return List.copyOf(values);
+        }
+
+        @JsonIgnore
+        public Map<String, JsonNode> extraFields() {
+            if (!value.isObject()) {
+                return Map.of();
+            }
+            Map<String, JsonNode> extras = new LinkedHashMap<>();
+            value.fields().forEachRemaining(entry -> {
+                if (!Set.of("impl", "protocol_version", "adapter", "features").contains(entry.getKey())) {
+                    extras.put(entry.getKey(), entry.getValue().deepCopy());
+                }
+            });
+            return Map.copyOf(extras);
+        }
+
+        private String text(String name) {
+            JsonNode field = value.get(name);
+            return field == null || field.isNull() ? null : field.asText();
         }
     }
 

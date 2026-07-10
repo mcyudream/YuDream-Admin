@@ -1,5 +1,5 @@
 {
   "friend": { "user": { "id": "10000000000000000008", "name": "friend" }, "nick": "朋友", "remark": "备注" },
   "emoji": { "id": "10000000000000000009", "name": "smile", "url": "https://example.test/smile.png" },
-  "meta": { "protocol_version": "1.0", "adapter": "onebot", "features": ["message.create", "upload.create"] }
+  "meta": { "impl": "satori", "protocol_version": "1.0", "adapter": "onebot", "features": ["message.create", "upload.create"], "vendor": { "revision": 2 } }
 }
