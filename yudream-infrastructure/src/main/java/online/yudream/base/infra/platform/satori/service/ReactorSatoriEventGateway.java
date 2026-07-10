@@ -17,6 +17,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClient;
 import reactor.util.retry.Retry;
 
+import java.io.IOException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.List;
@@ -63,12 +64,12 @@ public class ReactorSatoriEventGateway {
                 case EVENT -> listener.onEvent(mapper.treeToValue(body, SatoriModels.SatoriEvent.class), mapper.writeValueAsString(body));
                 default -> { }
             }
-        } catch (JsonProcessingException exception) {
+        } catch (IOException exception) {
             throw new IllegalArgumentException("Satori WebSocket 帧无效", exception);
         }
     }
 
-    private List<SatoriModels.SatoriLogin> readLogins(JsonNode node) throws JsonProcessingException {
+    private List<SatoriModels.SatoriLogin> readLogins(JsonNode node) throws IOException {
         if (!node.isArray()) return List.of();
         return mapper.readerForListOf(SatoriModels.SatoriLogin.class).readValue(node);
     }

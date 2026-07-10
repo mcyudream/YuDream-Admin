@@ -1,8 +1,8 @@
-FROM mcr.microsoft.com/playwright:v1.51.1-noble
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/mcr.microsoft.com/playwright:v1.60.0-noble
 
 WORKDIR /app
-COPY package.json ./
-RUN corepack enable && pnpm install --frozen-lockfile=false
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src ./src
 RUN pnpm exec tsc -p tsconfig.json

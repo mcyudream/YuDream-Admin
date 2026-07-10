@@ -5,6 +5,7 @@ import online.yudream.base.domain.platform.capability.service.CapabilityProvider
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
+import online.yudream.base.domain.platform.render.service.MessageRenderGateway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 

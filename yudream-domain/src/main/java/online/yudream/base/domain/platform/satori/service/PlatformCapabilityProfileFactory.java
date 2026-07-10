@@ -31,16 +31,18 @@ public final class PlatformCapabilityProfileFactory {
         }
 
         public boolean supportsRichText() {
-            return featureOrAdapter("html", "markdown", "message.rich", RICH_ADAPTERS);
+            return featureOrAdapter(RICH_ADAPTERS, "html", "markdown", "message.rich");
         }
 
         public boolean supportsMedia() {
-            return featureOrAdapter("image", "audio", "video", "file", "message.media", MEDIA_ADAPTERS);
+            return featureOrAdapter(MEDIA_ADAPTERS, "image", "audio", "video", "file", "message.media");
         }
 
-        private boolean featureOrAdapter(String first, String second, String third, Set<String> supportedAdapters) {
-            if (features.contains(first) || features.contains(second) || features.contains(third)) {
-                return true;
+        private boolean featureOrAdapter(Set<String> supportedAdapters, String... featureNames) {
+            for (String featureName : featureNames) {
+                if (features.contains(featureName)) {
+                    return true;
+                }
             }
             // A feature list that explicitly talks about this surface is authoritative.
             boolean declared = features.stream().anyMatch(value -> value.startsWith("message.")
