@@ -45,15 +45,22 @@ if grep -q '1.0-SNAPSHOT' ci/verify-plugin-spi-registry.sh; then
 fi
 require_pattern 'maven-settings-nexus.xml' "core CI must deploy Maven contracts with Nexus settings"
 require_pattern 'NEXUS_MAVEN_PUBLIC_URL' "core CI must configure the Nexus maven-public read endpoint"
-grep -q '<url>https://nexus.yudream.online/repository/maven-public/</url>' ci/maven-settings-nexus.xml \
-  || fail "Nexus Maven settings must support anonymous local reads without CI-only variables"
-if grep -q '<mirrorOf>\*</mirrorOf>' ci/maven-settings-nexus.xml ci/maven-settings.xml; then
-  fail "core Maven settings must not mirror third-party dependencies through Nexus"
+if grep -q '<mirrorOf>' ci/maven-settings-nexus.xml ci/maven-settings.xml; then
+  fail "core Maven settings must preserve explicit Aliyun-to-Nexus repository ordering"
 fi
 grep -q 'https://maven.aliyun.com/repository/public' ci/maven-settings-nexus.xml \
   || fail "core Maven settings must resolve third-party dependencies from Aliyun"
-grep -q 'external:\*,!nexus-public,!nexus-releases,!nexus-snapshots' ci/maven-settings-nexus.xml \
-  || fail "core Maven settings must exclude YuDream Nexus repositories from the Aliyun mirror"
+grep -q '<id>nexus-plugin</id>' ci/maven-settings-nexus.xml \
+  || fail "core Maven plugin resolution must fall back from Aliyun to Nexus"
+grep -q '<id>nexus-plugin</id>' ci/verify-plugin-spi-registry.sh \
+  || fail "SPI verification Maven plugins must fall back from Aliyun to Nexus"
+if grep -Eq 'maven-dependency-plugin[^[:space:]]*:get|dependency:get|remoteRepositories=' .gitlab-ci.yml; then
+  fail "core CI must not prefetch Maven artifacts outside the configured repository order"
+fi
+if grep -R -Eq 'gitlab-maven|gitlab\.yudream\.online/api/v4/projects|CI_JOB_TOKEN|CORE_PACKAGE_(USER|TOKEN)|packages/(maven|npm)' \
+  .gitlab-ci.yml ci/maven-settings-nexus.xml ci/maven-settings.xml ci/verify-plugin-spi-registry.sh; then
+  fail "core Maven publish and verification paths must not use GitLab Package Registry"
+fi
 grep -q 'remoteRepositories=nexus-public' ci/verify-plugin-spi-registry.sh \
   || fail "SPI verification must explicitly resolve the YuDream artifact from Nexus"
 

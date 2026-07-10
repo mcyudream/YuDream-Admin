@@ -72,7 +72,7 @@ packages:
 
 当前唯一来源：
 
-- YuDream Maven 契约从 Nexus `maven-public` 消费，第三方依赖和 Maven 插件从阿里云公共仓库消费
+- 通用 Maven 依赖和插件优先从阿里云公共仓库消费，未命中时回退 Nexus；YuDream Maven 契约最终从 Nexus `maven-public` 消费
 - `@yudream/plugin-sdk` 与 `@yudream/components` 统一从 Nexus `https://nexus.yudream.online/repository/npm-public/` 消费
 - GitLab Package Registry 与 npmjs 路径已经废弃；GitLab 只负责源码、CI 和 CI artifacts
 

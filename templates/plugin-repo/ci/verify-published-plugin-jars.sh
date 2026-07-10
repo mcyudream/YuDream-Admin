@@ -43,13 +43,24 @@ resolve_artifact_id() {
 
 cat > "$SETTINGS_FILE" <<EOF
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
-  <mirrors>
-    <mirror>
-      <id>aliyun-public</id>
-      <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
-      <url>https://maven.aliyun.com/repository/public</url>
-    </mirror>
-  </mirrors>
+  <profiles>
+    <profile>
+      <id>aliyun-plugins</id>
+      <pluginRepositories>
+        <pluginRepository>
+          <id>aliyun-plugin</id>
+          <url>https://maven.aliyun.com/repository/public</url>
+        </pluginRepository>
+        <pluginRepository>
+          <id>nexus-plugin</id>
+          <url>$REPOSITORY_URL</url>
+        </pluginRepository>
+      </pluginRepositories>
+    </profile>
+  </profiles>
+  <activeProfiles>
+    <activeProfile>aliyun-plugins</activeProfile>
+  </activeProfiles>
 </settings>
 EOF
 

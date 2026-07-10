@@ -73,11 +73,21 @@ grep -q 'NEXUS_PASSWORD' ci/publish-plugin-jars.sh || fail "plugin publishing mu
 if grep -Eq 'NEXUS_(USERNAME|PASSWORD)' ci/verify-core-maven-registry.sh ci/verify-core-npm-contracts.sh ci/verify-published-plugin-jars.sh; then
   fail "plugin read and verification paths must not require protected publish credentials"
 fi
-if grep -q '<mirrorOf>\*</mirrorOf>' .gitlab-ci.yml settings.xml.example ci/*.sh; then
-  fail "plugin builds must not route third-party Maven dependencies through Nexus"
+if grep -q '<mirrorOf>' .gitlab-ci.yml settings.xml.example; then
+  fail "plugin builds must preserve explicit Aliyun-to-Nexus repository ordering"
 fi
 grep -q 'https://maven.aliyun.com/repository/public' .gitlab-ci.yml || fail "plugin builds must resolve third-party Maven dependencies from Aliyun"
-grep -q 'external:\*,!nexus-public,!nexus-releases,!nexus-snapshots' .gitlab-ci.yml || fail "plugin builds must exclude YuDream Nexus repositories from the Aliyun mirror"
+grep -q '<id>nexus-plugin</id>' settings.xml.example || fail "plugin Maven plugins must fall back from Aliyun to Nexus"
+grep -q '<id>nexus-plugin</id>' .gitlab-ci.yml || fail "plugin CI Maven plugins must fall back from Aliyun to Nexus"
+for script in ci/publish-plugin-jars.sh ci/verify-core-maven-registry.sh ci/verify-published-plugin-jars.sh; do
+  grep -q '<id>nexus-plugin</id>' "$script" \
+    || fail "$script Maven plugins must fall back from Aliyun to Nexus"
+done
+grep -Fq '<url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' ci/publish-plugin-jars.sh \
+  || fail "plugin publish settings must pass the Nexus plugin fallback URL through Maven environment interpolation"
+if grep -Eq 'maven-dependency-plugin[^[:space:]]*:get|dependency:get|remoteRepositories=' .gitlab-ci.yml; then
+  fail "plugin CI must not prefetch Maven artifacts outside the configured repository order"
+fi
 grep -q 'remoteRepositories=nexus-public' ci/verify-core-maven-registry.sh || fail "SPI verification must explicitly resolve YuDream artifacts from Nexus"
 grep -q 'remoteRepositories=nexus-public' ci/verify-published-plugin-jars.sh || fail "plugin JAR and catalog verification must explicitly resolve YuDream artifacts from Nexus"
 grep -q 'maven-deploy-plugin.*deploy-file' ci/publish-plugin-jars.sh || fail "plugin publish script must deploy Maven artifacts"
@@ -87,6 +97,12 @@ if grep -q 'YUDREAM_PLUGIN_SPI_VERSION:-1.0-SNAPSHOT' ci/verify-core-maven-regis
 fi
 reject_pattern 'packages/generic' "plugin publishing must not use GitLab Generic Package Registry"
 reject_pattern 'JOB-TOKEN:' "plugin publishing must not authenticate to a registry with GitLab job tokens"
+if grep -R -Eq 'gitlab-maven|gitlab\.yudream\.online/api/v4/projects|CI_JOB_TOKEN|CORE_PACKAGE_(USER|TOKEN)|packages/(maven|npm)' \
+  .gitlab-ci.yml .npmrc.example settings.xml.example \
+  ci/publish-plugin-jars.sh ci/verify-core-maven-registry.sh \
+  ci/verify-core-npm-contracts.sh ci/verify-published-plugin-jars.sh; then
+  fail "plugin package routing must not use GitLab Package Registry"
+fi
 
 echo "[verify-plugin-publish-pipeline] checking publish rules"
 require_pattern '\$CI_COMMIT_TAG =~ /\^v/' "plugin CI publish/verify jobs must stay tag-gated"

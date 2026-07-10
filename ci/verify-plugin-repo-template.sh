@@ -75,23 +75,35 @@ grep -q 'NEXUS_PASSWORD' templates/plugin-repo/ci/publish-plugin-jars.sh || fail
 if grep -Eq 'NEXUS_(USERNAME|PASSWORD)' templates/plugin-repo/ci/verify-core-maven-registry.sh templates/plugin-repo/ci/verify-core-npm-contracts.sh templates/plugin-repo/ci/verify-published-plugin-jars.sh; then
   fail "template read and verification paths must not require protected publish credentials"
 fi
-if grep -R -q '<mirrorOf>\*</mirrorOf>' templates/plugin-repo/.gitlab-ci.yml.example templates/plugin-repo/settings.xml.example templates/plugin-repo/ci; then
-  fail "template must not route third-party Maven dependencies through Nexus"
+if grep -q '<mirrorOf>' templates/plugin-repo/.gitlab-ci.yml.example templates/plugin-repo/settings.xml.example; then
+  fail "template must preserve explicit Aliyun-to-Nexus repository ordering"
 fi
 grep -q 'https://maven.aliyun.com/repository/public' templates/plugin-repo/.gitlab-ci.yml.example || fail "template must resolve third-party Maven dependencies from Aliyun"
-grep -q 'external:\*,!nexus-public,!nexus-releases,!nexus-snapshots' templates/plugin-repo/.gitlab-ci.yml.example || fail "template must exclude YuDream Nexus repositories from the Aliyun mirror"
+grep -q '<id>nexus-plugin</id>' templates/plugin-repo/settings.xml.example || fail "template Maven plugins must fall back from Aliyun to Nexus"
+grep -q '<id>nexus-plugin</id>' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI Maven plugins must fall back from Aliyun to Nexus"
+for script in publish-plugin-jars.sh verify-core-maven-registry.sh verify-published-plugin-jars.sh; do
+  grep -q '<id>nexus-plugin</id>' "templates/plugin-repo/ci/$script" \
+    || fail "template $script Maven plugins must fall back from Aliyun to Nexus"
+done
+grep -Fq '<url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' templates/plugin-repo/ci/publish-plugin-jars.sh \
+  || fail "template publish settings must pass the Nexus plugin fallback URL through Maven environment interpolation"
+if grep -Eq 'maven-dependency-plugin[^[:space:]]*:get|dependency:get|remoteRepositories=' templates/plugin-repo/.gitlab-ci.yml.example; then
+  fail "template CI must not prefetch Maven artifacts outside the configured repository order"
+fi
 grep -q 'remoteRepositories=nexus-public' templates/plugin-repo/ci/verify-core-maven-registry.sh || fail "template SPI verification must explicitly resolve YuDream artifacts from Nexus"
 grep -q 'remoteRepositories=nexus-public' templates/plugin-repo/ci/verify-published-plugin-jars.sh || fail "template plugin JAR verification must explicitly resolve YuDream artifacts from Nexus"
 grep -q 'yudream\.plugin\.spi\.version' templates/plugin-repo/ci/verify-core-maven-registry.sh || fail "template Maven verification must derive the SPI version from the plugin root POM"
 if grep -q 'YUDREAM_PLUGIN_SPI_VERSION:-1.0-SNAPSHOT' templates/plugin-repo/ci/verify-core-maven-registry.sh; then
   fail "template Maven verification must not default to a hard-coded SPI snapshot"
 fi
-if grep -R -Eq 'gitlab-maven|gitlab\.example\.com/api/v4/projects|CI_JOB_TOKEN|CORE_PACKAGE_(USER|TOKEN)' \
+if grep -R -Eq 'gitlab-maven|gitlab\.(example\.com|yudream\.online)/api/v4/projects|CI_JOB_TOKEN|CORE_PACKAGE_(USER|TOKEN)|packages/(maven|npm)' \
   templates/plugin-repo/.gitlab-ci.yml.example \
   templates/plugin-repo/.npmrc.example \
   templates/plugin-repo/settings.xml.example \
+  templates/plugin-repo/ci/publish-plugin-jars.sh \
   templates/plugin-repo/ci/verify-core-maven-registry.sh \
-  templates/plugin-repo/ci/verify-core-npm-contracts.sh; then
+  templates/plugin-repo/ci/verify-core-npm-contracts.sh \
+  templates/plugin-repo/ci/verify-published-plugin-jars.sh; then
   fail "plugin repository templates must use only Nexus package endpoints and credentials"
 fi
 
