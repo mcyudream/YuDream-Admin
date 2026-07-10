@@ -21,6 +21,10 @@ public class SatoriEventRepoImpl implements SatoriEventRepo {
     private final MongoTemplate mongoTemplate; private final IdGenerator idGenerator;
     @Override public SatoriEventRecord save(SatoriEventRecord event) {
         SatoriEventRecordDO data = SatoriInfraMapper.toDataObj(event);
+        if (data.getId() != null) {
+            data.setUpdateTime(LocalDateTime.now());
+            return SatoriInfraMapper.toDomain(mongoTemplate.save(data));
+        }
         if (data.getId() == null) {
             data.setId(idGenerator.nextId());
             data.setCreateTime(LocalDateTime.now());

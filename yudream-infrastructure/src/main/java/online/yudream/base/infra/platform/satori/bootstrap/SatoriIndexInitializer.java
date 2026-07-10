@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.satori.bootstrap;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventRecordDO;
+import online.yudream.base.infra.platform.satori.dataobj.SatoriEventCursorDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriLoginDO;
 import org.bson.Document;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -34,5 +35,9 @@ public class SatoriIndexInitializer implements ApplicationListener<ApplicationRe
                 .on("expireAt", org.springframework.data.domain.Sort.Direction.ASC)
                 .named("satori_event_expire_at")
                 .expire(Duration.ZERO));
+        mongoTemplate.indexOps(SatoriEventCursorDO.class).ensureIndex(new Index()
+                .on("connectionId", org.springframework.data.domain.Sort.Direction.ASC)
+                .named("satori_event_cursor_connection")
+                .unique());
     }
 }

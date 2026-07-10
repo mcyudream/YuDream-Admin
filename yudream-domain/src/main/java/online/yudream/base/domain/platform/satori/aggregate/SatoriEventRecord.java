@@ -22,6 +22,7 @@ public class SatoriEventRecord extends BaseDomain {
     private String type;
     private String rawData;
     private LocalDateTime receivedAt;
+    private LocalDateTime publishedAt;
     private LocalDateTime expireAt;
 
     public static SatoriEventRecord create(Long connectionId, String sequence, String type, String rawData, int retentionDays) {
@@ -41,5 +42,13 @@ public class SatoriEventRecord extends BaseDomain {
 
     public String idempotencyKey() {
         return connectionId + ":" + sequence;
+    }
+
+    public boolean published() {
+        return publishedAt != null;
+    }
+
+    public void markPublished() {
+        this.publishedAt = LocalDateTime.now();
     }
 }

@@ -23,6 +23,7 @@ public class SatoriEventRecordDO extends BaseDO {
     private String type;
     private String rawData;
     private LocalDateTime receivedAt;
+    private LocalDateTime publishedAt;
     @Indexed(expireAfter = "0s")
     private LocalDateTime expireAt;
 }
