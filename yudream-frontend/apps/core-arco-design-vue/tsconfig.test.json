@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.test.tsbuildinfo",
+    "types": [
+      "@fantastic-admin/types/global",
+      "vite/client",
+      "@spiriit/vite-plugin-svg-spritemap/client",
+      "unplugin-turbo-console/client",
+      "vite-plugin-app-loading/client",
+      "node"
+    ]
+  },
+  "include": [
+    "src/types/**/*.d.ts",
+    "src/**/*.test.ts"
+  ],
+  "exclude": []
+}

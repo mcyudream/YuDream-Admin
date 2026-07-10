@@ -8,6 +8,7 @@
     "build:test": "vue-tsc -b && vite build --mode test",
     "serve": "http-server ./dist -o",
     "serve:test": "http-server ./dist-test -o",
+    "test:typecheck": "vue-tsc -p tsconfig.test.json --noEmit",
     "svgo": "svgo -f src/assets/icons",
     "generate:icons": "fa-iconify-tools",
     "lint": "vue-tsc -b"
