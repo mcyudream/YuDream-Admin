@@ -11,6 +11,8 @@ public class SatoriConnectionRes {
     private String id;
     private String name;
     private String baseUrl;
+    private String platform;
+    private String userId;
     private boolean enabled;
     private boolean credentialConfigured;
     private LocalDateTime createTime;

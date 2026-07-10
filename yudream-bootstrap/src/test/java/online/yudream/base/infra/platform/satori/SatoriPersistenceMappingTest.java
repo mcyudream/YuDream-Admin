@@ -45,7 +45,7 @@ class SatoriPersistenceMappingTest {
 
     @Test
     void shouldRoundTripConnectionWithoutPersistingPlaintextToken() {
-        SatoriConnection connection = SatoriConnection.create("Bot", "https://satori.example.com/v1/", "secret-token");
+        SatoriConnection connection = SatoriConnection.create("Bot", "https://satori.example.com/v1/", "discord", "bot-1", "secret-token");
         connection.setId(1L);
 
         var dataObj = SatoriInfraMapper.toDataObj(connection, cipher);

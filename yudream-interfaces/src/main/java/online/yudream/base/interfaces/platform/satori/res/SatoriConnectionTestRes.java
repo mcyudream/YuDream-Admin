@@ -10,8 +10,9 @@ import java.util.List;
 @Builder
 public class SatoriConnectionTestRes {
     private boolean success;
-    private String impl;
-    private String protocolVersion;
+    private String platform;
+    private String userId;
+    private String status;
     private String adapter;
     private List<String> features;
     private LocalDateTime testedAt;

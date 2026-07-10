@@ -9,6 +9,10 @@ public class SatoriConnectionCreateRequest {
     private String name;
     @NotBlank(message = "Satori 地址不能为空")
     private String baseUrl;
+    @NotBlank(message = "Satori 平台不能为空")
+    private String platform;
+    @NotBlank(message = "Satori 用户 ID 不能为空")
+    private String userId;
     @NotBlank(message = "连接令牌不能为空")
     private String token;
 }

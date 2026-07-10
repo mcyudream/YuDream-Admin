@@ -19,6 +19,8 @@ public final class SatoriInfraMapper {
         copyBase(source, target);
         target.setName(source.getName());
         target.setBaseUrl(source.getBaseUrl());
+        target.setPlatform(source.getPlatform());
+        target.setUserId(source.getUserId());
         target.setEncryptedToken(source.getToken() == null ? null : cipher.encrypt(source.getToken()));
         target.setEnabled(source.isEnabled());
         return target;
@@ -28,6 +30,7 @@ public final class SatoriInfraMapper {
         if (source == null) return null;
         return SatoriConnection.builder().id(source.getId()).version(source.getVersion()).createTime(source.getCreateTime()).updateTime(source.getUpdateTime())
                 .name(source.getName()).baseUrl(source.getBaseUrl())
+                .platform(source.getPlatform()).userId(source.getUserId())
                 .token(source.getEncryptedToken() == null ? null : cipher.decrypt(source.getEncryptedToken()))
                 .enabled(source.isEnabled()).build();
     }

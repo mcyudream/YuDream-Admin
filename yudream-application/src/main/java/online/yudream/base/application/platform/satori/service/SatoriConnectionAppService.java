@@ -38,14 +38,15 @@ public class SatoriConnectionAppService {
     @Transactional
     public SatoriConnectionDTO create(SatoriConnectionCreateCmd cmd) {
         ensureEnabled();
-        return SatoriConnectionAssembler.toDTO(connectionRepo.save(SatoriConnection.create(cmd.getName(), cmd.getBaseUrl(), cmd.getToken())));
+        return SatoriConnectionAssembler.toDTO(connectionRepo.save(SatoriConnection.create(cmd.getName(), cmd.getBaseUrl(),
+                cmd.getPlatform(), cmd.getUserId(), cmd.getToken())));
     }
 
     @Transactional
     public SatoriConnectionDTO update(SatoriConnectionUpdateCmd cmd) {
         ensureEnabled();
         SatoriConnection connection = connection(cmd.getId());
-        connection.update(cmd.getName(), cmd.getBaseUrl(), cmd.getToken());
+        connection.update(cmd.getName(), cmd.getBaseUrl(), cmd.getPlatform(), cmd.getUserId(), cmd.getToken());
         return SatoriConnectionAssembler.toDTO(connectionRepo.save(connection));
     }
 
@@ -83,7 +84,7 @@ public class SatoriConnectionAppService {
         if (!connection.enabled()) {
             throw new BizException("Satori 连接未启用");
         }
-        return SatoriConnectionAssembler.toTestDTO(apiGateway.meta(contextOf(connection)));
+        return SatoriConnectionAssembler.toTestDTO(connection, apiGateway.loginGet(contextOf(connection)));
     }
 
     @Transactional(readOnly = true)
@@ -96,7 +97,9 @@ public class SatoriConnectionAppService {
         if (cmd.getMethod() == null || cmd.getMethod().isBlank()) {
             throw new BizException("Satori 原生方法不能为空");
         }
-        return internalGateway.invoke(new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), cmd.getPlatform(), cmd.getUserId()),
+        String platform = cmd.getPlatform() == null || cmd.getPlatform().isBlank() ? connection.getPlatform() : cmd.getPlatform();
+        String userId = cmd.getUserId() == null || cmd.getUserId().isBlank() ? connection.getUserId() : cmd.getUserId();
+        return internalGateway.invoke(new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), platform, userId),
                 new InternalRequest(cmd.getMethod(), cmd.getPayload()));
     }
 
@@ -108,7 +111,7 @@ public class SatoriConnectionAppService {
     }
 
     private SatoriApiContext contextOf(SatoriConnection connection) {
-        return new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), null, null);
+        return new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), connection.getPlatform(), connection.getUserId());
     }
 
     private void ensureEnabled() {

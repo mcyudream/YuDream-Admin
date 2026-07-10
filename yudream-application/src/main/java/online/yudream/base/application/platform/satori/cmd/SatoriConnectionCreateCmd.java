@@ -6,5 +6,7 @@ import lombok.Data;
 public class SatoriConnectionCreateCmd {
     private String name;
     private String baseUrl;
+    private String platform;
+    private String userId;
     private String token;
 }

@@ -14,10 +14,12 @@ class SatoriConnectionTest {
 
     @Test
     void shouldNormalizeUrlSwitchStateAndNeverExposeToken() {
-        SatoriConnection connection = SatoriConnection.create("  Bot  ", " https://satori.example.com/v1/ ", "secret-token");
+        SatoriConnection connection = SatoriConnection.create("  Bot  ", " https://satori.example.com/v1/ ", "discord", "bot-1", "secret-token");
 
         assertThat(connection.getName()).isEqualTo("Bot");
         assertThat(connection.getBaseUrl()).isEqualTo("https://satori.example.com/v1");
+        assertThat(connection.getPlatform()).isEqualTo("discord");
+        assertThat(connection.getUserId()).isEqualTo("bot-1");
         assertThat(connection.enabled()).isTrue();
         assertThat(connection.toString()).contains("SatoriConnection").doesNotContain("secret-token");
 
@@ -29,7 +31,7 @@ class SatoriConnectionTest {
 
     @Test
     void shouldRejectCredentialsEmbeddedInSatoriUrl() {
-        assertThatThrownBy(() -> SatoriConnection.create("Bot", "https://operator:secret@satori.example.com/v1", "token"))
+        assertThatThrownBy(() -> SatoriConnection.create("Bot", "https://operator:secret@satori.example.com/v1", "discord", "bot-1", "token"))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("HTTP");
     }

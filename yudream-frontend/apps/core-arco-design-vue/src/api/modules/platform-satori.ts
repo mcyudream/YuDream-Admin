@@ -5,6 +5,8 @@ export interface SatoriConnection {
   id: string
   name: string
   baseUrl: string
+  platform: string
+  userId: string
   enabled: boolean
   credentialConfigured: boolean
   createTime?: string
@@ -14,13 +16,16 @@ export interface SatoriConnection {
 export interface SatoriConnectionPayload {
   name: string
   baseUrl: string
+  platform: string
+  userId: string
   token?: string
 }
 
 export interface SatoriConnectionTest {
   success: boolean
-  impl?: string
-  protocolVersion?: string
+  platform: string
+  userId: string
+  status?: string
   adapter?: string
   features: string[]
   testedAt?: string
