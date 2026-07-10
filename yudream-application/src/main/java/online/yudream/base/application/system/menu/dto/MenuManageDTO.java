@@ -21,6 +21,7 @@ public class MenuManageDTO implements Serializable {
     private String name;
     private MenuNodeType type;
     private String parentCode;
+    private String displayParentCode;
     private String module;
     private String icon;
     private String path;

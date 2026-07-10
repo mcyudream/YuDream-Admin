@@ -59,6 +59,7 @@ public class MenuWebAssembler {
                 .name(dto.getName())
                 .type(dto.getType())
                 .parentCode(dto.getParentCode())
+                .displayParentCode(dto.getDisplayParentCode())
                 .module(dto.getModule())
                 .icon(dto.getIcon())
                 .path(dto.getPath())

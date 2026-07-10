@@ -57,6 +57,8 @@ class MenuAppServicePluginMenuTest {
             assertThat(parent.getCode()).isEqualTo(systemParent.getCode());
             assertThat(parent.getChildren()).singleElement().satisfies(child -> {
                 assertThat(child.getCode()).isEqualTo(pluginMenu.getCode());
+                assertThat(child.getParentCode()).isEqualTo(systemParent.getCode());
+                assertThat(child.getDisplayParentCode()).isEqualTo(systemParent.getCode());
                 assertThat(child.getSource()).isEqualTo(MenuSource.PLUGIN);
                 assertThat(child.getPluginCode()).isEqualTo("wallet");
                 assertThat(child.getPluginModuleName()).isEqualTo("wallet-admin");
@@ -111,7 +113,8 @@ class MenuAppServicePluginMenuTest {
             assertThat(parent.getCode()).isEqualTo(systemParent.getCode());
             assertThat(parent.getChildren()).singleElement().satisfies(child -> {
                 assertThat(child.getCode()).isEqualTo(availableChild.getCode());
-                assertThat(child.getParentCode()).isEqualTo(systemParent.getCode());
+                assertThat(child.getParentCode()).isEqualTo(unavailablePlugin.getCode());
+                assertThat(child.getDisplayParentCode()).isEqualTo(systemParent.getCode());
             });
         });
         assertThat(availableChild.getParentCode()).isEqualTo(unavailablePlugin.getCode());
@@ -192,6 +195,37 @@ class MenuAppServicePluginMenuTest {
             assertThat(children).extracting(child -> child.get("name"))
                     .containsExactly(legacySystemChild.getCode());
         });
+    }
+
+    @Test
+    void staticRouteTreeClimbsPastDisabledSystemParentToVisibleSystemAncestor() {
+        Menu systemRoot = systemMenu("system:root", null, MenuNodeType.CATEGORY);
+        Menu disabledSystemParent = systemMenu("system:hidden", systemRoot.getCode(), MenuNodeType.CATEGORY);
+        disabledSystemParent.setStatus(MenuStatus.DISABLED);
+        Menu activeSystemChild = systemMenu("system:visible", disabledSystemParent.getCode(), MenuNodeType.MENU);
+        when(menuRepo.findAll()).thenReturn(List.of(systemRoot, disabledSystemParent, activeSystemChild));
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(systemRoot, activeSystemChild));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
+            assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(activeSystemChild.getCode());
+        });
+    }
+
+    @Test
+    void staticRouteTreeNormalizesMissingParentChainToRoot() {
+        Menu activeSystemChild = systemMenu("system:orphan", "system:missing", MenuNodeType.MENU);
+        when(menuRepo.findAll()).thenReturn(List.of(activeSystemChild));
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(activeSystemChild));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(route ->
+                assertThat(route.get("name")).isEqualTo(activeSystemChild.getCode()));
     }
 
     @Test
