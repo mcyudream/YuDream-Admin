@@ -151,6 +151,10 @@
     {
       "key": "plugin-authenticated-blob-download",
       "text": "受保护的插件下载不能用 window.open 裸 URL；Sa-Token 只读请求头时浏览器直开不会带 Authorization。插件前端应通过宿主 SDK 的 blob/responseType=blob 请求下载，并从 Content-Disposition 解析文件名。"
+    },
+    {
+      "key": "menu-structural-auth",
+      "text": "后端动态菜单树中 CATEGORY/LAYOUT 结构祖先只承载已授权后代，不得以自身 permission 二次阻断叶子权限；前端 backend route 模式不得把顶级 auth 覆盖到子路由，也不得在递归子节点前用结构父 auth 丢弃整支。BUTTON 权限应从持久化菜单上溯到所属页面，但不可用插件 BUTTON 不得授权页面。"
     }
   ]
 }

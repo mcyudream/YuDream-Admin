@@ -1,8 +1,10 @@
 import type { MenuRecordMainRaw, MenuRecordRaw, RouteRecordMainRaw } from '@fantastic-admin/types'
 import type { RouteRecordRaw } from 'vue-router'
+import type { AuthRouteNode } from './route-auth'
 import { cloneDeep } from 'es-toolkit'
 import { resolveRoutePath } from '@/utils'
 import { findBestMenuGroupIndex } from './menu-match'
+import { filterBackendMenuTreeByAuth } from './route-auth'
 
 export const useAppMenuStore = defineStore(
   'appMenu',
@@ -158,6 +160,12 @@ export const useAppMenuStore = defineStore(
     const auth = useAppAuth()
     // 根据权限过滤导航
     function filterAsyncMenus<T extends MenuRecordMainRaw[] | MenuRecordRaw[]>(menus: T): T {
+      if (appSettingsStore.settings.app.routeBaseOn === 'backend') {
+        return filterBackendMenuTreeByAuth(
+          menus as unknown as AuthRouteNode[],
+          value => auth.auth(value),
+        ) as unknown as T
+      }
       const res: any = []
       menus.forEach((menu) => {
         if (auth.auth(menu.meta?.auth ?? '')) {
