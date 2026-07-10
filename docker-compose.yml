@@ -60,6 +60,12 @@ services:
       - PLATFORM_NEO4J_ENABLED=${PLATFORM_NEO4J_ENABLED:-true}
       - PLATFORM_AI_ENABLED=${PLATFORM_AI_ENABLED:-true}
       - PLATFORM_DATAVIZ_ENABLED=${PLATFORM_DATAVIZ_ENABLED:-true}
+      - PLATFORM_SATORI_ENABLED=${PLATFORM_SATORI_ENABLED:-true}
+      - PLATFORM_MESSAGE_RENDER_ENABLED=${PLATFORM_MESSAGE_RENDER_ENABLED:-true}
+      - MESSAGE_RENDER_BASE_URL=${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
+      - MESSAGE_RENDER_TOKEN=${MESSAGE_RENDER_TOKEN:-}
+      - MESSAGE_RENDER_TIMEOUT=${MESSAGE_RENDER_TIMEOUT:-30s}
+      - YUDREAM_SATORI_CREDENTIAL_KEY=${YUDREAM_SATORI_CREDENTIAL_KEY:-}
       - PLATFORM_AI_CONNECT_TIMEOUT=${PLATFORM_AI_CONNECT_TIMEOUT:-30s}
       - PLATFORM_AI_READ_TIMEOUT=${PLATFORM_AI_READ_TIMEOUT:-10m}
       - PLATFORM_AI_SSE_TIMEOUT=${PLATFORM_AI_SSE_TIMEOUT:-10m}
@@ -75,6 +81,35 @@ services:
     volumes:
       # 将宿主机 ./plugins 目录挂载到容器，方便单独更新插件 JAR
       - ./plugins:/app/plugins
+    networks:
+      - yudream
+
+  render-server:
+    build:
+      context: ./yudream-render-server
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/render-server:${TAG:-latest}
+    container_name: yudream-render-server
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - RENDER_HOST=0.0.0.0
+      - RENDER_PORT=3000
+      - RENDER_TOKEN=${MESSAGE_RENDER_TOKEN:-}
+      - RENDER_CONCURRENCY=${RENDER_CONCURRENCY:-2}
+      - RENDER_TIMEOUT_MS=${RENDER_TIMEOUT_MS:-30000}
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 768M
     networks:
       - yudream
 
