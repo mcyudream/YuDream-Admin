@@ -135,6 +135,11 @@ public class MenuAppService {
         List<Menu> activeMenus = menuDomainService.findActiveMenus();
         Map<String, Menu> activeMenuMap = activeMenus.stream()
                 .collect(Collectors.toMap(Menu::getCode, menu -> menu));
+        Map<String, Menu> allMenuMap = new HashMap<>(activeMenuMap);
+        List<Menu> persistedMenus = menuRepo.findAll();
+        if (persistedMenus != null) {
+            persistedMenus.forEach(menu -> allMenuMap.putIfAbsent(menu.getCode(), menu));
+        }
         List<Menu> allMenus = activeMenus.stream()
                 .filter(menu -> !menu.isPluginMenu())
                 .filter(this::platformCapabilityVisible)
@@ -147,13 +152,13 @@ public class MenuAppService {
 
         Map<String, List<Menu>> childrenMap = new HashMap<>();
         for (Menu menu : allMenus) {
-            String parentCode = resolveSystemParentCode(menu, activeMenuMap);
+            String parentCode = resolveSystemParentCode(menu, allMenuMap);
             childrenMap.computeIfAbsent(parentCode, k -> new ArrayList<>()).add(menu);
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (Menu menu : allMenus) {
-            if (resolveSystemParentCode(menu, activeMenuMap) != null) {
+            if (resolveSystemParentCode(menu, allMenuMap) != null) {
                 continue;
             }
             Map<String, Object> root = menu.getType() == MenuNodeType.CATEGORY

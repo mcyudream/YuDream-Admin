@@ -141,6 +141,7 @@ class MenuAppServicePluginMenuTest {
         Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
         Menu systemChild = systemMenu("system:tools:audit", systemParent.getCode(), MenuNodeType.MENU);
         Menu pluginChild = pluginMenu("plugin:wallet:home", systemParent.getCode(), true);
+        when(menuRepo.findAll()).thenReturn(List.of(systemParent, systemChild, pluginChild));
         when(menuDomainService.findActiveMenus()).thenReturn(List.of(systemParent, systemChild, pluginChild));
 
         List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
@@ -160,7 +161,28 @@ class MenuAppServicePluginMenuTest {
         pluginParent.setType(MenuNodeType.LAYOUT);
         Menu legacySystemChild = systemMenu(
                 "system:tools:legacy-report", pluginParent.getCode(), MenuNodeType.MENU);
+        when(menuRepo.findAll()).thenReturn(List.of(systemParent, pluginParent, legacySystemChild));
         when(menuDomainService.findActiveMenus()).thenReturn(List.of(systemParent, pluginParent, legacySystemChild));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
+            assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(legacySystemChild.getCode());
+        });
+    }
+
+    @Test
+    void staticRouteTreeClimbsPastDisabledLegacyPluginParentToSystemAncestor() {
+        Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        Menu disabledPluginParent = pluginMenu("plugin:wallet:tools", systemParent.getCode(), false);
+        disabledPluginParent.setType(MenuNodeType.LAYOUT);
+        Menu legacySystemChild = systemMenu(
+                "system:tools:legacy-report", disabledPluginParent.getCode(), MenuNodeType.MENU);
+        when(menuRepo.findAll()).thenReturn(List.of(systemParent, disabledPluginParent, legacySystemChild));
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(systemParent, legacySystemChild));
 
         List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
 
@@ -178,6 +200,7 @@ class MenuAppServicePluginMenuTest {
         pluginParent.setType(MenuNodeType.CATEGORY);
         Menu legacySystemChild = systemMenu(
                 "system:legacy-report", pluginParent.getCode(), MenuNodeType.MENU);
+        when(menuRepo.findAll()).thenReturn(List.of(pluginParent, legacySystemChild));
         when(menuDomainService.findActiveMenus()).thenReturn(List.of(pluginParent, legacySystemChild));
 
         List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
@@ -198,7 +221,8 @@ class MenuAppServicePluginMenuTest {
         cmd.setParentCode(pluginParent.getCode());
 
         assertThatThrownBy(() -> service.create(cmd))
-                .isInstanceOf(BizException.class);
+                .isInstanceOf(BizException.class)
+                .hasMessage("系统菜单不能挂载到插件菜单下");
     }
 
     @Test
@@ -214,7 +238,8 @@ class MenuAppServicePluginMenuTest {
         cmd.setParentCode(pluginParent.getCode());
 
         assertThatThrownBy(() -> service.update(cmd))
-                .isInstanceOf(BizException.class);
+                .isInstanceOf(BizException.class)
+                .hasMessage("系统菜单不能挂载到插件菜单下");
     }
 
     @Test
