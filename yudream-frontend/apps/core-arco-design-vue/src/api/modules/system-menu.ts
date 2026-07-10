@@ -3,20 +3,27 @@ import systemClient from './system-client'
 
 export type MenuNodeType = 'CATEGORY' | 'LAYOUT' | 'MENU' | 'LINK' | 'BUTTON'
 export type MenuStatus = 'ACTIVE' | 'DISABLED'
+export type MenuSource = 'SYSTEM' | 'PLUGIN'
 
 export interface MenuManageItem {
   code: string
   name: string
   type: MenuNodeType
   parentCode?: string
+  displayParentCode?: string
   module?: string
   icon?: string
   path?: string
   component?: string
   link?: string
   sort?: number
+  visible?: boolean
   permission?: string
   status: MenuStatus
+  source?: MenuSource
+  pluginCode?: string
+  pluginModuleName?: string
+  runtimeAvailable?: boolean
   children?: MenuManageItem[]
 }
 

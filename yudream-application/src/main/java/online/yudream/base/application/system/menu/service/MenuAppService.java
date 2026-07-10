@@ -439,6 +439,7 @@ public class MenuAppService {
 
     private Map<String, Object> buildMeta(Menu menu) {
         Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("menuCode", menu.getCode());
         meta.put("title", menu.getName());
         if (StringUtils.hasText(menu.getIcon())) {
             meta.put("icon", menu.getIcon());
