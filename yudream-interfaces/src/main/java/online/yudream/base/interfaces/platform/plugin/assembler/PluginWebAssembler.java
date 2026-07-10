@@ -90,6 +90,7 @@ public class PluginWebAssembler {
                 .component(dto.getComponent())
                 .permission(dto.getPermission())
                 .sort(dto.getSort())
+                .hideInMenu(dto.getHideInMenu())
                 .parentCode(dto.getParentCode())
                 .visible(dto.getVisible())
                 .status(dto.getStatus())

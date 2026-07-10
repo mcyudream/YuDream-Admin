@@ -61,7 +61,7 @@ public class PluginMenuProjectionService {
                     defaultParentCode = parentMenu.getCode();
                 }
 
-                createIfMissing(
+                Menu routeMenu = createIfMissing(
                         pluginCode,
                         modulePlan.moduleName(),
                         routePlan.registrationKey(),
@@ -73,6 +73,10 @@ public class PluginMenuProjectionService {
                                 routePlan.route()
                         )
                 );
+                if (routePlan.route().hideInMenu() && routeMenu.isVisibleInMenu()) {
+                    routeMenu.setVisible(false);
+                    menuRepo.save(routeMenu);
+                }
             }
         }
     }
@@ -220,7 +224,7 @@ public class PluginMenuProjectionService {
                 .path(route.path())
                 .component(route.component())
                 .sort(defaultSort(route.sort()))
-                .visible(true)
+                .visible(!route.hideInMenu())
                 .permission(route.permission())
                 .status(MenuStatus.ACTIVE)
                 .build();

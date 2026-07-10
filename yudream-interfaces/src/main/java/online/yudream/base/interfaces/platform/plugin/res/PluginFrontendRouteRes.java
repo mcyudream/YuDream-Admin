@@ -30,6 +30,7 @@ public class PluginFrontendRouteRes implements Serializable {
     private String component;
     private String permission;
     private Integer sort;
+    private Boolean hideInMenu;
     private String parentCode;
     private Boolean visible;
     private MenuStatus status;

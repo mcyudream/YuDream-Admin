@@ -30,4 +30,10 @@ public @interface PluginRoute {
     String permission() default "";
 
     int sort() default 0;
+
+    /**
+     * Keeps the route registered while excluding its menu item from host navigation.
+     * Use this for contextual pages that require an identifier supplied by another page.
+     */
+    boolean hideInMenu() default false;
 }

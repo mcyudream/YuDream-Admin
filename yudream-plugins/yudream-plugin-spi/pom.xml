@@ -6,7 +6,7 @@
 
     <groupId>online.yudream.base</groupId>
     <artifactId>yudream-plugin-spi</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
 
     <name>YuDream Plugin SPI</name>

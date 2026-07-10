@@ -107,6 +107,10 @@
     {
       "key": "reversible-disable",
       "text": "凡保留持久化记录并将状态切换为 DISABLED、DEPRECATED 或 enabled=false 的软停用操作，必须提供显式且幂等的启用领域动作、应用用例、受权限保护 API 和前端入口；启用只恢复生命周期状态，不覆盖业务配置。真实删除、吊销、过期、下线/发布工作流不适用。"
+    },
+    {
+      "key": "plugin-contextual-route-hidden-menu",
+      "text": "Plugin routes that require a contextual identifier, such as detail pages, editors, operation histories, or scoped statistics, should declare @PluginRoute(hideInMenu = true). The host must retain the route and Layout wrapper while projecting its menu entry with visible=false so it is reachable only from contextual navigation."
     }
   ],
   "utilities": [

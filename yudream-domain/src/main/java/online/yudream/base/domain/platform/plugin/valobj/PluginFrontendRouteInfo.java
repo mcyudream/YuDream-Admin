@@ -15,13 +15,21 @@ public record PluginFrontendRouteInfo(
         String component,
         String permission,
         Integer sort,
+        boolean hideInMenu,
         PluginMenuOverrideInfo menuOverride,
         PluginMenuOverrideInfo parentOverride
 ) {
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort) {
-        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort,
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, false,
+                null, null);
+    }
+
+    public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
+                                   String parentTitle, String parentIcon, Integer parentSort, String component,
+                                   String permission, Integer sort, boolean hideInMenu) {
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, hideInMenu,
                 null, null);
     }
 
@@ -29,7 +37,7 @@ public record PluginFrontendRouteInfo(
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort, String parentCode, Boolean visible,
                                    MenuStatus status) {
-        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort,
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, false,
                 PluginMenuOverrideInfo.builder()
                         .name(title)
                         .type(MenuNodeType.MENU)
@@ -58,7 +66,7 @@ public record PluginFrontendRouteInfo(
                                    String parentMenuCode, String parentParentCode, MenuNodeType parentType,
                                    String parentModule, String parentComponent, String parentLink,
                                    String parentPermission, Boolean parentVisible, MenuStatus parentStatus) {
-        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort,
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, false,
                 PluginMenuOverrideInfo.builder()
                         .code(menuCode)
                         .name(title)
@@ -100,14 +108,14 @@ public record PluginFrontendRouteInfo(
                 parentOverride == null ? null : parentOverride.name(),
                 parentOverride == null ? null : parentOverride.icon(),
                 parentOverride == null ? null : parentOverride.sort(),
-                override.component(), override.permission(), override.sort(), override, parentOverride
+                override.component(), override.permission(), override.sort(), declaration.hideInMenu(), override, parentOverride
         );
     }
 
     public PluginFrontendRouteInfo withSortOverrides(Integer overriddenParentSort, Integer overriddenSort) {
         return new PluginFrontendRouteInfo(
                 path, name, title, icon, parentPath, parentTitle, parentIcon, overriddenParentSort,
-                component, permission, overriddenSort,
+                component, permission, overriddenSort, hideInMenu,
                 menuOverride == null ? null : menuOverride.withSort(overriddenSort),
                 parentOverride == null ? null : parentOverride.withSort(overriddenParentSort)
         );
