@@ -25,7 +25,7 @@
 
 ```vue
 <script setup lang="ts">
-import type { TableColumn } from '@fantastic-admin/components'
+import type { TableColumn } from '@yudream/components'
 import api{ModuleName} from '@/api/modules/{fileName}'
 import eventBus from '@/utils/eventBus'
 import DetailForm from './components/DetailForm/index.vue'

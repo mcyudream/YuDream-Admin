@@ -1,10 +1,12 @@
 # Project Progress Plugin Implementation Plan
 
+> Historical note (post-split): this plan was written before official business plugin source was moved out of the core repository. Paths like `yudream-plugins/yudream-plugin-project-progress` and `yudream-frontend/packages/plugin-project-progress` should now be read as paths inside the standalone plugin repository `yudream-admin-plugins`, not inside the core repository.
+
 > **For implementer:** Use TDD throughout where the module can support it. Write failing tests for domain/application rules before implementation. Watch them fail, implement, then verify.
 
 **Goal:** Build a standalone `project-progress` plugin for project progress monitoring, task assignment, multi-method check-in, Minecraft online-duration check-in, acceptance, and email notifications.
 
-**Architecture:** Add a stable mail SPI in `yudream-plugin-spi`, adapt it in host infrastructure, then add a DDD-shaped plugin module under `yudream-plugins/yudream-plugin-project-progress`. Add a frontend remote plugin package under `yudream-frontend/packages/plugin-project-progress` and package its `dist` into the plugin jar.
+**Architecture:** Add a stable mail SPI in `yudream-plugin-spi`, adapt it in host infrastructure, then add a DDD-shaped plugin module in the standalone plugin repository `yudream-admin-plugins` under `yudream-plugins/yudream-plugin-project-progress`. Add a frontend remote plugin package under `yudream-frontend/packages/plugin-project-progress` there and package its `dist` into the plugin jar.
 
 **Tech Stack:** Java 21, Maven, YuDream plugin SPI, Mongo-backed `PluginDocumentStore`, `PluginFileStore`, existing mail domain service, Vue 3, Vite, TypeScript, `@yudream/plugin-sdk`.
 

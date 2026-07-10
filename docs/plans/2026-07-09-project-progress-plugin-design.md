@@ -1,8 +1,10 @@
 # Project Progress Plugin Design
 
+> Historical note (post-split): this design document was written before official business plugin source was moved out of the core repository. Paths like `yudream-plugins/yudream-plugin-project-progress` and `yudream-frontend/packages/plugin-project-progress` should now be read as paths inside the standalone plugin repository `yudream-admin-plugins`, not inside the core repository.
+
 ## Context
 
-YuDream Admin already has a plugin runtime with SPI-only contracts for plugin jars. Business plugins live under `yudream-plugins/` and frontend plugin packages live under `yudream-frontend/packages/plugin-*`. The existing `minecraft-server` plugin exposes server and player activity through `PluginMinecraftService`, so a new project progress plugin can read Minecraft online duration without directly depending on the Minecraft plugin implementation.
+YuDream Admin already has a plugin runtime with SPI-only contracts for plugin jars. After the repository split, official business plugins now live by default in the standalone plugin repository `yudream-admin-plugins`; paths under `yudream-plugins/` and `yudream-frontend/packages/plugin-*` in this document should be read as paths inside that repository. The existing `minecraft-server` plugin exposes server and player activity through `PluginMinecraftService`, so a new project progress plugin can read Minecraft online duration without directly depending on the Minecraft plugin implementation.
 
 Current reusable platform abilities:
 
