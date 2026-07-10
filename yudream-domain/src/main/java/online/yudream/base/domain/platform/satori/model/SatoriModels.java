@@ -3,6 +3,8 @@ package online.yudream.base.domain.platform.satori.model;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +17,29 @@ import java.util.Set;
 public final class SatoriModels {
 
     private SatoriModels() {
+    }
+
+    private static Map<String, Object> immutableMap(Map<String, Object> source) {
+        if (source == null || source.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> copy = new LinkedHashMap<>();
+        source.forEach((key, value) -> copy.put(key, immutableValue(value)));
+        return Collections.unmodifiableMap(copy);
+    }
+
+    private static Object immutableValue(Object value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> copy = new LinkedHashMap<>();
+            map.forEach((key, nestedValue) -> copy.put(String.valueOf(key), immutableValue(nestedValue)));
+            return Collections.unmodifiableMap(copy);
+        }
+        if (value instanceof List<?> list) {
+            List<Object> copy = new ArrayList<>();
+            list.forEach(item -> copy.add(immutableValue(item)));
+            return Collections.unmodifiableList(copy);
+        }
+        return value;
     }
 
     public record SatoriLogin(
@@ -52,11 +77,11 @@ public final class SatoriModels {
             SatoriUser user,
             Map<String, Object> referrer,
             String extensionType,
-            Map<String, Object> extensionData
+            Object extensionData
     ) {
         public SatoriEvent {
-            referrer = referrer == null ? Map.of() : Map.copyOf(referrer);
-            extensionData = extensionData == null ? Map.of() : Map.copyOf(extensionData);
+            referrer = immutableMap(referrer);
+            extensionData = immutableValue(extensionData);
         }
     }
 
@@ -117,7 +142,7 @@ public final class SatoriModels {
 
         public SatoriMeta {
             features = features == null ? List.of() : List.copyOf(features);
-            extraFields = immutableMap(extraFields);
+            extraFields = SatoriModels.immutableMap(withoutReservedFields(extraFields));
         }
 
         public static SatoriMeta of(String impl, String protocolVersion, String adapter, List<String> features,
@@ -133,25 +158,18 @@ public final class SatoriModels {
             return new SatoriMeta(impl, protocolVersion, adapter, features, extras);
         }
 
-        private static Map<String, Object> immutableMap(Map<String, Object> source) {
+        private static Map<String, Object> withoutReservedFields(Map<String, Object> source) {
             if (source == null || source.isEmpty()) {
                 return Map.of();
             }
-            Map<String, Object> copy = new LinkedHashMap<>();
-            source.forEach((key, value) -> copy.put(key, immutableValue(value)));
-            return Map.copyOf(copy);
+            Map<String, Object> result = new LinkedHashMap<>();
+            source.forEach((key, value) -> {
+                if (!RESERVED_FIELDS.contains(key)) {
+                    result.put(key, value);
+                }
+            });
+            return result;
         }
 
-        private static Object immutableValue(Object value) {
-            if (value instanceof Map<?, ?> map) {
-                Map<String, Object> copy = new LinkedHashMap<>();
-                map.forEach((key, nestedValue) -> copy.put(String.valueOf(key), immutableValue(nestedValue)));
-                return Map.copyOf(copy);
-            }
-            if (value instanceof List<?> list) {
-                return list.stream().map(SatoriMeta::immutableValue).toList();
-            }
-            return value;
-        }
     }
 }

@@ -14,9 +14,12 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SatoriProtocolModelTest {
 
@@ -44,7 +47,7 @@ class SatoriProtocolModelTest {
         assertThat(event.argv().options()).containsEntry("silent", true);
         assertThat(event.button().id()).isEqualTo("approve");
         assertThat(event.extensionType()).isEqualTo("discord:interaction");
-        assertThat(event.extensionData()).containsEntry("interaction_id", "10000000000000000007");
+        assertThat(event.extensionData()).isEqualTo(Map.of("interaction_id", "10000000000000000007"));
         assertThat(event.referrer()).containsEntry("thread", "thread-1");
 
         SatoriResourceFixture resources = fixture("satori/resources.json", SatoriResourceFixture.class);
@@ -55,6 +58,7 @@ class SatoriProtocolModelTest {
         assertThat(resources.meta().adapter()).isEqualTo("onebot");
         assertThat(resources.meta().features()).contains("message.create");
         assertThat(resources.meta().extraFields()).containsKey("vendor");
+        assertThat(resources.meta().extraFields()).containsEntry("vendor_flag", null);
     }
 
     @Test
@@ -110,6 +114,31 @@ class SatoriProtocolModelTest {
         assertThat(resources.meta().extraFields()).isUnmodifiable();
         assertThat(resources.meta().extraFields().get("vendor")).isInstanceOf(Map.class);
         assertThat((Map<?, ?>) resources.meta().extraFields().get("vendor")).isUnmodifiable();
+    }
+
+    @Test
+    void shouldProtectReservedMetaFieldsAndRejectInvalidEnumWireValues() throws IOException {
+        SatoriModels.SatoriMeta meta = new SatoriModels.SatoriMeta(
+                "satori", "1.0", "onebot", List.of(),
+                Map.of("impl", "forged", "vendor", "trusted")
+        );
+
+        JsonNode serialized = objectMapper.readTree(objectMapper.writeValueAsString(meta));
+        assertThat(serialized.path("impl").asText()).isEqualTo("satori");
+        assertThat(serialized.path("vendor").asText()).isEqualTo("trusted");
+        assertThatThrownBy(() -> objectMapper.readValue("\"unexpected\"", SatoriOpcode.class))
+                .isInstanceOf(IOException.class);
+    }
+
+    @Test
+    void shouldKeepNativeEventPayloadsForArrayAndScalarExtensions() throws IOException {
+        SatoriModels.SatoriEvent arrayEvent = fixture("satori/event-native-data-array.json", SatoriModels.SatoriEvent.class);
+        SatoriModels.SatoriEvent scalarEvent = fixture("satori/event-native-data-scalar.json", SatoriModels.SatoriEvent.class);
+
+        assertThat(arrayEvent.extensionData()).isInstanceOf(List.class);
+        assertThat(arrayEvent.extensionData()).isEqualTo(Arrays.asList("first", null, Map.of("nested", true)));
+        assertThat((List<?>) arrayEvent.extensionData()).isUnmodifiable();
+        assertThat(scalarEvent.extensionData()).isEqualTo("opaque-token");
     }
 
     private <T> T fixture(String path, Class<T> type) throws IOException {

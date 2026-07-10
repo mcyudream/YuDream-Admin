@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.satori.json;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
@@ -18,6 +19,9 @@ final class SatoriIntegerEnumJsonDeserializer<T> extends StdDeserializer<T> {
 
     @Override
     public T deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+        if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT)) {
+            return (T) context.handleUnexpectedToken(handledType(), parser);
+        }
         return factory.apply(parser.getValueAsInt());
     }
 }
