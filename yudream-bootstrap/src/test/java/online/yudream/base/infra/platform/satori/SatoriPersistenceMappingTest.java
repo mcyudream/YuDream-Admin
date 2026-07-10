@@ -7,6 +7,7 @@ import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 import online.yudream.base.domain.platform.satori.service.SatoriCredentialCipher;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventRecordDO;
 import online.yudream.base.infra.platform.satori.mapper.SatoriInfraMapper;
+import online.yudream.base.infra.platform.satori.service.AesGcmSatoriCredentialCipher;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.mongodb.core.index.Indexed;
 
@@ -14,6 +15,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SatoriPersistenceMappingTest {
 
@@ -21,6 +23,16 @@ class SatoriPersistenceMappingTest {
         @Override public String encrypt(String plaintext) { return "enc:" + plaintext; }
         @Override public String decrypt(String ciphertext) { return ciphertext.substring(4); }
     };
+
+    @Test
+    void shouldDeferCredentialKeyValidationUntilSatoriActuallyUsesTheCipher() {
+        AesGcmSatoriCredentialCipher cipherWithoutConfiguredKey = new AesGcmSatoriCredentialCipher("");
+
+        assertThat(cipherWithoutConfiguredKey).isNotNull();
+        assertThatThrownBy(() -> cipherWithoutConfiguredKey.encrypt("secret-token"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("YUDREAM_SATORI_CREDENTIAL_KEY");
+    }
 
     @Test
     void shouldRoundTripConnectionWithoutPersistingPlaintextToken() {
