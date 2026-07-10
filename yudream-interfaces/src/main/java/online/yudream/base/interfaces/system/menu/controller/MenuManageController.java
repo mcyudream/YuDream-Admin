@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -41,16 +42,31 @@ public class MenuManageController {
         return Result.ok(MenuWebAssembler.toRes(menuAppService.create(MenuWebAssembler.toCmd(request))));
     }
 
-    @PutMapping("/{code}")
+    @PutMapping
     @PermissionRegister(code = "system:menu:edit", name = "编辑菜单", module = "系统管理", desc = "编辑菜单")
-    public Result<MenuManageRes> update(@PathVariable String code, @Valid @RequestBody MenuUpdateRequest request) {
+    public Result<MenuManageRes> update(@RequestParam String code, @Valid @RequestBody MenuUpdateRequest request) {
         return Result.ok(MenuWebAssembler.toRes(menuAppService.update(MenuWebAssembler.toCmd(code, request))));
     }
 
-    @DeleteMapping("/{code}")
+    @Deprecated
+    @PutMapping("/{code}")
+    @PermissionRegister(code = "system:menu:edit", name = "编辑菜单", module = "系统管理", desc = "编辑菜单")
+    public Result<MenuManageRes> updateLegacy(@PathVariable String code,
+                                               @Valid @RequestBody MenuUpdateRequest request) {
+        return update(code, request);
+    }
+
+    @DeleteMapping
     @PermissionRegister(code = "system:menu:delete", name = "删除菜单", module = "系统管理", desc = "停用菜单")
-    public Result<Void> disable(@PathVariable String code) {
+    public Result<Void> disable(@RequestParam String code) {
         menuAppService.disable(code);
         return Result.ok();
+    }
+
+    @Deprecated
+    @DeleteMapping("/{code}")
+    @PermissionRegister(code = "system:menu:delete", name = "删除菜单", module = "系统管理", desc = "停用菜单")
+    public Result<Void> disableLegacy(@PathVariable String code) {
+        return disable(code);
     }
 }

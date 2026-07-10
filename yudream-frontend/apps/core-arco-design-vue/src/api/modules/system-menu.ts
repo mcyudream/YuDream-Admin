@@ -51,6 +51,6 @@ export interface MenuPayload {
 export default {
   tree: (params?: MenuTreeParams) => systemClient.get<unknown, ApiResponse<MenuManageItem[]>>('api/system/menus', { params }),
   create: (data: MenuPayload) => systemClient.post<unknown, ApiResponse<MenuManageItem>>('api/system/menus', data),
-  update: (code: string, data: MenuPayload) => systemClient.put<unknown, ApiResponse<MenuManageItem>>(`api/system/menus/${encodeURIComponent(code)}`, data),
-  disable: (code: string) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/menus/${encodeURIComponent(code)}`),
+  update: (code: string, data: MenuPayload) => systemClient.put<unknown, ApiResponse<MenuManageItem>>('api/system/menus', data, { params: { code } }),
+  disable: (code: string) => systemClient.delete<unknown, ApiResponse<null>>('api/system/menus', { params: { code } }),
 }
