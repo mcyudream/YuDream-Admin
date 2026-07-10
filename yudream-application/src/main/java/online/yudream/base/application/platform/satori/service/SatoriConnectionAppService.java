@@ -14,6 +14,9 @@ import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.SatoriApiContext;
 import online.yudream.base.domain.platform.satori.repo.SatoriConnectionRepo;
 import online.yudream.base.domain.platform.satori.service.SatoriApiGateway;
+import online.yudream.base.domain.platform.satori.service.SatoriInternalGateway;
+import online.yudream.base.domain.platform.satori.model.SatoriApiModels.InternalRequest;
+import online.yudream.base.application.platform.satori.cmd.SatoriInternalInvokeCmd;
 import online.yudream.base.domain.platform.satori.service.SatoriEventGateway;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,7 @@ public class SatoriConnectionAppService {
 
     private final SatoriConnectionRepo connectionRepo;
     private final SatoriApiGateway apiGateway;
+    private final SatoriInternalGateway internalGateway;
     private final SatoriEventGateway eventGateway;
     private final CapabilityAppService capabilityAppService;
 
@@ -80,6 +84,20 @@ public class SatoriConnectionAppService {
             throw new BizException("Satori 连接未启用");
         }
         return SatoriConnectionAssembler.toTestDTO(apiGateway.meta(contextOf(connection)));
+    }
+
+    @Transactional(readOnly = true)
+    public Object invokeInternal(SatoriInternalInvokeCmd cmd) {
+        ensureEnabled();
+        SatoriConnection connection = connection(cmd.getConnectionId());
+        if (!connection.enabled()) {
+            throw new BizException("Satori 连接未启用");
+        }
+        if (cmd.getMethod() == null || cmd.getMethod().isBlank()) {
+            throw new BizException("Satori 原生方法不能为空");
+        }
+        return internalGateway.invoke(new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), cmd.getPlatform(), cmd.getUserId()),
+                new InternalRequest(cmd.getMethod(), cmd.getPayload()));
     }
 
     private SatoriConnection connection(Long id) {
