@@ -88,6 +88,34 @@ class PluginMenuProjectionServiceTest {
     }
 
     @Test
+    void createsContextualRoutesAsHiddenMenuEntries() {
+        stubDefaultRepo();
+        PluginFrontendRouteInfo contextualRoute = new PluginFrontendRouteInfo(
+                "/wallet/transactions/detail",
+                "walletTransactionDetail",
+                "交易详情",
+                "file-info-line",
+                "/wallet",
+                "钱包管理",
+                "folder",
+                10,
+                "wallet/transactions/detail",
+                "wallet:transaction:list",
+                30,
+                true
+        );
+
+        service.project(PLUGIN_CODE, List.of(module(contextualRoute)));
+
+        ArgumentCaptor<Menu> captor = ArgumentCaptor.forClass(Menu.class);
+        verify(menuRepo, org.mockito.Mockito.times(3)).save(captor.capture());
+        Menu route = menuByKey(captor.getAllValues(), "route:" + MODULE_NAME + ":walletTransactionDetail");
+        assertThat(route.getPath()).isEqualTo("/wallet/transactions/detail");
+        assertThat(route.getComponent()).isEqualTo("wallet/transactions/detail");
+        assertThat(route.getVisible()).isFalse();
+    }
+
+    @Test
     void existingMenuCodeIsNeverOverwrittenByADeclaration() {
         FailingMenuRepo repo = new FailingMenuRepo();
         PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);

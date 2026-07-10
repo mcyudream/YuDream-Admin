@@ -11,6 +11,7 @@ public record PluginFrontendRoute(
         Integer parentSort,
         String component,
         String permission,
-        Integer sort
+        Integer sort,
+        boolean hideInMenu
 ) {
 }

@@ -96,6 +96,7 @@ public class PluginAssembler {
                 .component(route.component())
                 .permission(route.permission())
                 .sort(route.sort())
+                .hideInMenu(route.hideInMenu())
                 .parentCode(route.parentCode())
                 .visible(route.visible())
                 .status(route.status())
