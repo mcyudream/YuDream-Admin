@@ -2,8 +2,8 @@
 
 .node_image: &node_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
 .maven_image: &maven_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
-.docker_cli_image: &docker_cli_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/docker:27.5.1-cli
-.docker_dind_image: &docker_dind_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/docker:28.5.2-dind
+.docker_cli_image: &docker_cli_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/docker:cli
+.docker_dind_image: &docker_dind_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/docker:dind
 
 default:
   tags:
