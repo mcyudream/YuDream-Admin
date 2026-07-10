@@ -49,6 +49,7 @@ public sealed interface SatoriElement permits SatoriElement.Text, SatoriElement.
                 throw new IllegalArgumentException("非法 Satori 元素名称: " + name);
             }
             attributes = immutableAttributes(attributes);
+            validateStandardElementRequiredAttributes(name, attributes);
             children = children == null ? List.of() : List.copyOf(children);
         }
 
@@ -64,6 +65,38 @@ public sealed interface SatoriElement permits SatoriElement.Text, SatoriElement.
                 copy.put(key, Objects.requireNonNull(value, "Satori 属性值不能为空"));
             });
             return Collections.unmodifiableMap(copy);
+        }
+
+        private static void validateStandardElementRequiredAttributes(String name, Map<String, String> attributes) {
+            switch (name) {
+                case "sharp" -> requireAttribute(attributes, "id");
+                case "a" -> requireAttribute(attributes, "href");
+                case "img", "audio", "video", "file" -> requireAttribute(attributes, "src");
+                case "button" -> validateButtonAttributes(attributes);
+                default -> {
+                    // The remaining standard elements have no required attributes.
+                }
+            }
+        }
+
+        private static void validateButtonAttributes(Map<String, String> attributes) {
+            String type = attributes.get("type");
+            if (type == null) {
+                return;
+            }
+            switch (type) {
+                case "action" -> requireAttribute(attributes, "id");
+                case "link" -> requireAttribute(attributes, "href");
+                case "input" -> requireAttribute(attributes, "text");
+                default -> throw new IllegalArgumentException("不支持的 Satori 按钮类型: " + type);
+            }
+        }
+
+        private static void requireAttribute(Map<String, String> attributes, String name) {
+            String value = attributes.get(name);
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException("Satori 必填属性不能为空: " + name);
+            }
         }
     }
 }
