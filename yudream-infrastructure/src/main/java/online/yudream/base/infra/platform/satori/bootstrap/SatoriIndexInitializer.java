@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventRecordDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventCursorDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriLoginDO;
+import online.yudream.base.infra.platform.satori.dataobj.SatoriOperationLogDO;
 import org.bson.Document;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.ApplicationListener;
@@ -39,5 +40,9 @@ public class SatoriIndexInitializer implements ApplicationListener<ApplicationRe
                 .on("connectionId", org.springframework.data.domain.Sort.Direction.ASC)
                 .named("satori_event_cursor_connection")
                 .unique());
+        mongoTemplate.indexOps(SatoriOperationLogDO.class).ensureIndex(new CompoundIndexDefinition(new Document()
+                .append("connectionId", 1)
+                .append("occurredAt", -1))
+                .named("satori_operation_log_connection_occurred"));
     }
 }

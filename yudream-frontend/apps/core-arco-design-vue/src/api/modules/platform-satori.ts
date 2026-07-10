@@ -31,6 +31,15 @@ export interface SatoriConnectionTest {
   testedAt?: string
 }
 
+export interface SatoriOperationLog {
+  id: string
+  level: 'INFO' | 'WARN' | 'ERROR'
+  category: string
+  action: string
+  detail?: string
+  occurredAt?: string
+}
+
 export default {
   pageConnections: (params: { page: number, size: number, keyword?: string }) => systemClient.get<unknown, ApiResponse<PageResult<SatoriConnection>>>('api/platform/satori/connections', { params }),
   createConnection: (data: SatoriConnectionPayload) => systemClient.post<unknown, ApiResponse<SatoriConnection>>('api/platform/satori/connections', data),
@@ -38,5 +47,6 @@ export default {
   enableConnection: (id: string) => systemClient.post<unknown, ApiResponse<SatoriConnection>>(`api/platform/satori/connections/${id}/enable`),
   disableConnection: (id: string) => systemClient.post<unknown, ApiResponse<SatoriConnection>>(`api/platform/satori/connections/${id}/disable`),
   testConnection: (id: string) => systemClient.post<unknown, ApiResponse<SatoriConnectionTest>>(`api/platform/satori/connections/${id}/test`),
+  pageConnectionLogs: (id: string, params: { page: number, size: number }) => systemClient.get<unknown, ApiResponse<PageResult<SatoriOperationLog>>>(`api/platform/satori/connections/${id}/logs`, { params }),
   render: (data: { sourceType: 'HTML' | 'MARKDOWN' | 'URL', content: string, width?: number, transparent?: boolean }) => systemClient.post<Blob>('api/platform/render', data, { responseType: 'blob' }),
 }

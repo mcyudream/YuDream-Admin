@@ -18,6 +18,7 @@ import online.yudream.base.domain.platform.satori.repo.SatoriConnectionRepo;
 import online.yudream.base.domain.platform.satori.repo.SatoriLoginRepo;
 import online.yudream.base.domain.platform.satori.service.PlatformCapabilityProfileFactory;
 import online.yudream.base.domain.platform.satori.service.SatoriApiGateway;
+import online.yudream.base.domain.platform.satori.service.SatoriOperationLogger;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -36,6 +37,7 @@ public class MessageDeliveryAppService {
     private final SatoriLoginRepo loginRepo;
     private final SatoriApiGateway apiGateway;
     private final MessageRenderGateway renderGateway;
+    private final SatoriOperationLogger operationLogger;
     private final MarkdownToSatoriConverter markdownConverter = new MarkdownToSatoriConverter();
 
     public DeliveryResult deliver(DeliveryRequest request) {
@@ -49,9 +51,15 @@ public class MessageDeliveryAppService {
         SatoriApiContext context = new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), request.platform(), request.userId());
         PreparedContent prepared = prepare(request.content(), profile, context);
         List<online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriMessage> messages = new ArrayList<>();
-        for (String payload : prepared.payloads()) {
-            // message.create is intentionally never retried: adapters may already have accepted it.
-            messages.addAll(apiGateway.messageCreate(context, new MessageCreate(request.channelId(), payload, request.content().referrer())));
+        try {
+            for (String payload : prepared.payloads()) {
+                // message.create is intentionally never retried: adapters may already have accepted it.
+                messages.addAll(apiGateway.messageCreate(context, new MessageCreate(request.channelId(), payload, request.content().referrer())));
+            }
+            operationLogger.info(connection.getId(), "MESSAGE", "message.create", "消息投递成功，共 " + messages.size() + " 条");
+        } catch (RuntimeException exception) {
+            operationLogger.error(connection.getId(), "MESSAGE", "message.create", exception.getMessage());
+            throw exception;
         }
         return new DeliveryResult(messages, prepared.rendered(), prepared.degraded());
     }
