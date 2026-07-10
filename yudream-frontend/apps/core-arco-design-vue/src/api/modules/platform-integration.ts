@@ -114,6 +114,9 @@ export default {
   disableConnector: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/integration/http-connectors/${id}`)
   },
+  enableConnector: (id: string) => {
+    return systemClient.post<unknown, ApiResponse<void>>(`api/platform/integration/http-connectors/${id}/enable`)
+  },
   invokeConnector: (id: string, data: HttpInvokePayload) => {
     return systemClient.post<unknown, ApiResponse<HttpInvocationLog>>(`api/platform/integration/http-connectors/${id}/invoke`, data)
   },
@@ -131,6 +134,9 @@ export default {
   },
   disableScript: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/integration/runtime-scripts/${id}`)
+  },
+  enableScript: (id: string) => {
+    return systemClient.post<unknown, ApiResponse<void>>(`api/platform/integration/runtime-scripts/${id}/enable`)
   },
   executeScript: (id: string, stdin?: string) => {
     return systemClient.post<unknown, ApiResponse<RuntimeExecutionLog>>(`api/platform/integration/runtime-scripts/${id}/execute`, { stdin })

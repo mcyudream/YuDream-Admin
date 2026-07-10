@@ -51,6 +51,10 @@ public class GraphConnection extends BaseDomain {
         this.status = GraphConnectionStatus.DISABLED;
     }
 
+    public void activate() {
+        this.status = GraphConnectionStatus.ACTIVE;
+    }
+
     public boolean active() {
         return GraphConnectionStatus.ACTIVE == status;
     }

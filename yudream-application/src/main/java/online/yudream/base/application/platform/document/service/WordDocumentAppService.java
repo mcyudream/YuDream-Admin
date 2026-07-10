@@ -96,6 +96,14 @@ public class WordDocumentAppService {
     }
 
     @Transactional
+    public void enableTemplate(Long id) {
+        ensureEnabled();
+        WordTemplate template = template(id);
+        template.activate();
+        wordTemplateRepo.save(template);
+    }
+
+    @Transactional
     public WordGenerationRecordDTO generate(WordGenerateCmd cmd) {
         ensureEnabled();
         WordTemplate template = template(cmd.getTemplateId());

@@ -255,6 +255,18 @@ function confirmDisableConnector(row: HttpConnector) {
   })
 }
 
+function confirmEnableConnector(row: HttpConnector) {
+  modal.confirm({
+    title: '确认启用',
+    content: `确认启用 HTTP 连接器「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiIntegration.enableConnector(row.id)
+      toast.success('HTTP 连接器已启用')
+      await load()
+    },
+  })
+}
+
 function openInvoke(row: HttpConnector) {
   invokingConnector.value = row
   invokeForm.headers = '{}'
@@ -345,6 +357,18 @@ function confirmDisableScript(row: RuntimeScript) {
     onConfirm: async () => {
       await apiIntegration.disableScript(row.id)
       toast.success('运行脚本已停用')
+      await load()
+    },
+  })
+}
+
+function confirmEnableScript(row: RuntimeScript) {
+  modal.confirm({
+    title: '确认启用',
+    content: `确认启用运行脚本「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiIntegration.enableScript(row.id)
+      toast.success('运行脚本已启用')
       await load()
     },
   })
@@ -484,8 +508,11 @@ function executionVariant(status: ExecutionStatus) {
             <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row.original)">
               编辑
             </FaButton>
-            <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableConnector(row.original)">
+            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row.original)">
               停用
+            </FaButton>
+            <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row.original)">
+              启用
             </FaButton>
           </div>
         </template>
@@ -574,8 +601,11 @@ function executionVariant(status: ExecutionStatus) {
             <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row.original)">
               编辑
             </FaButton>
-            <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableScript(row.original)">
+            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row.original)">
               停用
+            </FaButton>
+            <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row.original)">
+              启用
             </FaButton>
           </div>
         </template>

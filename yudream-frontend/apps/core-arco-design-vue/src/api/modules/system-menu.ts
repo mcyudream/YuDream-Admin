@@ -52,5 +52,6 @@ export default {
   tree: (params?: MenuTreeParams) => systemClient.get<unknown, ApiResponse<MenuManageItem[]>>('api/system/menus', { params }),
   create: (data: MenuPayload) => systemClient.post<unknown, ApiResponse<MenuManageItem>>('api/system/menus', data),
   update: (code: string, data: MenuPayload) => systemClient.put<unknown, ApiResponse<MenuManageItem>>('api/system/menus', data, { params: { code } }),
+  enable: (code: string) => systemClient.post<unknown, ApiResponse<null>>('api/system/menus/enable', undefined, { params: { code } }),
   disable: (code: string) => systemClient.delete<unknown, ApiResponse<null>>('api/system/menus', { params: { code } }),
 }

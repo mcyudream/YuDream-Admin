@@ -528,6 +528,18 @@ function confirmDisableOAuthClient(row: OAuthClient) {
   })
 }
 
+function confirmEnableOAuthClient(row: OAuthClient) {
+  modal.confirm({
+    title: '确认启用',
+    content: `确认启用 OAuth 客户端「${row.clientName}」吗？`,
+    onConfirm: async () => {
+      await apiSecurity.enableOAuthClient(row.id)
+      toast.success('已启用')
+      await loadOAuth()
+    },
+  })
+}
+
 function confirmDisableOAuthProvider(row: OAuthProvider) {
   modal.confirm({
     title: '确认停用',
@@ -535,6 +547,18 @@ function confirmDisableOAuthProvider(row: OAuthProvider) {
     onConfirm: async () => {
       await apiSecurity.disableOAuthProvider(row.id)
       toast.success('已停用')
+      await loadOAuth()
+    },
+  })
+}
+
+function confirmEnableOAuthProvider(row: OAuthProvider) {
+  modal.confirm({
+    title: '确认启用',
+    content: `确认启用 OAuth 提供商「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiSecurity.enableOAuthProvider(row.id)
+      toast.success('已启用')
       await loadOAuth()
     },
   })
@@ -770,7 +794,8 @@ function normalizeDateTime(value?: string) {
           <template #cell-operation="{ row }">
             <div class="table-actions">
               <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row.original)">编辑</FaButton>
-              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableOAuthClient(row.original)">停用</FaButton>
+              <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthClient(row.original)">停用</FaButton>
+              <FaButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row.original)">启用</FaButton>
             </div>
           </template>
         </FaTable>
@@ -782,7 +807,8 @@ function normalizeDateTime(value?: string) {
           <template #cell-operation="{ row }">
             <div class="table-actions">
               <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row.original)">编辑</FaButton>
-              <FaButton v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisableOAuthProvider(row.original)">停用</FaButton>
+              <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" @click="confirmDisableOAuthProvider(row.original)">停用</FaButton>
+              <FaButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row.original)">启用</FaButton>
             </div>
           </template>
         </FaTable>

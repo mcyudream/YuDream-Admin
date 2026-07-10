@@ -69,4 +69,11 @@ public class MenuManageController {
     public Result<Void> disableLegacy(@PathVariable String code) {
         return disable(code);
     }
+
+    @PostMapping("/enable")
+    @PermissionRegister(code = "system:menu:edit", name = "启用菜单", module = "系统管理", desc = "启用菜单")
+    public Result<Void> enable(@RequestParam String code) {
+        menuAppService.enable(code);
+        return Result.ok();
+    }
 }

@@ -74,6 +74,9 @@ function normalizeDataset(raw: BackendChartDataset, request?: ChartDataRequest):
 }
 
 export default {
+  enableDefinition: (id: string) => {
+    return systemClient.post<unknown, ApiResponse<void>>(`api/platform/dataviz/definitions/${id}/enable`)
+  },
   queryDataset: async (data: ChartDataRequest) => {
     const res = await systemClient.post<unknown, ApiResponse<BackendChartDataset>>('api/platform/dataviz/dataset', data)
     return {

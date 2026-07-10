@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class MenuAppServicePluginMenuTest {
@@ -419,6 +420,26 @@ class MenuAppServicePluginMenuTest {
         assertThat(updated.getPluginModuleName()).isEqualTo("wallet-admin");
         assertThat(updated.getRuntimeAvailable()).isTrue();
         assertThat(pluginMenu.getPluginRegistrationKey()).isEqualTo(registrationKey);
+    }
+
+    @Test
+    void enableOnlyActivatesMenuAndKeepsConfiguration() {
+        Menu menu = pluginMenu("plugin:wallet/pages/home", "system:tools", true);
+        menu.setName("Edited wallet");
+        menu.setPath("/custom/wallet");
+        menu.setPermission("wallet:custom");
+        menu.disable();
+        when(menuRepo.findByCode(menu.getCode())).thenReturn(Optional.of(menu));
+        when(menuRepo.save(menu)).thenReturn(menu);
+
+        service.enable(menu.getCode());
+
+        assertThat(menu.getStatus()).isEqualTo(MenuStatus.ACTIVE);
+        assertThat(menu.getName()).isEqualTo("Edited wallet");
+        assertThat(menu.getPath()).isEqualTo("/custom/wallet");
+        assertThat(menu.getPermission()).isEqualTo("wallet:custom");
+        assertThat(menu.getParentCode()).isEqualTo("system:tools");
+        verify(menuRepo).save(menu);
     }
 
     private Menu systemMenu(String code, String parentCode, MenuNodeType type) {

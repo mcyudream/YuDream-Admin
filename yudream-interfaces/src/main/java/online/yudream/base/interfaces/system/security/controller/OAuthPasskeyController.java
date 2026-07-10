@@ -56,6 +56,13 @@ public class OAuthPasskeyController {
         return Result.ok();
     }
 
+    @PostMapping("/oauth/clients/{id}/enable")
+    @PermissionRegister(code = "system:security:oauth:edit", name = "启用OAuth客户端", module = "系统管理", desc = "启用 OAuth 服务端客户端")
+    public Result<Void> enableClient(@PathVariable Long id) {
+        oauthPasskeyAppService.enableClient(id);
+        return Result.ok();
+    }
+
     @GetMapping("/oauth/providers")
     @PermissionRegister(code = "system:security:oauth:view", name = "查看OAuth提供商", module = "系统管理", desc = "查看 OAuth 外部登录提供商")
     public Result<List<OAuthProviderRes>> providers() {
@@ -78,6 +85,13 @@ public class OAuthPasskeyController {
     @PermissionRegister(code = "system:security:oauth:edit", name = "禁用OAuth提供商", module = "系统管理", desc = "禁用 OAuth 外部登录提供商")
     public Result<Void> disableProvider(@PathVariable Long id) {
         oauthPasskeyAppService.disableProvider(id);
+        return Result.ok();
+    }
+
+    @PostMapping("/oauth/providers/{id}/enable")
+    @PermissionRegister(code = "system:security:oauth:edit", name = "启用OAuth提供商", module = "系统管理", desc = "启用 OAuth 外部登录提供商")
+    public Result<Void> enableProvider(@PathVariable Long id) {
+        oauthPasskeyAppService.enableProvider(id);
         return Result.ok();
     }
 

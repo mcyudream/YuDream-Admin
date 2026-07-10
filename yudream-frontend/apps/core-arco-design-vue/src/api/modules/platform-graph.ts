@@ -64,6 +64,9 @@ export default {
   disableConnection: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/graph/connections/${id}`)
   },
+  enableConnection: (id: string) => {
+    return systemClient.post<unknown, ApiResponse<void>>(`api/platform/graph/connections/${id}/enable`)
+  },
   testConnection: (id: string) => {
     return systemClient.post<unknown, ApiResponse<GraphQueryLog>>(`api/platform/graph/connections/${id}/test`)
   },

@@ -53,6 +53,13 @@ public class GraphController {
         return Result.ok();
     }
 
+    @PostMapping("/connections/{id}/enable")
+    @PermissionRegister(code = "platform:graph:edit", name = "启用图数据库连接", module = "平台能力", desc = "启用 Neo4j 图数据库连接")
+    public Result<Void> enableConnection(@PathVariable Long id) {
+        graphAppService.enableConnection(id);
+        return Result.ok();
+    }
+
     @PostMapping("/connections/{id}/test")
     @PermissionRegister(code = "platform:graph:query", name = "测试图数据库连接", module = "平台能力", desc = "测试 Neo4j 图数据库连接")
     public Result<GraphQueryLogRes> testConnection(@PathVariable Long id) {

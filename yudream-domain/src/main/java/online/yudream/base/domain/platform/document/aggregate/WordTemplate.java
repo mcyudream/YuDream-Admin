@@ -60,6 +60,10 @@ public class WordTemplate extends BaseDomain {
         this.status = TemplateStatus.DISABLED;
     }
 
+    public void activate() {
+        this.status = TemplateStatus.ACTIVE;
+    }
+
     private static String required(String value, String message) {
         if (value == null || value.trim().isEmpty()) {
             throw new BizException(message);

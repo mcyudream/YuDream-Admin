@@ -70,6 +70,13 @@ public class RoleManageController {
         return Result.ok();
     }
 
+    @PostMapping("/{id}/enable")
+    @PermissionRegister(code = "system:role:edit", name = "启用角色", module = "系统管理", desc = "启用角色")
+    public Result<Void> enable(@PathVariable Long id) {
+        roleManageAppService.enable(id);
+        return Result.ok();
+    }
+
     @PutMapping("/{id}/permissions")
     @PermissionRegister(code = "system:role:edit", name = "分配角色权限", module = "系统管理", desc = "分配角色权限")
     public Result<RoleManageRes> assignPermissions(@PathVariable Long id, @Valid @RequestBody RoleAssignPermissionsRequest request) {

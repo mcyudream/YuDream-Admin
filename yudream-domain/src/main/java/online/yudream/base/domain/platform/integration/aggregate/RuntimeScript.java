@@ -58,6 +58,10 @@ public class RuntimeScript extends BaseDomain {
         this.status = ConnectorStatus.DISABLED;
     }
 
+    public void activate() {
+        this.status = ConnectorStatus.ACTIVE;
+    }
+
     private static String required(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new BizException(message);

@@ -80,6 +80,13 @@ public class WordDocumentController {
         return Result.ok();
     }
 
+    @PostMapping("/word-templates/{id}/enable")
+    @PermissionRegister(code = "platform:document:edit", name = "启用Word模板", module = "平台能力", desc = "启用 Word 模板")
+    public Result<Void> enableTemplate(@PathVariable Long id) {
+        wordDocumentAppService.enableTemplate(id);
+        return Result.ok();
+    }
+
     @PostMapping("/word-templates/{id}/generate")
     @PermissionRegister(code = "platform:document:generate", name = "生成Word文档", module = "平台能力", desc = "根据 Word 模板生成报告或证明文件")
     public Result<WordGenerationRecordRes> generate(@PathVariable Long id, @RequestBody WordGenerateRequest request) {

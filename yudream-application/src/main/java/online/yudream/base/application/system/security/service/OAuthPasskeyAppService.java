@@ -100,6 +100,15 @@ public class OAuthPasskeyAppService {
         oauthClientRegistrationRepo.save(registration);
     }
 
+    @Transactional
+    public void enableClient(Long id) {
+        ensureOAuthServerEnabled();
+        OAuthClientRegistration registration = oauthClientRegistrationRepo.findById(id)
+                .orElseThrow(() -> new BizException("OAuth 客户端不存在"));
+        registration.activate();
+        oauthClientRegistrationRepo.save(registration);
+    }
+
     @Transactional(readOnly = true)
     public List<OAuthProviderDTO> listProviders() {
         ensureOAuthClientEnabled();
@@ -134,6 +143,15 @@ public class OAuthPasskeyAppService {
         OAuthProviderRegistration registration = oauthProviderRegistrationRepo.findById(id)
                 .orElseThrow(() -> new BizException("OAuth 提供商不存在"));
         registration.disable();
+        oauthProviderRegistrationRepo.save(registration);
+    }
+
+    @Transactional
+    public void enableProvider(Long id) {
+        ensureOAuthClientEnabled();
+        OAuthProviderRegistration registration = oauthProviderRegistrationRepo.findById(id)
+                .orElseThrow(() -> new BizException("OAuth 提供商不存在"));
+        registration.activate();
         oauthProviderRegistrationRepo.save(registration);
     }
 

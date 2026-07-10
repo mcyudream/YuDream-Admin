@@ -76,6 +76,10 @@ public class OAuthClientRegistration extends BaseDomain {
         this.status = OAuthRegistrationStatus.DISABLED;
     }
 
+    public void activate() {
+        this.status = OAuthRegistrationStatus.ACTIVE;
+    }
+
     private static String required(String value, String message) {
         if (value == null || value.isBlank()) {
             throw new BizException(message);
