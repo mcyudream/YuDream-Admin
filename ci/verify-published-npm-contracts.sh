@@ -19,18 +19,12 @@ COMPONENTS_VERSION=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/
 [ -n "$PLUGIN_SDK_VERSION" ] || fail "unable to resolve @yudream/plugin-sdk version from package.json"
 [ -n "$COMPONENTS_VERSION" ] || fail "unable to resolve @yudream/components version from package.json"
 
-TARGET_REGISTRY="${VERIFY_NPM_REGISTRY:-${TARGET_NPM_REGISTRY:-https://registry.npmjs.org/}}"
+TARGET_REGISTRY="${VERIFY_NPM_REGISTRY:-${NEXUS_NPM_PUBLIC_URL:-https://nexus.yudream.online/repository/npm-public/}}"
 ATTEMPTS="${VERIFY_NPM_ATTEMPTS:-12}"
 SLEEP_SECONDS="${VERIFY_NPM_SLEEP_SECONDS:-10}"
 
-if [ -n "${VERIFY_NPM_TOKEN:-}" ]; then
-  PACKAGE_TOKEN="$VERIFY_NPM_TOKEN"
-elif [ -n "${NPM_TOKEN:-}" ] && [ "$TARGET_REGISTRY" = "https://registry.npmjs.org/" -o "$TARGET_REGISTRY" = "http://registry.npmjs.org/" ]; then
-  PACKAGE_TOKEN="$NPM_TOKEN"
-elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-  PACKAGE_TOKEN="$CI_JOB_TOKEN"
-else
-  PACKAGE_TOKEN=""
+if [ -z "${NEXUS_USERNAME:-}" ] || [ -z "${NEXUS_PASSWORD:-}" ]; then
+  fail "NEXUS_USERNAME and NEXUS_PASSWORD are required"
 fi
 
 VERIFY_DIR="${VERIFY_PUBLISHED_NPM_DIR:-$(mktemp -d "${TMPDIR:-/tmp}/yudream-published-npm-XXXXXX")}"
@@ -58,14 +52,10 @@ cat > "$VERIFY_DIR/.npmrc" <<EOF
 registry=https://registry.npmjs.org/
 @yudream:registry=${TARGET_REGISTRY}
 strict-peer-dependencies=false
-EOF
-
-if [ -n "$PACKAGE_TOKEN" ]; then
-  cat >> "$VERIFY_DIR/.npmrc" <<EOF
-//${REGISTRY_HOST}/:_authToken=${PACKAGE_TOKEN}
+//${REGISTRY_HOST}/:username=${NEXUS_USERNAME}
+//${REGISTRY_HOST}/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')
 always-auth=true
 EOF
-fi
 
 attempt=1
 while :; do

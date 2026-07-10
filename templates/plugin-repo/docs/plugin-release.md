@@ -23,7 +23,7 @@
 
 其中 `publish-plugin` 只在 Git tag 流水线执行，并调用 `ci/publish-plugin-jars.sh` 上传插件包。
 
-`verify-publish` 会在发布完成后调用 `ci/verify-published-plugin-jars.sh`，重新从 GitLab Generic Package Registry 拉回：
+`verify-publish` 会在发布完成后调用 `ci/verify-published-plugin-jars.sh`，重新从 Nexus `maven-public` 解析：
 - `sha256sum.txt`
 - `plugins.manifest.tsv`
 - 每个最终插件 JAR
@@ -54,7 +54,7 @@ packages:
 - 有 `*-shaded.jar` 就发布 `*-shaded.jar`
 - 没有就发布普通 `*.jar`
 
-并额外上传：
+并额外发布 Maven catalog 制品：
 
 - `sha256sum.txt`
 - `plugins.manifest.tsv`
@@ -62,19 +62,22 @@ packages:
 ## 默认发布地址
 
 ```text
-${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yudream-admin-plugins/${CI_COMMIT_TAG}/
+https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 ```
+
+每个插件使用 `online.yudream.plugins:<artifactId>:<tag version>:jar` 坐标；catalog 使用
+`online.yudream.plugins:plugin-catalog:<tag version>:tsv`，校验和使用同一制品的 `sha256` classifier。
 
 ## 需要的变量
 
 默认依赖：
 
-- `CI_API_V4_URL`
-- `CI_PROJECT_ID`
 - `CI_COMMIT_TAG`
-- `CI_JOB_TOKEN`
+- `NEXUS_USERNAME`
+- `NEXUS_PASSWORD`
+- `NEXUS_MAVEN_RELEASES_URL`
+- `NEXUS_MAVEN_PUBLIC_URL`
 
 可选覆盖：
 
-- `PLUGIN_GENERIC_PACKAGE_NAME`
 - `PLUGIN_PACKAGE_VERSION`

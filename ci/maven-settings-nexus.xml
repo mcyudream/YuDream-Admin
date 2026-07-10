@@ -4,6 +4,16 @@
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
     <servers>
         <server>
+            <id>nexus-releases</id>
+            <username>${env.NEXUS_USERNAME}</username>
+            <password>${env.NEXUS_PASSWORD}</password>
+        </server>
+        <server>
+            <id>nexus-snapshots</id>
+            <username>${env.NEXUS_USERNAME}</username>
+            <password>${env.NEXUS_PASSWORD}</password>
+        </server>
+        <server>
             <id>nexus-public</id>
             <username>${env.NEXUS_USERNAME}</username>
             <password>${env.NEXUS_PASSWORD}</password>
@@ -13,7 +23,6 @@
         <mirror>
             <id>nexus-public</id>
             <mirrorOf>*</mirrorOf>
-            <name>YuDream Nexus Maven Public</name>
             <url>https://nexus.yudream.online/repository/maven-public/</url>
         </mirror>
     </mirrors>

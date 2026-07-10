@@ -3,7 +3,7 @@
 .node_image: &node_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
 .maven_image: &maven_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
 .docker_cli_image: &docker_cli_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/docker:27.5.1-cli
-.docker_dind_image: &docker_dind_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/docker:27.5.1-dind
+.docker_dind_image: &docker_dind_image swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/docker:28.5.2-dind
 
 default:
   tags:
@@ -17,11 +17,16 @@ workflow:
 variables:
   PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
   MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
-  MAVEN_SETTINGS_PATH: "ci/maven-settings.xml"
+  MAVEN_SETTINGS_PATH: "ci/maven-settings-nexus.xml"
+  NEXUS_BASE_URL: "https://nexus.yudream.online"
+  NEXUS_MAVEN_PUBLIC_URL: "$NEXUS_BASE_URL/repository/maven-public/"
+  NEXUS_MAVEN_RELEASES_URL: "$NEXUS_BASE_URL/repository/maven-releases/"
+  NEXUS_MAVEN_SNAPSHOTS_URL: "$NEXUS_BASE_URL/repository/maven-snapshots/"
+  NEXUS_NPM_PUBLIC_URL: "$NEXUS_BASE_URL/repository/npm-public/"
   NPM_CONFIG_REGISTRY: "https://registry.npmmirror.com"
   COREPACK_NPM_REGISTRY: "https://registry.npmmirror.com"
+  YUDREAM_NPM_REGISTRY: "$NEXUS_NPM_PUBLIC_URL"
   FRONTEND_DIR: "yudream-frontend"
-  NPMJS_REGISTRY: "https://registry.npmjs.org/"
 
 cache:
   key: "${CI_COMMIT_REF_SLUG}"
@@ -117,8 +122,8 @@ publish:maven-plugin-spi:
   stage: publish-packages
   image: *maven_image
   script:
-    - echo "Deploy yudream-plugin-spi to $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/maven"
-    - mvn -s ci/maven-settings-gitlab.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests deploy -B -ntp -e
+    - echo "Deploy yudream-plugin-spi to Nexus"
+    - mvn -s ci/maven-settings-nexus.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests deploy -B -ntp -e
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
@@ -130,7 +135,7 @@ verify:maven-plugin-spi:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
-verify:gitlab-npm-contracts:
+verify:npm-contracts:
   stage: verify-packages
   image: *node_image
   before_script:
@@ -140,23 +145,9 @@ verify:gitlab-npm-contracts:
     - node -v
     - pnpm -v
   script:
-    - VERIFY_NPM_REGISTRY="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/" CI_JOB_TOKEN="$CI_JOB_TOKEN" sh ci/verify-published-npm-contracts.sh
+    - VERIFY_NPM_REGISTRY="$NEXUS_NPM_PUBLIC_URL" sh ci/verify-published-npm-contracts.sh
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/ && $GITLAB_NPM_PUBLISH_ENABLED == "true"
-
-verify:npmjs-contracts:
-  stage: verify-packages
-  image: *node_image
-  before_script:
-    - npm config set registry "$NPM_CONFIG_REGISTRY"
-    - corepack enable && corepack prepare pnpm@11.9.0 --activate
-    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
-    - node -v
-    - pnpm -v
-  script:
-    - VERIFY_NPM_REGISTRY="$NPMJS_REGISTRY" VERIFY_NPM_TOKEN="$NPM_TOKEN" sh ci/verify-published-npm-contracts.sh
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v/ && $NPMJS_PUBLISH_ENABLED == "true"
+    - if: $CI_COMMIT_TAG =~ /^v/
 
 publish:npm-plugin-sdk:
   stage: publish-packages
@@ -172,15 +163,16 @@ publish:npm-plugin-sdk:
     - pnpm install --frozen-lockfile
     - pnpm --filter @yudream/plugin-sdk run build
     - |
-      REGISTRY_HOST=$(echo "$CI_API_V4_URL" | sed -E 's#^https?://##')
+      REGISTRY_HOST=$(echo "$NEXUS_NPM_PUBLIC_URL" | sed -E 's#^https?://##' | sed 's#/$##')
       printf '%s\n' \
-        "@yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/" \
-        "//$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN" \
+        "@yudream:registry=$NEXUS_NPM_PUBLIC_URL" \
+        "//$REGISTRY_HOST/:username=$NEXUS_USERNAME" \
+        "//$REGISTRY_HOST/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')" \
         'always-auth=true' > .npmrc
     - cd packages/plugin-sdk
-    - pnpm publish --no-git-checks --registry "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/"
+    - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/ && $GITLAB_NPM_PUBLISH_ENABLED == "true"
+    - if: $CI_COMMIT_TAG =~ /^v/
 
 publish:npm-components:
   stage: publish-packages
@@ -196,71 +188,16 @@ publish:npm-components:
     - pnpm install --frozen-lockfile
     - pnpm --filter @yudream/components run build
     - |
-      REGISTRY_HOST=$(echo "$CI_API_V4_URL" | sed -E 's#^https?://##')
+      REGISTRY_HOST=$(echo "$NEXUS_NPM_PUBLIC_URL" | sed -E 's#^https?://##' | sed 's#/$##')
       printf '%s\n' \
-        "@yudream:registry=$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/" \
-        "//$REGISTRY_HOST/projects/$CI_PROJECT_ID/packages/npm/:_authToken=$CI_JOB_TOKEN" \
+        "@yudream:registry=$NEXUS_NPM_PUBLIC_URL" \
+        "//$REGISTRY_HOST/:username=$NEXUS_USERNAME" \
+        "//$REGISTRY_HOST/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')" \
         'always-auth=true' > .npmrc
     - cd packages/components
-    - pnpm publish --no-git-checks --registry "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/npm/"
+    - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/ && $GITLAB_NPM_PUBLISH_ENABLED == "true"
-
-publish:npmjs-plugin-sdk:
-  stage: publish-packages
-  image: *node_image
-  before_script:
-    - npm config set registry "$NPM_CONFIG_REGISTRY"
-    - corepack enable && corepack prepare pnpm@11.9.0 --activate
-    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
-    - node -v
-    - pnpm -v
-  script:
-    - |
-      if [ -z "$NPM_TOKEN" ]; then
-        echo "NPM_TOKEN is required for npmjs publish"
-        exit 1
-      fi
-    - cd "$FRONTEND_DIR"
-    - pnpm install --frozen-lockfile
-    - pnpm --filter @yudream/plugin-sdk run build
-    - |
-      printf '%s\n' \
-        "registry=$NPMJS_REGISTRY" \
-        "@yudream:registry=$NPMJS_REGISTRY" \
-        "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-    - cd packages/plugin-sdk
-    - pnpm publish --no-git-checks --access public --registry "$NPMJS_REGISTRY"
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v/ && $NPMJS_PUBLISH_ENABLED == "true"
-
-publish:npmjs-components:
-  stage: publish-packages
-  image: *node_image
-  before_script:
-    - npm config set registry "$NPM_CONFIG_REGISTRY"
-    - corepack enable && corepack prepare pnpm@11.9.0 --activate
-    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
-    - node -v
-    - pnpm -v
-  script:
-    - |
-      if [ -z "$NPM_TOKEN" ]; then
-        echo "NPM_TOKEN is required for npmjs publish"
-        exit 1
-      fi
-    - cd "$FRONTEND_DIR"
-    - pnpm install --frozen-lockfile
-    - pnpm --filter @yudream/components run build
-    - |
-      printf '%s\n' \
-        "registry=$NPMJS_REGISTRY" \
-        "@yudream:registry=$NPMJS_REGISTRY" \
-        "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > .npmrc
-    - cd packages/components
-    - pnpm publish --no-git-checks --access public --registry "$NPMJS_REGISTRY"
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v/ && $NPMJS_PUBLISH_ENABLED == "true"
+    - if: $CI_COMMIT_TAG =~ /^v/
 
 collect:artifacts:
   stage: artifacts
@@ -322,3 +259,5 @@ build-and-push-images:
       docker push "$FRONTEND_IMAGE_SHA"
       docker push "$FRONTEND_IMAGE_TAG"
       docker push "$FRONTEND_IMAGE_LATEST"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/

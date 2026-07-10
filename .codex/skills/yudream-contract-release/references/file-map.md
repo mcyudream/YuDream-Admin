@@ -4,12 +4,12 @@ Read this file before editing versions. Always inspect the live files instead of
 
 ## Core Repo
 
-- SPI version source: `yudream-plugins/yudream-plugin-spi/pom.xml`
+- SPI artifact version source: `yudream-plugins/yudream-plugin-spi/pom.xml`
+- Core SPI consumer version: `pom.xml` -> `yudream.plugin.spi.version` (must match the SPI artifact version)
 - SDK version source: `yudream-frontend/packages/plugin-sdk/package.json`
 - Components version source: `yudream-frontend/packages/components/package.json`
 - Core release pipeline: `.gitlab-ci.yml`
-- GitLab private package notes: `docs/plugin-system/gitlab-private-packages.md`
-- npmjs public package notes: `docs/plugin-system/npmjs-public-packages.md`
+- Nexus package notes: `docs/plugin-system/gitlab-private-packages.md`
 
 ## Downstream Plugin Repo
 
@@ -31,14 +31,11 @@ Tag-triggered publish jobs:
 - `publish:maven-plugin-spi`
 - `publish:npm-plugin-sdk`
 - `publish:npm-components`
-- `publish:npmjs-plugin-sdk`
-- `publish:npmjs-components`
 
 Tag-triggered verify jobs:
 
 - `verify:maven-plugin-spi`
-- `verify:gitlab-npm-contracts`
-- `verify:npmjs-contracts`
+- `verify:npm-contracts`
 
 Validation jobs worth running before release:
 
@@ -48,7 +45,7 @@ Validation jobs worth running before release:
 
 ## Registry Selection
 
-- GitLab Maven for SPI is always part of the release flow.
-- GitLab npm publish path is enabled by `GITLAB_NPM_PUBLISH_ENABLED=true`.
-- npmjs publish path is enabled by `NPMJS_PUBLISH_ENABLED=true` and requires `NPM_TOKEN`.
-- If both npm publish flags are enabled on the tag pipeline, both publish paths may run. Confirm that this is intended before tagging.
+- All contract packages publish only to `nexus.yudream.online`.
+- Maven resolves from `maven-public` and deploys to `maven-releases` or `maven-snapshots`.
+- The `@yudream` npm scope publishes to and resolves from `npm-public`.
+- Publishing and authenticated verification require `NEXUS_USERNAME` and `NEXUS_PASSWORD`.

@@ -1,15 +1,14 @@
 {
   "name": "@yudream/components",
   "type": "module",
-  "version": "1.0.0-snapshot",
+  "version": "1.0.0",
   "files": [
     "src",
     "resolver.ts"
   ],
   "types": "./src/index.ts",
   "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://nexus.yudream.online/repository/npm-public/"
   },
   "scripts": {
     "build": "vue-tsc -p tsconfig.json --noEmit",

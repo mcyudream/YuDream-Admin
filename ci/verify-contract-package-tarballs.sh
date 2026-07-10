@@ -61,14 +61,14 @@ tar -tf "$PLUGIN_SDK_TGZ" | grep -q '^package/src/host-vue\.ts$' || fail "plugin
 tar -tf "$PLUGIN_SDK_TGZ" | grep -q '^package/src/host-vue-router\.ts$' || fail "plugin-sdk tarball must contain src/host-vue-router.ts"
 tar -tf "$PLUGIN_SDK_TGZ" | grep -q '^package/src/host-components\.ts$' || fail "plugin-sdk tarball must contain src/host-components.ts"
 extract_tgz "$PLUGIN_SDK_TGZ" "$EXTRACT_DIR/plugin-sdk"
-grep -q '"registry":[[:space:]]*"https://registry.npmjs.org/"' "$EXTRACT_DIR/plugin-sdk/package/package.json" || fail "plugin-sdk tarball package.json must publish to npmjs by default"
+grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' "$EXTRACT_DIR/plugin-sdk/package/package.json" || fail "plugin-sdk tarball package.json must publish to Nexus npm-public"
 assert_no_publish_local_refs "@yudream/plugin-sdk" "$EXTRACT_DIR/plugin-sdk"
 
 echo "[verify-contract-package-tarballs] checking components tarball contents"
 tar -tf "$COMPONENTS_TGZ" | grep -q '^package/resolver\.ts$' || fail "components tarball must contain resolver.ts"
 tar -tf "$COMPONENTS_TGZ" | grep -q '^package/src/index\.ts$' || fail "components tarball must contain src/index.ts"
 extract_tgz "$COMPONENTS_TGZ" "$EXTRACT_DIR/components"
-grep -q '"registry":[[:space:]]*"https://registry.npmjs.org/"' "$EXTRACT_DIR/components/package/package.json" || fail "components tarball package.json must publish to npmjs by default"
+grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' "$EXTRACT_DIR/components/package/package.json" || fail "components tarball package.json must publish to Nexus npm-public"
 assert_no_publish_local_refs "@yudream/components" "$EXTRACT_DIR/components"
 
 echo "[verify-contract-package-tarballs] OK"

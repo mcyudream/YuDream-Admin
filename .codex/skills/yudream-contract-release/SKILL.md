@@ -1,6 +1,6 @@
 ---
 name: yudream-contract-release
-description: Release and synchronize YuDream plugin contract packages, including yudream-plugin-spi, @yudream/plugin-sdk, and @yudream/components. Use when Codex needs to bump contract versions, publish GitLab Maven or npm/npmjs packages, create or verify a core release tag, or update yudream-admin-plugins to consume the newest released contract versions.
+description: Release and synchronize YuDream plugin contract packages through Nexus, including yudream-plugin-spi, @yudream/plugin-sdk, and @yudream/components.
 ---
 
 # YuDream Contract Release
@@ -32,7 +32,7 @@ description: Release and synchronize YuDream plugin contract packages, including
 2. Update the core package versions first. Do not update downstream consumers yet.
 3. Run targeted validation in the core repo for every package being released.
 4. Commit and push the core version changes before creating the release tag.
-5. Publish through the existing tag pipeline unless the user explicitly asks for a local/manual publish.
+5. Publish through the tag pipeline to `nexus.yudream.online` unless the user explicitly asks for a local/manual publish.
 6. Wait for publish and verify jobs to pass before touching `yudream-admin-plugins`.
 7. Update downstream dependency versions in `yudream-admin-plugins`, refresh lockfiles, and run plugin repo verification.
 8. Commit and push the downstream sync separately so release and consumer updates stay easy to audit.

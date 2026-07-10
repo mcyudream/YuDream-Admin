@@ -88,16 +88,10 @@ fi
 require_job_status "publish:maven-plugin-spi" "success"
 require_job_status "verify:maven-plugin-spi" "success"
 
-if [ "${EXPECT_GITLAB_NPM_PUBLISH:-true}" = "true" ]; then
+if [ "${EXPECT_NEXUS_NPM_PUBLISH:-true}" = "true" ]; then
   require_job_status "publish:npm-plugin-sdk" "success"
   require_job_status "publish:npm-components" "success"
-  require_job_status "verify:gitlab-npm-contracts" "success"
-fi
-
-if [ "${EXPECT_NPMJS_PUBLISH:-true}" = "true" ]; then
-  require_job_status "publish:npmjs-plugin-sdk" "success"
-  require_job_status "publish:npmjs-components" "success"
-  require_job_status "verify:npmjs-contracts" "success"
+  require_job_status "verify:npm-contracts" "success"
 fi
 
 echo "[verify-core-remote-release-evidence] OK"

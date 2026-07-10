@@ -70,10 +70,11 @@ packages:
 - npm: `@yudream/plugin-sdk`
 - npm: `@yudream/components`
 
-当前默认来源建议：
+当前唯一来源：
 
-- Maven 继续从核心仓 GitLab Maven Registry 消费
-- npm 默认直接从 npmjs 消费 `@yudream/plugin-sdk` 与 `@yudream/components`
+- Maven 统一从 Nexus `https://nexus.yudream.online/repository/maven-public/` 消费
+- `@yudream/plugin-sdk` 与 `@yudream/components` 统一从 Nexus `https://nexus.yudream.online/repository/npm-public/` 消费
+- GitLab Package Registry 与 npmjs 路径已经废弃；GitLab 只负责源码、CI 和 CI artifacts
 
 ## 回归检查
 

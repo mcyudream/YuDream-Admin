@@ -1,26 +1,24 @@
 #!/usr/bin/env sh
 set -eu
 
-if [ -z "${CI_API_V4_URL:-}" ] || [ -z "${CI_PROJECT_ID:-}" ]; then
-  echo "CI_API_V4_URL and CI_PROJECT_ID are required"
-  exit 1
-fi
-
-SPI_VERSION="${YUDREAM_PLUGIN_SPI_VERSION:-1.0-SNAPSHOT}"
-PACKAGE_REGISTRY_URL="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven"
-
-if [ -n "${CI_DEPLOY_USER:-}" ] && [ -n "${CI_DEPLOY_PASSWORD:-}" ]; then
-  PACKAGE_USER="$CI_DEPLOY_USER"
-  PACKAGE_TOKEN="$CI_DEPLOY_PASSWORD"
-elif [ -n "${CI_JOB_TOKEN:-}" ]; then
-  PACKAGE_USER="gitlab-ci-token"
-  PACKAGE_TOKEN="$CI_JOB_TOKEN"
-else
-  echo "CI_DEPLOY_USER/CI_DEPLOY_PASSWORD or CI_JOB_TOKEN is required"
+if [ -z "${NEXUS_USERNAME:-}" ] || [ -z "${NEXUS_PASSWORD:-}" ]; then
+  echo "NEXUS_USERNAME and NEXUS_PASSWORD are required"
   exit 1
 fi
 
 WORK_ROOT="${CI_PROJECT_DIR:-$(pwd)}"
+SPI_POM="$WORK_ROOT/yudream-plugins/yudream-plugin-spi/pom.xml"
+if [ -n "${YUDREAM_PLUGIN_SPI_VERSION:-}" ]; then
+  SPI_VERSION="$YUDREAM_PLUGIN_SPI_VERSION"
+else
+  SPI_VERSION=$(sed -n 's#.*<version>\([^<]*\)</version>.*#\1#p' "$SPI_POM" | head -n 1)
+fi
+[ -n "$SPI_VERSION" ] || {
+  echo "unable to resolve yudream-plugin-spi version from $SPI_POM"
+  exit 1
+}
+PACKAGE_REGISTRY_URL="${NEXUS_MAVEN_PUBLIC_URL:-https://nexus.yudream.online/repository/maven-public/}"
+
 VERIFY_REPO="${VERIFY_MAVEN_REPO:-$WORK_ROOT/.m2/published-verify-repository}"
 SETTINGS_FILE="$(mktemp "${TMPDIR:-/tmp}/verify-plugin-spi-XXXXXX.xml")"
 
@@ -35,24 +33,24 @@ cat > "$SETTINGS_FILE" <<EOF
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
     <servers>
         <server>
-            <id>gitlab-maven</id>
-            <username>${PACKAGE_USER}</username>
-            <password>${PACKAGE_TOKEN}</password>
+            <id>nexus-public</id>
+            <username>\${env.NEXUS_USERNAME}</username>
+            <password>\${env.NEXUS_PASSWORD}</password>
         </server>
     </servers>
 
     <profiles>
         <profile>
-            <id>gitlab-private</id>
+            <id>nexus</id>
             <repositories>
                 <repository>
-                    <id>gitlab-maven</id>
+                    <id>nexus-public</id>
                     <url>${PACKAGE_REGISTRY_URL}</url>
                 </repository>
             </repositories>
             <pluginRepositories>
                 <pluginRepository>
-                    <id>gitlab-maven</id>
+                    <id>nexus-public</id>
                     <url>${PACKAGE_REGISTRY_URL}</url>
                 </pluginRepository>
             </pluginRepositories>
@@ -60,7 +58,7 @@ cat > "$SETTINGS_FILE" <<EOF
     </profiles>
 
     <activeProfiles>
-        <activeProfile>gitlab-private</activeProfile>
+        <activeProfile>nexus</activeProfile>
     </activeProfiles>
 </settings>
 EOF

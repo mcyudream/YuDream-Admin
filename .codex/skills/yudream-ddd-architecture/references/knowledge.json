@@ -81,8 +81,8 @@
       "text": "After official business plugins are split into a standalone repository, the core host frontend must not auto-glob packages/plugin-*/src/index.ts in DEV mode. Default behavior should load remoteEntry.js from backend plugin assets; any cross-repo local debugging bridge must be explicit and must not make the core workspace depend on migrated plugin source."
     },
     {
-      "key": "plugin-gitlab-private-packages",
-      "text": "Publish the stable plugin contract to GitLab Package Registry: yudream-plugin-spi is a standalone Maven artifact deployed with CI_JOB_TOKEN to the project Maven registry, and @yudream/plugin-sdk is a private npm package published by GitLab CI to the project npm registry. Split plugin repositories should consume them by version instead of inheriting the core root parent or workspace source."
+      "key": "plugin-nexus-contract-packages",
+      "text": "Use YuDream Nexus as the only package repository. Read Maven artifacts through maven-public; publish releases to maven-releases and snapshots to maven-snapshots. Publish and read @yudream/plugin-sdk and @yudream/components through npm-public. GitLab is limited to source hosting, CI execution, and CI artifacts; GitLab Package Registry and npmjs publishing are deprecated. Split plugin repositories consume contract versions from Nexus instead of inheriting the core root parent or workspace source."
     },
     {
       "key": "core-repo-no-business-plugin-reactor",

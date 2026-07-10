@@ -21,11 +21,7 @@ run_step "plugin publish pipeline validation" "ci/verify-plugin-publish-pipeline
 run_step "core npm contract reinstall validation" "ci/verify-core-npm-contracts.sh"
 run_step "docs independence validation" "ci/verify-doc-independence.sh"
 
-if [ -n "${CORE_PACKAGE_TOKEN:-}" ] || [ -n "${CI_JOB_TOKEN:-}" ]; then
-  run_step "core maven registry validation" "ci/verify-core-maven-registry.sh"
-else
-  echo "[verify-plugin-repo-readiness] skipping core maven registry check (set CORE_PACKAGE_TOKEN or CI_JOB_TOKEN to enable)"
-fi
+run_step "core maven registry validation" "ci/verify-core-maven-registry.sh"
 
 if has_plugin_jars; then
   run_step "plugin jar asset validation" "ci/verify-plugin-jar-assets.sh"

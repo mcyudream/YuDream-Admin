@@ -1,7 +1,7 @@
 {
   "name": "@yudream/plugin-sdk",
   "type": "module",
-  "version": "1.0.1-snapshot",
+  "version": "1.0.1",
   "files": [
     "src",
     "vite-shared.js",
@@ -9,8 +9,7 @@
   ],
   "types": "./src/index.ts",
   "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://nexus.yudream.online/repository/npm-public/"
   },
   "scripts": {
     "sync:vite-shared": "node ./scripts/sync-vite-shared.mjs",

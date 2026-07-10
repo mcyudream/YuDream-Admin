@@ -1,71 +1,51 @@
-# npmjs 公网包发布
+# npmjs 发布迁移说明（已废弃）
 
-本文约定核心仓可以把前端公共包直接发布到 npmjs.com。
+本文保留旧文件名仅用于兼容历史链接。直接发布到 npmjs.com 的链路已经废弃，`@yudream` 公共包统一发布到并从 YuDream Nexus 拉取。
 
-当前已接入的包：
+## 当前唯一 YuDream npm 仓库
 
-- `@yudream/plugin-sdk`
-- `@yudream/components`
+- registry：`https://nexus.yudream.online/repository/npm-public/`
+- scope：`@yudream`
+- 包：`@yudream/plugin-sdk`、`@yudream/components`
+- 匿名读取；发布使用受保护、掩码的 `NEXUS_USERNAME`、`NEXUS_PASSWORD`
 
-## 1. 发布前提
+包内必须声明：
 
-1. npm 账号具备目标 scope 的发布权限
-2. GitLab CI 或本地环境配置 `NPM_TOKEN`
-3. 首次发布 scoped 公共包时使用 `public` 访问级别
-
-当前仓库已经在包内声明：
-
-- `publishConfig.registry = https://registry.npmjs.org/`
-- `publishConfig.access = public`
-
-## 2. 本地发布
-
-把示例文件复制为临时 `.npmrc` 或写入你的用户级 `.npmrc`：
-
-```ini
-registry=https://registry.npmjs.org/
-@yudream:registry=https://registry.npmjs.org/
-//registry.npmjs.org/:_authToken=${NPM_TOKEN}
+```json
+{
+  "publishConfig": {
+    "registry": "https://nexus.yudream.online/repository/npm-public/"
+  }
+}
 ```
 
-本地发布命令：
+本地或 CI 的 `.npmrc` 应让第三方依赖继续走 npmjs/npmmirror，仅将 `@yudream` scope 指向 Nexus：
+
+```bash
+printf '%s\n' \
+  'registry=https://registry.npmmirror.com/' \
+  '@yudream:registry=https://nexus.yudream.online/repository/npm-public/' > .npmrc
+```
+
+发布命令必须显式使用 Nexus：
 
 ```bash
 cd yudream-frontend
 pnpm install --frozen-lockfile
 pnpm --filter @yudream/plugin-sdk run build
-pnpm --filter @yudream/plugin-sdk publish --no-git-checks --access public --registry https://registry.npmjs.org/
-```
+pnpm --filter @yudream/plugin-sdk publish --no-git-checks --registry https://nexus.yudream.online/repository/npm-public/
 
-```bash
-cd yudream-frontend
-pnpm install --frozen-lockfile
 pnpm --filter @yudream/components run build
-pnpm --filter @yudream/components publish --no-git-checks --access public --registry https://registry.npmjs.org/
+pnpm --filter @yudream/components publish --no-git-checks --registry https://nexus.yudream.online/repository/npm-public/
 ```
 
-## 3. GitLab CI 发布
+## 历史配置处置
 
-核心仓 `.gitlab-ci.yml` 已提供两个 npmjs 发布任务：
+以下迁移前配置已经废弃，不得重新启用：
 
-- `publish:npmjs-plugin-sdk`
-- `publish:npmjs-components`
-
-触发条件：
-
-- Git tag 匹配 `^v`
-- `NPMJS_PUBLISH_ENABLED=true`
-- CI 变量中存在 `NPM_TOKEN`
-
-推荐在 GitLab CI 中配置：
-
+- 将 npmjs registry 作为 `@yudream` 包的发布目标
 - `NPM_TOKEN`
-- `NPMJS_PUBLISH_ENABLED`
+- npmjs 发布开关和 npmjs 专用发布任务
+- GitLab npm Package Registry 及其 token
 
-## 4. 权限检查
-
-如果 `npm publish` 报 scope 无权限，优先检查：
-
-1. 目标 scope 是否已在 npm 上创建
-2. 当前 token 对应账号是否为该 scope 的 owner 或具备发布权限
-3. 包是否首次发布，且使用了 `--access public`
+GitLab 只负责触发发布流水线和保存 CI artifacts，不保存 npm 包产物。
