@@ -250,14 +250,39 @@ Markdown 使用成熟解析器生成 HTML，再进入同一截图管道。代码
 - Java Long、Snowflake ID、平台 ID 和前端可见的 `sn` 均以字符串跨 JSON 边界。
 - 资源代理只允许 `proxy_urls`、合法 `internal:` URL 和显式白名单。
 
-## 9. 插件 SPI
+## 9. 插件 SPI 与消息交互扩展点
+
+插件获得与宿主管理端一致的协议能力，但必须通过稳定 SPI 和宿主权限策略访问，不能依赖核心实现。
 
 新增稳定端口：
 
-- `PluginMessagingService`：查询可用账号、发送统一消息、回复事件、调用受限标准 API。
-- `PluginRenderService`：HTML/Markdown 转图片。
+- `PluginMessagingService`：查询连接和登录账号、发送统一消息、回复事件，并调用消息、频道、群组、成员、角色、好友、表态、登录、上传、资源下载和元信息等全部标准 API。
+- `PluginSatoriRawService`：提供通用 RPC 与受控 `/internal/**` 原生接口，用于尚未进入 SPI 版本的协议接口和平台专属能力。
+- `PluginRenderService`：HTML/Markdown 转图片、URL 截图和渲染健康检查。
+- `PluginMessageInteractionRegistry`：注册标准事件、原生事件、消息过滤器、斜线指令、按钮交互、发送前处理器和发送后观察器。
 
-SPI DTO 使用简单 record/值对象，所有 ID 均为字符串。插件不得访问 Satori 聚合、仓储、应用服务、Mongo DO 或 Spring Bean。
+交互注册支持以下上下文：
+
+- 连接、平台、适配器和登录账号过滤。
+- 标准事件类型与原生 `_type` 过滤。
+- 频道、群组、用户、提及和消息内容过滤。
+- 斜线指令名称、参数和选项。
+- Satori `button` 的 ID 与交互类型。
+
+处理器可以返回文字、Satori 元素、Markdown、HTML、图片、音频、视频、文件或组合消息。宿主自动携带来源事件的 `referrer`，通过 `MessageDeliveryAppService` 完成被动回复和平台降级。
+
+每次注册返回 `PluginDisposable`，并由 `PluginContext` 按 `pluginCode` 跟踪。插件停用、卸载和热更新时必须注销全部交互、过滤器和观察器，取消运行中任务，并释放类加载器引用。
+
+插件处理器运行在隔离执行器中，具备超时、并发上限、背压、失败记录和幂等事件 ID。单个插件失败不阻塞事件游标推进、其他插件或宿主处理器；失败处理完成后按策略记录、重试或进入失败队列。
+
+插件必须声明所需权限和能力：
+
+- 标准协议读写权限可以按资源与动作细分。
+- HTML/Markdown 渲染需要 `message-render` 能力可用。
+- `/internal/**`、任意 HTTP 方法、资源下载和原生事件订阅需要显式高权限与宿主策略授权。
+- 运行时调用再次校验插件启用状态、权限、连接范围和平台账号范围。
+
+SPI DTO 使用简单 record/值对象，所有 ID 与事件序列号均为字符串。插件不得访问 Satori 聚合、仓储、应用服务、Mongo DO、Spring Bean、连接 Token 或 Render Server 内部凭证。
 
 ## 10. 管理端
 
@@ -309,5 +334,5 @@ Compose 增加可选 Render Server 服务、健康检查、网络隔离、资源
 5. 实现 Render Server 与 Java 渲染网关。
 6. 实现消息投递编排、Markdown/HTML 与平台降级。
 7. 实现管理端与权限菜单。
-8. 扩展插件 SPI 并实现宿主适配器。
+8. 扩展插件 SPI、消息交互注册表、权限策略与宿主适配器。
 9. 完成 Docker/Server 部署、端到端验证和文档。

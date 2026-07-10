@@ -1,0 +1,6 @@
+{
+  "sn": "2",
+  "type": "internal",
+  "_type": "vendor:list",
+  "_data": ["first", null, { "nested": true }]
+}

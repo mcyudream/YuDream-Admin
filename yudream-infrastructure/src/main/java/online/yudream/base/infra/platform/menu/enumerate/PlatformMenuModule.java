@@ -7,6 +7,35 @@ import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 @MenuModule(code = "platform", name = "平台能力", icon = "i-ri:node-tree", sort = 2)
 public enum PlatformMenuModule {
 
+    @MenuNode(code = "platform:satori", name = "Satori 消息平台", type = MenuNodeType.MENU,
+            path = "/platform/satori", component = "platform/satori/index.vue",
+            icon = "i-ri:chat-3-line", sort = 76)
+    SATORI,
+
+    @MenuNode(code = "platform:satori:view", name = "查看 Satori 消息平台", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:view")
+    SATORI_VIEW,
+
+    @MenuNode(code = "platform:satori:config", name = "配置 Satori 连接", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:config")
+    SATORI_CONFIG,
+
+    @MenuNode(code = "platform:satori:connect", name = "连接 Satori 平台", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:connect")
+    SATORI_CONNECT,
+
+    @MenuNode(code = "platform:satori:send", name = "发送 Satori 消息", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:send")
+    SATORI_SEND,
+
+    @MenuNode(code = "platform:satori:internal", name = "调用 Satori 原生接口", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:satori:internal")
+    SATORI_INTERNAL,
+
+    @MenuNode(code = "platform:render:use", name = "渲染消息图片", type = MenuNodeType.BUTTON,
+            parentName = "SATORI", permission = "platform:render:use")
+    RENDER_USE,
+
     @MenuNode(code = "platform:capability", name = "能力管理", type = MenuNodeType.MENU,
             path = "/platform/capability", component = "platform/capability/index.vue",
             icon = "i-ri:dashboard-horizontal-line", sort = 100)

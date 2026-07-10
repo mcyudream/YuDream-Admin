@@ -9,6 +9,7 @@ import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionRegistry;
 
 import java.util.Optional;
 
@@ -25,6 +26,8 @@ public interface PluginContext {
     default PluginFileStore files() {
         return framework().files(pluginCode());
     }
+
+    PluginMessageInteractionRegistry interactions();
 
     void registerMenu(PluginMenuItem item);
 

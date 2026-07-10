@@ -1,0 +1,22 @@
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  width: fit-content;
+  min-width: 100%;
+  padding: 32px;
+  color: #1f2937;
+  background: #ffffff;
+  font-family: "Noto Sans CJK SC", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+pre, code { font-family: "Noto Sans Mono CJK SC", "Cascadia Mono", Consolas, monospace; }
+pre { padding: 16px; overflow: auto; color: #e5e7eb; background: #111827; border-radius: 4px; }
+code { padding: 1px 4px; background: #f3f4f6; border-radius: 3px; }
+pre code { padding: 0; color: inherit; background: transparent; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 12px; border: 1px solid #d1d5db; text-align: left; }
+blockquote { margin-left: 0; padding-left: 16px; color: #4b5563; border-left: 4px solid #9ca3af; }
+img, video { max-width: 100%; height: auto; }

@@ -6,6 +6,9 @@ import online.yudream.base.plugin.spi.system.mail.PluginMailService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
+import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
+import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +26,12 @@ public interface FrameworkServices {
     PluginDocumentStore documents(String pluginCode);
 
     PluginFileStore files(String pluginCode);
+
+    PluginMessagingService messaging();
+
+    PluginSatoriRawService satoriRaw();
+
+    PluginRenderService render();
 
     Optional<String> setting(String key);
 
