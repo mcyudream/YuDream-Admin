@@ -7,7 +7,6 @@ cd "$ROOT_DIR"
 git status --short -- \
   .gitignore \
   .gitlab-ci.yml \
-  .npmrc.npmjs.example \
   .codex/skills/yudream-contract-release \
   .codex/skills/yudream-ddd-architecture/references/knowledge.json \
   README.md \

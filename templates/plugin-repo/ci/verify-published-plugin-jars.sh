@@ -45,9 +45,9 @@ cat > "$SETTINGS_FILE" <<EOF
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
   <mirrors>
     <mirror>
-      <id>nexus-public</id>
-      <mirrorOf>*</mirrorOf>
-      <url>${REPOSITORY_URL}</url>
+      <id>aliyun-public</id>
+      <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
+      <url>https://maven.aliyun.com/repository/public</url>
     </mirror>
   </mirrors>
 </settings>
@@ -60,7 +60,8 @@ fetch_artifact() {
     return 0
   fi
   mvn -s "$SETTINGS_FILE" -N \
-    "-Dmaven.repo.local=$VERIFY_REPO" "-Dartifact=$coordinates" -Dtransitive=false \
+    "-Dmaven.repo.local=$VERIFY_REPO" "-Dartifact=$coordinates" \
+    "-DremoteRepositories=nexus-public::default::${REPOSITORY_URL}" -Dtransitive=false \
     org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get -B -ntp
 }
 

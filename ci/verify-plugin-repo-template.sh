@@ -75,6 +75,13 @@ grep -q 'NEXUS_PASSWORD' templates/plugin-repo/ci/publish-plugin-jars.sh || fail
 if grep -Eq 'NEXUS_(USERNAME|PASSWORD)' templates/plugin-repo/ci/verify-core-maven-registry.sh templates/plugin-repo/ci/verify-core-npm-contracts.sh templates/plugin-repo/ci/verify-published-plugin-jars.sh; then
   fail "template read and verification paths must not require protected publish credentials"
 fi
+if grep -R -q '<mirrorOf>\*</mirrorOf>' templates/plugin-repo/.gitlab-ci.yml.example templates/plugin-repo/settings.xml.example templates/plugin-repo/ci; then
+  fail "template must not route third-party Maven dependencies through Nexus"
+fi
+grep -q 'https://maven.aliyun.com/repository/public' templates/plugin-repo/.gitlab-ci.yml.example || fail "template must resolve third-party Maven dependencies from Aliyun"
+grep -q 'external:\*,!nexus-public,!nexus-releases,!nexus-snapshots' templates/plugin-repo/.gitlab-ci.yml.example || fail "template must exclude YuDream Nexus repositories from the Aliyun mirror"
+grep -q 'remoteRepositories=nexus-public' templates/plugin-repo/ci/verify-core-maven-registry.sh || fail "template SPI verification must explicitly resolve YuDream artifacts from Nexus"
+grep -q 'remoteRepositories=nexus-public' templates/plugin-repo/ci/verify-published-plugin-jars.sh || fail "template plugin JAR verification must explicitly resolve YuDream artifacts from Nexus"
 grep -q 'yudream\.plugin\.spi\.version' templates/plugin-repo/ci/verify-core-maven-registry.sh || fail "template Maven verification must derive the SPI version from the plugin root POM"
 if grep -q 'YUDREAM_PLUGIN_SPI_VERSION:-1.0-SNAPSHOT' templates/plugin-repo/ci/verify-core-maven-registry.sh; then
   fail "template Maven verification must not default to a hard-coded SPI snapshot"

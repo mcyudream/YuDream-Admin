@@ -26,9 +26,9 @@ cat > "$SETTINGS_FILE" <<EOF
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
     <mirrors>
         <mirror>
-            <id>nexus-public</id>
-            <mirrorOf>*</mirrorOf>
-            <url>${NEXUS_MAVEN_PUBLIC_URL}</url>
+            <id>aliyun-public</id>
+            <mirrorOf>external:*,!nexus-public,!nexus-releases,!nexus-snapshots</mirrorOf>
+            <url>https://maven.aliyun.com/repository/public</url>
         </mirror>
     </mirrors>
 </settings>
@@ -40,6 +40,7 @@ mvn -s "$SETTINGS_FILE" \
   -N \
   "-Dmaven.repo.local=$VERIFY_REPO" \
   "-Dartifact=online.yudream.base:yudream-plugin-spi:${SPI_VERSION}" \
+  "-DremoteRepositories=nexus-public::default::${NEXUS_MAVEN_PUBLIC_URL}" \
   -Dtransitive=false \
   org.apache.maven.plugins:maven-dependency-plugin:3.8.1:get \
   -B -ntp
