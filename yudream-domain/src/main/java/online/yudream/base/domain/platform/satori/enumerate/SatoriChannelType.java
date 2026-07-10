@@ -1,8 +1,5 @@
 package online.yudream.base.domain.platform.satori.enumerate;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
-
 /** Satori 定义的频道类型。 */
 public enum SatoriChannelType {
     TEXT(0),
@@ -16,12 +13,10 @@ public enum SatoriChannelType {
         this.value = value;
     }
 
-    @JsonValue
     public int value() {
         return value;
     }
 
-    @JsonCreator
     public static SatoriChannelType fromValue(int value) {
         for (SatoriChannelType type : values()) {
             if (type.value == value) {

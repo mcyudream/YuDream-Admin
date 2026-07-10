@@ -1,8 +1,5 @@
 package online.yudream.base.domain.platform.satori.enumerate;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonValue;
-
 /** Satori WebSocket 协议操作码。 */
 public enum SatoriOpcode {
     EVENT(0),
@@ -18,12 +15,10 @@ public enum SatoriOpcode {
         this.value = value;
     }
 
-    @JsonValue
     public int value() {
         return value;
     }
 
-    @JsonCreator
     public static SatoriOpcode fromValue(int value) {
         for (SatoriOpcode opcode : values()) {
             if (opcode.value == value) {

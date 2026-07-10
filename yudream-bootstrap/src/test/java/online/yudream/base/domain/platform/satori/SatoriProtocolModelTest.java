@@ -1,10 +1,9 @@
 package online.yudream.base.domain.platform.satori;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import online.yudream.base.infra.platform.satori.json.SatoriJsonMapper;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriOpcode;
@@ -15,15 +14,13 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SatoriProtocolModelTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
-            .addMixIn(SatoriModels.SatoriEvent.class, SatoriEventJsonMixin.class);
+    private final ObjectMapper objectMapper = SatoriJsonMapper.createObjectMapper();
 
     @Test
     void shouldDeserializeEveryStandardResourceFromEventFixture() throws IOException {
@@ -50,7 +47,7 @@ class SatoriProtocolModelTest {
         assertThat(event.extensionData()).containsEntry("interaction_id", "10000000000000000007");
         assertThat(event.referrer()).containsEntry("thread", "thread-1");
 
-        SatoriModels.SatoriResourceBundle resources = fixture("satori/resources.json", SatoriModels.SatoriResourceBundle.class);
+        SatoriResourceFixture resources = fixture("satori/resources.json", SatoriResourceFixture.class);
         assertThat(resources.friend().user().id()).isEqualTo("10000000000000000008");
         assertThat(resources.emoji().id()).isEqualTo("10000000000000000009");
         assertThat(resources.meta().impl()).isEqualTo("satori");
@@ -94,11 +91,25 @@ class SatoriProtocolModelTest {
 
     @Test
     void shouldRoundTripMetaImplementationAndUnknownFields() throws IOException {
-        SatoriModels.SatoriResourceBundle resources = fixture("satori/resources.json", SatoriModels.SatoriResourceBundle.class);
+        SatoriResourceFixture resources = fixture("satori/resources.json", SatoriResourceFixture.class);
         String serialized = objectMapper.writeValueAsString(resources.meta());
 
         assertThat(objectMapper.readTree(serialized).path("impl").asText()).isEqualTo("satori");
         assertThat(objectMapper.readTree(serialized).path("vendor").path("revision").intValue()).isEqualTo(2);
+    }
+
+    @Test
+    void shouldUseProductionWireNamesForSatoriExtensionsAndProtectMetaExtras() throws IOException {
+        SatoriModels.SatoriEvent event = fixture("satori/event-message-created.json", SatoriModels.SatoriEvent.class);
+        JsonNode serializedEvent = objectMapper.readTree(objectMapper.writeValueAsString(event));
+        SatoriResourceFixture resources = fixture("satori/resources.json", SatoriResourceFixture.class);
+
+        assertThat(serializedEvent.path("_type").asText()).isEqualTo("discord:interaction");
+        assertThat(serializedEvent.path("_data").path("interaction_id").asText())
+                .isEqualTo("10000000000000000007");
+        assertThat(resources.meta().extraFields()).isUnmodifiable();
+        assertThat(resources.meta().extraFields().get("vendor")).isInstanceOf(Map.class);
+        assertThat((Map<?, ?>) resources.meta().extraFields().get("vendor")).isUnmodifiable();
     }
 
     private <T> T fixture(String path, Class<T> type) throws IOException {
@@ -116,11 +127,10 @@ class SatoriProtocolModelTest {
         }
     }
 
-    abstract static class SatoriEventJsonMixin {
-        @JsonProperty("_type")
-        abstract String extensionType();
-
-        @JsonProperty("_data")
-        abstract java.util.Map<String, Object> extensionData();
+    private record SatoriResourceFixture(
+            SatoriModels.SatoriFriend friend,
+            SatoriModels.SatoriEmoji emoji,
+            SatoriModels.SatoriMeta meta
+    ) {
     }
 }
