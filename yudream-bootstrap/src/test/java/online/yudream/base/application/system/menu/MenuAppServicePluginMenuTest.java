@@ -1,9 +1,11 @@
 package online.yudream.base.application.system.menu;
 
+import online.yudream.base.application.system.menu.cmd.MenuCreateCmd;
 import online.yudream.base.application.system.menu.cmd.MenuUpdateCmd;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
 import online.yudream.base.application.system.menu.service.MenuAppService;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
@@ -22,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
@@ -77,6 +80,63 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
+    void managementTreeShowsPluginMenuUnderAnotherPluginMenu() {
+        Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
+        pluginParent.setType(MenuNodeType.CATEGORY);
+        Menu pluginChild = pluginMenu("plugin:report:wallet", pluginParent.getCode(), true);
+        pluginChild.setPluginCode("report");
+        when(menuRepo.findAll()).thenReturn(List.of(pluginParent, pluginChild));
+
+        List<MenuManageDTO> tree = service.tree(new MenuTreeQuery());
+
+        assertThat(tree).singleElement().satisfies(parent ->
+                assertThat(parent.getChildren()).singleElement().satisfies(child -> {
+                    assertThat(child.getCode()).isEqualTo(pluginChild.getCode());
+                    assertThat(child.getParentCode()).isEqualTo(pluginParent.getCode());
+                }));
+    }
+
+    @Test
+    void managementTreeReparentsAvailableChildPastUnavailablePluginAncestor() {
+        Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        Menu unavailablePlugin = pluginMenu("plugin:wallet:tools", systemParent.getCode(), false);
+        unavailablePlugin.setType(MenuNodeType.LAYOUT);
+        Menu availableChild = pluginMenu("plugin:report:wallet", unavailablePlugin.getCode(), true);
+        availableChild.setPluginCode("report");
+        when(menuRepo.findAll()).thenReturn(List.of(systemParent, unavailablePlugin, availableChild));
+
+        List<MenuManageDTO> tree = service.tree(new MenuTreeQuery());
+
+        assertThat(tree).singleElement().satisfies(parent -> {
+            assertThat(parent.getCode()).isEqualTo(systemParent.getCode());
+            assertThat(parent.getChildren()).singleElement().satisfies(child -> {
+                assertThat(child.getCode()).isEqualTo(availableChild.getCode());
+                assertThat(child.getParentCode()).isEqualTo(systemParent.getCode());
+            });
+        });
+        assertThat(availableChild.getParentCode()).isEqualTo(unavailablePlugin.getCode());
+    }
+
+    @Test
+    void managementTreeIncludesAvailableAncestorsOfKeywordMatches() {
+        Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        systemParent.setName("工具中心");
+        Menu matchingChild = pluginMenu("plugin:wallet:home", systemParent.getCode(), true);
+        matchingChild.setName("钱包控制台");
+        when(menuRepo.findAll()).thenReturn(List.of(systemParent, matchingChild));
+        MenuTreeQuery query = new MenuTreeQuery();
+        query.setKeyword("钱包");
+
+        List<MenuManageDTO> tree = service.tree(query);
+
+        assertThat(tree).singleElement().satisfies(parent -> {
+            assertThat(parent.getCode()).isEqualTo(systemParent.getCode());
+            assertThat(parent.getChildren()).extracting(MenuManageDTO::getCode)
+                    .containsExactly(matchingChild.getCode());
+        });
+    }
+
+    @Test
     void staticRouteTreeNeverReturnsPluginMenus() {
         Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
         Menu systemChild = systemMenu("system:tools:audit", systemParent.getCode(), MenuNodeType.MENU);
@@ -91,6 +151,70 @@ class MenuAppServicePluginMenuTest {
             assertThat(children).extracting(child -> child.get("name"))
                     .containsExactly(systemChild.getCode());
         });
+    }
+
+    @Test
+    void staticRouteTreeClimbsPastLegacyPluginParentToSystemAncestor() {
+        Menu systemParent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        Menu pluginParent = pluginMenu("plugin:wallet:tools", systemParent.getCode(), true);
+        pluginParent.setType(MenuNodeType.LAYOUT);
+        Menu legacySystemChild = systemMenu(
+                "system:tools:legacy-report", pluginParent.getCode(), MenuNodeType.MENU);
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(systemParent, pluginParent, legacySystemChild));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
+            assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(legacySystemChild.getCode());
+        });
+    }
+
+    @Test
+    void staticRouteTreeNormalizesLegacySystemMenuWithoutSystemAncestorToRoot() {
+        Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
+        pluginParent.setType(MenuNodeType.CATEGORY);
+        Menu legacySystemChild = systemMenu(
+                "system:legacy-report", pluginParent.getCode(), MenuNodeType.MENU);
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(pluginParent, legacySystemChild));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(route ->
+                assertThat(route.get("name")).isEqualTo(legacySystemChild.getCode()));
+    }
+
+    @Test
+    void createSystemMenuRejectsPluginParent() {
+        Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
+        when(menuRepo.existsByCode("system:report")).thenReturn(false);
+        when(menuRepo.findByCode(pluginParent.getCode())).thenReturn(Optional.of(pluginParent));
+        MenuCreateCmd cmd = new MenuCreateCmd();
+        cmd.setCode("system:report");
+        cmd.setName("系统报表");
+        cmd.setType(MenuNodeType.MENU);
+        cmd.setParentCode(pluginParent.getCode());
+
+        assertThatThrownBy(() -> service.create(cmd))
+                .isInstanceOf(BizException.class);
+    }
+
+    @Test
+    void updateSystemMenuRejectsPluginParent() {
+        Menu systemMenu = systemMenu("system:report", null, MenuNodeType.MENU);
+        Menu pluginParent = pluginMenu("plugin:wallet:tools", null, true);
+        when(menuRepo.findByCode(systemMenu.getCode())).thenReturn(Optional.of(systemMenu));
+        when(menuRepo.findByCode(pluginParent.getCode())).thenReturn(Optional.of(pluginParent));
+        MenuUpdateCmd cmd = new MenuUpdateCmd();
+        cmd.setCode(systemMenu.getCode());
+        cmd.setName("系统报表");
+        cmd.setType(MenuNodeType.MENU);
+        cmd.setParentCode(pluginParent.getCode());
+
+        assertThatThrownBy(() -> service.update(cmd))
+                .isInstanceOf(BizException.class);
     }
 
     @Test
