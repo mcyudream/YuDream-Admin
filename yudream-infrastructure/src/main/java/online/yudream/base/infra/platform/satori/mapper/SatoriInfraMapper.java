@@ -1,10 +1,12 @@
 package online.yudream.base.infra.platform.satori.mapper;
 
 import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
+import online.yudream.base.domain.platform.satori.aggregate.SatoriEventCursor;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriEventRecord;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriLogin;
 import online.yudream.base.domain.platform.satori.service.SatoriCredentialCipher;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriConnectionDO;
+import online.yudream.base.infra.platform.satori.dataobj.SatoriEventCursorDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriEventRecordDO;
 import online.yudream.base.infra.platform.satori.dataobj.SatoriLoginDO;
 
@@ -52,6 +54,7 @@ public final class SatoriInfraMapper {
         copyBase(source, target);
         target.setConnectionId(source.getConnectionId()); target.setSequence(source.getSequence()); target.setType(source.getType());
         target.setRawData(source.getRawData()); target.setReceivedAt(source.getReceivedAt()); target.setExpireAt(source.getExpireAt());
+        target.setPublishedAt(source.getPublishedAt());
         return target;
     }
 
@@ -59,7 +62,22 @@ public final class SatoriInfraMapper {
         if (source == null) return null;
         return SatoriEventRecord.builder().id(source.getId()).version(source.getVersion()).createTime(source.getCreateTime()).updateTime(source.getUpdateTime())
                 .connectionId(source.getConnectionId()).sequence(source.getSequence()).type(source.getType()).rawData(source.getRawData())
-                .receivedAt(source.getReceivedAt()).expireAt(source.getExpireAt()).build();
+                .receivedAt(source.getReceivedAt()).publishedAt(source.getPublishedAt()).expireAt(source.getExpireAt()).build();
+    }
+
+    public static SatoriEventCursorDO toDataObj(SatoriEventCursor source) {
+        if (source == null) return null;
+        SatoriEventCursorDO target = new SatoriEventCursorDO();
+        copyBase(source, target);
+        target.setConnectionId(source.getConnectionId());
+        target.setSequence(source.getSequence());
+        return target;
+    }
+
+    public static SatoriEventCursor toDomain(SatoriEventCursorDO source) {
+        if (source == null) return null;
+        return SatoriEventCursor.builder().id(source.getId()).version(source.getVersion()).createTime(source.getCreateTime())
+                .updateTime(source.getUpdateTime()).connectionId(source.getConnectionId()).sequence(source.getSequence()).build();
     }
 
     private static void copyBase(online.yudream.base.domain.common.base.BaseDomain source, online.yudream.base.infra.common.baseobj.BaseDO target) {

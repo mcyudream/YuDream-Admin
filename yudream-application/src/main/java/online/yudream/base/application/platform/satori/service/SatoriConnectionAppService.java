@@ -14,17 +14,21 @@ import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.SatoriApiContext;
 import online.yudream.base.domain.platform.satori.repo.SatoriConnectionRepo;
 import online.yudream.base.domain.platform.satori.service.SatoriApiGateway;
+import online.yudream.base.domain.platform.satori.service.SatoriEventGateway;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "yudream.platform.capabilities.satori", name = "enabled", havingValue = "true")
 public class SatoriConnectionAppService {
     public static final String CAPABILITY_CODE = "satori";
     private static final String CAPABILITY_NAME = "Satori 平台";
 
     private final SatoriConnectionRepo connectionRepo;
     private final SatoriApiGateway apiGateway;
+    private final SatoriEventGateway eventGateway;
     private final CapabilityAppService capabilityAppService;
 
     @Transactional
@@ -53,7 +57,9 @@ public class SatoriConnectionAppService {
         ensureEnabled();
         SatoriConnection connection = connection(id);
         connection.enable();
-        return SatoriConnectionAssembler.toDTO(connectionRepo.save(connection));
+        SatoriConnection saved = connectionRepo.save(connection);
+        eventGateway.connect(saved.getId());
+        return SatoriConnectionAssembler.toDTO(saved);
     }
 
     @Transactional
@@ -61,7 +67,9 @@ public class SatoriConnectionAppService {
         ensureEnabled();
         SatoriConnection connection = connection(id);
         connection.disable();
-        return SatoriConnectionAssembler.toDTO(connectionRepo.save(connection));
+        SatoriConnection saved = connectionRepo.save(connection);
+        eventGateway.close(saved.getId());
+        return SatoriConnectionAssembler.toDTO(saved);
     }
 
     @Transactional(readOnly = true)
