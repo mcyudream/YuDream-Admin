@@ -3,7 +3,11 @@ package online.yudream.base.domain.platform.satori;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
+import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
+import online.yudream.base.domain.platform.satori.enumerate.SatoriOpcode;
 import online.yudream.base.domain.platform.satori.model.SatoriBidiPage;
 import online.yudream.base.domain.platform.satori.model.SatoriModels;
 import online.yudream.base.domain.platform.satori.model.SatoriPage;
@@ -43,9 +47,11 @@ class SatoriProtocolModelTest {
         SatoriModels.SatoriResourceBundle resources = fixture("satori/resources.json", SatoriModels.SatoriResourceBundle.class);
         assertThat(resources.friend().user().id()).isEqualTo("10000000000000000008");
         assertThat(resources.emoji().id()).isEqualTo("10000000000000000009");
+        assertThat(resources.meta().impl()).isEqualTo("satori");
         assertThat(resources.meta().protocolVersion()).isEqualTo("1.0");
         assertThat(resources.meta().adapter()).isEqualTo("onebot");
         assertThat(resources.meta().features()).contains("message.create");
+        assertThat(resources.meta().extraFields()).containsKey("vendor");
     }
 
     @Test
@@ -62,6 +68,30 @@ class SatoriProtocolModelTest {
         assertThat(page.next()).isEqualTo("9007199254740993");
         assertThat(bidiPage.prev()).isEqualTo("9223372036854775806");
         assertThat(bidiPage.next()).isNull();
+    }
+
+    @Test
+    void shouldSerializeProtocolNumbersAndKeepBoundaryValuesAsStrings() throws IOException {
+        SatoriModels.SatoriEvent event = fixture("satori/event-message-created.json", SatoriModels.SatoriEvent.class);
+        JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(event));
+
+        assertThat(json.path("sn").isTextual()).isTrue();
+        assertThat(json.path("sn").asText()).isEqualTo("9007199254740993");
+        assertThat(json.path("channel").path("type").intValue()).isEqualTo(0);
+        assertThat(json.path("login").path("status").intValue()).isEqualTo(1);
+        assertThat(objectMapper.readValue("0", SatoriOpcode.class)).isEqualTo(SatoriOpcode.EVENT);
+        assertThat(objectMapper.writeValueAsString(SatoriOpcode.META)).isEqualTo("5");
+        assertThat(objectMapper.readValue("3", SatoriChannelType.class)).isEqualTo(SatoriChannelType.VOICE);
+        assertThat(objectMapper.readValue("4", SatoriLoginStatus.class)).isEqualTo(SatoriLoginStatus.RECONNECT);
+    }
+
+    @Test
+    void shouldRoundTripMetaImplementationAndUnknownFields() throws IOException {
+        SatoriModels.SatoriResourceBundle resources = fixture("satori/resources.json", SatoriModels.SatoriResourceBundle.class);
+        String serialized = objectMapper.writeValueAsString(resources.meta());
+
+        assertThat(objectMapper.readTree(serialized).path("impl").asText()).isEqualTo("satori");
+        assertThat(objectMapper.readTree(serialized).path("vendor").path("revision").intValue()).isEqualTo(2);
     }
 
     private <T> T fixture(String path, Class<T> type) throws IOException {
