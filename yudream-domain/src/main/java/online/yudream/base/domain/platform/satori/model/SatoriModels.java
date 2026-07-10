@@ -26,6 +26,7 @@ public final class SatoriModels {
     }
 
     public record SatoriLogin(
+            String sn,
             String platform,
             String selfId,
             SatoriUser user,
@@ -48,6 +49,8 @@ public final class SatoriModels {
             SatoriArgv argv,
             SatoriButton button,
             SatoriChannel channel,
+            SatoriEmoji emoji,
+            SatoriFriend friend,
             SatoriGuild guild,
             SatoriLogin login,
             SatoriGuildMember member,
@@ -55,10 +58,12 @@ public final class SatoriModels {
             SatoriUser operator,
             SatoriGuildRole role,
             SatoriUser user,
+            Map<String, Object> referrer,
             String extensionType,
             Map<String, Object> extensionData
     ) {
         public SatoriEvent {
+            referrer = referrer == null ? Map.of() : Map.copyOf(referrer);
             extensionData = extensionData == null ? Map.of() : Map.copyOf(extensionData);
         }
     }
@@ -81,7 +86,10 @@ public final class SatoriModels {
     public record SatoriGuild(String id, String name, String avatar) {
     }
 
-    public record SatoriGuildMember(SatoriUser user, String nick, String avatar, Long joinedAt) {
+    public record SatoriGuildMember(SatoriUser user, String nick, String avatar, Long joinedAt, List<SatoriGuildRole> roles) {
+        public SatoriGuildMember {
+            roles = roles == null ? List.of() : List.copyOf(roles);
+        }
     }
 
     public record SatoriGuildRole(String id, String name, Integer color, Integer position) {

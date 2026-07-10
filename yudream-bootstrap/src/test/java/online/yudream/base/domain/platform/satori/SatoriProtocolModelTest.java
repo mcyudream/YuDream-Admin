@@ -30,12 +30,17 @@ class SatoriProtocolModelTest {
         SatoriModels.SatoriEvent event = fixture("satori/event-message-created.json", SatoriModels.SatoriEvent.class);
 
         assertThat(event.sn()).isEqualTo("9007199254740993");
+        assertThat(event.login().sn()).isEqualTo("9007199254740994");
         assertThat(event.login().user().id()).isEqualTo("9223372036854775806");
         assertThat(event.message().id()).isEqualTo("9223372036854775805");
         assertThat(event.message().content()).contains("<at id=\"42\"/>");
         assertThat(event.channel().id()).isEqualTo("10000000000000000001");
+        assertThat(event.emoji().id()).isEqualTo("10000000000000000009");
+        assertThat(event.friend().user().id()).isEqualTo("10000000000000000008");
         assertThat(event.guild().id()).isEqualTo("10000000000000000002");
         assertThat(event.member().user().id()).isEqualTo("10000000000000000003");
+        assertThat(event.member().roles()).extracting(SatoriModels.SatoriGuildRole::id)
+                .containsExactly("10000000000000000004");
         assertThat(event.role().id()).isEqualTo("10000000000000000004");
         assertThat(event.user().id()).isEqualTo("10000000000000000005");
         assertThat(event.operator().id()).isEqualTo("10000000000000000006");
@@ -43,6 +48,7 @@ class SatoriProtocolModelTest {
         assertThat(event.button().id()).isEqualTo("approve");
         assertThat(event.extensionType()).isEqualTo("discord:interaction");
         assertThat(event.extensionData()).containsEntry("interaction_id", "10000000000000000007");
+        assertThat(event.referrer()).containsEntry("thread", "thread-1");
 
         SatoriModels.SatoriResourceBundle resources = fixture("satori/resources.json", SatoriModels.SatoriResourceBundle.class);
         assertThat(resources.friend().user().id()).isEqualTo("10000000000000000008");
@@ -63,6 +69,7 @@ class SatoriProtocolModelTest {
         assertThat(event.message().updatedAt()).isNull();
         assertThat(event.message().guild()).isNull();
         assertThat(event.login().features()).isEmpty();
+        assertThat(event.login().sn()).isNull();
         assertThat(page.data()).hasSize(1);
         assertThat(page.data().getFirst().id()).isEqualTo("10001");
         assertThat(page.next()).isEqualTo("9007199254740993");
