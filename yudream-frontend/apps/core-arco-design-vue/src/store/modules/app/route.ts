@@ -206,7 +206,7 @@ export const useAppRouteStore = defineStore(
           parent.children ||= []
           parent.children.push(...nodes.map(node => createPluginTreeRoute(node, res.data.sdkVersion)))
         })
-        return pluginTree.roots.map(node => createPluginTreeRoute(node, res.data.sdkVersion))
+        return pluginTree.roots.map(node => createPluginTreeRoute(node, res.data.sdkVersion)) as RouteRecordMainRaw[]
       }
       catch {
         return []
@@ -294,9 +294,6 @@ export const useAppRouteStore = defineStore(
     }
     function textValue(value?: string) {
       return typeof value === 'string' ? value.trim() : ''
-    }
-    function pluginMenuKey(module: any) {
-      return textValue(module.menuTitle) || 'legacy'
     }
     function safeRouteName(pluginCode: string, path: string) {
       return `${pluginCode}-${path}`.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
