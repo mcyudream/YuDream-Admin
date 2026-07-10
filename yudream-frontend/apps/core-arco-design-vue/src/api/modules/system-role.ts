@@ -61,6 +61,7 @@ export default {
   permissions: () => systemClient.get<unknown, ApiResponse<PermissionItem[]>>('api/system/roles/permissions'),
   create: (data: RolePayload) => systemClient.post<unknown, ApiResponse<RoleManageItem>>('api/system/roles', data),
   update: (id: IdValue, data: RolePayload) => systemClient.put<unknown, ApiResponse<RoleManageItem>>(`api/system/roles/${id}`, data),
+  enable: (id: IdValue) => systemClient.post<unknown, ApiResponse<null>>(`api/system/roles/${id}/enable`),
   disable: (id: IdValue) => systemClient.delete<unknown, ApiResponse<null>>(`api/system/roles/${id}`),
   assignPermissions: (id: IdValue, permissions: string[]) => systemClient.put<unknown, ApiResponse<RoleManageItem>>(`api/system/roles/${id}/permissions`, { permissions }),
 }

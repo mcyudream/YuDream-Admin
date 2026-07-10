@@ -124,6 +124,13 @@ public class MenuAppService {
         menuRepo.save(menu);
     }
 
+    @Transactional
+    public void enable(String code) {
+        Menu menu = getMenu(code);
+        menu.activate();
+        menuRepo.save(menu);
+    }
+
     /**
      * 构建当前用户可见的路由树。
      *

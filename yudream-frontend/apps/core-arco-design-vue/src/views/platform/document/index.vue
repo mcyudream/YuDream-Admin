@@ -207,6 +207,18 @@ function confirmDisable(row: WordTemplate) {
   })
 }
 
+function confirmEnable(row: WordTemplate) {
+  modal.confirm({
+    title: '确认启用',
+    content: `确认启用 Word 模板「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiDocument.enableTemplate(row.id)
+      toast.success('Word 模板已启用')
+      await load()
+    },
+  })
+}
+
 function openGenerate(row: WordTemplate) {
   generatingTemplate.value = row
   generateDataJson.value = JSON.stringify(defaultGenerateData(row), null, 2)
@@ -521,8 +533,11 @@ function generationVariant(status: GenerationStatus) {
             <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="pickReplaceFile(row.original)">
               替换
             </FaButton>
-            <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisable(row.original)">
+            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="confirmDisable(row.original)">
               停用
+            </FaButton>
+            <FaButton v-else v-auth="'platform:document:edit'" size="sm" variant="outline" @click="confirmEnable(row.original)">
+              启用
             </FaButton>
           </div>
         </template>

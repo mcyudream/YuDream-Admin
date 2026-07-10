@@ -65,6 +65,9 @@ export default {
   disableTemplate: (id: string) => {
     return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/documents/word-templates/${id}`)
   },
+  enableTemplate: (id: string) => {
+    return systemClient.post<unknown, ApiResponse<void>>(`api/platform/documents/word-templates/${id}/enable`)
+  },
   generate: (id: string, data: WordGenerateData) => {
     return systemClient.post<unknown, ApiResponse<WordGenerationRecord>>(`api/platform/documents/word-templates/${id}/generate`, { data })
   },

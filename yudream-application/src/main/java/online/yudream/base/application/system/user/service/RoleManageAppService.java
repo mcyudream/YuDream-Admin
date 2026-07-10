@@ -111,6 +111,13 @@ public class RoleManageAppService {
     }
 
     @Transactional
+    public void enable(Long id) {
+        Role role = getRole(id);
+        role.activate();
+        roleRepo.save(role);
+    }
+
+    @Transactional
     public RoleManageDTO assignPermissions(Long id, List<String> permissions) {
         Role role = getRole(id);
         role.replacePermissions(resolvePermissionIds(permissions));

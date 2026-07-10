@@ -63,6 +63,14 @@ public class GraphAppService {
     }
 
     @Transactional
+    public void enableConnection(Long id) {
+        ensureGraphEnabled();
+        GraphConnection connection = connection(id);
+        connection.activate();
+        graphConnectionRepo.save(connection);
+    }
+
+    @Transactional
     public GraphQueryLogDTO testConnection(Long id) {
         ensureGraphEnabled();
         GraphConnection connection = activeConnection(id);

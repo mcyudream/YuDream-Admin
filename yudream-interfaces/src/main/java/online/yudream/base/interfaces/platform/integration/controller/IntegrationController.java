@@ -57,6 +57,13 @@ public class IntegrationController {
         return Result.ok();
     }
 
+    @PostMapping("/http-connectors/{id}/enable")
+    @PermissionRegister(code = "platform:integration:edit", name = "启用HTTP连接器", module = "平台能力", desc = "启用 HTTP 连接器")
+    public Result<Void> enableConnector(@PathVariable Long id) {
+        integrationAppService.enableConnector(id);
+        return Result.ok();
+    }
+
     @PostMapping("/http-connectors/{id}/invoke")
     @PermissionRegister(code = "platform:integration:invoke", name = "执行HTTP调用", module = "平台能力", desc = "执行 HTTP 连接器调用")
     public Result<HttpInvocationLogRes> invoke(@PathVariable Long id, @RequestBody HttpInvokeRequest request) {
@@ -91,6 +98,13 @@ public class IntegrationController {
     @PermissionRegister(code = "platform:integration:edit", name = "禁用运行脚本", module = "平台能力", desc = "禁用运行脚本")
     public Result<Void> disableScript(@PathVariable Long id) {
         integrationAppService.disableScript(id);
+        return Result.ok();
+    }
+
+    @PostMapping("/runtime-scripts/{id}/enable")
+    @PermissionRegister(code = "platform:integration:edit", name = "启用运行脚本", module = "平台能力", desc = "启用运行脚本")
+    public Result<Void> enableScript(@PathVariable Long id) {
+        integrationAppService.enableScript(id);
         return Result.ok();
     }
 

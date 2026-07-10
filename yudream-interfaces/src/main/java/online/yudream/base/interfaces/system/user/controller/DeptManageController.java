@@ -60,4 +60,11 @@ public class DeptManageController {
         deptManageAppService.disable(id);
         return Result.ok();
     }
+
+    @PostMapping("/{id}/enable")
+    @PermissionRegister(code = "system:dept:edit", name = "启用部门", module = "系统管理", desc = "启用部门")
+    public Result<Void> enable(@PathVariable Long id) {
+        deptManageAppService.enable(id);
+        return Result.ok();
+    }
 }

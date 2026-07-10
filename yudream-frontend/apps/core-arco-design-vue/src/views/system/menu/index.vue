@@ -223,6 +223,24 @@ function confirmDisable(row?: MenuManageItem) {
   })
 }
 
+function confirmEnable(row?: MenuManageItem) {
+  const target = row || selectedMenu.value
+  if (!target) {
+    toast.warning('请先选择菜单')
+    return
+  }
+  modal.confirm({
+    title: '确认信息',
+    content: `确认启用“${target.name}”吗？`,
+    onConfirm: async () => {
+      await apiMenu.enable(target.code)
+      toast.success('启用成功')
+      await loadTree()
+      await refreshDynamicRoutes(router)
+    },
+  })
+}
+
 function normalizePayload(): MenuPayload {
   const payload: MenuPayload = {
     ...form,
@@ -394,11 +412,21 @@ function importMenus() {
               <FaIcon name="i-ri:add-line" />
             </FaButton>
             <FaButton
+              v-if="selectedMenu?.status === 'DISABLED'"
+              v-auth="'system:menu:edit'"
+              variant="ghost"
+              size="sm"
+              title="启用菜单"
+              @click="confirmEnable()"
+            >
+              <FaIcon name="i-ri:play-circle-line" />
+            </FaButton>
+            <FaButton
+              v-if="selectedMenu?.status === 'ACTIVE'"
               v-auth="'system:menu:delete'"
               variant="ghost"
               size="sm"
               title="停用菜单"
-              :disabled="!selectedMenu || selectedMenu.status === 'DISABLED'"
               @click="confirmDisable()"
             >
               <FaIcon name="i-ri:delete-bin-line" />
@@ -466,10 +494,20 @@ function importMenus() {
                 编辑
               </FaButton>
               <FaButton
+                v-if="selectedMenu?.status === 'DISABLED'"
+                v-auth="'system:menu:edit'"
+                variant="outline"
+                size="sm"
+                @click="confirmEnable()"
+              >
+                <FaIcon name="i-ri:play-circle-line" />
+                启用
+              </FaButton>
+              <FaButton
+                v-if="selectedMenu?.status === 'ACTIVE'"
                 v-auth="'system:menu:delete'"
                 variant="destructive"
                 size="sm"
-                :disabled="!selectedMenu || selectedMenu.status === 'DISABLED'"
                 @click="confirmDisable()"
               >
                 <FaIcon name="i-ri:delete-bin-line" />
@@ -575,11 +613,21 @@ function importMenus() {
                   <FaIcon name="i-ri:edit-2-line" />
                 </FaButton>
                 <FaButton
+                  v-if="row.original.status === 'DISABLED'"
+                  v-auth="'system:menu:edit'"
+                  variant="ghost"
+                  size="sm"
+                  title="启用"
+                  @click="confirmEnable(row.original)"
+                >
+                  <FaIcon name="i-ri:play-circle-line" />
+                </FaButton>
+                <FaButton
+                  v-if="row.original.status === 'ACTIVE'"
                   v-auth="'system:menu:delete'"
                   variant="ghost"
                   size="sm"
                   title="停用"
-                  :disabled="row.original.status === 'DISABLED'"
                   @click="confirmDisable(row.original)"
                 >
                   <FaIcon name="i-ri:delete-bin-line" />

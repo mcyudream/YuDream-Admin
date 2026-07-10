@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -67,6 +68,15 @@ class MenuManageControllerCodeParamTest {
                 .andExpect(status().isOk());
 
         verify(menuAppService).disable(PLUGIN_MENU_CODE);
+    }
+
+    @Test
+    void enableAcceptsPluginMenuCodeContainingSlashAndColonAsQueryParam() throws Exception {
+        mockMvc.perform(post("/api/system/menus/enable")
+                        .param("code", PLUGIN_MENU_CODE))
+                .andExpect(status().isOk());
+
+        verify(menuAppService).enable(PLUGIN_MENU_CODE);
     }
 
     @Test

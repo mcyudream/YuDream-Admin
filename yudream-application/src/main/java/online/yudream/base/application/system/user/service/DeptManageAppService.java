@@ -93,6 +93,13 @@ public class DeptManageAppService {
         deptRepo.save(dept);
     }
 
+    @Transactional
+    public void enable(Long id) {
+        Dept dept = getDept(id);
+        dept.activate();
+        deptRepo.save(dept);
+    }
+
     private Dept getDept(Long id) {
         return deptRepo.findById(id).orElseThrow(() -> new BizException("部门不存在"));
     }

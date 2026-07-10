@@ -55,6 +55,13 @@ public class ChartDataController {
         return Result.ok();
     }
 
+    @PostMapping("/definitions/{id}/enable")
+    @PermissionRegister(code = "platform:dataviz:edit", name = "启用图表定义", module = "平台能力", desc = "启用图表定义")
+    public Result<Void> enableDefinition(@PathVariable Long id) {
+        chartAppService.enableDefinition(id);
+        return Result.ok();
+    }
+
     @PostMapping("/dataset")
     @PermissionRegister(code = "platform:dataviz:dataset", name = "查询图表数据集", module = "平台能力", desc = "查询图表数据集")
     public Result<ChartDatasetRes> queryDataset(@Valid @RequestBody ChartDataRequest request) {

@@ -76,6 +76,14 @@ public class IntegrationAppService {
     }
 
     @Transactional
+    public void enableConnector(Long id) {
+        ensureIntegrationEnabled();
+        HttpConnector connector = connector(id);
+        connector.activate();
+        httpConnectorRepo.save(connector);
+    }
+
+    @Transactional
     public HttpInvocationLogDTO invoke(HttpInvokeCmd cmd) {
         ensureIntegrationEnabled();
         HttpConnector connector = connector(cmd.getConnectorId());
@@ -131,6 +139,14 @@ public class IntegrationAppService {
         ensureIntegrationEnabled();
         RuntimeScript script = script(id);
         script.disable();
+        runtimeScriptRepo.save(script);
+    }
+
+    @Transactional
+    public void enableScript(Long id) {
+        ensureIntegrationEnabled();
+        RuntimeScript script = script(id);
+        script.activate();
         runtimeScriptRepo.save(script);
     }
 

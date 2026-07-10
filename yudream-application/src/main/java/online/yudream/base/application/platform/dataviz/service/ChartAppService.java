@@ -82,6 +82,14 @@ public class ChartAppService {
         chartDefinitionRepo.save(chart);
     }
 
+    @Transactional
+    public void enableDefinition(Long id) {
+        ensureEnabled();
+        ChartDefinition chart = getChart(id);
+        chart.activate();
+        chartDefinitionRepo.save(chart);
+    }
+
     @Transactional(readOnly = true)
     public ChartDatasetDTO queryDataset(ChartDataQuery query) {
         ensureEnabled();

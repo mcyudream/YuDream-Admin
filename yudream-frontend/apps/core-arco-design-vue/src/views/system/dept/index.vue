@@ -128,6 +128,18 @@ function confirmDisable(row: DeptManageItem) {
   })
 }
 
+function confirmEnable(row: DeptManageItem) {
+  modal.confirm({
+    title: '确认信息',
+    content: `确认启用「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiDept.enable(row.id)
+      toast.success('启用成功')
+      await loadTree()
+    },
+  })
+}
+
 function flattenDepts(items: DeptManageItem[]): DeptManageItem[] {
   return items.flatMap(item => [item, ...flattenDepts(item.children || [])])
 }
@@ -225,10 +237,20 @@ function importDepts() {
               编辑
             </FaButton>
             <FaButton
+              v-if="row.original.status === 'DEPRECATED'"
+              v-auth="'system:dept:edit'"
+              variant="outline"
+              size="sm"
+              @click="confirmEnable(row.original)"
+            >
+              启用
+            </FaButton>
+            <FaButton
+              v-if="row.original.status === 'ACTIVE'"
               v-auth="'system:dept:delete'"
               variant="destructive"
               size="sm"
-              :disabled="row.original.systemDept || row.original.status === 'DEPRECATED'"
+              :disabled="row.original.systemDept"
               @click="confirmDisable(row.original)"
             >
               停用

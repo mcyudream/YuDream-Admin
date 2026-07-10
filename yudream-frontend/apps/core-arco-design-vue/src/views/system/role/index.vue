@@ -145,6 +145,18 @@ function confirmDisable(row: RoleManageItem) {
   })
 }
 
+function confirmEnable(row: RoleManageItem) {
+  modal.confirm({
+    title: '确认信息',
+    content: `确认启用「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiRole.enable(row.id)
+      toast.success('启用成功')
+      await loadRoles()
+    },
+  })
+}
+
 function onPageChange(page: number) {
   pagination.page = page
   loadRoles()
@@ -250,10 +262,20 @@ function importRoles() {
               编辑
             </FaButton>
             <FaButton
+              v-if="row.original.status === 'DEPRECATED'"
+              v-auth="'system:role:edit'"
+              variant="outline"
+              size="sm"
+              @click="confirmEnable(row.original)"
+            >
+              启用
+            </FaButton>
+            <FaButton
+              v-if="row.original.status === 'ACTIVE'"
               v-auth="'system:role:delete'"
               variant="destructive"
               size="sm"
-              :disabled="row.original.systemRole || row.original.status === 'DEPRECATED'"
+              :disabled="row.original.systemRole"
               @click="confirmDisable(row.original)"
             >
               停用

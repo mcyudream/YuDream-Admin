@@ -137,10 +137,12 @@ export default {
   createOAuthClient: (data: OAuthClientPayload) => systemClient.post<unknown, ApiResponse<OAuthClientCreateResult>>('api/system/security/oauth/clients', data),
   updateOAuthClient: (id: string, data: OAuthClientPayload) => systemClient.put<unknown, ApiResponse<OAuthClient>>(`api/system/security/oauth/clients/${id}`, data),
   disableOAuthClient: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/system/security/oauth/clients/${id}`),
+  enableOAuthClient: (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/system/security/oauth/clients/${id}/enable`),
   oauthProviders: () => systemClient.get<unknown, ApiResponse<OAuthProvider[]>>('api/system/security/oauth/providers'),
   createOAuthProvider: (data: OAuthProviderPayload) => systemClient.post<unknown, ApiResponse<OAuthProvider>>('api/system/security/oauth/providers', data),
   updateOAuthProvider: (id: string, data: OAuthProviderPayload) => systemClient.put<unknown, ApiResponse<OAuthProvider>>(`api/system/security/oauth/providers/${id}`, data),
   disableOAuthProvider: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/system/security/oauth/providers/${id}`),
+  enableOAuthProvider: (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/system/security/oauth/providers/${id}/enable`),
   passkeys: (userId?: string) => systemClient.get<unknown, ApiResponse<PasskeyCredential[]>>('api/system/security/passkeys', {
     params: userId ? { userId } : undefined,
   }),

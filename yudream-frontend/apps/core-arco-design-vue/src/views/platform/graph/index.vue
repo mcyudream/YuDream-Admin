@@ -165,6 +165,18 @@ function confirmDisable(row: GraphConnection) {
   })
 }
 
+function confirmEnable(row: GraphConnection) {
+  modal.confirm({
+    title: '确认启用',
+    content: `确认启用图数据库连接「${row.name}」吗？`,
+    onConfirm: async () => {
+      await apiGraph.enableConnection(row.id)
+      toast.success('图数据库连接已启用')
+      await load()
+    },
+  })
+}
+
 async function testConnection(row: GraphConnection) {
   actionLoading.value = `${row.id}:test`
   try {
@@ -320,8 +332,11 @@ function queryStatusVariant(status: GraphQueryStatus) {
             <FaButton v-auth="'platform:graph:edit'" size="sm" variant="ghost" @click="openEdit(row.original)">
               编辑
             </FaButton>
-            <FaButton v-auth="'platform:graph:edit'" size="sm" variant="ghost" :disabled="row.original.status !== 'ACTIVE'" @click="confirmDisable(row.original)">
+            <FaButton v-if="row.original.status === 'ACTIVE'" v-auth="'platform:graph:edit'" size="sm" variant="ghost" @click="confirmDisable(row.original)">
               停用
+            </FaButton>
+            <FaButton v-else v-auth="'platform:graph:edit'" size="sm" variant="outline" @click="confirmEnable(row.original)">
+              启用
             </FaButton>
           </div>
         </template>
