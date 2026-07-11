@@ -67,6 +67,14 @@ public class PluginMessagingFrameworkService implements PluginMessagingService, 
     }
 
     @Override
+    public CompletionStage<PluginMessageResult> sendToChannel(String connectionId, String channelId, PluginMessageContent content) {
+        SatoriConnection connection = connectionRepo.findById(parseConnectionId(connectionId))
+                .orElseThrow(() -> new BizException("Satori 连接不存在"));
+        if (!connection.enabled()) throw new BizException("Satori 连接未启用");
+        return send(new PluginMessageRequest(connectionId, connection.getPlatform(), connection.getUserId(), channelId, content));
+    }
+
+    @Override
     public CompletionStage<Map<String, Object>> invoke(String connectionId, String method, Map<String, Object> payload) {
         return CompletableFuture.supplyAsync(() -> {
             SatoriConnection connection = connectionRepo.findById(parseConnectionId(connectionId))
