@@ -36,6 +36,13 @@ public class PluginMessagingFrameworkService implements PluginMessagingService, 
     private final PluginUserService pluginUserService;
 
     @Override
+    public java.util.List<online.yudream.base.plugin.spi.system.messaging.PluginMessagingConnection> connections() {
+        return connectionRepo.findEnabled().stream().map(connection ->
+                new online.yudream.base.plugin.spi.system.messaging.PluginMessagingConnection(
+                        String.valueOf(connection.getId()), connection.getName(), connection.getPlatform(), connection.getUserId())).toList();
+    }
+
+    @Override
     public CompletionStage<PluginMessageResult> send(PluginMessageRequest request) {
         return CompletableFuture.supplyAsync(() -> {
             if (request == null || request.content() == null) throw new BizException("插件消息请求不能为空");

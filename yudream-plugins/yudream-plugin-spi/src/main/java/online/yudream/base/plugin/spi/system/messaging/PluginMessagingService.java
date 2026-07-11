@@ -3,6 +3,7 @@ package online.yudream.base.plugin.spi.system.messaging;
 import java.util.concurrent.CompletionStage;
 
 public interface PluginMessagingService {
+    java.util.List<PluginMessagingConnection> connections();
     CompletionStage<PluginMessageResult> send(PluginMessageRequest request);
 
     /**
