@@ -76,26 +76,27 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
     </div>
     <div class="login-form flex-col-center">
       <div class="w-full">
-        <Login
-          v-if="formType === 'login'"
-          :account
-          @on-login="handleLogin"
-          @on-register="(val) => { formType = 'register'; account = val }"
-          @on-reset-password="(val) => { formType = 'resetPassword'; account = val }"
-        />
+        <template v-if="formType === 'login'">
+          <Login
+            :account
+            @on-login="handleLogin"
+            @on-register="(val) => { formType = 'register'; account = val }"
+            @on-reset-password="(val) => { formType = 'resetPassword'; account = val }"
+          />
+        </template>
         <div v-if="formType === 'login' && externalTypes.length" class="qq-login-entry">
           <FaButton v-for="type in externalTypes" :key="type" variant="outline" size="icon" :title="externalTypeMeta[type]?.label || `${type} 登录`" :aria-label="externalTypeMeta[type]?.label || `${type} 登录`" @click="loginWithExternal(type)">
             <FaIcon :name="externalTypeMeta[type]?.icon || 'i-ri:links-line'" />
           </FaButton>
         </div>
         <Register
-          v-else-if="formType === 'register'"
+          v-if="formType === 'register'"
           :account
           @on-register="(val) => { formType = 'login'; account = val }"
           @on-login="formType = 'login'"
         />
         <ResetPassword
-          v-else
+          v-if="formType === 'resetPassword'"
           :account
           @on-reset-password="(val) => { formType = 'login'; account = val }"
           @on-login="formType = 'login'"
