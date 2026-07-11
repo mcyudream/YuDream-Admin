@@ -7,6 +7,7 @@ import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
+import online.yudream.base.plugin.spi.system.command.PluginCommandService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
@@ -19,6 +20,8 @@ public interface FrameworkServices {
     PluginUserService users();
 
     PluginQqBindingService qqBindings();
+
+    PluginCommandService commands();
 
     PluginSecurityService security();
 
