@@ -79,6 +79,18 @@ class SatoriProtocolModelTest {
     }
 
     @Test
+    void shouldIgnoreAdapterSpecificLoginFields() throws IOException {
+        SatoriModels.SatoriLogin login = objectMapper.readValue("""
+                {"sn":1,"platform":"llonebot","self_id":"3816679582","user":{"id":"3816679582"},
+                 "status":1,"adapter":"llonebot","features":["login.get"],"proxy_urls":[]}
+                """, SatoriModels.SatoriLogin.class);
+
+        assertThat(login.platform()).isEqualTo("llonebot");
+        assertThat(login.selfId()).isEqualTo("3816679582");
+        assertThat(login.features()).containsExactly("login.get");
+    }
+
+    @Test
     void shouldSerializeProtocolNumbersAndKeepBoundaryValuesAsStrings() throws IOException {
         SatoriModels.SatoriEvent event = fixture("satori/event-message-created.json", SatoriModels.SatoriEvent.class);
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(event));

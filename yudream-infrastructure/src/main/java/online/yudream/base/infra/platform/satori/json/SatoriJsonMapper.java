@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.satori.json;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
@@ -25,6 +26,8 @@ public final class SatoriJsonMapper {
         module.addDeserializer(SatoriOpcode.class, new SatoriIntegerEnumJsonDeserializer<>(SatoriOpcode.class, SatoriOpcode::fromValue));
         module.addSerializer(SatoriOpcode.class, new SatoriIntegerEnumJsonSerializer<>(SatoriOpcode.class, SatoriOpcode::value));
         return new ObjectMapper()
+                // Adapters may append non-standard fields such as LLBot's proxy_urls to standard resources.
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .addMixIn(SatoriModels.SatoriEvent.class, SatoriEventJsonMixin.class)
                 .registerModule(module);
