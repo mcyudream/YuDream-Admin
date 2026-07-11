@@ -22,7 +22,7 @@ const logLevel = ref<'ALL' | SatoriOperationLog['level']>('ALL')
 const logSearch = ref('')
 const logPaused = ref(false)
 const liveStatus = ref<'CONNECTING' | 'LIVE' | 'OFFLINE'>('OFFLINE')
-let logEventSource: EventSource | null = null
+let logAbortController: AbortController | null = null
 const form = reactive<SatoriConnectionPayload>({ name: '', baseUrl: 'http://localhost:5500', platform: '', userId: '', token: '' })
 const composer = reactive({ content: '# 消息预览\n\n支持 **Markdown** 与 HTML 渲染。', width: 720, transparent: false })
 
@@ -117,16 +117,56 @@ async function openLogs(row: SatoriConnection) {
 function connectLogStream(id: string) {
   closeLogStream()
   liveStatus.value = 'CONNECTING'
-  logEventSource = new EventSource(httpEndpoint(apiSatori.streamConnectionLogs(id)))
-  logEventSource.addEventListener('connected', () => { liveStatus.value = 'LIVE' })
-  logEventSource.addEventListener('log', (event) => appendLiveLog(JSON.parse((event as MessageEvent).data) as SatoriOperationLog))
-  logEventSource.onerror = () => { liveStatus.value = 'OFFLINE' }
+  const controller = new AbortController()
+  logAbortController = controller
+  void consumeLogStream(id, controller)
 }
 
 function closeLogStream() {
-  logEventSource?.close()
-  logEventSource = null
+  logAbortController?.abort()
+  logAbortController = null
   liveStatus.value = 'OFFLINE'
+}
+
+async function consumeLogStream(id: string, controller: AbortController) {
+  try {
+    const token = localStorage.getItem('token')
+    const response = await fetch(httpEndpoint(apiSatori.streamConnectionLogs(id)), {
+      headers: {
+        Accept: 'text/event-stream',
+        ...(token ? { Authorization: token } : {}),
+      },
+      signal: controller.signal,
+    })
+    if (!response.ok || !response.body) throw new Error(`实时日志连接失败（HTTP ${response.status}）`)
+    liveStatus.value = 'LIVE'
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    while (!controller.signal.aborted) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      buffer += decoder.decode(chunk.value, { stream: true })
+      const frames = buffer.split(/\r?\n\r?\n/)
+      buffer = frames.pop() || ''
+      frames.forEach(handleLogFrame)
+    }
+  }
+  catch (error) {
+    if (!controller.signal.aborted) {
+      liveStatus.value = 'OFFLINE'
+      toast.error('实时日志连接失败', { description: error instanceof Error ? error.message : '网络异常' })
+    }
+  }
+  finally {
+    if (logAbortController === controller) logAbortController = null
+  }
+}
+
+function handleLogFrame(frame: string) {
+  const event = frame.match(/^event:\s*(.+)$/m)?.[1]?.trim()
+  const data = frame.match(/^data:\s*(.+)$/m)?.[1]
+  if (event === 'log' && data) appendLiveLog(JSON.parse(data) as SatoriOperationLog)
 }
 
 function appendLiveLog(log: SatoriOperationLog) {
