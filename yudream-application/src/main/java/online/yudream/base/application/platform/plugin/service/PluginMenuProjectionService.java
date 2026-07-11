@@ -79,6 +79,38 @@ public class PluginMenuProjectionService {
                 }
             }
         }
+        retireMissingFrontendMenus(pluginCode, declaredRegistrationKeys(plan));
+    }
+
+    /**
+     * Plugin updates may remove a contextual route or its generated parent.
+     * Keep the persisted record for audit/editing, but remove it from runtime navigation.
+     */
+    private void retireMissingFrontendMenus(String pluginCode, Set<String> declaredKeys) {
+        menuRepo.findByPluginCode(pluginCode).forEach(menu -> {
+            String registrationKey = menu.getPluginRegistrationKey();
+            if (!isFrontendRegistrationKey(registrationKey) || declaredKeys.contains(registrationKey)
+                    || Boolean.FALSE.equals(menu.getRuntimeAvailable())) {
+                return;
+            }
+            menu.setRuntimeAvailable(false);
+            menuRepo.save(menu);
+        });
+    }
+
+    private Set<String> declaredRegistrationKeys(ProjectionPlan plan) {
+        Set<String> keys = new HashSet<>();
+        for (ModulePlan module : plan.modules()) {
+            keys.add(module.registrationKey());
+            module.parents().values().forEach(parent -> keys.add(parent.registrationKey()));
+            module.routes().forEach(route -> keys.add(route.registrationKey()));
+        }
+        return keys;
+    }
+
+    private boolean isFrontendRegistrationKey(String registrationKey) {
+        return registrationKey != null && (registrationKey.startsWith("module:")
+                || registrationKey.startsWith("parent:") || registrationKey.startsWith("route:"));
     }
 
     public void restoreAvailable(String pluginCode) {

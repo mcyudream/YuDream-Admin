@@ -44,6 +44,7 @@ export interface MenuPayload {
   component?: string
   link?: string
   sort?: number
+  visible?: boolean
   permission?: string
   status?: MenuStatus
 }

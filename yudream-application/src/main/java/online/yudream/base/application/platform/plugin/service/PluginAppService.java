@@ -17,7 +17,6 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
-import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -57,7 +56,6 @@ public class PluginAppService {
     private String uploadDirectory;
 
     @Value("${yudream.system.seed.menu.sync-mode:MISSING_ONLY}")
-    private SeedSyncMode menuSeedSyncMode = SeedSyncMode.MISSING_ONLY;
 
     @Transactional
     public List<PluginModuleDTO> list() {
@@ -444,12 +442,10 @@ public class PluginAppService {
                 .filter(frontendModule -> code.equals(frontendModule.pluginCode()))
                 .toList();
         pluginMenuProjectionService.restoreAvailable(code);
-        if (!module.menusInitialized() || menuSeedSyncMode == SeedSyncMode.MISSING_ONLY) {
-            pluginMenuProjectionService.project(code, modules);
-            if (!module.menusInitialized()) {
-                module.markMenusInitialized();
-                return pluginModuleRepo.save(module);
-            }
+        pluginMenuProjectionService.project(code, modules);
+        if (!module.menusInitialized()) {
+            module.markMenusInitialized();
+            return pluginModuleRepo.save(module);
         }
         return module;
     }

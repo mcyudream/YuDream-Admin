@@ -476,9 +476,6 @@ function dateText(value?: string) {
           </div>
           <div v-if="qqBindingCode" class="mt-3 flex flex-wrap items-center gap-3"><code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ qqBindingCode.code }}</code><span class="text-sm text-muted-foreground">有效至 {{ qqBindingCode.expiresAt }}</span></div>
         </div>
-        <div class="profile-save-bar">
-          <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
-        </div>
       </section>
 
       <section v-else-if="active === 'security'" class="profile-section">
@@ -647,6 +644,10 @@ function dateText(value?: string) {
           </div>
         </section>
       </section>
+
+      <div v-if="active === 'profile'" class="profile-save-bar">
+        <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
+      </div>
     </main>
   </div>
 </template>
@@ -744,6 +745,7 @@ function dateText(value?: string) {
 }
 
 .profile-main {
+  position: relative;
   min-width: 0;
   overflow: auto;
   padding: 22px;
@@ -751,16 +753,12 @@ function dateText(value?: string) {
 }
 
 .profile-save-bar {
-  position: sticky;
-  bottom: -22px;
+  position: absolute;
+  right: 22px;
+  bottom: 22px;
   z-index: 2;
   display: flex;
   justify-content: flex-end;
-  padding: 12px 0;
-  margin: 0 -22px -64px;
-  border-top: 1px solid var(--color-border-2);
-  background: color-mix(in srgb, var(--color-bg-1) 92%, transparent);
-  backdrop-filter: blur(8px);
 }
 
 .profile-section,
@@ -1000,9 +998,8 @@ function dateText(value?: string) {
   }
 
   .profile-save-bar {
-    bottom: -16px;
-    padding: 10px 0;
-    margin: 0 -16px -58px;
+    right: 16px;
+    bottom: 16px;
   }
 
   .permission-toolbar {

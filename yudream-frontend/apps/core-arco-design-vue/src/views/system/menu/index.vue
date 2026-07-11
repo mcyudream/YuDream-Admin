@@ -38,6 +38,7 @@ const form = reactive<MenuPayload>({
   component: '',
   link: '',
   sort: 0,
+  visible: true,
   permission: '',
   status: 'ACTIVE',
 })
@@ -153,6 +154,7 @@ function openCreate(parent?: MenuManageItem) {
     component: '',
     link: '',
     sort: 0,
+    visible: true,
     permission: '',
     status: 'ACTIVE' as MenuStatus,
   })
@@ -181,6 +183,7 @@ function openEdit(row?: MenuManageItem) {
     component: target.component,
     link: target.link,
     sort: target.sort || 0,
+    visible: target.visible !== false,
     permission: target.permission,
     status: target.status,
   })
@@ -678,6 +681,14 @@ function importMenus() {
           <a-grid-item>
             <a-form-item label="排序">
               <FaNumberField v-model="sortValue" :min="0" class="w-full" />
+            </a-form-item>
+          </a-grid-item>
+          <a-grid-item>
+            <a-form-item label="导航菜单">
+              <div class="flex items-center gap-3 pt-1">
+                <FaSwitch v-model="form.visible" />
+                <span class="text-sm text-muted-foreground">{{ form.visible ? '显示在导航中' : '仅保留路由访问' }}</span>
+              </div>
             </a-form-item>
           </a-grid-item>
           <a-grid-item v-if="form.type !== 'BUTTON'">
