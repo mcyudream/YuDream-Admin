@@ -1,4 +1,5 @@
 import type { ApiResponse, PageResult } from './system-client'
+import type { ExcelBlobResponse } from '@/utils/excel'
 import systemClient from './system-client'
 
 export interface SatoriConnection {
@@ -93,5 +94,5 @@ export default {
   sendMessage: (id: string, data: { platform: string, userId: string, channelId: string, type: 'TEXT' | 'SATORI' | 'COMPOSITE', content: string, attachments?: Array<{ url: string, title?: string, contentType?: string }> }) => systemClient.post(`api/platform/satori/connections/${id}/messages`, data),
   sendMedia: (id: string, data: FormData) => systemClient.post(`api/platform/satori/connections/${id}/messages/media`, data),
   sendMentionAll: (id: string, data: { platform: string, userId: string, channelId: string, content: string }) => systemClient.post(`api/platform/satori/connections/${id}/messages/mention-all`, data),
-  render: (data: { sourceType: 'HTML' | 'MARKDOWN' | 'URL', content: string, width?: number, transparent?: boolean }) => systemClient.post<Blob>('api/platform/render', data, { responseType: 'blob' }),
+  render: (data: { sourceType: 'HTML' | 'MARKDOWN' | 'URL', content: string, width?: number, transparent?: boolean }) => systemClient.post<unknown, ExcelBlobResponse>('api/platform/render', data, { responseType: 'blob' }),
 }

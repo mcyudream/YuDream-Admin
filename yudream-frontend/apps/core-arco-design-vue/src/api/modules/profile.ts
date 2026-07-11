@@ -29,7 +29,7 @@ export interface ExternalAccount {
   platformType: string
   socialUid: string
   nickname?: string
-  avatarUrl?: string
+  avatarUrl: string
   createTime?: string
 }
 

@@ -63,7 +63,7 @@ onMounted(load)
       <FaTable :columns="columns" :data="rows" :loading="loading" row-key="code" border stripe>
         <template #cell-command="{ row }"><code>/{{ row.original.command }}</code></template>
         <template #cell-permission="{ row }">{{ row.original.permission || '无需权限' }}</template>
-        <template #cell-anonymous="{ row }"><FaTag :variant="row.original.allowAnonymous ? 'success' : 'secondary'">{{ row.original.allowAnonymous ? '允许' : '不允许' }}</FaTag></template>
+        <template #cell-anonymous="{ row }"><FaTag :variant="row.original.allowAnonymous ? 'default' : 'secondary'">{{ row.original.allowAnonymous ? '允许' : '不允许' }}</FaTag></template>
       </FaTable>
     </FaPageMain>
   </div>
