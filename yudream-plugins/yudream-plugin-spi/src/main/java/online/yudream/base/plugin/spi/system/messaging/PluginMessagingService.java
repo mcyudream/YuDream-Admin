@@ -10,4 +10,6 @@ public interface PluginMessagingService {
      * The host selects an enabled Satori connection; it rejects ambiguous configurations.
      */
     CompletionStage<PluginMessageResult> sendDirectToBoundUser(String userId, PluginMessageContent content);
+
+    CompletionStage<PluginMessageResult> sendToChannel(String connectionId, String channelId, PluginMessageContent content);
 }
