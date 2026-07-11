@@ -8,6 +8,7 @@ import online.yudream.base.domain.platform.satori.enumerate.SatoriChannelType;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriLoginStatus;
 import online.yudream.base.domain.platform.satori.enumerate.SatoriOpcode;
 import online.yudream.base.domain.platform.satori.model.SatoriModels;
+import online.yudream.base.domain.platform.satori.model.SatoriApiModels;
 
 /** Satori v1 协议 JSON 编解码器，由基础设施层持有 Jackson 依赖与 wire 格式细节。 */
 public final class SatoriJsonMapper {
@@ -30,6 +31,7 @@ public final class SatoriJsonMapper {
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
                 .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
                 .addMixIn(SatoriModels.SatoriEvent.class, SatoriEventJsonMixin.class)
+                .addMixIn(SatoriApiModels.MessageCreate.class, SatoriMessageCreateJsonMixin.class)
                 .registerModule(module);
     }
 }

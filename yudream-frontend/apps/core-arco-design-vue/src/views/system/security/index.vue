@@ -12,6 +12,8 @@ import type {
   OAuthProvider,
   OAuthProviderPayload,
   OAuthRegistrationStatus,
+  ExternalLoginProvider,
+  ExternalLoginProviderPayload,
   PasskeyCredential,
 } from '@/api/modules/system-security'
 import type { PermissionItem } from '@/api/modules/system-role'
@@ -19,7 +21,7 @@ import apiSecurity from '@/api/modules/system-security'
 import apiRole from '@/api/modules/system-role'
 import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
-type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'passkey'
+type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'external' | 'passkey'
 type OAuthPane = 'clients' | 'providers'
 
 const modal = useFaModal()
@@ -34,6 +36,7 @@ const creating = ref(false)
 const apiKeyRows = ref<ApiKeyCredential[]>([])
 const oauthClients = ref<OAuthClient[]>([])
 const oauthProviders = ref<OAuthProvider[]>([])
+const externalProviders = ref<ExternalLoginProvider[]>([])
 const passkeyRows = ref<PasskeyCredential[]>([])
 const permissions = ref<PermissionItem[]>([])
 
@@ -93,11 +96,21 @@ const oauthProviderForm = reactive<OAuthProviderPayload>({
   redirectUri: '',
   status: 'ACTIVE',
 })
+const externalLoginForm = reactive<ExternalLoginProviderPayload>({ code: 'wwoyun', name: 'Wwoyun 登录', appId: '', appKey: '', callbackUrl: `${window.location.origin}/external-login/callback`, enabled: false, supportedTypes: 'qq,wx,google,gitee,github' })
+const selectedExternalTypes = ref(['qq', 'wx', 'google', 'gitee', 'github'])
+const externalTypeOptions = [
+  { label: 'QQ', value: 'qq' },
+  { label: '微信', value: 'wx' },
+  { label: 'Google', value: 'google' },
+  { label: 'Gitee', value: 'gitee' },
+  { label: 'GitHub', value: 'github' },
+]
 
 const tabOptions = [
   { key: 'policy', label: '安全策略', icon: 'i-ri:shield-check-line' },
   { key: 'apiKey', label: 'API Key', icon: 'i-ri:key-2-line' },
   { key: 'oauth', label: 'OAuth', icon: 'i-ri:login-circle-line' },
+  { key: 'external', label: '第三方登录', icon: 'i-ri:links-line' },
   { key: 'passkey', label: 'Passkey', icon: 'i-ri:fingerprint-line' },
 ] as const
 
@@ -285,11 +298,28 @@ async function loadOAuth() {
   await Promise.all(tasks)
 }
 
+async function loadExternalLogin() {
+  externalProviders.value = (await apiSecurity.externalLoginProviders()).data
+  const provider = externalProviders.value.find(item => item.code === 'wwoyun')
+  if (provider) {
+    Object.assign(externalLoginForm, { ...provider, appKey: '' })
+    selectedExternalTypes.value = (provider.supportedTypes || '').split(',').map(item => item.trim()).filter(Boolean)
+  }
+}
+
+async function saveExternalLogin() {
+  if (!externalLoginForm.appKey) { toast.error('请输入 AppKey'); return }
+  await apiSecurity.saveExternalLoginProvider({ ...externalLoginForm, supportedTypes: selectedExternalTypes.value.join(',') })
+  toast.success('第三方登录配置已保存')
+  await loadExternalLogin()
+}
+
 async function loadFeatureData() {
   await Promise.all([
     loadApiKeys(),
     loadPermissions(),
     loadOAuth(),
+    loadExternalLogin(),
     syncPasskeyState(),
   ])
 }
@@ -812,6 +842,12 @@ function normalizeDateTime(value?: string) {
             </div>
           </template>
         </FaTable>
+      </section>
+
+      <section v-if="activeTab === 'external'" class="panel">
+        <div class="key-toolbar"><div class="section-title"><FaIcon name="i-ri:links-line" />第三方登录</div></div>
+        <FaAlert icon="i-ri:information-line" title="Wwoyun 外置登录" description="配置后可使用 QQ、微信、Google、Gitee、GitHub 登录或在个人设置中绑定账号。回调地址需与 Wwoyun 后台登记一致。" />
+        <a-form :model="externalLoginForm" layout="vertical" class="mt-4"><div class="form-grid"><a-form-item label="提供方编码"><FaInput v-model="externalLoginForm.code" disabled /></a-form-item><a-form-item label="名称"><FaInput v-model="externalLoginForm.name" /></a-form-item><a-form-item label="AppId" required><FaInput v-model="externalLoginForm.appId" /></a-form-item><a-form-item label="AppKey" required><FaInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时请重新输入" /></a-form-item></div><a-form-item label="回调地址" required><FaInput v-model="externalLoginForm.callbackUrl" /></a-form-item><a-form-item label="启用平台"><FaSelect v-model="selectedExternalTypes" multiple :options="externalTypeOptions" class="w-full" /></a-form-item><a-form-item label="状态"><a-switch v-model="externalLoginForm.enabled" /></a-form-item><div class="flex justify-end"><FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin"><FaIcon name="i-ri:save-3-line" />保存配置</FaButton></div></a-form>
       </section>
 
       <section v-if="activeTab === 'passkey'" class="panel">

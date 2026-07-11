@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.satori.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.platform.satori.event.SatoriEventPublished;
 import online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriEvent;
 import online.yudream.base.domain.platform.satori.service.SatoriEventPublisher;
 import org.springframework.context.ApplicationEventPublisher;
@@ -14,8 +15,6 @@ public class SpringSatoriEventPublisher implements SatoriEventPublisher {
 
     @Override
     public void publish(Long connectionId, SatoriEvent event) {
-        applicationEventPublisher.publishEvent(new SatoriPublishedEvent(connectionId, event));
+        applicationEventPublisher.publishEvent(new SatoriEventPublished(connectionId, event));
     }
-
-    public record SatoriPublishedEvent(Long connectionId, SatoriEvent event) { }
 }

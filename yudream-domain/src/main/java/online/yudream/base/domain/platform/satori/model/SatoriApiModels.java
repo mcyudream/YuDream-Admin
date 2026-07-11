@@ -46,6 +46,8 @@ public final class SatoriApiModels {
     }
     public record GuildMemberRef(String guildId, String userId) {
     }
+    public record GuildMemberList(String guildId, String next) {
+    }
     public record GuildMemberKick(String guildId, String userId, Boolean permanent) {
     }
     public record GuildMemberMute(String guildId, String userId, Long duration) {

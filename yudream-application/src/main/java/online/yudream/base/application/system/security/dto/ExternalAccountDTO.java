@@ -1,0 +1,1 @@
+package online.yudream.base.application.system.security.dto; import lombok.Builder;import lombok.Data;import java.time.LocalDateTime;@Data @Builder public class ExternalAccountDTO {private Long id;private String providerCode;private String platformType;private String socialUid;private String nickname;private String avatarUrl;private LocalDateTime createTime;}

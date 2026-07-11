@@ -1,0 +1,1 @@
+package online.yudream.base.interfaces.system.security.res;import lombok.Builder;import lombok.Data;@Data @Builder public class ExternalAccountRes {private Long id;private String providerCode;private String platformType;private String socialUid;private String nickname;private String avatarUrl;private String createTime;}

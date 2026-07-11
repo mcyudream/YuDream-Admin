@@ -9,11 +9,15 @@ import online.yudream.base.domain.platform.satori.model.SatoriApiModels.Internal
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.SatoriApiContext;
 import online.yudream.base.domain.platform.satori.repo.SatoriConnectionRepo;
 import online.yudream.base.domain.platform.satori.service.SatoriInternalGateway;
+import online.yudream.base.domain.platform.satori.service.SatoriApiGateway;
+import online.yudream.base.domain.platform.satori.model.SatoriApiModels.SatoriApiContext;
+import online.yudream.base.domain.platform.satori.model.SatoriApiModels.UserChannelCreate;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageContent;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageRequest;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageResult;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
+import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
@@ -28,6 +32,8 @@ public class PluginMessagingFrameworkService implements PluginMessagingService, 
     private final MessageDeliveryAppService messageDeliveryAppService;
     private final SatoriConnectionRepo connectionRepo;
     private final SatoriInternalGateway internalGateway;
+    private final SatoriApiGateway apiGateway;
+    private final PluginUserService pluginUserService;
 
     @Override
     public CompletionStage<PluginMessageResult> send(PluginMessageRequest request) {
@@ -38,6 +44,25 @@ public class PluginMessagingFrameworkService implements PluginMessagingService, 
                             request.userId(), request.channelId(), toContent(request.content())));
             return new PluginMessageResult(result.messages().stream().map(message -> message.id()).toList(),
                     result.rendered(), result.degraded());
+        });
+    }
+
+    @Override
+    public CompletionStage<PluginMessageResult> sendDirectToBoundUser(String userId, PluginMessageContent content) {
+        return CompletableFuture.supplyAsync(() -> {
+            if (content == null) throw new BizException("私信内容不能为空");
+            Long systemUserId = parseConnectionId(userId);
+            String qq = pluginUserService.findById(systemUserId).map(profile -> profile.qq())
+                    .filter(value -> value != null && !value.isBlank())
+                    .orElseThrow(() -> new BizException("用户尚未绑定 QQ"));
+            var connections = connectionRepo.findEnabled();
+            if (connections.size() != 1) throw new BizException("私信需要恰好一个已启用的 Satori 连接");
+            SatoriConnection connection = connections.getFirst();
+            SatoriApiContext context = new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), connection.getPlatform(), connection.getUserId());
+            String channelId = apiGateway.userChannelCreate(context, new UserChannelCreate(qq.trim(), null)).id();
+            MessageDeliveryAppService.DeliveryResult result = messageDeliveryAppService.deliver(
+                    new MessageDeliveryAppService.DeliveryRequest(connection.getId(), connection.getPlatform(), connection.getUserId(), channelId, toContent(content)));
+            return new PluginMessageResult(result.messages().stream().map(message -> message.id()).toList(), result.rendered(), result.degraded());
         });
     }
 

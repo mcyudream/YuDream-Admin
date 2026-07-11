@@ -3,6 +3,8 @@ package online.yudream.base.application.platform.satori.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.satori.assembler.SatoriMessageAssembler;
+import online.yudream.base.application.platform.satori.cmd.SatoriMediaSendCmd;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.render.model.RenderModels.RenderRequest;
 import online.yudream.base.domain.platform.render.model.RenderModels.RenderedImage;
@@ -11,6 +13,7 @@ import online.yudream.base.domain.platform.render.service.MessageRenderGateway;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriLogin;
 import online.yudream.base.domain.platform.satori.message.SatoriMessageContent;
+import online.yudream.base.domain.platform.satori.message.SatoriMessageBuilder;
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.MessageCreate;
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.SatoriApiContext;
 import online.yudream.base.domain.platform.satori.model.SatoriApiModels.UploadFile;
@@ -20,8 +23,11 @@ import online.yudream.base.domain.platform.satori.service.PlatformCapabilityProf
 import online.yudream.base.domain.platform.satori.service.SatoriApiGateway;
 import online.yudream.base.domain.platform.satori.service.SatoriOperationLogger;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.ArrayList;
+import java.io.ByteArrayInputStream;
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +43,9 @@ public class MessageDeliveryAppService {
     private final SatoriLoginRepo loginRepo;
     private final SatoriApiGateway apiGateway;
     private final MessageRenderGateway renderGateway;
+    private final FileAppService fileAppService;
+    @Value("${app.base-url:http://localhost:8080}")
+    private String appBaseUrl;
     private final SatoriOperationLogger operationLogger;
     private final MarkdownToSatoriConverter markdownConverter = new MarkdownToSatoriConverter();
 
@@ -64,6 +73,62 @@ public class MessageDeliveryAppService {
             throw exception;
         }
         return new DeliveryResult(messages, prepared.rendered(), prepared.degraded());
+    }
+
+    /** Sends a standard Satori all-member mention; the HTTP boundary protects this operation with its own permission. */
+    public DeliveryResult deliverMentionAll(DeliveryRequest request) {
+        validate(request);
+        String content = SatoriMessageAssembler.encode(SatoriMessageBuilder.create().atAll().text(request.content().content()).build());
+        return deliver(new DeliveryRequest(request.connectionId(), request.platform(), request.userId(), request.channelId(),
+                new SatoriMessageContent(SatoriMessageContent.Type.SATORI, content, List.of(), request.content().referrer())));
+    }
+
+    /** Uploads browser-selected files to the target Satori adapter before sending them as one composite message. */
+    public DeliveryResult deliverMedia(SatoriMediaSendCmd cmd) {
+        if (cmd == null || cmd.attachments().isEmpty()) throw new BizException("至少需要一个附件");
+        capabilityAppService.ensureEnabled(SATORI_CAPABILITY_CODE, "Satori 平台");
+        SatoriConnection connection = connectionRepo.findById(cmd.connectionId())
+                .orElseThrow(() -> new BizException("Satori 连接不存在"));
+        if (!connection.enabled()) throw new BizException("Satori 连接未启用");
+        SatoriApiContext context = new SatoriApiContext(connection.getBaseUrl(), connection.getToken(), cmd.platform(), cmd.userId());
+        List<UploadFile> files = cmd.attachments().stream().map(item -> new UploadFile("file", item.filename(), item.contentType(), item.content())).toList();
+        List<String> urls = uploadMedia(context, cmd, files);
+        if (urls.size() != cmd.attachments().size()) throw new BizException("Satori 上传附件未返回完整访问地址");
+        List<SatoriMessageContent.Attachment> attachments = new ArrayList<>();
+        for (int index = 0; index < urls.size(); index++) {
+            SatoriMediaSendCmd.Attachment source = cmd.attachments().get(index);
+            attachments.add(new SatoriMessageContent.Attachment(urls.get(index), source.filename(), source.contentType()));
+        }
+        return deliver(new DeliveryRequest(cmd.connectionId(), cmd.platform(), cmd.userId(), cmd.channelId(),
+                new SatoriMessageContent(SatoriMessageContent.Type.COMPOSITE, cmd.content(), attachments, Map.of())));
+    }
+
+    private List<String> uploadMedia(SatoriApiContext context, SatoriMediaSendCmd cmd, List<UploadFile> files) {
+        try {
+            Map<String, String> uploaded = apiGateway.uploadCreate(context, files);
+            return uploaded.values().stream().filter(url -> url != null && !url.isBlank()).toList();
+        } catch (BizException exception) {
+            if (exception.getCode() != 404 && exception.getCode() != 501) throw exception;
+            String publicBaseUrl = publicBaseUrl();
+            return cmd.attachments().stream().map(item -> {
+                var stored = fileAppService.upload(new ByteArrayInputStream(item.content()), item.filename(), item.contentType(),
+                        item.content().length, "satori", null, true);
+                return publicBaseUrl + fileAppService.fileUrl(stored.getId());
+            }).toList();
+        }
+    }
+
+    private String publicBaseUrl() {
+        try {
+            URI uri = URI.create(appBaseUrl);
+            String host = uri.getHost();
+            if (host == null || "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host) || "::1".equals(host)) {
+                throw new BizException("当前 Satori 适配器不支持 upload.create，请将 APP_BASE_URL 配置为 QQ 适配器可访问的公网地址后重试");
+            }
+            return appBaseUrl.replaceAll("/+$", "");
+        } catch (IllegalArgumentException exception) {
+            throw new BizException("APP_BASE_URL 必须配置为 QQ 适配器可访问的公网 HTTP 地址");
+        }
     }
 
     private PreparedContent prepare(SatoriMessageContent content, PlatformCapabilityProfileFactory.Profile profile,

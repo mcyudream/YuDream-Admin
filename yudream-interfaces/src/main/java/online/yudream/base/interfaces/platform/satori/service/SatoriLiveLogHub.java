@@ -29,7 +29,7 @@ public class SatoriLiveLogHub {
         emitters.computeIfAbsent(connectionId, ignored -> new ConcurrentHashMap<>()).put(id, emitter);
         emitter.onCompletion(() -> remove(connectionId, id));
         emitter.onTimeout(() -> remove(connectionId, id));
-        send(emitter, "connected", Map.of("connectionId", String.valueOf(connectionId)));
+        emitter.onError(ignored -> remove(connectionId, id));
         return emitter;
     }
 
@@ -49,7 +49,11 @@ public class SatoriLiveLogHub {
         try {
             emitter.send(SseEmitter.event().name(event).data(objectMapper.writeValueAsString(payload)));
             return true;
-        } catch (IOException exception) {
+        } catch (IOException | IllegalStateException exception) {
+            try {
+                emitter.complete();
+            } catch (RuntimeException ignored) {
+            }
             return false;
         }
     }

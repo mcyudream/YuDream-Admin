@@ -34,6 +34,10 @@ public final class SatoriMessageBuilder {
         return element("at", optionalAttributes("id", id, "name", name), List.of());
     }
 
+    public SatoriMessageBuilder atAll() {
+        return element("at", Map.of("type", "all"), List.of());
+    }
+
     public SatoriMessageBuilder sharp(String id, String name) {
         return element("sharp", requiredAndOptionalAttributes("id", id, "name", name), List.of());
     }

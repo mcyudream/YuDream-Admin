@@ -115,6 +115,9 @@ export interface OAuthProviderPayload {
   status: OAuthRegistrationStatus
 }
 
+export interface ExternalLoginProvider { code: string, name: string, protocol: string, appId: string, callbackUrl: string, enabled: boolean, supportedTypes: string }
+export interface ExternalLoginProviderPayload { code: string, name?: string, appId: string, appKey: string, callbackUrl: string, enabled: boolean, supportedTypes?: string }
+
 export interface PasskeyCredential {
   id: string
   userId: string
@@ -147,4 +150,7 @@ export default {
     params: userId ? { userId } : undefined,
   }),
   revokePasskey: (id: string) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>(`api/system/security/passkeys/${id}/revoke`),
+  externalLoginProviders: () => systemClient.get<unknown, ApiResponse<ExternalLoginProvider[]>>('api/system/security/external-login/providers'),
+  saveExternalLoginProvider: (data: ExternalLoginProviderPayload) => systemClient.put<unknown, ApiResponse<ExternalLoginProvider>>('api/system/security/external-login/providers', data),
+  publicExternalLoginProviders: () => systemClient.get<unknown, ApiResponse<ExternalLoginProvider[]>>('api/external-login/providers'),
 }

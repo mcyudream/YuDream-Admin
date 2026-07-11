@@ -9,6 +9,7 @@ import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginMenu;
 import online.yudream.base.plugin.spi.annotation.PluginPermission;
 import online.yudream.base.plugin.spi.annotation.PluginRoute;
+import online.yudream.base.plugin.spi.annotation.PluginCommand;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -38,6 +39,44 @@ class PluginAnnotationRegistrar {
         registerDashboardCards(pluginClass, context);
         registerFrontend(pluginClass, context);
         registerHttpEndpoints(plugin, pluginClass, context);
+        registerCommands(plugin, pluginClass, context);
+    }
+
+    private void registerCommands(Object target, Class<?> targetClass, PluginContextImpl context) {
+        Class<?> current = targetClass;
+        while (current != null && current != Object.class) {
+            for (Method method : current.getDeclaredMethods()) {
+                for (PluginCommand command : method.getAnnotationsByType(PluginCommand.class)) {
+                    if (method.getParameterCount() < 1 || method.getParameterCount() > 2
+                            || !online.yudream.base.plugin.spi.system.command.PluginCommandContext.class.equals(method.getParameterTypes()[0])
+                            || (method.getParameterCount() == 2 && !PluginContext.class.equals(method.getParameterTypes()[1]))) {
+                        throw new BizException("插件指令方法必须接收 PluginCommandContext，可选 PluginContext: " + method.getName());
+                    }
+                    method.setAccessible(true);
+                    context.commands().register(new online.yudream.base.plugin.spi.system.command.PluginCommandDefinition(
+                            command.code(), command.command(), command.name(), command.permission(), command.description(), command.allowAnonymous()),
+                            commandContext -> invokeCommand(target, method, commandContext, context));
+                }
+            }
+            current = current.getSuperclass();
+        }
+    }
+
+    private void invokeCommand(Object targetInstance, Method method,
+                               online.yudream.base.plugin.spi.system.command.PluginCommandContext commandContext,
+                               PluginContext context) {
+        try {
+            Object[] arguments = method.getParameterCount() == 1 ? new Object[]{commandContext} : new Object[]{commandContext, context};
+            method.invoke(Modifier.isStatic(method.getModifiers()) ? null : targetInstance, arguments);
+        } catch (IllegalAccessException e) {
+            throw new BizException("插件指令不可访问: " + method.getName());
+        } catch (InvocationTargetException e) {
+            Throwable target = e.getTargetException();
+            if (target instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new BizException("插件指令执行失败: " + target.getMessage());
+        }
     }
 
     private void registerPermissions(Class<?> pluginClass, PluginContextImpl context) {
