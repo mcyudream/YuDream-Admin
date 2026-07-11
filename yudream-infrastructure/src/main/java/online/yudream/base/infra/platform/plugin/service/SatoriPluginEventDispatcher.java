@@ -3,6 +3,10 @@ package online.yudream.base.infra.platform.plugin.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.satori.event.SatoriEventPublished;
 import online.yudream.base.plugin.spi.system.messaging.PluginEvent;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessageContent;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessageRequest;
+import online.yudream.base.plugin.spi.system.command.PluginCommandInfo;
+import online.yudream.base.plugin.spi.system.command.PluginCommandService;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
@@ -10,6 +14,7 @@ import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -18,6 +23,8 @@ public class SatoriPluginEventDispatcher {
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
     private final SettingRepo settingRepo;
+    private final PluginCommandService pluginCommandService;
+    private final PluginMessagingFrameworkService messagingService;
 
     @EventListener
     public void dispatch(SatoriEventPublished published) {
@@ -39,9 +46,28 @@ public class SatoriPluginEventDispatcher {
         if (command != null) {
             User user = userId == null ? null : userRepo.findByQQ(userId).orElse(null);
             if (requiresBoundQq() && user == null && !"绑定".equals(command.name())) return;
+            if (isCommandMenu(command.name())) {
+                sendCommandMenu(pluginEvent, user);
+                return;
+            }
             pluginRuntimeGateway.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
                     permission -> hasPermission(user, permission));
         }
+    }
+
+    private boolean isCommandMenu(String command) {
+        return "指令菜单".equals(command) || "帮助".equals(command) || "菜单".equals(command);
+    }
+
+    private void sendCommandMenu(PluginEvent event, User user) {
+        List<PluginCommandInfo> commands = pluginCommandService.listAccessible(user == null ? null : user.getId());
+        StringBuilder text = new StringBuilder("可用指令：");
+        commands.stream().filter(item -> !isCommandMenu(item.command())).forEach(item -> text.append("\n/")
+                .append(item.command()).append(" - ").append(item.name()).append("：").append(item.description()));
+        if (commands.isEmpty()) text.append("\n当前没有可用指令。");
+        messagingService.send(new PluginMessageRequest(event.connectionId(), event.platform(), event.selfId(), event.channelId(),
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, text.toString(), null,
+                        event.messageId() == null ? java.util.Map.of() : java.util.Map.of("message_id", event.messageId()))));
     }
 
     private boolean requiresBoundQq() {
