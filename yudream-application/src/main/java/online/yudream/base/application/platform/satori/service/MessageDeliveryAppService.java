@@ -56,9 +56,11 @@ public class MessageDeliveryAppService {
                 // message.create is intentionally never retried: adapters may already have accepted it.
                 messages.addAll(apiGateway.messageCreate(context, new MessageCreate(request.channelId(), payload, request.content().referrer())));
             }
-            operationLogger.info(connection.getId(), "MESSAGE", "message.create", "消息投递成功，共 " + messages.size() + " 条");
+            operationLogger.info(connection.getId(), "MESSAGE", "message.create", "OUT " + request.content().type()
+                    + " platform=" + request.platform() + " user=" + request.userId() + " channel=" + request.channelId()
+                    + " returned=" + messages.size());
         } catch (RuntimeException exception) {
-            operationLogger.error(connection.getId(), "MESSAGE", "message.create", exception.getMessage());
+            operationLogger.error(connection.getId(), "MESSAGE", "message.create", "OUT channel=" + request.channelId() + " failed: " + exception.getMessage());
             throw exception;
         }
         return new DeliveryResult(messages, prepared.rendered(), prepared.degraded());

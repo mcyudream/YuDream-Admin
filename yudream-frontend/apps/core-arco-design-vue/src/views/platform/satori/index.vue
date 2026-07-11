@@ -17,6 +17,12 @@ const logVisible = ref(false)
 const logLoading = ref(false)
 const logConnection = ref<SatoriConnection | null>(null)
 const logs = ref<SatoriOperationLog[]>([])
+const pendingLogs = ref<SatoriOperationLog[]>([])
+const logLevel = ref<'ALL' | SatoriOperationLog['level']>('ALL')
+const logSearch = ref('')
+const logPaused = ref(false)
+const liveStatus = ref<'CONNECTING' | 'LIVE' | 'OFFLINE'>('OFFLINE')
+let logEventSource: EventSource | null = null
 const form = reactive<SatoriConnectionPayload>({ name: '', baseUrl: 'http://localhost:5500', platform: '', userId: '', token: '' })
 const composer = reactive({ content: '# 消息预览\n\n支持 **Markdown** 与 HTML 渲染。', width: 720, transparent: false })
 
@@ -32,6 +38,13 @@ const columns = [
 ]
 
 onMounted(load)
+onBeforeUnmount(closeLogStream)
+
+const filteredLogs = computed(() => logs.value.filter((log) => {
+  if (logLevel.value !== 'ALL' && log.level !== logLevel.value) return false
+  const needle = logSearch.value.trim().toLowerCase()
+  return !needle || `${log.category} ${log.action} ${log.detail || ''}`.toLowerCase().includes(needle)
+}))
 
 async function load() {
   loading.value = true
@@ -85,14 +98,67 @@ async function test(row: SatoriConnection) {
 }
 
 async function openLogs(row: SatoriConnection) {
+  closeLogStream()
   logConnection.value = row
   logVisible.value = true
+  logPaused.value = false
+  pendingLogs.value = []
+  logLevel.value = 'ALL'
+  logSearch.value = ''
   logLoading.value = true
   try {
     const result = await apiSatori.pageConnectionLogs(row.id, { page: 1, size: 100 })
-    logs.value = result.data.records
+    logs.value = [...result.data.records].reverse()
+    connectLogStream(row.id)
   }
   finally { logLoading.value = false }
+}
+
+function connectLogStream(id: string) {
+  closeLogStream()
+  liveStatus.value = 'CONNECTING'
+  logEventSource = new EventSource(httpEndpoint(apiSatori.streamConnectionLogs(id)))
+  logEventSource.addEventListener('connected', () => { liveStatus.value = 'LIVE' })
+  logEventSource.addEventListener('log', (event) => appendLiveLog(JSON.parse((event as MessageEvent).data) as SatoriOperationLog))
+  logEventSource.onerror = () => { liveStatus.value = 'OFFLINE' }
+}
+
+function closeLogStream() {
+  logEventSource?.close()
+  logEventSource = null
+  liveStatus.value = 'OFFLINE'
+}
+
+function appendLiveLog(log: SatoriOperationLog) {
+  if (logPaused.value) {
+    pendingLogs.value.push(log)
+    return
+  }
+  logs.value.push(log)
+  if (logs.value.length > 500) logs.value.splice(0, logs.value.length - 500)
+}
+
+function toggleLogPause() {
+  logPaused.value = !logPaused.value
+  if (!logPaused.value && pendingLogs.value.length) {
+    logs.value.push(...pendingLogs.value)
+    pendingLogs.value = []
+  }
+}
+
+function clearLogView() {
+  logs.value = []
+  pendingLogs.value = []
+}
+
+function exportLogs() {
+  const text = filteredLogs.value.map(log => `${dateText(log.occurredAt)} [${log.level}] ${log.category}/${log.action} ${log.detail || ''}`).join('\n')
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `satori-${logConnection.value?.id || 'logs'}-${Date.now()}.log`
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
 async function renderPreview() {
@@ -111,6 +177,12 @@ function confirmToggle(row: SatoriConnection) {
 }
 
 function dateText(value?: string) { return value ? value.replace('T', ' ').slice(0, 19) : '-' }
+
+function httpEndpoint(path: string) {
+  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) return `/proxy/${path.replace(/^\//, '')}`
+  const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
+  return `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`
+}
 </script>
 
 <template>
@@ -141,7 +213,7 @@ function dateText(value?: string) { return value ? value.replace('T', ' ').slice
       </div>
     </FaPageMain>
     <FaModal v-model="formVisible" :title="editing ? '编辑 Satori 连接' : '新增 Satori 连接'" show-cancel-button @confirm="save"><a-form :model="form" layout="vertical"><a-form-item label="名称" required><FaInput v-model="form.name" /></a-form-item><a-form-item label="Satori 地址" required><FaInput v-model="form.baseUrl" placeholder="https://satori.example.com" /></a-form-item><a-form-item label="Satori Platform" required><FaInput v-model="form.platform" placeholder="例如 discord、qq" /></a-form-item><a-form-item label="Satori User ID" required><FaInput v-model="form.userId" placeholder="机器人自身账号 ID" /></a-form-item><a-form-item label="令牌" :required="!editing"><FaInput v-model="form.token" type="password" :placeholder="editing ? '留空保持原令牌' : 'Bearer Token'" /></a-form-item></a-form></FaModal>
-    <FaModal v-model="logVisible" :title="`${logConnection?.name || 'Satori'} 运行日志`" :show-cancel-button="false" @confirm="logVisible = false"><div v-loading="logLoading" class="log-list"><div v-for="log in logs" :key="log.id" class="log-row"><FaTag :variant="log.level === 'ERROR' ? 'danger' : log.level === 'WARN' ? 'warning' : 'secondary'">{{ log.level }}</FaTag><span class="log-time">{{ dateText(log.occurredAt) }}</span><strong>{{ log.category }}/{{ log.action }}</strong><span>{{ log.detail || '-' }}</span></div><span v-if="!logLoading && !logs.length">暂无运行日志</span></div></FaModal>
+    <FaModal v-model="logVisible" :title="`${logConnection?.name || 'Satori'} 实时日志`" :show-cancel-button="false" class="sm:max-w-6xl" @confirm="closeLogStream(); logVisible = false"><div v-loading="logLoading" class="live-console"><header class="live-console__head"><div class="live-console__identity"><span class="live-console__icon"><FaIcon name="i-ri:terminal-box-line" /></span><div><strong>实时日志</strong><span><i :class="['live-dot', { 'live-dot--ok': liveStatus === 'LIVE' }]" />{{ liveStatus === 'LIVE' ? '已连接' : liveStatus === 'CONNECTING' ? '连接中' : '已断开' }} {{ logs.length }} 条日志</span></div></div><div class="live-console__actions"><div class="level-tabs"><button :class="{ active: logLevel === 'ALL' }" @click="logLevel = 'ALL'">全部</button><button :class="{ active: logLevel === 'INFO' }" @click="logLevel = 'INFO'">Info</button><button :class="{ active: logLevel === 'WARN' }" @click="logLevel = 'WARN'">Warn</button><button :class="{ active: logLevel === 'ERROR' }" @click="logLevel = 'ERROR'">Error</button></div><FaInput v-model="logSearch" placeholder="搜索日志..." class="live-console__search"><template #prefix><FaIcon name="i-ri:search-line" /></template></FaInput><FaButton size="sm" variant="outline" title="下载当前日志" @click="exportLogs"><FaIcon name="i-ri:download-2-line" /></FaButton><FaButton size="sm" :variant="logPaused ? 'outline' : 'secondary'" :title="logPaused ? '继续日志' : '暂停日志'" @click="toggleLogPause"><FaIcon :name="logPaused ? 'i-ri:play-line' : 'i-ri:pause-line'" />{{ pendingLogs.length ? pendingLogs.length : '' }}</FaButton><FaButton size="sm" variant="ghost" title="清空当前视图" @click="clearLogView"><FaIcon name="i-ri:delete-bin-line" /></FaButton></div></header><div class="live-console__body"><article v-for="log in filteredLogs" :key="log.id" class="live-log"><div class="live-log__meta"><time>{{ dateText(log.occurredAt) }}</time><span :class="`live-level live-level--${log.level.toLowerCase()}`">{{ log.level }}</span></div><div class="live-log__content"><strong>[{{ log.category }}] {{ log.action }}</strong><p>{{ log.detail || '-' }}</p></div></article><div v-if="!logLoading && !filteredLogs.length" class="live-console__empty">暂无匹配日志</div></div></div></FaModal>
   </div>
 </template>
 
@@ -150,6 +222,6 @@ function dateText(value?: string) { return value ? value.replace('T', ' ').slice
 .workspace, .composer { min-width: 0; }
 .composer { display: grid; gap: 12px; border: 1px solid var(--color-border-2); padding: 14px; border-radius: 6px; background: var(--color-bg-2); }
 .composer-head, .render-controls, .actions { display: flex; gap: 8px; align-items: center; }
-.log-list { display: grid; gap: 8px; max-height: 520px; overflow: auto; }.log-row { display: grid; grid-template-columns: auto 150px 160px minmax(0, 1fr); gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--color-border-2); background: var(--color-fill-1); font-size: 12px; }.log-time { color: var(--color-text-3); }
+.live-console { display: grid; gap: 14px; min-height: 560px; }.live-console__head { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 12px 14px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-2); }.live-console__identity, .live-console__identity div, .live-console__actions { display: flex; gap: 10px; align-items: center; }.live-console__identity div { display: grid; gap: 3px; }.live-console__identity span { color: var(--color-text-3); font-size: 12px; }.live-console__icon { display: grid; width: 38px; height: 38px; place-items: center; border-radius: 6px; color: #fff; background: rgb(var(--success-6)); font-size: 20px; }.live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; background: rgb(var(--color-text-4)); }.live-dot--ok { background: rgb(var(--success-6)); box-shadow: 0 0 0 3px rgba(var(--success-6), .15); }.level-tabs { display: inline-flex; overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 6px; }.level-tabs button { height: 30px; padding: 0 10px; border: 0; background: var(--color-bg-2); color: var(--color-text-2); font-size: 12px; }.level-tabs button.active { color: #fff; background: rgb(var(--primary-6)); }.live-console__search { width: 150px; }.live-console__body { display: grid; align-content: start; gap: 8px; max-height: 580px; overflow: auto; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-fill-1); }.live-log { display: grid; gap: 5px; padding: 10px 12px; border: 1px solid var(--color-border-2); border-radius: 5px; background: var(--color-bg-2); font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px; }.live-log__meta { display: flex; gap: 10px; align-items: center; color: var(--color-text-3); }.live-level { font-weight: 700; }.live-level--info { color: rgb(var(--primary-6)); }.live-level--warn { color: rgb(var(--warning-6)); }.live-level--error { color: rgb(var(--danger-6)); }.live-log__content { display: grid; gap: 4px; color: var(--color-text-1); }.live-log__content p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }.live-console__empty { padding: 32px; color: var(--color-text-3); text-align: center; }
 .composer-head { justify-content: space-between; }.composer h2 { margin: 0; font-size: 16px; }.segmented { display: inline-flex; border: 1px solid var(--color-border-2); border-radius: 6px; overflow: hidden; }.segmented button { height: 28px; padding: 0 8px; border: 0; background: transparent; font-size: 11px; }.segmented button.active { background: rgb(var(--primary-6)); color: white; }.render-controls { flex-wrap: wrap; justify-content: space-between; }.render-controls :deep(.arco-form-item) { margin: 0; }.preview { display: grid; place-items: center; min-height: 180px; overflow: auto; border: 1px dashed var(--color-border-2); background: var(--color-fill-1); color: var(--color-text-3); }.preview img { display: block; max-width: 100%; height: auto; }.actions { justify-content: center; } @media (max-width: 1100px) { .console-grid { grid-template-columns: 1fr; } }
 </style>

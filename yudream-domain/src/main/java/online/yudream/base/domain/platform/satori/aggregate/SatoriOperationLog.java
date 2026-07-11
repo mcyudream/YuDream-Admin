@@ -40,7 +40,9 @@ public class SatoriOperationLog extends BaseDomain {
 
     private static String sanitize(String value) {
         if (value == null || value.isBlank()) return null;
-        String compact = value.replaceAll("[\\r\\n\\t]+", " ").trim();
+        String compact = value.replaceAll("(?i)Bearer\\s+[^\\s,;]+", "Bearer ***")
+                .replaceAll("(?i)(token|authorization|access_token)\\s*[=:]\\s*[^\\s,;]+", "$1=***")
+                .replaceAll("[\\r\\n\\t]+", " ").trim();
         return compact.length() <= 512 ? compact : compact.substring(0, 512);
     }
 }

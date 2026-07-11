@@ -18,6 +18,7 @@ import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionTestRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriMessageSendRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriOperationLogRes;
+import online.yudream.base.interfaces.platform.satori.service.SatoriLiveLogHub;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
 @RequestMapping("/api/platform/satori/connections")
@@ -36,6 +38,7 @@ public class SatoriConnectionController {
     private final SatoriConnectionAppService connectionAppService;
     private final MessageDeliveryAppService messageDeliveryAppService;
     private final SatoriOperationLogAppService operationLogAppService;
+    private final SatoriLiveLogHub liveLogHub;
 
     @GetMapping
     @PermissionRegister(code = "platform:satori:view", name = "查看 Satori 连接", module = "Satori 平台", desc = "查看 Satori 连接列表")
@@ -81,6 +84,13 @@ public class SatoriConnectionController {
                                                            @RequestParam(defaultValue = "1") int page,
                                                            @RequestParam(defaultValue = "50") int size) {
         return Result.ok(SatoriConnectionWebAssembler.toLogRes(operationLogAppService.page(id, page, size)));
+    }
+
+    @GetMapping(value = "/{id}/logs/stream", produces = "text/event-stream")
+    @PermissionRegister(code = "platform:satori:view", name = "订阅 Satori 实时日志", module = "Satori 平台", desc = "订阅指定 Satori 连接的实时运行日志")
+    public SseEmitter streamLogs(@PathVariable Long id) {
+        operationLogAppService.page(id, 1, 1);
+        return liveLogHub.connect(id);
     }
 
     @PostMapping("/{id}/messages")
