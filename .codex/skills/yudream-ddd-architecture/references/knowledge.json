@@ -111,6 +111,10 @@
     {
       "key": "plugin-contextual-route-hidden-menu",
       "text": "Plugin routes that require a contextual identifier, such as detail pages, editors, operation histories, or scoped statistics, should declare @PluginRoute(hideInMenu = true). The host must retain the route and Layout wrapper while projecting its menu entry with visible=false so it is reachable only from contextual navigation."
+    },
+    {
+      "key": "plugin-menu-projection-reconcile",
+      "text": "Plugin enable must reproject frontend menu declarations without overwriting existing menu fields. Any stale module:/parent:/route: registration from a removed declaration must be marked runtimeAvailable=false so contextual parent layouts do not survive upgrades as duplicate navigation entries."
     }
   ],
   "utilities": [
