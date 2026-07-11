@@ -14,6 +14,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchReque
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -27,6 +28,7 @@ import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.security.PluginPrincipal;
 import online.yudream.base.plugin.spi.system.messaging.PluginEvent;
+import online.yudream.base.plugin.spi.system.command.PluginCommandContext;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -193,6 +195,38 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .filter(PluginRuntimeHolder::isEnabled)
                 .map(PluginRuntimeHolder::getContext)
                 .forEach(context -> context.interactionRegistry().publish(event, "internal".equals(event.type())));
+    }
+
+    @Override
+    public List<PluginCommandInfo> commands() {
+        return holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .flatMap(entry -> entry.getValue().getContext().commandRegistry().registrations().stream()
+                        .map(registration -> new PluginCommandInfo(entry.getKey(), registration.definition().code(),
+                                registration.definition().command(), registration.definition().name(),
+                                registration.definition().permission(), registration.definition().description(),
+                                registration.definition().allowAnonymous())))
+                .sorted(java.util.Comparator.comparing(PluginCommandInfo::pluginCode).thenComparing(PluginCommandInfo::code))
+                .toList();
+    }
+
+    public void publishCommand(PluginEvent event, String command, List<String> arguments, Long userId,
+                               java.util.function.Predicate<String> permissionChecker) {
+        holders.values().stream()
+                .filter(PluginRuntimeHolder::isEnabled)
+                .map(PluginRuntimeHolder::getContext)
+                .flatMap(context -> context.commandRegistry().registrations().stream())
+                .filter(registration -> registration.definition().command().equalsIgnoreCase(command))
+                .filter(registration -> registration.definition().allowAnonymous() || userId != null)
+                .filter(registration -> registration.definition().permission().isBlank()
+                        || permissionChecker.test(registration.definition().permission()))
+                .forEach(registration -> {
+                    try {
+                        registration.handler().handle(new PluginCommandContext(event, command, arguments, userId));
+                    } catch (Exception exception) {
+                        log.warn("Plugin command handler failed: command={}", command, exception);
+                    }
+                });
     }
 
     @Override

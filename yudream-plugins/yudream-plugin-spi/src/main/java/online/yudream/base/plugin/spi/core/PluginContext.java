@@ -10,6 +10,7 @@ import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionRegistry;
+import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 
 import java.util.Optional;
 
@@ -28,6 +29,8 @@ public interface PluginContext {
     }
 
     PluginMessageInteractionRegistry interactions();
+
+    PluginCommandRegistry commands();
 
     void registerMenu(PluginMenuItem item);
 

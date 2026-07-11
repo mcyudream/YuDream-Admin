@@ -10,4 +10,13 @@ public interface PluginMinecraftService {
     Optional<PluginMinecraftServer> minecraftServer(String serverId);
 
     List<PluginMinecraftPlayerActivity> minecraftPlayerActivities(String serverId, int page, int size);
+
+    /**
+     * Returns a player's activity calculated only from the requested time window.
+     * Implementations without retained activity events may return an empty result.
+     */
+    default Optional<PluginMinecraftOnlineWindow> minecraftOnlineWindow(String serverId, String playerId,
+                                                                         long windowStart, long windowEnd) {
+        return Optional.empty();
+    }
 }

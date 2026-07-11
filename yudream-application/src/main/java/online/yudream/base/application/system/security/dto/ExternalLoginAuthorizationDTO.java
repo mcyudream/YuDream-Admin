@@ -1,0 +1,1 @@
+package online.yudream.base.application.system.security.dto; import lombok.Builder;import lombok.Data;@Data @Builder public class ExternalLoginAuthorizationDTO {private String authorizationUrl;private String state;}

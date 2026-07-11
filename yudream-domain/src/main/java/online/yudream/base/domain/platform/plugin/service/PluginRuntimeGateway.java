@@ -9,6 +9,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResul
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +40,8 @@ public interface PluginRuntimeGateway {
     List<PluginDashboardCardInfo> dashboardCards();
 
     List<PluginHttpEndpointInfo> httpEndpoints();
+
+    List<PluginCommandInfo> commands();
 
     Optional<PluginFrontendAssetInfo> frontendAsset(String code, String assetPath);
 

@@ -99,6 +99,15 @@ public class UserRepoImpl implements UserRepo {
     }
 
     @Override
+    public Optional<User> findByQQ(String qq) {
+        if (!StringUtils.hasText(qq)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(mongoTemplate.findOne(Query.query(Criteria.where("qq").is(qq.trim())), UserDO.class))
+                .map(UserInfraMapper::toDomain);
+    }
+
+    @Override
     public List<User> findByEmailAll(String email) {
         return findAllByField("email", email);
     }

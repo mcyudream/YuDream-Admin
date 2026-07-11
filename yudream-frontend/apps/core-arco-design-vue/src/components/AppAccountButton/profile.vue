@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApiKeyCredential, ApiKeyCreatePayload, CredentialStatus, PasskeyCredential, PasskeyStatus, UserProfilePayload } from '@/api/modules/profile'
+import type { ApiKeyCredential, ApiKeyCreatePayload, CredentialStatus, ExternalAccount, PasskeyCredential, PasskeyStatus, QqBindingCode, UserProfilePayload } from '@/api/modules/profile'
 import type { PermissionItem } from '@/api/modules/system-role'
 import EditPassword from '@/components/AppAccountForm/edit-password.vue'
 import apiProfile from '@/api/modules/profile'
@@ -8,7 +8,7 @@ import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { createPasskeyRegistrationResponse } from '@/utils/webauthn'
 
-type ProfileTab = 'profile' | 'security' | 'apiKey'
+type ProfileTab = 'profile' | 'security' | 'external' | 'apiKey'
 
 const modal = useFaModal()
 const toast = useFaToast()
@@ -29,6 +29,10 @@ const apiKeys = ref<ApiKeyCredential[]>([])
 const availablePermissions = ref<PermissionItem[]>([])
 const apiKeySearch = reactive({ keyword: '', page: 1, size: 20, total: 0 })
 const createdApiKeyPlaintext = ref('')
+const issuingQqBindingCode = ref(false)
+const qqBindingCode = ref<QqBindingCode | null>(null)
+const externalAccounts = ref<ExternalAccount[]>([])
+const loadingExternalAccounts = ref(false)
 
 const form = reactive<UserProfilePayload>({
   username: '',
@@ -56,6 +60,7 @@ const tabs = computed<{ key: ProfileTab, title: string, description: string, ico
     description: appFeatureStore.passkeyEnabled ? '密码和 Passkey 凭据' : '账号密码安全',
     icon: 'i-ri:shield-keyhole-line',
   },
+  { key: 'external', title: '第三方账号', description: '绑定 QQ、微信及代码托管账号', icon: 'i-ri:links-line' },
   ...(appFeatureStore.apiKeyEnabled ? [{ key: 'apiKey' as const, title: 'API Key', description: '用户级访问密钥', icon: 'i-ri:key-2-line' }] : []),
 ])
 
@@ -111,6 +116,7 @@ watch(active, async (tab) => {
   if (tab === 'security' && appFeatureStore.passkeyEnabled && !passkeys.value.length) {
     await loadPasskeys()
   }
+  if (tab === 'external' && !externalAccounts.value.length) await loadExternalAccounts()
 })
 
 watch(() => appFeatureStore.apiKeyEnabled, (enabled) => {
@@ -229,6 +235,40 @@ async function saveProfile() {
   finally {
     saving.value = false
   }
+}
+
+async function issueQqBindingCode() {
+  issuingQqBindingCode.value = true
+  try {
+    qqBindingCode.value = (await apiProfile.issueQqBindingCode()).data
+    toast.success('绑定码已生成，请在群聊中使用')
+  }
+  finally { issuingQqBindingCode.value = false }
+}
+
+async function loadExternalAccounts() {
+  loadingExternalAccounts.value = true
+  try { externalAccounts.value = (await apiProfile.externalAccounts()).data }
+  finally { loadingExternalAccounts.value = false }
+}
+
+async function bindExternal(type: string) {
+  const res = await apiProfile.externalBindAuthorize('wwoyun', type)
+  window.location.assign(res.data.authorizationUrl)
+}
+
+function revokeExternal(row: ExternalAccount) {
+  modal.confirm({ title: '解除第三方账号', content: `确认解除 ${row.platformType} 账号「${row.nickname || row.socialUid}」吗？`, onConfirm: async () => {
+    await apiProfile.revokeExternalAccount(row.id)
+    await loadExternalAccounts()
+    toast.success('已解除绑定')
+  } })
+}
+
+async function useExternalAvatar(row: ExternalAccount) {
+  await apiProfile.useExternalAvatar(row.id)
+  await loadProfile()
+  toast.success('已使用第三方头像')
 }
 
 function pickAvatar() {
@@ -410,10 +450,6 @@ function dateText(value?: string) {
             <h2>个人资料</h2>
             <p>维护你的基础资料、头像和联系方式。</p>
           </div>
-          <FaButton :loading="saving" @click="saveProfile">
-            <FaIcon name="i-ri:save-3-line" />
-            保存资料
-          </FaButton>
         </div>
 
         <a-form :model="form" layout="vertical" class="form-grid">
@@ -433,6 +469,16 @@ function dateText(value?: string) {
             <FaInput v-model="form.qq" placeholder="请输入 QQ" />
           </a-form-item>
         </a-form>
+        <div v-if="!form.qq" class="inner-panel mt-4">
+          <div class="panel-head">
+            <div><h3>群聊绑定 QQ</h3><p>生成一次性绑定码后，在群聊中发送 `/绑定 绑定码`。</p></div>
+            <FaButton :loading="issuingQqBindingCode" @click="issueQqBindingCode"><FaIcon name="i-ri:key-2-line" />生成绑定码</FaButton>
+          </div>
+          <div v-if="qqBindingCode" class="mt-3 flex flex-wrap items-center gap-3"><code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ qqBindingCode.code }}</code><span class="text-sm text-muted-foreground">有效至 {{ qqBindingCode.expiresAt }}</span></div>
+        </div>
+        <div class="profile-save-bar">
+          <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
+        </div>
       </section>
 
       <section v-else-if="active === 'security'" class="profile-section">
@@ -482,6 +528,17 @@ function dateText(value?: string) {
             </div>
           </section>
         </div>
+      </section>
+
+      <section v-else-if="active === 'external'" class="profile-section">
+        <div class="section-head"><div><h2>第三方账号</h2><p>通过已配置的平台绑定账号，QQ 绑定会同步到系统资料。</p></div></div>
+        <section class="inner-panel">
+          <div class="panel-head"><div><h3>添加绑定</h3><p>需要管理员先在系统安全中配置 Wwoyun AppId、AppKey 与回调地址。</p></div></div>
+          <div class="panel-actions"><FaButton @click="bindExternal('qq')"><FaIcon name="i-ri:qq-line" />QQ</FaButton><FaButton variant="outline" @click="bindExternal('wx')">微信</FaButton><FaButton variant="outline" @click="bindExternal('github')">GitHub</FaButton><FaButton variant="outline" @click="bindExternal('gitee')">Gitee</FaButton><FaButton variant="outline" @click="bindExternal('google')">Google</FaButton></div>
+        </section>
+        <section class="inner-panel"><div class="panel-head"><div><h3>已绑定账号</h3></div><FaButton variant="ghost" size="sm" :loading="loadingExternalAccounts" @click="loadExternalAccounts"><FaIcon name="i-ri:refresh-line" /></FaButton></div>
+          <div class="credential-list"><div v-if="!externalAccounts.length" class="empty-state">暂无第三方账号</div><article v-for="item in externalAccounts" :key="item.id" class="credential-item"><FaAvatar :src="item.avatarUrl" :fallback="item.platformType.slice(0, 2)" class="size-10" /><div class="credential-info"><strong>{{ item.nickname || item.socialUid }}</strong><span>{{ item.platformType }} · {{ item.socialUid }}</span></div><FaButton size="sm" variant="outline" :disabled="!item.avatarUrl" @click="useExternalAvatar(item)">使用头像</FaButton><FaButton variant="destructive" size="sm" @click="revokeExternal(item)">解除</FaButton></article></div>
+        </section>
       </section>
 
       <section v-else class="profile-section">
@@ -690,6 +747,20 @@ function dateText(value?: string) {
   min-width: 0;
   overflow: auto;
   padding: 22px;
+  padding-bottom: 86px;
+}
+
+.profile-save-bar {
+  position: sticky;
+  bottom: -22px;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0;
+  margin: 0 -22px -64px;
+  border-top: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--color-bg-1) 92%, transparent);
+  backdrop-filter: blur(8px);
 }
 
 .profile-section,
@@ -926,6 +997,12 @@ function dateText(value?: string) {
     align-items: stretch;
     flex-direction: column;
     grid-template-columns: 1fr;
+  }
+
+  .profile-save-bar {
+    bottom: -16px;
+    padding: 10px 0;
+    margin: 0 -16px -58px;
   }
 
   .permission-toolbar {

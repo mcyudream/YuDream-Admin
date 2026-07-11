@@ -23,6 +23,18 @@ export interface UserProfilePayload {
   qq?: string
 }
 
+export interface ExternalAccount {
+  id: string
+  providerCode: string
+  platformType: string
+  socialUid: string
+  nickname?: string
+  avatarUrl?: string
+  createTime?: string
+}
+
+export interface QqBindingCode { code: string; expiresAt: string }
+
 export type PasskeyStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
 
 export interface PasskeyCredential {
@@ -84,7 +96,12 @@ export interface ApiKeyPageParams {
 export default {
   get: () => systemClient.get<unknown, ApiResponse<UserProfile>>('api/user/me/profile'),
   update: (data: UserProfilePayload) => systemClient.put<unknown, ApiResponse<UserProfile>>('api/user/me/profile', data),
+  issueQqBindingCode: () => systemClient.post<unknown, ApiResponse<QqBindingCode>>('api/user/me/qq-binding-code'),
   uploadAvatar: (data: FormData) => systemClient.post<unknown, ApiResponse<UserProfile>>('api/user/me/avatar', data),
+  externalAccounts: () => systemClient.get<unknown, ApiResponse<ExternalAccount[]>>('api/user/me/external-accounts'),
+  externalBindAuthorize: (providerCode: string, type: string) => systemClient.get<unknown, ApiResponse<{ authorizationUrl: string }>>(`api/user/me/external-accounts/${providerCode}/${type}/authorize`),
+  revokeExternalAccount: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/user/me/external-accounts/${id}`),
+  useExternalAvatar: (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/user/me/external-accounts/${id}/avatar`),
   passkeys: () => systemClient.get<unknown, ApiResponse<PasskeyCredential[]>>('api/user/me/passkeys'),
   startPasskeyRegistration: () => systemClient.post<unknown, ApiResponse<PasskeyRegistrationOptions>>('api/user/me/passkeys/registration/options'),
   finishPasskeyRegistration: (data: PasskeyRegistrationFinishPayload) => systemClient.post<unknown, ApiResponse<PasskeyCredential>>('api/user/me/passkeys/registration', data),

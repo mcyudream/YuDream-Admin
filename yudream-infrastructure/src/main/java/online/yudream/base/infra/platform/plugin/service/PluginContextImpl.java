@@ -11,6 +11,7 @@ import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionRegistry;
+import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -42,13 +43,16 @@ public class PluginContextImpl implements PluginContext {
     private final Set<String> frontendRouteKeys = ConcurrentHashMap.newKeySet();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
     private final PluginMessageInteractionRegistryImpl interactionRegistry;
+    private final PluginCommandRegistryImpl commandRegistry;
 
     public PluginContextImpl(String pluginCode, FrameworkServices frameworkServices, PluginExtensionRegistry pluginExtensionRegistry) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
         this.pluginExtensionRegistry = pluginExtensionRegistry;
         this.interactionRegistry = new PluginMessageInteractionRegistryImpl(pluginCode);
+        this.commandRegistry = new PluginCommandRegistryImpl(pluginCode);
         onDispose(interactionRegistry);
+        onDispose(commandRegistry);
     }
 
     @Override
@@ -66,8 +70,17 @@ public class PluginContextImpl implements PluginContext {
         return interactionRegistry;
     }
 
+    @Override
+    public PluginCommandRegistry commands() {
+        return commandRegistry;
+    }
+
     public PluginMessageInteractionRegistryImpl interactionRegistry() {
         return interactionRegistry;
+    }
+
+    public PluginCommandRegistryImpl commandRegistry() {
+        return commandRegistry;
     }
 
     @Override

@@ -15,6 +15,10 @@ public interface PluginUserService {
 
     Optional<PluginUserProfile> findByEmail(String email);
 
+    Optional<PluginUserProfile> findByQq(String qq);
+
+    void bindQqOnce(Long userId, String qq);
+
     List<PluginUserOption> searchUsers(String keyword, Long deptId, int page, int size);
 
     List<PluginDeptOption> listDepartments(String keyword);

@@ -22,6 +22,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
+import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import online.yudream.base.domain.system.user.service.EmailVerifyTokenProvider;
 import online.yudream.base.domain.system.user.service.PasswordResetTokenProvider;
 import online.yudream.base.domain.system.user.service.UserRegisterMailSender;
@@ -33,6 +34,8 @@ import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
 import online.yudream.base.domain.valobj.Phone;
 import online.yudream.base.domain.valobj.QQ;
+import online.yudream.base.plugin.spi.system.user.PluginQqBindingCode;
+import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -49,6 +52,8 @@ import java.util.Optional;
 public class UserAppService {
 
     private final UserRepo userRepo;
+    private final SettingRepo settingRepo;
+    private final PluginQqBindingService pluginQqBindingService;
     private final RoleRepo roleRepo;
     private final DeptRepo deptRepo;
     private final PasswordEncoder passwordEncoder;
@@ -180,6 +185,16 @@ public class UserAppService {
         return toProfileDTO(user);
     }
 
+    @Transactional(readOnly = true)
+    public PluginQqBindingCode issueQqBindingCode(Long userId) {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new BizException("用户不存在"));
+        if (user.getQq() != null && StringUtils.hasText(user.getQq().getValue())) {
+            throw new BizException("当前账号已绑定 QQ，不能重复生成绑定码");
+        }
+        return pluginQqBindingService.issue(userId);
+    }
+
     @Transactional
     public UserProfileDTO updateProfile(Long userId, UserProfileUpdateCmd cmd) {
         User user = userRepo.findById(userId)
@@ -188,6 +203,11 @@ public class UserAppService {
         Email email = StringUtils.hasText(cmd.getEmail()) ? Email.of(cmd.getEmail().trim()) : null;
         Phone phone = StringUtils.hasText(cmd.getPhone()) ? Phone.of(cmd.getPhone().trim()) : null;
         QQ qq = StringUtils.hasText(cmd.getQq()) ? QQ.of(cmd.getQq().trim()) : null;
+
+        if (Boolean.parseBoolean(settingRepo.findByKey("plugin.qq-binding.lock-profile-qq").map(online.yudream.base.domain.system.setting.aggregate.Setting::getValue).orElse("false"))
+                && !Objects.equals(user.getQq() == null ? null : user.getQq().getValue(), qq == null ? null : qq.getValue())) {
+            throw new BizException("当前 QQ 已由群聊绑定管理，不能在个人资料中修改");
+        }
 
         if (StringUtils.hasText(username) && !Objects.equals(username, user.getUsername())) {
             ensureUsernameUnique(username, userId);
@@ -220,6 +240,32 @@ public class UserAppService {
 
     public String avatarUrl(User user) {
         return user == null ? null : fileAppService.fileUrl(user.getAvatarFileId());
+    }
+
+    @Transactional
+    public User createExternalUser(String nickname) {
+        Dept rootDept = deptRepo.findRoot().orElseThrow(() -> new BizException("系统根部门未初始化"));
+        Role userRole = roleRepo.findBySystemType(SystemRoleType.USER).orElseThrow(() -> new BizException("普通用户角色未初始化"));
+        String base = "external_" + System.currentTimeMillis();
+        String username = base;
+        int suffix = 1;
+        while (userRepo.existsByUsername(username)) {
+            username = base + suffix++;
+        }
+        User user = User.builder().username(username).nickname(StringUtils.hasText(nickname) ? nickname : "第三方用户")
+                .password(Password.of(java.util.UUID.randomUUID().toString(), passwordEncoder)).emailVerified(false).build();
+        user.joinDept(DeptID.of(rootDept.getId()), true);
+        user.assignRoles(RoleID.of(userRole.getId()));
+        return userRepo.save(user);
+    }
+
+    @Transactional
+    public void bindExternalQq(Long userId, String qq) {
+        if (!StringUtils.hasText(qq)) return;
+        User user = userRepo.findById(userId).orElseThrow(() -> new BizException("用户不存在"));
+        if (userRepo.existsByQQExcludeId(qq, userId)) throw new BizException("QQ 已被其他账号绑定");
+        user.updateProfile(user.getNickname(), user.getEmail(), user.getPhone(), QQ.of(qq), null);
+        userRepo.save(user);
     }
 
     private User findLoginUser(UserLoginCmd cmd) {

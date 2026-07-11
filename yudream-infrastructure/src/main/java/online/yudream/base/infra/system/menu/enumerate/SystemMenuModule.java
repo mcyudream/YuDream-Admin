@@ -119,6 +119,19 @@ public enum SystemMenuModule {
             parentName = "SETTING", permission = "system:setting:upload")
     SETTING_UPLOAD,
 
+    @MenuNode(code = "system:command", name = "指令管理", type = MenuNodeType.MENU,
+            parentName = "CONFIG", path = "/system/command", component = "system/command/index.vue",
+            icon = "i-ri:terminal-box-line", sort = 25)
+    COMMAND,
+
+    @MenuNode(code = "system:command:view", name = "查看指令", type = MenuNodeType.BUTTON,
+            parentName = "COMMAND", permission = "system:command:view")
+    COMMAND_VIEW,
+
+    @MenuNode(code = "system:command:edit", name = "配置指令", type = MenuNodeType.BUTTON,
+            parentName = "COMMAND", permission = "system:command:edit")
+    COMMAND_EDIT,
+
     @MenuNode(code = "system:theme", name = "主题配置", type = MenuNodeType.MENU,
             parentName = "CONFIG", path = "/system/theme", component = "system/theme/index.vue",
             icon = "i-ri:palette-line", sort = 20)

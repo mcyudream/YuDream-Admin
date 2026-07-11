@@ -31,6 +31,7 @@ import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
 import online.yudream.base.interfaces.system.user.res.UserProfileRes;
+import online.yudream.base.plugin.spi.system.user.PluginQqBindingCode;
 import online.yudream.base.interfaces.system.user.res.UserRegisterRes;
 import online.yudream.base.interfaces.system.user.res.UserRoleRes;
 import online.yudream.base.interfaces.system.user.vo.PermissionListVO;
@@ -142,6 +143,11 @@ public class UserController {
     @GetMapping("/me/profile")
     public Result<UserProfileRes> profile() {
         return Result.ok(UserWebAssembler.toProfileRes(userAppService.profile(StpUtil.getLoginIdAsLong())));
+    }
+
+    @PostMapping("/me/qq-binding-code")
+    public Result<PluginQqBindingCode> issueQqBindingCode() {
+        return Result.ok(userAppService.issueQqBindingCode(StpUtil.getLoginIdAsLong()));
     }
 
     @PostMapping("/me/resend-verification-email")

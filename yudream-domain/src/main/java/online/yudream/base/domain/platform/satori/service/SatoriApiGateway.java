@@ -27,7 +27,7 @@ public interface SatoriApiGateway {
     SatoriPage<SatoriGuild> guildList(SatoriApiContext context, Cursor request);
     void guildApprove(SatoriApiContext context, Approve request);
     SatoriGuildMember guildMemberGet(SatoriApiContext context, GuildMemberRef request);
-    SatoriPage<SatoriGuildMember> guildMemberList(SatoriApiContext context, GuildMemberRef request);
+    SatoriPage<SatoriGuildMember> guildMemberList(SatoriApiContext context, GuildMemberList request);
     void guildMemberKick(SatoriApiContext context, GuildMemberKick request);
     void guildMemberMute(SatoriApiContext context, GuildMemberMute request);
     void guildMemberApprove(SatoriApiContext context, Approve request);

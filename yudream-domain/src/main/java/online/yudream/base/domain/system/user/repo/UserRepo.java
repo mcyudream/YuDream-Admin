@@ -28,6 +28,8 @@ public interface UserRepo {
 
     Optional<User> findByEmail(String email);
 
+    Optional<User> findByQQ(String qq);
+
     List<User> findByEmailAll(String email);
 
     Optional<User> findById(Long id);

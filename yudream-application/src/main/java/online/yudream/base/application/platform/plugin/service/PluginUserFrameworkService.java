@@ -111,6 +111,28 @@ public class PluginUserFrameworkService implements PluginUserService {
     }
 
     @Override
+    public Optional<PluginUserProfile> findByQq(String qq) {
+        return userRepo.findByQQ(qq).map(this::toProfile);
+    }
+
+    @Override
+    public void bindQqOnce(Long userId, String qq) {
+        if (userId == null || !hasText(qq)) {
+            throw new BizException("用户和 QQ 不能为空");
+        }
+        User user = userRepo.findById(userId).orElseThrow(() -> new BizException("用户不存在"));
+        if (user.getQq() != null && hasText(user.getQq().getValue())) {
+            throw new BizException("系统 QQ 已绑定，不能重复绑定");
+        }
+        String normalized = qq.trim();
+        if (userRepo.existsByQQExcludeId(normalized, userId)) {
+            throw new BizException("QQ 已被其他用户绑定");
+        }
+        user.updateProfile(user.getNickname(), user.getEmail(), user.getPhone(), online.yudream.base.domain.valobj.QQ.of(normalized), null);
+        userRepo.save(user);
+    }
+
+    @Override
     public List<PluginUserOption> searchUsers(String keyword, Long deptId, int page, int size) {
         Map<String, PluginUserOption> result = new LinkedHashMap<>();
         String safeKeyword = trimToNull(keyword);

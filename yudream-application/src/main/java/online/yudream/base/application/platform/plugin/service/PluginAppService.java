@@ -566,8 +566,14 @@ public class PluginAppService {
     }
 
     private void markError(PluginModule module, String message) {
-        module.markError(message);
-        pluginModuleRepo.save(module);
+        if (module == null || !StringUtils.hasText(module.getCode())) {
+            return;
+        }
+        // Runtime activation may have persisted menu/permission state before failing.
+        // Reload so the failure state never overwrites a stale optimistic-lock version.
+        PluginModule current = pluginModuleRepo.findByCode(module.getCode()).orElse(module);
+        current.markError(message);
+        pluginModuleRepo.save(current);
     }
 
     private boolean jarExists(PluginModule module) {

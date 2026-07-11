@@ -42,6 +42,12 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/external-login/callback',
+    name: 'external-login-callback',
+    component: () => import('@/views/external-login-callback.vue'),
+    meta: { title: '第三方登录', constant: true },
+  },
+  {
     path: '/pay/result',
     name: 'payResult',
     component: () => import('@/views/pay-result.vue'),

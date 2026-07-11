@@ -23,6 +23,7 @@ import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
+import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
@@ -48,6 +49,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private static final String WORD_TEMPLATE_CAPABILITY_CODE = "document-template";
 
     private final PluginUserService pluginUserService;
+    private final PluginQqBindingService pluginQqBindingService;
     private final PluginSecurityService pluginSecurityService;
     private final PluginMailService pluginMailService;
     private final PluginMessagingFrameworkService pluginMessagingFrameworkService;
@@ -67,6 +69,11 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginUserService users() {
         return pluginUserService;
+    }
+
+    @Override
+    public PluginQqBindingService qqBindings() {
+        return pluginQqBindingService;
     }
 
     @Override

@@ -63,7 +63,7 @@ public class ReactorSatoriApiGateway implements SatoriApiGateway, SatoriInternal
     @Override public SatoriPage<SatoriGuild> guildList(SatoriApiContext c, Cursor r) { return page(c, "guild.list", r, SatoriGuild.class); }
     @Override public void guildApprove(SatoriApiContext c, Approve r) { postVoid(c, "guild.approve", r); }
     @Override public SatoriGuildMember guildMemberGet(SatoriApiContext c, GuildMemberRef r) { return post(c, "guild.member.get", r, SatoriGuildMember.class); }
-    @Override public SatoriPage<SatoriGuildMember> guildMemberList(SatoriApiContext c, GuildMemberRef r) { return page(c, "guild.member.list", r, SatoriGuildMember.class); }
+    @Override public SatoriPage<SatoriGuildMember> guildMemberList(SatoriApiContext c, GuildMemberList r) { return page(c, "guild.member.list", r, SatoriGuildMember.class); }
     @Override public void guildMemberKick(SatoriApiContext c, GuildMemberKick r) { postVoid(c, "guild.member.kick", r); }
     @Override public void guildMemberMute(SatoriApiContext c, GuildMemberMute r) { postVoid(c, "guild.member.mute", r); }
     @Override public void guildMemberApprove(SatoriApiContext c, Approve r) { postVoid(c, "guild.member.approve", r); }
@@ -129,7 +129,8 @@ public class ReactorSatoriApiGateway implements SatoriApiGateway, SatoriInternal
         WebClient.RequestHeadersSpec<?> request = client(context, accountHeaders).post().uri("/v1/" + method)
                 .contentType(MediaType.APPLICATION_JSON)
                 // Some Satori adapters parse every POST body, including login.get.
-                .bodyValue(body == null ? Map.of() : body);
+                // Use the Satori mapper so record fields such as channelId become channel_id.
+                .bodyValue(writeRequestBody(body));
         String response = request.retrieve().onStatus(s -> s.isError(), r -> r.bodyToMono(String.class).map(text -> SatoriHttpErrorMapper.toException(r.statusCode(), text))).bodyToMono(String.class).block(REQUEST_TIMEOUT);
         if (type.getRawClass() == Void.class || response == null || response.isBlank()) return null;
         return read(response, type);
@@ -142,6 +143,14 @@ public class ReactorSatoriApiGateway implements SatoriApiGateway, SatoriInternal
         return builder.build();
     }
     private <T> T read(String body, JavaType type) { try { return mapper.readValue(body, type); } catch (JsonProcessingException ex) { throw new BizException("Satori 响应 JSON 无法解析"); } }
+    private String writeRequestBody(Object body) {
+        try {
+            return mapper.writeValueAsString(body == null ? Map.of() : body);
+        } catch (JsonProcessingException ex) {
+            throw new BizException("Satori 请求 JSON 无法序列化");
+        }
+    }
+
     private URI safeBaseUrl(SatoriApiContext context) {
         if (context == null) throw new BizException("Satori API 上下文不能为空");
         try { URI uri = URI.create(required(context.baseUrl(), "Satori 地址不能为空")); if (("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) && uri.getHost() != null && uri.getUserInfo() == null && uri.getQuery() == null && uri.getFragment() == null) return uri; } catch (IllegalArgumentException ignored) { }
