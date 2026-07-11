@@ -17,6 +17,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.List;
 import java.util.regex.Pattern;
 
 @Service
@@ -29,6 +30,7 @@ public class SatoriConnectionRepoImpl implements SatoriConnectionRepo {
         data.setUpdateTime(LocalDateTime.now()); return SatoriInfraMapper.toDomain(mongoTemplate.save(data), cipher);
     }
     @Override public Optional<SatoriConnection> findById(Long id) { return Optional.ofNullable(SatoriInfraMapper.toDomain(mongoTemplate.findById(id, SatoriConnectionDO.class), cipher)); }
+    @Override public List<SatoriConnection> findEnabled() { return mongoTemplate.find(Query.query(Criteria.where("enabled").is(true)), SatoriConnectionDO.class).stream().map(data -> SatoriInfraMapper.toDomain(data, cipher)).toList(); }
     @Override public PageResult<SatoriConnection> page(String keyword, int page, int size) {
         Query query = new Query(); if (StringUtils.hasText(keyword)) { String pattern = ".*" + Pattern.quote(keyword.trim()) + ".*"; query.addCriteria(new Criteria().orOperator(Criteria.where("name").regex(pattern, "i"), Criteria.where("baseUrl").regex(pattern, "i"))); }
         long total = mongoTemplate.count(query, SatoriConnectionDO.class); int current = Math.max(1, page); int limit = Math.max(1, size);

@@ -8,5 +8,6 @@ import java.util.Optional;
 public interface SatoriEventRepo {
     SatoriEventRecord save(SatoriEventRecord event);
     Optional<SatoriEventRecord> findByIdempotencyKey(Long connectionId, String sequence);
+    Optional<SatoriEventRecord> findByConnectionIdAndSequence(Long connectionId, String sequence);
     PageResult<SatoriEventRecord> page(Long connectionId, int page, int size);
 }

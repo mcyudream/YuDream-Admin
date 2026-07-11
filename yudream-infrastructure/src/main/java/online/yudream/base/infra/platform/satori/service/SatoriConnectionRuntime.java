@@ -10,6 +10,8 @@ import online.yudream.base.domain.platform.satori.service.SatoriEventGateway;
 import online.yudream.base.domain.platform.satori.service.SatoriEventIngress;
 import online.yudream.base.domain.platform.satori.service.SatoriOperationLogger;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import reactor.core.Disposable;
 
@@ -86,6 +88,18 @@ public class SatoriConnectionRuntime implements SatoriEventGateway {
         private volatile Set<String> proxyUrls = Set.of();
         private void replaceProxyUrls(Set<String> values) { proxyUrls = values == null ? Set.of() : Set.copyOf(values); }
         private Set<String> proxyUrls() { return proxyUrls; }
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void restoreEnabledConnections() {
+        for (SatoriConnection connection : connectionRepo.findEnabled()) {
+            try {
+                operationLogger.info(connection.getId(), "WEBSOCKET", "restore", "应用启动后恢复 WebSocket 会话");
+                connect(connection.getId());
+            } catch (RuntimeException exception) {
+                operationLogger.error(connection.getId(), "WEBSOCKET", "restore", "恢复 WebSocket 会话失败: " + exception.getMessage());
+            }
+        }
     }
 
     private String eventSummary(online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriEvent event) {
