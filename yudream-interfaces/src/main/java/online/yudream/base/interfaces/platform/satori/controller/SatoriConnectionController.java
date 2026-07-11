@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.satori.service.SatoriConnectionAppService;
 import online.yudream.base.application.platform.satori.service.MessageDeliveryAppService;
 import online.yudream.base.application.platform.satori.service.SatoriOperationLogAppService;
+import online.yudream.base.application.platform.satori.service.SatoriEventAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -18,6 +19,7 @@ import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionTestRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriMessageSendRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriOperationLogRes;
+import online.yudream.base.interfaces.platform.satori.res.SatoriEventDetailRes;
 import online.yudream.base.interfaces.platform.satori.service.SatoriLiveLogHub;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,6 +41,7 @@ public class SatoriConnectionController {
     private final MessageDeliveryAppService messageDeliveryAppService;
     private final SatoriOperationLogAppService operationLogAppService;
     private final SatoriLiveLogHub liveLogHub;
+    private final SatoriEventAppService eventAppService;
 
     @GetMapping
     @PermissionRegister(code = "platform:satori:view", name = "查看 Satori 连接", module = "Satori 平台", desc = "查看 Satori 连接列表")
@@ -91,6 +94,12 @@ public class SatoriConnectionController {
     public SseEmitter streamLogs(@PathVariable Long id) {
         operationLogAppService.page(id, 1, 1);
         return liveLogHub.connect(id);
+    }
+
+    @GetMapping("/{id}/events/{sequence}")
+    @PermissionRegister(code = "platform:satori:view", name = "查看 Satori 完整事件", module = "Satori 平台", desc = "查看已持久化的完整 Satori 原始事件")
+    public Result<SatoriEventDetailRes> eventDetail(@PathVariable Long id, @PathVariable String sequence) {
+        return Result.ok(SatoriConnectionWebAssembler.toRes(eventAppService.detail(id, sequence)));
     }
 
     @PostMapping("/{id}/messages")

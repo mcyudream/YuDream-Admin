@@ -6,12 +6,14 @@ import online.yudream.base.application.platform.satori.cmd.SatoriConnectionUpdat
 import online.yudream.base.application.platform.satori.dto.SatoriConnectionDTO;
 import online.yudream.base.application.platform.satori.dto.SatoriConnectionTestDTO;
 import online.yudream.base.application.platform.satori.dto.SatoriOperationLogDTO;
+import online.yudream.base.application.platform.satori.dto.SatoriEventDetailDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.platform.satori.request.SatoriConnectionCreateRequest;
 import online.yudream.base.interfaces.platform.satori.request.SatoriConnectionUpdateRequest;
 import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriConnectionTestRes;
 import online.yudream.base.interfaces.platform.satori.res.SatoriOperationLogRes;
+import online.yudream.base.interfaces.platform.satori.res.SatoriEventDetailRes;
 
 public final class SatoriConnectionWebAssembler {
     private SatoriConnectionWebAssembler() {
@@ -85,5 +87,10 @@ public final class SatoriConnectionWebAssembler {
     public static SatoriOperationLogRes toLogRes(SatoriOperationLogDTO dto) {
         return SatoriOperationLogRes.builder().id(dto.getId() == null ? null : String.valueOf(dto.getId())).level(dto.getLevel())
                 .category(dto.getCategory()).action(dto.getAction()).detail(dto.getDetail()).occurredAt(dto.getOccurredAt()).build();
+    }
+
+    public static SatoriEventDetailRes toRes(SatoriEventDetailDTO dto) {
+        return SatoriEventDetailRes.builder().sequence(dto.getSequence()).type(dto.getType()).rawData(dto.getRawData())
+                .receivedAt(dto.getReceivedAt()).build();
     }
 }

@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.satori.service;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
+import online.yudream.base.application.platform.satori.dto.SatoriEventDetailDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriConnection;
 import online.yudream.base.domain.platform.satori.aggregate.SatoriEventCursor;
@@ -76,6 +77,16 @@ public class SatoriEventAppService implements SatoriEventIngress {
     public void acceptMeta(Long connectionId, SatoriModels.SatoriMeta meta) {
         ensureEnabled();
         enabledConnection(connectionId);
+    }
+
+    @Transactional(readOnly = true)
+    public SatoriEventDetailDTO detail(Long connectionId, String sequence) {
+        ensureEnabled();
+        enabledConnection(connectionId);
+        SatoriEventRecord event = eventRepo.findByConnectionIdAndSequence(connectionId, sequence)
+                .orElseThrow(() -> new BizException("Satori 事件不存在或已过期"));
+        return SatoriEventDetailDTO.builder().sequence(event.getSequence()).type(event.getType())
+                .rawData(event.getRawData()).receivedAt(event.getReceivedAt()).build();
     }
 
     @Transactional

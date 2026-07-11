@@ -38,5 +38,6 @@ public class SatoriEventRepoImpl implements SatoriEventRepo {
         }
     }
     @Override public Optional<SatoriEventRecord> findByIdempotencyKey(Long connectionId, String sequence) { Query query = Query.query(Criteria.where("connectionId").is(connectionId).and("sequence").is(sequence)); return Optional.ofNullable(SatoriInfraMapper.toDomain(mongoTemplate.findOne(query, SatoriEventRecordDO.class))); }
+    @Override public Optional<SatoriEventRecord> findByConnectionIdAndSequence(Long connectionId, String sequence) { return findByIdempotencyKey(connectionId, sequence); }
     @Override public PageResult<SatoriEventRecord> page(Long connectionId, int page, int size) { int current = Math.max(1, page); int limit = Math.max(1, size); Query query = Query.query(Criteria.where("connectionId").is(connectionId)); long total = mongoTemplate.count(query, SatoriEventRecordDO.class); query.with(Sort.by(Sort.Direction.DESC, "receivedAt")).skip((long) (current - 1) * limit).limit(limit); return new PageResult<>(mongoTemplate.find(query, SatoriEventRecordDO.class).stream().map(SatoriInfraMapper::toDomain).toList(), total, current, limit); }
 }
