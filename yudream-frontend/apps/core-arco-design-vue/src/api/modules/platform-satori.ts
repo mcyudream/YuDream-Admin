@@ -48,5 +48,6 @@ export default {
   disableConnection: (id: string) => systemClient.post<unknown, ApiResponse<SatoriConnection>>(`api/platform/satori/connections/${id}/disable`),
   testConnection: (id: string) => systemClient.post<unknown, ApiResponse<SatoriConnectionTest>>(`api/platform/satori/connections/${id}/test`),
   pageConnectionLogs: (id: string, params: { page: number, size: number }) => systemClient.get<unknown, ApiResponse<PageResult<SatoriOperationLog>>>(`api/platform/satori/connections/${id}/logs`, { params }),
+  streamConnectionLogs: (id: string) => `api/platform/satori/connections/${id}/logs/stream`,
   render: (data: { sourceType: 'HTML' | 'MARKDOWN' | 'URL', content: string, width?: number, transparent?: boolean }) => systemClient.post<Blob>('api/platform/render', data, { responseType: 'blob' }),
 }

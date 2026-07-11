@@ -52,7 +52,7 @@ public class SatoriConnectionRuntime implements SatoriEventGateway {
             }
             @Override public void onEvent(online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriEvent event, String rawData) {
                 eventIngress.acceptEvent(connectionId, event, rawData);
-                operationLogger.info(connectionId, "EVENT", event.type(), "收到事件 sn=" + event.sn());
+                operationLogger.info(connectionId, "EVENT", event.type(), eventSummary(event));
             }
         });
         resource.disposable = disposable;
@@ -86,5 +86,16 @@ public class SatoriConnectionRuntime implements SatoriEventGateway {
         private volatile Set<String> proxyUrls = Set.of();
         private void replaceProxyUrls(Set<String> values) { proxyUrls = values == null ? Set.of() : Set.copyOf(values); }
         private Set<String> proxyUrls() { return proxyUrls; }
+    }
+
+    private String eventSummary(online.yudream.base.domain.platform.satori.model.SatoriModels.SatoriEvent event) {
+        String userId = event.user() != null ? event.user().id()
+                : event.message() != null && event.message().user() != null ? event.message().user().id() : "-";
+        String channelId = event.channel() == null ? "-" : event.channel().id();
+        String content = event.message() == null ? "" : event.message().content();
+        if (content != null) content = content.replaceAll("[\\r\\n\\t]+", " ").trim();
+        if (content != null && content.length() > 240) content = content.substring(0, 240) + "...";
+        return "IN platform=" + event.platform() + " self=" + event.selfId() + " user=" + userId
+                + " channel=" + channelId + " sn=" + event.sn() + (content == null || content.isBlank() ? "" : " content=" + content);
     }
 }
