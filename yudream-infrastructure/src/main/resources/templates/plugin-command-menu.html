@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      display: inline-block;
+      margin: 0;
+      padding: 18px;
+      background: #f1f1f1;
+      color: #182230;
+      font-family: Arial, "Microsoft YaHei", sans-serif;
+    }
+    #command-menu-card {
+      display: inline-block;
+      width: 760px;
+      padding: 0;
+      border: solid #f1f1f1;
+      border-width: 20px 22px 24px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .menu-title { margin-bottom: 22px; text-align: center; }
+    .menu-title span {
+      display: inline-block;
+      padding: 10px 20px;
+      border-radius: 5px;
+      background: #009688;
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .menu-intro {
+      margin: 0 0 18px;
+      color: #4b5563;
+      font-size: 13px;
+    }
+    .menu-columns {
+      column-count: 2;
+      column-gap: 20px;
+    }
+    .plugin-section {
+      display: block;
+      margin: 0 0 20px;
+      padding: 20px 22px;
+      border: 1px solid #d9dde3;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 1px 2px #00000008;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+    .plugin-name {
+      padding-bottom: 12px;
+      border-bottom: 1px solid #d9dde3;
+      color: #009688;
+      font-size: 22px;
+    }
+    .command-list { padding-top: 6px; }
+    .command-row {
+      padding: 12px 0;
+      border-top: 1px solid #e4e7eb;
+      line-height: 1.65;
+    }
+    .command-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    .command-code {
+      display: inline-block;
+      max-width: 100%;
+      padding: 2px 7px;
+      border: 1px solid #b9ded9;
+      border-radius: 4px;
+      background: #e9f7f5;
+      color: #007f75;
+      font-family: Consolas, "Cascadia Mono", "Microsoft YaHei", monospace;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+    .command-code::before {
+      content: "/";
+      margin-right: 1px;
+      color: #46a69e;
+      font-weight: 500;
+    }
+    .command-name { min-width: 0; color: #344054; font-weight: 600; }
+    .command-description { margin-top: 5px; color: #667085; font-size: 12px; }
+    .menu-empty { padding: 32px; color: #98a2b3; text-align: center; }
+    .menu-footer { margin-top: 2px; color: #98a2b3; font-size: 11px; text-align: right; }
+  </style>
+</head>
+<body>
+  <main id="command-menu-card">
+    <div class="menu-title"><span>指令菜单</span></div>
+    <p class="menu-intro">您好，<span th:text="${nickname}">访客</span>。以下是您当前有权限使用的指令：</p>
+    <div class="menu-columns">
+      <section class="plugin-section" th:each="entry : ${groups}">
+        <div class="plugin-name" th:text="${entry.key}">系统</div>
+        <div class="command-list">
+          <div class="command-row" th:each="command : ${entry.value}">
+            <div class="command-heading">
+              <span class="command-code" th:text="${command.command}">menu</span>
+              <span class="command-name" th:text="${command.name}">菜单</span>
+            </div>
+            <div class="command-description" th:text="${command.description}">查看可用指令</div>
+          </div>
+        </div>
+      </section>
+      <div class="menu-empty" th:if="${#maps.isEmpty(groups)}">暂无可用指令</div>
+    </div>
+    <div class="menu-footer">YuDream Admin · 权限菜单</div>
+  </main>
+</body>
+</html>

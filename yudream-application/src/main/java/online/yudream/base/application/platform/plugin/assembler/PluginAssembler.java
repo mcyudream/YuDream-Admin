@@ -33,6 +33,7 @@ public class PluginAssembler {
                 .mainClass(module.getMainClass())
                 .jarPath(module.getJarPath())
                 .dependencies(module.getDependencies())
+                .softDependencies(module.getSoftDependencies())
                 .status(module.getStatus())
                 .errorMessage(module.getErrorMessage())
                 .loadedAt(module.getLoadedAt())

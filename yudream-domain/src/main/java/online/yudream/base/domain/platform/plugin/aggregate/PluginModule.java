@@ -26,6 +26,7 @@ public class PluginModule extends BaseDomain {
     private String mainClass;
     private String jarPath;
     private List<String> dependencies;
+    private List<String> softDependencies;
     private PluginStatus status;
     private String errorMessage;
     private LocalDateTime loadedAt;
@@ -41,6 +42,7 @@ public class PluginModule extends BaseDomain {
                 .mainClass(descriptor.mainClass())
                 .jarPath(descriptor.jarPath())
                 .dependencies(descriptor.dependencies())
+                .softDependencies(descriptor.softDependencies())
                 .status(PluginStatus.INSTALLED)
                 .build();
     }
@@ -52,6 +54,7 @@ public class PluginModule extends BaseDomain {
         this.mainClass = descriptor.mainClass();
         this.jarPath = descriptor.jarPath();
         this.dependencies = descriptor.dependencies();
+        this.softDependencies = descriptor.softDependencies();
         if (this.status == null) {
             this.status = PluginStatus.INSTALLED;
         }

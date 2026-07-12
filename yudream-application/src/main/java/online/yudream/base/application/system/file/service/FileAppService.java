@@ -71,6 +71,19 @@ public class FileAppService {
     @Transactional(readOnly = true)
     public FileContentDTO content(Long id) {
         FileObject fileObject = getActiveFile(id);
+        return readContent(fileObject);
+    }
+
+    @Transactional(readOnly = true)
+    public FileContentDTO publicContent(Long id) {
+        FileObject fileObject = getActiveFile(id);
+        if (!Boolean.TRUE.equals(fileObject.getPublicAccess())) {
+            throw new BizException("文件未开放公开访问");
+        }
+        return readContent(fileObject);
+    }
+
+    private FileContentDTO readContent(FileObject fileObject) {
         StoredObject storedObject = objectStorage.get(fileObject.getObjectKey());
         return FileContentDTO.builder()
                 .originalName(fileObject.getOriginalName())

@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.render.model.RenderModels.RenderRequest;
 import online.yudream.base.domain.platform.render.model.RenderModels.RenderedImage;
+import online.yudream.base.domain.platform.render.model.RenderModels.SourceType;
 import online.yudream.base.domain.platform.render.service.MessageRenderGateway;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -95,6 +96,17 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
         if (request.transparent() != null) payload.put("transparent", request.transparent());
         if (StringUtils.hasText(request.format())) payload.put("format", request.format());
         if (request.options() != null && !request.options().isEmpty()) payload.put("options", request.options());
+        if (request.sourceType() == SourceType.HTML) {
+            Map<String, Object> options = new LinkedHashMap<>();
+            options.put("sanitize", false);
+            options.put("allowStyles", true);
+            if (request.options() != null) {
+                options.putAll(request.options());
+                Object selector = request.options().get("selector");
+                if (selector instanceof String value && !value.isBlank()) payload.put("selector", value);
+            }
+            payload.put("options", options);
+        }
         return payload;
     }
 

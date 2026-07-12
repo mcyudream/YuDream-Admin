@@ -1,0 +1,5 @@
+name: sample-plugin
+displayName: 示例插件
+main: online.yudream.base.plugin.sample.SampleYuDreamPlugin
+version: 1.0.0
+description: YuDream sample plugin

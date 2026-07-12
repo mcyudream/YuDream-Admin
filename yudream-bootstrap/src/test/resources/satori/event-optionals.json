@@ -1,9 +1,0 @@
-{
-  "sn": "9007199254740993",
-  "type": "message-created",
-  "platform": "onebot",
-  "self_id": "10001",
-  "timestamp": 1710000000000,
-  "login": { "platform": "onebot", "self_id": "10001", "user": { "id": "10001" }, "status": 1, "adapter": "onebot" },
-  "message": { "id": "10002", "content": "text", "user": { "id": "10003" }, "updated_at": null }
-}

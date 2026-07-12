@@ -1,6 +1,5 @@
 import { lookup } from "node:dns/promises";
 import net from "node:net";
-import sanitizeHtml from "sanitize-html";
 import { limits } from "./config.js";
 
 const privateIpv4Ranges: ReadonlyArray<readonly [number, number]> = [
@@ -17,17 +16,13 @@ export function assertTextLimit(value: string, maximum: number, name: string): v
   }
 }
 
-export function sanitizeMarkup(html: string): string {
+/**
+ * HTML rendering is intentionally style-preserving. The browser is isolated:
+ * scripts are disabled and document subresources are blocked by RenderService.
+ */
+export function validateMarkup(html: string): string {
   assertTextLimit(html, limits.maxHtmlBytes, "html");
-  return sanitizeHtml(html, {
-    allowedTags: ["a", "abbr", "b", "blockquote", "br", "code", "del", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "ol", "p", "pre", "span", "strong", "sub", "sup", "table", "tbody", "td", "th", "thead", "tr", "u", "ul"],
-    allowedAttributes: { a: ["href", "title"], img: ["alt", "height", "src", "title", "width"], "*": ["class"] },
-    allowedSchemes: ["https"],
-    allowedSchemesByTag: { img: ["https"] },
-    allowProtocolRelative: false,
-    disallowedTagsMode: "discard",
-    allowedStyles: {}
-  });
+  return html;
 }
 
 function ipv4ToNumber(address: string): number {
@@ -70,5 +65,4 @@ export function assertRenderOptions(input: { width?: number; maxHeight?: number;
   if (!Number.isFinite(deviceScaleFactor) || deviceScaleFactor < 1 || deviceScaleFactor > limits.maxScale) throw new RenderInputError("deviceScaleFactor is outside the allowed range");
   if (input.format !== undefined && input.format !== "png" && input.format !== "jpeg") throw new RenderInputError("only png and jpeg output formats are supported");
   assertTextLimit(css, limits.maxCssBytes, "css");
-  if (/@import\b|url\s*\(|<\s*\/\s*style/i.test(css)) throw new RenderInputError("css contains a forbidden construct");
 }

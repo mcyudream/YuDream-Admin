@@ -92,6 +92,8 @@ services:
     restart: unless-stopped
     expose:
       - "3000"
+    ports:
+      - "${RENDER_PORT:-3000}:3000"
     environment:
       - RENDER_HOST=0.0.0.0
       - RENDER_PORT=3000

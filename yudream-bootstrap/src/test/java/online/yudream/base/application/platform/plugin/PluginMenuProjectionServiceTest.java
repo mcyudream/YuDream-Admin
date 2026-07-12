@@ -176,7 +176,7 @@ class PluginMenuProjectionServiceTest {
     }
 
     @Test
-    void removedDeclarationDoesNotHidePersistedMenu() {
+    void removedDeclarationHidesPersistedMenuFromRuntimeNavigation() {
         FailingMenuRepo repo = new FailingMenuRepo();
         PluginMenuProjectionService projectionService = new PluginMenuProjectionService(repo);
         repo.put(pluginMenu("module:" + MODULE_NAME, true));
@@ -194,8 +194,8 @@ class PluginMenuProjectionServiceTest {
         ))));
 
         assertThat(current.getRuntimeAvailable()).isTrue();
-        assertThat(removed.getRuntimeAvailable()).isTrue();
-        assertThat(repo.getSaveCount()).isZero();
+        assertThat(removed.getRuntimeAvailable()).isFalse();
+        assertThat(repo.getSaveCount()).isEqualTo(1);
     }
 
     @Test
@@ -398,7 +398,7 @@ class PluginMenuProjectionServiceTest {
         assertThat(repo.findByPluginCodeAndRegistrationKey(
                 PLUGIN_CODE,
                 "route:" + MODULE_NAME + ":removed"
-        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(true);
+        )).get().extracting(Menu::getRuntimeAvailable).isEqualTo(false);
     }
 
     @Test

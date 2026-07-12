@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -21,16 +22,30 @@ public class PluginRenderFrameworkService implements PluginRenderService {
     public CompletionStage<PluginRenderedImage> html(String html) { return render(SourceType.HTML, html); }
 
     @Override
+    public CompletionStage<PluginRenderedImage> html(String html, String selector) {
+        return render(SourceType.HTML, html, selector);
+    }
+
+    @Override
     public CompletionStage<PluginRenderedImage> markdown(String markdown) { return render(SourceType.MARKDOWN, markdown); }
 
     @Override
     public CompletionStage<PluginRenderedImage> url(String url) { return render(SourceType.URL, url); }
 
     private CompletionStage<PluginRenderedImage> render(SourceType sourceType, String content) {
+        String selector = sourceType == SourceType.HTML && content != null && content.contains("command-menu-card")
+                ? "#command-menu-card" : null;
+        return render(sourceType, content, selector);
+    }
+
+    private CompletionStage<PluginRenderedImage> render(SourceType sourceType, String content, String selector) {
         return CompletableFuture.supplyAsync(() -> {
             MessageRenderCmd cmd = new MessageRenderCmd();
             cmd.setSourceType(sourceType);
             cmd.setContent(content);
+            if (sourceType == SourceType.HTML && selector != null && !selector.isBlank()) {
+                cmd.setOptions(Map.of("selector", selector.trim()));
+            }
             RenderedImageDTO rendered = messageRenderAppService.render(cmd);
             return new PluginRenderedImage(rendered.contentType(), rendered.content(), rendered.width(), rendered.height());
         });

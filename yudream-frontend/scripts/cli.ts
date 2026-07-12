@@ -203,7 +203,7 @@ async function selectScript(app: AppInfo, action: Mode): Promise<string> {
 
 async function runPackageScript(packageName: string, script: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    childProcess = spawn('pnpm', ['--filter', packageName, 'run', script], {
+    childProcess = spawn(isWindows ? 'pnpm.cmd' : 'pnpm', ['--filter', packageName, 'run', script], {
       stdio: 'inherit',
       cwd: rootDir,
       shell: isWindows,

@@ -9,9 +9,11 @@ public record PluginDescriptorInfo(
         String description,
         String mainClass,
         String jarPath,
-        List<String> dependencies
+        List<String> dependencies,
+        List<String> softDependencies
 ) {
     public PluginDescriptorInfo {
         dependencies = dependencies == null ? List.of() : List.copyOf(dependencies);
+        softDependencies = softDependencies == null ? List.of() : List.copyOf(softDependencies);
     }
 }

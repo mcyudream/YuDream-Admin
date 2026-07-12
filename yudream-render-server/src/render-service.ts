@@ -2,7 +2,7 @@ import MarkdownIt from "markdown-it";
 import type { Page } from "playwright";
 import { BrowserPool } from "./browser-pool.js";
 import { limits } from "./config.js";
-import { assertRenderOptions, assertSafeExternalUrl, assertTextLimit, sanitizeMarkup } from "./security.js";
+import { assertRenderOptions, assertSafeExternalUrl, assertTextLimit, RenderInputError, validateMarkup } from "./security.js";
 
 // Kept alongside themes/default.css for deployments that mount or replace the stylesheet.
 const defaultCss = `:root{color-scheme:light}*{box-sizing:border-box}html,body{margin:0;padding:0}body{width:fit-content;min-width:100%;padding:32px;color:#1f2937;background:#fff;font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",Arial,sans-serif;font-size:16px;line-height:1.65;overflow-wrap:anywhere}pre,code{font-family:"Noto Sans Mono CJK SC","Cascadia Mono",Consolas,monospace}pre{padding:16px;overflow:auto;color:#e5e7eb;background:#111827;border-radius:4px}code{padding:1px 4px;background:#f3f4f6;border-radius:3px}pre code{padding:0;color:inherit;background:transparent}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #d1d5db;text-align:left}blockquote{margin-left:0;padding-left:16px;color:#4b5563;border-left:4px solid #9ca3af}img,video{max-width:100%;height:auto}`;
@@ -21,6 +21,7 @@ export interface RenderRequest {
   format?: RenderFormat;
   quality?: number;
   transparent?: boolean;
+  selector?: string;
 }
 
 export interface RenderResult {
@@ -37,6 +38,11 @@ function imageType(format: RenderFormat): string {
 }
 
 function buildDocument(body: string, css: string, transparent: boolean): string {
+  if (/^\s*(?:<!doctype\s+html>\s*)?<html[\s>]/i.test(body)) {
+    if (!css && !transparent) return body;
+    const overrides = `<style>${css}\n${transparent ? "body { background: transparent; }" : ""}</style>`;
+    return /<\/head\s*>/i.test(body) ? body.replace(/<\/head\s*>/i, `${overrides}</head>`) : `${overrides}${body}`;
+  }
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https:; style-src 'unsafe-inline'"><style>${defaultCss}\n${css}\n${transparent ? "body { background: transparent; }" : ""}</style></head><body>${body}</body></html>`;
 }
 
@@ -45,13 +51,13 @@ export class RenderService {
 
   async renderHtml(input: RenderRequest): Promise<RenderResult> {
     if (typeof input.html !== "string") throw new Error("html is required");
-    return this.renderDocument(buildDocument(sanitizeMarkup(input.html), input.css ?? "", input.transparent === true), input);
+    return this.renderDocument(buildDocument(validateMarkup(input.html), input.css ?? "", input.transparent === true), input);
   }
 
   async renderMarkdown(input: RenderRequest): Promise<RenderResult> {
     if (typeof input.markdown !== "string") throw new Error("markdown is required");
     assertTextLimit(input.markdown, limits.maxMarkdownBytes, "markdown");
-    return this.renderDocument(buildDocument(sanitizeMarkup(markdown.render(input.markdown)), input.css ?? "", input.transparent === true), input);
+    return this.renderDocument(buildDocument(validateMarkup(markdown.render(input.markdown)), input.css ?? "", input.transparent === true), input);
   }
 
   async renderUrl(input: RenderRequest): Promise<RenderResult> {
@@ -90,16 +96,35 @@ export class RenderService {
 
   private async capture(page: Page, input: RenderRequest): Promise<RenderResult> {
     const maxHeight = input.maxHeight ?? 4_000;
-    const measured = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
-    const height = Math.min(Math.max(measured, limits.minHeight), maxHeight);
-    await page.setViewportSize({ width: input.width ?? 900, height: Math.min(height, 1_080) });
     const format = input.format ?? "png";
+    if (input.selector) {
+      const element = page.locator(input.selector);
+      const box = await element.boundingBox();
+      if (!box) throw new RenderInputError(`selector did not match a visible element: ${input.selector}`);
+      if (box.height > maxHeight) throw new RenderInputError(`selected element exceeds the ${maxHeight}px height limit`);
+      const screenshot = await element.screenshot({
+        type: format,
+        omitBackground: input.transparent === true && format === "png",
+        quality: format === "png" ? undefined : input.quality ?? 90
+      });
+      return {
+        contentType: imageType(format),
+        data: screenshot.toString("base64"),
+        width: Math.ceil(box.width),
+        height: Math.ceil(box.height)
+      };
+    }
+
+    const measured = await page.evaluate(() => Math.max(document.documentElement.scrollHeight, document.body.scrollHeight));
+    const captureWidth = input.width ?? 900;
+    const height = Math.min(Math.max(measured, limits.minHeight), maxHeight);
+    await page.setViewportSize({ width: Math.max(captureWidth, 320), height: Math.min(height, 1_080) });
     const screenshot = await page.screenshot({
       type: format,
-      clip: { x: 0, y: 0, width: input.width ?? 900, height },
+      clip: { x: 0, y: 0, width: captureWidth, height },
       omitBackground: input.transparent === true && format === "png",
       quality: format === "png" ? undefined : input.quality ?? 90
     });
-    return { contentType: imageType(format), data: screenshot.toString("base64"), width: input.width ?? 900, height };
+    return { contentType: imageType(format), data: screenshot.toString("base64"), width: captureWidth, height };
   }
 }
