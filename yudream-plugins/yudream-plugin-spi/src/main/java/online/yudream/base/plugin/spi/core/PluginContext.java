@@ -11,8 +11,11 @@ import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionRegistry;
 import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
+import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
+import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 
 import java.util.Optional;
+import java.util.List;
 
 public interface PluginContext {
 
@@ -32,6 +35,8 @@ public interface PluginContext {
 
     PluginCommandRegistry commands();
 
+    PluginTemplateRenderService templateRenderer();
+
     void registerMenu(PluginMenuItem item);
 
     void registerPermission(PluginPermissionItem item);
@@ -46,9 +51,15 @@ public interface PluginContext {
 
     void registerHttpController(Object controller);
 
-    <T> void registerExtension(Class<T> type, T extension);
+    void registerAiTool(PluginAiTool tool);
 
-    <T> Optional<T> getExtension(Class<T> type);
+    <T> void exposeService(Class<T> serviceType, T service);
+
+    <T> Optional<T> service(String pluginCode, Class<T> serviceType);
+
+    <T> List<T> services(Class<T> serviceType);
+
+    boolean dependencyAvailable(String pluginCode);
 
     void onDispose(AutoCloseable closeable);
 }

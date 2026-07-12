@@ -17,6 +17,10 @@ import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import online.yudream.base.infra.platform.ai.service.provider.ResolvedAiModel;
+import online.yudream.base.infra.platform.plugin.service.PluginAiToolExecutionScope;
+import online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry;
+import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
+import online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -73,17 +77,20 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     private final AiProviderConfigParser providerConfigParser;
     private final List<AiProviderAdapter> providerAdapters;
     private final AiClientProperties aiClientProperties;
+    private final PluginAiToolRegistry pluginAiToolRegistry;
 
     public OpenAiCompatibleGenerationGateway(
             ObjectProvider<AiAgentTool> aiAgentToolProvider,
             AiProviderConfigParser providerConfigParser,
             List<AiProviderAdapter> providerAdapters,
-            AiClientProperties aiClientProperties
+            AiClientProperties aiClientProperties,
+            PluginAiToolRegistry pluginAiToolRegistry
     ) {
         this.aiAgentToolProvider = aiAgentToolProvider;
         this.providerConfigParser = providerConfigParser;
         this.providerAdapters = providerAdapters;
         this.aiClientProperties = aiClientProperties;
+        this.pluginAiToolRegistry = pluginAiToolRegistry;
     }
 
     @Override
@@ -100,7 +107,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     StringUtils.hasText(request.imageDataUrl()));
             String content = requestSpec(request, resolved, toolResults).call().content();
             log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
-            return toResult(content, toolResults);
+            return toResult(content, toolResults, request.structuredOutputRequired());
         } catch (BizException e) {
             log.debug("AI non-stream call business error: {}", e.getMessage());
             throw e;
@@ -161,7 +168,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     .blockLast(aiClientProperties.getReadTimeout());
             log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
             progress(onProgress, "complete", "AI 处理完成。");
-            return toResult(content.toString(), toolResults);
+            return toResult(content.toString(), toolResults, request.structuredOutputRequired());
         } catch (BizException e) {
             log.debug("AI stream call business error: {}", e.getMessage());
             throw e;
@@ -216,7 +223,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        List<ToolCallback> callbacks = toolCallbacks(toolResults, onTool, onProgress);
+        List<ToolCallback> callbacks = request.toolCallingEnabled() ? toolCallbacks(toolResults, onTool, onProgress) : List.of();
         AiGenerationRequest effectiveRequest = request.withToolCallingEnabled(!callbacks.isEmpty());
         ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, effectiveRequest))
                 .prompt()
@@ -301,6 +308,11 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
+        var scope = PluginAiToolExecutionScope.current();
+        if (scope != null) {
+            return pluginAiToolRegistry.tools().stream().filter(tool -> allowed(tool, scope))
+                    .map(tool -> pluginToolCallback(tool, scope, toolResults, onTool, onProgress)).toList();
+        }
         return aiAgentToolProvider.stream()
                 .map(tool -> toolCallback(tool, toolResults, onTool, onProgress))
                 .toList();
@@ -409,11 +421,32 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return messages;
     }
 
-    private AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
+    private AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults, boolean structuredOutputRequired) {
         if (toolResults != null && !toolResults.isEmpty()) {
             return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", "", List.of(), List.copyOf(toolResults));
         }
-        return toLegacyResult(content);
+        return structuredOutputRequired ? toLegacyResult(content)
+                : new AiGenerationResult("", content == null ? "" : content.trim(), "", "", "", "", "", List.of(), List.of());
+    }
+
+    private boolean allowed(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context) {
+        var descriptor = tool.descriptor();
+        return descriptor != null && descriptor.risk() == PluginAiToolRisk.READ && context.allowsTool(descriptor.name())
+                && descriptor.allowedTriggers().contains(context.trigger()) && context.hasPermission(descriptor.permissionCode());
+    }
+
+    private ToolCallback pluginToolCallback(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context,
+                                             List<AiAgentToolResult> results, Consumer<AiAgentToolResult> onTool, Consumer<AiGenerationProgress> onProgress) {
+        var descriptor = tool.descriptor();
+        return FunctionToolCallback.<Map<String, Object>, AiAgentToolResult>builder(safeToolName(descriptor.name()), args -> {
+            if (!allowed(tool, context)) throw new BizException("当前用户无权调用 AI 工具：" + descriptor.title());
+            progress(onProgress, "tool-start", "正在调用工具：" + descriptor.title());
+            var value = tool.execute(context, new online.yudream.base.plugin.spi.system.ai.PluginAiToolCall(descriptor.name(), args));
+            AiAgentToolResult result = new AiAgentToolResult(descriptor.name(), value.action(), context.traceId(), value.message(), value.payload());
+            results.add(result); if (onTool != null) onTool.accept(result); progress(onProgress, "tool-complete", "工具调用完成：" + descriptor.title()); return result;
+        }).description(descriptor.description()).inputType(new ParameterizedTypeReference<Map<String, Object>>() {})
+                .inputSchema(inputSchema(new AiAgentToolDescriptor(descriptor.name(), descriptor.title(), descriptor.description(), descriptor.permissionCode(), descriptor.title(), "插件工具", descriptor.description(), descriptor.inputSchema())))
+                .toolCallResultConverter((result, type) -> JSONUtil.toJsonStr(result)).build();
     }
 
     private AiGenerationResult toLegacyResult(String content) {
