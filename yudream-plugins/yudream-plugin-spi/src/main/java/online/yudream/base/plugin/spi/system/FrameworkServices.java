@@ -8,11 +8,11 @@ import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
 import online.yudream.base.plugin.spi.system.command.PluginCommandService;
+import online.yudream.base.plugin.spi.system.ai.PluginAiService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
-import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 
-import java.util.List;
 import java.util.Optional;
 
 public interface FrameworkServices {
@@ -22,6 +22,8 @@ public interface FrameworkServices {
     PluginQqBindingService qqBindings();
 
     PluginCommandService commands();
+
+    PluginAiService ai();
 
     PluginSecurityService security();
 
@@ -35,13 +37,10 @@ public interface FrameworkServices {
 
     PluginMessagingService messaging();
 
-    PluginSatoriRawService satoriRaw();
+    PluginMessagingRawService messagingRaw();
 
     PluginRenderService render();
 
     Optional<String> setting(String key);
 
-    <T> Optional<T> extension(String pluginCode, Class<T> type);
-
-    <T> List<T> extensions(Class<T> type);
 }

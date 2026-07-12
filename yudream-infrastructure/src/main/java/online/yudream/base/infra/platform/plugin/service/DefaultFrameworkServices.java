@@ -26,8 +26,9 @@ import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
 import online.yudream.base.plugin.spi.system.command.PluginCommandService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
-import online.yudream.base.plugin.spi.system.messaging.PluginSatoriRawService;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
+import online.yudream.base.plugin.spi.system.ai.PluginAiService;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
@@ -54,8 +55,9 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final PluginCommandService pluginCommandService;
     private final PluginSecurityService pluginSecurityService;
     private final PluginMailService pluginMailService;
-    private final PluginMessagingFrameworkService pluginMessagingFrameworkService;
+    private final MilkyPluginMessagingService pluginMessagingFrameworkService;
     private final PluginRenderFrameworkService pluginRenderFrameworkService;
+    private final PluginAiFrameworkService pluginAiFrameworkService;
     private final MongoTemplate mongoTemplate;
     private final ObjectStorage objectStorage;
     private final WordTemplateRenderer wordTemplateRenderer;
@@ -64,7 +66,6 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final SettingRepo settingRepo;
     private final Environment environment;
-    private final PluginExtensionRegistry pluginExtensionRegistry;
     private final ConcurrentMap<String, PluginDocumentStore> documentStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginFileStore> fileStores = new ConcurrentHashMap<>();
 
@@ -144,13 +145,18 @@ public class DefaultFrameworkServices implements FrameworkServices {
     }
 
     @Override
-    public PluginSatoriRawService satoriRaw() {
+    public PluginMessagingRawService messagingRaw() {
         return pluginMessagingFrameworkService;
     }
 
     @Override
     public PluginRenderService render() {
         return pluginRenderFrameworkService;
+    }
+
+    @Override
+    public PluginAiService ai() {
+        return pluginAiFrameworkService;
     }
 
     @Override
@@ -162,16 +168,6 @@ public class DefaultFrameworkServices implements FrameworkServices {
                 .map(Setting::getValue)
                 .filter(StringUtils::hasText)
                 .or(() -> Optional.ofNullable(environment.getProperty(key)).filter(StringUtils::hasText));
-    }
-
-    @Override
-    public <T> Optional<T> extension(String pluginCode, Class<T> type) {
-        return pluginExtensionRegistry.find(pluginCode, type);
-    }
-
-    @Override
-    public <T> List<T> extensions(Class<T> type) {
-        return pluginExtensionRegistry.findAll(type);
     }
 
     private PluginRenderedDocument renderWordTemplate(byte[] templateContent, Map<String, Object> data) {

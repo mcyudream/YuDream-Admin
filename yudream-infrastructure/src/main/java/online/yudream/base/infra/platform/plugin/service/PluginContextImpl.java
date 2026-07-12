@@ -12,6 +12,8 @@ import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionRegistry;
 import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
+import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
+import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -21,12 +23,16 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+import java.net.URLClassLoader;
 
 public class PluginContextImpl implements PluginContext {
 
     private final String pluginCode;
     private final FrameworkServices frameworkServices;
-    private final PluginExtensionRegistry pluginExtensionRegistry;
+    private final PluginServiceRegistry pluginServiceRegistry;
+    private final Set<String> declaredDependencies;
+    private final Predicate<String> dependencyEnabled;
     private final List<PluginMenuItem> menus = new ArrayList<>();
     private final List<PluginPermissionItem> permissions = new ArrayList<>();
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
@@ -44,13 +50,21 @@ public class PluginContextImpl implements PluginContext {
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
     private final PluginMessageInteractionRegistryImpl interactionRegistry;
     private final PluginCommandRegistryImpl commandRegistry;
+    private final PluginTemplateRenderService templateRenderService;
+    private final PluginAiToolRegistry aiToolRegistry;
 
-    public PluginContextImpl(String pluginCode, FrameworkServices frameworkServices, PluginExtensionRegistry pluginExtensionRegistry) {
+    public PluginContextImpl(String pluginCode, URLClassLoader pluginClassLoader, FrameworkServices frameworkServices,
+                             PluginServiceRegistry pluginServiceRegistry, Set<String> declaredDependencies,
+                             Predicate<String> dependencyEnabled, PluginAiToolRegistry aiToolRegistry) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
-        this.pluginExtensionRegistry = pluginExtensionRegistry;
+        this.pluginServiceRegistry = pluginServiceRegistry;
+        this.declaredDependencies = Set.copyOf(declaredDependencies);
+        this.dependencyEnabled = dependencyEnabled;
         this.interactionRegistry = new PluginMessageInteractionRegistryImpl(pluginCode);
         this.commandRegistry = new PluginCommandRegistryImpl(pluginCode);
+        this.templateRenderService = new PluginTemplateRenderFrameworkService(pluginClassLoader, frameworkServices.render());
+        this.aiToolRegistry = aiToolRegistry;
         onDispose(interactionRegistry);
         onDispose(commandRegistry);
     }
@@ -73,6 +87,11 @@ public class PluginContextImpl implements PluginContext {
     @Override
     public PluginCommandRegistry commands() {
         return commandRegistry;
+    }
+
+    @Override
+    public PluginTemplateRenderService templateRenderer() {
+        return templateRenderService;
     }
 
     public PluginMessageInteractionRegistryImpl interactionRegistry() {
@@ -146,13 +165,36 @@ public class PluginContextImpl implements PluginContext {
     }
 
     @Override
-    public <T> void registerExtension(Class<T> type, T extension) {
-        pluginExtensionRegistry.register(pluginCode, type, extension);
+    public void registerAiTool(PluginAiTool tool) {
+        if (tool == null || tool.descriptor() == null || tool.descriptor().name() == null || tool.descriptor().name().isBlank()) {
+            throw new BizException("AI 工具定义无效");
+        }
+        onDispose(aiToolRegistry.register(pluginCode, tool));
     }
 
     @Override
-    public <T> Optional<T> getExtension(Class<T> type) {
-        return pluginExtensionRegistry.find(pluginCode, type);
+    public <T> void exposeService(Class<T> serviceType, T service) {
+        pluginServiceRegistry.export(pluginCode, serviceType, service);
+    }
+
+    @Override
+    public <T> Optional<T> service(String targetPluginCode, Class<T> serviceType) {
+        requireDeclaredDependency(targetPluginCode);
+        if (!dependencyEnabled.test(targetPluginCode)) {
+            return Optional.empty();
+        }
+        return pluginServiceRegistry.find(targetPluginCode, serviceType);
+    }
+
+    @Override
+    public <T> List<T> services(Class<T> serviceType) {
+        return pluginServiceRegistry.findAll(serviceType);
+    }
+
+    @Override
+    public boolean dependencyAvailable(String targetPluginCode) {
+        requireDeclaredDependency(targetPluginCode);
+        return dependencyEnabled.test(targetPluginCode);
     }
 
     @Override
@@ -201,7 +243,7 @@ public class PluginContextImpl implements PluginContext {
         frontendModules.clear();
         httpEndpoints.clear();
         httpHandlers.clear();
-        pluginExtensionRegistry.clear(pluginCode);
+        pluginServiceRegistry.clear(pluginCode);
         menuKeys.clear();
         permissionKeys.clear();
         capabilityKeys.clear();
@@ -317,6 +359,12 @@ public class PluginContextImpl implements PluginContext {
     private void ensureUnique(Set<String> keys, String key, String message) {
         if (!keys.add(key)) {
             throw new BizException(message);
+        }
+    }
+
+    private void requireDeclaredDependency(String targetPluginCode) {
+        if (!StringUtils.hasText(targetPluginCode) || !declaredDependencies.contains(targetPluginCode.trim())) {
+            throw new BizException("插件未声明依赖: " + targetPluginCode);
         }
     }
 }

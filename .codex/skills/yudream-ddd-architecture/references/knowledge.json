@@ -115,6 +115,22 @@
     {
       "key": "plugin-menu-projection-reconcile",
       "text": "Plugin enable must reproject frontend menu declarations without overwriting existing menu fields. Any stale module:/parent:/route: registration from a removed declaration must be marked runtimeAvailable=false so contextual parent layouts do not survive upgrades as duplicate navigation entries."
+    },
+    {
+      "key": "plugin-yml-cross-plugin-api",
+      "text": "Plugin JARs declare stable code in plugin.yml name and may declare a localized displayName for user-facing UI; displayName falls back to name and must never be used for depend/softdepend, routes, service lookup, or runtime identity. Plugin-owned APIs stay in the provider JAR; consumers use provided scope and direct context.service calls through dependency classloaders."
+    },
+    {
+      "key": "rendered-message-template",
+      "text": "Rendered message layouts such as the Milky command menu must use classpath Thymeleaf templates. Java may only assemble view data and invoke TemplateEngine; do not concatenate HTML or CSS inside dispatcher methods."
+    },
+    {
+      "key": "render-selector-native-screenshot",
+      "text": "When a render request includes a CSS selector, use Playwright Locator.screenshot() for the selected element. Do not emulate element screenshots with boundingBox plus page.screenshot clip or viewport resizing, because reflow can crop padding and borders."
+    },
+    {
+      "key": "ai-generation-response-mode",
+      "text": "AI gateway requests must explicitly mark structured CMS output; ordinary plugin/chat requests return natural-language content and must never enter CMS canvas JSON validation."
     }
   ],
   "utilities": [
@@ -163,6 +179,14 @@
     {
       "key": "menu-structural-auth",
       "text": "后端动态菜单树中 CATEGORY/LAYOUT 结构祖先只承载已授权后代，不得以自身 permission 二次阻断叶子权限；前端 backend route 模式不得把顶级 auth 覆盖到子路由，也不得在递归子节点前用结构父 auth 丢弃整支。BUTTON 权限应从持久化菜单上溯到所属页面，但不可用插件 BUTTON 不得授权页面。"
+    },
+    {
+      "key": "render-server-host-port",
+      "text": "When the backend runs on the host and the render service runs in Docker, compose must publish RENDER_PORT to the host with ports: \" :3000\\. Docker expose alone only permits container-network access; verify http://127.0.0.1:3000/health after recreation."
+    },
+    {
+      "key": "render-server-style-preservation",
+      "text": "HTML menu rendering must preserve style tags, inline style attributes, and caller CSS exactly. Do not apply sanitize-html or CSS allowlists in the render server; isolation is provided by disabled JavaScript, CSP, and blocked document subresources."
     }
   ]
 }

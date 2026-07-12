@@ -38,12 +38,13 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.stream.Stream;
@@ -55,7 +56,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
 
     private final PluginProperties pluginProperties;
     private final FrameworkServices frameworkServices;
-    private final PluginExtensionRegistry pluginExtensionRegistry;
+    private final PluginServiceRegistry pluginServiceRegistry;
+    private final PluginAiToolRegistry aiToolRegistry;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -120,6 +122,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (holder == null || !holder.isEnabled()) {
             return;
         }
+        ensureNoEnabledHardDependents(code);
         holder.getPlugin().onDisable(holder.getContext());
         holder.getContext().clearRuntimeContributions();
         holder.setEnabled(false);
@@ -128,6 +131,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
 
     @Override
     public void unload(String code) {
+        ensureNoLoadedDependents(code);
         PluginRuntimeHolder holder = holders.remove(code);
         if (holder == null) {
             return;
@@ -190,11 +194,19 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .toList();
     }
 
-    public void publishSatoriEvent(PluginEvent event) {
+    public void publishMessagingEvent(PluginEvent event) {
         holders.values().stream()
                 .filter(PluginRuntimeHolder::isEnabled)
                 .map(PluginRuntimeHolder::getContext)
                 .forEach(context -> context.interactionRegistry().publish(event, "internal".equals(event.type())));
+    }
+
+    public String displayName(String pluginCode) {
+        PluginRuntimeHolder holder = holders.get(pluginCode);
+        if (holder == null || holder.getDescriptor().name() == null || holder.getDescriptor().name().isBlank()) {
+            return pluginCode;
+        }
+        return holder.getDescriptor().name();
     }
 
     @Override
@@ -306,10 +318,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     private Optional<PluginDescriptorInfo> readDescriptor(Path jarPath) {
-        try (URLClassLoader classLoader = createClassLoader(jarPath)) {
-            YuDreamPlugin plugin = loadPlugin(classLoader)
-                    .orElseThrow(() -> new BizException("JAR 未声明 YuDreamPlugin 服务"));
-            return Optional.of(toInfo(plugin.descriptor(), jarPath));
+        try {
+            return Optional.of(toInfo(readYamlDescriptor(jarPath), jarPath));
         } catch (Exception e) {
             log.warn("Failed to read plugin descriptor from {}", jarPath, e);
             return Optional.empty();
@@ -325,33 +335,105 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             throw new BizException("插件 JAR 不存在：" + module.getJarPath());
         }
         try {
-            URLClassLoader classLoader = createClassLoader(jarPath);
-            YuDreamPlugin plugin = loadPlugin(classLoader)
-                    .orElseThrow(() -> new BizException("JAR 未声明 YuDreamPlugin 服务"));
-            PluginDescriptor descriptor = plugin.descriptor();
+            PluginDescriptor descriptor = readYamlDescriptor(jarPath);
             if (!module.getCode().equals(descriptor.code())) {
-                closeClassLoader(classLoader);
                 throw new BizException("插件编码不匹配：" + descriptor.code());
             }
+            URLClassLoader classLoader = createClassLoader(jarPath, descriptor);
+            YuDreamPlugin plugin = instantiatePlugin(classLoader, descriptor);
             return new PluginRuntimeHolder(
                     classLoader,
                     plugin,
                     descriptor,
-                    new PluginContextImpl(module.getCode(), frameworkServices, pluginExtensionRegistry)
+                    new PluginContextImpl(
+                            module.getCode(),
+                            classLoader,
+                            frameworkServices,
+                            pluginServiceRegistry,
+                            declaredDependencies(descriptor),
+                            this::enabled,
+                            aiToolRegistry
+                    )
             );
         } catch (IOException e) {
             throw new BizException("插件 ClassLoader 创建失败：" + e.getMessage());
         }
     }
 
-    private Optional<YuDreamPlugin> loadPlugin(URLClassLoader classLoader) {
-        ServiceLoader<YuDreamPlugin> loader = ServiceLoader.load(YuDreamPlugin.class, classLoader);
-        return loader.findFirst();
+    private URLClassLoader createClassLoader(Path jarPath, PluginDescriptor descriptor) throws IOException {
+        URL[] urls = new URL[]{jarPath.toUri().toURL()};
+        return new PluginClassLoader(urls, getClass().getClassLoader(), dependencyClassLoaders(descriptor));
     }
 
-    private URLClassLoader createClassLoader(Path jarPath) throws IOException {
-        URL[] urls = new URL[]{jarPath.toUri().toURL()};
-        return new URLClassLoader(urls, getClass().getClassLoader());
+    private PluginDescriptor readYamlDescriptor(Path jarPath) throws IOException {
+        try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(jarPath.toFile())) {
+            java.util.jar.JarEntry entry = jarFile.getJarEntry("plugin.yml");
+            if (entry == null) {
+                throw new BizException("插件 JAR 缺少 plugin.yml");
+            }
+            try (InputStream inputStream = jarFile.getInputStream(entry)) {
+                return new PluginYamlDescriptorReader().read(inputStream);
+            }
+        }
+    }
+
+    private YuDreamPlugin instantiatePlugin(URLClassLoader classLoader, PluginDescriptor descriptor) {
+        try {
+            Class<?> pluginClass = classLoader.loadClass(descriptor.mainClass());
+            if (!YuDreamPlugin.class.isAssignableFrom(pluginClass)) {
+                throw new BizException("plugin.yml 的 main 必须实现 YuDreamPlugin: " + descriptor.mainClass());
+            }
+            return (YuDreamPlugin) pluginClass.getDeclaredConstructor().newInstance();
+        } catch (BizException e) {
+            throw e;
+        } catch (ReflectiveOperationException e) {
+            throw new BizException("插件主类初始化失败: " + descriptor.mainClass() + ", " + e.getMessage());
+        }
+    }
+
+    private List<ClassLoader> dependencyClassLoaders(PluginDescriptor descriptor) {
+        List<ClassLoader> classLoaders = new ArrayList<>();
+        for (String dependencyCode : descriptor.dependencies()) {
+            PluginRuntimeHolder dependency = holders.get(dependencyCode);
+            if (dependency == null || !dependency.isEnabled()) {
+                throw new BizException("硬依赖插件未启用: " + dependencyCode);
+            }
+            classLoaders.add(dependency.getClassLoader());
+        }
+        for (String dependencyCode : descriptor.softDependencies()) {
+            PluginRuntimeHolder dependency = holders.get(dependencyCode);
+            if (dependency != null && dependency.isEnabled()) {
+                classLoaders.add(dependency.getClassLoader());
+            }
+        }
+        return classLoaders;
+    }
+
+    private Set<String> declaredDependencies(PluginDescriptor descriptor) {
+        Set<String> dependencies = new java.util.LinkedHashSet<>(descriptor.dependencies());
+        dependencies.addAll(descriptor.softDependencies());
+        return dependencies;
+    }
+
+    private void ensureNoEnabledHardDependents(String code) {
+        holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .filter(entry -> entry.getValue().getDescriptor().dependencies().contains(code))
+                .findFirst()
+                .ifPresent(entry -> {
+                    throw new BizException("请先禁用依赖插件: " + entry.getKey());
+                });
+    }
+
+    private void ensureNoLoadedDependents(String code) {
+        holders.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals(code))
+                .filter(entry -> entry.getValue().getDescriptor().dependencies().contains(code)
+                        || entry.getValue().getDescriptor().softDependencies().contains(code))
+                .findFirst()
+                .ifPresent(entry -> {
+                    throw new BizException("请先卸载依赖插件: " + entry.getKey());
+                });
     }
 
     private PluginRuntimeHolder holder(String code) {
@@ -370,7 +452,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 descriptor.description(),
                 descriptor.mainClass(),
                 jarPath.toAbsolutePath().normalize().toString(),
-                descriptor.dependencies()
+                descriptor.dependencies(),
+                descriptor.softDependencies()
         );
     }
 
