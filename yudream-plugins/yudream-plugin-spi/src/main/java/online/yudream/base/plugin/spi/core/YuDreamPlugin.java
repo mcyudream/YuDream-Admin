@@ -17,7 +17,8 @@ public interface YuDreamPlugin {
                 spec.version(),
                 spec.description(),
                 getClass().getName(),
-                List.of(spec.dependencies())
+                List.of(spec.dependencies()),
+                List.of()
         );
     }
 

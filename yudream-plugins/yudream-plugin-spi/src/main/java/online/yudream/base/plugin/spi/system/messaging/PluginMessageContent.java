@@ -9,7 +9,7 @@ public record PluginMessageContent(
         List<Attachment> attachments,
         Map<String, Object> referrer
 ) {
-    public enum Type { TEXT, SATORI, MARKDOWN, HTML, IMAGE, AUDIO, VIDEO, FILE, COMPOSITE }
+    public enum Type { TEXT, MARKDOWN, HTML, IMAGE, AUDIO, VIDEO, FILE, COMPOSITE }
 
     public PluginMessageContent {
         attachments = attachments == null ? List.of() : List.copyOf(attachments);

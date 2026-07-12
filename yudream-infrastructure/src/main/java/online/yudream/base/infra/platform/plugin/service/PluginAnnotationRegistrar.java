@@ -245,7 +245,7 @@ class PluginAnnotationRegistrar {
             if (target instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
-            throw new BizException("插件 HTTP 端点执行失败：" + target.getMessage());
+            throw new BizException("插件 HTTP 端点执行失败 (" + target.getClass().getSimpleName() + "): " + target.getMessage());
         }
     }
 

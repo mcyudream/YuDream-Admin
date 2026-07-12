@@ -65,6 +65,15 @@ public class FileController {
     @GetMapping("/{id}/content")
     public ResponseEntity<InputStreamResource> content(@PathVariable Long id) {
         FileContentDTO content = fileAppService.content(id);
+        return contentResponse(id, content);
+    }
+
+    @GetMapping("/public/{id}/content")
+    public ResponseEntity<InputStreamResource> publicContent(@PathVariable Long id) {
+        return contentResponse(id, fileAppService.publicContent(id));
+    }
+
+    private ResponseEntity<InputStreamResource> contentResponse(Long id, FileContentDTO content) {
         MediaType mediaType = StringUtils.hasText(content.getContentType())
                 ? MediaType.parseMediaType(content.getContentType())
                 : MediaType.APPLICATION_OCTET_STREAM;

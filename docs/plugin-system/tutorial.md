@@ -18,7 +18,7 @@
 - HTTP 接口：统一挂载到 `/api/plugins/{pluginCode}/**`。
 - 前端页面：通过 ESM remote entry 加载到后台布局内。
 - 首页卡片：参与首页 DIY 卡片。
-- 平台能力或扩展点：向其他插件或主系统提供扩展实现。
+- 平台能力：注册并使用宿主提供的能力声明。
 - 框架能力调用：通过 `FrameworkServices` 访问用户、文件、文档、安全等稳定端口。
 
 插件不能直接依赖主系统的 `domain`、`application`、`infrastructure`、`interfaces` 或 `bootstrap` 模块。
@@ -56,6 +56,21 @@ src/main/java/online/yudream/base/plugin/demo/
 ```
 
 ## 3. 编写插件入口
+
+在 JAR 根目录添加 `plugin.yml`。运行时以它作为唯一的插件元数据来源：
+
+```yaml
+name: demo-plugin
+displayName: 演示插件
+main: online.yudream.base.plugin.demo.bootstrap.DemoPlugin
+version: 1.0.0
+depend:
+  - wallet-plugin
+softdepend:
+  - coupon-plugin
+```
+
+`name` 是稳定插件代码，用于依赖、服务查找和运行时标识；可选的 `displayName` 是面向用户的显示名称，未声明时回退到 `name`。`depend` 是硬依赖，提供方未启用时消费者不能加载；`softdepend` 是可选依赖，插件必须在其不存在时不注册关联的菜单、路由和功能。
 
 ```java
 @PluginSpec(
@@ -143,7 +158,20 @@ PluginUserProfile profile = context.framework()
 - `framework().security()`：当前主体、安全校验等能力。
 - `context.files()`：插件私有文件存储。
 - `context.documents()`：插件私有文档存储。
-- `framework().extension(pluginCode, type)` / `extensions(type)`：扩展点发现。
+
+插件可将 Thymeleaf 图片模板放在自身 JAR 的 `templates/` 目录，例如 `src/main/resources/templates/player-card.html`，并通过插件作用域渲染器生成图片：
+
+```java
+CompletionStage<PluginRenderedImage> image = context.templateRenderer().render(
+        "player-card",
+        Map.of("playerName", "Steve", "online", true),
+        "#player-card"
+);
+```
+
+模板名是相对 `templates/` 的逻辑名称，不带 `.html`；运行时只使用当前插件 ClassLoader 读取模板。选择器为空时渲染完整页面，提供选择器时使用 Playwright 原生元素截图。
+
+插件业务接口不进入 SPI。提供方可在自己的 JAR 内定义 `*.api` 接口与 DTO，并在 `onEnable` 中调用 `context.exposeService(Api.class, implementation)` 导出；消费者在 `plugin.yml` 声明 `depend` 或 `softdepend`，使用 `context.service("provider-plugin", Api.class)` 直接调用。消费者将提供方 API 以 Maven `provided` 方式编译，不能把 API 类重复打进自己的 JAR。HTTP endpoint 仍用于浏览器和外部系统访问，不作为插件内部 Java API 的代理。
 
 需要新的主系统能力时，应先扩展 `yudream-plugin-spi` 的稳定端口，再由主系统实现适配。不要直接引用主系统 Spring Bean 或仓储实现。
 

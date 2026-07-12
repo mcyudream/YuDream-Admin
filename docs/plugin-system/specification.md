@@ -41,9 +41,10 @@
 
 插件入口类职责：
 
-- 声明 `@PluginSpec`、权限、前端、首页卡片、能力等静态元信息。
+- 在 JAR 根目录的 `plugin.yml` 中声明 `name`、`main`、`version` 与 `depend` / `softdepend`；可用 `displayName` 声明面向用户的显示名称。
+- 声明权限、前端、首页卡片、能力等静态元信息。
 - 在生命周期方法中组装插件自身服务。
-- 通过 `PluginContext` 注册 Controller、扩展点、资源清理回调。
+- 通过 `PluginContext` 注册 Controller、插件自有 API 服务、资源清理回调。
 
 插件入口类不应：
 
@@ -95,8 +96,14 @@ Controller 必须薄：
 - `registerFrontend`
 - `registerHttpHandler`
 - `registerHttpController`
-- `registerExtension`
+- `exposeService`
 - `onDispose`
+
+插件图片模板必须放在插件 JAR 自身的 `templates/` 目录，并通过 `PluginContext.templateRenderer()` 渲染。运行时为每个插件绑定独立 ClassLoader，不允许插件模板落入框架 `templates/` 目录，也不允许使用 `..` 或绝对路径跨插件读取资源。模板渲染支持 Thymeleaf 变量和可选 CSS selector；selector 存在时必须使用原生元素截图。
+
+`plugin.yml` 的 `depend` 是硬依赖：提供方必须先启用；`softdepend` 是可选依赖：消费者必须在 `dependencyAvailable(code)` 为 false 时不注册关联菜单、路由、权限、端点和任务。软依赖功能必须使用条件注册，不能用无条件扫描的静态注解声明。
+
+插件业务 API 不得进入 `yudream-plugin-spi`。提供方可将 `*.api` 与实现放在同一 JAR，并通过 `exposeService(Api.class, implementation)` 导出；消费者通过 Maven `provided` 依赖该 API、在 `plugin.yml` 声明依赖、调用 `service(providerCode, Api.class)`。消费者 JAR 不得重复打包 API 类。
 
 优先使用注解声明静态能力：
 

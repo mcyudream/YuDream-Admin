@@ -36,6 +36,9 @@ public class PluginModuleDTO implements Serializable {
     @Builder.Default
     private List<String> dependencies = new ArrayList<>();
 
+    @Builder.Default
+    private List<String> softDependencies = new ArrayList<>();
+
     private boolean loaded;
     private boolean enabled;
 }

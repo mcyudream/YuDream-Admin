@@ -17,6 +17,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
+import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -56,6 +57,7 @@ public class PluginAppService {
     private String uploadDirectory;
 
     @Value("${yudream.system.seed.menu.sync-mode:MISSING_ONLY}")
+    private SeedSyncMode menuSeedSyncMode = SeedSyncMode.MISSING_ONLY;
 
     @Transactional
     public List<PluginModuleDTO> list() {
@@ -286,6 +288,7 @@ public class PluginAppService {
                 throw new BizException("插件 JAR 不存在：" + module.getJarPath());
             }
             enableDependencies(module, modules, enabled, visiting);
+            enableAvailableSoftDependencies(module, modules, enabled, visiting);
             PluginModule saved = enableOwnRuntime(module);
             enabled.add(code);
             modules.put(code, saved);
@@ -442,6 +445,9 @@ public class PluginAppService {
                 .filter(frontendModule -> code.equals(frontendModule.pluginCode()))
                 .toList();
         pluginMenuProjectionService.restoreAvailable(code);
+        if (module.menusInitialized() && menuSeedSyncMode != SeedSyncMode.MISSING_ONLY) {
+            return module;
+        }
         pluginMenuProjectionService.project(code, modules);
         if (!module.menusInitialized()) {
             module.markMenusInitialized();
@@ -504,6 +510,21 @@ public class PluginAppService {
         }
     }
 
+    private void enableAvailableSoftDependencies(PluginModule module, Map<String, PluginModule> modules,
+                                                 Set<String> enabled, Set<String> visiting) {
+        for (String dependencyCode : softDependencies(module)) {
+            PluginModule dependency = modules.get(dependencyCode);
+            if (dependency == null || !dependency.enabled() || enabled.contains(dependencyCode)) {
+                continue;
+            }
+            try {
+                enableRuntimeWithDependencies(dependency, modules, enabled, visiting);
+            } catch (RuntimeException e) {
+                log.warn("Optional plugin dependency {} for {} is unavailable: {}", dependencyCode, module.getCode(), rootMessage(e));
+            }
+        }
+    }
+
     private void reconcileRuntimeHealth(List<PluginModule> modules) {
         for (PluginModule module : modules) {
             String code = module.getCode();
@@ -542,6 +563,10 @@ public class PluginAppService {
 
     private List<String> dependencies(PluginModule module) {
         return module.getDependencies() == null ? List.of() : module.getDependencies();
+    }
+
+    private List<String> softDependencies(PluginModule module) {
+        return module.getSoftDependencies() == null ? List.of() : module.getSoftDependencies();
     }
 
     private PluginModule module(String code) {

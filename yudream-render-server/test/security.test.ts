@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { assertSafeExternalUrl, isPrivateAddress, sanitizeMarkup } from "../src/security.js";
+import { assertSafeExternalUrl, isPrivateAddress, validateMarkup } from "../src/security.js";
 
 describe("render security", () => {
-  it("removes scripts and event attributes", () => {
-    expect(sanitizeMarkup('<script>alert(1)</script><p onclick="alert(2)">safe</p>')).toBe("<p>safe</p>");
+  it("preserves style tags and inline styles", () => {
+    const markup = '<style>.menu { color: red; }</style><p style="color: blue">safe</p>';
+    expect(validateMarkup(markup)).toBe(markup);
   });
 
   it("recognises private addresses", () => {

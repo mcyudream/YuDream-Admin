@@ -127,8 +127,8 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_AI_ENABLED:true}
   dataviz:
     enabled: ${PLATFORM_DATAVIZ_ENABLED:true}
-  satori:
-    enabled: ${PLATFORM_SATORI_ENABLED:true}
+  milky:
+    enabled: ${PLATFORM_MILKY_ENABLED:true}
   message-render:
     enabled: ${PLATFORM_MESSAGE_RENDER_ENABLED:true}
 

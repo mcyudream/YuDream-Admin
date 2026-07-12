@@ -27,6 +27,7 @@ public class PluginModuleDO extends BaseDO {
     private String mainClass;
     private String jarPath;
     private List<String> dependencies;
+    private List<String> softDependencies;
     private PluginStatus status;
     private String errorMessage;
     private LocalDateTime loadedAt;

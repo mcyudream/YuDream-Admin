@@ -37,6 +37,7 @@ public class PluginWebAssembler {
                 .mainClass(dto.getMainClass())
                 .jarPath(dto.getJarPath())
                 .dependencies(dto.getDependencies())
+                .softDependencies(dto.getSoftDependencies())
                 .status(dto.getStatus())
                 .errorMessage(dto.getErrorMessage())
                 .loadedAt(dto.getLoadedAt())

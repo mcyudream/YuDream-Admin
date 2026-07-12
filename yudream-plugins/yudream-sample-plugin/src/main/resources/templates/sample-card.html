@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { display: inline-block; margin: 0; background: #f3f4f6; font-family: Arial, "Microsoft YaHei", sans-serif; }
+    #sample-card { width: 420px; padding: 24px; border: 16px solid #f3f4f6; background: #fff; color: #182230; }
+    h1 { margin: 0 0 8px; color: #009688; font-size: 22px; }
+    p { margin: 0; color: #667085; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main id="sample-card">
+    <h1 th:text="${title}">插件模板</h1>
+    <p th:text="${content}">模板内容来自插件 JAR。</p>
+  </main>
+</body>
+</html>

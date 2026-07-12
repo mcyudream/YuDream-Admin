@@ -21,6 +21,7 @@ public class PluginModuleInfraMapper {
         dataObj.setMainClass(module.getMainClass());
         dataObj.setJarPath(module.getJarPath());
         dataObj.setDependencies(module.getDependencies());
+        dataObj.setSoftDependencies(module.getSoftDependencies());
         dataObj.setStatus(module.getStatus());
         dataObj.setErrorMessage(module.getErrorMessage());
         dataObj.setLoadedAt(module.getLoadedAt());
@@ -45,6 +46,7 @@ public class PluginModuleInfraMapper {
                 .mainClass(dataObj.getMainClass())
                 .jarPath(dataObj.getJarPath())
                 .dependencies(dataObj.getDependencies())
+                .softDependencies(dataObj.getSoftDependencies())
                 .status(dataObj.getStatus())
                 .errorMessage(dataObj.getErrorMessage())
                 .loadedAt(dataObj.getLoadedAt())
