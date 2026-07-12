@@ -40,6 +40,10 @@ export default defineConfig(({ mode, command }) => {
           target: env.VITE_APP_API_BASEURL,
           changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
           ws: true,
+          headers: {
+            // Preserve the public prefix after the proxy rewrites it away.
+            'X-Forwarded-Prefix': '/proxy',
+          },
           rewrite: path => path.replace(/\/proxy/, ''),
         },
       },
