@@ -20,10 +20,21 @@ public class AuthlibAliInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-        if (shouldExposeAli(request, response) && pluginAppService.enabled(AUTHLIB_PLUGIN_CODE)) {
+        if (!isAuthlibProtocolRequest(request)
+                && shouldExposeAli(request, response)
+                && pluginAppService.enabled(AUTHLIB_PLUGIN_CODE)) {
             response.setHeader(HEADER, API_LOCATION);
         }
         return true;
+    }
+
+    /**
+     * The authlib plugin writes its own protocol header. Writing it here as
+     * well makes servlet containers expose a comma-joined, invalid URL.
+     */
+    private boolean isAuthlibProtocolRequest(HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        return API_LOCATION.equals(requestUri) || requestUri.startsWith(API_LOCATION + "/");
     }
 
     private boolean shouldExposeAli(HttpServletRequest request, HttpServletResponse response) {
