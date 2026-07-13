@@ -14,6 +14,7 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionR
 import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
+import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -52,10 +53,12 @@ public class PluginContextImpl implements PluginContext {
     private final PluginCommandRegistryImpl commandRegistry;
     private final PluginTemplateRenderService templateRenderService;
     private final PluginAiToolRegistry aiToolRegistry;
+    private final PluginSemanticMemoryService semanticMemory;
 
     public PluginContextImpl(String pluginCode, URLClassLoader pluginClassLoader, FrameworkServices frameworkServices,
                              PluginServiceRegistry pluginServiceRegistry, Set<String> declaredDependencies,
-                             Predicate<String> dependencyEnabled, PluginAiToolRegistry aiToolRegistry) {
+                             Predicate<String> dependencyEnabled, PluginAiToolRegistry aiToolRegistry,
+                             PluginSemanticMemoryService semanticMemoryService) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
         this.pluginServiceRegistry = pluginServiceRegistry;
@@ -65,6 +68,7 @@ public class PluginContextImpl implements PluginContext {
         this.commandRegistry = new PluginCommandRegistryImpl(pluginCode);
         this.templateRenderService = new PluginTemplateRenderFrameworkService(pluginClassLoader, frameworkServices.render());
         this.aiToolRegistry = aiToolRegistry;
+        this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode, semanticMemoryService);
         onDispose(interactionRegistry);
         onDispose(commandRegistry);
     }
@@ -92,6 +96,11 @@ public class PluginContextImpl implements PluginContext {
     @Override
     public PluginTemplateRenderService templateRenderer() {
         return templateRenderService;
+    }
+
+    @Override
+    public PluginSemanticMemoryService semanticMemory() {
+        return semanticMemory;
     }
 
     public PluginMessageInteractionRegistryImpl interactionRegistry() {

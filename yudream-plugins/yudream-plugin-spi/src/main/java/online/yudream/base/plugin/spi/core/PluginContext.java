@@ -13,6 +13,7 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessageInteractionR
 import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
+import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 
 import java.util.Optional;
 import java.util.List;
@@ -36,6 +37,8 @@ public interface PluginContext {
     PluginCommandRegistry commands();
 
     PluginTemplateRenderService templateRenderer();
+
+    PluginSemanticMemoryService semanticMemory();
 
     void registerMenu(PluginMenuItem item);
 

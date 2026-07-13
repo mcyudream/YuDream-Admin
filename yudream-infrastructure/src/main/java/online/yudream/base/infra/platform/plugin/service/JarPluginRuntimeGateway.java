@@ -26,6 +26,7 @@ import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
+import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.security.PluginPrincipal;
 import online.yudream.base.plugin.spi.system.messaging.PluginEvent;
 import online.yudream.base.plugin.spi.system.command.PluginCommandContext;
@@ -58,6 +59,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final FrameworkServices frameworkServices;
     private final PluginServiceRegistry pluginServiceRegistry;
     private final PluginAiToolRegistry aiToolRegistry;
+    private final PluginSemanticMemoryService semanticMemoryService;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -352,7 +354,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                             pluginServiceRegistry,
                             declaredDependencies(descriptor),
                             this::enabled,
-                            aiToolRegistry
+                            aiToolRegistry,
+                            semanticMemoryService
                     )
             );
         } catch (IOException e) {
