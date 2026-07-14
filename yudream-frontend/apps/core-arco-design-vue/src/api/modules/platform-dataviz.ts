@@ -13,7 +13,7 @@ export interface ChartDataRequest {
 interface BackendChartSeries {
   name?: string
   categories?: string[]
-  values?: number[]
+  values?: Array<number | string>
   nodes?: ChartNode[]
   links?: ChartLink[]
 }
@@ -44,7 +44,7 @@ function normalizeDataset(raw: BackendChartDataset, request?: ChartDataRequest):
     dimensions: ['name', firstSeries?.name || 'value'],
     source: (firstSeries?.categories || []).map((name, index) => ({
       name,
-      [firstSeries?.name || 'value']: firstSeries?.values?.[index] ?? 0,
+      [firstSeries?.name || 'value']: toFiniteNumber(firstSeries?.values?.[index]),
     })),
   }
   if (raw.chartType === 'line' && metric.includes('-')) {
@@ -71,6 +71,11 @@ function normalizeDataset(raw: BackendChartDataset, request?: ChartDataRequest):
     ]
   }
   return dataset
+}
+
+function toFiniteNumber(value: number | string | undefined): number {
+  const numberValue = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(numberValue) ? numberValue : 0
 }
 
 export default {
