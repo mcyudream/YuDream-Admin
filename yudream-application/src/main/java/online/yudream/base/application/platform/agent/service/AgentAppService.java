@@ -43,7 +43,7 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class AgentAppService {
-    private static final String AI_CAPABILITY = "ai";
+    private static final String AGENT_CAPABILITY = "agent";
     private final CapabilityAppService capabilityAppService;
     private final AgentApplicationRepo applicationRepo;
     private final AgentToolRepo toolRepo;
@@ -97,7 +97,15 @@ public class AgentAppService {
     }
 
     @Transactional
-    public void deleteTool(Long id) { ensureEnabled(); tool(id); toolRepo.deleteById(id); }
+    public void deleteTool(Long id) {
+        ensureEnabled();
+        AgentTool value = tool(id);
+        List<AgentApplication> applications = applicationRepo.findByToolCode(value.getCode());
+        if (!applications.isEmpty()) {
+            throw new BizException("工具仍被 Agent 应用引用，无法删除：" + applications.stream().map(AgentApplication::getName).collect(java.util.stream.Collectors.joining("、")));
+        }
+        toolRepo.deleteById(id);
+    }
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> systemTools() {
@@ -166,7 +174,7 @@ public class AgentAppService {
     }
     private AgentApplication application(Long id) { return applicationRepo.findById(id).orElseThrow(() -> new BizException("Agent 应用不存在")); }
     private AgentTool tool(Long id) { return toolRepo.findById(id).orElseThrow(() -> new BizException("Agent 工具不存在")); }
-    private void ensureEnabled() { capabilityAppService.ensureEnabled(AI_CAPABILITY, "AI Agent"); }
+    private void ensureEnabled() { capabilityAppService.ensureEnabled(AGENT_CAPABILITY, "Agent 应用编排"); }
 
     private online.yudream.base.domain.platform.ai.valobj.AiGenerationResult runWithSystemTools(
             AiGenerationGateway gateway, AiGenerationRequest request, java.util.Set<String> selectedSystemTools

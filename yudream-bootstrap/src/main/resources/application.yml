@@ -125,6 +125,8 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_NEO4J_ENABLED:true}
   ai:
     enabled: ${PLATFORM_AI_ENABLED:true}
+  agent:
+    enabled: ${PLATFORM_AGENT_ENABLED:true}
   dataviz:
     enabled: ${PLATFORM_DATAVIZ_ENABLED:true}
   milky:

@@ -131,6 +131,10 @@
     {
       "key": "ai-generation-response-mode",
       "text": "AI gateway requests must explicitly mark structured CMS output; ordinary plugin/chat requests return natural-language content and must never enter CMS canvas JSON validation."
+    },
+    {
+      "key": "agent-capability-integration",
+      "text": "Agent applications are a standalone platform capability with an explicit provider, project gate, application gate, and AI/Integration dependencies; menus and endpoints must be bound to agent rather than only ai."
     }
   ],
   "utilities": [
