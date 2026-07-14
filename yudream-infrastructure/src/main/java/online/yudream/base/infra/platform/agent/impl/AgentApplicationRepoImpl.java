@@ -33,6 +33,11 @@ public class AgentApplicationRepoImpl implements AgentApplicationRepo {
     }
     public Optional<AgentApplication> findById(Long id) { return Optional.ofNullable(AgentInfraMapper.toDomain(mongoTemplate.findById(id, AgentApplicationDO.class))); }
     public Optional<AgentApplication> findByCode(String code) { return Optional.ofNullable(AgentInfraMapper.toDomain(mongoTemplate.findOne(Query.query(Criteria.where("code").is(code)), AgentApplicationDO.class))); }
+    public java.util.List<AgentApplication> findByToolCode(String toolCode) {
+        return mongoTemplate.find(Query.query(Criteria.where("toolCodes").is(toolCode)), AgentApplicationDO.class).stream()
+                .map(AgentInfraMapper::toDomain)
+                .toList();
+    }
     public void deleteById(Long id) { mongoTemplate.remove(Query.query(Criteria.where("id").is(id)), AgentApplicationDO.class); }
     public PageResult<AgentApplication> page(String keyword, AgentApplicationStatus status, int page, int size) {
         Query query = new Query();
