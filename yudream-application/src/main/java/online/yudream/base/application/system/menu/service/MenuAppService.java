@@ -44,6 +44,7 @@ public class MenuAppService {
             "platform:graph", "neo4j",
             "platform:form", "form",
             "platform:cms", "cms",
+            "platform:agent", "ai",
             "platform:ai:generate", "ai"
     );
 
