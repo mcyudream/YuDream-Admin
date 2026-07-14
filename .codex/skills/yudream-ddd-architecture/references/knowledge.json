@@ -131,6 +131,10 @@
     {
       "key": "ai-generation-response-mode",
       "text": "AI gateway requests must explicitly mark structured CMS output; ordinary plugin/chat requests return natural-language content and must never enter CMS canvas JSON validation."
+    },
+    {
+      "key": "cms-canvas-final-validation",
+      "text": "CMS AI structural mutations such as add-html, set-html, and replace-page must include CSS. The agent must call cms.canvas.validate with final HTML/CSS/JS and may finish only after valid=true; validation tools are read-only and must not be applied as frontend canvas mutations."
     }
   ],
   "utilities": [
@@ -187,6 +191,10 @@
     {
       "key": "render-server-style-preservation",
       "text": "HTML menu rendering must preserve style tags, inline style attributes, and caller CSS exactly. Do not apply sanitize-html or CSS allowlists in the render server; isolation is provided by disabled JavaScript, CSP, and blocked document subresources."
+    },
+    {
+      "key": "dataviz-empty-graph-arrays",
+      "text": "图表类型必须由 chartType 明确判定。后端折线/柱状序列可能同时返回 nodes: [] 与 links: []；JavaScript 空数组为真，不能用 nodes && links 推断关系图，否则会丢弃 categories/values 并只渲染空坐标轴。"
     }
   ]
 }
