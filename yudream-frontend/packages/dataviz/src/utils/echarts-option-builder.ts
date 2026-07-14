@@ -85,8 +85,8 @@ export function buildEChartsOption(dataset: ChartDataset, theme: ChartTheme): EC
     case 'line':
       return {
         ...baseOption,
-        xAxis: buildAxis(themeConfig, gridColor),
-        yAxis: buildAxis(themeConfig, gridColor),
+        xAxis: { type: 'category', ...buildAxis(themeConfig, gridColor) },
+        yAxis: { type: 'value', ...buildAxis(themeConfig, gridColor) },
         series: [{
           ...firstSeriesOption,
           type: 'line',
@@ -97,8 +97,8 @@ export function buildEChartsOption(dataset: ChartDataset, theme: ChartTheme): EC
     case 'bar':
       return {
         ...baseOption,
-        xAxis: buildAxis(themeConfig, gridColor),
-        yAxis: buildAxis(themeConfig, gridColor),
+        xAxis: { type: 'category', ...buildAxis(themeConfig, gridColor) },
+        yAxis: { type: 'value', ...buildAxis(themeConfig, gridColor) },
         series: [{ ...firstSeriesOption, type: 'bar', encode: { x: nameDimension, y: valueDimension } }],
       }
     case 'pie':
