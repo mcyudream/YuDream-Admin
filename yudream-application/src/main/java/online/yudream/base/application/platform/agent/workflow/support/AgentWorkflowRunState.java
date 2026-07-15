@@ -3,6 +3,7 @@ package online.yudream.base.application.platform.agent.workflow.support;
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,7 @@ public final class AgentWorkflowRunState {
     private final Set<String> systemToolCodes;
     private final Consumer<String> onDelta;
     private final Consumer<AiAgentToolResult> onTool;
+    private final AgentModelToolResolver modelToolResolver;
     private final List<AiAgentToolResult> toolResults = new ArrayList<>();
 
     public AgentWorkflowRunState(
@@ -27,12 +29,25 @@ public final class AgentWorkflowRunState {
             Consumer<String> onDelta,
             Consumer<AiAgentToolResult> onTool
     ) {
+        this(application, command, aiConfig, systemToolCodes, onDelta, onTool, null);
+    }
+
+    public AgentWorkflowRunState(
+            AgentApplication application,
+            AgentRunCmd command,
+            Map<String, String> aiConfig,
+            Set<String> systemToolCodes,
+            Consumer<String> onDelta,
+            Consumer<AiAgentToolResult> onTool,
+            AgentModelToolResolver modelToolResolver
+    ) {
         this.application = application;
         this.command = command;
         this.aiConfig = aiConfig == null ? Map.of() : Map.copyOf(aiConfig);
         this.systemToolCodes = systemToolCodes == null ? Set.of() : Set.copyOf(systemToolCodes);
         this.onDelta = onDelta;
         this.onTool = onTool;
+        this.modelToolResolver = modelToolResolver;
     }
 
     public AgentApplication application() {
@@ -53,6 +68,18 @@ public final class AgentWorkflowRunState {
 
     public List<AiAgentToolResult> toolResults() {
         return List.copyOf(toolResults);
+    }
+
+    /** Each model node resolves and scopes its own callbacks immediately before generation. */
+    public List<AiAgentTool> resolveModelTools(List<String> toolCodes) {
+        if (modelToolResolver == null) {
+            return List.of();
+        }
+        return modelToolResolver.resolve(toolCodes, application, command);
+    }
+
+    public int toolResultCount() {
+        return toolResults.size();
     }
 
     public void emitDelta(String delta) {
