@@ -178,7 +178,7 @@
     },
     {
       "key": "agent-async-permission-snapshot",
-      "text": "Agent SSE debug and plugin message execution must capture caller permission codes before crossing CompletableFuture/Reactor threads. Store an explicit permission snapshot on AgentRunCmd and make workflow/tool authorization consume it; never read Sa-Token or API-key ThreadLocal state from asynchronous worker threads."
+      "text": "Agent SSE debug, CMS AG-UI compatibility streams, and plugin message execution must capture caller permission codes before crossing CompletableFuture/Reactor threads. Store an explicit permission snapshot on the boundary command, propagate it to AgentRunCmd, and make workflow/tool authorization consume it; never read Sa-Token or API-key ThreadLocal state from asynchronous worker threads."
     }
   ],
   "utilities": [

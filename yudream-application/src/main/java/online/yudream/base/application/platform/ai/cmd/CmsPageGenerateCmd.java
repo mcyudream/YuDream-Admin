@@ -24,5 +24,7 @@ public class CmsPageGenerateCmd {
     private String currentSelectionJson;
     private String cmsVariableContextJson;
     private boolean thinkingEnabled;
-    private List<AiChatMessage> history;
+    private List<String> permissionCodes = List.of();
+    private boolean permissionContextExplicit;
+    private List<AiChatMessage> history = List.of();
 }
