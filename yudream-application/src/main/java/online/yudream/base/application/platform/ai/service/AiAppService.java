@@ -1,25 +1,23 @@
 package online.yudream.base.application.platform.ai.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
+import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
+import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
+import online.yudream.base.application.platform.agent.service.AgentAppService;
+import online.yudream.base.application.platform.agent.service.BuiltinAgentCodes;
 import online.yudream.base.application.platform.ai.assembler.AiAssembler;
 import online.yudream.base.application.platform.ai.cmd.CmsPageGenerateCmd;
 import online.yudream.base.application.platform.ai.dto.CmsPageGenerateDTO;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
-import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
-import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
-import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 
 @Service
@@ -29,8 +27,7 @@ public class AiAppService {
     private static final String CAPABILITY_CODE = "ai";
 
     private final CapabilityAppService capabilityAppService;
-    private final CapabilityModuleRepo capabilityModuleRepo;
-    private final ObjectProvider<AiGenerationGateway> aiGenerationGatewayProvider;
+    private final AgentAppService agentAppService;
 
     @Transactional(readOnly = true)
     public CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd) {
@@ -72,20 +69,42 @@ public class AiAppService {
         if (!StringUtils.hasText(cmd.getPrompt()) && !StringUtils.hasText(cmd.getImageDataUrl())) {
             throw new BizException("生成需求或样图不能为空");
         }
-        Map<String, String> config = capabilityModuleRepo.findByCode(CAPABILITY_CODE)
-                .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
-                .orElse(Map.of());
-        String modelCode = StringUtils.hasText(cmd.getModelCode()) ? cmd.getModelCode() : cmd.getModel();
-        AiGenerationRequest request = new AiGenerationRequest(systemPrompt(cmd), userPrompt(cmd), cmd.getImageDataUrl(), cmd.getProviderCode(), modelCode, config, cmd.getHistory())
-                .withToolCallingEnabled(true);
-        AiGenerationGateway gateway = aiGenerationGatewayProvider.getIfAvailable();
-        if (gateway == null) {
-            throw new BizException("AI 能力未在当前项目配置中启用");
-        }
         progress(onProgress, "analysis", "正在分析当前画布、用户需求和可用工具。");
-        AiGenerationResult result = stream ? gateway.generateStream(request, onDelta, onTool, onProgress) : gateway.generate(request);
-        ensureCanvasValidationPassed(result.toolResults());
-        return AiAssembler.withTools(AiAssembler.toDTO(result), result.toolResults());
+        AgentRunCmd agentCmd = new AgentRunCmd();
+        agentCmd.setInput(userPrompt(cmd));
+        agentCmd.setRuntimeSystemPrompt(systemPrompt(cmd));
+        agentCmd.setImageDataUrl(cmd.getImageDataUrl());
+        agentCmd.setHistory(cmd.getHistory() == null ? List.of() : cmd.getHistory());
+        String agentCode = StringUtils.hasText(cmd.getAgentCode())
+                ? cmd.getAgentCode().trim()
+                : BuiltinAgentCodes.CMS_BUILDER;
+        AgentRunDTO result = stream
+                ? agentAppService.debugByCode(
+                        agentCode,
+                        agentCmd,
+                        event -> progress(onProgress, progressAction(event), progressContent(event)),
+                        onDelta,
+                        onTool
+                )
+                : agentAppService.runByCode(agentCode, agentCmd);
+        ensureCanvasValidationPassed(result.getToolResults());
+        CmsPageGenerateDTO dto = CmsPageGenerateDTO.builder().summary(result.getContent()).build();
+        return AiAssembler.withTools(dto, result.getToolResults());
+    }
+
+    private String progressAction(AgentDebugEventDTO event) {
+        if ("FAILED".equals(event.status())) {
+            return "failed";
+        }
+        if ("tool".equals(event.nodeKind())) {
+            return "RUNNING".equals(event.status()) ? "tool-start" : "tool-complete";
+        }
+        return "analysis";
+    }
+
+    private String progressContent(AgentDebugEventDTO event) {
+        String title = StringUtils.hasText(event.nodeTitle()) ? event.nodeTitle() : event.nodeKind();
+        return StringUtils.hasText(event.message()) ? title + "：" + event.message() : title;
     }
 
     static void ensureCanvasValidationPassed(List<AiAgentToolResult> toolResults) {
