@@ -56,6 +56,17 @@ export interface AgentRunResult {
   toolResults: Array<{ toolName: string, action: string, message: string, payload?: Record<string, unknown> }>
 }
 
+export interface AgentModelOption {
+  providerCode: string
+  providerName: string
+  modelCode: string
+  modelName: string
+  kind: string
+  vision: boolean
+  configured: boolean
+  defaultModel: boolean
+}
+
 export type AgentDebugNodeStatus = 'RUNNING' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
 
 export interface AgentDebugStreamEvent {
@@ -82,7 +93,7 @@ export default {
   delete: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/agents/${id}`),
   run: (id: string, data: { input: string, providerCode?: string, modelCode?: string }) => systemClient.post<unknown, ApiResponse<AgentRunResult>>(`api/platform/agents/${id}/run`, data),
   debugStreamEndpoint: (id: string) => streamEndpoint(`/api/platform/agents/${id}/debug/stream`),
-  debugStreamRequest: async (id: string, data: { input: string, providerCode?: string, modelCode?: string }): Promise<RequestInit> => {
+  debugStreamRequest: async (id: string, data: { input: string, providerCode?: string, modelCode?: string, imageDataUrl?: string }): Promise<RequestInit> => {
     const headers: Record<string, string> = {
       'Accept-Language': 'zh-CN',
       'Content-Type': 'application/json',
@@ -100,6 +111,7 @@ export default {
     return { method: 'POST', headers, body: JSON.stringify(body) }
   },
   pageTools: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentTool>>>('api/platform/agents/tools', { params }),
+  models: () => systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/agents/models'),
   systemTools: () => systemClient.get<unknown, ApiResponse<SystemAgentTool[]>>('api/platform/agents/tools/system'),
   createTool: (data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.post<unknown, ApiResponse<AgentTool>>('api/platform/agents/tools', data),
   updateTool: (id: string, data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.put<unknown, ApiResponse<AgentTool>>(`api/platform/agents/tools/${id}`, data),

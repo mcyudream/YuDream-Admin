@@ -7,4 +7,5 @@ public class AgentRunRequest {
     private String input;
     private String providerCode;
     private String modelCode;
+    private String imageDataUrl;
 }

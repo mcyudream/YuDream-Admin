@@ -47,6 +47,10 @@ const nodeStyle = computed(() => ({
       <FaIcon name="i-ri:tools-line" />
       <span>{{ data.toolCode || '尚未选择工具' }}</span>
     </div>
+    <div v-else-if="data.kind === 'llm'" class="node-tool">
+      <FaIcon :name="data.vision ? 'i-ri:image-circle-line' : 'i-ri:chat-3-line'" />
+      <span>{{ data.modelCode ? `${data.providerCode} / ${data.modelCode}` : '尚未选择模型' }}</span>
+    </div>
 
     <div class="node-io">
       <span><i class="input-dot" />输入 <b>{{ data.inputName || 'any' }}</b></span>

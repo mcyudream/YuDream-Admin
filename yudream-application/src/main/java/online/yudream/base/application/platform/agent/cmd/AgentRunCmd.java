@@ -8,4 +8,5 @@ public class AgentRunCmd {
     private String input;
     private String providerCode;
     private String modelCode;
+    private String imageDataUrl;
 }

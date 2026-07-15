@@ -32,6 +32,10 @@ export interface AgentNodeData extends AgentNodeTemplate {
   prompt: string
   toolCode: string
   condition: string
+  providerCode: string
+  modelCode: string
+  vision: boolean
+  acceptFiles: boolean
 }
 
 export type AgentDebugStatus = 'RUNNING' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
@@ -57,4 +61,14 @@ export interface AgentDebugMessage {
   status?: 'streaming' | 'completed' | 'failed' | 'cancelled'
   steps?: AgentDebugStep[]
   tools?: AgentDebugToolResult[]
+  attachments?: AgentDebugAttachment[]
+}
+
+export interface AgentDebugAttachment {
+  id: string
+  name: string
+  type: string
+  size: number
+  dataUrl?: string
+  text?: string
 }

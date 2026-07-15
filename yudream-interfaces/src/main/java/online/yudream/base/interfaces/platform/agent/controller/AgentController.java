@@ -14,6 +14,7 @@ import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
 import online.yudream.base.interfaces.platform.agent.res.AgentApplicationRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +53,9 @@ public class AgentController {
     @GetMapping("/{id}")
     @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 应用详情", module = "平台能力", desc = "查看 Agent 编排详情")
     public Result<AgentApplicationRes> detail(@PathVariable Long id) { return Result.ok(AgentWebAssembler.toRes(agentAppService.detail(id))); }
+    @GetMapping("/models")
+    @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 模型", module = "平台能力", desc = "查看 Agent 节点可用模型")
+    public Result<List<AgentModelRes>> models() { return Result.ok(agentAppService.models().stream().map(AgentWebAssembler::toRes).toList()); }
     @PostMapping
     @PermissionRegister(code = "platform:agent:edit", name = "新建 Agent 应用", module = "平台能力", desc = "新建 Agent 应用")
     public Result<AgentApplicationRes> create(@Valid @RequestBody AgentApplicationSaveRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.save(AgentWebAssembler.toCmd(request)))); }

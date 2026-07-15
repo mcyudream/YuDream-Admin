@@ -9,11 +9,13 @@ import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.cmd.AgentToolSaveCmd;
 import online.yudream.base.application.platform.agent.dto.AgentApplicationDTO;
 import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
+import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
 import online.yudream.base.application.platform.agent.query.AgentToolPageQuery;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
+import online.yudream.base.application.platform.capability.dto.CapabilityDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
@@ -36,6 +38,7 @@ import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionRe
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.ArrayDeque;
@@ -138,10 +141,81 @@ public class AgentAppService {
                 .map(tool -> tool.descriptor().name())
                 .filter(name -> application.getToolCodes() != null && application.getToolCodes().contains(name))
                 .collect(java.util.stream.Collectors.toSet());
-        AiGenerationRequest request = new AiGenerationRequest(system, prompt, null, cmd.getProviderCode(), cmd.getModelCode(), Map.of())
+        ModelSelection selection = modelSelection(application, cmd);
+        AiGenerationRequest request = new AiGenerationRequest(system, prompt, cmd.getImageDataUrl(), selection.providerCode(), selection.modelCode(), Map.of())
                 .withToolCallingEnabled(!selectedSystemTools.isEmpty());
         var generated = runWithSystemTools(gateway, request, selectedSystemTools);
         return AgentRunDTO.builder().content(generated.summary()).toolResults(results).build();
+    }
+
+    @Transactional
+    public List<AgentModelDTO> models() {
+        ensureEnabled();
+        CapabilityDTO ai = capabilityAppService.list().stream()
+                .filter(item -> "ai".equals(item.getCode()))
+                .findFirst()
+                .orElse(null);
+        if (ai == null || !Boolean.TRUE.equals(ai.getEnabled())) {
+            return List.of();
+        }
+        return agentModels(ai.getConfig());
+    }
+
+    private List<AgentModelDTO> agentModels(Map<String, String> config) {
+        String providersJson = config == null ? null : config.get("providers");
+        if (!StringUtils.hasText(providersJson)) {
+            String providerCode = config == null ? "default" : config.getOrDefault("providerCode", "default");
+            String providerName = config == null ? "Default AI" : config.getOrDefault("providerName", "Default AI");
+            String modelCode = config == null ? "" : config.getOrDefault("model", config.getOrDefault("defaultModel", ""));
+            boolean configured = config != null && StringUtils.hasText(config.get("apiKey"));
+            return StringUtils.hasText(modelCode)
+                    ? List.of(new AgentModelDTO(providerCode, providerName, modelCode, modelCode, "chat", false, configured, true))
+                    : List.of();
+        }
+        try {
+            List<AgentModelDTO> result = new ArrayList<>();
+            for (JsonNode provider : objectMapper.readTree(providersJson)) {
+                if (!provider.path("enabled").asBoolean(true)) {
+                    continue;
+                }
+                String providerCode = provider.path("code").asText();
+                String providerName = provider.path("name").asText(providerCode);
+                String defaultModel = provider.path("defaultModel").asText();
+                boolean configured = StringUtils.hasText(provider.path("apiKey").asText());
+                for (JsonNode model : provider.path("models")) {
+                    String modelCode = model.isTextual()
+                            ? model.asText()
+                            : firstText(model.path("code").asText(), model.path("model").asText(), model.path("name").asText());
+                    if (!StringUtils.hasText(providerCode) || !StringUtils.hasText(modelCode)) {
+                        continue;
+                    }
+                    String modelName = model.isTextual() ? model.asText() : model.path("name").asText(modelCode);
+                    String kind = model.isTextual() ? "chat" : model.path("kind").asText("chat");
+                    result.add(new AgentModelDTO(
+                            providerCode,
+                            providerName,
+                            modelCode,
+                            modelName,
+                            kind,
+                            !model.isTextual() && model.path("vision").asBoolean(false),
+                            configured,
+                            modelCode.equals(defaultModel)
+                    ));
+                }
+            }
+            return result.stream().filter(item -> "chat".equalsIgnoreCase(item.kind())).toList();
+        } catch (Exception e) {
+            throw new BizException("AI 模型配置格式无效");
+        }
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value.trim();
+            }
+        }
+        return "";
     }
 
     @Transactional(readOnly = true)
@@ -250,12 +324,13 @@ public class AgentAppService {
         String system = (application.getSystemPrompt() == null ? "" : application.getSystemPrompt())
                 + "\n你正在作为 Agent 应用“" + application.getName() + "”工作。请直接给出对用户有用的结果。";
         Set<String> selectedSystemTools = selectedSystemTools(application);
+        ModelSelection selection = modelSelection(application, cmd);
         AiGenerationRequest request = new AiGenerationRequest(
                 system,
                 prompt,
-                null,
-                cmd.getProviderCode(),
-                cmd.getModelCode(),
+                cmd.getImageDataUrl(),
+                selection.providerCode(),
+                selection.modelCode(),
                 Map.of()
         ).withToolCallingEnabled(!selectedSystemTools.isEmpty());
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(selectedSystemTools)) {
@@ -317,7 +392,9 @@ public class AgentAppService {
                         id,
                         data.path("kind").asText("unknown"),
                         data.path("title").asText(data.path("label").asText("未命名节点")),
-                        data.path("toolCode").asText("")
+                        data.path("toolCode").asText(""),
+                        data.path("providerCode").asText(""),
+                        data.path("modelCode").asText("")
                 ));
             }
             Map<String, Integer> indegree = new HashMap<>();
@@ -363,6 +440,18 @@ public class AgentAppService {
         }
     }
 
+    private ModelSelection modelSelection(AgentApplication application, AgentRunCmd cmd) {
+        if (StringUtils.hasText(cmd.getProviderCode()) || StringUtils.hasText(cmd.getModelCode())) {
+            return new ModelSelection(cmd.getProviderCode(), cmd.getModelCode());
+        }
+        return workflowNodesInExecutionOrder(application.getWorkflowJson()).stream()
+                .filter(node -> "llm".equals(node.kind()))
+                .filter(node -> StringUtils.hasText(node.providerCode()) || StringUtils.hasText(node.modelCode()))
+                .findFirst()
+                .map(node -> new ModelSelection(node.providerCode(), node.modelCode()))
+                .orElseGet(() -> new ModelSelection(null, null));
+    }
+
     private List<String> pythonToolCodesInWorkflow(String workflowJson) {
         if (workflowJson == null || workflowJson.isBlank()) return List.of();
         try {
@@ -395,6 +484,16 @@ public class AgentAppService {
         }
     }
 
-    private record WorkflowNode(String id, String kind, String title, String toolCode) {
+    private record WorkflowNode(
+            String id,
+            String kind,
+            String title,
+            String toolCode,
+            String providerCode,
+            String modelCode
+    ) {
+    }
+
+    private record ModelSelection(String providerCode, String modelCode) {
     }
 }
