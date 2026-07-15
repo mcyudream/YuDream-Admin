@@ -106,6 +106,30 @@ class AgentLlmNodeHandlerTest {
     }
 
     @Test
+    void llmMustNotAcceptImageEvenWhenLegacyVisionFlagIsPresent() {
+        CapturingGateway gateway = new CapturingGateway("text only", List.of());
+        AgentWorkflowRunState state = state(gateway, List.of());
+        state.command().setImageDataUrl("data:image/png;base64,image");
+
+        execute("llm", """
+                {"id":"llm","data":{"kind":"llm","providerCode":"p","modelCode":"m","vision":true}}
+                """, state, gateway);
+
+        assertThat(gateway.requests.getFirst().imageDataUrl()).isNull();
+    }
+
+    @Test
+    void extractShouldUseExtractionErrorWhenModelReturnsInvalidJson() {
+        CapturingGateway gateway = new CapturingGateway("not json", List.of());
+
+        assertThatThrownBy(() -> execute("extract", """
+                {"id":"extract","data":{"kind":"extract","providerCode":"p","modelCode":"m"}}
+                """, state(gateway, List.of()), gateway))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("信息提取");
+    }
+
+    @Test
     void requiredToolModeShouldFailWhenGenerationHasNoToolResult() {
         CapturingGateway gateway = new CapturingGateway("answer", List.of());
         assertThatThrownBy(() -> execute("llm", """
@@ -138,6 +162,35 @@ class AgentLlmNodeHandlerTest {
         assertThat(understand).isEqualTo(Map.of("raw", "not json"));
     }
 
+    @Test
+    void runStateMustPreserveIndependentEqualToolEvents() {
+        List<AiAgentToolResult> events = new ArrayList<>();
+        AgentWorkflowRunState state = state(new CapturingGateway("unused", List.of()), List.of(), events::add);
+        AiAgentToolResult first = new AiAgentToolResult("web.fetch", "fetch", "", "done", Map.of("url", "a"));
+        AiAgentToolResult second = new AiAgentToolResult("web.fetch", "fetch", "", "done", Map.of("url", "a"));
+
+        state.addToolResult(first);
+        state.addToolResult(second);
+
+        assertThat(state.toolResults()).containsExactly(first, second);
+        assertThat(events).containsExactly(first, second);
+    }
+
+    @Test
+    void handlerMustNotRepeatTheSameCallbackResultReturnedByGateway() {
+        AiAgentToolResult toolResult = new AiAgentToolResult("web.fetch", "fetch", "", "done", Map.of());
+        List<AiAgentToolResult> events = new ArrayList<>();
+        CapturingGateway gateway = new CapturingGateway("answer", List.of(toolResult));
+        AgentWorkflowRunState state = state(gateway, List.of(), events::add);
+
+        execute("llm", """
+                {"id":"llm","data":{"kind":"llm","providerCode":"p","modelCode":"m"}}
+                """, state, gateway);
+
+        assertThat(state.toolResults()).containsExactly(toolResult);
+        assertThat(events).containsExactly(toolResult);
+    }
+
     private Object execute(String kind, String nodeJson, AgentWorkflowRunState state, AiGenerationGateway gateway) {
         ObjectMapper mapper = new ObjectMapper();
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(mapper);
@@ -153,6 +206,14 @@ class AgentLlmNodeHandlerTest {
     }
 
     private AgentWorkflowRunState state(AiGenerationGateway gateway, List<AiAgentTool> tools) {
+        return state(gateway, tools, ignored -> { });
+    }
+
+    private AgentWorkflowRunState state(
+            AiGenerationGateway gateway,
+            List<AiAgentTool> tools,
+            java.util.function.Consumer<AiAgentToolResult> onTool
+    ) {
         AgentApplication application = AgentApplication.builder().name("Agent").code("agent")
                 .toolCodes(tools.stream().map(item -> item.descriptor().name()).toList()).build();
         AgentRunCmd command = new AgentRunCmd();
@@ -160,7 +221,7 @@ class AgentLlmNodeHandlerTest {
         command.setPermissionContextExplicit(true);
         AgentToolExecutor executor = new AgentToolExecutor(new ObjectMapper(), mock(RuntimeExecutor.class),
                 mock(AgentToolRepo.class), tools, permission -> true);
-        return new AgentWorkflowRunState(application, command, Map.of(), java.util.Set.of(), ignored -> { }, ignored -> { },
+        return new AgentWorkflowRunState(application, command, Map.of(), java.util.Set.of(), ignored -> { }, onTool,
                 new AgentModelToolResolver(executor));
     }
 

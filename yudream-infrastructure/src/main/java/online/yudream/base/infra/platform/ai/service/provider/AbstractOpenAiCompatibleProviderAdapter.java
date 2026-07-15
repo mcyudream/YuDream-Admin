@@ -19,7 +19,8 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
         applyProviderDefaults(provider, model, request, extraBody);
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
                 .model(model.modelName())
-                .temperature(temperature(provider, model));
+                .temperature(temperature(provider, model))
+                .toolChoice(request.providerToolChoice());
         String reasoningEffort = reasoningEffort(provider, model, request, extraBody);
         if (StringUtils.hasText(reasoningEffort)) {
             builder.reasoningEffort(reasoningEffort);

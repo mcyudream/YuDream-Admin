@@ -19,6 +19,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -89,15 +90,17 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         );
 
         int toolResultsBefore = state.toolResultCount();
+        List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults = new ArrayList<>();
         AiGenerationResult generated;
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools)) {
             generated = "understand".equals(kind)
                     ? gateway.generate(request)
-                    : gateway.generateStream(request, state::emitDelta, state::addToolResult, null);
+                    : gateway.generateStream(request, state::emitDelta, result -> {
+                        callbackResults.add(result);
+                        state.addToolResult(result);
+                    }, null);
         }
-        if (generated.toolResults() != null) {
-            generated.toolResults().forEach(state::addToolResult);
-        }
+        addFinalToolResults(generated.toolResults(), callbackResults);
         if (toolMode == AiToolMode.REQUIRED && state.toolResultCount() == toolResultsBefore) {
             throw new BizException(node.title() + "必须调用工具后才能继续");
         }
@@ -108,13 +111,13 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         return switch (kind) {
             case "extract" -> extracted(node, summary);
             case "classify" -> classified(node, summary);
-            case "understand" -> structured(summary, values.bool(node, "strictJson", true));
+            case "understand" -> structured(summary, values.bool(node, "strictJson", true), "问题理解节点未返回合法 JSON");
             default -> summary == null ? "" : summary;
         };
     }
 
     private Object extracted(AgentWorkflowNode node, String summary) {
-        Object output = structured(summary, true);
+        Object output = structured(summary, true, "信息提取节点未返回合法 JSON");
         Map<String, Object> schema = outputSchema(node);
         if (schema.isEmpty()) {
             return output;
@@ -209,9 +212,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
     }
 
     private String image(AgentWorkflowNode node, AgentWorkflowContext context) {
-        boolean requiresImage = "vision".equals(kind);
-        boolean compatibilityVision = "llm".equals(kind) && values.bool(node, "vision", false);
-        if (!requiresImage && !compatibilityVision) {
+        if (!"vision".equals(kind)) {
             return null;
         }
         String configuredVariable = values.text(node, "imageVariable");
@@ -265,7 +266,34 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 .toList());
     }
 
-    private Object structured(String summary, boolean strictJson) {
+    private void addFinalToolResults(
+            List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> results,
+            List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults
+    ) {
+        if (results == null || results.isEmpty()) {
+            return;
+        }
+        List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> pendingCallbacks = new ArrayList<>(callbackResults);
+        for (var result : results) {
+            int callbackIndex = identityIndex(pendingCallbacks, result);
+            if (callbackIndex >= 0) {
+                pendingCallbacks.remove(callbackIndex);
+                continue;
+            }
+            state.addToolResult(result);
+        }
+    }
+
+    private int identityIndex(List<?> values, Object candidate) {
+        for (int index = 0; index < values.size(); index++) {
+            if (values.get(index) == candidate) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private Object structured(String summary, boolean strictJson, String invalidJsonMessage) {
         String json = summary == null ? "" : summary.trim();
         if (json.startsWith("```")) {
             json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "").trim();
@@ -276,7 +304,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             if (!strictJson) {
                 return Map.of("raw", json);
             }
-            throw new BizException("问题理解节点未返回合法 JSON");
+            throw new BizException(invalidJsonMessage);
         }
     }
 

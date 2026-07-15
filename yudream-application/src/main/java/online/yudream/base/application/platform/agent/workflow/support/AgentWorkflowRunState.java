@@ -89,7 +89,7 @@ public final class AgentWorkflowRunState {
     }
 
     public void addToolResult(AiAgentToolResult result) {
-        if (result == null || toolResults.contains(result)) {
+        if (result == null) {
             return;
         }
         toolResults.add(result);

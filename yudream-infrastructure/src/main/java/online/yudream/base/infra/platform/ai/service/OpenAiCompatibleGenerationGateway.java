@@ -8,6 +8,7 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
+import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
@@ -225,7 +226,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        List<ToolCallback> callbacks = request.toolCallingEnabled() ? toolCallbacks(toolResults, onTool, onProgress) : List.of();
+        List<ToolCallback> callbacks = request.toolCallingEnabled() && request.toolMode() != AiToolMode.NONE
+                ? toolCallbacks(toolResults, onTool, onProgress)
+                : List.of();
         AiGenerationRequest effectiveRequest = request.withToolCallingEnabled(!callbacks.isEmpty());
         ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, effectiveRequest))
                 .prompt()
