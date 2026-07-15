@@ -27,6 +27,7 @@ import online.yudream.base.application.platform.agent.workflow.handler.AgentTool
 import online.yudream.base.application.platform.agent.workflow.support.AgentKnowledgeOperations;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowRunState;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowValueResolver;
+import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
@@ -56,6 +57,7 @@ public class AgentWorkflowRuntimeService {
     private final AgentKnowledgeOperations knowledgeOperations;
     private final DocumentTextExtractor documentTextExtractor;
     private final AgentPermissionGateway permissionGateway;
+    private final CapabilityAppService capabilityAppService;
 
     public AgentWorkflowRuntimeResult execute(
             AgentApplication application,
@@ -86,6 +88,7 @@ public class AgentWorkflowRuntimeService {
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
         AgentWorkflowGraphParser graphParser = new AgentWorkflowGraphParser(objectMapper);
         var graph = graphParser.parse(application.getWorkflowJson());
+        ensurePythonRuntime(graph, selectedSystemTools);
         AgentWorkflowExecutor executor = new AgentWorkflowExecutor(graphParser, handlers(values, application, state, systemTools));
         AgentWorkflowExecution execution = executor.execute(
                 application.getWorkflowJson(),
@@ -178,6 +181,20 @@ public class AgentWorkflowRuntimeService {
     private void ensureToolPermission(String permissionCode, String toolName) {
         if (!permissionGateway.hasPermission(permissionCode)) {
             throw new online.yudream.base.domain.common.exception.BizException("无权限调用工具：" + toolName);
+        }
+    }
+
+    private void ensurePythonRuntime(
+            online.yudream.base.application.platform.agent.workflow.AgentWorkflowGraph graph,
+            Set<String> systemToolCodes
+    ) {
+        boolean required = graph.topologicalOrder().stream().anyMatch(node ->
+                "code".equals(node.kind())
+                        || ("tool".equals(node.kind())
+                        && !systemToolCodes.contains(node.data().path("toolCode").asText()))
+        );
+        if (required) {
+            capabilityAppService.ensureEnabled("integration", "集成与 Python 运行时");
         }
     }
 

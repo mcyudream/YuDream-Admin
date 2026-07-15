@@ -71,12 +71,15 @@ public final class AgentKnowledgeNodeHandler implements AgentWorkflowNodeHandler
         } catch (IllegalArgumentException exception) {
             throw new BizException("重排节点输入必须是检索结果列表");
         }
+        if (candidates == null || candidates.isEmpty()) {
+            throw new BizException("重排节点没有可用的候选结果");
+        }
         Object queryValue = context.variable("query");
         String query = queryValue instanceof String value ? value : "";
         return operations.rerank(
                 values.text(node, "knowledgeSpaceSlug"),
-                values.text(node, "providerCode"),
-                values.text(node, "modelCode"),
+                required(values.text(node, "providerCode"), "重排节点必须选择 Provider"),
+                required(values.text(node, "modelCode"), "重排节点必须选择模型"),
                 query,
                 candidates
         );

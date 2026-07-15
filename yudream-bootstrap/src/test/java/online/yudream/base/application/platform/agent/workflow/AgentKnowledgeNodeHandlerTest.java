@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentKnowledgeNodeHandlerTest {
 
@@ -56,6 +57,14 @@ class AgentKnowledgeNodeHandlerTest {
 
         assertThat(output).isEqualTo(candidates.reversed());
         assertThat(operations.lastCall).startsWith("rerank::cohere:rerank-v3:");
+    }
+
+    @Test
+    void shouldRejectEmptyRerankCandidates() {
+        assertThatThrownBy(() -> run("rerank", """
+                "providerCode":"cohere","modelCode":"rerank-v3"
+                """, List.of()))
+                .hasMessageContaining("没有可用");
     }
 
     private Object run(String kind, String config, Object input) {

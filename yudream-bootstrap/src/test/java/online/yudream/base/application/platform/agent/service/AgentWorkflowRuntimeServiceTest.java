@@ -43,7 +43,8 @@ class AgentWorkflowRuntimeServiceTest {
                 tools,
                 mock(AgentKnowledgeOperations.class),
                 mock(DocumentTextExtractor.class),
-                permission -> true
+                permission -> true,
+                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
         AgentApplication application = AgentApplication.builder()
                 .name("模板应用")
@@ -83,6 +84,7 @@ class AgentWorkflowRuntimeServiceTest {
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true
+                , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
         AgentApplication application = AgentApplication.builder()
                 .name("分支应用").code("branch").toolCodes(List.of())
@@ -115,6 +117,7 @@ class AgentWorkflowRuntimeServiceTest {
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> false
+                , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
         AgentApplication application = AgentApplication.builder()
                 .name("受限应用").code("protected").toolCodes(List.of("cms.patch"))

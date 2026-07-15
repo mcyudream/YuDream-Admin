@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentDataNodeHandlersTest {
 
@@ -82,6 +83,19 @@ class AgentDataNodeHandlersTest {
 
         assertThat(execution.context().nodeOutput("end").toString())
                 .contains("[1]", "部署手册", "/wiki/docs/ops/deploy", "先配置环境变量");
+    }
+
+    @Test
+    void shouldRejectEmptyCitationList() {
+        AgentCitationNodeHandler citation = new AgentCitationNodeHandler(values, objectMapper);
+        assertThatThrownBy(() -> executor(citation).execute("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start"}},
+                  {"id":"citation","data":{"kind":"citation","citationSource":"input"}},
+                  {"id":"end","data":{"kind":"end"}}
+                ],"edges":[{"source":"start","target":"citation"},{"source":"citation","target":"end"}]}
+                """, List.of()))
+                .hasMessageContaining("没有可用");
     }
 
     private AgentWorkflowExecutor executor(AgentWorkflowNodeHandler handler) {
