@@ -110,9 +110,12 @@ public class AgentAppService {
             }
         });
         AgentWorkflowToolCodes.NormalizedWorkflow workflow = AgentWorkflowToolCodes.normalize(cmd.getWorkflowJson());
+        List<String> toolCodes = workflow.declaresTools()
+                ? workflow.toolCodes()
+                : (creating || application.getToolCodes() == null ? List.of() : application.getToolCodes());
         application.update(
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), cmd.getIcon(), cmd.getSystemPrompt(),
-                workflow.workflowJson(), workflow.toolCodes(), savedStatus(application, creating)
+                workflow.workflowJson(), toolCodes, savedStatus(application, creating)
         );
         return AgentAssembler.toDTO(applicationRepo.save(application));
     }
