@@ -181,6 +181,29 @@ class AgentWorkflowValidatorTest {
     }
 
     @Test
+    void legacyUnderstandToolsAreClearedAndNeverGranted() {
+        String workflow = workflow(
+                """
+                {"id":"start","data":{"kind":"start"}},
+                {"id":"understand","data":{"kind":"understand","providerCode":"openai","modelCode":"gpt-5","toolMode":"REQUIRED","toolCodes":["client.smuggled"]}},
+                {"id":"end","data":{"kind":"end"}}
+                """,
+                """
+                {"source":"start","target":"understand"},
+                {"source":"understand","target":"end"}
+                """
+        );
+
+        var normalized = AgentWorkflowToolCodes.normalize(workflow);
+
+        assertThat(normalized.toolCodes()).isEmpty();
+        assertThat(normalized.workflowJson())
+                .contains("\"toolCodes\":[]")
+                .doesNotContain("\"toolMode\"");
+        validator.validate(workflow, chatCatalog(false, Set.of()));
+    }
+
+    @Test
     void validatesExtractClassifyAndVisionSpecificSettings() {
         var nonVisionCatalog = chatCatalog(false, Set.of());
         assertThatThrownBy(() -> validator.validate(workflow(

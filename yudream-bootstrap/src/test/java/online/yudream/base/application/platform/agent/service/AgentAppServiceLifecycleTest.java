@@ -94,6 +94,46 @@ class AgentAppServiceLifecycleTest {
     }
 
     @Test
+    void saveKeepsExistingAuthorizationForLegacyWorkflowWithoutToolDeclarations() {
+        Fixture fixture = fixture();
+        AgentApplication existing = application(AgentApplicationStatus.DRAFT);
+        existing.setToolCodes(List.of("legacy.permitted"));
+        when(fixture.applicationRepo.findById(1L)).thenReturn(Optional.of(existing));
+        when(fixture.applicationRepo.findByCode("test-agent")).thenReturn(Optional.of(existing));
+        when(fixture.applicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        AgentApplicationSaveCmd command = saveCommand(AgentApplicationStatus.DRAFT);
+        command.setId(1L);
+        command.setToolCodes(List.of("client.smuggled"));
+        command.setWorkflowJson("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start"}},
+                  {"id":"model","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5"}},
+                  {"id":"end","data":{"kind":"end"}}
+                ],"edges":[
+                  {"source":"start","target":"model"},
+                  {"source":"model","target":"end"}
+                ]}
+                """);
+
+        fixture.service.save(command);
+
+        verify(fixture.applicationRepo).save(argThat(application -> application.getToolCodes()
+                .equals(List.of("legacy.permitted"))));
+    }
+
+    @Test
+    void newLegacyWorkflowNeverAcceptsClientSuppliedApplicationTools() {
+        Fixture fixture = fixture();
+        AgentApplicationSaveCmd command = saveCommand(AgentApplicationStatus.DRAFT);
+        command.setToolCodes(List.of("client.smuggled"));
+        when(fixture.applicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        fixture.service.save(command);
+
+        verify(fixture.applicationRepo).save(argThat(application -> application.getToolCodes().isEmpty()));
+    }
+
+    @Test
     void formalRunRequiresPublishedApplicationWhileDraftCanBeDebugged() {
         Fixture fixture = fixture();
         AgentApplication draft = application(AgentApplicationStatus.DRAFT);

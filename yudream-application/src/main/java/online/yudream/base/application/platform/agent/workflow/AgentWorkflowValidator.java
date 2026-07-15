@@ -115,7 +115,9 @@ public final class AgentWorkflowValidator {
         if ("vision".equals(node.kind()) && !model.vision()) {
             throw invalid(node, "视觉节点只能选择支持图片输入的聊天模型");
         }
-        validateModelTools(node, catalog);
+        if (!"understand".equals(node.kind())) {
+            validateModelTools(node, catalog);
+        }
         if ("extract".equals(node.kind())) {
             validateOutputSchema(node);
         }

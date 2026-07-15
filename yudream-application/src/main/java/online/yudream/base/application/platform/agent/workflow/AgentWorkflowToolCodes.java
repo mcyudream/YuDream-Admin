@@ -16,7 +16,8 @@ import java.util.Set;
 public final class AgentWorkflowToolCodes {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final Set<String> MODEL_KINDS = Set.of("llm", "extract", "classify", "vision", "understand");
+    private static final Set<String> TOOL_MODEL_KINDS = Set.of("llm", "extract", "classify", "vision");
+    private static final String LEGACY_UNDERSTAND = "understand";
 
     private AgentWorkflowToolCodes() {
     }
@@ -27,6 +28,7 @@ public final class AgentWorkflowToolCodes {
 
     /**
      * NONE is a durable state, so stale selections are removed before persisting.
+     * Legacy understand nodes never support native model tool calling.
      */
     public static NormalizedWorkflow normalize(String workflowJson) {
         if (workflowJson == null || workflowJson.isBlank()) {
@@ -38,20 +40,28 @@ public final class AgentWorkflowToolCodes {
                 throw new AgentWorkflowDefinitionException("工作流必须包含 nodes 数组");
             }
             boolean changed = false;
+            boolean declaresTools = false;
             for (JsonNode node : root.path("nodes")) {
                 JsonNode data = node.path("data");
-                if (!isModelNode(data) || !isToolModeNone(data)) {
+                if (!data.isObject()) {
                     continue;
                 }
-                JsonNode toolCodes = data.path("toolCodes");
-                if (!toolCodes.isArray() || toolCodes.size() > 0) {
-                    ((ObjectNode) data).set("toolCodes", OBJECT_MAPPER.createArrayNode());
-                    changed = true;
+                String kind = kind(data);
+                if (LEGACY_UNDERSTAND.equals(kind)) {
+                    changed |= clearUnderstandToolConfig((ObjectNode) data);
+                } else if (TOOL_MODEL_KINDS.contains(kind)) {
+                    declaresTools |= data.has("toolCodes") || data.has("toolMode");
+                    if (isToolModeNone(data)) {
+                        changed |= clearToolCodes((ObjectNode) data);
+                    }
+                } else if ("tool".equals(kind)) {
+                    declaresTools = true;
                 }
             }
             return new NormalizedWorkflow(
                     changed ? OBJECT_MAPPER.writeValueAsString(root) : workflowJson,
-                    deriveRoot(root)
+                    deriveRoot(root),
+                    declaresTools
             );
         } catch (AgentWorkflowDefinitionException exception) {
             throw exception;
@@ -63,7 +73,7 @@ public final class AgentWorkflowToolCodes {
     public static List<String> derive(AgentWorkflowGraph graph) {
         LinkedHashSet<String> result = new LinkedHashSet<>();
         for (AgentWorkflowNode node : graph.topologicalOrder()) {
-            if (MODEL_KINDS.contains(node.kind()) && !isToolModeNone(node.data())) {
+            if (TOOL_MODEL_KINDS.contains(node.kind()) && !isToolModeNone(node.data())) {
                 addArrayCodes(node.data().path("toolCodes"), result);
             } else if ("tool".equals(node.kind())) {
                 addCode(node.data().path("toolCode"), result);
@@ -76,17 +86,32 @@ public final class AgentWorkflowToolCodes {
         LinkedHashSet<String> result = new LinkedHashSet<>();
         for (JsonNode node : root.path("nodes")) {
             JsonNode data = node.path("data");
-            if (MODEL_KINDS.contains(data.path("kind").asText("").trim()) && !isToolModeNone(data)) {
+            if (TOOL_MODEL_KINDS.contains(kind(data)) && !isToolModeNone(data)) {
                 addArrayCodes(data.path("toolCodes"), result);
-            } else if ("tool".equals(data.path("kind").asText(""))) {
+            } else if ("tool".equals(kind(data))) {
                 addCode(data.path("toolCode"), result);
             }
         }
         return List.copyOf(result);
     }
 
-    private static boolean isModelNode(JsonNode data) {
-        return data.isObject() && MODEL_KINDS.contains(data.path("kind").asText("").trim());
+    private static boolean clearUnderstandToolConfig(ObjectNode data) {
+        boolean changed = data.has("toolMode");
+        data.remove("toolMode");
+        return clearToolCodes(data) || changed;
+    }
+
+    private static boolean clearToolCodes(ObjectNode data) {
+        JsonNode toolCodes = data.path("toolCodes");
+        if (!toolCodes.isArray() || toolCodes.size() > 0) {
+            data.set("toolCodes", OBJECT_MAPPER.createArrayNode());
+            return true;
+        }
+        return false;
+    }
+
+    private static String kind(JsonNode data) {
+        return data.path("kind").asText("").trim();
     }
 
     private static boolean isToolModeNone(JsonNode data) {
@@ -110,7 +135,7 @@ public final class AgentWorkflowToolCodes {
         }
     }
 
-    public record NormalizedWorkflow(String workflowJson, List<String> toolCodes) {
+    public record NormalizedWorkflow(String workflowJson, List<String> toolCodes, boolean declaresTools) {
         public NormalizedWorkflow {
             toolCodes = toolCodes == null ? List.of() : List.copyOf(toolCodes);
         }
