@@ -150,6 +150,9 @@ public class BuiltinAgentInitializerService {
         if (build == null || !"llm".equals(build.path("kind").asText())) {
             return false;
         }
+        if (!build.path("toolConfigDeclared").asBoolean(false)) {
+            return true;
+        }
         if (!"AUTO".equalsIgnoreCase(build.path("toolMode").asText())) {
             return true;
         }
@@ -335,6 +338,7 @@ public class BuiltinAgentInitializerService {
         Map<String, Object> data = modelNode(kind, title, prompt, inputVariable, outputVariable, model, vision);
         data.put("toolCodes", List.copyOf(toolCodes));
         data.put("toolMode", "AUTO");
+        data.put("toolConfigDeclared", true);
         return data;
     }
 
