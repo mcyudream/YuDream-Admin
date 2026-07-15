@@ -7,7 +7,8 @@ test('扫描全部模型节点决定图片和文档能力', () => {
   const workflow = JSON.stringify({
     nodes: [
       { data: { kind: 'llm', vision: false, acceptFiles: false } },
-      { data: { kind: 'llm', vision: true, acceptFiles: true } },
+      { data: { kind: 'extract', acceptFiles: true } },
+      { data: { kind: 'vision', vision: true, acceptFiles: false } },
       { data: { kind: 'document' } },
     ],
   })

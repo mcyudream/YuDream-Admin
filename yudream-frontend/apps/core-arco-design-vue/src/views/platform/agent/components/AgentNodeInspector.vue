@@ -75,6 +75,7 @@ const isModelToolNode = computed(() => isAgentToolConfigModelNode(props.node.dat
 const isExtractNode = computed(() => props.node.data.kind === 'extract')
 const isClassifyNode = computed(() => props.node.data.kind === 'classify')
 const isVisionNode = computed(() => props.node.data.kind === 'vision')
+const isAttachmentChatNode = computed(() => ['llm', 'extract', 'classify', 'vision'].includes(props.node.data.kind))
 
 const modelSectionTitle = computed(() => {
   if (props.node.data.kind === 'embedding') {
@@ -186,7 +187,7 @@ function changeClasses(value: unknown) {
           <small v-if="selectedModel">{{ selectedModel.vision ? '支持文本和图片输入' : '支持文本输入' }}</small>
           <small v-else class="field-error">尚未选择可用模型，该节点无法运行</small>
         </label>
-        <label v-if="node.data.kind === 'llm'" class="toggle-option">
+        <label v-if="isAttachmentChatNode" class="toggle-option">
           <span><b>允许文本附件</b><small>调试时把 TXT、Markdown、JSON、CSV 等文本内容加入模型上下文</small></span>
           <FaSwitch :model-value="node.data.acceptFiles" @update:model-value="updateField('acceptFiles', $event)" />
         </label>

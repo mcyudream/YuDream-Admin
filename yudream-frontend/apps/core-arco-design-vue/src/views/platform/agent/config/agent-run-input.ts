@@ -12,13 +12,18 @@ export function agentRunCapabilities(workflowJson: string) {
     const workflow = JSON.parse(workflowJson || '{}') as { nodes?: Array<{ data?: Record<string, unknown> }> }
     const data = (workflow.nodes || []).map(node => node.data || {})
     return {
-      allowImage: data.some(node => (node.kind === 'llm' || node.kind === 'vision') && node.vision === true),
-      allowFiles: data.some(node => node.kind === 'document' || (node.kind === 'llm' && node.acceptFiles === true)),
+      allowImage: data.some(node => node.kind === 'vision' && node.vision === true),
+      allowFiles: data.some(node => node.kind === 'document'
+        || (isAttachmentChatNode(node.kind) && node.acceptFiles === true)),
     }
   }
   catch {
     return { allowImage: false, allowFiles: false }
   }
+}
+
+function isAttachmentChatNode(kind: unknown) {
+  return kind === 'llm' || kind === 'extract' || kind === 'classify' || kind === 'vision'
 }
 
 export function buildAgentRunInput(input: string, attachments: TextAttachment[]) {

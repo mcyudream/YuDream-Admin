@@ -118,7 +118,7 @@ public final class AgentToolExecutor {
     private Map<String, Object> parseSchema(AgentTool tool) {
         try {
             Map<String, Object> schema = objectMapper.readValue(tool.getInputSchemaJson(), JSON_OBJECT);
-            if (schema == null) {
+            if (schema == null || !"object".equals(schema.get("type"))) {
                 throw invalidSchema(tool);
             }
             return Collections.unmodifiableMap(new LinkedHashMap<>(schema));

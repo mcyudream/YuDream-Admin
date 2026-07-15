@@ -37,7 +37,8 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
     }
 
     /** Compatibility providers opt in only when their native API guarantees `tool_choice=required`. */
-    protected boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
+    @Override
+    public boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
         return false;
     }
 

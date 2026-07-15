@@ -8,4 +8,8 @@ public interface AiProviderAdapter {
     AiProviderType type();
 
     OpenAiChatOptions chatOptions(AiProviderEndpoint provider, AiModelEndpoint model, AiGenerationRequest request);
+
+    default boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
+        return false;
+    }
 }
