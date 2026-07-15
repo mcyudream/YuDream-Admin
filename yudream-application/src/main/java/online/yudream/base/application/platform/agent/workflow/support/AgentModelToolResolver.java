@@ -23,13 +23,14 @@ public final class AgentModelToolResolver {
         if (nodeToolCodes == null || nodeToolCodes.isEmpty()) {
             return List.of();
         }
+        AgentToolExecutor.PermissionSnapshot permissionSnapshot = toolExecutor.capturePermissionSnapshot(command);
         LinkedHashSet<String> orderedCodes = new LinkedHashSet<>();
         nodeToolCodes.stream()
                 .filter(code -> code != null && !code.isBlank())
                 .map(String::trim)
                 .forEach(orderedCodes::add);
         return orderedCodes.stream()
-                .map(code -> toolExecutor.resolve(code, application, command))
+                .map(code -> toolExecutor.resolve(code, application, permissionSnapshot))
                 .toList();
     }
 }

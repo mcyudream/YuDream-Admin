@@ -52,6 +52,20 @@ public final class AgentToolExecutor {
 
     /** Authorization happens before a model can receive a callback descriptor. */
     public AiAgentTool resolve(String toolCode, AgentApplication application, AgentRunCmd command) {
+        return resolve(toolCode, application, capturePermissionSnapshot(command));
+    }
+
+    public PermissionSnapshot capturePermissionSnapshot(AgentRunCmd command) {
+        List<String> permissionCodes = command == null || command.getPermissionCodes() == null
+                ? List.of()
+                : command.getPermissionCodes().stream()
+                .filter(code -> code != null && !code.isBlank())
+                .map(String::trim)
+                .toList();
+        return new PermissionSnapshot(permissionCodes, command != null && command.isPermissionContextExplicit());
+    }
+
+    AiAgentTool resolve(String toolCode, AgentApplication application, PermissionSnapshot permissionSnapshot) {
         String code = requiredCode(toolCode);
         ensureApplicationGrant(code, application);
         AiAgentTool systemTool = systemTools.stream()
@@ -59,14 +73,14 @@ public final class AgentToolExecutor {
                 .findFirst()
                 .orElse(null);
         if (systemTool != null) {
-            ensurePermission(systemTool.descriptor().permissionCode(), systemTool.descriptor().title(), command);
+            ensurePermission(systemTool.descriptor().permissionCode(), systemTool.descriptor().title(), permissionSnapshot);
             return systemTool;
         }
         AgentTool pythonTool = toolRepo.findByCode(code)
                 .orElseThrow(() -> new BizException("Tool does not exist: " + code));
         ensurePythonAvailable(pythonTool);
-        ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), command);
-        return new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), command);
+        ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), permissionSnapshot);
+        return new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), permissionSnapshot);
     }
 
     /** Makes old tool nodes use the exact same resolution and Python execution contract. */
@@ -76,9 +90,11 @@ public final class AgentToolExecutor {
             AgentApplication application,
             AgentRunCmd command
     ) {
-        AiAgentTool tool = resolve(toolCode, application, command);
+        PermissionSnapshot permissionSnapshot = capturePermissionSnapshot(command);
+        AiAgentTool tool = resolve(toolCode, application, permissionSnapshot);
         Map<String, Object> safeArguments = arguments == null ? Map.of() : new LinkedHashMap<>(arguments);
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(tool))) {
+            ensurePermission(tool.descriptor().permissionCode(), tool.descriptor().title(), permissionSnapshot);
             return tool.execute(new AiAgentToolCall(tool.descriptor().name(), safeArguments));
         }
     }
@@ -154,11 +170,12 @@ public final class AgentToolExecutor {
         }
     }
 
-    private void ensurePermission(String permissionCode, String toolName, AgentRunCmd command) {
-        List<String> snapshot = command == null || command.getPermissionCodes() == null
-                ? List.of()
-                : List.copyOf(command.getPermissionCodes());
-        if (!permissionGateway.hasPermission(permissionCode, snapshot, true)) {
+    private void ensurePermission(String permissionCode, String toolName, PermissionSnapshot permissionSnapshot) {
+        if (!permissionGateway.hasPermission(
+                permissionCode,
+                permissionSnapshot.permissionCodes(),
+                permissionSnapshot.permissionContextExplicit()
+        )) {
             throw new BizException("No permission to invoke tool: " + toolName);
         }
     }
@@ -173,12 +190,12 @@ public final class AgentToolExecutor {
     private final class PythonToolAdapter implements AiAgentTool {
         private final AgentTool tool;
         private final AiAgentToolDescriptor descriptor;
-        private final AgentRunCmd command;
+        private final PermissionSnapshot permissionSnapshot;
 
-        private PythonToolAdapter(AgentTool tool, AiAgentToolDescriptor descriptor, AgentRunCmd command) {
+        private PythonToolAdapter(AgentTool tool, AiAgentToolDescriptor descriptor, PermissionSnapshot permissionSnapshot) {
             this.tool = tool;
             this.descriptor = descriptor;
-            this.command = command;
+            this.permissionSnapshot = permissionSnapshot;
         }
 
         @Override
@@ -189,11 +206,17 @@ public final class AgentToolExecutor {
         @Override
         public AiAgentToolResult execute(AiAgentToolCall call) {
             ensurePythonAvailable(tool);
-            ensurePermission(tool.getPermissionCode(), tool.getName(), command);
+            ensurePermission(tool.getPermissionCode(), tool.getName(), permissionSnapshot);
             Map<String, Object> arguments = call == null || call.arguments() == null
                     ? Map.of()
                     : new LinkedHashMap<>(call.arguments());
             return executePython(tool, arguments);
+        }
+    }
+
+    public record PermissionSnapshot(List<String> permissionCodes, boolean permissionContextExplicit) {
+        public PermissionSnapshot {
+            permissionCodes = permissionCodes == null ? List.of() : List.copyOf(permissionCodes);
         }
     }
 }
