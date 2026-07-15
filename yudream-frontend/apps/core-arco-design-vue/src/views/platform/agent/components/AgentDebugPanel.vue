@@ -1,20 +1,30 @@
 <script setup lang="ts">
-import type { AgentDebugMessage, AgentDebugStatus } from './types'
+import type { AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus } from './types'
 
 const props = defineProps<{
   messages: AgentDebugMessage[]
   running: boolean
+  allowImage: boolean
+  allowFiles: boolean
+  modelLabel: string
 }>()
 
 const emit = defineEmits<{
-  send: [content: string]
+  send: [content: string, attachments: AgentDebugAttachment[]]
   stop: []
   clear: []
   close: []
 }>()
 
 const input = ref('')
+const attachments = ref<AgentDebugAttachment[]>([])
+const attachmentError = ref('')
 const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
+const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
+const fileAccept = computed(() => [
+  props.allowImage ? 'image/*' : '',
+  props.allowFiles ? '.txt,.md,.markdown,.json,.csv,.xml,.html,.css,.js,.ts,.yaml,.yml' : '',
+].filter(Boolean).join(','))
 
 watch(() => props.messages, () => {
   nextTick(() => {
@@ -26,11 +36,65 @@ watch(() => props.messages, () => {
 
 function send() {
   const content = input.value.trim()
-  if (!content || props.running) {
+  if ((!content && !attachments.value.length) || props.running) {
     return
   }
   input.value = ''
-  emit('send', content)
+  const selected = [...attachments.value]
+  attachments.value = []
+  emit('send', content, selected)
+}
+
+function pickFiles() {
+  fileInput.value?.click()
+}
+
+async function onFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  attachmentError.value = ''
+  try {
+    for (const file of Array.from(target.files || [])) {
+      const image = file.type.startsWith('image/')
+      if (image && !props.allowImage) {
+        throw new Error('当前模型不支持图片输入')
+      }
+      if (!image && !props.allowFiles) {
+        throw new Error('当前模型节点未开启文本附件')
+      }
+      if (image && file.size > 5 * 1024 * 1024) {
+        throw new Error('单张图片不能超过 5MB')
+      }
+      if (!image && file.size > 1024 * 1024) {
+        throw new Error('单个文本附件不能超过 1MB')
+      }
+      if (image && attachments.value.some(item => item.type.startsWith('image/'))) {
+        throw new Error('当前调试仅支持一张图片')
+      }
+      attachments.value.push({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name,
+        type: file.type || 'text/plain',
+        size: file.size,
+        dataUrl: image ? await readDataUrl(file) : undefined,
+        text: image ? undefined : await file.text(),
+      })
+    }
+  }
+  catch (error) {
+    attachmentError.value = error instanceof Error ? error.message : '附件读取失败'
+  }
+  finally {
+    target.value = ''
+  }
+}
+
+function readDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(new Error('图片读取失败'))
+    reader.readAsDataURL(file)
+  })
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -57,7 +121,7 @@ function statusIcon(status: AgentDebugStatus) {
         <span class="debug-mark"><FaIcon name="i-ri:bug-line" /></span>
         <span>
           <strong>Agent 调试</strong>
-          <small><i :class="{ active: running }" />{{ running ? '运行中' : '就绪' }}</small>
+          <small><i :class="{ active: running }" />{{ running ? '运行中' : modelLabel || '未选择模型' }}</small>
         </span>
       </div>
       <div class="debug-actions">
@@ -102,6 +166,13 @@ function statusIcon(status: AgentDebugStatus) {
             </div>
           </div>
 
+          <div v-if="message.attachments?.length" class="message-attachments">
+            <span v-for="attachment in message.attachments" :key="attachment.id">
+              <img v-if="attachment.dataUrl" :src="attachment.dataUrl" :alt="attachment.name">
+              <FaIcon v-else name="i-ri:file-text-line" />{{ attachment.name }}
+            </span>
+          </div>
+
           <div v-if="message.content || message.status === 'streaming'" class="message-content">
             {{ message.content }}<i v-if="message.status === 'streaming'" class="stream-caret" />
           </div>
@@ -110,16 +181,33 @@ function statusIcon(status: AgentDebugStatus) {
     </div>
 
     <footer class="debug-composer">
+      <div v-if="attachments.length" class="attachment-list">
+        <span v-for="attachment in attachments" :key="attachment.id">
+          <img v-if="attachment.dataUrl" :src="attachment.dataUrl" :alt="attachment.name">
+          <FaIcon v-else name="i-ri:file-text-line" />
+          <b>{{ attachment.name }}</b>
+          <button type="button" title="移除附件" aria-label="移除附件" @click="attachments = attachments.filter(item => item.id !== attachment.id)"><FaIcon name="i-ri:close-line" /></button>
+        </span>
+      </div>
+      <p v-if="attachmentError" class="attachment-error">
+        {{ attachmentError }}
+      </p>
       <FaTextarea v-model="input" class="w-full" :disabled="running" :autosize="{ minRows: 3, maxRows: 7 }" placeholder="输入调试消息" @keydown="onKeydown" />
       <div class="composer-footer">
-        <span>{{ input.length }}/2000</span>
+        <div>
+          <button v-if="allowImage || allowFiles" type="button" title="添加附件" aria-label="添加附件" :disabled="running" @click="pickFiles">
+            <FaIcon :name="allowImage ? 'i-ri:image-add-line' : 'i-ri:attachment-2'" />
+          </button>
+          <span>{{ input.length }}/2000</span>
+        </div>
         <button v-if="running" type="button" class="send-button stop" title="停止调试" aria-label="停止调试" @click="emit('stop')">
           <FaIcon name="i-ri:stop-fill" />
         </button>
-        <button v-else type="button" class="send-button" title="发送消息" aria-label="发送消息" :disabled="!input.trim()" @click="send">
+        <button v-else type="button" class="send-button" title="发送消息" aria-label="发送消息" :disabled="!input.trim() && !attachments.length" @click="send">
           <FaIcon name="i-ri:send-plane-2-fill" />
         </button>
       </div>
+      <input ref="fileInput" class="file-input" type="file" :accept="fileAccept" multiple @change="onFileChange">
     </footer>
   </aside>
 </template>
@@ -170,12 +258,22 @@ function statusIcon(status: AgentDebugStatus) {
 .tool-results span { display: grid; min-width: 0; gap: 1px; }
 .tool-results strong { font-size: 9px; }
 .tool-results small { overflow: hidden; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.message-attachments { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 7px; }
+.message-attachments span { display: flex; max-width: 100%; align-items: center; gap: 4px; padding: 4px 6px; border-radius: 4px; color: var(--color-text-2); background: var(--color-fill-2); font-size: 8px; }
+.message-attachments img, .attachment-list img { width: 24px; height: 24px; border-radius: 4px; object-fit: cover; }
 .debug-composer { padding: 10px 12px 12px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
+.attachment-list { display: flex; gap: 5px; margin-bottom: 7px; overflow-x: auto; }
+.attachment-list > span { display: flex; max-width: 180px; flex: 0 0 auto; align-items: center; gap: 4px; padding: 5px 6px; border: 1px solid var(--color-border-2); border-radius: 5px; color: var(--color-text-2); background: var(--color-fill-1); font-size: 8px; }
+.attachment-list b { overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-list button, .composer-footer > div button { display: grid; width: 22px; height: 22px; place-items: center; border: 0; border-radius: 4px; color: var(--color-text-3); background: transparent; cursor: pointer; }
+.attachment-error { margin: 0 0 6px; color: rgb(var(--danger-6)); font-size: 8px; }
 .composer-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
-.composer-footer > span { color: var(--color-text-4); font-size: 8px; }
+.composer-footer > div { display: flex; align-items: center; gap: 5px; }
+.composer-footer > div span { color: var(--color-text-4); font-size: 8px; }
 .send-button { display: grid; width: 30px; height: 30px; place-items: center; border: 0; border-radius: 6px; color: white; background: rgb(var(--primary-6)); cursor: pointer; }
 .send-button.stop { background: rgb(var(--danger-6)); }
 .send-button:disabled { color: var(--color-text-4); background: var(--color-fill-3); cursor: not-allowed; }
+.file-input { display: none; }
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

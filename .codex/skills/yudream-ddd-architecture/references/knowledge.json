@@ -155,6 +155,10 @@
     {
       "key": "agent-debug-sse-ui",
       "text": "Agent 调试前端必须通过 fetch ReadableStream 消费 POST SSE，并按 nodeId 映射节点状态；仅打印 AG-UI/SSE 日志或等待阻塞 /run 返回，无法实现实时画布反馈。"
+    },
+    {
+      "key": "agent-node-model-selection",
+      "text": "Agent 大模型节点必须持久化 providerCode/modelCode 和输入能力；运行与调试优先使用节点配置，Vision 模型才允许图片输入，禁止静默回退到未配置的 Default AI。"
     }
   ],
   "utilities": [

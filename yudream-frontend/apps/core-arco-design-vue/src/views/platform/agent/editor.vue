@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Connection, Edge, Node as FlowNode } from '@vue-flow/core'
-import type { AgentConnectionStyle, AgentDebugMessage, AgentDebugStatus, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
-import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
+import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MarkerType, useVueFlow, VueFlow } from '@vue-flow/core'
@@ -33,6 +33,7 @@ const selectedEdgeId = ref('')
 const defaultConnectionStyle = ref<AgentConnectionStyle>('arrow')
 const customTools = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
+const agentModels = ref<AgentModelOption[]>([])
 const debugRunning = ref(false)
 const debugMessages = ref<AgentDebugMessage[]>([])
 const activeDebugMessageId = ref('')
@@ -90,11 +91,15 @@ const selectedEdge = computed(() => edges.value.find(item => item.id === selecte
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
+const debugModelNode = computed(() => nodes.value.find(node => node.data.kind === 'llm'))
+const debugModel = computed(() => agentModels.value.find(model => model.providerCode === debugModelNode.value?.data.providerCode && model.modelCode === debugModelNode.value?.data.modelCode))
+const debugModelLabel = computed(() => debugModel.value ? `${debugModel.value.providerName} / ${debugModel.value.modelName}` : '')
 const { addNodes, addEdges, screenToFlowCoordinate, fitView, setCenter, updateNodeData } = useVueFlow()
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
-  await Promise.all([loadTools(), loadApplication()])
+  await Promise.all([loadTools(), loadModels()])
+  await loadApplication()
   if (!nodes.value.length) {
     seedWorkflow()
   }
@@ -113,6 +118,16 @@ async function loadTools() {
   }
   catch {
     toast.error('加载 Agent 工具失败')
+  }
+}
+
+async function loadModels() {
+  try {
+    agentModels.value = (await apiAgent.models()).data
+  }
+  catch {
+    agentModels.value = []
+    toast.error('加载 Agent 模型失败')
   }
 }
 
@@ -158,6 +173,10 @@ function normalizeNode(raw: FlowNode<AgentNodeData>): FlowNode<AgentNodeData> {
       prompt: raw.data?.prompt || '',
       toolCode: raw.data?.toolCode || '',
       condition: raw.data?.condition || '',
+      providerCode: raw.data?.providerCode || defaultAgentModel()?.providerCode || '',
+      modelCode: raw.data?.modelCode || defaultAgentModel()?.modelCode || '',
+      vision: raw.data?.vision ?? defaultAgentModel()?.vision ?? false,
+      acceptFiles: raw.data?.acceptFiles ?? false,
     },
   }
 }
@@ -173,12 +192,28 @@ function normalizeEdge(raw: Edge): Edge {
 }
 
 function makeNode(template: AgentNodeTemplate, position: { x: number, y: number }): FlowNode<AgentNodeData> {
+  const model = template.kind === 'llm' ? defaultAgentModel() : undefined
   return {
     id: `${template.kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     type: 'agent',
     position,
-    data: { ...template, title: template.label, prompt: '', toolCode: '', condition: '' },
+    data: {
+      ...template,
+      title: template.label,
+      prompt: '',
+      toolCode: '',
+      condition: '',
+      providerCode: model?.providerCode || '',
+      modelCode: model?.modelCode || '',
+      vision: model?.vision || false,
+      acceptFiles: false,
+    },
   }
+}
+
+function defaultAgentModel() {
+  return agentModels.value.find(model => model.configured && model.defaultModel)
+    || agentModels.value.find(model => model.configured)
 }
 
 function makeEdge(source: string, target: string, style = defaultConnectionStyle.value): Edge {
@@ -450,8 +485,25 @@ function handleDebugEvent(event: AgentDebugStreamEvent) {
   }
 }
 
-async function startDebug(content: string) {
+async function startDebug(content: string, attachments: AgentDebugAttachment[] = []) {
   if (debugRunning.value) {
+    return
+  }
+  const modelNode = debugModelNode.value
+  const model = debugModel.value
+  if (!modelNode || !model || !model.configured) {
+    if (modelNode) {
+      selectNode(modelNode.id)
+    }
+    toast.error('请先为大模型节点选择已配置 API Key 的模型')
+    return
+  }
+  if (attachments.some(item => item.type.startsWith('image/')) && !model.vision) {
+    toast.error('当前模型不支持图片输入')
+    return
+  }
+  if (attachments.some(item => !item.type.startsWith('image/')) && !modelNode.data.acceptFiles) {
+    toast.error('当前大模型节点未开启文本附件')
     return
   }
   const applicationId = await save(false, false)
@@ -462,8 +514,21 @@ async function startDebug(content: string) {
   rightMode.value = 'debug'
   resetDebugCanvas()
   const assistantId = `assistant-${Date.now()}`
+  const attachmentContext = attachments
+    .filter(item => item.text)
+    .map(item => `附件：${item.name}\n${item.text}`)
+    .join('\n\n')
+  const debugInput = [content, attachmentContext].filter(Boolean).join('\n\n')
+  const imageDataUrl = attachments.find(item => item.type.startsWith('image/'))?.dataUrl
+  const messageAttachments = attachments.map(item => ({
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    size: item.size,
+    dataUrl: item.type.startsWith('image/') ? item.dataUrl : undefined,
+  }))
   debugMessages.value.push(
-    { id: `user-${Date.now()}`, role: 'user', content },
+    { id: `user-${Date.now()}`, role: 'user', content, attachments: messageAttachments },
     { id: assistantId, role: 'assistant', content: '', status: 'streaming', steps: [], tools: [] },
   )
   activeDebugMessageId.value = assistantId
@@ -471,7 +536,12 @@ async function startDebug(content: string) {
   debugAbortController = new AbortController()
 
   try {
-    const request = await apiAgent.debugStreamRequest(applicationId, { input: content })
+    const request = await apiAgent.debugStreamRequest(applicationId, {
+      input: debugInput,
+      providerCode: model.providerCode,
+      modelCode: model.modelCode,
+      imageDataUrl,
+    })
     const response = await fetch(apiAgent.debugStreamEndpoint(applicationId), {
       ...request,
       signal: debugAbortController.signal,
@@ -534,6 +604,19 @@ async function save(publish = false, notify = true): Promise<string> {
     selectNode(emptyToolNode.id)
     toast.error('请为工具调用节点选择具体工具')
     return ''
+  }
+  if (publish) {
+    const invalidModelNode = nodes.value.find((node) => {
+      if (node.data.kind !== 'llm') {
+        return false
+      }
+      return !agentModels.value.some(model => model.configured && model.providerCode === node.data.providerCode && model.modelCode === node.data.modelCode)
+    })
+    if (invalidModelNode) {
+      selectNode(invalidModelNode.id)
+      toast.error('发布前请为每个大模型节点选择已配置的模型')
+      return ''
+    }
   }
 
   saving.value = true
@@ -659,6 +742,9 @@ async function save(publish = false, notify = true): Promise<string> {
         class="inspector-panel"
         :messages="debugMessages"
         :running="debugRunning"
+        :allow-image="Boolean(debugModel?.vision)"
+        :allow-files="Boolean(debugModelNode?.data.acceptFiles)"
+        :model-label="debugModelLabel"
         @send="startDebug"
         @stop="stopDebug"
         @clear="clearDebug"
@@ -670,6 +756,7 @@ async function save(publish = false, notify = true): Promise<string> {
         :node="selectedNode"
         :system-tools="systemTools"
         :custom-tools="customTools"
+        :models="agentModels"
         @update="updateSelectedNode"
         @delete="deleteNode(selectedNode.id)"
         @close="clearSelection"
