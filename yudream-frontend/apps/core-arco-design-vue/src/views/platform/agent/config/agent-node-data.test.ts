@@ -88,3 +88,45 @@ test('condition nodes expose true and false source handles', () => {
   assert.deepEqual(agentSourceHandles('llm'), ['source'])
   assert.deepEqual(agentSourceHandles('end'), [])
 })
+
+test('聊天模型节点使用独立的工具、结构化输出和视觉输入默认配置', () => {
+  const llmTemplate = { ...template, kind: 'llm' as const, label: '文本生成' }
+  const extractTemplate = { ...template, kind: 'extract' as const, label: '结构化提取' }
+  const classifyTemplate = { ...template, kind: 'classify' as const, label: '意图分类' }
+  const visionTemplate = { ...template, kind: 'vision' as const, label: '视觉理解' }
+  const first = createAgentNodeData(llmTemplate)
+  const second = createAgentNodeData(llmTemplate)
+
+  assert.equal(first.inputVariable, 'query')
+  assert.equal(first.toolMode, 'NONE')
+  assert.deepEqual(first.toolCodes, [])
+  assert.notEqual(first.toolCodes, second.toolCodes)
+  assert.equal(createAgentNodeData(extractTemplate).outputSchema, '')
+  assert.deepEqual(createAgentNodeData(classifyTemplate).classes, [])
+  assert.equal(createAgentNodeData(visionTemplate).inputVariable, 'query')
+  assert.equal(createAgentNodeData(visionTemplate).imageVariable, '')
+})
+
+test('所有聊天模型语义映射到 chat 模型，Embedding 和 Rerank 保持各自类型', () => {
+  assert.equal(agentModelKind('llm'), 'chat')
+  assert.equal(agentModelKind('extract'), 'chat')
+  assert.equal(agentModelKind('classify'), 'chat')
+  assert.equal(agentModelKind('vision'), 'chat')
+  assert.equal(agentModelKind('understand'), 'chat')
+  assert.equal(agentModelKind('embedding'), 'embedding')
+  assert.equal(agentModelKind('rerank'), 'rerank')
+})
+
+test('归一化保留历史 understand 和 tool 节点类型及其原始数据', () => {
+  const understandTemplate = { ...template, kind: 'understand' as const, label: '问题理解' }
+  const toolTemplate = { ...template, kind: 'tool' as const, label: '工具调用' }
+
+  const understand = normalizeAgentNodeData(understandTemplate, { prompt: '提取用户意图', inputVariable: 'query' })
+  const tool = normalizeAgentNodeData(toolTemplate, { toolCode: 'cms.canvas.patch', inputVariable: 'task' })
+
+  assert.equal(understand.kind, 'understand')
+  assert.equal(understand.prompt, '提取用户意图')
+  assert.equal(tool.kind, 'tool')
+  assert.equal(tool.toolCode, 'cms.canvas.patch')
+  assert.equal(tool.inputVariable, 'task')
+})

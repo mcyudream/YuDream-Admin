@@ -12,10 +12,14 @@ export type AgentNodeKind
     | 'document'
     | 'citation'
     | 'llm'
+    | 'extract'
+    | 'classify'
+    | 'vision'
     | 'embedding'
     | 'tool'
 
 export type AgentConnectionStyle = 'arrow' | 'line'
+export type AgentToolMode = 'NONE' | 'AUTO' | 'REQUIRED'
 
 export interface AgentNodeTemplate {
   kind: AgentNodeKind
@@ -30,7 +34,12 @@ export interface AgentNodeTemplate {
 export interface AgentNodeData extends AgentNodeTemplate {
   title: string
   prompt: string
+  toolCodes: string[]
+  toolMode: AgentToolMode
   toolCode: string
+  outputSchema: string
+  classes: string[]
+  imageVariable: string
   condition: string
   code: string
   template: string
