@@ -4,12 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.assembler.AgentAssembler;
+import online.yudream.base.application.platform.agent.assembler.AgentModelCatalogParser;
 import online.yudream.base.application.platform.agent.cmd.AgentApplicationSaveCmd;
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.cmd.AgentToolSaveCmd;
 import online.yudream.base.application.platform.agent.dto.AgentApplicationDTO;
+import online.yudream.base.application.platform.agent.dto.AgentCatalogDTO;
 import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
+import online.yudream.base.application.platform.agent.dto.AgentKnowledgeSpaceDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
@@ -35,6 +38,7 @@ import online.yudream.base.domain.platform.integration.enumerate.ConnectorStatus
 import online.yudream.base.domain.platform.integration.enumerate.RuntimeLanguage;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
+import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,6 +67,8 @@ public class AgentAppService {
     private final ObjectProvider<AiGenerationGateway> generationGatewayProvider;
     private final ObjectProvider<AiAgentTool> systemToolProvider;
     private final ObjectMapper objectMapper;
+    private final AgentModelCatalogParser modelCatalogParser;
+    private final WikiSpaceRepo wikiSpaceRepo;
 
     @Transactional(readOnly = true)
     public PageResult<AgentApplicationDTO> page(AgentPageQuery query) {
@@ -153,7 +159,26 @@ public class AgentAppService {
     @Transactional(readOnly = true)
     public List<AgentModelDTO> models() {
         ensureEnabled();
-        return agentModels(aiConfig());
+        return modelCatalogParser.parse(aiConfig()).stream()
+                .filter(model -> "chat".equals(model.kind()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AgentCatalogDTO catalog() {
+        ensureEnabled();
+        List<AgentKnowledgeSpaceDTO> spaces = wikiSpaceRepo.findAll().stream()
+                .map(space -> new AgentKnowledgeSpaceDTO(
+                        space.getSlug(),
+                        space.getName(),
+                        space.getEmbeddingProviderCode(),
+                        space.getEmbeddingModelCode(),
+                        space.getTopK(),
+                        space.isGraphEnabled(),
+                        space.isRerankEnabled()
+                ))
+                .toList();
+        return new AgentCatalogDTO(spaces, modelCatalogParser.parse(aiConfig()));
     }
 
     private List<AgentModelDTO> agentModels(Map<String, String> config) {

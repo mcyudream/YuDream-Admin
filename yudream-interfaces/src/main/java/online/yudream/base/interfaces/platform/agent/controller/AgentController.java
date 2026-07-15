@@ -13,6 +13,7 @@ import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSav
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
 import online.yudream.base.interfaces.platform.agent.res.AgentApplicationRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentCatalogRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
@@ -56,6 +57,9 @@ public class AgentController {
     @GetMapping("/models")
     @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 模型", module = "平台能力", desc = "查看 Agent 节点可用模型")
     public Result<List<AgentModelRes>> models() { return Result.ok(agentAppService.models().stream().map(AgentWebAssembler::toRes).toList()); }
+    @GetMapping("/catalog")
+    @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 编排目录", module = "平台能力", desc = "查看 Agent 节点可用模型与知识空间")
+    public Result<AgentCatalogRes> catalog() { return Result.ok(AgentWebAssembler.toRes(agentAppService.catalog())); }
     @PostMapping
     @PermissionRegister(code = "platform:agent:edit", name = "新建 Agent 应用", module = "平台能力", desc = "新建 Agent 应用")
     public Result<AgentApplicationRes> create(@Valid @RequestBody AgentApplicationSaveRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.save(AgentWebAssembler.toCmd(request)))); }
