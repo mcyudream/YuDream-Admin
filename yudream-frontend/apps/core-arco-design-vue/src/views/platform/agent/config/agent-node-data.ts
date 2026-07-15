@@ -1,4 +1,4 @@
-import type { AgentNodeData, AgentNodeKind, AgentNodeTemplate } from '../components/types'
+import type { AgentNodeData, AgentNodeKind, AgentNodeTemplate, AgentToolMode } from '../components/types'
 
 const variableDefaults: Record<AgentNodeKind, { input: string, output: string }> = {
   input: { input: 'request', output: 'query' },
@@ -13,16 +13,23 @@ const variableDefaults: Record<AgentNodeKind, { input: string, output: string }>
   rerank: { input: 'documents', output: 'documents' },
   document: { input: 'attachment', output: 'document' },
   citation: { input: 'answer', output: 'citations' },
-  llm: { input: 'context', output: 'answer' },
-  embedding: { input: 'text', output: 'vector' },
+  llm: { input: 'query', output: 'answer' },
+  extract: { input: 'query', output: 'data' },
+  classify: { input: 'query', output: 'classification' },
+  vision: { input: 'query', output: 'answer' },
+  embedding: { input: 'query', output: 'vector' },
   tool: { input: 'arguments', output: 'result' },
 }
 
 export function agentModelKind(kind: AgentNodeKind) {
-  if (kind === 'llm' || kind === 'understand') {
+  if (isAgentChatModelNode(kind)) {
     return 'chat'
   }
   return kind === 'embedding' || kind === 'rerank' ? kind : ''
+}
+
+export function isAgentChatModelNode(kind: AgentNodeKind) {
+  return kind === 'llm' || kind === 'extract' || kind === 'classify' || kind === 'vision' || kind === 'understand'
 }
 
 export function agentSourceHandles(kind: AgentNodeKind) {
@@ -34,11 +41,18 @@ export function agentSourceHandles(kind: AgentNodeKind) {
 
 export function createAgentNodeData(template: AgentNodeTemplate, overrides: Partial<AgentNodeData> = {}): AgentNodeData {
   const variables = variableDefaults[template.kind]
+  const toolCodes = Array.isArray(overrides.toolCodes) ? [...overrides.toolCodes] : []
+  const classes = Array.isArray(overrides.classes) ? [...overrides.classes] : []
   return {
     ...template,
     title: template.label,
     prompt: '',
+    toolCodes,
+    toolMode: 'NONE',
     toolCode: '',
+    outputSchema: '',
+    classes,
+    imageVariable: '',
     condition: '',
     code: '',
     template: '',
@@ -57,6 +71,8 @@ export function createAgentNodeData(template: AgentNodeTemplate, overrides: Part
     citationSource: 'documents',
     citationFormat: 'markdown',
     ...overrides,
+    toolCodes,
+    classes,
   }
 }
 
@@ -71,5 +87,24 @@ export function normalizeAgentNodeData(template: AgentNodeTemplate, raw: Partial
   if (template.kind === 'template' && !raw.template && raw.prompt) {
     normalized.template = raw.prompt
   }
+  normalized.toolCodes = strings(raw.toolCodes ?? defaults.toolCodes)
+  normalized.classes = strings(raw.classes ?? defaults.classes)
+  normalized.toolMode = toolMode(raw.toolMode ?? defaults.toolMode)
+  normalized.outputSchema = text(raw.outputSchema ?? defaults.outputSchema)
+  normalized.imageVariable = text(raw.imageVariable ?? defaults.imageVariable)
   return normalized
+}
+
+function strings(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string').map(item => item.trim()).filter(Boolean)
+    : []
+}
+
+function toolMode(value: unknown): AgentToolMode {
+  return value === 'AUTO' || value === 'REQUIRED' ? value : 'NONE'
+}
+
+function text(value: unknown) {
+  return typeof value === 'string' ? value : ''
 }
