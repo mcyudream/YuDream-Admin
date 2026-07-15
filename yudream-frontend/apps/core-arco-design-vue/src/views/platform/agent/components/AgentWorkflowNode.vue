@@ -9,6 +9,7 @@ const props = defineProps<{
   selected?: boolean
   connectable?: boolean | string | number
   debugStatus?: AgentDebugStatus
+  readonly?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -32,7 +33,7 @@ function handleStyle(handle: string) {
   <div class="workflow-node" :class="[{ 'is-selected': selected }, debugStatus ? `debug-${debugStatus.toLowerCase()}` : '']" :style="nodeStyle">
     <Handle v-if="data.kind !== 'start' && data.kind !== 'input'" id="target" type="target" :position="Position.Left" :connectable="connectable" />
 
-    <button class="node-delete nodrag nowheel" type="button" title="删除节点" aria-label="删除节点" @click.stop="emit('delete', id)">
+    <button v-if="!readonly" class="node-delete nodrag nowheel" type="button" title="删除节点" aria-label="删除节点" @click.stop="emit('delete', id)">
       <FaIcon name="i-ri:close-line" />
     </button>
 

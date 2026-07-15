@@ -42,9 +42,18 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    const res = await apiAgent.page({ ...pagination, keyword: search.keyword || undefined, status: search.status || undefined })
-    rows.value = res.data.records
-    pagination.total = Number(res.data.total || 0)
+    const [res, available] = await Promise.all([
+      apiAgent.page({ ...pagination, keyword: search.keyword || undefined, status: search.status || undefined }),
+      apiAgent.available(),
+    ])
+    const persisted = res.data.records.filter(row => row.code !== 'builtin-group-chatbot')
+    const runtime = pagination.page === 1
+      ? available.data.filter(row => row.id.startsWith('-'))
+          .filter(row => !search.status || row.status === search.status)
+          .filter(row => !search.keyword || `${row.name} ${row.code} ${row.description || ''}`.toLowerCase().includes(search.keyword.toLowerCase()))
+      : []
+    rows.value = [...runtime, ...persisted]
+    pagination.total = Math.max(0, Number(res.data.total || 0) - (res.data.records.length - persisted.length) + runtime.length)
   }
   finally {
     loading.value = false
@@ -55,7 +64,10 @@ function create() {
   router.push('/platform/agent/editor')
 }
 function edit(row: AgentApplication) {
-  router.push({ path: '/platform/agent/editor', query: { id: row.id } })
+  router.push({
+    path: '/platform/agent/editor',
+    query: row.id.startsWith('-') ? { runtimeCode: row.code } : { id: row.id },
+  })
 }
 async function publish(row: AgentApplication) {
   actionLoading.value = `publish-${row.id}`
@@ -209,13 +221,13 @@ function statusVariant(status: AgentApplicationStatus) {
             <code>{{ row.code }}</code><span>{{ row.toolCodes?.length || 0 }} 个工具</span>
           </div>
           <div class="agent-actions">
-            <FaButton size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
+            <FaButton v-if="!row.id.startsWith('-')" size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
               运行
             </FaButton><FaButton v-auth="'platform:agent:edit'" size="sm" variant="ghost" @click="edit(row)">
-              编排
-            </FaButton><FaButton v-auth="'platform:agent:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
+              {{ row.id.startsWith('-') ? '查看编排' : '编排' }}
+            </FaButton><FaButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
               发布
-            </FaButton><FaButton v-auth="'platform:agent:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
+            </FaButton><FaButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
               删除
             </FaButton>
           </div>
