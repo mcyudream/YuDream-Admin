@@ -104,7 +104,7 @@ public class AgentWorkflowRuntimeService {
         handlers.add(new AgentConditionNodeHandler(values));
         handlers.add(new AgentTemplateNodeHandler(values));
         handlers.add(new AgentCodeNodeHandler(values, objectMapper, runtimeExecutor));
-        handlers.add(new AgentDocumentNodeHandler(values, documentTextExtractor));
+        handlers.add(new AgentDocumentNodeHandler(values, documentTextExtractor, state));
         handlers.add(new AgentCitationNodeHandler(values, objectMapper));
         handlers.add(new AgentToolNodeHandler(values, objectMapper, runtimeExecutor, toolRepo, systemTools, application, state));
         for (String kind : List.of("search", "vector", "rerank", "embedding")) {
