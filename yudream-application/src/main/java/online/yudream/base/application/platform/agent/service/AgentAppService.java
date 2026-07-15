@@ -16,6 +16,7 @@ import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
 import online.yudream.base.application.platform.agent.query.AgentToolPageQuery;
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowValidator;
+import online.yudream.base.application.platform.agent.workflow.AgentWorkflowToolCodes;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
@@ -110,7 +111,7 @@ public class AgentAppService {
         });
         application.update(
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), cmd.getIcon(), cmd.getSystemPrompt(),
-                cmd.getWorkflowJson(), cmd.getToolCodes(), savedStatus(application, creating)
+                cmd.getWorkflowJson(), AgentWorkflowToolCodes.derive(cmd.getWorkflowJson()), savedStatus(application, creating)
         );
         return AgentAssembler.toDTO(applicationRepo.save(application));
     }
@@ -333,7 +334,7 @@ public class AgentAppService {
         Set<AgentWorkflowValidator.ModelRef> models = modelCatalogParser.parse(optionalAiConfig()).stream()
                 .filter(AgentModelDTO::configured)
                 .map(model -> new AgentWorkflowValidator.ModelRef(
-                        model.providerCode(), model.modelCode(), model.kind().toLowerCase()
+                        model.providerCode(), model.modelCode(), model.kind().toLowerCase(), model.vision()
                 ))
                 .collect(java.util.stream.Collectors.toSet());
         Set<String> knowledgeSpaces = wikiSpaceRepo.findAll().stream()
