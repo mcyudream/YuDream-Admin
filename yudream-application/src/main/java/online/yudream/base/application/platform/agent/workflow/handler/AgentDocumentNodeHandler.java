@@ -5,7 +5,6 @@ import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNode
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNodeHandler;
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNodeResult;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowValueResolver;
-import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowRunState;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.document.service.DocumentTextExtractor;
 import online.yudream.base.domain.platform.document.valobj.DocumentSource;
@@ -15,20 +14,10 @@ import java.util.Map;
 public final class AgentDocumentNodeHandler implements AgentWorkflowNodeHandler {
     private final AgentWorkflowValueResolver values;
     private final DocumentTextExtractor extractor;
-    private final AgentWorkflowRunState state;
 
     public AgentDocumentNodeHandler(AgentWorkflowValueResolver values, DocumentTextExtractor extractor) {
-        this(values, extractor, null);
-    }
-
-    public AgentDocumentNodeHandler(
-            AgentWorkflowValueResolver values,
-            DocumentTextExtractor extractor,
-            AgentWorkflowRunState state
-    ) {
         this.values = values;
         this.extractor = extractor;
-        this.state = state;
     }
 
     @Override
@@ -39,7 +28,7 @@ public final class AgentDocumentNodeHandler implements AgentWorkflowNodeHandler 
     @Override
     public AgentWorkflowNodeResult execute(AgentWorkflowNode node, AgentWorkflowContext context) {
         String configuredInput = values.text(node, "documentInput");
-        Object input = "attachment".equals(configuredInput) ? attachment() : null;
+        Object input = attachment(configuredInput, context);
         if (input == null) {
             input = configuredInput.isBlank() || "attachment".equals(configuredInput)
                     ? values.input(node, context)
@@ -48,16 +37,22 @@ public final class AgentDocumentNodeHandler implements AgentWorkflowNodeHandler 
         return values.result(node, extractor.extract(source(input)));
     }
 
-    private Object attachment() {
-        if (state == null || state.command().getAttachments() == null || state.command().getAttachments().isEmpty()) {
+    private Object attachment(String selector, AgentWorkflowContext context) {
+        if (!selector.isBlank() && !"attachment".equals(selector) && !selector.startsWith("attachment:")) {
             return null;
         }
-        var attachment = state.command().getAttachments().getFirst();
-        return Map.of(
-                "dataUrl", attachment.dataUrl() == null ? "" : attachment.dataUrl(),
-                "contentType", attachment.contentType() == null ? "" : attachment.contentType(),
-                "fileName", attachment.name() == null ? "" : attachment.name()
-        );
+        String fileName = selector.startsWith("attachment:") ? selector.substring("attachment:".length()).trim() : "";
+        Object all = context.variable("attachments");
+        if (!(all instanceof java.util.List<?> attachments) || attachments.isEmpty()) {
+            return null;
+        }
+        if (fileName.isBlank()) {
+            return attachments.getFirst();
+        }
+        return attachments.stream()
+                .filter(item -> item instanceof Map<?, ?> map && fileName.equals(String.valueOf(map.get("name"))))
+                .findFirst()
+                .orElseThrow(() -> new BizException("未找到文档附件：" + fileName));
     }
 
     private DocumentSource source(Object input) {

@@ -11,8 +11,14 @@ public final class AgentWorkflowContext {
     private final Map<String, Object> variables = new LinkedHashMap<>();
 
     AgentWorkflowContext(Object input) {
-        this.input = input;
-        variables.put("input", input);
+        if (input instanceof AgentWorkflowInitialInput initial) {
+            this.input = initial.input();
+            variables.putAll(initial.variables());
+        }
+        else {
+            this.input = input;
+        }
+        variables.put("input", this.input);
     }
 
     public Object input() {

@@ -30,6 +30,9 @@ public final class AgentWorkflowValueResolver {
     public Object input(AgentWorkflowNode node, AgentWorkflowContext context) {
         String variable = text(node, "inputVariable");
         if (StringUtils.hasText(variable)) {
+            if ("context".equals(variable)) {
+                return inputValue(context);
+            }
             return resolve(variable, context);
         }
         Object latest = null;
