@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 /** Native chat-model handler. Each instance has one explicit workflow node semantic. */
 public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
@@ -275,7 +276,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         }
         List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> pendingCallbacks = new ArrayList<>(callbackResults);
         for (var result : results) {
-            int callbackIndex = identityIndex(pendingCallbacks, result);
+            int callbackIndex = matchingIndex(pendingCallbacks, result);
             if (callbackIndex >= 0) {
                 pendingCallbacks.remove(callbackIndex);
                 continue;
@@ -284,9 +285,9 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         }
     }
 
-    private int identityIndex(List<?> values, Object candidate) {
+    private int matchingIndex(List<?> values, Object candidate) {
         for (int index = 0; index < values.size(); index++) {
-            if (values.get(index) == candidate) {
+            if (Objects.equals(values.get(index), candidate)) {
                 return index;
             }
         }

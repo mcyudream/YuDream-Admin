@@ -12,6 +12,7 @@ import online.yudream.base.infra.platform.ai.service.provider.AiModelEndpoint;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderEndpoint;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderType;
 import online.yudream.base.infra.platform.ai.service.provider.OpenAiProviderAdapter;
+import online.yudream.base.infra.platform.ai.service.provider.OpenAiCompatibleProviderAdapter;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolExecutionScope;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry;
 import online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext;
@@ -132,7 +133,22 @@ class OpenAiCompatibleGenerationGatewayTest {
         );
 
         assertThat(adapter.chatOptions(provider, model, request).getToolChoice()).isEqualTo("required");
-        assertThat(request.withToolCallingEnabled(false).providerToolChoice()).isEqualTo("none");
+        assertThat(adapter.chatOptions(provider, model, request.withToolCallingEnabled(false)).getToolChoice()).isNull();
+    }
+
+    @Test
+    void shouldOmitRequiredToolChoiceForGenericCompatibleProvider() {
+        OpenAiCompatibleProviderAdapter adapter = new OpenAiCompatibleProviderAdapter();
+        AiProviderEndpoint provider = new AiProviderEndpoint(
+                "compatible", "Compatible", AiProviderType.OPENAI_COMPATIBLE, "https://api.example.com/v1", "/chat/completions",
+                "key", null, "model", null, null, List.of(), List.of(), List.of(), true
+        );
+        AiModelEndpoint model = new AiModelEndpoint("model", "Model", "model", null, null, false, null, "chat", false);
+        AiGenerationRequest request = new AiGenerationRequest(
+                "system", "user", null, "compatible", "model", Map.of(), List.of(), true, AiToolMode.REQUIRED
+        );
+
+        assertThat(adapter.chatOptions(provider, model, request).getToolChoice()).isNull();
     }
 
     @Test

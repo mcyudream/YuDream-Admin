@@ -86,15 +86,4 @@ public record AiGenerationRequest(
         );
     }
 
-    /** Provider-level tool choice. Disabled callbacks must always be advertised as none. */
-    public String providerToolChoice() {
-        if (!toolCallingEnabled) {
-            return "none";
-        }
-        return switch (toolMode) {
-            case REQUIRED -> "required";
-            case AUTO -> "auto";
-            case NONE -> "none";
-        };
-    }
 }

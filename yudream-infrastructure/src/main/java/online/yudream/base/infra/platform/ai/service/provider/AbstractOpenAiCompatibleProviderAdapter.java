@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.ai.service.provider;
 
 import cn.hutool.json.JSONUtil;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.util.StringUtils;
@@ -19,8 +20,12 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
         applyProviderDefaults(provider, model, request, extraBody);
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
                 .model(model.modelName())
-                .temperature(temperature(provider, model))
-                .toolChoice(request.providerToolChoice());
+                .temperature(temperature(provider, model));
+        if (request.toolCallingEnabled()
+                && request.toolMode() == AiToolMode.REQUIRED
+                && supportsRequiredToolChoice(provider, model)) {
+            builder.toolChoice("required");
+        }
         String reasoningEffort = reasoningEffort(provider, model, request, extraBody);
         if (StringUtils.hasText(reasoningEffort)) {
             builder.reasoningEffort(reasoningEffort);
@@ -29,6 +34,11 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
             builder.extraBody(extraBody);
         }
         return builder.build();
+    }
+
+    /** Compatibility providers opt in only when their native API guarantees `tool_choice=required`. */
+    protected boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
+        return false;
     }
 
     protected void applyProviderDefaults(
