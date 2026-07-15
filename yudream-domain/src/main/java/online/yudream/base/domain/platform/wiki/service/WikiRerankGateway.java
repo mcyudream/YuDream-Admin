@@ -6,4 +6,13 @@ import java.util.List;
 
 public interface WikiRerankGateway {
     List<WikiSearchHit> rerank(String providerCode, String query, List<WikiSearchHit> candidates);
+
+    default List<WikiSearchHit> rerank(
+            String providerCode,
+            String modelCode,
+            String query,
+            List<WikiSearchHit> candidates
+    ) {
+        return rerank(providerCode, query, candidates);
+    }
 }
