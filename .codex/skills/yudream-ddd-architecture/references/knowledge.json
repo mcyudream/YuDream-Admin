@@ -175,6 +175,10 @@
     {
       "key": "plugin-agent-runtime-manifest",
       "text": "Plugin-owned Agent applications must be declared as static plugin.yml agents with classpath workflow resources and projected into the runtime registry only. Enabling registers them; disable/unload disposes them immediately. Never seed plugin Agent applications into the host database, and never fall back to legacy persisted copies when the owning plugin is unavailable."
+    },
+    {
+      "key": "agent-async-permission-snapshot",
+      "text": "Agent SSE debug and plugin message execution must capture caller permission codes before crossing CompletableFuture/Reactor threads. Store an explicit permission snapshot on AgentRunCmd and make workflow/tool authorization consume it; never read Sa-Token or API-key ThreadLocal state from asynchronous worker threads."
     }
   ],
   "utilities": [

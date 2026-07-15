@@ -73,7 +73,11 @@ public class AgentWorkflowRuntimeService {
                 .filter(code -> application.getToolCodes() != null && application.getToolCodes().contains(code))
                 .map(code -> systemTools.stream().filter(tool -> code.equals(tool.descriptor().name())).findFirst().orElseThrow())
                 .toList();
-        selectedTools.forEach(tool -> ensureToolPermission(tool.descriptor().permissionCode(), tool.descriptor().title()));
+        selectedTools.forEach(tool -> ensureToolPermission(
+                command,
+                tool.descriptor().permissionCode(),
+                tool.descriptor().title()
+        ));
         Set<String> selectedSystemTools = selectedTools.stream()
                 .map(tool -> tool.descriptor().name())
                 .collect(Collectors.toSet());
@@ -178,8 +182,12 @@ public class AgentWorkflowRuntimeService {
         return new AgentDebugEventDTO(node.id(), node.kind(), node.title(), status, message);
     }
 
-    private void ensureToolPermission(String permissionCode, String toolName) {
-        if (!permissionGateway.hasPermission(permissionCode)) {
+    private void ensureToolPermission(AgentRunCmd command, String permissionCode, String toolName) {
+        if (!permissionGateway.hasPermission(
+                permissionCode,
+                command.getPermissionCodes(),
+                command.isPermissionContextExplicit()
+        )) {
             throw new online.yudream.base.domain.common.exception.BizException("无权限调用工具：" + toolName);
         }
     }

@@ -18,6 +18,7 @@ import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
@@ -80,18 +81,19 @@ public class AgentController {
     public Result<Void> delete(@PathVariable Long id) { agentAppService.deleteApplication(id); return Result.ok(); }
     @PostMapping("/{id}/run")
     @PermissionRegister(code = "platform:agent:run", name = "运行 Agent 应用", module = "平台能力", desc = "运行 Agent 应用")
-    public Result<AgentRunRes> run(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.run(AgentWebAssembler.toRunCmd(id, request)))); }
+    public Result<AgentRunRes> run(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.run(AgentWebAssembler.toRunCmd(id, request, SecurityPrincipalSupport.current())))); }
 
     @PostMapping(value = "/{id}/debug/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PermissionRegister(code = "platform:agent:edit", name = "调试 Agent 应用", module = "平台能力", desc = "流式调试 Agent 工作流")
     public SseEmitter debug(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) {
         SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
         String runId = UUID.randomUUID().toString();
+        var command = AgentWebAssembler.toRunCmd(id, request, SecurityPrincipalSupport.current());
         CompletableFuture.runAsync(() -> {
             try {
                 send(emitter, AgentWebAssembler.toDebugRunStarted(runId));
                 var result = agentAppService.debug(
-                        AgentWebAssembler.toRunCmd(id, request),
+                        command,
                         event -> send(emitter, AgentWebAssembler.toDebugNodeEvent(runId, event)),
                         delta -> send(emitter, AgentWebAssembler.toDebugTextChunk(runId, delta)),
                         tool -> send(emitter, AgentWebAssembler.toDebugToolResult(runId, tool))

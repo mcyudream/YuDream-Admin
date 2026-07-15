@@ -30,6 +30,38 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AgentWorkflowRuntimeServiceTest {
 
     @Test
+    void shouldUseExplicitPermissionSnapshotWithoutReadingThreadContext() {
+        ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
+        ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        when(gateways.getIfAvailable()).thenReturn(null);
+        AiAgentTool protectedTool = new AiAgentTool() {
+            @Override public AiAgentToolDescriptor descriptor() { return new AiAgentToolDescriptor("cms.patch", "Patch page", "", "cms:edit", "", "", "", Map.of()); }
+            @Override public AiAgentToolResult execute(AiAgentToolCall call) { throw new AssertionError("Tool must not execute"); }
+        };
+        when(tools.stream()).thenReturn(Stream.of(protectedTool));
+        AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
+                new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class),
+                permission -> { throw new AssertionError("Thread permission context must not be read"); },
+                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+        );
+        AgentApplication application = AgentApplication.builder()
+                .name("Async debug application").code("async-debug").toolCodes(List.of("cms.patch"))
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                          {"id":"end","data":{"kind":"end","inputVariable":"query"}}
+                        ],"edges":[{"source":"start","target":"end"}]}
+                        """).build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("test");
+        cmd.setPermissionCodes(List.of("cms:edit"));
+        cmd.setPermissionContextExplicit(true);
+
+        assertThat(service.execute(application, cmd, Map.of(), null, null, null).content()).isEqualTo("test");
+    }
+
+    @Test
     void shouldRunWorkflowAndEmitRealNodeEventsWithoutSkippedFallback() {
         ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
         ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
