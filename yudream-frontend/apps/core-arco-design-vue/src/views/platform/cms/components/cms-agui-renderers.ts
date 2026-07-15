@@ -1,7 +1,8 @@
 import { activityRegistry, agentToolcallRegistry } from '@tdesign-vue-next/chat'
 import { defineComponent, h } from 'vue'
+import { normalizeAguiCard } from '../config/cms-agui-card'
 
-type ToolResult = {
+interface ToolResult {
   action?: string
   message?: string
   payload?: Record<string, unknown>
@@ -41,12 +42,53 @@ const CmsProgressActivity = defineComponent({
   setup(props) {
     return () => {
       const content = (props.content || {}) as Record<string, string>
-      return h('section', { class: 'cms-agui-activity', 'aria-live': 'polite' }, [
+      return h('section', { 'class': 'cms-agui-activity', 'aria-live': 'polite' }, [
         h('span', { class: 'cms-agui-activity__dot' }),
         h('div', { class: 'cms-agui-activity__body' }, [
           h('strong', content.title || 'CMS 构建任务'),
           h('p', content.content || '正在处理请求。'),
         ]),
+      ])
+    }
+  },
+})
+
+const AguiCardActivity = defineComponent({
+  name: 'AguiCardActivity',
+  props: {
+    content: { type: Object, required: true },
+  },
+  setup(props) {
+    async function runAction(action: 'copy' | 'open' | 'submit', value: string) {
+      if (action === 'copy') {
+        await navigator.clipboard.writeText(value)
+      }
+      else if (action === 'open' && value.startsWith('/')) {
+        window.open(value, '_blank', 'noopener,noreferrer')
+      }
+      else if (action === 'submit' && value.trim()) {
+        window.dispatchEvent(new CustomEvent('cms-ai-follow-up', { detail: value.trim() }))
+      }
+    }
+
+    return () => {
+      const card = normalizeAguiCard(props.content)
+      return h('section', { class: ['cms-agui-card', `is-${card.tone}`] }, [
+        h('header', { class: 'cms-agui-card__head' }, [
+          h('strong', card.title),
+          ...(card.summary ? [h('p', card.summary)] : []),
+        ]),
+        ...(card.fields.length
+          ? [h('dl', { class: 'cms-agui-card__fields' }, card.fields.flatMap(field => [
+              h('div', { class: 'cms-agui-card__field' }, [h('dt', field.label), h('dd', field.value)]),
+            ]))]
+          : []),
+        ...(card.actions.length
+          ? [h('div', { class: 'cms-agui-card__actions' }, card.actions.map(action => h('button', {
+              type: 'button',
+              onClick: () => void runAction(action.action, action.value),
+            }, action.label)))]
+          : []),
       ])
     }
   },
@@ -80,7 +122,7 @@ const CmsToolCall = defineComponent({
         ? webFetchPreview(result.payload)
         : null
       const children: any[] = [
-        h('span', { class: 'cms-agui-tool__state', 'aria-hidden': 'true' }),
+        h('span', { 'class': 'cms-agui-tool__state', 'aria-hidden': 'true' }),
         h('div', { class: 'cms-agui-tool__body' }, [
           h('strong', toolLabels[props.toolName] || props.toolName),
           h('p', validationErrors || `${message}${action}`),
@@ -108,6 +150,13 @@ export function registerCmsAguiRenderers() {
       activityType: 'cms-progress',
       component: CmsProgressActivity,
       description: 'CMS 构建进度',
+    })
+  }
+  if (!activityRegistry.has('agui-card')) {
+    activityRegistry.register({
+      activityType: 'agui-card',
+      component: AguiCardActivity,
+      description: 'AG-UI 结构化卡片',
     })
   }
 
