@@ -43,6 +43,9 @@ public final class AgentWorkflowValueResolver {
         if (!StringUtils.hasText(path)) {
             return inputValue(context);
         }
+        if (context.variables().containsKey(path)) {
+            return context.variable(path);
+        }
         try {
             return expressionParser.parseExpression(path).getValue(evaluationContext(context));
         } catch (RuntimeException exception) {
