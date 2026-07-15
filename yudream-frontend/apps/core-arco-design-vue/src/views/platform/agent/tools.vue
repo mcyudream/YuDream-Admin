@@ -11,7 +11,10 @@ const rows = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const keyword = ref('')
-const form = reactive({ name: '', code: '', description: '', inputSchemaJson: '{\n  "type": "object",\n  "properties": {}\n}', pythonCode: 'import sys\n\ninput_text = sys.stdin.read()\nprint(input_text)', timeoutMillis: 10000, permissionCode: '', enabled: true })
+const defaultInputSchema = '{\n  "type": "object",\n  "properties": {\n    "name": { "type": "string", "description": "名称" }\n  },\n  "required": ["name"]\n}'
+const defaultOutputExample = '{\n  "success": true,\n  "message": "Hello, YuDream"\n}'
+const defaultPythonCode = 'def run(params: dict) -> dict:\n    name = str(params.get("name", ""))\n    return {\n        "success": True,\n        "message": f"Hello, {name}",\n    }'
+const form = reactive({ name: '', code: '', description: '', inputSchemaJson: defaultInputSchema, outputExampleJson: defaultOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
 
 onMounted(load)
 async function load() {
@@ -25,7 +28,7 @@ async function load() {
   finally { loading.value = false }
 }
 function resetForm() {
-  Object.assign(form, { name: '', code: '', description: '', inputSchemaJson: '{\n  "type": "object",\n  "properties": {}\n}', pythonCode: 'import sys\n\ninput_text = sys.stdin.read()\nprint(input_text)', timeoutMillis: 10000, permissionCode: '', enabled: true })
+  Object.assign(form, { name: '', code: '', description: '', inputSchemaJson: defaultInputSchema, outputExampleJson: defaultOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
 }
 function create() {
   editing.value = null
@@ -34,12 +37,19 @@ function create() {
 }
 function edit(row: AgentTool) {
   editing.value = row
-  Object.assign(form, row)
+  Object.assign(form, row, {
+    inputSchemaJson: row.inputSchemaJson || defaultInputSchema,
+    outputExampleJson: row.outputExampleJson || defaultOutputExample,
+  })
   visible.value = true
 }
 async function save() {
-  if (!form.name.trim() || !form.code.trim() || !form.pythonCode.trim()) {
-    toast.error('请填写工具名称、编码和 Python 代码')
+  if (!form.name.trim() || !form.code.trim() || !form.outputExampleJson.trim() || !form.pythonCode.trim()) {
+    toast.error('请填写工具名称、编码、输出格式示例和 Python 代码')
+    return
+  }
+  if (!isJsonObject(form.inputSchemaJson) || !isJsonObject(form.outputExampleJson)) {
+    toast.error('参数 Schema 和输出格式示例必须是 JSON object')
     return
   }
   try {
@@ -52,7 +62,16 @@ async function save() {
     visible.value = false
     await load()
   }
-  catch { toast.error('工具保存失败，请检查 JSON Schema') }
+  catch { toast.error('工具保存失败，请检查工具配置') }
+}
+function isJsonObject(value: string) {
+  try {
+    const parsed = JSON.parse(value)
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+  }
+  catch {
+    return false
+  }
 }
 function remove(row: AgentTool) {
   modal.confirm({
@@ -86,7 +105,7 @@ function remove(row: AgentTool) {
       </section>
       <section class="custom-tools">
         <div class="section-head">
-          <div><h3>Python 工具</h3><p>脚本从标准输入读取 Agent 输入，并将标准输出作为工具结果。</p></div><FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 编码" @keydown.enter="load" />
+          <div><h3>Python 工具</h3><p>通过 <code>run(params: dict) -&gt; dict</code> 接收参数并返回结构化结果。</p></div><FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 编码" @keydown.enter="load" />
         </div><FaTable v-loading="loading" row-key="id" :data="rows" :columns="[{ accessorKey: 'name', header: '名称' }, { accessorKey: 'code', header: '编码' }, { accessorKey: 'description', header: '描述' }, { accessorKey: 'timeoutMillis', header: '超时(ms)' }, { id: 'enabled', header: '状态' }, { id: 'operation', header: '操作' }]">
           <template #cell-enabled="{ row }">
             <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
@@ -122,9 +141,14 @@ function remove(row: AgentTool) {
           <small>使用 JSON Schema object 描述参数，供模型生成合法调用参数</small>
         </label>
         <label class="form-field required">
+          <span>输出格式示例</span>
+          <FaTextarea v-model="form.outputExampleJson" class="w-full" input-class="font-mono" :autosize="{ minRows: 5, maxRows: 10 }" placeholder="填写 run() 返回字典的 JSON 示例" />
+          <small>必须是 JSON object 示例，用于说明返回字段、类型和业务含义</small>
+        </label>
+        <label class="form-field required">
           <span>Python 代码</span>
-          <FaTextarea v-model="form.pythonCode" class="w-full" input-class="font-mono" :autosize="{ minRows: 13, maxRows: 22 }" placeholder="从标准输入读取参数，并将执行结果写入标准输出" />
-          <small>运行环境从 stdin 接收输入，stdout 内容将作为工具调用结果</small>
+          <FaTextarea v-model="form.pythonCode" class="w-full" input-class="font-mono" :autosize="{ minRows: 13, maxRows: 22 }" placeholder="def run(params: dict) -> dict: ..." />
+          <small>必须定义 run(params: dict) -&gt; dict；不要读取 stdin、写 stdout 或返回字符串</small>
         </label>
       </div>
       <template #footer>

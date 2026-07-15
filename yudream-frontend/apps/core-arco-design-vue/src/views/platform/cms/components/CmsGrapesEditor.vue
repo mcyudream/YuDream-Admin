@@ -3535,6 +3535,30 @@ function escapeAttr(value: string) {
   background: var(--td-brand-color-light, #e8f0ff);
 }
 
+:deep(.cms-agui-card) {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-left: 3px solid rgb(var(--primary-6));
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+:deep(.cms-agui-card.is-success) { border-left-color: rgb(var(--success-6)); }
+:deep(.cms-agui-card.is-warning) { border-left-color: rgb(var(--warning-6)); }
+:deep(.cms-agui-card.is-danger) { border-left-color: rgb(var(--danger-6)); }
+:deep(.cms-agui-card__head) { display: grid; gap: 4px; }
+:deep(.cms-agui-card__head strong) { color: var(--color-text-1); font-size: 14px; }
+:deep(.cms-agui-card__head p) { margin: 0; color: var(--color-text-2); font-size: 12px; line-height: 1.6; }
+:deep(.cms-agui-card__fields) { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
+:deep(.cms-agui-card__field) { display: grid; gap: 2px; min-width: 0; padding: 8px; border-radius: 4px; background: var(--color-fill-1); }
+:deep(.cms-agui-card__field dt) { color: var(--color-text-3); font-size: 10px; }
+:deep(.cms-agui-card__field dd) { margin: 0; overflow-wrap: anywhere; color: var(--color-text-1); font-size: 13px; }
+:deep(.cms-agui-card__actions) { display: flex; flex-wrap: wrap; gap: 8px; }
+:deep(.cms-agui-card__actions button) { min-height: 30px; padding: 0 10px; border: 1px solid var(--color-border-2); border-radius: 4px; background: var(--color-bg-1); color: rgb(var(--primary-6)); font-size: 12px; cursor: pointer; }
+:deep(.cms-agui-card__actions button:hover) { border-color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); }
+
 .ai-attachment-input {
   display: none;
 }

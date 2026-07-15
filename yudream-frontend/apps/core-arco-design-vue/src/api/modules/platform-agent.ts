@@ -36,6 +36,7 @@ export interface AgentTool {
   description?: string
   type: 'PYTHON'
   inputSchemaJson?: string
+  outputExampleJson?: string
   pythonCode: string
   timeoutMillis: number
   permissionCode?: string
