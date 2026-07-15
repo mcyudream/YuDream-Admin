@@ -24,6 +24,13 @@ import static org.mockito.Mockito.when;
 
 class BuiltinAgentInitializerServiceTest {
 
+    private static final List<String> CMS_TOOLS = List.of(
+            "web.fetch", "cms.ask.user", "cms.canvas.patch", "cms.chrome.style",
+            "cms.canvas.selected.text", "cms.canvas.selected.html", "cms.canvas.selected.style",
+            "cms.canvas.block.add", "cms.canvas.selected.remove", "cms.block.template.list",
+            "cms.canvas.validate"
+    );
+
     @Test
     void createsPublishedComplexCmsAndAguiCardAgentsFromConfiguredDefaultModel() throws Exception {
         AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
@@ -194,6 +201,111 @@ class BuiltinAgentInitializerServiceTest {
     }
 
     @Test
+    void keepsExistingCmsWorkflowWhenNoConfiguredChatModelCanApplySchemaUpgrade() throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of());
+        String workflow = cmsWorkflow(CMS_TOOLS, false, "{\"kind\":\"template\"}");
+        AgentApplication cms = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson(workflow)
+                .build();
+        AgentApplication agui = AgentApplication.builder()
+                .code(BuiltinAgentCodes.AGUI_CARD)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{},{}]}")
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(agui));
+
+        List<AgentApplication> initialized = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        assertThat(initialized).isEmpty();
+        assertThat(cms.getWorkflowJson()).isEqualTo(workflow);
+        assertThat(cms.getStatus()).isEqualTo(AgentApplicationStatus.PUBLISHED);
+        verify(applications, never()).save(any());
+    }
+
+    @Test
+    void upgradesCmsWorkflowWhenClarificationNodeDeclaresToolConfiguration() throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of(new AgentModelDTO(
+                "openai", "OpenAI", "gpt-5", "GPT-5", "chat", true, true, true
+        )));
+        AgentApplication cms = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .status(AgentApplicationStatus.DISABLED)
+                .workflowJson(cmsWorkflow(
+                        CMS_TOOLS,
+                        true,
+                        "{\"kind\":\"understand\",\"strictJson\":false,\"providerCode\":\"openai\",\"modelCode\":\"gpt-5\",\"toolConfigDeclared\":true}"
+                ))
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.empty());
+        when(applications.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AgentApplication> initialized = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        AgentApplication upgraded = initialized.stream()
+                .filter(item -> BuiltinAgentCodes.CMS_BUILDER.equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        JsonNode nodes = new ObjectMapper().readTree(upgraded.getWorkflowJson()).path("nodes");
+        assertThat(upgraded.getStatus()).isEqualTo(AgentApplicationStatus.DISABLED);
+        assertThat(nodeData(nodes, "plan").has("toolConfigDeclared")).isFalse();
+        assertThat(nodeData(nodes, "clarify").has("toolConfigDeclared")).isFalse();
+    }
+
+    @Test
+    void keepsCmsWorkflowWhenNodeToolSetOnlyUsesDifferentOrder() throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of(new AgentModelDTO(
+                "openai", "OpenAI", "gpt-5", "GPT-5", "chat", true, true, true
+        )));
+        List<String> reorderedTools = new java.util.ArrayList<>(CMS_TOOLS);
+        java.util.Collections.reverse(reorderedTools);
+        AgentApplication cms = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson(cmsWorkflow(reorderedTools, true, "{\"kind\":\"template\"}"))
+                .build();
+        AgentApplication agui = AgentApplication.builder()
+                .code(BuiltinAgentCodes.AGUI_CARD)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{},{}]}")
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(agui));
+
+        List<AgentApplication> initialized = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        assertThat(initialized).isEmpty();
+        verify(applications, never()).save(any());
+    }
+
+    @Test
     void repairsComplexBuiltinWorkflowThatReferencesNonChatModel() throws Exception {
         AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
         CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
@@ -252,5 +364,18 @@ class BuiltinAgentInitializerServiceTest {
                 .filter(JsonNode::isTextual)
                 .map(JsonNode::asText)
                 .toList();
+    }
+
+    private String cmsWorkflow(List<String> toolCodes, boolean toolConfigDeclared, String planData) throws Exception {
+        String marker = toolConfigDeclared ? ",\"toolConfigDeclared\":true" : "";
+        String tools = new ObjectMapper().writeValueAsString(toolCodes);
+        return """
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start"}},
+                  {"id":"plan","data":%s},
+                  {"id":"route","data":{"kind":"condition"}},
+                  {"id":"build","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5","toolMode":"AUTO","toolCodes":%s%s}}
+                ]}
+                """.formatted(planData, tools, marker);
     }
 }

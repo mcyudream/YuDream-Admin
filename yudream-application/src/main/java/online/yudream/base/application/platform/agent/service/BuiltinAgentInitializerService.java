@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -111,12 +112,12 @@ public class BuiltinAgentInitializerService {
             if (nodes.size() <= 3) {
                 return true;
             }
+            if (chatModels == null || chatModels.isEmpty()) {
+                return false;
+            }
             if (BuiltinAgentCodes.CMS_BUILDER.equals(application.getCode())
                     && requiresCmsModelToolUpgrade(nodes)) {
                 return true;
-            }
-            if (chatModels == null || chatModels.isEmpty()) {
-                return false;
             }
             for (var node : nodes) {
                 var data = node.path("data");
@@ -156,7 +157,7 @@ public class BuiltinAgentInitializerService {
         if (!"AUTO".equalsIgnoreCase(build.path("toolMode").asText())) {
             return true;
         }
-        if (!CMS_TOOLS.equals(textValues(build.path("toolCodes")))) {
+        if (!Set.copyOf(CMS_TOOLS).equals(Set.copyOf(textValues(build.path("toolCodes"))))) {
             return true;
         }
         return hasToolConfiguration(nodeData(nodes, "plan"))
@@ -173,7 +174,9 @@ public class BuiltinAgentInitializerService {
     }
 
     private boolean hasToolConfiguration(JsonNode data) {
-        return data != null && (data.has("toolMode") || !textValues(data.path("toolCodes")).isEmpty());
+        return data != null && (data.has("toolMode")
+                || data.has("toolConfigDeclared")
+                || !textValues(data.path("toolCodes")).isEmpty());
     }
 
     private List<String> textValues(JsonNode values) {
