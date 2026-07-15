@@ -109,9 +109,10 @@ public class AgentAppService {
                 throw new BizException("Agent 应用编码已存在");
             }
         });
+        AgentWorkflowToolCodes.NormalizedWorkflow workflow = AgentWorkflowToolCodes.normalize(cmd.getWorkflowJson());
         application.update(
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), cmd.getIcon(), cmd.getSystemPrompt(),
-                cmd.getWorkflowJson(), AgentWorkflowToolCodes.derive(cmd.getWorkflowJson()), savedStatus(application, creating)
+                workflow.workflowJson(), workflow.toolCodes(), savedStatus(application, creating)
         );
         return AgentAssembler.toDTO(applicationRepo.save(application));
     }

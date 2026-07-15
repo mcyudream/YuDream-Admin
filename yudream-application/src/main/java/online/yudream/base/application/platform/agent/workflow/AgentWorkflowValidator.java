@@ -134,6 +134,14 @@ public final class AgentWorkflowValidator {
 
     private void validateModelTools(AgentWorkflowNode node, Catalog catalog) {
         JsonNode value = node.data().path("toolCodes");
+        String configured = text(node.data().path("toolMode"));
+        String mode = configured.isEmpty() ? (arrayTexts(value).isEmpty() ? "NONE" : "AUTO") : configured.toUpperCase(Locale.ROOT);
+        if (!Set.of("NONE", "AUTO", "REQUIRED").contains(mode)) {
+            throw invalid(node, "工具调用策略不受支持：" + configured);
+        }
+        if ("NONE".equals(mode)) {
+            return;
+        }
         if (!value.isMissingNode() && !value.isNull() && !value.isArray()) {
             throw invalid(node, "工具必须为数组");
         }
@@ -142,14 +150,6 @@ public final class AgentWorkflowValidator {
             if (!catalog.toolCodes().contains(code)) {
                 throw invalid(node, "工具不存在、未启用或当前用户无权使用：" + code);
             }
-        }
-        String configured = text(node.data().path("toolMode"));
-        String mode = configured.isEmpty() ? (codes.isEmpty() ? "NONE" : "AUTO") : configured.toUpperCase(Locale.ROOT);
-        if (!Set.of("NONE", "AUTO", "REQUIRED").contains(mode)) {
-            throw invalid(node, "工具调用策略不受支持：" + configured);
-        }
-        if ("NONE".equals(mode) && !codes.isEmpty()) {
-            throw invalid(node, "工具调用策略为 NONE 时不能配置工具");
         }
         if (("AUTO".equals(mode) || "REQUIRED".equals(mode)) && codes.isEmpty()) {
             throw invalid(node, "工具调用策略为 " + mode + " 时必须配置至少一个工具");

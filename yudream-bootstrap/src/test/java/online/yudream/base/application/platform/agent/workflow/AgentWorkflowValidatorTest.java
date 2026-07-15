@@ -147,7 +147,7 @@ class AgentWorkflowValidatorTest {
                 """
         ), catalog)).isInstanceOf(AgentWorkflowDefinitionException.class);
 
-        assertThatThrownBy(() -> validator.validate(workflow(
+        validator.validate(workflow(
                 """
                 {"id":"start","data":{"kind":"start"}},
                 {"id":"model","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5","toolMode":"NONE","toolCodes":["web.fetch"]}},
@@ -157,7 +157,27 @@ class AgentWorkflowValidatorTest {
                 {"source":"start","target":"model"},
                 {"source":"model","target":"end"}
                 """
-        ), catalog)).isInstanceOf(AgentWorkflowDefinitionException.class);
+        ), catalog);
+    }
+
+    @Test
+    void noneModeClearsStaleToolSelectionsBeforeDerivation() {
+        String workflow = workflow(
+                """
+                {"id":"start","data":{"kind":"start"}},
+                {"id":"model","data":{"kind":"llm","toolMode":"NONE","toolCodes":["stale.tool"]}},
+                {"id":"end","data":{"kind":"end"}}
+                """,
+                """
+                {"source":"start","target":"model"},
+                {"source":"model","target":"end"}
+                """
+        );
+
+        var normalized = AgentWorkflowToolCodes.normalize(workflow);
+
+        assertThat(normalized.toolCodes()).isEmpty();
+        assertThat(normalized.workflowJson()).contains("\"toolCodes\":[]");
     }
 
     @Test
