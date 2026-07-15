@@ -49,6 +49,22 @@ public class BuiltinAgentInitializerService {
                 List.of(),
                 model
         ).ifPresent(created::add);
+        createIfMissing(
+                BuiltinAgentCodes.AGUI_CARD,
+                "AG-UI 卡片生成 Agent",
+                "将用户内容整理为仅供 AG-UI 流展示的结构化卡片",
+                """
+                        你是 AG-UI 卡片生成 Agent。仅输出一个 JSON 对象，不要输出 Markdown 或解释文字。
+                        输出格式：
+                        {"title":"卡片标题","summary":"摘要","tone":"info|success|warning|danger",
+                         "fields":[{"label":"字段名","value":"字段值"}],
+                         "actions":[{"label":"按钮文字","action":"open|submit|copy","value":"动作参数"}]}
+                        fields 和 actions 必须是数组，没有内容时返回空数组；所有 value 必须是字符串。
+                        """,
+                List.of(),
+                model,
+                true
+        ).ifPresent(created::add);
         return List.copyOf(created);
     }
 
@@ -60,6 +76,18 @@ public class BuiltinAgentInitializerService {
             List<String> toolCodes,
             AgentModelDTO model
     ) {
+        return createIfMissing(code, name, description, systemPrompt, toolCodes, model, false);
+    }
+
+    private java.util.Optional<AgentApplication> createIfMissing(
+            String code,
+            String name,
+            String description,
+            String systemPrompt,
+            List<String> toolCodes,
+            AgentModelDTO model,
+            boolean structured
+    ) {
         if (applications.findByCode(code).isPresent()) {
             return java.util.Optional.empty();
         }
@@ -70,7 +98,7 @@ public class BuiltinAgentInitializerService {
                 description,
                 "i-ri:robot-2-line",
                 systemPrompt,
-                workflow(model),
+                workflow(model, structured),
                 toolCodes,
                 AgentApplicationStatus.DRAFT
         );
@@ -92,13 +120,16 @@ public class BuiltinAgentInitializerService {
                 .orElse(chatModels.isEmpty() ? null : chatModels.getFirst());
     }
 
-    private String workflow(AgentModelDTO model) {
+    private String workflow(AgentModelDTO model, boolean structured) {
         Map<String, Object> modelData = new LinkedHashMap<>();
-        modelData.put("kind", "llm");
-        modelData.put("title", "大模型");
+        modelData.put("kind", structured ? "understand" : "llm");
+        modelData.put("title", structured ? "生成卡片" : "大模型");
         modelData.put("providerCode", model == null ? "" : model.providerCode());
         modelData.put("modelCode", model == null ? "" : model.modelCode());
-        modelData.put("vision", model != null && model.vision());
+        modelData.put("vision", !structured && model != null && model.vision());
+        if (structured) {
+            modelData.put("prompt", "将输入内容整理为系统提示词规定的 AG-UI 卡片 JSON。");
+        }
         modelData.put("inputVariable", "query");
         modelData.put("outputVariable", "answer");
         Map<String, Object> graph = Map.of(

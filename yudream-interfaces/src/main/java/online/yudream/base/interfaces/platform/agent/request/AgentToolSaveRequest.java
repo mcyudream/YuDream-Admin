@@ -9,6 +9,7 @@ public class AgentToolSaveRequest {
     @NotBlank private String code;
     private String description;
     private String inputSchemaJson;
+    @NotBlank private String outputExampleJson;
     @NotBlank private String pythonCode;
     private Integer timeoutMillis;
     private String permissionCode;

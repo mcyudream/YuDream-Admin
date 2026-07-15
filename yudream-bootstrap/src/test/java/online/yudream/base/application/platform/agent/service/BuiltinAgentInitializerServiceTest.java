@@ -1,5 +1,6 @@
 package online.yudream.base.application.platform.agent.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.application.platform.agent.assembler.AgentModelCatalogParser;
 import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
@@ -8,7 +9,6 @@ import online.yudream.base.domain.platform.agent.repo.AgentApplicationRepo;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import org.junit.jupiter.api.Test;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.util.Map;
@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class BuiltinAgentInitializerServiceTest {
 
     @Test
-    void createsPublishedCmsAndChatbotAgentsFromConfiguredDefaultModel() {
+    void createsPublishedCmsChatbotAndAguiCardAgentsFromConfiguredDefaultModel() {
         AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
         CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
         AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
@@ -41,11 +41,21 @@ class BuiltinAgentInitializerServiceTest {
         List<AgentApplication> created = service.initialize();
 
         assertThat(created).extracting(AgentApplication::getCode)
-                .containsExactlyInAnyOrder(BuiltinAgentCodes.CMS_BUILDER, BuiltinAgentCodes.GROUP_CHATBOT);
+                .containsExactlyInAnyOrder(
+                        BuiltinAgentCodes.CMS_BUILDER,
+                        BuiltinAgentCodes.GROUP_CHATBOT,
+                        BuiltinAgentCodes.AGUI_CARD
+                );
         assertThat(created).allMatch(item -> item.getStatus() == AgentApplicationStatus.PUBLISHED);
         assertThat(created).allMatch(item -> item.getWorkflowJson().contains("\"providerCode\":\"openai\""));
         assertThat(created.stream().filter(item -> BuiltinAgentCodes.CMS_BUILDER.equals(item.getCode())).findFirst().orElseThrow().getToolCodes())
                 .contains("cms.canvas.patch", "cms.canvas.validate");
+        AgentApplication cardAgent = created.stream()
+                .filter(item -> BuiltinAgentCodes.AGUI_CARD.equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(cardAgent.getWorkflowJson()).contains("\"kind\":\"understand\"");
+        assertThat(cardAgent.getSystemPrompt()).contains("fields", "actions");
     }
 
     @Test
@@ -56,6 +66,7 @@ class BuiltinAgentInitializerServiceTest {
         AgentApplication existing = AgentApplication.builder().code(BuiltinAgentCodes.CMS_BUILDER).build();
         when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(existing));
         when(applications.findByCode(BuiltinAgentCodes.GROUP_CHATBOT)).thenReturn(Optional.of(existing));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(existing));
         BuiltinAgentInitializerService service = new BuiltinAgentInitializerService(applications, capabilities, models, new ObjectMapper());
 
         assertThat(service.initialize()).isEmpty();

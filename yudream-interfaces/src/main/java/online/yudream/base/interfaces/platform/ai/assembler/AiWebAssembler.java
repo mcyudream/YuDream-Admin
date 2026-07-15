@@ -14,6 +14,7 @@ import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -121,6 +122,21 @@ public class AiWebAssembler {
                         Map.of("op", "replace", "path", "/title", "value", activityTitle(action)),
                         Map.of("op", "replace", "path", "/content", "value", content == null ? "" : content)
                 ))
+                .build();
+    }
+
+    public static AguiStreamEventRes toAguiCardSnapshot(String traceId, String content) {
+        var source = JSONUtil.parseObj(content == null ? "{}" : content.trim());
+        Map<String, Object> card = new LinkedHashMap<>();
+        card.put("title", source.getStr("title", "AG-UI 卡片"));
+        card.put("summary", source.getStr("summary", ""));
+        card.put("tone", source.getStr("tone", "info"));
+        card.put("fields", source.getJSONArray("fields") == null ? List.of() : source.getJSONArray("fields"));
+        card.put("actions", source.getJSONArray("actions") == null ? List.of() : source.getJSONArray("actions"));
+        return agui("ACTIVITY_SNAPSHOT", traceId)
+                .messageId("card-" + traceId)
+                .activityType("agui-card")
+                .content(card)
                 .build();
     }
 

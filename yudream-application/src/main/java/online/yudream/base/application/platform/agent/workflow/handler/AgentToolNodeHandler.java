@@ -8,6 +8,7 @@ import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNode
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNodeResult;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowRunState;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowValueResolver;
+import online.yudream.base.application.platform.agent.workflow.support.AgentPythonToolContract;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
@@ -99,11 +100,12 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
             throw new BizException("Python 工具不可用：" + tool.getCode());
         }
         ensurePermission(tool.getPermissionCode(), tool.getName());
-        RuntimeScript script = RuntimeScript.create(tool.getName(), tool.getCode(), RuntimeLanguage.PYTHON, tool.getPythonCode());
+        String executableCode = AgentPythonToolContract.wrap(tool.getPythonCode());
+        RuntimeScript script = RuntimeScript.create(tool.getName(), tool.getCode(), RuntimeLanguage.PYTHON, executableCode);
         script.update(
                 tool.getName(),
                 RuntimeLanguage.PYTHON,
-                tool.getPythonCode(),
+                executableCode,
                 tool.getTimeoutMillis(),
                 Map.of(),
                 ConnectorStatus.ACTIVE
@@ -117,17 +119,18 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
         if (execution.status() != ExecutionStatus.SUCCESS) {
             throw new BizException("Python 工具执行失败：" + (execution.errorMessage() == null ? execution.stderr() : execution.errorMessage()));
         }
+        Map<String, Object> output;
+        try {
+            output = objectMapper.readValue(execution.stdout(), ARGUMENTS);
+        } catch (Exception exception) {
+            throw new BizException("Python 工具 run() 必须返回可序列化的字典");
+        }
         return new AiAgentToolResult(
                 tool.getCode(),
                 "python",
                 tool.getPermissionCode(),
                 "执行完成",
-                Map.of(
-                        "stdout", execution.stdout(),
-                        "stderr", execution.stderr(),
-                        "exitCode", execution.exitCode(),
-                        "durationMillis", execution.durationMillis()
-                )
+                output
         );
     }
 
