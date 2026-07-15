@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { FileObject } from '@/api/modules/files'
 import type { CapabilityItem } from '@/api/modules/platform-capability'
-import type { CmsPage, CmsPagePayload, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
+import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
 import apiCapability from '@/api/modules/platform-capability'
 import apiCms from '@/api/modules/platform-cms'
+import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { readChromeCss } from '@/utils/cms-chrome'
 import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
+import CmsBlockLibrary from './components/CmsBlockLibrary.vue'
 
 type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
@@ -26,19 +29,25 @@ interface CmsNavigationItem {
   parentId?: string
   visible: boolean
   sort: number
+  children?: CmsNavigationItem[]
 }
 
 const toast = useFaToast()
 const modal = useFaModal()
+const appSettingsStore = useAppSettingsStore()
+const appAccountStore = useAppAccountStore()
 
 const activeTab = ref<WorkbenchTab>('pages')
 const editorMode = ref<EditorMode>('builder')
 const loading = ref(false)
 const saving = ref(false)
 const grapesEditorVisible = ref(false)
+const blockLibraryVisible = ref(false)
 const editorTarget = ref<EditorTarget>('page')
 const pages = ref<CmsPage[]>([])
 const navigationItems = ref<CmsNavigationItem[]>([])
+const wikiEnabled = ref(false)
+const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const mediaItems = ref<FileObject[]>([])
 const mediaInput = ref<HTMLInputElement>()
 const aiCapability = ref<CapabilityItem>()
@@ -103,6 +112,58 @@ const selectedPage = computed(() => pages.value.find(item => item.id === selecte
 const aiEnabled = computed(() => Boolean(aiCapability.value?.enabled))
 const aiModelOptions = computed<AiModelSelectOption[]>(() => aiProviderModelOptions(aiCapability.value?.config || {}))
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
+const previewNavigationItems = computed(() => {
+  const items = navigationItems.value.filter(item => item.visible !== false)
+  return wikiEnabled.value && !items.some(item => item.url === '/wiki')
+    ? [...items, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
+    : items
+})
+const templatePreviewContext = computed(() => {
+  const siteName = appSettingsStore.siteName || home.title || 'YuDream'
+  const siteDescription = appSettingsStore.siteDescription || home.subtitle || ''
+  const siteInfo = {
+    name: siteName,
+    description: siteDescription,
+    logo: appSettingsStore.logo || '',
+    currentYear: String(new Date().getFullYear()),
+  }
+  return {
+    site: siteInfo,
+    system: {
+      ...siteInfo,
+      copyright: {
+        company: appSettingsStore.settings.app.copyright.company || '',
+        website: appSettingsStore.settings.app.copyright.website || '',
+        dates: appSettingsStore.settings.app.copyright.dates || siteInfo.currentYear,
+      },
+    },
+    page: {
+      title: editorTarget.value === 'page' ? pageForm.title : home.title,
+      summary: editorTarget.value === 'page' ? pageForm.summary : home.subtitle,
+      slug: editorTarget.value === 'page' ? pageForm.slug : '',
+    },
+    auth: {
+      isLoggedIn: appAccountStore.isLogin ? 'true' : 'false',
+      welcome: appAccountStore.isLogin ? `欢迎回来，${appAccountStore.account || '用户'}` : '欢迎访问',
+    },
+    user: {
+      username: appAccountStore.account || 'guest',
+      nickname: appAccountStore.account || '访客',
+      avatar: appAccountStore.avatar || '',
+    },
+    route: { path: '/site', slug: '' },
+    navigation: previewNavigationItems.value,
+    chromeNavigation: buildNavigationTree(previewNavigationItems.value),
+    navUsers: appAccountStore.isLogin
+      ? [{ name: appAccountStore.account || '用户', avatar: appAccountStore.avatar || '', url: '/' }]
+      : [{ name: '登录', avatar: appSettingsStore.logo || '', url: '/login' }],
+    pages: templateContext.value.cms.pages.latest,
+    cms: templateContext.value.cms,
+    knowledge: templateContext.value.knowledge,
+    categories: [],
+    tags: [],
+  }
+})
 const builderContentStatus = computed(() => pageForm.builderProjectJson ? '已有 GrapesJS 源数据' : pageForm.htmlContent ? '已有 HTML 内容' : '尚未生成可视化内容')
 const homeHtml = computed({
   get: () => home.settings?.homeHtml || '',
@@ -114,12 +175,18 @@ const homeHtml = computed({
   },
 })
 const homeCss = computed({
-  get: () => home.settings?.homeCss || '',
+  get: () => [
+    home.settings?.homeCss,
+    readChromeCss(home.settings, 'header'),
+    readChromeCss(home.settings, 'footer'),
+  ].filter(Boolean).join('\n'),
   set: (value: string) => {
     home.settings = {
       ...(home.settings || {}),
       homeCss: value,
     }
+    delete home.settings.chromeHeaderCss
+    delete home.settings.chromeFooterCss
   },
 })
 const homeJs = computed({
@@ -149,22 +216,13 @@ const homeLayoutMode = computed<SiteLayoutMode>({
     }
   },
 })
-const footerTitle = computed({
-  get: () => home.settings?.footerTitle || '',
-  set: value => setHomeSetting('footerTitle', value),
-})
-const footerDescription = computed({
-  get: () => home.settings?.footerDescription || '',
-  set: value => setHomeSetting('footerDescription', value),
-})
-const footerCopyright = computed({
-  get: () => home.settings?.footerCopyright || '',
-  set: value => setHomeSetting('footerCopyright', value),
-})
 const rootNavigationItems = computed(() => [...navigationItems.value].filter(item => !item.parentId).sort((a, b) => a.sort - b.sort))
 const homeBuilderContentStatus = computed(() => homeProjectJson.value ? '已有 GrapesJS 首页源数据' : homeHtml.value ? '已有动态首页内容' : '尚未生成动态首页内容')
 const visibleCmsVariables = computed(() => showAllVariables.value ? cmsVariables : cmsVariables.slice(0, 8))
 const cmsVariables = [
+  { key: '{{cms.pages.latest.count}}', label: '最新 CMS 页面数' },
+  { key: '{{knowledge.spaces.count}}', label: '公开知识库数' },
+  { key: '{{knowledge.pages.count}}', label: '已发布知识库页面数' },
   { key: '{{site.name}}', label: '站点名称' },
   { key: '{{site.description}}', label: '站点描述' },
   { key: '{{site.logo}}', label: '站点 Logo' },
@@ -205,6 +263,10 @@ const cmsVariables = [
   { key: 'data-yb-repeat="pages"', label: '循环公开页面' },
   { key: 'data-yb-repeat="categories"', label: '循环分类' },
   { key: 'data-yb-repeat="tags"', label: '循环标签' },
+  { key: 'data-yb-repeat="cms.pages.latest"', label: '循环最新 CMS 页面' },
+  { key: 'data-yb-repeat="knowledge.pages"', label: '循环知识库页面' },
+  { key: 'data-yb-repeat="knowledge.latest"', label: '循环最新知识库内容' },
+  { key: 'data-yb-repeat="knowledge.spaces"', label: '循环公开知识库' },
 ]
 
 watch(activeTab, async () => {
@@ -220,8 +282,9 @@ watch(activeTab, async () => {
 })
 
 onMounted(async () => {
-  await loadAiCapability()
+  await Promise.all([loadAiCapability(), loadWikiNavigation()])
   await loadPages()
+  await loadTemplatePreviewContext()
 })
 
 async function loadAiCapability() {
@@ -302,6 +365,26 @@ async function loadPages() {
   }
 }
 
+async function loadTemplatePreviewContext() {
+  try {
+    templateContext.value = (await apiCms.publicTemplateContext()).data
+  }
+  catch {
+    templateContext.value = emptyTemplateContext()
+  }
+}
+
+async function loadWikiNavigation() {
+  wikiEnabled.value = await hasPublicWikiSpaces()
+}
+
+function emptyTemplateContext(): CmsTemplateContext {
+  return {
+    cms: { pages: { latest: [] } },
+    knowledge: { spaces: [], pages: [], latest: [] },
+  }
+}
+
 async function loadHome() {
   loading.value = true
   try {
@@ -316,6 +399,7 @@ async function loadHome() {
       published: Boolean(res.data.published),
     })
     navigationItems.value = parseNavigationItems(res.data.settings?.navigationJson)
+    await Promise.all([loadTemplatePreviewContext(), loadWikiNavigation()])
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '首页配置加载失败')
@@ -529,10 +613,14 @@ async function persistHome(successMessage = '首页已保存') {
   try {
     homeHtml.value = resolveHomeHtmlForSave()
     homeJs.value = stripScriptTags(homeJs.value)
+    const currentHomeCss = homeCss.value
     home.settings = {
       ...(home.settings || {}),
+      homeCss: currentHomeCss,
       navigationJson: JSON.stringify(navigationItems.value),
     }
+    delete home.settings.chromeHeaderCss
+    delete home.settings.chromeFooterCss
     await apiCms.saveHome({
       ...home,
       sections: home.sections,
@@ -609,13 +697,6 @@ function resolveHomeHtmlForSave() {
   return stripLayoutBlocks(homeHtml.value?.trim() || '')
 }
 
-function setHomeSetting(key: string, value: string) {
-  home.settings = {
-    ...(home.settings || {}),
-    [key]: value,
-  }
-}
-
 function stripLayoutBlocks(value?: string) {
   if (!value) {
     return ''
@@ -663,23 +744,6 @@ function removeHomeSection(section: HomeSection) {
   home.sections = home.sections.filter(item => item !== section)
 }
 
-function addNavigationItem(parentId = '') {
-  navigationItems.value.push({
-    id: `nav-${Date.now()}`,
-    label: parentId ? '子菜单' : '新菜单',
-    url: '/site',
-    parentId,
-    visible: true,
-    sort: navigationItems.value.length + 1,
-  })
-}
-
-function removeNavigationItem(item: CmsNavigationItem) {
-  navigationItems.value = navigationItems.value
-    .filter(current => current !== item)
-    .map(current => current.parentId === item.id ? { ...current, parentId: '' } : current)
-}
-
 function parseNavigationItems(value?: string): CmsNavigationItem[] {
   if (!value) {
     return [
@@ -694,6 +758,33 @@ function parseNavigationItems(value?: string): CmsNavigationItem[] {
   catch {
     return []
   }
+}
+
+function buildNavigationTree(items: CmsNavigationItem[]) {
+  const itemMap = new Map<string, CmsNavigationItem>()
+  const roots: CmsNavigationItem[] = []
+  items.forEach((item) => {
+    itemMap.set(item.id, { ...item, children: [] })
+  })
+  items.forEach((item) => {
+    const current = itemMap.get(item.id)
+    if (!current) {
+      return
+    }
+    const parent = item.parentId ? itemMap.get(item.parentId) : undefined
+    if (parent) {
+      parent.children = [...(parent.children || []), current]
+    }
+    else {
+      roots.push(current)
+    }
+  })
+  const sortItems = (list: CmsNavigationItem[]) => {
+    list.sort((a, b) => a.sort - b.sort)
+    list.forEach(item => sortItems(item.children || []))
+    return list
+  }
+  return sortItems(roots)
 }
 
 function emptyBuilderHtml() {
@@ -725,11 +816,11 @@ function sectionTitle(type: HomeSectionType) {
         <FaIcon name="i-ri:save-3-line" />
         保存页面
       </FaButton>
-      <FaButton v-else-if="activeTab === 'home' || activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
+      <FaButton v-else-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
         <FaIcon name="i-ri:save-3-line" />
-        {{ activeTab === 'navigation' ? '保存导航' : '保存首页' }}
+        保存首页
       </FaButton>
-      <FaButton v-if="activeTab === 'home' || activeTab === 'navigation'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
+      <FaButton v-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
         <FaIcon :name="home.published ? 'i-ri:inbox-unarchive-line' : 'i-ri:send-plane-line'" />
         {{ home.published ? '取消发布首页' : '发布首页' }}
       </FaButton>
@@ -770,6 +861,10 @@ function sectionTitle(type: HomeSectionType) {
             <FaInput v-model="search.keyword" clearable placeholder="搜索标题、路径" @keydown.enter="loadPages" @clear="loadPages" />
             <FaButton v-auth="'platform:cms:edit'" @click="createPage">
               <FaIcon name="i-ri:add-line" />
+            </FaButton>
+            <FaButton v-auth="'platform:cms:edit'" variant="outline" @click="blockLibraryVisible = true">
+              <FaIcon name="i-ri:building-2-line" />
+              区块库
             </FaButton>
           </div>
           <div v-loading="loading" class="page-list__items">
@@ -934,7 +1029,7 @@ function sectionTitle(type: HomeSectionType) {
             <div>
               <span class="builder-entry__status">{{ homeBuilderContentStatus }}</span>
               <h2>动态首页构建器</h2>
-              <p>首页不再受固定区块限制，可通过可视化构建器自由组合首屏、内容、图文、行动按钮和自定义模块。</p>
+              <p>画布会同时展示固定 Header、首页主体和固定 Footer；首页主体可自由组合内容，Header/Footer 只开放样式调整。</p>
             </div>
             <div class="builder-entry__actions">
               <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
@@ -1020,12 +1115,8 @@ function sectionTitle(type: HomeSectionType) {
           <div class="legacy-sections__head">
             <div>
               <h3>站点导航</h3>
-              <p>类似 WordPress 菜单，可用于公开首页和内容页顶部导航。</p>
+              <p>导航由系统数据和公开站点上下文提供，此处只读，不能删除、改名、改 URL 或调整菜单层级。</p>
             </div>
-            <FaButton v-auth="'platform:cms:edit'" @click="addNavigationItem()">
-              <FaIcon name="i-ri:add-line" />
-              新增一级菜单
-            </FaButton>
           </div>
           <article v-for="item in navigationItems" :key="item.id" class="builder-block">
             <div class="builder-block__head">
@@ -1034,45 +1125,28 @@ function sectionTitle(type: HomeSectionType) {
                 <span>{{ item.label || '未命名菜单' }}</span>
               </div>
               <div class="navigation-item-actions">
-                <FaButton v-if="!item.parentId" size="sm" variant="ghost" @click="addNavigationItem(item.id)">
-                  <FaIcon name="i-ri:add-line" />
-                  子菜单
-                </FaButton>
-                <FaButton size="sm" variant="ghost" @click="removeNavigationItem(item)">
-                  <FaIcon name="i-ri:delete-bin-line" />
-                </FaButton>
+                <FaTag variant="secondary">固定数据</FaTag>
               </div>
             </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FaInput v-model="item.label" placeholder="菜单名称" />
-              <FaInput v-model="item.url" placeholder="/site/about 或 https://..." />
+              <FaInput :model-value="item.label" disabled placeholder="菜单名称" />
+              <FaInput :model-value="item.url" disabled placeholder="/site/about 或 https://..." />
               <label class="cms-field">
                 <span>上级菜单</span>
-                <select v-model="item.parentId" class="cms-native-select">
+                <select :value="item.parentId" disabled class="cms-native-select">
                   <option value="">一级菜单</option>
                   <option v-for="parent in rootNavigationItems.filter(parent => parent.id !== item.id)" :key="parent.id" :value="parent.id">
                     {{ parent.label }}
                   </option>
                 </select>
               </label>
-              <FaInput v-model.number="item.sort" type="number" placeholder="排序" />
+              <FaInput :model-value="item.sort" disabled type="number" placeholder="排序" />
               <label class="inline-flex items-center gap-2 text-sm">
-                <FaSwitch v-model="item.visible" />
+                <FaSwitch :model-value="item.visible" disabled />
                 显示菜单
               </label>
             </div>
           </article>
-          <section class="footer-settings">
-            <div>
-              <h3>底部 Footer</h3>
-              <p>由站点布局统一渲染，留空时使用系统站点名称和默认版权。</p>
-            </div>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FaInput v-model="footerTitle" placeholder="Footer 标题，默认站点名称" />
-              <FaInput v-model="footerCopyright" placeholder="版权文案，默认自动生成" />
-              <FaTextarea v-model="footerDescription" rows="3" class="md:col-span-2" placeholder="Footer 描述" />
-            </div>
-          </section>
         </main>
         <aside class="home-preview">
           <section>
@@ -1089,17 +1163,9 @@ function sectionTitle(type: HomeSectionType) {
             </nav>
           </section>
           <section>
-            <h3>Footer 预览</h3>
-            <div class="cms-footer-preview">
-              <strong>{{ footerTitle || home.title || 'YuDream' }}</strong>
-              <p>{{ footerDescription || home.subtitle || '由 YuDream CMS 驱动的内容站点' }}</p>
-              <small>{{ footerCopyright || `© ${new Date().getFullYear()} ${footerTitle || home.title || 'YuDream'}. All rights reserved.` }}</small>
-            </div>
-          </section>
-          <section>
             <h3>使用说明</h3>
             <p class="cms-help-text">
-              导航保存到首页 settings.navigationJson，二级菜单通过“上级菜单”关联；Footer 配置保存到首页 settings，由站点布局统一渲染。
+              导航数据只读；首页构建器中的 Header/Footer 结构、菜单层级、Logo、认证入口和数据绑定均由系统固定，用户与 AI 只能修改整体画布 CSS。
             </p>
           </section>
         </aside>
@@ -1124,21 +1190,23 @@ function sectionTitle(type: HomeSectionType) {
           <article v-for="item in mediaItems" :key="item.id" class="media-card">
             <div class="media-card__preview">
               <img :src="mediaUrl(item)" :alt="item.originalName || 'CMS 媒体'">
+              <div class="media-card__overlay">
+                <div class="media-card__actions">
+                  <FaButton size="sm" variant="outline" @click="copyMediaUrl(item)">
+                    <FaIcon name="i-ri:file-copy-line" />
+                    复制地址
+                  </FaButton>
+                  <FaButton size="sm" @click="useMediaAsCover(item)">
+                    <FaIcon name="i-ri:image-edit-line" />
+                    设为封面
+                  </FaButton>
+                </div>
+              </div>
             </div>
             <div class="media-card__body">
               <strong>{{ item.originalName || `文件 #${item.id}` }}</strong>
               <span>{{ item.contentType || 'image/*' }} · {{ formatFileSize(item.size) }}</span>
               <small>{{ dateText(item.createTime) }}</small>
-            </div>
-            <div class="media-card__actions">
-              <FaButton size="sm" variant="outline" @click="copyMediaUrl(item)">
-                <FaIcon name="i-ri:file-copy-line" />
-                复制地址
-              </FaButton>
-              <FaButton size="sm" @click="useMediaAsCover(item)">
-                <FaIcon name="i-ri:image-edit-line" />
-                设为封面
-              </FaButton>
             </div>
           </article>
         </div>
@@ -1155,6 +1223,9 @@ function sectionTitle(type: HomeSectionType) {
         :css-content="editorTarget === 'home' ? homeCss : pageForm.cssContent"
         :js-content="editorTarget === 'home' ? homeJs : pageForm.jsContent"
         :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
+        :chrome-frame="editorTarget === 'home'"
+        :chrome-layout="editorTarget === 'home' ? homeLayoutMode : undefined"
+        :template-preview-context="templatePreviewContext"
         :ai-enabled="aiEnabled"
         :ai-model-options="aiModelOptions"
         :history-target-type="editorTarget"
@@ -1164,6 +1235,8 @@ function sectionTitle(type: HomeSectionType) {
         @save="saveGrapesEditor"
       />
     </div>
+
+    <CmsBlockLibrary v-model:visible="blockLibraryVisible" />
   </div>
 </template>
 
@@ -1180,6 +1253,25 @@ function sectionTitle(type: HomeSectionType) {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.block-toolbar {
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.block-toolbar :deep([data-slot="button"]) {
+  min-width: 84px;
+  justify-content: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.block-toolbar :deep([data-slot="button"]:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
 }
 
 .cms-tabs {
@@ -1249,22 +1341,24 @@ function sectionTitle(type: HomeSectionType) {
 .page-list-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
-  padding: 10px;
+  padding: 14px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-bg-1);
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.page-list-card.active {
-  border-color: rgb(var(--primary-6));
-  box-shadow: inset 3px 0 0 rgb(var(--primary-6));
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .page-list-card:hover {
   border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.page-list-card.active {
+  border-color: rgb(var(--primary-6));
+  box-shadow: inset 3px 0 0 rgb(var(--primary-6)), 0 4px 12px rgba(var(--primary-6), 0.08);
 }
 
 .page-list-card__main {
@@ -1321,6 +1415,16 @@ function sectionTitle(type: HomeSectionType) {
   color: rgb(var(--primary-6));
 }
 
+.page-list-card__meta :deep([data-slot="tag"]) {
+  font-weight: 700;
+}
+
+.page-list-card__meta :deep([data-slot="tag"].bg-primary) {
+  background: rgb(var(--success-6));
+  border-color: rgb(var(--success-6));
+  color: #fff;
+}
+
 .title-input :deep(input) {
   height: 44px;
   font-size: 22px;
@@ -1344,10 +1448,20 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .builder-entry {
-  padding: 18px;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.18s ease;
+}
+
+.builder-entry:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
 .builder-entry h2,
@@ -1379,17 +1493,26 @@ function sectionTitle(type: HomeSectionType) {
 .builder-block,
 .publish-panel section {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 12px;
+  padding: 18px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.builder-block:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
 .legacy-sections {
-  padding: 16px;
+  display: grid;
+  gap: 18px;
+  padding: 20px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--color-bg-2);
 }
 
@@ -1671,11 +1794,18 @@ function sectionTitle(type: HomeSectionType) {
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-bg-2);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.media-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
 }
 
 .media-card__preview {
+  position: relative;
   overflow: hidden;
   aspect-ratio: 4 / 3;
   border-radius: 6px;
@@ -1686,11 +1816,44 @@ function sectionTitle(type: HomeSectionType) {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.25s ease;
+}
+
+.media-card:hover .media-card__preview img {
+  transform: scale(1.04);
+}
+
+.media-card__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.media-card:hover .media-card__overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.media-card__overlay :deep([data-slot="button"]) {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: var(--color-text-1);
+}
+
+.media-card__overlay :deep([data-slot="button"]:hover) {
+  background: #fff;
 }
 
 .media-card__body {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -1722,21 +1885,23 @@ function sectionTitle(type: HomeSectionType) {
 
 .home-preview {
   display: grid;
-  gap: 10px;
+  gap: 14px;
 }
 
 .home-preview section {
   display: grid;
-  gap: 10px;
-  padding: 14px;
+  gap: 14px;
+  padding: 18px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 10px;
   background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .home-preview h3 {
   margin: 0;
   font-size: 15px;
+  font-weight: 800;
 }
 
 .empty-state {
