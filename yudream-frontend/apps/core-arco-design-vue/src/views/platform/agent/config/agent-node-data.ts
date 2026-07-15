@@ -25,6 +25,13 @@ export function agentModelKind(kind: AgentNodeKind) {
   return kind === 'embedding' || kind === 'rerank' ? kind : ''
 }
 
+export function agentSourceHandles(kind: AgentNodeKind) {
+  if (kind === 'end') {
+    return []
+  }
+  return kind === 'condition' ? ['true', 'false'] : ['source']
+}
+
 export function createAgentNodeData(template: AgentNodeTemplate, overrides: Partial<AgentNodeData> = {}): AgentNodeData {
   const variables = variableDefaults[template.kind]
   return {

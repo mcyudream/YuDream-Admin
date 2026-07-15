@@ -530,6 +530,14 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
       providerCode: model?.providerCode,
       modelCode: model?.modelCode,
       imageDataUrl,
+      attachments: attachments
+        .filter(item => !item.type.startsWith('image/') && item.dataUrl)
+        .map(item => ({
+          name: item.name,
+          contentType: item.type || 'application/octet-stream',
+          size: item.size,
+          dataUrl: item.dataUrl!,
+        })),
     })
     const response = await fetch(apiAgent.debugStreamEndpoint(applicationId), {
       ...request,

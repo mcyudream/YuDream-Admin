@@ -2,7 +2,7 @@ import type { AgentNodeTemplate } from '../components/types'
 import assert from 'node:assert/strict'
 // eslint-disable-next-line test/no-import-node-test -- this workspace runs lightweight TS tests with Node.
 import { test } from 'node:test'
-import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './agent-node-data'
+import { agentModelKind, agentSourceHandles, createAgentNodeData, normalizeAgentNodeData } from './agent-node-data'
 
 const template: AgentNodeTemplate = {
   kind: 'search',
@@ -81,4 +81,10 @@ test('需要模型的节点会映射到正确的模型类型', () => {
   assert.equal(agentModelKind('embedding'), 'embedding')
   assert.equal(agentModelKind('rerank'), 'rerank')
   assert.equal(agentModelKind('search'), '')
+})
+
+test('condition nodes expose true and false source handles', () => {
+  assert.deepEqual(agentSourceHandles('condition'), ['true', 'false'])
+  assert.deepEqual(agentSourceHandles('llm'), ['source'])
+  assert.deepEqual(agentSourceHandles('end'), [])
 })

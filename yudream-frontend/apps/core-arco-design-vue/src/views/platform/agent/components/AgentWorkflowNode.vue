@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AgentDebugStatus, AgentNodeData } from './types'
 import { Handle, Position } from '@vue-flow/core'
+import { agentSourceHandles } from '../config/agent-node-data'
 
 const props = defineProps<{
   id: string
@@ -17,6 +18,14 @@ const emit = defineEmits<{
 const nodeStyle = computed(() => ({
   '--node-color': props.data.color || '#2563eb',
 }))
+const sourceHandles = computed(() => agentSourceHandles(props.data.kind))
+
+function handleStyle(handle: string) {
+  if (props.data.kind !== 'condition') {
+    return undefined
+  }
+  return { top: handle === 'true' ? '58%' : '78%' }
+}
 </script>
 
 <template>
@@ -57,7 +66,12 @@ const nodeStyle = computed(() => ({
       <span>输出 <b>{{ data.outputName || 'any' }}</b><i class="output-dot" /></span>
     </div>
 
-    <Handle v-if="data.kind !== 'end'" id="source" type="source" :position="Position.Right" :connectable="connectable" />
+    <template v-for="handle in sourceHandles" :key="handle">
+      <span v-if="data.kind === 'condition'" class="branch-label" :class="handle" :style="handleStyle(handle)">
+        {{ handle === 'true' ? '真' : '假' }}
+      </span>
+      <Handle :id="handle" type="source" :position="Position.Right" :connectable="connectable" :style="handleStyle(handle)" />
+    </template>
   </div>
 </template>
 
@@ -93,6 +107,9 @@ const nodeStyle = computed(() => ({
 .workflow-node :deep(.vue-flow__handle) { width: 11px; height: 11px; border: 2px solid var(--color-bg-1); background: var(--node-color); box-shadow: 0 0 0 1px color-mix(in srgb, var(--node-color), transparent 45%); }
 .workflow-node :deep(.vue-flow__handle-left) { left: -6px; }
 .workflow-node :deep(.vue-flow__handle-right) { right: -6px; }
+.branch-label { position: absolute; right: 10px; z-index: 2; padding: 1px 4px; border-radius: 3px; font-size: 8px; line-height: 14px; transform: translateY(-50%); }
+.branch-label.true { color: rgb(var(--success-7)); background: rgb(var(--success-1)); }
+.branch-label.false { color: rgb(var(--danger-7)); background: rgb(var(--danger-1)); }
 @keyframes debug-pulse { 50% { box-shadow: 0 0 0 6px rgb(var(--primary-2)), 0 10px 28px rgb(var(--primary-6) / 18%); } }
 @keyframes debug-spin { to { transform: rotate(360deg); } }
 </style>
