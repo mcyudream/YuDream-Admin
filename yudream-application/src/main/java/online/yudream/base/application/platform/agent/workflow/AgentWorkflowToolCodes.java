@@ -50,7 +50,7 @@ public final class AgentWorkflowToolCodes {
                 if (LEGACY_UNDERSTAND.equals(kind)) {
                     changed |= clearUnderstandToolConfig((ObjectNode) data);
                 } else if (TOOL_MODEL_KINDS.contains(kind)) {
-                    declaresTools |= data.has("toolCodes") || data.has("toolMode");
+                    declaresTools |= declaresNodeToolConfig(data);
                     if (isToolModeNone(data)) {
                         changed |= clearToolCodes((ObjectNode) data);
                     }
@@ -116,6 +116,17 @@ public final class AgentWorkflowToolCodes {
 
     private static boolean isToolModeNone(JsonNode data) {
         return "NONE".equals(data.path("toolMode").asText("").trim().toUpperCase(Locale.ROOT));
+    }
+
+    private static boolean declaresNodeToolConfig(JsonNode data) {
+        if (data.path("toolConfigDeclared").asBoolean(false)) {
+            return true;
+        }
+        if (data.path("toolCodes").isArray() && data.path("toolCodes").size() > 0) {
+            return true;
+        }
+        String mode = data.path("toolMode").asText("").trim().toUpperCase(Locale.ROOT);
+        return Set.of("AUTO", "ACTIVE", "REQUIRED").contains(mode);
     }
 
     private static void addArrayCodes(JsonNode values, LinkedHashSet<String> target) {

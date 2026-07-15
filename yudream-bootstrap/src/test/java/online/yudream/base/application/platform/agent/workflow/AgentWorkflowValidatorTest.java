@@ -177,6 +177,7 @@ class AgentWorkflowValidatorTest {
         var normalized = AgentWorkflowToolCodes.normalize(workflow);
 
         assertThat(normalized.toolCodes()).isEmpty();
+        assertThat(normalized.declaresTools()).isFalse();
         assertThat(normalized.workflowJson()).contains("\"toolCodes\":[]");
     }
 
