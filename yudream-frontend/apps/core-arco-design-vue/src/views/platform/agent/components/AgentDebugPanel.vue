@@ -23,7 +23,7 @@ const scrollEl = useTemplateRef<HTMLElement>('scrollEl')
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const fileAccept = computed(() => [
   props.allowImage ? 'image/*' : '',
-  props.allowFiles ? '.txt,.md,.markdown,.json,.csv,.xml,.html,.css,.js,.ts,.yaml,.yml' : '',
+  props.allowFiles ? '.txt,.md,.markdown,.json,.csv,.xml,.html,.css,.js,.ts,.yaml,.yml,.pdf,.doc,.docx,.rtf,.odt' : '',
 ].filter(Boolean).join(','))
 
 watch(() => props.messages, () => {
@@ -64,8 +64,8 @@ async function onFileChange(event: Event) {
       if (image && file.size > 5 * 1024 * 1024) {
         throw new Error('单张图片不能超过 5MB')
       }
-      if (!image && file.size > 1024 * 1024) {
-        throw new Error('单个文本附件不能超过 1MB')
+      if (!image && file.size > 10 * 1024 * 1024) {
+        throw new Error('单个文档附件不能超过 10MB')
       }
       if (image && attachments.value.some(item => item.type.startsWith('image/'))) {
         throw new Error('当前调试仅支持一张图片')
@@ -75,8 +75,8 @@ async function onFileChange(event: Event) {
         name: file.name,
         type: file.type || 'text/plain',
         size: file.size,
-        dataUrl: image ? await readDataUrl(file) : undefined,
-        text: image ? undefined : await file.text(),
+        dataUrl: await readDataUrl(file),
+        text: !image && isTextFile(file) ? await file.text() : undefined,
       })
     }
   }
@@ -95,6 +95,11 @@ function readDataUrl(file: File) {
     reader.onerror = () => reject(new Error('图片读取失败'))
     reader.readAsDataURL(file)
   })
+}
+
+function isTextFile(file: File) {
+  return file.type.startsWith('text/')
+    || /\.(?:txt|md|markdown|json|csv|xml|html|css|js|ts|yaml|yml)$/i.test(file.name)
 }
 
 function onKeydown(event: KeyboardEvent) {
