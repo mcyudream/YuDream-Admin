@@ -32,12 +32,13 @@ interface LegacyToolMigration<TEdge extends AgentWorkflowToolEdge> {
 export function deriveAgentApplicationToolCodes(nodes: readonly AgentWorkflowToolNode[]) {
   const codes: string[] = []
   for (const node of nodes) {
-    const kind = node.data?.kind
-    if (kind && declaresAgentNodeToolConfig(node.data)) {
-      codes.push(...strings(node.data?.toolCodes))
+    const data = node.data
+    const kind = data?.kind
+    if (data && kind && declaresAgentNodeToolConfig(data)) {
+      codes.push(...strings(data.toolCodes))
     }
     else if (kind === 'tool') {
-      const toolCode = string(node.data?.toolCode)
+      const toolCode = string(data?.toolCode)
       if (toolCode) {
         codes.push(toolCode)
       }

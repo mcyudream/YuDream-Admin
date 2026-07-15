@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import type { Node } from '@vue-flow/core'
-import type { AgentNodeData } from './types'
+import type { AgentFlowNode, AgentNodeData } from './types'
 import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import { agentModelKind, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
-  node: Node<AgentNodeData>
+  node: AgentFlowNode
   systemTools: SystemAgentTool[]
   customTools: AgentTool[]
   models: AgentModelOption[]

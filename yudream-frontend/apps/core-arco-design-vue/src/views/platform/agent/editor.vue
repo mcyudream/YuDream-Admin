@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Connection, Edge, Node as FlowNode } from '@vue-flow/core'
-import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
+import type { Connection, Edge } from '@vue-flow/core'
+import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus, AgentFlowEdgeView, AgentFlowNode, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
 import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -58,10 +58,13 @@ const form = reactive<AgentApplicationPayload>({
   status: 'DRAFT',
 })
 
-const nodes = ref<FlowNode<AgentNodeData>[]>([])
+const nodes = ref<AgentFlowNode[]>([])
 const edges = ref<Edge[]>([])
-const selectedNode = computed(() => nodes.value.find(node => node.id === selectedNodeId.value))
-const selectedEdge = computed(() => edges.value.find(item => item.id === selectedEdgeId.value))
+const selectedNode = computed<AgentFlowNode | undefined>(() => nodes.value.find(node => node.id === selectedNodeId.value))
+const selectedEdge = computed<AgentFlowEdgeView | undefined>(() => {
+  const views = edges.value as unknown as AgentFlowEdgeView[]
+  return views.find(edge => edge.id === selectedEdgeId.value)
+})
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
@@ -147,7 +150,7 @@ function templateOf(kind: AgentNodeKind): AgentNodeTemplate {
   return findAgentNodeTemplate(kind) || findAgentNodeTemplate('llm')!
 }
 
-function normalizeNode(raw: FlowNode<AgentNodeData>): FlowNode<AgentNodeData> {
+function normalizeNode(raw: AgentFlowNode): AgentFlowNode {
   const template = templateOf((raw.data?.kind || 'llm') as AgentNodeKind)
   const model = defaultAgentModel(agentModelKind(template.kind))
   return {
@@ -173,7 +176,7 @@ function normalizeEdge(raw: Edge): Edge {
   }
 }
 
-function makeNode(template: AgentNodeTemplate, position: { x: number, y: number }): FlowNode<AgentNodeData> {
+function makeNode(template: AgentNodeTemplate, position: { x: number, y: number }): AgentFlowNode {
   const model = defaultAgentModel(agentModelKind(template.kind))
   return {
     id: `${template.kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -282,23 +285,34 @@ function changeEdgeStyle(style: AgentConnectionStyle) {
   if (!selectedEdgeId.value) {
     return
   }
-  edges.value = edges.value.map(item => item.id === selectedEdgeId.value
-    ? { ...item, markerEnd: style === 'arrow' ? MarkerType.ArrowClosed : undefined, data: { ...item.data, connectionStyle: style } }
-    : item)
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
+  edges.value = edgeRecords.map((edge) => {
+    if (edge.id !== selectedEdgeId.value) {
+      return edge
+    }
+    const currentData = edge.data
+    const data = currentData && typeof currentData === 'object' && !Array.isArray(currentData)
+      ? { ...(currentData as Record<string, unknown>), connectionStyle: style }
+      : { connectionStyle: style }
+    return { ...edge, markerEnd: style === 'arrow' ? MarkerType.ArrowClosed : undefined, data }
+  }) as unknown as Edge[]
 }
 
 function changeEdgeLabel(label: string) {
-  edges.value = edges.value.map(item => item.id === selectedEdgeId.value ? { ...item, label } : item)
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
+  edges.value = edgeRecords.map(edge => edge.id === selectedEdgeId.value ? { ...edge, label } : edge) as unknown as Edge[]
 }
 
 function deleteNode(nodeId: string) {
   nodes.value = nodes.value.filter(node => node.id !== nodeId)
-  edges.value = edges.value.filter(item => item.source !== nodeId && item.target !== nodeId)
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
+  edges.value = edgeRecords.filter(edge => edge.source !== nodeId && edge.target !== nodeId) as unknown as Edge[]
   clearSelection()
 }
 
 function deleteEdge(edgeId: string) {
-  edges.value = edges.value.filter(item => item.id !== edgeId)
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
+  edges.value = edgeRecords.filter(edge => edge.id !== edgeId) as unknown as Edge[]
   clearSelection()
 }
 
@@ -344,7 +358,7 @@ function migrateLegacyTools() {
         toast.warning('没有可安全迁移的兼容工具节点')
         return
       }
-      nodes.value = migrated.nodes.map(node => normalizeNode(node as FlowNode<AgentNodeData>))
+      nodes.value = migrated.nodes.map(node => normalizeNode(node as AgentFlowNode))
       edges.value = migrated.edges.map(edge => normalizeEdge(edge as Edge))
       clearSelection()
       toast.success(`已将 ${migratedCount} 个工具节点迁移到模型节点`)
@@ -369,9 +383,10 @@ function resetWorkflow() {
 }
 
 function workflowData() {
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
   return {
     nodes: nodes.value.map(node => ({ id: node.id, type: 'agent', position: node.position, data: node.data })),
-    edges: edges.value.map(item => ({
+    edges: edgeRecords.map(item => ({
       id: item.id,
       source: item.source,
       target: item.target,
@@ -405,13 +420,17 @@ function activeDebugMessage() {
 
 function resetDebugCanvas() {
   Object.keys(nodeDebugStatus).forEach(key => delete nodeDebugStatus[key])
-  edges.value = edges.value.map(item => ({ ...item, class: undefined }))
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
+  edges.value = edgeRecords.map(edge => ({ ...edge, class: undefined })) as unknown as Edge[]
 }
 
 function refreshDebugEdges() {
-  edges.value = edges.value.map((item) => {
-    const sourceStatus = nodeDebugStatus[item.source]
-    const targetStatus = nodeDebugStatus[item.target]
+  const edgeRecords = edges.value as unknown as Array<Record<string, unknown>>
+  edges.value = edgeRecords.map((item) => {
+    const sourceId = typeof item.source === 'string' ? item.source : ''
+    const targetId = typeof item.target === 'string' ? item.target : ''
+    const sourceStatus = nodeDebugStatus[sourceId]
+    const targetStatus = nodeDebugStatus[targetId]
     let debugClass: string | undefined
     if (targetStatus === 'FAILED') {
       debugClass = 'debug-failed'
@@ -423,7 +442,7 @@ function refreshDebugEdges() {
       debugClass = 'debug-completed'
     }
     return { ...item, class: debugClass }
-  })
+  }) as unknown as Edge[]
 }
 
 function focusDebugNode(nodeId: string) {

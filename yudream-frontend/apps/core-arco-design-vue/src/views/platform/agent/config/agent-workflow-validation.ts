@@ -51,7 +51,7 @@ export function validateAgentWorkflow(
 
   nodes.forEach((node) => {
     const data = node.data || {}
-    const require = (value: unknown, label: string) => {
+    const require = (value: unknown, label: string): value is string => {
       if (typeof value !== 'string' || !value.trim()) {
         issues.push({ nodeId: node.id, message: `节点“${data.title}”：${label}不能为空` })
         return false
@@ -72,7 +72,8 @@ export function validateAgentWorkflow(
       require(data.template, '模板内容')
     }
     else if (data.kind === 'search' || data.kind === 'vector') {
-      if (require(data.knowledgeSpaceSlug, '知识空间') && !catalog.knowledgeSpaceSlugs.has(data.knowledgeSpaceSlug)) {
+      const knowledgeSpaceSlug = data.knowledgeSpaceSlug
+      if (require(knowledgeSpaceSlug, '知识空间') && !catalog.knowledgeSpaceSlugs.has(knowledgeSpaceSlug)) {
         issues.push({ nodeId: node.id, message: `节点“${data.title}”：知识空间不可用` })
       }
     }
@@ -106,7 +107,8 @@ export function validateAgentWorkflow(
       require(data.citationSource, '引用来源')
     }
     else if (data.kind === 'tool') {
-      if (require(data.toolCode, '工具') && !catalog.toolCodes.has(data.toolCode)) {
+      const toolCode = data.toolCode
+      if (require(toolCode, '工具') && !catalog.toolCodes.has(toolCode)) {
         issues.push({ nodeId: node.id, message: `节点“${data.title}”：工具不可用` })
       }
     }
