@@ -38,4 +38,31 @@ class AiProviderConfigParserTest {
         assertEquals("configured-key", resolved.provider().apiKey());
         assertEquals("deepseek-v4-pro", resolved.model().modelName());
     }
+
+    @Test
+    void ignoresEmbeddingDefaultWhenResolvingChatGenerationModel() {
+        String providers = """
+                [{
+                  "code":"yudream",
+                  "name":"YuDream",
+                  "type":"OPENAI_COMPATIBLE",
+                  "baseUrl":"https://example.com/v1",
+                  "apiKey":"configured-key",
+                  "defaultModel":"BAAI/bge-m3",
+                  "models":[
+                    {"code":"BAAI/bge-m3","model":"BAAI/bge-m3","kind":"embedding"},
+                    {"code":"deepseek-v4-pro","model":"deepseek-v4-pro","kind":"chat"}
+                  ]
+                }]
+                """;
+
+        var resolved = new AiProviderConfigParser().resolve(
+                Map.of("providers", providers),
+                "yudream",
+                null,
+                List.of(new OpenAiCompatibleProviderAdapter())
+        );
+
+        assertEquals("deepseek-v4-pro", resolved.model().modelName());
+    }
 }

@@ -51,4 +51,23 @@ class AgentModelCatalogParserTest {
                     assertThat(model.configured()).isFalse();
                 });
     }
+
+    @Test
+    void shouldHonorExplicitModelKindInsideUnifiedModelsArray() {
+        Map<String, String> config = Map.of("providers", """
+                [{
+                  "code":"main",
+                  "enabled":true,
+                  "apiKey":"secret-key",
+                  "defaultModel":"BAAI/bge-m3",
+                  "models":[
+                    {"code":"BAAI/bge-m3","name":"BGE M3","kind":"embedding"},
+                    {"code":"deepseek-v4-pro","name":"DeepSeek V4 Pro","kind":"chat"}
+                  ]
+                }]
+                """);
+
+        assertThat(parser.parse(config)).extracting(item -> item.kind() + ":" + item.modelCode())
+                .containsExactly("embedding:BAAI/bge-m3", "chat:deepseek-v4-pro");
+    }
 }

@@ -203,8 +203,13 @@ public class AiProviderConfigParser {
     }
 
     private AiModelEndpoint selectModel(AiProviderEndpoint provider, String modelCode) {
-        List<AiModelEndpoint> models = provider.models();
+        List<AiModelEndpoint> models = provider.models().stream()
+                .filter(model -> "chat".equalsIgnoreCase(model.kind()))
+                .toList();
         if (models.isEmpty()) {
+            if (!provider.models().isEmpty()) {
+                throw new BizException("AI 供应商未配置对话模型：" + provider.name());
+            }
             String model = firstText(provider.defaultModel(), DEFAULT_OPENAI_MODEL);
             return new AiModelEndpoint(model, model, model, provider.temperature(), "", null, "", "chat", false);
         }
