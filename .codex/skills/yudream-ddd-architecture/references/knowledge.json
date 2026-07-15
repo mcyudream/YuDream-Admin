@@ -139,6 +139,10 @@
     {
       "key": "cms-preview-js-lifecycle",
       "text": "CMS 画布预览 JS 必须可重复初始化并可释放。addEventListener、setInterval、requestAnimationFrame、Three.js setAnimationLoop 等长生命周期资源必须通过 window.__YU_CMS_REGISTER_CLEANUP__ 注册对应 removeEventListener、clearInterval、cancelAnimationFrame、setAnimationLoop(null) 及 WebGL 资源 dispose；前端预览更新应防抖，普通 HTML/CSS 更新不得重跑整段页面 JS。"
+    },
+    {
+      "key": "agent-capability-integration",
+      "text": "Agent applications are a standalone platform capability with an explicit provider, project gate, application gate, and AI/Integration dependencies; menus and endpoints must be bound to agent rather than only ai."
     }
   ],
   "utilities": [

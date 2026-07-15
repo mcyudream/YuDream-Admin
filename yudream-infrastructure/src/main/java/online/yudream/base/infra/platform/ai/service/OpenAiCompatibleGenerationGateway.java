@@ -6,6 +6,7 @@ import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
+import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
@@ -314,7 +315,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             return pluginAiToolRegistry.tools().stream().filter(tool -> allowed(tool, scope))
                     .map(tool -> pluginToolCallback(tool, scope, toolResults, onTool, onProgress)).toList();
         }
+        var allowedTools = AiAgentToolExecutionScope.current();
         return aiAgentToolProvider.stream()
+                .filter(tool -> allowedTools == null || allowedTools.contains(tool.descriptor().name()))
                 .map(tool -> toolCallback(tool, toolResults, onTool, onProgress))
                 .toList();
     }

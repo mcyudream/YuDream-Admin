@@ -37,17 +37,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MenuAppService {
 
-    private static final Map<String, String> PLATFORM_MENU_CAPABILITIES = Map.of(
-            "platform:wiki", "wiki",
-            "platform:milky", "milky",
-            "platform:docs", "api-docs",
-            "platform:integration", "integration",
-            "platform:document", "document-template",
-            "platform:graph", "neo4j",
-            "platform:form", "form",
-            "platform:cms", "cms",
-            "platform:ai:generate", "ai",
-            "platform:render:use", "message-render"
+    private static final Map<String, String> PLATFORM_MENU_CAPABILITIES = Map.ofEntries(
+            Map.entry("platform:wiki", "wiki"),
+            Map.entry("platform:milky", "milky"),
+            Map.entry("platform:docs", "api-docs"),
+            Map.entry("platform:integration", "integration"),
+            Map.entry("platform:document", "document-template"),
+            Map.entry("platform:graph", "neo4j"),
+            Map.entry("platform:form", "form"),
+            Map.entry("platform:cms", "cms"),
+            Map.entry("platform:agent", "agent"),
+            Map.entry("platform:ai:generate", "ai"),
+            Map.entry("platform:render:use", "message-render")
     );
 
     private final MenuDomainService menuDomainService;
