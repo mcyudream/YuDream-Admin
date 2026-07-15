@@ -15,7 +15,6 @@ import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
 import online.yudream.base.application.platform.agent.query.AgentToolPageQuery;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
-import online.yudream.base.application.platform.capability.dto.CapabilityDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
@@ -30,6 +29,7 @@ import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
+import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.integration.aggregate.RuntimeScript;
 import online.yudream.base.domain.platform.integration.enumerate.ConnectorStatus;
 import online.yudream.base.domain.platform.integration.enumerate.RuntimeLanguage;
@@ -54,7 +54,9 @@ import java.util.function.Consumer;
 @RequiredArgsConstructor
 public class AgentAppService {
     private static final String AGENT_CAPABILITY = "agent";
+    private static final String AI_CAPABILITY = "ai";
     private final CapabilityAppService capabilityAppService;
+    private final CapabilityModuleRepo capabilityModuleRepo;
     private final AgentApplicationRepo applicationRepo;
     private final AgentToolRepo toolRepo;
     private final RuntimeExecutor runtimeExecutor;
@@ -142,23 +144,16 @@ public class AgentAppService {
                 .filter(name -> application.getToolCodes() != null && application.getToolCodes().contains(name))
                 .collect(java.util.stream.Collectors.toSet());
         ModelSelection selection = modelSelection(application, cmd);
-        AiGenerationRequest request = new AiGenerationRequest(system, prompt, cmd.getImageDataUrl(), selection.providerCode(), selection.modelCode(), Map.of())
+        AiGenerationRequest request = new AiGenerationRequest(system, prompt, cmd.getImageDataUrl(), selection.providerCode(), selection.modelCode(), aiConfig())
                 .withToolCallingEnabled(!selectedSystemTools.isEmpty());
         var generated = runWithSystemTools(gateway, request, selectedSystemTools);
         return AgentRunDTO.builder().content(generated.summary()).toolResults(results).build();
     }
 
-    @Transactional
+    @Transactional(readOnly = true)
     public List<AgentModelDTO> models() {
         ensureEnabled();
-        CapabilityDTO ai = capabilityAppService.list().stream()
-                .filter(item -> "ai".equals(item.getCode()))
-                .findFirst()
-                .orElse(null);
-        if (ai == null || !Boolean.TRUE.equals(ai.getEnabled())) {
-            return List.of();
-        }
-        return agentModels(ai.getConfig());
+        return agentModels(aiConfig());
     }
 
     private List<AgentModelDTO> agentModels(Map<String, String> config) {
@@ -331,7 +326,7 @@ public class AgentAppService {
                 cmd.getImageDataUrl(),
                 selection.providerCode(),
                 selection.modelCode(),
-                Map.of()
+                aiConfig()
         ).withToolCallingEnabled(!selectedSystemTools.isEmpty());
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(selectedSystemTools)) {
             return gateway.generateStream(request, onDelta, onTool, null);
@@ -450,6 +445,13 @@ public class AgentAppService {
                 .findFirst()
                 .map(node -> new ModelSelection(node.providerCode(), node.modelCode()))
                 .orElseGet(() -> new ModelSelection(null, null));
+    }
+
+    private Map<String, String> aiConfig() {
+        capabilityAppService.ensureEnabled(AI_CAPABILITY, "AI");
+        return capabilityModuleRepo.findByCode(AI_CAPABILITY)
+                .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
+                .orElseThrow(() -> new BizException("AI 能力配置不存在"));
     }
 
     private List<String> pythonToolCodesInWorkflow(String workflowJson) {

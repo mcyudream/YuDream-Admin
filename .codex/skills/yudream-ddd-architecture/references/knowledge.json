@@ -235,6 +235,10 @@
     {
       "key": "cms-sse-validation-ownership",
       "text": "CMS AI 工具通过 SSE 在浏览器实时应用，服务端结束时只有修改前快照。模型遗漏 cms.canvas.validate 不能导致整个请求失败；仅在模型明确返回 valid=false 时阻断。最终实际画布校验应由浏览器侧状态或显式模型校验承担，不能在服务端用旧快照伪造。"
+    },
+    {
+      "key": "agent-ai-request-config",
+      "text": "Agent 运行和调试创建 AiGenerationRequest 时必须传入已启用 AI 能力的 providers 配置；仅传 providerCode/modelCode 且 config=Map.of() 会让网关回退到 Default AI 并误报 API Key 未配置。"
     }
   ]
 }
