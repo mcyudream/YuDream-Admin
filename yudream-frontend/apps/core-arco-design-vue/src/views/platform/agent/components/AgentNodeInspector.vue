@@ -2,6 +2,7 @@
 import type { Node } from '@vue-flow/core'
 import type { AgentNodeData } from './types'
 import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
+import { isAgentChatModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   node: Node<AgentNodeData>
@@ -17,10 +18,24 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const toolOptions = computed(() => [
-  ...props.systemTools.map(tool => ({ label: `[系统] ${tool.name} (${tool.code})`, value: tool.code })),
-  ...props.customTools.map(tool => ({ label: `[Python] ${tool.name} (${tool.code})`, value: tool.code })),
-])
+const toolSearch = ref('')
+const toolModeOptions = [
+  { label: '禁用工具', value: 'NONE' },
+  { label: '模型自主调用', value: 'AUTO' },
+  { label: '必须调用工具', value: 'REQUIRED' },
+]
+
+const modelToolOptions = computed(() => {
+  const keyword = toolSearch.value.trim().toLocaleLowerCase()
+  const matches = (tool: { name: string, code: string, description?: string }) => !keyword
+    || `${tool.name} ${tool.code} ${tool.description || ''}`.toLocaleLowerCase().includes(keyword)
+  const system = props.systemTools.filter(matches).map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))
+  const custom = props.customTools.filter(matches).map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))
+  return [
+    ...(system.length ? [{ label: '系统工具', options: system }] : []),
+    ...(custom.length ? [{ label: '自定义 Python 工具', options: custom }] : []),
+  ]
+})
 
 const knowledgeSpaceOptions = computed(() => props.knowledgeSpaces.map(space => ({
   label: `${space.name} (${space.slug})`,
@@ -62,7 +77,11 @@ const modelOptions = computed(() => kindModels.value
 const selectedModel = computed(() => kindModels.value.find(model => model.providerCode === props.node.data.providerCode && model.modelCode === props.node.data.modelCode))
 const selectedKnowledgeSpace = computed(() => props.knowledgeSpaces.find(space => space.slug === props.node.data.knowledgeSpaceSlug))
 const isKnowledgeNode = computed(() => props.node.data.kind === 'search' || props.node.data.kind === 'vector')
-const isPromptNode = computed(() => props.node.data.kind === 'llm' || props.node.data.kind === 'understand')
+const isPromptNode = computed(() => isAgentChatModelNode(props.node.data.kind))
+const isModelToolNode = computed(() => isAgentChatModelNode(props.node.data.kind))
+const isExtractNode = computed(() => props.node.data.kind === 'extract')
+const isClassifyNode = computed(() => props.node.data.kind === 'classify')
+const isVisionNode = computed(() => props.node.data.kind === 'vision')
 
 const modelSectionTitle = computed(() => {
   if (props.node.data.kind === 'embedding') {
@@ -112,6 +131,28 @@ function changeKnowledgeSpace(slug: string) {
     graphExpansion: space?.graphEnabled ? props.node.data.graphExpansion : false,
   })
 }
+
+function changeToolMode(value: unknown) {
+  const toolMode = value === 'AUTO' || value === 'REQUIRED' ? value : 'NONE'
+  emit('update', {
+    toolMode,
+    toolCodes: toolMode === 'NONE' ? [] : [...props.node.data.toolCodes],
+  })
+}
+
+function changeToolCodes(value: unknown) {
+  const codes = Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map(item => item.trim())
+    : []
+  emit('update', { toolCodes: [...new Set(codes)] })
+}
+
+function changeClasses(value: unknown) {
+  const classes = typeof value === 'string'
+    ? value.split(/[\n,，]/).map(item => item.trim()).filter(Boolean)
+    : []
+  emit('update', { classes: [...new Set(classes)] })
+}
 </script>
 
 <template>
@@ -157,6 +198,58 @@ function changeKnowledgeSpace(slug: string) {
         </label>
       </section>
 
+      <section v-if="isModelToolNode" class="form-section">
+        <h3>模型工具调用</h3>
+        <label class="form-field required">
+          <span>调用策略</span>
+          <FaSelect :model-value="node.data.toolMode" class="w-full" :options="toolModeOptions" placeholder="选择模型调用工具的策略" @update:model-value="changeToolMode" />
+          <small>自主调用由模型按任务判断；必须调用要求模型至少完成一次工具调用。</small>
+        </label>
+        <label class="form-field" :class="{ disabled: node.data.toolMode === 'NONE' }">
+          <span>可用工具</span>
+          <FaInput v-model="toolSearch" class="w-full" placeholder="搜索系统工具或 Python 工具" :disabled="node.data.toolMode === 'NONE'" />
+          <FaSelect
+            :model-value="node.data.toolCodes"
+            class="w-full"
+            multiple
+            :disabled="node.data.toolMode === 'NONE'"
+            :options="modelToolOptions"
+            placeholder="按分组选择此模型可调用的工具"
+            @update:model-value="changeToolCodes"
+          />
+          <small v-if="node.data.toolMode === 'NONE'">当前模型不会调用工具。</small>
+          <small v-else-if="!modelToolOptions.length" class="field-error">没有匹配的已启用工具，请调整搜索条件或先在工具页启用工具。</small>
+          <small v-else>应用授权会从所有模型节点的选择自动汇总。</small>
+        </label>
+      </section>
+
+      <section v-if="isExtractNode" class="form-section">
+        <h3>结构化输出</h3>
+        <label class="form-field required">
+          <span>输出 JSON Schema</span>
+          <FaTextarea :model-value="node.data.outputSchema" class="w-full" input-class="font-mono" :autosize="{ minRows: 8, maxRows: 16 }" placeholder='例如：{"type":"object","properties":{"title":{"type":"string"}}}' @update:model-value="updateField('outputSchema', $event)" />
+          <small>必须是 JSON 对象；模型结果将按该结构写入输出变量。</small>
+        </label>
+      </section>
+
+      <section v-if="isClassifyNode" class="form-section">
+        <h3>分类配置</h3>
+        <label class="form-field required">
+          <span>分类标签</span>
+          <FaTextarea :model-value="node.data.classes.join('\n')" class="w-full" :autosize="{ minRows: 4, maxRows: 10 }" placeholder="每行一个标签，例如：\n咨询\n投诉\n其他" @update:model-value="changeClasses($event)" />
+          <small>至少填写两个不重复标签，模型会从中选择一个分类。</small>
+        </label>
+      </section>
+
+      <section v-if="isVisionNode" class="form-section">
+        <h3>图片输入</h3>
+        <label class="form-field required">
+          <span>图片变量</span>
+          <FaInput :model-value="node.data.imageVariable" class="w-full" placeholder="例如 attachments[0] 或 product.coverImage" @update:model-value="updateField('imageVariable', $event)" />
+          <small>填写调试图片或运行上下文中图片 Data URL 的变量路径。</small>
+        </label>
+      </section>
+
       <section v-if="isKnowledgeNode" class="form-section">
         <h3>知识检索</h3>
         <label class="form-field required">
@@ -180,12 +273,12 @@ function changeKnowledgeSpace(slug: string) {
         </label>
       </section>
 
-      <section v-if="node.data.kind === 'tool'" class="form-section">
-        <h3>工具调用</h3>
+      <section v-if="node.data.kind === 'tool'" class="form-section compatibility-section">
+        <h3>兼容工具节点</h3>
         <label class="form-field required">
-          <span>调用工具</span>
-          <FaSelect :model-value="node.data.toolCode" class="w-full" :options="toolOptions" placeholder="选择系统工具或 Python 工具" @update:model-value="updateField('toolCode', $event)" />
-          <small>保存时会自动把该工具加入 Agent 应用授权范围</small>
+          <span>历史调用工具</span>
+          <FaSelect :model-value="node.data.toolCode" class="w-full" :options="modelToolOptions" placeholder="选择该历史节点调用的工具" @update:model-value="updateField('toolCode', $event)" />
+          <small>新工作流不再创建该节点。可通过画布工具栏迁移安全路径，将工具配置并入前驱模型节点。</small>
         </label>
       </section>
 
@@ -217,11 +310,13 @@ function changeKnowledgeSpace(slug: string) {
       </section>
 
       <section v-if="isPromptNode" class="form-section">
-        <h3>{{ node.data.kind === 'understand' ? '理解指令' : '模型指令' }}</h3>
+        <h3>模型指令</h3>
         <label class="form-field required">
           <span>提示词</span>
           <FaTextarea :model-value="node.data.prompt" class="w-full" :autosize="{ minRows: 8, maxRows: 16 }" placeholder="输入该模型节点的任务、输出格式与约束" @update:model-value="updateField('prompt', $event)" />
-          <small v-if="node.data.kind === 'understand'">建议明确需要提取的意图、实体字段和 JSON 输出结构</small>
+          <small v-if="isExtractNode">明确字段含义、缺失值处理和与 JSON Schema 对应的输出约束。</small>
+          <small v-else-if="isClassifyNode">说明分类标准、边界条件以及无法判断时应使用的标签。</small>
+          <small v-else-if="isVisionNode">说明图片与文本如何结合分析，不要假设图片中不存在的信息。</small>
         </label>
       </section>
 
@@ -290,11 +385,13 @@ function changeKnowledgeSpace(slug: string) {
 .form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }
 .form-field small { color: var(--color-text-3); font-size: 9px; line-height: 1.55; }
 .form-field .field-error { color: rgb(var(--danger-6)); }
+.form-field.disabled { opacity: 0.65; }
 .form-grid { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; }
 .toggle-option { display: grid; min-height: 54px; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 12px; padding: 9px 10px; border: 1px solid var(--color-border-2); border-radius: 6px; }
 .toggle-option > span { display: grid; gap: 3px; }
 .toggle-option b { color: var(--color-text-1); font-size: 10px; font-weight: 500; }
 .toggle-option small { color: var(--color-text-3); font-size: 8px; line-height: 1.5; }
 .toggle-option.disabled { opacity: 0.65; }
+.compatibility-section h3 { color: rgb(var(--warning-6)); }
 .inspector-footer { padding: 12px 16px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 </style>

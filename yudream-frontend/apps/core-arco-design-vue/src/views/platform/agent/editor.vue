@@ -14,8 +14,10 @@ import AgentNodeInspector from './components/AgentNodeInspector.vue'
 import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import { consumeAgentDebugStream } from './config/agent-debug-stream'
+import { agentNodePaletteGroups, agentNodeTemplates, findAgentNodeTemplate } from './config/agent-node-catalog'
 import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './config/agent-node-data'
 import { buildAgentRunInput } from './config/agent-run-input'
+import { deriveAgentApplicationToolCodes, migrateLegacyToolNodes } from './config/agent-workflow-tools'
 import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -56,40 +58,6 @@ const form = reactive<AgentApplicationPayload>({
   status: 'DRAFT',
 })
 
-const paletteGroups: Array<{ title: string, items: AgentNodeTemplate[] }> = [
-  {
-    title: '基础节点',
-    items: [
-      { kind: 'input', label: '输入', icon: 'i-ri:login-box-line', color: '#2563eb', description: '接收用户输入或业务参数', inputName: 'request', outputName: 'str.query' },
-      { kind: 'start', label: '开始', icon: 'i-ri:play-circle-line', color: '#2563eb', description: '接收用户输入和运行参数', inputName: 'str.query', outputName: 'str.query' },
-      { kind: 'end', label: '结束', icon: 'i-ri:stop-circle-line', color: '#64748b', description: '汇总并输出最终结果', inputName: 'str.answer', outputName: 'result' },
-      { kind: 'understand', label: '问题理解', icon: 'i-ri:brain-line', color: '#0f9488', description: '提取意图、实体与业务条件', inputName: 'str.query', outputName: 'json.intent' },
-      { kind: 'condition', label: '条件判断', icon: 'i-ri:git-branch-line', color: '#0f9488', description: '根据表达式选择后续分支', inputName: 'any', outputName: 'boolean' },
-      { kind: 'code', label: '代码执行', icon: 'i-ri:code-s-slash-line', color: '#d97706', description: '执行 Python 数据处理逻辑', inputName: 'any', outputName: 'any' },
-      { kind: 'template', label: '模板转换', icon: 'i-ri:file-code-line', color: '#7c3aed', description: '通过模板拼接结构化输出', inputName: 'json', outputName: 'str' },
-    ],
-  },
-  {
-    title: '知识库相关',
-    items: [
-      { kind: 'search', label: '知识检索', icon: 'i-ri:book-open-line', color: '#7c3aed', description: '从知识库检索相关内容', inputName: 'str.query', outputName: 'Array<Document>' },
-      { kind: 'vector', label: '向量检索', icon: 'i-ri:bubble-chart-line', color: '#16a34a', description: '基于向量相似度召回文档', inputName: 'vector', outputName: 'Array<Document>' },
-      { kind: 'rerank', label: '重排模型', icon: 'i-ri:sort-desc', color: '#d97706', description: '对召回结果进行相关性重排', inputName: 'Array<Document>', outputName: 'Array<Document>' },
-      { kind: 'document', label: '文档解析', icon: 'i-ri:file-text-line', color: '#4f46e5', description: '解析文档正文和元数据', inputName: 'File', outputName: 'Document' },
-      { kind: 'citation', label: '引用提取', icon: 'i-ri:double-quotes-l', color: '#0f9488', description: '提取答案引用来源和片段', inputName: 'answer + documents', outputName: 'Array<Citation>' },
-    ],
-  },
-  {
-    title: '模型与工具',
-    items: [
-      { kind: 'llm', label: '大模型', icon: 'i-ri:sparkling-line', color: '#7c3aed', description: '使用提示词调用模型处理上下文', inputName: 'context', outputName: 'str.answer' },
-      { kind: 'embedding', label: 'Embedding', icon: 'i-ri:focus-3-line', color: '#64748b', description: '将文本转换为向量表示', inputName: 'str', outputName: 'vector' },
-      { kind: 'tool', label: '工具调用', icon: 'i-ri:tools-line', color: '#d97706', description: '调用系统工具或自定义 Python 工具', inputName: 'json', outputName: 'tool.result' },
-    ],
-  },
-]
-
-const templates = computed(() => paletteGroups.flatMap(group => group.items))
 const nodes = ref<FlowNode<AgentNodeData>[]>([])
 const edges = ref<Edge[]>([])
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedNodeId.value))
@@ -97,6 +65,8 @@ const selectedEdge = computed(() => edges.value.find(item => item.id === selecte
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
+const applicationToolCodes = computed(() => deriveAgentApplicationToolCodes(nodes.value))
+const legacyToolNodeCount = computed(() => nodes.value.filter(node => node.data.kind === 'tool').length)
 const debugModelNodes = computed(() => nodes.value.filter(node => agentModelKind(node.data.kind) === 'chat'))
 const debugModels = computed(() => debugModelNodes.value.map(node => agentModels.value.find(model => model.providerCode === node.data.providerCode && model.modelCode === node.data.modelCode)))
 const debugModelLabel = computed(() => debugModelNodes.value.length ? `${debugModelNodes.value.length} 个模型节点` : '无需模型')
@@ -170,7 +140,8 @@ async function loadApplication() {
 }
 
 function templateOf(kind: AgentNodeKind): AgentNodeTemplate {
-  return templates.value.find(item => item.kind === kind) || templates.value[0]
+  // Unknown legacy data should degrade to a model node, never to an input node.
+  return findAgentNodeTemplate(kind) || findAgentNodeTemplate('llm')!
 }
 
 function normalizeNode(raw: FlowNode<AgentNodeData>): FlowNode<AgentNodeData> {
@@ -237,6 +208,10 @@ function seedWorkflow() {
 }
 
 function addNode(template: AgentNodeTemplate) {
+  if (!agentNodeTemplates.some(item => item.kind === template.kind)) {
+    toast.error('兼容节点不能从节点面板新建')
+    return
+  }
   const offset = (nodes.value.length % 5) * 34
   const node = makeNode(template, { x: 250 + offset, y: 150 + offset })
   addNodes(node)
@@ -251,6 +226,10 @@ function onDrop(event: DragEvent) {
   }
   try {
     const template = JSON.parse(raw) as AgentNodeTemplate
+    if (!agentNodeTemplates.some(item => item.kind === template.kind)) {
+      toast.error('兼容节点不能从节点面板新建')
+      return
+    }
     const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
     const node = makeNode(template, { x: point.x - 115, y: point.y - 70 })
     addNodes(node)
@@ -344,14 +323,30 @@ function onKeydown(event: KeyboardEvent) {
   deleteSelection()
 }
 
-function toggleTool(code: string, enabled: boolean) {
-  form.toolCodes = enabled
-    ? [...new Set([...form.toolCodes, code])]
-    : form.toolCodes.filter(item => item !== code)
-}
-
 function updateApplicationField(key: keyof AgentApplicationPayload, value: unknown) {
   Object.assign(form, { [key]: value })
+}
+
+function migrateLegacyTools() {
+  if (!legacyToolNodeCount.value) {
+    return
+  }
+  modal.confirm({
+    title: '迁移兼容工具节点',
+    content: '仅迁移直接连接在单个模型节点之后且只有一个后继的工具节点；存在分支或多个前驱的节点会保留，避免改变原有工作流。',
+    onConfirm: () => {
+      const migrated = migrateLegacyToolNodes({ nodes: nodes.value, edges: edges.value })
+      const migratedCount = legacyToolNodeCount.value - migrated.nodes.filter(node => node.data?.kind === 'tool').length
+      if (!migratedCount) {
+        toast.warning('没有可安全迁移的兼容工具节点')
+        return
+      }
+      nodes.value = migrated.nodes.map(node => normalizeNode(node as FlowNode<AgentNodeData>))
+      edges.value = migrated.edges.map(edge => normalizeEdge(edge as Edge))
+      clearSelection()
+      toast.success(`已将 ${migratedCount} 个工具节点迁移到模型节点`)
+    },
+  })
 }
 
 function fitCanvas() {
@@ -623,8 +618,7 @@ async function save(publish = false, notify = true): Promise<string> {
 
   saving.value = true
   try {
-    const nodeToolCodes = nodes.value.map(node => node.data.toolCode).filter(Boolean)
-    form.toolCodes = [...new Set([...form.toolCodes, ...nodeToolCodes])]
+    form.toolCodes = deriveAgentApplicationToolCodes(nodes.value)
     form.workflowJson = JSON.stringify(workflowData())
     const payload = { ...form, status: form.status === 'DISABLED' ? 'DISABLED' : 'DRAFT' } as AgentApplicationPayload
     const response = id.value ? await apiAgent.update(id.value, payload) : await apiAgent.create(payload)
@@ -674,7 +668,7 @@ async function save(publish = false, notify = true): Promise<string> {
     </FaPageHeader>
 
     <section class="agent-editor" :class="{ 'is-runtime-readonly': runtimeReadonly }">
-      <AgentNodePalette v-if="!runtimeReadonly" class="palette-panel" :groups="paletteGroups" @add="addNode" />
+      <AgentNodePalette v-if="!runtimeReadonly" class="palette-panel" :groups="agentNodePaletteGroups" @add="addNode" />
 
       <main
         class="flow-canvas"
@@ -700,6 +694,9 @@ async function save(publish = false, notify = true): Promise<string> {
           </button>
           <button v-if="!runtimeReadonly" type="button" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
             <FaIcon name="i-ri:restart-line" />
+          </button>
+          <button v-if="!runtimeReadonly && legacyToolNodeCount" type="button" class="toolbar-icon" title="迁移兼容工具节点" aria-label="迁移兼容工具节点" @click="migrateLegacyTools">
+            <FaIcon name="i-ri:git-merge-line" />
           </button>
           <button v-if="!runtimeReadonly" type="button" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
             <FaIcon name="i-ri:delete-bin-line" />
@@ -784,10 +781,10 @@ async function save(publish = false, notify = true): Promise<string> {
         v-else
         class="inspector-panel"
         :form="form"
+        :tool-codes="applicationToolCodes"
         :system-tools="systemTools"
         :custom-tools="customTools"
         :code-disabled="Boolean(id)"
-        @toggle-tool="toggleTool"
         @update-field="updateApplicationField"
       />
     </section>
