@@ -33,3 +33,28 @@ export interface AgentNodeData extends AgentNodeTemplate {
   toolCode: string
   condition: string
 }
+
+export type AgentDebugStatus = 'RUNNING' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
+
+export interface AgentDebugStep {
+  nodeId: string
+  nodeTitle: string
+  nodeKind: string
+  status: AgentDebugStatus
+  message: string
+}
+
+export interface AgentDebugToolResult {
+  toolName: string
+  action?: string
+  message?: string
+}
+
+export interface AgentDebugMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  status?: 'streaming' | 'completed' | 'failed' | 'cancelled'
+  steps?: AgentDebugStep[]
+  tools?: AgentDebugToolResult[]
+}

@@ -13,9 +13,12 @@ import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSav
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
 import online.yudream.base.interfaces.platform.agent.res.AgentApplicationRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,9 +27,14 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequiredArgsConstructor
@@ -34,6 +42,9 @@ import java.util.Map;
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.agent", name = "enabled", havingValue = "true")
 public class AgentController {
     private final AgentAppService agentAppService;
+
+    @Value("${yudream.platform.ai.client.sse-timeout:30m}")
+    private Duration sseTimeout;
 
     @GetMapping
     @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 应用", module = "平台能力", desc = "查看 Agent 应用列表")
@@ -56,6 +67,40 @@ public class AgentController {
     @PostMapping("/{id}/run")
     @PermissionRegister(code = "platform:agent:run", name = "运行 Agent 应用", module = "平台能力", desc = "运行 Agent 应用")
     public Result<AgentRunRes> run(@PathVariable Long id, @RequestBody AgentRunRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.run(AgentWebAssembler.toRunCmd(id, request)))); }
+
+    @PostMapping(value = "/{id}/debug/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PermissionRegister(code = "platform:agent:run", name = "调试 Agent 应用", module = "平台能力", desc = "流式调试 Agent 工作流")
+    public SseEmitter debug(@PathVariable Long id, @RequestBody AgentRunRequest request) {
+        SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
+        String runId = UUID.randomUUID().toString();
+        CompletableFuture.runAsync(() -> {
+            try {
+                send(emitter, AgentWebAssembler.toDebugRunStarted(runId));
+                var result = agentAppService.debug(
+                        AgentWebAssembler.toRunCmd(id, request),
+                        event -> send(emitter, AgentWebAssembler.toDebugNodeEvent(runId, event)),
+                        delta -> send(emitter, AgentWebAssembler.toDebugTextChunk(runId, delta)),
+                        tool -> send(emitter, AgentWebAssembler.toDebugToolResult(runId, tool))
+                );
+                send(emitter, AgentWebAssembler.toDebugRunFinished(runId, result));
+                emitter.complete();
+            } catch (Exception e) {
+                send(emitter, AgentWebAssembler.toDebugRunError(runId, e.getMessage()));
+                emitter.complete();
+            }
+        });
+        return emitter;
+    }
+
+    private void send(SseEmitter emitter, AgentDebugEventRes event) {
+        try {
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().name(event.getType()).data(event));
+            }
+        } catch (IOException e) {
+            emitter.completeWithError(e);
+        }
+    }
 
     @GetMapping("/tools")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看 Agent 工具", module = "平台能力", desc = "查看自定义 Agent 工具")

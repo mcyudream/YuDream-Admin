@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import type { Connection, Edge, Node as FlowNode } from '@vue-flow/core'
-import type { AgentConnectionStyle, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
-import type { AgentApplicationPayload, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentConnectionStyle, AgentDebugMessage, AgentDebugStatus, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
+import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MarkerType, useVueFlow, VueFlow } from '@vue-flow/core'
 import { MiniMap } from '@vue-flow/minimap'
 import apiAgent from '@/api/modules/platform-agent'
 import AgentApplicationInspector from './components/AgentApplicationInspector.vue'
+import AgentDebugPanel from './components/AgentDebugPanel.vue'
 import AgentEdgeInspector from './components/AgentEdgeInspector.vue'
 import AgentNodeInspector from './components/AgentNodeInspector.vue'
 import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
+import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -25,11 +27,17 @@ const id = computed(() => typeof route.query.id === 'string' ? route.query.id : 
 const saving = ref(false)
 const loading = ref(false)
 const isDragOver = ref(false)
+const rightMode = ref<'config' | 'debug'>('config')
 const selectedNodeId = ref('')
 const selectedEdgeId = ref('')
 const defaultConnectionStyle = ref<AgentConnectionStyle>('arrow')
 const customTools = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
+const debugRunning = ref(false)
+const debugMessages = ref<AgentDebugMessage[]>([])
+const activeDebugMessageId = ref('')
+const nodeDebugStatus = reactive<Record<string, AgentDebugStatus | undefined>>({})
+let debugAbortController: AbortController | null = null
 const form = reactive<AgentApplicationPayload>({
   name: '',
   code: '',
@@ -82,7 +90,7 @@ const selectedEdge = computed(() => edges.value.find(item => item.id === selecte
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
-const { addNodes, addEdges, screenToFlowCoordinate, fitView, updateNodeData } = useVueFlow()
+const { addNodes, addEdges, screenToFlowCoordinate, fitView, setCenter, updateNodeData } = useVueFlow()
 
 onMounted(async () => {
   window.addEventListener('keydown', onKeydown)
@@ -92,7 +100,10 @@ onMounted(async () => {
   }
 })
 
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown)
+  debugAbortController?.abort()
+})
 
 async function loadTools() {
   try {
@@ -226,11 +237,13 @@ function onConnect(connection: Connection) {
 }
 
 function selectNode(nodeId: string) {
+  rightMode.value = 'config'
   selectedNodeId.value = nodeId
   selectedEdgeId.value = ''
 }
 
 function selectEdge(edgeId: string) {
+  rightMode.value = 'config'
   selectedEdgeId.value = edgeId
   selectedNodeId.value = ''
 }
@@ -352,26 +365,175 @@ function nodeName(nodeId?: string) {
   return nodes.value.find(node => node.id === nodeId)?.data.title || nodeId || '-'
 }
 
-async function save(publish = false) {
+function activeDebugMessage() {
+  return debugMessages.value.find(message => message.id === activeDebugMessageId.value)
+}
+
+function resetDebugCanvas() {
+  Object.keys(nodeDebugStatus).forEach(key => delete nodeDebugStatus[key])
+  edges.value = edges.value.map(item => ({ ...item, class: undefined }))
+}
+
+function refreshDebugEdges() {
+  edges.value = edges.value.map((item) => {
+    const sourceStatus = nodeDebugStatus[item.source]
+    const targetStatus = nodeDebugStatus[item.target]
+    let debugClass: string | undefined
+    if (targetStatus === 'FAILED') {
+      debugClass = 'debug-failed'
+    }
+    else if (targetStatus === 'RUNNING') {
+      debugClass = 'debug-active'
+    }
+    else if (sourceStatus === 'COMPLETED' && targetStatus === 'COMPLETED') {
+      debugClass = 'debug-completed'
+    }
+    return { ...item, class: debugClass }
+  })
+}
+
+function focusDebugNode(nodeId: string) {
+  const node = nodes.value.find(item => item.id === nodeId)
+  if (!node) {
+    return
+  }
+  setCenter(node.position.x + 115, node.position.y + 70, { zoom: 1, duration: 260 })
+}
+
+function handleDebugEvent(event: AgentDebugStreamEvent) {
+  const message = activeDebugMessage()
+  if (!message) {
+    return
+  }
+  if (event.type.startsWith('NODE_') && event.nodeId && event.status) {
+    nodeDebugStatus[event.nodeId] = event.status
+    const step = message.steps?.find(item => item.nodeId === event.nodeId)
+    const nextStep = {
+      nodeId: event.nodeId,
+      nodeTitle: event.nodeTitle || nodeName(event.nodeId),
+      nodeKind: event.nodeKind || 'unknown',
+      status: event.status,
+      message: event.message || '节点状态已更新',
+    }
+    if (step) {
+      Object.assign(step, nextStep)
+    }
+    else {
+      message.steps?.push(nextStep)
+    }
+    refreshDebugEdges()
+    focusDebugNode(event.nodeId)
+    return
+  }
+  if (event.type === 'TEXT_MESSAGE_CHUNK' && event.delta) {
+    message.content += event.delta
+    return
+  }
+  if (event.type === 'TOOL_CALL_RESULT' && event.tool) {
+    message.tools?.push({
+      toolName: event.tool.toolName || '工具',
+      action: event.tool.action,
+      message: event.tool.message,
+    })
+    return
+  }
+  if (event.type === 'RUN_FINISHED') {
+    if (!message.content && event.result?.content) {
+      message.content = event.result.content
+    }
+    message.status = 'completed'
+    return
+  }
+  if (event.type === 'RUN_ERROR') {
+    message.status = 'failed'
+    message.content = message.content || event.message || 'Agent 调试失败'
+  }
+}
+
+async function startDebug(content: string) {
+  if (debugRunning.value) {
+    return
+  }
+  const applicationId = await save(false, false)
+  if (!applicationId) {
+    return
+  }
+
+  rightMode.value = 'debug'
+  resetDebugCanvas()
+  const assistantId = `assistant-${Date.now()}`
+  debugMessages.value.push(
+    { id: `user-${Date.now()}`, role: 'user', content },
+    { id: assistantId, role: 'assistant', content: '', status: 'streaming', steps: [], tools: [] },
+  )
+  activeDebugMessageId.value = assistantId
+  debugRunning.value = true
+  debugAbortController = new AbortController()
+
+  try {
+    const request = await apiAgent.debugStreamRequest(applicationId, { input: content })
+    const response = await fetch(apiAgent.debugStreamEndpoint(applicationId), {
+      ...request,
+      signal: debugAbortController.signal,
+    })
+    await consumeAgentDebugStream(response, raw => handleDebugEvent(raw as AgentDebugStreamEvent))
+    const message = activeDebugMessage()
+    if (message?.status === 'streaming') {
+      message.status = 'failed'
+      message.content = message.content || '调试连接已结束，但未收到完成事件'
+    }
+  }
+  catch (error) {
+    const message = activeDebugMessage()
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      if (message) {
+        message.status = 'cancelled'
+      }
+    }
+    else {
+      if (message) {
+        message.status = 'failed'
+        message.content = message.content || (error instanceof Error ? error.message : 'Agent 调试失败')
+      }
+      toast.error('Agent 调试失败')
+    }
+  }
+  finally {
+    debugRunning.value = false
+    debugAbortController = null
+  }
+}
+
+function stopDebug() {
+  debugAbortController?.abort()
+}
+
+function clearDebug() {
+  debugMessages.value = []
+  activeDebugMessageId.value = ''
+  resetDebugCanvas()
+}
+
+async function save(publish = false, notify = true): Promise<string> {
   if (!form.name.trim() || !form.code.trim()) {
     toast.error('请在右侧应用设置中填写应用名称和编码')
     clearSelection()
-    return
+    return ''
   }
   if (!/^[a-z][a-z0-9-]*$/i.test(form.code.trim())) {
     toast.error('应用编码只能包含英文字母、数字和连字符，并以字母开头')
     clearSelection()
-    return
+    return ''
   }
   if (!nodes.value.some(node => node.data.kind === 'start') || !nodes.value.some(node => node.data.kind === 'end')) {
     toast.error('工作流至少需要一个开始节点和一个结束节点')
-    return
+    return ''
   }
   const emptyToolNode = nodes.value.find(node => node.data.kind === 'tool' && !node.data.toolCode)
   if (emptyToolNode) {
     selectNode(emptyToolNode.id)
     toast.error('请为工具调用节点选择具体工具')
-    return
+    return ''
   }
 
   saving.value = true
@@ -385,11 +547,15 @@ async function save(publish = false) {
     if (publish) {
       await apiAgent.publish(response.data.id)
     }
-    toast.success(publish ? 'Agent 应用已发布' : 'Agent 编排已保存')
+    if (notify) {
+      toast.success(publish ? 'Agent 应用已发布' : 'Agent 编排已保存')
+    }
     await router.replace({ path: '/platform/agent/editor', query: { id: response.data.id } })
+    return response.data.id
   }
   catch {
     toast.error(publish ? '发布失败，请检查应用配置' : '保存失败，请检查应用配置')
+    return ''
   }
   finally {
     saving.value = false
@@ -406,6 +572,9 @@ async function save(publish = false) {
         </FaButton>
         <FaButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
           <FaIcon name="i-ri:download-2-line" /> 导出
+        </FaButton>
+        <FaButton :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
+          <FaIcon name="i-ri:bug-line" /> 调试
         </FaButton>
         <FaButton variant="outline" :loading="saving" @click="save(false)">
           <FaIcon name="i-ri:save-3-line" /> 保存
@@ -473,7 +642,7 @@ async function save(publish = false) {
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" :pannable="true" :zoomable="true" />
           <template #node-agent="nodeProps">
-            <AgentWorkflowNode v-bind="nodeProps" @delete="deleteNode" />
+            <AgentWorkflowNode v-bind="nodeProps" :debug-status="nodeDebugStatus[nodeProps.id]" @delete="deleteNode" />
           </template>
         </VueFlow>
 
@@ -481,12 +650,22 @@ async function save(publish = false) {
           <span>{{ nodes.length }} 个节点</span>
           <i />
           <span>{{ edges.length }} 条连线</span>
-          <span>拖动节点两侧圆点建立连接</span>
+          <span>{{ debugRunning ? '正在实时调试' : '拖动节点两侧圆点建立连接' }}</span>
         </div>
       </main>
 
+      <AgentDebugPanel
+        v-if="rightMode === 'debug'"
+        class="inspector-panel"
+        :messages="debugMessages"
+        :running="debugRunning"
+        @send="startDebug"
+        @stop="stopDebug"
+        @clear="clearDebug"
+        @close="rightMode = 'config'"
+      />
       <AgentNodeInspector
-        v-if="selectedNode"
+        v-else-if="selectedNode"
         class="inspector-panel"
         :node="selectedNode"
         :system-tools="systemTools"
@@ -523,7 +702,7 @@ async function save(publish = false) {
 <style scoped>
 .agent-editor-page { min-width: 0; }
 .header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.agent-editor { display: grid; height: calc(100vh - 174px); min-height: 650px; overflow: hidden; grid-template-columns: 242px minmax(0, 1fr) 326px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
+.agent-editor { display: grid; height: calc(100vh - 174px); min-height: 650px; overflow: hidden; grid-template-columns: 242px minmax(0, 1fr) 360px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 .flow-canvas { position: relative; min-width: 0; overflow: hidden; background: var(--color-bg-2); }
 .agent-flow { width: 100%; height: 100%; }
 .canvas-toolbar { position: absolute; top: 14px; left: 50%; z-index: 10; display: flex; min-height: 40px; align-items: center; gap: 8px; padding: 5px 7px 5px 12px; border: 1px solid var(--color-border-2); border-radius: 7px; background: color-mix(in srgb, var(--color-bg-1), transparent 4%); box-shadow: 0 7px 24px rgb(15 23 42 / 12%); transform: translateX(-50%); backdrop-filter: blur(8px); }
@@ -544,12 +723,16 @@ async function save(publish = false) {
 .canvas-status span:last-child { margin-left: 3px; }
 .agent-flow :deep(.vue-flow__edge-path) { stroke: var(--color-text-4); stroke-width: 1.6; }
 .agent-flow :deep(.vue-flow__edge.selected .vue-flow__edge-path), .agent-flow :deep(.vue-flow__edge:hover .vue-flow__edge-path) { stroke: rgb(var(--primary-6)); stroke-width: 2.2; }
+.agent-flow :deep(.vue-flow__edge.debug-active .vue-flow__edge-path) { stroke: rgb(var(--primary-6)); stroke-width: 2.6; stroke-dasharray: 8 5; animation: edge-flow 0.8s linear infinite; }
+.agent-flow :deep(.vue-flow__edge.debug-completed .vue-flow__edge-path) { stroke: rgb(var(--success-6)); stroke-width: 2.2; }
+.agent-flow :deep(.vue-flow__edge.debug-failed .vue-flow__edge-path) { stroke: rgb(var(--danger-6)); stroke-width: 2.4; }
 .agent-flow :deep(.vue-flow__edge-textbg) { fill: var(--color-bg-1); }
 .agent-flow :deep(.vue-flow__edge-text) { fill: var(--color-text-2); font-size: 10px; }
 .agent-flow :deep(.vue-flow__controls) { overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 6px; box-shadow: 0 5px 18px rgb(15 23 42 / 10%); }
 .agent-flow :deep(.vue-flow__controls-button) { border-bottom-color: var(--color-border-2); background: var(--color-bg-1); fill: var(--color-text-2); }
 .agent-flow :deep(.vue-flow__minimap) { width: 190px; height: 125px; overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 7px; background: var(--color-bg-1); box-shadow: 0 7px 22px rgb(15 23 42 / 11%); }
 .agent-flow :deep(.vue-flow__minimap-mask) { fill: color-mix(in srgb, var(--color-fill-3), transparent 18%); }
+@keyframes edge-flow { to { stroke-dashoffset: -13; } }
 @media (max-width: 1180px) {
   .agent-editor { height: auto; min-height: 0; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 640px 480px; }
   .inspector-panel { grid-column: 1 / -1; border-top: 1px solid var(--color-border-2); border-left: 0 !important; }

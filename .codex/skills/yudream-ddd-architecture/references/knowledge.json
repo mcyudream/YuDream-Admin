@@ -151,6 +151,10 @@
     {
       "key": "workflow-editor-scroll-container",
       "text": "固定高度的 Grid/Flex 工作台中，侧栏根节点必须设置 height:100%、min-height:0、overflow:hidden，内部内容区使用 min-height:0 和 overflow:auto，避免长工具列表被裁切。"
+    },
+    {
+      "key": "agent-debug-sse-ui",
+      "text": "Agent 调试前端必须通过 fetch ReadableStream 消费 POST SSE，并按 nodeId 映射节点状态；仅打印 AG-UI/SSE 日志或等待阻塞 /run 返回，无法实现实时画布反馈。"
     }
   ],
   "utilities": [
