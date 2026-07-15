@@ -26,6 +26,7 @@ public class AiWebAssembler {
 
     public static CmsPageGenerateCmd toCmd(CmsPageGenerateRequest request) {
         CmsPageGenerateCmd cmd = new CmsPageGenerateCmd();
+        cmd.setAgentCode(request.getAgentCode());
         cmd.setTitle(request.getTitle());
         cmd.setPrompt(request.getPrompt());
         cmd.setPageType(request.getPageType());
