@@ -5,15 +5,16 @@ import { test } from 'node:test'
 import { deriveAgentApplicationToolCodes, migrateLegacyToolNodes } from './agent-workflow-tools'
 
 function node(id: string, kind: AgentNodeData['kind'], data: Partial<AgentNodeData> = {}) {
-  return { id, data: { kind, title: id, toolCodes: [], ...data } }
+  return { id, data: { kind, title: id, toolCodes: [], toolConfigDeclared: false, ...data } }
 }
 
 test('derives an ordered unique application tool authorization union', () => {
   const toolCodes = deriveAgentApplicationToolCodes([
-    node('build', 'llm', { toolCodes: ['cms.canvas.patch', 'web.fetch', 'cms.canvas.patch'] }),
-    node('classify', 'classify', { toolCodes: ['knowledge.lookup'] }),
+    node('build', 'llm', { toolConfigDeclared: true, toolCodes: ['cms.canvas.patch', 'web.fetch', 'cms.canvas.patch'] }),
+    node('classify', 'classify', { toolConfigDeclared: true, toolCodes: ['knowledge.lookup'] }),
     node('legacy', 'tool', { toolCode: 'web.fetch' }),
     node('embedding', 'embedding', { toolCodes: ['ignored.by.embedding'] }),
+    node('undeclared', 'llm', { toolCodes: ['ignored.by.legacy.compatibility'] }),
   ])
 
   assert.deepEqual(toolCodes, ['cms.canvas.patch', 'web.fetch', 'knowledge.lookup'])
@@ -39,6 +40,7 @@ test('migrates an unambiguous legacy tool node into its direct chat-model predec
   assert.deepEqual(migrated.nodes.map(item => item.id), ['start', 'build', 'end'])
   assert.deepEqual(migrated.nodes.find(item => item.id === 'build')?.data?.toolCodes, ['web.fetch', 'cms.canvas.patch'])
   assert.equal(migrated.nodes.find(item => item.id === 'build')?.data?.toolMode, 'AUTO')
+  assert.equal(migrated.nodes.find(item => item.id === 'build')?.data?.toolConfigDeclared, true)
   assert.deepEqual(migrated.edges, [
     { id: 'start-build', source: 'start', target: 'build' },
     { id: 'tool-end', source: 'build', target: 'end', sourceHandle: 'source', targetHandle: 'input', data: { connectionStyle: 'arrow' } },

@@ -49,6 +49,7 @@ export function createAgentNodeData(template: AgentNodeTemplate, overrides: Part
     prompt: '',
     toolCodes,
     toolMode: 'NONE',
+    toolConfigDeclared: isAgentToolConfigModelNode(template.kind),
     toolCode: '',
     outputSchema: '',
     classes,
@@ -90,9 +91,16 @@ export function normalizeAgentNodeData(template: AgentNodeTemplate, raw: Partial
   normalized.toolCodes = strings(raw.toolCodes ?? defaults.toolCodes)
   normalized.classes = strings(raw.classes ?? defaults.classes)
   normalized.toolMode = toolMode(raw.toolMode ?? defaults.toolMode)
+  // Workflow data created before model-native tools has no declaration marker.
+  // Keep it distinct from a user intentionally selecting NONE with no tools.
+  normalized.toolConfigDeclared = isAgentToolConfigModelNode(template.kind) && raw.toolConfigDeclared === true
   normalized.outputSchema = text(raw.outputSchema ?? defaults.outputSchema)
   normalized.imageVariable = text(raw.imageVariable ?? defaults.imageVariable)
   return normalized
+}
+
+export function isAgentToolConfigModelNode(kind: AgentNodeKind) {
+  return kind !== 'understand' && isAgentChatModelNode(kind)
 }
 
 function strings(value: unknown) {
