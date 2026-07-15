@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.plugin.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
@@ -37,6 +38,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -60,6 +62,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final PluginServiceRegistry pluginServiceRegistry;
     private final PluginAiToolRegistry aiToolRegistry;
     private final PluginSemanticMemoryService semanticMemoryService;
+    private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -109,6 +112,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         }
         try {
             annotationRegistrar.register(holder.getPlugin(), holder.getContext());
+            registerDeclaredAgents(holder);
             holder.getPlugin().onEnable(holder.getContext());
             holder.setEnabled(true);
             log.info("Plugin enabled: code={}", module.getCode());
@@ -356,7 +360,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                             declaredDependencies(descriptor),
                             this::enabled,
                             aiToolRegistry,
-                            semanticMemoryService
+                            semanticMemoryService,
+                            agentApplicationRegistry
                     )
             );
         } catch (IOException e) {
@@ -379,6 +384,35 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 return new PluginYamlDescriptorReader().read(inputStream);
             }
         }
+    }
+
+    private void registerDeclaredAgents(PluginRuntimeHolder holder) {
+        ClassLoader classLoader = holder.getClassLoader();
+        try (InputStream manifest = classLoader.getResourceAsStream("plugin.yml")) {
+            List<PluginAgentManifestReader.Definition> definitions = new PluginAgentManifestReader().read(manifest);
+            for (PluginAgentManifestReader.Definition definition : definitions) {
+                String resource = safeAgentResource(definition.workflowResource());
+                try (InputStream workflow = classLoader.getResourceAsStream(resource)) {
+                    if (workflow == null) {
+                        throw new BizException("插件 Agent 工作流资源不存在：" + resource);
+                    }
+                    holder.getContext().registerDeclaredAgent(
+                            definition,
+                            new String(workflow.readAllBytes(), StandardCharsets.UTF_8)
+                    );
+                }
+            }
+        } catch (IOException exception) {
+            throw new BizException("读取插件 Agent 定义失败：" + exception.getMessage());
+        }
+    }
+
+    private String safeAgentResource(String resource) {
+        String normalized = resource == null ? "" : resource.trim().replace('\\', '/');
+        if (!StringUtils.hasText(normalized) || normalized.startsWith("/") || normalized.contains("../")) {
+            throw new BizException("插件 Agent 工作流资源路径无效：" + resource);
+        }
+        return normalized;
     }
 
     private YuDreamPlugin instantiatePlugin(URLClassLoader classLoader, PluginDescriptor descriptor) {

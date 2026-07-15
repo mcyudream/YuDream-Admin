@@ -51,6 +51,12 @@ public class AgentController {
     @GetMapping
     @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 应用", module = "平台能力", desc = "查看 Agent 应用列表")
     public Result<PageResult<AgentApplicationRes>> page(AgentPageQuery query) { return Result.ok(AgentWebAssembler.toApplicationPage(agentAppService.page(query))); }
+    @GetMapping("/available")
+    @PermissionRegister(code = "platform:agent:view", name = "查看可用 Agent 应用", module = "平台能力", desc = "查看持久化与插件运行时 Agent 应用")
+    public Result<List<AgentApplicationRes>> available() { return Result.ok(agentAppService.publishedApplications().stream().map(AgentWebAssembler::toRes).toList()); }
+    @GetMapping("/runtime/{code}")
+    @PermissionRegister(code = "platform:agent:view", name = "查看插件 Agent 编排", module = "平台能力", desc = "查看当前插件提供的运行时 Agent 编排")
+    public Result<AgentApplicationRes> runtime(@PathVariable String code) { return Result.ok(AgentWebAssembler.toRes(agentAppService.runtimeApplication(code))); }
     @GetMapping("/{id}")
     @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 应用详情", module = "平台能力", desc = "查看 Agent 编排详情")
     public Result<AgentApplicationRes> detail(@PathVariable Long id) { return Result.ok(AgentWebAssembler.toRes(agentAppService.detail(id))); }

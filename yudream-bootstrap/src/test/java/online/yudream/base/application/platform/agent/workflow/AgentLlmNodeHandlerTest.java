@@ -80,6 +80,49 @@ class AgentLlmNodeHandlerTest {
         assertThat(execution.context().nodeOutput("end")).isEqualTo("最终回答");
     }
 
+    @Test
+    void shouldAllowPluginRuntimeToOverrideModelAndEnablePluginToolCalling() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
+        CapturingGateway gateway = new CapturingGateway();
+        AgentApplication application = AgentApplication.builder()
+                .name("插件 Agent")
+                .code("plugin-agent")
+                .toolCodes(List.of())
+                .build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("hello");
+        cmd.setProviderCode("runtime-provider");
+        cmd.setModelCode("runtime-model");
+        cmd.setRuntimeToolCallingEnabled(true);
+        AgentWorkflowRunState state = new AgentWorkflowRunState(
+                application, cmd, Map.of(), java.util.Set.of(), ignored -> { }, ignored -> { }
+        );
+        AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
+                new AgentWorkflowGraphParser(objectMapper),
+                List.of(
+                        new AgentStartNodeHandler(values),
+                        new AgentLlmNodeHandler("llm", values, objectMapper, gateway, state),
+                        new AgentEndNodeHandler(values)
+                )
+        );
+
+        executor.execute("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                  {"id":"llm","data":{"kind":"llm","inputVariable":"query","outputVariable":"answer","providerCode":"__default__","modelCode":"__default__","allowModelOverride":true}},
+                  {"id":"end","data":{"kind":"end","inputVariable":"answer"}}
+                ],"edges":[
+                  {"source":"start","target":"llm"},{"source":"llm","target":"end"}
+                ]}
+                """, cmd.getInput());
+
+        AiGenerationRequest request = gateway.requests.getFirst();
+        assertThat(request.providerCode()).isEqualTo("runtime-provider");
+        assertThat(request.modelCode()).isEqualTo("runtime-model");
+        assertThat(request.toolCallingEnabled()).isTrue();
+    }
+
     private static final class CapturingGateway implements AiGenerationGateway {
         private final List<AiGenerationRequest> requests = new ArrayList<>();
 

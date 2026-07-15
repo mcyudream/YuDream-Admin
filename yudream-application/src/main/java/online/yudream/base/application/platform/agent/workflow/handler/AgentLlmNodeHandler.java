@@ -47,8 +47,11 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
 
     @Override
     public AgentWorkflowNodeResult execute(AgentWorkflowNode node, AgentWorkflowContext context) {
-        String providerCode = selected(values.text(node, "providerCode"), state.command().getProviderCode());
-        String modelCode = selected(values.text(node, "modelCode"), state.command().getModelCode());
+        boolean allowModelOverride = values.bool(node, "allowModelOverride", false);
+        String providerCode = selected(
+                values.text(node, "providerCode"), state.command().getProviderCode(), allowModelOverride
+        );
+        String modelCode = selected(values.text(node, "modelCode"), state.command().getModelCode(), allowModelOverride);
         if (!StringUtils.hasText(providerCode) || !StringUtils.hasText(modelCode)) {
             throw new BizException(node.title() + "必须选择可用模型");
         }
@@ -66,7 +69,8 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 modelCode,
                 state.aiConfig(),
                 state.command().getHistory()
-        ).withToolCallingEnabled("llm".equals(kind) && !state.systemToolCodes().isEmpty());
+        ).withToolCallingEnabled("llm".equals(kind)
+                && (!state.systemToolCodes().isEmpty() || state.command().isRuntimeToolCallingEnabled()));
         AiGenerationResult generated;
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(state.systemToolCodes())) {
             generated = "understand".equals(kind)
@@ -119,7 +123,10 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         }
     }
 
-    private String selected(String nodeValue, String requestValue) {
+    private String selected(String nodeValue, String requestValue, boolean allowOverride) {
+        if (allowOverride && StringUtils.hasText(requestValue)) {
+            return requestValue;
+        }
         return StringUtils.hasText(nodeValue) ? nodeValue : requestValue;
     }
 }

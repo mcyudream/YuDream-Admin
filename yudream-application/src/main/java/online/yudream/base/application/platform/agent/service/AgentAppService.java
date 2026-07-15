@@ -26,6 +26,7 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
 import online.yudream.base.domain.platform.agent.repo.AgentApplicationRepo;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
+import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -56,6 +57,7 @@ public class AgentAppService {
     private final AgentWorkflowRuntimeService workflowRuntime;
     private final AgentWorkflowValidator workflowValidator;
     private final AgentPermissionGateway permissionGateway;
+    private final AgentRuntimeApplicationRegistry runtimeApplications;
 
     @Transactional(readOnly = true)
     public PageResult<AgentApplicationDTO> page(AgentPageQuery query) {
@@ -80,9 +82,20 @@ public class AgentAppService {
     @Transactional(readOnly = true)
     public List<AgentApplicationDTO> publishedApplications() {
         ensureEnabled();
-        return applicationRepo.page(null, AgentApplicationStatus.PUBLISHED, 1, 200).getRecords().stream()
+        Map<String, AgentApplication> available = new java.util.LinkedHashMap<>();
+        applicationRepo.page(null, AgentApplicationStatus.PUBLISHED, 1, 200).getRecords().stream()
+                .filter(application -> !BuiltinAgentCodes.isPluginManaged(application.getCode()))
+                .forEach(application -> available.put(application.getCode(), application));
+        runtimeApplications.applications().forEach(application -> available.put(application.getCode(), application));
+        return available.values().stream().map(AgentAssembler::toDTO).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public AgentApplicationDTO runtimeApplication(String code) {
+        ensureEnabled();
+        return runtimeApplications.findByCode(code)
                 .map(AgentAssembler::toDTO)
-                .toList();
+                .orElseThrow(() -> new BizException("插件 Agent 当前不可用：" + code));
     }
 
     @Transactional
@@ -283,7 +296,15 @@ public class AgentAppService {
     }
 
     private AgentApplication publishedApplication(String code) {
-        AgentApplication application = applicationRepo.findByCode(code == null ? "" : code.trim())
+        String normalizedCode = code == null ? "" : code.trim().toLowerCase();
+        java.util.Optional<AgentApplication> runtime = runtimeApplications.findByCode(normalizedCode);
+        if (runtime.isPresent()) {
+            return runtime.get();
+        }
+        if (BuiltinAgentCodes.isPluginManaged(normalizedCode)) {
+            throw new BizException("插件 Agent 当前不可用：" + code);
+        }
+        AgentApplication application = applicationRepo.findByCode(normalizedCode)
                 .orElseThrow(() -> new BizException("Agent 应用不存在：" + code));
         if (application.getStatus() != AgentApplicationStatus.PUBLISHED) {
             throw new BizException("Agent 应用未发布：" + application.getName());

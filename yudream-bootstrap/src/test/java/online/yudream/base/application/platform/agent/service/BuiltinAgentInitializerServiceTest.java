@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 class BuiltinAgentInitializerServiceTest {
 
     @Test
-    void createsPublishedCmsChatbotAndAguiCardAgentsFromConfiguredDefaultModel() {
+    void createsPublishedComplexCmsAndAguiCardAgentsFromConfiguredDefaultModel() throws Exception {
         AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
         CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
         AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
@@ -43,19 +43,28 @@ class BuiltinAgentInitializerServiceTest {
         assertThat(created).extracting(AgentApplication::getCode)
                 .containsExactlyInAnyOrder(
                         BuiltinAgentCodes.CMS_BUILDER,
-                        BuiltinAgentCodes.GROUP_CHATBOT,
                         BuiltinAgentCodes.AGUI_CARD
                 );
         assertThat(created).allMatch(item -> item.getStatus() == AgentApplicationStatus.PUBLISHED);
         assertThat(created).allMatch(item -> item.getWorkflowJson().contains("\"providerCode\":\"openai\""));
-        assertThat(created.stream().filter(item -> BuiltinAgentCodes.CMS_BUILDER.equals(item.getCode())).findFirst().orElseThrow().getToolCodes())
+        AgentApplication cmsAgent = created.stream()
+                .filter(item -> BuiltinAgentCodes.CMS_BUILDER.equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(cmsAgent.getToolCodes())
                 .contains("cms.canvas.patch", "cms.canvas.validate");
+        var cmsNodes = new ObjectMapper().readTree(cmsAgent.getWorkflowJson()).path("nodes");
+        assertThat(cmsNodes).hasSize(8);
+        assertThat(cmsNodes.toString()).contains("\"kind\":\"understand\"", "\"kind\":\"condition\"", "\"kind\":\"template\"");
         AgentApplication cardAgent = created.stream()
                 .filter(item -> BuiltinAgentCodes.AGUI_CARD.equals(item.getCode()))
                 .findFirst()
                 .orElseThrow();
-        assertThat(cardAgent.getWorkflowJson()).contains("\"kind\":\"understand\"");
+        var cardNodes = new ObjectMapper().readTree(cardAgent.getWorkflowJson()).path("nodes");
+        assertThat(cardNodes).hasSize(8);
+        assertThat(cardNodes.toString()).contains("\"kind\":\"condition\"", "\"kind\":\"template\"");
         assertThat(cardAgent.getSystemPrompt()).contains("fields", "actions");
+        verify(applications, never()).findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT);
     }
 
     @Test
@@ -63,13 +72,53 @@ class BuiltinAgentInitializerServiceTest {
         AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
         CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
         AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
-        AgentApplication existing = AgentApplication.builder().code(BuiltinAgentCodes.CMS_BUILDER).build();
+        AgentApplication existing = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{},{}]}")
+                .build();
         when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(existing));
-        when(applications.findByCode(BuiltinAgentCodes.GROUP_CHATBOT)).thenReturn(Optional.of(existing));
         when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(existing));
         BuiltinAgentInitializerService service = new BuiltinAgentInitializerService(applications, capabilities, models, new ObjectMapper());
 
         assertThat(service.initialize()).isEmpty();
         verify(applications, never()).save(any());
+    }
+
+    @Test
+    void upgradesExistingThreeNodeBuiltinWorkflowWithoutTouchingPluginAgent() throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of(new AgentModelDTO(
+                "openai", "OpenAI", "gpt-5", "GPT-5", "chat", true, true, true
+        )));
+        AgentApplication cms = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .name("CMS 页面构建 Agent")
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{}]}")
+                .build();
+        AgentApplication card = AgentApplication.builder()
+                .code(BuiltinAgentCodes.AGUI_CARD)
+                .name("AG-UI 卡片生成 Agent")
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{}]}")
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(card));
+        when(applications.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AgentApplication> upgraded = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        assertThat(upgraded).hasSize(2);
+        assertThat(new ObjectMapper().readTree(cms.getWorkflowJson()).path("nodes")).hasSize(8);
+        assertThat(new ObjectMapper().readTree(card.getWorkflowJson()).path("nodes")).hasSize(8);
+        verify(applications, never()).findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT);
     }
 }

@@ -171,6 +171,10 @@
     {
       "key": "agui-card-activity-only",
       "text": "Structured Agent cards are emitted only in AG-UI streams as ACTIVITY_SNAPSHOT with activityType=agui-card. Ordinary Agent/non-stream responses keep raw structured output and must not render AG-UI cards."
+    },
+    {
+      "key": "plugin-agent-runtime-manifest",
+      "text": "Plugin-owned Agent applications must be declared as static plugin.yml agents with classpath workflow resources and projected into the runtime registry only. Enabling registers them; disable/unload disposes them immediately. Never seed plugin Agent applications into the host database, and never fall back to legacy persisted copies when the owning plugin is unavailable."
     }
   ],
   "utilities": [
