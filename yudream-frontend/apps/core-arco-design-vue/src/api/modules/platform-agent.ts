@@ -67,6 +67,20 @@ export interface AgentModelOption {
   defaultModel: boolean
 }
 
+export interface AgentKnowledgeSpaceOption {
+  slug: string
+  name: string
+  topK?: number
+  graphEnabled?: boolean
+  embeddingProviderCode?: string
+  embeddingModelCode?: string
+}
+
+export interface AgentCatalog {
+  knowledgeSpaces: AgentKnowledgeSpaceOption[]
+  models: AgentModelOption[]
+}
+
 export type AgentDebugNodeStatus = 'RUNNING' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
 
 export interface AgentDebugStreamEvent {
@@ -111,6 +125,7 @@ export default {
     return { method: 'POST', headers, body: JSON.stringify(body) }
   },
   pageTools: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentTool>>>('api/platform/agents/tools', { params }),
+  catalog: () => systemClient.get<unknown, ApiResponse<AgentCatalog>>('api/platform/agents/catalog'),
   models: () => systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/agents/models'),
   systemTools: () => systemClient.get<unknown, ApiResponse<SystemAgentTool[]>>('api/platform/agents/tools/system'),
   createTool: (data: Omit<AgentTool, 'id' | 'type' | 'updateTime'>) => systemClient.post<unknown, ApiResponse<AgentTool>>('api/platform/agents/tools', data),
