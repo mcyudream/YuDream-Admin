@@ -12,6 +12,7 @@ export interface CmsBlockDefinition {
   css?: string
   description?: string
   icon?: string
+  attributes?: Record<string, string>
 }
 
 export function toBlockDefinition(block: CmsBlock): CmsBlockDefinition {
