@@ -31,7 +31,8 @@ public class BuiltinAgentInitializerService {
     private final ObjectMapper objectMapper;
 
     public List<AgentApplication> initialize() {
-        AgentModelDTO model = defaultChatModel();
+        List<AgentModelDTO> chatModels = configuredChatModels();
+        AgentModelDTO model = defaultChatModel(chatModels);
         List<AgentApplication> created = new ArrayList<>();
         createIfMissing(
                 BuiltinAgentCodes.CMS_BUILDER,
@@ -40,7 +41,8 @@ public class BuiltinAgentInitializerService {
                 "你是 YuDream CMS 页面构建 Agent。优先调用已授权的 CMS 画布工具完成修改，所有修改完成后必须调用 cms.canvas.validate 校验。",
                 CMS_TOOLS,
                 cmsWorkflow(model),
-                model != null
+                model != null,
+                chatModels
         ).ifPresent(created::add);
         createIfMissing(
                 BuiltinAgentCodes.AGUI_CARD,
@@ -56,7 +58,8 @@ public class BuiltinAgentInitializerService {
                 """,
                 List.of(),
                 aguiWorkflow(model),
-                model != null
+                model != null,
+                chatModels
         ).ifPresent(created::add);
         return List.copyOf(created);
     }
@@ -68,10 +71,11 @@ public class BuiltinAgentInitializerService {
             String systemPrompt,
             List<String> toolCodes,
             String workflowJson,
-            boolean publish
+            boolean publish,
+            List<AgentModelDTO> chatModels
     ) {
         java.util.Optional<AgentApplication> existing = applications.findByCode(code);
-        if (existing.isPresent() && !requiresWorkflowUpgrade(existing.get())) {
+        if (existing.isPresent() && !requiresWorkflowUpgrade(existing.get(), chatModels)) {
             return java.util.Optional.empty();
         }
         AgentApplication application = existing.orElseGet(() -> AgentApplication.create(name, code));
@@ -94,26 +98,54 @@ public class BuiltinAgentInitializerService {
         return java.util.Optional.of(applications.save(application));
     }
 
-    private boolean requiresWorkflowUpgrade(AgentApplication application) {
+    private boolean requiresWorkflowUpgrade(
+            AgentApplication application,
+            List<AgentModelDTO> chatModels
+    ) {
         if (application.getWorkflowJson() == null || application.getWorkflowJson().isBlank()) {
             return true;
         }
         try {
-            return objectMapper.readTree(application.getWorkflowJson()).path("nodes").size() <= 3;
+            var nodes = objectMapper.readTree(application.getWorkflowJson()).path("nodes");
+            if (nodes.size() <= 3) {
+                return true;
+            }
+            if (chatModels == null || chatModels.isEmpty()) {
+                return false;
+            }
+            for (var node : nodes) {
+                var data = node.path("data");
+                String kind = data.path("kind").asText();
+                if (!List.of("llm", "understand").contains(kind)) {
+                    continue;
+                }
+                String providerCode = data.path("providerCode").asText();
+                String modelCode = data.path("modelCode").asText();
+                boolean valid = chatModels.stream().anyMatch(model ->
+                        model.providerCode().equals(providerCode) && model.modelCode().equals(modelCode)
+                );
+                if (!valid) {
+                    return true;
+                }
+            }
+            return false;
         }
         catch (Exception ignored) {
             return true;
         }
     }
 
-    private AgentModelDTO defaultChatModel() {
+    private List<AgentModelDTO> configuredChatModels() {
         Map<String, String> config = capabilities.findByCode("ai")
                 .map(module -> module.getConfig() == null ? Map.<String, String>of() : module.getConfig())
                 .orElseGet(Map::of);
-        List<AgentModelDTO> chatModels = models.parse(config).stream()
+        return models.parse(config).stream()
                 .filter(AgentModelDTO::configured)
                 .filter(model -> "chat".equalsIgnoreCase(model.kind()))
                 .toList();
+    }
+
+    private AgentModelDTO defaultChatModel(List<AgentModelDTO> chatModels) {
         return chatModels.stream().filter(AgentModelDTO::defaultModel).findFirst()
                 .orElse(chatModels.isEmpty() ? null : chatModels.getFirst());
     }

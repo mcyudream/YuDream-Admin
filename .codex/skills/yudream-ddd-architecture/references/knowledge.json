@@ -158,7 +158,7 @@
     },
     {
       "key": "agent-node-model-selection",
-      "text": "Agent 大模型节点必须持久化 providerCode/modelCode 和输入能力；运行与调试优先使用节点配置，Vision 模型才允许图片输入，禁止静默回退到未配置的 Default AI。"
+      "text": "Agent 大模型节点必须持久化 providerCode/modelCode 和输入能力；llm/understand 只能引用当前已配置的 chat 模型，Vision 模型才允许图片输入，禁止静默回退到未配置的 Default AI。系统内置 Agent 启动时应修复历史上指向 embedding/rerank 或已删除模型的非法引用，但保留仍然合法的 chat 模型选择。"
     },
     {
       "key": "document-text-extraction-gateway",
