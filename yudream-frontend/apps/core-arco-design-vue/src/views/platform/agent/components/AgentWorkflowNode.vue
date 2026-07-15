@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AgentNodeData } from './types'
+import type { AgentDebugStatus, AgentNodeData } from './types'
 import { Handle, Position } from '@vue-flow/core'
 
 const props = defineProps<{
@@ -7,6 +7,7 @@ const props = defineProps<{
   data: AgentNodeData
   selected?: boolean
   connectable?: boolean | string | number
+  debugStatus?: AgentDebugStatus
 }>()
 
 const emit = defineEmits<{
@@ -19,12 +20,17 @@ const nodeStyle = computed(() => ({
 </script>
 
 <template>
-  <div class="workflow-node" :class="{ 'is-selected': selected }" :style="nodeStyle">
+  <div class="workflow-node" :class="[{ 'is-selected': selected }, debugStatus ? `debug-${debugStatus.toLowerCase()}` : '']" :style="nodeStyle">
     <Handle v-if="data.kind !== 'start' && data.kind !== 'input'" id="target" type="target" :position="Position.Left" :connectable="connectable" />
 
     <button class="node-delete nodrag nowheel" type="button" title="删除节点" aria-label="删除节点" @click.stop="emit('delete', id)">
       <FaIcon name="i-ri:close-line" />
     </button>
+
+    <span v-if="debugStatus" class="node-debug-status">
+      <FaIcon :name="debugStatus === 'RUNNING' ? 'i-ri:loader-4-line' : debugStatus === 'COMPLETED' ? 'i-ri:check-line' : debugStatus === 'FAILED' ? 'i-ri:close-line' : 'i-ri:skip-forward-line'" />
+      {{ debugStatus === 'RUNNING' ? '运行中' : debugStatus === 'COMPLETED' ? '已完成' : debugStatus === 'FAILED' ? '失败' : '已跳过' }}
+    </span>
 
     <div class="node-heading">
       <span class="node-icon"><FaIcon :name="data.icon" /></span>
@@ -55,6 +61,15 @@ const nodeStyle = computed(() => ({
 .workflow-node { position: relative; width: 230px; overflow: visible; border: 1px solid var(--color-border-2); border-top: 3px solid var(--node-color); border-radius: 7px; background: var(--color-bg-1); box-shadow: 0 6px 20px rgb(15 23 42 / 10%); transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
 .workflow-node:hover { box-shadow: 0 9px 24px rgb(15 23 42 / 14%); transform: translateY(-1px); }
 .workflow-node.is-selected { border-color: var(--node-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--node-color), transparent 78%), 0 9px 24px rgb(15 23 42 / 14%); }
+.workflow-node.debug-running { border-color: rgb(var(--primary-6)); box-shadow: 0 0 0 4px rgb(var(--primary-2)), 0 10px 28px rgb(var(--primary-6) / 24%); animation: debug-pulse 1.4s ease-in-out infinite; }
+.workflow-node.debug-completed { border-color: rgb(var(--success-6)); box-shadow: 0 0 0 3px rgb(var(--success-2)), 0 7px 20px rgb(15 23 42 / 10%); }
+.workflow-node.debug-failed { border-color: rgb(var(--danger-6)); box-shadow: 0 0 0 3px rgb(var(--danger-2)), 0 7px 20px rgb(var(--danger-6) / 18%); }
+.workflow-node.debug-skipped { opacity: 0.68; }
+.node-debug-status { position: absolute; top: -26px; left: 0; display: flex; height: 20px; align-items: center; gap: 4px; padding: 0 6px; border-radius: 4px; color: var(--color-text-2); background: var(--color-bg-1); box-shadow: 0 3px 10px rgb(15 23 42 / 12%); font-size: 8px; white-space: nowrap; }
+.debug-running .node-debug-status { color: rgb(var(--primary-6)); }
+.debug-completed .node-debug-status { color: rgb(var(--success-6)); }
+.debug-failed .node-debug-status { color: rgb(var(--danger-6)); }
+.debug-running .node-debug-status > :first-child { animation: debug-spin 1s linear infinite; }
 .node-heading { display: grid; grid-template-columns: 34px minmax(0, 1fr) 18px; align-items: center; gap: 9px; padding: 11px 12px 8px; }
 .node-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 6px; color: var(--node-color); background: color-mix(in srgb, var(--node-color), transparent 88%); font-size: 17px; }
 .node-title { display: grid; min-width: 0; gap: 2px; }
@@ -74,4 +89,6 @@ const nodeStyle = computed(() => ({
 .workflow-node :deep(.vue-flow__handle) { width: 11px; height: 11px; border: 2px solid var(--color-bg-1); background: var(--node-color); box-shadow: 0 0 0 1px color-mix(in srgb, var(--node-color), transparent 45%); }
 .workflow-node :deep(.vue-flow__handle-left) { left: -6px; }
 .workflow-node :deep(.vue-flow__handle-right) { right: -6px; }
+@keyframes debug-pulse { 50% { box-shadow: 0 0 0 6px rgb(var(--primary-2)), 0 10px 28px rgb(var(--primary-6) / 18%); } }
+@keyframes debug-spin { to { transform: rotate(360deg); } }
 </style>

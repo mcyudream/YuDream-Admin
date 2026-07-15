@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.agent.cmd.AgentApplicationSaveCm
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.cmd.AgentToolSaveCmd;
 import online.yudream.base.application.platform.agent.dto.AgentApplicationDTO;
+import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.domain.common.PageResult;
@@ -12,9 +13,12 @@ import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSav
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
 import online.yudream.base.interfaces.platform.agent.res.AgentApplicationRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
+
+import java.time.Instant;
 
 public final class AgentWebAssembler {
     private AgentWebAssembler() {}
@@ -28,4 +32,11 @@ public final class AgentWebAssembler {
     public static AgentApplicationRes toRes(AgentApplicationDTO value) { return AgentApplicationRes.builder().id(String.valueOf(value.getId())).name(value.getName()).code(value.getCode()).description(value.getDescription()).icon(value.getIcon()).systemPrompt(value.getSystemPrompt()).workflowJson(value.getWorkflowJson()).toolCodes(value.getToolCodes()).status(value.getStatus()).createTime(value.getCreateTime()).updateTime(value.getUpdateTime()).build(); }
     public static AgentToolRes toRes(AgentToolDTO value) { return AgentToolRes.builder().id(String.valueOf(value.getId())).name(value.getName()).code(value.getCode()).description(value.getDescription()).type(value.getType()).inputSchemaJson(value.getInputSchemaJson()).pythonCode(value.getPythonCode()).timeoutMillis(value.getTimeoutMillis()).permissionCode(value.getPermissionCode()).enabled(value.getEnabled()).updateTime(value.getUpdateTime()).build(); }
     public static AgentRunRes toRes(AgentRunDTO value) { return AgentRunRes.builder().content(value.getContent()).toolResults(value.getToolResults().stream().map(tool -> AiToolCallRes.builder().toolName(tool.toolName()).action(tool.action()).permissionCode(tool.permissionCode()).message(tool.message()).payload(tool.payload()).build()).toList()).build(); }
+    public static AgentDebugEventRes toDebugRunStarted(String runId) { return debugEvent("RUN_STARTED", runId).status("RUNNING").message("Agent 调试已开始").build(); }
+    public static AgentDebugEventRes toDebugNodeEvent(String runId, AgentDebugEventDTO value) { return debugEvent("NODE_" + value.status(), runId).nodeId(value.nodeId()).nodeKind(value.nodeKind()).nodeTitle(value.nodeTitle()).status(value.status()).message(value.message()).build(); }
+    public static AgentDebugEventRes toDebugTextChunk(String runId, String delta) { return debugEvent("TEXT_MESSAGE_CHUNK", runId).delta(delta == null ? "" : delta).build(); }
+    public static AgentDebugEventRes toDebugToolResult(String runId, online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult value) { return debugEvent("TOOL_CALL_RESULT", runId).tool(AiToolCallRes.builder().toolName(value.toolName()).action(value.action()).permissionCode(value.permissionCode()).message(value.message()).payload(value.payload()).build()).build(); }
+    public static AgentDebugEventRes toDebugRunFinished(String runId, AgentRunDTO value) { return debugEvent("RUN_FINISHED", runId).status("COMPLETED").message("Agent 调试完成").result(toRes(value)).build(); }
+    public static AgentDebugEventRes toDebugRunError(String runId, String message) { return debugEvent("RUN_ERROR", runId).status("FAILED").message(message == null ? "Agent 调试失败" : message).build(); }
+    private static AgentDebugEventRes.AgentDebugEventResBuilder debugEvent(String type, String runId) { return AgentDebugEventRes.builder().type(type).threadId("agent-debug").runId(runId).timestamp(Instant.now().toEpochMilli()); }
 }

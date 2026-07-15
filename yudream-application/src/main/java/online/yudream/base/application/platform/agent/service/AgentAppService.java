@@ -8,6 +8,7 @@ import online.yudream.base.application.platform.agent.cmd.AgentApplicationSaveCm
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.cmd.AgentToolSaveCmd;
 import online.yudream.base.application.platform.agent.dto.AgentApplicationDTO;
+import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
@@ -26,6 +27,7 @@ import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.platform.integration.aggregate.RuntimeScript;
 import online.yudream.base.domain.platform.integration.enumerate.ConnectorStatus;
 import online.yudream.base.domain.platform.integration.enumerate.RuntimeLanguage;
@@ -36,9 +38,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -137,6 +144,132 @@ public class AgentAppService {
         return AgentRunDTO.builder().content(generated.summary()).toolResults(results).build();
     }
 
+    @Transactional(readOnly = true)
+    public AgentRunDTO debug(
+            AgentRunCmd cmd,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<AiAgentToolResult> onTool
+    ) {
+        ensureEnabled();
+        AgentApplication application = application(cmd.getApplicationId());
+        if (application.getStatus() == AgentApplicationStatus.DISABLED) {
+            throw new BizException("Agent 应用已停用");
+        }
+
+        List<AiAgentToolResult> workflowToolResults = new ArrayList<>();
+        AiGenerationResult generated = null;
+        boolean modelExecuted = false;
+        for (WorkflowNode node : workflowNodesInExecutionOrder(application.getWorkflowJson())) {
+            emitNode(onNode, node, "RUNNING", "正在执行" + node.title());
+            try {
+                switch (node.kind()) {
+                    case "start", "input" -> emitNode(onNode, node, "COMPLETED", "节点执行完成");
+                    case "end" -> {
+                        if (!modelExecuted) {
+                            generated = generateForDebug(application, cmd, workflowToolResults, onDelta, onTool);
+                            modelExecuted = true;
+                        }
+                        emitNode(onNode, node, "COMPLETED", "节点执行完成");
+                    }
+                    case "tool" -> debugToolNode(application, cmd.getInput(), node, workflowToolResults, onNode, onTool);
+                    case "llm" -> {
+                        if (modelExecuted) {
+                            emitNode(onNode, node, "SKIPPED", "当前调试运行器仅执行首个大模型节点");
+                            continue;
+                        }
+                        generated = generateForDebug(application, cmd, workflowToolResults, onDelta, onTool);
+                        modelExecuted = true;
+                        emitNode(onNode, node, "COMPLETED", "模型生成完成");
+                    }
+                    default -> emitNode(onNode, node, "SKIPPED", "当前运行器尚未实现该节点类型");
+                }
+            } catch (Exception e) {
+                emitNode(onNode, node, "FAILED", e.getMessage() == null ? "节点执行失败" : e.getMessage());
+                throw e;
+            }
+        }
+
+        if (!modelExecuted) {
+            generated = generateForDebug(application, cmd, workflowToolResults, onDelta, onTool);
+        }
+        List<AiAgentToolResult> allToolResults = new ArrayList<>(workflowToolResults);
+        if (generated.toolResults() != null) {
+            allToolResults.addAll(generated.toolResults());
+        }
+        return AgentRunDTO.builder().content(generated.summary()).toolResults(allToolResults).build();
+    }
+
+    private void debugToolNode(
+            AgentApplication application,
+            String input,
+            WorkflowNode node,
+            List<AiAgentToolResult> results,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<AiAgentToolResult> onTool
+    ) {
+        if (node.toolCode() == null || node.toolCode().isBlank()) {
+            emitNode(onNode, node, "SKIPPED", "未配置工具");
+            return;
+        }
+        if (application.getToolCodes() == null || !application.getToolCodes().contains(node.toolCode())) {
+            throw new BizException("应用未授权工具：" + node.toolCode());
+        }
+        var customTool = toolRepo.findByCode(node.toolCode());
+        if (customTool.isEmpty()) {
+            emitNode(onNode, node, "COMPLETED", "系统工具已授权，将由模型按需调用");
+            return;
+        }
+        AgentTool tool = customTool.get();
+        if (tool.getType() != AgentToolType.PYTHON || !Boolean.TRUE.equals(tool.getEnabled())) {
+            throw new BizException("Python 工具不可用：" + node.toolCode());
+        }
+        AiAgentToolResult result = executePythonTool(tool, input);
+        results.add(result);
+        if (onTool != null) {
+            onTool.accept(result);
+        }
+        emitNode(onNode, node, "COMPLETED", "工具执行完成");
+    }
+
+    private AiGenerationResult generateForDebug(
+            AgentApplication application,
+            AgentRunCmd cmd,
+            List<AiAgentToolResult> workflowToolResults,
+            Consumer<String> onDelta,
+            Consumer<AiAgentToolResult> onTool
+    ) {
+        AiGenerationGateway gateway = generationGatewayProvider.getIfAvailable();
+        if (gateway == null) {
+            throw new BizException("AI 能力未在当前项目配置中启用");
+        }
+        String prompt = cmd.getInput() == null ? "" : cmd.getInput();
+        if (!workflowToolResults.isEmpty()) {
+            prompt += "\n\n工作流工具执行结果：\n" + workflowToolResults;
+        }
+        String system = (application.getSystemPrompt() == null ? "" : application.getSystemPrompt())
+                + "\n你正在作为 Agent 应用“" + application.getName() + "”工作。请直接给出对用户有用的结果。";
+        Set<String> selectedSystemTools = selectedSystemTools(application);
+        AiGenerationRequest request = new AiGenerationRequest(
+                system,
+                prompt,
+                null,
+                cmd.getProviderCode(),
+                cmd.getModelCode(),
+                Map.of()
+        ).withToolCallingEnabled(!selectedSystemTools.isEmpty());
+        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(selectedSystemTools)) {
+            return gateway.generateStream(request, onDelta, onTool, null);
+        }
+    }
+
+    private Set<String> selectedSystemTools(AgentApplication application) {
+        return systemToolProvider.stream()
+                .map(tool -> tool.descriptor().name())
+                .filter(name -> application.getToolCodes() != null && application.getToolCodes().contains(name))
+                .collect(java.util.stream.Collectors.toSet());
+    }
+
     private List<AiAgentToolResult> executeWorkflowPythonTools(AgentApplication application, String input) {
         List<String> nodeCodes = pythonToolCodesInWorkflow(application.getWorkflowJson());
         List<AiAgentToolResult> result = new ArrayList<>();
@@ -144,12 +277,90 @@ public class AgentAppService {
             if (application.getToolCodes() == null || !application.getToolCodes().contains(code)) continue;
             AgentTool tool = toolRepo.findByCode(code).orElseThrow(() -> new BizException("工作流工具不存在：" + code));
             if (tool.getType() != AgentToolType.PYTHON || !Boolean.TRUE.equals(tool.getEnabled())) continue;
-            RuntimeScript script = RuntimeScript.create(tool.getName(), tool.getCode(), RuntimeLanguage.PYTHON, tool.getPythonCode());
-            script.update(tool.getName(), RuntimeLanguage.PYTHON, tool.getPythonCode(), tool.getTimeoutMillis(), Map.of(), ConnectorStatus.ACTIVE);
-            RuntimeExecutionResult execution = runtimeExecutor.execute(script, input);
-            result.add(new AiAgentToolResult(tool.getCode(), "python", tool.getPermissionCode(), execution.status().name(), Map.of("stdout", execution.stdout(), "stderr", execution.stderr(), "exitCode", execution.exitCode(), "durationMillis", execution.durationMillis())));
+            result.add(executePythonTool(tool, input));
         }
         return result;
+    }
+
+    private AiAgentToolResult executePythonTool(AgentTool tool, String input) {
+        RuntimeScript script = RuntimeScript.create(tool.getName(), tool.getCode(), RuntimeLanguage.PYTHON, tool.getPythonCode());
+        script.update(tool.getName(), RuntimeLanguage.PYTHON, tool.getPythonCode(), tool.getTimeoutMillis(), Map.of(), ConnectorStatus.ACTIVE);
+        RuntimeExecutionResult execution = runtimeExecutor.execute(script, input);
+        return new AiAgentToolResult(
+                tool.getCode(),
+                "python",
+                tool.getPermissionCode(),
+                execution.status().name(),
+                Map.of(
+                        "stdout", execution.stdout(),
+                        "stderr", execution.stderr(),
+                        "exitCode", execution.exitCode(),
+                        "durationMillis", execution.durationMillis()
+                )
+        );
+    }
+
+    private List<WorkflowNode> workflowNodesInExecutionOrder(String workflowJson) {
+        if (workflowJson == null || workflowJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(workflowJson);
+            Map<String, WorkflowNode> nodes = new LinkedHashMap<>();
+            for (JsonNode item : root.path("nodes")) {
+                String id = item.path("id").asText();
+                if (id.isBlank()) {
+                    continue;
+                }
+                JsonNode data = item.path("data");
+                nodes.put(id, new WorkflowNode(
+                        id,
+                        data.path("kind").asText("unknown"),
+                        data.path("title").asText(data.path("label").asText("未命名节点")),
+                        data.path("toolCode").asText("")
+                ));
+            }
+            Map<String, Integer> indegree = new HashMap<>();
+            Map<String, List<String>> adjacency = new HashMap<>();
+            nodes.keySet().forEach(id -> indegree.put(id, 0));
+            for (JsonNode item : root.path("edges")) {
+                String source = item.path("source").asText();
+                String target = item.path("target").asText();
+                if (!nodes.containsKey(source) || !nodes.containsKey(target)) {
+                    continue;
+                }
+                adjacency.computeIfAbsent(source, ignored -> new ArrayList<>()).add(target);
+                indegree.computeIfPresent(target, (ignored, value) -> value + 1);
+            }
+            ArrayDeque<String> queue = new ArrayDeque<>();
+            nodes.keySet().stream().filter(id -> indegree.get(id) == 0).forEach(queue::add);
+            List<WorkflowNode> ordered = new ArrayList<>();
+            while (!queue.isEmpty()) {
+                String id = queue.removeFirst();
+                ordered.add(nodes.get(id));
+                for (String target : adjacency.getOrDefault(id, List.of())) {
+                    int remaining = indegree.computeIfPresent(target, (ignored, value) -> value - 1);
+                    if (remaining == 0) {
+                        queue.addLast(target);
+                    }
+                }
+            }
+            nodes.values().stream().filter(node -> !ordered.contains(node)).forEach(ordered::add);
+            return ordered;
+        } catch (Exception e) {
+            throw new BizException("Agent 工作流格式无效");
+        }
+    }
+
+    private void emitNode(
+            Consumer<AgentDebugEventDTO> onNode,
+            WorkflowNode node,
+            String status,
+            String message
+    ) {
+        if (onNode != null) {
+            onNode.accept(new AgentDebugEventDTO(node.id(), node.kind(), node.title(), status, message));
+        }
     }
 
     private List<String> pythonToolCodesInWorkflow(String workflowJson) {
@@ -182,5 +393,8 @@ public class AgentAppService {
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(selectedSystemTools)) {
             return gateway.generate(request);
         }
+    }
+
+    private record WorkflowNode(String id, String kind, String title, String toolCode) {
     }
 }
