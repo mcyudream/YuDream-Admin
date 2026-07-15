@@ -17,4 +17,7 @@ public interface AgentWorkflowEventListener {
 
     default void onNodeFailed(AgentWorkflowNode node, RuntimeException error, AgentWorkflowContext context) {
     }
+
+    default void onNodeSkipped(AgentWorkflowNode node, AgentWorkflowContext context) {
+    }
 }

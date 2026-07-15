@@ -160,6 +160,14 @@ public class AgentWorkflowRuntimeService {
             ) {
                 onNode.accept(event(node, "FAILED", error.getMessage() == null ? "节点执行失败" : error.getMessage()));
             }
+
+            @Override
+            public void onNodeSkipped(
+                    AgentWorkflowNode node,
+                    online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context
+            ) {
+                onNode.accept(event(node, "SKIPPED", "条件分支未命中"));
+            }
         };
     }
 
