@@ -15,6 +15,16 @@ test('扫描全部模型节点决定图片和文档能力', () => {
   assert.deepEqual(agentRunCapabilities(workflow), { allowImage: true, allowFiles: true })
 })
 
+test('视觉理解节点在选择 Vision 模型后允许正式运行入口上传图片', () => {
+  const workflow = JSON.stringify({
+    nodes: [
+      { data: { kind: 'vision', vision: true } },
+    ],
+  })
+
+  assert.deepEqual(agentRunCapabilities(workflow), { allowImage: true, allowFiles: false })
+})
+
 test('仅把小型文本附件加入模型输入', () => {
   const input = buildAgentRunInput('总结附件', [
     { name: 'small.txt', type: 'text/plain', size: 12, text: 'hello' },

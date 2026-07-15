@@ -15,7 +15,7 @@ import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import { agentNodePaletteGroups, agentNodeTemplates, findAgentNodeTemplate } from './config/agent-node-catalog'
-import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './config/agent-node-data'
+import { agentModelKind, createAgentNodeData, isAgentChatModelNode, normalizeAgentNodeData } from './config/agent-node-data'
 import { buildAgentRunInput } from './config/agent-run-input'
 import { deriveAgentApplicationToolCodes, migrateLegacyToolNodes } from './config/agent-workflow-tools'
 import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
@@ -60,12 +60,21 @@ const form = reactive<AgentApplicationPayload>({
 
 const nodes = ref<FlowNode<AgentNodeData>[]>([])
 const edges = ref<Edge[]>([])
+const legacyApplicationToolCodes = ref<string[]>([])
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedNodeId.value))
 const selectedEdge = computed(() => edges.value.find(item => item.id === selectedEdgeId.value))
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
-const applicationToolCodes = computed(() => deriveAgentApplicationToolCodes(nodes.value))
+const workflowDefinesTools = computed(() => nodes.value.some((node) => {
+  if (node.data.kind === 'tool') {
+    return Boolean(node.data.toolCode)
+  }
+  return isAgentChatModelNode(node.data.kind) && node.data.toolCodes.length > 0
+}))
+const applicationToolCodes = computed(() => workflowDefinesTools.value
+  ? deriveAgentApplicationToolCodes(nodes.value)
+  : legacyApplicationToolCodes.value)
 const legacyToolNodeCount = computed(() => nodes.value.filter(node => node.data.kind === 'tool').length)
 const debugModelNodes = computed(() => nodes.value.filter(node => agentModelKind(node.data.kind) === 'chat'))
 const debugModels = computed(() => debugModelNodes.value.map(node => agentModels.value.find(model => model.providerCode === node.data.providerCode && model.modelCode === node.data.modelCode)))
@@ -127,6 +136,7 @@ async function loadApplication() {
       systemPrompt: application.systemPrompt || '',
       toolCodes: application.toolCodes || [],
     })
+    legacyApplicationToolCodes.value = [...(application.toolCodes || [])]
     const flow = application.workflowJson ? JSON.parse(application.workflowJson) : {}
     nodes.value = Array.isArray(flow.nodes) ? flow.nodes.map(normalizeNode) : []
     edges.value = Array.isArray(flow.edges) ? flow.edges.map(normalizeEdge) : []
@@ -618,7 +628,9 @@ async function save(publish = false, notify = true): Promise<string> {
 
   saving.value = true
   try {
-    form.toolCodes = deriveAgentApplicationToolCodes(nodes.value)
+    // Old applications authorized tools at the application level. Preserve that
+    // contract until a model or legacy tool node explicitly defines tools.
+    form.toolCodes = [...applicationToolCodes.value]
     form.workflowJson = JSON.stringify(workflowData())
     const payload = { ...form, status: form.status === 'DISABLED' ? 'DISABLED' : 'DRAFT' } as AgentApplicationPayload
     const response = id.value ? await apiAgent.update(id.value, payload) : await apiAgent.create(payload)
