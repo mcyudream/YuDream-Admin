@@ -64,7 +64,8 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 image,
                 providerCode,
                 modelCode,
-                state.aiConfig()
+                state.aiConfig(),
+                state.command().getHistory()
         ).withToolCallingEnabled("llm".equals(kind) && !state.systemToolCodes().isEmpty());
         AiGenerationResult generated;
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(state.systemToolCodes())) {
@@ -83,11 +84,14 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         String applicationPrompt = state.application().getSystemPrompt() == null
                 ? ""
                 : state.application().getSystemPrompt().trim();
+        String runtimePrompt = state.command().getRuntimeSystemPrompt() == null
+                ? ""
+                : state.command().getRuntimeSystemPrompt().trim();
         String role = "你正在作为 Agent 应用“" + state.application().getName() + "”工作。";
         String format = "understand".equals(kind)
                 ? "仅输出合法 JSON，不要使用 Markdown 代码块。"
                 : "直接给出对用户有用的结果。";
-        return String.join("\n", List.of(applicationPrompt, role, nodePrompt, format).stream()
+        return String.join("\n", List.of(applicationPrompt, runtimePrompt, role, nodePrompt, format).stream()
                 .filter(StringUtils::hasText)
                 .toList());
     }

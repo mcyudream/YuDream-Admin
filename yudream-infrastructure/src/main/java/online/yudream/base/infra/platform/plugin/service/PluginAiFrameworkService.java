@@ -11,6 +11,8 @@ import online.yudream.base.plugin.spi.system.ai.PluginAiChatResponse;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
+import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
+import online.yudream.base.application.platform.agent.service.AgentAppService;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
@@ -29,6 +31,43 @@ public class PluginAiFrameworkService implements PluginAiService {
     private final RoleRepo roleRepo;
     private final PluginAiToolRegistry pluginAiToolRegistry;
     private final AiProviderConfigParser providerConfigParser;
+    private final AgentAppService agentAppService;
+
+    @Override
+    public List<online.yudream.base.plugin.spi.system.ai.PluginAiAgentOption> agents() {
+        return agentAppService.publishedApplications().stream()
+                .map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiAgentOption(
+                        item.getCode(), item.getName(), item.getDescription()
+                ))
+                .toList();
+    }
+
+    @Override
+    public CompletionStage<PluginAiChatResponse> runAgent(String agentCode, PluginAiChatRequest request) {
+        return CompletableFuture.supplyAsync(() -> {
+            AgentRunCmd command = new AgentRunCmd();
+            command.setInput(request.userPrompt());
+            command.setRuntimeSystemPrompt(request.systemPrompt());
+            command.setHistory(request.history().stream()
+                    .map(item -> new AiChatMessage(item.role(), item.content()))
+                    .toList());
+            PluginAiToolExecutionScope.set(withPermissions(request));
+            try {
+                var result = agentAppService.runByCode(agentCode, command);
+                return new PluginAiChatResponse(
+                        result.getContent(),
+                        result.getToolResults().stream()
+                                .map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiToolResult(
+                                        item.action(), item.message(), item.payload()
+                                ))
+                                .toList()
+                );
+            }
+            finally {
+                PluginAiToolExecutionScope.clear();
+            }
+        });
+    }
 
     @Override
     public List<online.yudream.base.plugin.spi.system.ai.PluginAiProviderOption> providers() {
