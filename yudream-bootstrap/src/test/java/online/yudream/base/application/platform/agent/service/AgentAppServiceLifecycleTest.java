@@ -71,6 +71,29 @@ class AgentAppServiceLifecycleTest {
     }
 
     @Test
+    void saveClearsToolsForModelNodesExplicitlySwitchedToNone() {
+        Fixture fixture = fixture();
+        AgentApplicationSaveCmd command = saveCommand(AgentApplicationStatus.DRAFT);
+        command.setToolCodes(List.of("client.smuggled"));
+        command.setWorkflowJson("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start"}},
+                  {"id":"model","data":{"kind":"llm","toolMode":"NONE","toolCodes":["stale.tool"]}},
+                  {"id":"end","data":{"kind":"end"}}
+                ],"edges":[
+                  {"source":"start","target":"model"},
+                  {"source":"model","target":"end"}
+                ]}
+                """);
+        when(fixture.applicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        fixture.service.save(command);
+
+        verify(fixture.applicationRepo).save(argThat(application -> application.getToolCodes().isEmpty()
+                && application.getWorkflowJson().contains("\"toolCodes\":[]")));
+    }
+
+    @Test
     void formalRunRequiresPublishedApplicationWhileDraftCanBeDebugged() {
         Fixture fixture = fixture();
         AgentApplication draft = application(AgentApplicationStatus.DRAFT);
