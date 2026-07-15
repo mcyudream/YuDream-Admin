@@ -110,6 +110,7 @@ public final class AgentToolExecutor {
                 permissionCode,
                 "Agent custom tool",
                 description,
+                Map.of(),
                 parseSchema(tool)
         );
     }
@@ -136,12 +137,13 @@ public final class AgentToolExecutor {
         String executableCode = AgentPythonToolContract.wrap(tool.getPythonCode());
         RuntimeScript script = RuntimeScript.create(tool.getName(), tool.getCode(), RuntimeLanguage.PYTHON, executableCode);
         script.update(tool.getName(), RuntimeLanguage.PYTHON, executableCode, tool.getTimeoutMillis(), Map.of(), ConnectorStatus.ACTIVE);
-        RuntimeExecutionResult execution;
+        String serializedArguments;
         try {
-            execution = runtimeExecutor.execute(script, objectMapper.writeValueAsString(arguments));
+            serializedArguments = objectMapper.writeValueAsString(arguments);
         } catch (Exception exception) {
             throw new BizException("Unable to serialize Python tool arguments");
         }
+        RuntimeExecutionResult execution = runtimeExecutor.execute(script, serializedArguments);
         if (execution.status() != ExecutionStatus.SUCCESS) {
             String message = execution.errorMessage() == null ? execution.stderr() : execution.errorMessage();
             throw new BizException("Python tool execution failed: " + (message == null ? "unknown error" : message));

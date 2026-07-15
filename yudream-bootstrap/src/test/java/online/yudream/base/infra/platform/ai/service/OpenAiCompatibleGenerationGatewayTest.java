@@ -115,6 +115,31 @@ class OpenAiCompatibleGenerationGatewayTest {
         }
     }
 
+    @Test
+    void shouldPassCompleteCustomToolJsonSchemaToTheModel() {
+        OpenAiCompatibleGenerationGateway gateway = gatewayWithGlobalTools();
+        AiAgentToolDescriptor descriptor = new AiAgentToolDescriptor(
+                "risk_score",
+                "Risk score",
+                "Calculate risk",
+                "risk:score",
+                "Risk score",
+                "Agent",
+                "Calculate risk",
+                Map.of(),
+                Map.of(
+                        "type", "object",
+                        "properties", Map.of("score", Map.of("type", "integer")),
+                        "required", List.of("score"),
+                        "additionalProperties", false
+                )
+        );
+
+        String schema = inputSchema(gateway, descriptor);
+
+        assertThat(schema).contains("\"required\":[\"score\"]", "\"additionalProperties\":false", "\"type\":\"integer\"");
+    }
+
     @SuppressWarnings("unchecked")
     private OpenAiCompatibleGenerationGateway gatewayWithGlobalTools(AiAgentTool... tools) {
         ObjectProvider<AiAgentTool> provider = mock(ObjectProvider.class);
@@ -139,6 +164,10 @@ class OpenAiCompatibleGenerationGatewayTest {
                 null,
                 null
         );
+    }
+
+    private String inputSchema(OpenAiCompatibleGenerationGateway gateway, AiAgentToolDescriptor descriptor) {
+        return (String) ReflectionTestUtils.invokeMethod(gateway, "inputSchema", descriptor);
     }
 
     private static final class CountingTool implements AiAgentTool {
