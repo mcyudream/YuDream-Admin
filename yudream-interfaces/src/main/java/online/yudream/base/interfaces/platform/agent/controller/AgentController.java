@@ -77,7 +77,7 @@ public class AgentController {
     public Result<AgentRunRes> run(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.run(AgentWebAssembler.toRunCmd(id, request)))); }
 
     @PostMapping(value = "/{id}/debug/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PermissionRegister(code = "platform:agent:run", name = "调试 Agent 应用", module = "平台能力", desc = "流式调试 Agent 工作流")
+    @PermissionRegister(code = "platform:agent:edit", name = "调试 Agent 应用", module = "平台能力", desc = "流式调试 Agent 工作流")
     public SseEmitter debug(@PathVariable Long id, @Valid @RequestBody AgentRunRequest request) {
         SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
         String runId = UUID.randomUUID().toString();

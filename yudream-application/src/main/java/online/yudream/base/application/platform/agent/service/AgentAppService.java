@@ -15,6 +15,7 @@ import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
 import online.yudream.base.application.platform.agent.query.AgentToolPageQuery;
+import online.yudream.base.application.platform.agent.workflow.AgentWorkflowValidator;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
@@ -24,6 +25,7 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentApplicationStatu
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
 import online.yudream.base.domain.platform.agent.repo.AgentApplicationRepo;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
+import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -35,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Service
@@ -51,6 +54,8 @@ public class AgentAppService {
     private final AgentModelCatalogParser modelCatalogParser;
     private final WikiSpaceRepo wikiSpaceRepo;
     private final AgentWorkflowRuntimeService workflowRuntime;
+    private final AgentWorkflowValidator workflowValidator;
+    private final AgentPermissionGateway permissionGateway;
 
     @Transactional(readOnly = true)
     public PageResult<AgentApplicationDTO> page(AgentPageQuery query) {
@@ -75,7 +80,8 @@ public class AgentAppService {
     @Transactional
     public AgentApplicationDTO save(AgentApplicationSaveCmd cmd) {
         ensureEnabled();
-        AgentApplication application = cmd.getId() == null ? create(cmd) : application(cmd.getId());
+        boolean creating = cmd.getId() == null;
+        AgentApplication application = creating ? create(cmd) : application(cmd.getId());
         applicationRepo.findByCode(cmd.getCode().trim().toLowerCase()).ifPresent(existing -> {
             if (!Objects.equals(existing.getId(), application.getId())) {
                 throw new BizException("Agent 应用编码已存在");
@@ -83,7 +89,7 @@ public class AgentAppService {
         });
         application.update(
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), cmd.getIcon(), cmd.getSystemPrompt(),
-                cmd.getWorkflowJson(), cmd.getToolCodes(), cmd.getStatus()
+                cmd.getWorkflowJson(), cmd.getToolCodes(), savedStatus(application, creating)
         );
         return AgentAssembler.toDTO(applicationRepo.save(application));
     }
@@ -92,6 +98,7 @@ public class AgentAppService {
     public void publish(Long id) {
         ensureEnabled();
         AgentApplication value = application(id);
+        workflowValidator.validate(value.getWorkflowJson(), validationCatalog(value));
         value.publish();
         applicationRepo.save(value);
     }
@@ -176,7 +183,7 @@ public class AgentAppService {
     @Transactional(readOnly = true)
     public AgentRunDTO run(AgentRunCmd cmd) {
         ensureEnabled();
-        AgentApplication application = runnableApplication(cmd.getApplicationId());
+        AgentApplication application = publishedApplication(cmd.getApplicationId());
         var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), null, null, null);
         return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
     }
@@ -189,7 +196,7 @@ public class AgentAppService {
             Consumer<AiAgentToolResult> onTool
     ) {
         ensureEnabled();
-        AgentApplication application = runnableApplication(cmd.getApplicationId());
+        AgentApplication application = debuggableApplication(cmd.getApplicationId());
         var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), onNode, onDelta, onTool);
         return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
     }
@@ -237,12 +244,63 @@ public class AgentAppService {
         return AgentApplication.create(cmd.getName(), cmd.getCode());
     }
 
-    private AgentApplication runnableApplication(Long id) {
+    private AgentApplication publishedApplication(Long id) {
+        AgentApplication application = application(id);
+        if (application.getStatus() != AgentApplicationStatus.PUBLISHED) {
+            throw new BizException("Agent 应用未发布，正式运行前请先完成发布");
+        }
+        return application;
+    }
+
+    private AgentApplication debuggableApplication(Long id) {
         AgentApplication application = application(id);
         if (application.getStatus() == AgentApplicationStatus.DISABLED) {
             throw new BizException("Agent 应用已停用");
         }
         return application;
+    }
+
+    private AgentApplicationStatus savedStatus(AgentApplication application, boolean creating) {
+        if (creating) {
+            return AgentApplicationStatus.DRAFT;
+        }
+        return application.getStatus() == AgentApplicationStatus.DISABLED
+                ? AgentApplicationStatus.DISABLED
+                : AgentApplicationStatus.DRAFT;
+    }
+
+    private AgentWorkflowValidator.Catalog validationCatalog(AgentApplication application) {
+        Set<AgentWorkflowValidator.ModelRef> models = modelCatalogParser.parse(optionalAiConfig()).stream()
+                .filter(AgentModelDTO::configured)
+                .map(model -> new AgentWorkflowValidator.ModelRef(
+                        model.providerCode(), model.modelCode(), model.kind().toLowerCase()
+                ))
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> knowledgeSpaces = wikiSpaceRepo.findAll().stream()
+                .map(space -> space.getSlug())
+                .collect(java.util.stream.Collectors.toSet());
+        return new AgentWorkflowValidator.Catalog(models, knowledgeSpaces, availableToolCodes(application));
+    }
+
+    private Set<String> availableToolCodes(AgentApplication application) {
+        Set<String> selected = application.getToolCodes() == null ? Set.of() : Set.copyOf(application.getToolCodes());
+        Set<String> result = new java.util.HashSet<>();
+        List<AiAgentTool> systemTools = systemToolProvider.stream().toList();
+        Set<String> systemToolCodes = systemTools.stream()
+                .map(tool -> tool.descriptor().name())
+                .collect(java.util.stream.Collectors.toSet());
+        systemTools.stream()
+                .filter(tool -> selected.contains(tool.descriptor().name()))
+                .filter(tool -> permissionGateway.hasPermission(tool.descriptor().permissionCode()))
+                .forEach(tool -> result.add(tool.descriptor().name()));
+        selected.stream()
+                .filter(code -> !systemToolCodes.contains(code))
+                .map(toolRepo::findByCode)
+                .flatMap(java.util.Optional::stream)
+                .filter(tool -> Boolean.TRUE.equals(tool.getEnabled()))
+                .filter(tool -> permissionGateway.hasPermission(tool.getPermissionCode()))
+                .forEach(tool -> result.add(tool.getCode()));
+        return Set.copyOf(result);
     }
 
     private AgentApplication application(Long id) {
