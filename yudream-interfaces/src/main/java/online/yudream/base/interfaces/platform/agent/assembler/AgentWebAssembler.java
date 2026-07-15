@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.agent.cmd.AgentApplicationSaveCm
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.cmd.AgentToolSaveCmd;
 import online.yudream.base.application.platform.agent.dto.AgentApplicationDTO;
+import online.yudream.base.application.platform.agent.dto.AgentCatalogDTO;
 import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
@@ -14,8 +15,10 @@ import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSav
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
 import online.yudream.base.interfaces.platform.agent.res.AgentApplicationRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentCatalogRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentKnowledgeSpaceRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
@@ -35,6 +38,7 @@ public final class AgentWebAssembler {
     public static AgentToolRes toRes(AgentToolDTO value) { return AgentToolRes.builder().id(String.valueOf(value.getId())).name(value.getName()).code(value.getCode()).description(value.getDescription()).type(value.getType()).inputSchemaJson(value.getInputSchemaJson()).pythonCode(value.getPythonCode()).timeoutMillis(value.getTimeoutMillis()).permissionCode(value.getPermissionCode()).enabled(value.getEnabled()).updateTime(value.getUpdateTime()).build(); }
     public static AgentRunRes toRes(AgentRunDTO value) { return AgentRunRes.builder().content(value.getContent()).toolResults(value.getToolResults().stream().map(tool -> AiToolCallRes.builder().toolName(tool.toolName()).action(tool.action()).permissionCode(tool.permissionCode()).message(tool.message()).payload(tool.payload()).build()).toList()).build(); }
     public static AgentModelRes toRes(AgentModelDTO value) { return AgentModelRes.builder().providerCode(value.providerCode()).providerName(value.providerName()).modelCode(value.modelCode()).modelName(value.modelName()).kind(value.kind()).vision(value.vision()).configured(value.configured()).defaultModel(value.defaultModel()).build(); }
+    public static AgentCatalogRes toRes(AgentCatalogDTO value) { return AgentCatalogRes.builder().knowledgeSpaces(value.knowledgeSpaces().stream().map(space -> AgentKnowledgeSpaceRes.builder().slug(space.slug()).name(space.name()).embeddingProviderCode(space.embeddingProviderCode()).embeddingModelCode(space.embeddingModelCode()).topK(space.topK()).graphEnabled(space.graphEnabled()).rerankEnabled(space.rerankEnabled()).build()).toList()).models(value.models().stream().map(AgentWebAssembler::toRes).toList()).build(); }
     public static AgentDebugEventRes toDebugRunStarted(String runId) { return debugEvent("RUN_STARTED", runId).status("RUNNING").message("Agent 调试已开始").build(); }
     public static AgentDebugEventRes toDebugNodeEvent(String runId, AgentDebugEventDTO value) { return debugEvent("NODE_" + value.status(), runId).nodeId(value.nodeId()).nodeKind(value.nodeKind()).nodeTitle(value.nodeTitle()).status(value.status()).message(value.message()).build(); }
     public static AgentDebugEventRes toDebugTextChunk(String runId, String delta) { return debugEvent("TEXT_MESSAGE_CHUNK", runId).delta(delta == null ? "" : delta).build(); }
