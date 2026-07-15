@@ -149,7 +149,11 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
     }
 
     private void ensurePermission(String permissionCode, String toolName) {
-        if (!permissionGateway.hasPermission(permissionCode)) {
+        if (!permissionGateway.hasPermission(
+                permissionCode,
+                state.command().getPermissionCodes(),
+                state.command().isPermissionContextExplicit()
+        )) {
             throw new BizException("无权限调用工具：" + toolName);
         }
     }

@@ -1,19 +1,19 @@
 package online.yudream.base.infra.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
+import online.yudream.base.application.platform.agent.service.AgentAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.system.user.repo.RoleRepo;
+import online.yudream.base.domain.system.user.repo.UserRepo;
+import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import online.yudream.base.plugin.spi.system.ai.PluginAiChatRequest;
 import online.yudream.base.plugin.spi.system.ai.PluginAiChatResponse;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
-import online.yudream.base.domain.system.user.repo.UserRepo;
-import online.yudream.base.domain.system.user.repo.RoleRepo;
-import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
-import online.yudream.base.application.platform.agent.service.AgentAppService;
-import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
@@ -54,7 +54,10 @@ public class PluginAiFrameworkService implements PluginAiService {
             command.setHistory(request.history().stream()
                     .map(item -> new AiChatMessage(item.role(), item.content()))
                     .toList());
-            PluginAiToolExecutionScope.set(withPermissions(request));
+            var executionContext = withPermissions(request);
+            command.setPermissionCodes(executionContext == null ? List.of() : executionContext.permissions());
+            command.setPermissionContextExplicit(true);
+            PluginAiToolExecutionScope.set(executionContext);
             try {
                 var result = agentAppService.runByCode(agentCode, command);
                 return new PluginAiChatResponse(
