@@ -66,9 +66,16 @@ class AgentModelToolResolverTest {
         assertThat(tool.descriptor().title()).isEqualTo("风险评分");
         assertThat(tool.descriptor().description()).isEqualTo("计算风险等级");
         assertThat(tool.descriptor().permissionCode()).isEqualTo("risk:score");
-        assertThat(tool.descriptor().inputSchema()).containsEntry("type", "object");
-        assertThat(tool.descriptor().inputSchema()).containsEntry("required", List.of("score"));
-        assertThat(runtimeCode.get()).contains("def run(params: dict) -> dict", "run(_yudream_params)");
+        assertThat(tool.descriptor().inputSchemaDefinition()).containsEntry("type", "object");
+        assertThat(tool.descriptor().inputSchemaDefinition()).containsEntry("required", List.of("score"));
+        assertThat(tool.descriptor().inputSchemaDefinition().get("properties"))
+                .isEqualTo(Map.of("score", Map.of("type", "integer")));
+        assertThat(runtimeCode.get()).contains(
+                "def run(params: dict) -> dict",
+                "run(_yudream_params)",
+                "redirect_stdout",
+                "file=_yudream_sys.stderr"
+        );
         assertThat(runtimeInput.get()).isEqualTo("{\"score\":95}");
         assertThat(result.payload()).containsEntry("score", 95).containsEntry("level", "high");
     }
@@ -127,6 +134,21 @@ class AgentModelToolResolverTest {
         assertThat(permissions.fallbackCalls).isEqualTo(2);
     }
 
+    @Test
+    void shouldNotMislabelRuntimeExecutorFailureAsArgumentSerializationFailure() {
+        AgentModelToolResolver resolver = resolver(
+                toolRepo(pythonTool(true)),
+                (script, stdin) -> { throw new IllegalStateException("runtime unavailable"); },
+                List.of(),
+                permission -> true
+        );
+        AiAgentTool tool = resolver.resolve(List.of("risk_score"), application("risk_score"), command("risk:score")).getFirst();
+
+        assertThatThrownBy(() -> tool.execute(new AiAgentToolCall("risk_score", Map.of("score", 95))))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("runtime unavailable");
+    }
+
     private AgentModelToolResolver resolver(
             AgentToolRepo repo,
             online.yudream.base.domain.platform.integration.service.RuntimeExecutor runtime,
@@ -171,7 +193,7 @@ class AgentModelToolResolverTest {
                 .code("risk_score")
                 .description("计算风险等级")
                 .type(AgentToolType.PYTHON)
-                .inputSchemaJson("{\"type\":\"object\",\"required\":[\"score\"]}")
+                .inputSchemaJson("{\"type\":\"object\",\"properties\":{\"score\":{\"type\":\"integer\"}},\"required\":[\"score\"]}")
                 .outputExampleJson("{\"score\":95,\"level\":\"high\"}")
                 .pythonCode("def run(params: dict) -> dict:\n    return {\"score\": params[\"score\"]}")
                 .timeoutMillis(10_000)
