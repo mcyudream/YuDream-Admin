@@ -65,18 +65,28 @@ public class AgentModelCatalogParser {
                 continue;
             }
             String name = model.isTextual() ? code : model.path("name").asText(code);
-            boolean vision = "chat".equals(kind) && !model.isTextual() && model.path("vision").asBoolean(false);
+            String modelKind = model.isTextual()
+                    ? kind
+                    : normalizedKind(model.path("kind").asText(), kind);
+            boolean vision = "chat".equals(modelKind) && !model.isTextual() && model.path("vision").asBoolean(false);
             target.add(new AgentModelDTO(
                     providerCode,
                     providerName,
                     code,
                     name,
-                    kind,
+                    modelKind,
                     vision,
                     configured,
                     code.equals(defaultModel)
             ));
         }
+    }
+
+    private String normalizedKind(String configuredKind, String fallback) {
+        String kind = StringUtils.hasText(configuredKind)
+                ? configuredKind.trim().toLowerCase()
+                : fallback;
+        return List.of("chat", "embedding", "rerank").contains(kind) ? kind : fallback;
     }
 
     private List<AgentModelDTO> legacyModels(Map<String, String> config) {
