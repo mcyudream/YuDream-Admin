@@ -7,6 +7,31 @@ import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 @MenuModule(code = "platform", name = "平台能力", icon = "i-ri:node-tree", sort = 2)
 public enum PlatformMenuModule {
 
+    @MenuNode(code = "platform:wiki", name = "Wiki 知识库", type = MenuNodeType.MENU,
+            path = "/platform/wiki", component = "platform/wiki/index.vue",
+            icon = "i-ri:book-open-line", sort = 58)
+    WIKI,
+
+    @MenuNode(code = "platform:wiki:view", name = "查看 Wiki 知识库", type = MenuNodeType.BUTTON,
+            parentName = "WIKI", permission = "platform:wiki:view")
+    WIKI_VIEW,
+
+    @MenuNode(code = "platform:wiki:edit", name = "编辑 Wiki 知识库", type = MenuNodeType.BUTTON,
+            parentName = "WIKI", permission = "platform:wiki:edit")
+    WIKI_EDIT,
+
+    @MenuNode(code = "platform:wiki:publish", name = "发布 Wiki 页面", type = MenuNodeType.BUTTON,
+            parentName = "WIKI", permission = "platform:wiki:publish")
+    WIKI_PUBLISH,
+
+    @MenuNode(code = "platform:wiki:delete", name = "删除 Wiki 内容", type = MenuNodeType.BUTTON,
+            parentName = "WIKI", permission = "platform:wiki:delete")
+    WIKI_DELETE,
+
+    @MenuNode(code = "platform:wiki:manage", name = "管理 Wiki 检索配置", type = MenuNodeType.BUTTON,
+            parentName = "WIKI", permission = "platform:wiki:manage")
+    WIKI_MANAGE,
+
     @MenuNode(code = "platform:milky", name = "Milky 消息平台", type = MenuNodeType.MENU,
             path = "/platform/milky", component = "platform/milky/index.vue",
             icon = "i-ri:chat-3-line", sort = 76)

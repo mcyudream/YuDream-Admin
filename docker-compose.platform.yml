@@ -14,7 +14,7 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
   neo4j:
-    image: docker.io/neo4j:5.26-community
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/neo4j:5.26.7
     container_name: yudream-neo4j
     profiles:
       - graph

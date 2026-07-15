@@ -6,9 +6,7 @@ import online.yudream.base.application.platform.ai.cmd.CmsPageGenerateCmd;
 import online.yudream.base.application.platform.ai.dto.CmsPageGenerateDTO;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
-import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
@@ -33,7 +31,6 @@ public class AiAppService {
     private final CapabilityAppService capabilityAppService;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final ObjectProvider<AiGenerationGateway> aiGenerationGatewayProvider;
-    private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
 
     @Transactional(readOnly = true)
     public CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd) {
@@ -80,20 +77,34 @@ public class AiAppService {
                 .orElse(Map.of());
         String modelCode = StringUtils.hasText(cmd.getModelCode()) ? cmd.getModelCode() : cmd.getModel();
         AiGenerationRequest request = new AiGenerationRequest(systemPrompt(cmd), userPrompt(cmd), cmd.getImageDataUrl(), cmd.getProviderCode(), modelCode, config, cmd.getHistory())
-                .withStructuredOutputRequired(true);
+                .withToolCallingEnabled(true);
         AiGenerationGateway gateway = aiGenerationGatewayProvider.getIfAvailable();
         if (gateway == null) {
             throw new BizException("AI 能力未在当前项目配置中启用");
         }
         progress(onProgress, "analysis", "正在分析当前画布、用户需求和可用工具。");
         AiGenerationResult result = stream ? gateway.generateStream(request, onDelta, onTool, onProgress) : gateway.generate(request);
-        CmsPageGenerateDTO dto = AiAssembler.toDTO(result);
-        boolean hasNativeToolResults = result.toolResults() != null && !result.toolResults().isEmpty();
-        List<AiAgentToolResult> toolResults = hasNativeToolResults ? result.toolResults() : executeToolCalls(result, dto);
-        if (onTool != null && (!stream || !hasNativeToolResults)) {
-            toolResults.forEach(onTool);
+        ensureCanvasValidationPassed(result.toolResults());
+        return AiAssembler.withTools(AiAssembler.toDTO(result), result.toolResults());
+    }
+
+    static void ensureCanvasValidationPassed(List<AiAgentToolResult> toolResults) {
+        AiAgentToolResult validation = null;
+        if (toolResults != null) {
+            for (AiAgentToolResult result : toolResults) {
+                if (CmsCanvasValidateAiTool.TOOL_NAME.equals(result.toolName())) {
+                    validation = result;
+                }
+            }
         }
-        return AiAssembler.withTools(dto, toolResults);
+        if (validation == null) {
+            // 画布工具会在 SSE 到达时先由浏览器应用；服务端此时只有修改前快照，不能用旧状态替代最终校验。
+            return;
+        }
+        if (!Boolean.TRUE.equals(validation.payload().get("valid"))) {
+            Object errors = validation.payload().get("errors");
+            throw new BizException("AI 画布完整性校验未通过：" + (errors == null ? "请检查 HTML、CSS 和 JavaScript" : errors));
+        }
     }
 
     private String systemPrompt(CmsPageGenerateCmd cmd) {
@@ -103,8 +114,9 @@ public class AiAppService {
                 工作流必须按顺序执行：
                 1. 先分析当前 HTML、CSS、GrapesJS Project JSON、用户需求和样图信息。
                 2. 如果用户提供了参考网址、竞品网址或明显需要外部页面参考，先调用 web.fetch 抓取公开页面，再结合抓取结果分析。
-                3. 分析完成后，必须尽快调用 cms.canvas.patch 或更原子化的 CMS 画布工具修改画布；不要把工具参数、HTML、CSS 或 JSON 直接输出给用户。
+                3. 分析完成后，必须尽快调用 cms.canvas.patch 或更原子化的 CMS 画布工具修改画布；Header/Footer 只能调用 cms.chrome.style 校验或修改样式；不要把工具参数、HTML、CSS 或 JSON 直接输出给用户。
                 4. 工具执行后，只用一句简短中文说明完成了什么。
+                5. 所有画布修改完成后，必须调用 cms.canvas.validate，传入最终完整 HTML、CSS、JavaScript。valid=false 时必须按 errors 修复并再次校验；只有 valid=true 才能宣布完成。
 
                 响应节奏（重要）：
                 - 优先“先动画布，再简短解释”。不要长时间只输出思考或方案。
@@ -114,8 +126,17 @@ public class AiAppService {
                 分块增量构建（重要，用于更好的视觉反馈）：
                 - 新建整页或大范围重构时，不要一次性用 replace-page 返回全部内容。请按语义区块拆分（如：页头 Hero、特性介绍、内容主体、行动号召 CTA、页脚等），对每个区块单独调用一次 cms.canvas.patch，让页面在画布上一片片生成。
                 - 第一个区块可用 replace-page 或 set-html 建立基础；后续每个区块用 action=add-html 追加到画布末尾。
-                - 每个 add-html 区块要自带该区块所需的 scoped 样式，或紧随其后用 action=append-css 追加对应样式，避免样式滞后于结构。
+                - 每个 add-html 区块必须在同一次工具调用中自带完整 scoped CSS；禁止先追加 HTML、再用 append-css 补样式。
+                - 任何新增、替换或重构 HTML 的工具调用都必须同时提交可运行的 cssContent，并且本次 htmlContent 引入的每一个 class 都必须在本次 cssContent 中有对应选择器，包括 BEM 修饰类和元素类。
+                - 禁止只返回 HTML 骨架、依赖浏览器默认样式，或把配色、间距、响应式、悬停状态留给后续“可能的”处理；CSS 是页面变更的必需产物。
                 - 局部微调（只改某处文案、颜色、间距）时，优先使用选中元素工具动作，避免整页替换。
+
+                预设区块（重要）：
+                - 系统提供了一系列常见预设区块，例如 Hero、特性介绍（features）、行动号召（CTA）、客户评价（testimonial）、定价（pricing）、页脚（footer）等。
+                - 当用户要求添加这些常见区块时，优先调用 cms.canvas.block.add 并传入 presetCode，而不是从头生成 HTML/CSS/JS。
+                - 常用 presetCode：yb-hero-center、yb-hero-split、yb-features-3、yb-cta-box、yb-testimonial、yb-pricing-3、yb-footer-simple。
+                - 需要查看所有可用预设时，先调用 cms.block.template.list。
+                - 只有当现有预设明显不符合用户需求时，才允许自行生成新的 HTML/CSS/JS。
 
                 选中元素上下文（重要）：
                 - 如果“当前选中元素”不为空，并且用户说“这个、这块、当前、选中的、按钮、卡片、标题”等指代局部内容，必须优先操作选中元素。
@@ -137,13 +158,18 @@ public class AiAppService {
                 工具说明：
                 - web.fetch（模型工具名 web_fetch）：抓取公开网页的标题、描述和正文摘要，用于设计分析，不修改画布。
                 - cms.ask.user（模型工具名 cms_ask_user）：需求不明确时向用户提问并给出可点击选项，等待用户选择，不修改画布。
-                - cms.canvas.patch（模型工具名 cms_canvas_patch）：修改 GrapesJS CMS 画布，action 支持 replace-page、set-html、set-css、append-css、set-js、append-js、load-project、add-html、remove-selector、replace-selected、set-selected-html、append-to-selected、prepend-to-selected、set-selected-text、set-attributes、set-styles、add-class、remove-class、remove-selected。
+                - cms.canvas.patch（模型工具名 cms_canvas_patch）：修改 GrapesJS CMS 画布，target 只能是 page 或 home；Header/Footer 不允许作为独立 target，必须使用 cms.chrome.style。
+                - cms.chrome.style：Header/Footer 唯一的 AI 工具。validate 只校验首页整体画布中的固定结构；set-styles 和 append-css 只生成作用于 home 的 CSS，不得修改 Header/Footer HTML、菜单层级、Logo、认证入口或数据绑定。
+                - 当本轮修改了 Header/Footer 样式时，先用 cms.chrome.style 的 validate 校验完整首页 HTML 中固定 Header/Footer 各有且仅有一个，再调用 cms.canvas.validate 校验首页主体 CSS/JS；最终画布校验会忽略系统固定壳的基础 class，不会要求你为固定结构重复生成 CSS。
                 - 原子画布工具：cms.canvas.selected.text（模型工具名 cms_canvas_selected_text）只改选中文案；cms.canvas.selected.html（cms_canvas_selected_html）只替换选中元素内部 HTML；cms.canvas.selected.style（cms_canvas_selected_style）只改选中样式；cms.canvas.block.add（cms_canvas_block_add）只追加单个区块；cms.canvas.selected.remove（cms_canvas_selected_remove）只删除选中元素。
+                - cms.block.template.list（模型工具名 cms_block_template_list）：列出 CMS 区块库中已启用的预设区块模板，可用于选择合适的 presetCode。
+                - cms.canvas.validate（模型工具名 cms_canvas_validate）：所有修改结束后的必调只读工具。必须传最终完整 HTML/CSS/JS；校验失败后继续修复，直到 valid=true。
 
                 cms.canvas.patch 参数要求：
                 - htmlContent 只返回页面主体内容，不要 html/head/body/script，不要系统导航栏或 footer；add-html 时只返回当前这一个区块的 HTML。
-                - cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀；append-css 时只返回本次要新增的样式片段。
+                - cssContent 只写作用于 htmlContent 的 scoped 风格，类名使用 yb-ai- 前缀；add-html 时必须覆盖当前区块 HTML 的全部 class，append-css 只用于修改画布中已经存在的结构。
                 - jsContent 只写页面交互 JavaScript，不要包含 script 标签；优先使用 window.__YU_CMS_READY__(() => {}) 或直接执行初始化逻辑，使用 data-yb-* / class 选择器绑定事件；需要访问 CMS 上下文时使用 window.__YU_CMS_CONTEXT__。
+                - 页面 JS 必须可重复初始化。使用 addEventListener、setInterval、requestAnimationFrame 或 Three.js setAnimationLoop 时，必须通过 window.__YU_CMS_REGISTER_CLEANUP__(() => {}) 注册清理，并分别调用 removeEventListener、clearInterval、cancelAnimationFrame 或 setAnimationLoop(null)；同时释放 Three.js renderer、geometry、material、texture 等资源。
                 - builderProjectJson 可以为空字符串；如果无法生成 GrapesJS project JSON，请让 htmlContent/cssContent/jsContent 足够完整。
                 - title、summary、markdownContent 可以作为辅助字段传给工具。
                 - set-attributes 使用 attributes 对象；set-styles 使用 styles 对象；add-class/remove-class 使用 className。
@@ -156,6 +182,13 @@ public class AiAppService {
 
                 深度思考模式：%s
                 %s
+                CMS template runtime rules:
+                - Use {{cms.pages.latest.*}} for the latest published CMS pages.
+                - Use {{knowledge.spaces.*}}, {{knowledge.pages.*}} and {{knowledge.latest.*}} for public published knowledge content.
+                - Use data-yb-repeat="cms.pages.latest", data-yb-repeat="knowledge.pages", data-yb-repeat="knowledge.latest" or data-yb-repeat="knowledge.spaces" for lists.
+                - Use data-yb-html="{{item.htmlContent}}" or data-yb-markdown="{{item.markdownContent}}" only when the template needs rendered content; never insert draft or private data.
+                - These values are resolved at public page runtime. Generate template HTML/CSS only; never claim to publish content or call a publish action.
+
                 """.formatted(
                 cmd.isThinkingEnabled() ? "开启" : "关闭",
                 cmd.isThinkingEnabled()
@@ -220,50 +253,4 @@ public class AiAppService {
         return StringUtils.hasText(value) ? value.trim() : fallback;
     }
 
-    private List<AiAgentToolResult> executeToolCalls(AiGenerationResult result, CmsPageGenerateDTO dto) {
-        List<AiAgentToolCall> calls = result.toolCalls();
-        if (calls == null || calls.isEmpty()) {
-            calls = fallbackToolCalls(dto);
-        }
-        Map<String, AiAgentTool> tools = new LinkedHashMap<>();
-        aiAgentToolProvider.stream().forEach(tool -> {
-            String name = tool.descriptor().name();
-            tools.putIfAbsent(name, tool);
-            tools.putIfAbsent(safeToolName(name), tool);
-        });
-        return calls.stream()
-                .map(call -> executeTool(tools, call))
-                .toList();
-    }
-
-    private AiAgentToolResult executeTool(Map<String, AiAgentTool> tools, AiAgentToolCall call) {
-        AiAgentTool tool = tools.get(call.toolName());
-        if (tool == null) {
-            throw new BizException("AI 工具不存在：" + call.toolName());
-        }
-        return tool.execute(call);
-    }
-
-    private String safeToolName(String name) {
-        return name == null ? "" : name.replaceAll("[^a-zA-Z0-9_-]", "_");
-    }
-
-    private List<AiAgentToolCall> fallbackToolCalls(CmsPageGenerateDTO dto) {
-        if (!StringUtils.hasText(dto.getHtmlContent())
-                && !StringUtils.hasText(dto.getCssContent())
-                && !StringUtils.hasText(dto.getJsContent())
-                && !StringUtils.hasText(dto.getBuilderProjectJson())) {
-            return List.of();
-        }
-        Map<String, Object> arguments = new LinkedHashMap<>();
-        arguments.put("action", "replace-page");
-        arguments.put("title", dto.getTitle());
-        arguments.put("summary", dto.getSummary());
-        arguments.put("htmlContent", dto.getHtmlContent());
-        arguments.put("cssContent", dto.getCssContent());
-        arguments.put("jsContent", dto.getJsContent());
-        arguments.put("builderProjectJson", dto.getBuilderProjectJson());
-        arguments.put("markdownContent", dto.getMarkdownContent());
-        return List.of(new AiAgentToolCall(CmsCanvasAiTool.TOOL_NAME, arguments));
-    }
 }

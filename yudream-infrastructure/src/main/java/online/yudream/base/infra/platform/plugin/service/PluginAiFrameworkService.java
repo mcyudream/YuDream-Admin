@@ -59,7 +59,7 @@ public class PluginAiFrameworkService implements PluginAiService {
             PluginAiToolExecutionScope.set(withPermissions(request));
             try {
                 var result = gateway.generate(new AiGenerationRequest(request.systemPrompt(), request.userPrompt(), null,
-                        request.providerCode(), request.modelCode(), config, history, request.toolCallingEnabled(), false));
+                        request.providerCode(), request.modelCode(), config, history, request.toolCallingEnabled()));
                 return new PluginAiChatResponse(result.summary(), List.of());
             } finally { PluginAiToolExecutionScope.clear(); }
         });

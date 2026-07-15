@@ -9,6 +9,7 @@ import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
+import online.yudream.base.domain.system.user.service.UserContextStore;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import org.springframework.stereotype.Component;
@@ -26,6 +27,7 @@ public class SaTokenPermissionProvider implements StpInterface {
 
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
+    private final UserContextStore userContextStore;
 
     @Override
     public List<String> getPermissionList(Object loginId, String loginType) {
@@ -33,22 +35,17 @@ public class SaTokenPermissionProvider implements StpInterface {
         if (user == null || user.getRoles() == null || user.getStatus() != UserStatus.ACTIVE || !user.isEmailVerified()) {
             return List.of();
         }
-        Set<String> permissions = new HashSet<>();
-        for (RoleID roleId : user.getRoles()) {
-            Role role = roleRepo.findById(roleId.getValue()).orElse(null);
-            if (role == null || role.getStatus() != RoleStatus.ACTIVE) {
-                continue;
-            }
-            if (role.getSystemType() == SystemRoleType.SUPER_ADMIN) {
-                return List.of(ALL_PERMISSION);
-            }
-            if (role.getPermissions() != null) {
-                role.getPermissions().stream()
-                        .map(PermissionID::getCode)
-                        .forEach(permissions::add);
-            }
+        Role role = currentRole(user, Long.parseLong(String.valueOf(loginId)));
+        if (role == null || role.getStatus() != RoleStatus.ACTIVE) {
+            return List.of();
         }
-        return new ArrayList<>(permissions);
+        if (role.getSystemType() == SystemRoleType.SUPER_ADMIN) {
+            return List.of(ALL_PERMISSION);
+        }
+        if (role.getPermissions() == null) {
+            return List.of();
+        }
+        return role.getPermissions().stream().map(PermissionID::getCode).toList();
     }
 
     @Override
@@ -57,14 +54,8 @@ public class SaTokenPermissionProvider implements StpInterface {
         if (user == null || user.getRoles() == null || user.getStatus() != UserStatus.ACTIVE || !user.isEmailVerified()) {
             return List.of();
         }
-        List<String> roles = new ArrayList<>();
-        for (RoleID roleId : user.getRoles()) {
-            Role role = roleRepo.findById(roleId.getValue()).orElse(null);
-            if (role != null && role.getStatus() == RoleStatus.ACTIVE) {
-                roles.add(role.getCode());
-            }
-        }
-        return roles;
+        Role role = currentRole(user, Long.parseLong(String.valueOf(loginId)));
+        return role != null && role.getStatus() == RoleStatus.ACTIVE ? List.of(role.getCode()) : List.of();
     }
 
     private User getUser(Object loginId) {
@@ -72,5 +63,17 @@ public class SaTokenPermissionProvider implements StpInterface {
             return null;
         }
         return userRepo.findById(Long.parseLong(String.valueOf(loginId))).orElse(null);
+    }
+
+    private Role currentRole(User user, Long userId) {
+        List<RoleID> roles = user.getRoles();
+        if (roles == null || roles.isEmpty()) {
+            return null;
+        }
+        Long currentRoleId = userContextStore.getCurrentRoleId(userId);
+        RoleID selectedRoleId = currentRoleId == null
+                ? roles.getFirst()
+                : roles.stream().filter(roleId -> roleId.getValue().equals(currentRoleId)).findFirst().orElse(null);
+        return selectedRoleId == null ? null : roleRepo.findById(selectedRoleId.getValue()).orElse(null);
     }
 }

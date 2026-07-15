@@ -1,0 +1,91 @@
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::               (v3.5.15)
+
+2026-07-14T04:10:44.045+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.base.bootstrap.YuDreamApplication    : Starting YuDreamApplication using Java 21.0.10 with PID 44832 (D:\code\yudream-admim\yudream-bootstrap\target\yudream-bootstrap-1.0-SNAPSHOT.jar started by SiberianHusky in D:\code\yudream-admim)
+2026-07-14T04:10:44.048+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.base.bootstrap.YuDreamApplication    : Running with Spring Boot v3.5.15, Spring v6.2.19
+2026-07-14T04:10:44.048+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.base.bootstrap.YuDreamApplication    : No active profile set, falling back to 1 default profile: "default"
+2026-07-14T04:10:46.100+08:00  INFO 44832 --- [yudream-admin] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-14T04:10:46.103+08:00  INFO 44832 --- [yudream-admin] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data MongoDB repositories in DEFAULT mode.
+2026-07-14T04:10:46.128+08:00  INFO 44832 --- [yudream-admin] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 16 ms. Found 0 MongoDB repository interfaces.
+2026-07-14T04:10:46.148+08:00  INFO 44832 --- [yudream-admin] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-07-14T04:10:46.150+08:00  INFO 44832 --- [yudream-admin] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data Redis repositories in DEFAULT mode.
+2026-07-14T04:10:46.165+08:00  INFO 44832 --- [yudream-admin] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 1 ms. Found 0 Redis repository interfaces.
+2026-07-14T04:10:47.328+08:00  INFO 44832 --- [yudream-admin] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-07-14T04:10:47.359+08:00  INFO 44832 --- [yudream-admin] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-07-14T04:10:47.359+08:00  INFO 44832 --- [yudream-admin] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.55]
+2026-07-14T04:10:47.429+08:00  INFO 44832 --- [yudream-admin] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-07-14T04:10:47.430+08:00  INFO 44832 --- [yudream-admin] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 3322 ms
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2026-07-14T04:10:47.729+08:00  INFO 44832 --- [yudream-admin] [           main] org.mongodb.driver.client                : MongoClient with metadata {"driver": {"name": "mongo-java-driver|sync|spring-boot", "version": "5.5.2"}, "os": {"type": "Windows", "name": "Windows 11", "architecture": "amd64", "version": "10.0"}, "platform": "Java/Microsoft/21.0.10+7-LTS"} created with settings MongoClientSettings{readPreference=primary, writeConcern=WriteConcern{w=null, wTimeout=null ms, journal=null}, retryWrites=true, retryReads=true, readConcern=ReadConcern{level=null}, credential=null, transportSettings=null, commandListeners=[], codecRegistry=ProvidersCodecRegistry{codecProviders=[ValueCodecProvider{}, BsonValueCodecProvider{}, DBRefCodecProvider{}, DBObjectCodecProvider{}, DocumentCodecProvider{}, CollectionCodecProvider{}, IterableCodecProvider{}, MapCodecProvider{}, GeoJsonCodecProvider{}, GridFSFileCodecProvider{}, Jsr310CodecProvider{}, JsonObjectCodecProvider{}, BsonCodecProvider{}, EnumCodecProvider{}, com.mongodb.client.model.mql.ExpressionCodecProvider@579dde54, com.mongodb.Jep395RecordCodecProvider@30b9728f, com.mongodb.KotlinCodecProvider@6b899971]}, loggerSettings=LoggerSettings{maxDocumentLength=1000}, clusterSettings={hosts=[localhost:27017], srvServiceName=mongodb, mode=SINGLE, requiredClusterType=UNKNOWN, requiredReplicaSetName='null', serverSelector='null', clusterListeners='[]', serverSelectionTimeout='30000 ms', localThreshold='15 ms'}, socketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=0, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, heartbeatSocketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=10000, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, connectionPoolSettings=ConnectionPoolSettings{maxSize=100, minSize=0, maxWaitTimeMS=120000, maxConnectionLifeTimeMS=0, maxConnectionIdleTimeMS=0, maintenanceInitialDelayMS=0, maintenanceFrequencyMS=60000, connectionPoolListeners=[], maxConnecting=2}, serverSettings=ServerSettings{heartbeatFrequencyMS=10000, minHeartbeatFrequencyMS=500, serverMonitoringMode=AUTO, serverListeners='[]', serverMonitorListeners='[]'}, sslSettings=SslSettings{enabled=false, invalidHostNameAllowed=false, context=null}, applicationName='null', compressorList=[], uuidRepresentation=JAVA_LEGACY, serverApi=null, autoEncryptionSettings=null, dnsClient=null, inetAddressResolver=null, contextProvider=null, timeoutMS=null}
+2026-07-14T04:10:47.775+08:00  INFO 44832 --- [yudream-admin] [localhost:27017] org.mongodb.driver.cluster               : Monitor thread successfully connected to server with description ServerDescription{address=localhost:27017, type=STANDALONE, cryptd=false, state=CONNECTED, ok=true, minWireVersion=0, maxWireVersion=27, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=30, roundTripTimeNanos=54568800, minRoundTripTimeNanos=0}
+2026-07-14T04:10:49.016+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.s.f.ApiPayloadEncryptionFilter : Filter 'apiPayloadEncryptionFilter' configured for use
+2026-07-14T04:10:49.024+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.p.d.filter.ApiDocAccessFilter    : Filter 'apiDocAccessFilter' configured for use
+2026-07-14T04:10:49.025+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.c.f.ContentCachingRequestFilter  : Filter 'contentCachingRequestFilter' configured for use
+2026-07-14T04:10:49.025+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.s.f.ApiKeyAuthenticationFilter : Filter 'apiKeyAuthenticationFilter' configured for use
+2026-07-14T04:10:51.139+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.common.config.WebLogConfigure    : WebInvokeTimeInterceptor loaded: enabled=true, prefix=YuDreamAdmin
+2026-07-14T04:10:52.260+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.common.config.WebLogConfigure    : WebInvokeTimeInterceptor registered
+____ ____    ___ ____ _  _ ____ _  _ 
+[__  |__| __  |  |  | |_/  |___ |\ | 
+___] |  |     |  |__| | \_ |___ | \| 
+https://sa-token.cc (v1.45.0)
+2026-07-14T04:10:53.418+08:00  INFO 44832 --- [yudream-admin] [           main] o.neo4j.driver.internal.DriverFactory    : Direct driver instance 744357019 created for server address localhost:7687
+2026-07-14T04:10:53.506+08:00  INFO 44832 --- [yudream-admin] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-07-14T04:10:53.528+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.base.bootstrap.YuDreamApplication    : Started YuDreamApplication in 10.244 seconds (process running for 11.152)
+2026-07-14T04:10:53.533+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Initializing system data...
+2026-07-14T04:10:53.549+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Dept already exists: type=SYSTEM, id=2
+2026-07-14T04:10:53.553+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Dept already exists: type=SYSTEM_ADMIN, id=3
+2026-07-14T04:10:53.557+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Root dept already exists: id=1
+2026-07-14T04:10:53.573+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Role already exists: type=SUPER_ADMIN, id=-1740829301
+2026-07-14T04:10:53.576+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Role already exists: type=ADMIN, id=92668751
+2026-07-14T04:10:53.580+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Role already exists: type=USER, id=3599307
+2026-07-14T04:10:53.582+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : Role already exists: type=GUEST, id=98708952
+2026-07-14T04:10:53.582+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.s.u.b.SystemDataInitializer      : System data initialized. systemDeptId=2, systemAdminDeptId=3, rootDeptId=1
+2026-07-14T04:10:53.601+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.s.m.b.PluginMenuIndexInitializer : Ensured plugin menu registration index: uk_plugin_menu_registration
+2026-07-14T04:10:53.601+08:00  WARN 44832 --- [yudream-admin] [           main] o.s.core.events.SpringDocAppInitializer  : SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-07-14T04:10:53.601+08:00  WARN 44832 --- [yudream-admin] [           main] o.s.core.events.SpringDocAppInitializer  : SpringDoc /swagger-ui.html endpoint is enabled by default. To disable it in production, set the property 'springdoc.swagger-ui.enabled=false'
+2026-07-14T04:10:53.602+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.s.m.b.SystemMenuInitializer      : Initializing system menus from enums, syncMode=MISSING_ONLY
+2026-07-14T04:10:53.965+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.s.m.b.SystemMenuInitializer      : System menus initialized, modules=2, syncedMenus=0, syncMode=MISSING_ONLY
+2026-07-14T04:10:54.137+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.b.p.CapabilityRuntimeBootstrap     : Platform capability providers restored.
+2026-07-14T04:10:54.260+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=ai-chatbot, jar=D:\code\yudream-admim\plugins\yudream-plugin-ai-chatbot-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.280+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=ai-chatbot
+2026-07-14T04:10:54.338+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=yudream-skin, jar=D:\code\yudream-admim\plugins\yudream-plugin-yudream-skin-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.354+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=yudream-skin
+2026-07-14T04:10:54.424+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=authlib-injector, jar=D:\code\yudream-admim\plugins\yudream-plugin-authlib-injector-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.433+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=authlib-injector
+2026-07-14T04:10:54.463+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=yudream-wallet, jar=D:\code\yudream-admim\plugins\yudream-plugin-wallet-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.489+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=yudream-wallet
+2026-07-14T04:10:54.548+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=minecraft-server, jar=D:\code\yudream-admim\plugins\yudream-plugin-minecraft-server-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.583+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=minecraft-server
+2026-07-14T04:10:54.636+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=yudream-student-info, jar=D:\code\yudream-admim\plugins\yudream-plugin-student-info-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.641+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=yudream-student-info
+2026-07-14T04:10:54.676+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=minecraft-activity-proof, jar=D:\code\yudream-admim\plugins\yudream-plugin-minecraft-activity-proof-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.688+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=minecraft-activity-proof
+2026-07-14T04:10:54.720+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=project-progress, jar=D:\code\yudream-admim\plugins\yudream-plugin-project-progress-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.741+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=project-progress
+2026-07-14T04:10:54.806+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=qq-binding, jar=D:\code\yudream-admim\plugins\yudream-plugin-qq-binding-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.807+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=qq-binding
+2026-07-14T04:10:54.837+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin loaded: code=yudream-alipay, jar=D:\code\yudream-admim\plugins\yudream-plugin-alipay-1.0-SNAPSHOT.jar
+2026-07-14T04:10:54.858+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.i.p.p.s.JarPluginRuntimeGateway    : Plugin enabled: code=yudream-alipay
+2026-07-14T04:10:54.885+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.b.platform.PluginRuntimeBootstrap  : Platform plugins restored.
+2026-07-14T04:10:54.885+08:00 DEBUG 44832 --- [yudream-admin] [           main] o.y.b.i.c.c.p.CachePreheatBootstrap      : No cache preheat task found
+2026-07-14T04:10:54.921+08:00  INFO 44832 --- [yudream-admin] [           main] .y.b.i.s.s.b.PermissionRegisterBootstrap : Start scanning @PermissionRegister / @SaCheckPermission annotations...
+2026-07-14T04:10:55.546+08:00  INFO 44832 --- [yudream-admin] [           main] o.y.b.d.s.u.s.PermissionDomainService    : Permission sync completed, created=0, updated=99, deprecated=9
+2026-07-14T04:10:57.462+08:00  INFO 44832 --- [yudream-admin] [nio-8080-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-07-14T04:10:57.467+08:00  INFO 44832 --- [yudream-admin] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-07-14T04:10:57.469+08:00  INFO 44832 --- [yudream-admin] [nio-8080-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 2 ms
+2026-07-14T04:10:57.515+08:00  INFO 44832 --- [yudream-admin] [nio-8080-exec-1] o.y.b.i.c.i.WebInvokeTimeInterceptor     : [YuDreamAdmin] > start request
+[YuDreamAdmin]   URL   : POST /api/public/wiki/yudream/search
+[YuDreamAdmin]   params: none
+2026-07-14T04:10:59.604+08:00  INFO 44832 --- [yudream-admin] [nio-8080-exec-1] o.y.b.i.c.i.WebInvokeTimeInterceptor     : [YuDreamAdmin] < end request
+[YuDreamAdmin]   URL   : POST /api/public/wiki/yudream/search
+[YuDreamAdmin]   params: none
+[YuDreamAdmin]   body  : none
+[YuDreamAdmin]   cost  : 2090ms

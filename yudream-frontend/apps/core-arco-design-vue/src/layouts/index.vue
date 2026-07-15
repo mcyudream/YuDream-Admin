@@ -305,6 +305,7 @@ async function resendVerificationEmail() {
   .main-container {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     min-height: 100%;
     padding-inline-start: calc(var(--g-main-sidebar-actual-width) + var(--g-sub-sidebar-actual-width));
     overflow: auto;
@@ -328,6 +329,7 @@ async function resendVerificationEmail() {
     .main {
       position: relative;
       flex: auto;
+      min-width: 0;
       width: 100%;
       height: 100%;
       padding-top: var(--g-main-container-padding-top, 0);

@@ -14,6 +14,7 @@ import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
+import online.yudream.base.domain.system.user.valobj.UserDept;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,12 +41,11 @@ public class UserContextAppService {
         }
         final Long selectedDeptId = currentDeptId;
         return user.getDepts().stream().map(userDept -> {
-            Dept dept = deptRepo.findById(userDept.id().getValue())
-                    .orElseThrow(() -> new BizException("部门不存在"));
+            ResolvedDept dept = resolveDept(userDept);
             return UserDeptVO.builder()
-                    .id(dept.getId())
-                    .name(dept.getName())
-                    .current(selectedDeptId != null && selectedDeptId.equals(dept.getId()))
+                    .id(dept.id())
+                    .name(dept.dept().getName())
+                    .current(selectedDeptId != null && (selectedDeptId.equals(userDept.id().getValue()) || selectedDeptId.equals(dept.id())))
                     .defaultDept(userDept.isDefault())
                     .build();
         }).toList();
@@ -84,7 +84,8 @@ public class UserContextAppService {
     @Transactional
     public void switchDept(Long userId, Long deptId) {
         User user = getUser(userId);
-        if (!user.belongsToDept(DeptID.of(deptId))) {
+        boolean rootDept = deptRepo.findRoot().map(Dept::getId).filter(deptId::equals).isPresent();
+        if (!user.belongsToDept(DeptID.of(deptId)) && !rootDept) {
             throw new BizException("未加入该部门");
         }
         userContextStore.setCurrentDept(userId, deptId);
@@ -104,4 +105,16 @@ public class UserContextAppService {
         return userRepo.findById(userId)
                 .orElseThrow(() -> new BizException("用户不存在"));
     }
+
+    private ResolvedDept resolveDept(UserDept userDept) {
+        return deptRepo.findById(userDept.id().getValue())
+                .map(dept -> new ResolvedDept(userDept.id().getValue(), dept))
+                // Legacy users can retain an obsolete default-department ID after system data migration.
+                .or(() -> userDept.isDefault()
+                        ? deptRepo.findRoot().map(root -> new ResolvedDept(root.getId(), root))
+                        : java.util.Optional.empty())
+                .orElseThrow(() -> new BizException("部门不存在"));
+    }
+
+    private record ResolvedDept(Long id, Dept dept) {}
 }

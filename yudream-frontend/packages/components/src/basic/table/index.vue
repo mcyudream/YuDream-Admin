@@ -969,6 +969,7 @@ defineExpose({
     <component
       :is="tableRootComponent"
       :class="cn('size-full', props.border && 'border', props.tableRootClass)"
+      style="overflow-x: auto"
       :model-value="tableRootModelValue"
       @update:model-value="handleSingleSelectionChange"
     >

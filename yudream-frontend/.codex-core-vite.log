@@ -1,0 +1,82 @@
+Port 9000 is in use, trying another one...
+Port 9001 is in use, trying another one...
+Port 9002 is in use, trying another one...
+
+   ╔════════════════════════════════╗
+   ║                                ║
+   ║        [1m[32m由 [42mYuDream[49m 驱动[39m[22m         ║
+   ║                                ║
+   ║   [4mhttps://www.yudream.online[24m   ║
+   ║                                ║
+   ║        当前使用：[35m基础版[39m        ║
+   ║                                ║
+   ╚════════════════════════════════╝
+
+[vite-plugin-svg-spritemap] Using SVGO for SVG optimization on spritemap.
+[2m01:49:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+
+  [32m[1mVITE[22m v8.0.16[39m  [2mready in [0m[1m4803[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.0.145:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://169.254.83.107:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://10.126.126.3:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.16.1:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.71.1:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.25.160.1:[1m9003[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.29.64.1:[1m9003[22m/[39m
+[2m01:49:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[2m01:49:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[2m01:49:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ new dependencies optimized: [33m@tanstack/vue-table, @vueuse/components, class-variance-authority, filesize, vue-input-otp, vue-sonner[32m[39m
+[2m01:49:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ optimized dependencies changed. reloading[39m
+[2m01:49:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[2m01:49:59[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32m✨ new dependencies optimized: [33m@lucide/vue[32m[39m
+[2m02:06:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/@fs/D:/code/yudream-admim/yudream-frontend/packages/components/src/basic/table/index.vue[22m
+[2m02:23:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m02:26:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/api/index.ts[22m
+[2m02:26:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/api/modules/setup.ts[22m
+[2m02:26:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/api/modules/settings.ts[22m
+[2m02:32:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/store/modules/app/account.ts[22m
+[2m02:58:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/router/routes.ts[22m
+[2m02:58:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/views/wiki/home.vue[22m
+[2m03:03:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m03:18:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:21:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:31:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:57:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:58:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:58:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:58:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m04:58:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m05:02:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m14:50:01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m14:54:06[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m15:17:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m15:17:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m16:20:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m16:21:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m16:44:48[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m16:45:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m16:56:12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m16:57:02[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m00:32:56[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mchart-debug.html[22m
+[2m00:39:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mchart-debug.html[22m
+[2m00:45:21[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mchart-debug.html[22m
+[2m01:04:34[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:04:42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:04:42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:05:34[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:06:12[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:06:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:06:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:06:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:07:01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:07:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:07:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:07:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:09:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m01:12:45[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue?vue&type=style&index=0&scoped=e72668e1&lang.css[22m
+[2m01:16:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m01:16:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m01:16:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/site/index.vue[22m
+[2m01:18:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/views/platform/cms/components/CmsBlockLibrary.vue[22m

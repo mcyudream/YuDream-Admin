@@ -129,6 +129,11 @@ catalog:
   zod: ^4.4.3
   '@jboltai/tokui': ^0.1.4
   md-editor-v3: 6.5.3
+  grapesjs-blocks-basic: 1.0.2
+  grapesjs-plugin-forms: 2.0.6
+  grapesjs-navbar: 1.0.2
+  grapesjs-custom-code: 1.0.2
+  grapesjs-style-bg: 2.0.2
 catalogs:
   arco-design-vue:
     '@arco-design/web-vue': ^2.58.0

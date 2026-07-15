@@ -30,10 +30,18 @@ public class WebFetchAiTool implements AiAgentTool {
     private static final Pattern TITLE = Pattern.compile("(?is)<title[^>]*>(.*?)</title>");
     private static final Pattern DESCRIPTION = Pattern.compile("(?is)<meta\\s+[^>]*(name|property)=[\"'](?:description|og:description)[\"'][^>]*content=[\"'](.*?)[\"'][^>]*>");
 
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private final HttpClient httpClient;
+
+    public WebFetchAiTool() {
+        this(HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(10))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build());
+    }
+
+    public WebFetchAiTool(HttpClient httpClient) {
+        this.httpClient = httpClient;
+    }
 
     @Override
     public AiAgentToolDescriptor descriptor() {
@@ -59,20 +67,38 @@ public class WebFetchAiTool implements AiAgentTool {
         if (!StringUtils.hasText(url)) {
             throw new BizException("web.fetch 缺少 url 参数");
         }
-        URI uri = URI.create(url);
+        URI uri;
+        try {
+            uri = URI.create(url);
+        } catch (IllegalArgumentException e) {
+            throw new BizException("web.fetch 地址无效：" + url);
+        }
         if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
             throw new BizException("web.fetch 仅支持 http/https 地址");
         }
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "YuDream-AI-WebFetch/1.0")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 YuDream-AI-WebFetch/1.0")
+                .header("Accept", "text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.2")
+                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
                 .GET()
                 .build();
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            String contentType = response.headers().firstValue("Content-Type").orElse("");
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new BizException("web.fetch 请求失败：HTTP " + response.statusCode() + responseDetail(response.body()));
+            }
+            if (!isTextContent(contentType)) {
+                throw new BizException("web.fetch 响应不是可分析的文本内容：" + contentType);
+            }
+            if (!StringUtils.hasText(response.body())) {
+                throw new BizException("web.fetch 响应正文为空");
+            }
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("url", uri.toString());
             payload.put("status", response.statusCode());
+            payload.put("contentType", contentType);
             payload.put("title", extract(TITLE, response.body()));
             payload.put("description", extract(DESCRIPTION, response.body()));
             payload.put("content", normalize(response.body()));
@@ -105,6 +131,20 @@ public class WebFetchAiTool implements AiAgentTool {
 
     private String cleanText(String value) {
         return value == null ? "" : value.replaceAll("\\s+", " ").trim();
+    }
+
+    private boolean isTextContent(String contentType) {
+        String value = contentType == null ? "" : contentType.toLowerCase();
+        return !StringUtils.hasText(value)
+                || value.startsWith("text/")
+                || value.contains("json")
+                || value.contains("xml")
+                || value.contains("javascript");
+    }
+
+    private String responseDetail(String body) {
+        String detail = cleanText(normalize(body));
+        return StringUtils.hasText(detail) ? "：" + detail.substring(0, Math.min(detail.length(), 180)) : "";
     }
 
     private String text(Object value) {

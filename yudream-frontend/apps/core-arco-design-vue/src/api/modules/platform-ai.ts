@@ -8,6 +8,7 @@ export interface CmsChatHistoryMessage {
 }
 
 export interface CmsPageGeneratePayload {
+  target?: 'page' | 'home' | 'header' | 'footer'
   title?: string
   prompt: string
   pageType?: string

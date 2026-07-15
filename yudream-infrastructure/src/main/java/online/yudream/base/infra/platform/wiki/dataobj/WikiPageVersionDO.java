@@ -1,0 +1,3 @@
+package online.yudream.base.infra.platform.wiki.dataobj;
+import lombok.Data; import lombok.EqualsAndHashCode; import online.yudream.base.domain.platform.wiki.enumerate.WikiIndexStatus; import online.yudream.base.infra.common.baseobj.BaseDO; import org.springframework.data.mongodb.core.index.Indexed; import org.springframework.data.mongodb.core.mapping.Document; import java.time.LocalDateTime;
+@Data @EqualsAndHashCode(callSuper=true) @Document("platformWikiPageVersion") public class WikiPageVersionDO extends BaseDO { @Indexed private Long spaceId; @Indexed private Long nodeId; private long revision; private String title; private String markdown; private String contentHash; private WikiIndexStatus indexStatus; private String indexError; private LocalDateTime indexedAt; }

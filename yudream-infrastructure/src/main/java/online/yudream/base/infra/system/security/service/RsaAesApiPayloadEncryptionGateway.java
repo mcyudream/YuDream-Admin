@@ -6,12 +6,15 @@ import org.springframework.stereotype.Service;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.OAEPParameterSpec;
+import javax.crypto.spec.PSource;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.SecureRandom;
+import java.security.spec.MGF1ParameterSpec;
 import java.util.Base64;
 
 @Service
@@ -19,6 +22,8 @@ public class RsaAesApiPayloadEncryptionGateway implements ApiPayloadEncryptionGa
 
     private static final String RSA_ALGORITHM = "RSA";
     private static final String RSA_TRANSFORMATION = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
+    private static final OAEPParameterSpec RSA_OAEP_PARAMETER_SPEC = new OAEPParameterSpec(
+            "SHA-256", "MGF1", MGF1ParameterSpec.SHA256, PSource.PSpecified.DEFAULT);
     private static final String AES_TRANSFORMATION = "AES/GCM/NoPadding";
     private static final int RSA_KEY_SIZE = 2048;
     private static final int GCM_TAG_BITS = 128;
@@ -36,7 +41,7 @@ public class RsaAesApiPayloadEncryptionGateway implements ApiPayloadEncryptionGa
     public byte[] decryptSessionKey(String encryptedSessionKey) {
         try {
             Cipher cipher = Cipher.getInstance(RSA_TRANSFORMATION);
-            cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate());
+            cipher.init(Cipher.DECRYPT_MODE, keyPair.getPrivate(), RSA_OAEP_PARAMETER_SPEC);
             return cipher.doFinal(Base64.getDecoder().decode(encryptedSessionKey));
         } catch (GeneralSecurityException | IllegalArgumentException e) {
             throw new BizException("接口加密会话密钥解密失败");
@@ -47,7 +52,8 @@ public class RsaAesApiPayloadEncryptionGateway implements ApiPayloadEncryptionGa
     public String decrypt(byte[] sessionKey, String iv, String encryptedPayload) {
         try {
             Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(sessionKey, "AES"), new GCMParameterSpec(GCM_TAG_BITS, Base64.getDecoder().decode(iv)));
+            cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(sessionKey, "AES"),
+                    new GCMParameterSpec(GCM_TAG_BITS, Base64.getDecoder().decode(iv)));
             byte[] plain = cipher.doFinal(Base64.getDecoder().decode(encryptedPayload));
             return new String(plain, StandardCharsets.UTF_8);
         } catch (GeneralSecurityException | IllegalArgumentException e) {
@@ -59,7 +65,8 @@ public class RsaAesApiPayloadEncryptionGateway implements ApiPayloadEncryptionGa
     public String encrypt(byte[] sessionKey, String iv, String payload) {
         try {
             Cipher cipher = Cipher.getInstance(AES_TRANSFORMATION);
-            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(sessionKey, "AES"), new GCMParameterSpec(GCM_TAG_BITS, Base64.getDecoder().decode(iv)));
+            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(sessionKey, "AES"),
+                    new GCMParameterSpec(GCM_TAG_BITS, Base64.getDecoder().decode(iv)));
             byte[] encrypted = cipher.doFinal(payload.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(encrypted);
         } catch (GeneralSecurityException | IllegalArgumentException e) {

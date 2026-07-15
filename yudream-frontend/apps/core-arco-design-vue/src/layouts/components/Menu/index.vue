@@ -2,6 +2,7 @@
 import type { MenuInjection, MenuProps } from './types'
 import { cn } from '@/utils'
 import Item from './item.vue'
+import { getMenuNodeKey } from './menu-key'
 import SubMenu from './sub.vue'
 import { rootMenuInjectionKey } from './types'
 
@@ -30,6 +31,10 @@ function getUseId(obj: object): string {
   return idMap.get(obj)!
 }
 
+function getMenuKey(menu: MenuProps['menu'][number]) {
+  return getMenuNodeKey(menu, getUseId)
+}
+
 const activeIndex = ref<MenuInjection['activeIndex']>(props.value)
 const items = ref<MenuInjection['items']>({})
 const subMenus = ref<MenuInjection['subMenus']>({})
@@ -42,7 +47,7 @@ const isMenuPopup = computed<MenuInjection['isMenuPopup']>(() => {
 // 解析传入的 menu 数据，并保存到 items 和 subMenus 对象中
 function initItems(menu: MenuProps['menu'], parentPaths: string[] = []) {
   menu.forEach((item) => {
-    const index = item.path ?? getUseId(item)
+    const index = getMenuKey(item)
     if (item.children?.some(item => item.meta?.menu !== false)) {
       const indexPath = [...parentPaths, index]
       subMenus.value[index] = {
@@ -158,6 +163,7 @@ watch(() => props.collapse, (value) => {
 provide(rootMenuInjectionKey, reactive({
   props,
   getUseId,
+  getMenuNodeKey: getMenuKey,
   items,
   subMenus,
   activeIndex,
@@ -178,10 +184,10 @@ provide(rootMenuInjectionKey, reactive({
       'py-1': props.mode === 'vertical',
     })"
   >
-    <template v-for="item in menu" :key="item.path ?? getUseId(item)">
+    <template v-for="item in menu" :key="getMenuKey(item)">
       <template v-if="item.meta?.menu !== false">
-        <SubMenu v-if="item.children?.length" :menu="item" :unique-key="[item.path ?? (item.children.every(item => item.meta?.menu === false) ? item.children[0].path! : getUseId(item))]" />
-        <Item v-else :item="item" :unique-key="[item.path ?? (item.children?.every(item => item.meta?.menu === false) ? item.children[0].path! : getUseId(item))]" @click="handleMenuItemClick(item.path ?? (item.children?.every(item => item.meta?.menu === false) ? item.children[0].path! : getUseId(item)))" />
+        <SubMenu v-if="item.children?.length" :menu="item" :unique-key="[getMenuKey(item)]" />
+        <Item v-else :item="item" :unique-key="[getMenuKey(item)]" @click="handleMenuItemClick(getMenuKey(item))" />
       </template>
     </template>
   </div>

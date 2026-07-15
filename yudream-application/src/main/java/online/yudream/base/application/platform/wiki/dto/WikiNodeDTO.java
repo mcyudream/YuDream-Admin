@@ -1,0 +1,3 @@
+package online.yudream.base.application.platform.wiki.dto;
+import lombok.Builder; import lombok.Data; import online.yudream.base.domain.platform.wiki.enumerate.WikiIndexStatus; import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType; import java.util.List;
+@Data @Builder public class WikiNodeDTO { private String id; private String parentId; private String title; private String slug; private String path; private WikiNodeType nodeType; private int sort; private String markdown; private String publishedVersionId; private WikiIndexStatus indexStatus; private List<WikiNodeDTO> children; }

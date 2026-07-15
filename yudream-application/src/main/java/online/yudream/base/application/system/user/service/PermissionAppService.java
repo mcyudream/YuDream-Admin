@@ -9,6 +9,7 @@ import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
+import online.yudream.base.domain.system.user.service.UserContextStore;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import org.springframework.stereotype.Service;
@@ -31,6 +32,7 @@ public class PermissionAppService {
 
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
+    private final UserContextStore userContextStore;
 
     /**
      * 获取用户拥有的全部权限码（汇总所有角色）。
@@ -43,22 +45,30 @@ public class PermissionAppService {
             return List.of();
         }
 
-        Set<String> permissions = new HashSet<>();
-        for (RoleID roleId : user.getRoles()) {
-            Role role = roleRepo.findById(roleId.getValue()).orElse(null);
-            if (role == null || role.getStatus() != RoleStatus.ACTIVE) {
-                continue;
-            }
-            if (role.getSystemType() == SystemRoleType.SUPER_ADMIN) {
-                return List.of(ALL_PERMISSION);
-            }
-            if (role.getPermissions() == null) {
-                continue;
-            }
-            permissions.addAll(role.getPermissions().stream()
-                    .map(PermissionID::getCode)
-                    .collect(Collectors.toSet()));
+        Role role = currentRole(user, userId);
+        if (role == null || role.getStatus() != RoleStatus.ACTIVE) {
+            return List.of();
         }
-        return new ArrayList<>(permissions);
+        if (role.getSystemType() == SystemRoleType.SUPER_ADMIN) {
+            return List.of(ALL_PERMISSION);
+        }
+        if (role.getPermissions() == null) {
+            return List.of();
+        }
+        return role.getPermissions().stream()
+                .map(PermissionID::getCode)
+                .collect(Collectors.toList());
+    }
+
+    private Role currentRole(User user, Long userId) {
+        List<RoleID> roles = user.getRoles();
+        if (roles == null || roles.isEmpty()) {
+            return null;
+        }
+        Long currentRoleId = userContextStore.getCurrentRoleId(userId);
+        RoleID selectedRoleId = currentRoleId == null
+                ? roles.getFirst()
+                : roles.stream().filter(roleId -> roleId.getValue().equals(currentRoleId)).findFirst().orElse(null);
+        return selectedRoleId == null ? null : roleRepo.findById(selectedRoleId.getValue()).orElse(null);
     }
 }

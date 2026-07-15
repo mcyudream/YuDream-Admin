@@ -200,7 +200,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         holders.values().stream()
                 .filter(PluginRuntimeHolder::isEnabled)
                 .map(PluginRuntimeHolder::getContext)
-                .forEach(context -> context.interactionRegistry().publish(event, "internal".equals(event.type())));
+                .forEach(context -> context.interactionRegistry().publish(event,
+                        "internal".equals(event.type()) || "group_request".equals(event.type())));
     }
 
     public String displayName(String pluginCode) {

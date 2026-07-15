@@ -6,6 +6,7 @@ import online.yudream.base.application.system.menu.dto.MenuManageDTO;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
 import online.yudream.base.application.system.menu.service.MenuAppService;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
@@ -163,6 +164,25 @@ class MenuAppServicePluginMenuTest {
             assertThat(pluginMeta.get("pluginCode")).isEqualTo("wallet");
             assertThat(pluginMeta.get("pluginModuleName")).isEqualTo("wallet-admin");
         });
+    }
+
+    @Test
+    void routeTreeHidesDirectCapabilityMenuWhenCapabilityIsDisabled() {
+        Menu platform = systemMenu("platform", null, MenuNodeType.CATEGORY);
+        platform.setPermission(null);
+        Menu milky = systemMenu("platform:milky", platform.getCode(), MenuNodeType.MENU);
+        milky.setPermission("platform:milky:view");
+        CapabilityModule capability = CapabilityModule.builder()
+                .code("milky")
+                .enabled(false)
+                .build();
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(platform, milky));
+        when(menuRepo.findAll()).thenReturn(List.of(platform, milky));
+        when(capabilityModuleRepo.findByCode("milky")).thenReturn(Optional.of(capability));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).isEmpty();
     }
 
     @Test

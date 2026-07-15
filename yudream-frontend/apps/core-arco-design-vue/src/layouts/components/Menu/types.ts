@@ -18,6 +18,7 @@ export interface MenuProps {
 export interface MenuInjection {
   props: MenuProps
   getUseId: (obj: object) => string
+  getMenuNodeKey: (menu: MenuRecordRaw) => string
   items: Record<string, MenuItem>
   subMenus: Record<string, MenuItem>
   activeIndex: MenuProps['value']

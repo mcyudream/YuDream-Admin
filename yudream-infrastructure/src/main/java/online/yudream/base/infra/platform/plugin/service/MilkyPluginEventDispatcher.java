@@ -48,6 +48,10 @@ public class MilkyPluginEventDispatcher {
     @EventListener
     public void dispatch(MilkyEventPublished published) {
         var event = published.event();
+        if ("group_request".equals(event.eventType())) {
+            dispatchGroupRequest(published);
+            return;
+        }
         if (!"message_receive".equals(event.eventType())) {
             return;
         }
@@ -77,6 +81,28 @@ public class MilkyPluginEventDispatcher {
         }
         runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
                 permission -> allowed(user, permission));
+    }
+
+    private void dispatchGroupRequest(MilkyEventPublished published) {
+        var event = published.event();
+        Map<String, Object> data = event.data() == null ? Map.of() : event.data();
+        String groupId = firstText(data, "group_id", "group_uin", "peer_id");
+        String userId = firstText(data, "user_id", "applicant_id", "sender_id");
+        String requestId = firstText(data, "request_id", "flag", "id");
+        if (groupId == null || userId == null || requestId == null) {
+            log.warn("Ignoring incomplete Milky group request event, connectionId={}, data={}", published.connectionId(), data.keySet());
+            return;
+        }
+        Map<String, Object> referrer = new java.util.LinkedHashMap<>();
+        referrer.put("requestId", requestId);
+        String comment = firstText(data, "comment", "message", "verify_message");
+        if (comment != null) {
+            referrer.put("comment", comment);
+        }
+        PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), "group_request", "milky", userId, groupId,
+                comment, null, null, referrer, event.eventType(), data, String.valueOf(published.connectionId()),
+                event.selfId(), requestId);
+        runtime.publishMessagingEvent(pluginEvent);
     }
 
     private void menu(PluginEvent event, User user) {
@@ -267,6 +293,16 @@ public class MilkyPluginEventDispatcher {
             return content.toString();
         }
         return value == null ? null : String.valueOf(value);
+    }
+
+    private String firstText(Map<String, Object> values, String... keys) {
+        for (String key : keys) {
+            String value = text(values.get(key));
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private List<String> mentions(Object value) {

@@ -38,13 +38,16 @@ import java.util.stream.Collectors;
 public class MenuAppService {
 
     private static final Map<String, String> PLATFORM_MENU_CAPABILITIES = Map.of(
+            "platform:wiki", "wiki",
+            "platform:milky", "milky",
             "platform:docs", "api-docs",
             "platform:integration", "integration",
             "platform:document", "document-template",
             "platform:graph", "neo4j",
             "platform:form", "form",
             "platform:cms", "cms",
-            "platform:ai:generate", "ai"
+            "platform:ai:generate", "ai",
+            "platform:render:use", "message-render"
     );
 
     private final MenuDomainService menuDomainService;
@@ -507,12 +510,21 @@ public class MenuAppService {
 
     private boolean platformCapabilityVisible(Menu menu) {
         String capabilityCode = resolvePlatformCapability(menu);
-        if (capabilityCode == null) {
+        if (capabilityCode != null) {
+            return capabilityModuleRepo.findByCode(capabilityCode)
+                    .map(module -> Boolean.TRUE.equals(module.getEnabled()))
+                    .orElse(false);
+        }
+        String inferredCapabilityCode = inferPlatformCapability(menu.getCode());
+        if (inferredCapabilityCode == null) {
+            inferredCapabilityCode = inferPlatformCapability(menu.getParentCode());
+        }
+        if (inferredCapabilityCode == null) {
             return true;
         }
-        return capabilityModuleRepo.findByCode(capabilityCode)
+        return capabilityModuleRepo.findByCode(inferredCapabilityCode)
                 .map(module -> Boolean.TRUE.equals(module.getEnabled()))
-                .orElse(false);
+                .orElse(true);
     }
 
     private String resolvePlatformCapability(Menu menu) {
@@ -537,6 +549,14 @@ public class MenuAppService {
 
     private String platformCapabilityOf(String menuCode) {
         return StringUtils.hasText(menuCode) ? PLATFORM_MENU_CAPABILITIES.get(menuCode) : null;
+    }
+
+    private String inferPlatformCapability(String menuCode) {
+        if (!StringUtils.hasText(menuCode) || !menuCode.startsWith("platform:")) {
+            return null;
+        }
+        String candidate = menuCode.substring("platform:".length()).split(":", 2)[0];
+        return StringUtils.hasText(candidate) ? candidate : null;
     }
 
     private boolean isDescendantCode(String code, String parentCode) {
