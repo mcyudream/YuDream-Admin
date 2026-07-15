@@ -124,6 +124,10 @@ function findMigrations<TNode extends AgentWorkflowToolNode, TEdge extends Agent
     if (!predecessor?.data?.kind || !isAgentChatModelNode(predecessor.data.kind)) {
       continue
     }
+    const predecessorOutgoing = edges.filter(edge => edge.source === predecessor.id)
+    if (predecessorOutgoing.length !== 1 || predecessorOutgoing[0] !== incoming[0]) {
+      continue
+    }
     if (outgoing[0].target === predecessor.id) {
       continue
     }

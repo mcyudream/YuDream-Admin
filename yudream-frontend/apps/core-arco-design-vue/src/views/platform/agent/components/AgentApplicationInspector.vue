@@ -69,7 +69,7 @@ const authorizedTools = computed(() => props.toolCodes.map((code) => {
           <span>{{ toolCodes.length }} 项派生授权</span>
         </div>
         <p class="summary-copy">
-          授权范围由画布中各模型节点选择的工具自动汇总，不能在应用级单独编辑。
+          授权范围由画布中各模型节点选择的工具自动汇总，不能在应用级单独编辑；尚未定义节点工具的历史应用会暂时保留原授权。
         </p>
         <div v-if="authorizedTools.length" class="tool-summary" aria-label="模型节点派生的工具授权">
           <div v-for="tool in authorizedTools" :key="tool.code" class="tool-summary-row">

@@ -99,3 +99,21 @@ test('keeps an ambiguous legacy tool graph unchanged without mutating the input'
   assert.notEqual(migrated.edges, input.edges)
   assert.notEqual(migrated.nodes[0]?.data, input.nodes[0]?.data)
 })
+
+test('keeps a legacy tool node when its predecessor model also has another outgoing branch', () => {
+  const input = {
+    nodes: [
+      node('build', 'llm'),
+      node('legacy-tool', 'tool', { toolCode: 'cms.canvas.patch' }),
+      node('audit', 'template'),
+      node('end', 'end'),
+    ],
+    edges: [
+      { id: 'build-tool', source: 'build', target: 'legacy-tool' },
+      { id: 'build-audit', source: 'build', target: 'audit' },
+      { id: 'tool-end', source: 'legacy-tool', target: 'end' },
+    ],
+  }
+
+  assert.deepEqual(migrateLegacyToolNodes(input), input)
+})

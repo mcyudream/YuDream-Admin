@@ -12,7 +12,7 @@ export function agentRunCapabilities(workflowJson: string) {
     const workflow = JSON.parse(workflowJson || '{}') as { nodes?: Array<{ data?: Record<string, unknown> }> }
     const data = (workflow.nodes || []).map(node => node.data || {})
     return {
-      allowImage: data.some(node => node.kind === 'llm' && node.vision === true),
+      allowImage: data.some(node => (node.kind === 'llm' || node.kind === 'vision') && node.vision === true),
       allowFiles: data.some(node => node.kind === 'document' || (node.kind === 'llm' && node.acceptFiles === true)),
     }
   }
