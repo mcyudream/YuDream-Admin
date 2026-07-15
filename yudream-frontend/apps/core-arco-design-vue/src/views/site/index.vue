@@ -2,7 +2,7 @@
 import type { CmsPage, CmsTemplateContext, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
-import { readChromeCss } from '@/utils/cms-chrome'
+import { chromeRuntimeCss, readChromeCss } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 
 const route = useRoute()
@@ -56,6 +56,7 @@ const footerCopyright = computed(() => home.value?.settings?.footerCopyright || 
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
 const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
 const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
+const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, homeCss.value))
 const archiveFilter = computed(() => ({
   category: queryValue(route.query.category),
   tag: queryValue(route.query.tag),
@@ -452,8 +453,8 @@ function escapeHtml(value: string) {
     </div>
 
     <template v-else>
-      <component :is="'style'" v-if="homeCss">
-        {{ homeCss }}
+      <component :is="'style'">
+        {{ siteRuntimeCss }}
       </component>
       <header data-yb-chrome="header" class="site-layout-header">
         <div class="site-layout-header__bar">
@@ -472,22 +473,24 @@ function escapeHtml(value: string) {
               </div>
             </div>
           </nav>
-          <div v-if="!appAccountStore.isLogin" data-yb-chrome-slot="auth" class="site-layout-header__auth">
-            <a href="/login" class="ghost">登录</a>
-            <a href="/register" class="primary">注册</a>
-          </div>
-          <details v-else data-yb-chrome-slot="auth" class="site-layout-header__account">
-            <summary>
-              <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
-              <span>{{ appAccountStore.account }}</span>
-              <i>⌄</i>
-            </summary>
-            <div>
-              <a href="/">控制台</a>
-              <a href="/profile">个人资料</a>
-              <a href="/logout" class="danger">退出登录</a>
+          <div data-yb-chrome-slot="auth" class="site-layout-header__auth">
+            <div v-if="!appAccountStore.isLogin" data-visible-when="guest">
+              <a href="/login" class="ghost">登录</a>
+              <a href="/register" class="primary">注册</a>
             </div>
-          </details>
+            <details v-else data-visible-when="logged-in" class="site-layout-header__account">
+              <summary class="ghost site-layout-header__action">
+                <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
+                <span>{{ appAccountStore.account }}</span>
+                <i>⌄</i>
+              </summary>
+              <div>
+                <a href="/">控制台</a>
+                <a href="/profile">个人资料</a>
+                <a href="/logout" class="danger">退出登录</a>
+              </div>
+            </details>
+          </div>
         </div>
       </header>
 
@@ -562,6 +565,7 @@ function escapeHtml(value: string) {
 </template>
 
 <style scoped>
+@layer yudream-site-base {
 .site-page {
   --yb-site-bg: #f8fafc;
   --yb-site-text: #111827;
@@ -731,6 +735,11 @@ function escapeHtml(value: string) {
 }
 
 .site-layout-header__auth {
+  gap: 8px;
+}
+
+.site-layout-header__auth > div[data-visible-when="guest"] {
+  display: flex;
   gap: 8px;
 }
 
@@ -1262,5 +1271,6 @@ function escapeHtml(value: string) {
     white-space: pre-wrap;
     word-break: break-word;
   }
+}
 }
 </style>

@@ -80,7 +80,9 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         if (generated.toolResults() != null) {
             generated.toolResults().forEach(state::addToolResult);
         }
-        Object output = "understand".equals(kind) ? structured(generated.summary()) : generated.summary();
+        Object output = "understand".equals(kind)
+                ? structured(generated.summary(), values.bool(node, "strictJson", true))
+                : generated.summary();
         return values.result(node, output == null ? "" : output);
     }
 
@@ -100,7 +102,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 .toList());
     }
 
-    private Object structured(String summary) {
+    private Object structured(String summary, boolean strictJson) {
         String json = summary == null ? "" : summary.trim();
         if (json.startsWith("```")) {
             json = json.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "").trim();
@@ -108,6 +110,9 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         try {
             return objectMapper.readValue(json, Object.class);
         } catch (Exception exception) {
+            if (!strictJson) {
+                return java.util.Map.of("raw", json);
+            }
             throw new BizException("问题理解节点未返回合法 JSON");
         }
     }

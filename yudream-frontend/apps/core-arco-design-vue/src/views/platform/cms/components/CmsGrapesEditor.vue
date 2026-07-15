@@ -15,7 +15,7 @@ import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
-import { chromeCanvasPreviewCss, chromeFrameTemplate, extractHomeContent } from '@/utils/cms-chrome'
+import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { resolveCmsAgentCode } from '../config/cms-agent-options'
 import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
@@ -762,11 +762,7 @@ onMounted(async () => {
       sectors: styleSectors(),
     },
     deviceManager: {
-      devices: [
-        { id: 'desktop', name: '桌面', width: '' },
-        { id: 'tablet', name: '平板', width: '768px' },
-        { id: 'mobile', name: '手机', width: '390px' },
-      ],
+      devices: cmsCanvasDevices(),
     },
     canvas: {
       styles: [],
@@ -783,6 +779,7 @@ onMounted(async () => {
   observeBlockPanel()
   refreshBlockPanel()
   readCanvasZoom()
+  requestAnimationFrame(fitCanvasToWorkspace)
   window.addEventListener('keydown', onKeyDown, true)
   window.addEventListener('cms-ai-follow-up', onAiFollowUp as EventListener)
   loadInitialContent(editor)
@@ -1323,6 +1320,21 @@ function command(command: string) {
 function setDevice(device: 'desktop' | 'tablet' | 'mobile') {
   editor?.setDevice(device)
   activeDevice.value = device
+  requestAnimationFrame(fitCanvasToWorkspace)
+}
+
+function fitCanvasToWorkspace() {
+  if (!editor || !editorEl.value) {
+    return
+  }
+  const selected = editor.DeviceManager.getSelected() as any
+  const width = Number.parseInt(String(selected?.get?.('width') || selected?.attributes?.width || ''), 10)
+  if (!Number.isFinite(width) || width <= 0) {
+    return
+  }
+  const zoom = canvasFitZoom(editorEl.value.clientWidth, width)
+  ;(editor.Canvas as any)?.setZoom?.(zoom)
+  canvasZoom.value = zoom
 }
 
 function useSuggestion(suggestion: string) {

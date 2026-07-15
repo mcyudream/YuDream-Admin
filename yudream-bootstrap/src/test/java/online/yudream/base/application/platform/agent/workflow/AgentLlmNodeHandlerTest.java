@@ -123,6 +123,45 @@ class AgentLlmNodeHandlerTest {
         assertThat(request.toolCallingEnabled()).isTrue();
     }
 
+    @Test
+    void shouldContinueWithRawPlanWhenUnderstandJsonIsInvalidAndStrictModeIsDisabled() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
+        AiGenerationGateway gateway = new AiGenerationGateway() {
+            @Override
+            public AiGenerationResult generate(AiGenerationRequest request) {
+                return new AiGenerationResult(null, "需求明确，直接构建首页", null, null, null, null, null, List.of(), List.of());
+            }
+        };
+        AgentApplication application = AgentApplication.builder().name("CMS Agent").code("cms").build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("构建一个工作室首页");
+        AgentWorkflowRunState state = new AgentWorkflowRunState(
+                application, cmd, Map.of(), java.util.Set.of(), ignored -> { }, ignored -> { }
+        );
+        AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
+                new AgentWorkflowGraphParser(objectMapper),
+                List.of(
+                        new AgentStartNodeHandler(values),
+                        new AgentLlmNodeHandler("understand", values, objectMapper, gateway, state),
+                        new AgentEndNodeHandler(values)
+                )
+        );
+
+        AgentWorkflowExecution execution = executor.execute("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                  {"id":"plan","data":{"kind":"understand","inputVariable":"query","outputVariable":"plan","providerCode":"p1","modelCode":"m1","strictJson":false}},
+                  {"id":"end","data":{"kind":"end","inputVariable":"plan"}}
+                ],"edges":[
+                  {"source":"start","target":"plan"},{"source":"plan","target":"end"}
+                ]}
+                """, cmd.getInput());
+
+        assertThat(execution.context().nodeOutput("end"))
+                .isEqualTo(Map.of("raw", "需求明确，直接构建首页"));
+    }
+
     private static final class CapturingGateway implements AiGenerationGateway {
         private final List<AiGenerationRequest> requests = new ArrayList<>();
 
