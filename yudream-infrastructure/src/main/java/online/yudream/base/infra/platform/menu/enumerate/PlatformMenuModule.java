@@ -241,5 +241,52 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:ai:generate", name = "AI 生成内容", type = MenuNodeType.BUTTON,
             parentName = "CMS", permission = "platform:ai:generate")
-    AI_GENERATE
+    AI_GENERATE,
+
+    @MenuNode(code = "platform:agent", name = "Agent 应用", type = MenuNodeType.MENU,
+            path = "/platform/agent", component = "platform/agent/index.vue",
+            icon = "i-ri:robot-2-line", sort = 59)
+    AGENT,
+
+    @MenuNode(code = "platform:agent:editor", name = "Agent 编排", type = MenuNodeType.MENU,
+            path = "/platform/agent/editor", component = "platform/agent/editor.vue",
+            icon = "i-ri:node-tree", sort = 58, visible = false, permission = "platform:agent:edit")
+    AGENT_EDITOR,
+
+    @MenuNode(code = "platform:agent:tools", name = "Agent 工具", type = MenuNodeType.MENU,
+            path = "/platform/agent/tools", component = "platform/agent/tools.vue",
+            icon = "i-ri:tools-line", sort = 57, permission = "platform:agent:tool:view")
+    AGENT_TOOLS,
+
+    @MenuNode(code = "platform:agent:view", name = "查看 Agent 应用", type = MenuNodeType.BUTTON,
+            parentName = "AGENT", permission = "platform:agent:view")
+    AGENT_VIEW,
+
+    @MenuNode(code = "platform:agent:edit", name = "编辑 Agent 应用", type = MenuNodeType.BUTTON,
+            parentName = "AGENT", permission = "platform:agent:edit")
+    AGENT_EDIT,
+
+    @MenuNode(code = "platform:agent:publish", name = "发布 Agent 应用", type = MenuNodeType.BUTTON,
+            parentName = "AGENT", permission = "platform:agent:publish")
+    AGENT_PUBLISH,
+
+    @MenuNode(code = "platform:agent:delete", name = "删除 Agent 应用", type = MenuNodeType.BUTTON,
+            parentName = "AGENT", permission = "platform:agent:delete")
+    AGENT_DELETE,
+
+    @MenuNode(code = "platform:agent:run", name = "运行 Agent 应用", type = MenuNodeType.BUTTON,
+            parentName = "AGENT", permission = "platform:agent:run")
+    AGENT_RUN,
+
+    @MenuNode(code = "platform:agent:tool:view", name = "查看 Agent 工具", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TOOLS", permission = "platform:agent:tool:view")
+    AGENT_TOOL_VIEW,
+
+    @MenuNode(code = "platform:agent:tool:edit", name = "编辑 Agent 工具", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TOOLS", permission = "platform:agent:tool:edit")
+    AGENT_TOOL_EDIT,
+
+    @MenuNode(code = "platform:agent:tool:delete", name = "删除 Agent 工具", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TOOLS", permission = "platform:agent:tool:delete")
+    AGENT_TOOL_DELETE
 }
