@@ -177,8 +177,32 @@ class AgentWorkflowValidatorTest {
         var normalized = AgentWorkflowToolCodes.normalize(workflow);
 
         assertThat(normalized.toolCodes()).isEmpty();
-        assertThat(normalized.declaresTools()).isFalse();
+        assertThat(normalized.declaresTools()).isTrue();
         assertThat(normalized.workflowJson()).contains("\"toolCodes\":[]");
+    }
+
+    @Test
+    void migratesLegacyActiveToolModeToSupportedAutoMode() {
+        String workflow = workflow(
+                """
+                {"id":"start","data":{"kind":"start"}},
+                {"id":"model","data":{"kind":"llm","toolMode":"ACTIVE","toolCodes":["web.fetch"]}},
+                {"id":"end","data":{"kind":"end"}}
+                """,
+                """
+                {"source":"start","target":"model"},
+                {"source":"model","target":"end"}
+                """
+        );
+
+        var normalized = AgentWorkflowToolCodes.normalize(workflow);
+
+        assertThat(normalized.declaresTools()).isTrue();
+        assertThat(normalized.toolCodes()).containsExactly("web.fetch");
+        assertThat(normalized.workflowJson())
+                .contains("\"toolMode\":\"AUTO\"")
+                .contains("\"toolConfigDeclared\":true")
+                .doesNotContain("\"toolMode\":\"ACTIVE\"");
     }
 
     @Test
