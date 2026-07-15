@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.ai.service.AiAppService;
+import online.yudream.base.application.platform.agent.service.BuiltinAgentCodes;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.ai.assembler.AiWebAssembler;
@@ -76,6 +77,9 @@ public class AiController {
                 log.debug("AI SSE stream completed, traceId={}, tools={}",
                         traceId,
                         result.getTools() == null ? 0 : result.getTools().size());
+                if (BuiltinAgentCodes.AGUI_CARD.equals(request.getAgentCode())) {
+                    send(emitter, AiWebAssembler.toAguiCardSnapshot(traceId, result.getSummary()));
+                }
                 send(emitter, AiWebAssembler.toAguiRunFinished(traceId, result));
                 emitter.complete();
             } catch (Exception e) {

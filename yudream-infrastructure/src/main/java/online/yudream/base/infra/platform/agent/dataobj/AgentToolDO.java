@@ -17,6 +17,7 @@ public class AgentToolDO extends BaseDO {
     private String description;
     private AgentToolType type;
     private String inputSchemaJson;
+    private String outputExampleJson;
     private String pythonCode;
     private Integer timeoutMillis;
     private String permissionCode;

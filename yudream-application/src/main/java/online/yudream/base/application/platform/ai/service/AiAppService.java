@@ -69,10 +69,11 @@ public class AiAppService {
         if (!StringUtils.hasText(cmd.getPrompt()) && !StringUtils.hasText(cmd.getImageDataUrl())) {
             throw new BizException("生成需求或样图不能为空");
         }
-        progress(onProgress, "analysis", "正在分析当前画布、用户需求和可用工具。");
+        boolean aguiCard = BuiltinAgentCodes.AGUI_CARD.equals(cmd.getAgentCode());
+        progress(onProgress, "analysis", aguiCard ? "正在生成 AG-UI 卡片。" : "正在分析当前画布、用户需求和可用工具。");
         AgentRunCmd agentCmd = new AgentRunCmd();
-        agentCmd.setInput(userPrompt(cmd));
-        agentCmd.setRuntimeSystemPrompt(systemPrompt(cmd));
+        agentCmd.setInput(aguiCard ? defaultText(cmd.getPrompt(), "生成一张摘要卡片") : userPrompt(cmd));
+        agentCmd.setRuntimeSystemPrompt(aguiCard ? "" : systemPrompt(cmd));
         agentCmd.setImageDataUrl(cmd.getImageDataUrl());
         agentCmd.setHistory(cmd.getHistory() == null ? List.of() : cmd.getHistory());
         String agentCode = StringUtils.hasText(cmd.getAgentCode())

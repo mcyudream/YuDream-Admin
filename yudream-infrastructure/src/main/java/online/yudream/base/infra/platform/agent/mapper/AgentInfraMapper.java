@@ -29,7 +29,7 @@ public final class AgentInfraMapper {
         AgentToolDO data = new AgentToolDO();
         data.setId(value.getId()); data.setVersion(value.getVersion()); data.setCreateTime(value.getCreateTime()); data.setUpdateTime(value.getUpdateTime());
         data.setName(value.getName()); data.setCode(value.getCode()); data.setDescription(value.getDescription()); data.setType(value.getType());
-        data.setInputSchemaJson(value.getInputSchemaJson()); data.setPythonCode(value.getPythonCode()); data.setTimeoutMillis(value.getTimeoutMillis()); data.setPermissionCode(value.getPermissionCode()); data.setEnabled(value.getEnabled());
+        data.setInputSchemaJson(value.getInputSchemaJson()); data.setOutputExampleJson(value.getOutputExampleJson()); data.setPythonCode(value.getPythonCode()); data.setTimeoutMillis(value.getTimeoutMillis()); data.setPermissionCode(value.getPermissionCode()); data.setEnabled(value.getEnabled());
         return data;
     }
 
@@ -37,6 +37,6 @@ public final class AgentInfraMapper {
         if (value == null) return null;
         return AgentTool.builder().id(value.getId()).version(value.getVersion()).createTime(value.getCreateTime()).updateTime(value.getUpdateTime())
                 .name(value.getName()).code(value.getCode()).description(value.getDescription()).type(value.getType()).inputSchemaJson(value.getInputSchemaJson())
-                .pythonCode(value.getPythonCode()).timeoutMillis(value.getTimeoutMillis()).permissionCode(value.getPermissionCode()).enabled(value.getEnabled()).build();
+                .outputExampleJson(value.getOutputExampleJson()).pythonCode(value.getPythonCode()).timeoutMillis(value.getTimeoutMillis()).permissionCode(value.getPermissionCode()).enabled(value.getEnabled()).build();
     }
 }

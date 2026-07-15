@@ -57,4 +57,20 @@ class AiWebAssemblerAguiTest {
         assertThat(delta.getActivityType()).isEqualTo("cms-progress");
         assertThat(delta.getPatch()).isInstanceOf(List.class);
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void emitsStructuredAguiCardOnlyAsAnActivitySnapshot() {
+        var card = AiWebAssembler.toAguiCardSnapshot("run-1", """
+                {"title":"风险摘要","summary":"发现两项风险","tone":"warning",
+                 "fields":[{"label":"高风险","value":"2"}],
+                 "actions":[{"label":"查看详情","action":"open","value":"/risk"}]}
+                """);
+
+        assertThat(card.getType()).isEqualTo("ACTIVITY_SNAPSHOT");
+        assertThat(card.getActivityType()).isEqualTo("agui-card");
+        assertThat(card.getContent()).isInstanceOf(Map.class);
+        assertThat((Map<String, Object>) card.getContent()).containsEntry("title", "风险摘要");
+        assertThat(card.getDelta()).isNull();
+    }
 }

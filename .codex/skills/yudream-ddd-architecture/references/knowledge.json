@@ -163,6 +163,14 @@
     {
       "key": "document-text-extraction-gateway",
       "text": "Agent 和平台文档文本提取必须依赖领域 DocumentTextExtractor 网关；基础设施使用 Apache Tika 在内存中解析 Data URL/Base64，并在解码前后执行输入格式、MIME 类型和最大字节数校验，禁止把 Tika 或临时文件逻辑放入应用服务。"
+    },
+    {
+      "key": "agent-python-run-dict-contract",
+      "text": "Custom Python Agent tools expose def run(params: dict) -> dict. stdin/stdout are internal runtime IPC only and must not appear in tool authoring UI or tool payloads; persist an output JSON object example and reject non-dict results."
+    },
+    {
+      "key": "agui-card-activity-only",
+      "text": "Structured Agent cards are emitted only in AG-UI streams as ACTIVITY_SNAPSHOT with activityType=agui-card. Ordinary Agent/non-stream responses keep raw structured output and must not render AG-UI cards."
     }
   ],
   "utilities": [

@@ -10,11 +10,14 @@ import online.yudream.base.application.platform.agent.workflow.support.AgentWork
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
+import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.integration.enumerate.ExecutionStatus;
+import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,6 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentToolNodeHandlerTest {
 
@@ -85,12 +89,142 @@ class AgentToolNodeHandlerTest {
         assertThat(state.toolResults()).singleElement().satisfies(result -> assertThat(result.toolName()).isEqualTo("system.lookup"));
     }
 
+    @Test
+    void shouldInvokePythonRunFunctionAndExposeReturnedDictionaryAsToolPayload() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
+        AgentTool customTool = AgentTool.builder()
+                .name("风险评分")
+                .code("risk_score")
+                .description("计算风险分")
+                .type(AgentToolType.PYTHON)
+                .inputSchemaJson("{\"type\":\"object\"}")
+                .outputExampleJson("{\"score\":95,\"level\":\"high\"}")
+                .pythonCode("def run(params: dict) -> dict:\n    return {\"score\": params[\"score\"]}")
+                .timeoutMillis(10_000)
+                .enabled(true)
+                .build();
+        AgentApplication application = AgentApplication.builder()
+                .name("评分应用")
+                .code("score")
+                .toolCodes(List.of("risk_score"))
+                .build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("{\"score\":95}");
+        AtomicReference<String> executedCode = new AtomicReference<>();
+        AtomicReference<String> executedInput = new AtomicReference<>();
+        AgentWorkflowRunState state = new AgentWorkflowRunState(
+                application, cmd, Map.of(), java.util.Set.of(), null, ignored -> { }
+        );
+        AgentToolNodeHandler handler = new AgentToolNodeHandler(
+                values,
+                objectMapper,
+                (script, input) -> {
+                    executedCode.set(script.getScriptContent());
+                    executedInput.set(input);
+                    return new RuntimeExecutionResult(
+                            "{\"score\":95,\"level\":\"high\"}", "", 0, 5,
+                            ExecutionStatus.SUCCESS, null
+                    );
+                },
+                toolRepo(customTool),
+                List.of(),
+                application,
+                state,
+                permission -> true
+        );
+        AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
+                new AgentWorkflowGraphParser(objectMapper),
+                List.of(new AgentStartNodeHandler(values), handler, new AgentEndNodeHandler(values))
+        );
+
+        AgentWorkflowExecution execution = executor.execute("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start","outputVariable":"arguments"}},
+                  {"id":"tool","data":{"kind":"tool","toolCode":"risk_score","inputVariable":"arguments","outputVariable":"result"}},
+                  {"id":"end","data":{"kind":"end","inputVariable":"result"}}
+                ],"edges":[
+                  {"source":"start","target":"tool"},{"source":"tool","target":"end"}
+                ]}
+                """, cmd.getInput());
+
+        assertThat(executedCode.get()).contains("def run(params: dict) -> dict", "run(_yudream_params)");
+        assertThat(objectMapper.readTree(executedInput.get()).get("score").asInt()).isEqualTo(95);
+        assertThat(execution.context().nodeOutput("end")).isEqualTo(Map.of("score", 95, "level", "high"));
+        assertThat(state.toolResults()).singleElement().satisfies(result -> {
+            assertThat(result.payload()).containsEntry("score", 95).containsEntry("level", "high");
+            assertThat(result.payload()).doesNotContainKey("stdout");
+        });
+    }
+
+    @Test
+    void shouldRejectPythonRunResultThatIsNotADictionary() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
+        AgentTool customTool = AgentTool.builder()
+                .name("风险评分")
+                .code("risk_score")
+                .type(AgentToolType.PYTHON)
+                .inputSchemaJson("{\"type\":\"object\"}")
+                .outputExampleJson("{\"score\":95}")
+                .pythonCode("def run(params: dict) -> dict:\n    return [params]")
+                .timeoutMillis(10_000)
+                .enabled(true)
+                .build();
+        AgentApplication application = AgentApplication.builder()
+                .name("评分应用")
+                .code("score")
+                .toolCodes(List.of("risk_score"))
+                .build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("{\"score\":95}");
+        AgentWorkflowRunState state = new AgentWorkflowRunState(
+                application, cmd, Map.of(), java.util.Set.of(), null, ignored -> { }
+        );
+        AgentToolNodeHandler handler = new AgentToolNodeHandler(
+                values,
+                objectMapper,
+                (script, input) -> new RuntimeExecutionResult(
+                        "[95]", "", 0, 5, ExecutionStatus.SUCCESS, null
+                ),
+                toolRepo(customTool),
+                List.of(),
+                application,
+                state,
+                permission -> true
+        );
+
+        assertThatThrownBy(() -> handler.execute(
+                new AgentWorkflowNode(
+                        "tool",
+                        "agent",
+                        "风险评分",
+                        objectMapper.readTree("""
+                                {"kind":"tool","toolCode":"risk_score","inputVariable":"input","outputVariable":"result"}
+                                """)
+                ),
+                new AgentWorkflowContext(Map.of("score", 95))
+        ))
+                .isInstanceOf(online.yudream.base.domain.common.exception.BizException.class)
+                .hasMessage("Python 工具 run() 必须返回可序列化的字典");
+    }
+
     private AgentToolRepo emptyToolRepo() {
         return new AgentToolRepo() {
             @Override public AgentTool save(AgentTool tool) { return tool; }
             @Override public Optional<AgentTool> findById(Long id) { return Optional.empty(); }
             @Override public Optional<AgentTool> findByCode(String code) { return Optional.empty(); }
             @Override public PageResult<AgentTool> page(String keyword, int page, int size) { return new PageResult<>(List.of(), 0, page, size); }
+            @Override public void deleteById(Long id) { }
+        };
+    }
+
+    private AgentToolRepo toolRepo(AgentTool tool) {
+        return new AgentToolRepo() {
+            @Override public AgentTool save(AgentTool value) { return value; }
+            @Override public Optional<AgentTool> findById(Long id) { return Optional.empty(); }
+            @Override public Optional<AgentTool> findByCode(String code) { return tool.getCode().equals(code) ? Optional.of(tool) : Optional.empty(); }
+            @Override public PageResult<AgentTool> page(String keyword, int page, int size) { return new PageResult<>(List.of(tool), 1, page, size); }
             @Override public void deleteById(Long id) { }
         };
     }

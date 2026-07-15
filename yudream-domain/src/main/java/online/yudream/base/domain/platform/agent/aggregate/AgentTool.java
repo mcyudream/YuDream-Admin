@@ -21,6 +21,7 @@ public class AgentTool extends BaseDomain {
     private String description;
     private AgentToolType type;
     private String inputSchemaJson;
+    private String outputExampleJson;
     private String pythonCode;
     private Integer timeoutMillis;
     private String permissionCode;
@@ -28,17 +29,19 @@ public class AgentTool extends BaseDomain {
 
     public static AgentTool python(String name, String code, String pythonCode) {
         AgentTool tool = new AgentTool();
-        tool.update(name, code, null, AgentToolType.PYTHON, "{\"type\":\"object\"}", pythonCode, 10000, null, true);
+        tool.update(name, code, null, AgentToolType.PYTHON, "{\"type\":\"object\"}", "{}", pythonCode, 10000, null, true);
         return tool;
     }
 
     public void update(String name, String code, String description, AgentToolType type, String inputSchemaJson,
-                       String pythonCode, Integer timeoutMillis, String permissionCode, Boolean enabled) {
+                       String outputExampleJson, String pythonCode, Integer timeoutMillis, String permissionCode,
+                       Boolean enabled) {
         this.name = required(name, "工具名称不能为空");
         this.code = code(code);
         this.description = description;
         this.type = type == null ? AgentToolType.PYTHON : type;
         this.inputSchemaJson = inputSchemaJson == null || inputSchemaJson.isBlank() ? "{\"type\":\"object\"}" : inputSchemaJson;
+        this.outputExampleJson = outputExampleJson == null || outputExampleJson.isBlank() ? "{}" : outputExampleJson;
         this.pythonCode = this.type == AgentToolType.PYTHON ? required(pythonCode, "Python 工具代码不能为空") : null;
         this.timeoutMillis = timeoutMillis == null || timeoutMillis <= 0 ? 10000 : Math.min(timeoutMillis, 60000);
         this.permissionCode = permissionCode;

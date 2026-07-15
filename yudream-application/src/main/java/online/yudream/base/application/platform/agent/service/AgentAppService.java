@@ -152,7 +152,7 @@ public class AgentAppService {
         });
         value.update(
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), AgentToolType.PYTHON,
-                cmd.getInputSchemaJson(), cmd.getPythonCode(), cmd.getTimeoutMillis(),
+                cmd.getInputSchemaJson(), cmd.getOutputExampleJson(), cmd.getPythonCode(), cmd.getTimeoutMillis(),
                 cmd.getPermissionCode(), cmd.getEnabled()
         );
         return AgentAssembler.toDTO(toolRepo.save(value));
