@@ -104,6 +104,9 @@ public class BuiltinAgentInitializerService {
             AgentApplication application,
             List<AgentModelDTO> chatModels
     ) {
+        if (chatModels == null || chatModels.isEmpty()) {
+            return false;
+        }
         if (application.getWorkflowJson() == null || application.getWorkflowJson().isBlank()) {
             return true;
         }
@@ -111,9 +114,6 @@ public class BuiltinAgentInitializerService {
             var nodes = objectMapper.readTree(application.getWorkflowJson()).path("nodes");
             if (nodes.size() <= 3) {
                 return true;
-            }
-            if (chatModels == null || chatModels.isEmpty()) {
-                return false;
             }
             if (BuiltinAgentCodes.CMS_BUILDER.equals(application.getCode())
                     && requiresCmsModelToolUpgrade(nodes)) {
