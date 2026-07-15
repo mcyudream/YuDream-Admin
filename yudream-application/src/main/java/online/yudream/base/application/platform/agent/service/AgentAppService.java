@@ -77,6 +77,14 @@ public class AgentAppService {
         return AgentAssembler.toDTO(application(id));
     }
 
+    @Transactional(readOnly = true)
+    public List<AgentApplicationDTO> publishedApplications() {
+        ensureEnabled();
+        return applicationRepo.page(null, AgentApplicationStatus.PUBLISHED, 1, 200).getRecords().stream()
+                .map(AgentAssembler::toDTO)
+                .toList();
+    }
+
     @Transactional
     public AgentApplicationDTO save(AgentApplicationSaveCmd cmd) {
         ensureEnabled();
@@ -189,6 +197,28 @@ public class AgentAppService {
     }
 
     @Transactional(readOnly = true)
+    public AgentRunDTO runByCode(String code, AgentRunCmd cmd) {
+        ensureEnabled();
+        AgentApplication application = publishedApplication(code);
+        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), null, null, null);
+        return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
+    }
+
+    @Transactional(readOnly = true)
+    public AgentRunDTO debugByCode(
+            String code,
+            AgentRunCmd cmd,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<AiAgentToolResult> onTool
+    ) {
+        ensureEnabled();
+        AgentApplication application = publishedApplication(code);
+        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), onNode, onDelta, onTool);
+        return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
+    }
+
+    @Transactional(readOnly = true)
     public AgentRunDTO debug(
             AgentRunCmd cmd,
             Consumer<AgentDebugEventDTO> onNode,
@@ -248,6 +278,15 @@ public class AgentAppService {
         AgentApplication application = application(id);
         if (application.getStatus() != AgentApplicationStatus.PUBLISHED) {
             throw new BizException("Agent 应用未发布，正式运行前请先完成发布");
+        }
+        return application;
+    }
+
+    private AgentApplication publishedApplication(String code) {
+        AgentApplication application = applicationRepo.findByCode(code == null ? "" : code.trim())
+                .orElseThrow(() -> new BizException("Agent 应用不存在：" + code));
+        if (application.getStatus() != AgentApplicationStatus.PUBLISHED) {
+            throw new BizException("Agent 应用未发布：" + application.getName());
         }
         return application;
     }
