@@ -76,7 +76,7 @@ async function onFileChange(event: Event) {
         type: file.type || 'text/plain',
         size: file.size,
         dataUrl: await readDataUrl(file),
-        text: !image && isTextFile(file) ? await file.text() : undefined,
+        text: !image && file.size <= 256 * 1024 && isTextFile(file) ? await file.text() : undefined,
       })
     }
   }
