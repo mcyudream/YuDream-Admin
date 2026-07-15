@@ -82,7 +82,8 @@ class AgentAppServiceLifecycleTest {
                 mock(WikiSpaceRepo.class),
                 workflowRuntime,
                 mock(AgentWorkflowValidator.class),
-                permission -> true
+                permission -> true,
+                mock(online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry.class)
         );
         return new Fixture(service, applicationRepo, workflowRuntime);
     }

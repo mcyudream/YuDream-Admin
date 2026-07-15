@@ -1,6 +1,9 @@
 package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
+import online.yudream.base.domain.platform.agent.enumerate.AgentApplicationStatus;
+import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.core.PluginContext;
@@ -53,12 +56,14 @@ public class PluginContextImpl implements PluginContext {
     private final PluginCommandRegistryImpl commandRegistry;
     private final PluginTemplateRenderService templateRenderService;
     private final PluginAiToolRegistry aiToolRegistry;
+    private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final PluginSemanticMemoryService semanticMemory;
 
     public PluginContextImpl(String pluginCode, URLClassLoader pluginClassLoader, FrameworkServices frameworkServices,
                              PluginServiceRegistry pluginServiceRegistry, Set<String> declaredDependencies,
                              Predicate<String> dependencyEnabled, PluginAiToolRegistry aiToolRegistry,
-                             PluginSemanticMemoryService semanticMemoryService) {
+                             PluginSemanticMemoryService semanticMemoryService,
+                             AgentRuntimeApplicationRegistry agentApplicationRegistry) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
         this.pluginServiceRegistry = pluginServiceRegistry;
@@ -68,6 +73,7 @@ public class PluginContextImpl implements PluginContext {
         this.commandRegistry = new PluginCommandRegistryImpl(pluginCode);
         this.templateRenderService = new PluginTemplateRenderFrameworkService(pluginClassLoader, frameworkServices.render());
         this.aiToolRegistry = aiToolRegistry;
+        this.agentApplicationRegistry = agentApplicationRegistry;
         this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode, semanticMemoryService);
         onDispose(interactionRegistry);
         onDispose(commandRegistry);
@@ -179,6 +185,22 @@ public class PluginContextImpl implements PluginContext {
             throw new BizException("AI 工具定义无效");
         }
         onDispose(aiToolRegistry.register(pluginCode, tool));
+    }
+
+    void registerDeclaredAgent(PluginAgentManifestReader.Definition definition, String workflowJson) {
+        AgentApplication application = AgentApplication.create(definition.name(), definition.code());
+        application.setId(runtimeAgentId(definition.code()));
+        application.update(
+                definition.name(),
+                definition.code(),
+                definition.description(),
+                StringUtils.hasText(definition.icon()) ? definition.icon() : "i-ri:robot-2-line",
+                definition.systemPrompt(),
+                workflowJson,
+                definition.toolCodes(),
+                AgentApplicationStatus.PUBLISHED
+        );
+        onDispose(agentApplicationRegistry.register(pluginCode, application));
     }
 
     @Override
@@ -375,5 +397,10 @@ public class PluginContextImpl implements PluginContext {
         if (!StringUtils.hasText(targetPluginCode) || !declaredDependencies.contains(targetPluginCode.trim())) {
             throw new BizException("插件未声明依赖: " + targetPluginCode);
         }
+    }
+
+    private long runtimeAgentId(String agentCode) {
+        long value = Integer.toUnsignedLong((pluginCode + ":" + agentCode).hashCode());
+        return -Math.max(1L, value);
     }
 }

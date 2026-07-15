@@ -14,5 +14,6 @@ public class AgentRunCmd {
     private String imageDataUrl;
     private List<AgentAttachmentCmd> attachments = List.of();
     private String runtimeSystemPrompt;
+    private boolean runtimeToolCallingEnabled;
     private List<AiChatMessage> history = List.of();
 }

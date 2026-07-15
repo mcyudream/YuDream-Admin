@@ -48,6 +48,9 @@ public class PluginAiFrameworkService implements PluginAiService {
             AgentRunCmd command = new AgentRunCmd();
             command.setInput(request.userPrompt());
             command.setRuntimeSystemPrompt(request.systemPrompt());
+            command.setProviderCode(request.providerCode());
+            command.setModelCode(request.modelCode());
+            command.setRuntimeToolCallingEnabled(request.toolCallingEnabled());
             command.setHistory(request.history().stream()
                     .map(item -> new AiChatMessage(item.role(), item.content()))
                     .toList());

@@ -39,15 +39,8 @@ public class BuiltinAgentInitializerService {
                 "用于 CMS 可视化页面生成、局部修改和画布校验",
                 "你是 YuDream CMS 页面构建 Agent。优先调用已授权的 CMS 画布工具完成修改，所有修改完成后必须调用 cms.canvas.validate 校验。",
                 CMS_TOOLS,
-                model
-        ).ifPresent(created::add);
-        createIfMissing(
-                BuiltinAgentCodes.GROUP_CHATBOT,
-                "AI 群聊机器人 Agent",
-                "用于群聊提及和随机回复，具体人设与上下文由调用方提供",
-                "你是 YuDream 群聊机器人。回答简短、友好、准确，遵守调用方提供的群聊上下文和人设。",
-                List.of(),
-                model
+                cmsWorkflow(model),
+                model != null
         ).ifPresent(created::add);
         createIfMissing(
                 BuiltinAgentCodes.AGUI_CARD,
@@ -60,10 +53,10 @@ public class BuiltinAgentInitializerService {
                          "fields":[{"label":"字段名","value":"字段值"}],
                          "actions":[{"label":"按钮文字","action":"open|submit|copy","value":"动作参数"}]}
                         fields 和 actions 必须是数组，没有内容时返回空数组；所有 value 必须是字符串。
-                        """,
+                """,
                 List.of(),
-                model,
-                true
+                aguiWorkflow(model),
+                model != null
         ).ifPresent(created::add);
         return List.copyOf(created);
     }
@@ -74,38 +67,43 @@ public class BuiltinAgentInitializerService {
             String description,
             String systemPrompt,
             List<String> toolCodes,
-            AgentModelDTO model
+            String workflowJson,
+            boolean publish
     ) {
-        return createIfMissing(code, name, description, systemPrompt, toolCodes, model, false);
-    }
-
-    private java.util.Optional<AgentApplication> createIfMissing(
-            String code,
-            String name,
-            String description,
-            String systemPrompt,
-            List<String> toolCodes,
-            AgentModelDTO model,
-            boolean structured
-    ) {
-        if (applications.findByCode(code).isPresent()) {
+        java.util.Optional<AgentApplication> existing = applications.findByCode(code);
+        if (existing.isPresent() && !requiresWorkflowUpgrade(existing.get())) {
             return java.util.Optional.empty();
         }
-        AgentApplication application = AgentApplication.create(name, code);
+        AgentApplication application = existing.orElseGet(() -> AgentApplication.create(name, code));
+        AgentApplicationStatus status = application.getStatus() == AgentApplicationStatus.DISABLED
+                ? AgentApplicationStatus.DISABLED
+                : AgentApplicationStatus.DRAFT;
         application.update(
                 name,
                 code,
                 description,
                 "i-ri:robot-2-line",
                 systemPrompt,
-                workflow(model, structured),
+                workflowJson,
                 toolCodes,
-                AgentApplicationStatus.DRAFT
+                status
         );
-        if (model != null) {
+        if (publish && status != AgentApplicationStatus.DISABLED) {
             application.publish();
         }
         return java.util.Optional.of(applications.save(application));
+    }
+
+    private boolean requiresWorkflowUpgrade(AgentApplication application) {
+        if (application.getWorkflowJson() == null || application.getWorkflowJson().isBlank()) {
+            return true;
+        }
+        try {
+            return objectMapper.readTree(application.getWorkflowJson()).path("nodes").size() <= 3;
+        }
+        catch (Exception ignored) {
+            return true;
+        }
     }
 
     private AgentModelDTO defaultChatModel() {
@@ -120,33 +118,128 @@ public class BuiltinAgentInitializerService {
                 .orElse(chatModels.isEmpty() ? null : chatModels.getFirst());
     }
 
-    private String workflow(AgentModelDTO model, boolean structured) {
-        Map<String, Object> modelData = new LinkedHashMap<>();
-        modelData.put("kind", structured ? "understand" : "llm");
-        modelData.put("title", structured ? "生成卡片" : "大模型");
-        modelData.put("providerCode", model == null ? "" : model.providerCode());
-        modelData.put("modelCode", model == null ? "" : model.modelCode());
-        modelData.put("vision", !structured && model != null && model.vision());
-        if (structured) {
-            modelData.put("prompt", "将输入内容整理为系统提示词规定的 AG-UI 卡片 JSON。");
-        }
-        modelData.put("inputVariable", "query");
-        modelData.put("outputVariable", "answer");
+    private String cmsWorkflow(AgentModelDTO model) {
         Map<String, Object> graph = Map.of(
                 "nodes", List.of(
-                        node("start", 80, 180, Map.of(
+                        node("start", 60, 260, Map.of(
                                 "kind", "start", "title", "开始", "outputVariable", "query"
                         )),
-                        node("llm", 390, 180, modelData),
-                        node("end", 700, 180, Map.of(
+                        node("plan", 310, 260, modelNode(
+                                "understand", "理解构建需求",
+                                "分析 CMS 构建需求，仅输出 JSON：{\"route\":\"clarify|build\",\"goal\":\"目标\",\"constraints\":\"约束\"}。需求足以执行时 route=build，否则 route=clarify。",
+                                "query", "plan", model, false
+                        )),
+                        node("route", 570, 260, Map.of(
+                                "kind", "condition", "title", "是否需要澄清",
+                                "condition", "plan.route == 'clarify'", "inputVariable", "plan",
+                                "outputVariable", "needsClarification"
+                        )),
+                        node("clarify-task", 820, 90, Map.of(
+                                "kind", "template", "title", "组织澄清任务",
+                                "template", "目标：{{plan.goal}}\n待确认约束：{{plan.constraints}}\n原始需求：{{query}}",
+                                "inputVariable", "plan", "outputVariable", "task"
+                        )),
+                        node("build-task", 820, 430, Map.of(
+                                "kind", "template", "title", "组织构建任务",
+                                "template", "执行 CMS 构建目标：{{plan.goal}}\n约束：{{plan.constraints}}\n原始需求：{{query}}",
+                                "inputVariable", "plan", "outputVariable", "task"
+                        )),
+                        node("clarify", 1080, 90, modelNode(
+                                "llm", "提出澄清问题", "只提出最多 3 个关键问题，不修改画布。", "task", "answer", model, false
+                        )),
+                        node("build", 1080, 430, modelNode(
+                                "llm", "执行画布构建", "按照任务调用 CMS 画布工具完成修改，并在结束前校验画布。", "task", "answer", model, model != null && model.vision()
+                        )),
+                        node("end", 1360, 260, Map.of(
                                 "kind", "end", "title", "结束", "inputVariable", "answer"
                         ))
                 ),
                 "edges", List.of(
-                        Map.of("id", "start-llm", "source", "start", "target", "llm"),
-                        Map.of("id", "llm-end", "source", "llm", "target", "end")
+                        edge("start-plan", "start", "plan"),
+                        edge("plan-route", "plan", "route"),
+                        branchEdge("route-clarify", "route", "clarify-task", "true"),
+                        branchEdge("route-build", "route", "build-task", "false"),
+                        edge("clarify-task-model", "clarify-task", "clarify"),
+                        edge("build-task-model", "build-task", "build"),
+                        edge("clarify-end", "clarify", "end"),
+                        edge("build-end", "build", "end")
                 )
         );
+        return json(graph);
+    }
+
+    private String aguiWorkflow(AgentModelDTO model) {
+        Map<String, Object> graph = Map.of(
+                "nodes", List.of(
+                        node("start", 60, 260, Map.of(
+                                "kind", "start", "title", "开始", "outputVariable", "query"
+                        )),
+                        node("plan", 310, 260, modelNode(
+                                "understand", "分析卡片语义",
+                                "分析输入并仅输出 JSON：{\"actionable\":true|false,\"title\":\"标题\",\"tone\":\"info|success|warning|danger\",\"focus\":\"重点\"}。",
+                                "query", "cardPlan", model, false
+                        )),
+                        node("route", 570, 260, Map.of(
+                                "kind", "condition", "title", "是否包含操作",
+                                "condition", "cardPlan.actionable == true", "inputVariable", "cardPlan",
+                                "outputVariable", "actionable"
+                        )),
+                        node("action-task", 820, 90, Map.of(
+                                "kind", "template", "title", "组织操作卡片",
+                                "template", "生成可操作卡片。标题：{{cardPlan.title}}；语气：{{cardPlan.tone}}；重点：{{cardPlan.focus}}；原文：{{query}}",
+                                "inputVariable", "cardPlan", "outputVariable", "cardTask"
+                        )),
+                        node("summary-task", 820, 430, Map.of(
+                                "kind", "template", "title", "组织摘要卡片",
+                                "template", "生成只读摘要卡片。标题：{{cardPlan.title}}；语气：{{cardPlan.tone}}；重点：{{cardPlan.focus}}；原文：{{query}}",
+                                "inputVariable", "cardPlan", "outputVariable", "cardTask"
+                        )),
+                        node("action-card", 1080, 90, modelNode(
+                                "understand", "生成操作卡片", "严格按系统提示词的 title、summary、tone、fields、actions 格式输出 JSON，actions 只使用 open、submit、copy。", "cardTask", "card", model, false
+                        )),
+                        node("summary-card", 1080, 430, modelNode(
+                                "understand", "生成摘要卡片", "严格按系统提示词的 title、summary、tone、fields、actions 格式输出 JSON，actions 必须为空数组。", "cardTask", "card", model, false
+                        )),
+                        node("end", 1360, 260, Map.of(
+                                "kind", "end", "title", "结束", "inputVariable", "card"
+                        ))
+                ),
+                "edges", List.of(
+                        edge("start-plan", "start", "plan"),
+                        edge("plan-route", "plan", "route"),
+                        branchEdge("route-action", "route", "action-task", "true"),
+                        branchEdge("route-summary", "route", "summary-task", "false"),
+                        edge("action-task-card", "action-task", "action-card"),
+                        edge("summary-task-card", "summary-task", "summary-card"),
+                        edge("action-card-end", "action-card", "end"),
+                        edge("summary-card-end", "summary-card", "end")
+                )
+        );
+        return json(graph);
+    }
+
+    private Map<String, Object> modelNode(
+            String kind,
+            String title,
+            String prompt,
+            String inputVariable,
+            String outputVariable,
+            AgentModelDTO model,
+            boolean vision
+    ) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", kind);
+        data.put("title", title);
+        data.put("providerCode", model == null ? "" : model.providerCode());
+        data.put("modelCode", model == null ? "" : model.modelCode());
+        data.put("vision", vision);
+        data.put("prompt", prompt);
+        data.put("inputVariable", inputVariable);
+        data.put("outputVariable", outputVariable);
+        return data;
+    }
+
+    private String json(Map<String, Object> graph) {
         try {
             return objectMapper.writeValueAsString(graph);
         }
@@ -157,5 +250,13 @@ public class BuiltinAgentInitializerService {
 
     private Map<String, Object> node(String id, int x, int y, Map<String, Object> data) {
         return Map.of("id", id, "type", "agent", "position", Map.of("x", x, "y", y), "data", data);
+    }
+
+    private Map<String, Object> edge(String id, String source, String target) {
+        return Map.of("id", id, "source", source, "target", target);
+    }
+
+    private Map<String, Object> branchEdge(String id, String source, String target, String sourceHandle) {
+        return Map.of("id", id, "source", source, "target", target, "sourceHandle", sourceHandle);
     }
 }
