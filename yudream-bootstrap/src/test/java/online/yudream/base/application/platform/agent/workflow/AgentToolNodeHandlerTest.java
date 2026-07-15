@@ -41,6 +41,8 @@ class AgentToolNodeHandlerTest {
                 .build();
         AgentRunCmd cmd = new AgentRunCmd();
         cmd.setInput("{\"keyword\":\"订单\"}");
+        cmd.setPermissionCodes(List.of("order:view"));
+        cmd.setPermissionContextExplicit(true);
         AtomicReference<AiAgentToolCall> call = new AtomicReference<>();
         AiAgentTool systemTool = new AiAgentTool() {
             @Override
@@ -206,7 +208,7 @@ class AgentToolNodeHandlerTest {
                 new AgentWorkflowContext(Map.of("score", 95))
         ))
                 .isInstanceOf(online.yudream.base.domain.common.exception.BizException.class)
-                .hasMessage("Python 工具 run() 必须返回可序列化的字典");
+                .hasMessage("Python tool run() must return a serializable dict");
     }
 
     private AgentToolRepo emptyToolRepo() {
