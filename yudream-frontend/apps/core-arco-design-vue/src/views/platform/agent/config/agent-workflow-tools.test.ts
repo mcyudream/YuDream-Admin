@@ -38,12 +38,41 @@ test('migrates an unambiguous legacy tool node into its direct chat-model predec
 
   assert.deepEqual(migrated.nodes.map(item => item.id), ['start', 'build', 'end'])
   assert.deepEqual(migrated.nodes.find(item => item.id === 'build')?.data?.toolCodes, ['web.fetch', 'cms.canvas.patch'])
+  assert.equal(migrated.nodes.find(item => item.id === 'build')?.data?.toolMode, 'AUTO')
   assert.deepEqual(migrated.edges, [
     { id: 'start-build', source: 'start', target: 'build' },
     { id: 'tool-end', source: 'build', target: 'end', sourceHandle: 'source', targetHandle: 'input', data: { connectionStyle: 'arrow' } },
   ])
   assert.deepEqual(input.nodes.find(item => item.id === 'build')?.data.toolCodes, ['web.fetch'])
   assert.equal(migrated.nodes.find(item => item.id === 'build')?.data?.toolCodes === input.nodes.find(item => item.id === 'build')?.data.toolCodes, false)
+})
+
+test('upgrades NONE tool mode and preserves configured tool modes during legacy migration', () => {
+  const input = {
+    nodes: [
+      node('none', 'llm', { toolMode: 'NONE' }),
+      node('none-tool', 'tool', { toolCode: 'tool.none' }),
+      node('auto', 'llm', { toolMode: 'AUTO' }),
+      node('auto-tool', 'tool', { toolCode: 'tool.auto' }),
+      node('required', 'llm', { toolMode: 'REQUIRED' }),
+      node('required-tool', 'tool', { toolCode: 'tool.required' }),
+      node('end', 'end'),
+    ],
+    edges: [
+      { source: 'none', target: 'none-tool' },
+      { source: 'none-tool', target: 'end' },
+      { source: 'auto', target: 'auto-tool' },
+      { source: 'auto-tool', target: 'end' },
+      { source: 'required', target: 'required-tool' },
+      { source: 'required-tool', target: 'end' },
+    ],
+  }
+
+  const migrated = migrateLegacyToolNodes(input)
+
+  assert.equal(migrated.nodes.find(item => item.id === 'none')?.data?.toolMode, 'AUTO')
+  assert.equal(migrated.nodes.find(item => item.id === 'auto')?.data?.toolMode, 'AUTO')
+  assert.equal(migrated.nodes.find(item => item.id === 'required')?.data?.toolMode, 'REQUIRED')
 })
 
 test('keeps an ambiguous legacy tool graph unchanged without mutating the input', () => {
