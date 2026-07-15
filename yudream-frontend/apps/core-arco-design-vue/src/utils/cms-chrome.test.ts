@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  canvasFitZoom,
+  cmsCanvasDevices,
   chromeCssKey,
   chromeCanvasPreviewCss,
   chromeFrameTemplate,
+  chromeRuntimeCss,
   chromeTemplate,
   isChromeStyleAction,
   readChromeCss,
@@ -25,6 +28,7 @@ test('keeps chrome structure fixed while reading and writing zone CSS', () => {
   assert.match(chromeTemplate('header'), /data-visible-when="guest"/)
   assert.match(chromeTemplate('header'), /data-visible-when="logged-in"/)
   assert.match(chromeTemplate('header'), /site-layout-header__account/)
+  assert.match(chromeTemplate('header'), /summary class="ghost site-layout-header__action"/)
   assert.match(chromeTemplate('footer'), /data-yb-chrome="footer"/)
   assert.match(chromeTemplate('footer'), /class="site-layout-footer"/)
   assert.match(chromeFrameTemplate('<section class="hero"></section>'), /data-yb-home-content/)
@@ -52,4 +56,34 @@ test('allows only style actions for locked chrome targets', () => {
   assert.equal(isChromeStyleAction('set-html'), false)
   assert.equal(isChromeStyleAction('remove-selected'), false)
   assert.equal(isChromeStyleAction('load-project'), false)
+})
+
+test('shares chrome runtime css without editor-only markers', () => {
+  const customCss = '.site-layout-header { background: #080817; }'
+  const runtimeCss = chromeRuntimeCss('HEADER_FOOTER', customCss)
+
+  assert.match(chromeCanvasPreviewCss(), /content:\s*attr\(data-yb-chrome\)/)
+  assert.doesNotMatch(runtimeCss, /content:\s*attr\(data-yb-chrome\)/)
+  assert.ok(runtimeCss.indexOf('--yb-site-bg') < runtimeCss.indexOf(customCss))
+  assert.match(runtimeCss, /font-size:\s*16px/)
+})
+
+test('lets the authenticated account button inherit custom header styling', () => {
+  const runtimeCss = chromeRuntimeCss()
+  const header = chromeTemplate('header')
+
+  assert.match(header, /site-layout-header__auth[\s\S]*site-layout-header__account[\s\S]*summary class="ghost/)
+  assert.match(runtimeCss, /site-layout-header__account summary[^{]*\{[^}]*background:\s*transparent/i)
+  assert.match(runtimeCss, /site-layout-header__account summary[^{]*\{[^}]*color:\s*inherit/i)
+})
+
+test('uses stable CMS device widths and calculates a fit zoom', () => {
+  assert.deepEqual(cmsCanvasDevices(), [
+    { id: 'desktop', name: '桌面', width: '1440px' },
+    { id: 'tablet', name: '平板', width: '768px' },
+    { id: 'mobile', name: '手机', width: '390px' },
+  ])
+  assert.equal(canvasFitZoom(1200, 1440), 81)
+  assert.equal(canvasFitZoom(1600, 1440), 100)
+  assert.equal(canvasFitZoom(300, 1440), 25)
 })

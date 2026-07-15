@@ -1,6 +1,27 @@
 export type CmsChromeZone = 'header' | 'footer'
 export type CmsSiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
 
+const cmsDeviceWidths = {
+  desktop: 1440,
+  tablet: 768,
+  mobile: 390,
+} as const
+
+export function cmsCanvasDevices() {
+  return [
+    { id: 'desktop', name: '桌面', width: `${cmsDeviceWidths.desktop}px` },
+    { id: 'tablet', name: '平板', width: `${cmsDeviceWidths.tablet}px` },
+    { id: 'mobile', name: '手机', width: `${cmsDeviceWidths.mobile}px` },
+  ]
+}
+
+export function canvasFitZoom(containerWidth: number, deviceWidth: number) {
+  if (!Number.isFinite(containerWidth) || !Number.isFinite(deviceWidth) || deviceWidth <= 0) {
+    return 100
+  }
+  return Math.min(100, Math.max(25, Math.round(((containerWidth - 32) / deviceWidth) * 100)))
+}
+
 const chromeCssKeys: Record<CmsChromeZone, string> = {
   header: 'chromeHeaderCss',
   footer: 'chromeFooterCss',
@@ -44,7 +65,7 @@ export function chromeTemplate(zone: CmsChromeZone) {
         <a class="primary" href="/register">注册</a>
       </div>
       <details data-visible-when="logged-in" class="site-layout-header__account">
-        <summary>
+        <summary class="ghost site-layout-header__action">
           <img src="{{user.avatar}}" alt="{{user.nickname}}">
           <span>{{user.nickname}}</span>
           <i>⌄</i>
@@ -105,9 +126,28 @@ export function extractHomeContent(html: string) {
   return content?.innerHTML?.trim() || ''
 }
 
-/** CSS used only by the GrapesJS iframe so the locked chrome is visible while editing. */
-export function chromeCanvasPreviewCss(layoutMode: CmsSiteLayoutMode = 'HEADER_FOOTER') {
+/** CSS used by both the public site and GrapesJS so fixed chrome has one rendering contract. */
+function chromeCss(layoutMode: CmsSiteLayoutMode, editorMarkers: boolean) {
   const mode = layoutMode || 'HEADER_FOOTER'
+  const markerCss = editorMarkers
+    ? `
+:where(.site-layout-header)::before,
+:where(.site-layout-footer)::before {
+  position: absolute;
+  z-index: 2;
+  top: 8px;
+  right: 10px;
+  padding: 2px 6px;
+  border: 1px solid var(--yb-site-border-2);
+  border-radius: 4px;
+  background: var(--yb-site-bg);
+  color: var(--yb-site-muted);
+  content: attr(data-yb-chrome);
+  font: 600 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  pointer-events: none;
+  text-transform: uppercase;
+}`
+    : ''
   const baseCss = `
 :where(html, body) {
   min-height: 100%;
@@ -160,23 +200,12 @@ export function chromeCanvasPreviewCss(layoutMode: CmsSiteLayoutMode = 'HEADER_F
   border-bottom: 1px solid var(--yb-site-border);
   background: var(--yb-site-header-bg);
   color: var(--yb-site-heading);
+  font-size: 16px;
 }
-:where(.site-layout-header)::before,
-:where(.site-layout-footer)::before {
-  position: absolute;
-  z-index: 2;
-  top: 8px;
-  right: 10px;
-  padding: 2px 6px;
-  border: 1px solid var(--yb-site-border-2);
-  border-radius: 4px;
-  background: var(--yb-site-bg);
-  color: var(--yb-site-muted);
-  content: attr(data-yb-chrome);
-  font: 600 10px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  pointer-events: none;
-  text-transform: uppercase;
+:where(.site-layout-frame, .site-builder-home) {
+  font-size: 16px;
 }
+${markerCss}
 :where(.site-layout-header__bar, .site-layout-footer .site-shell) {
   display: flex;
   box-sizing: border-box;
@@ -267,9 +296,14 @@ export function chromeCanvasPreviewCss(layoutMode: CmsSiteLayoutMode = 'HEADER_F
   align-items: center;
   justify-content: center;
 }
-:where(.site-layout-header__auth .ghost, .site-layout-header__account summary) {
+:where(.site-layout-header__auth .ghost) {
   background: var(--yb-site-surface);
   color: var(--yb-site-text-2);
+}
+/* The logged-in trigger keeps the guest action classes so persisted Header CSS applies in both states. */
+:where(.site-layout-header__account summary) {
+  background: transparent;
+  color: inherit;
 }
 :where(.site-layout-header__auth .ghost) {
   border: 1px solid var(--yb-site-border-2);
@@ -418,4 +452,13 @@ ${layoutCss}
     display: block;
   }
 }`.trim()
+}
+
+/** CSS used only by the GrapesJS iframe so locked chrome remains identifiable while editing. */
+export function chromeCanvasPreviewCss(layoutMode: CmsSiteLayoutMode = 'HEADER_FOOTER') {
+  return chromeCss(layoutMode, true)
+}
+
+export function chromeRuntimeCss(layoutMode: CmsSiteLayoutMode = 'HEADER_FOOTER', customCss = '') {
+  return [chromeCss(layoutMode, false), customCss.trim()].filter(Boolean).join('\n')
 }

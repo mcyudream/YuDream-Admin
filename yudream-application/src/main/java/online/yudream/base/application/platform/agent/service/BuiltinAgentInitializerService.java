@@ -116,6 +116,11 @@ public class BuiltinAgentInitializerService {
             for (var node : nodes) {
                 var data = node.path("data");
                 String kind = data.path("kind").asText();
+                if ("plan".equals(node.path("id").asText())
+                        && "understand".equals(kind)
+                        && !data.has("strictJson")) {
+                    return true;
+                }
                 if (!List.of("llm", "understand").contains(kind)) {
                     continue;
                 }
@@ -156,7 +161,7 @@ public class BuiltinAgentInitializerService {
                         node("start", 60, 260, Map.of(
                                 "kind", "start", "title", "开始", "outputVariable", "query"
                         )),
-                        node("plan", 310, 260, modelNode(
+                        node("plan", 310, 260, tolerantModelNode(
                                 "understand", "理解构建需求",
                                 "分析 CMS 构建需求，仅输出 JSON：{\"route\":\"clarify|build\",\"goal\":\"目标\",\"constraints\":\"约束\"}。需求足以执行时 route=build，否则 route=clarify。",
                                 "query", "plan", model, false
@@ -268,6 +273,20 @@ public class BuiltinAgentInitializerService {
         data.put("prompt", prompt);
         data.put("inputVariable", inputVariable);
         data.put("outputVariable", outputVariable);
+        return data;
+    }
+
+    private Map<String, Object> tolerantModelNode(
+            String kind,
+            String title,
+            String prompt,
+            String inputVariable,
+            String outputVariable,
+            AgentModelDTO model,
+            boolean vision
+    ) {
+        Map<String, Object> data = modelNode(kind, title, prompt, inputVariable, outputVariable, model, vision);
+        data.put("strictJson", false);
         return data;
     }
 

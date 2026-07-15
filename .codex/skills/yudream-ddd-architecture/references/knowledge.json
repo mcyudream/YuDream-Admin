@@ -179,6 +179,10 @@
     {
       "key": "agent-async-permission-snapshot",
       "text": "Agent SSE debug, CMS AG-UI compatibility streams, and plugin message execution must capture caller permission codes before crossing CompletableFuture/Reactor threads. Store an explicit permission snapshot on the boundary command, propagate it to AgentRunCmd, and make workflow/tool authorization consume it; never read Sa-Token or API-key ThreadLocal state from asynchronous worker threads."
+    },
+    {
+      "key": "cms-editor-public-render-parity",
+      "text": "CMS GrapesJS editor and public site must share the same Header/Footer chrome CSS contract, typography baseline, and fixed device widths. Public base styles must not outrank persisted dynamic CMS CSS; authenticated account controls must inherit chrome styling unless explicitly overridden."
     }
   ],
   "utilities": [
