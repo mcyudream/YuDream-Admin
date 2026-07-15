@@ -234,6 +234,16 @@ class BuiltinAgentInitializerServiceTest {
     }
 
     @Test
+    void keepsExistingBlankCmsWorkflowWhenNoChatModelIsConfigured() throws Exception {
+        assertNoChatModelUpgrade(" ");
+    }
+
+    @Test
+    void keepsExistingShortCmsWorkflowWhenNoChatModelIsConfigured() throws Exception {
+        assertNoChatModelUpgrade("{\"nodes\":[{},{},{}]}");
+    }
+
+    @Test
     void upgradesCmsWorkflowWhenClarificationNodeDeclaresToolConfiguration() throws Exception {
         AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
         CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
@@ -377,5 +387,36 @@ class BuiltinAgentInitializerServiceTest {
                   {"id":"build","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5","toolMode":"AUTO","toolCodes":%s%s}}
                 ]}
                 """.formatted(planData, tools, marker);
+    }
+
+    private void assertNoChatModelUpgrade(String workflowJson) throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of());
+        AgentApplication cms = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .status(AgentApplicationStatus.DISABLED)
+                .workflowJson(workflowJson)
+                .build();
+        AgentApplication agui = AgentApplication.builder()
+                .code(BuiltinAgentCodes.AGUI_CARD)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{},{}]}")
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(agui));
+
+        List<AgentApplication> initialized = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        assertThat(initialized).isEmpty();
+        assertThat(cms.getWorkflowJson()).isEqualTo(workflowJson);
+        assertThat(cms.getStatus()).isEqualTo(AgentApplicationStatus.DISABLED);
+        verify(applications, never()).save(any());
     }
 }
