@@ -2,7 +2,7 @@
 import type { Node } from '@vue-flow/core'
 import type { AgentNodeData } from './types'
 import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
-import { isAgentChatModelNode } from '../config/agent-node-data'
+import { agentModelKind, isAgentChatModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   node: Node<AgentNodeData>
@@ -42,14 +42,7 @@ const knowledgeSpaceOptions = computed(() => props.knowledgeSpaces.map(space => 
   value: space.slug,
 })))
 
-const requiredModelKind = computed(() => {
-  if (props.node.data.kind === 'llm' || props.node.data.kind === 'understand') {
-    return 'chat'
-  }
-  return props.node.data.kind === 'embedding' || props.node.data.kind === 'rerank'
-    ? props.node.data.kind
-    : ''
-})
+const requiredModelKind = computed(() => agentModelKind(props.node.data.kind))
 
 const kindModels = computed(() => props.models.filter(model => model.kind.toLowerCase() === requiredModelKind.value))
 
