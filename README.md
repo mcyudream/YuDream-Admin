@@ -1,186 +1,196 @@
-# YuDream Admin Core
-
-<p align="center">面向插件化后台平台与独立业务插件生态的核心仓库</p>
+# YuDream Admin
 
 <p align="center">
-  <img alt="license" src="https://img.shields.io/badge/license-MIT-67C23A">
-  <img alt="java" src="https://img.shields.io/badge/Java-21-437291?logo=openjdk&logoColor=white">
-  <img alt="spring-boot" src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?logo=springboot&logoColor=white">
-  <img alt="vue" src="https://img.shields.io/badge/Vue-3-42B883?logo=vuedotjs&logoColor=white">
-  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-11.9-F69220?logo=pnpm&logoColor=white">
-  <img alt="docker" src="https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white">
+  <strong>面向可扩展业务场景的现代化管理平台</strong>
 </p>
 
-YuDream Admin Core 是 YuDream Admin 的主体仓库，负责提供后端核心能力、主前端宿主、插件运行时，以及面向独立插件仓发布的契约包。
+<p align="center">
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#核心能力">核心能力</a> ·
+  <a href="#插件开发">插件开发</a> ·
+  <a href="#参与贡献">参与贡献</a>
+</p>
 
-官方业务插件已经默认迁移到独立插件仓维护；当前仓库更聚焦于“平台核心”而不是“业务插件集合”。
+<p align="center">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e?style=flat-square">
+  <img alt="Java" src="https://img.shields.io/badge/Java-21-437291?style=flat-square&logo=openjdk&logoColor=white">
+  <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-3.5-6DB33F?style=flat-square&logo=springboot&logoColor=white">
+  <img alt="Vue" src="https://img.shields.io/badge/Vue-3-42B883?style=flat-square&logo=vuedotjs&logoColor=white">
+  <img alt="pnpm" src="https://img.shields.io/badge/pnpm-11.9-F69220?style=flat-square&logo=pnpm&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
+</p>
 
-## ✨ 功能特性
+YuDream Admin 是一个以 Java 21、Spring Boot 3 和 Vue 3 构建的管理平台。它提供用户与权限、内容管理、知识库、集成编排、可视化数据、AI Agent 等平台能力，并通过插件运行时将业务功能与平台核心解耦。
 
-- ✅ **DDD 核心分层**：内置 `domain / application / infrastructure / interfaces / bootstrap` 分层结构，适合持续演进的大型后台系统。
-- ✅ **插件运行时**：支持外部插件 JAR 加载、插件菜单/权限注册、后端扩展点接入。
-- ✅ **前端远程模块接入**：支持插件前端通过 `remoteEntry.js` 动态挂载到主前端宿主。
-- ✅ **正式契约发布**：统一发布 `yudream-plugin-spi`、`@yudream/plugin-sdk`、`@yudream/components`，为独立插件仓提供稳定接口。
-- ✅ **镜像化部署**：内置 Dockerfile 与 Compose 编排，可直接构建后端/前端镜像并部署。
-- ✅ **独立插件仓模板**：提供插件仓模板、边界校验脚本与发布流程样板，方便扩展官方或第三方插件生态。
+项目既可以作为一套完整的后台系统使用，也可以作为团队构建独立业务插件的宿主平台。
 
-## 仓库定位
+## 核心能力
 
-- 核心后端模块：领域层、应用层、基础设施层、接口层、启动模块
-- 主前端宿主：后台主应用与插件远程页面容器
-- 插件运行时：外部 JAR 加载、插件菜单/权限/前端远程模块接入
-- 契约发布：`yudream-plugin-spi`、`@yudream/plugin-sdk`、`@yudream/components`
-- 插件模板：独立插件仓模板、CI 模板、边界校验脚本
-
-## 项目生态
-
-| 仓库 | 角色 |
+| 方向 | 能力 |
 | --- | --- |
-| `YuDream-Admin` | 主体平台、插件运行时、契约包发布 |
-| `yudream-admin-plugins` | 官方业务插件源码、插件前端 remote 模块、插件 JAR 发布 |
+| 系统管理 | 用户、角色、部门、菜单、权限、在线用户与安全配置 |
+| 内容与站点 | CMS、可视化页面编辑、发布流程、公开站点与 SEO 元数据 |
+| 知识与智能 | 知识库检索、文档解析、AI Provider 管理、Agent 应用与可视化工作流 |
+| 集成与自动化 | HTTP、Python 运行时、消息队列、WebSocket、SSE、S3 兼容对象存储 |
+| 数据能力 | 数据可视化、图谱检索、Neo4j 与可选的 RAG 扩展 |
+| 插件生态 | JAR 热加载、动态菜单和权限、后端扩展点、前端 Remote Entry 模块 |
 
-相关入口：
+## 为什么使用它
 
-- GitLab Plugins: [yudream/yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)
+- **分层清晰**：后端遵循 DDD 分层，领域、应用、基础设施和接口职责明确。
+- **按需启用**：平台能力可由项目配置和运行状态共同控制，未启用的能力不会强制依赖外部中间件。
+- **插件优先**：业务插件可独立开发、构建和发布；平台核心只维护稳定运行时与契约。
+- **完整的前端体验**：Vue 3 管理端支持动态路由、主题、多布局和远程插件页面。
+- **面向生产部署**：提供 Docker 镜像、Compose 编排与环境变量模板。
 
-## 核心特性
+## 架构
 
-- DDD 风格的后端分层结构
-- 支持外部插件 JAR 的运行时加载
-- 支持前端 remote entry 动态接入
-- 提供插件 SPI、SDK、共享组件的正式发布链路
-- 支持 Docker 镜像构建与部署
-- 提供独立插件仓模板与边界校验脚本
+```text
+                         ┌──────────────────────────┐
+                         │      Vue 3 管理端          │
+                         │  主应用 + 插件 Remote UI   │
+                         └────────────┬─────────────┘
+                                      │ HTTP / SSE / WebSocket
+┌─────────────────────────────────────▼─────────────────────────────────────┐
+│                             YuDream Admin Core                              │
+│  interfaces  ->  application  ->  domain  <-  infrastructure               │
+│  API、鉴权        用例编排       业务规则       Mongo、Redis、AI、S3 等      │
+├───────────────────────────────────────────────────────────────────────────┤
+│                     Plugin Runtime / yudream-plugin-spi                    │
+│          JAR 生命周期 · 菜单权限 · HTTP 扩展 · 前端 Remote 模块             │
+└───────────────────────────────────────────────────────────────────────────┘
+                                      │
+                  ┌──────────────────┴──────────────────┐
+                  │                                     │
+        独立业务插件仓库                       外部平台与中间件
+  yudream-admin-plugins               MongoDB · Redis · S3 · AI Provider
+```
 
-## 技术栈
+### 仓库结构
 
-- Java 21
-- Maven 3.9+
-- Node.js 22.22+ / 24.15+
-- pnpm 11.9+
-- Spring Boot 3.5
-- Vue 3 + Vite
+```text
+yudream-domain/             领域模型、聚合与仓储契约
+yudream-application/        应用服务、用例编排与 DTO
+yudream-infrastructure/     持久化、外部服务适配与插件运行时
+yudream-interfaces/         HTTP 接口、请求响应与接口装配
+yudream-bootstrap/          Spring Boot 启动模块
+yudream-frontend/           Vue 3 主前端与共享包
+yudream-plugins/            插件 SPI 与示例插件
+plugins/                    运行时加载的外部插件 JAR 目录
+docs/                       平台、插件与部署文档
+```
 
 ## 快速开始
 
-### 1. 克隆并安装前端依赖
+### 环境要求
+
+- JDK 21
+- Maven 3.9+
+- Node.js `22.22+`、`24.15+` 或更高兼容版本
+- pnpm 11.9+
+- MongoDB 和 Redis
+- Docker 与 Docker Compose（容器化部署时需要）
+
+### 1. 配置环境变量
+
+复制模板并按环境修改数据库、缓存、邮件、对象存储和可选平台能力配置：
+
+```bash
+cp .env.example .env
+```
+
+Windows PowerShell：
 
 ```powershell
+Copy-Item .env.example .env
+```
+
+> `.env` 可能包含密钥，请仅在本地或部署环境中保存，不要提交到仓库。
+
+### 2. 安装前端依赖
+
+```bash
 cd yudream-frontend
 pnpm install
 ```
 
-### 2. 构建后端
+### 3. 启动后端
 
-```powershell
-mvn -s ci/maven-settings.xml -pl yudream-bootstrap -am -DskipTests compile
+在仓库根目录执行：
+
+```bash
+mvn -pl yudream-bootstrap -am spring-boot:run
 ```
 
-### 3. 构建主前端
+### 4. 启动前端
 
-```powershell
+另开一个终端：
+
+```bash
 cd yudream-frontend
-pnpm --filter @fantastic-admin/core-arco-design-vue run build
+pnpm dev
 ```
 
-### 4. 运行拆仓/边界审计
+默认开发地址由前端启动日志输出。首次运行前，请确认 `.env` 中的 MongoDB 与 Redis 连接配置可用。
 
-```powershell
-& 'C:/Program Files/Git/bin/sh.exe' ci/verify-core-split-readiness.sh
+### 构建验证
+
+```bash
+mvn -pl yudream-bootstrap -am -DskipTests compile
 ```
 
-### 5. 使用 Docker Compose 部署
+```bash
+cd yudream-frontend
+pnpm build
+```
 
-```powershell
+## Docker 部署
+
+仓库根目录提供生产 Compose 编排。准备好 `.env` 后执行：
+
+```bash
 docker compose pull
 docker compose up -d
 ```
 
-默认部署会启动：
+默认会启动后端、前端、渲染服务与镜像更新监控。MongoDB、Redis、S3 兼容存储等依赖需要按照 `.env` 指向可访问的服务。
 
-- `backend`: 主后端服务
-- `frontend`: 主前端服务
-- `watchtower`: 镜像自动更新监控
+可选的 RabbitMQ 与 Neo4j 服务位于 `docker-compose.platform.yml`：
 
-插件 JAR 默认通过宿主机 `./plugins` 目录挂载到运行容器。
-
-## 仓库结构
-
-```text
-yudream-domain/                        核心领域层
-yudream-application/                   核心应用层
-yudream-infrastructure/                基础设施层与插件运行时
-yudream-interfaces/                    接口层
-yudream-bootstrap/                     启动模块
-yudream-plugins/yudream-plugin-spi/    插件 SPI 契约
-yudream-plugins/yudream-sample-plugin/ 示例插件
-yudream-frontend/                      主前端宿主与共享前端包
-plugins/                               外部插件 JAR 挂载目录
-ci/                                    CI 校验与发布脚本
-docs/                                  架构、拆仓、发布文档
-templates/plugin-repo/                 独立插件仓模板
+```bash
+docker compose -f docker-compose.platform.yml --profile mq up -d
+docker compose -f docker-compose.platform.yml --profile graph up -d
 ```
 
-## 插件开发与契约包
+## 插件开发
 
-当前主体仓对外发布以下契约：
+插件通过稳定契约与平台交互，而不依赖平台内部模块：
 
-- Maven: `online.yudream.base:yudream-plugin-spi`
-- npm: `@yudream/plugin-sdk`
-- npm: `@yudream/components`
+- 后端插件依赖 `online.yudream.base:yudream-plugin-spi`。
+- 前端插件使用 `@yudream/plugin-sdk` 与 `@yudream/components`。
+- 插件 JAR 使用根目录 `plugin.yml` 描述元数据，并由运行时管理加载、启用与卸载。
+- 前端插件通过 `remoteEntry.js` 作为远程模块加载到主前端。
 
-这些契约用于独立插件仓消费，而不是让业务插件继续和主体仓共享源码工作区。
+新建插件时，建议从 [插件仓库模板](templates/plugin-repo/README.md) 开始；完整约定见 [插件系统规范](docs/plugin-system/specification.md) 和 [插件开发教程](docs/plugin-system/tutorial.md)。官方业务插件源码位于独立仓库 [yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)。
 
-如果你要新建官方或第三方插件，优先参考：
+## 文档
 
-- [插件仓模板 README](templates/plugin-repo/README.md)
-- [插件仓 CI 模板](templates/plugin-repo/.gitlab-ci.yml.example)
-- [插件仓 Maven 设置模板](templates/plugin-repo/settings.xml.example)
-- [插件仓 npm 设置模板](templates/plugin-repo/.npmrc.example)
-- [插件仓 pnpm workspace 模板](templates/plugin-repo/pnpm-workspace.yaml.example)
-
-## CI 与发布
-
-当前仓库 CI 主要负责：
-
-- 核心后端与主前端构建
-- 契约包发布与回读校验
-- 主体仓/插件仓边界校验
-- Docker 镜像打包与推送
-
-默认发布的契约路径：
-
-- `yudream-plugin-spi` release -> Nexus `maven-releases`
-- `yudream-plugin-spi` snapshot -> Nexus `maven-snapshots`
-- 通用 Maven 依赖和插件优先从阿里云公共仓库拉取，未命中时回退 Nexus；YuDream Maven 制品最终从 Nexus `maven-public` 拉取
-- `@yudream/plugin-sdk`、`@yudream/components` 发布和拉取 -> Nexus `npm-public`
-
-GitLab 只负责源码托管、CI 流水线和 CI artifacts，不再作为 Maven/npm/Generic Package Registry。npmjs 发布链路也已废弃。
-
-相关文档：
-
-- [GitLab 私有包迁移说明（已废弃）](docs/plugin-system/gitlab-private-packages.md)
-- [npmjs 发布迁移说明（已废弃）](docs/plugin-system/npmjs-public-packages.md)
+- [插件系统规范](docs/plugin-system/specification.md)
+- [插件开发教程](docs/plugin-system/tutorial.md)
+- [平台能力说明](docs/platform/)
+- [仓库拆分与边界说明](docs/repository-split/README.md)
 - [契约发布校验](docs/plugin-system/contract-validation.md)
 
-## 文档导航
+## 参与贡献
 
-- [拆仓说明](docs/repository-split/README.md)
-- [拆仓边界清单](docs/repository-split/staging-boundaries.md)
-- [远端发布验收记录](docs/repository-split/remote-release-evidence.md)
-- [插件系统规范](docs/plugin-system/specification.md)
-- [插件系统教程](docs/plugin-system/tutorial.md)
+欢迎提交 Issue 和 Pull Request。提交前请确保：
 
-## 贡献
-
-欢迎提交 Issue 和 Pull Request。
-
-如果改动涉及插件系统、SPI、插件前端接入或仓库边界，建议先阅读相关文档，并优先保证：
-
-- 主体仓不重新耦合官方业务插件源码
-- 插件仓只依赖正式发布的契约包
-- CI 校验脚本与模板保持同步
+1. 改动只覆盖当前问题，不混入无关格式化或生成文件。
+2. 后端变更遵循 `domain -> application -> infrastructure -> interfaces` 的职责边界。
+3. 新增或修改插件能力时，使用 SPI、SDK 和公开契约，不直接依赖平台内部实现。
+4. 运行与改动相关的测试、类型检查或构建命令。
+5. 在 Pull Request 中说明行为变化、配置影响和验证结果。
 
 ## License
 
-[MIT](LICENSE)
+本项目采用 [MIT License](LICENSE) 开源。
