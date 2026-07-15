@@ -26,6 +26,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -42,6 +43,31 @@ class AgentAppServiceLifecycleTest {
         var result = fixture.service.save(command);
 
         assertThat(result.getStatus()).isEqualTo(AgentApplicationStatus.DRAFT);
+    }
+
+    @Test
+    void saveDerivesApplicationToolAuthorizationFromWorkflowInsteadOfClientInput() {
+        Fixture fixture = fixture();
+        AgentApplicationSaveCmd command = saveCommand(AgentApplicationStatus.DRAFT);
+        command.setToolCodes(List.of("client.smuggled"));
+        command.setWorkflowJson("""
+                {"nodes":[
+                  {"id":"start","data":{"kind":"start"}},
+                  {"id":"model","data":{"kind":"llm","toolCodes":["web.fetch","python.report","web.fetch"]}},
+                  {"id":"legacy","data":{"kind":"tool","toolCode":"cms.patch"}},
+                  {"id":"end","data":{"kind":"end"}}
+                ],"edges":[
+                  {"source":"start","target":"model"},
+                  {"source":"model","target":"legacy"},
+                  {"source":"legacy","target":"end"}
+                ]}
+                """);
+        when(fixture.applicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        fixture.service.save(command);
+
+        verify(fixture.applicationRepo).save(argThat(application -> application.getToolCodes()
+                .equals(List.of("web.fetch", "python.report", "cms.patch"))));
     }
 
     @Test
