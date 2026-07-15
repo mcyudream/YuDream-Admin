@@ -283,8 +283,8 @@ onMounted(async () => {
 
 async function loadAiApplications() {
   try {
-    const res = await apiAgent.page({ page: 1, size: 200, status: 'PUBLISHED' })
-    aiAgentOptions.value = toCmsAgentOptions(res.data.records)
+    const res = await apiAgent.available()
+    aiAgentOptions.value = toCmsAgentOptions(res.data)
   }
   catch {
     aiAgentOptions.value = []

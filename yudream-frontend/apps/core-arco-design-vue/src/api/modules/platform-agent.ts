@@ -107,6 +107,8 @@ export interface AgentDebugStreamEvent {
 }
 
 export default {
+  available: () => systemClient.get<unknown, ApiResponse<AgentApplication[]>>('api/platform/agents/available'),
+  runtimeDetail: (code: string) => systemClient.get<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}`),
   page: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentApplication>>>('api/platform/agents', { params }),
   detail: (id: string) => systemClient.get<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/${id}`),
   create: (data: AgentApplicationPayload) => systemClient.post<unknown, ApiResponse<AgentApplication>>('api/platform/agents', data),

@@ -27,6 +27,8 @@ const router = useRouter()
 const toast = useFaToast()
 const modal = useFaModal()
 const id = computed(() => typeof route.query.id === 'string' ? route.query.id : '')
+const runtimeCode = computed(() => typeof route.query.runtimeCode === 'string' ? route.query.runtimeCode : '')
+const runtimeReadonly = computed(() => Boolean(runtimeCode.value))
 const saving = ref(false)
 const loading = ref(false)
 const isDragOver = ref(false)
@@ -141,12 +143,14 @@ async function loadCatalog() {
 }
 
 async function loadApplication() {
-  if (!id.value) {
+  if (!id.value && !runtimeCode.value) {
     return
   }
   loading.value = true
   try {
-    const application = (await apiAgent.detail(id.value)).data
+    const application = (await (runtimeCode.value
+      ? apiAgent.runtimeDetail(runtimeCode.value)
+      : apiAgent.detail(id.value))).data
     Object.assign(form, {
       ...application,
       description: application.description || '',
@@ -649,7 +653,7 @@ async function save(publish = false, notify = true): Promise<string> {
 
 <template>
   <div v-loading="loading" class="agent-editor-page">
-    <FaPageHeader :title="id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="editor-page-header mb-0">
+    <FaPageHeader :title="runtimeReadonly ? '查看插件 Agent 编排' : id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="editor-page-header mb-0">
       <div class="header-actions">
         <FaButton variant="outline" @click="router.push('/platform/agent')">
           <FaIcon name="i-ri:arrow-left-line" /> 返回
@@ -657,20 +661,20 @@ async function save(publish = false, notify = true): Promise<string> {
         <FaButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
           <FaIcon name="i-ri:download-2-line" /> 导出
         </FaButton>
-        <FaButton :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
+        <FaButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
           <FaIcon name="i-ri:bug-line" /> 调试
         </FaButton>
-        <FaButton variant="outline" :loading="saving" @click="save(false)">
+        <FaButton v-if="!runtimeReadonly" variant="outline" :loading="saving" @click="save(false)">
           <FaIcon name="i-ri:save-3-line" /> 保存
         </FaButton>
-        <FaButton :loading="saving" @click="save(true)">
+        <FaButton v-if="!runtimeReadonly" :loading="saving" @click="save(true)">
           <FaIcon name="i-ri:send-plane-line" /> 发布
         </FaButton>
       </div>
     </FaPageHeader>
 
-    <section class="agent-editor">
-      <AgentNodePalette class="palette-panel" :groups="paletteGroups" @add="addNode" />
+    <section class="agent-editor" :class="{ 'is-runtime-readonly': runtimeReadonly }">
+      <AgentNodePalette v-if="!runtimeReadonly" class="palette-panel" :groups="paletteGroups" @add="addNode" />
 
       <main
         class="flow-canvas"
@@ -681,8 +685,8 @@ async function save(publish = false, notify = true): Promise<string> {
         @drop.prevent="onDrop"
       >
         <div class="canvas-toolbar">
-          <span>新建连线</span>
-          <div class="connection-switch" aria-label="连线样式">
+          <span>{{ runtimeReadonly ? '插件运行时编排' : '新建连线' }}</span>
+          <div v-if="!runtimeReadonly" class="connection-switch" aria-label="连线样式">
             <button type="button" :class="{ active: defaultConnectionStyle === 'arrow' }" title="箭头连线" @click="defaultConnectionStyle = 'arrow'">
               <FaIcon name="i-ri:arrow-right-line" /> 箭头
             </button>
@@ -690,14 +694,14 @@ async function save(publish = false, notify = true): Promise<string> {
               <FaIcon name="i-ri:subtract-line" /> 线段
             </button>
           </div>
-          <i />
+          <i v-if="!runtimeReadonly" />
           <button type="button" class="toolbar-icon" title="适应画布" aria-label="适应画布" @click="fitCanvas">
             <FaIcon name="i-ri:fullscreen-line" />
           </button>
-          <button type="button" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
+          <button v-if="!runtimeReadonly" type="button" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
             <FaIcon name="i-ri:restart-line" />
           </button>
-          <button type="button" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
+          <button v-if="!runtimeReadonly" type="button" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
             <FaIcon name="i-ri:delete-bin-line" />
           </button>
         </div>
@@ -716,6 +720,8 @@ async function save(publish = false, notify = true): Promise<string> {
           :min-zoom="0.25"
           :max-zoom="1.8"
           :delete-key-code="null"
+          :nodes-draggable="!runtimeReadonly"
+          :nodes-connectable="!runtimeReadonly"
           @connect="onConnect"
           @node-click="selectNode($event.node.id)"
           @edge-click="selectEdge($event.edge.id)"
@@ -726,7 +732,7 @@ async function save(publish = false, notify = true): Promise<string> {
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" :pannable="true" :zoomable="true" />
           <template #node-agent="nodeProps">
-            <AgentWorkflowNode v-bind="nodeProps" :debug-status="nodeDebugStatus[nodeProps.id]" @delete="deleteNode" />
+            <AgentWorkflowNode v-bind="nodeProps" :debug-status="nodeDebugStatus[nodeProps.id]" :readonly="runtimeReadonly" @delete="deleteNode" />
           </template>
         </VueFlow>
 
@@ -792,6 +798,8 @@ async function save(publish = false, notify = true): Promise<string> {
 .agent-editor-page { min-width: 0; }
 .header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .agent-editor { display: grid; height: calc(100vh - 174px); min-height: 650px; overflow: hidden; grid-template-columns: 242px minmax(0, 1fr) 360px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
+.agent-editor.is-runtime-readonly { grid-template-columns: minmax(0, 1fr) 360px; }
+.agent-editor.is-runtime-readonly .inspector-panel { opacity: 0.86; pointer-events: none; }
 .flow-canvas { position: relative; min-width: 0; overflow: hidden; background: var(--color-bg-2); }
 .agent-flow { width: 100%; height: 100%; }
 .canvas-toolbar { position: absolute; top: 14px; left: 50%; z-index: 10; display: flex; min-height: 40px; align-items: center; gap: 8px; padding: 5px 7px 5px 12px; border: 1px solid var(--color-border-2); border-radius: 7px; background: color-mix(in srgb, var(--color-bg-1), transparent 4%); box-shadow: 0 7px 24px rgb(15 23 42 / 12%); transform: translateX(-50%); backdrop-filter: blur(8px); }
@@ -829,6 +837,7 @@ async function save(publish = false, notify = true): Promise<string> {
 @media (max-width: 760px) {
   .header-actions { justify-content: flex-start; }
   .agent-editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 350px 620px 520px; }
+  .agent-editor.is-runtime-readonly { grid-template-columns: minmax(0, 1fr); grid-template-rows: 620px 520px; }
   .palette-panel, .flow-canvas, .inspector-panel { grid-column: 1; }
   .palette-panel { border-right: 0 !important; border-bottom: 1px solid var(--color-border-2); }
   .canvas-toolbar { left: 10px; max-width: calc(100% - 20px); transform: none; }
