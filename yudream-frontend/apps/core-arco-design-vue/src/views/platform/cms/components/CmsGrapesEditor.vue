@@ -1,21 +1,32 @@
 <script setup lang="ts">
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
-import type * as grapesjs from 'grapesjs'
 import type { Editor } from 'grapesjs'
 import type { FileObject } from '@/api/modules/files'
-import type { AiStreamEnvelope, AiToolCallResult, CmsChatHistoryMessage, CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import type { AiToolCallResult, CmsChatHistoryMessage, CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import type { CmsAiChatAttachmentMeta, CmsAiChatSession, CmsAiChatSessionSummary } from '@/utils/cms-ai-chat-history'
 import { registerHandler, removeHandler } from '@jboltai/tokui'
-import { Chatbot } from '@tdesign-vue-next/chat'
+import { ActivityRenderer, ChatContent, ChatMessage, ChatSender, ToolCallRenderer, useChat } from '@tdesign-vue-next/chat'
 import { Select as TSelect, Switch as TSwitch, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
+import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
+import { chromeCanvasPreviewCss, chromeFrameTemplate, extractHomeContent } from '@/utils/cms-chrome'
+import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import CmsCodeEditor from './CmsCodeEditor.vue'
+import { registerCmsAguiRenderers } from './cms-agui-renderers'
+import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
+import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
+import { isNearChatBottom, scrollChatToBottom } from '../config/cms-chat-auto-scroll'
+import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
+import { cmsGrapesPlugins, cmsGrapesPluginsOpts, localizeCmsPluginBlocks } from '../config/cms-grapes-plugins'
+import apiCms from '@/api/modules/platform-cms'
 import TokuiBlock from './TokuiBlock.vue'
 import '@tdesign-vue-next/chat/es/style/index.css'
 import 'grapesjs/dist/css/grapes.min.css'
+
+registerCmsAguiRenderers()
 
 interface GrapesSavePayload {
   htmlContent: string
@@ -25,6 +36,8 @@ interface GrapesSavePayload {
 }
 
 type RightPanelTab = 'ai' | 'layers' | 'traits' | 'styles' | 'source'
+type LeftWorkspace = 'blocks' | 'media'
+type CanvasDevice = 'desktop' | 'tablet' | 'mobile'
 interface AiModelSelectOption {
   label: string
   value: string
@@ -65,6 +78,9 @@ const props = defineProps<{
   title?: string
   aiEnabled?: boolean
   aiModelOptions?: AiModelSelectOption[]
+  chromeFrame?: boolean
+  chromeLayout?: CmsSiteLayoutMode
+  templatePreviewContext?: Record<string, any>
   historyTargetType?: 'page' | 'home'
   historyTargetId?: string | null
   historyTargetLabel?: string
@@ -83,15 +99,13 @@ const layersEl = ref<HTMLElement>()
 const traitsEl = ref<HTMLElement>()
 const stylesEl = ref<HTMLElement>()
 const mediaInput = ref<HTMLInputElement>()
-const chatbotRef = ref<{
-  addPrompt?: (prompt: string, autoFocus?: boolean) => void
-  setMessages?: (messages: ChatMessagesData[], mode?: 'replace' | 'prepend' | 'append') => void
-  clearMessages?: () => void
-}>()
+const aiAttachmentInput = ref<HTMLInputElement>()
+const aiChatScrollEl = ref<HTMLElement>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 const aiModel = ref('')
 const aiThinkingEnabled = ref(false)
+const aiPrompt = ref('')
 const aiAttachments = ref<any[]>([])
 const chatHistorySummaries = ref<CmsAiChatSessionSummary[]>([])
 const selectedChatHistory = ref<CmsAiChatSession | null>(null)
@@ -100,6 +114,13 @@ const chatHistoryHasMore = ref(false)
 const chatHistoryOffset = ref(0)
 const chatHistoryLoadedOnce = ref(false)
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
+const leftWorkspace = ref<LeftWorkspace>('blocks')
+const leftSidebarCollapsed = ref(false)
+const rightSidebarCollapsed = ref(false)
+const previewActive = ref(false)
+const activeDevice = ref<CanvasDevice>('desktop')
+const editorDirty = ref(false)
+const editorReady = ref(false)
 const canvasRevision = ref(0)
 const selectedSourceCode = ref('')
 const selectedSourceDirty = ref(false)
@@ -113,16 +134,55 @@ const aiSuggestions = [
   '根据样图调整版式和配色',
   '优化移动端排版和间距',
 ]
-const reasoningActions = new Set(['reasoning'])
-const silentProgressActions = new Set(['heartbeat', 'request', 'subscribed', 'stream-complete', 'complete'])
+const aiBlockSuggestions = [
+  { label: '添加 Hero 首屏', prompt: '在画布末尾添加一个居中的 Hero 首屏区块' },
+  { label: '添加三列特性', prompt: '在画布末尾添加一个三列特性区块' },
+  { label: '添加 CTA 行动召唤', prompt: '在画布末尾添加一个 CTA 行动召唤区块' },
+  { label: '添加客户评价', prompt: '在画布末尾添加一个客户评价区块' },
+]
 // AI 需求澄清：当模型调用 cms.ask.user 时，用 TokUI 渲染的一段可点击选项 DSL。
 const pendingAskDsl = ref('')
 const pendingAskOptions = ref<AskOption[]>([])
 let editor: Editor | null = null
-let pendingAiResult: CmsPageGenerateResult | null = null
 let currentAiSession: CmsAiChatSession | null = null
 let canvasRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let selectedSourceSyncTimer: ReturnType<typeof setTimeout> | null = null
+let templatePreviewTimer: ReturnType<typeof setTimeout> | null = null
+let pageJsSyncTimer: ReturnType<typeof setTimeout> | null = null
+let blockPanelObserver: MutationObserver | null = null
+let isRefreshingBlockPanel = false
+let aiChatScrollFrame: number | null = null
+let aiChatAutoFollow = true
+
+const BLOCK_FAVORITES_KEY = 'yb:cms:block-favorites'
+const USER_BLOCKS_KEY = 'yb:cms:user-blocks'
+const blockCategories = ['全部', '收藏', '原子', '布局', '文字', '基础组件', '表单', '导航', '媒体', '动态数据', '高级', '预制']
+const blockSearch = ref('')
+const blockCategory = ref('全部')
+const blockFavorites = ref<string[]>(loadBlockFavorites())
+const userBlocks = ref<CmsBlockDefinition[]>([])
+const backendBlocks = ref<CmsBlockDefinition[]>([])
+const canvasZoom = ref(100)
+const showSaveBlockDialog = ref(false)
+const saveBlockForm = ref({
+  name: '',
+  category: '预制',
+  kind: 'preset' as CmsBlockKind,
+  description: '',
+})
+
+watch(() => props.templatePreviewContext, () => {
+  if (editor) {
+    scheduleCanvasTemplatePreview(editor, 120)
+  }
+}, { deep: true })
+
+watch(() => props.chromeLayout, (layout, previousLayout) => {
+  if (!editor || !props.chromeFrame || !layout || layout === previousLayout) {
+    return
+  }
+  rebuildHomeChrome(currentHomeContent(), layout)
+}, { flush: 'post' })
 
 const rightPanelTabs = computed(() => {
   const tabs: { label: string, value: RightPanelTab, icon: string }[] = [
@@ -137,6 +197,9 @@ const rightPanelTabs = computed(() => {
 })
 
 const canvasStats = computed(() => {
+  if (rightPanelTab.value !== 'ai') {
+    return []
+  }
   canvasRevision.value
   const instance = editor
   if (!instance) {
@@ -149,7 +212,7 @@ const canvasStats = computed(() => {
   }
   return [
     { label: 'HTML', value: `${instance.getHtml().length} 字符` },
-    { label: 'CSS', value: `${(instance.getCss() || '').length} 字符` },
+    { label: 'CSS', value: `${fullCanvasCss(instance).length} 字符` },
     { label: 'JS', value: `${pageJsContent.value.length} 字符` },
     { label: '项目源', value: '保存时生成' },
   ]
@@ -188,6 +251,12 @@ const hasSelectedComponent = computed(() => {
   return Boolean(editor?.getSelected())
 })
 
+const selectedSourceLocked = computed(() => {
+  canvasRevision.value
+  return Boolean(props.chromeFrame && isProtectedChromeComponent(editor?.getSelected()))
+})
+
+
 const cmsVariableContext = computed(() => {
   const copyright = appSettingsStore.settings.app.copyright
   const siteName = appSettingsStore.siteName || 'YuDream'
@@ -198,6 +267,9 @@ const cmsVariableContext = computed(() => {
     syntax: '{{path.to.value}}',
     usage: '生成 CMS HTML 时优先保留变量占位符，最终由公开站点渲染时替换；不要把站点名称、系统 Logo、版权年份等系统值写死。',
     variables: [
+      { key: '{{cms.pages.latest.count}}', label: 'Latest CMS page count', example: '6' },
+      { key: '{{knowledge.spaces.count}}', label: 'Public knowledge space count', example: '2' },
+      { key: '{{knowledge.pages.count}}', label: 'Published knowledge page count', example: '12' },
       { key: '{{site.name}}', label: '站点名称', example: siteName },
       { key: '{{site.description}}', label: '站点描述', example: siteDescription || '当前页面摘要或站点描述' },
       { key: '{{site.logo}}', label: '站点 Logo URL', example: logo, html: '<img src="{{site.logo}}" alt="{{site.name}}">' },
@@ -216,6 +288,10 @@ const cmsVariableContext = computed(() => {
       { key: '{{pages.count}}', label: '公开页面数量', example: '6' },
     ],
     repeats: [
+      { key: 'data-yb-repeat="cms.pages.latest"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: 'Latest published CMS pages' },
+      { key: 'data-yb-repeat="knowledge.pages"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: 'Published knowledge pages' },
+      { key: 'data-yb-repeat="knowledge.latest"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.content}}'], description: 'Latest knowledge content' },
+      { key: 'data-yb-repeat="knowledge.spaces"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: 'Public knowledge spaces' },
       { key: 'data-yb-repeat="navigation"', itemFields: ['{{item.label}}', '{{item.url}}'], description: '重复渲染导航项' },
       { key: 'data-yb-repeat="pages"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: '重复渲染公开页面卡片' },
       { key: 'data-yb-repeat="categories"', itemFields: ['{{item.name}}', '{{item.url}}', '{{item.count}}'], description: '重复渲染分类' },
@@ -229,6 +305,23 @@ const cmsVariableContext = computed(() => {
 })
 
 const cmsVariableCount = computed(() => cmsVariableContext.value.variables.length)
+
+const favoriteBlockIds = computed(() => new Set(blockFavorites.value))
+
+const selectedBreadcrumbs = computed(() => {
+  canvasRevision.value
+  const component = editor?.getSelected() as any
+  if (!component)
+    return []
+  const crumbs: { label: string; component: any }[] = []
+  let current: any = component
+  while (current) {
+    const label = String(current.getName?.() || current.get?.('tagName') || current.get?.('type') || '元素')
+    crumbs.unshift({ label, component: current })
+    current = current.parent?.()
+  }
+  return crumbs
+})
 
 const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
   if (rightPanelTab.value !== 'source') {
@@ -274,6 +367,10 @@ const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
     detail: item.description,
   }))
   const snippetCompletions: CodeCompletionItem[] = [
+    { label: 'repeat.cms.latest', type: 'property', apply: '<section data-yb-repeat="cms.pages.latest">\n  <a href="{{item.url}}">{{item.title}}</a>\n  <p>{{item.summary}}</p>\n</section>', detail: 'Latest CMS pages' },
+    { label: 'repeat.knowledge.latest', type: 'property', apply: '<section data-yb-repeat="knowledge.latest">\n  <a href="{{item.url}}">{{item.title}}</a>\n  <p>{{item.summary}}</p>\n</section>', detail: 'Latest knowledge pages' },
+    { label: 'content.html', type: 'property', apply: '<div data-yb-html="{{item.htmlContent}}"></div>', detail: 'Sanitized HTML content' },
+    { label: 'content.markdown', type: 'property', apply: '<div data-yb-markdown="{{item.markdownContent}}"></div>', detail: 'Markdown content' },
     { label: 'section.yb-ai-section', type: 'class', apply: '<section class="yb-ai-section">\n  \n</section>', detail: 'CMS 区块片段' },
     { label: 'img.site.logo', type: 'variable', apply: '<img src="{{site.logo}}" alt="{{site.name}}">', detail: '系统 Logo 图片' },
     { label: 'a.cms.link', type: 'type', apply: '<a href="">\n  {{page.title}}\n</a>', detail: '链接片段' },
@@ -374,7 +471,7 @@ const selectedRelatedCss = computed(() => {
   if (!snapshot) {
     return '/* 选择画布元素后显示关联 CSS */'
   }
-  const relatedCss = extractRelatedCss(editor?.getCss() || '', snapshot)
+  const relatedCss = extractRelatedCss(fullCanvasCss(), snapshot)
   return relatedCss ? formatCssText(relatedCss) : '/* 暂未匹配到选中元素的关联 CSS */'
 })
 
@@ -410,54 +507,42 @@ const aiSenderProps = computed(() => ({
   },
   actions: ['uploadImage', 'send'],
   onFileSelect: async (event: CustomEvent<File[]>) => {
-    try {
-      aiAttachments.value = await Promise.all(Array.from(event.detail || []).map(toAttachmentItem))
-    }
-    catch (error) {
-      toast.error(error instanceof Error ? error.message : '样图读取失败')
-    }
+    await attachAiFiles(Array.from(event.detail || []))
   },
   onFileRemove: (event: CustomEvent<any[]>) => {
     aiAttachments.value = event.detail || []
   },
 } as any))
 
+async function attachAiFiles(files: File[]) {
+  try {
+    aiAttachments.value = await Promise.all(files.map(toAttachmentItem))
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '样图读取失败')
+  }
+}
+
+function selectAiAttachment() {
+  aiAttachmentInput.value?.click()
+}
+
+function onAiAttachmentInput(event: Event) {
+  const input = event.target as HTMLInputElement
+  void attachAiFiles(Array.from(input.files || []))
+  input.value = ''
+}
+
 const aiMessageProps = {
   avatar: (item: { role?: string }) => item.role === 'user' ? '你' : 'AI',
   name: (item: { role?: string }) => item.role === 'user' ? '你' : 'YuDream AI',
 } as any
 
-function normalizeAiStreamChunk(chunk: SSEChunkData): AiStreamEnvelope<Record<string, any>> {
-  const data = (chunk.data || {}) as AiStreamEnvelope<Record<string, any>> & Record<string, any>
-  if (String(data.event || '').startsWith('ai.')) {
-    return {
-      event: data.event,
-      action: data.action,
-      module: data.module,
-      traceId: data.traceId,
-      timestamp: data.timestamp,
-      payload: data.payload || {},
-    }
-  }
-  if (chunk.event === 'delta') {
-    return { event: 'ai.message', action: 'delta', payload: { content: data.content } }
-  }
-  if (chunk.event === 'tool') {
-    return { event: 'ai.tool', action: data.tool?.action || 'tool', payload: { tool: data.tool } }
-  }
-  if (chunk.event === 'result') {
-    return { event: 'ai.result', action: 'complete', payload: { result: data.result } }
-  }
-  if (chunk.event === 'error') {
-    return { event: 'ai.error', action: 'failed', payload: { message: data.message || data.content } }
-  }
-  return { event: chunk.event || 'ai.message', action: data.action, payload: data.payload || data }
-}
-
 const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
   endpoint: apiAi.generateCmsPageStreamEndpoint(),
   stream: true,
-  timeout: 180000,
+  protocol: 'agui',
+  timeout: 1_800_000,
   onRequest: async (params: ChatRequestParams) => {
     if (!editor || !props.aiEnabled) {
       throw new Error('AI 能力未启用')
@@ -473,71 +558,22 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
     appendUserTurn(session, prompt, attachments)
     return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, attachments, history))
   },
-  isValidChunk: (chunk: SSEChunkData) => [
-    'ai.message',
-    'ai.progress',
-    'ai.tool',
-    'ai.result',
-    'ai.error',
-    'delta',
-    'tool',
-    'result',
-    'error',
-  ].includes(chunk.event || ''),
-  onMessage: (chunk: SSEChunkData) => {
-    const envelope = normalizeAiStreamChunk(chunk)
-    if (envelope.event === 'ai.progress') {
-      const content = String(envelope.payload?.content || '')
-      const action = String(envelope.action || '')
-      if (silentProgressActions.has(action)) {
-        return null
-      }
-      if (reasoningActions.has(action)) {
-        if (!aiThinkingEnabled.value) {
-          return null
-        }
-        return trackAiHistoryContent(thinkingChunk(content))
-      }
-      return trackAiHistoryContent(progressChunk(formatProgress(envelope.action, content)))
-    }
-    if (envelope.event === 'ai.message') {
-      return trackAiHistoryContent(markdownChunk(String(envelope.payload?.content || '')))
-    }
-    if (envelope.event === 'ai.tool') {
-      const tool = envelope.payload?.tool
+  onMessage: (chunk: SSEChunkData, _message, parsedResult) => {
+    const tool = aguiToolResult(chunk)
+    if (tool) {
       if (isCanvasTool(tool)) {
         applyAiTool(tool)
       }
       if (isAskUserTool(tool)) {
         showAskUserUi(tool)
-        return trackAiHistoryContent(markdownChunk(`\n\n${tool?.message || '请选择一个方向以便我继续。'}`))
       }
-      return trackAiHistoryContent(markdownChunk(formatToolMessage(tool)))
     }
-    if (envelope.event === 'ai.result') {
-      const result = envelope.payload?.result || null
-      pendingAiResult = result?.tools?.length ? null : result
-      return trackAiHistoryContent(markdownChunk('\n\n画布操作已完成。'))
-    }
-    if (envelope.event === 'ai.error') {
-      return trackAiHistoryContent({
-        ...markdownChunk(`\n\n生成失败：${envelope.payload?.message || envelope.payload?.content || '未知错误'}`),
-        status: 'error',
-      } as AIMessageContent)
-    }
-    return null
+    trackAguiHistoryContent(parsedResult)
+    return parsedResult || null
   },
   onComplete: (isAborted: boolean) => {
     if (isAborted) {
       return
-    }
-    if (pendingAiResult) {
-      applyAiResult(pendingAiResult)
-      pendingAiResult = null
-      clearAiAttachments()
-      const completeChunk = trackAiHistoryContent(markdownChunk('\n\n画布已更新。'))
-      void finishAiHistorySession('complete')
-      return completeChunk
     }
     clearAiAttachments()
     void finishAiHistorySession('complete')
@@ -552,6 +588,130 @@ const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
     toast.error('AI 调用失败', { description: message })
   },
 }))
+
+const {
+  chatEngine: aiChatEngine,
+  messages: aiChatMessages,
+  status: aiChatStatus,
+} = useChat({
+  defaultMessages: aiDefaultMessages.value,
+  chatServiceConfig: aiChatServiceConfig.value,
+})
+
+const aiChatLoading = computed(() => aiChatStatus.value === 'pending' || aiChatStatus.value === 'streaming')
+const aiRenderedMessages = computed(() => aiChatMessages.value.map(message => ({
+  message,
+  contents: messageContents(message),
+})))
+
+watch(aiRenderedMessages, () => {
+  scheduleAiChatScroll()
+}, { flush: 'post' })
+
+function onAiChatScroll() {
+  if (aiChatScrollEl.value) {
+    aiChatAutoFollow = isNearChatBottom(aiChatScrollEl.value)
+  }
+}
+
+function scheduleAiChatScroll(force = false) {
+  if (force) {
+    aiChatAutoFollow = true
+  }
+  if (!aiChatAutoFollow || aiChatScrollFrame !== null) {
+    return
+  }
+  aiChatScrollFrame = requestAnimationFrame(() => {
+    aiChatScrollFrame = null
+    if (aiChatAutoFollow && aiChatScrollEl.value) {
+      scrollChatToBottom(aiChatScrollEl.value)
+    }
+  })
+}
+
+async function sendAiPrompt(prompt: string) {
+  const content = String(prompt || aiPrompt.value || '').trim()
+  if (!content && aiAttachments.value.length === 0) {
+    return
+  }
+  aiPrompt.value = ''
+  scheduleAiChatScroll(true)
+  await aiChatEngine.value.sendUserMessage({
+    prompt: content,
+    attachments: aiAttachments.value,
+  })
+}
+
+function onAiFollowUp(event: CustomEvent<string>) {
+  const message = event.detail
+  if (typeof message === 'string' && message.trim()) {
+    void sendAiPrompt(message.trim())
+  }
+}
+
+function messageContents(item: ChatMessagesData): any[] {
+  const source = Array.isArray(item.content) ? item.content : [item.content]
+  const merged: any[] = []
+  const activityIndexes = new Map<string, number>()
+  const toolCallIndexes = new Map<string, number>()
+
+  source.forEach((content) => {
+    if (isAguiActivityContent(content)) {
+      const activityType = String(content.data.activityType)
+      const index = activityIndexes.get(activityType)
+      if (index === undefined) {
+        activityIndexes.set(activityType, merged.length)
+        merged.push(content)
+      }
+      else {
+        merged[index] = content
+      }
+      return
+    }
+
+    if (isAguiToolCallContent(content)) {
+      const toolCallId = String(content.data?.toolCallId || content.type)
+      const index = toolCallIndexes.get(toolCallId)
+      if (index === undefined) {
+        toolCallIndexes.set(toolCallId, merged.length)
+        merged.push(content)
+      }
+      else {
+        merged[index] = content
+      }
+      return
+    }
+
+    const previous = merged.at(-1)
+    if (isTextStreamContent(previous) && isTextStreamContent(content) && previous.type === content.type) {
+      merged[merged.length - 1] = {
+        ...content,
+        data: `${previous.data || ''}${content.data || ''}`,
+      }
+      return
+    }
+    merged.push(content)
+  })
+  return merged
+}
+
+function isTextStreamContent(content: any): boolean {
+  return typeof content?.type === 'string'
+    && !content.type.startsWith('activity-')
+    && !content.type.startsWith('toolcall-')
+    && !['reasoning', 'thinking'].includes(content.type)
+    && typeof content.data === 'string'
+}
+
+function isAguiActivityContent(content: any): boolean {
+  return typeof content?.type === 'string'
+    && content.type.startsWith('activity-')
+    && Boolean(content?.data?.activityType)
+}
+
+function isAguiToolCallContent(content: any): boolean {
+  return typeof content?.type === 'string' && content.type.startsWith('toolcall-')
+}
 
 watch(() => props.aiEnabled, (enabled) => {
   if (!enabled && rightPanelTab.value === 'ai') {
@@ -584,8 +744,15 @@ watch([rightPanelTab, chatHistoryTargetKey], () => {
 
 watch(pageJsContent, () => {
   canvasRevision.value += 1
-  syncCanvasJs()
+  if (editorReady.value) {
+    editorDirty.value = true
+  }
+  scheduleCanvasJsSync()
 })
+
+watch([blockSearch, blockCategory, blockFavorites], () => {
+  refreshBlockPanel()
+}, { flush: 'post' })
 
 onMounted(async () => {
   const { default: grapes } = await import('grapesjs')
@@ -597,6 +764,7 @@ onMounted(async () => {
     storageManager: false,
     undoManager: { trackSelection: false },
     selectorManager: { componentFirst: true },
+    keepUnusedStyles: true,
     blockManager: { appendTo: blocksEl.value! },
     layerManager: { appendTo: layersEl.value! },
     traitManager: { appendTo: traitsEl.value! },
@@ -614,20 +782,37 @@ onMounted(async () => {
     canvas: {
       styles: [],
     },
+    plugins: cmsGrapesPlugins(),
+    pluginsOpts: cmsGrapesPluginsOpts(),
     panels: { defaults: [] },
   })
+  localizeCmsPluginBlocks(editor)
   registerDynamicTypes(editor)
-  registerBlocks(editor)
+  registerBlocks(editor, false)
+  loadAndRegisterUserBlocks(editor, false)
+  editor.BlockManager.render()
+  observeBlockPanel()
+  refreshBlockPanel()
+  readCanvasZoom()
+  window.addEventListener('keydown', onKeyDown, true)
+  window.addEventListener('cms-ai-follow-up', onAiFollowUp as EventListener)
   loadInitialContent(editor)
   removeLayoutBlocks(editor)
   injectCanvasHighlightStyle(editor)
-  editor.on('component:add component:remove style:update undo redo load', () => {
+  injectCanvasChromePreviewStyle(editor)
+  scheduleCanvasTemplatePreview(editor, 80)
+  editor.on('component:add component:remove style:update undo redo', () => {
+    editorDirty.value = true
     scheduleCanvasRefresh(80)
     scheduleSelectedSourceSync(80)
+    scheduleCanvasTemplatePreview(editor!, 100)
   })
+  editor.on('load', () => injectCanvasChromePreviewStyle(editor!))
+  editor.on('load', () => refreshBlockPanel())
   editor.on('component:update', () => {
     scheduleCanvasRefresh(220)
     scheduleSelectedSourceSync(220)
+    scheduleCanvasTemplatePreview(editor!, 260)
   })
   editor.on('component:selected component:deselected', () => {
     clearScheduledCanvasWork()
@@ -635,7 +820,15 @@ onMounted(async () => {
     syncSelectedSource(true)
   })
   canvasRevision.value += 1
-  syncCanvasJs()
+  editorReady.value = true
+  readCanvasZoom()
+  scheduleCanvasJsSync(250)
+  const mountedEditor = editor
+  requestAnimationFrame(() => {
+    if (editor === mountedEditor) {
+      void loadAndRegisterBackendBlocks(mountedEditor)
+    }
+  })
   await loadMedia()
   aiModel.value = props.aiModelOptions?.[0]?.value || ''
   registerHandler('pick', onPickOption)
@@ -646,13 +839,31 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  editorReady.value = false
   clearScheduledCanvasWork()
   removeHandler('pick')
+  window.removeEventListener('keydown', onKeyDown, true)
+  window.removeEventListener('cms-ai-follow-up', onAiFollowUp as EventListener)
+  blockPanelObserver?.disconnect()
+  blockPanelObserver = null
+  if (aiChatScrollFrame !== null) {
+    cancelAnimationFrame(aiChatScrollFrame)
+    aiChatScrollFrame = null
+  }
+  runCanvasJsDisposers(editor?.Canvas.getDocument()?.defaultView)
   editor?.destroy()
   editor = null
 })
 
 function loadInitialContent(instance: Editor) {
+  if (props.chromeFrame) {
+    instance.setComponents(chromeFrameTemplate(props.htmlContent || '', props.chromeLayout))
+    if (props.cssContent) {
+      instance.setStyle(props.cssContent)
+    }
+    lockChromeFrameComponents(instance)
+    return
+  }
   if (props.builderProjectJson) {
     try {
       instance.loadProjectData(JSON.parse(props.builderProjectJson))
@@ -700,6 +911,14 @@ function clearScheduledCanvasWork() {
     clearTimeout(selectedSourceSyncTimer)
     selectedSourceSyncTimer = null
   }
+  if (templatePreviewTimer) {
+    clearTimeout(templatePreviewTimer)
+    templatePreviewTimer = null
+  }
+  if (pageJsSyncTimer) {
+    clearTimeout(pageJsSyncTimer)
+    pageJsSyncTimer = null
+  }
 }
 
 function save() {
@@ -708,11 +927,400 @@ function save() {
   }
   removeLayoutBlocks(editor)
   emit('save', {
-    htmlContent: editor.getHtml(),
-    cssContent: editor.getCss() || '',
+    htmlContent: props.chromeFrame ? extractHomeContent(editor.getHtml()) : editor.getHtml(),
+    cssContent: fullCanvasCss(),
     jsContent: stripScriptTags(pageJsContent.value),
-    builderProjectJson: JSON.stringify(editor.getProjectData()),
+    builderProjectJson: props.chromeFrame ? '' : JSON.stringify(editor.getProjectData()),
   })
+  editorDirty.value = false
+}
+
+function onKeyDown(event: KeyboardEvent) {
+  const ctrlOrCmd = event.ctrlKey || event.metaKey
+  if (ctrlOrCmd && event.key.toLowerCase() === 's') {
+    event.preventDefault()
+    save()
+    return
+  }
+  if (ctrlOrCmd && event.key.toLowerCase() === 'z') {
+    event.preventDefault()
+    if (event.shiftKey) {
+      editor?.runCommand('core:redo')
+    }
+    else {
+      editor?.runCommand('core:undo')
+    }
+    return
+  }
+  if ((event.key === 'Delete' || event.key === 'Backspace') && editor?.getSelected() && !isEditingText()) {
+    event.preventDefault()
+    editor.runCommand('core:component-delete')
+  }
+}
+
+function isEditingText() {
+  const active = document.activeElement
+  if (!active)
+    return false
+  if (['INPUT', 'TEXTAREA'].includes(active.tagName))
+    return true
+  return active.getAttribute('contenteditable') === 'true' || active.closest('[contenteditable="true"]') !== null
+}
+
+function readCanvasZoom() {
+  try {
+    const zoom = (editor?.Canvas as any)?.getZoom?.()
+    if (typeof zoom === 'number') {
+      canvasZoom.value = zoom > 10 ? Math.round(zoom) : Math.round(zoom * 100)
+    }
+    else {
+      canvasZoom.value = 100
+    }
+  }
+  catch {
+    canvasZoom.value = 100
+  }
+}
+
+function resetCanvasZoom() {
+  try {
+    (editor?.Canvas as any)?.setZoom?.(100)
+    readCanvasZoom()
+  }
+  catch {
+    // ignore
+  }
+}
+
+function duplicateSelected() {
+  const selected = editor?.getSelected() as any
+  if (!selected)
+    return
+  const clone = selected.clone?.()
+  const parent = selected.parent?.()
+  if (clone && parent) {
+    parent.append(clone)
+    editor?.select(clone)
+  }
+}
+
+function loadBlockFavorites(): string[] {
+  try {
+    const raw = localStorage.getItem(BLOCK_FAVORITES_KEY)
+    return raw ? JSON.parse(raw) : []
+  }
+  catch {
+    return []
+  }
+}
+
+function persistBlockFavorites() {
+  localStorage.setItem(BLOCK_FAVORITES_KEY, JSON.stringify(blockFavorites.value))
+}
+
+function toggleBlockFavorite(id: string) {
+  const set = new Set(blockFavorites.value)
+  if (set.has(id))
+    set.delete(id)
+  else
+    set.add(id)
+  blockFavorites.value = Array.from(set)
+  persistBlockFavorites()
+  refreshBlockPanel()
+}
+
+function loadUserBlocks(): CmsBlockDefinition[] {
+  try {
+    const raw = localStorage.getItem(USER_BLOCKS_KEY)
+    return raw ? JSON.parse(raw) : []
+  }
+  catch {
+    return []
+  }
+}
+
+function persistUserBlocks(blocks: CmsBlockDefinition[]) {
+  localStorage.setItem(USER_BLOCKS_KEY, JSON.stringify(blocks))
+}
+
+function loadAndRegisterUserBlocks(instance: Editor, render = true) {
+  userBlocks.value = loadUserBlocks().map(normalizeBlockAttributes)
+  userBlocks.value.forEach(block => instance.BlockManager.add(block.id, block, { silent: true }))
+  if (render) {
+    instance.BlockManager.render()
+  }
+}
+
+function changeCanvasZoom(delta: number) {
+  try {
+    const next = Math.min(150, Math.max(25, canvasZoom.value + delta))
+    ;(editor?.Canvas as any)?.setZoom?.(next)
+    canvasZoom.value = next
+  }
+  catch {
+    // Canvas zoom is optional in older GrapesJS builds.
+  }
+}
+
+function togglePreview() {
+  if (!editor) {
+    return
+  }
+  if (previewActive.value) {
+    editor.stopCommand('preview')
+  }
+  else {
+    editor.runCommand('preview')
+  }
+  previewActive.value = !previewActive.value
+}
+
+async function loadAndRegisterBackendBlocks(instance: Editor) {
+  try {
+    const res = await apiCms.blockList({ page: 1, size: 200, kind: undefined })
+    const blocks = (res.data.records || [])
+      .filter(block => block.enabled)
+      .map(toBlockDefinition)
+      .map(normalizeBlockAttributes)
+    if (editor !== instance) {
+      return
+    }
+    backendBlocks.value = blocks
+    const builtInIds = new Set(cmsBlocks().map(block => block.id))
+    blocks.forEach((block) => {
+      if (!builtInIds.has(block.id)) {
+        instance.BlockManager.add(block.id, block, { silent: true })
+      }
+    })
+    instance.BlockManager.render()
+    refreshBlockPanel()
+  }
+  catch (error) {
+    console.warn('[YuDream CMS] 后端区块加载失败', error)
+  }
+}
+
+function observeBlockPanel() {
+  if (!blocksEl.value || blockPanelObserver)
+    return
+  blockPanelObserver = new MutationObserver((mutations) => {
+    const blockTreeChanged = mutations.some(mutation => Array.from(mutation.addedNodes).some(isBlockPanelTreeNode))
+    if (blockTreeChanged && !isRefreshingBlockPanel)
+      refreshBlockPanel()
+  })
+  blockPanelObserver.observe(blocksEl.value, { childList: true, subtree: true })
+}
+
+function isBlockPanelTreeNode(node: Node) {
+  if (!(node instanceof Element)) {
+    return false
+  }
+  return node.matches('.gjs-block, .gjs-block-category, .gjs-blocks-c')
+    || Boolean(node.querySelector('.gjs-block, .gjs-block-category, .gjs-blocks-c'))
+}
+
+function refreshBlockPanel() {
+  if (!editor || !blocksEl.value)
+    return
+  isRefreshingBlockPanel = true
+  try {
+    const blocks = blocksEl.value.querySelectorAll('.gjs-block')
+    blocks.forEach((el) => {
+      const htmlEl = el as HTMLElement
+      const id = htmlEl.dataset.id || ''
+      const block = editor!.BlockManager.get(id) as any
+      const def = block ? (block.attributes as CmsBlockDefinition) : null
+      htmlEl.classList.toggle('hidden', !blockMatchesFilter(id, block))
+
+      let badge = htmlEl.querySelector('.gjs-block-kind-badge') as HTMLElement | null
+      if (def?.kind && !badge) {
+        badge = document.createElement('span')
+        badge.className = 'gjs-block-kind-badge'
+        htmlEl.appendChild(badge)
+      }
+      if (def?.kind) {
+        const badgeText = def.kind === 'atomic' ? '原子' : '预制'
+        if (badge.textContent !== badgeText) {
+          badge.textContent = badgeText
+        }
+        if (badge.dataset.kind !== def.kind) {
+          badge.dataset.kind = def.kind
+        }
+      }
+
+      let star = htmlEl.querySelector('.gjs-block-favorite') as HTMLElement | null
+      if (!star) {
+        star = document.createElement('button')
+        star.type = 'button'
+        star.className = 'gjs-block-favorite'
+        star.title = '收藏'
+        star.addEventListener('click', (e) => {
+          e.stopPropagation()
+          toggleBlockFavorite(id)
+        })
+        htmlEl.appendChild(star)
+      }
+      star.classList.toggle('is-active', favoriteBlockIds.value.has(id))
+    })
+  }
+  finally {
+    isRefreshingBlockPanel = false
+  }
+}
+
+function openSaveBlockDialog() {
+  const selected = editor?.getSelected() as any
+  if (!selected) {
+    toast.warning('请先在画布中选择一个元素')
+    return
+  }
+  saveBlockForm.value = {
+    name: String(selected.getName?.() || selected.get?.('tagName') || '自定义区块'),
+    category: '预制',
+    kind: 'preset',
+    description: '',
+  }
+  showSaveBlockDialog.value = true
+}
+
+async function confirmSaveBlock() {
+  const name = saveBlockForm.value.name.trim()
+  if (!name) {
+    toast.warning('请输入区块名称')
+    return
+  }
+  const selected = editor?.getSelected() as any
+  if (!selected || !editor)
+    return
+  const html = String(selected.toHTML?.() || '')
+  const css = fullCanvasCss()
+  const category = saveBlockForm.value.category.trim() || '预制'
+  const kind = saveBlockForm.value.kind
+  const description = saveBlockForm.value.description.trim()
+  const code = `user-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const payload = {
+    code,
+    name,
+    description,
+    category,
+    kind: kind === 'preset' ? 'PRESET' as const : 'ATOMIC' as const,
+    htmlContent: html,
+    cssContent: css,
+    jsContent: '',
+    enabled: true,
+  }
+  try {
+    await apiCms.createBlock(payload)
+    toast.success('已保存为后端区块')
+    showSaveBlockDialog.value = false
+    await loadAndRegisterBackendBlocks(editor)
+    refreshBlockPanel()
+  }
+  catch (error) {
+    console.warn('[YuDream CMS] 后端区块保存失败，回退到本地存储', error)
+    const blocks = loadUserBlocks()
+    const newBlock: CmsBlockDefinition = normalizeBlockAttributes({
+      id: code,
+      label: name,
+      category,
+      kind,
+      media: genericBlockPreview(),
+      content: html,
+      css,
+      description,
+    })
+    blocks.push(newBlock)
+    persistUserBlocks(blocks)
+    userBlocks.value = blocks
+    editor.BlockManager.add(newBlock.id, newBlock)
+    showSaveBlockDialog.value = false
+    toast.success('已保存为本地自定义区块')
+    refreshBlockPanel()
+  }
+}
+
+function genericBlockPreview() {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="42" viewBox="0 0 64 42" fill="none">
+    <rect width="64" height="42" rx="6" fill="#f1f5f9"/>
+    <rect x="8" y="10" width="48" height="6" rx="2" fill="#cbd5e1"/>
+    <rect x="8" y="22" width="36" height="4" rx="2" fill="#94a3b8"/>
+  </svg>`
+}
+
+function formatCanvasCss() {
+  if (!editor)
+    return
+  const css = fullCanvasCss()
+  editor.setStyle(formatCssText(css))
+  canvasRevision.value += 1
+  toast.success('CSS 已格式化')
+}
+
+function formatPageJs() {
+  const formatted = formatJsCode(pageJsContent.value)
+  if (formatted && formatted !== pageJsContent.value) {
+    pageJsContent.value = formatted
+    toast.success('JS 已格式化')
+  }
+}
+
+function formatJsCode(code: string) {
+  let out = ''
+  let indent = 0
+  const tokens = code.split(/(\{|\}|;)/)
+  for (const token of tokens) {
+    const trimmed = token.trim()
+    if (!trimmed) {
+      if (token.includes('\n'))
+        out += '\n'
+      continue
+    }
+    if (trimmed === '}')
+      indent = Math.max(0, indent - 1)
+    out += `${'  '.repeat(indent)}${trimmed}`
+    if (trimmed === '{') {
+      out += '\n'
+      indent += 1
+    }
+    else if (trimmed === ';') {
+      out += '\n'
+    }
+    else {
+      out += '\n'
+    }
+  }
+  return out.trimEnd()
+}
+
+function lockChromeFrameComponents(instance: Editor) {
+  instance.getWrapper()?.find('[data-yb-chrome], [data-yb-layout-slot]').forEach(component => lockChromeComponentTree(component))
+}
+
+function lockChromeComponentTree(component: any) {
+  component?.set?.({
+    removable: false,
+    draggable: false,
+    droppable: false,
+    copyable: false,
+    editable: false,
+    traits: [],
+  })
+  component?.components?.().models?.forEach((child: any) => lockChromeComponentTree(child))
+}
+
+function restoreLockedLayout() {
+  if (!editor || !props.chromeFrame) {
+    return
+  }
+  const homeContent = extractHomeContent(editor.getHtml())
+  const css = fullCanvasCss()
+  editor.setComponents(chromeFrameTemplate(homeContent, props.chromeLayout))
+  editor.setStyle(css)
+  lockChromeFrameComponents(editor)
+  injectCanvasChromePreviewStyle(editor)
+  injectCanvasTemplatePreview(editor)
+  canvasRevision.value += 1
+  save()
 }
 
 function removeLayoutBlocks(instance: Editor) {
@@ -725,10 +1333,15 @@ function command(command: string) {
 
 function setDevice(device: 'desktop' | 'tablet' | 'mobile') {
   editor?.setDevice(device)
+  activeDevice.value = device
 }
 
 function useSuggestion(suggestion: string) {
-  chatbotRef.value?.addPrompt?.(suggestion, true)
+  aiPrompt.value = suggestion
+}
+
+function useBlockSuggestion(prompt: string) {
+  void sendAiPrompt(prompt)
 }
 
 function sessionStorageId(targetKey = chatHistoryTargetKey.value) {
@@ -822,7 +1435,6 @@ function trackAiHistoryContent<T extends AIMessageContent>(content: T): T {
   }
   target.status = content.status === 'error' ? 'error' : 'streaming'
   currentAiSession.updatedAt = Date.now()
-  currentAiSession.preview = compactText(messageText(target), 120) || currentAiSession.preview
   return content
 }
 
@@ -899,7 +1511,8 @@ function restoreChatHistory() {
   if (!selectedChatHistory.value) {
     return
   }
-  chatbotRef.value?.setMessages?.([...aiDefaultMessages.value, ...selectedChatHistory.value.messages], 'replace')
+  aiChatEngine.value.setMessages([...aiDefaultMessages.value, ...selectedChatHistory.value.messages], 'replace')
+  scheduleAiChatScroll(true)
 }
 
 async function deleteSelectedChatHistory() {
@@ -919,7 +1532,8 @@ async function restoreActiveSession() {
     const messages = session.messages.length
       ? [...aiDefaultMessages.value, ...session.messages]
       : [...aiDefaultMessages.value]
-    chatbotRef.value?.setMessages?.(messages, 'replace')
+    aiChatEngine.value.setMessages(messages, 'replace')
+    scheduleAiChatScroll(true)
   }
   catch (error) {
     toast.error(error instanceof Error ? error.message : '会话恢复失败')
@@ -935,7 +1549,8 @@ async function clearChatHistory() {
   currentAiSession = null
   pendingAskDsl.value = ''
   selectedChatHistory.value = null
-  chatbotRef.value?.setMessages?.([...aiDefaultMessages.value], 'replace')
+  aiChatEngine.value.setMessages([...aiDefaultMessages.value], 'replace')
+  scheduleAiChatScroll(true)
   await loadChatHistory(true)
   toast.success('对话记录已清空')
 }
@@ -948,17 +1563,20 @@ function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsCha
   const image = firstImageAttachment(attachments)
   const modelOption = selectedAiModelOption.value
   return {
+    target: props.historyTargetType,
     title: props.title || '',
     siteName: appSettingsStore.siteName || 'YuDream',
     prompt: prompt || `参考样图调整当前页面：${image?.name || '样图'}`,
     pageType: 'GrapesJS 可视化页面',
-    style: '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。不要生成系统导航栏和页脚，它们由站点 Layout 渲染。',
+    style: props.chromeFrame
+      ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
+      : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
     providerCode: modelOption?.providerCode,
     modelCode: modelOption?.modelCode || aiModel.value || undefined,
     model: modelOption?.modelCode || aiModel.value || undefined,
     imageDataUrl: image?.url || undefined,
     currentHtml: editor.getHtml(),
-    currentCss: editor.getCss(),
+    currentCss: fullCanvasCss(),
     currentJs: pageJsContent.value,
     currentProjectJson: JSON.stringify(editor.getProjectData()),
     currentSelectionJson: currentSelectionJson(),
@@ -1043,6 +1661,11 @@ function applySelectedSource() {
     toast.warning('请先在画布中选择一个元素')
     return
   }
+  if (props.chromeFrame && isProtectedChromeComponent(component)) {
+    selectedSourceError.value = 'Header/Footer 固定结构只读，不能应用 HTML 源码'
+    toast.warning(selectedSourceError.value)
+    return
+  }
   const html = selectedSourceCode.value.trim()
   if (!html) {
     selectedSourceError.value = '源码不能为空'
@@ -1058,7 +1681,6 @@ function applySelectedSource() {
     selectedSourceError.value = ''
     canvasRevision.value += 1
     syncSelectedSource(true)
-    syncCanvasJs()
     toast.success('选中元素源码已应用')
   }
   catch (error) {
@@ -1416,15 +2038,6 @@ function markdownChunk(data: string): AIMessageContent {
   }
 }
 
-function progressChunk(data: string): AIMessageContent {
-  return {
-    type: 'markdown',
-    id: 'cms-ai-progress',
-    data,
-    strategy: 'merge',
-  }
-}
-
 function thinkingChunk(text: string): AIMessageContent {
   return {
     type: 'thinking',
@@ -1438,33 +2051,33 @@ function thinkingChunk(text: string): AIMessageContent {
   } as AIMessageContent
 }
 
-function formatProgress(action?: string, content?: string) {
-  const safeText = content || '处理中...'
-  const safeLabelMap: Record<string, string> = {
-    'accepted': '已接收',
-    'analysis': '分析',
-    'request': '请求',
-    'subscribed': '连接',
-    'reasoning': '思考',
-    'heartbeat': '心跳',
-    'tool-start': '工具',
-    'tool-complete': '工具',
-    'first-delta': '输出',
-    'stream-complete': '汇总',
-    'complete': '完成',
+function aguiToolResult(chunk: SSEChunkData): AiToolCallResult | null {
+  const event = chunk.data as Record<string, unknown> | undefined
+  if (event?.type !== 'TOOL_CALL_RESULT' || typeof event.content !== 'string') {
+    return null
   }
-  return `\n\n> ${safeLabelMap[String(action || '')] || '进度'}：${safeText}`
+  try {
+    return JSON.parse(event.content) as AiToolCallResult
+  }
+  catch {
+    return null
+  }
 }
 
-function formatToolMessage(tool?: AiToolCallResult) {
-  const safeName = tool?.toolName || '未知工具'
-  const safeAction = tool?.action || '执行'
-  const safeMessage = tool?.message || '工具调用完成'
-  return `\n\n> 工具：${safeName} / ${safeAction}\n\n${safeMessage}`
+function trackAguiHistoryContent(content: AIMessageContent | AIMessageContent[] | null | undefined) {
+  if (Array.isArray(content)) {
+    content.forEach(trackAiHistoryContent)
+  }
+  else if (content) {
+    trackAiHistoryContent(content)
+  }
 }
 
 function isCanvasTool(tool?: AiToolCallResult) {
-  return tool?.toolName === 'cms.canvas.patch'
+  return Boolean(
+    (tool?.toolName?.startsWith('cms.canvas.') && tool.toolName !== 'cms.canvas.validate')
+    || tool?.toolName === 'cms.chrome.style',
+  )
 }
 
 function isAskUserTool(tool?: AiToolCallResult) {
@@ -1495,7 +2108,7 @@ function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
 function chooseAskOption(title: string) {
   pendingAskDsl.value = ''
   pendingAskOptions.value = []
-  chatbotRef.value?.addPrompt?.(title, true)
+  aiPrompt.value = title
 }
 
 function parseAskOptions(raw: unknown): AskOption[] {
@@ -1520,6 +2133,20 @@ function parseAskOptions(raw: unknown): AskOption[] {
 }
 
 function applyAiResult(result: CmsPageGenerateResult) {
+  if (props.chromeFrame) {
+    if (result.tools?.length) {
+      result.tools.filter(isCanvasTool).forEach(applyAiTool)
+    }
+    else if (editor) {
+      if (result.htmlContent) {
+        replaceHomeContent(result.htmlContent)
+      }
+      if (result.cssContent) {
+        editor.setStyle(result.cssContent)
+      }
+    }
+    return
+  }
   if (result.tools?.length) {
     result.tools.filter(isCanvasTool).forEach(applyAiTool)
     return
@@ -1550,31 +2177,70 @@ function applyAiResult(result: CmsPageGenerateResult) {
   }
 }
 
-function applyAiTool(tool?: AiToolCallResult) {
+function applyAiTool(tool?: AiToolCallResult): boolean {
   if (!editor || !tool) {
-    return
+    return false
   }
-  if (tool.toolName !== 'cms.canvas.patch') {
+  if (!tool.toolName?.startsWith('cms.canvas.') && tool.toolName !== 'cms.chrome.style') {
     toast.warning(`暂不支持的 AI 工具：${tool.toolName || '未知工具'}`)
-    return
+    return false
   }
   const payload = tool.payload || {}
   const action = tool.action || 'replace-page'
+  if (tool.toolName === 'cms.chrome.style' && action === 'validate') {
+    toast.success(tool.message || 'Header/Footer 结构校验完成')
+    return true
+  }
+  if (props.chromeFrame && action === 'load-project') {
+    toast.warning('首页画布的 Header/Footer 结构已锁定，不能加载完整 Project JSON')
+    return false
+  }
   if (action === 'load-project' || (action === 'replace-page' && payload.builderProjectJson)) {
     try {
+      if (props.chromeFrame) {
+        toast.warning('首页画布的 Header/Footer 结构已锁定，不能加载完整 Project JSON')
+        return false
+      }
       editor.loadProjectData(JSON.parse(String(payload.builderProjectJson)))
       if (hasPayloadKey(payload, 'jsContent')) {
         setCanvasJs(String(payload.jsContent || ''))
       }
       canvasRevision.value += 1
-      return
+      return true
     }
     catch {
       toast.warning('AI 返回的 Project JSON 无法解析，已继续应用 HTML/CSS')
     }
   }
+  if (action === 'add-html') {
+    orderedAddHtmlAssets(payload).forEach((asset) => {
+      if (asset.kind === 'html') {
+        if (props.chromeFrame) {
+          appendHomeContent(asset.content)
+        }
+        else {
+          highlightAddedComponents(editor!.addComponents(asset.content))
+        }
+      }
+      else if (asset.kind === 'css') {
+        appendCanvasCss(asset.content)
+      }
+      else {
+        appendCanvasJs(asset.content)
+      }
+    })
+    canvasRevision.value += 1
+    return true
+  }
   if (action === 'replace-page' || action === 'set-html') {
-    editor.setComponents(String(payload.htmlContent || ''))
+    if (props.chromeFrame) {
+      if (!replaceHomeContent(String(payload.htmlContent || ''))) {
+        return false
+      }
+    }
+    else {
+      editor.setComponents(String(payload.htmlContent || ''))
+    }
   }
   if (action === 'replace-page' || action === 'set-css') {
     editor.setStyle(String(payload.cssContent || ''))
@@ -1588,15 +2254,14 @@ function applyAiTool(tool?: AiToolCallResult) {
   if (action === 'append-js' && payload.jsContent) {
     appendCanvasJs(String(payload.jsContent))
   }
-  if (action === 'add-html' && payload.htmlContent) {
-    const added = editor.addComponents(String(payload.htmlContent))
-    highlightAddedComponents(added)
-  }
-  if (action === 'add-html' && payload.jsContent) {
-    appendCanvasJs(String(payload.jsContent))
-  }
   if (action === 'remove-selector' && payload.selector) {
-    editor.getWrapper()?.find(String(payload.selector)).forEach(component => component.remove())
+    editor.getWrapper()?.find(String(payload.selector)).forEach((component) => {
+      if (props.chromeFrame && isProtectedChromeComponent(component)) {
+        toast.warning('Header/Footer 结构已锁定，不能删除其中的组件')
+        return
+      }
+      component.remove()
+    })
   }
   if ([
     'replace-selected',
@@ -1612,8 +2277,11 @@ function applyAiTool(tool?: AiToolCallResult) {
   ].includes(action)) {
     applySelectedComponentTool(action, payload)
   }
-  syncCanvasJs()
+  if (['set-selected-html', 'append-to-selected', 'prepend-to-selected'].includes(action) && payload.cssContent) {
+    appendCanvasCss(String(payload.cssContent))
+  }
   canvasRevision.value += 1
+  return true
 }
 
 function hasPayloadKey(payload: Record<string, any>, key: string) {
@@ -1624,6 +2292,10 @@ function applySelectedComponentTool(action: string, payload: Record<string, any>
   const component = resolveToolTarget(payload)
   if (!component) {
     toast.warning('请先在画布中选择一个元素，AI 才能执行局部操作。')
+    return
+  }
+  if (props.chromeFrame && isProtectedChromeComponent(component) && action !== 'set-styles') {
+    toast.warning('Header/Footer 结构和数据绑定已锁定，只能修改样式')
     return
   }
   if (action === 'replace-selected') {
@@ -1675,6 +2347,49 @@ function resolveToolTarget(payload: Record<string, any>) {
     }
   }
   return editor?.getSelected() as any
+}
+
+function replaceHomeContent(html: string): boolean {
+  rebuildHomeChrome(html)
+  return true
+}
+
+function appendHomeContent(html: string) {
+  rebuildHomeChrome(`${currentHomeContent()}${html}`)
+}
+
+function currentHomeContent() {
+  const canvasHtml = editor?.getHtml() || ''
+  const extracted = extractHomeContent(canvasHtml)
+  if (extracted) {
+    return extracted
+  }
+  const main = canvasHtml.match(/<main[^>]*site-builder-home[^>]*>([\s\S]*?)<\/main>/i)
+  return main?.[1] || props.htmlContent || ''
+}
+
+function rebuildHomeChrome(homeContent: string, layoutMode: CmsSiteLayoutMode = props.chromeLayout || 'HEADER_FOOTER') {
+  if (!editor) {
+    return
+  }
+  const css = fullCanvasCss()
+  editor.setComponents(chromeFrameTemplate(homeContent, layoutMode))
+  editor.setStyle(css)
+  lockChromeFrameComponents(editor)
+  injectCanvasChromePreviewStyle(editor)
+  injectCanvasTemplatePreview(editor)
+}
+
+function isProtectedChromeComponent(component: any) {
+  let current = component
+  while (current) {
+    const attributes = normalizeObject(readComponentValue(current, 'getAttributes'))
+    if (attributes['data-yb-chrome'] || attributes['data-yb-layout-slot']) {
+      return true
+    }
+    current = current.parent?.()
+  }
+  return false
 }
 
 function firstComponent(value: unknown): any {
@@ -1766,17 +2481,166 @@ function injectCanvasHighlightStyle(instance: Editor) {
 }
 
 // 增量追加样式：在现有 CSS 之后拼接新片段，避免整表替换丢失已有样式。
+function injectCanvasChromePreviewStyle(instance: Editor) {
+  if (!props.chromeFrame) {
+    return
+  }
+  try {
+    const doc = instance.Canvas.getDocument()
+    if (!doc) {
+      return
+    }
+    const style = doc.getElementById('yb-cms-chrome-preview-style') || doc.createElement('style')
+    style.id = 'yb-cms-chrome-preview-style'
+    style.textContent = chromeCanvasPreviewCss(props.chromeLayout)
+    if (!style.parentNode) {
+      doc.head?.appendChild(style)
+    }
+  }
+  catch {
+    // The canvas can still finish mounting after the first style injection attempt.
+  }
+}
+
+function injectCanvasTemplatePreview(instance: Editor) {
+  const context = props.templatePreviewContext
+  if (!context) {
+    return
+  }
+  try {
+    const doc = instance.Canvas.getDocument()
+    if (!doc?.body) {
+      return
+    }
+    renderCanvasNavigation(doc, context)
+    doc.querySelectorAll('[data-yb-repeat]').forEach((element) => {
+      const template = element.getAttribute('data-yb-preview-template') || element.innerHTML
+      element.setAttribute('data-yb-preview-template', template)
+      const key = element.getAttribute('data-yb-repeat') || ''
+      const rows = resolveCmsTemplateRows(key, context)
+      element.innerHTML = rows.map((item, index) => renderCmsVariables(
+        template,
+        { item, index: String(index + 1) },
+        context,
+      )).join('')
+    })
+    replaceCanvasTemplateValues(doc.body, context)
+    doc.querySelectorAll('[data-yb-html]').forEach((element) => {
+      element.innerHTML = sanitizeCmsHtml(element.getAttribute('data-yb-html') || '')
+      element.removeAttribute('data-yb-html')
+    })
+    doc.querySelectorAll('[data-yb-markdown]').forEach((element) => {
+      element.innerHTML = renderCmsMarkdown(element.getAttribute('data-yb-markdown') || '')
+      element.removeAttribute('data-yb-markdown')
+    })
+    const loggedIn = String(context.auth?.isLoggedIn || '') === 'true'
+    doc.querySelectorAll('[data-visible-when]').forEach((element) => {
+      const rule = element.getAttribute('data-visible-when')
+      const visible = rule === 'logged-in' ? loggedIn : rule === 'guest' ? !loggedIn : true
+      ;(element as HTMLElement).style.display = visible ? '' : 'none'
+    })
+  }
+  catch {
+    // Preview data must never prevent the GrapesJS editor from loading.
+  }
+}
+
+function blockMatchesFilter(id: string, block: any) {
+  const category = blockCategoryLabel(block?.get?.('category') ?? block?.attributes?.category)
+  const kind = String(block?.get?.('kind') ?? block?.attributes?.kind ?? '')
+  if (blockCategory.value === '收藏' && !favoriteBlockIds.value.has(id)) {
+    return false
+  }
+  if (blockCategory.value === '原子' && kind !== 'atomic') {
+    return false
+  }
+  if (!['全部', '收藏', '原子'].includes(blockCategory.value) && category !== blockCategory.value) {
+    return false
+  }
+  const search = blockSearch.value.trim().toLowerCase()
+  if (!search) {
+    return true
+  }
+  const label = String(block?.get?.('label') ?? block?.attributes?.label ?? '').replace(/<[^>]+>/g, ' ')
+  const description = String(block?.get?.('description') ?? block?.attributes?.description ?? '')
+  return `${label} ${category} ${description}`.toLowerCase().includes(search)
+}
+
+function blockCategoryLabel(category: any) {
+  if (typeof category === 'string') {
+    return category
+  }
+  return String(category?.get?.('label') ?? category?.get?.('id') ?? category?.label ?? category?.id ?? '')
+}
+
+function scheduleCanvasTemplatePreview(instance: Editor, delay = 180) {
+  if (templatePreviewTimer) {
+    clearTimeout(templatePreviewTimer)
+  }
+  templatePreviewTimer = setTimeout(() => {
+    templatePreviewTimer = null
+    if (editor === instance) {
+      injectCanvasTemplatePreview(instance)
+    }
+  }, delay)
+}
+
+function renderCanvasNavigation(doc: Document, context: Record<string, any>) {
+  const items = Array.isArray(context.chromeNavigation)
+    ? context.chromeNavigation
+    : Array.isArray(context.navigation) ? context.navigation : []
+  doc.querySelectorAll('[data-yb-chrome-navigation]').forEach((element) => {
+    element.innerHTML = items.map(item => renderCanvasNavigationItem(item, context)).join('')
+  })
+}
+
+function renderCanvasNavigationItem(item: Record<string, any>, context: Record<string, any>): string {
+  const children = Array.isArray(item.children) ? item.children : []
+  const link = renderCmsVariables(
+    children.length ? '<a href="{{item.url}}">{{item.label}} <span>⌄</span></a>' : '<a href="{{item.url}}">{{item.label}}</a>',
+    { item },
+    context,
+  )
+  if (!children.length) {
+    return `<div class="site-nav-item">${link}</div>`
+  }
+  const childLinks = children
+    .map(child => renderCmsVariables('<a href="{{item.url}}">{{item.label}}</a>', { item: child }, context))
+    .join('')
+  return `<div class="site-nav-item">${link}<div class="site-nav-dropdown">${childLinks}</div></div>`
+}
+
+function replaceCanvasTemplateValues(node: Node, context: Record<string, any>) {
+  if (node.nodeType === 3) {
+    node.textContent = renderCmsVariables(node.textContent || '', {}, context)
+    return
+  }
+  if (node.nodeType !== 1) {
+    return
+  }
+  const element = node as Element
+  Array.from(element.attributes).forEach((attribute) => {
+    if (attribute.name !== 'data-yb-preview-template' && attribute.value.includes('{{')) {
+      element.setAttribute(attribute.name, renderCmsVariables(attribute.value, {}, context))
+    }
+  })
+  Array.from(node.childNodes).forEach(child => replaceCanvasTemplateValues(child, context))
+}
+
 function appendCanvasCss(css: string) {
   if (!editor || !css.trim()) {
     return
   }
-  const existing = editor.getCss() || ''
+  const existing = fullCanvasCss()
   editor.setStyle(`${existing}\n${css}`.trim())
+}
+
+function fullCanvasCss(instance: Editor | null = editor) {
+  return instance?.getCss({ keepUnusedStyles: true }) || ''
 }
 
 function setCanvasJs(js: string) {
   pageJsContent.value = stripScriptTags(js)
-  syncCanvasJs()
 }
 
 function appendCanvasJs(js: string) {
@@ -1785,7 +2649,16 @@ function appendCanvasJs(js: string) {
     return
   }
   pageJsContent.value = [pageJsContent.value, clean].filter(item => item.trim()).join('\n\n')
-  syncCanvasJs()
+}
+
+function scheduleCanvasJsSync(delay = 450) {
+  if (pageJsSyncTimer) {
+    clearTimeout(pageJsSyncTimer)
+  }
+  pageJsSyncTimer = setTimeout(() => {
+    pageJsSyncTimer = null
+    syncCanvasJs()
+  }, delay)
 }
 
 function syncCanvasJs() {
@@ -1797,9 +2670,15 @@ function syncCanvasJs() {
     if (!doc) {
       return
     }
+    runCanvasJsDisposers(doc.defaultView)
     doc.querySelectorAll('script[data-yb-cms-page-script]').forEach(item => item.remove())
     const code = stripScriptTags(pageJsContent.value).trim()
     if (!code) {
+      return
+    }
+    const lifecycleIssue = canvasJsLifecycleIssue(code)
+    if (lifecycleIssue) {
+      console.warn(`[YuDream CMS] JS preview skipped: ${lifecycleIssue}`)
       return
     }
     const script = doc.createElement('script')
@@ -1830,6 +2709,49 @@ function syncCanvasJs() {
   catch (error) {
     console.warn('[YuDream CMS] JS preview failed', error)
   }
+}
+
+function canvasJsLifecycleIssue(code: string): string {
+  const normalized = code.toLowerCase()
+  const registersCleanup = normalized.includes('window.__yu_cms_register_cleanup__')
+  if (normalized.includes('requestanimationframe(')
+    && (!registersCleanup || !normalized.includes('cancelanimationframe('))) {
+    return 'requestAnimationFrame 缺少 cancelAnimationFrame 清理'
+  }
+  if (normalized.includes('setinterval(')
+    && (!registersCleanup || !normalized.includes('clearinterval('))) {
+    return 'setInterval 缺少 clearInterval 清理'
+  }
+  if (normalized.includes('addeventlistener(')
+    && (!registersCleanup || !normalized.includes('removeeventlistener('))) {
+    return 'addEventListener 缺少 removeEventListener 清理'
+  }
+  if (normalized.includes('setanimationloop(')
+    && (!registersCleanup || !normalized.includes('setanimationloop(null'))) {
+    return 'Three.js setAnimationLoop 缺少 setAnimationLoop(null) 清理'
+  }
+  return ''
+}
+
+function runCanvasJsDisposers(canvasWindow: (Window & typeof globalThis) | null | undefined) {
+  if (!canvasWindow) {
+    return
+  }
+  const runtimeWindow = canvasWindow as typeof canvasWindow & { __YU_CMS_DISPOSERS__?: unknown[] }
+  const disposers = Array.isArray(runtimeWindow.__YU_CMS_DISPOSERS__)
+    ? runtimeWindow.__YU_CMS_DISPOSERS__.splice(0)
+    : []
+  disposers.forEach((dispose) => {
+    if (typeof dispose !== 'function') {
+      return
+    }
+    try {
+      dispose()
+    }
+    catch (error) {
+      console.warn('[YuDream CMS] cleanup failed', error)
+    }
+  })
 }
 
 function stripScriptTags(value: string) {
@@ -2051,156 +2973,21 @@ function registerDynamicTypes(instance: Editor) {
   })
 }
 
-function registerBlocks(instance: Editor) {
-  cmsBlocks().forEach(block => instance.BlockManager.add(block.id || '', block))
-}
-
-function cmsBlocks(): grapesjs.BlockProperties[] {
-  return [
-    {
-      id: 'yb-section',
-      label: '区段 Section',
-      category: '布局',
-      media: preview('section'),
-      content: `<section style="padding:56px 48px; background:#ffffff;">
-  <div style="max-width:1120px; margin:0 auto;"></div>
-</section>`,
+function normalizeBlockAttributes(block: CmsBlockDefinition): CmsBlockDefinition {
+  return {
+    ...block,
+    attributes: {
+      ...(block.attributes || {}),
+      'data-id': block.id,
     },
-    {
-      id: 'yb-container',
-      label: '内容容器',
-      category: '布局',
-      media: preview('container'),
-      content: `<div style="max-width:1120px; margin:0 auto; padding:24px;"></div>`,
-    },
-    {
-      id: 'yb-grid-2',
-      label: '双列布局',
-      category: '布局',
-      media: preview('grid2'),
-      content: `<div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px;">
-  <div style="min-height:120px; padding:20px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
-  <div style="min-height:120px; padding:20px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
-</div>`,
-    },
-    {
-      id: 'yb-grid-3',
-      label: '三列布局',
-      category: '布局',
-      media: preview('grid3'),
-      content: `<div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px;">
-  <div style="min-height:120px; padding:18px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
-  <div style="min-height:120px; padding:18px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
-  <div style="min-height:120px; padding:18px; border:1px dashed #cbd5e1; border-radius:12px;"></div>
-</div>`,
-    },
-    {
-      id: 'yb-heading',
-      label: '标题 Heading',
-      category: '文字',
-      media: preview('heading'),
-      content: `<h2 style="margin:0 0 14px; color:#0f172a; font-size:40px; line-height:1.1; font-weight:900;">页面标题</h2>`,
-    },
-    {
-      id: 'yb-paragraph',
-      label: '段落 Paragraph',
-      category: '文字',
-      media: preview('paragraph'),
-      content: `<p style="margin:0 0 16px; color:#475569; font-size:16px; line-height:1.8;">这里填写正文内容，可以在右侧面板调整字体、颜色、行高和间距。</p>`,
-    },
-    {
-      id: 'yb-button',
-      label: '按钮 Button',
-      category: '基础组件',
-      media: preview('button'),
-      content: `<a href="/site" style="display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:0 18px; border-radius:8px; background:#0f766e; color:#ffffff; font-weight:800; text-decoration:none;">立即查看</a>`,
-    },
-    {
-      id: 'yb-image',
-      label: '图片 Image',
-      category: '媒体',
-      media: preview('image'),
-      content: `<img src="{{site.logo}}" alt="图片" style="display:block; width:100%; max-width:720px; aspect-ratio:16/9; object-fit:cover; border-radius:12px; background:#e2e8f0;">`,
-    },
-    {
-      id: 'yb-card',
-      label: '卡片 Card',
-      category: '基础组件',
-      media: preview('card'),
-      content: `<article style="display:grid; width:min(100%, 380px); gap:12px; padding:22px; border:1px solid #e5e7eb; border-radius:12px; background:#ffffff; box-shadow:0 10px 28px rgba(15,23,42,.06);">
-  <h3 style="margin:0; color:#0f172a; font-size:22px;">卡片标题</h3>
-  <p style="margin:0; color:#64748b; line-height:1.7;">卡片内容描述。</p>
-</article>`,
-    },
-    {
-      id: 'yb-divider',
-      label: '分割线 Divider',
-      category: '基础组件',
-      media: preview('divider'),
-      content: `<hr style="width:100%; margin:28px 0; border:0; border-top:1px solid #e5e7eb;">`,
-    },
-    {
-      id: 'yb-repeat-wrapper',
-      label: '动态循环容器',
-      category: '动态数据',
-      media: preview('repeat'),
-      content: `<div data-yb-repeat="pages" style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px;"></div>`,
-    },
-    {
-      id: 'yb-page-card',
-      label: '页面数据卡片',
-      category: '动态数据',
-      media: preview('pageCard'),
-      content: `<article style="display:grid; gap:12px; padding:18px; border:1px solid #e5e7eb; border-radius:12px; background:#ffffff;">
-  <img src="{{item.coverImageUrl}}" alt="{{item.title}}" style="width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:10px; background:#e2e8f0;">
-  <small style="color:#0f766e; font-weight:800;">{{item.category}} · {{item.publishedAt}}</small>
-  <h3 style="margin:0; color:#0f172a; font-size:22px;">{{item.title}}</h3>
-  <p style="margin:0; color:#64748b;">{{item.excerpt}}</p>
-  <a href="{{item.url}}" style="color:#0f766e; font-weight:800;">阅读全文</a>
-</article>`,
-    },
-    {
-      id: 'yb-tag-link',
-      label: '分类/标签链接',
-      category: '动态数据',
-      media: preview('tag'),
-      content: `<a href="{{item.url}}" style="display:inline-flex; align-items:center; min-height:34px; padding:0 12px; border-radius:999px; background:#ecfdf5; color:#047857; font-weight:700; text-decoration:none;">{{item.label}} · {{item.count}}</a>`,
-    },
-    {
-      id: 'yb-guest-box',
-      label: '游客可见容器',
-      category: '动态数据',
-      media: preview('visible'),
-      content: `<div data-visible-when="guest" style="padding:20px; border:1px dashed #cbd5e1; border-radius:12px;">游客可见内容</div>`,
-    },
-    {
-      id: 'yb-user-box',
-      label: '登录可见容器',
-      category: '动态数据',
-      media: preview('visible'),
-      content: `<div data-visible-when="logged-in" style="padding:20px; border:1px dashed #cbd5e1; border-radius:12px;">{{auth.welcome}}</div>`,
-    },
-  ]
-}
-
-function preview(type: string) {
-  const previewMap: Record<string, string> = {
-    section: '<div class="cms-block-preview section"><span></span><strong></strong></div>',
-    container: '<div class="cms-block-preview container"><strong></strong><span></span></div>',
-    grid2: '<div class="cms-block-preview grid two"><span></span><span></span></div>',
-    grid3: '<div class="cms-block-preview grid three"><span></span><span></span><span></span></div>',
-    heading: '<div class="cms-block-preview text heading"><strong></strong><span></span></div>',
-    paragraph: '<div class="cms-block-preview text paragraph"><span></span><span></span><span></span></div>',
-    button: '<div class="cms-block-preview button"><span></span></div>',
-    image: '<div class="cms-block-preview image"><span></span></div>',
-    card: '<div class="cms-block-preview card"><strong></strong><span></span><span></span></div>',
-    divider: '<div class="cms-block-preview divider"><span></span></div>',
-    repeat: '<div class="cms-block-preview repeat"><span></span><span></span><span></span></div>',
-    pageCard: '<div class="cms-block-preview page-card"><i></i><strong></strong><span></span></div>',
-    tag: '<div class="cms-block-preview tag"><span></span><span></span><span></span></div>',
-    visible: '<div class="cms-block-preview visible"><strong></strong><span></span></div>',
   }
-  return previewMap[type] || '<div class="cms-block-preview"></div>'
+}
+
+function registerBlocks(instance: Editor, render = true) {
+  cmsBlocks().map(normalizeBlockAttributes).forEach(block => instance.BlockManager.add(block.id, block, { silent: true }))
+  if (render) {
+    instance.BlockManager.render()
+  }
 }
 
 function styleSectors() {
@@ -2247,55 +3034,100 @@ function escapeAttr(value: string) {
 </script>
 
 <template>
-  <div class="grapes-shell">
+  <div
+    class="grapes-shell"
+    :class="{
+      'is-preview': previewActive,
+      'is-left-collapsed': leftSidebarCollapsed,
+      'is-right-collapsed': rightSidebarCollapsed,
+    }"
+  >
     <header class="grapes-header">
-      <div>
-        <strong>{{ title || 'CMS 构建器' }}</strong>
-        <span>GrapesJS 可视化编辑</span>
+      <div class="grapes-header__brand">
+        <span class="grapes-header__mark"><FaIcon name="i-ri:layout-masonry-line" /></span>
+        <div>
+          <strong>{{ title || 'CMS 构建器' }}</strong>
+          <span :class="{ 'is-dirty': editorDirty }">{{ editorDirty ? '有未保存修改' : editorReady ? '所有修改已保存' : '正在初始化画布' }}</span>
+        </div>
+      </div>
+      <div v-if="selectedBreadcrumbs.length" class="grapes-header__breadcrumbs">
+        <button
+          v-for="(crumb, index) in selectedBreadcrumbs"
+          :key="index"
+          type="button"
+          @click="editor?.select(crumb.component)"
+        >
+          {{ crumb.label }}
+        </button>
       </div>
       <div class="grapes-header__actions">
-        <FaButton variant="outline" size="sm" @click="command('core:undo')">
-          <FaIcon name="i-ri:arrow-go-back-line" />
-        </FaButton>
-        <FaButton variant="outline" size="sm" @click="command('core:redo')">
-          <FaIcon name="i-ri:arrow-go-forward-line" />
-        </FaButton>
-        <FaButton variant="outline" size="sm" @click="setDevice('desktop')">
-          桌面
-        </FaButton>
-        <FaButton variant="outline" size="sm" @click="setDevice('tablet')">
-          平板
-        </FaButton>
-        <FaButton variant="outline" size="sm" @click="setDevice('mobile')">
-          手机
-        </FaButton>
-        <FaButton size="sm" @click="save">
+        <div class="workbench-command-group">
+          <TTooltip content="撤销" trigger="hover"><button type="button" class="workbench-icon-button" @click="command('core:undo')"><FaIcon name="i-ri:arrow-go-back-line" /></button></TTooltip>
+          <TTooltip content="重做" trigger="hover"><button type="button" class="workbench-icon-button" @click="command('core:redo')"><FaIcon name="i-ri:arrow-go-forward-line" /></button></TTooltip>
+          <TTooltip content="复制选中元素" trigger="hover"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><FaIcon name="i-ri:file-copy-line" /></button></TTooltip>
+          <TTooltip content="删除选中元素" trigger="hover"><button type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><FaIcon name="i-ri:delete-bin-line" /></button></TTooltip>
+        </div>
+        <div class="workbench-device-switch" aria-label="画布设备">
+          <TTooltip content="桌面" trigger="hover"><button type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><FaIcon name="i-ri:computer-line" /></button></TTooltip>
+          <TTooltip content="平板" trigger="hover"><button type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><FaIcon name="i-ri:tablet-line" /></button></TTooltip>
+          <TTooltip content="手机" trigger="hover"><button type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><FaIcon name="i-ri:smartphone-line" /></button></TTooltip>
+        </div>
+        <div class="workbench-command-group grapes-header__zoom">
+          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><FaIcon name="i-ri:subtract-line" /></button>
+          <button type="button" class="workbench-zoom-value" @click="resetCanvasZoom">{{ canvasZoom }}%</button>
+          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><FaIcon name="i-ri:add-line" /></button>
+        </div>
+        <div class="workbench-command-group">
+          <TTooltip :content="previewActive ? '退出预览' : '预览页面'" trigger="hover"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'i-ri:edit-box-line' : 'i-ri:eye-line'" /></button></TTooltip>
+          <TTooltip v-if="chromeFrame" content="还原固定布局" trigger="hover"><button type="button" class="workbench-icon-button" @click="restoreLockedLayout"><FaIcon name="i-ri:layout-line" /></button></TTooltip>
+          <TTooltip content="保存为区块" trigger="hover"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><FaIcon name="i-ri:archive-drawer-line" /></button></TTooltip>
+        </div>
+        <FaButton size="sm" :disabled="!editorReady" @click="save">
           <FaIcon name="i-ri:save-3-line" />
-          保存
+          {{ editorDirty ? '保存修改' : '保存' }}
         </FaButton>
-        <FaButton variant="outline" size="sm" @click="emit('close')">
-          <FaIcon name="i-ri:close-line" />
-        </FaButton>
+        <TTooltip content="关闭构建器" trigger="hover"><button type="button" class="workbench-icon-button" @click="emit('close')"><FaIcon name="i-ri:close-line" /></button></TTooltip>
       </div>
     </header>
 
     <div class="grapes-body">
-      <aside class="grapes-sidebar left">
-        <section>
-          <h3>区块</h3>
+      <aside class="grapes-sidebar left" :class="{ collapsed: leftSidebarCollapsed }">
+        <div class="sidebar-rail-head">
+          <div class="left-workspace-tabs" role="tablist" aria-label="素材工作区">
+            <button type="button" :class="{ active: leftWorkspace === 'blocks' }" @click="leftWorkspace = 'blocks'; leftSidebarCollapsed = false"><FaIcon name="i-ri:layout-grid-line" /><span>区块</span></button>
+            <button type="button" :class="{ active: leftWorkspace === 'media' }" @click="leftWorkspace = 'media'; leftSidebarCollapsed = false"><FaIcon name="i-ri:image-2-line" /><span>媒体</span></button>
+          </div>
+          <TTooltip :content="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'" trigger="hover"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><FaIcon :name="leftSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></TTooltip>
+        </div>
+        <section v-show="leftWorkspace === 'blocks'" class="block-panel">
+          <div class="block-panel__search-wrap">
+            <FaIcon name="i-ri:search-line" class="block-panel__search-icon" />
+            <input
+              v-model="blockSearch"
+              type="text"
+              placeholder="搜索区块..."
+              class="block-panel__search"
+            >
+          </div>
+          <div class="block-panel__tabs">
+            <button
+              v-for="cat in blockCategories"
+              :key="cat"
+              type="button"
+              :class="{ active: blockCategory === cat }"
+              @click="blockCategory = cat"
+            >
+              {{ cat }}
+            </button>
+          </div>
           <div ref="blocksEl" />
         </section>
-        <section>
+        <section v-show="leftWorkspace === 'media'" class="media-panel">
           <div class="media-head">
-            <h3>媒体</h3>
+            <div><h3>媒体资源</h3><span>{{ mediaItems.length }} 项</span></div>
+            <FaButton size="sm" @click="pickMedia"><FaIcon name="i-ri:upload-cloud-2-line" />上传</FaButton>
           </div>
-          <div class="media-actions">
-            <FaButton size="sm" @click="pickMedia">
-              <FaIcon name="i-ri:upload-cloud-2-line" />
-              上传
-            </FaButton>
-            <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
-          </div>
+          <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
           <div class="media-grid">
             <button v-for="item in mediaItems" :key="item.id" type="button" @click="insertImage(item)">
               <img :src="toBackendAssetUrl(item.url)" :alt="item.originalName || 'CMS 图片'">
@@ -2306,9 +3138,16 @@ function escapeAttr(value: string) {
 
       <main class="grapes-canvas">
         <div ref="editorEl" class="grapes-editor" />
+        <footer class="canvas-statusbar">
+          <span><i :class="{ ready: editorReady }" />{{ editorReady ? '画布就绪' : '加载中' }}</span>
+          <span>{{ activeDevice === 'desktop' ? '桌面' : activeDevice === 'tablet' ? '平板' : '手机' }}</span>
+          <span>{{ canvasZoom }}%</span>
+          <span v-if="selectedBreadcrumbs.length">{{ selectedBreadcrumbs.at(-1)?.label }}</span>
+        </footer>
       </main>
 
-      <aside class="grapes-sidebar right">
+      <aside class="grapes-sidebar right" :class="{ collapsed: rightSidebarCollapsed }">
+        <div class="sidebar-rail-head right-sidebar-head">
         <div class="right-tabs" role="tablist" aria-label="构建器右侧面板">
           <button
             v-for="tab in rightPanelTabs"
@@ -2317,25 +3156,74 @@ function escapeAttr(value: string) {
             :class="{ active: rightPanelTab === tab.value }"
             role="tab"
             :aria-selected="rightPanelTab === tab.value"
-            @click="rightPanelTab = tab.value"
+            @click="rightPanelTab = tab.value; rightSidebarCollapsed = false"
           >
             <FaIcon :name="tab.icon" />
             <span>{{ tab.label }}</span>
           </button>
         </div>
+          <TTooltip :content="rightSidebarCollapsed ? '展开检查器' : '收起检查器'" trigger="hover"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><FaIcon :name="rightSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></TTooltip>
+        </div>
 
-        <section v-if="aiEnabled" class="right-panel ai-panel" :class="{ active: rightPanelTab === 'ai' }">
+        <section v-if="aiEnabled && rightPanelTab === 'ai'" class="right-panel ai-panel active">
           <div class="builder-chatbot-wrap">
-            <Chatbot
-              ref="chatbotRef"
-              class="builder-chatbot"
-              layout="single"
-              :default-messages="aiDefaultMessages"
-              :chat-service-config="aiChatServiceConfig"
-              :sender-props="aiSenderProps"
-              :message-props="aiMessageProps"
+            <div ref="aiChatScrollEl" class="builder-chatbot t-chat--normal" @scroll.passive="onAiChatScroll">
+              <ChatMessage
+                v-for="entry in aiRenderedMessages"
+                :key="entry.message.id"
+                :role="entry.message.role"
+                :status="entry.message.status"
+                :content="entry.contents"
+                :name="aiMessageProps.name(entry.message)"
+                :placement="entry.message.role === 'user' ? 'right' : 'left'"
+              >
+                <template #avatar>
+                  <span class="cms-ai-avatar" :class="entry.message.role === 'user' ? 'is-user' : 'is-assistant'">
+                    {{ entry.message.role === 'user' ? '你' : 'AI' }}
+                  </span>
+                </template>
+                <template #content>
+                <div class="cms-agui-message-content">
+                  <template v-for="(content, index) in entry.contents" :key="`${entry.message.id}-${index}`">
+                    <ActivityRenderer
+                      v-if="isAguiActivityContent(content)"
+                      :activity="content.data"
+                    />
+                    <ToolCallRenderer
+                      v-else-if="isAguiToolCallContent(content)"
+                      :tool-call="content.data"
+                    />
+                    <div
+                      v-else
+                      :class="{ 'cms-ai-content-error': entry.message.status === 'error' && content?.type === 'text' }"
+                    >
+                      <ChatContent
+                        :content="content"
+                        :role="entry.message.role"
+                      />
+                    </div>
+                  </template>
+                </div>
+                </template>
+              </ChatMessage>
+            </div>
+            <ChatSender
+              v-model="aiPrompt"
+              :loading="aiChatLoading"
+              :placeholder="aiSenderProps.placeholder"
+              :textarea-props="aiSenderProps.textareaProps"
+              :attachments-props="aiSenderProps.attachmentsProps"
+              @send="sendAiPrompt"
+              @stop="aiChatEngine.abortChat()"
+              @file-select="aiSenderProps.onFileSelect?.({ detail: $event.files })"
+              @remove="aiSenderProps.onFileRemove?.({ detail: $event })"
             >
-              <template #sender-footer-prefix>
+              <template #footer-prefix>
+                <TTooltip content="添加样图" trigger="hover">
+                  <button type="button" class="ai-attachment-button" aria-label="添加样图" @click="selectAiAttachment">
+                    <FaIcon name="i-ri:image-add-line" />
+                  </button>
+                </TTooltip>
                 <div v-if="aiModelOptions?.length" class="ai-model-select">
                   <TTooltip content="切换模型" trigger="hover">
                     <TSelect
@@ -2351,7 +3239,8 @@ function escapeAttr(value: string) {
                   <span>深度思考</span>
                 </label>
               </template>
-            </Chatbot>
+            </ChatSender>
+            <input ref="aiAttachmentInput" class="ai-attachment-input" type="file" accept="image/*" multiple @change="onAiAttachmentInput">
             <section v-if="pendingAskDsl" class="ai-ask" aria-label="AI 需求澄清">
               <TokuiBlock :dsl="pendingAskDsl" />
               <div v-if="pendingAskOptions.length" class="ai-ask-options">
@@ -2424,9 +3313,17 @@ function escapeAttr(value: string) {
             </section>
           </div>
 
+          <p class="ai-tools-hint">AI 可以使用系统预设区块快速搭建页面。</p>
+
           <div class="ai-suggestions" aria-label="AI 快捷指令">
             <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
               {{ suggestion }}
+            </button>
+          </div>
+
+          <div class="ai-suggestions ai-block-suggestions" aria-label="AI 添加区块">
+            <button v-for="item in aiBlockSuggestions" :key="item.label" type="button" @click="useBlockSuggestion(item.prompt)">
+              {{ item.label }}
             </button>
           </div>
 
@@ -2462,7 +3359,7 @@ function escapeAttr(value: string) {
                 <FaIcon name="i-ri:align-left" />
                 格式化
               </FaButton>
-              <FaButton size="sm" :disabled="!hasSelectedComponent || !selectedSourceDirty" @click="applySelectedSource">
+              <FaButton size="sm" :disabled="!hasSelectedComponent || selectedSourceLocked || !selectedSourceDirty" @click="applySelectedSource">
                 <FaIcon name="i-ri:check-line" />
                 应用
               </FaButton>
@@ -2478,7 +3375,7 @@ function escapeAttr(value: string) {
                 v-model="selectedSourceCode"
                 class="source-panel__editor"
                 language="html"
-                :disabled="!hasSelectedComponent"
+                :disabled="!hasSelectedComponent || selectedSourceLocked"
                 :completions="htmlSourceCompletions"
                 @update:model-value="markSelectedSourceDirty"
               />
@@ -2486,7 +3383,13 @@ function escapeAttr(value: string) {
             <section class="source-editor-section source-editor-section--css">
               <div class="source-editor-section__head">
                 <strong>关联 CSS</strong>
-                <span>根据当前选择自动匹配</span>
+                <div class="source-editor-section__actions">
+                  <FaButton variant="outline" size="sm" @click="formatCanvasCss">
+                    <FaIcon name="i-ri:align-left" />
+                    格式化
+                  </FaButton>
+                  <span>根据当前选择自动匹配</span>
+                </div>
               </div>
               <CmsCodeEditor
                 class="source-panel__editor"
@@ -2499,7 +3402,13 @@ function escapeAttr(value: string) {
             <section class="source-editor-section source-editor-section--js">
               <div class="source-editor-section__head">
                 <strong>页面 JS</strong>
-                <span>自动注入预览并随页面保存</span>
+                <div class="source-editor-section__actions">
+                  <FaButton variant="outline" size="sm" @click="formatPageJs">
+                    <FaIcon name="i-ri:align-left" />
+                    格式化
+                  </FaButton>
+                  <span>自动注入预览并随页面保存</span>
+                </div>
               </div>
               <CmsCodeEditor
                 v-model="pageJsContent"
@@ -2512,20 +3421,218 @@ function escapeAttr(value: string) {
           <div class="source-panel__status" :class="{ error: selectedSourceError }">
             <span v-if="selectedSourceError">{{ selectedSourceError }}</span>
             <span v-else-if="selectedSourceDirty">未应用</span>
+            <span v-else-if="selectedSourceLocked">Header/Footer 固定结构只读</span>
             <span v-else>{{ hasSelectedComponent ? '已同步' : '未选择元素' }}</span>
           </div>
         </section>
       </aside>
     </div>
+
+    <div v-if="showSaveBlockDialog" class="save-block-modal" role="dialog" aria-modal="true" aria-labelledby="save-block-title">
+      <div class="save-block-modal__overlay" @click="showSaveBlockDialog = false" />
+      <div class="save-block-modal__content">
+        <h3 id="save-block-title">保存为区块</h3>
+        <label class="save-block-modal__field">
+          <span>名称</span>
+          <input v-model="saveBlockForm.name" type="text" placeholder="区块名称">
+        </label>
+        <label class="save-block-modal__field">
+          <span>分类</span>
+          <input v-model="saveBlockForm.category" type="text" placeholder="预制">
+        </label>
+        <label class="save-block-modal__field">
+          <span>类型</span>
+          <select v-model="saveBlockForm.kind">
+            <option value="atomic">原子</option>
+            <option value="preset">预制</option>
+          </select>
+        </label>
+        <label class="save-block-modal__field">
+          <span>描述</span>
+          <textarea v-model="saveBlockForm.description" rows="2" placeholder="可选描述" />
+        </label>
+        <div class="save-block-modal__actions">
+          <FaButton variant="outline" size="sm" @click="showSaveBlockDialog = false">取消</FaButton>
+          <FaButton size="sm" @click="confirmSaveBlock">保存</FaButton>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
+:deep(.cms-agui-activity),
+:deep(.cms-agui-tool) {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 6px 0;
+  padding: 9px 10px;
+  color: var(--td-text-color-primary, #1f2937);
+  background: var(--td-bg-color-secondarycontainer, #f5f7fa);
+  border: 1px solid var(--td-component-border, #dcdfe6);
+  border-radius: 6px;
+}
+
+:deep(.cms-agui-activity__dot),
+:deep(.cms-agui-tool__state) {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  background: var(--td-brand-color, #0052d9);
+  border-radius: 50%;
+}
+
+:deep(.cms-agui-activity__body),
+:deep(.cms-agui-tool__body) {
+  min-width: 0;
+}
+
+:deep(.cms-agui-activity strong),
+:deep(.cms-agui-tool strong) {
+  display: block;
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 600;
+}
+
+:deep(.cms-agui-activity p),
+:deep(.cms-agui-tool p) {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--td-text-color-secondary, #5e6d82);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+:deep(.cms-agui-tool__meta) {
+  color: var(--td-brand-color, #0052d9) !important;
+  font-weight: 600;
+}
+
+:deep(.cms-agui-tool__preview) {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+:deep(.cms-agui-tool.is-complete .cms-agui-tool__state) {
+  background: var(--td-success-color, #00a870);
+}
+
+:deep(.cms-agui-tool.is-error .cms-agui-tool__state) {
+  background: var(--td-error-color, #d54941);
+}
+
+:deep(.cms-agui-tool.is-executing .cms-agui-tool__state) {
+  animation: cms-agui-pulse 1.2s ease-in-out infinite;
+}
+
+:deep(.cms-agui-tool__action) {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--td-brand-color, #0052d9);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--td-brand-color, #0052d9);
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+:deep(.cms-agui-tool__action:hover) {
+  background: var(--td-brand-color-light, #e8f0ff);
+}
+
+.ai-attachment-input {
+  display: none;
+}
+
+.ai-attachment-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--td-text-color-secondary, #5e6d82);
+  background: transparent;
+  border: 0;
+  place-items: center;
+  cursor: pointer;
+}
+
+.ai-attachment-button:hover {
+  color: var(--td-brand-color, #0052d9);
+}
+
+.cms-ai-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 600;
+  place-items: center;
+}
+
+.cms-ai-avatar.is-assistant {
+  background: var(--td-brand-color, #0052d9);
+}
+
+.cms-ai-avatar.is-user {
+  background: #64748b;
+}
+
+.builder-chatbot :deep(.t-chat__inner) {
+  margin-bottom: 8px;
+}
+
+.builder-chatbot :deep(.t-chat__avatar) {
+  margin: 2px 8px 0 0;
+  padding-top: 0;
+}
+
+.builder-chatbot :deep(.t-chat__detail) {
+  min-width: 0;
+  max-width: calc(100% - 36px);
+  padding: 0 4px;
+}
+
+.builder-chatbot :deep(.t-chat__name) {
+  margin-bottom: 2px;
+  color: var(--td-text-color-secondary, #5e6d82);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.builder-chatbot :deep(.t-chat__inner.user .t-chat__avatar) {
+  margin: 2px 0 0 8px;
+}
+
+.cms-agui-message-content {
+  width: 100%;
+  min-width: 0;
+}
+
+.cms-ai-content-error {
+  color: var(--td-error-color, #d54941);
+}
+
+@keyframes cms-agui-pulse {
+  50% { opacity: .35; }
+}
+
 .grapes-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
-  background: #f8fafc;
+  color: #1f2937;
+  background: #eef1f5;
 }
 
 .grapes-header,
@@ -2538,10 +3645,36 @@ function escapeAttr(value: string) {
 }
 
 .grapes-header {
+  position: relative;
+  z-index: 20;
+  flex-wrap: nowrap;
   justify-content: space-between;
-  padding: 10px 14px;
+  min-height: 54px;
+  gap: 12px;
+  padding: 7px 10px;
   border-bottom: 1px solid #e5e7eb;
   background: #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.grapes-header__brand {
+  display: flex;
+  flex: 0 1 240px;
+  min-width: 160px;
+  align-items: center;
+  gap: 9px;
+}
+
+.grapes-header__mark {
+  display: grid !important;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
+  background: #0f766e;
+  color: #fff !important;
+  font-size: 17px !important;
+  place-items: center;
 }
 
 .grapes-header strong,
@@ -2554,10 +3687,518 @@ function escapeAttr(value: string) {
   font-size: 12px;
 }
 
+.grapes-header__brand span.is-dirty {
+  color: #b45309;
+}
+
+.grapes-header__actions {
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.grapes-header__breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 420px;
+  padding: 0 12px;
+}
+
+.grapes-header__breadcrumbs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #475569;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.grapes-header__breadcrumbs button:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+  background: #f0fdfa;
+}
+
+.grapes-header__breadcrumbs button:not(:last-child)::after {
+  content: '/';
+  margin-left: 4px;
+  color: #cbd5e1;
+}
+
+.grapes-header__zoom {
+  font-variant-numeric: tabular-nums;
+}
+
+.workbench-command-group,
+.workbench-device-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.workbench-icon-button,
+.workbench-device-switch button,
+.workbench-zoom-value {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #526176;
+  font-size: 15px;
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.workbench-icon-button:hover:not(:disabled),
+.workbench-device-switch button:hover,
+.workbench-device-switch button.active,
+.workbench-icon-button.active {
+  background: #fff;
+  color: #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.workbench-icon-button.is-danger:hover:not(:disabled) {
+  color: #dc2626;
+}
+
+.workbench-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+.workbench-zoom-value {
+  width: 46px;
+  color: #334155;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.block-panel {
+  --yb-block-bg: #fff;
+  --yb-block-bg-hover: #fff;
+  --yb-block-border: #e5e7eb;
+  --yb-block-border-hover: #0f766e;
+  --yb-block-text: #334155;
+  --yb-block-text-hover: #0f766e;
+  --yb-block-muted: #64748b;
+  --yb-block-bg-2: #f8fafc;
+  --yb-primary: #0f766e;
+  --yb-primary-soft: #ecfdf5;
+  --yb-star: #f59e0b;
+
+  display: grid;
+  gap: 12px;
+}
+
+:global(.dark) .block-panel {
+  --yb-block-bg: #1e293b;
+  --yb-block-bg-hover: #1e293b;
+  --yb-block-border: #334155;
+  --yb-block-border-hover: #2dd4bf;
+  --yb-block-text: #e2e8f0;
+  --yb-block-text-hover: #2dd4bf;
+  --yb-block-muted: #94a3b8;
+  --yb-block-bg-2: #0f172a;
+  --yb-primary: #2dd4bf;
+  --yb-primary-soft: #134e4a;
+  --yb-star: #fbbf24;
+}
+
+.block-panel__search-wrap {
+  position: relative;
+}
+
+.block-panel__search-icon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: var(--yb-block-muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.block-panel__search {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--yb-block-border);
+  border-radius: 999px;
+  background: var(--yb-block-bg-2);
+  color: var(--yb-block-text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.block-panel__search::placeholder {
+  color: var(--yb-block-muted);
+}
+
+.block-panel__search:focus {
+  border-color: var(--yb-primary);
+  background: var(--yb-block-bg);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+:global(.dark) .block-panel__search:focus {
+  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.15);
+}
+
+.block-panel__tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.block-panel__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.block-panel__tabs button {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--yb-block-bg-2);
+  color: var(--yb-block-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.block-panel__tabs button:hover {
+  border-color: var(--yb-block-border);
+  background: var(--yb-block-bg);
+  color: var(--yb-block-text);
+}
+
+.block-panel__tabs button.active {
+  border-color: var(--yb-primary);
+  background: var(--yb-primary-soft);
+  color: var(--yb-primary);
+  font-weight: 600;
+}
+
+:deep(.gjs-block-category) {
+  overflow: hidden;
+  border: 0 !important;
+  border-bottom: 1px solid var(--yb-block-border) !important;
+  background: transparent !important;
+}
+
+:deep(.gjs-block-category .gjs-title) {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  gap: 4px;
+  margin: 0;
+  padding: 0 4px !important;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  color: var(--yb-block-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 34px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+:deep(.gjs-block-category .gjs-title:hover) {
+  background: var(--yb-block-bg-2) !important;
+  color: var(--yb-block-text-hover);
+}
+
+:deep(.gjs-block-category .gjs-caret-icon) {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  margin: 0 2px 0 0 !important;
+  color: var(--yb-block-muted);
+  place-items: center;
+}
+
+:deep(.gjs-block-category:not(:has(.gjs-block:not(.hidden)))) {
+  display: none;
+}
+
+:deep(.gjs-blocks-c) {
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+  padding: 8px 0 12px !important;
+  background: transparent !important;
+}
+
+:deep(.gjs-block-category:not(.gjs-open) .gjs-blocks-c) {
+  display: none !important;
+}
+
+:deep(.gjs-block) {
+  position: relative;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center !important;
+  gap: 6px;
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 94px !important;
+  margin: 0 !important;
+  padding: 10px 7px 22px !important;
+  float: none !important;
+  border: 1px solid var(--yb-block-border);
+  border-radius: 7px;
+  background: var(--yb-block-bg);
+  color: var(--yb-block-text);
+  box-shadow: none;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+
+:deep(.gjs-block:hover) {
+  border-color: var(--yb-block-border-hover);
+  color: var(--yb-block-text-hover);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+:global(.dark) :deep(.gjs-block:hover) {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+
+:deep(.gjs-block.hidden) {
+  display: none !important;
+}
+
+:deep(.gjs-block-label) {
+  width: 100%;
+  min-width: 0;
+  padding: 0 4px !important;
+  overflow: visible;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  text-overflow: clip;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+:deep(.gjs-block__media) {
+  display: grid;
+  width: 100%;
+  height: 42px;
+  margin: 0 !important;
+  overflow: hidden;
+  place-items: center;
+  pointer-events: none;
+}
+
+:deep(.gjs-block__media > *) {
+  max-width: 100%;
+  max-height: 42px;
+}
+
+:deep(.gjs-block-kind-badge) {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(226, 232, 240, 0.85);
+  color: var(--yb-block-muted);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  pointer-events: none;
+  backdrop-filter: blur(2px);
+}
+
+:deep(.gjs-block-kind-badge[data-kind="atomic"]) {
+  background: rgba(236, 253, 245, 0.9);
+  color: #047857;
+}
+
+:deep(.gjs-block-kind-badge[data-kind="preset"]) {
+  background: rgba(239, 246, 255, 0.9);
+  color: #1d4ed8;
+}
+
+:global(.dark) :deep(.gjs-block-kind-badge) {
+  background: rgba(51, 65, 85, 0.85);
+  color: var(--yb-block-muted);
+}
+
+:global(.dark) :deep(.gjs-block-kind-badge[data-kind="atomic"]) {
+  background: rgba(6, 78, 59, 0.85);
+  color: #34d399;
+}
+
+:global(.dark) :deep(.gjs-block-kind-badge[data-kind="preset"]) {
+  background: rgba(30, 58, 138, 0.85);
+  color: #60a5fa;
+}
+
+:deep(.gjs-block-favorite) {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--yb-block-muted);
+  font-size: 12px;
+  line-height: 1;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s, color 0.15s, transform 0.1s;
+  backdrop-filter: blur(2px);
+}
+
+:global(.dark) :deep(.gjs-block-favorite) {
+  background: rgba(30, 41, 59, 0.8);
+  color: var(--yb-block-muted);
+}
+
+:deep(.gjs-block-favorite)::before {
+  content: '☆';
+}
+
+:deep(.gjs-block-favorite.is-active)::before {
+  content: '★';
+}
+
+:deep(.gjs-block-favorite:hover) {
+  opacity: 1;
+  color: var(--yb-star);
+  transform: scale(1.1);
+}
+
+:deep(.gjs-block-favorite.is-active) {
+  opacity: 1;
+  color: var(--yb-star);
+}
+
+.source-editor-section__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-block-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.save-block-modal__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.save-block-modal__content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 14px;
+  width: min(100%, 400px);
+  padding: 20px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+}
+
+.save-block-modal__content h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.save-block-modal__field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.save-block-modal__field input,
+.save-block-modal__field select,
+.save-block-modal__field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13px;
+  outline: none;
+}
+
+.save-block-modal__field input:focus,
+.save-block-modal__field select:focus,
+.save-block-modal__field textarea:focus {
+  border-color: #0f766e;
+  background: #fff;
+}
+
+.save-block-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .grapes-body {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr) 360px;
   min-height: 0;
+  transition: grid-template-columns 0.2s ease;
+}
+
+.grapes-shell.is-left-collapsed .grapes-body {
+  grid-template-columns: 50px minmax(0, 1fr) 360px;
+}
+
+.grapes-shell.is-right-collapsed .grapes-body {
+  grid-template-columns: 280px minmax(0, 1fr) 50px;
+}
+
+.grapes-shell.is-left-collapsed.is-right-collapsed .grapes-body {
+  grid-template-columns: 50px minmax(0, 1fr) 50px;
+}
+
+.grapes-shell.is-preview .grapes-body {
+  grid-template-columns: 0 minmax(0, 1fr) 0;
 }
 
 .grapes-sidebar {
@@ -2569,6 +4210,80 @@ function escapeAttr(value: string) {
   padding: 12px;
   border-color: #e5e7eb;
   background: #fff;
+}
+
+.grapes-sidebar.collapsed {
+  gap: 6px;
+  padding: 7px;
+  overflow: hidden;
+}
+
+.grapes-sidebar.collapsed > section,
+.grapes-shell.is-preview .grapes-sidebar {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.grapes-sidebar.collapsed .sidebar-rail-head {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.sidebar-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.left-workspace-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 1;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 7px;
+  background: #f1f5f9;
+}
+
+.left-workspace-tabs button {
+  display: flex;
+  min-width: 0;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.left-workspace-tabs button.active {
+  background: #fff;
+  color: #0f766e;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.grapes-sidebar.left.collapsed .sidebar-rail-head,
+.grapes-sidebar.right.collapsed .sidebar-rail-head {
+  flex-direction: column;
+}
+
+.grapes-sidebar.left.collapsed .left-workspace-tabs {
+  grid-template-columns: 1fr;
+  width: 36px;
+}
+
+.grapes-sidebar.left.collapsed .left-workspace-tabs button span,
+.grapes-sidebar.right.collapsed .right-tabs button span {
+  display: none;
+}
+
+.sidebar-collapse-button {
+  border: 1px solid #e2e8f0;
 }
 
 .grapes-sidebar.left {
@@ -2594,16 +4309,63 @@ function escapeAttr(value: string) {
 }
 
 .grapes-canvas {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 28px;
   min-width: 0;
   min-height: 0;
+  background: #e9edf2;
 }
 
 .grapes-editor {
   height: 100%;
+  min-height: 0;
+}
+
+.canvas-statusbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 12px;
+  border-top: 1px solid #dbe2ea;
+  background: #fff;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.canvas-statusbar span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-statusbar i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+
+.canvas-statusbar i.ready {
+  background: #10b981;
 }
 
 .media-head {
   justify-content: space-between;
+}
+
+.media-head > div {
+  display: grid;
+  gap: 2px;
+}
+
+.media-head span {
+  color: #94a3b8;
+  font-size: 11px;
 }
 
 .media-grid {
@@ -2634,6 +4396,20 @@ function escapeAttr(value: string) {
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #f8fafc;
+}
+
+.right-sidebar-head {
+  align-items: stretch;
+}
+
+.right-sidebar-head .right-tabs {
+  flex: 1;
+}
+
+.grapes-sidebar.right.collapsed .right-tabs {
+  grid-template-columns: 1fr;
+  width: 36px;
+  padding: 2px;
 }
 
 .right-tabs button {
@@ -2841,6 +4617,25 @@ function escapeAttr(value: string) {
   color: #0f172a;
 }
 
+.ai-tools-hint {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.ai-block-suggestions button {
+  border-color: #ccfbf1;
+  background: #f0fdfa;
+  color: #0d9488;
+}
+
+.ai-block-suggestions button:hover {
+  border-color: #99f6e4;
+  background: #e6fbf7;
+  color: #0f766e;
+}
+
 .ai-ask {
   padding: 12px;
   margin-bottom: 8px;
@@ -3028,7 +4823,7 @@ function escapeAttr(value: string) {
 .builder-chatbot-wrap {
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 10px;
   min-height: 0;
   overflow: hidden;
@@ -3037,6 +4832,7 @@ function escapeAttr(value: string) {
 .builder-chatbot {
   height: 100%;
   min-height: 0;
+  overflow: auto;
 }
 
 .builder-chatbot :deep(t-chatbot) {
@@ -3149,34 +4945,73 @@ function escapeAttr(value: string) {
   font-weight: 700;
 }
 
-:deep(.gjs-block) {
-  width: 100%;
-  min-height: 116px;
-  margin: 0 0 10px;
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #334155;
+:deep(.gjs-sm-sector) {
+  border: 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+:deep(.gjs-sm-sector .gjs-sm-sector-title),
+:deep(.gjs-trt-header),
+:deep(.gjs-layer-title) {
+  min-height: 36px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 0;
+  background: #f8fafc;
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+:deep(.gjs-sm-properties) {
+  gap: 8px;
+  padding: 10px 8px 12px;
+}
+
+:deep(.gjs-sm-property) {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 4px;
+}
+
+:deep(.gjs-sm-label),
+:deep(.gjs-trt-trait .gjs-label) {
+  margin-bottom: 4px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+:deep(.gjs-field),
+:deep(.gjs-input-holder),
+:deep(.gjs-select) {
+  min-height: 32px;
+  border: 1px solid #dfe5ec;
+  border-radius: 6px;
   box-shadow: none;
 }
 
-:deep(.gjs-block:hover) {
-  border-color: #0f766e;
+:deep(.gjs-layer) {
+  min-height: 34px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+:deep(.gjs-layer-title) {
+  background: #fff;
+  font-weight: 500;
+}
+
+:deep(.gjs-layer-title:hover) {
+  background: #f8fafc;
+}
+
+:deep(.gjs-layer.gjs-selected .gjs-layer-title) {
+  background: #ecfdf5;
   color: #0f766e;
-  box-shadow: 0 8px 22px rgba(15, 118, 110, 0.12);
 }
 
-:deep(.gjs-block-label) {
-  color: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-:deep(.gjs-block__media) {
-  width: 100%;
-  margin: 0 0 8px;
+:deep(.gjs-trt-trait) {
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid #f1f5f9;
 }
 
 :deep(.cms-block-preview) {
@@ -3388,6 +5223,264 @@ function escapeAttr(value: string) {
   width: 76%;
   height: 8px;
 }
+:deep(.cms-block-preview.spacer) {
+  place-items: center;
+  background: #f8fafc;
+}
+
+:deep(.cms-block-preview.spacer span) {
+  width: 100%;
+  height: 6px;
+  border-radius: 2px;
+  background: #cbd5e1;
+}
+
+:deep(.cms-block-preview.badge) {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+:deep(.cms-block-preview.badge span) {
+  height: 18px;
+  border-radius: 999px;
+  background: #dcfce7;
+}
+
+:deep(.cms-block-preview.badge span:nth-child(1)) {
+  width: 42px;
+}
+
+:deep(.cms-block-preview.badge span:nth-child(2)) {
+  width: 28px;
+}
+
+:deep(.cms-block-preview.list-item),
+:deep(.cms-block-preview.quote),
+:deep(.cms-block-preview.link) {
+  place-items: center start;
+  padding: 0 8px;
+}
+
+:deep(.cms-block-preview.list-item span),
+:deep(.cms-block-preview.quote span),
+:deep(.cms-block-preview.link span) {
+  width: 64%;
+  height: 8px;
+  border-radius: 2px;
+  background: #64748b;
+}
+
+:deep(.cms-block-preview.quote span) {
+  border-left: 3px solid #0f766e;
+  padding-left: 6px;
+  width: 78%;
+}
+
+:deep(.cms-block-preview.link span) {
+  width: 50%;
+  height: 7px;
+  text-decoration: underline;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.hero-center) {
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+:deep(.cms-block-preview.hero-center strong) {
+  width: 62%;
+  height: 14px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.hero-center span) {
+  width: 76%;
+  height: 7px;
+}
+
+:deep(.cms-block-preview.hero-center em) {
+  width: 46px;
+  height: 20px;
+  border-radius: 4px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.hero-split) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+:deep(.cms-block-preview.hero-split-text) {
+  display: grid;
+  gap: 6px;
+}
+
+:deep(.cms-block-preview.hero-split-text strong) {
+  width: 80%;
+  height: 12px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.hero-split-text span) {
+  width: 100%;
+  height: 6px;
+}
+
+:deep(.cms-block-preview.hero-split-text em) {
+  width: 52px;
+  height: 16px;
+  border-radius: 4px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.hero-split-media) {
+  height: 100%;
+  border-radius: 7px;
+  background: #e2e8f0;
+}
+
+:deep(.cms-block-preview.features-3) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+:deep(.cms-block-preview.features-3 span) {
+  height: 100%;
+  border-radius: 8px;
+  background: #f0fdfa;
+  border: 1px solid #e5e7eb;
+}
+
+:deep(.cms-block-preview.cta-box) {
+  align-content: center;
+  justify-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 10px;
+  background: #0f766e;
+}
+
+:deep(.cms-block-preview.cta-box strong) {
+  width: 58%;
+  height: 12px;
+  background: #ffffff;
+}
+
+:deep(.cms-block-preview.cta-box span) {
+  width: 74%;
+  height: 6px;
+  background: rgba(255, 255, 255, .7);
+}
+
+:deep(.cms-block-preview.cta-box em) {
+  width: 50px;
+  height: 18px;
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+:deep(.cms-block-preview.testimonial) {
+  gap: 10px;
+  padding: 10px;
+}
+
+:deep(.cms-block-preview.testimonial > span) {
+  width: 92%;
+  height: 7px;
+}
+
+:deep(.cms-block-preview.testimonial-avatar) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.cms-block-preview.testimonial-avatar i) {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #e2e8f0;
+}
+
+:deep(.cms-block-preview.testimonial-avatar div) {
+  display: grid;
+  gap: 4px;
+}
+
+:deep(.cms-block-preview.testimonial-avatar strong) {
+  width: 46px;
+  height: 7px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.testimonial-avatar em) {
+  width: 32px;
+  height: 5px;
+  background: #94a3b8;
+}
+
+:deep(.cms-block-preview.pricing-3) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+:deep(.cms-block-preview.pricing-3 span) {
+  height: 100%;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
+:deep(.cms-block-preview.pricing-3 span:nth-child(2)) {
+  border-color: #0f766e;
+}
+
+:deep(.cms-block-preview.footer-simple) {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 10px;
+  background: #0f172a;
+}
+
+:deep(.cms-block-preview.footer-simple .footer-col-wide),
+:deep(.cms-block-preview.footer-simple .footer-col) {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+:deep(.cms-block-preview.footer-simple .footer-col-wide strong) {
+  width: 52%;
+  height: 8px;
+  background: #ffffff;
+}
+
+:deep(.cms-block-preview.footer-simple .footer-col-wide span) {
+  width: 80%;
+  height: 5px;
+  background: #64748b;
+}
+
+:deep(.cms-block-preview.footer-simple .footer-col strong) {
+  width: 54%;
+  height: 7px;
+  background: #ffffff;
+}
+
+:deep(.cms-block-preview.footer-simple .footer-col span) {
+  width: 66%;
+  height: 5px;
+  background: #64748b;
+}
+
 
 :deep(.gjs-field),
 :deep(.gjs-field input),
@@ -3410,11 +5503,31 @@ function escapeAttr(value: string) {
 
 @media (max-width: 1180px) {
   .grapes-body {
-    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(0, 1fr) 300px;
   }
 
-  .grapes-sidebar.right {
+  .grapes-header__breadcrumbs {
     display: none;
+  }
+
+  .grapes-header__brand {
+    flex-basis: 180px;
+  }
+
+  .grapes-shell.is-left-collapsed .grapes-body {
+    grid-template-columns: 50px minmax(0, 1fr) 300px;
+  }
+
+  .grapes-shell.is-right-collapsed .grapes-body {
+    grid-template-columns: 220px minmax(0, 1fr) 50px;
+  }
+
+  .grapes-shell.is-left-collapsed.is-right-collapsed .grapes-body {
+    grid-template-columns: 50px minmax(0, 1fr) 50px;
+  }
+
+  .grapes-shell.is-preview .grapes-body {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
   }
 }
 </style>

@@ -1,6 +1,9 @@
 <script setup lang="ts">
-import type { CmsPage, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
+import type { CmsPage, CmsTemplateContext, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
+import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
+import { readChromeCss } from '@/utils/cms-chrome'
+import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 
 const route = useRoute()
 const appAccountStore = useAppAccountStore()
@@ -10,7 +13,9 @@ const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
 const publishedPages = ref<CmsPage[]>([])
+const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
+const wikiEnabled = ref(false)
 interface SiteNavigationItem {
   id?: string
   label: string
@@ -30,10 +35,19 @@ const slug = computed(() => {
   return value ? String(value) : ''
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
-const homeCss = computed(() => home.value?.settings?.homeCss || '')
+const homeCss = computed(() => [
+  home.value?.settings?.homeCss,
+  readChromeCss(home.value?.settings, 'header'),
+  readChromeCss(home.value?.settings, 'footer'),
+].filter(Boolean).join('\n'))
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
 const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : homeJs.value)
-const navigationItems = computed(() => parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url)))
+const navigationItems = computed(() => {
+  const items = parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url))
+  return wikiEnabled.value && !items.some(item => item.url === '/wiki')
+    ? [...items, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
+    : items
+})
 const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
 const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))
 const footerTitle = computed(() => home.value?.settings?.footerTitle || renderContext.value.site.name)
@@ -111,6 +125,8 @@ const renderContext = computed(() => {
     navigation: navigationItems.value,
     navUsers,
     pages: pageItems,
+    cms: templateContext.value.cms,
+    knowledge: templateContext.value.knowledge,
     categories: collectTermItems(publishedPages.value, 'categories'),
     tags: collectTermItems(publishedPages.value, 'tags'),
     archive: {
@@ -127,6 +143,7 @@ watch(() => route.fullPath, load, { immediate: true })
 watch([
   activeCmsJs,
   homeHtml,
+  templateContext,
   () => page.value?.htmlContent,
   () => appAccountStore.isLogin,
 ], runCmsScript, { flush: 'post' })
@@ -140,6 +157,8 @@ async function load() {
   errorMessage.value = ''
   home.value = null
   page.value = null
+  templateContext.value = emptyTemplateContext()
+  void loadWikiNavigation()
   try {
     if (slug.value) {
       const res = await apiCms.publicPage(slug.value)
@@ -158,7 +177,7 @@ async function load() {
       home.value = res.data
       document.title = `${res.data.title || '站点首页'} - ${appSettingsStore.siteName}`
     }
-    await loadPublicPages()
+    await Promise.all([loadPublicPages(), loadTemplateContext()])
   }
   catch (error: any) {
     errorMessage.value = error?.response?.data?.message || '页面暂不可访问'
@@ -166,6 +185,27 @@ async function load() {
   finally {
     loading.value = false
   }
+}
+
+async function loadTemplateContext() {
+  try {
+    const res = await apiCms.publicTemplateContext()
+    templateContext.value = res.data
+  }
+  catch {
+    templateContext.value = emptyTemplateContext()
+  }
+}
+
+function emptyTemplateContext(): CmsTemplateContext {
+  return {
+    cms: { pages: { latest: [] } },
+    knowledge: { spaces: [], pages: [], latest: [] },
+  }
+}
+
+async function loadWikiNavigation() {
+  wikiEnabled.value = await hasPublicWikiSpaces()
 }
 
 async function loadPublicPages() {
@@ -287,7 +327,7 @@ function renderDynamicHtml(value?: string) {
   if (!value) {
     return ''
   }
-  const sanitized = sanitizeHtml(value)
+  const sanitized = sanitizeCmsHtml(value)
   const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html')
   doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
   doc.querySelectorAll('main, section').forEach((el) => {
@@ -313,29 +353,19 @@ function renderDynamicHtml(value?: string) {
   })
   doc.querySelectorAll('[data-yb-repeat]').forEach((el) => {
     const key = el.getAttribute('data-yb-repeat')
-    const rows = key === 'navUsers'
-      ? renderContext.value.navUsers
-      : key === 'navigation'
-        ? renderContext.value.navigation
-        : key === 'pages'
-          ? renderContext.value.pages
-          : key === 'categories'
-            ? renderContext.value.categories
-            : key === 'tags'
-              ? renderContext.value.tags
-              : []
+    const rows = resolveCmsTemplateRows(key || '', renderContext.value)
     const template = el.innerHTML
-    el.innerHTML = rows.map((item, index) => renderVariables(template, { item, index: String(index + 1) })).join('')
+    el.innerHTML = rows.map((item, index) => renderCmsVariables(template, { item, index: String(index + 1) }, renderContext.value)).join('')
   })
-  return renderVariables(doc.body.firstElementChild?.innerHTML || sanitized)
-}
-
-function sanitizeHtml(value?: string) {
-  return (value || '')
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/javascript:/gi, '')
+  doc.querySelectorAll('[data-yb-html]').forEach((el) => {
+    el.innerHTML = sanitizeCmsHtml(el.getAttribute('data-yb-html') || '')
+    el.removeAttribute('data-yb-html')
+  })
+  doc.querySelectorAll('[data-yb-markdown]').forEach((el) => {
+    el.innerHTML = renderCmsMarkdown(el.getAttribute('data-yb-markdown') || '')
+    el.removeAttribute('data-yb-markdown')
+  })
+  return renderCmsVariables(doc.body.firstElementChild?.innerHTML || sanitized, {}, renderContext.value)
 }
 
 async function runCmsScript() {
@@ -398,64 +428,6 @@ function stripScriptTags(value: string) {
     .trim()
 }
 
-function renderVariables(value: string, localContext: Record<string, any> = {}) {
-  return value.replace(/\{\{\s*([\w.]+)\s*}}/g, (_, path: string) => escapeHtml(String(resolvePath(path, localContext) ?? '')))
-}
-
-function resolvePath(path: string, localContext: Record<string, any>) {
-  const root = { ...renderContext.value, ...localContext }
-  return path.split('.').reduce<any>((target, key) => {
-    if (Array.isArray(target) && key === 'count') {
-      return target.length
-    }
-    return target?.[key]
-  }, root)
-}
-
-function markdownPreview(markdown?: string) {
-  const lines = escapeHtml(markdown || '').split(/\r?\n/)
-  const html: string[] = []
-  let inList = false
-  for (const line of lines) {
-    const listMatch = line.match(/^\s*[-*]\s+(.+)$/)
-    if (listMatch) {
-      if (!inList) {
-        html.push('<ul>')
-        inList = true
-      }
-      html.push(`<li>${inlineMarkdown(listMatch[1])}</li>`)
-      continue
-    }
-    if (inList) {
-      html.push('</ul>')
-      inList = false
-    }
-    if (line.startsWith('### ')) {
-      html.push(`<h3>${inlineMarkdown(line.slice(4))}</h3>`)
-    }
-    else if (line.startsWith('## ')) {
-      html.push(`<h2>${inlineMarkdown(line.slice(3))}</h2>`)
-    }
-    else if (line.startsWith('# ')) {
-      html.push(`<h1>${inlineMarkdown(line.slice(2))}</h1>`)
-    }
-    else if (line.trim()) {
-      html.push(`<p>${inlineMarkdown(line)}</p>`)
-    }
-  }
-  if (inList) {
-    html.push('</ul>')
-  }
-  return html.join('')
-}
-
-function inlineMarkdown(value: string) {
-  return value
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-}
-
 function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 10) : ''
 }
@@ -480,13 +452,16 @@ function escapeHtml(value: string) {
     </div>
 
     <template v-else>
-      <header class="site-layout-header">
+      <component :is="'style'" v-if="homeCss">
+        {{ homeCss }}
+      </component>
+      <header data-yb-chrome="header" class="site-layout-header">
         <div class="site-layout-header__bar">
-          <a class="site-layout-header__brand" href="/site">
+          <a data-yb-chrome-slot="logo" class="site-layout-header__brand" href="/site">
             <img v-if="renderContext.site.logo" :src="renderContext.site.logo" :alt="renderContext.site.name">
             <span>{{ renderContext.site.name }}</span>
           </a>
-          <nav class="site-layout-header__nav">
+          <nav data-yb-chrome-slot="navigation" class="site-layout-header__nav">
             <div v-for="item in navigationTree" :key="item.id || item.url" class="site-nav-item" :class="{ 'has-children': item.children?.length }">
               <a :href="item.url">
                 {{ item.label }}
@@ -497,11 +472,11 @@ function escapeHtml(value: string) {
               </div>
             </div>
           </nav>
-          <div v-if="!appAccountStore.isLogin" class="site-layout-header__auth">
+          <div v-if="!appAccountStore.isLogin" data-yb-chrome-slot="auth" class="site-layout-header__auth">
             <a href="/login" class="ghost">登录</a>
             <a href="/register" class="primary">注册</a>
           </div>
-          <details v-else class="site-layout-header__account">
+          <details v-else data-yb-chrome-slot="auth" class="site-layout-header__account">
             <summary>
               <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
               <span>{{ appAccountStore.account }}</span>
@@ -528,9 +503,6 @@ function escapeHtml(value: string) {
 
         <div class="site-layout-content">
           <template v-if="!page && home">
-            <component :is="'style'" v-if="homeCss">
-              {{ homeCss }}
-            </component>
             <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
             <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
               <div class="site-shell">
@@ -570,19 +542,19 @@ function escapeHtml(value: string) {
         </div>
       </div>
 
-      <footer v-if="showFooter" class="site-layout-footer">
+      <footer v-if="showFooter" data-yb-chrome="footer" class="site-layout-footer">
         <div class="site-shell">
-          <div>
+          <div data-yb-chrome-slot="footer-brand">
             <strong>{{ footerTitle }}</strong>
             <p>{{ footerDescription }}</p>
             <small>{{ footerCopyright }}</small>
           </div>
-          <nav>
+          <nav data-yb-chrome-slot="footer-navigation">
             <a v-for="item in footerNavigationItems" :key="`foot-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
           </nav>
         </div>
       </footer>
-      <footer v-else-if="showCopyright" class="site-layout-copyright">
+      <footer v-else-if="showCopyright" data-yb-chrome="footer" class="site-layout-copyright">
         {{ footerCopyright }}
       </footer>
     </template>
@@ -591,9 +563,51 @@ function escapeHtml(value: string) {
 
 <style scoped>
 .site-page {
+  --yb-site-bg: #f8fafc;
+  --yb-site-text: #111827;
+  --yb-site-heading: #0f172a;
+  --yb-site-muted: #64748b;
+  --yb-site-caption: #94a3b8;
+  --yb-site-nav-text: #475569;
+  --yb-site-text-2: #334155;
+  --yb-site-border: #e5e7eb;
+  --yb-site-border-2: #e2e8f0;
+  --yb-site-header-bg: rgba(255, 255, 255, 0.94);
+  --yb-site-surface: #ffffff;
+  --yb-site-hover: #f1f5f9;
+  --yb-site-primary: #0f766e;
+  --yb-site-primary-text: #ffffff;
+  --yb-site-primary-btn-bg: #111827;
+  --yb-site-primary-btn-text: #ffffff;
+  --yb-site-hero-bg: linear-gradient(135deg, #0f766e, #1f2937);
+  --yb-site-hero-text: #ffffff;
+  --yb-site-danger: #b91c1c;
+
   min-height: 100vh;
-  background: #f8fafc;
-  color: #111827;
+  background: var(--yb-site-bg);
+  color: var(--yb-site-text);
+}
+
+.site-page.dark,
+.dark .site-page {
+  --yb-site-bg: #0f172a;
+  --yb-site-text: #e2e8f0;
+  --yb-site-heading: #f8fafc;
+  --yb-site-muted: #94a3b8;
+  --yb-site-caption: #64748b;
+  --yb-site-nav-text: #cbd5e1;
+  --yb-site-text-2: #e2e8f0;
+  --yb-site-border: #1e293b;
+  --yb-site-border-2: #334155;
+  --yb-site-header-bg: rgba(15, 23, 42, 0.86);
+  --yb-site-surface: #1e293b;
+  --yb-site-hover: #334155;
+  --yb-site-primary: #2dd4bf;
+  --yb-site-primary-text: #0f172a;
+  --yb-site-primary-btn-bg: #2dd4bf;
+  --yb-site-primary-btn-text: #0f172a;
+  --yb-site-hero-bg: linear-gradient(135deg, #115e59, #111827);
+  --yb-site-hero-text: #f8fafc;
 }
 
 .site-shell {
@@ -605,15 +619,15 @@ function escapeHtml(value: string) {
   display: grid;
   min-height: 100vh;
   place-items: center;
-  color: #64748b;
+  color: var(--yb-site-muted);
 }
 
 .site-layout-header {
   position: sticky;
   top: 0;
   z-index: 1000;
-  border-bottom: 1px solid #e5e7eb;
-  background: rgba(255, 255, 255, 0.94);
+  border-bottom: 1px solid var(--yb-site-border);
+  background: var(--yb-site-header-bg);
   backdrop-filter: blur(12px);
   isolation: isolate;
 }
@@ -638,7 +652,7 @@ function escapeHtml(value: string) {
 .site-layout-header__brand {
   min-width: 0;
   gap: 10px;
-  color: #0f172a;
+  color: var(--yb-site-heading);
   font-size: 18px;
   font-weight: 900;
   text-decoration: none;
@@ -669,7 +683,7 @@ function escapeHtml(value: string) {
   gap: 4px;
   padding: 8px 9px;
   border-radius: 7px;
-  color: #475569;
+  color: var(--yb-site-nav-text);
   font-size: 14px;
   font-weight: 650;
   text-decoration: none;
@@ -677,8 +691,8 @@ function escapeHtml(value: string) {
 
 .site-layout-header__nav a:hover,
 .site-nav-item:hover > a {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--yb-site-hover);
+  color: var(--yb-site-heading);
 }
 
 .site-nav-dropdown {
@@ -697,9 +711,9 @@ function escapeHtml(value: string) {
   position: absolute;
   inset: 8px 0 0;
   z-index: -1;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--yb-site-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--yb-site-surface);
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
   content: "";
 }
@@ -740,17 +754,17 @@ function escapeHtml(value: string) {
 
 .site-layout-header__auth .ghost,
 .site-layout-header__account summary {
-  background: #fff;
-  color: #334155;
+  background: var(--yb-site-surface);
+  color: var(--yb-site-text-2);
 }
 
 .site-layout-header__auth .ghost {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--yb-site-border-2);
 }
 
 .site-layout-header__auth .primary {
-  background: #111827;
-  color: #fff;
+  background: var(--yb-site-primary-btn-bg);
+  color: var(--yb-site-primary-btn-text);
 }
 
 .site-layout-header__account {
@@ -772,7 +786,7 @@ function escapeHtml(value: string) {
 
 .site-layout-header__account summary:hover,
 .site-layout-header__account[open] summary {
-  background: #f8fafc;
+  background: var(--yb-site-bg);
 }
 
 .site-layout-header__account summary:focus-visible {
@@ -787,7 +801,7 @@ function escapeHtml(value: string) {
 }
 
 .site-layout-header__account i {
-  color: #94a3b8;
+  color: var(--yb-site-caption);
   font-size: 12px;
   font-style: normal;
 }
@@ -799,25 +813,25 @@ function escapeHtml(value: string) {
   display: grid;
   min-width: 142px;
   padding: 7px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--yb-site-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--yb-site-surface);
   box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
 }
 
 .site-layout-header__account a {
   padding: 9px 10px;
   border-radius: 8px;
-  color: #334155;
+  color: var(--yb-site-text-2);
   text-decoration: none;
 }
 
 .site-layout-header__account a:hover {
-  background: #f1f5f9;
+  background: var(--yb-site-hover);
 }
 
 .site-layout-header__account a.danger {
-  color: #b91c1c;
+  color: var(--yb-site-danger);
 }
 
 .site-layout-frame {
@@ -840,32 +854,32 @@ function escapeHtml(value: string) {
   width: 240px;
   height: calc(100vh - 63px);
   padding: 18px 14px;
-  border-right: 1px solid #e5e7eb;
-  background: #fff;
+  border-right: 1px solid var(--yb-site-border);
+  background: var(--yb-site-surface);
   gap: 6px;
 }
 
 .site-admin-sidebar strong {
   padding: 10px 12px 14px;
-  color: #0f172a;
+  color: var(--yb-site-heading);
 }
 
 .site-admin-sidebar a {
   padding: 10px 12px;
   border-radius: 8px;
-  color: #475569;
+  color: var(--yb-site-nav-text);
   text-decoration: none;
 }
 
 .site-admin-sidebar a:hover {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--yb-site-hover);
+  color: var(--yb-site-heading);
 }
 
 .site-admin-sidebar a.child {
   margin-left: 12px;
   padding-left: 18px;
-  color: #64748b;
+  color: var(--yb-site-muted);
   font-size: 13px;
 }
 
@@ -873,9 +887,9 @@ function escapeHtml(value: string) {
   position: relative;
   z-index: 1;
   padding: 36px 0;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
-  color: #0f172a;
+  border-top: 1px solid var(--yb-site-border);
+  background: var(--yb-site-surface);
+  color: var(--yb-site-heading);
 }
 
 .site-layout-footer .site-shell {
@@ -891,13 +905,13 @@ function escapeHtml(value: string) {
 
 .site-layout-footer p {
   margin: 8px 0 0;
-  color: #64748b;
+  color: var(--yb-site-muted);
 }
 
 .site-layout-footer small {
   display: block;
   margin-top: 12px;
-  color: #94a3b8;
+  color: var(--yb-site-caption);
 }
 
 .site-layout-footer nav {
@@ -908,19 +922,19 @@ function escapeHtml(value: string) {
 }
 
 .site-layout-footer a {
-  color: #475569;
+  color: var(--yb-site-nav-text);
   text-decoration: none;
 }
 
 .site-layout-footer a:hover {
-  color: #0f766e;
+  color: var(--yb-site-primary);
 }
 
 .site-layout-copyright {
   padding: 18px;
-  border-top: 1px solid #e5e7eb;
-  background: #fff;
-  color: #64748b;
+  border-top: 1px solid var(--yb-site-border);
+  background: var(--yb-site-surface);
+  color: var(--yb-site-muted);
   text-align: center;
 }
 
@@ -928,12 +942,40 @@ function escapeHtml(value: string) {
   min-height: initial;
 }
 
-.site-builder-home :deep(section) {
-  min-height: initial;
+.site-builder-home :deep(section:not([class])),
+.site-builder-home :deep(article:not([class])) {
+  margin-block: 0 1.25rem;
+  padding-block: 0.75rem;
+  padding-inline: 0;}
+
+.site-builder-home :deep(:where(h1, h2, h3, h4, h5, h6)) {
+  margin-block: 0 0.6em;
+  line-height: 1.2;
+}
+
+.site-builder-home :deep(:where(p, ul, ol, blockquote)) {
+  margin-block: 0 0.9em;
+  line-height: 1.7;}
+
+.site-builder-home :deep(:where(ul, ol)) {
+  padding-inline-start: 1.4em;
 }
 
 .site-builder-home :deep(img) {
   max-width: 100%;
+  height: auto;
+}
+
+.site-builder-home :deep(pre) {
+  overflow: auto;
+  max-width: 100%;
+}
+
+.site-builder-home :deep(iframe),
+.site-builder-home :deep(video),
+.site-builder-home :deep(embed) {
+  max-width: 100%;
+  height: auto;
 }
 
 .site-hero,
@@ -942,10 +984,10 @@ function escapeHtml(value: string) {
   min-height: 420px;
   align-items: end;
   padding: 72px 0;
-  background: linear-gradient(135deg, #0f766e, #1f2937);
+  background: var(--yb-site-hero-bg);
   background-position: center;
   background-size: cover;
-  color: #fff;
+  color: var(--yb-site-hero-text);
 }
 
 .site-hero h1,
@@ -1001,15 +1043,15 @@ function escapeHtml(value: string) {
   min-height: 240px;
   align-items: end;
   padding: 28px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--yb-site-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--yb-site-surface);
   background-position: center;
   background-size: cover;
 }
 
 .site-section span {
-  color: #0f766e;
+  color: var(--yb-site-primary);
   font-weight: 700;
 }
 
@@ -1020,20 +1062,20 @@ function escapeHtml(value: string) {
 
 .site-section p {
   margin: 0;
-  color: #64748b;
+  color: var(--yb-site-muted);
 }
 
 .site-section a {
   display: inline-flex;
   margin-top: 16px;
-  color: #0f766e;
+  color: var(--yb-site-primary);
   font-weight: 700;
 }
 
 .site-article__body {
   max-width: 860px;
   padding: 48px 0 72px;
-  color: #1f2937;
+  color: var(--yb-site-text);
   font-size: 17px;
   line-height: 1.8;
 }
@@ -1043,14 +1085,39 @@ function escapeHtml(value: string) {
   gap: 20px;
 }
 
-.site-article__body :deep(.yb-hero),
+.site-article__body :deep(:where(h1, h2, h3, h4, h5, h6)) {
+  margin-block: 0 0.55em;
+  line-height: 1.25;
+}
+
+.site-article__body :deep(:where(p, ul, ol, blockquote)) {
+  margin-block: 0 0.85em;
+  line-height: 1.8;
+}
+
+.site-article__body :deep(:where(ul, ol)) {
+  padding-inline-start: 1.5em;
+}
+
+.site-article__body :deep(img),
+.site-article__body :deep(iframe),
+.site-article__body :deep(video),
+.site-article__body :deep(embed) {
+  max-width: 100%;
+  height: auto;
+}
+
+.site-article__body :deep(pre) {
+  overflow: auto;
+  max-width: 100%;
+}
 .site-article__body :deep(.yb-cta) {
   padding: 34px;
   border-radius: 8px;
-  background: #0f766e;
+  background: var(--yb-site-primary);
   background-position: center;
   background-size: cover;
-  color: #fff;
+  color: var(--yb-site-hero-text);
 }
 
 .site-article__body :deep(.yb-hero h1) {
@@ -1073,8 +1140,8 @@ function escapeHtml(value: string) {
   margin-top: 22px;
   padding: 10px 14px;
   border-radius: 6px;
-  background: #fff;
-  color: #0f766e;
+  background: var(--yb-site-surface);
+  color: var(--yb-site-primary);
   font-weight: 800;
   text-decoration: none;
 }
@@ -1082,9 +1149,9 @@ function escapeHtml(value: string) {
 .site-article__body :deep(.yb-text),
 .site-article__body :deep(.yb-image) {
   padding: 22px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--yb-site-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--yb-site-surface);
 }
 
 .site-article__body :deep(.yb-image figcaption) {
@@ -1094,7 +1161,7 @@ function escapeHtml(value: string) {
 }
 
 .site-article__body :deep(.yb-image figcaption span) {
-  color: #64748b;
+  color: var(--yb-site-muted);
 }
 
 .site-article__body :deep(h1),
@@ -1138,7 +1205,7 @@ function escapeHtml(value: string) {
     width: auto;
     height: auto;
     border-right: 0;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--yb-site-border);
   }
 
   .site-layout-footer .site-shell {
@@ -1157,6 +1224,43 @@ function escapeHtml(value: string) {
 
   .site-sections {
     grid-template-columns: 1fr;
+  }
+
+  .site-shell {
+    width: calc(100% - 24px);
+  }
+
+  .site-builder-home :deep(section:not([class])),
+  .site-builder-home :deep(article:not([class])) {
+    padding-inline: 0.75rem;
+  }
+
+  .site-builder-home :deep(iframe),
+  .site-builder-home :deep(video),
+  .site-builder-home :deep(embed),
+  .site-builder-home :deep(img),
+  .site-builder-home :deep(table) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .site-builder-home :deep(pre) {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .site-article__body :deep(iframe),
+  .site-article__body :deep(video),
+  .site-article__body :deep(embed),
+  .site-article__body :deep(img),
+  .site-article__body :deep(table) {
+    max-width: 100%;
+    height: auto;
+  }
+
+  .site-article__body :deep(pre) {
+    white-space: pre-wrap;
+    word-break: break-word;
   }
 }
 </style>
