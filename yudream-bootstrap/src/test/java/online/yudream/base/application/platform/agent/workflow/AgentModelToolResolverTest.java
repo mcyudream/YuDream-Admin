@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
+import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
@@ -88,6 +89,44 @@ class AgentModelToolResolverTest {
                 .isInstanceOf(BizException.class);
     }
 
+    @Test
+    void shouldFreezePermissionSnapshotForPythonAdapterBeforeTheCommandCanChange() {
+        AgentRunCmd command = command("risk:score");
+        AgentModelToolResolver resolver = resolver(
+                toolRepo(pythonTool(true)),
+                (script, stdin) -> success("{\"score\":95}"),
+                List.of(),
+                permission -> false
+        );
+
+        AiAgentTool tool = resolver.resolve(List.of("risk_score"), application("risk_score"), command).getFirst();
+        command.setPermissionCodes(List.of());
+        command.setPermissionContextExplicit(false);
+
+        assertThat(tool.execute(new AiAgentToolCall("risk_score", Map.of("score", 95))).payload())
+                .containsEntry("score", 95);
+    }
+
+    @Test
+    void shouldKeepNonExplicitPermissionGatewayFallbackForSystemToolExecution() {
+        RecordingPermissionGateway permissions = new RecordingPermissionGateway();
+        AgentToolExecutor executor = new AgentToolExecutor(
+                new ObjectMapper(),
+                (script, stdin) -> failRuntime(),
+                emptyToolRepo(),
+                List.of(systemTool()),
+                permissions
+        );
+        AgentRunCmd command = new AgentRunCmd();
+        command.setPermissionCodes(List.of("ignored:permission"));
+        command.setPermissionContextExplicit(false);
+
+        executor.execute("system.lookup", Map.of(), application("system.lookup"), command);
+
+        assertThat(permissions.explicitContexts).containsExactly(false, false);
+        assertThat(permissions.fallbackCalls).isEqualTo(2);
+    }
+
     private AgentModelToolResolver resolver(
             AgentToolRepo repo,
             online.yudream.base.domain.platform.integration.service.RuntimeExecutor runtime,
@@ -157,6 +196,23 @@ class AgentModelToolResolverTest {
             }
             @Override public void deleteById(Long id) { }
         };
+    }
+
+    private static final class RecordingPermissionGateway implements AgentPermissionGateway {
+        private final java.util.ArrayList<Boolean> explicitContexts = new java.util.ArrayList<>();
+        private int fallbackCalls;
+
+        @Override
+        public boolean hasPermission(String permissionCode) {
+            fallbackCalls++;
+            return true;
+        }
+
+        @Override
+        public boolean hasPermission(String permissionCode, List<String> permissionCodes, boolean explicitContext) {
+            explicitContexts.add(explicitContext);
+            return AgentPermissionGateway.super.hasPermission(permissionCode, permissionCodes, explicitContext);
+        }
     }
 
     private RuntimeExecutionResult success(String output) {
