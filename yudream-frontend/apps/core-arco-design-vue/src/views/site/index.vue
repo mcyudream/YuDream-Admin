@@ -433,14 +433,6 @@ function dateText(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 10) : ''
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
 </script>
 
 <template>
@@ -540,7 +532,7 @@ function escapeHtml(value: string) {
                 </div>
               </div>
             </header>
-            <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : markdownPreview(page.markdownContent)" />
+            <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : renderCmsMarkdown(page.markdownContent)" />
           </article>
         </div>
       </div>
