@@ -15,6 +15,7 @@ import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './config/agent-node-data'
+import { buildAgentRunInput } from './config/agent-run-input'
 import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
@@ -94,10 +95,11 @@ const selectedEdge = computed(() => edges.value.find(item => item.id === selecte
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
-const debugModelNode = computed(() => nodes.value.find(node => agentModelKind(node.data.kind) === 'chat'))
-const debugModel = computed(() => agentModels.value.find(model => model.providerCode === debugModelNode.value?.data.providerCode && model.modelCode === debugModelNode.value?.data.modelCode))
-const debugModelLabel = computed(() => debugModel.value ? `${debugModel.value.providerName} / ${debugModel.value.modelName}` : debugModelNode.value ? '' : '无需模型')
-const debugAllowsTextFiles = computed(() => Boolean(debugModelNode.value?.data.acceptFiles || nodes.value.some(node => node.data.kind === 'document')))
+const debugModelNodes = computed(() => nodes.value.filter(node => agentModelKind(node.data.kind) === 'chat'))
+const debugModels = computed(() => debugModelNodes.value.map(node => agentModels.value.find(model => model.providerCode === node.data.providerCode && model.modelCode === node.data.modelCode)))
+const debugModelLabel = computed(() => debugModelNodes.value.length ? `${debugModelNodes.value.length} 个模型节点` : '无需模型')
+const debugAllowsImage = computed(() => debugModelNodes.value.some((node, index) => node.data.vision && debugModels.value[index]?.vision))
+const debugAllowsTextFiles = computed(() => Boolean(debugModelNodes.value.some(node => node.data.acceptFiles) || nodes.value.some(node => node.data.kind === 'document')))
 const { addNodes, addEdges, screenToFlowCoordinate, fitView, setCenter, updateNodeData } = useVueFlow()
 
 onMounted(async () => {
@@ -484,14 +486,13 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
   if (debugRunning.value) {
     return
   }
-  const modelNode = debugModelNode.value
-  const model = debugModel.value
-  if (modelNode && (!model || !model.configured)) {
-    selectNode(modelNode.id)
+  const invalidModelIndex = debugModels.value.findIndex(model => !model?.configured)
+  if (invalidModelIndex >= 0) {
+    selectNode(debugModelNodes.value[invalidModelIndex]!.id)
     toast.error('请先为大模型节点选择已配置 API Key 的模型')
     return
   }
-  if (attachments.some(item => item.type.startsWith('image/')) && !model?.vision) {
+  if (attachments.some(item => item.type.startsWith('image/')) && !debugAllowsImage.value) {
     toast.error('当前模型不支持图片输入')
     return
   }
@@ -507,11 +508,7 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
   rightMode.value = 'debug'
   resetDebugCanvas()
   const assistantId = `assistant-${Date.now()}`
-  const attachmentContext = attachments
-    .filter(item => item.text)
-    .map(item => `附件：${item.name}\n${item.text}`)
-    .join('\n\n')
-  const debugInput = [content, attachmentContext].filter(Boolean).join('\n\n')
+  const debugInput = buildAgentRunInput(content, attachments)
   const imageDataUrl = attachments.find(item => item.type.startsWith('image/'))?.dataUrl
   const messageAttachments = attachments.map(item => ({
     id: item.id,
@@ -531,8 +528,6 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
   try {
     const request = await apiAgent.debugStreamRequest(applicationId, {
       input: debugInput,
-      providerCode: model?.providerCode,
-      modelCode: model?.modelCode,
       imageDataUrl,
       attachments: attachments
         .filter(item => !item.type.startsWith('image/') && item.dataUrl)
@@ -748,7 +743,7 @@ async function save(publish = false, notify = true): Promise<string> {
         class="inspector-panel"
         :messages="debugMessages"
         :running="debugRunning"
-        :allow-image="Boolean(debugModel?.vision)"
+        :allow-image="debugAllowsImage"
         :allow-files="debugAllowsTextFiles"
         :model-label="debugModelLabel"
         @send="startDebug"
