@@ -1,27 +1,29 @@
 <script setup lang="ts">
 import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { Editor } from 'grapesjs'
+import type { CmsAgentSelectOption } from '../config/cms-agent-options'
+import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
 import type { AiToolCallResult, CmsChatHistoryMessage, CmsPageGenerateResult } from '@/api/modules/platform-ai'
 import type { CmsAiChatAttachmentMeta, CmsAiChatSession, CmsAiChatSessionSummary } from '@/utils/cms-ai-chat-history'
+import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
 import { registerHandler, removeHandler } from '@jboltai/tokui'
 import { ActivityRenderer, ChatContent, ChatMessage, ChatSender, ToolCallRenderer, useChat } from '@tdesign-vue-next/chat'
 import { Select as TSelect, Switch as TSwitch, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
+import apiCms from '@/api/modules/platform-cms'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
-import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
 import { chromeCanvasPreviewCss, chromeFrameTemplate, extractHomeContent } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
-import CmsCodeEditor from './CmsCodeEditor.vue'
-import { registerCmsAguiRenderers } from './cms-agui-renderers'
-import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
+import { resolveCmsAgentCode } from '../config/cms-agent-options'
 import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
-import { isNearChatBottom, scrollChatToBottom } from '../config/cms-chat-auto-scroll'
 import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
+import { isNearChatBottom, scrollChatToBottom } from '../config/cms-chat-auto-scroll'
 import { cmsGrapesPlugins, cmsGrapesPluginsOpts, localizeCmsPluginBlocks } from '../config/cms-grapes-plugins'
-import apiCms from '@/api/modules/platform-cms'
+import { registerCmsAguiRenderers } from './cms-agui-renderers'
+import CmsCodeEditor from './CmsCodeEditor.vue'
 import TokuiBlock from './TokuiBlock.vue'
 import '@tdesign-vue-next/chat/es/style/index.css'
 import 'grapesjs/dist/css/grapes.min.css'
@@ -38,13 +40,6 @@ interface GrapesSavePayload {
 type RightPanelTab = 'ai' | 'layers' | 'traits' | 'styles' | 'source'
 type LeftWorkspace = 'blocks' | 'media'
 type CanvasDevice = 'desktop' | 'tablet' | 'mobile'
-interface AiModelSelectOption {
-  label: string
-  value: string
-  providerCode?: string
-  modelCode?: string
-}
-
 interface CanvasSelectionSnapshot {
   label: string
   type?: string
@@ -77,7 +72,7 @@ const props = defineProps<{
   builderProjectJson?: string
   title?: string
   aiEnabled?: boolean
-  aiModelOptions?: AiModelSelectOption[]
+  aiAgentOptions?: CmsAgentSelectOption[]
   chromeFrame?: boolean
   chromeLayout?: CmsSiteLayoutMode
   templatePreviewContext?: Record<string, any>
@@ -103,7 +98,7 @@ const aiAttachmentInput = ref<HTMLInputElement>()
 const aiChatScrollEl = ref<HTMLElement>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
-const aiModel = ref('')
+const aiAgentCode = ref('')
 const aiThinkingEnabled = ref(false)
 const aiPrompt = ref('')
 const aiAttachments = ref<any[]>([])
@@ -479,7 +474,7 @@ const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
 const chatHistoryTargetId = computed(() => String(props.historyTargetId || props.title || 'draft'))
 const chatHistoryTargetKey = computed(() => cmsAiChatTargetKey(chatHistoryTargetType.value, chatHistoryTargetId.value))
 const chatHistoryTargetLabel = computed(() => props.historyTargetLabel || props.title || (chatHistoryTargetType.value === 'home' ? '首页' : '未命名页面'))
-const selectedAiModelOption = computed(() => props.aiModelOptions?.find(item => item.value === aiModel.value) || props.aiModelOptions?.[0] || null)
+const selectedAiAgentOption = computed(() => props.aiAgentOptions?.find(item => item.value === aiAgentCode.value) || null)
 
 const aiDefaultMessages = computed<ChatMessagesData[]>(() => [
   {
@@ -722,14 +717,8 @@ watch(() => props.aiEnabled, (enabled) => {
   }
 })
 
-watch(() => props.aiModelOptions, (options) => {
-  if (!options?.length) {
-    aiModel.value = ''
-    return
-  }
-  if (!options.some(item => item.value === aiModel.value)) {
-    aiModel.value = options[0].value
-  }
+watch(() => props.aiAgentOptions, (options) => {
+  aiAgentCode.value = resolveCmsAgentCode(options || [], aiAgentCode.value)
 }, { deep: true })
 
 watch([rightPanelTab, chatHistoryTargetKey], () => {
@@ -830,7 +819,7 @@ onMounted(async () => {
     }
   })
   await loadMedia()
-  aiModel.value = props.aiModelOptions?.[0]?.value || ''
+  aiAgentCode.value = resolveCmsAgentCode(props.aiAgentOptions || [], aiAgentCode.value)
   registerHandler('pick', onPickOption)
   if (rightPanelTab.value === 'ai') {
     void loadChatHistory(true)
@@ -1367,7 +1356,7 @@ async function ensureActiveSession(): Promise<CmsAiChatSession> {
     targetLabel: chatHistoryTargetLabel.value,
     title: chatHistoryTargetLabel.value,
     preview: '',
-    model: selectedAiModelOption.value?.label || aiModel.value || undefined,
+    model: selectedAiAgentOption.value?.label || aiAgentCode.value || undefined,
     thinkingEnabled: aiThinkingEnabled.value,
     attachments: [],
     createdAt: now,
@@ -1409,7 +1398,7 @@ function appendUserTurn(session: CmsAiChatSession, prompt: string, attachments: 
     session.title = compactText(displayPrompt, 36)
   }
   session.preview = compactText(displayPrompt, 120)
-  session.model = selectedAiModelOption.value?.label || aiModel.value || session.model
+  session.model = selectedAiAgentOption.value?.label || aiAgentCode.value || session.model
   session.thinkingEnabled = aiThinkingEnabled.value
   session.updatedAt = now
   if (attachmentMetas.length) {
@@ -1561,7 +1550,6 @@ function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsCha
   }
   removeLayoutBlocks(editor)
   const image = firstImageAttachment(attachments)
-  const modelOption = selectedAiModelOption.value
   return {
     target: props.historyTargetType,
     title: props.title || '',
@@ -1571,9 +1559,7 @@ function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsCha
     style: props.chromeFrame
       ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
       : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
-    providerCode: modelOption?.providerCode,
-    modelCode: modelOption?.modelCode || aiModel.value || undefined,
-    model: modelOption?.modelCode || aiModel.value || undefined,
+    agentCode: aiAgentCode.value || undefined,
     imageDataUrl: image?.url || undefined,
     currentHtml: editor.getHtml(),
     currentCss: fullCanvasCss(),
@@ -3224,12 +3210,12 @@ function escapeAttr(value: string) {
                     <FaIcon name="i-ri:image-add-line" />
                   </button>
                 </TTooltip>
-                <div v-if="aiModelOptions?.length" class="ai-model-select">
-                  <TTooltip content="切换模型" trigger="hover">
+                <div v-if="aiAgentOptions?.length" class="ai-model-select">
+                  <TTooltip content="切换 Agent" trigger="hover">
                     <TSelect
-                      v-model="aiModel"
+                      v-model="aiAgentCode"
                       class="ai-model-select__control"
-                      :options="aiModelOptions"
+                      :options="aiAgentOptions"
                       size="small"
                     />
                   </TTooltip>
@@ -3272,7 +3258,7 @@ function escapeAttr(value: string) {
                   @click="openChatHistory(item)"
                 >
                   <strong>{{ item.title || '未命名会话' }}</strong>
-                  <small>{{ formatHistoryTime(item.updatedAt) }} · {{ item.model || '默认模型' }}</small>
+                  <small>{{ formatHistoryTime(item.updatedAt) }} · {{ item.model || '默认 Agent' }}</small>
                   <span>{{ item.preview }}</span>
                 </button>
               </div>
