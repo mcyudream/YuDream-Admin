@@ -1,27 +1,22 @@
 <script setup lang="ts">
+import type { CmsAgentSelectOption } from './config/cms-agent-options'
 import type { FileObject } from '@/api/modules/files'
-import type { CapabilityItem } from '@/api/modules/platform-capability'
 import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
-import apiCapability from '@/api/modules/platform-capability'
+import apiAgent from '@/api/modules/platform-agent'
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { readChromeCss } from '@/utils/cms-chrome'
+import CmsBlockLibrary from './components/CmsBlockLibrary.vue'
 import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
-import CmsBlockLibrary from './components/CmsBlockLibrary.vue'
+import { toCmsAgentOptions } from './config/cms-agent-options'
 
 type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type EditorTarget = 'page' | 'home'
 type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
-interface AiModelSelectOption {
-  label: string
-  value: string
-  providerCode?: string
-  modelCode?: string
-}
 interface CmsNavigationItem {
   id: string
   label: string
@@ -50,7 +45,7 @@ const wikiEnabled = ref(false)
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const mediaItems = ref<FileObject[]>([])
 const mediaInput = ref<HTMLInputElement>()
-const aiCapability = ref<CapabilityItem>()
+const aiAgentOptions = ref<CmsAgentSelectOption[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
 const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
@@ -109,8 +104,7 @@ const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] =
 ]
 
 const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
-const aiEnabled = computed(() => Boolean(aiCapability.value?.enabled))
-const aiModelOptions = computed<AiModelSelectOption[]>(() => aiProviderModelOptions(aiCapability.value?.config || {}))
+const aiEnabled = computed(() => aiAgentOptions.value.length > 0)
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
 const previewNavigationItems = computed(() => {
   const items = navigationItems.value.filter(item => item.visible !== false)
@@ -282,57 +276,19 @@ watch(activeTab, async () => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadAiCapability(), loadWikiNavigation()])
+  await Promise.all([loadAiApplications(), loadWikiNavigation()])
   await loadPages()
   await loadTemplatePreviewContext()
 })
 
-async function loadAiCapability() {
+async function loadAiApplications() {
   try {
-    const res = await apiCapability.list()
-    aiCapability.value = res.data.find(item => item.code === 'ai')
+    const res = await apiAgent.page({ page: 1, size: 200, status: 'PUBLISHED' })
+    aiAgentOptions.value = toCmsAgentOptions(res.data.records)
   }
   catch {
-    aiCapability.value = undefined
+    aiAgentOptions.value = []
   }
-}
-
-function aiProviderModelOptions(config: Record<string, string>): AiModelSelectOption[] {
-  if (config.providers) {
-    try {
-      const providers = JSON.parse(config.providers) as Array<Record<string, any>>
-      return providers.flatMap((provider) => {
-        const providerCode = String(provider.code || '').trim()
-        const providerName = String(provider.name || providerCode || 'AI').trim()
-        const models = Array.isArray(provider.models) ? provider.models : []
-        return models
-          .map((model) => {
-            const raw = typeof model === 'string' ? { code: model, model } : model
-            const modelCode = String(raw.code || raw.model || raw.name || '').trim()
-            const modelName = String(raw.name || raw.model || modelCode).trim()
-            if (!providerCode || !modelCode) {
-              return null
-            }
-            return {
-              label: `${providerName} / ${modelName}`,
-              value: `${providerCode}:${modelCode}`,
-              providerCode,
-              modelCode,
-            }
-          })
-          .filter(Boolean) as AiModelSelectOption[]
-      })
-    }
-    catch {
-      return []
-    }
-  }
-  const source = config.models || config.model || ''
-  return source
-    .split(/[,，\n\r]/)
-    .map(item => item.trim())
-    .filter(Boolean)
-    .map(value => ({ label: value, value, modelCode: value }))
 }
 
 async function loadPages() {
@@ -1227,7 +1183,7 @@ function sectionTitle(type: HomeSectionType) {
         :chrome-layout="editorTarget === 'home' ? homeLayoutMode : undefined"
         :template-preview-context="templatePreviewContext"
         :ai-enabled="aiEnabled"
-        :ai-model-options="aiModelOptions"
+        :ai-agent-options="aiAgentOptions"
         :history-target-type="editorTarget"
         :history-target-id="editorTarget === 'home' ? 'home' : (selectedPageId || pageForm.slug || pageForm.title || 'draft')"
         :history-target-label="editorTarget === 'home' ? home.title : pageForm.title"

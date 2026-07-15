@@ -9,14 +9,12 @@ export interface CmsChatHistoryMessage {
 
 export interface CmsPageGeneratePayload {
   target?: 'page' | 'home' | 'header' | 'footer'
+  agentCode?: string
   title?: string
   prompt: string
   pageType?: string
   style?: string
   siteName?: string
-  providerCode?: string
-  modelCode?: string
-  model?: string
   imageDataUrl?: string
   currentHtml?: string
   currentCss?: string
