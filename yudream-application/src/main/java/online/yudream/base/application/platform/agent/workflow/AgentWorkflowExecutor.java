@@ -58,7 +58,26 @@ public final class AgentWorkflowExecutor {
                 throw exception;
             }
         }
+        Set<String> reachableNodeIds = structurallyReachableNodeIds(graph);
+        graph.topologicalOrder().stream()
+                .filter(node -> reachableNodeIds.contains(node.id()))
+                .filter(node -> !executedNodeIds.contains(node.id()))
+                .forEach(node -> listener.onNodeSkipped(node, context));
         return new AgentWorkflowExecution(context, executedNodeIds);
+    }
+
+    private Set<String> structurallyReachableNodeIds(AgentWorkflowGraph graph) {
+        Set<String> reachable = new LinkedHashSet<>();
+        java.util.ArrayDeque<String> queue = new java.util.ArrayDeque<>();
+        queue.add(graph.startNode().id());
+        while (!queue.isEmpty()) {
+            String nodeId = queue.removeFirst();
+            if (!reachable.add(nodeId)) {
+                continue;
+            }
+            graph.outgoingEdges(nodeId).forEach(edge -> queue.addLast(edge.target()));
+        }
+        return reachable;
     }
 
     private void activateTargets(

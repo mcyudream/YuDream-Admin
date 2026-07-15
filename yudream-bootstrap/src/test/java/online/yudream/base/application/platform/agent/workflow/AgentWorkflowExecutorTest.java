@@ -121,6 +121,11 @@ class AgentWorkflowExecutorTest {
             ) {
                 events.add("complete:" + node.id());
             }
+
+            @Override
+            public void onNodeSkipped(AgentWorkflowNode node, AgentWorkflowContext context) {
+                events.add("skip:" + node.id());
+            }
         };
         AgentWorkflowExecutor executor = executor(
                 handler("start", (node, context) -> AgentWorkflowNodeResult.output(context.input())),
@@ -147,7 +152,8 @@ class AgentWorkflowExecutorTest {
         assertThat(events).containsExactly(
                 "start:start", "complete:start",
                 "start:condition", "complete:condition",
-                "start:yes", "complete:yes"
+                "start:yes", "complete:yes",
+                "skip:no"
         );
     }
 
