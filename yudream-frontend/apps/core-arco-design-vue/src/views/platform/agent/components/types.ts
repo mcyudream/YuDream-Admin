@@ -32,10 +32,22 @@ export interface AgentNodeData extends AgentNodeTemplate {
   prompt: string
   toolCode: string
   condition: string
+  code: string
+  template: string
   providerCode: string
   modelCode: string
   vision: boolean
   acceptFiles: boolean
+  inputVariable: string
+  outputVariable: string
+  knowledgeSpaceSlug: string
+  topK: number
+  pathPrefix: string
+  graphExpansion: boolean
+  documentInput: string
+  documentMode: 'text'
+  citationSource: string
+  citationFormat: 'json' | 'markdown'
 }
 
 export type AgentDebugStatus = 'RUNNING' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
