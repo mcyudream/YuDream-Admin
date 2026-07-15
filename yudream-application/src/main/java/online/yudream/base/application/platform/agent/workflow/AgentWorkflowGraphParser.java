@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.agent.workflow;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -85,11 +86,19 @@ public final class AgentWorkflowGraphParser {
                 throw new AgentWorkflowDefinitionException("边引用了不存在的节点：" + source + " -> " + target);
             }
             String id = textOrNull(item, "id");
+            String sourceHandle = textOrNull(item, "sourceHandle");
+            if ("condition".equals(nodes.get(source).kind())
+                    && (!StringUtils.hasText(sourceHandle) || "source".equals(sourceHandle))) {
+                String legacyBranch = firstText(textOrNull(item, "label"), textOrNull(item.path("data"), "branch"));
+                if ("true".equalsIgnoreCase(legacyBranch) || "false".equalsIgnoreCase(legacyBranch)) {
+                    sourceHandle = legacyBranch.toLowerCase();
+                }
+            }
             AgentWorkflowEdge edge = new AgentWorkflowEdge(
                     id == null ? "edge-" + index : id,
                     source,
                     target,
-                    textOrNull(item, "sourceHandle"),
+                    sourceHandle,
                     textOrNull(item, "targetHandle")
             );
             outgoing.computeIfAbsent(source, ignored -> new ArrayList<>()).add(edge);
@@ -151,5 +160,14 @@ public final class AgentWorkflowGraphParser {
         }
         String text = value.asText().trim();
         return text.isEmpty() ? null : text;
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 }
