@@ -37,6 +37,9 @@ public final class AgentCitationNodeHandler implements AgentWorkflowNodeHandler 
         } catch (IllegalArgumentException exception) {
             throw new BizException("引用节点输入必须是检索结果列表");
         }
+        if (citations == null || citations.isEmpty()) {
+            throw new BizException("引用节点没有可用的检索结果");
+        }
         List<Map<String, Object>> normalized = normalize(citations);
         Object output = "json".equalsIgnoreCase(values.text(node, "citationFormat"))
                 ? normalized

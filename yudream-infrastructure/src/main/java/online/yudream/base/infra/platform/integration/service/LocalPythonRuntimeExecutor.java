@@ -51,7 +51,9 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
                 command.add(DEFAULT_PYTHON_COMMAND);
             }
             command.add("--version");
-            Process process = new ProcessBuilder(command).start();
+            ProcessBuilder builder = new ProcessBuilder(command);
+            configureEnvironment(builder, null);
+            Process process = builder.start();
             CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getInputStream()));
             CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getErrorStream()));
             boolean finished = process.waitFor(PYTHON_CHECK_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
@@ -84,9 +86,7 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
             List<String> command = commandLine(scriptFile);
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(workDir.toFile());
-            if (script.getEnv() != null) {
-                builder.environment().putAll(script.getEnv());
-            }
+            configureEnvironment(builder, script.getEnv());
             Process process = builder.start();
             CompletableFuture<String> stdoutFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getInputStream()));
             CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> readQuietly(process.getErrorStream()));
@@ -183,6 +183,24 @@ public class LocalPythonRuntimeExecutor implements RuntimeExecutor {
             parts.add(current.toString());
         }
         return parts;
+    }
+
+    private void configureEnvironment(ProcessBuilder builder, java.util.Map<String, String> configured) {
+        var environment = builder.environment();
+        String path = environment.get("PATH");
+        String systemRoot = environment.get("SystemRoot");
+        environment.clear();
+        if (path != null) {
+            environment.put("PATH", path);
+        }
+        if (systemRoot != null) {
+            environment.put("SystemRoot", systemRoot);
+        }
+        environment.put("PYTHONNOUSERSITE", "1");
+        environment.put("PYTHONDONTWRITEBYTECODE", "1");
+        if (configured != null) {
+            environment.putAll(configured);
+        }
     }
 
     private void cleanup(Path workDir) {
