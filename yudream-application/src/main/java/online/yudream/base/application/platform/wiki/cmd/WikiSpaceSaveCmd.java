@@ -1,0 +1,3 @@
+package online.yudream.base.application.platform.wiki.cmd;
+import lombok.Data; import java.io.Serializable;
+@Data public class WikiSpaceSaveCmd implements Serializable { private Long id; private String name; private String slug; private String description; private boolean publicReadEnabled; private boolean externalSearchEnabled; private String embeddingProviderCode; private String embeddingModelCode; private boolean graphEnabled; private String graphProviderCode; private String graphModelCode; private String neo4jConnectionCode; private int chunkSize = 1200; private int chunkOverlap = 160; private int topK = 8; private boolean queryExpansionEnabled; private boolean rerankEnabled; }

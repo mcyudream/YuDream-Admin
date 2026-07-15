@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
 
 interface BackendResult<T> {
   code: number
@@ -13,7 +14,8 @@ const settingsApi = axios.create({
 })
 
 settingsApi.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    response.data = await decryptApiResponse(response.data, response.config.apiEncryptionKey)
     const result = response.data as BackendResult<any>
     if (result && result.code === 200) {
       return Promise.resolve({
@@ -26,18 +28,27 @@ settingsApi.interceptors.response.use(
     useFaToast().error('错误', { description: message })
     return Promise.reject(new Error(message))
   },
-  (error) => {
+  async (error) => {
+    if (error.response?.data) {
+      error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
+    }
     const message = error.response?.data?.message || error.message || '网络错误'
     useFaToast().error('错误', { description: message })
     return Promise.reject(error)
   },
 )
 
-settingsApi.interceptors.request.use((request) => {
+settingsApi.interceptors.request.use(async (request) => {
   request.headers['Accept-Language'] = 'zh-CN'
   const token = localStorage.getItem('token')
   if (token) {
     request.headers.Authorization = token
+  }
+  const encrypted = await prepareApiEncryption(request.url, request.data)
+  if (encrypted) {
+    Object.assign(request.headers, encrypted.headers)
+    request.data = encrypted.body
+    request.apiEncryptionKey = encrypted.key
   }
   return request
 })

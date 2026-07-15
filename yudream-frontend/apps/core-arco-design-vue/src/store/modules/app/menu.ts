@@ -52,6 +52,7 @@ export const useAppMenuStore = defineStore(
             menu: item?.meta?.menu,
             expand: item?.meta?.expand,
             link: item?.meta?.link,
+            menuCode: (item.meta as Record<string, unknown> | undefined)?.menuCode,
           },
         }
         if (item.children) {
@@ -138,7 +139,10 @@ export const useAppMenuStore = defineStore(
       menus.forEach((item) => {
         if (item.children) {
           if (item.meta?.expand) {
-            expandPaths.push(resolveRoutePath(rootPath, item.path))
+            const menuCode = (item.meta as Record<string, unknown> | undefined)?.menuCode
+            expandPaths.push(typeof menuCode === 'string' && menuCode.length > 0
+              ? menuCode
+              : resolveRoutePath(rootPath, item.path))
           }
           const childrenExpandPaths = getExpandPaths(item.children, resolveRoutePath(rootPath, item.path))
           if (childrenExpandPaths.length > 0) {

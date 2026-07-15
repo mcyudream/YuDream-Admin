@@ -79,7 +79,7 @@ const selectedActualParentLabel = computed(() => {
 const parentOptions = computed(() => {
   const disabledCodes = editing.value ? new Set([editing.value.code, ...collectDescendantCodes(editing.value)]) : new Set<string>()
   const allowPluginParents = editing.value?.source === 'PLUGIN'
-  return flattenMenus(rows.value)
+  const options = flattenMenus(rows.value)
     .filter(item => item.type !== 'BUTTON' && item.type !== 'LINK')
     .filter(item => allowPluginParents || item.source !== 'PLUGIN')
     .filter(item => !disabledCodes.has(item.code))
@@ -87,6 +87,7 @@ const parentOptions = computed(() => {
       label: `${item.name} (${item.code})`,
       value: item.code,
     }))
+  return [{ label: ROOT_LABEL, value: undefined }, ...options]
 })
 
 const sortValue = computed({

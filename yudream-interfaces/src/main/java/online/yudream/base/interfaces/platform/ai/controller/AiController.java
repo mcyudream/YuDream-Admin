@@ -8,7 +8,7 @@ import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.ai.assembler.AiWebAssembler;
 import online.yudream.base.interfaces.platform.ai.request.CmsPageGenerateRequest;
-import online.yudream.base.interfaces.platform.ai.res.AiStreamEventRes;
+import online.yudream.base.interfaces.platform.ai.res.AguiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
 @RequestMapping("/api/platform/ai")
@@ -34,7 +35,7 @@ public class AiController {
 
     private final AiAppService aiAppService;
 
-    @Value("${yudream.platform.ai.client.sse-timeout:10m}")
+    @Value("${yudream.platform.ai.client.sse-timeout:30m}")
     private Duration sseTimeout;
 
     @PostMapping("/cms/pages/generate")
@@ -48,44 +49,55 @@ public class AiController {
     public SseEmitter streamCmsPage(@Valid @RequestBody CmsPageGenerateRequest request) {
         SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
         String traceId = UUID.randomUUID().toString();
+        AtomicInteger toolSequence = new AtomicInteger();
         CompletableFuture.runAsync(() -> {
             AtomicBoolean running = new AtomicBoolean(true);
-            CompletableFuture<Void> heartbeat = startHeartbeat(emitter, traceId, running);
+            AtomicBoolean activityStarted = new AtomicBoolean(false);
+            CompletableFuture<Void> heartbeat = null;
             try {
                 log.debug("AI SSE stream accepted, traceId={}, title={}, promptLength={}, image={}",
                         traceId,
                         request.getTitle(),
                         request.getPrompt() == null ? 0 : request.getPrompt().length(),
                         request.getImageDataUrl() != null && !request.getImageDataUrl().isBlank());
-                send(emitter, AiWebAssembler.toProgressEvent(traceId, "accepted", "已收到请求，正在连接模型。"));
+                send(emitter, AiWebAssembler.toAguiRunStarted(traceId));
+                sendActivity(emitter, traceId, activityStarted, "accepted", "已收到请求，正在连接模型。");
+                heartbeat = startHeartbeat(emitter, traceId, running, activityStarted);
                 var result = aiAppService.streamCmsPage(
                         AiWebAssembler.toCmd(request),
-                        delta -> send(emitter, AiWebAssembler.toDeltaEvent(traceId, delta)),
+                        delta -> send(emitter, AiWebAssembler.toAguiTextChunk(traceId, delta)),
                         tool -> {
-                            boolean asking = "cms.ask.user".equals(tool.toolName());
-                            send(emitter, AiWebAssembler.toProgressEvent(traceId, "tool", asking ? "正在向你确认需求。" : "正在更新画布。"));
-                            send(emitter, AiWebAssembler.toToolEvent(traceId, tool));
+                            String toolCallId = traceId + "-tool-" + toolSequence.incrementAndGet();
+                            send(emitter, AiWebAssembler.toAguiToolStart(traceId, toolCallId, tool));
+                            send(emitter, AiWebAssembler.toAguiToolResult(traceId, toolCallId, tool));
                         },
-                        progress -> send(emitter, AiWebAssembler.toProgressEvent(traceId, progress.action(), progress.content()))
+                        progress -> sendActivity(emitter, traceId, activityStarted, progress.action(), progress.content())
                 );
                 log.debug("AI SSE stream completed, traceId={}, tools={}",
                         traceId,
                         result.getTools() == null ? 0 : result.getTools().size());
-                send(emitter, AiWebAssembler.toResultEvent(traceId, result));
+                send(emitter, AiWebAssembler.toAguiRunFinished(traceId, result));
                 emitter.complete();
             } catch (Exception e) {
                 log.debug("AI SSE stream failed, traceId={}", traceId, e);
-                send(emitter, AiWebAssembler.toErrorEvent(traceId, e.getMessage()));
+                send(emitter, AiWebAssembler.toAguiRunError(traceId, e.getMessage()));
                 emitter.complete();
             } finally {
                 running.set(false);
-                heartbeat.cancel(true);
+                if (heartbeat != null) {
+                    heartbeat.cancel(true);
+                }
             }
         });
         return emitter;
     }
 
-    private CompletableFuture<Void> startHeartbeat(SseEmitter emitter, String traceId, AtomicBoolean running) {
+    private CompletableFuture<Void> startHeartbeat(
+            SseEmitter emitter,
+            String traceId,
+            AtomicBoolean running,
+            AtomicBoolean activityStarted
+    ) {
         return CompletableFuture.runAsync(() -> {
             int count = 0;
             while (running.get()) {
@@ -100,22 +112,33 @@ public class AiController {
                 }
                 count++;
                 log.debug("AI SSE heartbeat, traceId={}, count={}", traceId, count);
-                send(emitter, AiWebAssembler.toProgressEvent(traceId, "heartbeat", "模型仍在生成中。"));
+                sendActivity(emitter, traceId, activityStarted, "heartbeat", "模型仍在生成中。");
             }
         });
     }
 
-    private void send(SseEmitter emitter, AiStreamEventRes data) {
+    private void sendActivity(
+            SseEmitter emitter,
+            String traceId,
+            AtomicBoolean activityStarted,
+            String action,
+            String content
+    ) {
+        if (activityStarted.compareAndSet(false, true)) {
+            send(emitter, AiWebAssembler.toAguiActivitySnapshot(traceId, action, content));
+            return;
+        }
+        send(emitter, AiWebAssembler.toAguiActivityDelta(traceId, action, content));
+    }
+
+    private void send(SseEmitter emitter, AguiStreamEventRes data) {
         try {
-            log.debug("AI SSE send event, traceId={}, event={}, action={}",
-                    data.getTraceId(),
-                    data.getEvent(),
-                    data.getAction());
+            log.debug("AI AG-UI SSE send event, type={}, runId={}", data.getType(), data.getRunId());
             synchronized (emitter) {
-                emitter.send(SseEmitter.event().name(data.getEvent()).data(data));
+                emitter.send(SseEmitter.event().name(data.getType()).data(data));
             }
         } catch (IOException e) {
-            log.debug("AI SSE send failed, traceId={}, event={}", data.getTraceId(), data.getEvent(), e);
+            log.debug("AI AG-UI SSE send failed, type={}", data.getType(), e);
             emitter.completeWithError(e);
         }
     }

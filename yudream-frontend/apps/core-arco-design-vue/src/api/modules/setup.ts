@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
 
 interface BackendResult<T> {
   code: number
@@ -25,8 +26,19 @@ const setupApi = axios.create({
   timeout: 1000 * 60,
 })
 
+setupApi.interceptors.request.use(async (request) => {
+  const encrypted = await prepareApiEncryption(request.url, request.data)
+  if (encrypted) {
+    Object.assign(request.headers, encrypted.headers)
+    request.data = encrypted.body
+    request.apiEncryptionKey = encrypted.key
+  }
+  return request
+})
+
 setupApi.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    response.data = await decryptApiResponse(response.data, response.config.apiEncryptionKey)
     const result = response.data as BackendResult<any>
     if (result && result.code === 200) {
       return Promise.resolve({
@@ -39,7 +51,10 @@ setupApi.interceptors.response.use(
     useFaToast().error('错误', { description: message })
     return Promise.reject(new Error(message))
   },
-  (error) => {
+  async (error) => {
+    if (error.response?.data) {
+      error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
+    }
     const message = error.response?.data?.message || error.message || '网络错误'
     useFaToast().error('错误', { description: message })
     return Promise.reject(error)

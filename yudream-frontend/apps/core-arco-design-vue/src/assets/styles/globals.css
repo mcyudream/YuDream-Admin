@@ -70,6 +70,19 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+img,
+svg,
+canvas,
+video {
+  max-width: 100%;
+}
+
 #app {
   height: 100%;
 }

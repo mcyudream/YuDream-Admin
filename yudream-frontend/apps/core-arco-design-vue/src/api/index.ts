@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
 // import qs from 'qs'
 
 // 请求重试配置
@@ -11,6 +12,8 @@ declare module 'axios' {
     retry?: boolean
     retryCount?: number
     fake?: boolean
+    apiEncryptionKey?: CryptoKey
+    apiPlainData?: unknown
   }
 }
 
@@ -21,7 +24,7 @@ const api = axios.create({
 })
 
 api.interceptors.request.use(
-  (request) => {
+  async (request) => {
     // 如果设置了 fake 属性，强制使用 fake 的 baseURL
     if (request.fake) {
       request.baseURL = '/fake/'
@@ -33,6 +36,21 @@ api.interceptors.request.use(
       request.headers['Accept-Language'] = 'zh-CN'
       if (appAccountStore.isLogin) {
         request.headers.Authorization = appAccountStore.token
+      }
+    }
+    if (request.fake) {
+      return request
+    }
+    if (request.apiPlainData === undefined) {
+      request.apiPlainData = request.data
+    }
+    if (request.responseType !== 'blob') {
+      request.data = request.apiPlainData
+      const encrypted = await prepareApiEncryption(request.url, request.data)
+      if (encrypted) {
+        Object.assign(request.headers, encrypted.headers)
+        request.data = encrypted.body
+        request.apiEncryptionKey = encrypted.key
       }
     }
     // 是否将 POST 请求参数进行字符串化处理
@@ -67,7 +85,10 @@ function errorMessage(error: any) {
 }
 
 api.interceptors.response.use(
-  (response) => {
+  async (response) => {
+    if (response.config.responseType !== 'blob') {
+      response.data = await decryptApiResponse(response.data, response.config.apiEncryptionKey)
+    }
     /**
      * 全局拦截请求发送后返回的数据，如果数据有报错则在这做全局的错误提示
      * 约定的数据格式：{ status: 1 | 0, error: string, data: object }
@@ -121,6 +142,9 @@ api.interceptors.response.use(
     }
   },
   async (error) => {
+    if (error.response?.data) {
+      error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
+    }
     // 获取请求配置
     const config = error.config
     // 如果配置不存在或未启用重试，则直接处理错误

@@ -62,6 +62,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 
 @Component
@@ -107,7 +108,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     StringUtils.hasText(request.imageDataUrl()));
             String content = requestSpec(request, resolved, toolResults).call().content();
             log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
-            return toResult(content, toolResults, request.structuredOutputRequired());
+            return toResult(content, toolResults);
         } catch (BizException e) {
             log.debug("AI non-stream call business error: {}", e.getMessage());
             throw e;
@@ -168,7 +169,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     .blockLast(aiClientProperties.getReadTimeout());
             log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
             progress(onProgress, "complete", "AI 处理完成。");
-            return toResult(content.toString(), toolResults, request.structuredOutputRequired());
+            return toResult(content.toString(), toolResults);
         } catch (BizException e) {
             log.debug("AI stream call business error: {}", e.getMessage());
             throw e;
@@ -421,12 +422,11 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return messages;
     }
 
-    private AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults, boolean structuredOutputRequired) {
+    static AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
         if (toolResults != null && !toolResults.isEmpty()) {
             return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", "", List.of(), List.copyOf(toolResults));
         }
-        return structuredOutputRequired ? toLegacyResult(content)
-                : new AiGenerationResult("", content == null ? "" : content.trim(), "", "", "", "", "", List.of(), List.of());
+        return new AiGenerationResult("", content == null ? "" : content.trim(), "", "", "", "", "", List.of(), List.of());
     }
 
     private boolean allowed(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context) {
@@ -449,83 +449,6 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .toolCallResultConverter((result, type) -> JSONUtil.toJsonStr(result)).build();
     }
 
-    private AiGenerationResult toLegacyResult(String content) {
-        JSONObject json = parseJsonObject(content);
-        return new AiGenerationResult(
-                json.getStr("title", ""),
-                json.getStr("summary", json.getStr("message", "")),
-                json.getStr("htmlContent", ""),
-                json.getStr("cssContent", ""),
-                json.getStr("jsContent", ""),
-                json.getStr("builderProjectJson", ""),
-                json.getStr("markdownContent", ""),
-                toolCalls(json),
-                List.of()
-        );
-    }
-
-    private List<AiAgentToolCall> toolCalls(JSONObject json) {
-        Object rawToolCalls = json.get("toolCalls");
-        if (rawToolCalls == null) {
-            return List.of();
-        }
-        List<JSONObject> calls = rawToolCalls instanceof Iterable<?> iterable
-                ? toJsonObjects(iterable)
-                : List.of(JSONUtil.parseObj(rawToolCalls));
-        return calls.stream()
-                .map(this::toToolCall)
-                .filter(call -> StringUtils.hasText(call.toolName()))
-                .toList();
-    }
-
-    private List<JSONObject> toJsonObjects(Iterable<?> iterable) {
-        List<JSONObject> result = new ArrayList<>();
-        for (Object item : iterable) {
-            if (item instanceof JSONObject json) {
-                result.add(json);
-            } else if (item != null) {
-                result.add(JSONUtil.parseObj(item));
-            }
-        }
-        return result;
-    }
-
-    private AiAgentToolCall toToolCall(JSONObject json) {
-        JSONObject arguments = json.getJSONObject("arguments");
-        return new AiAgentToolCall(
-                json.getStr("toolName", json.getStr("name", "")),
-                arguments == null ? Map.of() : toMap(arguments)
-        );
-    }
-
-    private JSONObject parseJsonObject(String content) {
-        String normalized = stripFence(content);
-        try {
-            return JSONUtil.parseObj(normalized);
-        } catch (Exception e) {
-            int start = normalized.indexOf('{');
-            int end = normalized.lastIndexOf('}');
-            if (start >= 0 && end > start) {
-                return JSONUtil.parseObj(normalized.substring(start, end + 1));
-            }
-            throw new BizException("AI 未调用画布工具，且返回内容不是有效 JSON");
-        }
-    }
-
-    private String stripFence(String content) {
-        String value = content == null ? "" : content.trim();
-        if (value.startsWith("```")) {
-            value = value.replaceFirst("^```[a-zA-Z]*\\s*", "");
-            value = value.replaceFirst("\\s*```$", "");
-        }
-        return value.trim();
-    }
-
-    private Map<String, Object> toMap(JSONObject json) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        json.forEach(result::put);
-        return result;
-    }
 
     private URI parseProxyUri(String proxyUrl) {
         String value = proxyUrl.trim();
@@ -535,7 +458,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return URI.create(value);
     }
 
-    private String summary(String content, List<AiAgentToolResult> toolResults) {
+    private static String summary(String content, List<AiAgentToolResult> toolResults) {
         if (StringUtils.hasText(content)) {
             return content.trim();
         }
@@ -587,6 +510,10 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     }
 
     private String explainException(Exception e) {
+        if (hasCause(e, TimeoutException.class)) {
+            long minutes = Math.max(1, aiClientProperties.getReadTimeout().toMinutes());
+            return "模型生成超过 " + minutes + " 分钟仍未结束，请缩小任务范围后重试";
+        }
         String responseError = explainResponseException(e);
         if (StringUtils.hasText(responseError)) {
             return responseError;
@@ -600,6 +527,17 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             return "目标地址返回 HTML 页面，请确认 baseUrl 填的是 API 根地址，例如 https://api.openai.com/v1";
         }
         return normalized.length() > ERROR_BODY_LIMIT ? normalized.substring(0, ERROR_BODY_LIMIT) + "..." : normalized;
+    }
+
+    private boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        Throwable current = error;
+        while (current != null) {
+            if (type.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private String explainResponseException(Throwable error) {

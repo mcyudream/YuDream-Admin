@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   filterBackendMenuTreeByAuth,
   flattenBackendRouteGroups,
+  mergeBackendStructuralRoutes,
   stripBackendStructuralAuth,
 } from './route-auth'
 
@@ -34,6 +35,41 @@ test('backend route groups preserve child auth instead of inheriting parent auth
   assert.equal(routes[0].meta?.auth, undefined)
   assert.equal(flattened[0].meta?.auth, undefined)
   assert.equal(flattened[0].children?.[0].meta?.auth, 'system:user')
+})
+
+test('backend route groups flatten nested categories before registering routes', () => {
+  const routes = flattenBackendRouteGroups([{
+    children: [{
+      meta: { title: '系统目录' },
+      children: [{
+        path: '/platform/plugins/yudream-wallet',
+        component: 'yudream-wallet/Home',
+        meta: { auth: 'plugin:yudream-wallet:user' },
+      }],
+    }],
+  }])
+
+  assert.deepEqual(routes.map(route => route.path), ['/platform/plugins/yudream-wallet'])
+})
+
+test('backend routes merge duplicated plugin layout paths and retain every child page', () => {
+  const routes = mergeBackendStructuralRoutes([{
+    path: '/platform/plugins/yudream-wallet/system',
+    component: 'Layout',
+    meta: { menuCode: 'plugin:yudream-wallet:parent:yudreamWallet:system' },
+    children: [{ path: '/platform/plugins/yudream-wallet/system/settings', meta: { title: '钱包设置' } }],
+  }, {
+    path: '/platform/plugins/yudream-wallet/system',
+    component: 'Layout',
+    meta: { menuCode: 'plugin:yudream-alipay:parent:yudreamAlipay:system' },
+    children: [{ path: '/platform/plugins/yudream-alipay/system/settings', meta: { title: '支付宝设置' } }],
+  }])
+
+  assert.equal(routes.length, 1)
+  assert.deepEqual(routes[0].children?.map(route => route.path), [
+    '/platform/plugins/yudream-wallet/system/settings',
+    '/platform/plugins/yudream-alipay/system/settings',
+  ])
 })
 
 test('backend menu keeps an unauthorized structural parent with an authorized child only', () => {

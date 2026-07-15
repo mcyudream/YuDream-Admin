@@ -8,7 +8,7 @@ import apiApp from '@/api/modules/app'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { systemRoutes as systemRoutesRaw } from '@/router/routes'
 import { indexPluginRuntimeModules, resolvePluginRuntimeRoute } from './plugin-route-runtime'
-import { flattenBackendRouteGroups, stripBackendStructuralAuth } from './route-auth'
+import { flattenBackendRouteGroups, mergeBackendStructuralRoutes, stripBackendStructuralAuth } from './route-auth'
 
 export const useAppRouteStore = defineStore(
   'appRoute',
@@ -234,7 +234,7 @@ export const useAppRouteStore = defineStore(
         loadPluginRuntimeManifest(),
       ])
       const staticRoutes = formatBackRoutes(
-        stripBackendStructuralAuth(res.data),
+        mergeBackendStructuralRoutes(stripBackendStructuralAuth(res.data)),
         pluginManifest.modules,
         pluginManifest.sdkVersion,
       ) as any

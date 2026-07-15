@@ -70,6 +70,7 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             filterChain.doFilter(nextRequest, response);
             return;
         }
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         ContentCachingResponseWrapper wrappedResponse = new ContentCachingResponseWrapper(response);
         filterChain.doFilter(nextRequest, wrappedResponse);
         encryptResponse(wrappedResponse, sessionKey);
@@ -80,7 +81,7 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             return false;
         }
         String path = request.getRequestURI();
-        if (STATUS_PATH.equals(path) || PUBLIC_KEY_PATH.equals(path)) {
+        if (STATUS_PATH.equals(path) || PUBLIC_KEY_PATH.equals(path) || isBinaryAssetPath(path)) {
             return false;
         }
         if (path != null && path.startsWith("/api/public/cms")) {
@@ -90,6 +91,11 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             return false;
         }
         return path != null && path.startsWith("/api/") && acceptsJson(request);
+    }
+
+    private boolean isBinaryAssetPath(String path) {
+        return path != null && (path.matches("/api/files/(?:public/)?\\d+/content")
+                || path.matches("/api/platform/plugins/[^/]+/assets(?:/.*)?"));
     }
 
     private boolean acceptsJson(HttpServletRequest request) {
@@ -132,7 +138,13 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
             response.copyBodyToResponse();
             return;
         }
-        String plain = new String(body, response.getCharacterEncoding() == null ? StandardCharsets.UTF_8 : java.nio.charset.Charset.forName(response.getCharacterEncoding()));
+        String contentType = response.getContentType();
+        if (StringUtils.hasText(contentType)
+                && !contentType.toLowerCase().contains(MediaType.APPLICATION_JSON_VALUE)) {
+            response.copyBodyToResponse();
+            return;
+        }
+        String plain = new String(body, StandardCharsets.UTF_8);
         ApiEncryptedPayloadDTO encrypted = apiEncryptionAppService.encrypt(sessionKey, plain);
         byte[] encryptedBody = objectMapper.writeValueAsBytes(ApiSecurityWebAssembler.toRes(encrypted));
         response.resetBuffer();
@@ -146,6 +158,7 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
     private void writeBadRequest(HttpServletResponse response, String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         objectMapper.writeValue(response.getWriter(), Result.fail(ResultCode.BAD_REQUEST.getCode(), message));
     }
 }

@@ -1,18 +1,69 @@
 package online.yudream.base.interfaces.platform.cms.assembler;
 
+import online.yudream.base.application.platform.cms.cmd.CmsBlockSaveCmd;
 import online.yudream.base.application.platform.cms.cmd.CmsPageSaveCmd;
 import online.yudream.base.application.platform.cms.cmd.HomePageLayoutSaveCmd;
+import online.yudream.base.application.platform.cms.dto.CmsBlockDTO;
 import online.yudream.base.application.platform.cms.dto.CmsPageDTO;
 import online.yudream.base.application.platform.cms.dto.HomePageLayoutDTO;
 import online.yudream.base.domain.common.PageResult;
+import online.yudream.base.interfaces.platform.cms.request.CmsBlockSaveRequest;
 import online.yudream.base.interfaces.platform.cms.request.CmsPageSaveRequest;
 import online.yudream.base.interfaces.platform.cms.request.HomePageLayoutSaveRequest;
+import online.yudream.base.interfaces.platform.cms.res.CmsBlockRes;
 import online.yudream.base.interfaces.platform.cms.res.CmsPageRes;
 import online.yudream.base.interfaces.platform.cms.res.HomePageLayoutRes;
 
 public class CmsWebAssembler {
 
     private CmsWebAssembler() {
+    }
+
+    public static CmsBlockSaveCmd toBlockCmd(CmsBlockSaveRequest request) {
+        CmsBlockSaveCmd cmd = new CmsBlockSaveCmd();
+        cmd.setCode(request.getCode());
+        cmd.setName(request.getName());
+        cmd.setDescription(request.getDescription());
+        cmd.setCategory(request.getCategory());
+        cmd.setKind(request.getKind());
+        cmd.setIcon(request.getIcon());
+        cmd.setPreviewImageUrl(request.getPreviewImageUrl());
+        cmd.setHtmlContent(request.getHtmlContent());
+        cmd.setCssContent(request.getCssContent());
+        cmd.setJsContent(request.getJsContent());
+        cmd.setBuilderProjectJson(request.getBuilderProjectJson());
+        cmd.setTags(request.getTags());
+        cmd.setEnabled(request.getEnabled());
+        cmd.setSort(request.getSort());
+        return cmd;
+    }
+
+    public static PageResult<CmsBlockRes> toBlockPage(PageResult<CmsBlockDTO> page) {
+        return new PageResult<>(page.getRecords().stream().map(CmsWebAssembler::toBlockRes).toList(),
+                page.getTotal(), page.getPage(), page.getSize());
+    }
+
+    public static CmsBlockRes toBlockRes(CmsBlockDTO dto) {
+        return CmsBlockRes.builder()
+                .id(dto.getId())
+                .code(dto.getCode())
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .category(dto.getCategory())
+                .kind(dto.getKind())
+                .icon(dto.getIcon())
+                .previewImageUrl(dto.getPreviewImageUrl())
+                .htmlContent(dto.getHtmlContent())
+                .cssContent(dto.getCssContent())
+                .jsContent(dto.getJsContent())
+                .builderProjectJson(dto.getBuilderProjectJson())
+                .tags(dto.getTags())
+                .enabled(dto.getEnabled())
+                .builtin(dto.getBuiltin())
+                .sort(dto.getSort())
+                .createTime(dto.getCreateTime())
+                .updateTime(dto.getUpdateTime())
+                .build();
     }
 
     public static CmsPageSaveCmd toCmd(CmsPageSaveRequest request) {

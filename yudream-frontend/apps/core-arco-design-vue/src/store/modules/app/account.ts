@@ -2,6 +2,7 @@ import type { DeptItem, IdValue, LoginData, RoleItem } from '@/api/modules/user'
 import apiApp from '@/api/modules/app'
 import apiUser from '@/api/modules/user'
 import router from '@/router'
+import { refreshDynamicRoutes } from '@/router/dynamic'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
 function parseStoredItem<T>(key: string): T | null {
@@ -33,6 +34,7 @@ const IMPERSONATOR_SESSION_KEY = 'impersonatorSession'
 export const useAppAccountStore = defineStore('appAccount', () => {
   const appSettingsStore = useAppSettingsStore()
   const appTabbarStore = useAppTabbarStore()
+  const appKeepAliveStore = useAppKeepAliveStore()
   const appRouteStore = useAppRouteStore()
   const appMenuStore = useAppMenuStore()
 
@@ -256,6 +258,14 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   async function switchRole(roleId: IdValue) {
     await apiUser.switchRole(roleId)
     await loadContext()
+    await refreshDynamicRoutes(router)
+    appTabbarStore.clean()
+    appKeepAliveStore.clean()
+    appMenuStore.setActived(0)
+    await router.replace({
+      path: appSettingsStore.settings.app.home.fullPath,
+      force: true,
+    })
   }
 
   // 手动登出

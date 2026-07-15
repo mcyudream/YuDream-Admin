@@ -13,9 +13,9 @@ public class AiClientProperties {
 
     private Duration connectTimeout = Duration.ofSeconds(30);
 
-    private Duration readTimeout = Duration.ofMinutes(10);
+    private Duration readTimeout = Duration.ofMinutes(30);
 
-    private Duration sseTimeout = Duration.ofMinutes(10);
+    private Duration sseTimeout = Duration.ofMinutes(30);
 
     /**
      * 注入模型的历史对话最大轮数（1 轮 = 1 条 user + 1 条 assistant）。

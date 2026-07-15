@@ -3,10 +3,13 @@ package online.yudream.base.interfaces.platform.cms.controller;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.cms.query.CmsPageQuery;
 import online.yudream.base.application.platform.cms.service.CmsAppService;
+import online.yudream.base.application.platform.cms.service.CmsTemplateContextAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.cms.assembler.CmsWebAssembler;
+import online.yudream.base.interfaces.platform.cms.assembler.CmsTemplateContextWebAssembler;
 import online.yudream.base.interfaces.platform.cms.res.CmsPageRes;
+import online.yudream.base.interfaces.platform.cms.res.CmsTemplateContextRes;
 import online.yudream.base.interfaces.platform.cms.res.HomePageLayoutRes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicCmsController {
 
     private final CmsAppService cmsAppService;
+    private final CmsTemplateContextAppService templateContextAppService;
 
     @GetMapping("/home")
     public Result<HomePageLayoutRes> home() {
@@ -33,5 +37,10 @@ public class PublicCmsController {
     @GetMapping("/pages/list")
     public Result<PageResult<CmsPageRes>> pages(CmsPageQuery query) {
         return Result.ok(CmsWebAssembler.toPage(cmsAppService.publicPages(query)));
+    }
+
+    @GetMapping("/template-context")
+    public Result<CmsTemplateContextRes> templateContext() {
+        return Result.ok(CmsTemplateContextWebAssembler.toRes(templateContextAppService.query()));
     }
 }

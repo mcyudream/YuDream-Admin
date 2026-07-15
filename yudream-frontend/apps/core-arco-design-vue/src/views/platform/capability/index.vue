@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { CapabilityItem, CapabilityStatus, CapabilityType } from '@/api/modules/platform-capability'
 import apiCapability from '@/api/modules/platform-capability'
+import { refreshDynamicRoutes } from '@/router/dynamic'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 
 interface CapabilityGroup {
   type: CapabilityType
@@ -47,6 +49,8 @@ interface AiProviderDraft {
 }
 
 const toast = useFaToast()
+const router = useRouter()
+const appFeatureStore = useAppFeatureStore()
 
 const loading = ref(false)
 const actionLoading = ref('')
@@ -148,6 +152,10 @@ async function toggleCapability(item: CapabilityItem) {
   try {
     const res = item.enabled ? await apiCapability.disable(item.code) : await apiCapability.enable(item.code)
     replaceItem(res.data)
+    await Promise.all([
+      refreshDynamicRoutes(router),
+      appFeatureStore.load(true),
+    ])
     toast.success(item.enabled ? '已禁用' : '已启用')
   }
   finally {

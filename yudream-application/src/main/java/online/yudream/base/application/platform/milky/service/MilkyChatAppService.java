@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.milky.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
@@ -20,9 +21,11 @@ import java.util.function.Consumer;
 public class MilkyChatAppService {
     private final MilkyConnectionRepo connectionRepo;
     private final MilkyApiGateway apiGateway;
+    private final CapabilityAppService capabilityAppService;
     private final Map<Long, CopyOnWriteArrayList<Consumer<MilkyModels.Event>>> subscribers = new ConcurrentHashMap<>();
 
     public AutoCloseable subscribe(Long connectionId, Consumer<MilkyModels.Event> consumer) {
+        ready();
         var list = subscribers.computeIfAbsent(connectionId, ignored -> new CopyOnWriteArrayList<>());
         list.add(consumer);
         return () -> {
@@ -39,12 +42,14 @@ public class MilkyChatAppService {
 
     @Transactional(readOnly = true)
     public Object conversations(Long id) {
+        ready();
         MilkyConnection connection = connection(id);
         return Map.of("groups", call(connection, "get_group_list", Map.of()), "friends", call(connection, "get_friend_list", Map.of()));
     }
 
     @Transactional(readOnly = true)
     public Object history(Long id, String scene, String peerId, String start, int limit) {
+        ready();
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("message_scene", scene);
         body.put("peer_id", peerId);
@@ -57,6 +62,7 @@ public class MilkyChatAppService {
 
     @Transactional
     public Object send(Long id, String scene, String peerId, Object message) {
+        ready();
         if (!"group".equals(scene) && !"friend".equals(scene) && !"private".equals(scene)) {
             throw new BizException("不支持的会话类型");
         }
@@ -70,6 +76,7 @@ public class MilkyChatAppService {
     /** Exposes every documented Milky API through the selected connection. */
     @Transactional(readOnly = true)
     public Object invoke(Long id, String api, Object payload) {
+        ready();
         if (api == null || !api.matches("[a-z][a-z0-9_]{0,127}")) {
             throw new BizException("Milky API 名称无效");
         }
@@ -86,5 +93,9 @@ public class MilkyChatAppService {
             throw new BizException("Milky 连接未启用");
         }
         return connection;
+    }
+
+    private void ready() {
+        capabilityAppService.ensureEnabled("milky", "Milky 消息平台");
     }
 }

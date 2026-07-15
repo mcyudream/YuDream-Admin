@@ -11,8 +11,7 @@ public record AiGenerationRequest(
         String modelCode,
         Map<String, String> config,
         List<AiChatMessage> history,
-        boolean toolCallingEnabled,
-        boolean structuredOutputRequired
+        boolean toolCallingEnabled
 ) {
     public AiGenerationRequest(
             String systemPrompt,
@@ -22,7 +21,7 @@ public record AiGenerationRequest(
             String modelCode,
             Map<String, String> config
     ) {
-        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, List.of(), false, false);
+        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, List.of(), false);
     }
 
     public AiGenerationRequest(
@@ -34,7 +33,7 @@ public record AiGenerationRequest(
             Map<String, String> config,
             List<AiChatMessage> history
     ) {
-        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history, false, false);
+        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history, false);
     }
 
     public List<AiChatMessage> history() {
@@ -42,10 +41,6 @@ public record AiGenerationRequest(
     }
 
     public AiGenerationRequest withToolCallingEnabled(boolean enabled) {
-        return new AiGenerationRequest(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history(), enabled, structuredOutputRequired);
-    }
-
-    public AiGenerationRequest withStructuredOutputRequired(boolean required) {
-        return new AiGenerationRequest(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history(), toolCallingEnabled, required);
+        return new AiGenerationRequest(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history(), enabled);
     }
 }

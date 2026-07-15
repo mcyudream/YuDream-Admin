@@ -103,6 +103,58 @@ async function uploadMarkdownImage(file: File): Promise<MarkdownUploadImage> {
   background: var(--color-bg-1);
 }
 
+/* Keep Markdown code blocks aligned with the application surface, not a terminal mockup. */
+.markdown-editor :deep(.md-editor-code) {
+  overflow: hidden;
+  border: 1px solid var(--color-border-2);
+  border-radius: 5px;
+  background: var(--color-fill-1);
+}
+
+.markdown-editor :deep(.md-editor-code-head) {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-fill-2);
+}
+
+.markdown-editor :deep(.md-editor-code-flag) {
+  display: none;
+}
+
+.markdown-editor :deep(.md-editor-code-action) {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.markdown-editor :deep(.md-editor-code-lang),
+.markdown-editor :deep(.md-editor-copy-button) {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.markdown-editor :deep(.md-editor-copy-button) {
+  padding: 2px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.markdown-editor :deep(.md-editor-copy-button:hover) {
+  background: var(--color-fill-3);
+  color: rgb(var(--primary-6));
+}
+
+.markdown-editor :deep(.md-editor-code pre) {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 @media (max-width: 1100px) {
   .markdown-editor :deep(.md-editor) {
     min-height: 560px;

@@ -109,6 +109,8 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_API_DOCS_ENABLED:true}
   cms:
     enabled: ${PLATFORM_CMS_ENABLED:true}
+  wiki:
+    enabled: ${PLATFORM_WIKI_ENABLED:true}
   form:
     enabled: ${PLATFORM_FORM_ENABLED:true}
   document-template:
@@ -134,8 +136,14 @@ yudream.platform.capabilities:
 
 yudream.platform.ai.client:
   connect-timeout: ${PLATFORM_AI_CONNECT_TIMEOUT:30s}
-  read-timeout: ${PLATFORM_AI_READ_TIMEOUT:10m}
-  sse-timeout: ${PLATFORM_AI_SSE_TIMEOUT:10m}
+  read-timeout: ${PLATFORM_AI_READ_TIMEOUT:30m}
+  sse-timeout: ${PLATFORM_AI_SSE_TIMEOUT:30m}
+
+yudream.platform.wiki.neo4j:
+  uri: ${PLATFORM_WIKI_NEO4J_URI:bolt://localhost:7687}
+  username: ${PLATFORM_WIKI_NEO4J_USERNAME:neo4j}
+  password: ${PLATFORM_WIKI_NEO4J_PASSWORD:${NEO4J_PASSWORD:yudream123456}}
+  database: ${PLATFORM_WIKI_NEO4J_DATABASE:neo4j}
 
 yudream.platform.render:
   base-url: ${MESSAGE_RENDER_BASE_URL:http://localhost:3000}

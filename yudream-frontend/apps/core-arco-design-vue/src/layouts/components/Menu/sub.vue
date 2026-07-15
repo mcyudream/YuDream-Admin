@@ -20,7 +20,7 @@ const itemRef = useTemplateRef('itemRef')
 const subMenuRef = useTemplateRef('subMenuRef')
 const rootMenu = inject(rootMenuInjectionKey)!
 
-const index = props.menu.path ?? rootMenu.getUseId(props.menu)
+const index = rootMenu.getMenuNodeKey(props.menu)
 
 const expand = computed(() => rootMenu.expandMenus.includes(props.uniqueKey.at(-1)!))
 
@@ -220,8 +220,8 @@ function handleMouseleave() {
             'py-1 overscroll-contain': rootMenu.isMenuPopup,
           })"
         >
-          <template v-for="item in menu.children" :key="item.path ?? rootMenu.getUseId(item)">
-            <SubMenu v-if="item.meta?.menu !== false" :unique-key="[...uniqueKey, item.path ?? rootMenu.getUseId(item)]" :menu="item" :level="level + 1" />
+          <template v-for="item in menu.children" :key="rootMenu.getMenuNodeKey(item)">
+            <SubMenu v-if="item.meta?.menu !== false" :unique-key="[...uniqueKey, rootMenu.getMenuNodeKey(item)]" :menu="item" :level="level + 1" />
           </template>
         </FaScrollArea>
       </Transition>

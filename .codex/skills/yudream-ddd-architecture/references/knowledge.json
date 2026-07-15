@@ -135,6 +135,10 @@
     {
       "key": "cms-canvas-final-validation",
       "text": "CMS AI structural mutations such as add-html, set-html, and replace-page must include CSS. The agent must call cms.canvas.validate with final HTML/CSS/JS and may finish only after valid=true; validation tools are read-only and must not be applied as frontend canvas mutations."
+    },
+    {
+      "key": "cms-preview-js-lifecycle",
+      "text": "CMS 画布预览 JS 必须可重复初始化并可释放。addEventListener、setInterval、requestAnimationFrame、Three.js setAnimationLoop 等长生命周期资源必须通过 window.__YU_CMS_REGISTER_CLEANUP__ 注册对应 removeEventListener、clearInterval、cancelAnimationFrame、setAnimationLoop(null) 及 WebGL 资源 dispose；前端预览更新应防抖，普通 HTML/CSS 更新不得重跑整段页面 JS。"
     }
   ],
   "utilities": [
@@ -195,6 +199,22 @@
     {
       "key": "dataviz-empty-graph-arrays",
       "text": "图表类型必须由 chartType 明确判定。后端折线/柱状序列可能同时返回 nodes: [] 与 links: []；JavaScript 空数组为真，不能用 nodes && links 推断关系图，否则会丢弃 categories/values 并只渲染空坐标轴。"
+    },
+    {
+      "key": "cms-add-html-style-order",
+      "text": "GrapesJS 默认会裁剪未命中组件的 CSS。CMS add-html 前端必须先插入 HTML，再应用 CSS/JS，所有 getCss 调用必须保留 keepUnusedStyles；后端 cms.canvas.block.add 与 cms.canvas.patch/add-html 必须拒绝 cssContent 未覆盖本次 HTML 全部 class 的调用。"
+    },
+    {
+      "key": "ai-tool-result-final-text",
+      "text": "Spring AI 工具调用完成后必须保留模型的最终自然语言文本；AiGenerationResult 不能因为 toolResults 非空而清空 summary/content。只显示工具完成状态会掩盖 web.fetch 等读取工具已经返回的分析结论。"
+    },
+    {
+      "key": "cms-locked-chrome-validation",
+      "text": "CMS 首页最终完整性校验必须将 data-yb-chrome 固定 Header/Footer 及 site-builder-home 系统包装器排除出 AI CSS 覆盖检查；固定结构由 cms.chrome.style validate 负责，首页主体和 add-html 的 class 覆盖仍保持严格校验。"
+    },
+    {
+      "key": "cms-sse-validation-ownership",
+      "text": "CMS AI 工具通过 SSE 在浏览器实时应用，服务端结束时只有修改前快照。模型遗漏 cms.canvas.validate 不能导致整个请求失败；仅在模型明确返回 valid=false 时阻断。最终实际画布校验应由浏览器侧状态或显式模型校验承担，不能在服务端用旧快照伪造。"
     }
   ]
 }
