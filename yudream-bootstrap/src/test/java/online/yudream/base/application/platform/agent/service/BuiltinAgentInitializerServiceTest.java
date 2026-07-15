@@ -65,6 +65,7 @@ class BuiltinAgentInitializerServiceTest {
                         "cms.canvas.validate"
                 );
         assertThat(nodeData(cmsNodes, "build").path("toolMode").asText()).isEqualTo("AUTO");
+        assertThat(nodeData(cmsNodes, "build").path("toolConfigDeclared").asBoolean()).isTrue();
         assertThat(textValues(nodeData(cmsNodes, "plan").path("toolCodes"))).isEmpty();
         assertThat(nodeData(cmsNodes, "plan").path("toolMode").asText()).isBlank();
         assertThat(textValues(nodeData(cmsNodes, "clarify").path("toolCodes"))).isEmpty();
@@ -159,7 +160,13 @@ class BuiltinAgentInitializerServiceTest {
                           {"id":"clarify-task","data":{"kind":"template"}},
                           {"id":"build-task","data":{"kind":"template"}},
                           {"id":"clarify","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5"}},
-                          {"id":"build","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5"}},
+                          {"id":"build","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5",
+                            "toolMode":"AUTO","toolCodes":[
+                              "web.fetch","cms.ask.user","cms.canvas.patch","cms.chrome.style",
+                              "cms.canvas.selected.text","cms.canvas.selected.html","cms.canvas.selected.style",
+                              "cms.canvas.block.add","cms.canvas.selected.remove","cms.block.template.list",
+                              "cms.canvas.validate"
+                            ]}},
                           {"id":"end","data":{"kind":"end"}}
                         ]}
                         """)
@@ -181,6 +188,7 @@ class BuiltinAgentInitializerServiceTest {
         assertThat(textValues(nodeData(nodes, "build").path("toolCodes")))
                 .contains("cms.canvas.patch", "cms.canvas.validate");
         assertThat(nodeData(nodes, "build").path("toolMode").asText()).isEqualTo("AUTO");
+        assertThat(nodeData(nodes, "build").path("toolConfigDeclared").asBoolean()).isTrue();
         assertThat(textValues(nodeData(nodes, "plan").path("toolCodes"))).isEmpty();
         assertThat(textValues(nodeData(nodes, "clarify").path("toolCodes"))).isEmpty();
     }
