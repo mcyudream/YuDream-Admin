@@ -9,11 +9,16 @@ public final class AiAgentToolExecutionScope implements AutoCloseable {
 
     private static final ThreadLocal<ScopeState> CURRENT = new ThreadLocal<>();
 
+    private final ScopeState previous;
+    private boolean closed;
+
     private AiAgentToolExecutionScope(Set<String> allowedToolNames) {
+        previous = CURRENT.get();
         CURRENT.set(new ScopeState(null, immutableNames(allowedToolNames)));
     }
 
     private AiAgentToolExecutionScope(List<AiAgentTool> tools) {
+        previous = CURRENT.get();
         List<AiAgentTool> scopedTools = tools == null ? List.of() : List.copyOf(tools);
         Set<String> allowedToolNames = new LinkedHashSet<>();
         scopedTools.forEach(tool -> allowedToolNames.add(tool.descriptor().name()));
@@ -40,7 +45,15 @@ public final class AiAgentToolExecutionScope implements AutoCloseable {
 
     @Override
     public void close() {
-        CURRENT.remove();
+        if (closed) {
+            return;
+        }
+        closed = true;
+        if (previous == null) {
+            CURRENT.remove();
+            return;
+        }
+        CURRENT.set(previous);
     }
 
     private static Set<String> immutableNames(Set<String> allowedToolNames) {

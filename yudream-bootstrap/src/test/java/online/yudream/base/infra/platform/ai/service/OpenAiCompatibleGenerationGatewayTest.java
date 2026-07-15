@@ -71,6 +71,31 @@ class OpenAiCompatibleGenerationGatewayTest {
     }
 
     @Test
+    void shouldRestoreOuterScopeAndCloseIdempotently() {
+        CountingTool outerTool = new CountingTool("outer.tool");
+        CountingTool innerTool = new CountingTool("inner.tool");
+        AiAgentToolExecutionScope outer = AiAgentToolExecutionScope.open(List.of(outerTool));
+        AiAgentToolExecutionScope inner = AiAgentToolExecutionScope.open(List.of(innerTool));
+
+        try {
+            assertThat(AiAgentToolExecutionScope.currentTools()).containsExactly(innerTool);
+
+            inner.close();
+            assertThat(AiAgentToolExecutionScope.currentTools()).containsExactly(outerTool);
+
+            inner.close();
+            assertThat(AiAgentToolExecutionScope.currentTools()).containsExactly(outerTool);
+
+            outer.close();
+            outer.close();
+            assertThat(AiAgentToolExecutionScope.currentTools()).isNull();
+        } finally {
+            inner.close();
+            outer.close();
+        }
+    }
+
+    @Test
     void shouldPreserveToolModeWhenCopyingToolCallingFlag() {
         for (AiToolMode mode : AiToolMode.values()) {
             AiGenerationRequest request = new AiGenerationRequest(
