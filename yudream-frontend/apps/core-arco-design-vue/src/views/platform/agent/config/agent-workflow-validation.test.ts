@@ -76,3 +76,78 @@ test('完整工作流可以发布', () => {
   assert.equal(result.valid, true)
   assert.deepEqual(result.issues, [])
 })
+
+test('chat model nodes validate tool modes and available tools', () => {
+  const result = validateAgentWorkflow(
+    [
+      node('start', 'start'),
+      node('none', 'llm', { providerCode: 'openai', modelCode: 'gpt-5', toolMode: 'NONE', toolCodes: ['wiki.search'] }),
+      node('auto', 'llm', { providerCode: 'openai', modelCode: 'gpt-5', toolMode: 'AUTO', toolCodes: [] }),
+      node('required', 'llm', { providerCode: 'openai', modelCode: 'gpt-5', toolMode: 'REQUIRED', toolCodes: ['missing.tool'] }),
+      node('end', 'end'),
+    ],
+    [
+      { source: 'start', target: 'none' },
+      { source: 'none', target: 'auto' },
+      { source: 'auto', target: 'required' },
+      { source: 'required', target: 'end' },
+    ],
+    {
+      models: [{ providerCode: 'openai', modelCode: 'gpt-5', kind: 'chat', configured: true, vision: false }],
+      knowledgeSpaceSlugs: new Set(),
+      toolCodes: new Set(['wiki.search']),
+    },
+  )
+
+  assert.equal(result.valid, false)
+  assert.deepEqual(new Set(result.issues.map(issue => issue.nodeId)), new Set(['none', 'auto', 'required']))
+})
+
+test('semantic model nodes validate vision capability, extract schema, and classify labels', () => {
+  const result = validateAgentWorkflow(
+    [
+      node('start', 'start'),
+      node('vision', 'vision', { providerCode: 'openai', modelCode: 'gpt-5', imageVariable: 'upload.image' }),
+      node('extract', 'extract', { providerCode: 'openai', modelCode: 'gpt-5', outputSchema: '[]' }),
+      node('classify', 'classify', { providerCode: 'openai', modelCode: 'gpt-5', classes: ['support', ' support '] }),
+      node('end', 'end'),
+    ],
+    [
+      { source: 'start', target: 'vision' },
+      { source: 'vision', target: 'extract' },
+      { source: 'extract', target: 'classify' },
+      { source: 'classify', target: 'end' },
+    ],
+    {
+      models: [{ providerCode: 'openai', modelCode: 'gpt-5', kind: 'chat', configured: true, vision: false }],
+      knowledgeSpaceSlugs: new Set(),
+      toolCodes: new Set(),
+    },
+  )
+
+  assert.equal(result.valid, false)
+  assert.deepEqual(new Set(result.issues.map(issue => issue.nodeId)), new Set(['vision', 'extract', 'classify']))
+})
+
+test('extract accepts a JSON object schema and classify accepts distinct labels', () => {
+  const result = validateAgentWorkflow(
+    [
+      node('start', 'start'),
+      node('extract', 'extract', { providerCode: 'openai', modelCode: 'gpt-5', outputSchema: '{"type":"object","properties":{"name":{"type":"string"}}}' }),
+      node('classify', 'classify', { providerCode: 'openai', modelCode: 'gpt-5', classes: ['support', 'sales'] }),
+      node('end', 'end'),
+    ],
+    [
+      { source: 'start', target: 'extract' },
+      { source: 'extract', target: 'classify' },
+      { source: 'classify', target: 'end' },
+    ],
+    {
+      models: [{ providerCode: 'openai', modelCode: 'gpt-5', kind: 'chat', configured: true, vision: true }],
+      knowledgeSpaceSlugs: new Set(),
+      toolCodes: new Set(),
+    },
+  )
+
+  assert.equal(result.valid, true)
+})
