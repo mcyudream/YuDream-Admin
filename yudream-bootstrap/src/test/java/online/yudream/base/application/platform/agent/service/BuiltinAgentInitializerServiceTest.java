@@ -121,4 +121,46 @@ class BuiltinAgentInitializerServiceTest {
         assertThat(new ObjectMapper().readTree(card.getWorkflowJson()).path("nodes")).hasSize(8);
         verify(applications, never()).findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT);
     }
+
+    @Test
+    void repairsComplexBuiltinWorkflowThatReferencesNonChatModel() throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of(
+                new AgentModelDTO("openai", "OpenAI", "gpt-5", "GPT-5", "chat", true, true, true),
+                new AgentModelDTO("openai", "OpenAI", "BAAI/bge-m3", "BGE M3", "embedding", false, true, false)
+        ));
+        AgentApplication cms = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .name("CMS 页面构建 Agent")
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start"}},
+                          {"id":"plan","data":{"kind":"understand","providerCode":"openai","modelCode":"BAAI/bge-m3"}},
+                          {"id":"route","data":{"kind":"condition"}},
+                          {"id":"task","data":{"kind":"template"}},
+                          {"id":"build","data":{"kind":"llm","providerCode":"openai","modelCode":"BAAI/bge-m3"}},
+                          {"id":"end","data":{"kind":"end"}}
+                        ]}
+                        """)
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.empty());
+        when(applications.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AgentApplication> repaired = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        assertThat(repaired).extracting(AgentApplication::getCode)
+                .contains(BuiltinAgentCodes.CMS_BUILDER);
+        assertThat(cms.getWorkflowJson())
+                .contains("\"modelCode\":\"gpt-5\"")
+                .doesNotContain("BAAI/bge-m3");
+    }
 }
