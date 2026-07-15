@@ -33,6 +33,7 @@
         <aws.sdk.version>2.31.78</aws.sdk.version>
         <easyexcel.version>4.0.3</easyexcel.version>
         <poi.version>5.3.0</poi.version>
+        <tika.version>3.2.3</tika.version>
         <springdoc.version>2.8.17</springdoc.version>
         <neo4j.driver.version>5.28.5</neo4j.driver.version>
         <yubico.webauthn.version>2.9.0</yubico.webauthn.version>
@@ -119,6 +120,16 @@
                 <groupId>org.apache.poi</groupId>
                 <artifactId>poi-ooxml</artifactId>
                 <version>${poi.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-core</artifactId>
+                <version>${tika.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.tika</groupId>
+                <artifactId>tika-parsers-standard-package</artifactId>
+                <version>${tika.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.springdoc</groupId>
