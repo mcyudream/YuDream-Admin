@@ -87,7 +87,7 @@ const parentOptions = computed(() => {
       label: `${item.name} (${item.code})`,
       value: item.code,
     }))
-  return [{ label: ROOT_LABEL, value: undefined }, ...options]
+  return [{ label: ROOT_LABEL, value: '' }, ...options]
 })
 
 const sortValue = computed({

@@ -43,17 +43,18 @@ export const useAppMenuStore = defineStore(
     function convertRouteToMenuRecursive(routes: RouteRecordRaw[], basePath = ''): MenuRecordRaw[] {
       const returnMenus: MenuRecordRaw[] = []
       routes.forEach((item) => {
+        const meta = {
+          auth: item?.meta?.auth,
+          title: item?.meta?.title,
+          icon: item?.meta?.icon,
+          menu: item?.meta?.menu,
+          expand: item?.meta?.expand,
+          link: item?.meta?.link,
+          menuCode: (item.meta as Record<string, unknown> | undefined)?.menuCode,
+        }
         const menuItem: MenuRecordRaw = {
           path: resolveRoutePath(basePath, item.path),
-          meta: {
-            auth: item?.meta?.auth,
-            title: item?.meta?.title,
-            icon: item?.meta?.icon,
-            menu: item?.meta?.menu,
-            expand: item?.meta?.expand,
-            link: item?.meta?.link,
-            menuCode: (item.meta as Record<string, unknown> | undefined)?.menuCode,
-          },
+          meta,
         }
         if (item.children) {
           menuItem.children = convertRouteToMenuRecursive(item.children, menuItem.path)

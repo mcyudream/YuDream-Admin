@@ -99,13 +99,19 @@ const publicationStatusText = computed(() => ({
   SUCCESS: '发布与索引完成',
   FAILED: '页面已发布，索引失败',
 })[publicationState.value])
-const publicationStatusVariant = computed(() => ({
-  IDLE: 'outline',
-  CONNECTING: 'warning',
-  RUNNING: 'warning',
-  SUCCESS: 'success',
-  FAILED: 'danger',
-})[publicationState.value])
+const publicationStatusVariant = computed<'outline' | 'secondary' | 'default' | 'destructive'>(() => {
+  switch (publicationState.value) {
+    case 'CONNECTING':
+    case 'RUNNING':
+      return 'secondary'
+    case 'SUCCESS':
+      return 'default'
+    case 'FAILED':
+      return 'destructive'
+    default:
+      return 'outline'
+  }
+})
 
 onMounted(async () => {
   await Promise.all([loadSpaces(), loadAiCapability(), loadGraphConnections()])
@@ -452,8 +458,8 @@ function parseAiProviders(config: Record<string, string>): AiProviderOption[] {
           code,
           name,
           defaultModel: String(provider.defaultModel || '').trim(),
-          embeddingModels: listValues(provider.embeddingModels),
-          models: listValues(provider.models).map(model => typeof model === 'string' ? model : String(model?.code || model?.model || model?.name || '').trim()).filter(Boolean),
+          embeddingModels: modelCodes(provider.embeddingModels),
+          models: modelCodes(provider.models),
         }
       })
       .filter(provider => provider.code)
@@ -463,8 +469,16 @@ function parseAiProviders(config: Record<string, string>): AiProviderOption[] {
   }
 }
 
-function listValues(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
+function listValues(value: unknown): Array<Record<string, unknown> | string> {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> | string => typeof item === 'string' || (item !== null && typeof item === 'object'))
+    : []
+}
+
+function modelCodes(value: unknown): string[] {
+  return listValues(value)
+    .map(model => typeof model === 'string' ? model : String(model.code || model.model || model.name || '').trim())
+    .filter(Boolean)
 }
 
 function providerOptions(providers: AiProviderOption[]) {
