@@ -15,6 +15,7 @@ import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './config/agent-node-data'
+import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -181,8 +182,11 @@ function normalizeNode(raw: FlowNode<AgentNodeData>): FlowNode<AgentNodeData> {
 
 function normalizeEdge(raw: Edge): Edge {
   const connectionStyle = raw.data?.connectionStyle === 'line' ? 'line' : 'arrow'
+  const sourceKind = nodes.value.find(node => node.id === raw.source)?.data.kind
+  const sourceHandle = migrateConditionSourceHandle(sourceKind, raw.sourceHandle, raw.label, raw.data)
   return {
     ...raw,
+    sourceHandle,
     type: raw.type || 'smoothstep',
     markerEnd: connectionStyle === 'arrow' ? MarkerType.ArrowClosed : undefined,
     data: { ...raw.data, connectionStyle },
@@ -603,19 +607,17 @@ async function save(publish = false, notify = true): Promise<string> {
     return ''
   }
   if (publish) {
-    const invalidModelNode = nodes.value.find((node) => {
-      if (!agentModelKind(node.data.kind)) {
-        return false
-      }
-      const kind = agentModelKind(node.data.kind)
-      return !agentModels.value.some(model => model.configured
-        && model.kind.toLowerCase() === kind
-        && model.providerCode === node.data.providerCode
-        && model.modelCode === node.data.modelCode)
+    const validation = validateAgentWorkflow(nodes.value, edges.value, {
+      models: agentModels.value,
+      knowledgeSpaceSlugs: new Set(knowledgeSpaces.value.map(space => space.slug)),
+      toolCodes: new Set([...customTools.value.map(tool => tool.code), ...systemTools.value.map(tool => tool.code)]),
     })
-    if (invalidModelNode) {
-      selectNode(invalidModelNode.id)
-      toast.error('发布前请为每个模型节点选择已配置的对应类型模型')
+    if (!validation.valid) {
+      const issue = validation.issues[0]!
+      if (issue.nodeId) {
+        selectNode(issue.nodeId)
+      }
+      toast.error(issue.message)
       return ''
     }
   }
@@ -625,11 +627,14 @@ async function save(publish = false, notify = true): Promise<string> {
     const nodeToolCodes = nodes.value.map(node => node.data.toolCode).filter(Boolean)
     form.toolCodes = [...new Set([...form.toolCodes, ...nodeToolCodes])]
     form.workflowJson = JSON.stringify(workflowData())
-    form.status = publish ? 'PUBLISHED' : form.status
-    const payload = { ...form }
+    const payload = { ...form, status: form.status === 'DISABLED' ? 'DISABLED' : 'DRAFT' } as AgentApplicationPayload
     const response = id.value ? await apiAgent.update(id.value, payload) : await apiAgent.create(payload)
     if (publish) {
       await apiAgent.publish(response.data.id)
+      form.status = 'PUBLISHED'
+    }
+    else {
+      form.status = response.data.status
     }
     if (notify) {
       toast.success(publish ? 'Agent 应用已发布' : 'Agent 编排已保存')
