@@ -8,7 +8,9 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
+import online.yudream.base.infra.platform.plugin.service.PluginAiToolExecutionScope;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry;
+import online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.ObjectProvider;
@@ -54,6 +56,21 @@ class OpenAiCompatibleGenerationGatewayTest {
     }
 
     @Test
+    void shouldPreferExactScopedToolsWhenPluginScopeAlsoExists() {
+        CountingTool scopedTool = new CountingTool("model.tool");
+        OpenAiCompatibleGenerationGateway gateway = gatewayWithGlobalTools();
+        PluginAiToolExecutionScope.set(mock(PluginAiExecutionContext.class));
+
+        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(scopedTool))) {
+            assertThat(toolCallbacks(gateway))
+                    .extracting(callback -> callback.getToolDefinition().name())
+                    .containsExactly("model_tool");
+        } finally {
+            PluginAiToolExecutionScope.clear();
+        }
+    }
+
+    @Test
     void shouldPreserveToolModeWhenCopyingToolCallingFlag() {
         for (AiToolMode mode : AiToolMode.values()) {
             AiGenerationRequest request = new AiGenerationRequest(
@@ -76,13 +93,15 @@ class OpenAiCompatibleGenerationGatewayTest {
     @SuppressWarnings("unchecked")
     private OpenAiCompatibleGenerationGateway gatewayWithGlobalTools(AiAgentTool... tools) {
         ObjectProvider<AiAgentTool> provider = mock(ObjectProvider.class);
+        PluginAiToolRegistry pluginToolRegistry = mock(PluginAiToolRegistry.class);
         when(provider.stream()).thenAnswer(ignored -> Stream.of(tools));
+        when(pluginToolRegistry.tools()).thenReturn(List.of());
         return new OpenAiCompatibleGenerationGateway(
                 provider,
                 mock(AiProviderConfigParser.class),
                 List.of(),
                 new AiClientProperties(),
-                mock(PluginAiToolRegistry.class)
+                pluginToolRegistry
         );
     }
 
