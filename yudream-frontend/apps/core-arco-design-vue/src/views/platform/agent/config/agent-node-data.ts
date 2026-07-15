@@ -93,7 +93,7 @@ export function normalizeAgentNodeData(template: AgentNodeTemplate, raw: Partial
   normalized.toolMode = toolMode(raw.toolMode ?? defaults.toolMode)
   // Workflow data created before model-native tools has no declaration marker.
   // Keep it distinct from a user intentionally selecting NONE with no tools.
-  normalized.toolConfigDeclared = isAgentToolConfigModelNode(template.kind) && raw.toolConfigDeclared === true
+  normalized.toolConfigDeclared = declaresAgentNodeToolConfig({ ...raw, kind: raw.kind || template.kind })
   normalized.outputSchema = text(raw.outputSchema ?? defaults.outputSchema)
   normalized.imageVariable = text(raw.imageVariable ?? defaults.imageVariable)
   return normalized
@@ -103,6 +103,20 @@ export function isAgentToolConfigModelNode(kind: AgentNodeKind) {
   return kind !== 'understand' && isAgentChatModelNode(kind)
 }
 
+export function declaresAgentNodeToolConfig(data: Partial<AgentNodeData>) {
+  if (!data.kind || !isAgentToolConfigModelNode(data.kind)) {
+    return false
+  }
+  if (data.toolConfigDeclared === true) {
+    return true
+  }
+  if (Array.isArray(data.toolCodes) && data.toolCodes.some(code => typeof code === 'string' && Boolean(code.trim()))) {
+    return true
+  }
+  const mode = typeof data.toolMode === 'string' ? data.toolMode.trim().toUpperCase() : ''
+  return mode === 'AUTO' || mode === 'ACTIVE' || mode === 'REQUIRED'
+}
+
 function strings(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string').map(item => item.trim()).filter(Boolean)
@@ -110,7 +124,9 @@ function strings(value: unknown) {
 }
 
 function toolMode(value: unknown): AgentToolMode {
-  return value === 'AUTO' || value === 'REQUIRED' ? value : 'NONE'
+  return value === 'AUTO' || value === 'ACTIVE' || value === 'REQUIRED'
+    ? value === 'ACTIVE' ? 'AUTO' : value
+    : 'NONE'
 }
 
 function text(value: unknown) {

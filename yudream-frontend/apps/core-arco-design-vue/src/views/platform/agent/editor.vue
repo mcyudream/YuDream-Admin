@@ -15,7 +15,7 @@ import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import { agentNodePaletteGroups, agentNodeTemplates, findAgentNodeTemplate } from './config/agent-node-catalog'
-import { agentModelKind, createAgentNodeData, isAgentToolConfigModelNode, normalizeAgentNodeData } from './config/agent-node-data'
+import { agentModelKind, createAgentNodeData, declaresAgentNodeToolConfig, normalizeAgentNodeData } from './config/agent-node-data'
 import { buildAgentRunInput } from './config/agent-run-input'
 import { deriveAgentApplicationToolCodes, migrateLegacyToolNodes } from './config/agent-workflow-tools'
 import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
@@ -70,7 +70,7 @@ const workflowDefinesTools = computed(() => nodes.value.some((node) => {
   if (node.data.kind === 'tool') {
     return Boolean(node.data.toolCode)
   }
-  return isAgentToolConfigModelNode(node.data.kind) && node.data.toolConfigDeclared
+  return declaresAgentNodeToolConfig(node.data)
 }))
 const applicationToolCodes = computed(() => workflowDefinesTools.value
   ? deriveAgentApplicationToolCodes(nodes.value)

@@ -2,7 +2,7 @@ import type { AgentNodeTemplate } from '../components/types'
 import assert from 'node:assert/strict'
 // eslint-disable-next-line test/no-import-node-test -- this workspace runs lightweight TS tests with Node.
 import { test } from 'node:test'
-import { agentModelKind, agentSourceHandles, createAgentNodeData, normalizeAgentNodeData } from './agent-node-data'
+import { agentModelKind, agentSourceHandles, createAgentNodeData, declaresAgentNodeToolConfig, normalizeAgentNodeData } from './agent-node-data'
 
 const template: AgentNodeTemplate = {
   kind: 'search',
@@ -115,6 +115,13 @@ test('历史模型节点未声明工具配置时保持兼容状态，显式声�
   assert.equal(normalizeAgentNodeData(llmTemplate, { toolMode: 'NONE', toolCodes: [] }).toolConfigDeclared, false)
   assert.equal(normalizeAgentNodeData(llmTemplate, { toolConfigDeclared: true, toolMode: 'NONE', toolCodes: [] }).toolConfigDeclared, true)
   assert.equal(normalizeAgentNodeData(understandTemplate, { toolConfigDeclared: true }).toolConfigDeclared, false)
+})
+
+test('工具声明判定兼容旧的工具列表和 ACTIVE 调用模式', () => {
+  assert.equal(declaresAgentNodeToolConfig({ kind: 'llm', toolCodes: ['cms.canvas.patch'] }), true)
+  assert.equal(declaresAgentNodeToolConfig({ kind: 'llm', toolMode: 'ACTIVE' as never }), true)
+  assert.equal(declaresAgentNodeToolConfig({ kind: 'llm', toolMode: 'NONE', toolCodes: [] }), false)
+  assert.equal(normalizeAgentNodeData({ ...template, kind: 'llm' as const }, { toolMode: 'ACTIVE' as never }).toolMode, 'AUTO')
 })
 
 test('所有聊天模型语义映射到 chat 模型，Embedding 和 Rerank 保持各自类型', () => {

@@ -14,10 +14,10 @@ test('derives an ordered unique application tool authorization union', () => {
     node('classify', 'classify', { toolConfigDeclared: true, toolCodes: ['knowledge.lookup'] }),
     node('legacy', 'tool', { toolCode: 'web.fetch' }),
     node('embedding', 'embedding', { toolCodes: ['ignored.by.embedding'] }),
-    node('undeclared', 'llm', { toolCodes: ['ignored.by.legacy.compatibility'] }),
+    node('legacy-configured', 'llm', { toolCodes: ['legacy.compatibility.tool'] }),
   ])
 
-  assert.deepEqual(toolCodes, ['cms.canvas.patch', 'web.fetch', 'knowledge.lookup'])
+  assert.deepEqual(toolCodes, ['cms.canvas.patch', 'web.fetch', 'knowledge.lookup', 'legacy.compatibility.tool'])
 })
 
 test('migrates an unambiguous legacy tool node into its direct chat-model predecessor', () => {

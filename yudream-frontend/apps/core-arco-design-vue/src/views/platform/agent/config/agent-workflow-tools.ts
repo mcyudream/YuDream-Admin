@@ -1,5 +1,5 @@
 import type { AgentNodeData } from '../components/types'
-import { isAgentToolConfigModelNode } from './agent-node-data'
+import { declaresAgentNodeToolConfig, isAgentToolConfigModelNode } from './agent-node-data'
 
 export interface AgentWorkflowToolNode {
   id: string
@@ -33,7 +33,7 @@ export function deriveAgentApplicationToolCodes(nodes: readonly AgentWorkflowToo
   const codes: string[] = []
   for (const node of nodes) {
     const kind = node.data?.kind
-    if (kind && isAgentToolConfigModelNode(kind) && node.data?.toolConfigDeclared) {
+    if (kind && declaresAgentNodeToolConfig(node.data)) {
       codes.push(...strings(node.data?.toolCodes))
     }
     else if (kind === 'tool') {
