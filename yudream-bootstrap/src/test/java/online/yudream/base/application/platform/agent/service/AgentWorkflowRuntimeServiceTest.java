@@ -8,6 +8,10 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.document.service.DocumentTextExtractor;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import org.junit.jupiter.api.Test;
@@ -21,6 +25,7 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentWorkflowRuntimeServiceTest {
 
@@ -37,7 +42,8 @@ class AgentWorkflowRuntimeServiceTest {
                 gateways,
                 tools,
                 mock(AgentKnowledgeOperations.class),
-                mock(DocumentTextExtractor.class)
+                mock(DocumentTextExtractor.class),
+                permission -> true
         );
         AgentApplication application = AgentApplication.builder()
                 .name("模板应用")
@@ -64,5 +70,65 @@ class AgentWorkflowRuntimeServiceTest {
         assertThat(events).extracting(AgentDebugEventDTO::status)
                 .containsExactly("RUNNING", "COMPLETED", "RUNNING", "COMPLETED", "RUNNING", "COMPLETED");
         assertThat(events).noneMatch(event -> "SKIPPED".equals(event.status()));
+        assertThat(events.getFirst().message()).contains("输入：hello");
+        assertThat(events.get(1).message()).contains("输出：hello");
+    }
+
+    @Test
+    void shouldReturnEndNodeOutputInsteadOfLastExecutedSibling() {
+        ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
+        ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        when(gateways.getIfAvailable()).thenReturn(null);
+        when(tools.stream()).thenReturn(Stream.empty());
+        AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
+                new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true
+        );
+        AgentApplication application = AgentApplication.builder()
+                .name("分支应用").code("branch").toolCodes(List.of())
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                          {"id":"end","data":{"kind":"end","inputVariable":"query"}},
+                          {"id":"sibling","data":{"kind":"template","template":"later","outputVariable":"other"}}
+                        ],"edges":[
+                          {"source":"start","target":"end"},{"source":"start","target":"sibling"}
+                        ]}
+                        """)
+                .build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("expected");
+
+        assertThat(service.execute(application, cmd, Map.of(), null, null, null).content()).isEqualTo("expected");
+    }
+
+    @Test
+    void shouldRejectSystemToolWhenCurrentRunnerLacksToolPermission() {
+        ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
+        ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        when(gateways.getIfAvailable()).thenReturn(null);
+        AiAgentTool protectedTool = new AiAgentTool() {
+            @Override public AiAgentToolDescriptor descriptor() { return new AiAgentToolDescriptor("cms.patch", "修改页面", "", "cms:edit", "", "", "", Map.of()); }
+            @Override public AiAgentToolResult execute(AiAgentToolCall call) { throw new AssertionError("不应执行"); }
+        };
+        when(tools.stream()).thenReturn(Stream.of(protectedTool));
+        AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
+                new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> false
+        );
+        AgentApplication application = AgentApplication.builder()
+                .name("受限应用").code("protected").toolCodes(List.of("cms.patch"))
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start"}},
+                          {"id":"end","data":{"kind":"end"}}
+                        ],"edges":[{"source":"start","target":"end"}]}
+                        """).build();
+        AgentRunCmd cmd = new AgentRunCmd();
+        cmd.setInput("test");
+
+        assertThatThrownBy(() -> service.execute(application, cmd, Map.of(), null, null, null))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("无权限调用工具");
     }
 }

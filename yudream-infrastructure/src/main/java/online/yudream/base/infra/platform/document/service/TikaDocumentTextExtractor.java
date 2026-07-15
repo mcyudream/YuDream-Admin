@@ -11,6 +11,7 @@ import org.apache.tika.parser.AutoDetectParser;
 import org.apache.tika.parser.ParseContext;
 import org.apache.tika.sax.BodyContentHandler;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xml.sax.SAXException;
 
@@ -21,25 +22,67 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 public class TikaDocumentTextExtractor implements DocumentTextExtractor {
 
     private static final String DATA_URL_PREFIX = "data:";
     private static final String OCTET_STREAM = "application/octet-stream";
+    private static final long DEFAULT_PARSE_TIMEOUT_MILLIS = 30_000L;
+    private static final ExecutorService PARSER_EXECUTOR = Executors.newThreadPerTaskExecutor(
+            Thread.ofVirtual().name("agent-document-parser-", 0).factory()
+    );
     private final long maxBytes;
+    private final long parseTimeoutMillis;
 
+    public TikaDocumentTextExtractor(long maxBytes) {
+        this(maxBytes, DEFAULT_PARSE_TIMEOUT_MILLIS);
+    }
+
+    @Autowired
     public TikaDocumentTextExtractor(
-            @Value("${yudream.platform.agent.document.max-bytes:10485760}") long maxBytes) {
+            @Value("${yudream.platform.agent.document.max-bytes:10485760}") long maxBytes,
+            @Value("${yudream.platform.agent.document.parse-timeout-millis:30000}") long parseTimeoutMillis) {
         if (maxBytes <= 0) {
             throw new IllegalArgumentException("文档大小限制必须大于 0");
         }
+        if (parseTimeoutMillis <= 0) {
+            throw new IllegalArgumentException("文档解析超时时间必须大于 0");
+        }
         this.maxBytes = maxBytes;
+        this.parseTimeoutMillis = parseTimeoutMillis;
     }
 
     @Override
     public String extract(DocumentSource source) {
         DecodedDocument document = decode(source);
+        Future<String> parsing = PARSER_EXECUTOR.submit(() -> parse(document));
+        try {
+            return parsing.get(parseTimeoutMillis, TimeUnit.MILLISECONDS);
+        }
+        catch (TimeoutException exception) {
+            parsing.cancel(true);
+            throw new BizException("文档解析超时");
+        }
+        catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new BizException("文档解析被中断");
+        }
+        catch (ExecutionException exception) {
+            if (exception.getCause() instanceof BizException bizException) {
+                throw bizException;
+            }
+            throw new BizException("文档文本提取失败：" + readableMessage(exception));
+        }
+    }
+
+    private String parse(DecodedDocument document) {
         AutoDetectParser parser = new AutoDetectParser();
         ParseContext context = new ParseContext();
         Metadata metadata = metadata(document);

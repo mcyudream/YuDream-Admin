@@ -133,4 +133,9 @@ class TikaDocumentTextExtractorTest {
 
         assertEquals("不支持的文档类型：application/x-yudream-unsupported", exception.getMessage());
     }
+
+    @Test
+    void rejectsNonPositiveParseTimeout() {
+        assertThrows(IllegalArgumentException.class, () -> new TikaDocumentTextExtractor(1024, 0));
+    }
 }

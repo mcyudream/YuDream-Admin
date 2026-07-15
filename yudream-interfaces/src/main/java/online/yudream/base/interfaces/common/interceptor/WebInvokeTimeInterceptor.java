@@ -73,6 +73,9 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
     }
 
     private String formatBody(HttpServletRequest request) {
+        if (request.getRequestURI().matches("/api/platform/agents/[^/]+/(?:run|debug/stream)")) {
+            return "[Agent 运行载荷已省略]";
+        }
         if (request instanceof ContentCachingRequestWrapper wrapper) {
             byte[] buf = wrapper.getContentAsByteArray();
             if (buf.length > 0) {

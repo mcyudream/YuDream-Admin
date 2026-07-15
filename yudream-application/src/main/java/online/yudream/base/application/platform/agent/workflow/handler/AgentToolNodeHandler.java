@@ -13,6 +13,7 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
+import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
@@ -37,6 +38,7 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
     private final List<AiAgentTool> systemTools;
     private final AgentApplication application;
     private final AgentWorkflowRunState state;
+    private final AgentPermissionGateway permissionGateway;
 
     public AgentToolNodeHandler(
             AgentWorkflowValueResolver values,
@@ -45,7 +47,8 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
             AgentToolRepo toolRepo,
             List<AiAgentTool> systemTools,
             AgentApplication application,
-            AgentWorkflowRunState state
+            AgentWorkflowRunState state,
+            AgentPermissionGateway permissionGateway
     ) {
         this.values = values;
         this.objectMapper = objectMapper;
@@ -54,6 +57,7 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
         this.systemTools = systemTools == null ? List.of() : List.copyOf(systemTools);
         this.application = application;
         this.state = state;
+        this.permissionGateway = permissionGateway;
     }
 
     @Override
@@ -84,6 +88,7 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
                 .filter(item -> toolCode.equals(item.descriptor().name()))
                 .findFirst()
                 .orElseThrow(() -> new BizException("系统工具不存在：" + toolCode));
+        ensurePermission(tool.descriptor().permissionCode(), tool.descriptor().title());
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(java.util.Set.of(toolCode))) {
             return tool.execute(new AiAgentToolCall(toolCode, arguments));
         }
@@ -93,6 +98,7 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
         if (tool.getType() != AgentToolType.PYTHON || !Boolean.TRUE.equals(tool.getEnabled())) {
             throw new BizException("Python 工具不可用：" + tool.getCode());
         }
+        ensurePermission(tool.getPermissionCode(), tool.getName());
         RuntimeScript script = RuntimeScript.create(tool.getName(), tool.getCode(), RuntimeLanguage.PYTHON, tool.getPythonCode());
         script.update(
                 tool.getName(),
@@ -137,5 +143,11 @@ public final class AgentToolNodeHandler implements AgentWorkflowNodeHandler {
             }
         }
         return Map.of("input", input == null ? "" : input);
+    }
+
+    private void ensurePermission(String permissionCode, String toolName) {
+        if (!permissionGateway.hasPermission(permissionCode)) {
+            throw new BizException("无权限调用工具：" + toolName);
+        }
     }
 }

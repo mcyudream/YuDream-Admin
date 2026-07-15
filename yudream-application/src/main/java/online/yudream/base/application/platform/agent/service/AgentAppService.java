@@ -212,7 +212,7 @@ public class AgentAppService {
                         space.isGraphEnabled(), space.isRerankEnabled()
                 ))
                 .toList();
-        return new AgentCatalogDTO(spaces, modelCatalogParser.parse(aiConfig()));
+        return new AgentCatalogDTO(spaces, modelCatalogParser.parse(optionalAiConfig()));
     }
 
     private Map<String, String> aiConfig() {

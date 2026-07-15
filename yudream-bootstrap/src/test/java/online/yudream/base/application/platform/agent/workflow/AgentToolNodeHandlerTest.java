@@ -62,7 +62,8 @@ class AgentToolNodeHandlerTest {
                 emptyToolRepo(),
                 List.of(systemTool),
                 application,
-                state
+                state,
+                permission -> true
         );
         AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
                 new AgentWorkflowGraphParser(objectMapper),
