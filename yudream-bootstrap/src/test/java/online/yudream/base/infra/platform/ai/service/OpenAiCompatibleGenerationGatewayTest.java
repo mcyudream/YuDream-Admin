@@ -8,6 +8,10 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
+import online.yudream.base.infra.platform.ai.service.provider.AiModelEndpoint;
+import online.yudream.base.infra.platform.ai.service.provider.AiProviderEndpoint;
+import online.yudream.base.infra.platform.ai.service.provider.AiProviderType;
+import online.yudream.base.infra.platform.ai.service.provider.OpenAiProviderAdapter;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolExecutionScope;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry;
 import online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext;
@@ -113,6 +117,22 @@ class OpenAiCompatibleGenerationGatewayTest {
             assertThat(request.withToolCallingEnabled(false).toolMode()).isEqualTo(mode);
             assertThat(request.withToolCallingEnabled(true).toolMode()).isEqualTo(mode);
         }
+    }
+
+    @Test
+    void shouldMapRequiredToolModeToOpenAiRequiredToolChoice() {
+        OpenAiProviderAdapter adapter = new OpenAiProviderAdapter();
+        AiProviderEndpoint provider = new AiProviderEndpoint(
+                "openai", "OpenAI", AiProviderType.OPENAI, "https://api.example.com/v1", "/chat/completions",
+                "key", null, "gpt", null, null, List.of(), List.of(), List.of(), true
+        );
+        AiModelEndpoint model = new AiModelEndpoint("gpt", "GPT", "gpt", null, null, false, null, "chat", false);
+        AiGenerationRequest request = new AiGenerationRequest(
+                "system", "user", null, "openai", "gpt", Map.of(), List.of(), true, AiToolMode.REQUIRED
+        );
+
+        assertThat(adapter.chatOptions(provider, model, request).getToolChoice()).isEqualTo("required");
+        assertThat(request.withToolCallingEnabled(false).providerToolChoice()).isEqualTo("none");
     }
 
     @Test
