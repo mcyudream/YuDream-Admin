@@ -1,5 +1,6 @@
 package online.yudream.base.application.platform.agent.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.assembler.AgentModelCatalogParser;
@@ -110,6 +111,10 @@ public class BuiltinAgentInitializerService {
             if (nodes.size() <= 3) {
                 return true;
             }
+            if (BuiltinAgentCodes.CMS_BUILDER.equals(application.getCode())
+                    && requiresCmsModelToolUpgrade(nodes)) {
+                return true;
+            }
             if (chatModels == null || chatModels.isEmpty()) {
                 return false;
             }
@@ -121,7 +126,7 @@ public class BuiltinAgentInitializerService {
                         && !data.has("strictJson")) {
                     return true;
                 }
-                if (!List.of("llm", "understand").contains(kind)) {
+                if (!List.of("llm", "understand", "extract", "classify", "vision").contains(kind)) {
                     continue;
                 }
                 String providerCode = data.path("providerCode").asText();
@@ -138,6 +143,47 @@ public class BuiltinAgentInitializerService {
         catch (Exception ignored) {
             return true;
         }
+    }
+
+    private boolean requiresCmsModelToolUpgrade(JsonNode nodes) {
+        JsonNode build = nodeData(nodes, "build");
+        if (build == null || !"llm".equals(build.path("kind").asText())) {
+            return false;
+        }
+        if (!"AUTO".equalsIgnoreCase(build.path("toolMode").asText())) {
+            return true;
+        }
+        if (!CMS_TOOLS.equals(textValues(build.path("toolCodes")))) {
+            return true;
+        }
+        return hasToolConfiguration(nodeData(nodes, "plan"))
+                || hasToolConfiguration(nodeData(nodes, "clarify"));
+    }
+
+    private JsonNode nodeData(JsonNode nodes, String id) {
+        for (JsonNode node : nodes) {
+            if (id.equals(node.path("id").asText())) {
+                return node.path("data");
+            }
+        }
+        return null;
+    }
+
+    private boolean hasToolConfiguration(JsonNode data) {
+        return data != null && (data.has("toolMode") || !textValues(data.path("toolCodes")).isEmpty());
+    }
+
+    private List<String> textValues(JsonNode values) {
+        if (!values.isArray()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        values.forEach(value -> {
+            if (value.isTextual() && !value.asText().isBlank()) {
+                result.add(value.asText().trim());
+            }
+        });
+        return List.copyOf(result);
     }
 
     private List<AgentModelDTO> configuredChatModels() {
@@ -185,7 +231,7 @@ public class BuiltinAgentInitializerService {
                                 "llm", "提出澄清问题", "只提出最多 3 个关键问题，不修改画布。", "task", "answer", model, false
                         )),
                         node("build", 1080, 430, modelNode(
-                                "llm", "执行画布构建", "按照任务调用 CMS 画布工具完成修改，并在结束前校验画布。", "task", "answer", model, model != null && model.vision()
+                                "llm", "执行画布构建", "按照任务调用 CMS 画布工具完成修改，并在结束前校验画布。", "task", "answer", model, model != null && model.vision(), CMS_TOOLS
                         )),
                         node("end", 1360, 260, Map.of(
                                 "kind", "end", "title", "结束", "inputVariable", "answer"
@@ -273,6 +319,22 @@ public class BuiltinAgentInitializerService {
         data.put("prompt", prompt);
         data.put("inputVariable", inputVariable);
         data.put("outputVariable", outputVariable);
+        return data;
+    }
+
+    private Map<String, Object> modelNode(
+            String kind,
+            String title,
+            String prompt,
+            String inputVariable,
+            String outputVariable,
+            AgentModelDTO model,
+            boolean vision,
+            List<String> toolCodes
+    ) {
+        Map<String, Object> data = modelNode(kind, title, prompt, inputVariable, outputVariable, model, vision);
+        data.put("toolCodes", List.copyOf(toolCodes));
+        data.put("toolMode", "AUTO");
         return data;
     }
 
