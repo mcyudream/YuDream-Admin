@@ -363,7 +363,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     }
 
     private String inputSchema(AiAgentToolDescriptor descriptor) {
-        if (descriptor.inputSchemaDefinition() != null && !descriptor.inputSchemaDefinition().isEmpty()) {
+        if (descriptor.inputSchemaDefinition() != null) {
             return JSONUtil.toJsonStr(descriptor.inputSchemaDefinition());
         }
         JSONObject properties = JSONUtil.createObj();

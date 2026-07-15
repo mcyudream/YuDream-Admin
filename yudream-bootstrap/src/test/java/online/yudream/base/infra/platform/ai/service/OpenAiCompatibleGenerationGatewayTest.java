@@ -140,6 +140,24 @@ class OpenAiCompatibleGenerationGatewayTest {
         assertThat(schema).contains("\"required\":[\"score\"]", "\"additionalProperties\":false", "\"type\":\"integer\"");
     }
 
+    @Test
+    void shouldPassAnEmptyCompleteCustomToolJsonSchemaToTheModel() {
+        OpenAiCompatibleGenerationGateway gateway = gatewayWithGlobalTools();
+        AiAgentToolDescriptor descriptor = new AiAgentToolDescriptor(
+                "empty_schema",
+                "Empty schema",
+                "Accept an empty schema",
+                "test:tool",
+                "Empty schema",
+                "Agent",
+                "Accept an empty schema",
+                Map.of("legacy", "must not be used"),
+                Map.of()
+        );
+
+        assertThat(inputSchema(gateway, descriptor)).isEqualTo("{}");
+    }
+
     @SuppressWarnings("unchecked")
     private OpenAiCompatibleGenerationGateway gatewayWithGlobalTools(AiAgentTool... tools) {
         ObjectProvider<AiAgentTool> provider = mock(ObjectProvider.class);
