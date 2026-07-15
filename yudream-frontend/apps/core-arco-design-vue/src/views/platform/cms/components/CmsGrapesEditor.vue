@@ -4,7 +4,7 @@ import type { Editor } from 'grapesjs'
 import type { CmsAgentSelectOption } from '../config/cms-agent-options'
 import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
-import type { AiToolCallResult, CmsChatHistoryMessage, CmsPageGenerateResult } from '@/api/modules/platform-ai'
+import type { AiToolCallResult, CmsChatHistoryMessage } from '@/api/modules/platform-ai'
 import type { CmsAiChatAttachmentMeta, CmsAiChatSession, CmsAiChatSessionSummary } from '@/utils/cms-ai-chat-history'
 import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
 import { registerHandler, removeHandler } from '@jboltai/tokui'
@@ -55,6 +55,27 @@ interface CanvasSelectionSnapshot {
 interface AskOption {
   title: string
   desc?: string
+}
+
+interface AguiActivityContent {
+  type: string
+  data: {
+    activityType: string
+    content: Record<string, unknown>
+  }
+}
+
+interface AguiToolCallContent {
+  type: string
+  data: {
+    toolCallId: string
+    toolCallName: string
+  }
+}
+
+interface TextStreamContent {
+  type: string
+  data: string
 }
 
 interface CodeCompletionItem {
@@ -690,22 +711,39 @@ function messageContents(item: ChatMessagesData): any[] {
   return merged
 }
 
-function isTextStreamContent(content: any): boolean {
-  return typeof content?.type === 'string'
-    && !content.type.startsWith('activity-')
-    && !content.type.startsWith('toolcall-')
-    && !['reasoning', 'thinking'].includes(content.type)
-    && typeof content.data === 'string'
+function isTextStreamContent(content: unknown): content is TextStreamContent {
+  if (!content || typeof content !== 'object') {
+    return false
+  }
+  const value = content as TextStreamContent
+  return typeof value.type === 'string'
+    && !value.type.startsWith('activity-')
+    && !value.type.startsWith('toolcall-')
+    && !['reasoning', 'thinking'].includes(value.type)
+    && typeof value.data === 'string'
 }
 
-function isAguiActivityContent(content: any): boolean {
-  return typeof content?.type === 'string'
-    && content.type.startsWith('activity-')
-    && Boolean(content?.data?.activityType)
+function isAguiActivityContent(content: unknown): content is AguiActivityContent {
+  if (!content || typeof content !== 'object') {
+    return false
+  }
+  const value = content as AguiActivityContent
+  return typeof value.type === 'string'
+    && value.type.startsWith('activity-')
+    && typeof value.data?.activityType === 'string'
+    && Boolean(value.data.activityType)
+    && Boolean(value.data.content && typeof value.data.content === 'object')
 }
 
-function isAguiToolCallContent(content: any): boolean {
-  return typeof content?.type === 'string' && content.type.startsWith('toolcall-')
+function isAguiToolCallContent(content: unknown): content is AguiToolCallContent {
+  if (!content || typeof content !== 'object') {
+    return false
+  }
+  const value = content as AguiToolCallContent
+  return typeof value.type === 'string'
+    && value.type.startsWith('toolcall-')
+    && typeof value.data?.toolCallId === 'string'
+    && typeof value.data.toolCallName === 'string'
 }
 
 watch(() => props.aiEnabled, (enabled) => {
@@ -1124,7 +1162,7 @@ function refreshBlockPanel() {
         badge.className = 'gjs-block-kind-badge'
         htmlEl.appendChild(badge)
       }
-      if (def?.kind) {
+      if (def?.kind && badge) {
         const badgeText = def.kind === 'atomic' ? '原子' : '预制'
         if (badge.textContent !== badgeText) {
           badge.textContent = badgeText
@@ -1134,7 +1172,7 @@ function refreshBlockPanel() {
         }
       }
 
-      let star = htmlEl.querySelector('.gjs-block-favorite') as HTMLElement | null
+      let star = htmlEl.querySelector('.gjs-block-favorite') as HTMLButtonElement | null
       if (!star) {
         star = document.createElement('button')
         star.type = 'button'
@@ -2036,19 +2074,6 @@ function markdownChunk(data: string): AIMessageContent {
   }
 }
 
-function thinkingChunk(text: string): AIMessageContent {
-  return {
-    type: 'thinking',
-    id: 'cms-ai-thinking',
-    data: {
-      title: '思考中',
-      text,
-    },
-    status: 'streaming',
-    strategy: 'merge',
-  } as AIMessageContent
-}
-
 function aguiToolResult(chunk: SSEChunkData): AiToolCallResult | null {
   const event = chunk.data as Record<string, unknown> | undefined
   if (event?.type !== 'TOOL_CALL_RESULT' || typeof event.content !== 'string') {
@@ -2128,51 +2153,6 @@ function parseAskOptions(raw: unknown): AskOption[] {
       return { title: '' }
     })
     .filter(item => item.title)
-}
-
-function applyAiResult(result: CmsPageGenerateResult) {
-  if (props.chromeFrame) {
-    if (result.tools?.length) {
-      result.tools.filter(isCanvasTool).forEach(applyAiTool)
-    }
-    else if (editor) {
-      if (result.htmlContent) {
-        replaceHomeContent(result.htmlContent)
-      }
-      if (result.cssContent) {
-        editor.setStyle(result.cssContent)
-      }
-    }
-    return
-  }
-  if (result.tools?.length) {
-    result.tools.filter(isCanvasTool).forEach(applyAiTool)
-    return
-  }
-  if (!editor) {
-    return
-  }
-  if (result.builderProjectJson) {
-    try {
-      editor.loadProjectData(JSON.parse(result.builderProjectJson))
-      if (result.jsContent) {
-        setCanvasJs(result.jsContent)
-      }
-      return
-    }
-    catch {
-      toast.warning('AI 返回的 Project JSON 无法解析，已使用 HTML/CSS 更新画布')
-    }
-  }
-  if (result.htmlContent) {
-    editor.setComponents(result.htmlContent)
-  }
-  if (result.cssContent) {
-    editor.setStyle(result.cssContent)
-  }
-  if (result.jsContent) {
-    setCanvasJs(result.jsContent)
-  }
 }
 
 function applyAiTool(tool?: AiToolCallResult): boolean {
@@ -3029,6 +3009,10 @@ function escapeHtml(value: string) {
 function escapeAttr(value: string) {
   return escapeHtml(value)
 }
+
+function selectBreadcrumb(component: any) {
+  editor?.select(component)
+}
 </script>
 
 <template>
@@ -3053,7 +3037,7 @@ function escapeAttr(value: string) {
           v-for="(crumb, index) in selectedBreadcrumbs"
           :key="index"
           type="button"
-          @click="editor?.select(crumb.component)"
+          @click="selectBreadcrumb(crumb.component)"
         >
           {{ crumb.label }}
         </button>

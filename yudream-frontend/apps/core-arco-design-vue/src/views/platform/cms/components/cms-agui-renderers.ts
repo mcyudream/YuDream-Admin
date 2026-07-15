@@ -1,5 +1,7 @@
 import { activityRegistry, agentToolcallRegistry } from '@tdesign-vue-next/chat'
+import type { ActivityComponentProps, ToolcallComponentProps } from '@tdesign-vue-next/chat'
 import { defineComponent, h } from 'vue'
+import type { DefineComponent } from 'vue'
 import { normalizeAguiCard } from '../config/cms-agui-card'
 
 interface ToolResult {
@@ -148,14 +150,14 @@ export function registerCmsAguiRenderers() {
   if (!activityRegistry.has('cms-progress')) {
     activityRegistry.register({
       activityType: 'cms-progress',
-      component: CmsProgressActivity,
+      component: CmsProgressActivity as unknown as (props: ActivityComponentProps) => any,
       description: 'CMS 构建进度',
     })
   }
   if (!activityRegistry.has('agui-card')) {
     activityRegistry.register({
       activityType: 'agui-card',
-      component: AguiCardActivity,
+      component: AguiCardActivity as unknown as (props: ActivityComponentProps) => any,
       description: 'AG-UI 结构化卡片',
     })
   }
@@ -168,9 +170,9 @@ export function registerCmsAguiRenderers() {
         component: defineComponent({
           name: `CmsAguiTool_${name.replaceAll('.', '_')}`,
           setup(_, { attrs }) {
-            return () => h(CmsToolCall, { ...attrs, toolName: name })
+            return () => h(CmsToolCall as any, { ...attrs, toolName: name })
           },
-        }),
+        }) as unknown as DefineComponent<ToolcallComponentProps>,
       })
     }
   })
