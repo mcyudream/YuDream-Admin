@@ -1,5 +1,7 @@
 package online.yudream.base.application.platform.agent.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.assembler.AgentAssembler;
 import online.yudream.base.application.platform.agent.assembler.AgentModelCatalogParser;
@@ -47,6 +49,7 @@ import java.util.function.Consumer;
 public class AgentAppService {
     private static final String AGENT_CAPABILITY = "agent";
     private static final String AI_CAPABILITY = "ai";
+    private static final ObjectMapper TOOL_CONTRACT_MAPPER = new ObjectMapper();
 
     private final CapabilityAppService capabilityAppService;
     private final CapabilityModuleRepo capabilityModuleRepo;
@@ -110,9 +113,7 @@ public class AgentAppService {
             }
         });
         AgentWorkflowToolCodes.NormalizedWorkflow workflow = AgentWorkflowToolCodes.normalize(cmd.getWorkflowJson());
-        List<String> toolCodes = workflow.declaresTools()
-                ? workflow.toolCodes()
-                : (creating || application.getToolCodes() == null ? List.of() : application.getToolCodes());
+        List<String> toolCodes = workflow.toolCodes();
         application.update(
                 cmd.getName(), cmd.getCode(), cmd.getDescription(), cmd.getIcon(), cmd.getSystemPrompt(),
                 workflow.workflowJson(), toolCodes, savedStatus(application, creating)
@@ -160,6 +161,7 @@ public class AgentAppService {
         if (cmd.getType() == AgentToolType.SYSTEM) {
             throw new BizException("系统工具由平台提供，不能在此修改");
         }
+        validatePythonToolContract(cmd);
         AgentTool value = cmd.getId() == null
                 ? AgentTool.python(cmd.getName(), cmd.getCode(), cmd.getPythonCode())
                 : tool(cmd.getId());
@@ -174,6 +176,36 @@ public class AgentAppService {
                 cmd.getPermissionCode(), cmd.getEnabled()
         );
         return AgentAssembler.toDTO(toolRepo.save(value));
+    }
+
+    private void validatePythonToolContract(AgentToolSaveCmd cmd) {
+        JsonNode inputSchema = jsonObject(
+                cmd.getInputSchemaJson(),
+                "{\"type\":\"object\"}",
+                "Python 工具输入 Schema 必须是 JSON 对象"
+        );
+        if (!"object".equals(inputSchema.path("type").asText())) {
+            throw new BizException("Python 工具输入 Schema 的 type 必须为 object");
+        }
+        jsonObject(
+                cmd.getOutputExampleJson(),
+                "{}",
+                "Python 工具输出格式示例必须是 JSON 对象"
+        );
+    }
+
+    private JsonNode jsonObject(String source, String fallback, String errorMessage) {
+        try {
+            JsonNode value = TOOL_CONTRACT_MAPPER.readTree(source == null || source.isBlank() ? fallback : source);
+            if (value == null || !value.isObject()) {
+                throw new BizException(errorMessage);
+            }
+            return value;
+        } catch (BizException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new BizException(errorMessage);
+        }
     }
 
     @Transactional

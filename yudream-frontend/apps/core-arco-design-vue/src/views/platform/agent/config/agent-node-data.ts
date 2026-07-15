@@ -18,7 +18,9 @@ const variableDefaults: Record<AgentNodeKind, { input: string, output: string }>
   classify: { input: 'query', output: 'classification' },
   vision: { input: 'query', output: 'answer' },
   embedding: { input: 'query', output: 'vector' },
-  tool: { input: 'arguments', output: 'result' },
+  // Compatibility tool nodes should consume their direct predecessor by default.
+  // A nonexistent `arguments` variable makes complex legacy graphs fail on load.
+  tool: { input: '', output: 'result' },
 }
 
 export function agentModelKind(kind: AgentNodeKind) {

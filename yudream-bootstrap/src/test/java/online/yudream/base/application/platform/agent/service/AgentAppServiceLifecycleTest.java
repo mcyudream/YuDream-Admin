@@ -94,7 +94,7 @@ class AgentAppServiceLifecycleTest {
     }
 
     @Test
-    void saveKeepsExistingAuthorizationForLegacyWorkflowWithoutToolDeclarations() {
+    void saveClearsExistingAuthorizationWhenWorkflowHasNoToolDeclarations() {
         Fixture fixture = fixture();
         AgentApplication existing = application(AgentApplicationStatus.DRAFT);
         existing.setToolCodes(List.of("legacy.permitted"));
@@ -117,8 +117,7 @@ class AgentAppServiceLifecycleTest {
 
         fixture.service.save(command);
 
-        verify(fixture.applicationRepo).save(argThat(application -> application.getToolCodes()
-                .equals(List.of("legacy.permitted"))));
+        verify(fixture.applicationRepo).save(argThat(application -> application.getToolCodes().isEmpty()));
     }
 
     @Test

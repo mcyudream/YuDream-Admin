@@ -100,6 +100,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     public AiGenerationResult generate(AiGenerationRequest request) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
         ResolvedAiModel resolved = resolve(config, request);
+        ensureRequiredToolChoice(request, resolved);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         try {
             log.debug("AI non-stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}",
@@ -129,6 +130,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     ) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
         ResolvedAiModel resolved = resolve(config, request);
+        ensureRequiredToolChoice(request, resolved);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         StringBuilder content = new StringBuilder();
         try {
@@ -209,6 +211,14 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             throw new BizException("AI 模型未配置：" + resolved.provider().displayName());
         }
         return resolved;
+    }
+
+    private void ensureRequiredToolChoice(AiGenerationRequest request, ResolvedAiModel resolved) {
+        if (request.toolCallingEnabled()
+                && request.toolMode() == AiToolMode.REQUIRED
+                && !resolved.adapter().supportsRequiredToolChoice(resolved.provider(), resolved.model())) {
+            throw new BizException("当前 AI 提供者不支持 REQUIRED 工具调用模式，请选择 AUTO 或支持原生 tool_choice 的模型");
+        }
     }
 
     private ChatClient.ChatClientRequestSpec requestSpec(

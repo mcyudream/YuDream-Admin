@@ -10,11 +10,13 @@ public final class AiAgentToolExecutionScope implements AutoCloseable {
     private static final ThreadLocal<ScopeState> CURRENT = new ThreadLocal<>();
 
     private final ScopeState previous;
+    private final ScopeState installed;
     private boolean closed;
 
     private AiAgentToolExecutionScope(Set<String> allowedToolNames) {
         previous = CURRENT.get();
-        CURRENT.set(new ScopeState(null, immutableNames(allowedToolNames)));
+        installed = new ScopeState(null, immutableNames(allowedToolNames));
+        CURRENT.set(installed);
     }
 
     private AiAgentToolExecutionScope(List<AiAgentTool> tools) {
@@ -22,7 +24,8 @@ public final class AiAgentToolExecutionScope implements AutoCloseable {
         List<AiAgentTool> scopedTools = tools == null ? List.of() : List.copyOf(tools);
         Set<String> allowedToolNames = new LinkedHashSet<>();
         scopedTools.forEach(tool -> allowedToolNames.add(tool.descriptor().name()));
-        CURRENT.set(new ScopeState(scopedTools, Set.copyOf(allowedToolNames)));
+        installed = new ScopeState(scopedTools, Set.copyOf(allowedToolNames));
+        CURRENT.set(installed);
     }
 
     public static AiAgentToolExecutionScope open(Set<String> allowedToolNames) {
@@ -47,6 +50,9 @@ public final class AiAgentToolExecutionScope implements AutoCloseable {
     public void close() {
         if (closed) {
             return;
+        }
+        if (CURRENT.get() != installed) {
+            throw new IllegalStateException("AI 工具执行作用域必须按后进先出顺序关闭");
         }
         closed = true;
         if (previous == null) {

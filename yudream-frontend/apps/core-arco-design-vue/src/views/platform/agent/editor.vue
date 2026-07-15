@@ -15,7 +15,7 @@ import AgentNodePalette from './components/AgentNodePalette.vue'
 import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import { consumeAgentDebugStream } from './config/agent-debug-stream'
 import { agentNodePaletteGroups, agentNodeTemplates, findAgentNodeTemplate } from './config/agent-node-catalog'
-import { agentModelKind, createAgentNodeData, declaresAgentNodeToolConfig, normalizeAgentNodeData } from './config/agent-node-data'
+import { agentModelKind, createAgentNodeData, normalizeAgentNodeData } from './config/agent-node-data'
 import { buildAgentRunInput } from './config/agent-run-input'
 import { deriveAgentApplicationToolCodes, migrateLegacyToolNodes } from './config/agent-workflow-tools'
 import { migrateConditionSourceHandle, validateAgentWorkflow } from './config/agent-workflow-validation'
@@ -60,27 +60,21 @@ const form = reactive<AgentApplicationPayload>({
 
 const nodes = ref<FlowNode<AgentNodeData>[]>([])
 const edges = ref<Edge[]>([])
-const legacyApplicationToolCodes = ref<string[]>([])
 const selectedNode = computed(() => nodes.value.find(node => node.id === selectedNodeId.value))
 const selectedEdge = computed(() => edges.value.find(item => item.id === selectedEdgeId.value))
 const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
 const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
 const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
-const workflowDefinesTools = computed(() => nodes.value.some((node) => {
-  if (node.data.kind === 'tool') {
-    return Boolean(node.data.toolCode)
-  }
-  return declaresAgentNodeToolConfig(node.data)
-}))
-const applicationToolCodes = computed(() => workflowDefinesTools.value
-  ? deriveAgentApplicationToolCodes(nodes.value)
-  : legacyApplicationToolCodes.value)
+const applicationToolCodes = computed(() => deriveAgentApplicationToolCodes(nodes.value))
 const legacyToolNodeCount = computed(() => nodes.value.filter(node => node.data.kind === 'tool').length)
 const debugModelNodes = computed(() => nodes.value.filter(node => agentModelKind(node.data.kind) === 'chat'))
 const debugModels = computed(() => debugModelNodes.value.map(node => agentModels.value.find(model => model.providerCode === node.data.providerCode && model.modelCode === node.data.modelCode)))
 const debugModelLabel = computed(() => debugModelNodes.value.length ? `${debugModelNodes.value.length} 个模型节点` : '无需模型')
-const debugAllowsImage = computed(() => debugModelNodes.value.some((node, index) => node.data.vision && debugModels.value[index]?.vision))
-const debugAllowsTextFiles = computed(() => Boolean(debugModelNodes.value.some(node => node.data.acceptFiles) || nodes.value.some(node => node.data.kind === 'document')))
+const debugAllowsImage = computed(() => debugModelNodes.value.some((node, index) => node.data.kind === 'vision' && node.data.vision && debugModels.value[index]?.vision))
+const debugAllowsTextFiles = computed(() => Boolean(
+  debugModelNodes.value.some(node => ['llm', 'extract', 'classify', 'vision'].includes(node.data.kind) && node.data.acceptFiles)
+  || nodes.value.some(node => node.data.kind === 'document'),
+))
 const { addNodes, addEdges, screenToFlowCoordinate, fitView, setCenter, updateNodeData } = useVueFlow()
 
 onMounted(async () => {
@@ -136,7 +130,6 @@ async function loadApplication() {
       systemPrompt: application.systemPrompt || '',
       toolCodes: application.toolCodes || [],
     })
-    legacyApplicationToolCodes.value = [...(application.toolCodes || [])]
     const flow = application.workflowJson ? JSON.parse(application.workflowJson) : {}
     nodes.value = Array.isArray(flow.nodes) ? flow.nodes.map(normalizeNode) : []
     edges.value = Array.isArray(flow.edges) ? flow.edges.map(normalizeEdge) : []
@@ -495,6 +488,9 @@ async function startDebug(content: string, attachments: AgentDebugAttachment[] =
   if (debugRunning.value) {
     return
   }
+  if (!validateCurrentWorkflow()) {
+    return
+  }
   const invalidModelIndex = debugModels.value.findIndex(model => !model?.configured)
   if (invalidModelIndex >= 0) {
     selectNode(debugModelNodes.value[invalidModelIndex]!.id)
@@ -610,20 +606,8 @@ async function save(publish = false, notify = true): Promise<string> {
     toast.error('请为工具调用节点选择具体工具')
     return ''
   }
-  if (publish) {
-    const validation = validateAgentWorkflow(nodes.value, edges.value, {
-      models: agentModels.value,
-      knowledgeSpaceSlugs: new Set(knowledgeSpaces.value.map(space => space.slug)),
-      toolCodes: new Set([...customTools.value.map(tool => tool.code), ...systemTools.value.map(tool => tool.code)]),
-    })
-    if (!validation.valid) {
-      const issue = validation.issues[0]!
-      if (issue.nodeId) {
-        selectNode(issue.nodeId)
-      }
-      toast.error(issue.message)
-      return ''
-    }
+  if (publish && !validateCurrentWorkflow()) {
+    return ''
   }
 
   saving.value = true
@@ -654,6 +638,23 @@ async function save(publish = false, notify = true): Promise<string> {
   finally {
     saving.value = false
   }
+}
+
+function validateCurrentWorkflow() {
+  const validation = validateAgentWorkflow(nodes.value, edges.value, {
+    models: agentModels.value,
+    knowledgeSpaceSlugs: new Set(knowledgeSpaces.value.map(space => space.slug)),
+    toolCodes: new Set([...customTools.value.map(tool => tool.code), ...systemTools.value.map(tool => tool.code)]),
+  })
+  if (validation.valid) {
+    return true
+  }
+  const issue = validation.issues[0]!
+  if (issue.nodeId) {
+    selectNode(issue.nodeId)
+  }
+  toast.error(issue.message)
+  return false
 }
 </script>
 

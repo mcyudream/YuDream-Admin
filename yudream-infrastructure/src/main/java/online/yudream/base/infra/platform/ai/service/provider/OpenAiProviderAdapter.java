@@ -13,7 +13,7 @@ public class OpenAiProviderAdapter extends AbstractOpenAiCompatibleProviderAdapt
     }
 
     @Override
-    protected boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
+    public boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
         return true;
     }
 }

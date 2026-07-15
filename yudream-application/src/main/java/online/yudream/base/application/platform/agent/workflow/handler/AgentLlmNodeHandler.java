@@ -262,7 +262,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             default -> "直接给出对用户有用的结果。";
         };
         String toolInstruction = toolMode == AiToolMode.REQUIRED ? "必须至少调用一次可用工具后再回答。" : "";
-        return String.join("\n", List.of(applicationPrompt, runtimePrompt, role, nodePrompt, format, toolInstruction).stream()
+        return String.join("\n", List.of(applicationPrompt, runtimePrompt, role, nodePrompt, format).stream()
                 .filter(StringUtils::hasText)
                 .toList());
     }
