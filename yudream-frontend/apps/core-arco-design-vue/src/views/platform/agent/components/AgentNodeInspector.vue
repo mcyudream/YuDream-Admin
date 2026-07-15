@@ -211,8 +211,8 @@ function changeKnowledgeSpace(slug: string) {
         <h3>文本模板</h3>
         <label class="form-field required">
           <span>模板内容</span>
-          <FaTextarea :model-value="node.data.template" class="w-full" input-class="font-mono" :autosize="{ minRows: 8, maxRows: 16 }" placeholder="例如：问题：$query$&#10;答案：$answer$" @update:model-value="updateField('template', $event)" />
-          <small>使用 $变量名$ 引用运行上下文中的值</small>
+          <FaTextarea :model-value="node.data.template" class="w-full" input-class="font-mono" :autosize="{ minRows: 8, maxRows: 16 }" placeholder="例如：问题：{{query}}&#10;答案：{{answer}}" @update:model-value="updateField('template', $event)" />
+          <small>使用双花括号引用运行上下文中的值，例如 <code v-pre>{{query}}</code></small>
         </label>
       </section>
 
