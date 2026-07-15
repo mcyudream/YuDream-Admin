@@ -76,6 +76,7 @@ export function migrateLegacyToolNodes<TNode extends AgentWorkflowToolNode, TEdg
         data: {
           ...node.data,
           toolCodes: orderedUnique([...strings(node.data.toolCodes), ...addedToolCodes]),
+          toolMode: migratedToolMode(node.data.toolMode),
         },
       }
     }) as TNode[]
@@ -161,6 +162,10 @@ function cloneValue(value: unknown): unknown {
 
 function orderedUnique(values: string[]) {
   return [...new Set(values)]
+}
+
+function migratedToolMode(value: unknown) {
+  return value === 'AUTO' || value === 'REQUIRED' ? value : 'AUTO'
 }
 
 function strings(value: unknown) {
