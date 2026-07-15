@@ -25,6 +25,8 @@ import online.yudream.base.application.platform.agent.workflow.handler.AgentStar
 import online.yudream.base.application.platform.agent.workflow.handler.AgentTemplateNodeHandler;
 import online.yudream.base.application.platform.agent.workflow.handler.AgentToolNodeHandler;
 import online.yudream.base.application.platform.agent.workflow.support.AgentKnowledgeOperations;
+import online.yudream.base.application.platform.agent.workflow.support.AgentModelToolResolver;
+import online.yudream.base.application.platform.agent.workflow.support.AgentToolExecutor;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowRunState;
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowValueResolver;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
@@ -44,7 +46,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -68,32 +69,28 @@ public class AgentWorkflowRuntimeService {
             Consumer<AiAgentToolResult> onTool
     ) {
         List<AiAgentTool> systemTools = systemToolProvider.stream().toList();
-        List<AiAgentTool> selectedTools = systemTools.stream()
+        Set<String> systemToolCodes = systemTools.stream()
                 .map(tool -> tool.descriptor().name())
-                .filter(code -> application.getToolCodes() != null && application.getToolCodes().contains(code))
-                .map(code -> systemTools.stream().filter(tool -> code.equals(tool.descriptor().name())).findFirst().orElseThrow())
-                .toList();
-        selectedTools.forEach(tool -> ensureToolPermission(
-                command,
-                tool.descriptor().permissionCode(),
-                tool.descriptor().title()
-        ));
-        Set<String> selectedSystemTools = selectedTools.stream()
-                .map(tool -> tool.descriptor().name())
-                .collect(Collectors.toSet());
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        AgentToolExecutor toolExecutor = new AgentToolExecutor(
+                objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway
+        );
         AgentWorkflowRunState state = new AgentWorkflowRunState(
                 application,
                 command,
                 aiConfig,
-                selectedSystemTools,
+                systemToolCodes,
                 onDelta,
-                onTool
+                onTool,
+                new AgentModelToolResolver(toolExecutor)
         );
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
         AgentWorkflowGraphParser graphParser = new AgentWorkflowGraphParser(objectMapper);
         var graph = graphParser.parse(application.getWorkflowJson());
-        ensurePythonRuntime(graph, selectedSystemTools);
-        AgentWorkflowExecutor executor = new AgentWorkflowExecutor(graphParser, handlers(values, application, state, systemTools));
+        ensurePythonRuntime(graph, systemToolCodes);
+        AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
+                graphParser, handlers(values, application, state, toolExecutor)
+        );
         AgentWorkflowExecution execution = executor.execute(
                 application.getWorkflowJson(),
                 initialInput(command),
@@ -112,7 +109,7 @@ public class AgentWorkflowRuntimeService {
             AgentWorkflowValueResolver values,
             AgentApplication application,
             AgentWorkflowRunState state,
-            List<AiAgentTool> systemTools
+            AgentToolExecutor toolExecutor
     ) {
         List<AgentWorkflowNodeHandler> handlers = new ArrayList<>();
         handlers.add(new AgentStartNodeHandler(values));
@@ -124,7 +121,7 @@ public class AgentWorkflowRuntimeService {
         handlers.add(new AgentDocumentNodeHandler(values, documentTextExtractor));
         handlers.add(new AgentCitationNodeHandler(values, objectMapper));
         handlers.add(new AgentToolNodeHandler(
-                values, objectMapper, runtimeExecutor, toolRepo, systemTools, application, state, permissionGateway
+                values, objectMapper, toolExecutor, application, state
         ));
         for (String kind : List.of("search", "vector", "rerank", "embedding")) {
             handlers.add(new AgentKnowledgeNodeHandler(kind, values, objectMapper, knowledgeOperations));
@@ -133,6 +130,9 @@ public class AgentWorkflowRuntimeService {
         if (generationGateway != null) {
             handlers.add(new AgentLlmNodeHandler("understand", values, objectMapper, generationGateway, state));
             handlers.add(new AgentLlmNodeHandler("llm", values, objectMapper, generationGateway, state));
+            handlers.add(new AgentLlmNodeHandler("extract", values, objectMapper, generationGateway, state));
+            handlers.add(new AgentLlmNodeHandler("classify", values, objectMapper, generationGateway, state));
+            handlers.add(new AgentLlmNodeHandler("vision", values, objectMapper, generationGateway, state));
         }
         return handlers;
     }
@@ -182,28 +182,43 @@ public class AgentWorkflowRuntimeService {
         return new AgentDebugEventDTO(node.id(), node.kind(), node.title(), status, message);
     }
 
-    private void ensureToolPermission(AgentRunCmd command, String permissionCode, String toolName) {
-        if (!permissionGateway.hasPermission(
-                permissionCode,
-                command.getPermissionCodes(),
-                command.isPermissionContextExplicit()
-        )) {
-            throw new online.yudream.base.domain.common.exception.BizException("无权限调用工具：" + toolName);
-        }
-    }
-
     private void ensurePythonRuntime(
             online.yudream.base.application.platform.agent.workflow.AgentWorkflowGraph graph,
             Set<String> systemToolCodes
     ) {
-        boolean required = graph.topologicalOrder().stream().anyMatch(node ->
-                "code".equals(node.kind())
-                        || ("tool".equals(node.kind())
-                        && !systemToolCodes.contains(node.data().path("toolCode").asText()))
-        );
+        boolean required = graph.topologicalOrder().stream()
+                .anyMatch(node -> requiresPythonRuntime(node, systemToolCodes));
         if (required) {
             capabilityAppService.ensureEnabled("integration", "集成与 Python 运行时");
         }
+    }
+
+    private boolean requiresPythonRuntime(AgentWorkflowNode node, Set<String> systemToolCodes) {
+        if ("code".equals(node.kind())) {
+            return true;
+        }
+        if ("tool".equals(node.kind())) {
+            return isPythonTool(node.data().path("toolCode").asText(), systemToolCodes);
+        }
+        if (!List.of("llm", "extract", "classify", "vision").contains(node.kind())
+                || !node.data().path("toolCodes").isArray()) {
+            return false;
+        }
+        for (com.fasterxml.jackson.databind.JsonNode code : node.data().path("toolCodes")) {
+            if (isPythonTool(code.asText(), systemToolCodes)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isPythonTool(String toolCode, Set<String> systemToolCodes) {
+        if (toolCode == null || toolCode.isBlank() || systemToolCodes.contains(toolCode.trim())) {
+            return false;
+        }
+        return toolRepo.findByCode(toolCode.trim())
+                .map(tool -> tool.getType() == online.yudream.base.domain.platform.agent.enumerate.AgentToolType.PYTHON)
+                .orElse(false);
     }
 
     private AgentWorkflowInitialInput initialInput(AgentRunCmd command) {

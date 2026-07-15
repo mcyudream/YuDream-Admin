@@ -5,12 +5,15 @@ import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.workflow.support.AgentKnowledgeOperations;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
+import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.document.service.DocumentTextExtractor;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
@@ -20,14 +23,99 @@ import org.springframework.beans.factory.ObjectProvider;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentWorkflowRuntimeServiceTest {
+
+    @Test
+    void shouldRunExtractNodeWithoutEnablingIntegrationForSystemModelTool() {
+        ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
+        ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        AiGenerationGateway gateway = new AiGenerationGateway() {
+            @Override public AiGenerationResult generate(AiGenerationRequest request) {
+                return new AiGenerationResult(null, "{\"intent\":\"refund\"}", null, null, null, null, null, List.of(), List.of());
+            }
+            @Override public AiGenerationResult generateStream(AiGenerationRequest request,
+                    java.util.function.Consumer<String> onDelta,
+                    java.util.function.Consumer<AiAgentToolResult> onTool,
+                    java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress> onProgress) {
+                return generate(request);
+            }
+        };
+        AiAgentTool systemTool = new AiAgentTool() {
+            @Override public AiAgentToolDescriptor descriptor() {
+                return new AiAgentToolDescriptor("web.fetch", "Fetch", "", "", "", "", "", Map.of());
+            }
+            @Override public AiAgentToolResult execute(AiAgentToolCall call) { return null; }
+        };
+        when(gateways.getIfAvailable()).thenReturn(gateway);
+        when(tools.stream()).thenReturn(Stream.of(systemTool));
+        var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
+        AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
+                new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true, capability
+        );
+        AgentApplication application = AgentApplication.builder().name("Extract").code("extract")
+                .toolCodes(List.of("web.fetch"))
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                          {"id":"extract","data":{"kind":"extract","providerCode":"p","modelCode":"m",
+                            "inputVariable":"query","outputVariable":"result","toolCodes":["web.fetch"],"toolMode":"AUTO"}},
+                          {"id":"end","data":{"kind":"end","inputVariable":"result"}}
+                        ],"edges":[{"source":"start","target":"extract"},{"source":"extract","target":"end"}]}
+                        """).build();
+        AgentRunCmd command = new AgentRunCmd();
+        command.setInput("refund request");
+
+        assertThat(service.execute(application, command, Map.of(), null, null, null).content())
+                .isEqualTo("{\"intent\":\"refund\"}");
+        verifyNoInteractions(capability);
+    }
+
+    @Test
+    void shouldEnableIntegrationWhenModelNodeSelectsPythonTool() {
+        ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
+        ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        AgentToolRepo toolRepo = mock(AgentToolRepo.class);
+        AgentTool pythonTool = AgentTool.python("Risk score", "risk_score", "def run(params: dict) -> dict:\n    return {'score': 1}");
+        when(toolRepo.findByCode("risk_score")).thenReturn(Optional.of(pythonTool));
+        when(tools.stream()).thenReturn(Stream.empty());
+        when(gateways.getIfAvailable()).thenReturn(new AiGenerationGateway() {
+            @Override public AiGenerationResult generate(AiGenerationRequest request) {
+                return new AiGenerationResult(null, "done", null, null, null, null, null, List.of(), List.of());
+            }
+        });
+        var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
+        AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
+                new ObjectMapper(), mock(RuntimeExecutor.class), toolRepo, gateways, tools,
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true, capability
+        );
+        AgentApplication application = AgentApplication.builder().name("Python model").code("python-model")
+                .toolCodes(List.of("risk_score"))
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                          {"id":"model","data":{"kind":"llm","providerCode":"p","modelCode":"m",
+                            "inputVariable":"query","outputVariable":"answer","toolCodes":["risk_score"]}},
+                          {"id":"end","data":{"kind":"end","inputVariable":"answer"}}
+                        ],"edges":[{"source":"start","target":"model"},{"source":"model","target":"end"}]}
+                        """).build();
+        AgentRunCmd command = new AgentRunCmd();
+        command.setInput("score it");
+
+        service.execute(application, command, Map.of(), null, null, null);
+
+        verify(capability).ensureEnabled("integration", "集成与 Python 运行时");
+    }
 
     @Test
     void shouldUseExplicitPermissionSnapshotWithoutReadingThreadContext() {
@@ -140,7 +228,11 @@ class AgentWorkflowRuntimeServiceTest {
     void shouldRejectSystemToolWhenCurrentRunnerLacksToolPermission() {
         ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
         ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
-        when(gateways.getIfAvailable()).thenReturn(null);
+        when(gateways.getIfAvailable()).thenReturn(new AiGenerationGateway() {
+            @Override public AiGenerationResult generate(AiGenerationRequest request) {
+                return new AiGenerationResult(null, "unused", null, null, null, null, null, List.of(), List.of());
+            }
+        });
         AiAgentTool protectedTool = new AiAgentTool() {
             @Override public AiAgentToolDescriptor descriptor() { return new AiAgentToolDescriptor("cms.patch", "修改页面", "", "cms:edit", "", "", "", Map.of()); }
             @Override public AiAgentToolResult execute(AiAgentToolCall call) { throw new AssertionError("不应执行"); }
@@ -155,15 +247,17 @@ class AgentWorkflowRuntimeServiceTest {
                 .name("受限应用").code("protected").toolCodes(List.of("cms.patch"))
                 .workflowJson("""
                         {"nodes":[
-                          {"id":"start","data":{"kind":"start"}},
-                          {"id":"end","data":{"kind":"end"}}
-                        ],"edges":[{"source":"start","target":"end"}]}
+                          {"id":"start","data":{"kind":"start","outputVariable":"query"}},
+                          {"id":"model","data":{"kind":"llm","providerCode":"p","modelCode":"m",
+                            "inputVariable":"query","outputVariable":"answer","toolCodes":["cms.patch"]}},
+                          {"id":"end","data":{"kind":"end","inputVariable":"answer"}}
+                        ],"edges":[{"source":"start","target":"model"},{"source":"model","target":"end"}]}
                         """).build();
         AgentRunCmd cmd = new AgentRunCmd();
         cmd.setInput("test");
 
         assertThatThrownBy(() -> service.execute(application, cmd, Map.of(), null, null, null))
                 .isInstanceOf(BizException.class)
-                .hasMessageContaining("无权限调用工具");
+                .hasMessageContaining("No permission to invoke tool");
     }
 }
