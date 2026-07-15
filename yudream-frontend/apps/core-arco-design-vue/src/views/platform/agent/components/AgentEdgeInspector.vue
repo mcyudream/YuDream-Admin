@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { Edge } from '@vue-flow/core'
-import type { AgentConnectionStyle } from './types'
+import type { AgentConnectionStyle, AgentFlowEdgeView } from './types'
 
 defineProps<{
-  edge: Edge
+  edge: AgentFlowEdgeView
   sourceName: string
   targetName: string
 }>()

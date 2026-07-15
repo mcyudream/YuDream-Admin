@@ -60,6 +60,21 @@ export interface AgentNodeData extends AgentNodeTemplate {
   citationFormat: 'json' | 'markdown'
 }
 
+export interface AgentFlowNode {
+  id: string
+  type: string
+  position: { x: number, y: number }
+  data: AgentNodeData
+}
+
+export interface AgentFlowEdgeView {
+  id: string
+  source: string
+  target: string
+  label?: string
+  data?: { connectionStyle?: AgentConnectionStyle }
+}
+
 export type AgentDebugStatus = 'RUNNING' | 'COMPLETED' | 'SKIPPED' | 'FAILED'
 
 export interface AgentDebugStep {

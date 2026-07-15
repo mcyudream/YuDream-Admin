@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { AgentDebugStatus, AgentNodeData } from './types'
+import type { HandleConnectable } from '@vue-flow/core'
 import { Handle, Position } from '@vue-flow/core'
 import { agentModelKind, agentSourceHandles, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
@@ -7,7 +8,7 @@ const props = defineProps<{
   id: string
   data: AgentNodeData
   selected?: boolean
-  connectable?: boolean | string | number
+  connectable?: HandleConnectable
   debugStatus?: AgentDebugStatus
   readonly?: boolean
 }>()
