@@ -107,7 +107,7 @@ class AgentAppServiceLifecycleTest {
         command.setWorkflowJson("""
                 {"nodes":[
                   {"id":"start","data":{"kind":"start"}},
-                  {"id":"model","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5","toolMode":"NONE","toolCodes":[]}},
+                  {"id":"model","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5","toolMode":"NONE","toolCodes":[" "]}},
                   {"id":"end","data":{"kind":"end"}}
                 ],"edges":[
                   {"source":"start","target":"model"},

@@ -132,11 +132,17 @@ public final class AgentWorkflowToolCodes {
         if (data.path("toolConfigDeclared").asBoolean(false)) {
             return true;
         }
-        if (data.path("toolCodes").isArray() && data.path("toolCodes").size() > 0) {
+        if (hasToolCode(data.path("toolCodes"))) {
             return true;
         }
         String mode = data.path("toolMode").asText("").trim().toUpperCase(Locale.ROOT);
         return Set.of("AUTO", "ACTIVE", "REQUIRED").contains(mode);
+    }
+
+    private static boolean hasToolCode(JsonNode values) {
+        LinkedHashSet<String> codes = new LinkedHashSet<>();
+        addArrayCodes(values, codes);
+        return !codes.isEmpty();
     }
 
     private static void addArrayCodes(JsonNode values, LinkedHashSet<String> target) {
