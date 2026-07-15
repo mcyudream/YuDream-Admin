@@ -159,6 +159,10 @@
     {
       "key": "agent-node-model-selection",
       "text": "Agent 大模型节点必须持久化 providerCode/modelCode 和输入能力；运行与调试优先使用节点配置，Vision 模型才允许图片输入，禁止静默回退到未配置的 Default AI。"
+    },
+    {
+      "key": "document-text-extraction-gateway",
+      "text": "Agent 和平台文档文本提取必须依赖领域 DocumentTextExtractor 网关；基础设施使用 Apache Tika 在内存中解析 Data URL/Base64，并在解码前后执行输入格式、MIME 类型和最大字节数校验，禁止把 Tika 或临时文件逻辑放入应用服务。"
     }
   ],
   "utilities": [
