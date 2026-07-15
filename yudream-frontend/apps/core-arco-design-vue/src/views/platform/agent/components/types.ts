@@ -36,6 +36,7 @@ export interface AgentNodeData extends AgentNodeTemplate {
   prompt: string
   toolCodes: string[]
   toolMode: AgentToolMode
+  toolConfigDeclared: boolean
   toolCode: string
   outputSchema: string
   classes: string[]

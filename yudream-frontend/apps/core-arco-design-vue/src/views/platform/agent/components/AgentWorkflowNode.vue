@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AgentDebugStatus, AgentNodeData } from './types'
 import { Handle, Position } from '@vue-flow/core'
-import { agentModelKind, agentSourceHandles, isAgentChatModelNode } from '../config/agent-node-data'
+import { agentModelKind, agentSourceHandles, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   id: string
@@ -21,7 +21,7 @@ const nodeStyle = computed(() => ({
 }))
 const sourceHandles = computed(() => agentSourceHandles(props.data.kind))
 const isModelNode = computed(() => Boolean(agentModelKind(props.data.kind)))
-const isToolEnabledModel = computed(() => isAgentChatModelNode(props.data.kind))
+const isToolEnabledModel = computed(() => isAgentToolConfigModelNode(props.data.kind))
 const toolModeLabel = computed(() => ({
   NONE: '禁用',
   AUTO: '自主',

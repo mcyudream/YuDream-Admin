@@ -2,7 +2,7 @@
 import type { Node } from '@vue-flow/core'
 import type { AgentNodeData } from './types'
 import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
-import { agentModelKind, isAgentChatModelNode } from '../config/agent-node-data'
+import { agentModelKind, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   node: Node<AgentNodeData>
@@ -71,7 +71,7 @@ const selectedModel = computed(() => kindModels.value.find(model => model.provid
 const selectedKnowledgeSpace = computed(() => props.knowledgeSpaces.find(space => space.slug === props.node.data.knowledgeSpaceSlug))
 const isKnowledgeNode = computed(() => props.node.data.kind === 'search' || props.node.data.kind === 'vector')
 const isPromptNode = computed(() => isAgentChatModelNode(props.node.data.kind))
-const isModelToolNode = computed(() => isAgentChatModelNode(props.node.data.kind))
+const isModelToolNode = computed(() => isAgentToolConfigModelNode(props.node.data.kind))
 const isExtractNode = computed(() => props.node.data.kind === 'extract')
 const isClassifyNode = computed(() => props.node.data.kind === 'classify')
 const isVisionNode = computed(() => props.node.data.kind === 'vision')
@@ -130,6 +130,7 @@ function changeToolMode(value: unknown) {
   emit('update', {
     toolMode,
     toolCodes: toolMode === 'NONE' ? [] : [...props.node.data.toolCodes],
+    toolConfigDeclared: true,
   })
 }
 
@@ -137,7 +138,7 @@ function changeToolCodes(value: unknown) {
   const codes = Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map(item => item.trim())
     : []
-  emit('update', { toolCodes: [...new Set(codes)] })
+  emit('update', { toolCodes: [...new Set(codes)], toolConfigDeclared: true })
 }
 
 function changeClasses(value: unknown) {
@@ -214,6 +215,13 @@ function changeClasses(value: unknown) {
           <small v-else-if="!modelToolOptions.length" class="field-error">没有匹配的已启用工具，请调整搜索条件或先在工具页启用工具。</small>
           <small v-else>应用授权会从所有模型节点的选择自动汇总。</small>
         </label>
+      </section>
+
+      <section v-if="node.data.kind === 'understand'" class="form-section compatibility-section">
+        <h3>兼容理解节点</h3>
+        <p class="compatibility-copy">
+          该历史节点仅保留原有理解逻辑，不能配置模型工具。请使用意图分类或结构化提取节点编排新的模型任务。
+        </p>
       </section>
 
       <section v-if="isExtractNode" class="form-section">
@@ -386,5 +394,6 @@ function changeClasses(value: unknown) {
 .toggle-option small { color: var(--color-text-3); font-size: 8px; line-height: 1.5; }
 .toggle-option.disabled { opacity: 0.65; }
 .compatibility-section h3 { color: rgb(var(--warning-6)); }
+.compatibility-copy { margin: 0; color: var(--color-text-3); font-size: 10px; line-height: 1.6; }
 .inspector-footer { padding: 12px 16px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 </style>

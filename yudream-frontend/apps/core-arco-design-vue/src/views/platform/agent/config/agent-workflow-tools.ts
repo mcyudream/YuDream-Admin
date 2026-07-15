@@ -1,5 +1,5 @@
 import type { AgentNodeData } from '../components/types'
-import { isAgentChatModelNode } from './agent-node-data'
+import { isAgentToolConfigModelNode } from './agent-node-data'
 
 export interface AgentWorkflowToolNode {
   id: string
@@ -33,7 +33,7 @@ export function deriveAgentApplicationToolCodes(nodes: readonly AgentWorkflowToo
   const codes: string[] = []
   for (const node of nodes) {
     const kind = node.data?.kind
-    if (kind && isAgentChatModelNode(kind)) {
+    if (kind && isAgentToolConfigModelNode(kind) && node.data?.toolConfigDeclared) {
       codes.push(...strings(node.data?.toolCodes))
     }
     else if (kind === 'tool') {
@@ -77,6 +77,7 @@ export function migrateLegacyToolNodes<TNode extends AgentWorkflowToolNode, TEdg
           ...node.data,
           toolCodes: orderedUnique([...strings(node.data.toolCodes), ...addedToolCodes]),
           toolMode: migratedToolMode(node.data.toolMode),
+          toolConfigDeclared: true,
         },
       }
     }) as TNode[]
@@ -121,7 +122,7 @@ function findMigrations<TNode extends AgentWorkflowToolNode, TEdge extends Agent
       continue
     }
     const predecessor = nodesById.get(incoming[0].source)
-    if (!predecessor?.data?.kind || !isAgentChatModelNode(predecessor.data.kind)) {
+    if (!predecessor?.data?.kind || !isAgentToolConfigModelNode(predecessor.data.kind)) {
       continue
     }
     const predecessorOutgoing = edges.filter(edge => edge.source === predecessor.id)
