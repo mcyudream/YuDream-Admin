@@ -11,6 +11,7 @@ import online.yudream.base.interfaces.platform.ai.res.AiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
 import online.yudream.base.interfaces.platform.ai.res.AguiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport.SecurityPrincipal;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
@@ -26,6 +27,10 @@ public class AiWebAssembler {
     }
 
     public static CmsPageGenerateCmd toCmd(CmsPageGenerateRequest request) {
+        return toCmd(request, null);
+    }
+
+    public static CmsPageGenerateCmd toCmd(CmsPageGenerateRequest request, SecurityPrincipal principal) {
         CmsPageGenerateCmd cmd = new CmsPageGenerateCmd();
         cmd.setAgentCode(request.getAgentCode());
         cmd.setTitle(request.getTitle());
@@ -45,6 +50,10 @@ public class AiWebAssembler {
         cmd.setCmsVariableContextJson(request.getCmsVariableContextJson());
         cmd.setThinkingEnabled(request.isThinkingEnabled());
         cmd.setHistory(toHistory(request.getHistory()));
+        if (principal != null) {
+            cmd.setPermissionCodes(principal.permissions() == null ? List.of() : List.copyOf(principal.permissions()));
+            cmd.setPermissionContextExplicit(true);
+        }
         return cmd;
     }
 

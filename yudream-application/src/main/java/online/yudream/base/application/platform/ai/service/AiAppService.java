@@ -76,6 +76,8 @@ public class AiAppService {
         agentCmd.setRuntimeSystemPrompt(aguiCard ? "" : systemPrompt(cmd));
         agentCmd.setImageDataUrl(cmd.getImageDataUrl());
         agentCmd.setHistory(cmd.getHistory() == null ? List.of() : cmd.getHistory());
+        agentCmd.setPermissionCodes(cmd.getPermissionCodes());
+        agentCmd.setPermissionContextExplicit(cmd.isPermissionContextExplicit());
         String agentCode = StringUtils.hasText(cmd.getAgentCode())
                 ? cmd.getAgentCode().trim()
                 : BuiltinAgentCodes.CMS_BUILDER;

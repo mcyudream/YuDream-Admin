@@ -3,14 +3,15 @@ package online.yudream.base.interfaces.platform.ai.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import online.yudream.base.application.platform.ai.service.AiAppService;
 import online.yudream.base.application.platform.agent.service.BuiltinAgentCodes;
+import online.yudream.base.application.platform.ai.service.AiAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.ai.assembler.AiWebAssembler;
 import online.yudream.base.interfaces.platform.ai.request.CmsPageGenerateRequest;
 import online.yudream.base.interfaces.platform.ai.res.AguiStreamEventRes;
 import online.yudream.base.interfaces.platform.ai.res.CmsPageGenerateRes;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
@@ -42,7 +43,9 @@ public class AiController {
     @PostMapping("/cms/pages/generate")
     @PermissionRegister(code = "platform:ai:generate", name = "AI 生成页面", module = "平台能力", desc = "使用 AI 为 CMS 生成页面草稿")
     public Result<CmsPageGenerateRes> generateCmsPage(@Valid @RequestBody CmsPageGenerateRequest request) {
-        return Result.ok(AiWebAssembler.toRes(aiAppService.generateCmsPage(AiWebAssembler.toCmd(request))));
+        return Result.ok(AiWebAssembler.toRes(aiAppService.generateCmsPage(
+                AiWebAssembler.toCmd(request, SecurityPrincipalSupport.current())
+        )));
     }
 
     @PostMapping(value = "/cms/pages/generate/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -51,6 +54,7 @@ public class AiController {
         SseEmitter emitter = new SseEmitter(sseTimeout.toMillis());
         String traceId = UUID.randomUUID().toString();
         AtomicInteger toolSequence = new AtomicInteger();
+        var command = AiWebAssembler.toCmd(request, SecurityPrincipalSupport.current());
         CompletableFuture.runAsync(() -> {
             AtomicBoolean running = new AtomicBoolean(true);
             AtomicBoolean activityStarted = new AtomicBoolean(false);
@@ -65,7 +69,7 @@ public class AiController {
                 sendActivity(emitter, traceId, activityStarted, "accepted", "已收到请求，正在连接模型。");
                 heartbeat = startHeartbeat(emitter, traceId, running, activityStarted);
                 var result = aiAppService.streamCmsPage(
-                        AiWebAssembler.toCmd(request),
+                        command,
                         delta -> send(emitter, AiWebAssembler.toAguiTextChunk(traceId, delta)),
                         tool -> {
                             String toolCallId = traceId + "-tool-" + toolSequence.incrementAndGet();
