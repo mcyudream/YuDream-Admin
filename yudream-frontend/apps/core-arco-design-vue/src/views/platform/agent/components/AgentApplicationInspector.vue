@@ -1,17 +1,28 @@
 <script setup lang="ts">
 import type { AgentApplicationPayload, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 
-defineProps<{
+const emit = defineEmits<{
+  updateField: [key: keyof AgentApplicationPayload, value: unknown]
+}>()
+
+const props = defineProps<{
   form: AgentApplicationPayload
+  toolCodes: string[]
   systemTools: SystemAgentTool[]
   customTools: AgentTool[]
   codeDisabled?: boolean
 }>()
 
-const emit = defineEmits<{
-  toggleTool: [code: string, enabled: boolean]
-  updateField: [key: keyof AgentApplicationPayload, value: unknown]
-}>()
+const authorizedTools = computed(() => props.toolCodes.map((code) => {
+  const systemTool = props.systemTools.find(tool => tool.code === code)
+  if (systemTool) {
+    return { ...systemTool, type: '系统工具' }
+  }
+  const customTool = props.customTools.find(tool => tool.code === code)
+  return customTool
+    ? { ...customTool, type: 'Python 工具' }
+    : { code, name: code, description: '该工具当前不可用或已被删除', type: '不可用工具' }
+}))
 </script>
 
 <template>
@@ -54,31 +65,21 @@ const emit = defineEmits<{
 
       <section class="form-section">
         <div class="section-title">
-          <h3>可用工具</h3>
-          <span>{{ form.toolCodes.length }} 已选择</span>
+          <h3>应用授权摘要</h3>
+          <span>{{ toolCodes.length }} 项派生授权</span>
         </div>
-
-        <div class="tool-group">
-          <strong>系统工具</strong>
-          <label v-for="tool in systemTools" :key="tool.code" class="tool-option">
-            <input type="checkbox" :checked="form.toolCodes.includes(tool.code)" @change="emit('toggleTool', tool.code, ($event.target as HTMLInputElement).checked)">
+        <p class="summary-copy">
+          授权范围由画布中各模型节点选择的工具自动汇总，不能在应用级单独编辑。
+        </p>
+        <div v-if="authorizedTools.length" class="tool-summary" aria-label="模型节点派生的工具授权">
+          <div v-for="tool in authorizedTools" :key="tool.code" class="tool-summary-row">
+            <span class="tool-type">{{ tool.type }}</span>
             <span><b>{{ tool.name }}</b><small>{{ tool.description || tool.code }}</small></span>
-          </label>
-          <p v-if="!systemTools.length" class="empty-copy">
-            暂无已启用的系统工具
-          </p>
+          </div>
         </div>
-
-        <div class="tool-group">
-          <strong>自定义 Python 工具</strong>
-          <label v-for="tool in customTools" :key="tool.code" class="tool-option">
-            <input type="checkbox" :checked="form.toolCodes.includes(tool.code)" @change="emit('toggleTool', tool.code, ($event.target as HTMLInputElement).checked)">
-            <span><b>{{ tool.name }}</b><small>{{ tool.description || tool.code }}</small></span>
-          </label>
-          <p v-if="!customTools.length" class="empty-copy">
-            请先在 Agent 工具页创建 Python 工具
-          </p>
-        </div>
+        <p v-else class="empty-copy">
+          尚未有模型节点授权工具；在文本生成、结构化提取、意图分类或视觉理解节点中配置。
+        </p>
       </section>
     </div>
   </aside>
@@ -101,13 +102,13 @@ const emit = defineEmits<{
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .section-title h3 { margin-bottom: 0; }
 .section-title span { color: rgb(var(--primary-6)); font-size: 10px; }
-.tool-group { display: grid; gap: 8px; margin-top: 15px; }
-.tool-group > strong { color: var(--color-text-3); font-size: 10px; }
-.tool-option { display: grid; min-width: 0; grid-template-columns: 16px minmax(0, 1fr); align-items: start; gap: 8px; padding: 8px; border: 1px solid var(--color-border-2); border-radius: 6px; cursor: pointer; }
-.tool-option:hover { border-color: rgb(var(--primary-3)); background: var(--color-fill-1); }
-.tool-option input { margin-top: 2px; accent-color: rgb(var(--primary-6)); }
-.tool-option > span { display: grid; min-width: 0; gap: 2px; }
-.tool-option b { color: var(--color-text-1); font-size: 11px; font-weight: 500; }
-.tool-option small { overflow: hidden; color: var(--color-text-3); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.summary-copy { margin: 0; color: var(--color-text-3); font-size: 10px; line-height: 1.6; }
+.tool-summary { display: grid; gap: 8px; margin-top: 12px; }
+.tool-summary-row { display: grid; min-width: 0; grid-template-columns: max-content minmax(0, 1fr); align-items: start; gap: 7px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border-2); }
+.tool-summary-row:last-child { padding-bottom: 0; border-bottom: 0; }
+.tool-summary-row > span:last-child { display: grid; min-width: 0; gap: 2px; }
+.tool-summary-row b { overflow: hidden; color: var(--color-text-1); font-size: 11px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.tool-summary-row small { overflow: hidden; color: var(--color-text-3); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.tool-type { padding: 2px 4px; border-radius: 3px; color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); font-size: 9px; line-height: 1.3; white-space: nowrap; }
 .empty-copy { margin: 0; color: var(--color-text-3); font-size: 10px; line-height: 1.5; }
 </style>

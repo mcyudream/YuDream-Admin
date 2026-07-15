@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { AgentNodeTemplate } from './types'
+import type { AgentNodePaletteGroup } from '../config/agent-node-catalog'
 
 const props = defineProps<{
-  groups: Array<{ title: string, items: AgentNodeTemplate[] }>
+  groups: AgentNodePaletteGroup[]
 }>()
 
 const emit = defineEmits<{

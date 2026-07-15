@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AgentDebugStatus, AgentNodeData } from './types'
 import { Handle, Position } from '@vue-flow/core'
-import { agentSourceHandles } from '../config/agent-node-data'
+import { agentModelKind, agentSourceHandles, isAgentChatModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   id: string
@@ -20,6 +20,13 @@ const nodeStyle = computed(() => ({
   '--node-color': props.data.color || '#2563eb',
 }))
 const sourceHandles = computed(() => agentSourceHandles(props.data.kind))
+const isModelNode = computed(() => Boolean(agentModelKind(props.data.kind)))
+const isToolEnabledModel = computed(() => isAgentChatModelNode(props.data.kind))
+const toolModeLabel = computed(() => ({
+  NONE: '禁用',
+  AUTO: '自主',
+  REQUIRED: '必须',
+}[props.data.toolMode] || '禁用'))
 
 function handleStyle(handle: string) {
   if (props.data.kind !== 'condition') {
@@ -53,13 +60,18 @@ function handleStyle(handle: string) {
 
     <p>{{ data.description || '选择节点后在右侧完善配置' }}</p>
 
-    <div v-if="data.kind === 'tool'" class="node-tool">
+    <div v-if="data.kind === 'tool'" class="node-tool legacy-tool">
       <FaIcon name="i-ri:tools-line" />
-      <span>{{ data.toolCode || '尚未选择工具' }}</span>
+      <span>兼容节点 · {{ data.toolCode || '尚未选择工具' }}</span>
     </div>
-    <div v-else-if="data.kind === 'llm'" class="node-tool">
+    <div v-else-if="isModelNode" class="node-model">
       <FaIcon :name="data.vision ? 'i-ri:image-circle-line' : 'i-ri:chat-3-line'" />
       <span>{{ data.modelCode ? `${data.providerCode} / ${data.modelCode}` : '尚未选择模型' }}</span>
+    </div>
+    <div v-if="isToolEnabledModel" class="node-badges">
+      <span><FaIcon name="i-ri:tools-line" /> 工具 {{ data.toolCodes.length }} · {{ toolModeLabel }}</span>
+      <span v-if="data.kind === 'vision'"><FaIcon name="i-ri:image-2-line" /> 图片变量</span>
+      <span v-else-if="data.vision"><FaIcon name="i-ri:eye-line" /> Vision 可用</span>
     </div>
 
     <div class="node-io">
@@ -96,8 +108,11 @@ function handleStyle(handle: string) {
 .node-title small { color: var(--color-text-3); font-size: 9px; }
 .node-more { color: var(--color-text-4); }
 .workflow-node p { min-height: 31px; margin: 0; padding: 0 12px 9px; color: var(--color-text-3); font-size: 10px; line-height: 1.55; }
-.node-tool { display: flex; min-width: 0; align-items: center; gap: 5px; margin: 0 12px 9px; padding: 5px 7px; border-radius: 4px; color: var(--node-color); background: color-mix(in srgb, var(--node-color), transparent 91%); font-size: 9px; }
-.node-tool span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.node-tool, .node-model { display: flex; min-width: 0; align-items: center; gap: 5px; margin: 0 12px 8px; padding: 5px 7px; border-radius: 4px; color: var(--node-color); background: color-mix(in srgb, var(--node-color), transparent 91%); font-size: 9px; }
+.node-tool span, .node-model span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.legacy-tool { color: rgb(var(--warning-6)); background: rgb(var(--warning-1)); }
+.node-badges { display: flex; min-width: 0; flex-wrap: wrap; gap: 4px; margin: 0 12px 9px; }
+.node-badges span { display: inline-flex; max-width: 100%; align-items: center; gap: 3px; padding: 3px 5px; border-radius: 3px; color: var(--color-text-2); background: var(--color-fill-2); font-size: 8px; white-space: nowrap; }
 .node-io { display: flex; min-height: 33px; align-items: center; justify-content: space-between; padding: 0 12px; border-top: 1px solid var(--color-border-2); color: var(--color-text-3); font-size: 9px; }
 .node-io span { display: flex; align-items: center; gap: 4px; }
 .node-io b { max-width: 70px; overflow: hidden; color: var(--color-text-2); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
