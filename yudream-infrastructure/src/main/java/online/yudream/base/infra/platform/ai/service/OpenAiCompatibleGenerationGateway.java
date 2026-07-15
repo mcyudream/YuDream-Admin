@@ -310,16 +310,16 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        var scope = PluginAiToolExecutionScope.current();
-        if (scope != null) {
-            return pluginAiToolRegistry.tools().stream().filter(tool -> allowed(tool, scope))
-                    .map(tool -> pluginToolCallback(tool, scope, toolResults, onTool, onProgress)).toList();
-        }
         List<AiAgentTool> scopedTools = AiAgentToolExecutionScope.currentTools();
         if (scopedTools != null) {
             return scopedTools.stream()
                     .map(tool -> toolCallback(tool, toolResults, onTool, onProgress))
                     .toList();
+        }
+        var scope = PluginAiToolExecutionScope.current();
+        if (scope != null) {
+            return pluginAiToolRegistry.tools().stream().filter(tool -> allowed(tool, scope))
+                    .map(tool -> pluginToolCallback(tool, scope, toolResults, onTool, onProgress)).toList();
         }
         var allowedToolNames = AiAgentToolExecutionScope.current();
         return aiAgentToolProvider.stream()
