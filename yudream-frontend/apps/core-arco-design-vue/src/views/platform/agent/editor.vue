@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import type { Edge, Node } from '@vue-flow/core'
+import type { Connection, Edge, Node as FlowNode } from '@vue-flow/core'
+import type { AgentConnectionStyle, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
 import type { AgentApplicationPayload, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
-import { MarkerType, VueFlow, useVueFlow } from '@vue-flow/core'
+import { MarkerType, useVueFlow, VueFlow } from '@vue-flow/core'
 import { MiniMap } from '@vue-flow/minimap'
 import apiAgent from '@/api/modules/platform-agent'
+import AgentApplicationInspector from './components/AgentApplicationInspector.vue'
+import AgentEdgeInspector from './components/AgentEdgeInspector.vue'
+import AgentNodeInspector from './components/AgentNodeInspector.vue'
+import AgentNodePalette from './components/AgentNodePalette.vue'
+import AgentWorkflowNode from './components/AgentWorkflowNode.vue'
 import '@vue-flow/core/dist/style.css'
 import '@vue-flow/core/dist/theme-default.css'
 import '@vue-flow/controls/dist/style.css'
@@ -14,119 +20,548 @@ import '@vue-flow/minimap/dist/style.css'
 const route = useRoute()
 const router = useRouter()
 const toast = useFaToast()
+const modal = useFaModal()
 const id = computed(() => typeof route.query.id === 'string' ? route.query.id : '')
 const saving = ref(false)
 const loading = ref(false)
-const selectedId = ref('')
+const isDragOver = ref(false)
+const selectedNodeId = ref('')
+const selectedEdgeId = ref('')
+const defaultConnectionStyle = ref<AgentConnectionStyle>('arrow')
 const customTools = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
-const form = reactive<AgentApplicationPayload>({ name: '', code: '', description: '', icon: 'i-ri:robot-2-line', systemPrompt: '', workflowJson: '', toolCodes: [], status: 'DRAFT' })
-
-const nodeKinds = [
-  { kind: 'start', label: '开始', icon: 'i-ri:play-circle-line', color: '#2563eb', description: '接收用户输入' },
-  { kind: 'llm', label: '大模型', icon: 'i-ri:sparkling-line', color: '#7c3aed', description: '调用模型处理上下文' },
-  { kind: 'tool', label: '工具', icon: 'i-ri:tools-line', color: '#d97706', description: '调用已选择的 Python 工具' },
-  { kind: 'condition', label: '条件', icon: 'i-ri:git-branch-line', color: '#0f766e', description: '按规则分支' },
-  { kind: 'end', label: '结束', icon: 'i-ri:stop-circle-line', color: '#475569', description: '输出结果' },
-]
-const nodes = ref<Node[]>([])
-const edges = ref<Edge[]>([])
-const { addNodes, addEdges, screenToFlowCoordinate, fitView, updateNodeData } = useVueFlow()
-const selectedNode = computed(() => nodes.value.find(node => node.id === selectedId.value))
-
-onMounted(async () => {
-  await Promise.all([loadTools(), loadApplication()])
-  if (!nodes.value.length) seedWorkflow()
-  nextTick(() => fitView({ padding: 0.2 }))
+const form = reactive<AgentApplicationPayload>({
+  name: '',
+  code: '',
+  description: '',
+  icon: 'i-ri:robot-2-line',
+  systemPrompt: '',
+  workflowJson: '',
+  toolCodes: [],
+  status: 'DRAFT',
 })
 
+const paletteGroups: Array<{ title: string, items: AgentNodeTemplate[] }> = [
+  {
+    title: '基础节点',
+    items: [
+      { kind: 'input', label: '输入', icon: 'i-ri:login-box-line', color: '#2563eb', description: '接收用户输入或业务参数', inputName: 'request', outputName: 'str.query' },
+      { kind: 'start', label: '开始', icon: 'i-ri:play-circle-line', color: '#2563eb', description: '接收用户输入和运行参数', inputName: 'str.query', outputName: 'str.query' },
+      { kind: 'end', label: '结束', icon: 'i-ri:stop-circle-line', color: '#64748b', description: '汇总并输出最终结果', inputName: 'str.answer', outputName: 'result' },
+      { kind: 'understand', label: '问题理解', icon: 'i-ri:brain-line', color: '#0f9488', description: '提取意图、实体与业务条件', inputName: 'str.query', outputName: 'json.intent' },
+      { kind: 'condition', label: '条件判断', icon: 'i-ri:git-branch-line', color: '#0f9488', description: '根据表达式选择后续分支', inputName: 'any', outputName: 'boolean' },
+      { kind: 'code', label: '代码执行', icon: 'i-ri:code-s-slash-line', color: '#d97706', description: '执行 Python 数据处理逻辑', inputName: 'any', outputName: 'any' },
+      { kind: 'template', label: '模板转换', icon: 'i-ri:file-code-line', color: '#7c3aed', description: '通过模板拼接结构化输出', inputName: 'json', outputName: 'str' },
+    ],
+  },
+  {
+    title: '知识库相关',
+    items: [
+      { kind: 'search', label: '知识检索', icon: 'i-ri:book-open-line', color: '#7c3aed', description: '从知识库检索相关内容', inputName: 'str.query', outputName: 'Array<Document>' },
+      { kind: 'vector', label: '向量检索', icon: 'i-ri:bubble-chart-line', color: '#16a34a', description: '基于向量相似度召回文档', inputName: 'vector', outputName: 'Array<Document>' },
+      { kind: 'rerank', label: '重排模型', icon: 'i-ri:sort-desc', color: '#d97706', description: '对召回结果进行相关性重排', inputName: 'Array<Document>', outputName: 'Array<Document>' },
+      { kind: 'document', label: '文档解析', icon: 'i-ri:file-text-line', color: '#4f46e5', description: '解析文档正文和元数据', inputName: 'File', outputName: 'Document' },
+      { kind: 'citation', label: '引用提取', icon: 'i-ri:double-quotes-l', color: '#0f9488', description: '提取答案引用来源和片段', inputName: 'answer + documents', outputName: 'Array<Citation>' },
+    ],
+  },
+  {
+    title: '模型与工具',
+    items: [
+      { kind: 'llm', label: '大模型', icon: 'i-ri:sparkling-line', color: '#7c3aed', description: '使用提示词调用模型处理上下文', inputName: 'context', outputName: 'str.answer' },
+      { kind: 'embedding', label: 'Embedding', icon: 'i-ri:focus-3-line', color: '#64748b', description: '将文本转换为向量表示', inputName: 'str', outputName: 'vector' },
+      { kind: 'tool', label: '工具调用', icon: 'i-ri:tools-line', color: '#d97706', description: '调用系统工具或自定义 Python 工具', inputName: 'json', outputName: 'tool.result' },
+    ],
+  },
+]
+
+const templates = computed(() => paletteGroups.flatMap(group => group.items))
+const nodes = ref<FlowNode<AgentNodeData>[]>([])
+const edges = ref<Edge[]>([])
+const selectedNode = computed(() => nodes.value.find(node => node.id === selectedNodeId.value))
+const selectedEdge = computed(() => edges.value.find(item => item.id === selectedEdgeId.value))
+const selectedSourceName = computed(() => nodeName(selectedEdge.value?.source))
+const selectedTargetName = computed(() => nodeName(selectedEdge.value?.target))
+const hasSelection = computed(() => Boolean(selectedNodeId.value || selectedEdgeId.value))
+const { addNodes, addEdges, screenToFlowCoordinate, fitView, updateNodeData } = useVueFlow()
+
+onMounted(async () => {
+  window.addEventListener('keydown', onKeydown)
+  await Promise.all([loadTools(), loadApplication()])
+  if (!nodes.value.length) {
+    seedWorkflow()
+  }
+})
+
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+
 async function loadTools() {
-  const [result, system] = await Promise.all([apiAgent.pageTools({ page: 1, size: 200 }), apiAgent.systemTools()])
-  customTools.value = result.data.records.filter(item => item.enabled)
-  systemTools.value = system.data
+  try {
+    const [result, system] = await Promise.all([apiAgent.pageTools({ page: 1, size: 200 }), apiAgent.systemTools()])
+    customTools.value = result.data.records.filter(item => item.enabled)
+    systemTools.value = system.data
+  }
+  catch {
+    toast.error('加载 Agent 工具失败')
+  }
 }
+
 async function loadApplication() {
-  if (!id.value) return
+  if (!id.value) {
+    return
+  }
   loading.value = true
   try {
     const application = (await apiAgent.detail(id.value)).data
-    Object.assign(form, application)
-    const flow = JSON.parse(application.workflowJson)
-    nodes.value = Array.isArray(flow.nodes) ? flow.nodes : []
-    edges.value = Array.isArray(flow.edges) ? flow.edges : []
+    Object.assign(form, {
+      ...application,
+      description: application.description || '',
+      systemPrompt: application.systemPrompt || '',
+      toolCodes: application.toolCodes || [],
+    })
+    const flow = application.workflowJson ? JSON.parse(application.workflowJson) : {}
+    nodes.value = Array.isArray(flow.nodes) ? flow.nodes.map(normalizeNode) : []
+    edges.value = Array.isArray(flow.edges) ? flow.edges.map(normalizeEdge) : []
   }
-  catch { toast.error('加载 Agent 应用失败') }
-  finally { loading.value = false }
+  catch {
+    toast.error('加载 Agent 应用失败，请检查工作流数据')
+  }
+  finally {
+    loading.value = false
+  }
 }
+
+function templateOf(kind: AgentNodeKind): AgentNodeTemplate {
+  return templates.value.find(item => item.kind === kind) || templates.value[0]
+}
+
+function normalizeNode(raw: FlowNode<AgentNodeData>): FlowNode<AgentNodeData> {
+  const template = templateOf((raw.data?.kind || 'llm') as AgentNodeKind)
+  return {
+    id: raw.id,
+    type: 'agent',
+    position: raw.position || { x: 0, y: 0 },
+    data: {
+      ...template,
+      ...raw.data,
+      title: raw.data?.title || raw.data?.label || template.label,
+      prompt: raw.data?.prompt || '',
+      toolCode: raw.data?.toolCode || '',
+      condition: raw.data?.condition || '',
+    },
+  }
+}
+
+function normalizeEdge(raw: Edge): Edge {
+  const connectionStyle = raw.data?.connectionStyle === 'line' ? 'line' : 'arrow'
+  return {
+    ...raw,
+    type: raw.type || 'smoothstep',
+    markerEnd: connectionStyle === 'arrow' ? MarkerType.ArrowClosed : undefined,
+    data: { ...raw.data, connectionStyle },
+  }
+}
+
+function makeNode(template: AgentNodeTemplate, position: { x: number, y: number }): FlowNode<AgentNodeData> {
+  return {
+    id: `${template.kind}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    type: 'agent',
+    position,
+    data: { ...template, title: template.label, prompt: '', toolCode: '', condition: '' },
+  }
+}
+
+function makeEdge(source: string, target: string, style = defaultConnectionStyle.value): Edge {
+  return {
+    id: `edge-${source}-${target}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    source,
+    target,
+    type: 'smoothstep',
+    markerEnd: style === 'arrow' ? MarkerType.ArrowClosed : undefined,
+    data: { connectionStyle: style },
+  }
+}
+
 function seedWorkflow() {
-  nodes.value = [
-    makeNode('start', { x: 80, y: 240 }),
-    makeNode('llm', { x: 390, y: 240 }),
-    makeNode('end', { x: 700, y: 240 }),
-  ]
-  edges.value = [edge('start', 'llm'), edge('llm', 'end')]
+  const start = makeNode(templateOf('start'), { x: 70, y: 230 })
+  const llm = makeNode(templateOf('llm'), { x: 390, y: 230 })
+  const end = makeNode(templateOf('end'), { x: 710, y: 230 })
+  nodes.value = [start, llm, end]
+  edges.value = [makeEdge(start.id, llm.id), makeEdge(llm.id, end.id)]
 }
-function makeNode(kind: string, position: { x: number; y: number }): Node {
-  const config = nodeKinds.find(item => item.kind === kind) || nodeKinds[0]
-  const node: Node = { id: `${kind}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, type: 'agent', position, data: { ...config, title: config.label, prompt: '', toolCode: '' } }
-  return node
+
+function addNode(template: AgentNodeTemplate) {
+  const offset = (nodes.value.length % 5) * 34
+  const node = makeNode(template, { x: 250 + offset, y: 150 + offset })
+  addNodes(node)
+  selectNode(node.id)
 }
-function edge(source: string, target: string): Edge { return { id: `edge-${source}-${target}-${Date.now()}`, source, target, type: 'smoothstep', markerEnd: MarkerType.ArrowClosed } }
-function addNode(kind: string) {
-  const offset = nodes.value.length * 32
-  const node = makeNode(kind, { x: 260 + offset, y: 180 + offset })
-  addNodes(node); selectedId.value = node.id
-}
+
 function onDrop(event: DragEvent) {
-  const kind = event.dataTransfer?.getData('application/agent-node')
-  if (!kind) return
-  const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
-  const node = makeNode(kind, { x: point.x - 110, y: point.y - 42 })
-  addNodes(node); selectedId.value = node.id
+  isDragOver.value = false
+  const raw = event.dataTransfer?.getData('application/agent-node')
+  if (!raw) {
+    return
+  }
+  try {
+    const template = JSON.parse(raw) as AgentNodeTemplate
+    const point = screenToFlowCoordinate({ x: event.clientX, y: event.clientY })
+    const node = makeNode(template, { x: point.x - 115, y: point.y - 70 })
+    addNodes(node)
+    selectNode(node.id)
+  }
+  catch {
+    toast.error('无法识别拖入的节点')
+  }
 }
-function onConnect(connection: Edge) { addEdges({ ...connection, id: `edge-${Date.now()}`, type: 'smoothstep', markerEnd: MarkerType.ArrowClosed }) }
-function dragStart(event: DragEvent, kind: string) { event.dataTransfer?.setData('application/agent-node', kind); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move' }
-function updateSelected(key: string, value: unknown) { if (!selectedId.value) return; updateNodeData(selectedId.value, { [key]: value }) }
-function toggleTool(code: string, enabled: boolean) { form.toolCodes = enabled ? [...new Set([...form.toolCodes, code])] : form.toolCodes.filter(item => item !== code) }
-function deleteSelected() { if (!selectedId.value) return; nodes.value = nodes.value.filter(node => node.id !== selectedId.value); edges.value = edges.value.filter(edge => edge.source !== selectedId.value && edge.target !== selectedId.value); selectedId.value = '' }
-function workflowJson() { return JSON.stringify({ nodes: nodes.value, edges: edges.value }) }
+
+function onConnect(connection: Connection) {
+  if (!connection.source || !connection.target || connection.source === connection.target) {
+    return
+  }
+  addEdges({
+    ...makeEdge(connection.source, connection.target),
+    sourceHandle: connection.sourceHandle,
+    targetHandle: connection.targetHandle,
+  })
+}
+
+function selectNode(nodeId: string) {
+  selectedNodeId.value = nodeId
+  selectedEdgeId.value = ''
+}
+
+function selectEdge(edgeId: string) {
+  selectedEdgeId.value = edgeId
+  selectedNodeId.value = ''
+}
+
+function clearSelection() {
+  selectedNodeId.value = ''
+  selectedEdgeId.value = ''
+}
+
+function updateSelectedNode(data: Partial<AgentNodeData>) {
+  if (!selectedNodeId.value) {
+    return
+  }
+  updateNodeData(selectedNodeId.value, data)
+}
+
+function changeEdgeStyle(style: AgentConnectionStyle) {
+  if (!selectedEdgeId.value) {
+    return
+  }
+  edges.value = edges.value.map(item => item.id === selectedEdgeId.value
+    ? { ...item, markerEnd: style === 'arrow' ? MarkerType.ArrowClosed : undefined, data: { ...item.data, connectionStyle: style } }
+    : item)
+}
+
+function changeEdgeLabel(label: string) {
+  edges.value = edges.value.map(item => item.id === selectedEdgeId.value ? { ...item, label } : item)
+}
+
+function deleteNode(nodeId: string) {
+  nodes.value = nodes.value.filter(node => node.id !== nodeId)
+  edges.value = edges.value.filter(item => item.source !== nodeId && item.target !== nodeId)
+  clearSelection()
+}
+
+function deleteEdge(edgeId: string) {
+  edges.value = edges.value.filter(item => item.id !== edgeId)
+  clearSelection()
+}
+
+function deleteSelection() {
+  if (selectedNodeId.value) {
+    deleteNode(selectedNodeId.value)
+  }
+  else if (selectedEdgeId.value) {
+    deleteEdge(selectedEdgeId.value)
+  }
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Delete' && event.key !== 'Backspace') {
+    return
+  }
+  const target = event.target as HTMLElement | null
+  if (target?.matches('input, textarea, [contenteditable="true"]')) {
+    return
+  }
+  if (!hasSelection.value) {
+    return
+  }
+  event.preventDefault()
+  deleteSelection()
+}
+
+function toggleTool(code: string, enabled: boolean) {
+  form.toolCodes = enabled
+    ? [...new Set([...form.toolCodes, code])]
+    : form.toolCodes.filter(item => item !== code)
+}
+
+function updateApplicationField(key: keyof AgentApplicationPayload, value: unknown) {
+  Object.assign(form, { [key]: value })
+}
+
+function fitCanvas() {
+  nextTick(() => fitView({ padding: 0.22, duration: 260 }))
+}
+
+function resetWorkflow() {
+  modal.confirm({
+    title: '重置工作流',
+    content: '当前画布内容将替换为“开始 → 大模型 → 结束”的基础流程。',
+    onConfirm: () => {
+      clearSelection()
+      seedWorkflow()
+      fitCanvas()
+    },
+  })
+}
+
+function workflowData() {
+  return {
+    nodes: nodes.value.map(node => ({ id: node.id, type: 'agent', position: node.position, data: node.data })),
+    edges: edges.value.map(item => ({
+      id: item.id,
+      source: item.source,
+      target: item.target,
+      sourceHandle: item.sourceHandle,
+      targetHandle: item.targetHandle,
+      type: item.type || 'smoothstep',
+      label: item.label || undefined,
+      markerEnd: item.markerEnd,
+      data: item.data,
+    })),
+  }
+}
+
+function exportWorkflow() {
+  const blob = new Blob([JSON.stringify(workflowData(), null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `${form.code || 'agent-workflow'}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
+function nodeName(nodeId?: string) {
+  return nodes.value.find(node => node.id === nodeId)?.data.title || nodeId || '-'
+}
+
 async function save(publish = false) {
-  if (!form.name.trim() || !form.code.trim()) { toast.error('请填写应用名称和编码'); return }
-  if (!nodes.value.some(node => node.data.kind === 'start') || !nodes.value.some(node => node.data.kind === 'end')) { toast.error('工作流需要开始和结束节点'); return }
+  if (!form.name.trim() || !form.code.trim()) {
+    toast.error('请在右侧应用设置中填写应用名称和编码')
+    clearSelection()
+    return
+  }
+  if (!/^[a-z][a-z0-9-]*$/i.test(form.code.trim())) {
+    toast.error('应用编码只能包含英文字母、数字和连字符，并以字母开头')
+    clearSelection()
+    return
+  }
+  if (!nodes.value.some(node => node.data.kind === 'start') || !nodes.value.some(node => node.data.kind === 'end')) {
+    toast.error('工作流至少需要一个开始节点和一个结束节点')
+    return
+  }
+  const emptyToolNode = nodes.value.find(node => node.data.kind === 'tool' && !node.data.toolCode)
+  if (emptyToolNode) {
+    selectNode(emptyToolNode.id)
+    toast.error('请为工具调用节点选择具体工具')
+    return
+  }
+
   saving.value = true
   try {
-    form.workflowJson = workflowJson(); form.status = publish ? 'PUBLISHED' : form.status
+    const nodeToolCodes = nodes.value.map(node => node.data.toolCode).filter(Boolean)
+    form.toolCodes = [...new Set([...form.toolCodes, ...nodeToolCodes])]
+    form.workflowJson = JSON.stringify(workflowData())
+    form.status = publish ? 'PUBLISHED' : form.status
     const payload = { ...form }
     const response = id.value ? await apiAgent.update(id.value, payload) : await apiAgent.create(payload)
-    if (publish) await apiAgent.publish(response.data.id)
-    toast.success(publish ? '应用已发布' : '编排已保存')
-    router.replace({ path: '/platform/agent/editor', query: { id: response.data.id } })
+    if (publish) {
+      await apiAgent.publish(response.data.id)
+    }
+    toast.success(publish ? 'Agent 应用已发布' : 'Agent 编排已保存')
+    await router.replace({ path: '/platform/agent/editor', query: { id: response.data.id } })
   }
-  finally { saving.value = false }
+  catch {
+    toast.error(publish ? '发布失败，请检查应用配置' : '保存失败，请检查应用配置')
+  }
+  finally {
+    saving.value = false
+  }
 }
 </script>
 
 <template>
-  <div class="agent-editor-page" v-loading="loading">
-    <FaPageHeader :title="id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="mb-0">
-      <div class="flex gap-2"><FaButton variant="outline" @click="router.push('/platform/agent')">返回</FaButton><FaButton :loading="saving" variant="outline" @click="save(false)">保存</FaButton><FaButton :loading="saving" @click="save(true)">发布</FaButton></div>
+  <div v-loading="loading" class="agent-editor-page">
+    <FaPageHeader :title="id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="editor-page-header mb-0">
+      <div class="header-actions">
+        <FaButton variant="outline" @click="router.push('/platform/agent')">
+          <FaIcon name="i-ri:arrow-left-line" /> 返回
+        </FaButton>
+        <FaButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
+          <FaIcon name="i-ri:download-2-line" /> 导出
+        </FaButton>
+        <FaButton variant="outline" :loading="saving" @click="save(false)">
+          <FaIcon name="i-ri:save-3-line" /> 保存
+        </FaButton>
+        <FaButton :loading="saving" @click="save(true)">
+          <FaIcon name="i-ri:send-plane-line" /> 发布
+        </FaButton>
+      </div>
     </FaPageHeader>
+
     <section class="agent-editor">
-      <aside class="node-palette"><strong>节点</strong><button v-for="item in nodeKinds" :key="item.kind" type="button" draggable="true" class="palette-node" @dragstart="dragStart($event, item.kind)" @click="addNode(item.kind)"><FaIcon :name="item.icon" :style="{ color: item.color }" /><span><b>{{ item.label }}</b><small>{{ item.description }}</small></span></button></aside>
-      <main class="flow-canvas" @dragover.prevent @drop.prevent="onDrop">
-        <VueFlow v-model:nodes="nodes" v-model:edges="edges" :snap-to-grid="true" :snap-grid="[16, 16]" :min-zoom="0.2" @connect="onConnect" @node-click="({ node }) => selectedId = node.id" @pane-click="selectedId = ''">
-          <Background pattern-color="#cbd5e1" :gap="16" /><Controls position="bottom-left" /><MiniMap position="bottom-right" />
-          <template #node-agent="nodeProps"><div class="agent-node" :class="{ selected: nodeProps.selected }" :style="{ '--node-color': nodeProps.data.color }"><div><FaIcon :name="nodeProps.data.icon" /><strong>{{ nodeProps.data.title }}</strong></div><small>{{ nodeProps.data.description }}</small><em v-if="nodeProps.data.kind === 'tool'">{{ nodeProps.data.toolCode || '未选择工具' }}</em></div></template>
+      <AgentNodePalette class="palette-panel" :groups="paletteGroups" @add="addNode" />
+
+      <main
+        class="flow-canvas"
+        :class="{ 'is-drag-over': isDragOver }"
+        @dragenter.prevent="isDragOver = true"
+        @dragleave.self="isDragOver = false"
+        @dragover.prevent
+        @drop.prevent="onDrop"
+      >
+        <div class="canvas-toolbar">
+          <span>新建连线</span>
+          <div class="connection-switch" aria-label="连线样式">
+            <button type="button" :class="{ active: defaultConnectionStyle === 'arrow' }" title="箭头连线" @click="defaultConnectionStyle = 'arrow'">
+              <FaIcon name="i-ri:arrow-right-line" /> 箭头
+            </button>
+            <button type="button" :class="{ active: defaultConnectionStyle === 'line' }" title="普通线段" @click="defaultConnectionStyle = 'line'">
+              <FaIcon name="i-ri:subtract-line" /> 线段
+            </button>
+          </div>
+          <i />
+          <button type="button" class="toolbar-icon" title="适应画布" aria-label="适应画布" @click="fitCanvas">
+            <FaIcon name="i-ri:fullscreen-line" />
+          </button>
+          <button type="button" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
+            <FaIcon name="i-ri:restart-line" />
+          </button>
+          <button type="button" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
+            <FaIcon name="i-ri:delete-bin-line" />
+          </button>
+        </div>
+
+        <div v-if="isDragOver" class="drop-overlay">
+          <FaIcon name="i-ri:drag-drop-line" />
+          <strong>释放以添加节点</strong>
+        </div>
+
+        <VueFlow
+          v-model:nodes="nodes"
+          v-model:edges="edges"
+          class="agent-flow"
+          :snap-to-grid="true"
+          :snap-grid="[16, 16]"
+          :min-zoom="0.25"
+          :max-zoom="1.8"
+          :delete-key-code="null"
+          @connect="onConnect"
+          @node-click="selectNode($event.node.id)"
+          @edge-click="selectEdge($event.edge.id)"
+          @pane-click="clearSelection"
+          @init="fitCanvas"
+        >
+          <Background pattern-color="var(--color-border-3)" :gap="18" :size="1" />
+          <Controls position="bottom-left" />
+          <MiniMap position="bottom-right" :pannable="true" :zoomable="true" />
+          <template #node-agent="nodeProps">
+            <AgentWorkflowNode v-bind="nodeProps" @delete="deleteNode" />
+          </template>
         </VueFlow>
+
+        <div class="canvas-status">
+          <span>{{ nodes.length }} 个节点</span>
+          <i />
+          <span>{{ edges.length }} 条连线</span>
+          <span>拖动节点两侧圆点建立连接</span>
+        </div>
       </main>
-      <aside class="inspector">
-        <template v-if="selectedNode"><h3>节点配置</h3><FaInput :model-value="selectedNode.data.title" label="名称" @update:model-value="updateSelected('title', $event)" /><FaTextarea :model-value="selectedNode.data.prompt" :autosize="{ minRows: 4 }" label="指令" @update:model-value="updateSelected('prompt', $event)" /><FaSelect v-if="selectedNode.data.kind === 'tool'" :model-value="selectedNode.data.toolCode" label="Python 工具" :options="customTools.map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))" @update:model-value="updateSelected('toolCode', $event)" /><FaButton variant="destructive" size="sm" @click="deleteSelected">删除节点</FaButton></template>
-        <template v-else><h3>应用配置</h3><FaInput v-model="form.name" label="名称" placeholder="例如：运营内容助手" /><FaInput v-model="form.code" label="编码" placeholder="content-agent" /><FaInput v-model="form.description" label="描述" /><FaTextarea v-model="form.systemPrompt" :autosize="{ minRows: 6 }" label="系统提示词" placeholder="定义该 Agent 应用的角色、边界和输出要求" /><div class="tool-checks"><span>允许使用的系统工具</span><label v-for="tool in systemTools" :key="tool.code"><input type="checkbox" :checked="form.toolCodes.includes(tool.code)" @change="toggleTool(tool.code, ($event.target as HTMLInputElement).checked)"> {{ tool.name }}</label></div><div class="tool-checks"><span>允许使用的 Python 工具</span><label v-for="tool in customTools" :key="tool.code"><input type="checkbox" :checked="form.toolCodes.includes(tool.code)" @change="toggleTool(tool.code, ($event.target as HTMLInputElement).checked)"> {{ tool.name }}</label></div></template>
-      </aside>
+
+      <AgentNodeInspector
+        v-if="selectedNode"
+        class="inspector-panel"
+        :node="selectedNode"
+        :system-tools="systemTools"
+        :custom-tools="customTools"
+        @update="updateSelectedNode"
+        @delete="deleteNode(selectedNode.id)"
+        @close="clearSelection"
+      />
+      <AgentEdgeInspector
+        v-else-if="selectedEdge"
+        class="inspector-panel"
+        :edge="selectedEdge"
+        :source-name="selectedSourceName"
+        :target-name="selectedTargetName"
+        @change-style="changeEdgeStyle"
+        @change-label="changeEdgeLabel"
+        @delete="deleteEdge(selectedEdge.id)"
+        @close="clearSelection"
+      />
+      <AgentApplicationInspector
+        v-else
+        class="inspector-panel"
+        :form="form"
+        :system-tools="systemTools"
+        :custom-tools="customTools"
+        :code-disabled="Boolean(id)"
+        @toggle-tool="toggleTool"
+        @update-field="updateApplicationField"
+      />
     </section>
   </div>
 </template>
 
 <style scoped>
-.agent-editor { display: grid; height: calc(100vh - 174px); min-height: 620px; grid-template-columns: 230px minmax(0, 1fr) 310px; border-top: 1px solid var(--color-border-2); }.node-palette, .inspector { display: grid; align-content: start; gap: 12px; padding: 16px; overflow: auto; background: var(--color-bg-1); }.node-palette { border-right: 1px solid var(--color-border-2); }.inspector { border-left: 1px solid var(--color-border-2); }.palette-node { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; background: transparent; text-align: left; cursor: grab; }.palette-node span { display: grid; gap: 3px; }.palette-node small { color: var(--color-text-3); font-size: 11px; }.flow-canvas { min-width: 0; background: var(--color-bg-2); }.agent-node { display: grid; gap: 8px; width: 210px; padding: 12px; border: 2px solid var(--node-color); border-radius: 6px; background: var(--color-bg-1); box-shadow: 0 3px 12px rgb(15 23 42 / 8%); }.agent-node.selected { box-shadow: 0 0 0 3px color-mix(in srgb, var(--node-color), transparent 75%); }.agent-node div { display: flex; gap: 8px; align-items: center; }.agent-node small, .agent-node em { color: var(--color-text-3); font-size: 12px; font-style: normal; }.agent-node em { color: var(--node-color); }.tool-checks { display: grid; gap: 8px; color: var(--color-text-2); font-size: 13px; }.tool-checks label { display: flex; gap: 8px; align-items: center; }@media (max-width: 1100px) { .agent-editor { grid-template-columns: 190px minmax(0, 1fr); }.inspector { grid-column: 1 / -1; max-height: 260px; border-top: 1px solid var(--color-border-2); border-left: 0; } }
+.agent-editor-page { min-width: 0; }
+.header-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.agent-editor { display: grid; height: calc(100vh - 174px); min-height: 650px; overflow: hidden; grid-template-columns: 242px minmax(0, 1fr) 326px; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
+.flow-canvas { position: relative; min-width: 0; overflow: hidden; background: var(--color-bg-2); }
+.agent-flow { width: 100%; height: 100%; }
+.canvas-toolbar { position: absolute; top: 14px; left: 50%; z-index: 10; display: flex; min-height: 40px; align-items: center; gap: 8px; padding: 5px 7px 5px 12px; border: 1px solid var(--color-border-2); border-radius: 7px; background: color-mix(in srgb, var(--color-bg-1), transparent 4%); box-shadow: 0 7px 24px rgb(15 23 42 / 12%); transform: translateX(-50%); backdrop-filter: blur(8px); }
+.canvas-toolbar > span { color: var(--color-text-3); font-size: 10px; font-weight: 600; white-space: nowrap; }
+.canvas-toolbar > i { width: 1px; height: 24px; background: var(--color-border-2); }
+.connection-switch { display: flex; gap: 2px; padding: 3px; border-radius: 6px; background: var(--color-fill-2); }
+.connection-switch button { display: flex; height: 26px; align-items: center; gap: 4px; padding: 0 8px; border: 0; border-radius: 4px; color: var(--color-text-3); background: transparent; font-size: 10px; cursor: pointer; }
+.connection-switch button.active { color: rgb(var(--primary-6)); background: var(--color-bg-1); box-shadow: 0 2px 6px rgb(15 23 42 / 9%); }
+.toolbar-icon { display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 5px; color: var(--color-text-2); background: transparent; cursor: pointer; }
+.toolbar-icon:hover { background: var(--color-fill-2); }
+.toolbar-icon.danger { color: rgb(var(--danger-6)); }
+.toolbar-icon:disabled { color: var(--color-text-4); cursor: not-allowed; }
+.drop-overlay { position: absolute; z-index: 20; display: grid; inset: 10px; place-items: center; align-content: center; gap: 9px; border: 2px dashed rgb(var(--primary-5)); border-radius: 8px; color: rgb(var(--primary-6)); background: rgb(var(--primary-1) / 86%); pointer-events: none; }
+.drop-overlay > :first-child { font-size: 30px; }
+.drop-overlay strong { font-size: 13px; }
+.canvas-status { position: absolute; bottom: 15px; left: 76px; z-index: 8; display: flex; min-height: 28px; align-items: center; gap: 8px; padding: 0 9px; border: 1px solid var(--color-border-2); border-radius: 6px; color: var(--color-text-3); background: color-mix(in srgb, var(--color-bg-1), transparent 4%); box-shadow: 0 3px 12px rgb(15 23 42 / 7%); font-size: 9px; }
+.canvas-status i { width: 1px; height: 12px; background: var(--color-border-2); }
+.canvas-status span:last-child { margin-left: 3px; }
+.agent-flow :deep(.vue-flow__edge-path) { stroke: var(--color-text-4); stroke-width: 1.6; }
+.agent-flow :deep(.vue-flow__edge.selected .vue-flow__edge-path), .agent-flow :deep(.vue-flow__edge:hover .vue-flow__edge-path) { stroke: rgb(var(--primary-6)); stroke-width: 2.2; }
+.agent-flow :deep(.vue-flow__edge-textbg) { fill: var(--color-bg-1); }
+.agent-flow :deep(.vue-flow__edge-text) { fill: var(--color-text-2); font-size: 10px; }
+.agent-flow :deep(.vue-flow__controls) { overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 6px; box-shadow: 0 5px 18px rgb(15 23 42 / 10%); }
+.agent-flow :deep(.vue-flow__controls-button) { border-bottom-color: var(--color-border-2); background: var(--color-bg-1); fill: var(--color-text-2); }
+.agent-flow :deep(.vue-flow__minimap) { width: 190px; height: 125px; overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 7px; background: var(--color-bg-1); box-shadow: 0 7px 22px rgb(15 23 42 / 11%); }
+.agent-flow :deep(.vue-flow__minimap-mask) { fill: color-mix(in srgb, var(--color-fill-3), transparent 18%); }
+@media (max-width: 1180px) {
+  .agent-editor { height: auto; min-height: 0; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: 640px 480px; }
+  .inspector-panel { grid-column: 1 / -1; border-top: 1px solid var(--color-border-2); border-left: 0 !important; }
+}
+@media (max-width: 760px) {
+  .header-actions { justify-content: flex-start; }
+  .agent-editor { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 350px 620px 520px; }
+  .palette-panel, .flow-canvas, .inspector-panel { grid-column: 1; }
+  .palette-panel { border-right: 0 !important; border-bottom: 1px solid var(--color-border-2); }
+  .canvas-toolbar { left: 10px; max-width: calc(100% - 20px); transform: none; }
+  .canvas-toolbar > span { display: none; }
+  .canvas-status span:last-child { display: none; }
+  .agent-flow :deep(.vue-flow__minimap) { width: 130px; height: 90px; }
+}
 </style>

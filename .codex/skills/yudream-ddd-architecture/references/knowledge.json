@@ -143,6 +143,14 @@
     {
       "key": "agent-capability-integration",
       "text": "Agent applications are a standalone platform capability with an explicit provider, project gate, application gate, and AI/Integration dependencies; menus and endpoints must be bound to agent rather than only ai."
+    },
+    {
+      "key": "frontend-fa-form-label",
+      "text": "FaInput、FaTextarea、FaSelect 不渲染 label 属性；业务表单必须使用显式 label/字段标题，并提供 placeholder 或帮助文本。"
+    },
+    {
+      "key": "workflow-editor-scroll-container",
+      "text": "固定高度的 Grid/Flex 工作台中，侧栏根节点必须设置 height:100%、min-height:0、overflow:hidden，内部内容区使用 min-height:0 和 overflow:auto，避免长工具列表被裁切。"
     }
   ],
   "utilities": [
