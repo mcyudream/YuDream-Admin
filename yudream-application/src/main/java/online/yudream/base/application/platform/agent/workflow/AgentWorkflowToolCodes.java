@@ -50,6 +50,7 @@ public final class AgentWorkflowToolCodes {
                 if (LEGACY_UNDERSTAND.equals(kind)) {
                     changed |= clearUnderstandToolConfig((ObjectNode) data);
                 } else if (TOOL_MODEL_KINDS.contains(kind)) {
+                    changed |= migrateLegacyActiveMode((ObjectNode) data);
                     declaresTools |= declaresNodeToolConfig(data);
                     if (isToolModeNone(data)) {
                         changed |= clearToolCodes((ObjectNode) data);
@@ -116,6 +117,15 @@ public final class AgentWorkflowToolCodes {
 
     private static boolean isToolModeNone(JsonNode data) {
         return "NONE".equals(data.path("toolMode").asText("").trim().toUpperCase(Locale.ROOT));
+    }
+
+    private static boolean migrateLegacyActiveMode(ObjectNode data) {
+        if (!"ACTIVE".equals(data.path("toolMode").asText("").trim().toUpperCase(Locale.ROOT))) {
+            return false;
+        }
+        data.put("toolMode", "AUTO");
+        data.put("toolConfigDeclared", true);
+        return true;
     }
 
     private static boolean declaresNodeToolConfig(JsonNode data) {
