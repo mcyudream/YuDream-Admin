@@ -11,4 +11,9 @@ public class OpenAiProviderAdapter extends AbstractOpenAiCompatibleProviderAdapt
     public AiProviderType type() {
         return AiProviderType.OPENAI;
     }
+
+    @Override
+    protected boolean supportsRequiredToolChoice(AiProviderEndpoint provider, AiModelEndpoint model) {
+        return true;
+    }
 }

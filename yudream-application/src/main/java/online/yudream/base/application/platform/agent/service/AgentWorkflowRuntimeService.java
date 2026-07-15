@@ -201,6 +201,7 @@ public class AgentWorkflowRuntimeService {
             return isPythonTool(node.data().path("toolCode").asText(), systemToolCodes);
         }
         if (!List.of("llm", "extract", "classify", "vision").contains(node.kind())
+                || !modelToolCallingEnabled(node)
                 || !node.data().path("toolCodes").isArray()) {
             return false;
         }
@@ -210,6 +211,11 @@ public class AgentWorkflowRuntimeService {
             }
         }
         return false;
+    }
+
+    private boolean modelToolCallingEnabled(AgentWorkflowNode node) {
+        String mode = node.data().path("toolMode").asText("").trim();
+        return !"NONE".equalsIgnoreCase(mode);
     }
 
     private boolean isPythonTool(String toolCode, Set<String> systemToolCodes) {

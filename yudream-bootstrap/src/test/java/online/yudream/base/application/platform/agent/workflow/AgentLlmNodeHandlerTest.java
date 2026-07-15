@@ -191,6 +191,33 @@ class AgentLlmNodeHandlerTest {
         assertThat(events).containsExactly(toolResult);
     }
 
+    @Test
+    void handlerMustMatchEqualFinalToolResultAsTheAlreadyStreamedCallback() {
+        AiAgentToolResult callbackResult = new AiAgentToolResult("web.fetch", "fetch", "", "done", Map.of("url", "a"));
+        AiAgentToolResult finalResult = new AiAgentToolResult("web.fetch", "fetch", "", "done", Map.of("url", "a"));
+        List<AiAgentToolResult> events = new ArrayList<>();
+        AiGenerationGateway gateway = new AiGenerationGateway() {
+            @Override public AiGenerationResult generate(AiGenerationRequest request) {
+                return new AiGenerationResult(null, "answer", null, null, null, null, null, List.of(), List.of(finalResult));
+            }
+            @Override public AiGenerationResult generateStream(AiGenerationRequest request,
+                    java.util.function.Consumer<String> onDelta,
+                    java.util.function.Consumer<AiAgentToolResult> onTool,
+                    java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress> onProgress) {
+                onTool.accept(callbackResult);
+                return generate(request);
+            }
+        };
+        AgentWorkflowRunState state = state(gateway, List.of(), events::add);
+
+        execute("llm", """
+                {"id":"llm","data":{"kind":"llm","providerCode":"p","modelCode":"m"}}
+                """, state, gateway);
+
+        assertThat(state.toolResults()).containsExactly(callbackResult);
+        assertThat(events).containsExactly(callbackResult);
+    }
+
     private Object execute(String kind, String nodeJson, AgentWorkflowRunState state, AiGenerationGateway gateway) {
         ObjectMapper mapper = new ObjectMapper();
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(mapper);

@@ -19,11 +19,13 @@ import online.yudream.base.domain.platform.document.service.DocumentTextExtracto
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,6 +117,23 @@ class AgentWorkflowRuntimeServiceTest {
         service.execute(application, command, Map.of(), null, null, null);
 
         verify(capability).ensureEnabled("integration", "集成与 Python 运行时");
+    }
+
+    @Test
+    void shouldNotEnablePythonIntegrationWhenModelToolModeIsNone() {
+        AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
+                new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), mock(ObjectProvider.class), mock(ObjectProvider.class),
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true,
+                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+        );
+        var data = new ObjectMapper().createObjectNode()
+                .put("toolMode", "NONE")
+                .putArray("toolCodes").add("risk_score");
+        AgentWorkflowNode node = new AgentWorkflowNode("model", "llm", "Model", data);
+
+        Boolean required = (Boolean) ReflectionTestUtils.invokeMethod(service, "requiresPythonRuntime", node, Set.of());
+
+        assertThat(required).isFalse();
     }
 
     @Test
