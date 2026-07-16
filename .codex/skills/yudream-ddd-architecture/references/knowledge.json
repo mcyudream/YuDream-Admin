@@ -183,6 +183,10 @@
     {
       "key": "cms-editor-public-render-parity",
       "text": "CMS GrapesJS editor and public site must share the same Header/Footer chrome CSS contract, typography baseline, and fixed device widths. Public base styles must not outrank persisted dynamic CMS CSS; authenticated account controls must inherit chrome styling unless explicitly overridden."
+    },
+    {
+      "key": "plugin-agent-editable-local-overlay",
+      "text": "Plugin-provided Agent workflows remain immutable runtime definitions. Importing one creates a local draft marked sourcePluginCode; a published local overlay takes precedence only while the source plugin is loaded, and it must be hidden and non-runnable after plugin disable or unload without seeding or mutating plugin-owned database records."
     }
   ],
   "utilities": [

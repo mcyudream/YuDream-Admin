@@ -24,11 +24,13 @@ class PluginAgentApplicationRegistryTest {
         AutoCloseable registration = registry.register("sample-plugin", application);
 
         assertThat(registry.findByCode("plugin-agent")).containsSame(application);
+        assertThat(registry.ownerCode("plugin-agent")).contains("sample-plugin");
         assertThat(registry.applications()).containsExactly(application);
 
         registration.close();
 
         assertThat(registry.findByCode("plugin-agent")).isEmpty();
+        assertThat(registry.ownerCode("plugin-agent")).isEmpty();
         assertThat(registry.applications()).isEmpty();
     }
 }

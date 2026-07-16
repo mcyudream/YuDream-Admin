@@ -145,6 +145,24 @@ async function loadApplication() {
   }
 }
 
+async function importRuntimeApplication() {
+  if (!runtimeCode.value || saving.value) {
+    return
+  }
+  saving.value = true
+  try {
+    const imported = (await apiAgent.importRuntime(runtimeCode.value)).data
+    toast.success('插件编排已导入为本地草稿')
+    await router.replace({ path: '/platform/agent/editor', query: { id: imported.id } })
+  }
+  catch {
+    toast.error('导入插件编排失败')
+  }
+  finally {
+    saving.value = false
+  }
+}
+
 function templateOf(kind: AgentNodeKind): AgentNodeTemplate {
   // Unknown legacy data should degrade to a model node, never to an input node.
   return findAgentNodeTemplate(kind) || findAgentNodeTemplate('llm')!
@@ -686,6 +704,9 @@ function validateCurrentWorkflow() {
         </FaButton>
         <FaButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
           <FaIcon name="i-ri:download-2-line" /> 导出
+        </FaButton>
+        <FaButton v-if="runtimeReadonly" :loading="saving" @click="importRuntimeApplication">
+          <FaIcon name="i-ri:download-cloud-2-line" /> 导入并编辑
         </FaButton>
         <FaButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
           <FaIcon name="i-ri:bug-line" /> 调试

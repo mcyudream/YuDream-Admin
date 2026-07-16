@@ -58,6 +58,9 @@ public class AgentController {
     @GetMapping("/runtime/{code}")
     @PermissionRegister(code = "platform:agent:view", name = "查看插件 Agent 编排", module = "平台能力", desc = "查看当前插件提供的运行时 Agent 编排")
     public Result<AgentApplicationRes> runtime(@PathVariable String code) { return Result.ok(AgentWebAssembler.toRes(agentAppService.runtimeApplication(code))); }
+    @PostMapping("/runtime/{code}/import")
+    @PermissionRegister(code = "platform:agent:edit", name = "导入插件 Agent 编排", module = "平台能力", desc = "将插件运行时 Agent 导入为可编辑的本地覆盖")
+    public Result<AgentApplicationRes> importRuntime(@PathVariable String code) { return Result.ok(AgentWebAssembler.toRes(agentAppService.importRuntimeApplication(code))); }
     @GetMapping("/{id}")
     @PermissionRegister(code = "platform:agent:view", name = "查看 Agent 应用详情", module = "平台能力", desc = "查看 Agent 编排详情")
     public Result<AgentApplicationRes> detail(@PathVariable Long id) { return Result.ok(AgentWebAssembler.toRes(agentAppService.detail(id))); }

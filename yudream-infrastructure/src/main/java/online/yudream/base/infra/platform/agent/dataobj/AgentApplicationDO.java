@@ -22,4 +22,5 @@ public class AgentApplicationDO extends BaseDO {
     private String workflowJson;
     private List<String> toolCodes;
     private AgentApplicationStatus status;
+    private String sourcePluginCode;
 }

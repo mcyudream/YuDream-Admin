@@ -46,9 +46,11 @@ async function load() {
       apiAgent.page({ ...pagination, keyword: search.keyword || undefined, status: search.status || undefined }),
       apiAgent.available(),
     ])
-    const persisted = res.data.records.filter(row => row.code !== 'builtin-group-chatbot')
+    const persisted = res.data.records.filter(row => row.code !== 'builtin-group-chatbot' || Boolean(row.sourcePluginCode))
+    const persistedCodes = new Set(persisted.map(row => row.code))
     const runtime = pagination.page === 1
       ? available.data.filter(row => row.id.startsWith('-'))
+          .filter(row => !persistedCodes.has(row.code))
           .filter(row => !search.status || row.status === search.status)
           .filter(row => !search.keyword || `${row.name} ${row.code} ${row.description || ''}`.toLowerCase().includes(search.keyword.toLowerCase()))
       : []
@@ -63,11 +65,19 @@ async function load() {
 function create() {
   router.push('/platform/agent/editor')
 }
-function edit(row: AgentApplication) {
-  router.push({
-    path: '/platform/agent/editor',
-    query: row.id.startsWith('-') ? { runtimeCode: row.code } : { id: row.id },
-  })
+async function edit(row: AgentApplication) {
+  if (!row.id.startsWith('-')) {
+    await router.push({ path: '/platform/agent/editor', query: { id: row.id } })
+    return
+  }
+  actionLoading.value = `import-${row.id}`
+  try {
+    const imported = (await apiAgent.importRuntime(row.code)).data
+    await router.push({ path: '/platform/agent/editor', query: { id: imported.id } })
+  }
+  finally {
+    actionLoading.value = ''
+  }
 }
 async function publish(row: AgentApplication) {
   actionLoading.value = `publish-${row.id}`
@@ -223,8 +233,8 @@ function statusVariant(status: AgentApplicationStatus) {
           <div class="agent-actions">
             <FaButton v-if="!row.id.startsWith('-')" size="sm" variant="outline" :disabled="row.status !== 'PUBLISHED'" @click="openRunner(row)">
               运行
-            </FaButton><FaButton v-auth="'platform:agent:edit'" size="sm" variant="ghost" @click="edit(row)">
-              {{ row.id.startsWith('-') ? '查看编排' : '编排' }}
+            </FaButton><FaButton v-auth="'platform:agent:edit'" size="sm" variant="ghost" title="导入并编辑" :loading="actionLoading === `import-${row.id}`" @click="edit(row)">
+              {{ row.id.startsWith('-') ? '导入并编辑' : '编排' }}
             </FaButton><FaButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
               发布
             </FaButton><FaButton v-if="!row.id.startsWith('-')" v-auth="'platform:agent:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">

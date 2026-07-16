@@ -25,7 +25,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 class AgentApplicationConsumerTest {
@@ -99,6 +98,59 @@ class AgentApplicationConsumerTest {
         assertThat(service.runByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT, new AgentRunCmd()).getContent())
                 .isEqualTo("plugin reply");
         verify(workflowRuntime).execute(eq(runtime), any(), any(), any(), any(), any());
-        verify(applicationRepo, never()).findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT);
+    }
+
+    @Test
+    void importsPluginRuntimeAsEditableLocalDraft() {
+        AgentApplicationRepo applicationRepo = mock(AgentApplicationRepo.class);
+        AgentRuntimeApplicationRegistry runtimeApplications = mock(AgentRuntimeApplicationRegistry.class);
+        AgentApplication runtime = AgentApplication.builder()
+                .id(-1L).code("plugin-agent").name("插件 Agent").description("默认编排")
+                .workflowJson("{}").toolCodes(List.of("web.fetch")).status(AgentApplicationStatus.PUBLISHED).build();
+        when(runtimeApplications.findByCode("plugin-agent")).thenReturn(java.util.Optional.of(runtime));
+        when(runtimeApplications.ownerCode("plugin-agent")).thenReturn(java.util.Optional.of("sample-plugin"));
+        when(applicationRepo.findByCode("plugin-agent")).thenReturn(java.util.Optional.empty());
+        when(applicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        @SuppressWarnings("unchecked") ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        when(tools.stream()).thenReturn(Stream.empty());
+        AgentAppService service = new AgentAppService(
+                mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
+                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentWorkflowRuntimeService.class), mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
+        );
+
+        var imported = service.importRuntimeApplication("plugin-agent");
+
+        assertThat(imported.getCode()).isEqualTo("plugin-agent");
+        assertThat(imported.getSourcePluginCode()).isEqualTo("sample-plugin");
+        assertThat(imported.getStatus()).isEqualTo(AgentApplicationStatus.DRAFT);
+        verify(applicationRepo).save(any(AgentApplication.class));
+    }
+
+    @Test
+    void publishedPluginOverrideTakesPrecedenceOverRuntimeDefault() {
+        AgentApplicationRepo applicationRepo = mock(AgentApplicationRepo.class);
+        AgentWorkflowRuntimeService workflowRuntime = mock(AgentWorkflowRuntimeService.class);
+        AgentRuntimeApplicationRegistry runtimeApplications = mock(AgentRuntimeApplicationRegistry.class);
+        AgentApplication runtime = AgentApplication.builder()
+                .id(-1L).code("plugin-agent").name("插件 Agent").workflowJson("{}").toolCodes(List.of())
+                .status(AgentApplicationStatus.PUBLISHED).build();
+        AgentApplication override = AgentApplication.pluginOverride("sample-plugin", runtime);
+        override.setId(9L);
+        override.publish();
+        when(runtimeApplications.findByCode("plugin-agent")).thenReturn(java.util.Optional.of(runtime));
+        when(applicationRepo.findByCode("plugin-agent")).thenReturn(java.util.Optional.of(override));
+        when(workflowRuntime.execute(any(), any(), any(), any(), any(), any()))
+                .thenReturn(new AgentWorkflowRuntimeResult("local reply", List.of()));
+        @SuppressWarnings("unchecked") ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        when(tools.stream()).thenReturn(Stream.empty());
+        AgentAppService service = new AgentAppService(
+                mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
+                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                workflowRuntime, mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
+        );
+
+        assertThat(service.runByCode("plugin-agent", new AgentRunCmd()).getContent()).isEqualTo("local reply");
+        verify(workflowRuntime).execute(eq(override), any(), any(), any(), any(), any());
     }
 }
