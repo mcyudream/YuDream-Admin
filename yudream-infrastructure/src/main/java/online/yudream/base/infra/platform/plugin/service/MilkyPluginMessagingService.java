@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -167,8 +168,8 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         if (value instanceof Map<?, ?> raw) {
             Map<String, Object> copied = new LinkedHashMap<>();
             raw.forEach((key, item) -> copied.put(String.valueOf(key), item));
-            return Map.copyOf(copied);
+            return Collections.unmodifiableMap(copied);
         }
-        return Map.of("data", value);
+        return value == null ? Map.of() : Map.of("data", value);
     }
 }

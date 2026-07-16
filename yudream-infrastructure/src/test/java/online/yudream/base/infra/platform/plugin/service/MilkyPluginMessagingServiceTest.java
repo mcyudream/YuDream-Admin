@@ -54,4 +54,24 @@ class MilkyPluginMessagingServiceTest {
         assertEquals("record", record.get("type"));
         assertEquals("https://audio.example.test/post.mp3", ((Map<?, ?>) record.get("data")).get("uri"));
     }
+
+    @Test
+    void acceptsSuccessfulMilkyResponsesWithoutData() {
+        MilkyConnection connection = MilkyConnection.create("Milky", "http://127.0.0.1:3000", "token", "base64", null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "findById" -> Optional.of(connection);
+                    case "findEnabled" -> List.of(connection);
+                    default -> null;
+                });
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> null);
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        service.sendToChannel("1", "1064685901", new PluginMessageContent(PluginMessageContent.Type.COMPOSITE,
+                "{\"messages\":[]}", List.of(), Map.of())).toCompletableFuture().join();
+    }
 }
