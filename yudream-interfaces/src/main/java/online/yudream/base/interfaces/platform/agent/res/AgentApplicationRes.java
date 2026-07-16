@@ -19,6 +19,7 @@ public class AgentApplicationRes {
     private String workflowJson;
     private List<String> toolCodes;
     private AgentApplicationStatus status;
+    private String sourcePluginCode;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

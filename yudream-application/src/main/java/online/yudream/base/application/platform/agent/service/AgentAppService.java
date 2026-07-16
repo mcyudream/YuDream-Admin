@@ -70,7 +70,7 @@ public class AgentAppService {
                 query.getKeyword(), query.getStatus(), query.getPage(), query.getSize()
         );
         return new PageResult<>(
-                result.getRecords().stream().map(AgentAssembler::toDTO).toList(),
+                result.getRecords().stream().filter(this::visibleInAgentPage).map(AgentAssembler::toDTO).toList(),
                 result.getTotal(),
                 result.getPage(),
                 result.getSize()
@@ -88,9 +88,20 @@ public class AgentAppService {
         ensureEnabled();
         Map<String, AgentApplication> available = new java.util.LinkedHashMap<>();
         applicationRepo.page(null, AgentApplicationStatus.PUBLISHED, 1, 200).getRecords().stream()
-                .filter(application -> !BuiltinAgentCodes.isPluginManaged(application.getCode()))
+                .filter(this::visibleInAgentPage)
+                .filter(application -> !BuiltinAgentCodes.isPluginManaged(application.getCode()) || application.isPluginOverride())
                 .forEach(application -> available.put(application.getCode(), application));
-        runtimeApplications.applications().forEach(application -> available.put(application.getCode(), application));
+        runtimeApplications.applications().forEach(runtime -> {
+            java.util.Optional<AgentApplication> override = applicationRepo.findByCode(runtime.getCode())
+                    .filter(AgentApplication::isPluginOverride);
+            if (override.map(application -> application.getStatus() == AgentApplicationStatus.DISABLED).orElse(false)) {
+                available.remove(runtime.getCode());
+                return;
+            }
+            available.put(runtime.getCode(), override
+                    .filter(application -> application.getStatus() == AgentApplicationStatus.PUBLISHED)
+                    .orElse(runtime));
+        });
         return available.values().stream().map(AgentAssembler::toDTO).toList();
     }
 
@@ -102,12 +113,31 @@ public class AgentAppService {
                 .orElseThrow(() -> new BizException("插件 Agent 当前不可用：" + code));
     }
 
+    /** Imports a plugin runtime definition into a local editable overlay. */
+    @Transactional
+    public AgentApplicationDTO importRuntimeApplication(String code) {
+        ensureEnabled();
+        String normalizedCode = normalizeCode(code);
+        AgentApplication runtime = runtimeApplications.findByCode(normalizedCode)
+                .orElseThrow(() -> new BizException("插件 Agent 当前不可用：" + code));
+        String pluginCode = runtimeApplications.ownerCode(normalizedCode)
+                .orElseThrow(() -> new BizException("无法识别插件 Agent 的归属插件：" + code));
+        AgentApplication application = applicationRepo.findByCode(normalizedCode)
+                .map(existing -> existingPluginOverride(existing, pluginCode))
+                .orElseGet(() -> applicationRepo.save(AgentApplication.pluginOverride(pluginCode, runtime)));
+        return AgentAssembler.toDTO(application);
+    }
+
     @Transactional
     public AgentApplicationDTO save(AgentApplicationSaveCmd cmd) {
         ensureEnabled();
         boolean creating = cmd.getId() == null;
         AgentApplication application = creating ? create(cmd) : application(cmd.getId());
-        applicationRepo.findByCode(cmd.getCode().trim().toLowerCase()).ifPresent(existing -> {
+        String normalizedCode = normalizeCode(cmd.getCode());
+        if (application.isPluginOverride() && !application.getCode().equals(normalizedCode)) {
+            throw new BizException("插件导入的 Agent 不支持修改应用编码");
+        }
+        applicationRepo.findByCode(normalizedCode).ifPresent(existing -> {
             if (!Objects.equals(existing.getId(), application.getId())) {
                 throw new BizException("Agent 应用编码已存在");
             }
@@ -335,18 +365,52 @@ public class AgentAppService {
     private AgentApplication publishedApplication(String code) {
         String normalizedCode = code == null ? "" : code.trim().toLowerCase();
         java.util.Optional<AgentApplication> runtime = runtimeApplications.findByCode(normalizedCode);
+        java.util.Optional<AgentApplication> local = applicationRepo.findByCode(normalizedCode);
         if (runtime.isPresent()) {
+            if (local.filter(AgentApplication::isPluginOverride).isPresent()) {
+                AgentApplication override = local.get();
+                if (override.getStatus() == AgentApplicationStatus.PUBLISHED) {
+                    return override;
+                }
+                if (override.getStatus() == AgentApplicationStatus.DISABLED) {
+                    throw new BizException("插件 Agent 的本地覆盖版本已停用：" + override.getName());
+                }
+            }
             return runtime.get();
+        }
+        if (local.filter(AgentApplication::isPluginOverride).isPresent()) {
+            throw new BizException("所属插件未加载，本地 Agent 覆盖不可用：" + code);
         }
         if (BuiltinAgentCodes.isPluginManaged(normalizedCode)) {
             throw new BizException("插件 Agent 当前不可用：" + code);
         }
-        AgentApplication application = applicationRepo.findByCode(normalizedCode)
+        AgentApplication application = local
                 .orElseThrow(() -> new BizException("Agent 应用不存在：" + code));
         if (application.getStatus() != AgentApplicationStatus.PUBLISHED) {
             throw new BizException("Agent 应用未发布：" + application.getName());
         }
         return application;
+    }
+
+    private AgentApplication existingPluginOverride(AgentApplication existing, String pluginCode) {
+        if (!existing.isPluginOverride()) {
+            throw new BizException("Agent 编码已被本地应用占用，无法导入插件编排：" + existing.getCode());
+        }
+        if (!pluginCode.equals(existing.getSourcePluginCode())) {
+            throw new BizException("Agent 编码已被其他插件的本地覆盖占用：" + existing.getCode());
+        }
+        return existing;
+    }
+
+    private boolean visibleInAgentPage(AgentApplication application) {
+        return !application.isPluginOverride() || runtimeApplications.findByCode(application.getCode()).isPresent();
+    }
+
+    private String normalizeCode(String code) {
+        if (code == null || code.isBlank()) {
+            throw new BizException("Agent 应用编码不能为空");
+        }
+        return code.trim().toLowerCase();
     }
 
     private AgentApplication debuggableApplication(Long id) {

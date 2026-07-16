@@ -13,7 +13,7 @@ public final class AgentInfraMapper {
         AgentApplicationDO data = new AgentApplicationDO();
         data.setId(value.getId()); data.setVersion(value.getVersion()); data.setCreateTime(value.getCreateTime()); data.setUpdateTime(value.getUpdateTime());
         data.setName(value.getName()); data.setCode(value.getCode()); data.setDescription(value.getDescription()); data.setIcon(value.getIcon());
-        data.setSystemPrompt(value.getSystemPrompt()); data.setWorkflowJson(value.getWorkflowJson()); data.setToolCodes(value.getToolCodes()); data.setStatus(value.getStatus());
+        data.setSystemPrompt(value.getSystemPrompt()); data.setWorkflowJson(value.getWorkflowJson()); data.setToolCodes(value.getToolCodes()); data.setStatus(value.getStatus()); data.setSourcePluginCode(value.getSourcePluginCode());
         return data;
     }
 
@@ -21,7 +21,7 @@ public final class AgentInfraMapper {
         if (value == null) return null;
         return AgentApplication.builder().id(value.getId()).version(value.getVersion()).createTime(value.getCreateTime()).updateTime(value.getUpdateTime())
                 .name(value.getName()).code(value.getCode()).description(value.getDescription()).icon(value.getIcon()).systemPrompt(value.getSystemPrompt())
-                .workflowJson(value.getWorkflowJson()).toolCodes(value.getToolCodes()).status(value.getStatus()).build();
+                .workflowJson(value.getWorkflowJson()).toolCodes(value.getToolCodes()).status(value.getStatus()).sourcePluginCode(value.getSourcePluginCode()).build();
     }
 
     public static AgentToolDO toDataObj(AgentTool value) {

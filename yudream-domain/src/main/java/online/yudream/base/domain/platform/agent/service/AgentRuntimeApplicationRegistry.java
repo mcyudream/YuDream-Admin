@@ -10,5 +10,10 @@ public interface AgentRuntimeApplicationRegistry {
 
     Optional<AgentApplication> findByCode(String code);
 
+    /** Identifies the plugin that owns a runtime definition without exposing plugin internals. */
+    default Optional<String> ownerCode(String code) {
+        return Optional.empty();
+    }
+
     List<AgentApplication> applications();
 }

@@ -39,6 +39,15 @@ public class PluginAgentApplicationRegistry implements AgentRuntimeApplicationRe
     }
 
     @Override
+    public Optional<String> ownerCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(applications.get(code.trim().toLowerCase()))
+                .map(Registration::ownerCode);
+    }
+
+    @Override
     public List<AgentApplication> applications() {
         return applications.values().stream()
                 .map(Registration::application)

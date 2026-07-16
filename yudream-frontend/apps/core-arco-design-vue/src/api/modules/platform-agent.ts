@@ -14,6 +14,7 @@ export interface AgentApplication {
   workflowJson: string
   toolCodes: string[]
   status: AgentApplicationStatus
+  sourcePluginCode?: string
   createTime?: string
   updateTime?: string
 }
@@ -109,6 +110,7 @@ export interface AgentDebugStreamEvent {
 export default {
   available: () => systemClient.get<unknown, ApiResponse<AgentApplication[]>>('api/platform/agents/available'),
   runtimeDetail: (code: string) => systemClient.get<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}`),
+  importRuntime: (code: string) => systemClient.post<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/runtime/${encodeURIComponent(code)}/import`),
   page: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentApplication>>>('api/platform/agents', { params }),
   detail: (id: string) => systemClient.get<unknown, ApiResponse<AgentApplication>>(`api/platform/agents/${id}`),
   create: (data: AgentApplicationPayload) => systemClient.post<unknown, ApiResponse<AgentApplication>>('api/platform/agents', data),

@@ -26,6 +26,7 @@ public class AgentApplication extends BaseDomain {
     private String workflowJson;
     private List<String> toolCodes;
     private AgentApplicationStatus status;
+    private String sourcePluginCode;
 
     public static AgentApplication create(String name, String code) {
         AgentApplication application = new AgentApplication();
@@ -34,6 +35,24 @@ public class AgentApplication extends BaseDomain {
         application.status = AgentApplicationStatus.DRAFT;
         application.toolCodes = List.of();
         return application;
+    }
+
+    /** Creates an editable local overlay while keeping the plugin manifest immutable. */
+    public static AgentApplication pluginOverride(String pluginCode, AgentApplication source) {
+        if (source == null) {
+            throw new BizException("插件 Agent 定义不能为空");
+        }
+        AgentApplication application = create(source.getName(), source.getCode());
+        application.sourcePluginCode = required(pluginCode, "插件编码不能为空");
+        application.update(
+                source.getName(), source.getCode(), source.getDescription(), source.getIcon(), source.getSystemPrompt(),
+                source.getWorkflowJson(), source.getToolCodes(), AgentApplicationStatus.DRAFT
+        );
+        return application;
+    }
+
+    public boolean isPluginOverride() {
+        return sourcePluginCode != null && !sourcePluginCode.isBlank();
     }
 
     public void update(String name, String code, String description, String icon, String systemPrompt,
