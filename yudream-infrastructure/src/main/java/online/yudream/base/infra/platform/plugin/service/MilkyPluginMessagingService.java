@@ -1,5 +1,7 @@
 package online.yudream.base.infra.platform.plugin.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
@@ -28,6 +30,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
     private final MilkyConnectionRepo connectionRepo;
     private final MilkyApiGateway apiGateway;
     private final PluginUserService pluginUserService;
+    private final ObjectMapper objectMapper;
 
     @Override
     public List<PluginMessagingConnection> connections() {
@@ -112,12 +115,28 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         String idKey = "group".equals(scene) ? "group_id" : "user_id";
         Map<String, Object> segment = switch (content.type()) {
             case IMAGE -> Map.of("type", "image", "data", Map.of("uri", content.content()));
+            case VIDEO -> Map.of("type", "video", "data", Map.of("uri", content.content()));
             case FILE -> Map.of("type", "file", "data", Map.of("uri", content.content()));
+            case COMPOSITE -> Map.of("type", "forward", "data", compositeData(content.content()));
             default -> Map.of("type", "text", "data", Map.of("text", content.content()));
         };
         List<Map<String, Object>> message = List.of(segment);
         Map<String, Object> result = map(apiGateway.invoke(context(connection), api, Map.of(idKey, peer, "message", message)));
         return new PluginMessageResult(List.of(String.valueOf(result.getOrDefault("message_seq", ""))), false, false);
+    }
+
+    private Map<String, Object> compositeData(String content) {
+        try {
+            Map<String, Object> data = objectMapper.readValue(content, new TypeReference<>() { });
+            if (!data.containsKey("messages")) {
+                throw new BizException("Composite plugin message must contain forward messages");
+            }
+            return data;
+        } catch (BizException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new BizException("Composite plugin message is not valid JSON");
+        }
     }
 
     private MilkyConnection connection(String id) {
