@@ -125,6 +125,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         String idKey = "group".equals(scene) ? "group_id" : "user_id";
         Map<String, Object> segment = switch (content.type()) {
             case IMAGE -> Map.of("type", "image", "data", Map.of("uri", content.content()));
+            case AUDIO -> Map.of("type", "record", "data", Map.of("uri", content.content()));
             case VIDEO -> Map.of("type", "video", "data", Map.of("uri", content.content()));
             case FILE -> Map.of("type", "file", "data", Map.of("uri", content.content()));
             case COMPOSITE -> Map.of("type", "forward", "data", compositeData(content.content()));
