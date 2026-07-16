@@ -89,7 +89,7 @@ public class ReactorMilkyApiGateway implements MilkyApiGateway {
         if (value instanceof List<?> values) {
             return values.stream().map(item -> normalizeIdentifiers(item, null)).toList();
         }
-        if (NUMERIC_ID_FIELDS.contains(fieldName) && value instanceof String text && text.matches("\\d+")) {
+        if (fieldName != null && NUMERIC_ID_FIELDS.contains(fieldName) && value instanceof String text && text.matches("\\d+")) {
             try {
                 return Long.parseLong(text);
             } catch (NumberFormatException ignored) {
