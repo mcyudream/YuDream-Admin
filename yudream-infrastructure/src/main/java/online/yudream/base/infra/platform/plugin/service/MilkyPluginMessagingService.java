@@ -35,8 +35,18 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
     @Override
     public List<PluginMessagingConnection> connections() {
         return connectionRepo.findEnabled().stream()
-                .map(connection -> new PluginMessagingConnection(String.valueOf(connection.getId()), connection.getName(), "qq", null))
+                .map(connection -> new PluginMessagingConnection(String.valueOf(connection.getId()), connection.getName(), "qq", botUin(connection)))
                 .toList();
+    }
+
+    private String botUin(MilkyConnection connection) {
+        try {
+            Map<String, Object> login = map(apiGateway.invoke(context(connection), "get_login_info", Map.of()));
+            Object uin = login.containsKey("uin") ? login.get("uin") : login.get("user_id");
+            return uin == null ? null : String.valueOf(uin);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     @Override
