@@ -48,7 +48,7 @@ public class MilkyPluginEventDispatcher {
     @EventListener
     public void dispatch(MilkyEventPublished published) {
         var event = published.event();
-        if ("group_request".equals(event.eventType())) {
+        if ("group_request".equals(event.eventType()) || "group_join_request".equals(event.eventType())) {
             dispatchGroupRequest(published);
             return;
         }
@@ -86,23 +86,29 @@ public class MilkyPluginEventDispatcher {
     private void dispatchGroupRequest(MilkyEventPublished published) {
         var event = published.event();
         Map<String, Object> data = event.data() == null ? Map.of() : event.data();
-        String groupId = firstText(data, "group_id", "group_uin", "peer_id");
-        String userId = firstText(data, "user_id", "applicant_id", "sender_id");
-        String requestId = firstText(data, "request_id", "flag", "id");
-        if (groupId == null || userId == null || requestId == null) {
+        GroupRequest request = groupRequest(data);
+        if (request == null) {
             log.warn("Ignoring incomplete Milky group request event, connectionId={}, data={}", published.connectionId(), data.keySet());
             return;
         }
         Map<String, Object> referrer = new java.util.LinkedHashMap<>();
-        referrer.put("requestId", requestId);
-        String comment = firstText(data, "comment", "message", "verify_message");
+        referrer.put("requestId", request.requestId());
+        String comment = request.comment();
         if (comment != null) {
             referrer.put("comment", comment);
         }
-        PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), "group_request", "milky", userId, groupId,
+        PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), "group_request", "milky", request.userId(), request.groupId(),
                 comment, null, null, referrer, event.eventType(), data, String.valueOf(published.connectionId()),
-                event.selfId(), requestId);
+                event.selfId(), request.requestId());
         runtime.publishMessagingEvent(pluginEvent);
+    }
+
+    static GroupRequest groupRequest(Map<String, Object> data) {
+        String groupId = firstText(data, "group_id", "group_uin", "peer_id");
+        String userId = firstText(data, "user_id", "applicant_id", "initiator_id", "sender_id");
+        String requestId = firstText(data, "request_id", "notification_seq", "flag", "id");
+        return groupId == null || userId == null || requestId == null ? null
+                : new GroupRequest(groupId, userId, requestId, firstText(data, "comment", "message", "verify_message"));
     }
 
     private void menu(PluginEvent event, User user) {
@@ -281,7 +287,7 @@ public class MilkyPluginEventDispatcher {
         return parts.length == 0 || parts[0].isBlank() ? null : new Parsed(parts[0], Arrays.stream(parts).skip(1).toList());
     }
 
-    private String text(Object value) {
+    private static String text(Object value) {
         if (value instanceof List<?> parts) {
             StringBuilder content = new StringBuilder();
             for (Object part : parts) {
@@ -295,7 +301,7 @@ public class MilkyPluginEventDispatcher {
         return value == null ? null : String.valueOf(value);
     }
 
-    private String firstText(Map<String, Object> values, String... keys) {
+    private static String firstText(Map<String, Object> values, String... keys) {
         for (String key : keys) {
             String value = text(values.get(key));
             if (value != null && !value.isBlank()) {
@@ -325,4 +331,6 @@ public class MilkyPluginEventDispatcher {
 
     private record Parsed(String name, List<String> arguments) {
     }
+
+    record GroupRequest(String groupId, String userId, String requestId, String comment) { }
 }
