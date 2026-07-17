@@ -123,7 +123,7 @@ public class AgentAppService {
         String pluginCode = runtimeApplications.ownerCode(normalizedCode)
                 .orElseThrow(() -> new BizException("无法识别插件 Agent 的归属插件：" + code));
         AgentApplication application = applicationRepo.findByCode(normalizedCode)
-                .map(existing -> existingPluginOverride(existing, pluginCode))
+                .map(existing -> existingPluginOverride(existing, pluginCode, runtime))
                 .orElseGet(() -> applicationRepo.save(AgentApplication.pluginOverride(pluginCode, runtime)));
         return AgentAssembler.toDTO(application);
     }
@@ -392,7 +392,11 @@ public class AgentAppService {
         return application;
     }
 
-    private AgentApplication existingPluginOverride(AgentApplication existing, String pluginCode) {
+    private AgentApplication existingPluginOverride(AgentApplication existing, String pluginCode, AgentApplication runtime) {
+        if (!existing.isPluginOverride() && BuiltinAgentCodes.isPluginManaged(existing.getCode())) {
+            existing.adoptPluginOverride(pluginCode, runtime);
+            return applicationRepo.save(existing);
+        }
         if (!existing.isPluginOverride()) {
             throw new BizException("Agent 编码已被本地应用占用，无法导入插件编排：" + existing.getCode());
         }
