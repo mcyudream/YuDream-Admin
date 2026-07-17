@@ -43,12 +43,20 @@ public class AgentApplication extends BaseDomain {
             throw new BizException("插件 Agent 定义不能为空");
         }
         AgentApplication application = create(source.getName(), source.getCode());
-        application.sourcePluginCode = required(pluginCode, "插件编码不能为空");
-        application.update(
+        application.adoptPluginOverride(pluginCode, source);
+        return application;
+    }
+
+    /** Reuses a legacy persisted plugin-managed Agent as a local editable overlay. */
+    public void adoptPluginOverride(String pluginCode, AgentApplication source) {
+        if (source == null) {
+            throw new BizException("插件 Agent 定义不能为空");
+        }
+        sourcePluginCode = required(pluginCode, "插件编码不能为空");
+        update(
                 source.getName(), source.getCode(), source.getDescription(), source.getIcon(), source.getSystemPrompt(),
                 source.getWorkflowJson(), source.getToolCodes(), AgentApplicationStatus.DRAFT
         );
-        return application;
     }
 
     public boolean isPluginOverride() {

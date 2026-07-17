@@ -128,6 +128,37 @@ class AgentApplicationConsumerTest {
     }
 
     @Test
+    void importsLegacyPluginManagedAgentAsEditableLocalDraft() {
+        AgentApplicationRepo applicationRepo = mock(AgentApplicationRepo.class);
+        AgentRuntimeApplicationRegistry runtimeApplications = mock(AgentRuntimeApplicationRegistry.class);
+        AgentApplication legacy = AgentApplication.builder()
+                .id(8L).code(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT).name("旧机器人")
+                .workflowJson("{\"legacy\":true}").toolCodes(List.of()).status(AgentApplicationStatus.PUBLISHED).build();
+        AgentApplication runtime = AgentApplication.builder()
+                .id(-1L).code(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT).name("插件机器人")
+                .workflowJson("{\"runtime\":true}").toolCodes(List.of("web.fetch")).status(AgentApplicationStatus.PUBLISHED).build();
+        when(runtimeApplications.findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT)).thenReturn(java.util.Optional.of(runtime));
+        when(runtimeApplications.ownerCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT)).thenReturn(java.util.Optional.of("milky"));
+        when(applicationRepo.findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT)).thenReturn(java.util.Optional.of(legacy));
+        when(applicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        @SuppressWarnings("unchecked") ObjectProvider<AiAgentTool> tools = mock(ObjectProvider.class);
+        when(tools.stream()).thenReturn(Stream.empty());
+        AgentAppService service = new AgentAppService(
+                mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
+                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentWorkflowRuntimeService.class), mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
+        );
+
+        var imported = service.importRuntimeApplication(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT);
+
+        assertThat(imported.getId()).isEqualTo(8L);
+        assertThat(imported.getSourcePluginCode()).isEqualTo("milky");
+        assertThat(imported.getWorkflowJson()).isEqualTo("{\"runtime\":true}");
+        assertThat(imported.getStatus()).isEqualTo(AgentApplicationStatus.DRAFT);
+        verify(applicationRepo).save(legacy);
+    }
+
+    @Test
     void publishedPluginOverrideTakesPrecedenceOverRuntimeDefault() {
         AgentApplicationRepo applicationRepo = mock(AgentApplicationRepo.class);
         AgentWorkflowRuntimeService workflowRuntime = mock(AgentWorkflowRuntimeService.class);
