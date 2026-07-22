@@ -16,6 +16,7 @@ import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
+import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashSet;
@@ -87,7 +88,8 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 state.aiConfig(),
                 state.command().getHistory(),
                 toolMode != AiToolMode.NONE && !tools.isEmpty(),
-                toolMode
+                toolMode,
+                structuredOutput(node)
         );
 
         int toolResultsBefore = state.toolResultCount();
@@ -210,6 +212,19 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             throw new BizException("信息提取节点输出格式必须是 JSON 对象");
         }
         throw new BizException("信息提取节点输出格式必须是 JSON 对象");
+    }
+
+    private AiStructuredOutput structuredOutput(AgentWorkflowNode node) {
+        if ("understand".equals(kind)) {
+            return AiStructuredOutput.jsonObject();
+        }
+        if (!"extract".equals(kind)) {
+            return AiStructuredOutput.none();
+        }
+        Map<String, Object> schema = outputSchema(node);
+        return schema.isEmpty()
+                ? AiStructuredOutput.jsonObject()
+                : AiStructuredOutput.jsonSchema("agent_extract_result", schema, false);
     }
 
     private String image(AgentWorkflowNode node, AgentWorkflowContext context) {

@@ -19,6 +19,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
+import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import org.junit.jupiter.api.Test;
 
@@ -44,6 +45,7 @@ class AgentLlmNodeHandlerTest {
 
         assertThat(result).isEqualTo("answer");
         assertThat(gateway.requests.getFirst().toolMode()).isEqualTo(AiToolMode.AUTO);
+        assertThat(gateway.requests.getFirst().structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.NONE);
         assertThat(gateway.scopedToolNames).containsExactly(List.of("web.fetch"));
     }
 
@@ -58,6 +60,10 @@ class AgentLlmNodeHandlerTest {
                 """, state, gateway);
 
         assertThat(output).isEqualTo(Map.of("title", "Agent"));
+        assertThat(gateway.requests.getFirst().structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.JSON_SCHEMA);
+        assertThat(gateway.requests.getFirst().structuredOutput().schema())
+                .containsEntry("type", "object")
+                .containsEntry("required", List.of("title"));
 
         CapturingGateway missing = new CapturingGateway("{\"other\":true}", List.of());
         assertThatThrownBy(() -> execute("extract", """
@@ -160,6 +166,18 @@ class AgentLlmNodeHandlerTest {
 
         assertThat(gateway.scopedToolNames).containsExactly(List.of("web.fetch"), List.of("cms.patch"), List.of());
         assertThat(understand).isEqualTo(Map.of("raw", "not json"));
+        assertThat(gateway.requests.get(2).structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.JSON_OBJECT);
+    }
+
+    @Test
+    void extractWithoutSchemaShouldRequestJsonObjectMode() {
+        CapturingGateway gateway = new CapturingGateway("{\"title\":\"Agent\"}", List.of());
+
+        execute("extract", """
+                {"id":"extract","data":{"kind":"extract","providerCode":"p","modelCode":"m"}}
+                """, state(gateway, List.of()), gateway);
+
+        assertThat(gateway.requests.getFirst().structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.JSON_OBJECT);
     }
 
     @Test

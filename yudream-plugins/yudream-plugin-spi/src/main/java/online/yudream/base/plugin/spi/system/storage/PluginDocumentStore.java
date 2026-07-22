@@ -16,5 +16,10 @@ public interface PluginDocumentStore {
 
     long count(String collection);
 
+    default boolean updateIfFieldAtMost(String collection, String id, String field, long maximum,
+                                        Map<String, Object> document) {
+        return false;
+    }
+
     void delete(String collection, String id);
 }

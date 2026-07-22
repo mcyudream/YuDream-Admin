@@ -47,4 +47,5 @@ public class PluginFrontendRouteDTO implements Serializable {
     private String parentPermission;
     private Boolean parentVisible;
     private MenuStatus parentStatus;
+    private Boolean publicAccess;
 }

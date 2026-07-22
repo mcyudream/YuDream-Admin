@@ -53,6 +53,12 @@ class MilkyPluginMessagingServiceTest {
         Map<?, ?> record = (Map<?, ?>) ((List<?>) payload.get().get("message")).getFirst();
         assertEquals("record", record.get("type"));
         assertEquals("https://audio.example.test/post.mp3", ((Map<?, ?>) record.get("data")).get("uri"));
+
+        service.sendToChannel("1", "1064685901", new PluginMessageContent(PluginMessageContent.Type.IMAGE,
+                "base64://aW1hZ2U=", List.of(), Map.of())).toCompletableFuture().join();
+        Map<?, ?> image = (Map<?, ?>) ((List<?>) payload.get().get("message")).getFirst();
+        assertEquals("image", image.get("type"));
+        assertEquals("base64://aW1hZ2U=", ((Map<?, ?>) image.get("data")).get("uri"));
     }
 
     @Test

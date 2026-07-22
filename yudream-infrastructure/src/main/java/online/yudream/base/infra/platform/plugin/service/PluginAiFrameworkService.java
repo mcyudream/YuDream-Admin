@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 
 @Service
 @RequiredArgsConstructor
@@ -45,34 +46,68 @@ public class PluginAiFrameworkService implements PluginAiService {
     @Override
     public CompletionStage<PluginAiChatResponse> runAgent(String agentCode, PluginAiChatRequest request) {
         return CompletableFuture.supplyAsync(() -> {
-            AgentRunCmd command = new AgentRunCmd();
-            command.setInput(request.userPrompt());
-            command.setRuntimeSystemPrompt(request.systemPrompt());
-            command.setProviderCode(request.providerCode());
-            command.setModelCode(request.modelCode());
-            command.setRuntimeToolCallingEnabled(request.toolCallingEnabled());
-            command.setHistory(request.history().stream()
-                    .map(item -> new AiChatMessage(item.role(), item.content()))
-                    .toList());
             var executionContext = withPermissions(request);
-            command.setPermissionCodes(executionContext == null ? List.of() : executionContext.permissions());
-            command.setPermissionContextExplicit(true);
             PluginAiToolExecutionScope.set(executionContext);
             try {
-                var result = agentAppService.runByCode(agentCode, command);
-                return new PluginAiChatResponse(
-                        result.getContent(),
-                        result.getToolResults().stream()
-                                .map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiToolResult(
-                                        item.action(), item.message(), item.payload()
-                                ))
-                                .toList()
-                );
+                return agentResponse(agentAppService.runByCode(
+                        agentCode, agentCommand(request, executionContext)
+                ));
             }
             finally {
                 PluginAiToolExecutionScope.clear();
             }
         });
+    }
+
+    @Override
+    public CompletionStage<PluginAiChatResponse> runAgentStream(
+            String agentCode,
+            PluginAiChatRequest request,
+            Consumer<String> onDelta
+    ) {
+        return CompletableFuture.supplyAsync(() -> {
+            var executionContext = withPermissions(request);
+            PluginAiToolExecutionScope.set(executionContext);
+            try {
+                return agentResponse(agentAppService.debugByCode(
+                        agentCode, agentCommand(request, executionContext), null, onDelta, null
+                ));
+            }
+            finally {
+                PluginAiToolExecutionScope.clear();
+            }
+        });
+    }
+
+    private AgentRunCmd agentCommand(
+            PluginAiChatRequest request,
+            online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext executionContext
+    ) {
+        AgentRunCmd command = new AgentRunCmd();
+        command.setInput(request.userPrompt());
+        command.setRuntimeSystemPrompt(request.systemPrompt());
+        command.setProviderCode(request.providerCode());
+        command.setModelCode(request.modelCode());
+        command.setRuntimeToolCallingEnabled(request.toolCallingEnabled());
+        command.setHistory(request.history().stream()
+                .map(item -> new AiChatMessage(item.role(), item.content()))
+                .toList());
+        command.setPermissionCodes(executionContext == null ? List.of() : executionContext.permissions());
+        command.setPermissionContextExplicit(true);
+        return command;
+    }
+
+    private PluginAiChatResponse agentResponse(
+            online.yudream.base.application.platform.agent.dto.AgentRunDTO result
+    ) {
+        return new PluginAiChatResponse(
+                result.getContent(),
+                result.getToolResults().stream()
+                        .map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiToolResult(
+                                item.action(), item.message(), item.payload()
+                        ))
+                        .toList()
+        );
     }
 
     @Override

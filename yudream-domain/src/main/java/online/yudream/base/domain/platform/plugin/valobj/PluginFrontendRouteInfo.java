@@ -17,20 +17,28 @@ public record PluginFrontendRouteInfo(
         Integer sort,
         boolean hideInMenu,
         PluginMenuOverrideInfo menuOverride,
-        PluginMenuOverrideInfo parentOverride
+        PluginMenuOverrideInfo parentOverride,
+        boolean publicAccess
 ) {
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort) {
         this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, false,
-                null, null);
+                null, null, false);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort, boolean hideInMenu) {
         this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, hideInMenu,
-                null, null);
+                null, null, false);
+    }
+
+    public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
+                                   String parentTitle, String parentIcon, Integer parentSort, String component,
+                                   String permission, Integer sort, boolean hideInMenu, boolean publicAccess) {
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, hideInMenu,
+                null, null, publicAccess);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
@@ -56,7 +64,8 @@ public record PluginFrontendRouteInfo(
                         .icon(parentIcon)
                         .path(parentPath)
                         .sort(parentSort)
-                        .build());
+                        .build(),
+                false);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
@@ -96,7 +105,8 @@ public record PluginFrontendRouteInfo(
                         .visible(parentVisible)
                         .permission(parentPermission)
                         .status(parentStatus)
-                        .build());
+                        .build(),
+                false);
     }
 
     public static PluginFrontendRouteInfo withMenuOverrides(PluginFrontendRouteInfo declaration,
@@ -108,7 +118,8 @@ public record PluginFrontendRouteInfo(
                 parentOverride == null ? null : parentOverride.name(),
                 parentOverride == null ? null : parentOverride.icon(),
                 parentOverride == null ? null : parentOverride.sort(),
-                override.component(), override.permission(), override.sort(), declaration.hideInMenu(), override, parentOverride
+                override.component(), override.permission(), override.sort(), declaration.hideInMenu(), override, parentOverride,
+                declaration.publicAccess()
         );
     }
 
@@ -117,7 +128,8 @@ public record PluginFrontendRouteInfo(
                 path, name, title, icon, parentPath, parentTitle, parentIcon, overriddenParentSort,
                 component, permission, overriddenSort, hideInMenu,
                 menuOverride == null ? null : menuOverride.withSort(overriddenSort),
-                parentOverride == null ? null : parentOverride.withSort(overriddenParentSort)
+                parentOverride == null ? null : parentOverride.withSort(overriddenParentSort),
+                publicAccess
         );
     }
 

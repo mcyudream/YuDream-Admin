@@ -16,6 +16,7 @@ declare global {
   const defineComponent: typeof import('vue').defineComponent
   const defineStore: typeof import('pinia').defineStore
   const effectScope: typeof import('vue').effectScope
+  const ensurePublicPluginRoutes: typeof import('../store/modules/app/plugin-route-runtime').ensurePublicPluginRoutes
   const filterBackendMenuTreeByAuth: typeof import('../store/modules/app/route-auth').filterBackendMenuTreeByAuth
   const findBestMenuGroupIndex: typeof import('../store/modules/app/menu-match').findBestMenuGroupIndex
   const flattenBackendRouteGroups: typeof import('../store/modules/app/route-auth').flattenBackendRouteGroups

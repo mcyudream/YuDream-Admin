@@ -108,6 +108,7 @@ public class PluginWebAssembler {
                 .parentPermission(dto.getParentPermission())
                 .parentVisible(dto.getParentVisible())
                 .parentStatus(dto.getParentStatus())
+                .publicAccess(dto.getPublicAccess())
                 .build();
     }
 

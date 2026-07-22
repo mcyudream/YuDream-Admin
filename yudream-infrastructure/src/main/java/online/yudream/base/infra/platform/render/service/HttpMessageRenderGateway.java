@@ -13,9 +13,11 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.LinkedHashMap;
@@ -32,31 +34,64 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
         if (request == null || !StringUtils.hasText(request.content())) {
             throw new BizException("渲染内容不能为空");
         }
-        JsonNode response;
+        HttpRenderResponse response;
         try {
             response = client().post()
                     .uri("/v1/render/" + request.sourceType().name().toLowerCase())
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(payload(request))
-                    .retrieve()
-                    .bodyToMono(JsonNode.class)
+                    .exchangeToMono(value -> value.bodyToMono(byte[].class)
+                            .defaultIfEmpty(new byte[0])
+                            .map(body -> new HttpRenderResponse(
+                                    value.statusCode().value(),
+                                    value.headers().contentType().map(MediaType::toString).orElse(""),
+                                    body
+                            )))
                     .block(timeout());
-        } catch (WebClientResponseException exception) {
-            throw new BizException("渲染服务请求失败（HTTP " + exception.getStatusCode().value() + "）：" + responseMessage(exception));
+        } catch (BizException exception) {
+            throw exception;
         } catch (RuntimeException exception) {
             throw new BizException("渲染服务不可用：" + exception.getMessage());
         }
-        if (response == null || !response.hasNonNull("data")) {
-            throw new BizException("渲染服务未返回图片数据");
+        return decodeResponse(response, objectMapper);
+    }
+
+    static RenderedImage decodeResponse(HttpRenderResponse response, ObjectMapper objectMapper) {
+        if (response == null) throw new BizException("渲染服务未返回响应");
+        if (response.status() < 200 || response.status() >= 300) {
+            throw new BizException("渲染服务请求失败（HTTP " + response.status() + "）："
+                    + responseMessage(response.body(), objectMapper));
+        }
+        if (response.contentType().toLowerCase().startsWith("image/")) {
+            if (response.body().length == 0) throw new BizException("渲染服务返回了空图片");
+            int[] dimensions = dimensions(response.body());
+            return new RenderedImage(response.contentType().split(";")[0], response.body(), dimensions[0], dimensions[1]);
         }
         try {
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode payload = root.path("data").isObject() ? root.path("data") : root;
+            String encoded = firstText(
+                    payload.path("data").asText(""),
+                    payload.path("base64").asText(""),
+                    payload.path("image").asText(""),
+                    root.path("data").isTextual() ? root.path("data").asText("") : ""
+            );
+            int comma = encoded.indexOf(',');
+            if (encoded.startsWith("data:image/") && comma > 0) encoded = encoded.substring(comma + 1);
+            if (!StringUtils.hasText(encoded)) {
+                throw new BizException("渲染服务返回成功状态但没有图片数据：" + responseMessage(response.body(), objectMapper));
+            }
             return new RenderedImage(
-                    response.path("contentType").asText(MediaType.IMAGE_PNG_VALUE),
-                    Base64.getDecoder().decode(response.path("data").asText()),
-                    response.path("width").asInt(),
-                    response.path("height").asInt());
+                    firstText(payload.path("contentType").asText(""), root.path("contentType").asText(""), MediaType.IMAGE_PNG_VALUE),
+                    Base64.getDecoder().decode(encoded),
+                    payload.path("width").asInt(root.path("width").asInt()),
+                    payload.path("height").asInt(root.path("height").asInt()));
+        } catch (BizException exception) {
+            throw exception;
         } catch (IllegalArgumentException ex) {
             throw new BizException("渲染服务返回的数据格式无效");
+        } catch (Exception ex) {
+            throw new BizException("渲染服务返回成功状态但响应无法解析：" + responseMessage(response.body(), objectMapper));
         }
     }
 
@@ -77,11 +112,21 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
         } catch (IllegalArgumentException ex) {
             throw new BizException("渲染服务地址无效");
         }
-        WebClient.Builder builder = WebClient.builder().baseUrl(base.toString());
+        WebClient.Builder builder = WebClient.builder()
+                .baseUrl(base.toString())
+                .codecs(codecs -> codecs.defaultCodecs().maxInMemorySize(maxResponseBytes()));
         if (StringUtils.hasText(properties.getToken())) {
             builder.defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + properties.getToken().trim());
         }
         return builder.build();
+    }
+
+    private int maxResponseBytes() {
+        long configured = properties.getMaxResponseSize() == null
+                ? 16L * 1024 * 1024
+                : properties.getMaxResponseSize().toBytes();
+        if (configured < 1024 * 1024) configured = 1024 * 1024;
+        return (int) Math.min(configured, 64L * 1024 * 1024);
     }
 
     private Map<String, Object> payload(RenderRequest request) {
@@ -110,13 +155,39 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
         return payload;
     }
 
-    private String responseMessage(WebClientResponseException exception) {
+    private static String responseMessage(byte[] responseBody, ObjectMapper objectMapper) {
+        String text = responseBody == null ? "" : new String(responseBody, StandardCharsets.UTF_8).trim();
         try {
-            JsonNode body = objectMapper.readTree(exception.getResponseBodyAsString());
-            return body.path("message").asText("渲染服务未提供错误详情");
+            JsonNode body = objectMapper.readTree(text);
+            return firstText(body.path("message").asText(""), body.path("error").asText(""),
+                    body.path("data").path("message").asText(""), limit(text));
         } catch (Exception ignored) {
-            String body = exception.getResponseBodyAsString();
-            return body == null || body.isBlank() ? "渲染服务未提供错误详情" : body.substring(0, Math.min(256, body.length()));
+            return text.isBlank() ? "渲染服务未提供错误详情" : limit(text);
+        }
+    }
+
+    private static String firstText(String... values) {
+        for (String value : values) if (StringUtils.hasText(value)) return value.trim();
+        return "";
+    }
+
+    private static String limit(String value) {
+        return value.length() <= 256 ? value : value.substring(0, 256);
+    }
+
+    private static int[] dimensions(byte[] image) {
+        try {
+            var value = ImageIO.read(new ByteArrayInputStream(image));
+            return value == null ? new int[]{0, 0} : new int[]{value.getWidth(), value.getHeight()};
+        } catch (Exception ignored) {
+            return new int[]{0, 0};
+        }
+    }
+
+    record HttpRenderResponse(int status, String contentType, byte[] body) {
+        HttpRenderResponse {
+            contentType = contentType == null ? "" : contentType;
+            body = body == null ? new byte[0] : body;
         }
     }
 

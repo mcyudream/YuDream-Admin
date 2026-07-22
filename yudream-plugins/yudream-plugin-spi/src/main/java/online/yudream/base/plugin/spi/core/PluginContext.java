@@ -14,6 +14,7 @@ import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
+import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 
 import java.util.Optional;
 import java.util.List;
@@ -30,6 +31,10 @@ public interface PluginContext {
 
     default PluginFileStore files() {
         return framework().files(pluginCode());
+    }
+
+    default PluginSecretStore secrets() {
+        return framework().secrets(pluginCode());
     }
 
     PluginMessageInteractionRegistry interactions();

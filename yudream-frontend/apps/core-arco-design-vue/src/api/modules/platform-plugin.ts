@@ -38,6 +38,7 @@ export interface PluginFrontendRoute {
   permission?: string
   sort?: number
   hideInMenu?: boolean
+  publicAccess?: boolean
   parentCode?: string
   visible?: boolean
   status?: 'ACTIVE' | 'DISABLED'

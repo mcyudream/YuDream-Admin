@@ -3,6 +3,7 @@ import { useNProgress } from '@vueuse/integrations/useNProgress'
 import { warnKeepAliveComponentNameMissing } from 'virtual:fantastic-admin/turbo-console'
 import apiSetup from '@/api/modules/setup'
 import { useAppFeatureStore } from '@/store/modules/app/features'
+import { ensurePublicPluginRoutes } from '@/store/modules/app/plugin-route-runtime'
 import { refreshDynamicRoutes } from './dynamic'
 import '@/assets/styles/nprogress.css'
 
@@ -90,6 +91,16 @@ function setupRoutes(router: Router) {
     else {
       if (to.name === 'setup' || to.name === 'verifyEmail') {
         return
+      }
+      // 未登录访问插件公开页面：注册 publicAccess 路由后重进当前导航
+      const publicPluginPaths = await ensurePublicPluginRoutes(router)
+      if (to.name === 'notFound' && publicPluginPaths.some(path => to.path === path || to.path.startsWith(`${path}/`))) {
+        return {
+          path: to.path,
+          query: to.query,
+          hash: to.hash,
+          replace: true,
+        }
       }
       const appFeatureStore = useAppFeatureStore()
       await appFeatureStore.load()

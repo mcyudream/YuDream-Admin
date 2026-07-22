@@ -52,7 +52,7 @@ public class MenuManageController {
     @PutMapping("/{code}")
     @PermissionRegister(code = "system:menu:edit", name = "编辑菜单", module = "系统管理", desc = "编辑菜单")
     public Result<MenuManageRes> updateLegacy(@PathVariable String code,
-                                               @Valid @RequestBody MenuUpdateRequest request) {
+                                                   @Valid @RequestBody MenuUpdateRequest request) {
         return update(code, request);
     }
 

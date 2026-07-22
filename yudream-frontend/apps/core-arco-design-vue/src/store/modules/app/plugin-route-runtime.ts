@@ -1,4 +1,6 @@
+import type { Router } from 'vue-router'
 import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
+import apiPlugin from '@/api/modules/platform-plugin'
 
 export interface PluginRuntimeRouteMeta {
   pluginCode: string
@@ -46,4 +48,50 @@ function runtimeModuleKey(pluginCode: string, moduleName: string) {
 
 function textValue(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+// 匿名可访问的插件公开路由（publicAccess），未登录时注册为顶级路由
+let publicPluginRoutesPromise: Promise<string[]> | null = null
+
+export function ensurePublicPluginRoutes(router: Router): Promise<string[]> {
+  publicPluginRoutesPromise ??= registerPublicPluginRoutes(router).catch(() => [])
+  return publicPluginRoutesPromise
+}
+
+async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
+  const res = await apiPlugin.frontendManifest()
+  const paths: string[] = []
+  for (const module of res.data.modules || []) {
+    if (!module.pluginCode || !module.moduleName) {
+      continue
+    }
+    for (const route of module.routes || []) {
+      if (!route.publicAccess || !route.path || !route.component) {
+        continue
+      }
+      const name = `plugin-public-${module.pluginCode}-${route.name || route.path}`
+      if (router.hasRoute(name)) {
+        paths.push(route.path)
+        continue
+      }
+      router.addRoute({
+        path: route.path,
+        name,
+        component: () => import('@/views/platform/plugin/runtime-page.vue'),
+        meta: {
+          public: true,
+          title: route.title,
+          plugin: {
+            pluginCode: module.pluginCode,
+            component: route.component,
+            entry: module.entry,
+            moduleName: module.moduleName,
+            sdkVersion: module.sdkVersion || res.data.sdkVersion,
+          },
+        },
+      })
+      paths.push(route.path)
+    }
+  }
+  return paths
 }

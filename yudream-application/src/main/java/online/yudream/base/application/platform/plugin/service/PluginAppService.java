@@ -190,10 +190,16 @@ public class PluginAppService {
 
     @Transactional(readOnly = true)
     public PluginFrontendManifestDTO frontendManifest() {
+        return frontendManifest(false);
+    }
+
+    @Transactional(readOnly = true)
+    public PluginFrontendManifestDTO frontendManifest(boolean onlyPublicRoutes) {
         Map<String, PluginModule> modules = pluginModuleRepo.findAll().stream()
                 .collect(Collectors.toMap(PluginModule::getCode, Function.identity(), (left, right) -> left));
         List<PluginFrontendModuleInfo> runtimeModules = pluginRuntimeGateway.frontendModules().stream()
                 .filter(module -> healthy(modules.get(module.pluginCode()), module.pluginCode()))
+                .map(module -> onlyPublicRoutes ? PluginFrontendModuleInfo.onlyPublicRoutes(module) : module)
                 .toList();
         return PluginAssembler.toManifestDTO(runtimeModules);
     }

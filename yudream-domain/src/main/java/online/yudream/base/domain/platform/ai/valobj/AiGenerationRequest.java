@@ -14,12 +14,29 @@ public record AiGenerationRequest(
         Map<String, String> config,
         List<AiChatMessage> history,
         boolean toolCallingEnabled,
-        AiToolMode toolMode
+        AiToolMode toolMode,
+        AiStructuredOutput structuredOutput
 ) {
     public AiGenerationRequest {
         toolMode = toolMode == null
                 ? (toolCallingEnabled ? AiToolMode.AUTO : AiToolMode.NONE)
                 : toolMode;
+        structuredOutput = structuredOutput == null ? AiStructuredOutput.none() : structuredOutput;
+    }
+
+    public AiGenerationRequest(
+            String systemPrompt,
+            String userPrompt,
+            String imageDataUrl,
+            String providerCode,
+            String modelCode,
+            Map<String, String> config,
+            List<AiChatMessage> history,
+            boolean toolCallingEnabled,
+            AiToolMode toolMode
+    ) {
+        this(systemPrompt, userPrompt, imageDataUrl, providerCode, modelCode, config, history,
+                toolCallingEnabled, toolMode, AiStructuredOutput.none());
     }
 
     public AiGenerationRequest(
@@ -82,7 +99,23 @@ public record AiGenerationRequest(
                 config,
                 history(),
                 enabled,
-                toolMode
+                toolMode,
+                structuredOutput
+        );
+    }
+
+    public AiGenerationRequest withStructuredOutput(AiStructuredOutput output) {
+        return new AiGenerationRequest(
+                systemPrompt,
+                userPrompt,
+                imageDataUrl,
+                providerCode,
+                modelCode,
+                config,
+                history(),
+                toolCallingEnabled,
+                toolMode,
+                output
         );
     }
 

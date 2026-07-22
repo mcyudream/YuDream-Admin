@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 @Service
 public class ReactorMilkyApiGateway implements MilkyApiGateway {
     private static final Pattern API = Pattern.compile("[a-z][a-z0-9_]{0,127}");
-    private static final Duration TIMEOUT = Duration.ofSeconds(30);
+    private static final Duration TIMEOUT = Duration.ofMinutes(10);
     private static final Set<String> NUMERIC_ID_FIELDS = Set.of(
             "peer_id", "user_id", "group_id", "sender_id", "operator_id", "target_user_id",
             "message_seq", "message_id", "start_message_seq", "end_message_seq", "face_id");

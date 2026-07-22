@@ -4,7 +4,9 @@ import cn.hutool.json.JSONUtil;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
+import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
 import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
@@ -26,6 +28,7 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
                 && supportsRequiredToolChoice(provider, model)) {
             builder.toolChoice("required");
         }
+        applyStructuredOutput(builder, request);
         String reasoningEffort = reasoningEffort(provider, model, request, extraBody);
         if (StringUtils.hasText(reasoningEffort)) {
             builder.reasoningEffort(reasoningEffort);
@@ -34,6 +37,28 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
             builder.extraBody(extraBody);
         }
         return builder.build();
+    }
+
+    private void applyStructuredOutput(OpenAiChatOptions.Builder builder, AiGenerationRequest request) {
+        var structured = request.structuredOutput();
+        if (structured == null || !structured.enabled()) {
+            return;
+        }
+        if (structured.mode() == AiStructuredOutput.Mode.JSON_OBJECT) {
+            builder.responseFormat(ResponseFormat.builder()
+                    .type(ResponseFormat.Type.JSON_OBJECT)
+                    .build());
+            return;
+        }
+        ResponseFormat.JsonSchema jsonSchema = ResponseFormat.JsonSchema.builder()
+                .name(StringUtils.hasText(structured.name()) ? structured.name() : "structured_result")
+                .schema(structured.schema())
+                .strict(structured.strict())
+                .build();
+        builder.responseFormat(ResponseFormat.builder()
+                .type(ResponseFormat.Type.JSON_SCHEMA)
+                .jsonSchema(jsonSchema)
+                .build());
     }
 
     /** Compatibility providers opt in only when their native API guarantees `tool_choice=required`. */

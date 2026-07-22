@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
@@ -77,6 +78,23 @@ public class MongoPluginDocumentStore implements PluginDocumentStore {
     @Override
     public long count(String collection) {
         return mongoTemplate.count(scopedQuery(), collectionName(collection));
+    }
+
+    @Override
+    public boolean updateIfFieldAtMost(String collection, String id, String field, long maximum,
+                                       Map<String, Object> document) {
+        String safeId = requireText(id, "Document ID must not be blank");
+        String safeField = requireField(field);
+        validateDocument(document);
+        Query query = scopedQuery()
+                .addCriteria(Criteria.where("_id").is(safeId))
+                .addCriteria(Criteria.where(safeField).lte(maximum));
+        Update update = new Update();
+        document.forEach((key, value) -> {
+            if (!"id".equals(key)) update.set(key, value);
+        });
+        update.set("pluginCode", pluginCode).set("id", safeId);
+        return mongoTemplate.findAndModify(query, update, Document.class, collectionName(collection)) != null;
     }
 
     @Override

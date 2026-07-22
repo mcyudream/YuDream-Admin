@@ -36,4 +36,11 @@ public @interface PluginRoute {
      * Use this for contextual pages that require an identifier supplied by another page.
      */
     boolean hideInMenu() default false;
+
+    /**
+     * Marks the route as publicly accessible without login.
+     * The host registers such routes for anonymous visitors (meta.public=true);
+     * make sure the backing HTTP endpoints do not require permissions either.
+     */
+    boolean publicAccess() default false;
 }
