@@ -12,9 +12,11 @@ import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class MilkyPluginMessagingServiceTest {
 
@@ -79,5 +81,29 @@ class MilkyPluginMessagingServiceTest {
 
         service.sendToChannel("1", "1064685901", new PluginMessageContent(PluginMessageContent.Type.COMPOSITE,
                 "{\"messages\":[]}", List.of(), Map.of())).toCompletableFuture().join();
+    }
+
+    @Test
+    void listsConnectionsWithoutCallingTheRemoteMilkyApi() {
+        MilkyConnection connection = MilkyConnection.create("Milky", "http://127.0.0.1:3000", "token", "base64", null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> "findEnabled".equals(method.getName()) ? List.of(connection) : null);
+        AtomicInteger calls = new AtomicInteger();
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    calls.incrementAndGet();
+                    return Map.of();
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        var connections = service.connections();
+
+        assertEquals(1, connections.size());
+        assertEquals("1", connections.getFirst().id());
+        assertNull(connections.getFirst().userId());
+        assertEquals(0, calls.get());
     }
 }

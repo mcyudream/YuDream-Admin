@@ -3,11 +3,32 @@ package online.yudream.base.infra.platform.plugin.service;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MilkyPluginEventDispatcherTest {
+
+    @Test
+    void normalizesGroupMessageFieldsForCommandDispatch() {
+        Map<String, Object> data = Map.of(
+                "group_id", 1064685901L,
+                "user_id", 3816679582L,
+                "message", List.of(Map.of("type", "text", "data", Map.of("text", "/菜单")))
+        );
+
+        assertEquals("3816679582", MilkyPluginEventDispatcher.messageUserId(data));
+        assertEquals("1064685901", MilkyPluginEventDispatcher.messageChannelId(data));
+        assertEquals("/菜单", MilkyPluginEventDispatcher.messageContent(data));
+    }
+
+    @Test
+    void acceptsBothMilkyMessageEventNames() {
+        assertTrue(MilkyPluginEventDispatcher.isMessageEvent("message_receive"));
+        assertTrue(MilkyPluginEventDispatcher.isMessageEvent("message"));
+    }
 
     @Test
     void normalizesMilkyJoinNotificationFieldsForPlugins() {

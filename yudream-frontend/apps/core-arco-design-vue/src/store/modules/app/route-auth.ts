@@ -29,7 +29,13 @@ export function flattenBackendRouteGroups<T extends AuthRouteNode>(routes: T[]):
     if (!route.path && !route.component) {
       return flattenBackendRouteGroups(route.children ?? [])
     }
-    return [route]
+    const children = route.children?.length
+      ? flattenBackendRouteGroups(route.children)
+      : route.children
+    return [{
+      ...route,
+      ...(children?.length ? { children } : { children: undefined }),
+    } as T]
   })
 }
 

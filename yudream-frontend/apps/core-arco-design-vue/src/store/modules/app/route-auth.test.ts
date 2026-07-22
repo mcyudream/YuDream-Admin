@@ -52,6 +52,28 @@ test('backend route groups flatten nested categories before registering routes',
   assert.deepEqual(routes.map(route => route.path), ['/platform/plugins/yudream-wallet'])
 })
 
+test('backend route groups remove a plugin category nested below a system layout', () => {
+  const routes = flattenBackendRouteGroups([{
+    path: '/system',
+    component: 'Layout',
+    meta: { title: '系统管理' },
+    children: [{
+      meta: { title: '网站卡片' },
+      children: [{
+        path: '/platform/plugins/web-card/admin/studio',
+        component: 'web-card/Studio',
+        meta: { auth: 'plugin:web-card:manage' },
+      }],
+    }],
+  }])
+
+  assert.equal(routes.length, 1)
+  assert.deepEqual(routes[0].children?.map(route => route.path), [
+    '/platform/plugins/web-card/admin/studio',
+  ])
+  assert.equal(routes[0].children?.[0].component, 'web-card/Studio')
+})
+
 test('backend routes merge duplicated plugin layout paths and retain every child page', () => {
   const routes = mergeBackendStructuralRoutes([{
     path: '/platform/plugins/yudream-wallet/system',
