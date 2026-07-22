@@ -52,12 +52,12 @@ public class MilkyPluginEventDispatcher {
             dispatchGroupRequest(published);
             return;
         }
-        if (!"message_receive".equals(event.eventType())) {
+        if (!isMessageEvent(event.eventType())) {
             return;
         }
-        String userId = text(event.data().get("sender_id"));
-        String channelId = text(event.data().get("peer_id"));
-        String content = text(event.data().get("segments"));
+        String userId = messageUserId(event.data());
+        String channelId = messageChannelId(event.data());
+        String content = messageContent(event.data());
         Map<String, Object> referrer = new java.util.LinkedHashMap<>();
         referrer.put("mentions", mentions(event.data().get("segments")));
         String replyMessageId = replyMessageId(event.data().get("segments"));
@@ -273,6 +273,22 @@ public class MilkyPluginEventDispatcher {
 
     private boolean isMenu(String name) {
         return "菜单".equals(name) || "帮助".equals(name) || "菜单指令".equals(name);
+    }
+
+    static boolean isMessageEvent(String eventType) {
+        return "message_receive".equals(eventType) || "message".equals(eventType);
+    }
+
+    static String messageUserId(Map<String, Object> data) {
+        return firstText(data, "sender_id", "user_id");
+    }
+
+    static String messageChannelId(Map<String, Object> data) {
+        return firstText(data, "peer_id", "group_id", "user_id");
+    }
+
+    static String messageContent(Map<String, Object> data) {
+        return firstText(data, "segments", "message", "raw_message");
     }
 
     private Parsed parse(String value) {
