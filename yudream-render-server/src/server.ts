@@ -9,14 +9,23 @@ export function buildServer(pool = new BrowserPool()): FastifyInstance {
   const service = new RenderService(pool);
   void app.register(sensible);
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     const message = error instanceof Error ? error.message : "render failed";
     const name = error instanceof Error ? error.name : "";
-    if (error instanceof RenderInputError || message === "html is required" || message === "markdown is required" || message === "url is required") return reply.code(400).send({ message });
-    if (error instanceof RenderQueueFullError) return reply.code(429).send({ message: error.message });
-    if (name === "TimeoutError") return reply.code(504).send({ message: "render timed out" });
-    app.log.error(error);
-    return reply.code(500).send({ message: "render failed" });
+    const statusCode = error instanceof RenderInputError || message === "html is required" || message === "markdown is required" || message === "url is required"
+      ? 400
+      : error instanceof RenderQueueFullError
+        ? 429
+        : name === "TimeoutError"
+          ? 504
+          : 500;
+
+    request.log.error({ err: error, method: request.method, route: request.routeOptions.url, statusCode }, "render request failed");
+
+    if (statusCode === 400) return reply.code(statusCode).send({ message });
+    if (statusCode === 429) return reply.code(statusCode).send({ message });
+    if (statusCode === 504) return reply.code(statusCode).send({ message: "render timed out" });
+    return reply.code(statusCode).send({ message: "render failed" });
   });
 
   app.get("/health", async () => ({ ok: await pool.healthy() }));

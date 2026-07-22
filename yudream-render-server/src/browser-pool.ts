@@ -13,7 +13,12 @@ export class BrowserPool {
     if (this.active >= limits.maxConcurrent && this.waiters.length >= limits.maxQueue) throw new RenderQueueFullError("render queue is full");
     if (this.active >= limits.maxConcurrent) await new Promise<void>((resolve) => this.waiters.push(resolve));
     this.active++;
-    return this.getBrowser();
+    try {
+      return await this.getBrowser();
+    } catch (error) {
+      this.release();
+      throw error;
+    }
   }
 
   release(): void {
