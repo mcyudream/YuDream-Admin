@@ -178,7 +178,8 @@ class PluginAnnotationRegistrar {
                 route.component(),
                 route.permission(),
                 route.sort(),
-                route.hideInMenu()
+                route.hideInMenu(),
+                route.publicAccess()
         );
     }
 

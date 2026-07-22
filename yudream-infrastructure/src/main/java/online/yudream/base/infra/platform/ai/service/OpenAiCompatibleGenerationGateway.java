@@ -16,6 +16,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
+import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import online.yudream.base.infra.platform.ai.service.provider.ResolvedAiModel;
@@ -102,22 +103,33 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         ResolvedAiModel resolved = resolve(config, request);
         ensureRequiredToolChoice(request, resolved);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
-        try {
-            log.debug("AI non-stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}",
-                    resolved.provider().code(),
-                    resolved.provider().endpointUrl(),
-                    resolved.model().modelName(),
-                    length(request.userPrompt()),
-                    StringUtils.hasText(request.imageDataUrl()));
-            String content = requestSpec(request, resolved, toolResults).call().content();
-            log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
-            return toResult(content, toolResults);
-        } catch (BizException e) {
-            log.debug("AI non-stream call business error: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.debug("AI non-stream call failed", e);
-            throw new BizException("AI 调用异常：" + explainException(e));
+        AiGenerationRequest attempt = request;
+        while (true) {
+            try {
+                log.debug("AI non-stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}, structuredOutput={}",
+                        resolved.provider().code(),
+                        resolved.provider().endpointUrl(),
+                        resolved.model().modelName(),
+                        length(attempt.userPrompt()),
+                        StringUtils.hasText(attempt.imageDataUrl()),
+                        attempt.structuredOutput().mode());
+                String content = requestSpec(attempt, resolved, toolResults).call().content();
+                log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
+                return toResult(content, toolResults);
+            } catch (BizException e) {
+                log.debug("AI non-stream call business error: {}", e.getMessage());
+                throw e;
+            } catch (Exception e) {
+                AiGenerationRequest fallback = structuredOutputFallback(attempt, e);
+                if (fallback != null && toolResults.isEmpty()) {
+                    log.warn("AI provider rejected structured output mode {}, retrying with {}",
+                            attempt.structuredOutput().mode(), fallback.structuredOutput().mode());
+                    attempt = fallback;
+                    continue;
+                }
+                log.debug("AI non-stream call failed", e);
+                throw new BizException("AI 调用异常：" + explainException(e));
+            }
         }
     }
 
@@ -133,15 +145,18 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         ensureRequiredToolChoice(request, resolved);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         StringBuilder content = new StringBuilder();
-        try {
-            progress(onProgress, "request", "正在准备模型请求。");
-            log.debug("AI stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}",
-                    resolved.provider().code(),
-                    resolved.provider().endpointUrl(),
-                    resolved.model().modelName(),
-                    length(request.userPrompt()),
-                    StringUtils.hasText(request.imageDataUrl()));
-            requestSpec(request, resolved, toolResults, onTool, onProgress)
+        AiGenerationRequest attempt = request;
+        while (true) {
+            try {
+                progress(onProgress, "request", "正在准备模型请求。");
+                log.debug("AI stream call start, provider={}, endpoint={}, model={}, promptLength={}, image={}, structuredOutput={}",
+                        resolved.provider().code(),
+                        resolved.provider().endpointUrl(),
+                        resolved.model().modelName(),
+                        length(attempt.userPrompt()),
+                        StringUtils.hasText(attempt.imageDataUrl()),
+                        attempt.structuredOutput().mode());
+                requestSpec(attempt, resolved, toolResults, onTool, onProgress)
                     .stream()
                     .chatResponse()
                     .doFirst(() -> {
@@ -170,17 +185,98 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         }
                     })
                     .doOnComplete(() -> progress(onProgress, "stream-complete", "模型流式输出已完成，正在汇总结果。"))
-                    .blockLast(aiClientProperties.getReadTimeout());
-            log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
-            progress(onProgress, "complete", "AI 处理完成。");
-            return toResult(content.toString(), toolResults);
-        } catch (BizException e) {
-            log.debug("AI stream call business error: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.debug("AI stream call failed", e);
-            throw new BizException("AI 流式调用异常：" + explainException(e));
+                        .blockLast(aiClientProperties.getReadTimeout());
+                log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
+                progress(onProgress, "complete", "AI 处理完成。");
+                return toResult(content.toString(), toolResults);
+            } catch (BizException e) {
+                log.debug("AI stream call business error: {}", e.getMessage());
+                throw e;
+            } catch (Exception e) {
+                AiGenerationRequest fallback = content.isEmpty() && toolResults.isEmpty()
+                        ? structuredOutputFallback(attempt, e)
+                        : null;
+                if (fallback != null) {
+                    log.warn("AI provider rejected structured output mode {}, retrying stream with {}",
+                            attempt.structuredOutput().mode(), fallback.structuredOutput().mode());
+                    attempt = fallback;
+                    continue;
+                }
+                log.debug("AI stream call failed", e);
+                throw new BizException("AI 流式调用异常：" + explainException(e));
+            }
         }
+    }
+
+    static AiGenerationRequest structuredOutputFallback(AiGenerationRequest request, Throwable error) {
+        AiStructuredOutput structured = request.structuredOutput();
+        if (structured == null || !structured.enabled() || !isUnsupportedStructuredOutput(error)) {
+            return null;
+        }
+        return switch (structured.mode()) {
+            case JSON_SCHEMA -> request.withStructuredOutput(AiStructuredOutput.jsonObject());
+            case JSON_OBJECT -> request.withStructuredOutput(AiStructuredOutput.none());
+            case NONE -> null;
+        };
+    }
+
+    private static boolean isUnsupportedStructuredOutput(Throwable error) {
+        String detail = structuredOutputErrorText(error).toLowerCase();
+        boolean badRequest = hasHttpStatus(error, 400) || detail.contains("400 bad request") || detail.contains("status 400");
+        boolean mentionsFormat = detail.contains("response_format")
+                || detail.contains("response format")
+                || detail.contains("json_schema")
+                || detail.contains("json schema")
+                || detail.contains("json_object")
+                || detail.contains("structured output");
+        boolean unsupported = detail.contains("not supported")
+                || detail.contains("does not support")
+                || detail.contains("unsupported")
+                || detail.contains("unknown parameter")
+                || detail.contains("unrecognized parameter")
+                || detail.contains("not available");
+        return badRequest && mentionsFormat && unsupported;
+    }
+
+    private static boolean hasHttpStatus(Throwable error, int status) {
+        if (error == null) {
+            return false;
+        }
+        if (error instanceof WebClientResponseException response && response.getStatusCode().value() == status) {
+            return true;
+        }
+        if (error instanceof RestClientResponseException response && response.getStatusCode().value() == status) {
+            return true;
+        }
+        if (hasHttpStatus(error.getCause(), status)) {
+            return true;
+        }
+        for (Throwable suppressed : error.getSuppressed()) {
+            if (hasHttpStatus(suppressed, status)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String structuredOutputErrorText(Throwable error) {
+        if (error == null) {
+            return "";
+        }
+        StringBuilder detail = new StringBuilder();
+        if (error.getMessage() != null) {
+            detail.append(error.getMessage()).append(' ');
+        }
+        if (error instanceof WebClientResponseException response) {
+            detail.append(response.getResponseBodyAsString()).append(' ');
+        } else if (error instanceof RestClientResponseException response) {
+            detail.append(response.getResponseBodyAsString()).append(' ');
+        }
+        detail.append(structuredOutputErrorText(error.getCause()));
+        for (Throwable suppressed : error.getSuppressed()) {
+            detail.append(structuredOutputErrorText(suppressed));
+        }
+        return detail.toString();
     }
 
     public void test(Map<String, String> config, String message) {

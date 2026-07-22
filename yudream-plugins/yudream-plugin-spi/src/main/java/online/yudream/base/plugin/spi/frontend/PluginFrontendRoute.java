@@ -12,6 +12,25 @@ public record PluginFrontendRoute(
         String component,
         String permission,
         Integer sort,
-        boolean hideInMenu
+        boolean hideInMenu,
+        boolean publicAccess
 ) {
+
+    public PluginFrontendRoute(
+            String path,
+            String name,
+            String title,
+            String icon,
+            String parentPath,
+            String parentTitle,
+            String parentIcon,
+            Integer parentSort,
+            String component,
+            String permission,
+            Integer sort,
+            boolean hideInMenu
+    ) {
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort,
+                component, permission, sort, hideInMenu, false);
+    }
 }

@@ -22,12 +22,14 @@ import online.yudream.base.plugin.spi.system.mail.PluginMailService;
 import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
+import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
 import online.yudream.base.plugin.spi.system.command.PluginCommandService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
+import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -68,6 +70,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final Environment environment;
     private final ConcurrentMap<String, PluginDocumentStore> documentStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginFileStore> fileStores = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, PluginSecretStore> secretStores = new ConcurrentHashMap<>();
 
     @Override
     public PluginUserService users() {
@@ -140,6 +143,12 @@ public class DefaultFrameworkServices implements FrameworkServices {
     }
 
     @Override
+    public PluginSecretStore secrets(String pluginCode) {
+        return secretStores.computeIfAbsent(pluginCode, code -> new MongoPluginSecretStore(
+                code, mongoTemplate, environment.getProperty("yudream.plugin.secret-key")));
+    }
+
+    @Override
     public PluginMessagingService messaging() {
         return pluginMessagingFrameworkService;
     }
@@ -157,6 +166,25 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginAiService ai() {
         return pluginAiFrameworkService;
+    }
+
+    @Override
+    public Optional<PluginStoredFile> platformFile(String fileId) {
+        if (!StringUtils.hasText(fileId)) {
+            return Optional.empty();
+        }
+        Long id;
+        try {
+            id = Long.valueOf(fileId.trim());
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+        return fileObjectRepo.findById(id)
+                .filter(file -> !file.isDeleted())
+                .map(file -> {
+                    StoredObject stored = objectStorage.get(file.getObjectKey());
+                    return new PluginStoredFile(file.getObjectKey(), file.getContentType(), file.getSize(), stored.inputStream());
+                });
     }
 
     @Override

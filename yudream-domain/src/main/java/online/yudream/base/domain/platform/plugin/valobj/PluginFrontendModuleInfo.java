@@ -90,6 +90,18 @@ public record PluginFrontendModuleInfo(
         );
     }
 
+    /**
+     * 只保留匿名公开路由（publicAccess=true），用于未登录访客的 frontend-manifest。
+     */
+    public static PluginFrontendModuleInfo onlyPublicRoutes(PluginFrontendModuleInfo module) {
+        return new PluginFrontendModuleInfo(
+                module.pluginCode(), module.entry(), module.moduleName(), module.sdkVersion(),
+                module.integrity(), module.menuTitle(), module.menuIcon(), module.menuSort(),
+                module.routes().stream().filter(PluginFrontendRouteInfo::publicAccess).toList(),
+                module.menuOverride()
+        );
+    }
+
     public String parentCode() { return menuOverride == null ? null : menuOverride.parentCode(); }
     public Boolean visible() { return menuOverride == null ? true : menuOverride.visible(); }
     public MenuStatus status() { return menuOverride == null ? MenuStatus.ACTIVE : menuOverride.status(); }

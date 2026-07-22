@@ -7,6 +7,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
+import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import online.yudream.base.infra.platform.ai.service.provider.AiModelEndpoint;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderEndpoint;
@@ -18,7 +19,10 @@ import online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry;
 import online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.HttpHeaders;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
@@ -26,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -113,10 +118,12 @@ class OpenAiCompatibleGenerationGatewayTest {
                     List.of(),
                     true,
                     mode
-            );
+            ).withStructuredOutput(AiStructuredOutput.jsonObject());
 
             assertThat(request.withToolCallingEnabled(false).toolMode()).isEqualTo(mode);
             assertThat(request.withToolCallingEnabled(true).toolMode()).isEqualTo(mode);
+            assertThat(request.withToolCallingEnabled(false).structuredOutput().mode())
+                    .isEqualTo(AiStructuredOutput.Mode.JSON_OBJECT);
         }
     }
 
@@ -149,6 +156,65 @@ class OpenAiCompatibleGenerationGatewayTest {
         );
 
         assertThat(adapter.chatOptions(provider, model, request).getToolChoice()).isNull();
+    }
+
+    @Test
+    void shouldMapJsonObjectAndJsonSchemaToNativeResponseFormat() {
+        OpenAiProviderAdapter adapter = new OpenAiProviderAdapter();
+        AiProviderEndpoint provider = new AiProviderEndpoint(
+                "openai", "OpenAI", AiProviderType.OPENAI, "https://api.example.com/v1", "/chat/completions",
+                "key", null, "gpt", null, null, List.of(), List.of(), List.of(), true
+        );
+        AiModelEndpoint model = new AiModelEndpoint("gpt", "GPT", "gpt", null, null, false, null, "chat", false);
+        AiGenerationRequest base = new AiGenerationRequest(
+                "Return JSON", "user", null, "openai", "gpt", Map.of()
+        );
+
+        ResponseFormat objectFormat = adapter.chatOptions(
+                provider, model, base.withStructuredOutput(AiStructuredOutput.jsonObject())
+        ).getResponseFormat();
+        assertThat(objectFormat.getType()).isEqualTo(ResponseFormat.Type.JSON_OBJECT);
+
+        Map<String, Object> schema = Map.of(
+                "type", "object",
+                "properties", Map.of("title", Map.of("type", "string"))
+        );
+        ResponseFormat schemaFormat = adapter.chatOptions(
+                provider, model, base.withStructuredOutput(AiStructuredOutput.jsonSchema("result", schema, false))
+        ).getResponseFormat();
+        assertThat(schemaFormat.getType()).isEqualTo(ResponseFormat.Type.JSON_SCHEMA);
+        assertThat(schemaFormat.getJsonSchema().getName()).isEqualTo("result");
+        assertThat(schemaFormat.getJsonSchema().getSchema()).isEqualTo(schema);
+        assertThat(schemaFormat.getJsonSchema().getStrict()).isFalse();
+    }
+
+    @Test
+    void shouldDowngradeOnlyExplicitUnsupportedStructuredOutputErrors() {
+        AiGenerationRequest schemaRequest = new AiGenerationRequest(
+                "Return JSON", "user", null, "openai", "gpt", Map.of()
+        ).withStructuredOutput(AiStructuredOutput.jsonSchema(
+                "result", Map.of("type", "object"), false
+        ));
+        WebClientResponseException unsupportedSchema = responseError(
+                400, "response_format type json_schema is not supported by this model"
+        );
+
+        AiGenerationRequest objectFallback = OpenAiCompatibleGenerationGateway
+                .structuredOutputFallback(schemaRequest, unsupportedSchema);
+        assertThat(objectFallback.structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.JSON_OBJECT);
+
+        AiGenerationRequest textFallback = OpenAiCompatibleGenerationGateway
+                .structuredOutputFallback(objectFallback, responseError(
+                        400, "unknown parameter: response_format json_object is not supported"
+                ));
+        assertThat(textFallback.structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.NONE);
+
+        assertThat(OpenAiCompatibleGenerationGateway.structuredOutputFallback(
+                schemaRequest, responseError(400, "Invalid schema for response_format")
+        )).isNull();
+        assertThat(OpenAiCompatibleGenerationGateway.structuredOutputFallback(
+                schemaRequest, responseError(401, "response_format is not supported")
+        )).isNull();
     }
 
     @Test
@@ -222,6 +288,16 @@ class OpenAiCompatibleGenerationGatewayTest {
 
     private String inputSchema(OpenAiCompatibleGenerationGateway gateway, AiAgentToolDescriptor descriptor) {
         return (String) ReflectionTestUtils.invokeMethod(gateway, "inputSchema", descriptor);
+    }
+
+    private WebClientResponseException responseError(int status, String body) {
+        return WebClientResponseException.create(
+                status,
+                status == 400 ? "Bad Request" : "Unauthorized",
+                HttpHeaders.EMPTY,
+                body.getBytes(StandardCharsets.UTF_8),
+                StandardCharsets.UTF_8
+        );
     }
 
     private static final class CountingTool implements AiAgentTool {

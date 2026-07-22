@@ -4,6 +4,7 @@ server:
 spring.application:
     name: yudream-admin
 
+
 spring.data:
   mongodb:
     uri: ${MONGO_URI}
@@ -41,8 +42,8 @@ spring.thymeleaf:
   cache: false
 
 spring.servlet.multipart:
-  max-file-size: 10MB
-  max-request-size: 50MB
+  max-file-size: 1000MB
+  max-request-size: 5000MB
 
 logging:
   level:
@@ -151,6 +152,7 @@ yudream.platform.render:
   base-url: ${MESSAGE_RENDER_BASE_URL:http://localhost:3000}
   token: ${MESSAGE_RENDER_TOKEN:}
   timeout: ${MESSAGE_RENDER_TIMEOUT:30s}
+  max-response-size: ${MESSAGE_RENDER_MAX_RESPONSE_SIZE:16MB}
 
 yudream.storage.s3:
   endpoint: ${S3_ENDPOINT:http://localhost:9000}
@@ -159,3 +161,6 @@ yudream.storage.s3:
   bucket: ${S3_BUCKET:yudream-admin}
   region: ${S3_REGION:us-east-1}
   path-style-access: ${S3_PATH_STYLE_ACCESS:true}
+yudream:
+  plugin:
+    secret-key: ${YUDREAM_PLUGIN_SECRET_KEY}
