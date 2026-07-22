@@ -13,6 +13,7 @@ import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -23,9 +24,26 @@ public class CommandManageAppService {
     private final PluginQqBindingService pluginQqBindingService;
     private static final String REQUIRE_BOUND_QQ = "plugin.qq-binding.require-bound-qq";
     private static final String LOCK_PROFILE_QQ = "plugin.qq-binding.lock-profile-qq";
+    private static final String SYSTEM_COMMAND_SOURCE = "SYSTEM";
+    private static final List<PluginCommandInfo> SYSTEM_MENU_COMMANDS = List.of(
+            new PluginCommandInfo(SYSTEM_COMMAND_SOURCE, "system.menu", "菜单", "菜单", null, "查看可用指令", true),
+            new PluginCommandInfo(SYSTEM_COMMAND_SOURCE, "system.help", "帮助", "帮助", null, "查看可用指令", true),
+            new PluginCommandInfo(SYSTEM_COMMAND_SOURCE, "system.menu-commands", "菜单指令", "菜单指令", null, "查看可用指令", true)
+    );
+    private static final Set<String> SYSTEM_MENU_COMMAND_CODES = SYSTEM_MENU_COMMANDS.stream()
+            .map(CommandManageAppService::commandKey)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     public List<PluginCommandInfo> list() {
-        return pluginRuntimeGateway.commands();
+        return java.util.stream.Stream.concat(
+                        SYSTEM_MENU_COMMANDS.stream(),
+                        pluginRuntimeGateway.commands().stream()
+                                .filter(command -> !SYSTEM_MENU_COMMAND_CODES.contains(commandKey(command))))
+                .toList();
+    }
+
+    private static String commandKey(PluginCommandInfo command) {
+        return command.pluginCode() + "\u0000" + command.code();
     }
 
     public java.util.Map<String, Boolean> qqBindingPolicy() {

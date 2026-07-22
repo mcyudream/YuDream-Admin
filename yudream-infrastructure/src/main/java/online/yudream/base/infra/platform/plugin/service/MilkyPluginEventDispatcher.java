@@ -67,12 +67,12 @@ public class MilkyPluginEventDispatcher {
                 event.selfId(), text(event.data().get("message_seq")));
         runtime.publishMessagingEvent(pluginEvent);
 
-        Parsed command = parse(content);
+        Parsed command = parseCommand(content);
         if (command == null) {
             return;
         }
         User user = userId == null ? null : users.findByQQ(userId).orElse(null);
-        if (isMenu(command.name())) {
+        if (isMenuAlias(command.name())) {
             menuImage(pluginEvent, user);
             return;
         }
@@ -271,7 +271,7 @@ public class MilkyPluginEventDispatcher {
                 .anyMatch(role -> role.hasPermission(permission));
     }
 
-    private boolean isMenu(String name) {
+    static boolean isMenuAlias(String name) {
         return "菜单".equals(name) || "帮助".equals(name) || "菜单指令".equals(name);
     }
 
@@ -291,11 +291,14 @@ public class MilkyPluginEventDispatcher {
         return firstText(data, "segments", "message", "raw_message");
     }
 
-    private Parsed parse(String value) {
+    static Parsed parseCommand(String value) {
         if (value == null) {
             return null;
         }
         String source = value.trim();
+        if (isMenuAlias(source)) {
+            return new Parsed(source, List.of());
+        }
         if (!source.startsWith("/") && !source.startsWith("!")) {
             return null;
         }
@@ -345,7 +348,7 @@ public class MilkyPluginEventDispatcher {
         return null;
     }
 
-    private record Parsed(String name, List<String> arguments) {
+    record Parsed(String name, List<String> arguments) {
     }
 
     record GroupRequest(String groupId, String userId, String requestId, String comment) { }
