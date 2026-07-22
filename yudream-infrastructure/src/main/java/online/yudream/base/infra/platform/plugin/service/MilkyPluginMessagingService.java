@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.plugin.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
@@ -16,22 +17,31 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingGroup;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
+import jakarta.annotation.PreDestroy;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collections;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class MilkyPluginMessagingService implements PluginMessagingService, PluginMessagingRawService {
     private final MilkyConnectionRepo connectionRepo;
     private final MilkyApiGateway apiGateway;
     private final PluginUserService pluginUserService;
     private final ObjectMapper objectMapper;
+    private final ExecutorService executor = new ThreadPoolExecutor(2, 4, 60L, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(100), Thread.ofVirtual().name("milky-plugin-messaging-", 0).factory(),
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Override
     public List<PluginMessagingConnection> connections() {
@@ -68,7 +78,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public CompletionStage<PluginMessageResult> send(PluginMessageRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+        return async("send", request == null ? null : request.connectionId(), "group", () -> {
             if (request == null || request.content() == null) {
                 throw new BizException("插件消息请求不能为空");
             }
@@ -78,7 +88,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public CompletionStage<PluginMessageResult> sendDirectToBoundUser(String userId, PluginMessageContent content) {
-        return CompletableFuture.supplyAsync(() -> {
+        return async("sendDirect", null, "private", () -> {
             if (content == null) {
                 throw new BizException("私聊内容不能为空");
             }
@@ -102,12 +112,40 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public CompletionStage<PluginMessageResult> sendToChannel(String connectionId, String channelId, PluginMessageContent content) {
-        return CompletableFuture.supplyAsync(() -> sendNow(connection(connectionId), channelId, "group", content));
+        return async("sendToChannel", connectionId, "group", () -> sendNow(connection(connectionId), channelId, "group", content));
     }
 
     @Override
     public CompletionStage<Map<String, Object>> invoke(String connectionId, String method, Map<String, Object> payload) {
-        return CompletableFuture.supplyAsync(() -> map(apiGateway.invoke(context(connection(connectionId)), method, payload == null ? Map.of() : payload)));
+        return async("invoke", connectionId, "api", () -> map(apiGateway.invoke(context(connection(connectionId)), method, payload == null ? Map.of() : payload)));
+    }
+
+    private <T> CompletionStage<T> async(String operation, String connectionId, String channelType, java.util.function.Supplier<T> action) {
+        try {
+            return CompletableFuture.supplyAsync(action, executor).whenComplete((result, exception) -> {
+                if (exception != null) {
+                    log.error("Milky plugin async operation failed: operation={}, connectionId={}, channelType={}, errorType={}",
+                            operation, connectionId, channelType, exception.getClass().getSimpleName());
+                }
+            });
+        } catch (RuntimeException exception) {
+            log.error("Milky plugin async operation rejected: operation={}, connectionId={}, channelType={}, errorType={}",
+                    operation, connectionId, channelType, exception.getClass().getSimpleName());
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException exception) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private PluginMessageResult sendNow(MilkyConnection connection, String peer, String scene, PluginMessageContent content) {

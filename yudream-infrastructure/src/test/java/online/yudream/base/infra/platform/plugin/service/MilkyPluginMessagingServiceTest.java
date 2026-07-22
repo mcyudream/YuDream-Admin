@@ -17,6 +17,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MilkyPluginMessagingServiceTest {
 
@@ -105,5 +107,46 @@ class MilkyPluginMessagingServiceTest {
         assertEquals("1", connections.getFirst().id());
         assertNull(connections.getFirst().userId());
         assertEquals(0, calls.get());
+    }
+
+    @Test
+    void runsBlockingMilkyCallsOnTheNamedExecutor() {
+        MilkyConnection connection = MilkyConnection.create("Milky", "http://127.0.0.1:3000", "token", "base64", null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> "findById".equals(method.getName()) ? Optional.of(connection) : null);
+        AtomicReference<String> threadName = new AtomicReference<>();
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    threadName.set(Thread.currentThread().getName());
+                    return Map.of("message_seq", 42);
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        service.sendToChannel("1", "1064685901", new PluginMessageContent(PluginMessageContent.Type.TEXT,
+                "private message", List.of(), Map.of())).toCompletableFuture().join();
+        service.shutdown();
+
+        assertTrue(threadName.get().startsWith("milky-plugin-messaging-"));
+    }
+
+    @Test
+    void preservesAsyncGatewayFailureForCallers() {
+        MilkyConnection connection = MilkyConnection.create("Milky", "http://127.0.0.1:3000", "token", "base64", null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> "findById".equals(method.getName()) ? Optional.of(connection) : null);
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    throw new IllegalStateException("gateway unavailable");
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        assertThrows(java.util.concurrent.CompletionException.class, () -> service.sendToChannel("1", "1064685901",
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, "private message", List.of(), Map.of())).toCompletableFuture().join());
     }
 }

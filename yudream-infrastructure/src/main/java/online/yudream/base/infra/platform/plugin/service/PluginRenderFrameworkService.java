@@ -1,6 +1,8 @@
 package online.yudream.base.infra.platform.plugin.service;
 
+import jakarta.annotation.PreDestroy;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.render.cmd.MessageRenderCmd;
 import online.yudream.base.application.platform.render.dto.RenderedImageDTO;
 import online.yudream.base.application.platform.render.service.MessageRenderAppService;
@@ -9,14 +11,22 @@ import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderedImage;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
-import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class PluginRenderFrameworkService implements PluginRenderService {
     private final MessageRenderAppService messageRenderAppService;
+    private final ExecutorService executor = new ThreadPoolExecutor(2, 4, 60L, TimeUnit.SECONDS,
+            new ArrayBlockingQueue<>(100), Thread.ofVirtual().name("plugin-render-", 0).factory(),
+            new ThreadPoolExecutor.AbortPolicy());
 
     @Override
     public CompletionStage<PluginRenderedImage> html(String html) { return render(SourceType.HTML, html); }
@@ -39,15 +49,39 @@ public class PluginRenderFrameworkService implements PluginRenderService {
     }
 
     private CompletionStage<PluginRenderedImage> render(SourceType sourceType, String content, String selector) {
-        return CompletableFuture.supplyAsync(() -> {
-            MessageRenderCmd cmd = new MessageRenderCmd();
-            cmd.setSourceType(sourceType);
-            cmd.setContent(content);
-            if (sourceType == SourceType.HTML && selector != null && !selector.isBlank()) {
-                cmd.setOptions(Map.of("selector", selector.trim()));
+        try {
+            return CompletableFuture.supplyAsync(() -> {
+                MessageRenderCmd cmd = new MessageRenderCmd();
+                cmd.setSourceType(sourceType);
+                cmd.setContent(content);
+                if (sourceType == SourceType.HTML && selector != null && !selector.isBlank()) {
+                    cmd.setOptions(Map.of("selector", selector.trim()));
+                }
+                RenderedImageDTO rendered = messageRenderAppService.render(cmd);
+                return new PluginRenderedImage(rendered.contentType(), rendered.content(), rendered.width(), rendered.height());
+            }, executor).whenComplete((result, exception) -> {
+                if (exception != null) {
+                    log.error("Plugin render operation failed: sourceType={}, errorType={}",
+                            sourceType, exception.getClass().getSimpleName());
+                }
+            });
+        } catch (RuntimeException exception) {
+            log.error("Plugin render operation rejected: sourceType={}, errorType={}",
+                    sourceType, exception.getClass().getSimpleName());
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                executor.shutdownNow();
             }
-            RenderedImageDTO rendered = messageRenderAppService.render(cmd);
-            return new PluginRenderedImage(rendered.contentType(), rendered.content(), rendered.width(), rendered.height());
-        });
+        } catch (InterruptedException exception) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 }

@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.milky.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
@@ -17,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class MilkyChatAppService {
     private final MilkyConnectionRepo connectionRepo;
@@ -35,9 +37,18 @@ public class MilkyChatAppService {
     }
 
     public void publishEvent(Long connectionId, MilkyModels.Event event) {
-        subscribers.getOrDefault(connectionId, new CopyOnWriteArrayList<>()).forEach(consumer -> {
-            try { consumer.accept(event); } catch (RuntimeException ignored) { }
+        CopyOnWriteArrayList<Consumer<MilkyModels.Event>> list = subscribers.get(connectionId);
+        if (list == null) return;
+        list.forEach(consumer -> {
+            try {
+                consumer.accept(event);
+            } catch (RuntimeException exception) {
+                log.warn("Removing failed Milky SSE consumer: connectionId={}, eventType={}",
+                        connectionId, event == null ? null : event.eventType(), exception);
+                list.remove(consumer);
+            }
         });
+        if (list.isEmpty()) subscribers.remove(connectionId, list);
     }
 
     @Transactional(readOnly = true)

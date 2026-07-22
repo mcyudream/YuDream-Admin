@@ -4,6 +4,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,6 +14,12 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MilkyPluginEventDispatcherTest {
+
+    @Test
+    void normalizesNullEventDataToAnEmptyMap() {
+        assertEquals(Map.of(), MilkyPluginEventDispatcher.eventData(
+                new online.yudream.base.domain.platform.milky.model.MilkyModels.Event(1L, "self", "message", null)));
+    }
 
     @Test
     void normalizesGroupMessageFieldsForCommandDispatch() {
@@ -29,6 +38,11 @@ class MilkyPluginEventDispatcherTest {
     void acceptsBothMilkyMessageEventNames() {
         assertTrue(MilkyPluginEventDispatcher.isMessageEvent("message_receive"));
         assertTrue(MilkyPluginEventDispatcher.isMessageEvent("message"));
+    }
+
+    @Test
+    void normalizesMissingEventDataToAnEmptyMap() {
+        assertEquals(Map.of(), MilkyPluginEventDispatcher.eventData(null));
     }
 
     @Test
@@ -80,5 +94,34 @@ class MilkyPluginEventDispatcherTest {
         assertNotNull(command);
         assertEquals("weather", command.name());
         assertEquals(List.of("beijing"), command.arguments());
+    }
+
+    @Test
+    void preservesFailureCauseForMenuFallbackHandling() {
+        IllegalStateException expected = new IllegalStateException("render failed");
+
+        CompletionException error = org.junit.jupiter.api.Assertions.assertThrows(CompletionException.class,
+                () -> MilkyPluginEventDispatcher.failedStage(expected).toCompletableFuture().join());
+
+        assertEquals(expected, error.getCause());
+    }
+
+    @Test
+    void keepsCompletedMenuImageResultWithinDeadline() throws Exception {
+        String value = MilkyPluginEventDispatcher.withMenuDeadline(CompletableFuture.completedFuture("sent"))
+                .toCompletableFuture().get(1, TimeUnit.SECONDS);
+
+        assertEquals("sent", value);
+    }
+
+    @Test
+    void failsIncompleteMenuImageStageAtDeadline() {
+        CompletableFuture<String> pending = new CompletableFuture<>();
+
+        CompletionException error = org.junit.jupiter.api.Assertions.assertThrows(CompletionException.class,
+                () -> MilkyPluginEventDispatcher.withMenuDeadline(pending, 1, TimeUnit.MILLISECONDS)
+                        .toCompletableFuture().join());
+
+        assertTrue(error.getCause() instanceof java.util.concurrent.TimeoutException);
     }
 }

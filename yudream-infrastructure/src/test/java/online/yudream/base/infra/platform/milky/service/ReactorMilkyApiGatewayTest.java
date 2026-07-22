@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.milky.service;
 
 import com.sun.net.httpserver.HttpServer;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ReactorMilkyApiGatewayTest {
@@ -46,6 +48,30 @@ class ReactorMilkyApiGatewayTest {
             assertEquals(Map.of("message_seq", 42), result);
             assertTrue(requestBody.get().contains("\"user_id\":2675448709"));
             assertTrue(requestBody.get().contains("\"group_id\":1064685901"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void preservesCauseWithoutLeakingErrorResponseContent() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/api/get_group_list", exchange -> {
+            byte[] response = "sensitive error response".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(502, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        try {
+            server.start();
+
+            BizException exception = assertThrows(BizException.class, () -> new ReactorMilkyApiGateway().invoke(
+                    new MilkyModels.Context("http://localhost:" + server.getAddress().getPort(), "test-token", null),
+                    "get_group_list", Map.of()));
+
+            assertEquals("Milky 服务请求失败（HTTP 502）", exception.getMessage());
+            assertTrue(exception.getCause() != null);
+            assertTrue(!exception.getMessage().contains("sensitive error response"));
         } finally {
             server.stop(0);
         }

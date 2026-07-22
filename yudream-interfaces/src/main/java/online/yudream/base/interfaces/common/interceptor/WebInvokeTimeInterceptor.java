@@ -7,13 +7,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
 import online.yudream.base.domain.system.monitor.dto.ApiLogDTO;
+import online.yudream.base.interfaces.common.RequestFailureContext;
 import online.yudream.base.interfaces.common.config.WebLogProperties;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 
 import java.io.UnsupportedEncodingException;
-import java.util.Map;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -21,6 +21,8 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
 
     private static final String START_TIME_ATTR = "WEB_LOG_START_TIME";
     private static final int MAX_BODY_LENGTH = 2000;
+    private static final String SENSITIVE_VALUE_PATTERN = "(?i)(\\b(?:token|authorization|cookie|password|secret|message|content|html|prompt)\\b\\s*(?:=|:)\\s*)([^&\\s,]+)";
+    private static final String SENSITIVE_JSON_PATTERN = "(?i)(\"(?:token|authorization|cookie|password|secret|message|content|html|prompt)\"\\s*:\\s*\")(?:[^\"]*)(\")";
 
     private final WebLogProperties properties;
     private final SystemMonitorAppService systemMonitorAppService;
@@ -62,14 +64,7 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
 
     private String formatParams(HttpServletRequest request) {
         String query = request.getQueryString();
-        if (StringUtils.hasText(query)) {
-            return query;
-        }
-        Map<String, String[]> paramMap = request.getParameterMap();
-        if (!paramMap.isEmpty()) {
-            return paramMap.toString();
-        }
-        return "none";
+        return StringUtils.hasText(query) ? maskSensitive(query) : "none";
     }
 
     private String formatBody(HttpServletRequest request) {
@@ -82,7 +77,7 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
                 try {
                     String encoding = wrapper.getCharacterEncoding();
                     String body = new String(buf, StringUtils.hasText(encoding) ? encoding : "UTF-8");
-                    return StringUtils.hasText(body) ? body : "none";
+                    return StringUtils.hasText(body) ? maskSensitive(body) : "none";
                 }
                 catch (UnsupportedEncodingException e) {
                     return "[body read failed]";
@@ -96,23 +91,26 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         if (isLogClearRequest(request)) {
             return;
         }
+        String handledFailure = RequestFailureContext.getSummary(request);
+        String errorSummary = handledFailure != null ? handledFailure : ex == null ? null : ex.getClass().getSimpleName();
         try {
             systemMonitorAppService.recordApiLog(ApiLogDTO.builder()
                     .method(request.getMethod())
                     .path(request.getRequestURI())
-                    .query(request.getQueryString())
-                    .requestBody(limit(maskSensitiveBody(body)))
+                    .query(maskSensitive(request.getQueryString()))
+                    .requestBody(limit(body))
                     .status(response.getStatus())
                     .costMs(cost)
-                    .success(ex == null && response.getStatus() < 400)
+                    .success(handledFailure == null && ex == null && response.getStatus() < 400)
                     .loginId(currentLoginId())
                     .ip(clientIp(request))
                     .userAgent(request.getHeader("User-Agent"))
-                    .errorMessage(ex == null ? null : ex.getMessage())
+                    .errorMessage(errorSummary)
                     .build());
         }
-        catch (Exception ignored) {
-            log.debug("Record API log failed", ignored);
+        catch (Exception auditException) {
+            log.warn("Record API log failed: method={} path={} status={}",
+                    request.getMethod(), request.getRequestURI(), response.getStatus(), auditException);
         }
     }
 
@@ -150,10 +148,11 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         return value.substring(0, MAX_BODY_LENGTH);
     }
 
-    private String maskSensitiveBody(String value) {
+    private String maskSensitive(String value) {
         if (!StringUtils.hasText(value)) {
             return value;
         }
-        return value.replaceAll("(?i)(\"password\"\\s*:\\s*\")([^\"]*)(\")", "$1******$3");
+        return value.replaceAll(SENSITIVE_JSON_PATTERN, "$1******$2")
+                .replaceAll(SENSITIVE_VALUE_PATTERN, "$1******");
     }
 }

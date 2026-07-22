@@ -29,6 +29,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @RequiredArgsConstructor
@@ -45,50 +49,65 @@ public class MilkyPluginEventDispatcher {
     private final FileAppService files;
     private final TemplateEngine templateEngine;
 
+    static final long MENU_IMAGE_DEADLINE_SECONDS = 15;
+
     @EventListener
     public void dispatch(MilkyEventPublished published) {
-        var event = published.event();
-        if ("group_request".equals(event.eventType()) || "group_join_request".equals(event.eventType())) {
-            dispatchGroupRequest(published);
-            return;
-        }
-        if (!isMessageEvent(event.eventType())) {
-            return;
-        }
-        String userId = messageUserId(event.data());
-        String channelId = messageChannelId(event.data());
-        String content = messageContent(event.data());
-        Map<String, Object> referrer = new java.util.LinkedHashMap<>();
-        referrer.put("mentions", mentions(event.data().get("segments")));
-        String replyMessageId = replyMessageId(event.data().get("segments"));
-        if (replyMessageId != null) referrer.put("replyMessageId", replyMessageId);
-        PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
-                content, null, null, referrer, event.eventType(), event.data(), String.valueOf(published.connectionId()),
-                event.selfId(), text(event.data().get("message_seq")));
-        runtime.publishMessagingEvent(pluginEvent);
+        online.yudream.base.domain.platform.milky.model.MilkyModels.Event event = null;
+        String messageSeq = null;
+        try {
+            event = published == null ? null : published.event();
+            Map<String, Object> data = eventData(event);
+            messageSeq = text(data.get("message_seq"));
+            if (event == null) {
+                return;
+            }
+            if ("group_request".equals(event.eventType()) || "group_join_request".equals(event.eventType())) {
+                dispatchGroupRequest(published, data);
+                return;
+            }
+            if (!isMessageEvent(event.eventType())) {
+                return;
+            }
+            String userId = messageUserId(data);
+            String channelId = messageChannelId(data);
+            String content = messageContent(data);
+            Map<String, Object> referrer = new java.util.LinkedHashMap<>();
+            referrer.put("mentions", mentions(data.get("segments")));
+            String replyMessageId = replyMessageId(data.get("segments"));
+            if (replyMessageId != null) referrer.put("replyMessageId", replyMessageId);
+            PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
+                    content, null, null, referrer, event.eventType(), data, String.valueOf(published.connectionId()),
+                    event.selfId(), messageSeq);
+            runtime.publishMessagingEvent(pluginEvent);
 
-        Parsed command = parseCommand(content);
-        if (command == null) {
-            return;
+            Parsed command = parseCommand(content);
+            if (command == null) {
+                return;
+            }
+            User user = userId == null ? null : users.findByQQ(userId).orElse(null);
+            if (isMenuAlias(command.name())) {
+                menuImage(pluginEvent, user);
+                return;
+            }
+            if (requiresBound() && user == null && !"绑定".equals(command.name())) {
+                return;
+            }
+            runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
+                    permission -> allowed(user, permission));
+        } catch (Exception error) {
+            log.error("Milky plugin event dispatch failed: connectionId={}, eventType={}, selfId={}, messageSeq={}, errorType={}",
+                    published == null ? null : published.connectionId(), event == null ? null : event.eventType(),
+                    event == null ? null : event.selfId(), messageSeq, error.getClass().getSimpleName());
         }
-        User user = userId == null ? null : users.findByQQ(userId).orElse(null);
-        if (isMenuAlias(command.name())) {
-            menuImage(pluginEvent, user);
-            return;
-        }
-        if (requiresBound() && user == null && !"绑定".equals(command.name())) {
-            return;
-        }
-        runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
-                permission -> allowed(user, permission));
     }
 
-    private void dispatchGroupRequest(MilkyEventPublished published) {
+    private void dispatchGroupRequest(MilkyEventPublished published, Map<String, Object> data) {
         var event = published.event();
-        Map<String, Object> data = event.data() == null ? Map.of() : event.data();
         GroupRequest request = groupRequest(data);
         if (request == null) {
-            log.warn("Ignoring incomplete Milky group request event, connectionId={}, data={}", published.connectionId(), data.keySet());
+            log.warn("Ignoring incomplete Milky group request event: connectionId={}, eventType={}, selfId={}, messageSeq={}",
+                    published.connectionId(), event.eventType(), event.selfId(), text(data.get("message_seq")));
             return;
         }
         Map<String, Object> referrer = new java.util.LinkedHashMap<>();
@@ -103,6 +122,10 @@ public class MilkyPluginEventDispatcher {
         runtime.publishMessagingEvent(pluginEvent);
     }
 
+    static Map<String, Object> eventData(online.yudream.base.domain.platform.milky.model.MilkyModels.Event event) {
+        return event == null || event.data() == null ? Map.of() : event.data();
+    }
+
     static GroupRequest groupRequest(Map<String, Object> data) {
         String groupId = firstText(data, "group_id", "group_uin", "peer_id");
         String userId = firstText(data, "user_id", "applicant_id", "initiator_id", "sender_id");
@@ -111,41 +134,70 @@ public class MilkyPluginEventDispatcher {
                 : new GroupRequest(groupId, userId, requestId, firstText(data, "comment", "message", "verify_message"));
     }
 
-    private void menu(PluginEvent event, User user) {
+    private CompletionStage<?> menu(PluginEvent event, User user) {
         StringBuilder content = new StringBuilder("可用指令：");
         commands.listAccessible(user == null ? null : user.getId()).forEach(command -> content
                 .append("\n/").append(command.command()).append(" - ").append(command.description()));
-        sendMenuText(event, content.toString());
+        return sendMenuText(event, content.toString());
     }
 
     private void menuImage(PluginEvent event, User user) {
-        var commandList = commands.listAccessible(user == null ? null : user.getId());
-        String nickname = user == null ? "访客" : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
-        renderer.html(commandMenuHtmlTemplate(nickname, commandList)).thenCompose(image -> {
-            var connection = connections.findById(Long.valueOf(event.connectionId())).orElse(null);
-            String mode = connection == null ? "base64" : connection.getCommandMenuImageMode();
-            String uri = "url".equalsIgnoreCase(mode) ? uploadMenuImage(image, connection == null ? null : connection.getCommandMenuPublicBaseUrl()) : "base64://" + Base64.getEncoder().encodeToString(image.content());
-            return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
-                    new PluginMessageContent(PluginMessageContent.Type.IMAGE, uri, null, Map.of())));
-        }).whenComplete((ignored, error) -> {
-            if (error == null) {
+        AtomicBoolean fallbackStarted = new AtomicBoolean();
+        try {
+            var commandList = commands.listAccessible(user == null ? null : user.getId());
+            String nickname = user == null ? "访客" : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
+            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname, commandList)).thenCompose(image -> {
+                var connection = connections.findById(Long.valueOf(event.connectionId())).orElse(null);
+                String mode = connection == null ? "base64" : connection.getCommandMenuImageMode();
+                String uri = "url".equalsIgnoreCase(mode) ? uploadMenuImage(image, connection == null ? null : connection.getCommandMenuPublicBaseUrl()) : "base64://" + Base64.getEncoder().encodeToString(image.content());
+                return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
+                        new PluginMessageContent(PluginMessageContent.Type.IMAGE, uri, null, Map.of())));
+            });
+            fallbackOnMenuImageFailure(withMenuDeadline(imageSend), fallbackStarted, () -> menu(event, user), event);
+        } catch (Exception error) {
+            fallbackOnMenuImageFailure(failedStage(error), fallbackStarted, () -> menu(event, user), event);
+        }
+    }
+
+    static <T> CompletionStage<T> withMenuDeadline(CompletionStage<T> stage) {
+        return withMenuDeadline(stage, MENU_IMAGE_DEADLINE_SECONDS, TimeUnit.SECONDS);
+    }
+
+    static <T> CompletionStage<T> withMenuDeadline(CompletionStage<T> stage, long timeout, TimeUnit unit) {
+        return stage.toCompletableFuture().orTimeout(timeout, unit);
+    }
+
+    static <T> CompletionStage<T> failedStage(Throwable error) {
+        CompletableFuture<T> result = new CompletableFuture<>();
+        result.completeExceptionally(error);
+        return result;
+    }
+
+    private void fallbackOnMenuImageFailure(CompletionStage<?> imageSend, AtomicBoolean fallbackStarted,
+                                            java.util.function.Supplier<CompletionStage<?>> fallback, PluginEvent event) {
+        imageSend.whenComplete((ignored, error) -> {
+            if (error == null || !fallbackStarted.compareAndSet(false, true)) {
                 return;
             }
-            log.warn("Milky 菜单图片发送失败，降级为文本菜单: connectionId={}, channelId={}",
+            log.warn("Milky 菜单图片渲染或发送失败，降级为文本菜单: connectionId={}, channelId={}",
                     event.connectionId(), event.channelId(), error);
-            menu(event, user);
+            try {
+                fallback.get().whenComplete((fallbackIgnored, fallbackError) -> {
+                    if (fallbackError != null) {
+                        log.error("Milky 菜单文本降级发送失败: connectionId={}, channelId={}",
+                                event.connectionId(), event.channelId(), fallbackError);
+                    }
+                });
+            } catch (Exception fallbackError) {
+                log.error("Milky 菜单文本降级构建失败: connectionId={}, channelId={}",
+                        event.connectionId(), event.channelId(), fallbackError);
+            }
         });
     }
 
-    private void sendMenuText(PluginEvent event, String content) {
-        messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
-                new PluginMessageContent(PluginMessageContent.Type.TEXT, content, null, Map.of())))
-                .whenComplete((ignored, error) -> {
-                    if (error != null) {
-                        log.error("Milky 菜单文本发送失败: connectionId={}, channelId={}",
-                                event.connectionId(), event.channelId(), error);
-                    }
-                });
+    private CompletionStage<?> sendMenuText(PluginEvent event, String content) {
+        return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, content, null, Map.of())));
     }
 
     private String uploadMenuImage(online.yudream.base.plugin.spi.system.render.PluginRenderedImage image, String publicBaseUrl) {
