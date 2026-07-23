@@ -1,5 +1,6 @@
 package online.yudream.base.infra.system.user.context;
 
+import cn.dev33.satoken.exception.SaTokenContextException;
 import cn.dev33.satoken.stp.StpUtil;
 import online.yudream.base.domain.system.user.service.UserContextStore;
 import org.springframework.stereotype.Component;
@@ -25,14 +26,24 @@ public class SaTokenUserContextStore implements UserContextStore {
 
     @Override
     public Long getCurrentDeptId(Long userId) {
-        Object value = StpUtil.getTokenSession().get(CURRENT_DEPT_KEY);
-        return value == null ? null : ((Number) value).longValue();
+        try {
+            Object value = StpUtil.getTokenSession().get(CURRENT_DEPT_KEY);
+            return value == null ? null : ((Number) value).longValue();
+        } catch (SaTokenContextException ignored) {
+            // Non-HTTP work (for example, Milky events) has no Sa-Token ThreadLocal context.
+            return null;
+        }
     }
 
     @Override
     public Long getCurrentRoleId(Long userId) {
-        Object value = StpUtil.getTokenSession().get(CURRENT_ROLE_KEY);
-        return value == null ? null : ((Number) value).longValue();
+        try {
+            Object value = StpUtil.getTokenSession().get(CURRENT_ROLE_KEY);
+            return value == null ? null : ((Number) value).longValue();
+        } catch (SaTokenContextException ignored) {
+            // Non-HTTP work (for example, Milky events) has no Sa-Token ThreadLocal context.
+            return null;
+        }
     }
 
     @Override
