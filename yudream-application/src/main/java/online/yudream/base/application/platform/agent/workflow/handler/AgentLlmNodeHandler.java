@@ -198,14 +198,14 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
 
     private Map<String, Object> outputSchema(AgentWorkflowNode node) {
         JsonNode raw = node.data().path("outputSchema");
-        if (raw.isMissingNode() || raw.isNull() || raw.isEmpty()) {
-            return Map.of();
+        if (raw.isMissingNode() || raw.isNull() || raw.isEmpty() || (raw.isTextual() && raw.asText().isBlank())) {
+            throw new BizException("信息提取节点输出格式不能为空且必须是 JSON 对象");
         }
         try {
             if (raw.isObject()) {
                 return objectMapper.convertValue(raw, JSON_OBJECT);
             }
-            if (raw.isTextual() && !raw.asText().isBlank()) {
+            if (raw.isTextual()) {
                 return objectMapper.readValue(raw.asText(), JSON_OBJECT);
             }
         } catch (Exception exception) {
@@ -221,10 +221,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         if (!"extract".equals(kind)) {
             return AiStructuredOutput.none();
         }
-        Map<String, Object> schema = outputSchema(node);
-        return schema.isEmpty()
-                ? AiStructuredOutput.jsonObject()
-                : AiStructuredOutput.jsonSchema("agent_extract_result", schema, false);
+        return AiStructuredOutput.jsonSchema("agent_extract_result", outputSchema(node), false);
     }
 
     private String image(AgentWorkflowNode node, AgentWorkflowContext context) {

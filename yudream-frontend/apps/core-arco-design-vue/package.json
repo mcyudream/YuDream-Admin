@@ -19,6 +19,7 @@
     "@codemirror/lang-css": "catalog:",
     "@codemirror/lang-html": "catalog:",
     "@codemirror/lang-javascript": "catalog:",
+    "@codemirror/lang-json": "catalog:",
     "@codemirror/language": "catalog:",
     "@codemirror/state": "catalog:",
     "@codemirror/view": "catalog:",

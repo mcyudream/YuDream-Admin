@@ -39,6 +39,7 @@ export interface AgentNodeData extends AgentNodeTemplate {
   toolConfigDeclared: boolean
   toolCode: string
   outputSchema: string
+  strictJson: boolean
   classes: string[]
   imageVariable: string
   condition: string

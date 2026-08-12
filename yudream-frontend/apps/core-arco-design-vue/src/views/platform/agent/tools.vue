@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import apiAgent from '@/api/modules/platform-agent'
+import AgentJsonCodeEditor from './components/AgentJsonCodeEditor.vue'
+import { defaultAgentToolInputSchema, defaultAgentToolOutputExample, isJsonObject } from './config/agent-json'
 
 const toast = useFaToast()
 const modal = useFaModal()
@@ -11,10 +13,8 @@ const rows = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const keyword = ref('')
-const defaultInputSchema = '{\n  "type": "object",\n  "properties": {\n    "name": { "type": "string", "description": "名称" }\n  },\n  "required": ["name"]\n}'
-const defaultOutputExample = '{\n  "success": true,\n  "message": "Hello, YuDream"\n}'
 const defaultPythonCode = 'def run(params: dict) -> dict:\n    name = str(params.get("name", ""))\n    return {\n        "success": True,\n        "message": f"Hello, {name}",\n    }'
-const form = reactive({ name: '', code: '', description: '', inputSchemaJson: defaultInputSchema, outputExampleJson: defaultOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
+const form = reactive({ name: '', code: '', description: '', inputSchemaJson: defaultAgentToolInputSchema, outputExampleJson: defaultAgentToolOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
 
 onMounted(load)
 async function load() {
@@ -28,7 +28,7 @@ async function load() {
   finally { loading.value = false }
 }
 function resetForm() {
-  Object.assign(form, { name: '', code: '', description: '', inputSchemaJson: defaultInputSchema, outputExampleJson: defaultOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
+  Object.assign(form, { name: '', code: '', description: '', inputSchemaJson: defaultAgentToolInputSchema, outputExampleJson: defaultAgentToolOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
 }
 function create() {
   editing.value = null
@@ -38,8 +38,8 @@ function create() {
 function edit(row: AgentTool) {
   editing.value = row
   Object.assign(form, row, {
-    inputSchemaJson: row.inputSchemaJson || defaultInputSchema,
-    outputExampleJson: row.outputExampleJson || defaultOutputExample,
+    inputSchemaJson: row.inputSchemaJson || defaultAgentToolInputSchema,
+    outputExampleJson: row.outputExampleJson || defaultAgentToolOutputExample,
   })
   visible.value = true
 }
@@ -63,15 +63,6 @@ async function save() {
     await load()
   }
   catch { toast.error('工具保存失败，请检查工具配置') }
-}
-function isJsonObject(value: string) {
-  try {
-    const parsed = JSON.parse(value)
-    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-  }
-  catch {
-    return false
-  }
 }
 function remove(row: AgentTool) {
   modal.confirm({
@@ -135,16 +126,16 @@ function remove(row: AgentTool) {
           <label class="form-field"><span>权限编码</span><FaInput v-model="form.permissionCode" class="w-full" placeholder="可选，例如：order:risk:query" /></label>
         </div>
         <label class="check-line"><input v-model="form.enabled" type="checkbox"> <span><b>启用工具</b><small>停用后 Agent 无法再调用此工具</small></span></label>
-        <label class="form-field required">
+        <div class="form-field required">
           <span>输入 JSON Schema</span>
-          <FaTextarea v-model="form.inputSchemaJson" class="w-full" input-class="font-mono" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="定义工具接收的参数名称、类型和必填项" />
+          <AgentJsonCodeEditor v-model="form.inputSchemaJson" :default-value="defaultAgentToolInputSchema" />
           <small>使用 JSON Schema object 描述参数，供模型生成合法调用参数</small>
-        </label>
-        <label class="form-field required">
+        </div>
+        <div class="form-field required">
           <span>输出格式示例</span>
-          <FaTextarea v-model="form.outputExampleJson" class="w-full" input-class="font-mono" :autosize="{ minRows: 5, maxRows: 10 }" placeholder="填写 run() 返回字典的 JSON 示例" />
+          <AgentJsonCodeEditor v-model="form.outputExampleJson" :default-value="defaultAgentToolOutputExample" />
           <small>必须是 JSON object 示例，用于说明返回字段、类型和业务含义</small>
-        </label>
+        </div>
         <label class="form-field required">
           <span>Python 代码</span>
           <FaTextarea v-model="form.pythonCode" class="w-full" input-class="font-mono" :autosize="{ minRows: 13, maxRows: 22 }" placeholder="def run(params: dict) -> dict: ..." />

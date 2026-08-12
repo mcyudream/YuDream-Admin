@@ -12,7 +12,9 @@ import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigPa
 import online.yudream.base.infra.platform.ai.service.provider.AiModelEndpoint;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderEndpoint;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderType;
+import online.yudream.base.infra.platform.ai.service.provider.DeepSeekProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.OpenAiProviderAdapter;
+import online.yudream.base.infra.platform.ai.service.provider.ResolvedAiModel;
 import online.yudream.base.infra.platform.ai.service.provider.OpenAiCompatibleProviderAdapter;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolExecutionScope;
 import online.yudream.base.infra.platform.plugin.service.PluginAiToolRegistry;
@@ -189,6 +191,25 @@ class OpenAiCompatibleGenerationGatewayTest {
     }
 
     @Test
+    void shouldKeepNativeJsonResponseFormatAndAddJsonCompanionOnlyForStructuredDeepSeekRequests() {
+        DeepSeekProviderAdapter adapter = new DeepSeekProviderAdapter();
+        AiProviderEndpoint provider = new AiProviderEndpoint(
+                "deepseek", "DeepSeek", AiProviderType.DEEPSEEK, "https://api.deepseek.com/v1", "/chat/completions",
+                "key", null, "deepseek-chat", null, null, List.of(), List.of(), List.of(), true
+        );
+        AiModelEndpoint model = new AiModelEndpoint("deepseek-chat", "DeepSeek Chat", "deepseek-chat", null, null, false, null, "chat", false);
+        ResolvedAiModel resolved = new ResolvedAiModel(provider, model, adapter);
+        OpenAiCompatibleGenerationGateway gateway = gatewayWithGlobalTools();
+        AiGenerationRequest base = new AiGenerationRequest("existing instructions", "user", null, "deepseek", "deepseek-chat", Map.of());
+
+        assertThat(adapter.chatOptions(provider, model, base.withStructuredOutput(AiStructuredOutput.jsonObject()))
+                .getResponseFormat().getType()).isEqualTo(ResponseFormat.Type.JSON_OBJECT);
+        assertThat(systemPrompt(gateway, base.withStructuredOutput(AiStructuredOutput.jsonObject()), resolved))
+                .contains("existing instructions", "必须仅返回合法 JSON 对象", "{\"result\":\"value\"}");
+        assertThat(systemPrompt(gateway, base, resolved)).isEqualTo("existing instructions");
+    }
+
+    @Test
     void shouldDowngradeOnlyExplicitUnsupportedStructuredOutputErrors() {
         AiGenerationRequest schemaRequest = new AiGenerationRequest(
                 "Return JSON", "user", null, "openai", "gpt", Map.of()
@@ -284,6 +305,14 @@ class OpenAiCompatibleGenerationGatewayTest {
                 null,
                 null
         );
+    }
+
+    private String systemPrompt(
+            OpenAiCompatibleGenerationGateway gateway,
+            AiGenerationRequest request,
+            ResolvedAiModel resolved
+    ) {
+        return (String) ReflectionTestUtils.invokeMethod(gateway, "systemPrompt", request, resolved);
     }
 
     private String inputSchema(OpenAiCompatibleGenerationGateway gateway, AiAgentToolDescriptor descriptor) {
