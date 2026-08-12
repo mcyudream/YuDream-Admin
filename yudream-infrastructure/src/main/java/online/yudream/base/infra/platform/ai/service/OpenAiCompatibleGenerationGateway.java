@@ -338,7 +338,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         AiGenerationRequest effectiveRequest = request.withToolCallingEnabled(!callbacks.isEmpty());
         ChatClient.ChatClientRequestSpec spec = ChatClient.create(chatModel(resolved, effectiveRequest))
                 .prompt()
-                .system(request.systemPrompt())
+                .system(systemPrompt(request, resolved))
                 .messages(historyMessages(request.history()))
                 .user(user -> {
                     user.text(request.userPrompt());
@@ -351,6 +351,16 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             spec.toolCallbacks(callbacks);
         }
         return spec;
+    }
+
+    private String systemPrompt(AiGenerationRequest request, ResolvedAiModel resolved) {
+        String prompt = request.systemPrompt() == null ? "" : request.systemPrompt().trim();
+        if (resolved.provider().type() != online.yudream.base.infra.platform.ai.service.provider.AiProviderType.DEEPSEEK
+                || !request.structuredOutput().enabled()) {
+            return prompt;
+        }
+        String instruction = "必须仅返回合法 JSON 对象，不要使用 Markdown 代码块。示例：{\"result\":\"value\"}";
+        return StringUtils.hasText(prompt) ? prompt + "\n" + instruction : instruction;
     }
 
     private OpenAiChatModel chatModel(ResolvedAiModel resolved, AiGenerationRequest request) {

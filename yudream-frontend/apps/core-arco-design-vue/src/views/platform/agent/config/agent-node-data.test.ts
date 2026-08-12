@@ -2,7 +2,7 @@ import type { AgentNodeTemplate } from '../components/types'
 import assert from 'node:assert/strict'
 // eslint-disable-next-line test/no-import-node-test -- this workspace runs lightweight TS tests with Node.
 import { test } from 'node:test'
-import { agentModelKind, agentSourceHandles, createAgentNodeData, declaresAgentNodeToolConfig, normalizeAgentNodeData } from './agent-node-data'
+import { agentModelKind, agentSourceHandles, createAgentNodeData, declaresAgentNodeToolConfig, extractOutputSchemaDefault, normalizeAgentNodeData } from './agent-node-data'
 
 const template: AgentNodeTemplate = {
   kind: 'search',
@@ -102,7 +102,13 @@ test('聊天模型节点使用独立的工具、结构化输出和视觉输入�
   assert.equal(first.toolConfigDeclared, true)
   assert.deepEqual(first.toolCodes, [])
   assert.notEqual(first.toolCodes, second.toolCodes)
-  assert.equal(createAgentNodeData(extractTemplate).outputSchema, '')
+  const extract = createAgentNodeData(extractTemplate)
+  assert.equal(extract.outputSchema, extractOutputSchemaDefault)
+  assert.deepEqual(JSON.parse(extract.outputSchema), {
+    type: 'object',
+    properties: {},
+    additionalProperties: false,
+  })
   assert.deepEqual(createAgentNodeData(classifyTemplate).classes, [])
   assert.equal(createAgentNodeData(visionTemplate).inputVariable, 'query')
   assert.equal(createAgentNodeData(visionTemplate).imageVariable, '')
@@ -115,6 +121,8 @@ test('历史模型节点未声明工具配置时保持兼容状态，显式声�
   assert.equal(normalizeAgentNodeData(llmTemplate, { toolMode: 'NONE', toolCodes: [] }).toolConfigDeclared, false)
   assert.equal(normalizeAgentNodeData(llmTemplate, { toolConfigDeclared: true, toolMode: 'NONE', toolCodes: [] }).toolConfigDeclared, true)
   assert.equal(normalizeAgentNodeData(understandTemplate, { toolConfigDeclared: true }).toolConfigDeclared, false)
+  assert.equal(createAgentNodeData(understandTemplate).strictJson, true)
+  assert.equal(normalizeAgentNodeData(understandTemplate, { strictJson: false }).strictJson, false)
 })
 
 test('工具声明判定兼容旧的工具列表和 ACTIVE 调用模式', () => {

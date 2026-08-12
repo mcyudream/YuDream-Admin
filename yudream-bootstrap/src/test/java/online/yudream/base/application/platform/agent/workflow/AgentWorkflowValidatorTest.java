@@ -234,6 +234,19 @@ class AgentWorkflowValidatorTest {
         assertThatThrownBy(() -> validator.validate(workflow(
                 """
                 {"id":"start","data":{"kind":"start"}},
+                {"id":"extract","data":{"kind":"extract","providerCode":"openai","modelCode":"gpt-5"}},
+                {"id":"end","data":{"kind":"end"}}
+                """,
+                """
+                {"source":"start","target":"extract"},
+                {"source":"extract","target":"end"}
+                """
+        ), nonVisionCatalog)).isInstanceOf(AgentWorkflowDefinitionException.class)
+                .hasMessageContaining("输出格式不能为空");
+
+        assertThatThrownBy(() -> validator.validate(workflow(
+                """
+                {"id":"start","data":{"kind":"start"}},
                 {"id":"extract","data":{"kind":"extract","providerCode":"openai","modelCode":"gpt-5","outputSchema":"[]"}},
                 {"id":"end","data":{"kind":"end"}}
                 """,

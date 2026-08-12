@@ -161,7 +161,7 @@ public final class AgentWorkflowValidator {
     private void validateOutputSchema(AgentWorkflowNode node) {
         JsonNode value = node.data().path("outputSchema");
         if (value.isMissingNode() || value.isNull() || (value.isTextual() && value.asText().isBlank())) {
-            return;
+            throw invalid(node, "输出格式不能为空且必须为 JSON 对象");
         }
         if (value.isObject()) {
             return;

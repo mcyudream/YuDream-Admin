@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { AgentFlowNode, AgentNodeData } from './types'
 import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
-import { agentModelKind, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
+import AgentJsonCodeEditor from './AgentJsonCodeEditor.vue'
+import { agentModelKind, extractOutputSchemaDefault, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
 const props = defineProps<{
   node: AgentFlowNode
@@ -228,8 +229,8 @@ function changeClasses(value: unknown) {
         <h3>结构化输出</h3>
         <label class="form-field required">
           <span>输出 JSON Schema</span>
-          <FaTextarea :model-value="node.data.outputSchema" class="w-full" input-class="font-mono" :autosize="{ minRows: 8, maxRows: 16 }" placeholder='例如：{"type":"object","properties":{"title":{"type":"string"}}}' @update:model-value="updateField('outputSchema', $event)" />
-          <small>必须是 JSON 对象；模型结果将按该结构写入输出变量。</small>
+          <AgentJsonCodeEditor :model-value="node.data.outputSchema" :default-value="extractOutputSchemaDefault" @update:model-value="updateField('outputSchema', $event)" />
+          <small>必须是 JSON 对象；严格 JSON 输出由模型提供方的 response_format 配置保证。</small>
         </label>
       </section>
 

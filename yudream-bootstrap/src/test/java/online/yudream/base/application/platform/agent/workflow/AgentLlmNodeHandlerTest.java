@@ -170,14 +170,15 @@ class AgentLlmNodeHandlerTest {
     }
 
     @Test
-    void extractWithoutSchemaShouldRequestJsonObjectMode() {
+    void extractShouldRequireAnExplicitOutputSchemaBeforeCallingTheModel() {
         CapturingGateway gateway = new CapturingGateway("{\"title\":\"Agent\"}", List.of());
 
-        execute("extract", """
+        assertThatThrownBy(() -> execute("extract", """
                 {"id":"extract","data":{"kind":"extract","providerCode":"p","modelCode":"m"}}
-                """, state(gateway, List.of()), gateway);
-
-        assertThat(gateway.requests.getFirst().structuredOutput().mode()).isEqualTo(AiStructuredOutput.Mode.JSON_OBJECT);
+                """, state(gateway, List.of()), gateway))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("输出格式不能为空");
+        assertThat(gateway.requests).isEmpty();
     }
 
     @Test

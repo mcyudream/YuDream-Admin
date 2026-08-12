@@ -465,6 +465,9 @@ importers:
       '@codemirror/lang-javascript':
         specifier: 'catalog:'
         version: 6.2.5
+      '@codemirror/lang-json':
+        specifier: 'catalog:'
+        version: 6.0.2
       '@codemirror/language':
         specifier: 'catalog:'
         version: 6.12.4

@@ -1,5 +1,11 @@
 import type { AgentNodeData, AgentNodeKind, AgentNodeTemplate, AgentToolMode } from '../components/types'
 
+export const extractOutputSchemaDefault = JSON.stringify({
+  type: 'object',
+  properties: {},
+  additionalProperties: false,
+}, null, 2)
+
 const variableDefaults: Record<AgentNodeKind, { input: string, output: string }> = {
   input: { input: 'request', output: 'query' },
   start: { input: 'input', output: 'query' },
@@ -52,7 +58,8 @@ export function createAgentNodeData(template: AgentNodeTemplate, overrides: Part
     toolMode: 'NONE',
     toolConfigDeclared: isAgentToolConfigModelNode(template.kind),
     toolCode: '',
-    outputSchema: '',
+    outputSchema: template.kind === 'extract' ? extractOutputSchemaDefault : '',
+    strictJson: template.kind === 'understand',
     imageVariable: '',
     condition: '',
     code: '',
