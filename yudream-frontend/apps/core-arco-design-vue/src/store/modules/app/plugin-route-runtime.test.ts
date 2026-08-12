@@ -7,6 +7,8 @@ const modules = indexPluginRuntimeModules([{
   moduleName: 'minecraftServer',
   entry: '/plugins/minecraft-server/remoteEntry.js',
   sdkVersion: '1.2.0',
+  styles: ['assets/minecraft.css'],
+  scripts: ['assets/bootstrap.js'],
   routes: [],
 }])
 
@@ -22,6 +24,8 @@ test('binds the persisted menu component to its enabled remote module', () => {
     entry: '/plugins/minecraft-server/remoteEntry.js',
     moduleName: 'minecraftServer',
     sdkVersion: '1.2.0',
+    styles: ['assets/minecraft.css'],
+    scripts: ['assets/bootstrap.js'],
   })
 })
 
@@ -42,5 +46,7 @@ test('falls back to the default remote entry when the manifest is unavailable', 
     entry: undefined,
     moduleName: 'disabledModule',
     sdkVersion: undefined,
+    styles: [],
+    scripts: [],
   })
 })

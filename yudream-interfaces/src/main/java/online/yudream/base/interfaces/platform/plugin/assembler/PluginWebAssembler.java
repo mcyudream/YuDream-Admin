@@ -74,6 +74,8 @@ public class PluginWebAssembler {
                 .menuComponent(dto.getMenuComponent())
                 .menuLink(dto.getMenuLink())
                 .menuPermission(dto.getMenuPermission())
+                .styles(dto.getStyles())
+                .scripts(dto.getScripts())
                 .routes(dto.getRoutes().stream().map(PluginWebAssembler::toRes).toList())
                 .build();
     }

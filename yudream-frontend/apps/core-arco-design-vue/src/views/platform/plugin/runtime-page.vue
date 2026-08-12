@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
+import { loadPluginFrontendAssets } from '@/plugins/frontend-assets'
 import { createPluginSdk } from '@/plugins/sdk'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
@@ -10,6 +11,8 @@ interface PluginRouteMeta {
   entry?: string
   moduleName?: string
   sdkVersion?: string
+  styles?: string[]
+  scripts?: string[]
 }
 
 const route = useRoute()
@@ -33,6 +36,7 @@ async function loadRemoteComponent() {
 
   remoteLoading.value = true
   try {
+    await loadPluginFrontendAssets(plugin.value)
     const entry = plugin.value.entry || `/api/platform/plugins/${plugin.value.pluginCode}/assets/remoteEntry.js`
     const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
     await mountPluginModule(module)

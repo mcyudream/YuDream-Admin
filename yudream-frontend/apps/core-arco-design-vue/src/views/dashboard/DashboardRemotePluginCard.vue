@@ -2,6 +2,7 @@
 import type { Component } from 'vue'
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
+import { loadPluginFrontendAssetsByCode } from '@/plugins/frontend-assets'
 import { createPluginSdk } from '@/plugins/sdk'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
@@ -30,6 +31,7 @@ async function loadRemoteComponent() {
 
   remoteLoading.value = true
   try {
+    await loadPluginFrontendAssetsByCode(props.card.pluginCode)
     const entry = `/api/platform/plugins/${props.card.pluginCode}/assets/remoteEntry.js`
     const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
     await mountPluginModule(module)

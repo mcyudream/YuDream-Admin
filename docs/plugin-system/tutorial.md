@@ -199,6 +199,8 @@ META-INF/yudream-plugin/frontend/demo-plugin/remoteEntry.js
 
 主前端会根据插件 frontend manifest 加载 remote entry，并把 SDK 和路由上下文传给插件页面。插件前端应使用宿主提供的 SDK/client，不要捆绑私有 axios 实例。
 
+样式既可使用 `styles.css?inline` 在插件 `install()` 中注入（需始终更新已有 style 标签的 `textContent`），也可在 `PluginFrontendModule.styles` 中声明 JAR 内的独立 CSS。`scripts` 可声明必须早于 remote entry 执行的 module script；remote entry 的普通动态 import chunk 会由浏览器自动加载。图片、字体、JSON 等独立资源放入同一前端目录后，可通过 `sdk.assets.url("assets/example.svg")` 生成 URL。
+
 `@PluginRoute.component` 应指向插件导出的页面组件，例如 `Home`、`AdminSettings`、`pages/Home`。一个主要页面对应一个真实组件，不要把多个大功能都塞进一个 tab 页面。
 
 ## 7. 菜单和排序

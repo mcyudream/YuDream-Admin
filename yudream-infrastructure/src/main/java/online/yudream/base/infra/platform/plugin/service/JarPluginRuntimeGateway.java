@@ -512,7 +512,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 module.routes().stream().map(this::toInfo).toList(),
                 module.parentCode(),
                 true,
-                MenuStatus.ACTIVE
+                MenuStatus.ACTIVE,
+                module.styles(),
+                module.scripts()
         );
     }
 
@@ -594,6 +596,42 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         }
         if (lower.endsWith(".woff")) {
             return "font/woff";
+        }
+        if (lower.endsWith(".ttf")) {
+            return "font/ttf";
+        }
+        if (lower.endsWith(".otf")) {
+            return "font/otf";
+        }
+        if (lower.endsWith(".gif")) {
+            return "image/gif";
+        }
+        if (lower.endsWith(".avif")) {
+            return "image/avif";
+        }
+        if (lower.endsWith(".ico")) {
+            return "image/x-icon";
+        }
+        if (lower.endsWith(".webmanifest")) {
+            return "application/manifest+json";
+        }
+        if (lower.endsWith(".wasm")) {
+            return "application/wasm";
+        }
+        if (lower.endsWith(".pdf")) {
+            return "application/pdf";
+        }
+        if (lower.endsWith(".mp4")) {
+            return "video/mp4";
+        }
+        if (lower.endsWith(".webm")) {
+            return "video/webm";
+        }
+        if (lower.endsWith(".mp3")) {
+            return "audio/mpeg";
+        }
+        if (lower.endsWith(".ogg")) {
+            return "audio/ogg";
         }
         return "application/octet-stream";
     }

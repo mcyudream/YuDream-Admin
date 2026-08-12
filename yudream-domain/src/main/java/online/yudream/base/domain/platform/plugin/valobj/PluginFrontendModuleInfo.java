@@ -15,8 +15,17 @@ public record PluginFrontendModuleInfo(
         String menuIcon,
         Integer menuSort,
         List<PluginFrontendRouteInfo> routes,
-        PluginMenuOverrideInfo menuOverride
+        PluginMenuOverrideInfo menuOverride,
+        List<String> styles,
+        List<String> scripts
 ) {
+    public PluginFrontendModuleInfo(String pluginCode, String entry, String moduleName, String sdkVersion,
+                                    String integrity, String menuTitle, String menuIcon, Integer menuSort,
+                                    List<PluginFrontendRouteInfo> routes, PluginMenuOverrideInfo menuOverride) {
+        this(pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon, menuSort, routes, menuOverride,
+                List.of(), List.of());
+    }
+
     public PluginFrontendModuleInfo(String pluginCode, String entry, String moduleName, String sdkVersion,
                                     String integrity, String menuTitle, String menuIcon, Integer menuSort,
                                     List<PluginFrontendRouteInfo> routes) {
@@ -33,6 +42,14 @@ public record PluginFrontendModuleInfo(
                                     List<PluginFrontendRouteInfo> routes, String parentCode, Boolean visible,
                                     MenuStatus status) {
         this(pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon, menuSort, routes,
+                parentCode, visible, status, List.of(), List.of());
+    }
+
+    public PluginFrontendModuleInfo(String pluginCode, String entry, String moduleName, String sdkVersion,
+                                    String integrity, String menuTitle, String menuIcon, Integer menuSort,
+                                    List<PluginFrontendRouteInfo> routes, String parentCode, Boolean visible,
+                                    MenuStatus status, List<String> styles, List<String> scripts) {
+        this(pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon, menuSort, routes,
                 PluginMenuOverrideInfo.builder()
                         .name(menuTitle)
                         .type(MenuNodeType.CATEGORY)
@@ -41,7 +58,7 @@ public record PluginFrontendModuleInfo(
                         .sort(menuSort)
                         .visible(visible)
                         .status(status)
-                        .build());
+                        .build(), styles, scripts);
     }
 
     public PluginFrontendModuleInfo(String pluginCode, String entry, String moduleName, String sdkVersion,
@@ -70,6 +87,8 @@ public record PluginFrontendModuleInfo(
     public PluginFrontendModuleInfo {
         menuSort = menuSort == null ? 0 : menuSort;
         routes = routes == null ? List.of() : List.copyOf(routes);
+        styles = styles == null ? List.of() : List.copyOf(styles);
+        scripts = scripts == null ? List.of() : List.copyOf(scripts);
     }
 
     public static PluginFrontendModuleInfo withMenuOverride(PluginFrontendModuleInfo declaration,
@@ -77,7 +96,8 @@ public record PluginFrontendModuleInfo(
                                                             List<PluginFrontendRouteInfo> routes) {
         return new PluginFrontendModuleInfo(
                 declaration.pluginCode(), declaration.entry(), declaration.moduleName(), declaration.sdkVersion(),
-                declaration.integrity(), override.name(), override.icon(), override.sort(), routes, override
+                declaration.integrity(), override.name(), override.icon(), override.sort(), routes, override,
+                declaration.styles(), declaration.scripts()
         );
     }
 
@@ -86,7 +106,7 @@ public record PluginFrontendModuleInfo(
         return new PluginFrontendModuleInfo(
                 pluginCode, entry, moduleName, sdkVersion, integrity, menuTitle, menuIcon,
                 overriddenMenuSort, overriddenRoutes,
-                menuOverride == null ? null : menuOverride.withSort(overriddenMenuSort)
+                menuOverride == null ? null : menuOverride.withSort(overriddenMenuSort), styles, scripts
         );
     }
 
@@ -98,7 +118,7 @@ public record PluginFrontendModuleInfo(
                 module.pluginCode(), module.entry(), module.moduleName(), module.sdkVersion(),
                 module.integrity(), module.menuTitle(), module.menuIcon(), module.menuSort(),
                 module.routes().stream().filter(PluginFrontendRouteInfo::publicAccess).toList(),
-                module.menuOverride()
+                module.menuOverride(), module.styles(), module.scripts()
         );
     }
 
