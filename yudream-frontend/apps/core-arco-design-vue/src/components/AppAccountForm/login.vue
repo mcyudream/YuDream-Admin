@@ -13,6 +13,7 @@ defineOptions({
 
 const props = defineProps<{
   account?: string
+  bindingToken?: string
 }>()
 
 const emits = defineEmits<{
@@ -32,7 +33,7 @@ const passkeyLoading = ref(false)
 const type = ref<'password' | 'passkey'>('password')
 const loginTabs = computed(() => [
   { label: '账号密码登录', value: 'password' },
-  ...(appFeatureStore.passkeyEnabled ? [{ label: 'Passkey 登录', value: 'passkey' }] : []),
+  ...(!props.bindingToken && appFeatureStore.passkeyEnabled ? [{ label: 'Passkey 登录', value: 'passkey' }] : []),
 ])
 
 onMounted(() => {
@@ -61,7 +62,10 @@ const form = useForm({
 const onSubmit = form.handleSubmit(async (values) => {
   loading.value = true
   try {
-    await appAccountStore.login(values)
+    await appAccountStore.login({
+      ...values,
+      bindingToken: props.bindingToken,
+    })
     rememberAccount(values.account, values.remember)
     emits('onLogin', values.account)
   }

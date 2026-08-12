@@ -55,6 +55,7 @@ public class UserWebAssembler {
                 .email(request.getEmail())
                 .password(request.getPassword())
                 .nickname(request.getNickname())
+                .bindingToken(request.getBindingToken())
                 .build();
     }
 

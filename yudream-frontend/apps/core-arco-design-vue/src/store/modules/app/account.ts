@@ -70,6 +70,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   async function login(data: {
     account: string
     password: string
+    bindingToken?: string
   }) {
     const res = await apiUser.login(data)
     clearImpersonatorSession()
@@ -90,6 +91,16 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     clearImpersonatorSession()
     applyLoginData(res.data)
     await loadContext()
+  }
+
+  async function initializeSession(session: LoginData) {
+    clearImpersonatorSession()
+    applyLoginData(session)
+    await loadContext()
+    await refreshDynamicRoutes(router)
+    appTabbarStore.clean()
+    appKeepAliveStore.clean()
+    appMenuStore.setActived(0)
   }
 
   async function refreshAccessToken() {
@@ -216,6 +227,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     email: string
     password: string
     nickname?: string
+    bindingToken?: string
   }) {
     await apiUser.register(data)
   }
@@ -388,6 +400,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     impersonatorAccount,
     login,
     passkeyLogin,
+    initializeSession,
     refreshAccessToken,
     impersonate,
     exitImpersonation,

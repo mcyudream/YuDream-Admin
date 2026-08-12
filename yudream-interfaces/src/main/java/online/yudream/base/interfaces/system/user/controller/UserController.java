@@ -79,7 +79,7 @@ public class UserController {
     @PostMapping("/login")
     public Result<UserLoginRes> login(@Valid @RequestBody UserLoginRequest request, HttpServletRequest httpRequest) {
         try {
-            User user = userAppService.login(UserWebAssembler.toLoginCmd(request));
+            User user = userAppService.login(UserWebAssembler.toLoginCmd(request), request.getBindingToken());
             LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
             UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
             recordLoginLog(request, httpRequest, user, true, "success", res.getToken());
