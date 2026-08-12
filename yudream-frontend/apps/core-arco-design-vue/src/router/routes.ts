@@ -15,6 +15,16 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/register',
+    redirect: {
+      name: 'login',
+      query: { form: 'register' },
+    },
+    meta: {
+      public: true,
+    },
+  },
+  {
     path: '/setup',
     name: 'setup',
     component: () => import('@/views/setup.vue'),

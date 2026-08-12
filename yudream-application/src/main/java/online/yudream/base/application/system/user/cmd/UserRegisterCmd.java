@@ -21,4 +21,5 @@ public class UserRegisterCmd implements Serializable {
     private String email;
     private String password;
     private String nickname;
+    private String bindingToken;
 }

@@ -12,6 +12,7 @@ import online.yudream.base.application.system.user.dto.UserProfileDTO;
 import online.yudream.base.application.system.user.dto.UserRegisterDTO;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.service.FileAppService;
+import online.yudream.base.application.system.security.service.ExternalLoginBindingAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.common.service.PasswordEncoder;
 import online.yudream.base.domain.system.user.aggregate.Dept;
@@ -61,13 +62,20 @@ public class UserAppService {
     private final PasswordResetTokenProvider passwordResetTokenProvider;
     private final UserRegisterMailSender userRegisterMailSender;
     private final FileAppService fileAppService;
+    private final ExternalLoginBindingAppService externalLoginBindingAppService;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public User login(UserLoginCmd cmd) {
+        return login(cmd, null);
+    }
+
+    @Transactional
+    public User login(UserLoginCmd cmd, String bindingToken) {
         User user = findLoginUser(cmd);
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
         }
+        externalLoginBindingAppService.claim(bindingToken, user.getId());
         log.info("用户登录成功: id={}, username={}", user.getId(), user.getUsername());
         return user;
     }
@@ -98,6 +106,7 @@ public class UserAppService {
         user.assignRoles(RoleID.of(userRole.getId()));
 
         User saved = userRepo.save(user);
+        externalLoginBindingAppService.claim(cmd.getBindingToken(), saved.getId());
 
         String token = emailVerifyTokenProvider.generate(saved.getId(), email.getValue());
         userRegisterMailSender.sendVerifyEmail(saved.getUsername(), email.getValue(), token);

@@ -143,10 +143,11 @@ async function refreshTokenOnce() {
 }
 
 export default {
-  login: (data: { account: string, password: string }) => {
+  login: (data: { account: string, password: string, bindingToken?: string }) => {
     return userApi.post<unknown, { status: 1, error: '', data: LoginData }>('api/user/login', {
       username: data.account,
       password: data.password,
+      ...(data.bindingToken && { bindingToken: data.bindingToken }),
     }, { skipTokenRefresh: true })
   },
 
@@ -162,7 +163,7 @@ export default {
     return userApi.post<unknown, { status: 1, error: '', data: LoginData }>('api/user/token/refresh', { refreshToken }, { skipTokenRefresh: true })
   },
 
-  register: (data: { username: string, email: string, password: string, nickname?: string }) => {
+  register: (data: { username: string, email: string, password: string, nickname?: string, bindingToken?: string }) => {
     return userApi.post<unknown, { status: 1, error: '', data: RegisterData }>('api/user/register', data, { skipTokenRefresh: true })
   },
 

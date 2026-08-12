@@ -10,6 +10,7 @@ defineOptions({
 
 const props = defineProps<{
   account?: string
+  bindingToken?: string
 }>()
 
 const emits = defineEmits<{
@@ -48,9 +49,10 @@ const onSubmit = form.handleSubmit((values) => {
     email: values.email,
     nickname: values.nickname,
     password: values.password,
+    bindingToken: props.bindingToken,
   }).then(() => {
     useFaToast().success('注册成功', {
-      description: '验证邮件已发送，请前往邮箱查收并验证后再登录',
+      description: props.bindingToken ? '验证邮件已发送，验证后将绑定该第三方账号' : '验证邮件已发送，请前往邮箱查收并验证后再登录',
     })
     emits('onRegister', values.account)
   }).finally(() => {
@@ -67,7 +69,7 @@ const onSubmit = form.handleSubmit((values) => {
           探索从这里开始 🚀
         </h3>
         <p class="text-sm text-muted-foreground lg:text-base">
-          注册后即可开启旅程
+          {{ props.bindingToken ? '注册后将绑定该第三方账号' : '注册后即可开启旅程' }}
         </p>
       </div>
       <FormField v-slot="{ componentField, errors }" name="account">

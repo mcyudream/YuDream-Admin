@@ -16,4 +16,5 @@ public class UserLoginRequest implements Serializable {
     @NotBlank(message = "密码不能为空")
     @PasswordRule
     private String password;
+    private String bindingToken;
 }

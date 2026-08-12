@@ -24,7 +24,10 @@ const redirect = ref(route.query.redirect?.toString() ?? appSettingsStore.settin
 const layoutAlign = ref<'left' | 'center' | 'right'>('center')
 // 表单相关
 const account = ref<string>()
-const formType = ref<'login' | 'register' | 'resetPassword'>('login')
+const bindingToken = typeof route.query.externalLoginBindingToken === 'string' && route.query.externalLoginBindingToken
+  ? route.query.externalLoginBindingToken
+  : undefined
+const formType = ref<'binding' | 'login' | 'register' | 'resetPassword'>(bindingToken && route.query.form !== 'register' ? 'binding' : route.query.form === 'register' ? 'register' : 'login')
 const externalProviders = ref<{ code: string, supportedTypes: string }[]>([])
 const externalTypes = computed(() => [...new Set(externalProviders.value.flatMap(provider => provider.supportedTypes.split(',').map(item => item.trim().toLowerCase())))])
 const externalTypeMeta: Record<string, { label: string, icon: string }> = { qq: { label: 'QQ 登录', icon: 'i-ri:qq-line' }, wx: { label: '微信登录', icon: 'i-ri:wechat-line' }, google: { label: 'Google 登录', icon: 'i-ri:google-line' }, gitee: { label: 'Gitee 登录', icon: 'i-ri:git-repository-line' }, github: { label: 'GitHub 登录', icon: 'i-ri:github-line' } }
@@ -76,9 +79,31 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
     </div>
     <div class="login-form flex-col-center">
       <div class="w-full">
+        <template v-if="formType === 'binding'">
+          <div class="p-12 flex-col-stretch-center min-h-500px w-full">
+            <div class="mb-8 space-y-2">
+              <h3 class="text-4xl font-bold">
+                绑定第三方账号
+              </h3>
+              <p class="text-sm text-muted-foreground lg:text-base">
+                请选择要绑定的账号类型
+              </p>
+            </div>
+            <FaButton size="lg" class="w-full" @click="formType = 'login'">
+              登录已有账号
+            </FaButton>
+            <FaButton variant="outline" size="lg" class="mt-4 w-full" @click="formType = 'register'">
+              注册新账号
+            </FaButton>
+          </div>
+        </template>
+        <div v-if="bindingToken && formType !== 'binding'" class="mx-12 mt-8 border border-primary/30 rounded-md bg-primary/5 px-4 py-3 text-sm text-primary">
+          该第三方账号尚未绑定。请登录已有账号完成绑定，或注册新账号后绑定。
+        </div>
         <template v-if="formType === 'login'">
           <Login
             :account
+            :binding-token="bindingToken"
             @on-login="handleLogin"
             @on-register="(val) => { formType = 'register'; account = val }"
             @on-reset-password="(val) => { formType = 'resetPassword'; account = val }"
@@ -92,6 +117,7 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
         <Register
           v-if="formType === 'register'"
           :account
+          :binding-token="bindingToken"
           @on-register="(val) => { formType = 'login'; account = val }"
           @on-login="formType = 'login'"
         />

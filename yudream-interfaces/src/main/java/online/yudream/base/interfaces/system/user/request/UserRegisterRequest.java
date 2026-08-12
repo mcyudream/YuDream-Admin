@@ -26,4 +26,6 @@ public class UserRegisterRequest implements Serializable {
     private String password;
 
     private String nickname;
+
+    private String bindingToken;
 }
