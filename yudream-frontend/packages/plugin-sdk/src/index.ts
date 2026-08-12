@@ -35,6 +35,10 @@ export interface YuDreamPluginFilesClient {
   assetUrl: (url?: string) => string
 }
 
+export interface YuDreamPluginAssetsClient {
+  url: (path: string) => string
+}
+
 export interface YuDreamPluginAccount {
   userId: string
   username: string
@@ -50,6 +54,7 @@ export interface YuDreamPluginSdk {
   account: YuDreamPluginAccount
   http: YuDreamPluginHttpClient
   files: YuDreamPluginFilesClient
+  assets: YuDreamPluginAssetsClient
 }
 
 export interface YuDreamPluginPageProps {

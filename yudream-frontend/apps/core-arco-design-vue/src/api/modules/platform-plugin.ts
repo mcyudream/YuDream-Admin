@@ -63,6 +63,8 @@ export interface PluginFrontendModule {
   moduleName?: string
   sdkVersion?: string
   integrity?: string
+  styles?: string[]
+  scripts?: string[]
   menuTitle?: string
   menuIcon?: string
   menuSort?: number

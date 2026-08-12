@@ -33,6 +33,11 @@
 `ci/verify-plugin-jar-assets.sh` 还应额外保证最终插件 JAR 中不包含
 `online/yudream/base/plugin/spi/*` 类文件，避免把主体 SPI 契约重新打进插件产物。
 
+前端产物应将 `remoteEntry.js`、其独立 JS chunk、CSS、图片和字体一并放入
+`META-INF/yudream-plugin/frontend/{pluginCode}/`。需要由宿主预加载的 CSS 或 module script 在
+`PluginFrontendModule.styles` / `scripts` 声明相对路径；动态 import chunk 不必重复声明。仍可使用
+`styles.css?inline` 在 `install()` 注入样式，作为无需独立 CSS 的兼容方式。
+
 ## 前端工作区边界
 
 插件仓前端工作区应保持为：

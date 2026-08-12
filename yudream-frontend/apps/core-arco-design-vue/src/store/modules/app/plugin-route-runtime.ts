@@ -8,6 +8,8 @@ export interface PluginRuntimeRouteMeta {
   entry?: string
   moduleName: string
   sdkVersion?: string
+  styles?: string[]
+  scripts?: string[]
 }
 
 export function indexPluginRuntimeModules(modules: PluginFrontendModule[]) {
@@ -39,6 +41,8 @@ export function resolvePluginRuntimeRoute(
     entry: module?.entry,
     moduleName,
     sdkVersion: module?.sdkVersion || manifestSdkVersion,
+    styles: module?.styles || [],
+    scripts: module?.scripts || [],
   }
 }
 
@@ -87,6 +91,8 @@ async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
             entry: module.entry,
             moduleName: module.moduleName,
             sdkVersion: module.sdkVersion || res.data.sdkVersion,
+            styles: module.styles || [],
+            scripts: module.scripts || [],
           },
         },
       })

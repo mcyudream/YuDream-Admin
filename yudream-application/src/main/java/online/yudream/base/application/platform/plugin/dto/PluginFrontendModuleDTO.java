@@ -41,5 +41,11 @@ public class PluginFrontendModuleDTO implements Serializable {
     private String menuPermission;
 
     @Builder.Default
+    private List<String> styles = new ArrayList<>();
+
+    @Builder.Default
+    private List<String> scripts = new ArrayList<>();
+
+    @Builder.Default
     private List<PluginFrontendRouteDTO> routes = new ArrayList<>();
 }

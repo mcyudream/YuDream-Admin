@@ -60,6 +60,8 @@ public class PluginAssembler {
                 .menuTitle(module.menuTitle())
                 .menuIcon(module.menuIcon())
                 .menuSort(module.menuSort())
+                .styles(module.styles())
+                .scripts(module.scripts())
                 .routes(module.routes() == null ? List.of() : module.routes().stream().map(PluginAssembler::toDTO).toList())
                 .build();
     }
@@ -84,6 +86,8 @@ public class PluginAssembler {
                 .menuComponent(module.menuComponent())
                 .menuLink(module.menuLink())
                 .menuPermission(module.menuPermission())
+                .styles(module.styles())
+                .scripts(module.scripts())
                 .routes(module.routes().stream().map(PluginAssembler::toDTO).toList())
                 .build();
     }

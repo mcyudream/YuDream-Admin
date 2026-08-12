@@ -207,6 +207,14 @@ META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js
 META-INF/yudream-plugin/frontend/{pluginCode}/assets/*
 ```
 
+插件可同时采用以下资源方式：
+
+- **内联样式（兼容模式）**：使用 `import styles from './styles.css?inline'`，并在 `install()` 中创建或更新宿主 `<style>` 的 `textContent`。宿主不会自动加载未声明的独立 CSS。
+- **独立资源**：在 `PluginFrontendModule` 的 `styles` 与 `scripts` 中声明相对路径，例如 `List.of("assets/plugin.css")` 与 `List.of("assets/bootstrap.js")`。宿主在导入 `remoteEntry.js` 前按声明顺序加载 CSS 和 module script。
+- **其他静态资源**：随 JAR 放入同一前端目录；插件通过 `sdk.assets.url("assets/logo.svg")` 取得资源 URL。路径必须是相对路径，且不得包含 `..` 或反斜杠。
+
+Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图片、字体能从插件 `/assets/**` 地址加载；动态 import 的 JS chunk 无须额外写入 `scripts`。
+
 ## 10. 菜单与路由规范
 
 插件菜单由 `@PluginFrontend` 和 `@PluginRoute` 声明。

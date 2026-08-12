@@ -4,6 +4,7 @@ import * as Vue from 'vue'
 import * as VueRouter from 'vue-router'
 import apiFiles from '@/api/modules/files'
 import apiPlugin from '@/api/modules/platform-plugin'
+import { pluginFrontendAssetUrl } from '@/plugins/frontend-assets'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
@@ -57,6 +58,11 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
         }
       },
       assetUrl: toBackendAssetUrl,
+    },
+    assets: {
+      url(path: string) {
+        return pluginFrontendAssetUrl(pluginCode, path)
+      },
     },
   }
 }
