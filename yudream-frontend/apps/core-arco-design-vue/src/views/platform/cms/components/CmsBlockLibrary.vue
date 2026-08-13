@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn } from '@yudream/components'
 import type { CmsBlock, CmsBlockKind, CmsBlockPayload } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
 
@@ -40,13 +41,13 @@ const kindOptions: { label: string, value: CmsBlockKind }[] = [
   { label: '预制', value: 'PRESET' },
 ]
 
-const columns = [
-  { title: '编码', dataIndex: 'code', ellipsis: true, tooltip: true },
-  { title: '名称', dataIndex: 'name', ellipsis: true, tooltip: true },
-  { title: '分类', dataIndex: 'category' },
-  { title: '类型', slotName: 'kind' },
-  { title: '启用状态', slotName: 'enabled', width: 100 },
-  { title: '操作', slotName: 'operations', width: 180 },
+const columns: TableColumn<CmsBlock>[] = [
+  { accessorKey: 'code', header: '编码', width: 160 },
+  { accessorKey: 'name', header: '名称', width: 180 },
+  { accessorKey: 'category', header: '分类', width: 120 },
+  { id: 'kind', header: '类型', width: 90, align: 'center' },
+  { id: 'enabled', header: '启用状态', width: 100, align: 'center' },
+  { id: 'operation', header: '操作', width: 180, align: 'center' },
 ]
 
 const categoryOptions = computed(() => [
@@ -259,43 +260,89 @@ function onPageSizeChange(size: number) {
         </a-button>
       </div>
 
-      <a-table
+      <FaResponsiveTable
+        v-loading="loading"
+        row-key="id"
+        table-root-class="rounded-lg overflow-hidden"
+        table-class="min-w-[720px]"
+        border
+        stripe
         :columns="columns"
         :data="blocks"
-        :loading="loading"
-        :pagination="{
-          total: pagination.total,
-          current: pagination.page,
-          pageSize: pagination.size,
-          showTotal: true,
-          showJumper: true,
-        }"
-        size="medium"
-        @page-change="onPageChange"
-        @page-size-change="onPageSizeChange"
       >
-        <template #kind="{ record }">
-          <a-tag :color="record.kind === 'PRESET' ? 'blue' : 'green'">
-            {{ kindLabel(record.kind) }}
-          </a-tag>
+        <template #cell-kind="{ row }">
+          <FaTag :variant="row.original.kind === 'PRESET' ? 'default' : 'secondary'">
+            {{ kindLabel(row.original.kind) }}
+          </FaTag>
         </template>
-        <template #enabled="{ record }">
-          <a-switch :model-value="record.enabled" size="small" @change="toggleEnable(record)" />
+        <template #cell-enabled="{ row }">
+          <FaSwitch :model-value="row.original.enabled" @update:model-value="toggleEnable(row.original)" />
         </template>
-        <template #operations="{ record }">
-          <a-space>
-            <a-button type="text" size="small" @click="openEdit(record)">
+        <template #cell-operation="{ row }">
+          <div class="flex flex-wrap gap-2">
+            <FaButton size="sm" variant="outline" @click="openEdit(row.original)">
               编辑
-            </a-button>
-            <a-button type="text" size="small" @click="toggleEnable(record)">
-              {{ record.enabled ? '禁用' : '启用' }}
-            </a-button>
-            <a-button type="text" size="small" status="danger" @click="confirmDelete(record)">
+            </FaButton>
+            <FaButton size="sm" variant="outline" @click="toggleEnable(row.original)">
+              {{ row.original.enabled ? '禁用' : '启用' }}
+            </FaButton>
+            <FaButton size="sm" variant="destructive" @click="confirmDelete(row.original)">
               删除
-            </a-button>
-          </a-space>
+            </FaButton>
+          </div>
         </template>
-      </a-table>
+
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <FaTag :variant="row.kind === 'PRESET' ? 'default' : 'secondary'">
+                  {{ kindLabel(row.kind) }}
+                </FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                  <span class="break-all font-mono">{{ row.code }}</span>
+                </div>
+                <div v-if="row.category" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">分类</span>
+                  <span>{{ row.category }}</span>
+                </div>
+                <div v-if="row.description" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">描述</span>
+                  <span class="break-all">{{ row.description }}</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-secondary-foreground/60">启用</span>
+                <FaSwitch :model-value="row.enabled" @update:model-value="toggleEnable(row)" />
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton size="sm" variant="outline" @click="openEdit(row)">
+                  编辑
+                </FaButton>
+                <FaButton size="sm" variant="outline" @click="toggleEnable(row)">
+                  {{ row.enabled ? '禁用' : '启用' }}
+                </FaButton>
+                <FaButton size="sm" variant="destructive" @click="confirmDelete(row)">
+                  删除
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
+
+      <FaPagination
+        v-model:page="pagination.page"
+        v-model:size="pagination.size"
+        :total="pagination.total"
+        class="mt-3"
+        @page-change="onPageChange"
+        @size-change="onPageSizeChange"
+      />
     </div>
 
     <a-modal
