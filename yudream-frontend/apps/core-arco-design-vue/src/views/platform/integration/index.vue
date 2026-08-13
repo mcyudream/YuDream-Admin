@@ -468,7 +468,7 @@ function executionVariant(status: ExecutionStatus) {
         </button>
       </div>
 
-      <FaTable
+      <FaResponsiveTable
         v-if="activeTab === 'connectors'"
         v-loading="loading"
         row-key="id"
@@ -516,9 +516,55 @@ function executionVariant(status: ExecutionStatus) {
             </FaButton>
           </div>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                  <span>{{ row.code }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">方法</span>
+                  <span>{{ row.method }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">地址</span>
+                  <span class="break-all">{{ row.url }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">超时</span>
+                  <span>{{ row.timeoutMillis }}ms</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">重试</span>
+                  <span>{{ row.retryTimes }}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'platform:integration:invoke'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openInvoke(row)">
+                  调用
+                </FaButton>
+                <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditConnector(row)">
+                  编辑
+                </FaButton>
+                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableConnector(row)">
+                  停用
+                </FaButton>
+                <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableConnector(row)">
+                  启用
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
-      <FaTable
+      <FaResponsiveTable
         v-else-if="activeTab === 'httpLogs'"
         v-loading="loading"
         row-key="id"
@@ -556,9 +602,45 @@ function executionVariant(status: ExecutionStatus) {
         <template #cell-errorMessage="{ row }">
           <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.connectorCode }}</span>
+                <FaTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">方法</span>
+                  <span>{{ row.method }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">地址</span>
+                  <span class="break-all">{{ row.url }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">响应码</span>
+                  <span>{{ row.responseStatus }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">耗时</span>
+                  <span>{{ row.durationMillis }}ms</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">调用时间</span>
+                  <span>{{ dateText(row.invokedAt) }}</span>
+                </div>
+                <div v-if="row.errorMessage" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">异常</span>
+                  <span class="break-all">{{ row.errorMessage }}</span>
+                </div>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
-      <FaTable
+      <FaResponsiveTable
         v-else-if="activeTab === 'scripts'"
         v-loading="loading"
         row-key="id"
@@ -609,9 +691,51 @@ function executionVariant(status: ExecutionStatus) {
             </FaButton>
           </div>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                  <span>{{ row.code }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">语言</span>
+                  <span>{{ row.language }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">超时</span>
+                  <span>{{ row.timeoutMillis }}ms</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">更新时间</span>
+                  <span>{{ dateText(row.updateTime) }}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'platform:integration:execute'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openExecute(row)">
+                  执行
+                </FaButton>
+                <FaButton v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="openEditScript(row)">
+                  编辑
+                </FaButton>
+                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'platform:integration:edit'" size="sm" variant="ghost" @click="confirmDisableScript(row)">
+                  停用
+                </FaButton>
+                <FaButton v-else v-auth="'platform:integration:edit'" size="sm" variant="outline" @click="confirmEnableScript(row)">
+                  启用
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
-      <FaTable
+      <FaResponsiveTable
         v-else
         v-loading="loading"
         row-key="id"
@@ -652,7 +776,43 @@ function executionVariant(status: ExecutionStatus) {
         <template #cell-errorMessage="{ row }">
           <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.scriptCode }}</span>
+                <FaTag :variant="executionVariant(row.status)">{{ executionText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">语言</span>
+                  <span>{{ row.language }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">退出码</span>
+                  <span>{{ row.exitCode }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">耗时</span>
+                  <span>{{ row.durationMillis }}ms</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">执行时间</span>
+                  <span>{{ dateText(row.executedAt) }}</span>
+                </div>
+                <div v-if="row.stdout || row.stderr" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">输出</span>
+                  <span class="break-all">{{ row.stdout || row.stderr }}</span>
+                </div>
+                <div v-if="row.errorMessage" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">异常</span>
+                  <span class="break-all">{{ row.errorMessage }}</span>
+                </div>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"

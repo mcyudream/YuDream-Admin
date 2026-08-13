@@ -739,7 +739,7 @@ function normalizeDateTime(value?: string) {
             </FaButton>
           </div>
         </div>
-        <FaTable
+        <FaResponsiveTable
           v-loading="loading"
           row-key="id"
           table-root-class="rounded-lg overflow-hidden"
@@ -784,7 +784,43 @@ function normalizeDateTime(value?: string) {
               吊销
             </FaButton>
           </template>
-        </FaTable>
+
+          <template #card="{ row }">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-base font-semibold break-all">{{ row.name }}</span>
+                  <FaTag :variant="statusVariant(row.status)">
+                    {{ statusText(row.status) }}
+                  </FaTag>
+                </div>
+                <div class="flex flex-col gap-1 text-sm">
+                  <div v-if="row.maskedValue" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">密钥标识</span>
+                    <span class="break-all">{{ row.maskedValue }}</span>
+                  </div>
+                  <div v-if="row.permissions?.length" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">权限</span>
+                    <span class="break-all">{{ row.permissions.map((item: string) => permissionText(item)).join('、') }}</span>
+                  </div>
+                  <div v-if="row.lastUsedTime" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">最后使用</span>
+                    <span>{{ row.lastUsedTime }}</span>
+                  </div>
+                  <div v-if="row.expireTime" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">过期时间</span>
+                    <span>{{ row.expireTime }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 border-t pt-3">
+                  <FaButton v-auth="'system:security:api-key:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevoke(row)">
+                    吊销
+                  </FaButton>
+                </div>
+              </div>
+            </FaCard>
+          </template>
+        </FaResponsiveTable>
         <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="onPageChange" @size-change="onSizeChange" />
       </section>
 
@@ -809,7 +845,7 @@ function normalizeDateTime(value?: string) {
           </div>
         </div>
 
-        <FaTable v-if="oauthPane === 'clients'" row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthClientColumns" :data="oauthClients">
+        <FaResponsiveTable v-if="oauthPane === 'clients'" row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthClientColumns" :data="oauthClients">
           <template #cell-grantTypes="{ row }">
             <div class="tag-row">
               <FaTag v-for="item in row.original.grantTypes" :key="item" variant="secondary">{{ item }}</FaTag>
@@ -828,9 +864,47 @@ function normalizeDateTime(value?: string) {
               <FaButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row.original)">启用</FaButton>
             </div>
           </template>
-        </FaTable>
 
-        <FaTable v-else row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthProviderColumns" :data="oauthProviders">
+          <template #card="{ row }">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-base font-semibold break-all">{{ row.clientName }}</span>
+                  <FaTag :variant="statusVariant(row.status)">
+                    {{ statusText(row.status) }}
+                  </FaTag>
+                </div>
+                <div class="flex flex-col gap-1 text-sm">
+                  <div v-if="row.clientId" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">Client ID</span>
+                    <span class="break-all">{{ row.clientId }}</span>
+                  </div>
+                  <div v-if="row.grantTypes?.length" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">授权模式</span>
+                    <span class="break-all">{{ row.grantTypes.join('、') }}</span>
+                  </div>
+                  <div v-if="row.redirectUris?.length" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">回调地址</span>
+                    <span class="break-all">{{ row.redirectUris.join('、') }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 border-t pt-3">
+                  <FaButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient(row)">
+                    编辑
+                  </FaButton>
+                  <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthClient(row)">
+                    停用
+                  </FaButton>
+                  <FaButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthServerEnabled" @click="confirmEnableOAuthClient(row)">
+                    启用
+                  </FaButton>
+                </div>
+              </div>
+            </FaCard>
+          </template>
+        </FaResponsiveTable>
+
+        <FaResponsiveTable v-else row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1080px]" border stripe column-visibility :columns="oauthProviderColumns" :data="oauthProviders">
           <template #cell-status="{ row }">
             <FaTag :variant="statusVariant(row.original.status)">{{ statusText(row.original.status) }}</FaTag>
           </template>
@@ -841,7 +915,45 @@ function normalizeDateTime(value?: string) {
               <FaButton v-else v-auth="'system:security:oauth:edit'" size="sm" variant="ghost" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row.original)">启用</FaButton>
             </div>
           </template>
-        </FaTable>
+
+          <template #card="{ row }">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-base font-semibold break-all">{{ row.name }}</span>
+                  <FaTag :variant="statusVariant(row.status)">
+                    {{ statusText(row.status) }}
+                  </FaTag>
+                </div>
+                <div class="flex flex-col gap-1 text-sm">
+                  <div class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                    <span class="break-all">{{ row.code }}</span>
+                  </div>
+                  <div v-if="row.clientId" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">Client ID</span>
+                    <span class="break-all">{{ row.clientId }}</span>
+                  </div>
+                  <div v-if="row.authorizationUri" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">授权地址</span>
+                    <span class="break-all">{{ row.authorizationUri }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 border-t pt-3">
+                  <FaButton v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider(row)">
+                    编辑
+                  </FaButton>
+                  <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:security:oauth:edit'" variant="outline" size="sm" @click="confirmDisableOAuthProvider(row)">
+                    停用
+                  </FaButton>
+                  <FaButton v-else v-auth="'system:security:oauth:edit'" variant="outline" size="sm" :disabled="!policy.oauthClientEnabled" @click="confirmEnableOAuthProvider(row)">
+                    启用
+                  </FaButton>
+                </div>
+              </div>
+            </FaCard>
+          </template>
+        </FaResponsiveTable>
       </section>
 
       <section v-if="activeTab === 'external'" class="panel">
@@ -858,7 +970,7 @@ function normalizeDateTime(value?: string) {
             Passkey 凭据
           </div>
         </div>
-        <FaTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
+        <FaResponsiveTable row-key="id" table-root-class="rounded-lg overflow-hidden" table-class="min-w-[1060px]" border stripe column-visibility :columns="passkeyColumns" :data="passkeyRows">
           <template #toolbar>
             <FaSearchBar class="w-full">
               <div class="grid grid-cols-1 gap-3 md:grid-cols-[minmax(260px,360px)_auto] md:items-center">
@@ -880,7 +992,43 @@ function normalizeDateTime(value?: string) {
               吊销
             </FaButton>
           </template>
-        </FaTable>
+
+          <template #card="{ row }">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-base font-semibold break-all">{{ row.deviceName || row.credentialId }}</span>
+                  <FaTag :variant="statusVariant(row.status)">
+                    {{ statusText(row.status) }}
+                  </FaTag>
+                </div>
+                <div class="flex flex-col gap-1 text-sm">
+                  <div v-if="row.userId" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">用户 ID</span>
+                    <span class="break-all">{{ row.userId }}</span>
+                  </div>
+                  <div v-if="row.credentialId" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">凭据 ID</span>
+                    <span class="break-all">{{ row.credentialId }}</span>
+                  </div>
+                  <div class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">签名次数</span>
+                    <span>{{ row.signCount }}</span>
+                  </div>
+                  <div v-if="row.lastUsedTime" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">最后使用</span>
+                    <span>{{ row.lastUsedTime }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 border-t pt-3">
+                  <FaButton v-auth="'system:security:passkey:revoke'" variant="destructive" size="sm" :disabled="row.status !== 'ACTIVE'" @click="confirmRevokePasskey(row)">
+                    吊销
+                  </FaButton>
+                </div>
+              </div>
+            </FaCard>
+          </template>
+        </FaResponsiveTable>
       </section>
     </FaPageMain>
 

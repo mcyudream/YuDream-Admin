@@ -138,7 +138,7 @@ async function clearApiLogs() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable
+      <FaResponsiveTable
         v-loading="loading"
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
@@ -186,7 +186,33 @@ async function clearApiLogs() {
         <template #cell-errorMessage="{ row }">
           <span class="line-clamp-1">{{ row.original.errorMessage || '-' }}</span>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex min-w-0 flex-col gap-1">
+                  <span class="break-all text-base font-semibold">{{ row.path || '-' }}</span>
+                  <span class="text-sm text-secondary-foreground/70">{{ row.method }} · 响应码 {{ row.status ?? '-' }} · 耗时 {{ row.costMs ?? '-' }}ms</span>
+                </div>
+                <FaTag :variant="row.success ? 'default' : 'destructive'">
+                  {{ row.success ? successText : failText }}
+                </FaTag>
+              </div>
+              <div v-if="row.query" class="break-all text-xs text-secondary-foreground/60">
+                {{ row.query }}
+              </div>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                <span v-if="row.ip">IP：{{ row.ip }}</span>
+                <span>用户：{{ userText(row) }}</span>
+                <span>时间：{{ dateText(row.createTime) }}</span>
+              </div>
+              <div v-if="row.errorMessage" class="break-all text-sm">
+                异常：{{ row.errorMessage }}
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"

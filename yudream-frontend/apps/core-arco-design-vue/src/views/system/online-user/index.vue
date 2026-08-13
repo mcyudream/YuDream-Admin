@@ -110,7 +110,7 @@ async function exportOnlineUsers() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable
+      <FaResponsiveTable
         v-loading="loading"
         row-key="token"
         table-root-class="rounded-lg overflow-hidden"
@@ -149,7 +149,44 @@ async function exportOnlineUsers() {
             &#19979;&#32447;
           </FaButton>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.username || row.userId || '-' }}</span>
+                <FaTag variant="default">在线</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div v-if="row.nickname" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">昵称</span>
+                  <span>{{ row.nickname }}</span>
+                </div>
+                <div v-if="row.email" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">邮箱</span>
+                  <span class="break-all">{{ row.email }}</span>
+                </div>
+                <div v-if="row.device" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">设备</span>
+                  <span>{{ row.device }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">剩余时间</span>
+                  <span>{{ ttlText(row.timeout) }}</span>
+                </div>
+              </div>
+              <div class="flex gap-2 text-sm">
+                <span class="shrink-0 text-secondary-foreground/60">会话标识</span>
+                <code>{{ shortToken(row.token) }}</code>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'system:monitor:online:kickout'" variant="destructive" size="sm" @click="confirmKickout(row)">
+                  下线
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
     </FaPageMain>
   </div>
 </template>

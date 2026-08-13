@@ -97,7 +97,7 @@ function remove(row: AgentTool) {
       <section class="custom-tools">
         <div class="section-head">
           <div><h3>Python 工具</h3><p>通过 <code>run(params: dict) -&gt; dict</code> 接收参数并返回结构化结果。</p></div><FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 编码" @keydown.enter="load" />
-        </div><FaTable v-loading="loading" row-key="id" :data="rows" :columns="[{ accessorKey: 'name', header: '名称' }, { accessorKey: 'code', header: '编码' }, { accessorKey: 'description', header: '描述' }, { accessorKey: 'timeoutMillis', header: '超时(ms)' }, { id: 'enabled', header: '状态' }, { id: 'operation', header: '操作' }]">
+        </div><FaResponsiveTable v-loading="loading" row-key="id" :data="rows" :columns="[{ accessorKey: 'name', header: '名称' }, { accessorKey: 'code', header: '编码' }, { accessorKey: 'description', header: '描述' }, { accessorKey: 'timeoutMillis', header: '超时(ms)' }, { id: 'enabled', header: '状态' }, { id: 'operation', header: '操作' }]">
           <template #cell-enabled="{ row }">
             <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
               {{ row.original.enabled ? '启用' : '停用' }}
@@ -111,7 +111,45 @@ function remove(row: AgentTool) {
               </FaButton>
             </div>
           </template>
-        </FaTable><FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="load" @size-change="load" />
+          <template #card="{ row }">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-base font-semibold">{{ row.name }}</span>
+                  <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                    {{ row.enabled ? '启用' : '停用' }}
+                  </FaTag>
+                </div>
+                <div class="flex flex-col gap-1 text-sm">
+                  <div class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                    <span>{{ row.code }}</span>
+                  </div>
+                  <div v-if="row.description" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">描述</span>
+                    <span class="break-all">{{ row.description }}</span>
+                  </div>
+                  <div class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">超时</span>
+                    <span>{{ row.timeoutMillis }}ms</span>
+                  </div>
+                  <div v-if="row.permissionCode" class="flex gap-2">
+                    <span class="shrink-0 text-secondary-foreground/60">权限</span>
+                    <span>{{ row.permissionCode }}</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-2 border-t pt-3">
+                  <FaButton v-auth="'platform:agent:tool:edit'" size="sm" variant="outline" @click="edit(row)">
+                    编辑
+                  </FaButton>
+                  <FaButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="remove(row)">
+                    删除
+                  </FaButton>
+                </div>
+              </div>
+            </FaCard>
+          </template>
+        </FaResponsiveTable><FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="load" @size-change="load" />
       </section>
     </FaPageMain>
     <FaModal v-model="visible" :title="editing ? '编辑 Python 工具' : '新建 Python 工具'" class="sm:max-w-4xl">
