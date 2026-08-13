@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.platform.milky.event.MilkyEventPublished;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import online.yudream.base.domain.system.user.aggregate.User;
+import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
@@ -90,7 +91,8 @@ public class MilkyPluginEventDispatcher {
                 menuImage(pluginEvent, user);
                 return;
             }
-            if (requiresBound() && user == null && !"绑定".equals(command.name())) {
+            if (user == null && !"绑定".equals(command.name()) && (requiresBound() || commandRequiresBound(command.name()))) {
+                replyBindHint(pluginEvent);
                 return;
             }
             runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
@@ -318,9 +320,20 @@ public class MilkyPluginEventDispatcher {
                 .orElse(false);
     }
 
+    /** 判断指令是否为仅绑定用户可用（allowAnonymous=false）。 */
+    private boolean commandRequiresBound(String commandName) {
+        return runtime.commands().stream()
+                .anyMatch(command -> commandName.equalsIgnoreCase(command.command()) && !command.allowAnonymous());
+    }
+
+    /** 未绑定用户使用需要绑定的指令时，给出明确提示而非静默忽略。 */
+    private void replyBindHint(PluginEvent event) {
+        sendMenuText(event, "当前 QQ 未绑定系统账号，请先完成绑定后再使用该指令。");
+    }
+
     private boolean allowed(User user, String permission) {
         return user != null && roles.findByIds(user.getRoles().stream().map(item -> item.getValue()).toList()).stream()
-                .anyMatch(role -> role.hasPermission(permission));
+                .anyMatch(role -> role.getSystemType() == SystemRoleType.SUPER_ADMIN || role.hasPermission(permission));
     }
 
     static boolean isMenuAlias(String name) {

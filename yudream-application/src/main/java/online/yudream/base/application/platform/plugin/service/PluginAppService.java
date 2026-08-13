@@ -18,6 +18,10 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInf
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
 import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
+import online.yudream.base.domain.system.user.aggregate.Role;
+import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
+import online.yudream.base.domain.system.user.repo.RoleRepo;
+import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -54,6 +58,7 @@ public class PluginAppService {
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final PermissionDomainService permissionDomainService;
     private final PluginMenuProjectionService pluginMenuProjectionService;
+    private final RoleRepo roleRepo;
 
     @Value("${yudream.platform.plugin.upload-directory:plugins}")
     private String uploadDirectory;
@@ -948,6 +953,31 @@ public class PluginAppService {
                 .map(this::toPermissionMeta)
                 .toList();
         permissionDomainService.upsertManualPermissions(metas);
+        grantPluginPermissionsToSystemRoles(metas);
+    }
+
+    /** 将插件权限自动授予系统超管/管理员角色，与菜单权限的自动授权保持一致，避免插件指令因未授权被静默拦截。 */
+    private void grantPluginPermissionsToSystemRoles(List<PermissionMeta> metas) {
+        if (metas == null || metas.isEmpty()) {
+            return;
+        }
+        for (SystemRoleType roleType : List.of(SystemRoleType.SUPER_ADMIN, SystemRoleType.ADMIN)) {
+            Role role = roleRepo.findBySystemType(roleType).orElse(null);
+            if (role == null) {
+                continue;
+            }
+            boolean changed = false;
+            for (PermissionMeta meta : metas) {
+                PermissionID permissionId = PermissionID.of(meta.code());
+                if (!role.getPermissions().contains(permissionId)) {
+                    role.assignPermission(permissionId);
+                    changed = true;
+                }
+            }
+            if (changed) {
+                roleRepo.save(role);
+            }
+        }
     }
 
     private PluginModule projectRuntimeMenus(PluginModule module) {
