@@ -8,6 +8,16 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDT
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpEndpointDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginCompatibilityDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDependencyDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDescriptorDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDetailDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginJarDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginPublisherDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSourceDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
@@ -15,6 +25,15 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginCompatibility;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDependency;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescriptor;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDetail;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginPublisher;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginSource;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginVersion;
 
 import java.util.List;
 
@@ -40,6 +59,111 @@ public class PluginAssembler {
                 .enabledAt(module.getEnabledAt())
                 .loaded(loaded)
                 .enabled(enabled)
+                .rollbackAvailable(module.getBackupJarPath() != null)
+                .rollbackVersion(module.getBackupPluginVersion())
+                .build();
+    }
+
+    public static PluginMarketplaceUpdateDTO toDTO(PluginMarketplaceUpdateDTO update) {
+        return PluginMarketplaceUpdateDTO.builder()
+                .code(update.getCode())
+                .currentVersion(update.getCurrentVersion())
+                .latestVersion(update.getLatestVersion())
+                .latestReleaseVersion(update.getLatestReleaseVersion())
+                .latestDisplayName(update.getLatestDisplayName())
+                .updateAvailable(update.isUpdateAvailable())
+                .compatible(update.isCompatible())
+                .blockedReason(update.getBlockedReason())
+                .build();
+    }
+
+    public static PluginStorePluginDTO toDTO(PluginStorePluginInfo plugin) {
+        return PluginStorePluginDTO.builder()
+                .code(plugin.getCode())
+                .descriptor(toDTO(plugin.getDescriptor()))
+                .build();
+    }
+
+    public static PluginStorePluginDetailDTO toDTO(PluginStorePluginDetail detail) {
+        return PluginStorePluginDetailDTO.builder()
+                .code(detail.code())
+                .versions(detail.versions().stream().map(PluginAssembler::toDTO).toList())
+                .build();
+    }
+
+    public static PluginStorePluginVersionDTO toDTO(PluginStorePluginVersion version) {
+        return PluginStorePluginVersionDTO.builder()
+                .releaseVersion(version.releaseVersion())
+                .descriptor(toDTO(version.descriptor()))
+                .build();
+    }
+
+    private static PluginStorePluginDescriptorDTO toDTO(PluginStorePluginDescriptor descriptor) {
+        return PluginStorePluginDescriptorDTO.builder()
+                .releaseVersion(descriptor.releaseVersion())
+                .code(descriptor.code())
+                .version(descriptor.version())
+                .main(descriptor.main())
+                .displayName(descriptor.displayName())
+                .description(descriptor.description())
+                .icon(descriptor.icon())
+                .screenshots(descriptor.screenshots())
+                .publisher(toDTO(descriptor.publisher()))
+                .source(toDTO(descriptor.source()))
+                .license(descriptor.license())
+                .releaseNotes(descriptor.releaseNotes())
+                .compatibility(toDTO(descriptor.compatibility()))
+                .dependencies(descriptor.dependencies().stream().map(PluginAssembler::toDTO).toList())
+                .jar(toDTO(descriptor.jar()))
+                .build();
+    }
+
+    private static PluginStorePluginPublisherDTO toDTO(PluginStorePluginPublisher publisher) {
+        if (publisher == null) {
+            return null;
+        }
+        return PluginStorePluginPublisherDTO.builder()
+                .id(publisher.id())
+                .name(publisher.name())
+                .url(publisher.url())
+                .verified(publisher.verified())
+                .build();
+    }
+
+    private static PluginStorePluginSourceDTO toDTO(PluginStorePluginSource source) {
+        if (source == null) {
+            return null;
+        }
+        return PluginStorePluginSourceDTO.builder()
+                .repository(source.repository())
+                .commit(source.commit())
+                .build();
+    }
+
+    private static PluginStorePluginCompatibilityDTO toDTO(PluginStorePluginCompatibility compatibility) {
+        if (compatibility == null) {
+            return null;
+        }
+        return PluginStorePluginCompatibilityDTO.builder()
+                .host(compatibility.host())
+                .spi(compatibility.spi())
+                .frontendSdk(compatibility.frontendSdk())
+                .build();
+    }
+
+    public static PluginStorePluginDependencyDTO toDTO(PluginStorePluginDependency dependency) {
+        return PluginStorePluginDependencyDTO.builder()
+                .code(dependency.code())
+                .range(dependency.range())
+                .required(dependency.required())
+                .build();
+    }
+
+    private static PluginStorePluginJarDTO toDTO(PluginStorePluginJar jar) {
+        return PluginStorePluginJarDTO.builder()
+                .mavenCoordinates(jar.mavenCoordinates())
+                .url(jar.url())
+                .sha256(jar.sha256())
                 .build();
     }
 

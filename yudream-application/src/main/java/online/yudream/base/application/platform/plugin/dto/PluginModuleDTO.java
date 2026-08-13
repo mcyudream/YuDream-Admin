@@ -41,4 +41,6 @@ public class PluginModuleDTO implements Serializable {
 
     private boolean loaded;
     private boolean enabled;
+    private boolean rollbackAvailable;
+    private String rollbackVersion;
 }

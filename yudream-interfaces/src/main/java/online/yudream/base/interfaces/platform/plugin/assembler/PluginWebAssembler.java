@@ -6,10 +6,34 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifes
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdatePlanDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateResultDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginCompatibilityDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDependencyDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDescriptorDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginDetailDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginJarDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginPublisherDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSourceDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendRouteRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdatePlanRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateResultRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginCompatibilityRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginDependencyRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginDescriptorRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginDetailRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginJarRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginPublisherRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginSourceRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginVersionRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 
 import java.util.Arrays;
@@ -44,6 +68,152 @@ public class PluginWebAssembler {
                 .enabledAt(dto.getEnabledAt())
                 .loaded(dto.isLoaded())
                 .enabled(dto.isEnabled())
+                .rollbackAvailable(dto.isRollbackAvailable())
+                .rollbackVersion(dto.getRollbackVersion())
+                .build();
+    }
+
+    public static List<PluginMarketplaceUpdateRes> toUpdateResList(List<PluginMarketplaceUpdateDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toUpdateRes).toList();
+    }
+
+    public static PluginMarketplaceUpdateRes toUpdateRes(PluginMarketplaceUpdateDTO dto) {
+        return PluginMarketplaceUpdateRes.builder()
+                .code(dto.getCode())
+                .currentVersion(dto.getCurrentVersion())
+                .latestVersion(dto.getLatestVersion())
+                .latestReleaseVersion(dto.getLatestReleaseVersion())
+                .latestDisplayName(dto.getLatestDisplayName())
+                .updateAvailable(dto.isUpdateAvailable())
+                .compatible(dto.isCompatible())
+                .blockedReason(dto.getBlockedReason())
+                .build();
+    }
+
+    public static PluginMarketplaceUpdateResultRes toUpdateResultRes(PluginMarketplaceUpdateResultDTO dto) {
+        return PluginMarketplaceUpdateResultRes.builder()
+                .modules(toResList(dto.getModules()))
+                .requiresRestart(dto.isRequiresRestart())
+                .build();
+    }
+
+    public static List<PluginMarketplaceUpdatePlanRes> toUpdatePlanResList(List<PluginMarketplaceUpdatePlanDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toUpdatePlanRes).toList();
+    }
+
+    public static PluginMarketplaceUpdatePlanRes toUpdatePlanRes(PluginMarketplaceUpdatePlanDTO dto) {
+        return PluginMarketplaceUpdatePlanRes.builder()
+                .code(dto.getCode())
+                .fromVersion(dto.getFromVersion())
+                .toVersion(dto.getToVersion())
+                .changeType(dto.getChangeType())
+                .requiredDependencies(dto.getRequiredDependencies().stream()
+                        .map(PluginWebAssembler::toStoreDependencyRes).toList())
+                .optionalDependencies(dto.getOptionalDependencies().stream()
+                        .map(PluginWebAssembler::toStoreDependencyRes).toList())
+                .affectedEnabledPlugins(dto.getAffectedEnabledPlugins())
+                .requiresRestart(dto.isRequiresRestart())
+                .blockedReason(dto.getBlockedReason())
+                .warnings(dto.getWarnings())
+                .build();
+    }
+
+    public static List<PluginStorePluginRes> toStoreResList(List<PluginStorePluginDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toStoreRes).toList();
+    }
+
+    public static PluginStorePluginRes toStoreRes(PluginStorePluginDTO dto) {
+        return PluginStorePluginRes.builder()
+                .code(dto.getCode())
+                .descriptor(toStoreDescriptorRes(dto.getDescriptor()))
+                .build();
+    }
+
+    public static PluginStorePluginDetailRes toStoreDetailRes(PluginStorePluginDetailDTO dto) {
+        return PluginStorePluginDetailRes.builder()
+                .code(dto.getCode())
+                .versions(dto.getVersions().stream().map(PluginWebAssembler::toStoreVersionRes).toList())
+                .build();
+    }
+
+    private static PluginStorePluginVersionRes toStoreVersionRes(PluginStorePluginVersionDTO dto) {
+        return PluginStorePluginVersionRes.builder()
+                .releaseVersion(dto.getReleaseVersion())
+                .descriptor(toStoreDescriptorRes(dto.getDescriptor()))
+                .installable(dto.isInstallable())
+                .installDisabledReason(dto.getInstallDisabledReason())
+                .build();
+    }
+
+    private static PluginStorePluginDescriptorRes toStoreDescriptorRes(PluginStorePluginDescriptorDTO dto) {
+        return PluginStorePluginDescriptorRes.builder()
+                .releaseVersion(dto.getReleaseVersion())
+                .code(dto.getCode())
+                .version(dto.getVersion())
+                .main(dto.getMain())
+                .displayName(dto.getDisplayName())
+                .description(dto.getDescription())
+                .icon(dto.getIcon())
+                .screenshots(dto.getScreenshots())
+                .publisher(toStorePublisherRes(dto.getPublisher()))
+                .source(toStoreSourceRes(dto.getSource()))
+                .license(dto.getLicense())
+                .releaseNotes(dto.getReleaseNotes())
+                .compatibility(toStoreCompatibilityRes(dto.getCompatibility()))
+                .dependencies(dto.getDependencies() == null ? List.of() : dto.getDependencies().stream()
+                        .map(PluginWebAssembler::toStoreDependencyRes).toList())
+                .jar(toStoreJarRes(dto.getJar()))
+                .build();
+    }
+
+    private static PluginStorePluginPublisherRes toStorePublisherRes(PluginStorePluginPublisherDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginStorePluginPublisherRes.builder()
+                .id(dto.getId())
+                .name(dto.getName())
+                .url(dto.getUrl())
+                .verified(dto.isVerified())
+                .build();
+    }
+
+    private static PluginStorePluginSourceRes toStoreSourceRes(PluginStorePluginSourceDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginStorePluginSourceRes.builder()
+                .repository(dto.getRepository())
+                .commit(dto.getCommit())
+                .build();
+    }
+
+    private static PluginStorePluginCompatibilityRes toStoreCompatibilityRes(PluginStorePluginCompatibilityDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginStorePluginCompatibilityRes.builder()
+                .host(dto.getHost())
+                .spi(dto.getSpi())
+                .frontendSdk(dto.getFrontendSdk())
+                .build();
+    }
+
+    private static PluginStorePluginDependencyRes toStoreDependencyRes(PluginStorePluginDependencyDTO dto) {
+        return PluginStorePluginDependencyRes.builder()
+                .code(dto.getCode())
+                .range(dto.getRange())
+                .required(dto.isRequired())
+                .warning(dto.isWarning())
+                .warningReason(dto.getWarningReason())
+                .build();
+    }
+
+    private static PluginStorePluginJarRes toStoreJarRes(PluginStorePluginJarDTO dto) {
+        return PluginStorePluginJarRes.builder()
+                .mavenCoordinates(dto.getMavenCoordinates())
+                .url(dto.getUrl())
+                .sha256(dto.getSha256())
                 .build();
     }
 

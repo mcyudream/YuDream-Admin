@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "releaseVersion": "1.0.0",
+  "plugin": {
+    "code": "example-plugin",
+    "version": "1.0.0",
+    "main": "com.example.yudream.ExamplePlugin",
+    "displayName": "Example Plugin",
+    "description": "A third-party YuDream plugin submission example.",
+    "icon": "resources/icon.svg",
+    "screenshots": [
+      "resources/screenshot.png"
+    ],
+    "compatibility": {
+      "host": ">=1.0.0 <2.0.0",
+      "spi": ">=1.0.0 <2.0.0",
+      "frontendSdk": ">=1.0.0 <2.0.0"
+    },
+    "dependencies": []
+  },
+  "jar": {
+    "mavenCoordinates": "com.example.yudream:example-plugin:1.0.0:jar",
+    "url": "plugin.jar",
+    "sha256": "REPLACE_WITH_64_LOWERCASE_HEX_SHA256"
+  },
+  "license": "LICENSE"
+}

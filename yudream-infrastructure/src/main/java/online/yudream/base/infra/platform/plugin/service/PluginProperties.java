@@ -14,4 +14,9 @@ public class PluginProperties {
 
     private boolean enabled = true;
     private List<String> directories = new ArrayList<>(List.of("plugins"));
+    private String storeRootUrl = "https://nexus.yudream.online/repository/plugin-store-releases/index.json";
+    private long storeConnectTimeoutMillis = 5_000;
+    private long storeRequestTimeoutMillis = 5_000;
+    private long storeMaxResponseBytes = 1_048_576;
+    private long storeMaxJarBytes = 104_857_600;
 }

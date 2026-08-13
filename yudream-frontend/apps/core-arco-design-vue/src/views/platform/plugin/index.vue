@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
+import type { PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
 import apiPlugin from '@/api/modules/platform-plugin'
+import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 
@@ -8,8 +10,10 @@ const toast = useFaToast()
 const modal = useFaModal()
 const loading = ref(false)
 const uploading = ref(false)
+const checkingUpdates = ref(false)
 const actionLoading = ref('')
 const rows = ref<PluginModule[]>([])
+const updatePlans = ref<PluginMarketplaceUpdatePlan[]>([])
 const selectedCode = ref('')
 const uploadInput = ref<HTMLInputElement>()
 
@@ -38,6 +42,73 @@ async function load() {
   finally {
     loading.value = false
   }
+}
+
+async function checkUpdates() {
+  checkingUpdates.value = true
+  try {
+    const res = await apiPluginMarketplace.updatePlans()
+    updatePlans.value = res.data
+    toast.success(updatePlans.value.length ? `已生成 ${updatePlans.value.length} 个插件更新计划` : '已检查，没有可用更新计划')
+  }
+  finally {
+    checkingUpdates.value = false
+  }
+}
+
+function updatePlanFor(code: string) {
+  return updatePlans.value.find(item => item.code === code)
+}
+
+function canConfirmUpdate(item: PluginModule, plan?: PluginMarketplaceUpdatePlan) {
+  return !!plan && !plan.blockedReason && actionLoading.value !== `${item.code}:update`
+}
+
+function confirmRollback(item = selected.value) {
+  if (!item || !item.rollbackAvailable || item.loaded || item.enabled) {
+    return
+  }
+  modal.confirm({
+    title: '确认回滚插件',
+    content: `确认将插件「${item.name}」回滚到 ${item.rollbackVersion || '本地备份'} 吗？目标插件及依赖方必须停止；回滚后需重启服务，且不会自动启用。`,
+    onConfirm: async () => {
+      actionLoading.value = `${item.code}:rollback`
+      try {
+        const res = await apiPluginMarketplace.rollback(item.code)
+        rows.value = res.data.modules
+        syncSelectedCode()
+        await refreshDynamicRoutes(router)
+        toast.success('插件已回滚，请重启服务后生效；未自动启用插件')
+      }
+      finally {
+        actionLoading.value = ''
+      }
+    },
+  })
+}
+
+function confirmUpdate(item = selected.value) {
+  const plan = item && updatePlanFor(item.code)
+  if (!item || !plan || !canConfirmUpdate(item, plan)) {
+    return
+  }
+  modal.confirm({
+    title: '确认更新插件',
+    content: `确认将插件「${item.name}」从 ${plan.fromVersion} 更新至 ${plan.toVersion} 吗？系统会受控停用并卸载目标插件及其依赖方；必须重启，且仅恢复更新前已启用的插件。`,
+    onConfirm: async () => {
+      actionLoading.value = `${item.code}:update`
+      try {
+        const res = await apiPluginMarketplace.update(item.code, { releaseVersion: plan.toVersion })
+        rows.value = res.data.modules
+        syncSelectedCode()
+        await checkUpdates()
+        toast.success(res.data.requiresRestart ? '插件已更新，请重启服务；将恢复更新前已启用的插件' : '插件已更新')
+      }
+      finally {
+        actionLoading.value = ''
+      }
+    },
+  })
 }
 
 async function refresh() {
@@ -176,6 +247,10 @@ function actionText(action: string) {
           上传 JAR
         </FaButton>
         <input ref="uploadInput" type="file" accept=".jar,application/java-archive" hidden @change="uploadJar">
+        <FaButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
+          <FaIcon name="i-ri:arrow-up-circle-line" />
+          检查更新
+        </FaButton>
         <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
           <FaIcon name="i-ri:folder-search-line" />
           扫描目录
@@ -239,6 +314,69 @@ function actionText(action: string) {
               <span>JAR 路径</span>
               <strong>{{ selected.jarPath || '-' }}</strong>
             </div>
+          </div>
+
+          <div v-if="updatePlanFor(selected.code)" class="update-panel" :class="{ blocked: updatePlanFor(selected.code)?.blockedReason }">
+            <div class="section-title">更新计划（只读）</div>
+            <p>版本变化：{{ updatePlanFor(selected.code)?.fromVersion || '-' }} → {{ updatePlanFor(selected.code)?.toVersion || '-' }}</p>
+            <p>变更类型：{{ updatePlanFor(selected.code)?.changeType || '-' }}</p>
+            <p>需要重启：{{ updatePlanFor(selected.code)?.requiresRestart ? '是' : '否' }}</p>
+            <p v-if="updatePlanFor(selected.code)?.blockedReason">阻断原因：{{ updatePlanFor(selected.code)?.blockedReason }}</p>
+
+            <div v-if="updatePlanFor(selected.code)?.requiredDependencies?.length" class="plan-section">
+              <strong>必需依赖</strong>
+              <div class="dependency-list">
+                <FaTag v-for="dependency in updatePlanFor(selected.code)?.requiredDependencies" :key="`required-${dependency.code}`" variant="secondary">
+                  {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }}{{ dependency.warning ? `：${dependency.warningReason || '存在告警'}` : '' }}
+                </FaTag>
+              </div>
+            </div>
+
+            <div v-if="updatePlanFor(selected.code)?.optionalDependencies?.length" class="plan-section">
+              <strong>可选依赖</strong>
+              <div class="dependency-list">
+                <FaTag v-for="dependency in updatePlanFor(selected.code)?.optionalDependencies" :key="`optional-${dependency.code}`" variant="secondary">
+                  {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }}{{ dependency.warning ? `：${dependency.warningReason || '存在告警'}` : '' }}
+                </FaTag>
+              </div>
+            </div>
+
+            <div v-if="updatePlanFor(selected.code)?.affectedEnabledPlugins?.length" class="plan-section">
+              <strong>受影响的已启用插件</strong>
+              <div class="dependency-list">
+                <FaTag v-for="code in updatePlanFor(selected.code)?.affectedEnabledPlugins" :key="code" variant="secondary">{{ code }}</FaTag>
+              </div>
+            </div>
+
+            <div v-if="updatePlanFor(selected.code)?.warnings?.length" class="plan-section">
+              <strong>警告</strong>
+              <ul class="warning-list">
+                <li v-for="warning in updatePlanFor(selected.code)?.warnings" :key="warning">{{ warning }}</li>
+              </ul>
+            </div>
+
+            <div class="detail-actions">
+              <FaButton
+                v-auth="'platform:plugin:manage'"
+                :disabled="!canConfirmUpdate(selected, updatePlanFor(selected.code))"
+                :loading="actionLoading === `${selected.code}:update`"
+                @click="confirmUpdate(selected)"
+              >
+                <FaIcon name="i-ri:arrow-up-circle-line" />
+                确认更新
+              </FaButton>
+              <FaButton
+                v-auth="'platform:plugin:manage'"
+                variant="outline"
+                :disabled="!selected.rollbackAvailable || selected.loaded || selected.enabled || Boolean(actionLoading)"
+                :loading="actionLoading === `${selected.code}:rollback`"
+                @click="confirmRollback(selected)"
+              >
+                <FaIcon name="i-ri:history-line" />
+                回滚到 {{ selected.rollbackVersion || '备份版本' }}
+              </FaButton>
+            </div>
+            <p v-if="selected.enabled || updatePlanFor(selected.code)?.affectedEnabledPlugins?.length" class="plan-warning">确认更新会受控停用并卸载目标插件及其依赖方；重启后仅恢复更新前已启用的插件。</p>
           </div>
 
           <div v-if="selected.dependencies?.length" class="dependency-panel">
@@ -451,8 +589,46 @@ function actionText(action: string) {
 }
 
 .dependency-panel,
+.update-panel,
 .detail-actions {
   margin-top: 16px;
+}
+
+.update-panel {
+  padding: 12px;
+  border: 1px solid rgb(var(--success-6));
+  border-radius: 6px;
+  background: rgb(var(--success-1));
+  color: rgb(var(--success-6));
+}
+
+.update-panel.blocked {
+  border-color: rgb(var(--danger-6));
+  background: rgb(var(--danger-1));
+  color: rgb(var(--danger-6));
+}
+
+.update-panel p {
+  margin: 4px 0 0;
+}
+
+.plan-section {
+  margin-top: 12px;
+}
+
+.plan-section strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.plan-warning {
+  color: rgb(var(--warning-6));
+  font-weight: 700;
+}
+
+.warning-list {
+  margin: 0;
+  padding-left: 20px;
 }
 
 .section-title {

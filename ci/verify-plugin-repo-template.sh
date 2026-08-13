@@ -22,6 +22,10 @@ require_file "templates/plugin-repo/.npmrc.example"
 require_file "templates/plugin-repo/settings.xml.example"
 require_file "templates/plugin-repo/pnpm-workspace.yaml.example"
 require_file "templates/plugin-repo/README.md"
+require_file "templates/plugin-repo/plugin.yml.example"
+require_file "templates/plugin-repo/store.json.example"
+require_file "templates/plugin-repo/submission.json.example"
+require_file "templates/plugin-repo/LICENSE"
 require_file "templates/plugin-repo/docs/plugin-release.md"
 require_file "templates/plugin-repo/ci/verify-plugin-repo-independence.sh"
 require_file "templates/plugin-repo/ci/stage-plugin-repo-foundation.sh"
@@ -34,7 +38,9 @@ require_file "templates/plugin-repo/ci/verify-plugin-maven-boundary.sh"
 require_file "templates/plugin-repo/ci/verify-core-npm-contracts.sh"
 require_file "templates/plugin-repo/ci/verify-doc-independence.sh"
 require_file "templates/plugin-repo/ci/verify-plugin-publish-pipeline.sh"
+require_file "templates/plugin-repo/ci/verify-plugin-release-selection.sh"
 require_file "templates/plugin-repo/ci/lib/plugin-jar-selection.sh"
+require_file "templates/plugin-repo/release/plugins.txt"
 require_file "templates/plugin-repo/ci/verify-plugin-jar-assets.sh"
 require_file "templates/plugin-repo/ci/publish-plugin-jars.sh"
 require_file "templates/plugin-repo/ci/verify-published-plugin-jars.sh"
@@ -44,10 +50,13 @@ grep -q 'sh ci/verify-core-npm-contracts.sh' templates/plugin-repo/.gitlab-ci.ym
 grep -q 'sh ci/verify-doc-independence.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify documentation independence"
 grep -q 'sh ci/verify-plugin-maven-boundary.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify plugin maven boundary"
 grep -q 'sh ci/verify-plugin-publish-pipeline.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify plugin publish pipeline"
+grep -q 'sh ci/verify-plugin-release-selection.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must validate explicit plugin release selection"
 grep -q 'sh ci/verify-plugin-jar-assets.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify plugin jar assets"
-grep -q 'copy_final_plugin_jars "\$PWD" "\$PWD/dist/plugins"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must flatten final plugin jars into dist/plugins"
-grep -q 'sh ci/publish-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must publish plugin jars"
-grep -q 'sh ci/verify-published-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify published plugin jars"
+grep -q 'selected_plugin_modules_csv' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI tag package must resolve explicit plugin modules"
+grep -q 'clean package -pl "\$release_modules" -am' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI tag package must use Maven -pl selected modules -am"
+grep -q 'PLUGIN_RELEASE_ONLY="\${CI_COMMIT_TAG:+1}" copy_final_plugin_jars "\$PWD" "\$PWD/dist/plugins"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must stage only selected tag jars"
+grep -q 'PLUGIN_RELEASE_ONLY=1 sh ci/publish-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must publish only selected tag jars"
+grep -q 'PLUGIN_RELEASE_ONLY=1 sh ci/verify-published-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify only selected tag jars"
 grep -q 'PACKAGE_MAVEN_REPO' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI package job must use a dedicated clean Maven local repository"
 grep -Eq '^[[:space:]]*-[[:space:]]+yudream-frontend/packages/plugin-\*/package\.json$' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must restrict frontend job discovery to plugin packages"
 grep -q 'pnpm -r --filter=@yudream/plugin-\* run build' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI frontend build must explicitly filter @yudream/plugin-* packages"
@@ -105,6 +114,29 @@ if grep -R -Eq 'gitlab-maven|gitlab\.(example\.com|yudream\.online)/api/v4/proje
   templates/plugin-repo/ci/verify-core-npm-contracts.sh \
   templates/plugin-repo/ci/verify-published-plugin-jars.sh; then
   fail "plugin repository templates must use only Nexus package endpoints and credentials"
+fi
+
+echo "[verify-plugin-repo-template] checking third-party submission templates"
+grep -q '^name: example-plugin$' templates/plugin-repo/plugin.yml.example || fail "submission plugin.yml example must declare its code"
+grep -q '^main: com.example.yudream.ExamplePlugin$' templates/plugin-repo/plugin.yml.example || fail "submission plugin.yml example must declare its entry class"
+grep -q '^version: 1.0.0$' templates/plugin-repo/plugin.yml.example || fail "submission plugin.yml example must use stable SemVer"
+grep -q '"releaseVersion": "1.0.0"' templates/plugin-repo/store.json.example || fail "submission store example must declare a release version"
+grep -q '"sha256"' templates/plugin-repo/store.json.example || fail "submission store example must declare a JAR checksum"
+grep -q '"pluginYml": "plugin.yml"' templates/plugin-repo/submission.json.example || fail "submission manifest example must reference plugin.yml"
+grep -q '"license": "LICENSE"' templates/plugin-repo/submission.json.example || fail "submission manifest example must reference its license"
+grep -q 'MR' templates/plugin-repo/README.md || fail "template README must restrict third-party authors to merge requests"
+grep -q '普通 MR CI' templates/plugin-repo/README.md || fail "template README must state the ordinary MR credential boundary"
+grep -q 'protected tag' templates/plugin-repo/README.md || fail "template README must state the protected release boundary"
+grep -q '版本不可覆盖' templates/plugin-repo/README.md || fail "template README must state immutable versions"
+grep -q 'SPI' templates/plugin-repo/README.md || fail "template README must prohibit embedding SPI"
+
+# Submission examples describe materials only: no credentials or upload client may be added.
+if grep -Eq 'NEXUS_(USERNAME|PASSWORD)|curl[[:space:]]|wget[[:space:]]|mvn[[:space:]].*deploy|pnpm[[:space:]].*publish' \
+  templates/plugin-repo/plugin.yml.example \
+  templates/plugin-repo/store.json.example \
+  templates/plugin-repo/submission.json.example \
+  templates/plugin-repo/LICENSE; then
+  fail "third-party submission examples must not contain Nexus credentials or upload commands"
 fi
 
 echo "[verify-plugin-repo-template] checking template docs for local absolute paths"

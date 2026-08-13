@@ -1,0 +1,9 @@
+# Copy to submission/plugin.yml and replace every example value.
+name: example-plugin
+displayName: Example Plugin
+main: com.example.yudream.ExamplePlugin
+version: 1.0.0
+description: A third-party YuDream plugin submission example.
+# depend contains required plugin codes; softdepend contains optional plugin codes.
+depend: []
+softdepend: []

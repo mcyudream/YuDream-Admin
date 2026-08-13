@@ -1,0 +1,14 @@
+yudream-plugin-ai-chatbot
+yudream-plugin-alipay
+yudream-plugin-authlib-injector
+yudream-plugin-minecraft-activity-proof
+yudream-plugin-minecraft-server
+yudream-plugin-project-progress
+yudream-plugin-qq-binding
+yudream-plugin-qqbot-automation
+yudream-plugin-student-info
+yudream-plugin-wallet
+yudream-plugin-web-card
+yudream-plugin-world-map
+yudream-plugin-yudream-launcher
+yudream-plugin-yudream-skin

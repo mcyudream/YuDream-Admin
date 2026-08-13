@@ -17,12 +17,15 @@ export interface PluginModule {
   mainClass?: string
   jarPath?: string
   dependencies?: string[]
+  softDependencies?: string[]
   status: PluginStatus
   errorMessage?: string
   loadedAt?: string
   enabledAt?: string
   loaded: boolean
   enabled: boolean
+  rollbackAvailable?: boolean
+  rollbackVersion?: string
 }
 
 export interface PluginFrontendRoute {

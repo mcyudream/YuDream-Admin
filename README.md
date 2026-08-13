@@ -171,12 +171,16 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 - 插件 JAR 使用根目录 `plugin.yml` 描述元数据，并由运行时管理加载、启用与卸载。
 - 前端插件通过 `remoteEntry.js` 作为远程模块加载到主前端。
 
-新建插件时，建议从 [插件仓库模板](templates/plugin-repo/README.md) 开始；完整约定见 [插件系统规范](docs/plugin-system/specification.md) 和 [插件开发教程](docs/plugin-system/tutorial.md)。官方业务插件源码位于独立仓库 [yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)。
+新建官方插件时，建议从 [插件仓库模板](templates/plugin-repo/README.md) 开始；完整约定见 [插件系统规范](docs/plugin-system/specification.md) 和 [插件开发教程](docs/plugin-system/tutorial.md)。官方业务插件源码位于独立仓库 [yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)。
+
+第三方插件作者只能通过 MR 提交投稿材料，普通 MR CI 不会获得 Nexus 写凭据，也不会发布或上传制品。审核通过后仅由受信发布者通过 protected tag 或受保护的手动流水线代发；已发布版本不可覆盖。投稿格式和审核边界见[第三方插件市场投稿指南](docs/third-party-plugin-submission.md)。
 
 ## 文档
 
 - [插件系统规范](docs/plugin-system/specification.md)
 - [插件开发教程](docs/plugin-system/tutorial.md)
+- [第三方插件市场投稿](docs/third-party-plugin-submission.md)
+- [插件市场发布边界](docs/plugin-store-release.md)
 - [平台能力说明](docs/platform/)
 - [仓库拆分与边界说明](docs/repository-split/README.md)
 - [契约发布校验](docs/plugin-system/contract-validation.md)
