@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="TData extends RowData = RowData">
 import type { RowData } from '@tanstack/vue-table'
 import { useMediaQuery } from '@vueuse/core'
-import { computed, onMounted, useSlots } from 'vue'
+import { computed, useSlots } from 'vue'
 import FaCard from '../card/index.vue'
 import type { TableColumn, TableProps } from '../table/index.vue'
 
@@ -14,16 +14,6 @@ const props = withDefaults(defineProps<TableProps<TData> & {
 
 const slots = useSlots()
 const isMobile = useMediaQuery(() => props.mobileBreakpoint || '(max-width: 768px)')
-
-onMounted(() => {
-  console.log('[FaResponsiveTable] mounted', {
-    tree: props.tree,
-    defaultExpanded: props.defaultExpanded,
-    isMobile: isMobile.value,
-    columns: props.columns?.length,
-    data: props.data?.length,
-  })
-})
 
 /** 转发给桌面 FaTable 的插槽（排除移动端专用的 card 插槽） */
 const tableSlots = computed(() => {
