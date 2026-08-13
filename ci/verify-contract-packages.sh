@@ -40,8 +40,8 @@ fi
 echo "[verify-contract-packages] checking npm publish registries"
 grep -q '"version":[[:space:]]*"1.0.1"' yudream-frontend/packages/plugin-sdk/package.json \
   || fail "@yudream/plugin-sdk must use stable version 1.0.1"
-grep -q '"version":[[:space:]]*"1.0.0"' yudream-frontend/packages/components/package.json \
-  || fail "@yudream/components must use stable version 1.0.0"
+grep -q '"version":[[:space:]]*"1.1.0"' yudream-frontend/packages/components/package.json \
+  || fail "@yudream/components must use stable version 1.1.0"
 if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' yudream-frontend/packages/plugin-sdk/package.json; then
   fail "@yudream/plugin-sdk must publish to Nexus npm-public"
 fi
