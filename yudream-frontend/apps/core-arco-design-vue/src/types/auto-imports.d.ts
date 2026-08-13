@@ -94,6 +94,7 @@ declare global {
   const useFaModal: typeof import('@yudream/components').useFaModal
   const useFaToast: typeof import('@yudream/components').useFaToast
   const useId: typeof import('vue').useId
+  const useIsMobile: typeof import('@yudream/components').useIsMobile
   const useLink: typeof import('vue-router').useLink
   const useModel: typeof import('vue').useModel
   const usePagination: typeof import('@fantastic-admin/composables').usePagination
