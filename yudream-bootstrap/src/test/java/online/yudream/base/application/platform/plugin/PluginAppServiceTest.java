@@ -9,6 +9,7 @@ import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
+import online.yudream.base.domain.system.user.repo.RoleRepo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -58,6 +59,9 @@ class PluginAppServiceTest {
     @Mock
     private PluginMenuProjectionService pluginMenuProjectionService;
 
+    @Mock
+    private RoleRepo roleRepo;
+
     private PluginAppService service;
 
     @BeforeEach
@@ -66,7 +70,8 @@ class PluginAppServiceTest {
                 pluginModuleRepo,
                 pluginRuntimeGateway,
                 permissionDomainService,
-                pluginMenuProjectionService
+                pluginMenuProjectionService,
+                roleRepo
         );
         ReflectionTestUtils.setField(service, "uploadDirectory", tempDir.toString());
     }
