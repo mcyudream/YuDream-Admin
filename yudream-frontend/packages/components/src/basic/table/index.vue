@@ -447,6 +447,7 @@ const table = useVueTable<TData>({
   },
   getCoreRowModel: getCoreRowModel(),
   getExpandedRowModel: getExpandedRowModel(),
+  autoResetExpanded: false,
   getRowId: resolveRowId,
   getSubRows: resolveSubRows,
   get manualExpanding() {
