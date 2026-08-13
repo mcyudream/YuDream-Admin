@@ -190,19 +190,22 @@ function compareSemVer(left: string, right: string): number | undefined {
   return 0
 }
 
-function marketplaceStatus(item: MarketplaceVersion): Exclude<MarketplaceStatus, 'all'> {
-  const module = modules.value.find(localItem => localItem.code === item.code)
+function marketplaceStatus(item: PluginStorePlugin | MarketplaceVersion): Exclude<MarketplaceStatus, 'all'> {
+  const descriptor = getDescriptor(item)
+  const code = item.code ?? descriptor.code
+  const releaseVersion = item.releaseVersion ?? descriptor.releaseVersion ?? descriptor.version
+  const module = modules.value.find(localItem => localItem.code === code)
   if (!module) {
     return 'uninstalled'
   }
-  const comparison = compareSemVer(item.releaseVersion, module.version || '')
+  const comparison = compareSemVer(releaseVersion || '', module.version || '')
   if (comparison === undefined || comparison < 0) {
     return 'local-newer'
   }
   return comparison > 0 ? 'update' : 'installed'
 }
 
-function marketplaceStatusLabel(item: MarketplaceVersion) {
+function marketplaceStatusLabel(item: PluginStorePlugin | MarketplaceVersion) {
   switch (marketplaceStatus(item)) {
     case 'uninstalled': return '未安装'
     case 'update': return '可更新'
@@ -363,7 +366,7 @@ function rollbackConfirmationContent() {
         </div>
         <div class="marketplace-toolbar-actions">
           <span class="result-count">共 {{ pagination.total }} 个结果</span>
-          <FaButton v-if="hasActiveFilters" variant="text" @click="resetFilters">重置筛选</FaButton>
+          <FaButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</FaButton>
           <FaButton variant="outline" :loading="loading" @click="load">
             <FaIcon name="i-ri:refresh-line" />
             刷新
@@ -395,7 +398,7 @@ function rollbackConfirmationContent() {
         </button>
       </div>
       <div v-else-if="!loading" class="empty-state">
-        <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<FaButton variant="text" @click="resetFilters">重置筛选</FaButton></template>
+        <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<FaButton variant="link" @click="resetFilters">重置筛选</FaButton></template>
         <template v-else>插件市场暂时没有可用插件。</template>
       </div>
       <FaPagination
