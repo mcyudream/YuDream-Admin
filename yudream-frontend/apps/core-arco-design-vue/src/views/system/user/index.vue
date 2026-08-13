@@ -394,7 +394,7 @@ function importUsers() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable
+      <FaResponsiveTable
         v-loading="loading"
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
@@ -465,7 +465,63 @@ function importUsers() {
             </FaButton>
           </div>
         </template>
-      </FaTable>
+
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.username }}</span>
+                <div class="flex gap-1">
+                  <FaTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
+                    {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
+                  </FaTag>
+                  <FaTag :variant="row.emailVerified ? 'default' : 'secondary'">
+                    {{ row.emailVerified ? '已验证' : '未验证' }}
+                  </FaTag>
+                </div>
+              </div>
+              <div v-if="row.nickname" class="text-sm text-secondary-foreground/70">
+                {{ row.nickname }}
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div v-if="row.email" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">邮箱</span>
+                  <span class="break-all">{{ row.email }}</span>
+                </div>
+                <div v-if="row.qq" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">QQ</span>
+                  <span>{{ row.qq }}</span>
+                </div>
+              </div>
+              <div v-if="row.deptIds?.length" class="flex flex-wrap gap-1">
+                <FaTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
+                  {{ row.deptNames?.[index] || deptId }}{{ sameId(deptId, row.defaultDeptId) ? '（默认）' : '' }}
+                </FaTag>
+              </div>
+              <div v-if="row.roleNames?.length" class="text-sm text-secondary-foreground/80">
+                角色：{{ row.roleNames.join('、') }}
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                  编辑
+                </FaButton>
+                <FaButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
+                  部门角色
+                </FaButton>
+                <FaButton v-auth="'system:user:impersonate'" variant="outline" size="sm" :disabled="!canImpersonateRow(row)" @click="confirmImpersonate(row)">
+                  伪装
+                </FaButton>
+                <FaButton v-if="row.status === 'DISABLED'" v-auth="'system:user:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                  启用
+                </FaButton>
+                <FaButton v-else v-auth="'system:user:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
+                  停用
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"

@@ -41,6 +41,8 @@ export { default as FaPasswordStrength } from './basic/password-strength/index.v
 export { default as FaPopover } from './basic/popover/index.vue'
 export { default as FaProgress } from './basic/progress/index.vue'
 export { default as FaRadioGroup } from './basic/radio-group/index.vue'
+export { default as FaResponsiveTable } from './basic/responsive-table/index.vue'
+export { useIsMobile } from './basic/responsive-table/index'
 export { default as FaScrollArea } from './basic/scroll-area/index.vue'
 export { default as FaSearchBar } from './basic/search-bar/index.vue'
 export { default as FaSelect } from './basic/select/index.vue'
