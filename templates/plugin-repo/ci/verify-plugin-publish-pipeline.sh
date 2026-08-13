@@ -29,40 +29,38 @@ reject_pattern() {
 }
 
 echo "[verify-plugin-publish-pipeline] checking required verification scripts"
-require_file "ci/verify-plugin-repo-independence.sh"
-require_file "ci/verify-plugin-maven-boundary.sh"
-require_file "ci/verify-core-maven-registry.sh"
-require_file "ci/verify-core-npm-contracts.sh"
-require_file "ci/verify-plugin-jar-assets.sh"
-require_file "ci/publish-plugin-jars.sh"
-require_file "ci/verify-published-plugin-jars.sh"
+for file in \
+  ci/verify-plugin-repo-independence.sh ci/verify-plugin-maven-boundary.sh \
+  ci/verify-core-maven-registry.sh ci/verify-core-npm-contracts.sh \
+  ci/verify-plugin-jar-assets.sh ci/verify-plugin-release-selection.sh \
+  ci/publish-plugin-jars.sh ci/verify-published-plugin-jars.sh release/plugins.txt; do
+  require_file "$file"
+done
 
 echo "[verify-plugin-publish-pipeline] checking stage layout"
-require_pattern '^[[:space:]]*-[[:space:]]\+validate$' "plugin CI must keep validate stage"
-require_pattern '^[[:space:]]*-[[:space:]]\+build-frontend$' "plugin CI must keep build-frontend stage"
-require_pattern '^[[:space:]]*-[[:space:]]\+package-plugin$' "plugin CI must keep package-plugin stage"
-require_pattern '^[[:space:]]*-[[:space:]]\+publish-plugin$' "plugin CI must keep publish-plugin stage"
-require_pattern '^[[:space:]]*-[[:space:]]\+verify-publish$' "plugin CI must keep verify-publish stage"
+for stage in validate build-frontend package-plugin publish-plugin verify-publish; do
+  require_pattern "^[[:space:]]*-[[:space:]]\\+$stage$" "plugin CI must keep $stage stage"
+done
 
 echo "[verify-plugin-publish-pipeline] checking validation jobs"
-require_pattern '^validate:independence:$' "plugin CI must validate repository independence"
-require_pattern '^validate:plugin-maven-boundary:$' "plugin CI must validate plugin Maven boundary"
-require_pattern '^validate:core-maven-registry:$' "plugin CI must validate core Maven registry access"
-require_pattern '^validate:core-npm-contracts:$' "plugin CI must validate core npm contracts"
-require_pattern '^validate:docs:$' "plugin CI must validate documentation independence"
-require_pattern '^validate:publish-pipeline:$' "plugin CI must validate its own publish pipeline shape"
+for job in independence plugin-maven-boundary core-maven-registry core-npm-contracts docs publish-pipeline release-selection; do
+  require_pattern "^validate:$job:$" "plugin CI must validate $job"
+done
+require_pattern 'sh ci/verify-plugin-release-selection.sh' "plugin CI must validate explicit release selection"
 require_pattern 'sh ci/verify-plugin-publish-pipeline.sh' "plugin CI must call ci/verify-plugin-publish-pipeline.sh"
 
-echo "[verify-plugin-publish-pipeline] checking package/publish/verify chain"
+echo "[verify-plugin-publish-pipeline] checking explicit release packaging"
 require_pattern '^package:plugins:$' "plugin CI must keep package:plugins job"
 require_pattern 'PACKAGE_MAVEN_REPO' "plugin CI package job must use a dedicated clean Maven local repository"
-require_pattern 'sh ci/verify-plugin-jar-assets.sh' "plugin CI package job must verify plugin jar assets"
-require_pattern 'copy_final_plugin_jars "\$PWD" "\$PWD/dist/plugins"' "plugin CI package job must flatten final plugin jars into dist/plugins"
+require_pattern 'selected_plugin_modules_csv' "tag package must resolve canonical selected modules"
+require_pattern 'clean package -pl "\$release_modules" -am' "tag package must build selected modules with Maven -pl and -am"
+require_pattern 'PLUGIN_RELEASE_ONLY="\${CI_COMMIT_TAG:+1}" sh ci/verify-plugin-jar-assets.sh' "tag package must verify only selected jars"
+require_pattern 'PLUGIN_RELEASE_ONLY="\${CI_COMMIT_TAG:+1}" copy_final_plugin_jars' "tag package must stage only selected jars"
 require_pattern '^[[:space:]]*-[[:space:]]\+dist/plugins/\*\.jar$' "plugin CI package artifacts must expose flat dist/plugins jars"
 require_pattern '^publish:plugin-jars:$' "plugin CI must keep publish:plugin-jars job"
-require_pattern 'sh ci/publish-plugin-jars.sh' "plugin CI publish job must upload plugin jars"
+require_pattern 'PLUGIN_RELEASE_ONLY=1 sh ci/publish-plugin-jars.sh' "tag publishing must publish only selected jars"
 require_pattern '^verify:published-plugin-jars:$' "plugin CI must keep verify:published-plugin-jars job"
-require_pattern 'sh ci/verify-published-plugin-jars.sh' "plugin CI must re-read published plugin jars after upload"
+require_pattern 'PLUGIN_RELEASE_ONLY=1 sh ci/verify-published-plugin-jars.sh' "tag verification must verify only selected jars"
 
 echo "[verify-plugin-publish-pipeline] checking Nexus-only package routing"
 require_pattern 'NEXUS_MAVEN_PUBLIC_URL' "plugin CI must pull Maven artifacts through Nexus maven-public"
@@ -80,11 +78,9 @@ grep -q 'https://maven.aliyun.com/repository/public' .gitlab-ci.yml || fail "plu
 grep -q '<id>nexus-plugin</id>' settings.xml.example || fail "plugin Maven plugins must fall back from Aliyun to Nexus"
 grep -q '<id>nexus-plugin</id>' .gitlab-ci.yml || fail "plugin CI Maven plugins must fall back from Aliyun to Nexus"
 for script in ci/publish-plugin-jars.sh ci/verify-core-maven-registry.sh ci/verify-published-plugin-jars.sh; do
-  grep -q '<id>nexus-plugin</id>' "$script" \
-    || fail "$script Maven plugins must fall back from Aliyun to Nexus"
+  grep -q '<id>nexus-plugin</id>' "$script" || fail "$script Maven plugins must fall back from Aliyun to Nexus"
 done
-grep -Fq '<url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' ci/publish-plugin-jars.sh \
-  || fail "plugin publish settings must pass the Nexus plugin fallback URL through Maven environment interpolation"
+grep -Fq '<url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' ci/publish-plugin-jars.sh || fail "plugin publish settings must pass the Nexus plugin fallback URL through Maven environment interpolation"
 if grep -Eq 'maven-dependency-plugin[^[:space:]]*:get|dependency:get|remoteRepositories=' .gitlab-ci.yml; then
   fail "plugin CI must not prefetch Maven artifacts outside the configured repository order"
 fi
@@ -98,9 +94,8 @@ fi
 reject_pattern 'packages/generic' "plugin publishing must not use GitLab Generic Package Registry"
 reject_pattern 'JOB-TOKEN:' "plugin publishing must not authenticate to a registry with GitLab job tokens"
 if grep -R -Eq 'gitlab-maven|gitlab\.yudream\.online/api/v4/projects|CI_JOB_TOKEN|CORE_PACKAGE_(USER|TOKEN)|packages/(maven|npm)' \
-  .gitlab-ci.yml .npmrc.example settings.xml.example \
-  ci/publish-plugin-jars.sh ci/verify-core-maven-registry.sh \
-  ci/verify-core-npm-contracts.sh ci/verify-published-plugin-jars.sh; then
+  .gitlab-ci.yml .npmrc.example settings.xml.example ci/publish-plugin-jars.sh \
+  ci/verify-core-maven-registry.sh ci/verify-core-npm-contracts.sh ci/verify-published-plugin-jars.sh; then
   fail "plugin package routing must not use GitLab Package Registry"
 fi
 

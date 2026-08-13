@@ -30,6 +30,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -75,6 +77,14 @@ public class PluginAppService {
         return list();
     }
 
+    @Transactional(readOnly = true)
+    public List<PluginModuleDTO> listInstalled() {
+        return pluginModuleRepo.findAll().stream()
+                .sorted(Comparator.comparing(PluginModule::getCode))
+                .map(module -> PluginAssembler.toDTO(module, false, false))
+                .toList();
+    }
+
     @Transactional
     public List<PluginModuleDTO> upload(InputStream inputStream, String originalFilename, long size) {
         if (size <= 0) {
@@ -87,23 +97,157 @@ public class PluginAppService {
             Files.createDirectories(directory);
             tempFile = Files.createTempFile(directory, ".plugin-upload-", ".tmp");
             Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-            PluginDescriptorInfo descriptor = pluginRuntimeGateway.describe(tempFile)
-                    .orElseThrow(() -> new BizException("上传文件不是有效的 YuDream 插件 JAR"));
-            PluginModule existing = pluginModuleRepo.findByCode(descriptor.code()).orElse(null);
-            Path target = targetJarPath(directory, descriptorJarFilename(descriptor), existing);
-            replaceExistingPlugin(existing);
-            moveUploadedJar(tempFile, target);
+            List<PluginModuleDTO> result = installStagedJar(tempFile, null, null, null);
             tempFile = null;
-            deleteOldJarIfChanged(existing, target);
-            syncPluginRegistry();
-            return pluginModuleRepo.findAll().stream()
-                    .sorted(Comparator.comparing(PluginModule::getCode))
-                    .map(this::toDTO)
-                    .toList();
+            return result;
         } catch (IOException e) {
             throw new BizException("插件 JAR 上传失败：" + e.getMessage());
         } finally {
             deleteQuietly(tempFile);
+        }
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> installStoreJar(Path stagedJar, String expectedCode, String expectedVersion, String expectedMain) {
+        PluginDescriptorInfo descriptor = pluginRuntimeGateway.describe(stagedJar)
+                .orElseThrow(() -> new BizException("上传文件不是有效的 YuDream 插件 JAR"));
+        validateStoreDescriptor(descriptor, expectedCode, expectedVersion, expectedMain);
+        return installMarketplaceJar(stagedJar, descriptor);
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> updateStoreJar(Path stagedJar, String expectedCode, String expectedVersion, String expectedMain) {
+        return installStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain);
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> rollbackStoreJar(String code) {
+        return rollbackStoreJar(code, null);
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> rollbackStoreJar(String code, String expectedVersion) {
+        if (!StringUtils.hasText(code)) {
+            throw new BizException("插件代码不能为空");
+        }
+        PluginModule module = module(code.trim());
+        rejectRollbackWhenRunning(module);
+        Path active = activeJarPath(module);
+        Path backup = backupJarPath(module);
+        validateBackup(module, backup, expectedVersion);
+        PluginModuleSnapshot originalMetadata = snapshot(module);
+        Path activeOriginal = null;
+        Path backupOriginal = null;
+        Path activeSwap = null;
+        Path backupSwap = null;
+        boolean switchStarted = false;
+        boolean recoverySucceeded = false;
+        try {
+            Files.createDirectories(backupDirectory());
+            activeOriginal = stageJar(active, active.getParent(), ".plugin-rollback-active-original-");
+            backupOriginal = stageJar(backup, active.getParent(), ".plugin-rollback-backup-original-");
+            activeSwap = stageJar(backup, active.getParent(), ".plugin-rollback-active-");
+            backupSwap = stageJar(active, active.getParent(), ".plugin-rollback-backup-");
+            validateJarAgainstDescriptor(activeSwap, module, expectedVersion, true);
+            validateJarAgainstDescriptor(backupSwap, module, null, false);
+            switchStarted = true;
+            moveReplacing(activeSwap, active);
+            moveReplacing(backupSwap, backup);
+            swapBackupMetadata(module, backup);
+            pluginModuleRepo.save(module);
+            syncPluginRegistry();
+            recoverySucceeded = true;
+            return modules();
+        } catch (Exception exception) {
+            boolean activeRestored = !switchStarted || restoreActiveFromStaged(active, activeOriginal);
+            boolean backupRestored = !switchStarted || restoreBackupFromActive(backup, backupOriginal);
+            if (switchStarted && (!activeRestored || !backupRestored)) {
+                log.error("Rollback recovery incomplete for {} (activeRestored={}, backupRestored={}); retaining original staging files",
+                        module.getCode(), activeRestored, backupRestored);
+            }
+            restoreSnapshot(module, originalMetadata);
+            try {
+                pluginModuleRepo.save(module);
+            } catch (Exception metadataFailure) {
+                log.error("Failed to restore plugin rollback metadata for {}", module.getCode(), metadataFailure);
+            }
+            throw new BizException("插件回滚失败：" + rootMessage(exception)
+                    + (switchStarted && (!activeRestored || !backupRestored) ? "；文件恢复未完成，已保留恢复副本" : ""));
+        } finally {
+            if (recoverySucceeded) {
+                deleteQuietly(activeOriginal);
+                deleteQuietly(backupOriginal);
+            }
+            deleteQuietly(activeSwap);
+            deleteQuietly(backupSwap);
+        }
+    }
+
+    private List<PluginModuleDTO> installStagedJar(Path stagedJar, String expectedCode, String expectedVersion, String expectedMain) {
+        PluginDescriptorInfo descriptor = pluginRuntimeGateway.describe(stagedJar)
+                .orElseThrow(() -> new BizException("上传文件不是有效的 YuDream 插件 JAR"));
+        validateStoreDescriptor(descriptor, expectedCode, expectedVersion, expectedMain);
+        PluginModule existing = pluginModuleRepo.findByCode(descriptor.code()).orElse(null);
+        Path target = targetJarPath(uploadDirectory(), descriptorJarFilename(descriptor), existing);
+        try {
+            stopExistingPlugin(existing);
+            moveUploadedJar(stagedJar, target);
+            deleteOldJarIfChanged(existing, target);
+            syncPluginRegistry();
+            return modules();
+        } catch (IOException e) {
+            throw new BizException("插件 JAR 上传失败：" + e.getMessage());
+        }
+    }
+
+    private List<PluginModuleDTO> installMarketplaceJar(Path stagedJar, PluginDescriptorInfo descriptor) {
+        PluginModule existing = pluginModuleRepo.findByCode(descriptor.code()).orElse(null);
+        if (existing == null || !StringUtils.hasText(existing.getJarPath())) {
+            return installStagedJar(stagedJar, descriptor.code(), descriptor.version(), descriptor.mainClass());
+        }
+        Path active = activeJarPath(existing);
+        Path backup = controlledBackupPath(existing, active);
+        Map<String, PluginModule> modules = modulesByCode();
+        List<PluginModule> affected = affectedModules(existing, modules);
+        Map<String, PluginModuleSnapshot> originalMetadata = affected.stream()
+                .collect(Collectors.toMap(PluginModule::getCode, this::snapshot));
+        Path activeOriginal = null;
+        Path backupOriginal = null;
+        Path actualBackup = null;
+        boolean backupExisted = Files.isRegularFile(backup);
+        boolean switchStarted = false;
+        try {
+            Files.createDirectories(backup.getParent());
+            activeOriginal = stageJar(active, active.getParent(), ".plugin-marketplace-active-original-");
+            if (backupExisted) {
+                backupOriginal = stageJar(backup, backup.getParent(), ".plugin-marketplace-backup-original-");
+            }
+            stopAffectedForMarketplaceUpdate(affected);
+            switchStarted = true;
+            actualBackup = backupActiveJar(existing, active, backup);
+            moveUploadedJar(stagedJar, active);
+            syncPluginRegistry();
+            return modules();
+        } catch (Exception exception) {
+            boolean activeRestored = !switchStarted || restoreActiveFromStaged(active, activeOriginal);
+            boolean backupRestored = restoreMarketplaceBackup(backup, actualBackup, backupOriginal, backupExisted);
+            restoreMarketplaceMetadata(affected, originalMetadata);
+            if (!activeRestored || !backupRestored) {
+                log.error("Marketplace update recovery incomplete for {} (activeRestored={}, backupRestored={})", existing.getCode(), activeRestored, backupRestored);
+            }
+            throw new BizException("插件市场更新失败：" + rootMessage(exception)
+                    + (!activeRestored || !backupRestored ? "；文件恢复未完成，已保留恢复副本" : ""));
+        } finally {
+            deleteQuietly(activeOriginal);
+            deleteQuietly(backupOriginal);
+        }
+    }
+
+    private void validateStoreDescriptor(PluginDescriptorInfo descriptor, String expectedCode, String expectedVersion, String expectedMain) {
+        if (expectedCode != null && !expectedCode.equals(descriptor.code())
+                || expectedVersion != null && !expectedVersion.equals(descriptor.version())
+                || expectedMain != null && !expectedMain.equals(descriptor.mainClass())) {
+            throw new BizException("插件 JAR 描述信息与商店版本不一致");
         }
     }
 
@@ -128,7 +272,9 @@ public class PluginAppService {
             throw new BizException("插件不存在，请先刷新插件目录");
         }
         try {
-            return toDTO(enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>()));
+            PluginModule enabled = enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>());
+            enabled.setRestoreIntentActive(true);
+            return toDTO(pluginModuleRepo.save(enabled));
         } catch (Exception e) {
             String failure = rootMessage(e);
             String cleanupFailure = cleanupFailedEnable(module.getCode());
@@ -147,6 +293,7 @@ public class PluginAppService {
             runtimeFailure = e;
         }
         module.markDisabled();
+        module.setRestoreIntentActive(false);
         PluginModule saved = pluginModuleRepo.save(module);
         String menuFailure = reconcileUnavailableMenus(code);
         if (runtimeFailure != null || menuFailure != null) {
@@ -161,6 +308,7 @@ public class PluginAppService {
         PluginModule module = module(code);
         pluginRuntimeGateway.unload(code);
         module.markUnloaded();
+        module.setRestoreIntentActive(false);
         PluginModule saved = pluginModuleRepo.save(module);
         String menuFailure = reconcileUnavailableMenus(code);
         if (menuFailure != null) {
@@ -217,6 +365,11 @@ public class PluginAppService {
     }
 
     @Transactional(readOnly = true)
+    public boolean loaded(String code) {
+        return StringUtils.hasText(code) && pluginRuntimeGateway.loaded(code.trim());
+    }
+
+    @Transactional(readOnly = true)
     public PluginFrontendAssetDTO frontendAsset(String code, String assetPath) {
         return pluginRuntimeGateway.frontendAsset(code, assetPath)
                 .map(PluginAssembler::toDTO)
@@ -238,7 +391,7 @@ public class PluginAppService {
         Set<String> restored = new HashSet<>();
         Set<String> visiting = new HashSet<>();
         for (PluginModule module : modules.values().stream().sorted(Comparator.comparing(PluginModule::getCode)).toList()) {
-            if (!module.enabled()) {
+            if (!restoreCandidate(module)) {
                 disableZombieRuntime(module.getCode());
                 String menuFailure = reconcileUnavailableMenus(module.getCode());
                 if (menuFailure != null) {
@@ -256,15 +409,19 @@ public class PluginAppService {
             restored.add(code);
             return;
         }
-        if (!module.enabled()) {
+        if (!restoreCandidate(module)) {
             return;
         }
         try {
+            PluginModule restoredModule;
             if (pluginRuntimeGateway.enabled(code)) {
-                projectRuntimeMenus(module);
+                restoredModule = projectRuntimeMenus(module);
             } else {
-                enableRuntimeWithDependencies(module, modules, restored, visiting);
+                restoredModule = enableRuntimeWithDependencies(module, modules, restored, visiting);
             }
+            restoredModule.setRestoreIntentActive(false);
+            pluginModuleRepo.save(restoredModule);
+            modules.put(code, restoredModule);
             restored.add(code);
         } catch (Exception e) {
             log.warn("Failed to restore plugin {}", code, e);
@@ -310,7 +467,7 @@ public class PluginAppService {
             if (dependency == null) {
                 throw new BizException("插件依赖不存在：" + dependencyCode);
             }
-            if (!dependency.enabled()) {
+            if (!dependency.enabled() && !Boolean.TRUE.equals(dependency.getRestoreIntentActive())) {
                 throw new BizException("请先启用插件依赖：" + dependency.getName());
             }
             if (!enabled.contains(dependencyCode)) {
@@ -354,7 +511,36 @@ public class PluginAppService {
         }
     }
 
-    private void replaceExistingPlugin(PluginModule existing) {
+    private List<PluginModule> affectedModules(PluginModule target, Map<String, PluginModule> modules) {
+        Set<String> affected = new HashSet<>();
+        affected.add(target.getCode());
+        boolean changed;
+        do {
+            changed = false;
+            for (PluginModule module : modules.values()) {
+                if ((!affected.contains(module.getCode()) && dependencies(module).stream().anyMatch(affected::contains))
+                        || (!affected.contains(module.getCode()) && softDependencies(module).stream().anyMatch(affected::contains))) {
+                    changed |= affected.add(module.getCode());
+                }
+            }
+        } while (changed);
+        return affected.stream().map(modules::get)
+                .sorted(Comparator.<PluginModule>comparingInt(module -> reverseDependencyDepth(module, modules, affected))
+                        .thenComparing(PluginModule::getCode))
+                .toList();
+    }
+
+    private int reverseDependencyDepth(PluginModule module, Map<String, PluginModule> modules, Set<String> affected) {
+        int depth = 0;
+        for (PluginModule dependent : modules.values()) {
+            if (affected.contains(dependent.getCode()) && dependsOn(dependent, module.getCode())) {
+                depth = Math.max(depth, 1 + reverseDependencyDepth(dependent, modules, affected));
+            }
+        }
+        return depth;
+    }
+
+    private void stopExistingPlugin(PluginModule existing) {
         if (existing == null) {
             return;
         }
@@ -366,8 +552,327 @@ public class PluginAppService {
             pluginRuntimeGateway.unload(code);
         }
         existing.markUnloaded();
+        existing.setRestoreIntentActive(false);
         pluginModuleRepo.save(existing);
         reconcileUnavailableMenus(code);
+    }
+
+    private void stopAffectedForMarketplaceUpdate(List<PluginModule> affected) {
+        for (PluginModule module : affected) {
+            String code = module.getCode();
+            boolean enabled = pluginRuntimeGateway.enabled(code);
+            if (enabled || module.enabled()) {
+                module.setRestoreIntentActive(true);
+            }
+            if (enabled) {
+                pluginRuntimeGateway.disable(code);
+            }
+            if (pluginRuntimeGateway.loaded(code)) {
+                pluginRuntimeGateway.unload(code);
+            }
+            module.markUnloaded();
+            pluginModuleRepo.save(module);
+            String menuFailure = reconcileUnavailableMenus(code);
+            if (menuFailure != null) {
+                throw new BizException(menuFailure);
+            }
+        }
+    }
+
+    private boolean restoreMarketplaceBackup(Path originalBackup, Path actualBackup, Path backupOriginal, boolean backupExisted) {
+        try {
+            if (backupExisted) {
+                if (backupOriginal == null || !Files.isRegularFile(backupOriginal)) {
+                    return false;
+                }
+                Files.copy(backupOriginal, originalBackup, StandardCopyOption.REPLACE_EXISTING);
+            } else if (actualBackup != null) {
+                Files.deleteIfExists(actualBackup);
+            }
+            return true;
+        } catch (IOException restoreFailure) {
+            log.error("Failed to restore marketplace backup state", restoreFailure);
+            return false;
+        }
+    }
+
+    private void restoreMarketplaceMetadata(List<PluginModule> affected, Map<String, PluginModuleSnapshot> snapshots) {
+        for (PluginModule module : affected) {
+            restoreSnapshot(module, snapshots.get(module.getCode()));
+            try {
+                pluginModuleRepo.save(module);
+            } catch (Exception metadataFailure) {
+                log.error("Failed to restore plugin metadata for {}", module.getCode(), metadataFailure);
+            }
+        }
+    }
+
+    private Path backupActiveJar(PluginModule module, Path active, Path backup) throws IOException {
+        if (!Files.isRegularFile(active)) {
+            throw new BizException("当前插件 JAR 不存在：" + active);
+        }
+        Files.createDirectories(backup.getParent());
+        String activeHash = sha256(active);
+        if (Files.isRegularFile(backup) && activeHash.equalsIgnoreCase(sha256(backup))) {
+            snapshotBackup(module, backup);
+            pluginModuleRepo.save(module);
+            return backup;
+        }
+        if (Files.isRegularFile(backup)) {
+            backup = backup.getParent().resolve(module.getCode() + "-" +
+                    (StringUtils.hasText(module.getPluginVersion()) ? module.getPluginVersion() : "unknown") +
+                    "-" + activeHash + ".jar").toAbsolutePath().normalize();
+        }
+        Path staged = stageJar(active, backup.getParent(), ".plugin-rollback-backup-");
+        try {
+            moveReplacing(staged, backup);
+        } finally {
+            deleteQuietly(staged);
+        }
+        snapshotBackup(module, backup);
+        pluginModuleRepo.save(module);
+        return backup;
+    }
+
+    private void validateBackup(PluginModule module, Path backup, String expectedVersion) {
+        if (!backup.startsWith(backupDirectory()) || !Files.isRegularFile(backup)
+                || !StringUtils.hasText(module.getBackupSha256())
+                || !module.getBackupSha256().equalsIgnoreCase(sha256(backup))) {
+            throw new BizException("插件回滚备份无效");
+        }
+        validateJarAgainstDescriptor(backup, module, expectedVersion, true);
+    }
+
+    private void validateJarAgainstDescriptor(Path jar, PluginModule module, String expectedVersion, boolean backup) {
+        PluginDescriptorInfo descriptor = pluginRuntimeGateway.describe(jar)
+                .orElseThrow(() -> new BizException("插件 JAR 描述信息无效"));
+        if (!same(module.getCode(), descriptor.code())
+                || (StringUtils.hasText(expectedVersion) && !same(expectedVersion, descriptor.version()))
+                || (backup && (!same(module.getBackupName(), descriptor.name())
+                || !same(module.getBackupPluginVersion(), descriptor.version())
+                || !same(module.getBackupDescription(), descriptor.description())
+                || !same(module.getBackupMainClass(), descriptor.mainClass())
+                || !same(module.getBackupDependencies(), descriptor.dependencies())
+                || !same(module.getBackupSoftDependencies(), descriptor.softDependencies())
+                || module.getBackupStatus() == null))) {
+            throw new BizException("插件 JAR 描述信息不匹配");
+        }
+    }
+
+    private PluginModuleSnapshot snapshot(PluginModule module) {
+        return new PluginModuleSnapshot(module);
+    }
+
+    private void restoreSnapshot(PluginModule module, PluginModuleSnapshot snapshot) {
+        snapshot.restore(module);
+    }
+
+    private Path stageJar(Path source, Path directory, String prefix) throws IOException {
+        Path temp = Files.createTempFile(directory, prefix, ".jar");
+        try {
+            Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING);
+            return temp;
+        } catch (IOException failure) {
+            deleteQuietly(temp);
+            throw failure;
+        }
+    }
+
+    private void moveReplacing(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    private void snapshotBackup(PluginModule module, Path backup) {
+        module.setBackupJarPath(backup.toString());
+        module.setBackupName(module.getName());
+        module.setBackupPluginVersion(module.getPluginVersion());
+        module.setBackupDescription(module.getDescription());
+        module.setBackupMainClass(module.getMainClass());
+        module.setBackupSha256(sha256(backup));
+        module.setBackupDependencies(copy(module.getDependencies()));
+        module.setBackupSoftDependencies(copy(module.getSoftDependencies()));
+        module.setBackupStatus(module.getStatus());
+        module.setBackupErrorMessage(module.getErrorMessage());
+        module.setBackupLoadedAt(module.getLoadedAt());
+        module.setBackupEnabledAt(module.getEnabledAt());
+        module.setBackupMenusInitialized(module.getMenusInitialized());
+        module.setBackupRestoreIntentActive(module.getRestoreIntentActive());
+    }
+
+    private void swapBackupMetadata(PluginModule module, Path backup) {
+        PluginModule activeSnapshot = PluginModule.builder()
+                .name(module.getName()).pluginVersion(module.getPluginVersion()).description(module.getDescription())
+                .mainClass(module.getMainClass()).dependencies(copy(module.getDependencies()))
+                .softDependencies(copy(module.getSoftDependencies())).status(module.getStatus())
+                .errorMessage(module.getErrorMessage()).loadedAt(module.getLoadedAt()).enabledAt(module.getEnabledAt())
+                .menusInitialized(module.getMenusInitialized()).restoreIntentActive(module.getRestoreIntentActive()).build();
+        restoreBackupSnapshot(module);
+        module.setBackupName(activeSnapshot.getName());
+        module.setBackupPluginVersion(activeSnapshot.getPluginVersion());
+        module.setBackupDescription(activeSnapshot.getDescription());
+        module.setBackupMainClass(activeSnapshot.getMainClass());
+        module.setBackupSha256(sha256(backup));
+        module.setBackupDependencies(activeSnapshot.getDependencies());
+        module.setBackupSoftDependencies(activeSnapshot.getSoftDependencies());
+        module.setBackupStatus(activeSnapshot.getStatus());
+        module.setBackupErrorMessage(activeSnapshot.getErrorMessage());
+        module.setBackupLoadedAt(activeSnapshot.getLoadedAt());
+        module.setBackupEnabledAt(activeSnapshot.getEnabledAt());
+        module.setBackupMenusInitialized(activeSnapshot.getMenusInitialized());
+        module.setBackupRestoreIntentActive(activeSnapshot.getRestoreIntentActive());
+        module.markUnloaded();
+    }
+
+    private void restoreBackupSnapshot(PluginModule module) {
+        module.setName(module.getBackupName());
+        module.setPluginVersion(module.getBackupPluginVersion());
+        module.setDescription(module.getBackupDescription());
+        module.setMainClass(module.getBackupMainClass());
+        module.setDependencies(copy(module.getBackupDependencies()));
+        module.setSoftDependencies(copy(module.getBackupSoftDependencies()));
+        module.setStatus(module.getBackupStatus());
+        module.setErrorMessage(module.getBackupErrorMessage());
+        module.setLoadedAt(module.getBackupLoadedAt());
+        module.setEnabledAt(module.getBackupEnabledAt());
+        module.setMenusInitialized(module.getBackupMenusInitialized());
+        module.setRestoreIntentActive(module.getBackupRestoreIntentActive());
+    }
+
+    private void rejectRollbackWhenRunning(PluginModule target) {
+        Map<String, PluginModule> modules = modulesByCode();
+        Set<String> affected = new HashSet<>();
+        affected.add(target.getCode());
+        boolean changed;
+        do {
+            changed = false;
+            for (PluginModule module : modules.values()) {
+                if (!affected.contains(module.getCode()) && dependencies(module).stream().anyMatch(affected::contains)
+                        || !affected.contains(module.getCode()) && softDependencies(module).stream().anyMatch(affected::contains)) {
+                    changed |= affected.add(module.getCode());
+                }
+            }
+        } while (changed);
+        for (String code : affected) {
+            PluginModule module = modules.get(code);
+            if (module != null && running(module)) {
+                throw new BizException("插件或其依赖方正在运行，需停止后完成回滚");
+            }
+        }
+    }
+
+    private boolean running(PluginModule module) {
+        String code = module.getCode();
+        return module.getStatus() == online.yudream.base.domain.platform.plugin.enumerate.PluginStatus.LOADED
+                || module.getStatus() == online.yudream.base.domain.platform.plugin.enumerate.PluginStatus.ENABLED
+                || pluginRuntimeGateway.loaded(code)
+                || pluginRuntimeGateway.enabled(code);
+    }
+
+    private boolean dependsOn(PluginModule module, String code) {
+        return dependencies(module).contains(code) || softDependencies(module).contains(code);
+    }
+
+    private List<String> copy(List<String> values) {
+        return values == null ? null : List.copyOf(values);
+    }
+
+    private boolean same(Object left, Object right) {
+        return java.util.Objects.equals(left, right);
+    }
+
+    private Path activeJarPath(PluginModule module) {
+        if (!StringUtils.hasText(module.getJarPath())) {
+            throw new BizException("当前插件 JAR 不存在");
+        }
+        return Path.of(module.getJarPath()).toAbsolutePath().normalize();
+    }
+
+    private Path backupJarPath(PluginModule module) {
+        if (!StringUtils.hasText(module.getBackupJarPath())) {
+            throw new BizException("插件没有可用回滚备份");
+        }
+        return Path.of(module.getBackupJarPath()).toAbsolutePath().normalize();
+    }
+
+    private Path controlledBackupPath(PluginModule module, Path active) {
+        String version = StringUtils.hasText(module.getPluginVersion()) ? module.getPluginVersion() : "unknown";
+        return backupDirectory()
+                .resolve((module.getCode() + "-" + version + ".jar").replaceAll("[^A-Za-z0-9._-]", "-"))
+                .toAbsolutePath().normalize();
+    }
+
+    private Path backupDirectory() {
+        Path upload = uploadDirectory();
+        Path parent = upload.getParent();
+        // Keep rollback artifacts outside plugin discovery and upload scanning.
+        return (parent == null ? upload.resolveSibling(".plugin-rollback") : parent.resolve(".plugin-rollback"))
+                .toAbsolutePath().normalize();
+    }
+
+    private String sha256(Path file) {
+        try (InputStream input = Files.newInputStream(file)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            for (int read; (read = input.read(buffer)) != -1;) {
+                digest.update(buffer, 0, read);
+            }
+            return java.util.HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | NoSuchAlgorithmException exception) {
+            throw new BizException("插件 JAR 校验失败：" + rootMessage(exception));
+        }
+    }
+
+    private boolean restoreActiveJar(Path active, Path backup) {
+        try {
+            if (!Files.isRegularFile(backup)) {
+                log.error("Cannot restore plugin JAR: backup is missing at {}", backup);
+                return false;
+            }
+            Files.copy(backup, active, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException restoreFailure) {
+            log.error("Failed to restore plugin JAR from {} to {}", backup, active, restoreFailure);
+            return false;
+        }
+    }
+
+    private boolean restoreActiveFromStaged(Path active, Path rollbackTemp) {
+        try {
+            if (rollbackTemp == null || !Files.isRegularFile(rollbackTemp)) {
+                log.error("Cannot restore plugin JAR: rollback staging file is missing at {}", rollbackTemp);
+                return false;
+            }
+            Files.copy(rollbackTemp, active, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException restoreFailure) {
+            log.error("Failed to restore plugin JAR from rollback staging file {}", rollbackTemp, restoreFailure);
+            return false;
+        }
+    }
+
+    private boolean restoreBackupFromActive(Path backup, Path rollbackTemp) {
+        try {
+            if (rollbackTemp == null || !Files.isRegularFile(rollbackTemp)) {
+                log.error("Cannot restore rollback backup: staging file is missing at {}", rollbackTemp);
+                return false;
+            }
+            Files.copy(rollbackTemp, backup, StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        } catch (IOException restoreFailure) {
+            log.error("Failed to restore plugin rollback backup from staging file {}", rollbackTemp, restoreFailure);
+            return false;
+        }
+    }
+
+    private List<PluginModuleDTO> modules() {
+        return pluginModuleRepo.findAll().stream()
+                .sorted(Comparator.comparing(PluginModule::getCode))
+                .map(this::toDTO)
+                .toList();
     }
 
     private void deleteJar(PluginModule module) {
@@ -603,6 +1108,10 @@ public class PluginAppService {
         pluginModuleRepo.save(current);
     }
 
+    private boolean restoreCandidate(PluginModule module) {
+        return Boolean.TRUE.equals(module.getRestoreIntentActive()) || module.enabled();
+    }
+
     private boolean jarExists(PluginModule module) {
         try {
             return module.getJarPath() != null && Files.isRegularFile(Path.of(module.getJarPath()));
@@ -617,5 +1126,46 @@ public class PluginAppService {
             cursor = cursor.getCause();
         }
         return cursor.getMessage() == null ? cursor.getClass().getSimpleName() : cursor.getMessage();
+    }
+
+    private static final class PluginModuleSnapshot {
+        private final PluginModule value;
+
+        private PluginModuleSnapshot(PluginModule module) {
+            this.value = PluginModule.builder()
+                    .code(module.getCode()).name(module.getName()).pluginVersion(module.getPluginVersion())
+                    .description(module.getDescription()).mainClass(module.getMainClass()).jarPath(module.getJarPath())
+                    .backupJarPath(module.getBackupJarPath()).backupName(module.getBackupName())
+                    .backupPluginVersion(module.getBackupPluginVersion()).backupDescription(module.getBackupDescription())
+                    .backupMainClass(module.getBackupMainClass()).backupSha256(module.getBackupSha256())
+                    .backupDependencies(module.getBackupDependencies() == null ? null : List.copyOf(module.getBackupDependencies()))
+                    .backupSoftDependencies(module.getBackupSoftDependencies() == null ? null : List.copyOf(module.getBackupSoftDependencies()))
+                    .backupStatus(module.getBackupStatus()).backupErrorMessage(module.getBackupErrorMessage())
+                    .backupLoadedAt(module.getBackupLoadedAt()).backupEnabledAt(module.getBackupEnabledAt())
+                    .backupMenusInitialized(module.getBackupMenusInitialized()).backupRestoreIntentActive(module.getBackupRestoreIntentActive())
+                    .restoreIntentActive(module.getRestoreIntentActive())
+                    .dependencies(module.getDependencies() == null ? null : List.copyOf(module.getDependencies()))
+                    .softDependencies(module.getSoftDependencies() == null ? null : List.copyOf(module.getSoftDependencies()))
+                    .status(module.getStatus()).errorMessage(module.getErrorMessage()).loadedAt(module.getLoadedAt())
+                    .enabledAt(module.getEnabledAt()).menusInitialized(module.getMenusInitialized())
+                    .id(module.getId()).version(module.getVersion()).createTime(module.getCreateTime())
+                    .updateTime(module.getUpdateTime()).build();
+        }
+
+        private void restore(PluginModule module) {
+            PluginModule copy = value;
+            module.setName(copy.getName()); module.setPluginVersion(copy.getPluginVersion());
+            module.setDescription(copy.getDescription()); module.setMainClass(copy.getMainClass()); module.setJarPath(copy.getJarPath());
+            module.setBackupJarPath(copy.getBackupJarPath()); module.setBackupName(copy.getBackupName());
+            module.setBackupPluginVersion(copy.getBackupPluginVersion()); module.setBackupDescription(copy.getBackupDescription());
+            module.setBackupMainClass(copy.getBackupMainClass()); module.setBackupSha256(copy.getBackupSha256());
+            module.setBackupDependencies(copy.getBackupDependencies()); module.setBackupSoftDependencies(copy.getBackupSoftDependencies());
+            module.setBackupStatus(copy.getBackupStatus()); module.setBackupErrorMessage(copy.getBackupErrorMessage());
+            module.setBackupLoadedAt(copy.getBackupLoadedAt()); module.setBackupEnabledAt(copy.getBackupEnabledAt());
+            module.setBackupMenusInitialized(copy.getBackupMenusInitialized()); module.setBackupRestoreIntentActive(copy.getBackupRestoreIntentActive());
+            module.setRestoreIntentActive(copy.getRestoreIntentActive()); module.setDependencies(copy.getDependencies());
+            module.setSoftDependencies(copy.getSoftDependencies()); module.setStatus(copy.getStatus()); module.setErrorMessage(copy.getErrorMessage());
+            module.setLoadedAt(copy.getLoadedAt()); module.setEnabledAt(copy.getEnabledAt()); module.setMenusInitialized(copy.getMenusInitialized());
+        }
     }
 }

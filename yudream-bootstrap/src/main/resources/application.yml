@@ -164,3 +164,13 @@ yudream.storage.s3:
 yudream:
   plugin:
     secret-key: ${YUDREAM_PLUGIN_SECRET_KEY}
+
+yudream.platform.plugin:
+  compatibility:
+    host: ${PLATFORM_PLUGIN_HOST_VERSION:1.0.0}
+    spi: ${PLATFORM_PLUGIN_SPI_VERSION:2.6.0}
+    frontend-sdk: ${PLATFORM_PLUGIN_FRONTEND_SDK_VERSION:1.0.1}
+  store-root-url: ${PLATFORM_PLUGIN_STORE_ROOT_URL:https://nexus.yudream.online/repository/plugin-store-releases/index.json}
+  store-connect-timeout-millis: ${PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS:5000}
+  store-request-timeout-millis: ${PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS:5000}
+  store-max-response-bytes: ${PLATFORM_PLUGIN_STORE_MAX_RESPONSE_BYTES:1048576}

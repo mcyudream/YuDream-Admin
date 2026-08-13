@@ -99,6 +99,15 @@ public enum PlatformMenuModule {
             parentName = "PLUGIN", permission = "platform:plugin:manage")
     PLUGIN_MANAGE,
 
+    @MenuNode(code = "platform:plugin-marketplace", name = "插件市场", type = MenuNodeType.MENU,
+            path = "/platform/plugin-marketplace", component = "platform/plugin-marketplace/index.vue",
+            icon = "i-ri:store-2-line", sort = 94)
+    PLUGIN_MARKETPLACE,
+
+    @MenuNode(code = "platform:plugin-marketplace:view", name = "查看插件市场", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKETPLACE", permission = "platform:plugin-marketplace:view")
+    PLUGIN_MARKETPLACE_VIEW,
+
     @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
             path = "/platform/api-doc", component = "platform/api-doc/index.vue",
             icon = "i-ri:file-list-2-line", sort = 90)

@@ -20,6 +20,21 @@ public class PluginModuleInfraMapper {
         dataObj.setDescription(module.getDescription());
         dataObj.setMainClass(module.getMainClass());
         dataObj.setJarPath(module.getJarPath());
+        dataObj.setBackupJarPath(module.getBackupJarPath());
+        dataObj.setBackupName(module.getBackupName());
+        dataObj.setBackupPluginVersion(module.getBackupPluginVersion());
+        dataObj.setBackupDescription(module.getBackupDescription());
+        dataObj.setBackupMainClass(module.getBackupMainClass());
+        dataObj.setBackupSha256(module.getBackupSha256());
+        dataObj.setBackupDependencies(module.getBackupDependencies());
+        dataObj.setBackupSoftDependencies(module.getBackupSoftDependencies());
+        dataObj.setBackupStatus(module.getBackupStatus());
+        dataObj.setBackupErrorMessage(module.getBackupErrorMessage());
+        dataObj.setBackupLoadedAt(module.getBackupLoadedAt());
+        dataObj.setBackupEnabledAt(module.getBackupEnabledAt());
+        dataObj.setBackupMenusInitialized(module.getBackupMenusInitialized());
+        dataObj.setBackupRestoreIntentActive(module.getBackupRestoreIntentActive());
+        dataObj.setRestoreIntentActive(module.getRestoreIntentActive());
         dataObj.setDependencies(module.getDependencies());
         dataObj.setSoftDependencies(module.getSoftDependencies());
         dataObj.setStatus(module.getStatus());
@@ -45,6 +60,21 @@ public class PluginModuleInfraMapper {
                 .description(dataObj.getDescription())
                 .mainClass(dataObj.getMainClass())
                 .jarPath(dataObj.getJarPath())
+                .backupJarPath(dataObj.getBackupJarPath())
+                .backupName(dataObj.getBackupName())
+                .backupPluginVersion(dataObj.getBackupPluginVersion())
+                .backupDescription(dataObj.getBackupDescription())
+                .backupMainClass(dataObj.getBackupMainClass())
+                .backupSha256(dataObj.getBackupSha256())
+                .backupDependencies(dataObj.getBackupDependencies())
+                .backupSoftDependencies(dataObj.getBackupSoftDependencies())
+                .backupStatus(dataObj.getBackupStatus())
+                .backupErrorMessage(dataObj.getBackupErrorMessage())
+                .backupLoadedAt(dataObj.getBackupLoadedAt())
+                .backupEnabledAt(dataObj.getBackupEnabledAt())
+                .backupMenusInitialized(dataObj.getBackupMenusInitialized())
+                .backupRestoreIntentActive(dataObj.getBackupRestoreIntentActive())
+                .restoreIntentActive(dataObj.getRestoreIntentActive())
                 .dependencies(dataObj.getDependencies())
                 .softDependencies(dataObj.getSoftDependencies())
                 .status(dataObj.getStatus())

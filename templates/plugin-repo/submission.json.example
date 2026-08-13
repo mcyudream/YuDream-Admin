@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "submission": {
+    "code": "example-plugin",
+    "version": "1.0.0",
+    "main": "com.example.yudream.ExamplePlugin",
+    "author": {
+      "name": "Example Author",
+      "contact": "author@example.invalid"
+    }
+  },
+  "files": {
+    "pluginYml": "plugin.yml",
+    "store": "store.json",
+    "jar": "plugin.jar",
+    "sha256": "plugin.jar.sha256",
+    "license": "LICENSE"
+  }
+}

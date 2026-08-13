@@ -79,6 +79,12 @@ validate:publish-pipeline:
   script:
     - sh ci/verify-plugin-publish-pipeline.sh
 
+validate:release-selection:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - sh ci/verify-plugin-release-selection.sh
+
 build:frontend:
   image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
   stage: build-frontend
@@ -148,13 +154,22 @@ package:plugins:
       fi
     - rm -rf "$PACKAGE_MAVEN_REPO"
     - mkdir -p "$PACKAGE_MAVEN_REPO"
-    - mvn -s settings.xml "-Dmaven.repo.local=$PACKAGE_MAVEN_REPO" clean package -DskipTests -B -e
-    - sh ci/verify-plugin-jar-assets.sh
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        . ./ci/lib/plugin-jar-selection.sh
+        PLUGIN_RELEASE_ONLY=1
+        export PLUGIN_RELEASE_ONLY
+        release_modules=$(selected_plugin_modules_csv "$PWD")
+        mvn -s settings.xml "-Dmaven.repo.local=$PACKAGE_MAVEN_REPO" clean package -pl "$release_modules" -am -DskipTests -B -e
+      else
+        mvn -s settings.xml "-Dmaven.repo.local=$PACKAGE_MAVEN_REPO" clean package -DskipTests -B -e
+      fi
+    - PLUGIN_RELEASE_ONLY="${CI_COMMIT_TAG:+1}" sh ci/verify-plugin-jar-assets.sh
     - rm -rf dist/plugins
     - mkdir -p dist/plugins
     - |
       . ./ci/lib/plugin-jar-selection.sh
-      copy_final_plugin_jars "$PWD" "$PWD/dist/plugins"
+      PLUGIN_RELEASE_ONLY="${CI_COMMIT_TAG:+1}" copy_final_plugin_jars "$PWD" "$PWD/dist/plugins"
     - ls -R dist/plugins
   artifacts:
     paths:
@@ -167,7 +182,7 @@ publish:plugin-jars:
   dependencies:
     - package:plugins
   script:
-    - sh ci/publish-plugin-jars.sh
+    - PLUGIN_RELEASE_ONLY=1 sh ci/publish-plugin-jars.sh
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
@@ -177,6 +192,6 @@ verify:published-plugin-jars:
   dependencies:
     - package:plugins
   script:
-    - sh ci/verify-published-plugin-jars.sh
+    - PLUGIN_RELEASE_ONLY=1 sh ci/verify-published-plugin-jars.sh
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
