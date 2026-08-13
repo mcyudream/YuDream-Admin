@@ -593,7 +593,7 @@ function importMenus() {
             <h2>按钮权限列表</h2>
           </div>
 
-          <FaTable
+          <FaResponsiveTable
             v-loading="loading"
             row-key="code"
             table-root-class="rounded-lg overflow-hidden"
@@ -638,7 +638,41 @@ function importMenus() {
                 </FaButton>
               </div>
             </template>
-          </FaTable>
+
+            <template #card="{ row }">
+              <FaCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-base font-semibold">{{ row.name }}</span>
+                    <FaTag :variant="statusVariant(row.status)">
+                      {{ statusText(row.status) }}
+                    </FaTag>
+                  </div>
+                  <div class="flex flex-col gap-1 text-sm">
+                    <div v-if="row.permission" class="flex gap-2">
+                      <span class="shrink-0 text-secondary-foreground/60">权限标识</span>
+                      <span class="break-all">{{ row.permission }}</span>
+                    </div>
+                    <div class="flex gap-2">
+                      <span class="shrink-0 text-secondary-foreground/60">排序</span>
+                      <span>{{ row.sort }}</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap gap-2 border-t pt-3">
+                    <FaButton v-auth="'system:menu:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                      编辑
+                    </FaButton>
+                    <FaButton v-if="row.status === 'DISABLED'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                      启用
+                    </FaButton>
+                    <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:menu:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
+                      停用
+                    </FaButton>
+                  </div>
+                </div>
+              </FaCard>
+            </template>
+          </FaResponsiveTable>
         </section>
       </main>
     </div>

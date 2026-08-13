@@ -96,7 +96,7 @@ function ttlText(ttl?: number) {
             <span>Keyspace</span>
             <FaTag variant="secondary">{{ keyspaceRows.length }}</FaTag>
           </div>
-          <FaTable
+          <FaResponsiveTable
             row-key="db"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[420px]"
@@ -104,7 +104,16 @@ function ttlText(ttl?: number) {
             stripe
             :columns="keyspaceColumns"
             :data="keyspaceRows"
-          />
+          >
+            <template #card="{ row }">
+              <FaCard class="w-full">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-base font-semibold">{{ row.db }}</span>
+                  <span class="text-sm text-secondary-foreground/80">{{ row.value }}</span>
+                </div>
+              </FaCard>
+            </template>
+          </FaResponsiveTable>
         </section>
 
         <section class="monitor-panel">
@@ -112,7 +121,7 @@ function ttlText(ttl?: number) {
             <span>&#32531;&#23384; Key &#25277;&#26679;</span>
             <FaTag variant="secondary">{{ data.keys.length }}</FaTag>
           </div>
-          <FaTable
+          <FaResponsiveTable
             row-key="key"
             table-root-class="rounded-md overflow-hidden"
             table-class="min-w-[720px]"
@@ -141,7 +150,21 @@ function ttlText(ttl?: number) {
             <template #cell-ttl="{ row }">
               {{ ttlText(row.original.ttl) }}
             </template>
-          </FaTable>
+            <template #card="{ row }">
+              <FaCard class="w-full">
+                <div class="flex flex-col gap-3">
+                  <div class="flex items-start justify-between gap-2">
+                    <code class="break-all text-sm font-semibold">{{ row.key }}</code>
+                    <FaTag variant="secondary">{{ row.type }}</FaTag>
+                  </div>
+                  <div class="flex items-center gap-2 text-sm">
+                    <span class="shrink-0 text-secondary-foreground/60">过期时间</span>
+                    <span>{{ ttlText(row.ttl) }}</span>
+                  </div>
+                </div>
+              </FaCard>
+            </template>
+          </FaResponsiveTable>
         </section>
       </div>
     </FaPageMain>

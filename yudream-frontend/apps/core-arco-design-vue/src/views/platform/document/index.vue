@@ -475,7 +475,7 @@ function generationVariant(status: GenerationStatus) {
         </div>
       </section>
 
-      <FaTable
+      <FaResponsiveTable
         v-if="activeTab === 'templates'"
         v-loading="loading"
         row-key="id"
@@ -541,9 +541,58 @@ function generationVariant(status: GenerationStatus) {
             </FaButton>
           </div>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                  <span>{{ row.code }}</span>
+                </div>
+                <div v-if="row.originalFilename" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">模板文件</span>
+                  <span class="break-all">{{ row.originalFilename }}</span>
+                </div>
+                <div v-if="row.description" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">描述</span>
+                  <span class="break-all">{{ row.description }}</span>
+                </div>
+              </div>
+              <div v-if="Object.keys(row.placeholders || {}).length" class="flex flex-wrap gap-1">
+                <FaTag v-for="(_, key) in row.placeholders" :key="key" variant="secondary">
+                  {{ key }}
+                </FaTag>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'platform:document:generate'" size="sm" variant="outline" :disabled="row.status !== 'ACTIVE'" @click="openGenerate(row)">
+                  生成
+                </FaButton>
+                <FaButton size="sm" variant="ghost" @click="openFile(row.templateFileUrl)">
+                  原文件
+                </FaButton>
+                <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="openEdit(row)">
+                  编辑
+                </FaButton>
+                <FaButton v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="pickReplaceFile(row)">
+                  替换
+                </FaButton>
+                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'platform:document:edit'" size="sm" variant="ghost" @click="confirmDisable(row)">
+                  停用
+                </FaButton>
+                <FaButton v-else v-auth="'platform:document:edit'" size="sm" variant="outline" @click="confirmEnable(row)">
+                  启用
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
-      <FaTable
+      <FaResponsiveTable
         v-else
         v-loading="loading"
         row-key="id"
@@ -587,7 +636,40 @@ function generationVariant(status: GenerationStatus) {
             下载
           </FaButton>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.templateCode }}</span>
+                <FaTag :variant="generationVariant(row.status)">{{ generationText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div v-if="row.outputFilename" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">生成文件</span>
+                  <span class="break-all">{{ row.outputFilename }}</span>
+                </div>
+                <div v-if="row.operatorId" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">操作人</span>
+                  <span>{{ row.operatorId }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">生成时间</span>
+                  <span>{{ dateText(row.generatedAt) }}</span>
+                </div>
+                <div v-if="row.errorMessage" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">异常</span>
+                  <span class="break-all">{{ row.errorMessage }}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton size="sm" variant="outline" :disabled="!row.outputFileUrl" @click="openFile(row.outputFileUrl)">
+                  下载
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"

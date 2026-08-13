@@ -128,7 +128,7 @@ async function clearLoginLogs() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable
+      <FaResponsiveTable
         v-loading="loading"
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
@@ -170,7 +170,30 @@ async function clearLoginLogs() {
         <template #cell-userAgent="{ row }">
           <span class="line-clamp-1">{{ row.original.userAgent || '-' }}</span>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.username }}</span>
+                <FaTag :variant="row.success ? 'default' : 'destructive'">
+                  {{ row.success ? successText : failText }}
+                </FaTag>
+              </div>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                <span v-if="row.userId">用户ID：{{ row.userId }}</span>
+                <span v-if="row.ip">IP：{{ row.ip }}</span>
+                <span>时间：{{ dateText(row.createTime) }}</span>
+              </div>
+              <div v-if="row.message" class="text-sm text-secondary-foreground/80">
+                结果：{{ row.message }}
+              </div>
+              <div v-if="row.userAgent" class="break-all text-sm text-secondary-foreground/60">
+                客户端：{{ row.userAgent }}
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"

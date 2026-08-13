@@ -95,7 +95,7 @@ onMounted(load)
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable v-loading="loading" :columns="columns" :data="rows" row-key="id" border stripe>
+      <FaResponsiveTable v-loading="loading" :columns="columns" :data="rows" row-key="id" border stripe>
         <template #cell-status="{ row }">
           <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
             {{ row.original.enabled ? '已启用' : '已停用' }}
@@ -117,7 +117,43 @@ onMounted(load)
             </FaButton>
           </div>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                  {{ row.enabled ? '已启用' : '已停用' }}
+                </FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">服务地址</span>
+                  <span class="break-all">{{ row.baseUrl }}</span>
+                </div>
+                <div v-if="row.updateTime" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">更新时间</span>
+                  <span>{{ row.updateTime }}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton size="sm" variant="outline" @click="openEdit(row)">
+                  编辑
+                </FaButton>
+                <FaButton size="sm" variant="outline" @click="test(row)">
+                  测试
+                </FaButton>
+                <FaButton size="sm" variant="outline" @click="toggle(row)">
+                  {{ row.enabled ? '停用' : '启用' }}
+                </FaButton>
+                <FaButton size="sm" variant="ghost" :disabled="!row.enabled" @click="openChat(row)">
+                  WebQQ
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
       <FaPagination v-model:page="page.page" v-model:size="page.size" :total="page.total" class="mt-3" @page-change="load" @size-change="load" />
     </FaPageMain>
 

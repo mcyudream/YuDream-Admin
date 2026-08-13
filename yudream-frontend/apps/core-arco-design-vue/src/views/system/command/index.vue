@@ -60,11 +60,39 @@ onMounted(load)
           <template v-if="bindingCode"><code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ bindingCode.code }}</code><span class="text-sm text-muted-foreground">有效至 {{ bindingCode.expiresAt }}</span></template>
         </div>
       </div>
-      <FaTable :columns="columns" :data="rows" :loading="loading" row-key="code" border stripe>
+      <FaResponsiveTable :columns="columns" :data="rows" :loading="loading" row-key="code" border stripe>
         <template #cell-command="{ row }"><code>/{{ row.original.command }}</code></template>
         <template #cell-permission="{ row }">{{ row.original.permission || '无需权限' }}</template>
         <template #cell-anonymous="{ row }"><FaTag :variant="row.original.allowAnonymous ? 'default' : 'secondary'">{{ row.original.allowAnonymous ? '允许' : '不允许' }}</FaTag></template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-start justify-between gap-2">
+                <div class="flex min-w-0 flex-col gap-1">
+                  <span class="text-base font-semibold">{{ row.name }}</span>
+                  <code class="text-sm text-secondary-foreground/70">/{{ row.command }}</code>
+                </div>
+                <FaTag :variant="row.allowAnonymous ? 'default' : 'secondary'">
+                  {{ row.allowAnonymous ? '允许' : '不允许' }}
+                </FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">权限码</span>
+                  <span class="break-all">{{ row.permission || '无需权限' }}</span>
+                </div>
+                <div v-if="row.pluginCode" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">插件</span>
+                  <span>{{ row.pluginCode }}</span>
+                </div>
+              </div>
+              <div v-if="row.description" class="text-sm text-secondary-foreground/80">
+                {{ row.description }}
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
     </FaPageMain>
   </div>
 </template>

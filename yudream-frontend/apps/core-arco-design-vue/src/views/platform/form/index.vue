@@ -193,7 +193,7 @@ function dateText(value?: string) {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable
+      <FaResponsiveTable
         v-loading="loading"
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
@@ -249,7 +249,61 @@ function dateText(value?: string) {
             <FaButton v-auth="'platform:form:delete'" size="sm" variant="destructive" @click="confirmDelete(row.original)">删除</FaButton>
           </div>
         </template>
-      </FaTable>
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                  <span>{{ row.code }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">公开填写</span>
+                  <span>{{ row.allowAnonymous ? '是' : '登录后填写' }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">发布时间</span>
+                  <span>{{ dateText(row.publishedAt) }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">更新时间</span>
+                  <span>{{ dateText(row.updateTime) }}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'platform:form:view'" size="sm" variant="outline" @click="openPreview(row)">
+                  查看
+                </FaButton>
+                <FaButton v-auth="'platform:form:edit'" size="sm" variant="outline" @click="openDesigner(row)">
+                  设计
+                </FaButton>
+                <FaButton v-auth="'platform:form:submission:view'" size="sm" variant="outline" @click="openSubmissions(row)">
+                  提交结果
+                </FaButton>
+                <FaButton v-auth="'platform:form:statistics:view'" size="sm" variant="ghost" @click="openStatistics(row)">
+                  统计
+                </FaButton>
+                <FaButton size="sm" variant="ghost" :disabled="row.status !== 'PUBLISHED'" @click="copyPublicUrl(row)">
+                  公开链接
+                </FaButton>
+                <FaButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `publish-${row.id}`" :disabled="row.status === 'PUBLISHED'" @click="publish(row)">
+                  发布
+                </FaButton>
+                <FaButton v-auth="'platform:form:publish'" size="sm" variant="ghost" :loading="actionLoading === `unpublish-${row.id}`" :disabled="row.status !== 'PUBLISHED'" @click="unpublish(row)">
+                  下线
+                </FaButton>
+                <FaButton v-auth="'platform:form:delete'" size="sm" variant="destructive" @click="confirmDelete(row)">
+                  删除
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"

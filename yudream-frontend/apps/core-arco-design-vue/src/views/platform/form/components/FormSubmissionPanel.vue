@@ -122,7 +122,7 @@ function formatValue(value: unknown) {
       </div>
     </div>
 
-    <FaTable
+    <FaResponsiveTable
       v-loading="loading"
       row-key="id"
       table-root-class="rounded-lg overflow-hidden"
@@ -148,7 +148,43 @@ function formatValue(value: unknown) {
       <template #cell-operation="{ row }">
         <FaButton v-if="form" size="sm" variant="outline" @click="openDetail(row.original)">查看</FaButton>
       </template>
-    </FaTable>
+
+      <template #card="{ row }">
+        <FaCard class="w-full">
+          <div class="flex flex-col gap-3">
+            <div class="flex items-start justify-between gap-2">
+              <span class="text-sm text-secondary-foreground/60">提交 ID</span>
+              <span class="break-all font-mono">{{ row.id }}</span>
+            </div>
+            <div class="flex flex-col gap-1 text-sm">
+              <div class="flex gap-2">
+                <span class="shrink-0 text-secondary-foreground/60">提交用户</span>
+                <span class="break-all">{{ row.submitterId }}</span>
+              </div>
+              <div class="flex gap-2">
+                <span class="shrink-0 text-secondary-foreground/60">来源 IP</span>
+                <span>{{ row.submitterIp }}</span>
+              </div>
+              <div class="flex gap-2">
+                <span class="shrink-0 text-secondary-foreground/60">提交时间</span>
+                <span>{{ dateText(row.submittedAt) }}</span>
+              </div>
+            </div>
+            <div v-if="dataPairs(row.data).length" class="flex flex-wrap gap-1.5">
+              <span v-for="item in dataPairs(row.data)" :key="item.key" class="data-pair-chip">
+                <b>{{ item.key }}</b>
+                {{ item.value }}
+              </span>
+            </div>
+            <div v-if="form" class="flex flex-wrap gap-2 border-t pt-3">
+              <FaButton size="sm" variant="outline" @click="openDetail(row)">
+                查看
+              </FaButton>
+            </div>
+          </div>
+        </FaCard>
+      </template>
+    </FaResponsiveTable>
 
     <FaPagination
       v-model:page="pagination.page"
@@ -228,6 +264,22 @@ function formatValue(value: unknown) {
 }
 
 .data-pairs b {
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.data-pair-chip {
+  display: inline-flex;
+  max-width: 100%;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--color-fill-2);
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.data-pair-chip b {
   color: var(--color-text-1);
   font-weight: 600;
 }

@@ -217,7 +217,7 @@ function importRoles() {
     </FaPageHeader>
 
     <FaPageMain>
-      <FaTable
+      <FaResponsiveTable
         v-loading="loading"
         row-key="id"
         table-root-class="rounded-lg overflow-hidden"
@@ -282,7 +282,54 @@ function importRoles() {
             </FaButton>
           </div>
         </template>
-      </FaTable>
+
+        <template #card="{ row }">
+          <FaCard class="w-full">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-base font-semibold">{{ row.name }}</span>
+                <div class="flex gap-1">
+                  <FaTag :variant="row.systemRole ? 'default' : 'secondary'">
+                    {{ row.systemRole ? '系统角色' : '自定义' }}
+                  </FaTag>
+                  <FaTag :variant="row.status === 'ACTIVE' ? 'default' : 'secondary'">
+                    {{ row.status === 'ACTIVE' ? '启用' : '停用' }}
+                  </FaTag>
+                </div>
+              </div>
+              <div class="flex flex-col gap-1 text-sm">
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">编码</span>
+                  <span class="break-all">{{ row.code }}</span>
+                </div>
+                <div v-if="row.deptName" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">部门</span>
+                  <span>{{ row.deptName }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">等级</span>
+                  <span>{{ levelOptions.find(item => item.value === row.level)?.label || row.level }}</span>
+                </div>
+                <div class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">权限数</span>
+                  <span>{{ row.permissionCount }}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-2 border-t pt-3">
+                <FaButton v-auth="'system:role:edit'" variant="outline" size="sm" @click="openEdit(row)">
+                  编辑
+                </FaButton>
+                <FaButton v-if="row.status === 'DEPRECATED'" v-auth="'system:role:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
+                  启用
+                </FaButton>
+                <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:role:delete'" variant="destructive" size="sm" :disabled="row.systemRole" @click="confirmDisable(row)">
+                  停用
+                </FaButton>
+              </div>
+            </div>
+          </FaCard>
+        </template>
+      </FaResponsiveTable>
 
       <FaPagination
         v-model:page="pagination.page"
