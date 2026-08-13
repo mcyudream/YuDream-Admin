@@ -59,5 +59,7 @@ export const useFaToast = components.useFaToast
 export const FaToast = components.FaToast
 export const FaTooltip = components.FaTooltip
 export const FaTrend = components.FaTrend
+export const FaResponsiveTable = components.FaResponsiveTable
+export const useIsMobile = components.useIsMobile
 
 export default components
