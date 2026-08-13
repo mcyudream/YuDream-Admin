@@ -35,7 +35,7 @@ const slots = defineSlots<{
         </slot>
       </div>
     </div>
-    <div v-if="!!slots.default" :class="cn('ml-a flex-none', props.defaultClass)">
+    <div v-if="!!slots.default" :class="cn('ml-a flex flex-none flex-wrap items-center gap-2', props.defaultClass)">
       <slot />
     </div>
   </div>

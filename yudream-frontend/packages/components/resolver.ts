@@ -40,6 +40,7 @@ const BASIC_COMPONENT_NAMES = [
   'FaPopover',
   'FaProgress',
   'FaRadioGroup',
+  'FaResponsiveTable',
   'FaScrollArea',
   'FaSearchBar',
   'FaSelect',
@@ -63,6 +64,7 @@ const AUTO_IMPORT_NAMES = [
   'useFaImagePreview',
   'useFaModal',
   'useFaToast',
+  'useIsMobile',
 ] as const
 
 export const ComponentsAutoImports: ImportsMap = {
