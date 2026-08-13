@@ -10,6 +10,30 @@ const props = withDefaults(defineProps<TableProps<TData> & {
   mobileBreakpoint?: string
 }>(), {
   mobileBreakpoint: '(max-width: 768px)',
+  // 以下 prop 类型包含 Boolean，未传值时 Vue 会将其断言为 false。
+  // 这里显式声明 undefined 默认值，保证未传值时经 v-bind 透传给 FaTable 后仍走 FaTable 自身的默认值，
+  // 尤其是 expanded：若为 false 会让 FaTable 误判为受控展开状态，导致树形表格无法展开、点击无效。
+  border: undefined,
+  bodyClass: undefined,
+  class: undefined,
+  columnVisibility: undefined,
+  defaultExpanded: undefined,
+  enableMultiSort: undefined,
+  enableSortingRemoval: undefined,
+  expanded: undefined,
+  headerClass: undefined,
+  headerRowClass: undefined,
+  manualExpanding: undefined,
+  multiple: undefined,
+  rowClass: undefined,
+  selectable: undefined,
+  selectionColumnClass: undefined,
+  sortable: undefined,
+  sortDescFirst: undefined,
+  stripe: undefined,
+  tableClass: undefined,
+  tableRootClass: undefined,
+  tree: undefined,
 })
 
 const slots = useSlots()
