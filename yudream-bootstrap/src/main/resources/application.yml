@@ -105,6 +105,15 @@ yudream.system.seed:
   menu:
     sync-mode: ${SYSTEM_SEED_MENU_SYNC_MODE:MISSING_ONLY}
 
+# 系统日志：docker 容器日志实时采集（可选）
+# transport: auto=有 unix socket 走 Docker API，否则走 docker CLI；cli=强制 CLI；socket=强制 Docker API
+yudream.system.log.docker:
+  enabled: ${SYSTEM_LOG_DOCKER_ENABLED:false}
+  containers: ${SYSTEM_LOG_DOCKER_CONTAINERS:}
+  tail: ${SYSTEM_LOG_DOCKER_TAIL:200}
+  transport: ${SYSTEM_LOG_DOCKER_TRANSPORT:auto}
+  socket: ${SYSTEM_LOG_DOCKER_SOCKET:/var/run/docker.sock}
+
 yudream.platform.capabilities:
   api-docs:
     enabled: ${PLATFORM_API_DOCS_ENABLED:true}

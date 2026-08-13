@@ -274,4 +274,25 @@ public enum SystemMenuModule {
     @MenuNode(code = "system:login-log:delete", name = "删除登录日志", type = MenuNodeType.BUTTON,
             parentName = "LOGIN_LOG", permission = "system:monitor:login-log:delete")
     LOGIN_LOG_DELETE,
+
+    @MenuNode(code = "system:runtime-log", name = "系统日志", type = MenuNodeType.MENU,
+            parentName = "LOGS", path = "/system/runtime-log", component = "system/runtime-log/index.vue",
+            icon = "i-ri:terminal-window-line", sort = 5)
+    RUNTIME_LOG,
+
+    @MenuNode(code = "system:runtime-log:view", name = "查看系统日志", type = MenuNodeType.BUTTON,
+            parentName = "RUNTIME_LOG", permission = "system:runtime-log:view")
+    RUNTIME_LOG_VIEW,
+
+    @MenuNode(code = "system:runtime-log:download", name = "下载系统日志", type = MenuNodeType.BUTTON,
+            parentName = "RUNTIME_LOG", permission = "system:runtime-log:download")
+    RUNTIME_LOG_DOWNLOAD,
+
+    @MenuNode(code = "system:runtime-log:delete", name = "清空系统日志", type = MenuNodeType.BUTTON,
+            parentName = "RUNTIME_LOG", permission = "system:runtime-log:delete")
+    RUNTIME_LOG_DELETE,
+
+    @MenuNode(code = "system:runtime-log:config", name = "配置容器日志", type = MenuNodeType.BUTTON,
+            parentName = "RUNTIME_LOG", permission = "system:runtime-log:config")
+    RUNTIME_LOG_CONFIG,
 }

@@ -78,9 +78,17 @@ services:
       - S3_BUCKET=${S3_BUCKET:-yudream-admin}
       - S3_REGION=${S3_REGION:-us-east-1}
       - S3_PATH_STYLE_ACCESS=${S3_PATH_STYLE_ACCESS:-true}
+      # 系统日志：docker 容器日志采集（默认关闭）
+      - SYSTEM_LOG_DOCKER_ENABLED=${SYSTEM_LOG_DOCKER_ENABLED:-false}
+      - SYSTEM_LOG_DOCKER_CONTAINERS=${SYSTEM_LOG_DOCKER_CONTAINERS:-}
+      - SYSTEM_LOG_DOCKER_TAIL=${SYSTEM_LOG_DOCKER_TAIL:-200}
+      - SYSTEM_LOG_DOCKER_TRANSPORT=${SYSTEM_LOG_DOCKER_TRANSPORT:-auto}
+      - SYSTEM_LOG_DOCKER_SOCKET=${SYSTEM_LOG_DOCKER_SOCKET:-/var/run/docker.sock}
     volumes:
       # 将宿主机 ./plugins 目录挂载到容器，方便单独更新插件 JAR
       - ./plugins:/app/plugins
+      # 启用 docker 容器日志采集时，取消下一行注释，将宿主 docker 只读 socket 挂入容器
+      # - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - yudream
 
