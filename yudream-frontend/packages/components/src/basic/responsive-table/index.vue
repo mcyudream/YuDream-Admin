@@ -31,8 +31,6 @@ const tableProps = computed<TableProps<TData>>(() => {
   const { mobileBreakpoint: _mobileBreakpoint, ...rest } = props
   return rest
 })
-
-/** 移动端兜底卡片可展示的列（仅支持有 accessorKey 的列） */
 const cardColumns = computed(() => props.columns.filter(column => 'accessorKey' in column && column.accessorKey))
 
 function childrenOf(node: TData): TData[] {
