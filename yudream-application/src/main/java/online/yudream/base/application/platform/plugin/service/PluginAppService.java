@@ -149,10 +149,10 @@ public class PluginAppService {
         boolean recoverySucceeded = false;
         try {
             Files.createDirectories(backupDirectory());
-            activeOriginal = stageJar(active, active.getParent(), ".plugin-rollback-active-original-");
-            backupOriginal = stageJar(backup, active.getParent(), ".plugin-rollback-backup-original-");
-            activeSwap = stageJar(backup, active.getParent(), ".plugin-rollback-active-");
-            backupSwap = stageJar(active, active.getParent(), ".plugin-rollback-backup-");
+            activeOriginal = stageJar(active, backupDirectory(), ".plugin-rollback-active-original-");
+            backupOriginal = stageJar(backup, backupDirectory(), ".plugin-rollback-backup-original-");
+            activeSwap = stageJar(backup, backupDirectory(), ".plugin-rollback-active-");
+            backupSwap = stageJar(active, backupDirectory(), ".plugin-rollback-backup-");
             validateJarAgainstDescriptor(activeSwap, module, expectedVersion, true);
             validateJarAgainstDescriptor(backupSwap, module, null, false);
             switchStarted = true;
@@ -226,7 +226,7 @@ public class PluginAppService {
             if (!Files.isRegularFile(active)) {
                 throw new BizException("当前插件 JAR 不存在：" + active);
             }
-            activeOriginal = stageJar(active, active.getParent(), ".plugin-marketplace-active-original-");
+            activeOriginal = stageJar(active, backup.getParent(), ".plugin-marketplace-active-original-");
             if (backupExisted) {
                 backupOriginal = stageJar(backup, backup.getParent(), ".plugin-marketplace-backup-original-");
             }
