@@ -108,7 +108,7 @@ function ttlText(ttl?: number) {
             <template #card="{ row }">
               <FaCard class="w-full">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-base font-semibold">{{ row.db }}</span>
+                  <span class="min-w-0 break-words text-base font-semibold">{{ row.db }}</span>
                   <span class="text-sm text-secondary-foreground/80">{{ row.value }}</span>
                 </div>
               </FaCard>

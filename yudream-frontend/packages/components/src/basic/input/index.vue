@@ -55,7 +55,7 @@ defineExpose({
 </script>
 
 <template>
-  <InputGroup :class="cn('w-[200px]', props.class)" @mouseenter="isHovered = true" @mouseleave="isHovered = false">
+  <InputGroup :class="cn('w-full min-w-0', props.class)" @mouseenter="isHovered = true" @mouseleave="isHovered = false">
     <Input
       v-bind="{
         ...omit(props, ['type', 'align', 'clearable', 'class', 'inputClass', 'startClass', 'endClass']),

@@ -643,7 +643,7 @@ function importMenus() {
               <FaCard class="w-full">
                 <div class="flex flex-col gap-3">
                   <div class="flex items-center justify-between gap-2">
-                    <span class="text-base font-semibold">{{ row.name }}</span>
+                    <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
                     <FaTag :variant="statusVariant(row.status)">
                       {{ statusText(row.status) }}
                     </FaTag>
