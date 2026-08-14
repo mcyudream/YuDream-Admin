@@ -241,7 +241,7 @@ public class PluginAppService {
             return modules();
         } catch (Exception exception) {
             boolean activeRestored = !switchStarted || restoreActiveFromStaged(active, activeOriginal);
-            boolean backupRestored = restoreMarketplaceBackup(backup, actualBackup, backupOriginal, backupExisted);
+            boolean backupRestored = !switchStarted || restoreMarketplaceBackup(backup, actualBackup, backupOriginal, backupExisted);
             restoreMarketplaceMetadata(affected, originalMetadata);
             if (!activeRestored || !backupRestored) {
                 log.error("Marketplace update recovery incomplete for {} (activeRestored={}, backupRestored={})", existing.getCode(), activeRestored, backupRestored);
