@@ -69,7 +69,7 @@ onMounted(load)
             <div class="flex flex-col gap-3">
               <div class="flex items-start justify-between gap-2">
                 <div class="flex min-w-0 flex-col gap-1">
-                  <span class="text-base font-semibold">{{ row.name }}</span>
+                  <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
                   <code class="text-sm text-secondary-foreground/70">/{{ row.command }}</code>
                 </div>
                 <FaTag :variant="row.allowAnonymous ? 'default' : 'secondary'">

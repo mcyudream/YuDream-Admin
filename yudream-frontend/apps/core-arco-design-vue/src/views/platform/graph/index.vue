@@ -344,7 +344,7 @@ function queryStatusVariant(status: GraphQueryStatus) {
           <FaCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
-                <span class="text-base font-semibold">{{ row.name }}</span>
+                <span class="min-w-0 break-words text-base font-semibold">{{ row.name }}</span>
                 <FaTag :variant="statusVariant(row.status)">{{ statusText(row.status) }}</FaTag>
               </div>
               <div class="flex flex-col gap-1 text-sm">
@@ -437,7 +437,7 @@ function queryStatusVariant(status: GraphQueryStatus) {
           <FaCard class="w-full">
             <div class="flex flex-col gap-3">
               <div class="flex items-center justify-between gap-2">
-                <span class="text-base font-semibold">{{ row.connectionCode }}</span>
+                <span class="min-w-0 break-words text-base font-semibold">{{ row.connectionCode }}</span>
                 <FaTag :variant="queryStatusVariant(row.status)">{{ queryStatusText(row.status) }}</FaTag>
               </div>
               <div class="break-all text-sm">{{ row.cypher }}</div>
