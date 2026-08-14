@@ -229,6 +229,9 @@ public class PluginAppService {
             }
             stopAffectedForMarketplaceUpdate(affected);
             switchStarted = true;
+            // stopAffectedForMarketplaceUpdate 已经保存过 affected 中的同一模块，
+            // 这里重新读取以获得最新 @Version，避免 backupActiveJar 用陈旧版本再次保存触发乐观锁冲突。
+            existing = pluginModuleRepo.findByCode(existing.getCode()).orElse(existing);
             actualBackup = backupActiveJar(existing, active, backup);
             moveUploadedJar(stagedJar, active);
             syncPluginRegistry();
