@@ -104,7 +104,7 @@ function handleJump() {
 </script>
 
 <template>
-  <Pagination v-slot="{ page: currentPage }" :total="props.total" :sibling-count="1" show-edges :page="page" class="gap-4 items-center" :items-per-page="size" @update:page="(val) => page = val">
+  <Pagination v-slot="{ page: currentPage }" :total="props.total" :sibling-count="1" show-edges :page="page" class="gap-2 sm:gap-4 items-center" :items-per-page="size" @update:page="(val) => page = val">
     <PaginationContent v-if="layoutConfig.pager.show" v-slot="{ items }" class="flex-center gap-1" :style="{ order: layoutConfig.pager.order }">
       <PaginationFirst size="icon-sm" class="size-8 rtl:rotate-180" />
       <PaginationPrevious size="icon-sm" class="size-8 rtl:rotate-180" />
@@ -128,6 +128,6 @@ function handleJump() {
       <Input v-model="jumpPage" class="h-8 w-16" input-class="text-center" @focus="handleFocus" @input="handleInput" @keyup.enter="handleJump" />
       <span class="text-sm text-muted-foreground">{{ props.textTemplates.jumper?.after }}</span>
     </div>
-    <div v-if="layoutConfig['->'].show" class="flex-1" :style="{ order: layoutConfig['->'].order }" />
+    <div v-if="layoutConfig['->'].show" class="hidden flex-1 sm:block" :style="{ order: layoutConfig['->'].order }" />
   </Pagination>
 </template>

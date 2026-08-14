@@ -117,7 +117,9 @@ const selectedOption = computed({
 <template>
   <Select v-model="selectValue" :multiple :disabled :dir="dir === 'ltr' ? 'ltr' : 'rtl'">
     <SelectTrigger :class="cn('w-[200px]', props.class)">
-      <SelectValue :placeholder="props.placeholder" :selected-option="selectedOption?.label" />
+      <SelectValue :placeholder="props.placeholder">
+        {{ selectedOption?.label }}
+      </SelectValue>
     </SelectTrigger>
     <SelectContent :position class="z-2000">
       <template v-for="option in props.options" :key="option.label">
