@@ -223,6 +223,9 @@ public class PluginAppService {
         boolean switchStarted = false;
         try {
             Files.createDirectories(backup.getParent());
+            if (!Files.isRegularFile(active)) {
+                throw new BizException("当前插件 JAR 不存在：" + active);
+            }
             activeOriginal = stageJar(active, active.getParent(), ".plugin-marketplace-active-original-");
             if (backupExisted) {
                 backupOriginal = stageJar(backup, backup.getParent(), ".plugin-marketplace-backup-original-");
@@ -676,6 +679,7 @@ public class PluginAppService {
     }
 
     private Path stageJar(Path source, Path directory, String prefix) throws IOException {
+        Files.createDirectories(directory);
         Path temp = Files.createTempFile(directory, prefix, ".jar");
         try {
             Files.copy(source, temp, StandardCopyOption.REPLACE_EXISTING);
