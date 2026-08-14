@@ -122,6 +122,8 @@ public class DockerContainerLogSource {
     }
 
     private void stream(String container) {
+        // 线程池复用线程，上一轮 cancel(true) 残留的中断状态会让本轮任务直接退出，先清除
+        Thread.interrupted();
         DockerLogSettingsDTO current = this.settings;
         boolean socketTransport = useSocket(current);
         while (!Thread.currentThread().isInterrupted()) {
@@ -132,7 +134,9 @@ public class DockerContainerLogSource {
                     streamViaCli(container, current.tail());
                 }
             } catch (Exception error) {
-                if (!(error instanceof InterruptedException)) {
+                if (Thread.currentThread().isInterrupted()) {
+                    // future.cancel(true) 打断阻塞读取属正常取消/重配置，不记录错误
+                } else if (!(error instanceof InterruptedException)) {
                     log.error("docker 日志读取失败：container={}, transport={}", container, socketTransport ? "socket" : "cli", error);
                 }
             }
