@@ -226,6 +226,11 @@ public class AiAppService {
                 - 不要使用外部脚本，不要依赖远程不可控资源。
                 - 构建器中的组件效果必须尽量接近最终渲染效果。
 
+                公开站版式（重要）：
+                - 页面最终嵌在站点外壳（固定页头/页脚）中展示：禁止给页面根容器或第一个区块添加顶部 padding/margin，顶部间距由站点页头负责。
+                - CSS 只允许 yb-ai- 前缀的类选择器（含 @media 内部）；禁止 *、body、html 以及 header/footer/nav/a/img/div 等裸元素选择器，避免污染站点外壳。
+                - 区块需要背景、渐变或图片铺满整屏宽度时，外层区块元素必须保持 width:100%，禁止给外层区块设置 max-width；内容居中一律用内层容器（max-width + margin:0 auto）实现。
+
                 深度思考模式：%s
                 %s
                 CMS template runtime rules:
