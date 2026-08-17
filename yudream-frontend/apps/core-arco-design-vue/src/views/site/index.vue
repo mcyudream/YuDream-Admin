@@ -3,7 +3,7 @@ import type { CmsPage, CmsTemplateContext, HomePageLayout, HomeSection } from '@
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { chromeRuntimeCss, readChromeCss } from '@/utils/cms-chrome'
-import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml } from '@/utils/cms-template-render'
+import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const route = useRoute()
@@ -25,8 +25,9 @@ const articleProse = computed(() =>
 )
 const articleHeroVisible = computed(() => articleProse.value)
 const articleFullWidth = computed(() => !articleProse.value)
-// 页面自定义 CSS 注入前剥离全局/裸元素规则，保护站点页头页脚不被页面样式污染
-const articleCss = computed(() => sanitizeCmsCss(page.value?.cssContent))
+// 页面自定义 CSS 注入前剥离全局/裸元素规则并加上 .site-article 作用域：
+// 既保护站点页头页脚不被页面样式污染，也让页面自身规则压过历史遗留的全局同名类。
+const articleCss = computed(() => scopeCmsCss(sanitizeCmsCss(page.value?.cssContent), '.site-article'))
 const publishedPages = ref<CmsPage[]>([])
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
@@ -50,11 +51,13 @@ const slug = computed(() => {
   return value ? String(value) : ''
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
-const homeCss = computed(() => [
-  home.value?.settings?.homeCss,
+// 首页内容 CSS 只应在首页注入；全站只保留页头/页脚的 chrome 自定义样式，
+// 否则首页 CSS 里的通用类（如 .yb-ai-hero）会污染其它页面。
+const chromeCustomCss = computed(() => [
   readChromeCss(home.value?.settings, 'header'),
   readChromeCss(home.value?.settings, 'footer'),
 ].filter(Boolean).join('\n'))
+const homeContentCss = computed(() => home.value?.settings?.homeCss || '')
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
 const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : homeJs.value)
 const navigationItems = computed(() => {
@@ -71,7 +74,7 @@ const footerCopyright = computed(() => home.value?.settings?.footerCopyright || 
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
 const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
 const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
-const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, homeCss.value))
+const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, chromeCustomCss.value))
 const archiveFilter = computed(() => ({
   category: queryValue(route.query.category),
   tag: queryValue(route.query.tag),
@@ -533,6 +536,9 @@ function dateText(value?: string) {
 
         <div class="site-layout-content">
           <template v-if="!page && home">
+            <component :is="'style'" v-if="homeContentCss">
+              {{ homeContentCss }}
+            </component>
             <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
             <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
               <div class="site-shell">
