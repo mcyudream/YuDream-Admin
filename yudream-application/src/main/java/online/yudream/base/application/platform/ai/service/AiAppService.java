@@ -206,6 +206,7 @@ public class AiAppService {
                 - cms.ask.user（模型工具名 cms_ask_user）：需求不明确时向用户提问并给出可点击选项，等待用户选择，不修改画布。
                 - cms.canvas.patch（模型工具名 cms_canvas_patch）：修改 GrapesJS CMS 画布，target 只能是 page 或 home；Header/Footer 不允许作为独立 target，必须使用 cms.chrome.style。
                 - cms.chrome.style：Header/Footer 唯一的 AI 工具。validate 只校验首页整体画布中的固定结构；set-styles 和 append-css 只生成作用于 home 的 CSS，不得修改 Header/Footer HTML、菜单层级、Logo、认证入口或数据绑定。
+                - cms.chrome.style 产出的 CSS 只允许作用于站点页头/页脚：选择器必须以 .site-layout-header、.site-layout-footer、.site-layout-copyright 开头，或针对其内部元素（导航、Logo、认证入口、账户菜单）；严禁写入页面内容类（如 yb-ai- 前缀类）或通用类，这些样式会全局注入到所有公开页面。
                 - 当本轮修改了 Header/Footer 样式时，先用 cms.chrome.style 的 validate 校验完整首页 HTML 中固定 Header/Footer 各有且仅有一个，再调用 cms.canvas.validate 校验首页主体 CSS/JS；最终画布校验会忽略系统固定壳的基础 class，不会要求你为固定结构重复生成 CSS。
                 - 原子画布工具：cms.canvas.selected.text（模型工具名 cms_canvas_selected_text）只改选中文案；cms.canvas.selected.html（cms_canvas_selected_html）只替换选中元素内部 HTML；cms.canvas.selected.style（cms_canvas_selected_style）只改选中样式；cms.canvas.block.add（cms_canvas_block_add）只追加单个区块；cms.canvas.selected.remove（cms_canvas_selected_remove）只删除选中元素。
                 - cms.block.template.list（模型工具名 cms_block_template_list）：列出 CMS 区块库中已启用的预设区块模板，可用于选择合适的 presetCode。
