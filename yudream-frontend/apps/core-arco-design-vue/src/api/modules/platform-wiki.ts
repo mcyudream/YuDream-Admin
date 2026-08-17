@@ -201,6 +201,8 @@ export const uploadWikiSource = (spaceId: string, folderPath: string, file: File
     `api/platform/wiki/spaces/${spaceId}/sources/upload?folderPath=${encodeURIComponent(folderPath)}`, form)
 }
 export const importWikiUrls = (spaceId: string, data: { folderPath?: string; urls: string[] }) => systemClient.post<unknown, ApiResponse<WikiSource[]>>(`api/platform/wiki/spaces/${spaceId}/sources/import-urls`, data)
+export const createWikiTextSource = (spaceId: string, data: { folderPath?: string; title: string; content: string }) => systemClient.post<unknown, ApiResponse<WikiSource>>(`api/platform/wiki/spaces/${spaceId}/sources/text`, data)
+export const updateWikiTextSource = (id: string, data: { title: string; content: string }) => systemClient.put<unknown, ApiResponse<WikiSource>>(`api/platform/wiki/sources/${id}/text`, data)
 export const deleteWikiSource = (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/wiki/sources/${id}`)
 export const captionWikiSourceImages = (id: string) => systemClient.post<unknown, ApiResponse<WikiSource>>(`api/platform/wiki/sources/${id}/caption-images`)
 
