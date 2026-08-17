@@ -524,6 +524,10 @@ async function savePage() {
     const payload = { ...pageForm }
     payload.htmlContent = resolvePageHtmlForSave()
     payload.jsContent = stripScriptTags(pageForm.jsContent || '')
+    // 构建器产出的整页默认用「空白画布」模板，保证公开站渲染与构建器预览一致
+    if (payload.builderProjectJson && payload.template === 'DEFAULT') {
+      payload.template = 'BLANK'
+    }
     const res = selectedPageId.value
       ? await apiCms.updatePage(selectedPageId.value, payload)
       : await apiCms.createPage(payload)

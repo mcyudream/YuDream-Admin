@@ -4,6 +4,7 @@ import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { chromeRuntimeCss, readChromeCss } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
+import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const route = useRoute()
 const appAccountStore = useAppAccountStore()
@@ -12,6 +13,11 @@ const appSettingsStore = useAppSettingsStore()
 const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
+
+// 页面模板控制公开站版式：DEFAULT/DOC 保留文章头与排版容器，BLANK/LANDING 全宽裸渲染（与构建器预览一致）
+const articleTemplate = computed(() => (page.value?.template || 'DEFAULT').toUpperCase())
+const articleHeroVisible = computed(() => articleTemplate.value === 'DEFAULT' || articleTemplate.value === 'DOC')
+const articleFullWidth = computed(() => articleTemplate.value === 'BLANK' || articleTemplate.value === 'LANDING')
 const publishedPages = ref<CmsPage[]>([])
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
@@ -151,7 +157,10 @@ watch([
 
 let activeCmsScript: HTMLScriptElement | null = null
 
-onBeforeUnmount(cleanupCmsScript)
+onBeforeUnmount(() => {
+  cleanupCmsScript()
+  clearPublicSeo()
+})
 
 async function load() {
   loading.value = true
@@ -171,12 +180,29 @@ async function load() {
       catch {
         home.value = null
       }
-      document.title = `${res.data.seoTitle || res.data.title} - ${appSettingsStore.siteName}`
+      applyPublicSeo({
+        title: res.data.seoTitle || res.data.title,
+        description: res.data.seoDescription || res.data.summary || res.data.excerpt,
+        canonicalPath: `/site/${res.data.slug}`,
+        image: res.data.coverImageUrl,
+        type: 'article',
+        siteName: appSettingsStore.siteName,
+        publishedAt: res.data.publishedAt,
+        updatedAt: res.data.updateTime,
+        breadcrumbs: [{ name: '站点首页', path: '/site' }, { name: res.data.title, path: `/site/${res.data.slug}` }],
+      })
     }
     else {
       const res = await apiCms.publicHome()
       home.value = res.data
-      document.title = `${res.data.title || '站点首页'} - ${appSettingsStore.siteName}`
+      applyPublicSeo({
+        title: res.data.title || '站点首页',
+        description: res.data.subtitle || appSettingsStore.siteDescription,
+        canonicalPath: '/site',
+        image: res.data.heroImageUrl,
+        type: 'website',
+        siteName: appSettingsStore.siteName,
+      })
     }
     await Promise.all([loadPublicPages(), loadTemplateContext()])
   }
@@ -201,7 +227,7 @@ async function loadTemplateContext() {
 function emptyTemplateContext(): CmsTemplateContext {
   return {
     cms: { pages: { latest: [] } },
-    knowledge: { spaces: [], pages: [], latest: [] },
+    knowledge: { spaces: [], pages: [], latest: [], featured: [] },
   }
 }
 
@@ -521,7 +547,7 @@ function dateText(value?: string) {
             <component :is="'style'" v-if="page.cssContent">
               {{ page.cssContent }}
             </component>
-            <header class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
+            <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
               <div class="site-shell">
                 <span>{{ page.slug }}</span>
                 <h1>{{ page.title }}</h1>
@@ -532,7 +558,11 @@ function dateText(value?: string) {
                 </div>
               </div>
             </header>
-            <div class="site-shell site-article__body" v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : renderCmsMarkdown(page.markdownContent)" />
+            <div
+              class="site-article__body"
+              :class="[articleFullWidth ? 'site-article__body--full' : 'site-article__body--prose site-shell']"
+              v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : renderCmsMarkdown(page.markdownContent)"
+            />
           </article>
         </div>
       </div>
@@ -1073,7 +1103,8 @@ function dateText(value?: string) {
   font-weight: 700;
 }
 
-.site-article__body {
+/* 排版容器仅作用于 DEFAULT/DOC 模板；BLANK/LANDING 全宽裸渲染，贴近构建器预览 */
+.site-article__body--prose {
   max-width: 860px;
   padding: 48px 0 72px;
   color: var(--yb-site-text);
@@ -1081,22 +1112,27 @@ function dateText(value?: string) {
   line-height: 1.8;
 }
 
-.site-article__body :deep(main) {
+.site-article__body--full {
+  width: 100%;
+  color: var(--yb-site-text);
+}
+
+.site-article__body--prose :deep(main) {
   display: grid;
   gap: 20px;
 }
 
-.site-article__body :deep(:where(h1, h2, h3, h4, h5, h6)) {
+.site-article__body--prose :deep(:where(h1, h2, h3, h4, h5, h6)) {
   margin-block: 0 0.55em;
   line-height: 1.25;
 }
 
-.site-article__body :deep(:where(p, ul, ol, blockquote)) {
+.site-article__body--prose :deep(:where(p, ul, ol, blockquote)) {
   margin-block: 0 0.85em;
   line-height: 1.8;
 }
 
-.site-article__body :deep(:where(ul, ol)) {
+.site-article__body--prose :deep(:where(ul, ol)) {
   padding-inline-start: 1.5em;
 }
 
@@ -1108,11 +1144,11 @@ function dateText(value?: string) {
   height: auto;
 }
 
-.site-article__body :deep(pre) {
+.site-article__body--prose :deep(pre) {
   overflow: auto;
   max-width: 100%;
 }
-.site-article__body :deep(.yb-cta) {
+.site-article__body--prose :deep(.yb-cta) {
   padding: 34px;
   border-radius: 8px;
   background: var(--yb-site-primary);
@@ -1121,22 +1157,22 @@ function dateText(value?: string) {
   color: var(--yb-site-hero-text);
 }
 
-.site-article__body :deep(.yb-hero h1) {
+.site-article__body--prose :deep(.yb-hero h1) {
   max-width: 720px;
   margin: 0 0 12px;
   font-size: clamp(36px, 6vw, 68px);
   line-height: 1;
 }
 
-.site-article__body :deep(.yb-hero p),
-.site-article__body :deep(.yb-cta p) {
+.site-article__body--prose :deep(.yb-hero p),
+.site-article__body--prose :deep(.yb-cta p) {
   max-width: 640px;
   margin: 0;
   color: rgba(255, 255, 255, 0.84);
 }
 
-.site-article__body :deep(.yb-hero a),
-.site-article__body :deep(.yb-cta a) {
+.site-article__body--prose :deep(.yb-hero a),
+.site-article__body--prose :deep(.yb-cta a) {
   display: inline-flex;
   margin-top: 22px;
   padding: 10px 14px;
@@ -1147,31 +1183,31 @@ function dateText(value?: string) {
   text-decoration: none;
 }
 
-.site-article__body :deep(.yb-text),
-.site-article__body :deep(.yb-image) {
+.site-article__body--prose :deep(.yb-text),
+.site-article__body--prose :deep(.yb-image) {
   padding: 22px;
   border: 1px solid var(--yb-site-border);
   border-radius: 8px;
   background: var(--yb-site-surface);
 }
 
-.site-article__body :deep(.yb-image figcaption) {
+.site-article__body--prose :deep(.yb-image figcaption) {
   display: grid;
   gap: 4px;
   margin-top: 10px;
 }
 
-.site-article__body :deep(.yb-image figcaption span) {
+.site-article__body--prose :deep(.yb-image figcaption span) {
   color: var(--yb-site-muted);
 }
 
-.site-article__body :deep(h1),
-.site-article__body :deep(h2),
-.site-article__body :deep(h3) {
+.site-article__body--prose :deep(h1),
+.site-article__body--prose :deep(h2),
+.site-article__body--prose :deep(h3) {
   line-height: 1.2;
 }
 
-.site-article__body :deep(img) {
+.site-article__body--prose :deep(img) {
   max-width: 100%;
   border-radius: 8px;
 }
@@ -1250,16 +1286,16 @@ function dateText(value?: string) {
     word-break: break-word;
   }
 
-  .site-article__body :deep(iframe),
-  .site-article__body :deep(video),
-  .site-article__body :deep(embed),
-  .site-article__body :deep(img),
-  .site-article__body :deep(table) {
+  .site-article__body--prose :deep(iframe),
+  .site-article__body--prose :deep(video),
+  .site-article__body--prose :deep(embed),
+  .site-article__body--prose :deep(img),
+  .site-article__body--prose :deep(table) {
     max-width: 100%;
     height: auto;
   }
 
-  .site-article__body :deep(pre) {
+  .site-article__body--prose :deep(pre) {
     white-space: pre-wrap;
     word-break: break-word;
   }
