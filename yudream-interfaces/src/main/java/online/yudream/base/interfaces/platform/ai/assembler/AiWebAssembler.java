@@ -36,6 +36,7 @@ public class AiWebAssembler {
         cmd.setTitle(request.getTitle());
         cmd.setPrompt(request.getPrompt());
         cmd.setPageType(request.getPageType());
+        cmd.setTemplate(request.getTemplate());
         cmd.setStyle(request.getStyle());
         cmd.setSiteName(request.getSiteName());
         cmd.setProviderCode(request.getProviderCode());
