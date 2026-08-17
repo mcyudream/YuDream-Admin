@@ -211,16 +211,27 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         progress(task, source, "apply", "写入 Wiki 页面并维护 index/log/overview", 70);
         throwIfCancelled(isCancelled);
         List<Long> touched = applyPages(space, source, generated);
-        updateIndex(space);
-        updateOverview(space);
-        appendLog(space, source);
+        Long indexId = updateIndex(space);
+        Long overviewId = updateOverview(space);
+        Long logId = appendLog(space, source);
         saveReviewItems(space, source, analysis, generated);
 
         source.markIngested(source.getContentHash());
         sourceRepo.save(source);
 
         progress(task, source, "publish", "发布页面并构建检索索引", 85);
-        publishPages(touched);
+        // 特殊页（内容目录/全局概要/操作日志）与内容页一起自动发布，避免只生成草稿
+        List<Long> toPublish = new ArrayList<>(touched);
+        if (indexId != null) {
+            toPublish.add(indexId);
+        }
+        if (overviewId != null) {
+            toPublish.add(overviewId);
+        }
+        if (logId != null) {
+            toPublish.add(logId);
+        }
+        publishPages(toPublish);
         progress(task, source, "done", "摄入完成", 100);
     }
 
@@ -302,10 +313,17 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 results.stream().map(WikiWebSearchResult::url).toList(), List.of(), List.of("research"),
                 "关于「" + topic + "」的深度研究", body).fullMarkdown());
         Long nodeId = nodeRepo.save(node).getId();
-        updateIndex(space);
-        updateOverview(space);
+        Long indexId = updateIndex(space);
+        Long overviewId = updateOverview(space);
         progress(task, null, "publish", "发布研究页面", 85);
-        publishPages(List.of(nodeId));
+        List<Long> toPublish = new ArrayList<>(List.of(nodeId));
+        if (indexId != null) {
+            toPublish.add(indexId);
+        }
+        if (overviewId != null) {
+            toPublish.add(overviewId);
+        }
+        publishPages(toPublish);
         progress(task, null, "done", "深度研究完成", 100);
     }
 
@@ -405,7 +423,9 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
     private Long ensureSourceDocument(WikiSpace space, WikiSource source) {
         String slug = "source-" + source.getId();
         WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
-                .orElseGet(() -> WikiNode.page(space.getId(), null, source.getTitle(), slug, -100));
+                .orElseGet(() -> WikiNode.page(space.getId(), null, source.getTitle(), slug, 0));
+        // 置顶：WikiNode 工厂对 sort 做了 >=0 钳制，这里显式赋负值让原文档排在最前作为入口了解页
+        node.setSort(-100);
         node.applyGeneratedMarkdown(WikiFrontmatter.of(source.getTitle(), WikiPageType.SOURCE_DOCUMENT,
                 List.of(source.displayPath()), List.of(), List.of("原文档"),
                 "原始资料原文：" + source.getTitle(), source.getExtractedText()).fullMarkdown());
@@ -428,7 +448,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 List.of(), List.of("source"), summary, body);
     }
 
-    private void updateIndex(WikiSpace space) {
+    private Long updateIndex(WikiSpace space) {
         Map<WikiPageType, List<WikiNode>> grouped = nodeRepo.findBySpaceId(space.getId()).stream()
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE && node.getPageType() != null
                         && !SPECIAL_TYPES.contains(node.getPageType()))
@@ -445,10 +465,10 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
             }
             index.append('\n');
         }
-        saveSpecialPage(space, "index", "内容目录", WikiPageType.INDEX, index.toString());
+        return saveSpecialPage(space, "index", "内容目录", WikiPageType.INDEX, index.toString());
     }
 
-    private void updateOverview(WikiSpace space) {
+    private Long updateOverview(WikiSpace space) {
         Map<WikiPageType, List<WikiNode>> grouped = nodeRepo.findBySpaceId(space.getId()).stream()
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE && node.getPageType() != null
                         && !SPECIAL_TYPES.contains(node.getPageType()))
@@ -467,10 +487,10 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
             }
             overview.append('\n');
         }
-        saveSpecialPage(space, "overview", "全局概要", WikiPageType.OVERVIEW, overview.toString());
+        return saveSpecialPage(space, "overview", "全局概要", WikiPageType.OVERVIEW, overview.toString());
     }
 
-    private void appendLog(WikiSpace space, WikiSource source) {
+    private Long appendLog(WikiSpace space, WikiSource source) {
         String slug = "log";
         WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
                 .orElseGet(() -> WikiNode.page(space.getId(), null, "操作日志", slug, 0));
@@ -478,14 +498,14 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
         String entry = "## [" + LocalDate.now() + "] ingest | " + source.getTitle() + "\n";
         String body = (existing == null || existing.isBlank() ? "" : existing.trim() + "\n\n") + entry;
         node.savePage("操作日志", WikiPageType.LOG, List.of(), List.of(), List.of(), "", body);
-        nodeRepo.save(node);
+        return nodeRepo.save(node).getId();
     }
 
-    private void saveSpecialPage(WikiSpace space, String slug, String title, WikiPageType type, String body) {
+    private Long saveSpecialPage(WikiSpace space, String slug, String title, WikiPageType type, String body) {
         WikiNode node = nodeRepo.findBySlug(space.getId(), slug)
                 .orElseGet(() -> WikiNode.page(space.getId(), null, title, slug, 0));
         node.savePage(title, type, List.of(), List.of(), List.of(), "", body);
-        nodeRepo.save(node);
+        return nodeRepo.save(node).getId();
     }
 
     private void saveReviewItems(WikiSpace space, WikiSource source, JsonNode analysis, JsonNode generated) {
