@@ -65,6 +65,8 @@ const props = defineProps<{
   jsContent?: string
   builderProjectJson?: string
   title?: string
+  /** 当前页面模板（DEFAULT/LANDING/DOC/BLANK），随 AI 请求与画布上下文下发 */
+  pageTemplate?: string
   aiEnabled?: boolean
   aiAgentOptions?: CmsAgentSelectOption[]
   chromeFrame?: boolean
@@ -1190,6 +1192,7 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
     siteName: appSettingsStore.siteName || 'YuDream',
     prompt: prompt || `参考样图调整当前页面：${image?.fileName || '样图'}`,
     pageType: 'GrapesJS 可视化页面',
+    template: props.pageTemplate || 'DEFAULT',
     style: props.chromeFrame
       ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
       : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
