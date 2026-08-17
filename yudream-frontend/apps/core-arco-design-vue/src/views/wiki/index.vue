@@ -5,6 +5,7 @@ import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { fetchPublicWikiDocument, fetchPublicWikiDocuments, fetchPublicWikiTree, type WikiNode, type WikiPublicDocument, type WikiPublicDocumentDetail } from '@/api/modules/platform-wiki'
 import { pageTypeLabel, resolveWikiLink, wikilinksToMarkdown } from '../platform/wiki/wiki-utils'
+import { rewriteApiFileUrls } from '@/utils/api-file-url'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const route = useRoute()
@@ -15,7 +16,7 @@ const spaceSlug = computed(() => String(route.params.spaceSlug || ''))
 const nodePath = computed(() => Array.isArray(route.params.nodePath) ? route.params.nodePath.join('/') : String(route.params.nodePath || ''))
 const pages = computed(() => flatten(tree.value).filter(node => node.nodeType === 'PAGE'))
 const active = computed(() => pages.value.find(node => node.path === nodePath.value || node.slug === nodePath.value) || pages.value[0])
-const activeMarkdown = computed(() => wikilinksToMarkdown(active.value?.body ?? active.value?.markdown ?? ''))
+const activeMarkdown = computed(() => rewriteApiFileUrls(wikilinksToMarkdown(active.value?.body ?? active.value?.markdown ?? '')))
 const relatedPages = computed(() => (active.value?.related || [])
   .map(title => pages.value.find(node => node.title === title))
   .filter((node): node is WikiNode => Boolean(node)))
@@ -35,7 +36,7 @@ const documentGroups = computed(() => {
   }
   return [...groups.entries()].map(([folder, items]) => ({ folder, items }))
 })
-const documentMarkdown = computed(() => documentDetail.value?.content ?? '')
+const documentMarkdown = computed(() => rewriteApiFileUrls(documentDetail.value?.content ?? ''))
 
 async function load() {
   try {

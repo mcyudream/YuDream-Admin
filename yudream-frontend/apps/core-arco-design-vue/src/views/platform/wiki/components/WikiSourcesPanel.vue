@@ -12,6 +12,7 @@ import {
   uploadWikiSource,
 } from '@/api/modules/platform-wiki'
 import CmsMarkdownEditor from '../../cms/components/CmsMarkdownEditor.vue'
+import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 import { extractionStatusLabel, ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
 const store = inject(wikiWorkbenchKey)!
@@ -127,7 +128,7 @@ async function ingest(source: WikiSource) {
 }
 
 function previewImage(source: WikiSource, index: number) {
-  const urls = (source.images || []).map(img => img.url || '').filter(Boolean)
+  const urls = (source.images || []).map(img => resolveApiFileUrl(img.url)).filter(Boolean)
   if (urls.length) {
     imagePreview.open(urls, index)
   }
@@ -143,7 +144,8 @@ const textContent = ref('')
 function openTextEditor(source?: WikiSource) {
   textEditingId.value = source?.id || ''
   textTitle.value = source?.title || ''
-  textContent.value = source?.extractedText || ''
+  // 开发环境预览需要 /proxy 前缀；保存时后端会把 /proxy/api/files 规范化回 /api/files
+  textContent.value = rewriteApiFileUrls(source?.extractedText || '')
   textEditorVisible.value = true
 }
 
@@ -265,7 +267,7 @@ watch(() => store.spaceId.value, load)
                 :title="img.caption || `第 ${img.pageNumber} 页图片`"
                 @click="previewImage(source, index)"
               >
-                <img v-if="img.url" :src="img.url" :alt="img.caption || '资料图片'" loading="lazy">
+                <img v-if="img.url" :src="resolveApiFileUrl(img.url)" :alt="img.caption || '资料图片'" loading="lazy">
                 <span v-else class="src-thumb__placeholder"><FaIcon name="i-ri:image-line" /></span>
                 <span v-if="img.caption" class="src-thumb__caption">{{ img.caption }}</span>
               </button>
