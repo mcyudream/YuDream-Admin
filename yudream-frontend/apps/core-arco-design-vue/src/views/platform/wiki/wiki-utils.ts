@@ -10,6 +10,7 @@ export interface PageTypeMeta {
 
 export const pageTypeMeta: Record<string, PageTypeMeta> = {
   source_summary: { label: '资料摘要', color: 'rgb(var(--primary-3))' },
+  source_document: { label: '原文档', color: 'rgb(var(--primary-3))' },
   entity: { label: '实体', color: 'rgb(var(--primary-4))' },
   concept: { label: '概念', color: 'rgb(var(--primary-6))' },
   synthesis: { label: '综合分析', color: 'rgb(var(--primary-7))' },
