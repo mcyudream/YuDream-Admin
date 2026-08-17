@@ -4,6 +4,7 @@ import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { publishWikiNode, saveWikiNode, unpublishWikiNode, deleteWikiNode } from '@/api/modules/platform-wiki'
 import CmsMarkdownEditor from '../../cms/components/CmsMarkdownEditor.vue'
+import { rewriteApiFileUrls } from '@/utils/api-file-url'
 import {
   pageTypeColor,
   pageTypeLabel,
@@ -37,7 +38,7 @@ const filteredTree = computed(() => {
   return store.flatTree.value.filter(item => item.title.toLowerCase().includes(keyword))
 })
 
-const previewMarkdown = computed(() => wikilinksToMarkdown(editorBody.value))
+const previewMarkdown = computed(() => rewriteApiFileUrls(wikilinksToMarkdown(editorBody.value)))
 
 watch(node, (value) => {
   if (!value) {
