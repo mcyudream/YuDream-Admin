@@ -2147,6 +2147,11 @@ function appendCanvasCss(css: string) {
     return
   }
   const existing = fullCanvasCss()
+  // 模型每次 patch 常附带同一段基础样式（如 reset），已存在时跳过避免重复累积
+  const normalize = (value: string) => value.replace(/\s+/g, '')
+  if (normalize(existing).includes(normalize(css))) {
+    return
+  }
   editor.setStyle(`${existing}\n${css}`.trim())
 }
 
