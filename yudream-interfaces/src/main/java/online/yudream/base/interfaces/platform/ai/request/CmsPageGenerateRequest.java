@@ -10,6 +10,7 @@ public class CmsPageGenerateRequest {
     private String title;
     private String prompt;
     private String pageType;
+    private String template;
     private String style;
     private String siteName;
     private String providerCode;

@@ -228,6 +228,7 @@ public class AiAppService {
                 - 构建器中的组件效果必须尽量接近最终渲染效果。
 
                 公开站版式（重要）：
+                - 根据用户需求里的「页面模板」决定内容结构：DEFAULT 模板自带文章头（标题/描述/封面），页面内不要重复大标题；LANDING 只有站点页头页脚，页面需自带 hero；DOC 正文会收窄为约 860px 阅读容器，内容按阅读宽度设计；BLANK 无任何站点元素，页面需自带全部结构。
                 - 页面最终嵌在站点外壳（固定页头/页脚）中展示：禁止给页面根容器或第一个区块添加顶部 padding/margin，顶部间距由站点页头负责。
                 - CSS 只允许 yb-ai- 前缀的类选择器（含 @media 内部）；禁止 *、body、html 以及 header/footer/nav/a/img/div 等裸元素选择器，避免污染站点外壳。
                 - 区块需要背景、渐变或图片铺满整屏宽度时，外层区块元素必须保持 width:100%，禁止给外层区块设置 max-width；内容居中一律用内层容器（max-width + margin:0 auto）实现。
@@ -257,6 +258,7 @@ public class AiAppService {
                 站点：%s
                 页面标题：%s
                 页面类型：%s
+                页面模板：%s
                 风格偏好：%s
                 样图参考：%s
                 深度思考：%s
@@ -285,6 +287,7 @@ public class AiAppService {
                 defaultText(cmd.getSiteName(), "YuDream"),
                 defaultText(cmd.getTitle(), "未命名页面"),
                 defaultText(cmd.getPageType(), "通用内容页"),
+                templateDescription(cmd.getTemplate()),
                 defaultText(cmd.getStyle(), "清爽、专业、可读性高"),
                 StringUtils.hasText(cmd.getImageDataUrl()) ? "已提供，请参考样图的布局、视觉层次、色彩和组件组织方式" : "未提供",
                 cmd.isThinkingEnabled() ? "开启" : "关闭",
@@ -306,6 +309,17 @@ public class AiAppService {
 
     private String defaultText(String value, String fallback) {
         return StringUtils.hasText(value) ? value.trim() : fallback;
+    }
+
+    /** 页面模板决定公开站渲染版式，模型需据此决定内容结构（是否自带标题区、是否收窄）。 */
+    private String templateDescription(String template) {
+        String normalized = StringUtils.hasText(template) ? template.trim().toUpperCase() : "DEFAULT";
+        return switch (normalized) {
+            case "LANDING" -> "LANDING（营销落地页）：公开站只有站点页头/页脚，无标题区，正文全宽铺满；页面必须自带 hero 等首屏区块";
+            case "DOC" -> "DOC（文档页面）：站点页头/页脚 + 紧凑标题区，正文收窄为约 860px 阅读容器；内容按阅读宽度设计，不要给区块外层做全宽背景";
+            case "BLANK" -> "BLANK（空白画布）：纯白页面，无站点页头/页脚，版式完全由页面内容决定；适合做整屏自定义活动页，页面需自带全部结构";
+            default -> "DEFAULT（默认页面）：站点页头/页脚 + 文章头（自动渲染页面标题/描述/封面），正文全宽；页面内不要重复做大标题 hero";
+        };
     }
 
 }
