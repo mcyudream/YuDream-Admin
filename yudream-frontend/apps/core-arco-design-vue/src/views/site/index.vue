@@ -14,16 +14,18 @@ const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
 
-// 页面模板控制公开站版式：
-// - BLANK/LANDING：全宽裸渲染，与构建器预览一致；
-// - DEFAULT/DOC：Markdown 文章走「文章头 + 排版容器」；
-//   若页面带有整页自定义 HTML（构建器/AI 产出），则自动降级为全宽裸渲染，避免双重头部与排版挤压。
+// 页面模板严格决定公开站版式：
+// - DEFAULT：站点页头/页脚 + 文章头（标题/描述/封面），Markdown 正文走排版容器，整页自定义 HTML 全宽；
+// - DOC：站点页头/页脚 + 紧凑文档标题，正文收窄为阅读容器（860px）；
+// - LANDING：只有站点页头/页脚，无标题区，正文全宽铺满；
+// - BLANK：纯白页面，不渲染任何站点元素（页头/页脚/侧栏），正文全宽。
 const articleTemplate = computed(() => (page.value?.template || 'DEFAULT').toUpperCase())
-const articleHasCustomHtml = computed(() => !!page.value?.htmlContent?.trim())
+const isBlankPage = computed(() => !!page.value && articleTemplate.value === 'BLANK')
+const articleHeroVisible = computed(() => articleTemplate.value === 'DEFAULT')
+const articleDocHeaderVisible = computed(() => articleTemplate.value === 'DOC')
 const articleProse = computed(() =>
-  !articleHasCustomHtml.value && (articleTemplate.value === 'DEFAULT' || articleTemplate.value === 'DOC'),
+  articleTemplate.value === 'DOC' || (articleTemplate.value === 'DEFAULT' && !page.value?.htmlContent?.trim()),
 )
-const articleHeroVisible = computed(() => articleProse.value)
 const articleFullWidth = computed(() => !articleProse.value)
 // 页面自定义 CSS 注入前剥离全局/裸元素规则并加上 .site-article 作用域：
 // 既保护站点页头页脚不被页面样式污染，也让页面自身规则压过历史遗留的全局同名类。
@@ -125,6 +127,7 @@ const renderContext = computed(() => {
       slug: page.value?.slug || '',
       summary: page.value?.summary || '',
       excerpt: page.value?.excerpt || '',
+      template: page.value ? articleTemplate.value : '',
       categories: (page.value?.categories || []).join(', '),
       tags: (page.value?.tags || []).join(', '),
     },
@@ -486,7 +489,7 @@ function dateText(value?: string) {
       <component :is="'style'">
         {{ siteRuntimeCss }}
       </component>
-      <header data-yb-chrome="header" class="site-layout-header">
+      <header v-if="!isBlankPage" data-yb-chrome="header" class="site-layout-header">
         <div class="site-layout-header__bar">
           <a data-yb-chrome-slot="logo" class="site-layout-header__brand" href="/site">
             <img v-if="renderContext.site.logo" :src="renderContext.site.logo" :alt="renderContext.site.name">
@@ -525,7 +528,7 @@ function dateText(value?: string) {
       </header>
 
       <div class="site-layout-frame">
-        <aside v-if="siteLayout === 'ADMIN'" class="site-admin-sidebar">
+        <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">
           <strong>{{ renderContext.site.name }}</strong>
           <a href="/site">首页</a>
           <template v-for="item in navigationTree" :key="`side-${item.id || item.url}`">
@@ -573,6 +576,14 @@ function dateText(value?: string) {
                 </div>
               </div>
             </header>
+            <header v-if="articleDocHeaderVisible" class="site-article__doc-header">
+              <div class="site-shell">
+                <h1>{{ page.title }}</h1>
+                <p v-if="page.excerpt || page.summary">
+                  {{ page.excerpt || page.summary }}
+                </p>
+              </div>
+            </header>
             <div
               class="site-article__body"
               :class="[articleFullWidth ? 'site-article__body--full' : 'site-article__body--prose site-shell']"
@@ -582,7 +593,7 @@ function dateText(value?: string) {
         </div>
       </div>
 
-      <footer v-if="showFooter" data-yb-chrome="footer" class="site-layout-footer">
+      <footer v-if="showFooter && !isBlankPage" data-yb-chrome="footer" class="site-layout-footer">
         <div class="site-shell">
           <div data-yb-chrome-slot="footer-brand">
             <strong>{{ footerTitle }}</strong>
@@ -594,7 +605,7 @@ function dateText(value?: string) {
           </nav>
         </div>
       </footer>
-      <footer v-else-if="showCopyright" data-yb-chrome="footer" class="site-layout-copyright">
+      <footer v-else-if="showCopyright && !isBlankPage" data-yb-chrome="footer" class="site-layout-copyright">
         {{ footerCopyright }}
       </footer>
     </template>
@@ -1118,7 +1129,26 @@ function dateText(value?: string) {
   font-weight: 700;
 }
 
-/* 排版容器仅作用于 DEFAULT/DOC 模板；BLANK/LANDING 全宽裸渲染，贴近构建器预览 */
+/* 排版容器仅作用于 DEFAULT 的 Markdown 正文与 DOC 模板；LANDING/BLANK 与 DEFAULT 的整页自定义 HTML 全宽渲染 */
+.site-article__doc-header {
+  padding: 40px 0 28px;
+  border-bottom: 1px solid var(--yb-site-border);
+}
+
+.site-article__doc-header h1 {
+  margin: 0;
+  color: var(--yb-site-heading);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.site-article__doc-header p {
+  margin: 10px 0 0;
+  color: var(--yb-site-muted);
+  font-size: 15px;
+}
+
 .site-article__body--prose {
   max-width: 860px;
   padding: 48px 0 72px;

@@ -90,10 +90,10 @@ const home = reactive<HomePageLayout>({
 })
 
 const templateOptions: { label: string, value: PageTemplate }[] = [
-  { label: '默认页面', value: 'DEFAULT' },
-  { label: '营销落地页', value: 'LANDING' },
-  { label: '文档页面', value: 'DOC' },
-  { label: '空白画布', value: 'BLANK' },
+  { label: '默认页面（文章头：标题+描述+封面）', value: 'DEFAULT' },
+  { label: '营销落地页（仅页头页脚，全宽）', value: 'LANDING' },
+  { label: '文档页面（紧凑标题 + 窄栏阅读）', value: 'DOC' },
+  { label: '空白画布（纯白，无站点元素）', value: 'BLANK' },
 ]
 const statusOptions: { label: string, value: PageStatus }[] = [
   { label: '草稿', value: 'DRAFT' },
@@ -143,6 +143,7 @@ const templatePreviewContext = computed(() => {
       title: editorTarget.value === 'page' ? pageForm.title : home.title,
       summary: editorTarget.value === 'page' ? pageForm.summary : home.subtitle,
       slug: editorTarget.value === 'page' ? pageForm.slug : '',
+      template: editorTarget.value === 'page' ? pageForm.template : 'DEFAULT',
     },
     auth: {
       isLoggedIn: appAccountStore.isLogin ? 'true' : 'false',
@@ -1242,6 +1243,7 @@ function sectionTitle(type: HomeSectionType) {
         :css-content="editorTarget === 'home' ? homeCss : pageForm.cssContent"
         :js-content="editorTarget === 'home' ? homeJs : pageForm.jsContent"
         :builder-project-json="editorTarget === 'home' ? homeProjectJson : pageForm.builderProjectJson"
+        :page-template="editorTarget === 'home' ? 'DEFAULT' : pageForm.template"
         :chrome-frame="editorTarget === 'home'"
         :chrome-layout="editorTarget === 'home' ? homeLayoutMode : undefined"
         :template-preview-context="templatePreviewContext"

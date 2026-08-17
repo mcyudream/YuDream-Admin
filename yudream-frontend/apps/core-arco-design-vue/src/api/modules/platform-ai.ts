@@ -13,6 +13,7 @@ export interface CmsPageGeneratePayload {
   title?: string
   prompt: string
   pageType?: string
+  template?: string
   style?: string
   siteName?: string
   imageDataUrl?: string
@@ -60,6 +61,9 @@ export default {
   },
   generateCmsPageStreamEndpoint: () => {
     return streamEndpoint('/api/platform/ai/cms/pages/generate/stream')
+  },
+  generateCmsPageAguiWsEndpoint: () => {
+    return streamEndpoint('/api/platform/ai/cms/pages/generate/ws')
   },
   generateCmsPageStreamRequest: async (data: CmsPageGeneratePayload): Promise<RequestInit> => {
     const headers: Record<string, string> = {
