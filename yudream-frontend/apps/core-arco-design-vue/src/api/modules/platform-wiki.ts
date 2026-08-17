@@ -211,6 +211,8 @@ export const enqueueWikiIngest = (spaceId: string, sourceId: string) => systemCl
 export const fetchWikiIngestTasks = (spaceId: string) => systemClient.get<unknown, ApiResponse<WikiIngestTask[]>>(`api/platform/wiki/spaces/${spaceId}/ingest-tasks`)
 export const cancelWikiIngestTask = (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/ingest-tasks/${id}/cancel`)
 export const retryWikiIngestTask = (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/ingest-tasks/${id}/retry`)
+export const deleteWikiIngestTask = (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/wiki/ingest-tasks/${id}`)
+export const clearWikiIngestTasks = (spaceId: string) => systemClient.delete<unknown, ApiResponse<number>>(`api/platform/wiki/spaces/${spaceId}/ingest-tasks`)
 export const wikiIngestEventsEndpoint = (spaceId: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
   ? `/proxy/api/platform/wiki/spaces/${spaceId}/ingest-events`
   : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/ingest-events`
