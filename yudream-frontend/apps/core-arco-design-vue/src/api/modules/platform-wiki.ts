@@ -270,3 +270,18 @@ export async function hasPublicWikiSpaces(): Promise<boolean> {
 }
 export const searchPublicWiki = (slug: string, data: { query: string }) => systemClient.post<unknown, ApiResponse<WikiSearchHit[]>>(`api/public/wiki/${slug}/search`, data)
 export const searchAllPublicWiki = (data: { query: string, spaceSlug?: string }) => systemClient.post<unknown, ApiResponse<WikiSearchHit[]>>('api/public/wiki/search', data)
+
+// 公开端原文档目录：已摄入的原始资料
+export interface WikiPublicDocument {
+  id: string
+  title: string
+  folderPath?: string
+  kind?: string
+  format?: string
+}
+export interface WikiPublicDocumentDetail extends WikiPublicDocument {
+  content?: string
+  images?: { url?: string, caption?: string, width?: number, height?: number }[]
+}
+export const fetchPublicWikiDocuments = (slug: string) => systemClient.get<unknown, ApiResponse<WikiPublicDocument[]>>(`api/public/wiki/${slug}/documents`)
+export const fetchPublicWikiDocument = (slug: string, sourceId: string) => systemClient.get<unknown, ApiResponse<WikiPublicDocumentDetail>>(`api/public/wiki/${slug}/documents/${sourceId}`)
