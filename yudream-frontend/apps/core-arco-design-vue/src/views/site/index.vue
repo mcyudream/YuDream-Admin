@@ -613,7 +613,7 @@ function dateText(value?: string) {
 </template>
 
 <style scoped>
-@layer yudream-site-base {
+/* 注意：不能包 @layer —— Tailwind preflight 的 *{margin:0;padding:0} 等非分层规则会压过所有分层规则 */
 .site-page {
   --yb-site-bg: #f8fafc;
   --yb-site-text: #111827;
@@ -1350,6 +1350,5 @@ function dateText(value?: string) {
     white-space: pre-wrap;
     word-break: break-word;
   }
-}
 }
 </style>
