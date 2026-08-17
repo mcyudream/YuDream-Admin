@@ -14,10 +14,17 @@ const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
 
-// 页面模板控制公开站版式：DEFAULT/DOC 保留文章头与排版容器，BLANK/LANDING 全宽裸渲染（与构建器预览一致）
+// 页面模板控制公开站版式：
+// - BLANK/LANDING：全宽裸渲染，与构建器预览一致；
+// - DEFAULT/DOC：Markdown 文章走「文章头 + 排版容器」；
+//   若页面带有整页自定义 HTML（构建器/AI 产出），则自动降级为全宽裸渲染，避免双重头部与排版挤压。
 const articleTemplate = computed(() => (page.value?.template || 'DEFAULT').toUpperCase())
-const articleHeroVisible = computed(() => articleTemplate.value === 'DEFAULT' || articleTemplate.value === 'DOC')
-const articleFullWidth = computed(() => articleTemplate.value === 'BLANK' || articleTemplate.value === 'LANDING')
+const articleHasCustomHtml = computed(() => !!page.value?.htmlContent?.trim())
+const articleProse = computed(() =>
+  !articleHasCustomHtml.value && (articleTemplate.value === 'DEFAULT' || articleTemplate.value === 'DOC'),
+)
+const articleHeroVisible = computed(() => articleProse.value)
+const articleFullWidth = computed(() => !articleProse.value)
 const publishedPages = ref<CmsPage[]>([])
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
