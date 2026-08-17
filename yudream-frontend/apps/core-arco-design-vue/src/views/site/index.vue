@@ -1129,26 +1129,32 @@ function dateText(value?: string) {
   font-weight: 700;
 }
 
-/* 排版容器仅作用于 DEFAULT 的 Markdown 正文与 DOC 模板；LANDING/BLANK 与 DEFAULT 的整页自定义 HTML 全宽渲染 */
+/* DOC 模板：带底色的紧凑标题区 + 窄栏阅读容器 */
 .site-article__doc-header {
-  padding: 40px 0 28px;
+  padding: 56px 0 40px;
+  background:
+    radial-gradient(60% 120% at 20% 0%, color-mix(in srgb, var(--yb-site-primary) 14%, transparent), transparent),
+    linear-gradient(180deg, color-mix(in srgb, var(--yb-site-primary) 8%, var(--yb-site-bg)), var(--yb-site-bg));
   border-bottom: 1px solid var(--yb-site-border);
 }
 
 .site-article__doc-header h1 {
   margin: 0;
   color: var(--yb-site-heading);
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   line-height: 1.3;
 }
 
 .site-article__doc-header p {
-  margin: 10px 0 0;
+  margin: 12px 0 0;
+  max-width: 640px;
   color: var(--yb-site-muted);
   font-size: 15px;
+  line-height: 1.7;
 }
 
+/* 排版容器仅作用于 DEFAULT 的 Markdown 正文与 DOC 模板；LANDING/BLANK 与 DEFAULT 的整页自定义 HTML 全宽渲染 */
 .site-article__body--prose {
   max-width: 860px;
   padding: 48px 0 72px;
