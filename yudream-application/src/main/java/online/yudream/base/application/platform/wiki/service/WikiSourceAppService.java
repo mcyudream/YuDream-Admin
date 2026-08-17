@@ -32,8 +32,10 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,8 +47,9 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class WikiSourceAppService {
 
-    /** Markdown 图片引用：![alt](url "可选标题") */
-    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^\\]]*]\\(\\s*(https?://[^\\s)]+?)(\\s+\"[^\"]*\")?\\s*\\)");
+    /** Markdown 图片引用：![alt](url "可选标题")；支持单/双引号标题与站内文件地址（含 dev /proxy 前缀） */
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile(
+            "!\\[[^\\]]*]\\(\\s*<?(https?://[^\\s)>]+?|/(?:proxy/)?api/files/(\\d+)/content)>?(\\s+(?:\"[^\"]*\"|'[^']*'))?\\s*\\)");
     private static final int MAX_MARKDOWN_IMAGES = 10;
 
     private final CapabilityAppService capabilities;
@@ -228,6 +231,7 @@ public class WikiSourceAppService {
         }
         Matcher matcher = MARKDOWN_IMAGE.matcher(markdown);
         Map<String, String> replacements = new LinkedHashMap<>();
+        Set<Long> seenInternalIds = new LinkedHashSet<>();
         List<WikiSourceImage> images = new ArrayList<>();
         boolean captionEnabled = StringUtils.hasText(space.getVisionProviderCode())
                 && StringUtils.hasText(space.getVisionModelCode());
@@ -237,6 +241,18 @@ public class WikiSourceAppService {
                 break;
             }
             String imageUrl = matcher.group(1);
+            String internalId = matcher.group(2);
+            if (internalId != null) {
+                // 站内文件引用：无需下载，登记为资料图片并规范化地址（去掉 dev 代理前缀）
+                Long fileObjectId = Long.valueOf(internalId);
+                if (seenInternalIds.add(fileObjectId)) {
+                    images.add(captionStored(fileObjectId, images.size(), space, aiConfig, captionEnabled));
+                }
+                if (imageUrl.startsWith("/proxy/") && !replacements.containsKey(imageUrl)) {
+                    replacements.put(imageUrl, imageUrl.substring("/proxy".length()));
+                }
+                continue;
+            }
             if (replacements.containsKey(imageUrl)) {
                 continue;
             }
@@ -256,6 +272,45 @@ public class WikiSourceAppService {
             rewritten = rewritten.replace(entry.getKey(), entry.getValue());
         }
         return new MarkdownImageIngest(rewritten, images);
+    }
+
+    /** 站内已存储图片：登记为资料图片，配置了视觉模型时读取字节生成 caption。 */
+    private WikiSourceImage captionStored(Long fileObjectId, int sequence, WikiSpace space,
+                                          Map<String, String> aiConfig, boolean captionEnabled) {
+        try {
+            FileContentDTO content = fileAppService.content(fileObjectId);
+            String contentType = StringUtils.hasText(content.getContentType()) ? content.getContentType() : "image/png";
+            if (!captionEnabled) {
+                closeQuietly(content);
+                return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.SKIPPED,
+                        space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, contentType);
+            }
+            byte[] bytes;
+            try (InputStream inputStream = content.getInputStream()) {
+                bytes = inputStream.readAllBytes();
+            }
+            String dataUrl = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(bytes);
+            String caption = visionCaptionGateway.caption(space.getVisionProviderCode(), space.getVisionModelCode(),
+                    aiConfig, dataUrl);
+            return new WikiSourceImage(fileObjectId, 0, sequence, caption, WikiCaptionStatus.CAPTIONED,
+                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, contentType);
+        }
+        catch (Exception exception) {
+            log.warn("站内图片 caption 失败 {}：{}", fileObjectId, exception.getMessage());
+            return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.FAILED,
+                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, "image/png");
+        }
+    }
+
+    private void closeQuietly(FileContentDTO content) {
+        try {
+            if (content.getInputStream() != null) {
+                content.getInputStream().close();
+            }
+        }
+        catch (Exception ignored) {
+            // 忽略关闭失败
+        }
     }
 
     private WikiSourceImage captionDownloaded(Long fileObjectId, WikiRemoteImage remote, int sequence, WikiSpace space,
