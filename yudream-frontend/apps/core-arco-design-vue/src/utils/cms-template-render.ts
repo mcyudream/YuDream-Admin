@@ -27,6 +27,24 @@ export function sanitizeCmsHtml(value?: string) {
     .replace(/javascript:/gi, '')
 }
 
+/**
+ * 剥离页面 CSS 中的全局/裸元素规则（*、body、header、a:hover 等），避免污染站点外壳的页头页脚。
+ * 带类名/ID 的选择器（如 a.yb-ai-btn、main.yb-ai-page）保留；@media 内的规则逐条处理。
+ */
+export function sanitizeCmsCss(value?: string) {
+  return (value || '').replace(/([^{}@]+)\{[^{}]*\}/g, (rule, selectors: string) => {
+    const unsafe = selectors.split(',').some((selector) => {
+      const s = selector.trim()
+      if (/^(\*|html|body)$/i.test(s)) {
+        return true
+      }
+      // 裸元素选择器（后面不带类名/ID）才判定为全局污染
+      return /^(header|footer|nav|main|section|article|aside|div|span|a|img|p|h[1-6]|ul|ol|li|button|input|summary|details|strong|em|table|thead|tbody|tr|td|th)(?![.\-#\w])/i.test(s)
+    })
+    return unsafe ? '' : rule
+  })
+}
+
 export function renderCmsMarkdown(markdown?: string) {
   const lines = escapeCmsHtml(markdown || '').split(/\r?\n/)
   const html: string[] = []

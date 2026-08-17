@@ -3,7 +3,7 @@ import type { CmsPage, CmsTemplateContext, HomePageLayout, HomeSection } from '@
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { chromeRuntimeCss, readChromeCss } from '@/utils/cms-chrome'
-import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
+import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const route = useRoute()
@@ -25,6 +25,8 @@ const articleProse = computed(() =>
 )
 const articleHeroVisible = computed(() => articleProse.value)
 const articleFullWidth = computed(() => !articleProse.value)
+// 页面自定义 CSS 注入前剥离全局/裸元素规则，保护站点页头页脚不被页面样式污染
+const articleCss = computed(() => sanitizeCmsCss(page.value?.cssContent))
 const publishedPages = ref<CmsPage[]>([])
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
@@ -551,8 +553,8 @@ function dateText(value?: string) {
           </template>
 
           <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
-            <component :is="'style'" v-if="page.cssContent">
-              {{ page.cssContent }}
+            <component :is="'style'" v-if="articleCss">
+              {{ articleCss }}
             </component>
             <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
               <div class="site-shell">
