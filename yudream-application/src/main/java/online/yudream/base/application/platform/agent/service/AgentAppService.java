@@ -32,6 +32,7 @@ import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import org.springframework.beans.factory.ObjectProvider;
@@ -273,7 +274,7 @@ public class AgentAppService {
         ensureEnabled();
         AgentApplication application = publishedApplication(cmd.getApplicationId());
         var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), null, null, null);
-        return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
+        return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
     }
 
     @Transactional(readOnly = true)
@@ -281,7 +282,7 @@ public class AgentAppService {
         ensureEnabled();
         AgentApplication application = publishedApplication(code);
         var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), null, null, null);
-        return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
+        return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
     }
 
     @Transactional(readOnly = true)
@@ -292,10 +293,35 @@ public class AgentAppService {
             Consumer<String> onDelta,
             Consumer<AiAgentToolResult> onTool
     ) {
+        return debugByCode(code, cmd, onNode, onDelta, null, onTool);
+    }
+
+    @Transactional(readOnly = true)
+    public AgentRunDTO debugByCode(
+            String code,
+            AgentRunCmd cmd,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool
+    ) {
+        return debugByCode(code, cmd, onNode, onDelta, onReasoningDelta, onTool, null);
+    }
+
+    @Transactional(readOnly = true)
+    public AgentRunDTO debugByCode(
+            String code,
+            AgentRunCmd cmd,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         ensureEnabled();
         AgentApplication application = publishedApplication(code);
-        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), onNode, onDelta, onTool);
-        return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
+        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), onNode, onDelta, onReasoningDelta, onTool, onProgress);
+        return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
     }
 
     @Transactional(readOnly = true)
@@ -305,10 +331,22 @@ public class AgentAppService {
             Consumer<String> onDelta,
             Consumer<AiAgentToolResult> onTool
     ) {
+        return debug(cmd, onNode, onDelta, null, onTool);
+    }
+
+    @Transactional(readOnly = true)
+    public AgentRunDTO debug(
+            AgentRunCmd cmd,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool
+    ) {
         ensureEnabled();
         AgentApplication application = debuggableApplication(cmd.getApplicationId());
-        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), onNode, onDelta, onTool);
-        return AgentRunDTO.builder().content(result.content()).toolResults(result.toolResults()).build();
+        var result = workflowRuntime.execute(
+                application, cmd, optionalAiConfig(), onNode, onDelta, onReasoningDelta, onTool);
+        return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
     }
 
     @Transactional(readOnly = true)

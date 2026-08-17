@@ -78,11 +78,12 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
 
         String nodePrompt = values.render(values.text(node, "prompt"), context);
         String userPrompt = stringify(values.input(node, context));
-        String image = image(node, context);
+        List<String> images = images(node, context);
         AiGenerationRequest request = new AiGenerationRequest(
                 systemPrompt(nodePrompt, node, toolMode),
                 userPrompt,
-                image,
+                null,
+                images,
                 providerCode,
                 modelCode,
                 state.aiConfig(),
@@ -98,11 +99,12 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools)) {
             generated = "understand".equals(kind)
                     ? gateway.generate(request)
-                    : gateway.generateStream(request, state::emitDelta, result -> {
+                    : gateway.generateStream(request, state::emitDelta, state::emitReasoningDelta, result -> {
                         callbackResults.add(result);
                         state.addToolResult(result);
-                    }, null);
+                    }, state::emitProgress);
         }
+        state.addUsage(generated.usage());
         addFinalToolResults(generated.toolResults(), callbackResults);
         if (toolMode == AiToolMode.REQUIRED && state.toolResultCount() == toolResultsBefore) {
             throw new BizException(node.title() + "必须调用工具后才能继续");
@@ -224,20 +226,44 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         return AiStructuredOutput.jsonSchema("agent_extract_result", outputSchema(node), false);
     }
 
-    private String image(AgentWorkflowNode node, AgentWorkflowContext context) {
+    private List<String> images(AgentWorkflowNode node, AgentWorkflowContext context) {
         if (!"vision".equals(kind)) {
-            return null;
+            return List.of();
         }
         String configuredVariable = values.text(node, "imageVariable");
         Object configured = configuredVariable.isBlank() ? null : values.resolve(configuredVariable, context);
-        String image = imageData(configured);
-        if (image == null) {
-            image = state.command().getImageDataUrl();
+        List<String> images = imageList(configured);
+        if (images.isEmpty()) {
+            images = commandImages();
         }
-        if (!StringUtils.hasText(image)) {
+        if (images.isEmpty()) {
             throw new BizException("视觉理解节点必须提供图片输入");
         }
-        return image;
+        return images;
+    }
+
+    private List<String> commandImages() {
+        List<String> configured = state.command().getImageDataUrls();
+        if (configured != null && !configured.isEmpty()) {
+            return configured.stream().filter(StringUtils::hasText).toList();
+        }
+        String single = state.command().getImageDataUrl();
+        return StringUtils.hasText(single) ? List.of(single) : List.of();
+    }
+
+    private List<String> imageList(Object value) {
+        if (value instanceof Iterable<?> values) {
+            java.util.List<String> result = new java.util.ArrayList<>();
+            for (Object item : values) {
+                String image = imageData(item);
+                if (image != null) {
+                    result.add(image);
+                }
+            }
+            return result;
+        }
+        String image = imageData(value);
+        return image == null ? List.of() : List.of(image);
     }
 
     private String imageData(Object value) {
@@ -270,8 +296,8 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         String format = switch (kind) {
             case "extract", "understand" -> "仅输出合法 JSON，不要使用 Markdown 代码块。";
             case "classify" -> "只能输出一个分类值: " + String.join("、", strings(node.data().path("classes"))) + "。";
-            case "vision" -> "基于输入图片回答用户问题。";
-            default -> "直接给出对用户有用的结果。";
+            case "vision" -> "基于输入图片回答用户问题。正文使用标准 Markdown，段落之间保留空行，语法必须完整。";
+            default -> "直接给出对用户有用的结果。正文使用标准 Markdown，段落之间保留空行，列表、标题、引用和代码块使用规范语法，不输出未闭合标记。";
         };
         String toolInstruction = toolMode == AiToolMode.REQUIRED ? "必须至少调用一次可用工具后再回答。" : "";
         return String.join("\n", List.of(applicationPrompt, runtimePrompt, role, nodePrompt, format).stream()

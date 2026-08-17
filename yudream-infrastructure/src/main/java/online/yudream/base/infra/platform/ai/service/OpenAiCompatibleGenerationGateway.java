@@ -17,6 +17,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
+import online.yudream.base.domain.platform.ai.valobj.AiUsage;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import online.yudream.base.infra.platform.ai.service.provider.ResolvedAiModel;
@@ -66,6 +67,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 @Component
@@ -111,11 +113,12 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         resolved.provider().endpointUrl(),
                         resolved.model().modelName(),
                         length(attempt.userPrompt()),
-                        StringUtils.hasText(attempt.imageDataUrl()),
+                        attempt.imageDataUrls().size(),
                         attempt.structuredOutput().mode());
-                String content = requestSpec(attempt, resolved, toolResults).call().content();
+                ChatResponse response = requestSpec(attempt, resolved, toolResults).call().chatResponse();
+                String content = response.getResult() == null ? "" : contentOf(response);
                 log.debug("AI non-stream call completed, contentLength={}, toolResults={}", length(content), toolResults.size());
-                return toResult(content, toolResults);
+                return toResult(content, toolResults, usageOf(response));
             } catch (BizException e) {
                 log.debug("AI non-stream call business error: {}", e.getMessage());
                 throw e;
@@ -140,11 +143,23 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
+        return generateStream(request, onDelta, null, onTool, onProgress);
+    }
+
+    @Override
+    public AiGenerationResult generateStream(
+            AiGenerationRequest request,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         Map<String, String> config = request.config() == null ? Map.of() : request.config();
         ResolvedAiModel resolved = resolve(config, request);
         ensureRequiredToolChoice(request, resolved);
         List<AiAgentToolResult> toolResults = Collections.synchronizedList(new ArrayList<>());
         StringBuilder content = new StringBuilder();
+        AtomicReference<AiUsage> usage = new AtomicReference<>(AiUsage.empty());
         AiGenerationRequest attempt = request;
         while (true) {
             try {
@@ -154,7 +169,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         resolved.provider().endpointUrl(),
                         resolved.model().modelName(),
                         length(attempt.userPrompt()),
-                        StringUtils.hasText(attempt.imageDataUrl()),
+                        attempt.imageDataUrls().size(),
                         attempt.structuredOutput().mode());
                 requestSpec(attempt, resolved, toolResults, onTool, onProgress)
                     .stream()
@@ -166,13 +181,19 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。");
                     })
                     .doOnNext(response -> {
+                        AiUsage chunkUsage = usageOf(response);
+                        if (chunkUsage.totalTokens() > 0) {
+                            usage.set(chunkUsage);
+                        }
                         String reasoning = reasoningDelta(response);
-                        if (StringUtils.hasText(reasoning)) {
+                        if (hasStreamDelta(reasoning)) {
                             log.debug("AI stream reasoning received, length={}, preview={}", reasoning.length(), preview(reasoning));
-                            progress(onProgress, "reasoning", reasoning);
+                            if (onReasoningDelta != null) {
+                                onReasoningDelta.accept(reasoning);
+                            }
                         }
                         String delta = contentDelta(response);
-                        if (!StringUtils.hasText(delta)) {
+                        if (!hasStreamDelta(delta)) {
                             return;
                         }
                         if (content.isEmpty()) {
@@ -188,11 +209,17 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         .blockLast(aiClientProperties.getReadTimeout());
                 log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
                 progress(onProgress, "complete", "AI 处理完成。");
-                return toResult(content.toString(), toolResults);
+                return toResult(content.toString(), toolResults, usage.get());
             } catch (BizException e) {
                 log.debug("AI stream call business error: {}", e.getMessage());
                 throw e;
             } catch (Exception e) {
+                if (isInterruption(e)) {
+                    // blockLast 被线程中断时已经取消订阅；保留中断标志并直接转业务异常，
+                    // 避免中断信号被 structuredOutputFallback 误判为格式不支持而重试。
+                    Thread.currentThread().interrupt();
+                    throw new BizException("AI 流式调用已取消");
+                }
                 AiGenerationRequest fallback = content.isEmpty() && toolResults.isEmpty()
                         ? structuredOutputFallback(attempt, e)
                         : null;
@@ -206,6 +233,10 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 throw new BizException("AI 流式调用异常：" + explainException(e));
             }
         }
+    }
+
+    static boolean hasStreamDelta(String delta) {
+        return delta != null && !delta.isEmpty();
     }
 
     static AiGenerationRequest structuredOutputFallback(AiGenerationRequest request, Throwable error) {
@@ -342,7 +373,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .messages(historyMessages(request.history()))
                 .user(user -> {
                     user.text(request.userPrompt());
-                    imageMedia(request.imageDataUrl()).ifPresent(user::media);
+                    for (String image : request.imageDataUrls()) {
+                        imageMedia(image).ifPresent(user::media);
+                    }
                 });
         if (!callbacks.isEmpty()) {
             log.debug("AI tool callbacks registered, count={}, names={}",
@@ -456,7 +489,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         AiAgentToolDescriptor descriptor = tool.descriptor();
         return FunctionToolCallback.<Map<String, Object>, AiAgentToolResult>builder(safeToolName(descriptor.name()), args -> {
                     Map<String, Object> arguments = args == null ? Map.of() : args;
-                    progress(onProgress, "tool-start", "正在调用工具：" + descriptor.title());
+                    progress(onProgress, "tool-start", toolProgressMessage("正在调用工具", descriptor, arguments));
                     log.debug("AI tool call start, tool={}, action={}, argsKeys={}",
                             descriptor.name(),
                             arguments.get("action"),
@@ -466,7 +499,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                     if (onTool != null) {
                         onTool.accept(result);
                     }
-                    progress(onProgress, "tool-complete", "工具调用完成：" + descriptor.title());
+                    progress(onProgress, "tool-complete", toolProgressMessage("工具调用完成", descriptor, arguments));
                     log.debug("AI tool call completed, tool={}, action={}, payloadKeys={}",
                             result.toolName(),
                             result.action(),
@@ -553,11 +586,32 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         return messages;
     }
 
-    static AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
+    static AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults, AiUsage usage) {
         if (toolResults != null && !toolResults.isEmpty()) {
-            return new AiGenerationResult("", summary(content, toolResults), "", "", "", "", "", List.of(), List.copyOf(toolResults));
+            return AiGenerationResult.of(summary(content, toolResults), toolResults, usage);
         }
-        return new AiGenerationResult("", content == null ? "" : content.trim(), "", "", "", "", "", List.of(), List.of());
+        return AiGenerationResult.of(content == null ? "" : content.trim(), List.of(), usage);
+    }
+
+    static AiGenerationResult toResult(String content, List<AiAgentToolResult> toolResults) {
+        return toResult(content, toolResults, AiUsage.empty());
+    }
+
+    private static String contentOf(ChatResponse response) {
+        return response == null || response.getResult() == null || response.getResult().getOutput() == null
+                ? ""
+                : response.getResult().getOutput().getText();
+    }
+
+    private static AiUsage usageOf(ChatResponse response) {
+        if (response == null || response.getMetadata() == null || response.getMetadata().getUsage() == null) {
+            return AiUsage.empty();
+        }
+        org.springframework.ai.chat.metadata.Usage usage = response.getMetadata().getUsage();
+        long prompt = usage.getPromptTokens() == null ? 0 : usage.getPromptTokens();
+        long completion = usage.getCompletionTokens() == null ? 0 : usage.getCompletionTokens();
+        long total = usage.getTotalTokens() == null ? prompt + completion : usage.getTotalTokens();
+        return new AiUsage(prompt, completion, total);
     }
 
     private boolean allowed(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context) {
@@ -636,6 +690,28 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
     }
 
+    /** 工具进度带上参数里的摘要/标题（如 CMS 区块名），让前端展示「正在构建：Hero 区块」。 */
+    private String toolProgressMessage(String prefix, AiAgentToolDescriptor descriptor, Map<String, Object> arguments) {
+        String detail = firstText(
+                stringArg(arguments, "summary"),
+                stringArg(arguments, "title"),
+                stringArg(arguments, "blockTitle"),
+                stringArg(arguments, "presetCode"),
+                stringArg(arguments, "action")
+        );
+        String base = prefix + "：" + descriptor.title();
+        if (!StringUtils.hasText(detail)) {
+            return base;
+        }
+        String normalized = detail.replaceAll("\\s+", " ").trim();
+        return base + "（" + (normalized.length() > 60 ? normalized.substring(0, 60) + "…" : normalized) + "）";
+    }
+
+    private String stringArg(Map<String, Object> arguments, String key) {
+        Object value = arguments == null ? null : arguments.get(key);
+        return value instanceof String text ? text : "";
+    }
+
     private String safeToolName(String name) {
         return name.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
@@ -669,6 +745,10 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             current = current.getCause();
         }
         return false;
+    }
+
+    private boolean isInterruption(Throwable error) {
+        return Thread.currentThread().isInterrupted() || hasCause(error, InterruptedException.class);
     }
 
     private String explainResponseException(Throwable error) {

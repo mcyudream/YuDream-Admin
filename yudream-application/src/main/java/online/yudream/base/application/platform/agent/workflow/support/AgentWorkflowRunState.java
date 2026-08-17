@@ -3,6 +3,8 @@ package online.yudream.base.application.platform.agent.workflow.support;
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
+import online.yudream.base.domain.platform.ai.valobj.AiUsage;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 
 import java.util.ArrayList;
@@ -17,9 +19,13 @@ public final class AgentWorkflowRunState {
     private final Map<String, String> aiConfig;
     private final Set<String> systemToolCodes;
     private final Consumer<String> onDelta;
+    private final Consumer<String> onReasoningDelta;
     private final Consumer<AiAgentToolResult> onTool;
+    private final Consumer<AiGenerationProgress> onProgress;
     private final AgentModelToolResolver modelToolResolver;
     private final List<AiAgentToolResult> toolResults = new ArrayList<>();
+    private final StringBuilder reasoning = new StringBuilder();
+    private AiUsage usage = AiUsage.empty();
 
     public AgentWorkflowRunState(
             AgentApplication application,
@@ -41,12 +47,41 @@ public final class AgentWorkflowRunState {
             Consumer<AiAgentToolResult> onTool,
             AgentModelToolResolver modelToolResolver
     ) {
+        this(application, command, aiConfig, systemToolCodes, onDelta, null, onTool, modelToolResolver);
+    }
+
+    public AgentWorkflowRunState(
+            AgentApplication application,
+            AgentRunCmd command,
+            Map<String, String> aiConfig,
+            Set<String> systemToolCodes,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            AgentModelToolResolver modelToolResolver
+    ) {
+        this(application, command, aiConfig, systemToolCodes, onDelta, onReasoningDelta, onTool, null, modelToolResolver);
+    }
+
+    public AgentWorkflowRunState(
+            AgentApplication application,
+            AgentRunCmd command,
+            Map<String, String> aiConfig,
+            Set<String> systemToolCodes,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress,
+            AgentModelToolResolver modelToolResolver
+    ) {
         this.application = application;
         this.command = command;
         this.aiConfig = aiConfig == null ? Map.of() : Map.copyOf(aiConfig);
         this.systemToolCodes = systemToolCodes == null ? Set.of() : Set.copyOf(systemToolCodes);
         this.onDelta = onDelta;
+        this.onReasoningDelta = onReasoningDelta;
         this.onTool = onTool;
+        this.onProgress = onProgress;
         this.modelToolResolver = modelToolResolver;
     }
 
@@ -70,6 +105,16 @@ public final class AgentWorkflowRunState {
         return List.copyOf(toolResults);
     }
 
+    public AiUsage usage() {
+        return usage;
+    }
+
+    public void addUsage(AiUsage value) {
+        if (value != null) {
+            this.usage = this.usage.plus(value);
+        }
+    }
+
     /** Each model node resolves and scopes its own callbacks immediately before generation. */
     public List<AiAgentTool> resolveModelTools(List<String> toolCodes) {
         if (modelToolResolver == null) {
@@ -85,6 +130,27 @@ public final class AgentWorkflowRunState {
     public void emitDelta(String delta) {
         if (onDelta != null && delta != null && !delta.isEmpty()) {
             onDelta.accept(delta);
+        }
+    }
+
+    public String reasoning() {
+        return reasoning.toString();
+    }
+
+    public void emitReasoningDelta(String delta) {
+        if (delta == null || delta.isEmpty()) {
+            return;
+        }
+        reasoning.append(delta);
+        if (onReasoningDelta != null) {
+            onReasoningDelta.accept(delta);
+        }
+    }
+
+    /** 透传模型网关的细粒度进度（工具开始/完成、首个增量等）。 */
+    public void emitProgress(AiGenerationProgress progress) {
+        if (progress != null && onProgress != null) {
+            onProgress.accept(progress);
         }
     }
 

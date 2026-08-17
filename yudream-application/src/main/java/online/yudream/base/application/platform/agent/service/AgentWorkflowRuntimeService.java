@@ -36,6 +36,7 @@ import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.document.service.DocumentTextExtractor;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import org.springframework.beans.factory.ObjectProvider;
@@ -68,6 +69,31 @@ public class AgentWorkflowRuntimeService {
             Consumer<String> onDelta,
             Consumer<AiAgentToolResult> onTool
     ) {
+        return execute(application, command, aiConfig, onNode, onDelta, null, onTool);
+    }
+
+    public AgentWorkflowRuntimeResult execute(
+            AgentApplication application,
+            AgentRunCmd command,
+            Map<String, String> aiConfig,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool
+    ) {
+        return execute(application, command, aiConfig, onNode, onDelta, onReasoningDelta, onTool, null);
+    }
+
+    public AgentWorkflowRuntimeResult execute(
+            AgentApplication application,
+            AgentRunCmd command,
+            Map<String, String> aiConfig,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         List<AiAgentTool> systemTools = systemToolProvider.stream().toList();
         Set<String> systemToolCodes = systemTools.stream()
                 .map(tool -> tool.descriptor().name())
@@ -81,7 +107,9 @@ public class AgentWorkflowRuntimeService {
                 aiConfig,
                 systemToolCodes,
                 onDelta,
+                onReasoningDelta,
                 onTool,
+                onProgress,
                 new AgentModelToolResolver(toolExecutor)
         );
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
@@ -102,7 +130,7 @@ public class AgentWorkflowRuntimeService {
                 .map(node -> execution.context().nodeOutput(node.id()))
                 .reduce((left, right) -> right)
                 .orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("工作流未执行结束节点"));
-        return new AgentWorkflowRuntimeResult(content(output), state.toolResults());
+        return new AgentWorkflowRuntimeResult(content(output), state.reasoning(), state.toolResults(), state.usage());
     }
 
     private List<AgentWorkflowNodeHandler> handlers(
@@ -241,6 +269,12 @@ public class AgentWorkflowRuntimeService {
         variables.put("attachments", attachments);
         variables.put("attachment", attachments.isEmpty() ? Map.of() : attachments.getFirst());
         variables.put("imageDataUrl", command.getImageDataUrl() == null ? "" : command.getImageDataUrl());
+        List<String> imageDataUrls = command.getImageDataUrls() == null || command.getImageDataUrls().isEmpty()
+                ? (command.getImageDataUrl() == null || command.getImageDataUrl().isBlank()
+                    ? List.of()
+                    : List.of(command.getImageDataUrl()))
+                : command.getImageDataUrls();
+        variables.put("imageDataUrls", imageDataUrls);
         return new AgentWorkflowInitialInput(command.getInput() == null ? "" : command.getInput(), variables);
     }
 

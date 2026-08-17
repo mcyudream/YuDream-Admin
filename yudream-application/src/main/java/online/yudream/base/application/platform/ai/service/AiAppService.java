@@ -110,7 +110,8 @@ public class AiAppService {
                         event -> progress(onProgress, progressAction(event), progressContent(event)),
                         onDelta,
                         onReasoningDelta,
-                        onTool
+                        onTool,
+                        onProgress
                 )
                 : agentAppService.runByCode(agentCode, agentCmd);
         ensureCanvasValidationPassed(result.getToolResults());
