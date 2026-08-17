@@ -16,8 +16,10 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiCaptionStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiSourceFormat;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
+import online.yudream.base.domain.platform.wiki.service.WikiRemoteImageFetcher;
 import online.yudream.base.domain.platform.wiki.service.WikiVisionCaptionGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiWebPageFetcher;
+import online.yudream.base.domain.platform.wiki.valobj.WikiRemoteImage;
 import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebPage;
 import org.springframework.stereotype.Service;
@@ -29,8 +31,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 原始资料来源管理：上传、URL/批量导入、删除级联、重新生成图片 caption。
@@ -40,6 +45,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WikiSourceAppService {
 
+    /** Markdown 图片引用：![alt](url "可选标题") */
+    private static final Pattern MARKDOWN_IMAGE = Pattern.compile("!\\[[^\\]]*]\\(\\s*(https?://[^\\s)]+?)(\\s+\"[^\"]*\")?\\s*\\)");
+    private static final int MAX_MARKDOWN_IMAGES = 10;
+
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final WikiSpaceRepo spaceRepo;
@@ -47,6 +56,7 @@ public class WikiSourceAppService {
     private final FileAppService fileAppService;
     private final WikiSourceExtractionService extractionService;
     private final WikiWebPageFetcher webPageFetcher;
+    private final WikiRemoteImageFetcher remoteImageFetcher;
     private final WikiVisionCaptionGateway visionCaptionGateway;
     private final WikiIngestAppService ingestAppService;
 
@@ -123,11 +133,15 @@ public class WikiSourceAppService {
     @Transactional
     public WikiSourceDTO createText(Long spaceId, String folderPath, String title, String content) {
         enabled();
-        space(spaceId);
+        WikiSpace space = space(spaceId);
         if (!StringUtils.hasText(content)) {
             throw new BizException("资料内容不能为空");
         }
-        WikiSource saved = sourceRepo.save(WikiSource.text(spaceId, folderPath, title, content, sha256(content)));
+        // 在线 Markdown 编辑的资料同样摄取其中引用的远程图片：下载入库、可生成 caption、重写为站内地址
+        MarkdownImageIngest ingest = ingestMarkdownImages(space, content);
+        WikiSource source = WikiSource.text(spaceId, folderPath, title, ingest.markdown(), sha256(ingest.markdown()));
+        source.markExtracted(ingest.markdown(), ingest.images());
+        WikiSource saved = sourceRepo.save(source);
         ingestAppService.enqueueIngest(spaceId, saved.getId());
         return WikiKnowledgeAssembler.source(saved);
     }
@@ -139,7 +153,9 @@ public class WikiSourceAppService {
         if (!StringUtils.hasText(content)) {
             throw new BizException("资料内容不能为空");
         }
-        source.updateText(title, content, sha256(content));
+        MarkdownImageIngest ingest = ingestMarkdownImages(space(source.getSpaceId()), content);
+        source.updateText(title, ingest.markdown(), sha256(ingest.markdown()));
+        source.markExtracted(ingest.markdown(), ingest.images());
         WikiSource saved = sourceRepo.save(source);
         ingestAppService.enqueueIngest(saved.getSpaceId(), saved.getId());
         return WikiKnowledgeAssembler.source(saved);
@@ -201,6 +217,68 @@ public class WikiSourceAppService {
                     WikiCaptionStatus.FAILED, image.captionProviderCode(), image.captionModelCode(),
                     image.width(), image.height(), image.contentType());
         }
+    }
+
+    /**
+     * 摄取在线 Markdown 中引用的远程图片：下载入库（图片重写为站内地址），并按知识库视觉配置生成 caption。
+     */
+    private MarkdownImageIngest ingestMarkdownImages(WikiSpace space, String markdown) {
+        if (!StringUtils.hasText(markdown)) {
+            return new MarkdownImageIngest(markdown, List.of());
+        }
+        Matcher matcher = MARKDOWN_IMAGE.matcher(markdown);
+        Map<String, String> replacements = new LinkedHashMap<>();
+        List<WikiSourceImage> images = new ArrayList<>();
+        boolean captionEnabled = StringUtils.hasText(space.getVisionProviderCode())
+                && StringUtils.hasText(space.getVisionModelCode());
+        Map<String, String> aiConfig = captionEnabled ? aiConfig() : Map.of();
+        while (matcher.find()) {
+            if (images.size() >= MAX_MARKDOWN_IMAGES) {
+                break;
+            }
+            String imageUrl = matcher.group(1);
+            if (replacements.containsKey(imageUrl)) {
+                continue;
+            }
+            try {
+                WikiRemoteImage remote = remoteImageFetcher.fetch(imageUrl);
+                Long fileObjectId = fileAppService.upload(new java.io.ByteArrayInputStream(remote.content()),
+                        remote.fileName(), remote.contentType(), remote.content().length, "wiki-image", null, true).getId();
+                replacements.put(imageUrl, "/api/files/" + fileObjectId + "/content");
+                images.add(captionDownloaded(fileObjectId, remote, images.size(), space, aiConfig, captionEnabled));
+            }
+            catch (Exception exception) {
+                log.warn("Markdown 图片摄取失败 {}：{}", imageUrl, exception.getMessage());
+            }
+        }
+        String rewritten = markdown;
+        for (Map.Entry<String, String> entry : replacements.entrySet()) {
+            rewritten = rewritten.replace(entry.getKey(), entry.getValue());
+        }
+        return new MarkdownImageIngest(rewritten, images);
+    }
+
+    private WikiSourceImage captionDownloaded(Long fileObjectId, WikiRemoteImage remote, int sequence, WikiSpace space,
+                                              Map<String, String> aiConfig, boolean captionEnabled) {
+        if (!captionEnabled) {
+            return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.SKIPPED,
+                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
+        }
+        try {
+            String dataUrl = "data:" + remote.contentType() + ";base64," + Base64.getEncoder().encodeToString(remote.content());
+            String caption = visionCaptionGateway.caption(space.getVisionProviderCode(), space.getVisionModelCode(),
+                    aiConfig, dataUrl);
+            return new WikiSourceImage(fileObjectId, 0, sequence, caption, WikiCaptionStatus.CAPTIONED,
+                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
+        }
+        catch (Exception exception) {
+            log.warn("图片 caption 失败：{}", exception.getMessage());
+            return new WikiSourceImage(fileObjectId, 0, sequence, null, WikiCaptionStatus.FAILED,
+                    space.getVisionProviderCode(), space.getVisionModelCode(), 0, 0, remote.contentType());
+        }
+    }
+
+    private record MarkdownImageIngest(String markdown, List<WikiSourceImage> images) {
     }
 
     private Map<String, String> aiConfig() {
