@@ -53,6 +53,16 @@ function onProviderChange(field: 'chat' | 'ingest' | 'vision' | 'embedding' | 'g
   const providerCode = typeof value === 'string' ? value : ''
   ;(form.value as Record<string, unknown>)[`${field}ProviderCode`] = providerCode || undefined
   ;(form.value as Record<string, unknown>)[`${field}ModelCode`] = undefined
+  if (!providerCode) {
+    return
+  }
+  // 自动选中该供应商下的默认/首个可用模型，避免只选供应商导致模型为空（后端要求成对配置）
+  const filterMap = { chat: chatFilter, ingest: chatFilter, vision: visionFilter, embedding: embeddingFilter, graph: chatFilter }
+  const candidates = models.value.filter(model => model.providerCode === providerCode && filterMap[field](model))
+  const preferred = candidates.find(model => model.defaultModel) || candidates[0]
+  if (preferred) {
+    ;(form.value as Record<string, unknown>)[`${field}ModelCode`] = preferred.modelCode
+  }
 }
 
 const webSearchProviderOptions = [
@@ -84,6 +94,19 @@ async function loadCatalog() {
 async function save() {
   if (!form.value.id) {
     return
+  }
+  // 保存兜底：供应商已选但模型为空时，用目录中的默认/首个模型补齐（后端要求 provider+model 成对）
+  const filterMap = { chat: chatFilter, ingest: chatFilter, vision: visionFilter, embedding: embeddingFilter, graph: chatFilter }
+  for (const field of Object.keys(filterMap) as (keyof typeof filterMap)[]) {
+    const record = form.value as Record<string, unknown>
+    const providerCode = record[`${field}ProviderCode`]
+    if (typeof providerCode === 'string' && providerCode && !record[`${field}ModelCode`]) {
+      const candidates = models.value.filter(model => model.providerCode === providerCode && filterMap[field](model))
+      const preferred = candidates.find(model => model.defaultModel) || candidates[0]
+      if (preferred) {
+        record[`${field}ModelCode`] = preferred.modelCode
+      }
+    }
   }
   saving.value = true
   try {
