@@ -114,6 +114,15 @@ public class AiWebAssembler {
                 .build();
     }
 
+    /** 深度思考增量：AG-UI THINKING_TEXT_MESSAGE_CONTENT，前端独立于正文流式渲染。 */
+    public static AguiStreamEventRes toAguiThinkingChunk(String traceId, String content) {
+        return agui("THINKING_TEXT_MESSAGE_CONTENT", traceId)
+                .messageId("assistant-" + traceId)
+                .role("assistant")
+                .delta(content == null ? "" : content)
+                .build();
+    }
+
     public static AguiStreamEventRes toAguiActivitySnapshot(String traceId, String action, String content) {
         return agui("ACTIVITY_SNAPSHOT", traceId)
                 .messageId("activity-" + traceId)

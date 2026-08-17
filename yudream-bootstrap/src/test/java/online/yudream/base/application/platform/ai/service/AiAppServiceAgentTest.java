@@ -25,7 +25,7 @@ class AiAppServiceAgentTest {
     void delegatesCmsGenerationToSelectedAgentWithRuntimeContext() {
         CapabilityAppService capabilities = mock(CapabilityAppService.class);
         AgentAppService agents = mock(AgentAppService.class);
-        when(agents.debugByCode(eq(BuiltinAgentCodes.CMS_BUILDER), any(), any(), any(), any()))
+        when(agents.debugByCode(eq(BuiltinAgentCodes.CMS_BUILDER), any(), any(), any(), any(), any()))
                 .thenReturn(AgentRunDTO.builder().content("完成").toolResults(List.of()).build());
         AiAppService service = new AiAppService(capabilities, agents);
         CmsPageGenerateCmd command = new CmsPageGenerateCmd();
@@ -40,7 +40,7 @@ class AiAppServiceAgentTest {
 
         assertThat(result.getSummary()).isEqualTo("完成");
         ArgumentCaptor<AgentRunCmd> agentCommand = ArgumentCaptor.forClass(AgentRunCmd.class);
-        verify(agents).debugByCode(eq(BuiltinAgentCodes.CMS_BUILDER), agentCommand.capture(), any(), any(), any());
+        verify(agents).debugByCode(eq(BuiltinAgentCodes.CMS_BUILDER), agentCommand.capture(), any(), any(), any(), any());
         assertThat(agentCommand.getValue().isPermissionContextExplicit()).isTrue();
         assertThat(agentCommand.getValue().getPermissionCodes()).containsExactly("platform:cms:edit");
     }
