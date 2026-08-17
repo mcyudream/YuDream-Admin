@@ -45,6 +45,63 @@ export function sanitizeCmsCss(value?: string) {
   })
 }
 
+/**
+ * 给页面 CSS 的每条规则加作用域前缀（如 .site-article），让页面样式：
+ * 1. 不外溢到站点页头/页脚与其它页面；
+ * 2. 凭借更高优先级压过外壳/历史遗留的全局同名类。
+ * @media/@supports 等条件规则递归处理内部；@keyframes/@font-face 原样保留。
+ */
+export function scopeCmsCss(value: string | undefined, scope: string): string {
+  const css = value || ''
+  let result = ''
+  let index = 0
+  while (index < css.length) {
+    const braceOpen = css.indexOf('{', index)
+    if (braceOpen === -1) {
+      result += css.slice(index)
+      break
+    }
+    const selector = css.slice(index, braceOpen).trim()
+    let depth = 1
+    let cursor = braceOpen + 1
+    while (cursor < css.length && depth > 0) {
+      if (css[cursor] === '{') {
+        depth++
+      }
+      else if (css[cursor] === '}') {
+        depth--
+      }
+      cursor++
+    }
+    const body = css.slice(braceOpen + 1, cursor - 1)
+    index = cursor
+    if (!selector) {
+      continue
+    }
+    if (/^@(media|supports|layer|container)\b/i.test(selector)) {
+      result += `${selector}{${scopeCmsCss(body, scope)}}`
+    }
+    else if (/^@/.test(selector)) {
+      // @keyframes/@font-face 等：内部不是选择器规则，原样保留
+      result += `${selector}{${body}}`
+    }
+    else {
+      const scoped = selector.split(',').map((part) => {
+        const item = part.trim()
+        if (!item) {
+          return scope
+        }
+        if (/^(:root|html|body)\b/i.test(item)) {
+          return item.replace(/^(:root|html|body)\b/i, scope)
+        }
+        return `${scope} ${item}`
+      }).join(', ')
+      result += `${scoped} { ${body.trim()} }\n`
+    }
+  }
+  return result
+}
+
 export function renderCmsMarkdown(markdown?: string) {
   const lines = escapeCmsHtml(markdown || '').split(/\r?\n/)
   const html: string[] = []
