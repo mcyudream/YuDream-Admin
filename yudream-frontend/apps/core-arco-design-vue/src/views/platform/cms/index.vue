@@ -51,6 +51,14 @@ const search = reactive({ keyword: '' })
 const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
 const selectedPageId = ref<string | null>(null)
 const showAllVariables = ref(false)
+type PublishTab = 'publish' | 'seo' | 'js' | 'variables'
+const publishTab = ref<PublishTab>('publish')
+const publishTabs: { label: string, value: PublishTab, icon: string }[] = [
+  { label: '发布', value: 'publish', icon: 'i-ri:send-plane-line' },
+  { label: 'SEO', value: 'seo', icon: 'i-ri:search-eye-line' },
+  { label: 'JS', value: 'js', icon: 'i-ri:code-line' },
+  { label: '变量', value: 'variables', icon: 'i-ri:braces-line' },
+]
 
 const pageForm = reactive<CmsPagePayload>({
   title: '',
@@ -260,6 +268,7 @@ const cmsVariables = [
   { key: 'data-yb-repeat="cms.pages.latest"', label: '循环最新 CMS 页面' },
   { key: 'data-yb-repeat="knowledge.pages"', label: '循环知识库页面' },
   { key: 'data-yb-repeat="knowledge.latest"', label: '循环最新知识库内容' },
+  { key: 'data-yb-repeat="knowledge.featured"', label: '循环编辑推荐知识库内容' },
   { key: 'data-yb-repeat="knowledge.spaces"', label: '循环公开知识库' },
 ]
 
@@ -337,7 +346,7 @@ async function loadWikiNavigation() {
 function emptyTemplateContext(): CmsTemplateContext {
   return {
     cms: { pages: { latest: [] } },
-    knowledge: { spaces: [], pages: [], latest: [] },
+    knowledge: { spaces: [], pages: [], latest: [], featured: [] },
   }
 }
 
@@ -860,30 +869,80 @@ function sectionTitle(type: HomeSectionType) {
             </div>
           </div>
 
-          <section v-if="editorMode === 'builder'" class="builder-entry">
-            <div>
-              <span class="builder-entry__status">{{ builderContentStatus }}</span>
-              <h2>可视化页面构建器</h2>
-              <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS、JS 和可继续编辑的 Project JSON。</p>
-            </div>
-            <div class="builder-entry__actions">
-              <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
-                <FaIcon name="i-ri:drag-drop-line" />
-                打开构建器
-              </FaButton>
-              <FaButton variant="outline" @click="editorMode = 'html'">
-                <FaIcon name="i-ri:code-s-slash-line" />
-                查看 HTML
-              </FaButton>
-            </div>
-          </section>
+          <template v-if="editorMode === 'builder'">
+            <section class="builder-entry">
+              <div>
+                <span class="builder-entry__status">{{ builderContentStatus }}</span>
+                <h2>可视化页面构建器</h2>
+                <p>使用 GrapesJS 设计页面，发布时会保存 HTML、CSS、JS 和可继续编辑的 Project JSON。</p>
+              </div>
+              <div class="builder-entry__actions">
+                <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('page')">
+                  <FaIcon name="i-ri:drag-drop-line" />
+                  打开构建器
+                </FaButton>
+                <FaButton variant="outline" @click="editorMode = 'html'">
+                  <FaIcon name="i-ri:code-s-slash-line" />
+                  查看 HTML
+                </FaButton>
+              </div>
+            </section>
+            <section class="cms-runtime-overview">
+              <div class="runtime-overview__head">
+                <div>
+                  <span>YD 内容引擎</span>
+                  <strong>{{ aiEnabled ? '已连接 YuDream YD 页面引擎' : '等待发布内置 CMS Agent' }}</strong>
+                </div>
+                <FaTag :variant="aiEnabled ? 'default' : 'secondary'">{{ aiEnabled ? '可用' : '未就绪' }}</FaTag>
+              </div>
+              <div class="runtime-overview__grid">
+                <article>
+                  <FaIcon name="i-ri:time-line" />
+                  <strong>{{ templateContext.knowledge.latest.length }}</strong>
+                  <span>最新 Wiki 条目</span>
+                </article>
+                <article>
+                  <FaIcon name="i-ri:star-line" />
+                  <strong>{{ templateContext.knowledge.featured.length }}</strong>
+                  <span>编辑推荐条目</span>
+                </article>
+                <article>
+                  <FaIcon name="i-ri:article-line" />
+                  <strong>{{ templateContext.cms.pages.latest.length }}</strong>
+                  <span>最新 CMS 页面</span>
+                </article>
+              </div>
+              <div class="runtime-content-list">
+                <a v-for="item in templateContext.knowledge.latest.slice(0, 5)" :key="item.id" :href="item.url" target="_blank" rel="noopener noreferrer">
+                  <span><strong>{{ item.title }}</strong><small>{{ item.summary || item.excerpt || '暂无摘要' }}</small></span>
+                  <time>{{ dateText(item.publishedAt || item.updatedAt || item.createdAt) }}</time>
+                </a>
+                <div v-if="!templateContext.knowledge.latest.length" class="runtime-content-empty">发布 Wiki 页面后，最新内容会在此供 YD 引擎动态渲染。</div>
+              </div>
+            </section>
+          </template>
 
           <CmsMarkdownEditor v-else-if="editorMode === 'markdown'" v-model="pageForm.markdownContent" />
           <FaTextarea v-else v-model="pageForm.htmlContent" rows="22" input-class="font-mono" placeholder="<main>...</main>" />
         </main>
 
         <aside class="publish-panel">
-          <section>
+          <nav class="publish-panel__tabs" role="tablist" aria-label="页面设置">
+            <button
+              v-for="tab in publishTabs"
+              :key="tab.value"
+              type="button"
+              role="tab"
+              :class="{ active: publishTab === tab.value }"
+              :aria-selected="publishTab === tab.value"
+              @click="publishTab = tab.value"
+            >
+              <FaIcon :name="tab.icon" />
+              {{ tab.label }}
+            </button>
+          </nav>
+
+          <section v-if="publishTab === 'publish'" class="publish-panel__section">
             <h3>发布</h3>
             <a-form :model="pageForm" layout="vertical">
               <a-form-item label="路径">
@@ -930,7 +989,7 @@ function sectionTitle(type: HomeSectionType) {
             </div>
           </section>
 
-          <section>
+          <section v-else-if="publishTab === 'seo'" class="publish-panel__section">
             <h3>SEO 与封面</h3>
             <a-form :model="pageForm" layout="vertical">
               <a-form-item label="摘要">
@@ -951,7 +1010,7 @@ function sectionTitle(type: HomeSectionType) {
             </a-form>
           </section>
 
-          <section>
+          <section v-else-if="publishTab === 'js'" class="publish-panel__section">
             <h3>页面 JS</h3>
             <FaTextarea
               v-model="pageForm.jsContent"
@@ -961,7 +1020,7 @@ function sectionTitle(type: HomeSectionType) {
             />
           </section>
 
-          <section>
+          <section v-else-if="publishTab === 'variables'" class="publish-panel__section">
             <div class="panel-title-row">
               <h3>动态变量</h3>
               <button type="button" @click="showAllVariables = !showAllVariables">
@@ -1251,8 +1310,8 @@ function sectionTitle(type: HomeSectionType) {
 
 .cms-tabs button.active,
 .editor-mode button.active {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
 }
 
 .public-link {
@@ -1262,7 +1321,7 @@ function sectionTitle(type: HomeSectionType) {
 
 .cms-layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(300px, 340px);
   gap: 16px;
   align-items: start;
 }
@@ -1276,6 +1335,8 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .page-list {
+  position: sticky;
+  top: 16px;
   padding: 12px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
@@ -1288,7 +1349,7 @@ function sectionTitle(type: HomeSectionType) {
 
 .page-list__items {
   display: grid;
-  gap: 6px;
+  gap: 10px;
   margin-top: 12px;
   max-height: calc(100vh - 270px);
   overflow: auto;
@@ -1313,8 +1374,8 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .page-list-card.active {
-  border-color: rgb(var(--primary-6));
-  box-shadow: inset 3px 0 0 rgb(var(--primary-6)), 0 4px 12px rgba(var(--primary-6), 0.08);
+  border-color: var(--color-text-1);
+  box-shadow: inset 3px 0 0 var(--color-text-1), 0 4px 12px color-mix(in srgb, var(--color-fill-2), transparent 8%);
 }
 
 .page-list-card__main {
@@ -1368,7 +1429,7 @@ function sectionTitle(type: HomeSectionType) {
 .page-list-card__actions a:hover,
 .page-list-card__actions button:hover {
   background: var(--color-fill-2);
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
 }
 
 .page-list-card__meta :deep([data-slot="tag"]) {
@@ -1387,9 +1448,15 @@ function sectionTitle(type: HomeSectionType) {
   font-weight: 800;
 }
 
+.page-editor {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
 .editor-top {
   justify-content: space-between;
-  margin-bottom: 12px;
 }
 
 .editor-mode {
@@ -1436,7 +1503,7 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .builder-entry__status {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   font-size: 12px;
   font-weight: 800;
 }
@@ -1446,8 +1513,109 @@ function sectionTitle(type: HomeSectionType) {
   flex-wrap: wrap;
 }
 
-.builder-block,
-.publish-panel section {
+.cms-runtime-overview {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.runtime-overview__head,
+.runtime-content-list a {
+  display: flex;
+  min-width: 0;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.runtime-overview__head > div,
+.runtime-content-list a > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.runtime-overview__head span,
+.runtime-content-list small,
+.runtime-content-list time,
+.runtime-content-empty {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.runtime-overview__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.runtime-overview__grid article {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 8px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+}
+
+.runtime-overview__grid article > :deep(svg) {
+  grid-row: 1 / 3;
+  color: var(--color-text-2);
+  font-size: 20px;
+}
+
+.runtime-overview__grid strong {
+  font-size: 18px;
+}
+
+.runtime-overview__grid span {
+  color: var(--color-text-3);
+  font-size: 11px;
+}
+
+.runtime-content-list {
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+}
+
+.runtime-content-list a {
+  padding: 10px 12px;
+  color: var(--color-text-1);
+  text-decoration: none;
+}
+
+.runtime-content-list a + a {
+  border-top: 1px solid var(--color-border-2);
+}
+
+.runtime-content-list a:hover {
+  background: var(--color-fill-1);
+}
+
+.runtime-content-list strong,
+.runtime-content-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.runtime-content-list time {
+  flex-shrink: 0;
+}
+
+.runtime-content-empty {
+  padding: 18px;
+  text-align: center;
+}
+
+.builder-block {
   display: grid;
   gap: 12px;
   padding: 18px;
@@ -1495,8 +1663,64 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .publish-panel {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  max-height: calc(100vh - 130px);
+  overflow: hidden auto;
+  align-content: start;
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-2);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.publish-panel__tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
+}
+
+.publish-panel__tabs button {
+  display: inline-flex;
+  min-width: 0;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.publish-panel__tabs button:hover {
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
+}
+
+.publish-panel__tabs button.active {
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.publish-panel__section {
   display: grid;
   gap: 12px;
+  align-content: start;
+  padding: 16px;
 }
 
 .publish-panel h3 {
@@ -1512,7 +1736,7 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .panel-title-row button {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   font-size: 12px;
 }
 
@@ -1522,7 +1746,7 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .publish-actions a {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-1);
   text-decoration: none;
 }
 
@@ -1557,8 +1781,8 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .variable-list button:hover {
-  border-color: rgb(var(--primary-6));
-  color: rgb(var(--primary-6));
+  border-color: var(--color-text-1);
+  color: var(--color-text-1);
 }
 
 .variable-list strong,
@@ -1627,8 +1851,8 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .cms-native-select:focus {
-  border-color: rgb(var(--primary-6));
-  box-shadow: 0 0 0 2px rgba(var(--primary-6), 0.12);
+  border-color: var(--color-text-1);
+  box-shadow: 0 0 0 2px var(--color-fill-2);
 }
 
 .footer-settings {
@@ -1840,6 +2064,8 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .home-preview {
+  position: sticky;
+  top: 16px;
   display: grid;
   gap: 14px;
 }
@@ -1874,11 +2100,29 @@ function sectionTitle(type: HomeSectionType) {
   background: var(--color-bg-1);
 }
 
+@media (max-width: 760px) {
+  .runtime-overview__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-content-list time {
+    display: none;
+  }
+}
+
 @media (max-width: 1180px) {
   .cms-layout,
   .home-layout,
   .navigation-layout {
     grid-template-columns: 1fr;
+  }
+
+  .page-list,
+  .publish-panel,
+  .home-preview {
+    position: static;
+    max-height: none;
+    overflow: visible;
   }
 
   .media-toolbar-main {

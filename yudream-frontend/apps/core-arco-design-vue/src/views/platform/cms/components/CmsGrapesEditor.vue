@@ -1,34 +1,28 @@
 <script setup lang="ts">
-import type { AIMessageContent, ChatMessagesData, ChatRequestParams, ChatServiceConfig, SSEChunkData } from '@tdesign-vue-next/chat'
 import type { Editor } from 'grapesjs'
+import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolEvent } from '@yudream/components'
 import type { CmsAgentSelectOption } from '../config/cms-agent-options'
 import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
 import type { AiToolCallResult, CmsChatHistoryMessage } from '@/api/modules/platform-ai'
-import type { CmsAiChatAttachmentMeta, CmsAiChatSession, CmsAiChatSessionSummary } from '@/utils/cms-ai-chat-history'
 import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
+import type { YdAgentChatSession, YdAgentChatSessionStore } from '@/components/YdAgentChatPanel/types'
 import { registerHandler, removeHandler } from '@jboltai/tokui'
-import { ActivityRenderer, ChatContent, ChatMessage, ChatSender, ToolCallRenderer, useChat } from '@tdesign-vue-next/chat'
-import { Select as TSelect, Switch as TSwitch, Tooltip as TTooltip } from 'tdesign-vue-next'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
+import YdAgentChatPanel from '@/components/YdAgentChatPanel/index.vue'
 import { toBackendAssetUrl } from '@/utils/backend-url'
-import { clearCmsAiChatTarget, cmsAiChatTargetKey, deleteCmsAiChatSession, getCmsAiChatSession, listCmsAiChatSessionSummaries, saveCmsAiChatSession } from '@/utils/cms-ai-chat-history'
+import { createCmsAiChatSessionStore, cmsAiChatTargetKey, readActiveCmsAiChatSessionId } from '@/utils/cms-ai-chat-history'
 import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { resolveCmsAgentCode } from '../config/cms-agent-options'
 import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
 import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
-import { isNearChatBottom, scrollChatToBottom } from '../config/cms-chat-auto-scroll'
 import { cmsGrapesPlugins, cmsGrapesPluginsOpts, localizeCmsPluginBlocks } from '../config/cms-grapes-plugins'
-import { registerCmsAguiRenderers } from './cms-agui-renderers'
 import CmsCodeEditor from './CmsCodeEditor.vue'
 import TokuiBlock from './TokuiBlock.vue'
-import '@tdesign-vue-next/chat/es/style/index.css'
 import 'grapesjs/dist/css/grapes.min.css'
-
-registerCmsAguiRenderers()
 
 interface GrapesSavePayload {
   htmlContent: string
@@ -55,27 +49,6 @@ interface CanvasSelectionSnapshot {
 interface AskOption {
   title: string
   desc?: string
-}
-
-interface AguiActivityContent {
-  type: string
-  data: {
-    activityType: string
-    content: Record<string, unknown>
-  }
-}
-
-interface AguiToolCallContent {
-  type: string
-  data: {
-    toolCallId: string
-    toolCallName: string
-  }
-}
-
-interface TextStreamContent {
-  type: string
-  data: string
 }
 
 interface CodeCompletionItem {
@@ -115,20 +88,11 @@ const layersEl = ref<HTMLElement>()
 const traitsEl = ref<HTMLElement>()
 const stylesEl = ref<HTMLElement>()
 const mediaInput = ref<HTMLInputElement>()
-const aiAttachmentInput = ref<HTMLInputElement>()
-const aiChatScrollEl = ref<HTMLElement>()
+const aiChatPanelRef = ref<InstanceType<typeof YdAgentChatPanel>>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 const aiAgentCode = ref('')
 const aiThinkingEnabled = ref(false)
-const aiPrompt = ref('')
-const aiAttachments = ref<any[]>([])
-const chatHistorySummaries = ref<CmsAiChatSessionSummary[]>([])
-const selectedChatHistory = ref<CmsAiChatSession | null>(null)
-const chatHistoryLoading = ref(false)
-const chatHistoryHasMore = ref(false)
-const chatHistoryOffset = ref(0)
-const chatHistoryLoadedOnce = ref(false)
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
 const leftWorkspace = ref<LeftWorkspace>('blocks')
 const leftSidebarCollapsed = ref(false)
@@ -160,15 +124,12 @@ const aiBlockSuggestions = [
 const pendingAskDsl = ref('')
 const pendingAskOptions = ref<AskOption[]>([])
 let editor: Editor | null = null
-let currentAiSession: CmsAiChatSession | null = null
 let canvasRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let selectedSourceSyncTimer: ReturnType<typeof setTimeout> | null = null
 let templatePreviewTimer: ReturnType<typeof setTimeout> | null = null
 let pageJsSyncTimer: ReturnType<typeof setTimeout> | null = null
 let blockPanelObserver: MutationObserver | null = null
 let isRefreshingBlockPanel = false
-let aiChatScrollFrame: number | null = null
-let aiChatAutoFollow = true
 
 const BLOCK_FAVORITES_KEY = 'yb:cms:block-favorites'
 const USER_BLOCKS_KEY = 'yb:cms:user-blocks'
@@ -495,167 +456,82 @@ const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
 const chatHistoryTargetId = computed(() => String(props.historyTargetId || props.title || 'draft'))
 const chatHistoryTargetKey = computed(() => cmsAiChatTargetKey(chatHistoryTargetType.value, chatHistoryTargetId.value))
 const chatHistoryTargetLabel = computed(() => props.historyTargetLabel || props.title || (chatHistoryTargetType.value === 'home' ? '首页' : '未命名页面'))
-const selectedAiAgentOption = computed(() => props.aiAgentOptions?.find(item => item.value === aiAgentCode.value) || null)
 
-const aiDefaultMessages = computed<ChatMessagesData[]>(() => [
-  {
-    id: 'cms-ai-welcome',
-    role: 'assistant',
-    status: 'complete',
-    content: [
-      {
-        type: 'markdown',
-        data: '我可以读取当前 GrapesJS 画布、CSS、JS 和项目 JSON，并按你的描述直接修改或增加区块。你也可以附一张样图让我参考。',
-      },
-    ],
-  },
-])
-
-const aiSenderProps = computed(() => ({
-  loading: false,
-  placeholder: '输入 / 唤起插件和技能，或描述要如何修改当前画布',
-  textareaProps: {
-    autosize: { minRows: 3, maxRows: 6 },
-  },
-  attachmentsProps: {
-    items: aiAttachments.value,
-    overflow: 'scrollX' as const,
-  },
-  actions: ['uploadImage', 'send'],
-  onFileSelect: async (event: CustomEvent<File[]>) => {
-    await attachAiFiles(Array.from(event.detail || []))
-  },
-  onFileRemove: (event: CustomEvent<any[]>) => {
-    aiAttachments.value = event.detail || []
-  },
-} as any))
-
-async function attachAiFiles(files: File[]) {
-  try {
-    aiAttachments.value = await Promise.all(files.map(toAttachmentItem))
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '样图读取失败')
-  }
-}
-
-function selectAiAttachment() {
-  aiAttachmentInput.value?.click()
-}
-
-function onAiAttachmentInput(event: Event) {
-  const input = event.target as HTMLInputElement
-  void attachAiFiles(Array.from(input.files || []))
-  input.value = ''
-}
-
-const aiMessageProps = {
-  avatar: (item: { role?: string }) => item.role === 'user' ? '你' : 'AI',
-  name: (item: { role?: string }) => item.role === 'user' ? '你' : 'YuDream AI',
-} as any
-
-const aiChatServiceConfig = computed<ChatServiceConfig>(() => ({
-  endpoint: apiAi.generateCmsPageStreamEndpoint(),
-  stream: true,
-  protocol: 'agui',
-  timeout: 1_800_000,
-  onRequest: async (params: ChatRequestParams) => {
-    if (!editor || !props.aiEnabled) {
-      throw new Error('AI 能力未启用')
-    }
-    const prompt = String(params.prompt || '').trim()
-    if (!prompt && aiAttachments.value.length === 0) {
-      throw new Error('请输入修改想法或添加样图')
-    }
-    const attachments = params.attachments || aiAttachments.value
-    pendingAskDsl.value = ''
-    const session = await ensureActiveSession()
-    const history = collectHistoryMessages(session)
-    appendUserTurn(session, prompt, attachments)
-    return apiAi.generateCmsPageStreamRequest(buildAiPayload(prompt, attachments, history))
-  },
-  onMessage: (chunk: SSEChunkData, _message, parsedResult) => {
-    const tool = aguiToolResult(chunk)
-    if (tool) {
-      if (isCanvasTool(tool)) {
-        applyAiTool(tool)
-      }
-      if (isAskUserTool(tool)) {
-        showAskUserUi(tool)
-      }
-    }
-    trackAguiHistoryContent(parsedResult)
-    return parsedResult || null
-  },
-  onComplete: (isAborted: boolean) => {
-    if (isAborted) {
-      return
-    }
-    clearAiAttachments()
-    void finishAiHistorySession('complete')
-  },
-  onError: (error: Error | Response) => {
-    const message = error instanceof Response ? `${error.status} ${error.statusText}` : error.message
-    trackAiHistoryContent({
-      ...markdownChunk(`\n\n调用失败：${message}`),
-      status: 'error',
-    } as AIMessageContent)
-    void finishAiHistorySession('error')
-    toast.error('AI 调用失败', { description: message })
-  },
-}))
-
-const {
-  chatEngine: aiChatEngine,
-  messages: aiChatMessages,
-  status: aiChatStatus,
-} = useChat({
-  defaultMessages: aiDefaultMessages.value,
-  chatServiceConfig: aiChatServiceConfig.value,
+// CMS 画布 AI 会话存储：按编辑目标（页面 / 首页）分组，多会话可管理
+const aiSessionStore: YdAgentChatSessionStore = createCmsAiChatSessionStore({
+  targetKey: () => chatHistoryTargetKey.value,
+  targetType: () => chatHistoryTargetType.value,
+  targetId: () => chatHistoryTargetId.value,
+  targetLabel: () => chatHistoryTargetLabel.value,
 })
 
-const aiChatLoading = computed(() => aiChatStatus.value === 'pending' || aiChatStatus.value === 'streaming')
-const aiRenderedMessages = computed(() => aiChatMessages.value.map(message => ({
-  message,
-  contents: messageContents(message),
-})))
+function aiChatEndpoint() {
+  return apiAi.generateCmsPageStreamEndpoint()
+}
 
-watch(aiRenderedMessages, () => {
-  scheduleAiChatScroll()
-}, { flush: 'post' })
+function buildAiChatBody(question: string, history: YdChatHistoryTurn[], attachments: YdChatAttachment[] = []) {
+  const historyMessages: CmsChatHistoryMessage[] = history
+    .filter(item => item.role === 'user' || item.role === 'assistant')
+    .map(item => ({ role: item.role as 'user' | 'assistant', content: item.content }))
+  return buildAiPayload(question, attachments, historyMessages)
+}
 
-function onAiChatScroll() {
-  if (aiChatScrollEl.value) {
-    aiChatAutoFollow = isNearChatBottom(aiChatScrollEl.value)
+// 持久化前裁剪消息：剥离工具 payload 与附件 dataUrl 等大字段，避免 IndexedDB 膨胀
+function sanitizeCmsAiMessage(message: YdChatMessage): YdChatMessage {
+  return {
+    ...message,
+    pending: false,
+    tools: message.tools?.map(tool => ({ ...tool, payload: undefined })),
+    attachments: message.attachments?.map(({ dataUrl: _dataUrl, ...rest }) => rest),
   }
 }
 
-function scheduleAiChatScroll(force = false) {
-  if (force) {
-    aiChatAutoFollow = true
+function aiSessionMeta() {
+  return {
+    agentCode: aiAgentCode.value,
+    thinkingEnabled: aiThinkingEnabled.value,
   }
-  if (!aiChatAutoFollow || aiChatScrollFrame !== null) {
+}
+
+function onAiSessionChange(session: YdAgentChatSession | null) {
+  pendingAskDsl.value = ''
+  pendingAskOptions.value = []
+  const meta = session?.meta
+  if (!meta) {
     return
   }
-  aiChatScrollFrame = requestAnimationFrame(() => {
-    aiChatScrollFrame = null
-    if (aiChatAutoFollow && aiChatScrollEl.value) {
-      scrollChatToBottom(aiChatScrollEl.value)
-    }
-  })
+  if (typeof meta.agentCode === 'string' && meta.agentCode) {
+    aiAgentCode.value = resolveCmsAgentCode(props.aiAgentOptions || [], meta.agentCode)
+  }
+  if (typeof meta.thinkingEnabled === 'boolean') {
+    aiThinkingEnabled.value = meta.thinkingEnabled
+  }
+}
+
+// AGUI 工具结果 → 画布应用 / 需求澄清 UI
+function onAiToolEvent(tool: YdChatToolEvent) {
+  if (tool.status !== 'complete' || !tool.toolName) {
+    return
+  }
+  const result: AiToolCallResult = {
+    toolName: tool.toolName,
+    action: tool.action,
+    message: tool.message,
+    payload: tool.payload,
+  }
+  if (isCanvasTool(result)) {
+    applyAiTool(result)
+  }
+  if (isAskUserTool(result)) {
+    showAskUserUi(result)
+  }
 }
 
 async function sendAiPrompt(prompt: string) {
-  const content = String(prompt || aiPrompt.value || '').trim()
-  if (!content && aiAttachments.value.length === 0) {
-    return
+  const content = String(prompt || '').trim()
+  if (content) {
+    await aiChatPanelRef.value?.sendPrompt(content)
   }
-  aiPrompt.value = ''
-  scheduleAiChatScroll(true)
-  await aiChatEngine.value.sendUserMessage({
-    prompt: content,
-    attachments: aiAttachments.value,
-  })
 }
 
 function onAiFollowUp(event: CustomEvent<string>) {
@@ -665,85 +541,14 @@ function onAiFollowUp(event: CustomEvent<string>) {
   }
 }
 
-function messageContents(item: ChatMessagesData): any[] {
-  const source = Array.isArray(item.content) ? item.content : [item.content]
-  const merged: any[] = []
-  const activityIndexes = new Map<string, number>()
-  const toolCallIndexes = new Map<string, number>()
-
-  source.forEach((content) => {
-    if (isAguiActivityContent(content)) {
-      const activityType = String(content.data.activityType)
-      const index = activityIndexes.get(activityType)
-      if (index === undefined) {
-        activityIndexes.set(activityType, merged.length)
-        merged.push(content)
-      }
-      else {
-        merged[index] = content
-      }
-      return
-    }
-
-    if (isAguiToolCallContent(content)) {
-      const toolCallId = String(content.data?.toolCallId || content.type)
-      const index = toolCallIndexes.get(toolCallId)
-      if (index === undefined) {
-        toolCallIndexes.set(toolCallId, merged.length)
-        merged.push(content)
-      }
-      else {
-        merged[index] = content
-      }
-      return
-    }
-
-    const previous = merged.at(-1)
-    if (isTextStreamContent(previous) && isTextStreamContent(content) && previous.type === content.type) {
-      merged[merged.length - 1] = {
-        ...content,
-        data: `${previous.data || ''}${content.data || ''}`,
-      }
-      return
-    }
-    merged.push(content)
-  })
-  return merged
-}
-
-function isTextStreamContent(content: unknown): content is TextStreamContent {
-  if (!content || typeof content !== 'object') {
-    return false
+// 重新打开 AI 面板或切换编辑目标时，恢复该目标最近一次打开的会话
+async function restoreAiSession() {
+  await nextTick()
+  await aiChatPanelRef.value?.reloadSessions()
+  const sessionId = readActiveCmsAiChatSessionId(chatHistoryTargetKey.value)
+  if (sessionId) {
+    await aiChatPanelRef.value?.selectSession(sessionId)
   }
-  const value = content as TextStreamContent
-  return typeof value.type === 'string'
-    && !value.type.startsWith('activity-')
-    && !value.type.startsWith('toolcall-')
-    && !['reasoning', 'thinking'].includes(value.type)
-    && typeof value.data === 'string'
-}
-
-function isAguiActivityContent(content: unknown): content is AguiActivityContent {
-  if (!content || typeof content !== 'object') {
-    return false
-  }
-  const value = content as AguiActivityContent
-  return typeof value.type === 'string'
-    && value.type.startsWith('activity-')
-    && typeof value.data?.activityType === 'string'
-    && Boolean(value.data.activityType)
-    && Boolean(value.data.content && typeof value.data.content === 'object')
-}
-
-function isAguiToolCallContent(content: unknown): content is AguiToolCallContent {
-  if (!content || typeof content !== 'object') {
-    return false
-  }
-  const value = content as AguiToolCallContent
-  return typeof value.type === 'string'
-    && value.type.startsWith('toolcall-')
-    && typeof value.data?.toolCallId === 'string'
-    && typeof value.data.toolCallName === 'string'
 }
 
 watch(() => props.aiEnabled, (enabled) => {
@@ -761,8 +566,7 @@ watch(() => props.aiAgentOptions, (options) => {
 
 watch([rightPanelTab, chatHistoryTargetKey], () => {
   if (rightPanelTab.value === 'ai') {
-    void loadChatHistory(true)
-    void restoreActiveSession()
+    void restoreAiSession()
   }
   if (rightPanelTab.value === 'source') {
     syncSelectedSource()
@@ -857,8 +661,7 @@ onMounted(async () => {
   aiAgentCode.value = resolveCmsAgentCode(props.aiAgentOptions || [], aiAgentCode.value)
   registerHandler('pick', onPickOption)
   if (rightPanelTab.value === 'ai') {
-    void loadChatHistory(true)
-    void restoreActiveSession()
+    void restoreAiSession()
   }
 })
 
@@ -870,10 +673,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('cms-ai-follow-up', onAiFollowUp as EventListener)
   blockPanelObserver?.disconnect()
   blockPanelObserver = null
-  if (aiChatScrollFrame !== null) {
-    cancelAnimationFrame(aiChatScrollFrame)
-    aiChatScrollFrame = null
-  }
   runCanvasJsDisposers(editor?.Canvas.getDocument()?.defaultView)
   editor?.destroy()
   editor = null
@@ -1375,226 +1174,11 @@ function fitCanvasToWorkspace() {
   canvasZoom.value = zoom
 }
 
-function useSuggestion(suggestion: string) {
-  aiPrompt.value = suggestion
-}
-
 function useBlockSuggestion(prompt: string) {
   void sendAiPrompt(prompt)
 }
 
-function sessionStorageId(targetKey = chatHistoryTargetKey.value) {
-  return `session:${targetKey}`
-}
-
-// 一个页面对应一个持久会话：优先复用内存中的当前会话，其次从 IndexedDB 载入，最后新建空会话。
-async function ensureActiveSession(): Promise<CmsAiChatSession> {
-  if (currentAiSession && currentAiSession.targetKey === chatHistoryTargetKey.value) {
-    return currentAiSession
-  }
-  const existing = await getCmsAiChatSession(sessionStorageId())
-  if (existing) {
-    currentAiSession = existing
-    return existing
-  }
-  const now = Date.now()
-  currentAiSession = {
-    id: sessionStorageId(),
-    targetKey: chatHistoryTargetKey.value,
-    targetType: chatHistoryTargetType.value,
-    targetId: chatHistoryTargetId.value,
-    targetLabel: chatHistoryTargetLabel.value,
-    title: chatHistoryTargetLabel.value,
-    preview: '',
-    model: selectedAiAgentOption.value?.label || aiAgentCode.value || undefined,
-    thinkingEnabled: aiThinkingEnabled.value,
-    attachments: [],
-    createdAt: now,
-    updatedAt: now,
-    messages: [],
-  }
-  return currentAiSession
-}
-
-// 向当前会话追加一轮对话（1 条用户消息 + 1 条待流式的助手消息）。
-function appendUserTurn(session: CmsAiChatSession, prompt: string, attachments: any[] = []) {
-  const turnId = createHistoryId()
-  const now = Date.now()
-  const displayPrompt = prompt || `参考样图调整当前页面：${firstImageAttachment(attachments)?.name || '样图'}`
-  const attachmentMetas = attachmentMetaList(attachments)
-  const attachmentText = attachmentMetas.length
-    ? `\n\n附件：${attachmentMetas.map(item => item.name || item.fileType || '文件').join('、')}`
-    : ''
-  session.messages.push(
-    {
-      id: `${turnId}-user`,
-      role: 'user',
-      status: 'complete',
-      content: [
-        {
-          type: 'text',
-          data: `${displayPrompt}${attachmentText}`,
-        },
-      ],
-    } as ChatMessagesData,
-    {
-      id: `${turnId}-assistant`,
-      role: 'assistant',
-      status: 'streaming',
-      content: [],
-    } as ChatMessagesData,
-  )
-  if (!session.title) {
-    session.title = compactText(displayPrompt, 36)
-  }
-  session.preview = compactText(displayPrompt, 120)
-  session.model = selectedAiAgentOption.value?.label || aiAgentCode.value || session.model
-  session.thinkingEnabled = aiThinkingEnabled.value
-  session.updatedAt = now
-  if (attachmentMetas.length) {
-    session.attachments = attachmentMetas
-  }
-}
-
-function trackAiHistoryContent<T extends AIMessageContent>(content: T): T {
-  if (!currentAiSession) {
-    return content
-  }
-  const assistant = currentAiSession.messages.findLast(item => item.role === 'assistant')
-  if (!assistant) {
-    return content
-  }
-  const target = assistant as Extract<ChatMessagesData, { role: 'assistant' }>
-  const existing = target.content?.find(item => item.id && item.id === content.id)
-  if (existing && content.strategy === 'merge') {
-    mergeAiContent(existing, content)
-  }
-  else {
-    target.content = [...(target.content || []), cloneAiContent(content)]
-  }
-  target.status = content.status === 'error' ? 'error' : 'streaming'
-  currentAiSession.updatedAt = Date.now()
-  return content
-}
-
-async function finishAiHistorySession(status: 'complete' | 'error') {
-  if (!currentAiSession) {
-    return
-  }
-  const session = currentAiSession
-  const assistant = session.messages.findLast(item => item.role === 'assistant')
-  if (assistant) {
-    assistant.status = status
-  }
-  session.updatedAt = Date.now()
-  session.preview = compactText(messageText(assistant), 120) || session.preview
-  // 页面级会话：持久化但保留在内存中，供后续追问累积多轮上下文。
-  await saveCmsAiChatSession(session)
-  await loadChatHistory(true)
-}
-
-// 把已完成的历史轮次抽取为纯文本消息，供后端注入多轮上下文（不含画布大字段）。
-function collectHistoryMessages(session: CmsAiChatSession, maxTurns = 8): CmsChatHistoryMessage[] {
-  const messages: CmsChatHistoryMessage[] = []
-  for (const message of session.messages) {
-    if (message.role !== 'user' && message.role !== 'assistant') {
-      continue
-    }
-    const text = messageText(message).trim()
-    if (!text) {
-      continue
-    }
-    messages.push({ role: message.role, content: text })
-  }
-  const maxMessages = Math.max(0, maxTurns) * 2
-  return maxMessages > 0 && messages.length > maxMessages
-    ? messages.slice(messages.length - maxMessages)
-    : messages
-}
-
-async function loadChatHistory(reset = false) {
-  if (chatHistoryLoading.value) {
-    return
-  }
-  chatHistoryLoading.value = true
-  try {
-    if (reset) {
-      chatHistoryOffset.value = 0
-      chatHistorySummaries.value = []
-      selectedChatHistory.value = null
-    }
-    const page = await listCmsAiChatSessionSummaries(chatHistoryTargetKey.value, chatHistoryOffset.value, 8)
-    chatHistorySummaries.value = reset ? page.items : [...chatHistorySummaries.value, ...page.items]
-    chatHistoryOffset.value = chatHistorySummaries.value.length
-    chatHistoryHasMore.value = page.hasMore
-    chatHistoryLoadedOnce.value = true
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '会话记录加载失败')
-  }
-  finally {
-    chatHistoryLoading.value = false
-  }
-}
-
-async function openChatHistory(summary: CmsAiChatSessionSummary) {
-  try {
-    selectedChatHistory.value = await getCmsAiChatSession(summary.id) || null
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '会话详情加载失败')
-  }
-}
-
-function restoreChatHistory() {
-  if (!selectedChatHistory.value) {
-    return
-  }
-  aiChatEngine.value.setMessages([...aiDefaultMessages.value, ...selectedChatHistory.value.messages], 'replace')
-  scheduleAiChatScroll(true)
-}
-
-async function deleteSelectedChatHistory() {
-  if (!selectedChatHistory.value) {
-    return
-  }
-  await deleteCmsAiChatSession(selectedChatHistory.value.id)
-  selectedChatHistory.value = null
-  await loadChatHistory(true)
-  toast.success('会话记录已删除')
-}
-
-// 把当前页面已持久化的会话恢复到聊天区，实现「一个页面 = 一段可持续的对话」。
-async function restoreActiveSession() {
-  try {
-    const session = await ensureActiveSession()
-    const messages = session.messages.length
-      ? [...aiDefaultMessages.value, ...session.messages]
-      : [...aiDefaultMessages.value]
-    aiChatEngine.value.setMessages(messages, 'replace')
-    scheduleAiChatScroll(true)
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '会话恢复失败')
-  }
-}
-
-// 一键清空当前页面会话，方便重新开始聊天。
-async function clearChatHistory() {
-  if (!window.confirm(`确认清空“${chatHistoryTargetLabel.value}”的 AI 对话记录并重新开始吗？`)) {
-    return
-  }
-  await clearCmsAiChatTarget(chatHistoryTargetKey.value)
-  currentAiSession = null
-  pendingAskDsl.value = ''
-  selectedChatHistory.value = null
-  aiChatEngine.value.setMessages([...aiDefaultMessages.value], 'replace')
-  scheduleAiChatScroll(true)
-  await loadChatHistory(true)
-  toast.success('对话记录已清空')
-}
-
-function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsChatHistoryMessage[] = []) {
+function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], history: CmsChatHistoryMessage[] = []) {
   if (!editor) {
     throw new Error('构建器未初始化')
   }
@@ -1604,13 +1188,13 @@ function buildAiPayload(prompt: string, attachments: any[] = [], history: CmsCha
     target: props.historyTargetType,
     title: props.title || '',
     siteName: appSettingsStore.siteName || 'YuDream',
-    prompt: prompt || `参考样图调整当前页面：${image?.name || '样图'}`,
+    prompt: prompt || `参考样图调整当前页面：${image?.fileName || '样图'}`,
     pageType: 'GrapesJS 可视化页面',
     style: props.chromeFrame
       ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
       : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
     agentCode: aiAgentCode.value || undefined,
-    imageDataUrl: image?.url || undefined,
+    imageDataUrl: image?.dataUrl || image?.url || undefined,
     currentHtml: editor.getHtml(),
     currentCss: fullCanvasCss(),
     currentJs: pageJsContent.value,
@@ -2045,55 +1629,8 @@ function indentCssLines(css: string) {
   return css.split('\n').map(line => line.trim() ? `  ${line}` : line).join('\n')
 }
 
-async function toAttachmentItem(file: File) {
-  if (!file.type.startsWith('image/')) {
-    throw new Error('请选择图片文件')
-  }
-  if (file.size > 4 * 1024 * 1024) {
-    throw new Error('样图不能超过 4MB')
-  }
-  return {
-    key: `${file.name}-${file.size}-${file.lastModified}`,
-    name: file.name,
-    fileType: file.type.startsWith('image/') ? 'image' : 'txt',
-    size: file.size,
-    url: await fileToDataUrl(file),
-  }
-}
-
-function firstImageAttachment(attachments: any[]) {
-  return attachments.find(item => item?.fileType === 'image' && item?.url)
-}
-
-function markdownChunk(data: string): AIMessageContent {
-  return {
-    type: 'markdown',
-    id: 'cms-ai-stream',
-    data,
-    strategy: 'merge',
-  }
-}
-
-function aguiToolResult(chunk: SSEChunkData): AiToolCallResult | null {
-  const event = chunk.data as Record<string, unknown> | undefined
-  if (event?.type !== 'TOOL_CALL_RESULT' || typeof event.content !== 'string') {
-    return null
-  }
-  try {
-    return JSON.parse(event.content) as AiToolCallResult
-  }
-  catch {
-    return null
-  }
-}
-
-function trackAguiHistoryContent(content: AIMessageContent | AIMessageContent[] | null | undefined) {
-  if (Array.isArray(content)) {
-    content.forEach(trackAiHistoryContent)
-  }
-  else if (content) {
-    trackAiHistoryContent(content)
-  }
+function firstImageAttachment(attachments: YdChatAttachment[]) {
+  return attachments.find(item => (item.kind === 'IMAGE' || item.contentType?.startsWith('image/')) && (item.dataUrl || item.url))
 }
 
 function isCanvasTool(tool?: AiToolCallResult) {
@@ -2131,7 +1668,7 @@ function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
 function chooseAskOption(title: string) {
   pendingAskDsl.value = ''
   pendingAskOptions.value = []
-  aiPrompt.value = title
+  void sendAiPrompt(title)
 }
 
 function parseAskOptions(raw: unknown): AskOption[] {
@@ -2764,55 +2301,6 @@ function highlightComponent(component: unknown) {
   })
 }
 
-function clearAiAttachments() {
-  aiAttachments.value = []
-}
-
-function mergeAiContent(existing: AIMessageContent, incoming: AIMessageContent) {
-  if (existing.type === 'markdown' && incoming.type === 'markdown') {
-    existing.data = `${existing.data || ''}${incoming.data || ''}`
-    return
-  }
-  if (existing.type === 'thinking' && incoming.type === 'thinking') {
-    existing.data = {
-      title: incoming.data.title || existing.data.title || '思考中',
-      text: [existing.data.text, incoming.data.text].filter(Boolean).join('\n'),
-    }
-    return
-  }
-  Object.assign(existing, cloneAiContent(incoming))
-}
-
-function cloneAiContent<T>(content: T): T {
-  return JSON.parse(JSON.stringify(content)) as T
-}
-
-function messageText(message?: ChatMessagesData | null) {
-  return message?.content?.map(contentText).filter(Boolean).join('\n') || ''
-}
-
-function contentText(content: unknown) {
-  const item = content as Record<string, any>
-  if (item.type === 'text' || item.type === 'markdown') {
-    return String(item.data || '')
-  }
-  if (item.type === 'thinking') {
-    return String(item.data?.text || '')
-  }
-  if (item.type === 'attachment' && Array.isArray(item.data)) {
-    return `附件：${item.data.map((file: CmsAiChatAttachmentMeta) => file.name || file.fileType || '文件').join('、')}`
-  }
-  return ''
-}
-
-function attachmentMetaList(attachments: any[]): CmsAiChatAttachmentMeta[] {
-  return attachments.map(item => ({
-    name: item?.name,
-    fileType: item?.fileType,
-    size: item?.size,
-  }))
-}
-
 function compactText(value: string, maxLength: number) {
   const text = String(value || '').replace(/\s+/g, ' ').trim()
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
@@ -2838,32 +2326,6 @@ function cssEscape(value: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-function createHistoryId() {
-  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
-}
-
-function formatHistoryTime(value: number) {
-  return new Date(value).toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
-
-function roleLabel(role?: string) {
-  return role === 'user' ? '你' : 'AI'
-}
-
-function fileToDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
 }
 
 async function loadMedia() {
@@ -3044,15 +2506,15 @@ function selectBreadcrumb(component: any) {
       </div>
       <div class="grapes-header__actions">
         <div class="workbench-command-group">
-          <TTooltip content="撤销" trigger="hover"><button type="button" class="workbench-icon-button" @click="command('core:undo')"><FaIcon name="i-ri:arrow-go-back-line" /></button></TTooltip>
-          <TTooltip content="重做" trigger="hover"><button type="button" class="workbench-icon-button" @click="command('core:redo')"><FaIcon name="i-ri:arrow-go-forward-line" /></button></TTooltip>
-          <TTooltip content="复制选中元素" trigger="hover"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><FaIcon name="i-ri:file-copy-line" /></button></TTooltip>
-          <TTooltip content="删除选中元素" trigger="hover"><button type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><FaIcon name="i-ri:delete-bin-line" /></button></TTooltip>
+          <FaTooltip text="撤销"><button type="button" class="workbench-icon-button" @click="command('core:undo')"><FaIcon name="i-ri:arrow-go-back-line" /></button></FaTooltip>
+          <FaTooltip text="重做"><button type="button" class="workbench-icon-button" @click="command('core:redo')"><FaIcon name="i-ri:arrow-go-forward-line" /></button></FaTooltip>
+          <FaTooltip text="复制选中元素"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><FaIcon name="i-ri:file-copy-line" /></button></FaTooltip>
+          <FaTooltip text="删除选中元素"><button type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><FaIcon name="i-ri:delete-bin-line" /></button></FaTooltip>
         </div>
         <div class="workbench-device-switch" aria-label="画布设备">
-          <TTooltip content="桌面" trigger="hover"><button type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><FaIcon name="i-ri:computer-line" /></button></TTooltip>
-          <TTooltip content="平板" trigger="hover"><button type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><FaIcon name="i-ri:tablet-line" /></button></TTooltip>
-          <TTooltip content="手机" trigger="hover"><button type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><FaIcon name="i-ri:smartphone-line" /></button></TTooltip>
+          <FaTooltip text="桌面"><button type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><FaIcon name="i-ri:computer-line" /></button></FaTooltip>
+          <FaTooltip text="平板"><button type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><FaIcon name="i-ri:tablet-line" /></button></FaTooltip>
+          <FaTooltip text="手机"><button type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><FaIcon name="i-ri:smartphone-line" /></button></FaTooltip>
         </div>
         <div class="workbench-command-group grapes-header__zoom">
           <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><FaIcon name="i-ri:subtract-line" /></button>
@@ -3060,15 +2522,15 @@ function selectBreadcrumb(component: any) {
           <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><FaIcon name="i-ri:add-line" /></button>
         </div>
         <div class="workbench-command-group">
-          <TTooltip :content="previewActive ? '退出预览' : '预览页面'" trigger="hover"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'i-ri:edit-box-line' : 'i-ri:eye-line'" /></button></TTooltip>
-          <TTooltip v-if="chromeFrame" content="还原固定布局" trigger="hover"><button type="button" class="workbench-icon-button" @click="restoreLockedLayout"><FaIcon name="i-ri:layout-line" /></button></TTooltip>
-          <TTooltip content="保存为区块" trigger="hover"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><FaIcon name="i-ri:archive-drawer-line" /></button></TTooltip>
+          <FaTooltip :text="previewActive ? '退出预览' : '预览页面'"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'i-ri:edit-box-line' : 'i-ri:eye-line'" /></button></FaTooltip>
+          <FaTooltip v-if="chromeFrame" text="还原固定布局"><button type="button" class="workbench-icon-button" @click="restoreLockedLayout"><FaIcon name="i-ri:layout-line" /></button></FaTooltip>
+          <FaTooltip text="保存为区块"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><FaIcon name="i-ri:archive-drawer-line" /></button></FaTooltip>
         </div>
         <FaButton size="sm" :disabled="!editorReady" @click="save">
           <FaIcon name="i-ri:save-3-line" />
           {{ editorDirty ? '保存修改' : '保存' }}
         </FaButton>
-        <TTooltip content="关闭构建器" trigger="hover"><button type="button" class="workbench-icon-button" @click="emit('close')"><FaIcon name="i-ri:close-line" /></button></TTooltip>
+        <FaTooltip text="关闭构建器"><button type="button" class="workbench-icon-button" @click="emit('close')"><FaIcon name="i-ri:close-line" /></button></FaTooltip>
       </div>
     </header>
 
@@ -3079,7 +2541,7 @@ function selectBreadcrumb(component: any) {
             <button type="button" :class="{ active: leftWorkspace === 'blocks' }" @click="leftWorkspace = 'blocks'; leftSidebarCollapsed = false"><FaIcon name="i-ri:layout-grid-line" /><span>区块</span></button>
             <button type="button" :class="{ active: leftWorkspace === 'media' }" @click="leftWorkspace = 'media'; leftSidebarCollapsed = false"><FaIcon name="i-ri:image-2-line" /><span>媒体</span></button>
           </div>
-          <TTooltip :content="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'" trigger="hover"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><FaIcon :name="leftSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></TTooltip>
+          <FaTooltip :text="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><FaIcon :name="leftSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></FaTooltip>
         </div>
         <section v-show="leftWorkspace === 'blocks'" class="block-panel">
           <div class="block-panel__search-wrap">
@@ -3144,178 +2606,69 @@ function selectBreadcrumb(component: any) {
             <span>{{ tab.label }}</span>
           </button>
         </div>
-          <TTooltip :content="rightSidebarCollapsed ? '展开检查器' : '收起检查器'" trigger="hover"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><FaIcon :name="rightSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></TTooltip>
+          <FaTooltip :text="rightSidebarCollapsed ? '展开检查器' : '收起检查器'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><FaIcon :name="rightSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></FaTooltip>
         </div>
 
         <section v-if="aiEnabled && rightPanelTab === 'ai'" class="right-panel ai-panel active">
-          <div class="builder-chatbot-wrap">
-            <div ref="aiChatScrollEl" class="builder-chatbot t-chat--normal" @scroll.passive="onAiChatScroll">
-              <ChatMessage
-                v-for="entry in aiRenderedMessages"
-                :key="entry.message.id"
-                :role="entry.message.role"
-                :status="entry.message.status"
-                :content="entry.contents"
-                :name="aiMessageProps.name(entry.message)"
-                :placement="entry.message.role === 'user' ? 'right' : 'left'"
-              >
-                <template #avatar>
-                  <span class="cms-ai-avatar" :class="entry.message.role === 'user' ? 'is-user' : 'is-assistant'">
-                    {{ entry.message.role === 'user' ? '你' : 'AI' }}
-                  </span>
-                </template>
-                <template #content>
-                <div class="cms-agui-message-content">
-                  <template v-for="(content, index) in entry.contents" :key="`${entry.message.id}-${index}`">
-                    <ActivityRenderer
-                      v-if="isAguiActivityContent(content)"
-                      :activity="content.data"
-                    />
-                    <ToolCallRenderer
-                      v-else-if="isAguiToolCallContent(content)"
-                      :tool-call="content.data"
-                    />
-                    <div
-                      v-else
-                      :class="{ 'cms-ai-content-error': entry.message.status === 'error' && content?.type === 'text' }"
-                    >
-                      <ChatContent
-                        :content="content"
-                        :role="entry.message.role"
-                      />
-                    </div>
-                  </template>
-                </div>
-                </template>
-              </ChatMessage>
-            </div>
-            <ChatSender
-              v-model="aiPrompt"
-              :loading="aiChatLoading"
-              :placeholder="aiSenderProps.placeholder"
-              :textarea-props="aiSenderProps.textareaProps"
-              :attachments-props="aiSenderProps.attachmentsProps"
-              @send="sendAiPrompt"
-              @stop="aiChatEngine.abortChat()"
-              @file-select="aiSenderProps.onFileSelect?.({ detail: $event.files })"
-              @remove="aiSenderProps.onFileRemove?.({ detail: $event })"
-            >
-              <template #footer-prefix>
-                <TTooltip content="添加样图" trigger="hover">
-                  <button type="button" class="ai-attachment-button" aria-label="添加样图" @click="selectAiAttachment">
-                    <FaIcon name="i-ri:image-add-line" />
-                  </button>
-                </TTooltip>
-                <div v-if="aiAgentOptions?.length" class="ai-model-select">
-                  <TTooltip content="切换 Agent" trigger="hover">
-                    <TSelect
-                      v-model="aiAgentCode"
-                      class="ai-model-select__control"
-                      :options="aiAgentOptions"
-                      size="small"
-                    />
-                  </TTooltip>
+          <YdAgentChatPanel
+            ref="aiChatPanelRef"
+            :endpoint="aiChatEndpoint"
+            :build-body="buildAiChatBody"
+            :session-store="aiSessionStore"
+            :sanitize-message="sanitizeCmsAiMessage"
+            :session-meta="aiSessionMeta"
+            welcome-title="我是 CMS 页面构建助手"
+            welcome-description="我可以读取当前画布、CSS、JS 和项目 JSON，按你的描述直接修改或增加区块，也可以附一张样图作参考。"
+            :suggestions="aiSuggestions"
+            placeholder="描述要如何修改当前画布，或附一张样图"
+            thinking-text="正在分析画布…"
+            disclaimer="AI 修改会直接作用于当前画布，保存前请确认效果"
+            @tool="onAiToolEvent"
+            @session-change="onAiSessionChange"
+          >
+            <template #actions>
+              <div class="ai-panel-actions">
+                <div v-if="aiAgentOptions?.length" class="ai-agent-select" title="切换 Agent">
+                  <FaIcon name="i-ri:robot-2-line" />
+                  <a-select
+                    v-model="aiAgentCode"
+                    size="small"
+                    :bordered="false"
+                    placeholder="Agent"
+                    :options="aiAgentOptions"
+                  />
                 </div>
                 <label class="ai-thinking-switch">
-                  <TSwitch v-model="aiThinkingEnabled" size="small" />
+                  <FaSwitch v-model="aiThinkingEnabled" />
                   <span>深度思考</span>
                 </label>
-              </template>
-            </ChatSender>
-            <input ref="aiAttachmentInput" class="ai-attachment-input" type="file" accept="image/*" multiple @change="onAiAttachmentInput">
-            <section v-if="pendingAskDsl" class="ai-ask" aria-label="AI 需求澄清">
-              <TokuiBlock :dsl="pendingAskDsl" />
-              <div v-if="pendingAskOptions.length" class="ai-ask-options">
-                <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
-                  <strong>{{ option.title }}</strong>
-                  <span v-if="option.desc">{{ option.desc }}</span>
+              </div>
+            </template>
+            <template #footer>
+              <section v-if="pendingAskDsl" class="ai-ask" aria-label="AI 需求澄清">
+                <TokuiBlock :dsl="pendingAskDsl" />
+                <div v-if="pendingAskOptions.length" class="ai-ask-options">
+                  <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
+                    <strong>{{ option.title }}</strong>
+                    <span v-if="option.desc">{{ option.desc }}</span>
+                  </button>
+                </div>
+              </section>
+              <p class="ai-tools-hint">AI 可以使用系统预设区块快速搭建页面。</p>
+              <div class="ai-suggestions ai-block-suggestions" aria-label="AI 添加区块">
+                <button v-for="item in aiBlockSuggestions" :key="item.label" type="button" @click="useBlockSuggestion(item.prompt)">
+                  {{ item.label }}
                 </button>
               </div>
-            </section>
-            <section class="ai-history" aria-label="AI 会话记录">
-              <div class="ai-history__head">
-                <div>
-                  <strong>会话记录</strong>
-                  <span>{{ chatHistoryTargetLabel }}</span>
-                </div>
-                <div class="ai-history__actions">
-                  <button type="button" @click="clearChatHistory">
-                    清空并重开
-                  </button>
-                </div>
+              <div class="ai-context">
+                <span>选中 {{ selectedCanvasSummary }}</span>
+                <span>变量 {{ cmsVariableCount }} 个</span>
+                <span v-for="item in canvasStats" :key="item.label">
+                  {{ item.label }} {{ item.value }}
+                </span>
               </div>
-
-              <div v-if="chatHistorySummaries.length" class="ai-history__list">
-                <button
-                  v-for="item in chatHistorySummaries"
-                  :key="item.id"
-                  type="button"
-                  :class="{ active: selectedChatHistory?.id === item.id }"
-                  @click="openChatHistory(item)"
-                >
-                  <strong>{{ item.title || '未命名会话' }}</strong>
-                  <small>{{ formatHistoryTime(item.updatedAt) }} · {{ item.model || '默认 Agent' }}</small>
-                  <span>{{ item.preview }}</span>
-                </button>
-              </div>
-              <div v-else class="ai-history__empty">
-                {{ chatHistoryLoadedOnce ? '暂无会话记录' : '打开 AI 面板后按需加载记录' }}
-              </div>
-
-              <button
-                v-if="chatHistoryHasMore"
-                type="button"
-                class="ai-history__more"
-                :disabled="chatHistoryLoading"
-                @click="loadChatHistory(false)"
-              >
-                加载更多
-              </button>
-
-              <div v-if="selectedChatHistory" class="ai-history__detail">
-                <div class="ai-history__detail-head">
-                  <strong>{{ selectedChatHistory.title }}</strong>
-                  <button type="button" @click="selectedChatHistory = null">
-                    关闭
-                  </button>
-                </div>
-                <div class="ai-history__detail-actions">
-                  <button type="button" @click="restoreChatHistory">
-                    恢复到聊天区
-                  </button>
-                  <button type="button" @click="deleteSelectedChatHistory">
-                    删除本条
-                  </button>
-                </div>
-                <article v-for="message in selectedChatHistory.messages" :key="message.id">
-                  <strong>{{ roleLabel(message.role) }}</strong>
-                  <p>{{ compactText(messageText(message), 360) }}</p>
-                </article>
-              </div>
-            </section>
-          </div>
-
-          <p class="ai-tools-hint">AI 可以使用系统预设区块快速搭建页面。</p>
-
-          <div class="ai-suggestions" aria-label="AI 快捷指令">
-            <button v-for="suggestion in aiSuggestions" :key="suggestion" type="button" @click="useSuggestion(suggestion)">
-              {{ suggestion }}
-            </button>
-          </div>
-
-          <div class="ai-suggestions ai-block-suggestions" aria-label="AI 添加区块">
-            <button v-for="item in aiBlockSuggestions" :key="item.label" type="button" @click="useBlockSuggestion(item.prompt)">
-              {{ item.label }}
-            </button>
-          </div>
-
-          <div class="ai-context">
-            <span>选中 {{ selectedCanvasSummary }}</span>
-            <span>变量 {{ cmsVariableCount }} 个</span>
-            <span v-for="item in canvasStats" :key="item.label">
-              {{ item.label }} {{ item.value }}
-            </span>
-          </div>
+            </template>
+          </YdAgentChatPanel>
         </section>
 
         <section class="right-panel" :class="{ active: rightPanelTab === 'layers' }">
@@ -3443,195 +2796,6 @@ function selectBreadcrumb(component: any) {
 </template>
 
 <style scoped>
-:deep(.cms-agui-activity),
-:deep(.cms-agui-tool) {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  box-sizing: border-box;
-  width: 100%;
-  margin: 6px 0;
-  padding: 9px 10px;
-  color: var(--td-text-color-primary, #1f2937);
-  background: var(--td-bg-color-secondarycontainer, #f5f7fa);
-  border: 1px solid var(--td-component-border, #dcdfe6);
-  border-radius: 6px;
-}
-
-:deep(.cms-agui-activity__dot),
-:deep(.cms-agui-tool__state) {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-top: 6px;
-  background: var(--td-brand-color, #0052d9);
-  border-radius: 50%;
-}
-
-:deep(.cms-agui-activity__body),
-:deep(.cms-agui-tool__body) {
-  min-width: 0;
-}
-
-:deep(.cms-agui-activity strong),
-:deep(.cms-agui-tool strong) {
-  display: block;
-  font-size: 13px;
-  line-height: 20px;
-  font-weight: 600;
-}
-
-:deep(.cms-agui-activity p),
-:deep(.cms-agui-tool p) {
-  margin: 2px 0 0;
-  overflow-wrap: anywhere;
-  color: var(--td-text-color-secondary, #5e6d82);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-:deep(.cms-agui-tool__meta) {
-  color: var(--td-brand-color, #0052d9) !important;
-  font-weight: 600;
-}
-
-:deep(.cms-agui-tool__preview) {
-  display: -webkit-box;
-  overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-}
-
-:deep(.cms-agui-tool.is-complete .cms-agui-tool__state) {
-  background: var(--td-success-color, #00a870);
-}
-
-:deep(.cms-agui-tool.is-error .cms-agui-tool__state) {
-  background: var(--td-error-color, #d54941);
-}
-
-:deep(.cms-agui-tool.is-executing .cms-agui-tool__state) {
-  animation: cms-agui-pulse 1.2s ease-in-out infinite;
-}
-
-:deep(.cms-agui-tool__action) {
-  flex: 0 0 auto;
-  margin-left: auto;
-  padding: 4px 10px;
-  border: 1px solid var(--td-brand-color, #0052d9);
-  border-radius: 4px;
-  background: transparent;
-  color: var(--td-brand-color, #0052d9);
-  font-size: 12px;
-  line-height: 18px;
-  cursor: pointer;
-}
-
-:deep(.cms-agui-tool__action:hover) {
-  background: var(--td-brand-color-light, #e8f0ff);
-}
-
-:deep(.cms-agui-card) {
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--color-border-2);
-  border-left: 3px solid rgb(var(--primary-6));
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-:deep(.cms-agui-card.is-success) { border-left-color: rgb(var(--success-6)); }
-:deep(.cms-agui-card.is-warning) { border-left-color: rgb(var(--warning-6)); }
-:deep(.cms-agui-card.is-danger) { border-left-color: rgb(var(--danger-6)); }
-:deep(.cms-agui-card__head) { display: grid; gap: 4px; }
-:deep(.cms-agui-card__head strong) { color: var(--color-text-1); font-size: 14px; }
-:deep(.cms-agui-card__head p) { margin: 0; color: var(--color-text-2); font-size: 12px; line-height: 1.6; }
-:deep(.cms-agui-card__fields) { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 0; }
-:deep(.cms-agui-card__field) { display: grid; gap: 2px; min-width: 0; padding: 8px; border-radius: 4px; background: var(--color-fill-1); }
-:deep(.cms-agui-card__field dt) { color: var(--color-text-3); font-size: 10px; }
-:deep(.cms-agui-card__field dd) { margin: 0; overflow-wrap: anywhere; color: var(--color-text-1); font-size: 13px; }
-:deep(.cms-agui-card__actions) { display: flex; flex-wrap: wrap; gap: 8px; }
-:deep(.cms-agui-card__actions button) { min-height: 30px; padding: 0 10px; border: 1px solid var(--color-border-2); border-radius: 4px; background: var(--color-bg-1); color: rgb(var(--primary-6)); font-size: 12px; cursor: pointer; }
-:deep(.cms-agui-card__actions button:hover) { border-color: rgb(var(--primary-6)); background: rgb(var(--primary-1)); }
-
-.ai-attachment-input {
-  display: none;
-}
-
-.ai-attachment-button {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--td-text-color-secondary, #5e6d82);
-  background: transparent;
-  border: 0;
-  place-items: center;
-  cursor: pointer;
-}
-
-.ai-attachment-button:hover {
-  color: var(--td-brand-color, #0052d9);
-}
-
-.cms-ai-avatar {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  color: #fff;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: 600;
-  place-items: center;
-}
-
-.cms-ai-avatar.is-assistant {
-  background: var(--td-brand-color, #0052d9);
-}
-
-.cms-ai-avatar.is-user {
-  background: #64748b;
-}
-
-.builder-chatbot :deep(.t-chat__inner) {
-  margin-bottom: 8px;
-}
-
-.builder-chatbot :deep(.t-chat__avatar) {
-  margin: 2px 8px 0 0;
-  padding-top: 0;
-}
-
-.builder-chatbot :deep(.t-chat__detail) {
-  min-width: 0;
-  max-width: calc(100% - 36px);
-  padding: 0 4px;
-}
-
-.builder-chatbot :deep(.t-chat__name) {
-  margin-bottom: 2px;
-  color: var(--td-text-color-secondary, #5e6d82);
-  font-size: 12px;
-  line-height: 18px;
-}
-
-.builder-chatbot :deep(.t-chat__inner.user .t-chat__avatar) {
-  margin: 2px 0 0 8px;
-}
-
-.cms-agui-message-content {
-  width: 100%;
-  min-width: 0;
-}
-
-.cms-ai-content-error {
-  color: var(--td-error-color, #d54941);
-}
-
-@keyframes cms-agui-pulse {
-  50% { opacity: .35; }
-}
 
 .grapes-shell {
   display: grid;
@@ -4458,10 +3622,58 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-panel.active {
-  grid-template-rows: minmax(0, 1fr) auto auto auto;
+  display: block !important;
   height: 100%;
-  gap: 12px;
+  padding: 0;
   overflow: hidden;
+}
+
+.ai-panel-actions {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-agent-select {
+  display: inline-flex;
+  min-width: 0;
+  flex: 1;
+  height: 28px;
+  align-items: center;
+  gap: 4px;
+  padding-left: 7px;
+  border-radius: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.ai-agent-select:hover,
+.ai-agent-select:focus-within {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.ai-agent-select :deep(.arco-select) {
+  min-width: 0;
+  flex: 1;
+}
+
+.ai-agent-select :deep(.arco-select-view-single) {
+  height: 26px;
+  min-width: 0;
+  padding: 0 5px;
+  border: 0;
+  background: transparent;
+  color: #475569;
+  font-size: 12px;
+}
+
+.ai-agent-select :deep(.arco-select-view-value) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-context {
@@ -4583,6 +3795,7 @@ function selectBreadcrumb(component: any) {
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
   color: #64748b;
   font-size: 12px;
   white-space: nowrap;
@@ -4691,204 +3904,6 @@ function selectBreadcrumb(component: any) {
   font-size: 11px;
 }
 
-.ai-history {
-  display: grid;
-  gap: 8px;
-  max-height: 280px;
-  min-height: 0;
-  padding: 10px;
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.ai-history__head,
-.ai-history__actions,
-.ai-history__detail-head,
-.ai-history__detail-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ai-history__head,
-.ai-history__detail-head {
-  justify-content: space-between;
-}
-
-.ai-history__head strong,
-.ai-history__detail-head strong {
-  display: block;
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.ai-history__head span {
-  display: block;
-  max-width: 160px;
-  overflow: hidden;
-  color: #64748b;
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-history button {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #475569;
-  cursor: pointer;
-}
-
-.ai-history button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.ai-history__actions button,
-.ai-history__detail-actions button,
-.ai-history__detail-head button,
-.ai-history__more {
-  min-height: 28px;
-  padding: 0 8px;
-  font-size: 12px;
-}
-
-.ai-history__list {
-  display: grid;
-  gap: 6px;
-  max-height: 116px;
-  overflow: auto;
-}
-
-.ai-history__list > button {
-  display: grid;
-  gap: 3px;
-  padding: 8px;
-  text-align: left;
-}
-
-.ai-history__list > button.active,
-.ai-history__list > button:hover {
-  border-color: #0f766e;
-  background: #ecfdf5;
-}
-
-.ai-history__list strong,
-.ai-history__list small,
-.ai-history__list span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ai-history__list strong {
-  color: #0f172a;
-  font-size: 12px;
-}
-
-.ai-history__list small,
-.ai-history__list span,
-.ai-history__empty {
-  color: #64748b;
-  font-size: 11px;
-}
-
-.ai-history__detail {
-  display: grid;
-  gap: 8px;
-  max-height: 140px;
-  overflow: auto;
-  padding-top: 8px;
-  border-top: 1px solid #e5e7eb;
-}
-
-.ai-history__detail article {
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.ai-history__detail article strong {
-  color: #0f766e;
-  font-size: 12px;
-}
-
-.ai-history__detail article p {
-  margin: 0;
-  color: #475569;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.builder-chatbot-wrap {
-  position: relative;
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto;
-  gap: 10px;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.builder-chatbot {
-  height: 100%;
-  min-height: 0;
-  overflow: auto;
-}
-
-.builder-chatbot :deep(t-chatbot) {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  height: 100%;
-  min-height: 0;
-  background: transparent;
-}
-
-.builder-chatbot :deep(t-chat-list),
-.builder-chatbot :deep(.t-chat-list) {
-  min-height: 0;
-  overflow: auto;
-}
-
-.builder-chatbot :deep(t-chat-sender),
-.builder-chatbot :deep(.t-chat-sender) {
-  overflow: hidden;
-  border: 1px solid #e5e7eb;
-  border-radius: 18px;
-  background: #fff;
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
-}
-
-.builder-chatbot :deep(textarea) {
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-.ai-model-select {
-  display: flex;
-  align-items: center;
-}
-
-.ai-model-select__control {
-  width: 128px;
-}
-
-.ai-model-select__control :deep(.t-input) {
-  height: 30px;
-  border-radius: 999px;
-  padding: 0 12px;
-  background: #f8fafc;
-  box-shadow: none;
-}
-
-.ai-model-select__control :deep(.t-input.t-is-focused) {
-  box-shadow: none;
-}
 
 :deep(.gjs-one-bg) {
   background-color: #fff;
