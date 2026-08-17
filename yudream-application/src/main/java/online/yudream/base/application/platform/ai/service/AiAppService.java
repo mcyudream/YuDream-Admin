@@ -51,16 +51,38 @@ public class AiAppService {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
-        return generateCmsPage(cmd, onDelta, onTool, onProgress, true);
+        return generateCmsPage(cmd, onDelta, null, onTool, onProgress, true);
+    }
+
+    @Transactional(readOnly = true)
+    public CmsPageGenerateDTO streamCmsPage(
+            CmsPageGenerateCmd cmd,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
+        return generateCmsPage(cmd, onDelta, onReasoningDelta, onTool, onProgress, true);
     }
 
     private CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd, Consumer<String> onDelta, boolean stream) {
-        return generateCmsPage(cmd, onDelta, null, null, stream);
+        return generateCmsPage(cmd, onDelta, null, null, null, stream);
     }
 
     private CmsPageGenerateDTO generateCmsPage(
             CmsPageGenerateCmd cmd,
             Consumer<String> onDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress,
+            boolean stream
+    ) {
+        return generateCmsPage(cmd, onDelta, null, onTool, onProgress, stream);
+    }
+
+    private CmsPageGenerateDTO generateCmsPage(
+            CmsPageGenerateCmd cmd,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress,
             boolean stream
@@ -87,6 +109,7 @@ public class AiAppService {
                         agentCmd,
                         event -> progress(onProgress, progressAction(event), progressContent(event)),
                         onDelta,
+                        onReasoningDelta,
                         onTool
                 )
                 : agentAppService.runByCode(agentCode, agentCmd);
@@ -206,8 +229,11 @@ public class AiAppService {
                 %s
                 CMS template runtime rules:
                 - Use {{cms.pages.latest.*}} for the latest published CMS pages.
-                - Use {{knowledge.spaces.*}}, {{knowledge.pages.*}} and {{knowledge.latest.*}} for public published knowledge content.
-                - Use data-yb-repeat="cms.pages.latest", data-yb-repeat="knowledge.pages", data-yb-repeat="knowledge.latest" or data-yb-repeat="knowledge.spaces" for lists.
+                - Use {{knowledge.spaces.*}} for public knowledge spaces and {{knowledge.pages.*}} for all public published knowledge pages.
+                - Use {{knowledge.latest.*}} for the most recently updated public knowledge pages.
+                - Use {{knowledge.featured.*}} for editor-recommended public knowledge pages ordered by Wiki sort; it is not a popularity or hotness ranking.
+                - Use data-yb-repeat="cms.pages.latest", data-yb-repeat="knowledge.pages", data-yb-repeat="knowledge.latest", data-yb-repeat="knowledge.featured" or data-yb-repeat="knowledge.spaces" for lists.
+                - Content items expose createdAt, publishedAt and updatedAt. Prefer publishedAt for publication dates and updatedAt for update dates.
                 - Use data-yb-html="{{item.htmlContent}}" or data-yb-markdown="{{item.markdownContent}}" only when the template needs rendered content; never insert draft or private data.
                 - These values are resolved at public page runtime. Generate template HTML/CSS only; never claim to publish content or call a publish action.
 

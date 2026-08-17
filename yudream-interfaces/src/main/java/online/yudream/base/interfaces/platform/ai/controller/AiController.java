@@ -71,6 +71,7 @@ public class AiController {
                 var result = aiAppService.streamCmsPage(
                         command,
                         delta -> send(emitter, AiWebAssembler.toAguiTextChunk(traceId, delta)),
+                        reasoning -> send(emitter, AiWebAssembler.toAguiThinkingChunk(traceId, reasoning)),
                         tool -> {
                             String toolCallId = traceId + "-tool-" + toolSequence.incrementAndGet();
                             send(emitter, AiWebAssembler.toAguiToolStart(traceId, toolCallId, tool));
