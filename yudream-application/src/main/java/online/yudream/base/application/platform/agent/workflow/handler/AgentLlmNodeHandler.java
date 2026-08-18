@@ -340,11 +340,63 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         try {
             return objectMapper.readValue(json, Object.class);
         } catch (Exception exception) {
+            Object embedded = embeddedJson(json);
+            if (embedded != null) {
+                return embedded;
+            }
             if (!strictJson) {
                 return Map.of("raw", json);
             }
             throw new BizException(invalidJsonMessage);
         }
+    }
+
+    /** 模型在 JSON 前后夹杂说明文字时，截取第一个配平的 JSON 对象/数组再解析。 */
+    private Object embeddedJson(String text) {
+        int start = -1;
+        for (int index = 0; index < text.length(); index++) {
+            char current = text.charAt(index);
+            if (current == '{' || current == '[') {
+                start = index;
+                break;
+            }
+        }
+        if (start < 0) {
+            return null;
+        }
+        char open = text.charAt(start);
+        char close = open == '{' ? '}' : ']';
+        int depth = 0;
+        boolean inString = false;
+        boolean escaped = false;
+        for (int index = start; index < text.length(); index++) {
+            char current = text.charAt(index);
+            if (inString) {
+                if (escaped) {
+                    escaped = false;
+                } else if (current == '\\') {
+                    escaped = true;
+                } else if (current == '"') {
+                    inString = false;
+                }
+                continue;
+            }
+            if (current == '"') {
+                inString = true;
+            } else if (current == open) {
+                depth++;
+            } else if (current == close) {
+                depth--;
+                if (depth == 0) {
+                    try {
+                        return objectMapper.readValue(text.substring(start, index + 1), Object.class);
+                    } catch (Exception ignored) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     private String stringify(Object input) {
