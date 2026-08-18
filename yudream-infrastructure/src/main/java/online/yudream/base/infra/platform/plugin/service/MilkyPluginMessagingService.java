@@ -162,9 +162,33 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             case COMPOSITE -> Map.of("type", "forward", "data", compositeData(content.content()));
             default -> Map.of("type", "text", "data", Map.of("text", content.content()));
         };
-        List<Map<String, Object>> message = List.of(segment);
+        List<Map<String, Object>> message = new java.util.ArrayList<>();
+        message.add(segment);
+        // 附件按类型渲染为同一条消息的后续分段（图片/语音/视频/文件），实现图文混排
+        for (PluginMessageContent.Attachment attachment : content.attachments()) {
+            Map<String, Object> attachmentSegment = attachmentSegment(attachment);
+            if (attachmentSegment != null) {
+                message.add(attachmentSegment);
+            }
+        }
         Map<String, Object> result = map(apiGateway.invoke(context(connection), api, Map.of(idKey, peer, "message", message)));
         return new PluginMessageResult(List.of(String.valueOf(result.getOrDefault("message_seq", ""))), false, false);
+    }
+
+    /** 附件转消息分段：仅支持可内联的媒体类型，未知类型跳过 */
+    private Map<String, Object> attachmentSegment(PluginMessageContent.Attachment attachment) {
+        if (attachment == null || attachment.url() == null || attachment.url().isBlank()) {
+            return null;
+        }
+        String contentType = attachment.contentType() == null ? "" : attachment.contentType().toLowerCase(java.util.Locale.ROOT);
+        String type = contentType.startsWith("image/") ? "image"
+                : contentType.startsWith("audio/") ? "record"
+                : contentType.startsWith("video/") ? "video"
+                : null;
+        if (type == null) {
+            return null;
+        }
+        return Map.of("type", type, "data", Map.of("uri", attachment.url()));
     }
 
     private Map<String, Object> compositeData(String content) {
