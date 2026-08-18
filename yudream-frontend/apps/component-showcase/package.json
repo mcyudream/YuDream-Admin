@@ -1,0 +1,29 @@
+{
+  "name": "@fantastic-admin/component-showcase",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview --port 5188",
+    "test:typecheck": "vue-tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@arco-design/color": "^0.4.0",
+    "@arco-design/web-vue": "catalog:arco-design-vue",
+    "@yudream/components": "workspace:*",
+    "vue": "catalog:"
+  },
+  "devDependencies": {
+    "@fantastic-admin/composables": "workspace:*",
+    "@types/node": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "@vue/tsconfig": "catalog:",
+    "typescript": "catalog:",
+    "unocss": "catalog:",
+    "unplugin-auto-import": "catalog:",
+    "unplugin-vue-components": "catalog:",
+    "vite": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

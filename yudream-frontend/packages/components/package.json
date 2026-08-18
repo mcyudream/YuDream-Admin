@@ -19,6 +19,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./ai": "./src/ai/index.ts",
     "./examples": "./src/examples.ts",
     "./resolver": "./resolver.ts"
   },
@@ -45,8 +46,10 @@
     "axios": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
+    "echarts": "catalog:",
     "es-toolkit": "catalog:",
     "filesize": "catalog:",
+    "md-editor-v3": "catalog:",
     "reka-ui": "catalog:",
     "tailwind-merge": "catalog:",
     "vue-input-otp": "catalog:",
