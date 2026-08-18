@@ -57,6 +57,7 @@ public class AgentAppService {
     private final AgentApplicationRepo applicationRepo;
     private final AgentToolRepo toolRepo;
     private final ObjectProvider<AiAgentTool> systemToolProvider;
+    private final ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> pluginToolGateways;
     private final AgentModelCatalogParser modelCatalogParser;
     private final WikiSpaceRepo wikiSpaceRepo;
     private final AgentWorkflowRuntimeService workflowRuntime;
@@ -257,16 +258,32 @@ public class AgentAppService {
     @Transactional(readOnly = true)
     public List<Map<String, Object>> systemTools() {
         ensureEnabled();
-        return systemToolProvider.stream().map(tool -> {
+        List<Map<String, Object>> result = new java.util.ArrayList<>(systemToolProvider.stream().map(tool -> {
             var descriptor = tool.descriptor();
             return Map.<String, Object>of(
                     "code", descriptor.name(),
                     "name", descriptor.title(),
                     "description", descriptor.description(),
                     "permissionCode", descriptor.permissionCode(),
-                    "inputSchema", descriptor.inputSchema()
+                    "inputSchema", descriptor.inputSchema(),
+                    "source", "system"
             );
-        }).toList();
+        }).toList());
+        Set<String> listed = result.stream().map(item -> String.valueOf(item.get("code"))).collect(java.util.stream.Collectors.toSet());
+        pluginToolGateways.stream().flatMap(gateway -> gateway.pluginTools().stream()).forEach(descriptor -> {
+            if (descriptor == null || descriptor.name() == null || !listed.add(descriptor.name())) {
+                return;
+            }
+            Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("code", descriptor.name());
+            item.put("name", descriptor.title() == null || descriptor.title().isBlank() ? descriptor.name() : descriptor.title());
+            item.put("description", descriptor.description() == null ? "" : descriptor.description());
+            item.put("permissionCode", descriptor.permissionCode() == null ? "" : descriptor.permissionCode());
+            item.put("inputSchema", descriptor.inputSchema() == null ? Map.of() : descriptor.inputSchema());
+            item.put("source", "plugin");
+            result.add(item);
+        });
+        return List.copyOf(result);
     }
 
     @Transactional(readOnly = true)

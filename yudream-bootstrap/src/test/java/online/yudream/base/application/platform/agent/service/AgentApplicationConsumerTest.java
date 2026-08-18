@@ -29,6 +29,13 @@ import static org.mockito.Mockito.when;
 
 class AgentApplicationConsumerTest {
 
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> emptyPluginTools() {
+        ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenReturn(Stream.empty());
+        return provider;
+    }
+
     @Test
     void listsPublishedApplicationsAndRunsByStableCode() {
         AgentApplicationRepo applicationRepo = mock(AgentApplicationRepo.class);
@@ -40,7 +47,7 @@ class AgentApplicationConsumerTest {
         when(tools.stream()).thenReturn(Stream.empty());
         AgentAppService service = new AgentAppService(
                 mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
-                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentToolRepo.class), tools, emptyPluginTools(), mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
                 workflowRuntime, mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
         );
         AgentApplication application = AgentApplication.builder()
@@ -91,7 +98,7 @@ class AgentApplicationConsumerTest {
                 .thenReturn(new AgentWorkflowRuntimeResult("plugin reply", List.of()));
         AgentAppService service = new AgentAppService(
                 mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
-                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentToolRepo.class), tools, emptyPluginTools(), mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
                 workflowRuntime, mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
         );
 
@@ -117,7 +124,7 @@ class AgentApplicationConsumerTest {
         when(tools.stream()).thenReturn(Stream.empty());
         AgentAppService service = new AgentAppService(
                 mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
-                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentToolRepo.class), tools, emptyPluginTools(), mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
                 mock(AgentWorkflowRuntimeService.class), mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
         );
 
@@ -147,7 +154,7 @@ class AgentApplicationConsumerTest {
         when(tools.stream()).thenReturn(Stream.empty());
         AgentAppService service = new AgentAppService(
                 mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
-                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentToolRepo.class), tools, emptyPluginTools(), mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
                 mock(AgentWorkflowRuntimeService.class), mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
         );
 
@@ -179,7 +186,7 @@ class AgentApplicationConsumerTest {
         when(tools.stream()).thenReturn(Stream.empty());
         AgentAppService service = new AgentAppService(
                 mock(CapabilityAppService.class), mock(CapabilityModuleRepo.class), applicationRepo,
-                mock(AgentToolRepo.class), tools, mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
+                mock(AgentToolRepo.class), tools, emptyPluginTools(), mock(AgentModelCatalogParser.class), mock(WikiSpaceRepo.class),
                 workflowRuntime, mock(AgentWorkflowValidator.class), permission -> true, runtimeApplications
         );
 
