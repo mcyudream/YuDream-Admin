@@ -1,0 +1,30 @@
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+/* 示例分组小标题 */
+.demo-label {
+  margin: 0;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+/* 示例横向排列 */
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}

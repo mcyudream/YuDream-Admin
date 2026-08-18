@@ -12,13 +12,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
-    AppAccountButton: typeof import('./../components/AppAccountButton/index.vue')['default']
-    AppAuth: typeof import('./../components/AppAuth/index.vue')['default']
-    AppBackToTop: typeof import('./../components/AppBackToTop/index.vue')['default']
-    AppCopyright: typeof import('./../components/AppCopyright/index.vue')['default']
-    AppNotAllowed: typeof import('./../components/AppNotAllowed/index.vue')['default']
-    AppNotSupportedMobile: typeof import('./../components/AppNotSupportedMobile/index.vue')['default']
-    AppSystemInfo: typeof import('./../components/AppSystemInfo/index.vue')['default']
+    DemoCard: typeof import('./../components/DemoCard.vue')['default']
     FaAlert: typeof import('@yudream/components')['FaAlert']
     FaAvatar: typeof import('@yudream/components')['FaAvatar']
     FaBadge: typeof import('@yudream/components')['FaBadge']
@@ -66,19 +60,13 @@ declare module 'vue' {
     FaToast: typeof import('@yudream/components')['FaToast']
     FaTooltip: typeof import('@yudream/components')['FaTooltip']
     FaTrend: typeof import('@yudream/components')['FaTrend']
-    YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
+    ThemePanel: typeof import('./../components/ThemePanel.vue')['default']
   }
 }
 
 // For TSX support
 declare global {
-  const AppAccountButton: typeof import('./../components/AppAccountButton/index.vue')['default']
-  const AppAuth: typeof import('./../components/AppAuth/index.vue')['default']
-  const AppBackToTop: typeof import('./../components/AppBackToTop/index.vue')['default']
-  const AppCopyright: typeof import('./../components/AppCopyright/index.vue')['default']
-  const AppNotAllowed: typeof import('./../components/AppNotAllowed/index.vue')['default']
-  const AppNotSupportedMobile: typeof import('./../components/AppNotSupportedMobile/index.vue')['default']
-  const AppSystemInfo: typeof import('./../components/AppSystemInfo/index.vue')['default']
+  const DemoCard: typeof import('./../components/DemoCard.vue')['default']
   const FaAlert: typeof import('@yudream/components')['FaAlert']
   const FaAvatar: typeof import('@yudream/components')['FaAvatar']
   const FaBadge: typeof import('@yudream/components')['FaBadge']
@@ -126,5 +114,5 @@ declare global {
   const FaToast: typeof import('@yudream/components')['FaToast']
   const FaTooltip: typeof import('@yudream/components')['FaTooltip']
   const FaTrend: typeof import('@yudream/components')['FaTrend']
-  const YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
+  const ThemePanel: typeof import('./../components/ThemePanel.vue')['default']
 }

@@ -57,3 +57,6 @@ export { useToast as useFaToast } from './basic/toast/index'
 export { default as FaToast } from './basic/toast/index.vue'
 export { default as FaTooltip } from './basic/tooltip/index.vue'
 export { default as FaTrend } from './basic/trend/index.vue'
+
+// yd AI 对话元件
+export * from './ai/index'
