@@ -19,6 +19,7 @@ export interface WikiSpace {
   topK: number
   queryExpansionEnabled: boolean
   rerankEnabled: boolean
+  hitImageLimit?: number
   purpose?: string
   schemaContent?: string
   language?: string

@@ -295,6 +295,11 @@ onMounted(loadGraphConnections)
               <small class="set-hint">向量索引与知识图谱写入所选连接；不选时写入服务端默认连接（yudream.platform.wiki.neo4j.*），连接在「平台 → 图数据库」维护</small>
             </label>
             <label class="set-field">
+              <span>命中图片上限（hitImageLimit）</span>
+              <FaNumberField :model-value="form.hitImageLimit ?? 4" :min="0" :max="12" @update:model-value="(value: number) => form.hitImageLimit = value" />
+              <small class="set-hint">检索/问答每条命中最多随带的相关图片数，0 表示不带图片</small>
+            </label>
+            <label class="set-field">
               <span>Top K</span>
               <FaNumberField :model-value="form.topK ?? 8" :min="1" :max="50" @update:model-value="(value: number) => form.topK = value" />
             </label>
