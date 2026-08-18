@@ -104,6 +104,9 @@ public final class WikiWebAssembler {
             event.put("title", nullToEmpty(citation.title()));
             event.put("path", nullToEmpty(citation.path()));
             event.put("nodeId", nullToEmpty(citation.nodeId()));
+            event.put("images", citation.images() == null ? List.of() : citation.images().stream()
+                    .map(image -> Map.of("url", nullToEmpty(image.url()), "caption", nullToEmpty(image.caption())))
+                    .toList());
             return event;
         }).toList();
     }
