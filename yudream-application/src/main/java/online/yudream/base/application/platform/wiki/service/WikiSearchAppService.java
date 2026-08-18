@@ -385,18 +385,57 @@ public class WikiSearchAppService {
         return ratio + phraseBonus;
     }
 
+    /**
+     * 保守分词：按空白与标点拆分；其中中文连续段在超过 2 字时再展开为二字滑窗（bigram），
+     * 否则“服务器怎么进入”这类无空格中文问句只能整串精确匹配，永远命中不了“服务器进入教程”。
+     */
     private List<String> tokenize(String query) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
         List<String> terms = new ArrayList<>();
         for (String token : query.strip().toLowerCase(Locale.ROOT).split("[\\p{P}\\s]+")) {
-            if (!token.isBlank()) {
-                terms.add(token);
+            if (token.isBlank()) {
+                continue;
             }
+            addToken(terms, token);
         }
-        return terms;
+        return List.copyOf(terms);
     }
+
+    private void addToken(List<String> terms, String token) {
+        Matcher matcher = CJK_RUN.matcher(token);
+        int cursor = 0;
+        while (matcher.find()) {
+            String prefix = token.substring(cursor, matcher.start());
+            if (!prefix.isBlank()) {
+                addTerm(terms, prefix);
+            }
+            String run = matcher.group();
+            if (run.length() <= 2) {
+                addTerm(terms, run);
+            }
+            else {
+                for (int index = 0; index + 2 <= run.length(); index++) {
+                    addTerm(terms, run.substring(index, index + 2));
+                }
+            }
+            cursor = matcher.end();
+        }
+        // 无中文段时 suffix 即整词；有中文段时附带的英文/数字片段也在此收录
+        String suffix = token.substring(cursor);
+        if (!suffix.isBlank()) {
+            addTerm(terms, suffix);
+        }
+    }
+
+    private void addTerm(List<String> terms, String term) {
+        if (!term.isBlank() && !terms.contains(term)) {
+            terms.add(term);
+        }
+    }
+
+    private static final Pattern CJK_RUN = Pattern.compile("[\\u4e00-\\u9fff\\u3400-\\u4dbf]+");
 
     private Map<Long, PublishedPage> publishedPages(WikiSpace space) {
         List<WikiNode> all = nodes.findBySpaceId(space.getId());

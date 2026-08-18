@@ -217,6 +217,21 @@ class WikiSearchAppServiceTest {
     }
 
     @Test
+    void publicSearchMatchesChineseQuestionAgainstRelatedTitle() {
+        WikiNode tutorial = page(1L, null, "join", "服务器进入教程");
+        publish(tutorial, "服务器进入教程", "获取服务器 IP 后在多人游戏里添加服务器。");
+        WikiNode other = page(2L, null, "account", "角色配置");
+        publish(other, "角色配置", "创建游戏角色并设置外观。");
+        setupPublicSpace(List.of(tutorial, other));
+
+        // “服务器怎么进入”是无空格中文问句，不能再要求整串精确命中
+        var result = service.searchForPublicSite("demo", "服务器怎么进入", 5, null, false);
+
+        assertThat(result).isNotEmpty();
+        assertThat(result.get(0).getNodeId()).isEqualTo("1");
+    }
+
+    @Test
     void adminSearchPassesGraphExpansionWhenSpaceGraphIsEnabled() {
         WikiSpace space = setupGraphSearchSpace(true);
         when(indexes.search(space, "部署", 10, null, true)).thenReturn(List.of());
