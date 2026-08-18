@@ -191,6 +191,10 @@
     {
       "key": "plugin-agent-legacy-overlay-migration",
       "text": "When a reserved plugin-managed Agent code has a legacy persisted record without sourcePluginCode, importing the active plugin Agent must reuse that record, mark its source plugin, replace it with the runtime workflow as a DRAFT overlay, and save it. Arbitrary non-plugin local code collisions must still be rejected."
+    },
+    {
+      "key": "chat-wiki-permission-snapshot",
+      "text": "聊天从前端接收 Wiki slug/all 时，必须在任何空间枚举、检索或目录读取前校验服务端捕获的 Wiki 查看权限快照；聊天目录兜底只能物化已发布版本，禁止复用可能返回 markdownDraft 的管理目录接口。"
     }
   ],
   "utilities": [

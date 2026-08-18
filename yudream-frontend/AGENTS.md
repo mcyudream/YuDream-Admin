@@ -61,7 +61,8 @@ pnpm lint         # 运行全量 lint（tsc + eslint + stylelint）
 
 ## 注意事项
 
-- 框架内建组件在 `packages/components/` 子包中，优先使用内建组件而非第三方组件或自定义实现
+- 框架内建组件在 `packages/components/` 子包中，优先使用内建组件而非第三方组件或自定义实现；页面控件优先使用 `Fa*`，AI/对话等领域能力优先使用 `Yd*`。
+- 主题、主色和深浅模式由后台主题配置与组件体系统一控制。业务页面不得自行声明品牌色、固定色板或手写主色强调态；只使用中性语义变量和组件内建状态样式。
 - 在任何情况下都请勿直接修改内建组件，确定修改前需要和用户进行确认
 - Mock 数据使用 `vite-plugin-fake-server`，文件放在 `apps/<app>/src/api/modules/` 对应模块旁
 - 代码提交前会自动运行 lint-staged，确保代码符合规范
