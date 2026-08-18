@@ -95,6 +95,51 @@ const aiChatPanelRef = ref<InstanceType<typeof YdAgentChatPanel>>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
 const aiAgentCode = ref('')
+// 本地极简 Agent 下拉：内建 FaSelect 的弹层在本自定义全屏构建器里动画/主题变量不可靠，改用自绘弹层
+const agentSelectOpen = ref(false)
+const agentPopStyle = ref<Record<string, string>>({})
+const agentSelectEl = ref<HTMLElement | null>(null)
+const aiAgentLabel = computed(() =>
+  (props.aiAgentOptions || []).find(option => option.value === aiAgentCode.value)?.label || 'Agent',
+)
+
+function closeAgentSelect() {
+  agentSelectOpen.value = false
+  document.removeEventListener('pointerdown', onAgentSelectOutside, true)
+  window.removeEventListener('resize', closeAgentSelect)
+}
+
+function onAgentSelectOutside(ev: Event) {
+  const target = ev.target as Node | null
+  const pop = document.querySelector('.ai-agent-pop')
+  if (agentSelectEl.value?.contains(target) || pop?.contains(target)) {
+    return
+  }
+  closeAgentSelect()
+}
+
+function toggleAgentSelect() {
+  if (agentSelectOpen.value) {
+    closeAgentSelect()
+    return
+  }
+  const rect = agentSelectEl.value?.getBoundingClientRect()
+  if (rect) {
+    agentPopStyle.value = {
+      left: `${Math.round(rect.left)}px`,
+      bottom: `${Math.round(window.innerHeight - rect.top + 6)}px`,
+      width: `${Math.max(Math.round(rect.width), 200)}px`,
+    }
+  }
+  agentSelectOpen.value = true
+  document.addEventListener('pointerdown', onAgentSelectOutside, true)
+  window.addEventListener('resize', closeAgentSelect)
+}
+
+function pickAgent(value: string) {
+  aiAgentCode.value = value
+  closeAgentSelect()
+}
 const aiThinkingEnabled = ref(false)
 const rightPanelTab = ref<RightPanelTab>(props.aiEnabled ? 'ai' : 'layers')
 const leftWorkspace = ref<LeftWorkspace>('blocks')
@@ -734,6 +779,7 @@ onBeforeUnmount(() => {
   blockPanelObserver = null
   canvasResizeObserver?.disconnect()
   canvasResizeObserver = null
+  closeAgentSelect()
   if (canvasRecenterTimer) {
     clearTimeout(canvasRecenterTimer)
     canvasRecenterTimer = null
@@ -2830,14 +2876,36 @@ function selectBreadcrumb(component: any) {
           >
             <template #actions>
               <div class="ai-panel-actions">
-                <div v-if="aiAgentOptions?.length" class="ai-agent-select" title="切换 Agent">
-                  <FaIcon name="i-ri:robot-2-line" />
-                  <FaSelect
-                    v-model="aiAgentCode"
-                    :options="aiAgentOptions"
-                    placeholder="Agent"
+                <div v-if="aiAgentOptions?.length" ref="agentSelectEl" class="ai-agent-select" title="切换 Agent">
+                  <button
+                    type="button"
                     class="ai-agent-select-trigger"
-                  />
+                    :class="{ open: agentSelectOpen }"
+                    aria-haspopup="listbox"
+                    :aria-expanded="agentSelectOpen"
+                    @click.stop="toggleAgentSelect"
+                  >
+                    <FaIcon name="i-ri:robot-2-line" class="ai-agent-select-icon" />
+                    <span class="ai-agent-select-label">{{ aiAgentLabel }}</span>
+                    <FaIcon name="i-ri:arrow-down-s-line" class="ai-agent-select-caret" />
+                  </button>
+                  <Teleport to="body">
+                    <div v-if="agentSelectOpen" class="ai-agent-pop" :style="agentPopStyle" role="listbox" @click.stop>
+                      <button
+                        v-for="opt in aiAgentOptions"
+                        :key="opt.value"
+                        type="button"
+                        class="ai-agent-pop-item"
+                        :class="{ active: opt.value === aiAgentCode }"
+                        role="option"
+                        :aria-selected="opt.value === aiAgentCode"
+                        @click="pickAgent(opt.value)"
+                      >
+                        <span class="ai-agent-pop-item-label">{{ opt.label }}</span>
+                        <FaIcon v-if="opt.value === aiAgentCode" name="i-ri:check-line" class="ai-agent-pop-item-check" />
+                      </button>
+                    </div>
+                  </Teleport>
                 </div>
                 <label class="ai-thinking-switch">
                   <FaSwitch v-model="aiThinkingEnabled" />
@@ -3839,34 +3907,109 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-agent-select {
-  display: inline-flex;
   min-width: 0;
   flex: 1;
-  height: 28px;
-  align-items: center;
-  gap: 4px;
-  padding-left: 7px;
-  border-radius: 6px;
-  color: #64748b;
-  font-size: 12px;
 }
 
-.ai-agent-select:hover,
-.ai-agent-select:focus-within {
+.ai-agent-select-trigger {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #475569;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.ai-agent-select-trigger:hover,
+.ai-agent-select-trigger.open {
   background: #f1f5f9;
   color: #0f172a;
 }
 
-.ai-agent-select-trigger {
-  height: 26px;
+.ai-agent-select-icon {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.ai-agent-select-label {
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-agent-select-caret {
+  flex-shrink: 0;
+  color: #94a3b8;
+  font-size: 14px;
+  transition: transform 0.15s;
+}
+
+.ai-agent-select-trigger.open .ai-agent-select-caret {
+  transform: rotate(180deg);
+}
+
+/* Teleport 到 body 的弹层（scoped 样式随组件作用域生效） */
+.ai-agent-pop {
+  position: fixed;
+  z-index: 4000;
+  max-height: 320px;
+  padding: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.ai-agent-pop-item {
+  display: flex;
   width: 100%;
-  padding: 0 4px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
   border: 0;
+  border-radius: 7px;
   background: transparent;
-  box-shadow: none;
-  color: #475569;
+  color: #334155;
+  font: inherit;
   font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ai-agent-pop-item:hover {
+  background: #f1f5f9;
+}
+
+.ai-agent-pop-item.active {
+  color: #0f172a;
+  font-weight: 500;
+}
+
+.ai-agent-pop-item-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-agent-pop-item-check {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 13px;
 }
 
 .ai-context {
