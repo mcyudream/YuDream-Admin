@@ -50,6 +50,7 @@ public class AiWebAssembler {
         cmd.setCurrentSelectionJson(request.getCurrentSelectionJson());
         cmd.setCmsVariableContextJson(request.getCmsVariableContextJson());
         cmd.setThinkingEnabled(request.isThinkingEnabled());
+        cmd.setMode(request.getMode());
         cmd.setHistory(toHistory(request.getHistory()));
         if (principal != null) {
             cmd.setPermissionCodes(principal.permissions() == null ? List.of() : List.copyOf(principal.permissions()));
@@ -174,6 +175,18 @@ public class AiWebAssembler {
                 .toolCallId(toolCallId)
                 .toolCallName(result.toolName())
                 .content(JSONUtil.toJsonStr(toToolRes(result)))
+                .build();
+    }
+
+    /**
+     * v2 客户端工具请求：服务端挂起模型循环，等浏览器在画布上真实执行后回传 TOOL_RESULT 帧。
+     */
+    public static AguiStreamEventRes toAguiToolCallRequest(String traceId, String toolCallId, String toolName, Map<String, Object> args) {
+        return agui("TOOL_CALL_REQUEST", traceId)
+                .toolCallId(toolCallId)
+                .toolCallName(toolName)
+                .parentMessageId("assistant-" + traceId)
+                .content(args == null ? Map.of() : args)
                 .build();
     }
 
