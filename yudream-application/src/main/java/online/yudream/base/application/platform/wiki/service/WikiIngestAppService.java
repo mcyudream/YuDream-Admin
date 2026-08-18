@@ -16,10 +16,12 @@ import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiIngestTask;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
+import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiReviewItem;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSource;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiExtractionStatus;
+import online.yudream.base.domain.platform.wiki.enumerate.WikiIndexStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiIngestTaskStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiIngestTaskType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
@@ -27,6 +29,7 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiPageType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiReviewItemType;
 import online.yudream.base.domain.platform.wiki.repo.WikiIngestTaskRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
+import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiReviewItemRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
@@ -68,6 +71,7 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
     private final AiGenerationGateway aiGeneration;
     private final WikiSpaceRepo spaceRepo;
     private final WikiNodeRepo nodeRepo;
+    private final WikiPageVersionRepo versionRepo;
     private final WikiSourceRepo sourceRepo;
     private final WikiIngestTaskRepo taskRepo;
     private final WikiReviewItemRepo reviewItemRepo;
@@ -329,6 +333,10 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
 
     private void doReindex(WikiIngestTask task, Consumer<WikiIngestProgress> progress) {
         WikiSpace space = spaceRepo.findById(task.getSpaceId()).orElseThrow(() -> new BizException("知识库不存在"));
+        if (space.getEmbeddingProviderCode() == null || space.getEmbeddingProviderCode().isBlank()
+                || space.getEmbeddingModelCode() == null || space.getEmbeddingModelCode().isBlank()) {
+            throw new BizException("知识库未配置 Embedding Provider 和模型，无法构建向量索引；请先在知识库设置中配置后再重建索引");
+        }
         progress(task, null, "rebuild", "重建 index/overview", 20);
         updateIndex(space);
         updateOverview(space);
@@ -337,7 +345,28 @@ public class WikiIngestAppService implements WikiIngestTaskRunner {
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE)
                 .map(WikiNode::getId).toList();
         publishPages(nodeIds);
+        List<String> failures = indexFailures(nodeIds);
+        if (!failures.isEmpty()) {
+            throw new BizException("索引重建结束，但 " + failures.size() + "/" + nodeIds.size()
+                    + " 个页面索引失败：" + failures.getFirst());
+        }
         progress(task, null, "done", "重建完成", 100);
+    }
+
+    /** 汇总本次发布后仍处于索引失败的页面及原因 */
+    private List<String> indexFailures(List<Long> nodeIds) {
+        List<String> failures = new ArrayList<>();
+        for (Long nodeId : nodeIds) {
+            WikiNode node = nodeRepo.findById(nodeId).orElse(null);
+            if (node == null || node.getPublishedVersionId() == null) {
+                continue;
+            }
+            WikiPageVersion version = versionRepo.findById(node.getPublishedVersionId()).orElse(null);
+            if (version != null && version.getIndexStatus() == WikiIndexStatus.FAILED) {
+                failures.add("《" + node.getTitle() + "》" + (version.getIndexError() == null ? "" : "：" + version.getIndexError()));
+            }
+        }
+        return failures;
     }
 
     // ---------- 两步思维链 ----------
