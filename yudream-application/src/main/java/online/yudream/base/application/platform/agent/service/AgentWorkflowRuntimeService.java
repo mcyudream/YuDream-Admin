@@ -58,6 +58,7 @@ public class AgentWorkflowRuntimeService {
     private final ObjectProvider<AiAgentTool> systemToolProvider;
     private final AgentKnowledgeOperations knowledgeOperations;
     private final DocumentTextExtractor documentTextExtractor;
+    private final ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> pluginToolGateways;
     private final AgentPermissionGateway permissionGateway;
     private final CapabilityAppService capabilityAppService;
 
@@ -99,7 +100,7 @@ public class AgentWorkflowRuntimeService {
                 .map(tool -> tool.descriptor().name())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         AgentToolExecutor toolExecutor = new AgentToolExecutor(
-                objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway
+                objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, pluginToolGateways
         );
         AgentWorkflowRunState state = new AgentWorkflowRunState(
                 application,

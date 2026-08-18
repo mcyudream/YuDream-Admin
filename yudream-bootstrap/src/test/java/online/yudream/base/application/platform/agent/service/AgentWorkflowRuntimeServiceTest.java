@@ -38,6 +38,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class AgentWorkflowRuntimeServiceTest {
 
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> emptyPluginToolGateways() {
+        ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenReturn(Stream.empty());
+        return provider;
+    }
+
     @Test
     void shouldRunExtractNodeWithoutEnablingIntegrationForSystemModelTool() {
         ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
@@ -64,7 +71,7 @@ class AgentWorkflowRuntimeServiceTest {
         var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true, capability
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability
         );
         AgentApplication application = AgentApplication.builder().name("Extract").code("extract")
                 .toolCodes(List.of("web.fetch"))
@@ -100,7 +107,7 @@ class AgentWorkflowRuntimeServiceTest {
         var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), toolRepo, gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true, capability
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability
         );
         AgentApplication application = AgentApplication.builder().name("Python model").code("python-model")
                 .toolCodes(List.of("risk_score"))
@@ -124,7 +131,7 @@ class AgentWorkflowRuntimeServiceTest {
     void shouldNotEnablePythonIntegrationWhenModelToolModeIsNone() {
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), mock(ObjectProvider.class), mock(ObjectProvider.class),
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true,
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true,
                 mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
         var data = new ObjectMapper().createObjectNode()
@@ -149,7 +156,7 @@ class AgentWorkflowRuntimeServiceTest {
         when(tools.stream()).thenReturn(Stream.of(protectedTool));
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class),
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(),
                 permission -> { throw new AssertionError("Thread permission context must not be read"); },
                 mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
@@ -182,7 +189,7 @@ class AgentWorkflowRuntimeServiceTest {
                 gateways,
                 tools,
                 mock(AgentKnowledgeOperations.class),
-                mock(DocumentTextExtractor.class),
+                mock(DocumentTextExtractor.class), emptyPluginToolGateways(),
                 permission -> true,
                 mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
@@ -223,7 +230,7 @@ class AgentWorkflowRuntimeServiceTest {
         when(tools.stream()).thenReturn(Stream.empty());
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> true
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true
                 , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
         AgentApplication application = AgentApplication.builder()
@@ -260,7 +267,7 @@ class AgentWorkflowRuntimeServiceTest {
         when(tools.stream()).thenReturn(Stream.of(protectedTool));
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), permission -> false
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> false
                 , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
         );
         AgentApplication application = AgentApplication.builder()

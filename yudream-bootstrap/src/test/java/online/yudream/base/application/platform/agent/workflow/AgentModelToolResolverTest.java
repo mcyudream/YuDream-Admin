@@ -18,14 +18,18 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.integration.enumerate.ExecutionStatus;
 import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class AgentModelToolResolverTest {
 
@@ -168,6 +172,40 @@ class AgentModelToolResolverTest {
         assertThatThrownBy(() -> tool.execute(new AiAgentToolCall("risk_score", Map.of("score", 95))))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessage("runtime unavailable");
+    }
+
+    @Test
+    void shouldResolvePluginRuntimeToolInsteadOfDeclaringItMissing() {
+        AiAgentTool pluginTool = new AiAgentTool() {
+            @Override public AiAgentToolDescriptor descriptor() {
+                return new AiAgentToolDescriptor("minecraft.server.status", "服务器状态", "查询 MC 服务器状态",
+                        "plugin:minecraft:status", null, null, null, Map.of());
+            }
+            @Override public AiAgentToolResult execute(AiAgentToolCall call) {
+                return new AiAgentToolResult("minecraft.server.status", "query", "trace", "在线 3 人", Map.of("online", 3));
+            }
+        };
+        @SuppressWarnings("unchecked") ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> gateways = mock(ObjectProvider.class);
+        online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway fullGateway = new online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway() {
+            @Override public List<AiAgentToolDescriptor> pluginTools() { return List.of(pluginTool.descriptor()); }
+            @Override public AiAgentTool pluginTool(String toolCode) { return "minecraft.server.status".equals(toolCode) ? pluginTool : null; }
+        };
+        when(gateways.stream()).thenReturn(Stream.of(fullGateway));
+        AgentToolExecutor executor = new AgentToolExecutor(
+                new ObjectMapper(),
+                (script, stdin) -> failRuntime(),
+                emptyToolRepo(),
+                List.of(),
+                permission -> true,
+                gateways
+        );
+
+        AiAgentTool resolved = executor.resolve("minecraft.server.status", application("minecraft.server.status"),
+                command("plugin:minecraft:status"));
+
+        assertThat(resolved.descriptor().name()).isEqualTo("minecraft.server.status");
+        assertThat(resolved.execute(new AiAgentToolCall("minecraft.server.status", Map.of())).payload())
+                .containsEntry("online", 3);
     }
 
     private AgentModelToolResolver resolver(
