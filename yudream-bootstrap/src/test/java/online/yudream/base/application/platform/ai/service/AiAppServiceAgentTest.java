@@ -29,6 +29,7 @@ class AiAppServiceAgentTest {
                 .thenReturn(AgentRunDTO.builder().content("完成").toolResults(List.of()).build());
         AiAppService service = new AiAppService(capabilities, agents,
                 mock(online.yudream.base.application.system.setting.service.SettingAppService.class),
+                mock(online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo.class),
                 mock(online.yudream.base.domain.platform.ai.service.AiGenerationGateway.class), List.of());
         CmsPageGenerateCmd command = new CmsPageGenerateCmd();
         command.setAgentCode(BuiltinAgentCodes.CMS_BUILDER);
