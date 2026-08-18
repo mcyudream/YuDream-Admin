@@ -97,7 +97,6 @@ const loadingMedia = ref(false)
 const aiAgentCode = ref('')
 // 本地极简 Agent 下拉：内建 FaSelect 的弹层在本自定义全屏构建器里动画/主题变量不可靠，改用自绘弹层
 const agentSelectOpen = ref(false)
-const agentPopStyle = ref<Record<string, string>>({})
 const agentSelectEl = ref<HTMLElement | null>(null)
 const aiAgentLabel = computed(() =>
   (props.aiAgentOptions || []).find(option => option.value === aiAgentCode.value)?.label || 'Agent',
@@ -122,14 +121,6 @@ function toggleAgentSelect() {
   if (agentSelectOpen.value) {
     closeAgentSelect()
     return
-  }
-  const rect = agentSelectEl.value?.getBoundingClientRect()
-  if (rect) {
-    agentPopStyle.value = {
-      left: `${Math.round(rect.left)}px`,
-      bottom: `${Math.round(window.innerHeight - rect.top + 6)}px`,
-      width: `${Math.max(Math.round(rect.width), 200)}px`,
-    }
   }
   agentSelectOpen.value = true
   document.addEventListener('pointerdown', onAgentSelectOutside, true)
@@ -2889,23 +2880,22 @@ function selectBreadcrumb(component: any) {
                     <span class="ai-agent-select-label">{{ aiAgentLabel }}</span>
                     <FaIcon name="i-ri:arrow-down-s-line" class="ai-agent-select-caret" />
                   </button>
-                  <Teleport to="body">
-                    <div v-if="agentSelectOpen" class="ai-agent-pop" :style="agentPopStyle" role="listbox" @click.stop>
-                      <button
-                        v-for="opt in aiAgentOptions"
-                        :key="opt.value"
-                        type="button"
-                        class="ai-agent-pop-item"
-                        :class="{ active: opt.value === aiAgentCode }"
-                        role="option"
-                        :aria-selected="opt.value === aiAgentCode"
-                        @click="pickAgent(opt.value)"
-                      >
-                        <span class="ai-agent-pop-item-label">{{ opt.label }}</span>
-                        <FaIcon v-if="opt.value === aiAgentCode" name="i-ri:check-line" class="ai-agent-pop-item-check" />
-                      </button>
-                    </div>
-                  </Teleport>
+                  <!-- 内联向上展开的弹层：teleport 到 body 的固定层在本构建器页面不渲染，故内联 -->
+                  <div v-if="agentSelectOpen" class="ai-agent-pop" role="listbox" @click.stop>
+                    <button
+                      v-for="opt in aiAgentOptions"
+                      :key="opt.value"
+                      type="button"
+                      class="ai-agent-pop-item"
+                      :class="{ active: opt.value === aiAgentCode }"
+                      role="option"
+                      :aria-selected="opt.value === aiAgentCode"
+                      @click="pickAgent(opt.value)"
+                    >
+                      <span class="ai-agent-pop-item-label">{{ opt.label }}</span>
+                      <FaIcon v-if="opt.value === aiAgentCode" name="i-ri:check-line" class="ai-agent-pop-item-check" />
+                    </button>
+                  </div>
                 </div>
                 <label class="ai-thinking-switch">
                   <FaSwitch v-model="aiThinkingEnabled" />
@@ -3907,6 +3897,7 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-agent-select {
+  position: relative;
   min-width: 0;
   flex: 1;
 }
@@ -3960,11 +3951,14 @@ function selectBreadcrumb(component: any) {
   transform: rotate(180deg);
 }
 
-/* Teleport 到 body 的弹层（scoped 样式随组件作用域生效） */
+/* 内联弹层：向上展开到消息区，不 teleport（body 级固定层在本页不渲染） */
 .ai-agent-pop {
-  position: fixed;
-  z-index: 4000;
-  max-height: 320px;
+  position: absolute;
+  z-index: 60;
+  right: 0;
+  bottom: calc(100% + 6px);
+  left: 0;
+  max-height: 280px;
   padding: 4px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
