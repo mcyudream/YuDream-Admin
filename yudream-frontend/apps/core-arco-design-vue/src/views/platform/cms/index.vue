@@ -3,7 +3,7 @@ import type { CmsAgentSelectOption } from './config/cms-agent-options'
 import type { FileObject } from '@/api/modules/files'
 import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
-import apiAgent from '@/api/modules/platform-agent'
+import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -80,7 +80,7 @@ const pageForm = reactive<CmsPagePayload>({
 })
 
 const home = reactive<HomePageLayout>({
-  title: 'YuDream',
+  title: appSettingsStore.siteName || '',
   subtitle: '自定义首页',
   theme: 'default',
   heroImageUrl: '',
@@ -121,7 +121,7 @@ const previewNavigationItems = computed(() => {
     : items
 })
 const templatePreviewContext = computed(() => {
-  const siteName = appSettingsStore.siteName || home.title || 'YuDream'
+  const siteName = appSettingsStore.siteName || home.title || ''
   const siteDescription = appSettingsStore.siteDescription || home.subtitle || ''
   const siteInfo = {
     name: siteName,
@@ -293,7 +293,8 @@ onMounted(async () => {
 
 async function loadAiApplications() {
   try {
-    const res = await apiAgent.available()
+    // 走 AI 场景端点而非 Agent 管理台端点：CMS 操作者通常没有 platform:agent:view 权限
+    const res = await apiAi.availableAgents()
     aiAgentOptions.value = toCmsAgentOptions(res.data)
   }
   catch {
@@ -356,7 +357,7 @@ async function loadHome() {
   try {
     const res = await apiCms.home()
     Object.assign(home, {
-      title: res.data.title || 'YuDream',
+      title: res.data.title || appSettingsStore.siteName || '',
       subtitle: res.data.subtitle || '',
       theme: res.data.theme || 'default',
       heroImageUrl: res.data.heroImageUrl || '',
@@ -604,6 +605,32 @@ async function saveHome() {
   await persistHome()
 }
 
+async function saveNavigation() {
+  await persistHome('导航菜单已保存')
+}
+
+function addNavigationItem(parentId?: string) {
+  const sort = navigationItems.value.reduce((max, item) => Math.max(max, Number(item.sort) || 0), 0) + 1
+  navigationItems.value.push({
+    id: `nav-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    label: '',
+    url: '',
+    parentId: parentId || undefined,
+    visible: true,
+    sort,
+  })
+}
+
+function removeNavigationItem(item: CmsNavigationItem) {
+  // 删除一级菜单时，其子菜单提升为一级，避免整组消失
+  navigationItems.value.forEach(child => {
+    if (child.parentId === item.id) {
+      child.parentId = undefined
+    }
+  })
+  navigationItems.value = navigationItems.value.filter(nav => nav.id !== item.id)
+}
+
 function confirmToggleHomePublish() {
   const nextPublished = !home.published
   modal.confirm({
@@ -787,6 +814,10 @@ function sectionTitle(type: HomeSectionType) {
         <FaIcon name="i-ri:save-3-line" />
         保存首页
       </FaButton>
+      <FaButton v-else-if="activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveNavigation">
+        <FaIcon name="i-ri:save-3-line" />
+        保存首页配置
+      </FaButton>
       <FaButton v-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
         <FaIcon :name="home.published ? 'i-ri:inbox-unarchive-line' : 'i-ri:send-plane-line'" />
         {{ home.published ? '取消发布首页' : '发布首页' }}
@@ -893,7 +924,7 @@ function sectionTitle(type: HomeSectionType) {
               <div class="runtime-overview__head">
                 <div>
                   <span>YD 内容引擎</span>
-                  <strong>{{ aiEnabled ? '已连接 YuDream YD 页面引擎' : '等待发布内置 CMS Agent' }}</strong>
+                  <strong>{{ aiEnabled ? '已连接内置 CMS 页面构建 Agent' : '等待发布内置 CMS Agent' }}</strong>
                 </div>
                 <FaTag :variant="aiEnabled ? 'default' : 'secondary'">{{ aiEnabled ? '可用' : '未就绪' }}</FaTag>
               </div>
@@ -1132,9 +1163,14 @@ function sectionTitle(type: HomeSectionType) {
           <div class="legacy-sections__head">
             <div>
               <h3>站点导航</h3>
-              <p>导航由系统数据和公开站点上下文提供，此处只读，不能删除、改名、改 URL 或调整菜单层级。</p>
+              <p>管理公开站点的导航菜单：可新增、删除、改名、调整链接、上级与排序，保存后公开站点立即生效。</p>
             </div>
+            <FaButton v-auth="'platform:cms:edit'" size="sm" @click="addNavigationItem()">
+              <FaIcon name="i-ri:add-line" />
+              新增菜单
+            </FaButton>
           </div>
+          <a-empty v-if="!navigationItems.length" description="暂无导航菜单，点击右上角新增" />
           <article v-for="item in navigationItems" :key="item.id" class="builder-block">
             <div class="builder-block__head">
               <div class="navigation-item-title">
@@ -1142,24 +1178,31 @@ function sectionTitle(type: HomeSectionType) {
                 <span>{{ item.label || '未命名菜单' }}</span>
               </div>
               <div class="navigation-item-actions">
-                <FaTag variant="secondary">固定数据</FaTag>
+                <FaButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="addNavigationItem(item.id)">
+                  <FaIcon name="i-ri:add-line" />
+                  子菜单
+                </FaButton>
+                <FaButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="removeNavigationItem(item)">
+                  <FaIcon name="i-ri:delete-bin-line" />
+                  删除
+                </FaButton>
               </div>
             </div>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <FaInput :model-value="item.label" disabled placeholder="菜单名称" />
-              <FaInput :model-value="item.url" disabled placeholder="/site/about 或 https://..." />
+              <FaInput v-model="item.label" placeholder="菜单名称" />
+              <FaInput v-model="item.url" placeholder="/site/about 或 https://..." />
               <label class="cms-field">
                 <span>上级菜单</span>
-                <select :value="item.parentId" disabled class="cms-native-select">
+                <select v-model="item.parentId" class="cms-native-select">
                   <option value="">一级菜单</option>
                   <option v-for="parent in rootNavigationItems.filter(parent => parent.id !== item.id)" :key="parent.id" :value="parent.id">
                     {{ parent.label }}
                   </option>
                 </select>
               </label>
-              <FaInput :model-value="item.sort" disabled type="number" placeholder="排序" />
+              <FaInput v-model="item.sort" type="number" placeholder="排序" />
               <label class="inline-flex items-center gap-2 text-sm">
-                <FaSwitch :model-value="item.visible" disabled />
+                <FaSwitch v-model="item.visible" />
                 显示菜单
               </label>
             </div>
@@ -1169,12 +1212,20 @@ function sectionTitle(type: HomeSectionType) {
           <section>
             <h3>导航预览</h3>
             <nav class="cms-nav-preview">
-              <div v-for="item in rootNavigationItems.filter(nav => nav.visible)" :key="item.id" class="cms-nav-preview__item">
-                <a :href="item.url">{{ item.label }}</a>
-                <div v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" class="cms-nav-preview__children">
-                  <a v-for="child in navigationItems.filter(child => child.parentId === item.id && child.visible).sort((a, b) => a.sort - b.sort)" :key="child.id" :href="child.url">
-                    {{ child.label }}
-                  </a>
+              <div class="cms-nav-preview__bar">
+                <span class="cms-nav-preview__brand">{{ appSettingsStore.siteName || home.title || '站点' }}</span>
+                <div class="cms-nav-preview__menus">
+                  <div v-for="item in rootNavigationItems.filter(nav => nav.visible)" :key="item.id" class="cms-nav-preview__menu">
+                    <a :href="item.url" class="cms-nav-preview__link">
+                      {{ item.label }}
+                      <FaIcon v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" name="i-ri:arrow-down-s-line" />
+                    </a>
+                    <div v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" class="cms-nav-preview__dropdown">
+                      <a v-for="child in navigationItems.filter(child => child.parentId === item.id && child.visible).sort((a, b) => a.sort - b.sort)" :key="child.id" :href="child.url" class="cms-nav-preview__sublink">
+                        {{ child.label }}
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
             </nav>
@@ -1182,7 +1233,7 @@ function sectionTitle(type: HomeSectionType) {
           <section>
             <h3>使用说明</h3>
             <p class="cms-help-text">
-              导航数据只读；首页构建器中的 Header/Footer 结构、菜单层级、Logo、认证入口和数据绑定均由系统固定，用户与 AI 只能修改整体画布 CSS。
+              导航菜单随首页配置一起保存（点右上角「保存首页配置」生效）；删除一级菜单时其子菜单会自动提升为一级。首页构建器中的 Header/Footer 结构、Logo、认证入口和数据绑定仍由系统固定，画布仅开放整体 CSS 定制。
             </p>
           </section>
         </aside>
@@ -1878,36 +1929,76 @@ function sectionTitle(type: HomeSectionType) {
 }
 
 .cms-nav-preview {
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
+  background: var(--color-bg-1);
+  overflow: hidden;
+}
+
+.cms-nav-preview__bar {
   display: flex;
-  gap: 8px;
+  gap: 12px;
   align-items: center;
+  padding: 10px 14px;
+}
+
+.cms-nav-preview__brand {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text-1);
+}
+
+.cms-nav-preview__menus {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 2px;
+  align-items: flex-start;
   flex-wrap: wrap;
 }
 
-.cms-nav-preview__item {
+.cms-nav-preview__menu {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
-.cms-nav-preview a {
+.cms-nav-preview__link {
   display: inline-flex;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 999px;
+  gap: 3px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
   color: var(--color-text-2);
+  font-size: 13px;
   text-decoration: none;
 }
 
-.cms-nav-preview__children {
-  display: grid;
-  gap: 4px;
-  padding-left: 12px;
+.cms-nav-preview__link:hover {
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
 }
 
-.cms-nav-preview__children a {
+.cms-nav-preview__dropdown {
+  display: grid;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.cms-nav-preview__sublink {
   padding: 6px 10px;
-  border-style: dashed;
+  border-radius: 5px;
+  color: var(--color-text-2);
   font-size: 12px;
+  text-decoration: none;
+}
+
+.cms-nav-preview__sublink:hover {
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
 }
 
 .cms-footer-preview {

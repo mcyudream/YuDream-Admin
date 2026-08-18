@@ -6,11 +6,13 @@ import { fetchPublicWikiSpaces, type WikiPublicSpace } from '@/api/modules/platf
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const router = useRouter()
+const appSettingsStore = useAppSettingsStore()
 const loading = ref(false)
 const spaces = ref<WikiPublicSpace[]>([])
 const recentPages = ref<Array<{ title: string, summary: string, url: string, spaceName: string }>>([])
 const publicPageCount = ref(0)
 const query = ref('')
+const siteName = computed(() => appSettingsStore.siteName || '')
 
 async function load() {
   loading.value = true
@@ -35,7 +37,7 @@ async function load() {
       description: '浏览已发布文档，或直接检索全部知识库内容。',
       canonicalPath: '/wiki',
       type: 'website',
-      siteName: 'YuDream Wiki',
+      siteName: siteName.value ? `${siteName.value} Wiki` : '公开知识库',
     })
   }
   finally {
@@ -57,7 +59,7 @@ onBeforeUnmount(clearPublicSeo)
 <template>
   <main class="wiki-home">
     <header class="wiki-home__header">
-      <a href="/" class="wiki-home__brand"><FaIcon name="i-ri:book-2-line" /> YuDream 控制台</a>
+      <a href="/" class="wiki-home__brand"><FaIcon name="i-ri:book-2-line" /> {{ siteName || '知识库' }}</a>
       <a href="/login">登录</a>
     </header>
     <section class="wiki-home__content">

@@ -327,6 +327,8 @@ onMounted(async () => {
 .chat-context__menu button:hover, .chat-context__menu button.active { background: var(--color-fill-1); color: var(--color-text-1); }
 .chat-context__menu .chat-context__clear { margin-top: 4px; border-top: 1px solid var(--color-border-2); color: var(--color-text-3); }
 @media (max-width: 760px) {
+  /* 移动端：100dvh 链式计算会受地址栏/版权栏/固定区影响而超出可视区，改为由已 flex 撑满的父容器决定高度 */
+  .chat-page { width: 100%; max-width: 100%; height: 100%; }
   .chat-page__sessions { display: none; }
   .chat-page__history { display: grid; }
   .chat-page__top { min-height: 42px; padding: 6px 12px; }

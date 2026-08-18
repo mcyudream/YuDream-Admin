@@ -16,7 +16,7 @@ export function toCmsAgentOptions(applications: CmsAgentApplicationLike[]): CmsA
     .filter(application => application.status === 'PUBLISHED')
     .map(application => ({
       label: application.code === BUILTIN_CMS_AGENT_CODE
-        ? 'YuDream YD 页面引擎'
+        ? '内置 CMS 页面构建 Agent'
         : String(application.name || application.code || '').trim(),
       value: String(application.code || '').trim(),
     }))

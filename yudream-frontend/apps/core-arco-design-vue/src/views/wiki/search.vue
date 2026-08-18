@@ -83,12 +83,13 @@ watch(() => route.fullPath, () => {
 })
 
 function applySearchSeo() {
+  const siteName = useAppSettingsStore().siteName
   applyPublicSeo({
     title: query.value.trim() ? `${query.value.trim()}的知识库搜索结果` : '搜索知识库',
-    description: '搜索 YuDream 公开知识库中的已发布页面。',
+    description: siteName ? `搜索 ${siteName} 公开知识库中的已发布页面。` : '搜索公开知识库中的已发布页面。',
     canonicalPath: route.fullPath,
     type: 'website',
-    siteName: 'YuDream Wiki',
+    siteName: siteName ? `${siteName} Wiki` : '公开知识库',
   })
 }
 </script>

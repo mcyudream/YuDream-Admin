@@ -1,4 +1,5 @@
 import type { ApiResponse } from './system-client'
+import type { AgentApplication } from './platform-agent'
 import { prepareApiEncryption } from '@/utils/api-encryption'
 import systemClient from './system-client'
 
@@ -56,6 +57,10 @@ export interface AiStreamEnvelope<T = Record<string, any>> {
 }
 
 export default {
+  /** CMS/AI 场景的可用 Agent 列表（platform:ai:generate 权限，不走 Agent 管理台权限） */
+  availableAgents: () => {
+    return systemClient.get<unknown, ApiResponse<AgentApplication[]>>('api/platform/ai/agents/available')
+  },
   generateCmsPage: (data: CmsPageGeneratePayload) => {
     return systemClient.post<unknown, ApiResponse<CmsPageGenerateResult>>('api/platform/ai/cms/pages/generate', data)
   },
