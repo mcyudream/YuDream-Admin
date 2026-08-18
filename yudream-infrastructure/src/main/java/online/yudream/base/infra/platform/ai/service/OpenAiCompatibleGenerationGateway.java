@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.ai.service;
 
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
@@ -535,7 +536,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         onTool.accept(result);
                     }
                     progress(onProgress, "tool-complete", toolProgressMessage("工具调用完成", descriptor, arguments));
-                    String payloadPreview = result.payload() == null ? "null" : abbreviate(JSONUtil.toJsonStr(result.payload()));
+                    String payloadPreview = result.payload() == null ? "null" : abbreviate(toolResultJson(result.payload()));
                     log.debug("AI tool call completed, tool={}, action={}, payloadKeys={}, payload={}",
                             result.toolName(),
                             result.action(),
@@ -547,7 +548,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .inputType(new ParameterizedTypeReference<Map<String, Object>>() {
                 })
                 .inputSchema(inputSchema(descriptor))
-                .toolCallResultConverter((result, type) -> JSONUtil.toJsonStr(result))
+                .toolCallResultConverter((result, type) -> toolResultJson(result))
                 .build();
     }
 
@@ -668,7 +669,18 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
             results.add(result); if (onTool != null) onTool.accept(result); progress(onProgress, "tool-complete", "工具调用完成：" + descriptor.title()); return result;
         }).description(descriptor.description()).inputType(new ParameterizedTypeReference<Map<String, Object>>() {})
                 .inputSchema(inputSchema(new AiAgentToolDescriptor(descriptor.name(), descriptor.title(), descriptor.description(), descriptor.permissionCode(), descriptor.title(), "插件工具", descriptor.description(), descriptor.inputSchema())))
-                .toolCallResultConverter((result, type) -> JSONUtil.toJsonStr(result)).build();
+                .toolCallResultConverter((result, type) -> toolResultJson(result)).build();
+    }
+
+    /** 工具结果序列化给模型：Hutool 不认 Java record 访问器会把 DTO 输出成 {}，统一用 Jackson。 */
+    private static final ObjectMapper TOOL_RESULT_MAPPER = new ObjectMapper();
+
+    private static String toolResultJson(Object value) {
+        try {
+            return TOOL_RESULT_MAPPER.writeValueAsString(value);
+        } catch (Exception exception) {
+            return String.valueOf(value);
+        }
     }
 
 
