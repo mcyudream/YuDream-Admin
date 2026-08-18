@@ -34,6 +34,13 @@ import static org.mockito.Mockito.when;
 
 class AgentAppServiceLifecycleTest {
 
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> emptyPluginTools() {
+        ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenReturn(Stream.empty());
+        return provider;
+    }
+
     @Test
     void newlyCreatedApplicationCannotBypassPublishEndpoint() {
         Fixture fixture = fixture();
@@ -167,6 +174,7 @@ class AgentAppServiceLifecycleTest {
                 applicationRepo,
                 toolRepo,
                 tools,
+                emptyPluginTools(),
                 mock(AgentModelCatalogParser.class),
                 mock(WikiSpaceRepo.class),
                 workflowRuntime,
