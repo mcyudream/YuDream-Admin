@@ -252,7 +252,7 @@ public class MilkyPluginEventDispatcher {
             sections.append("<div style='padding:16px 18px;background:#fff;border:1px solid #d9dde3;border-radius:6px;box-shadow:0 1px 2px #00000008;'><div style='padding-bottom:10px;border-bottom:1px solid #d9dde3;font-size:22px;color:#009688;'>").append(escape(plugin)).append("</div><div style='padding-top:4px;'>").append(cards).append("</div></div>");
         });
         if (sections.isEmpty()) sections.append("<div style='padding:28px;text-align:center;color:#98a2b3;'>暂时没有可用指令</div>");
-        return "<html><body style='display:inline-block;margin:0;padding:10px;background:#f1f1f1;font-family:Arial,Microsoft YaHei,sans-serif;color:#182230;'><div id='command-menu-card' style='display:inline-block;width:720px;box-sizing:border-box;padding:10px;'><div style='text-align:center;margin-bottom:18px;'><span style='display:inline-block;padding:8px 16px;background:#009688;color:#fff;border-radius:5px;font-size:22px;font-weight:700;'>指令菜单</span></div><div style='margin:0 0 14px;padding:0 4px;color:#4b5563;font-size:13px;'>您好，" + escape(nickname) + "。以下是您当前有权限使用的指令：</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;'>" + sections + "</div><div style='margin-top:14px;font-size:11px;color:#98a2b3;text-align:right;'>YuDream Admin · 权限菜单</div></div></body></html>";
+        return "<html><body style='display:inline-block;margin:0;padding:10px;background:#f1f1f1;font-family:Arial,Microsoft YaHei,sans-serif;color:#182230;'><div id='command-menu-card' style='display:inline-block;width:720px;box-sizing:border-box;padding:10px;'><div style='text-align:center;margin-bottom:18px;'><span style='display:inline-block;padding:8px 16px;background:#009688;color:#fff;border-radius:5px;font-size:22px;font-weight:700;'>指令菜单</span></div><div style='margin:0 0 14px;padding:0 4px;color:#4b5563;font-size:13px;'>您好，" + escape(nickname) + "。以下是您当前有权限使用的指令：</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;'>" + sections + "</div><div style='margin-top:14px;font-size:11px;color:#98a2b3;text-align:right;'>" + escape(siteName()) + " · 权限菜单</div></div></body></html>";
     }
 
     private String commandMenuHtmlTemplate(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
@@ -265,7 +265,23 @@ public class MilkyPluginEventDispatcher {
         Context context = new Context();
         context.setVariable("nickname", nickname);
         context.setVariable("groups", groups);
+        context.setVariable("siteName", siteName());
         return templateEngine.process("plugin-command-menu", context);
+    }
+
+    /** 指令菜单卡片落款使用系统设置的站点名称 */
+    private String siteName() {
+        try {
+            return settings.findByCategory("site").stream()
+                    .filter(setting -> setting != null && "siteName".equals(setting.getKey()))
+                    .map(online.yudream.base.domain.system.setting.aggregate.Setting::getValue)
+                    .filter(value -> value != null && !value.isBlank())
+                    .findFirst()
+                    .orElse("站点");
+        }
+        catch (Exception ignored) {
+            return "站点";
+        }
     }
 
     private String commandMenuHtmlV4(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
@@ -290,7 +306,7 @@ public class MilkyPluginEventDispatcher {
                 + "<div style='text-align:center;margin-bottom:22px;'><span style='display:inline-block;padding:10px 20px;background:#009688;color:#fff;border-radius:5px;font-size:22px;font-weight:700;'>指令菜单</span></div>"
                 + "<div style='margin:0 0 18px;padding:0 22px;color:#4b5563;font-size:13px;'>您好，" + escape(nickname) + "。以下是您当前有权限使用的指令：</div>"
                 + "<div style='box-sizing:border-box;padding:0 22px;column-count:2;column-gap:20px;'>" + sections + "</div>"
-                + "<div style='margin-top:2px;font-size:11px;color:#98a2b3;text-align:right;'>YuDream Admin · 权限菜单</div></div></body></html>";
+                + "<div style='margin-top:2px;font-size:11px;color:#98a2b3;text-align:right;'>" + escape(siteName()) + " · 权限菜单</div></div></body></html>";
     }
 
     private String commandMenuMarkdown(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
@@ -302,7 +318,7 @@ public class MilkyPluginEventDispatcher {
             commands.forEach(command -> text.append("| `/").append(markdown(command.command())).append("` | ").append(markdown(command.name())).append(" | ").append(markdown(command.description())).append(" |\n"));
             text.append("\n");
         });
-        text.append("---\n*YuDream Admin · 权限菜单*");
+        text.append("---\n*").append(markdown(siteName())).append(" · 权限菜单*");
         return text.toString();
     }
 

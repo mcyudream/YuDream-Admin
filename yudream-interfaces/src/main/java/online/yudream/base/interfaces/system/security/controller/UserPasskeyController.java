@@ -27,6 +27,7 @@ import java.util.List;
 public class UserPasskeyController {
 
     private final OAuthPasskeyAppService oauthPasskeyAppService;
+    private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
 
     @GetMapping
     public Result<List<PasskeyCredentialRes>> listOwnPasskeys() {
@@ -40,7 +41,7 @@ public class UserPasskeyController {
     public Result<PasskeyRegistrationOptionsRes> startRegistration(HttpServletRequest request) {
         Long userId = StpUtil.getLoginIdAsLong();
         return Result.ok(ApiSecurityWebAssembler.toRes(oauthPasskeyAppService.startPasskeyRegistration(
-                PasskeyWebAssembler.toRegistrationStartCmd(userId, PasskeyRelyingPartySupport.from(request)))));
+                PasskeyWebAssembler.toRegistrationStartCmd(userId, PasskeyRelyingPartySupport.from(request, siteName())))));
     }
 
     @PostMapping("/registration")
@@ -50,7 +51,16 @@ public class UserPasskeyController {
     ) {
         Long userId = StpUtil.getLoginIdAsLong();
         return Result.ok(ApiSecurityWebAssembler.toRes(oauthPasskeyAppService.finishPasskeyRegistration(
-                PasskeyWebAssembler.toRegistrationFinishCmd(userId, request, PasskeyRelyingPartySupport.from(httpRequest)))));
+                PasskeyWebAssembler.toRegistrationFinishCmd(userId, request, PasskeyRelyingPartySupport.from(httpRequest, siteName())))));
+    }
+
+    private String siteName() {
+        try {
+            return settingAppService.siteSettings().getSiteName();
+        }
+        catch (Exception ignored) {
+            return null;
+        }
     }
 
     @PostMapping("/{id}/revoke")

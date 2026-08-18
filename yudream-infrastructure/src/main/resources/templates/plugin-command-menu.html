@@ -114,7 +114,7 @@
       </section>
       <div class="menu-empty" th:if="${#maps.isEmpty(groups)}">暂无可用指令</div>
     </div>
-    <div class="menu-footer">YuDream Admin · 权限菜单</div>
+    <div class="menu-footer" th:text="${siteName} + ' · 权限菜单'">站点 · 权限菜单</div>
   </main>
 </body>
 </html>

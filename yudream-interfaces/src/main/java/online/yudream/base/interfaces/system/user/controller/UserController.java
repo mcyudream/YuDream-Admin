@@ -58,6 +58,7 @@ public class UserController {
     private final SystemMonitorAppService systemMonitorAppService;
     private final LoginTokenAppService loginTokenAppService;
     private final OAuthPasskeyAppService oauthPasskeyAppService;
+    private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
 
     @PostMapping("/register")
     public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request) {
@@ -102,14 +103,14 @@ public class UserController {
             HttpServletRequest httpRequest
     ) {
         return Result.ok(UserWebAssembler.toRes(oauthPasskeyAppService.startPasskeyAuthentication(
-                PasskeyWebAssembler.toAuthenticationStartCmd(request, PasskeyRelyingPartySupport.from(httpRequest)))));
+                PasskeyWebAssembler.toAuthenticationStartCmd(request, PasskeyRelyingPartySupport.from(httpRequest, siteName())))));
     }
 
     @PostMapping("/passkeys/authentication")
     public Result<UserLoginRes> finishPasskeyAuthentication(@Valid @RequestBody PasskeyAuthenticationFinishRequest request, HttpServletRequest httpRequest) {
         try {
             User user = oauthPasskeyAppService.finishPasskeyAuthentication(
-                    PasskeyWebAssembler.toAuthenticationFinishCmd(request, PasskeyRelyingPartySupport.from(httpRequest)));
+                    PasskeyWebAssembler.toAuthenticationFinishCmd(request, PasskeyRelyingPartySupport.from(httpRequest, siteName())));
             LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
             UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
             recordLoginLog(request.getUsername(), httpRequest, user, true, "passkey success", res.getToken());
@@ -118,6 +119,15 @@ public class UserController {
         catch (RuntimeException e) {
             recordLoginLog(request.getUsername(), httpRequest, null, false, e.getMessage(), null);
             throw e;
+        }
+    }
+
+    private String siteName() {
+        try {
+            return settingAppService.siteSettings().getSiteName();
+        }
+        catch (Exception ignored) {
+            return null;
         }
     }
 

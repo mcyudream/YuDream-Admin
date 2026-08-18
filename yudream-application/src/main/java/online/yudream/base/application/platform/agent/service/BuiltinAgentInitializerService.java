@@ -40,7 +40,7 @@ public class BuiltinAgentInitializerService {
                 BuiltinAgentCodes.CMS_BUILDER,
                 "CMS 页面构建 Agent",
                 "用于 CMS 可视化页面生成、局部修改和画布校验",
-                "你是 YuDream CMS 页面构建 Agent。优先调用已授权的 CMS 画布工具完成修改，所有修改完成后必须调用 cms.canvas.validate 校验。",
+                "你是 CMS 页面构建 Agent。优先调用已授权的 CMS 画布工具完成修改，所有修改完成后必须调用 cms.canvas.validate 校验。",
                 CMS_TOOLS,
                 cmsWorkflow(model),
                 model != null,

@@ -1,0 +1,247 @@
+#
+# There is insufficient memory for the Java Runtime Environment to continue.
+# Native memory allocation (mmap) failed to map 1073741824 bytes. Error detail: G1 virtual space
+# Possible reasons:
+#   The system is out of physical RAM or swap space
+#   This process is running with CompressedOops enabled, and the Java Heap may be blocking the growth of the native heap
+# Possible solutions:
+#   Reduce memory load on the system
+#   Increase physical memory or swap space
+#   Check if swap backing store is full
+#   Decrease Java heap size (-Xmx/-Xms)
+#   Decrease number of Java threads
+#   Decrease Java thread stack sizes (-Xss)
+#   Set larger code cache with -XX:ReservedCodeCacheSize=
+#   JVM is running with Zero Based Compressed Oops mode in which the Java heap is
+#     placed in the first 32GB address space. The Java Heap base address is the
+#     maximum limit for the native heap growth. Please use -XX:HeapBaseMinAddress
+#     to set the Java Heap base and to place the Java Heap above 32GB virtual address.
+# This output file may be truncated or incomplete.
+#
+#  Out of Memory Error (os_windows.cpp:3737), pid=46856, tid=62416
+#
+# JRE version:  (21.0.10+7) (build )
+# Java VM: OpenJDK 64-Bit Server VM (21.0.10+7-LTS, mixed mode, sharing, tiered, compressed oops, compressed class ptrs, g1 gc, windows-amd64)
+# No core dump will be written. Minidumps are not enabled by default on client versions of Windows
+#
+
+---------------  S U M M A R Y ------------
+
+Command Line: C:\Users\SiberianHusky\AppData\Local\Temp\surefire18301165418783070956\surefirebooter-20260818004107930_3.jar C:\Users\SiberianHusky\AppData\Local\Temp\surefire18301165418783070956 2026-08-18T00-41-03_251-jvmRun1 surefire-20260818004107930_1tmp surefire_0-20260818004107930_2tmp
+
+Host: AMD Ryzen 7 5700X 8-Core Processor             , 16 cores, 63G,  Windows 11 , 64 bit Build 26100 (10.0.26100.7623)
+Time: Tue Aug 18 00:41:09 2026 elapsed time: 1.310168 seconds (0d 0h 0m 1s)
+
+---------------  T H R E A D  ---------------
+
+Current thread (0x000002418f951740):  JavaThread "Unknown thread" [_thread_in_vm, id=62416, stack(0x00000079a9000000,0x00000079a9100000) (1024K)]
+
+Stack: [0x00000079a9000000,0x00000079a9100000]
+Native frames: (J=compiled Java code, j=interpreted, Vv=VM code, C=native code)
+V  [jvm.dll+0x6dfe69]  (no source info available)
+V  [jvm.dll+0x8bfe4b]  (no source info available)
+V  [jvm.dll+0x8c23da]  (no source info available)
+V  [jvm.dll+0x8c2ab3]  (no source info available)
+V  [jvm.dll+0x28a9e6]  (no source info available)
+V  [jvm.dll+0x6df315]  (no source info available)
+V  [jvm.dll+0x6d325a]  (no source info available)
+V  [jvm.dll+0x367a0e]  (no source info available)
+V  [jvm.dll+0x36f8db]  (no source info available)
+V  [jvm.dll+0x3c13a9]  (no source info available)
+V  [jvm.dll+0x3c164b]  (no source info available)
+V  [jvm.dll+0x33b2c7]  (no source info available)
+V  [jvm.dll+0x33be0b]  (no source info available)
+V  [jvm.dll+0x88a37e]  (no source info available)
+V  [jvm.dll+0x3ce301]  (no source info available)
+V  [jvm.dll+0x87328c]  (no source info available)
+V  [jvm.dll+0x461f31]  (no source info available)
+V  [jvm.dll+0x463b71]  (no source info available)
+C  [jli.dll+0x52f0]  (no source info available)
+C  [ucrtbase.dll+0x37b0]  (no source info available)
+C  [KERNEL32.DLL+0x2e8d7]  (no source info available)
+C  [ntdll.dll+0x8c53c]  (no source info available)
+
+
+---------------  P R O C E S S  ---------------
+
+Threads class SMR info:
+_java_thread_list=0x00007ff95d717288, length=0, elements={
+}
+
+Java Threads: ( => current thread )
+Total: 0
+
+Other Threads:
+  0x000002418f9f8c20 WorkerThread "GC Thread#0"                     [id=36916, stack(0x00000079a9100000,0x00000079a9200000) (1024K)]
+  0x00000241bb9fab80 ConcurrentGCThread "G1 Main Marker"            [id=58492, stack(0x00000079a9200000,0x00000079a9300000) (1024K)]
+  0x00000241bb9fbbb0 WorkerThread "G1 Conc#0"                       [id=36680, stack(0x00000079a9300000,0x00000079a9400000) (1024K)]
+
+[error occurred during error reporting (printing all threads), id 0xc0000005, EXCEPTION_ACCESS_VIOLATION (0xc0000005) at pc=0x00007ff95ce0dd87]
+VM state: not at safepoint (not fully initialized)
+
+VM Mutex/Monitor currently owned by a thread:  ([mutex/lock_event])
+[0x00007ff95d78b9a0] Heap_lock - owner thread: 0x000002418f951740
+
+Heap address: 0x0000000401000000, size: 16368 MB, Compressed Oops mode: Zero based, Oop shift amount: 3
+
+CDS archive(s) mapped at: [0x0000000000000000-0x0000000000000000-0x0000000000000000), size 0, SharedBaseAddress: 0x0000000800000000, ArchiveRelocationMode: 1.
+Narrow klass base: 0x0000000000000000, Narrow klass shift: 0, Narrow klass range: 0x0
+
+GC Precious Log:
+ CardTable entry size: 512
+ Card Set container configuration: InlinePtr #cards 4 size 8 Array Of Cards #cards 64 size 144 Howl #buckets 8 coarsen threshold 14745 Howl Bitmap #cards 2048 size 272 coarsen threshold 1843 Card regions per heap region 1 cards per card region 16384
+
+Heap:
+ garbage-first heap   total 0K, used 0K [0x0000000401000000, 0x0000000800000000)
+  region size 8192K, 0 young (0K), 0 survivors (0K)
+
+[error occurred during error reporting (printing heap information), id 0xc0000005, EXCEPTION_ACCESS_VIOLATION (0xc0000005) at pc=0x00007ff95d1fce29]
+GC Heap History (0 events):
+No events
+
+Dll operation events (1 events):
+Event: 0.011 Loaded shared library C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\java.dll
+
+Deoptimization events (0 events):
+No events
+
+Classes loaded (0 events):
+No events
+
+Classes unloaded (0 events):
+No events
+
+Classes redefined (0 events):
+No events
+
+Internal exceptions (0 events):
+No events
+
+ZGC Phase Switch (0 events):
+No events
+
+VM Operations (0 events):
+No events
+
+Memory protections (0 events):
+No events
+
+Nmethod flushes (0 events):
+No events
+
+Events (0 events):
+No events
+
+
+Dynamic libraries:
+0x00007ff751bb0000 - 0x00007ff751bbe000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\java.exe
+0x00007ffa19f40000 - 0x00007ffa1a1a7000 	C:\WINDOWS\SYSTEM32\ntdll.dll
+0x00007ffa18b70000 - 0x00007ffa18c39000 	C:\WINDOWS\System32\KERNEL32.DLL
+0x00007ffa17820000 - 0x00007ffa17c0f000 	C:\WINDOWS\System32\KERNELBASE.dll
+0x00007ffa13190000 - 0x00007ffa1322f000 	C:\WINDOWS\SYSTEM32\apphelp.dll
+0x00007ffa17250000 - 0x00007ffa1739b000 	C:\WINDOWS\System32\ucrtbase.dll
+0x00007ff9ef6d0000 - 0x00007ff9ef6e8000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\jli.dll
+0x00007ff9f4f00000 - 0x00007ff9f4f1e000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\VCRUNTIME140.dll
+0x00007ffa19d30000 - 0x00007ffa19ef5000 	C:\WINDOWS\System32\USER32.dll
+0x00007ff9f8160000 - 0x00007ff9f83f3000 	C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.26100.7309_none_3e05feeae336a044\COMCTL32.dll
+0x00007ffa175d0000 - 0x00007ffa175f7000 	C:\WINDOWS\System32\win32u.dll
+0x00007ffa18e70000 - 0x00007ffa18f19000 	C:\WINDOWS\System32\msvcrt.dll
+0x00007ffa19b10000 - 0x00007ffa19b3b000 	C:\WINDOWS\System32\GDI32.dll
+0x00007ffa17090000 - 0x00007ffa171bc000 	C:\WINDOWS\System32\gdi32full.dll
+0x00007ffa17600000 - 0x00007ffa176a3000 	C:\WINDOWS\System32\msvcp_win.dll
+0x00007ffa18cb0000 - 0x00007ffa18ce1000 	C:\WINDOWS\System32\IMM32.DLL
+0x00007ff9f5de0000 - 0x00007ff9f5dec000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\vcruntime140_1.dll
+0x00007ff9d4010000 - 0x00007ff9d4099000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\msvcp140.dll
+0x00007ff95cac0000 - 0x00007ff95d86d000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\server\jvm.dll
+0x00007ffa18f20000 - 0x00007ffa18fd4000 	C:\WINDOWS\System32\ADVAPI32.dll
+0x00007ffa19a60000 - 0x00007ffa19b06000 	C:\WINDOWS\System32\sechost.dll
+0x00007ffa17de0000 - 0x00007ffa17ef8000 	C:\WINDOWS\System32\RPCRT4.dll
+0x00007ffa19840000 - 0x00007ffa198b4000 	C:\WINDOWS\System32\WS2_32.dll
+0x00007ffa16ef0000 - 0x00007ffa16f4e000 	C:\WINDOWS\SYSTEM32\POWRPROF.dll
+0x00007ffa05480000 - 0x00007ffa054b5000 	C:\WINDOWS\SYSTEM32\WINMM.dll
+0x00007ffa0e5e0000 - 0x00007ffa0e5eb000 	C:\WINDOWS\SYSTEM32\VERSION.dll
+0x00007ffa16ed0000 - 0x00007ffa16ee4000 	C:\WINDOWS\SYSTEM32\UMPDC.dll
+0x00007ffa15dd0000 - 0x00007ffa15deb000 	C:\WINDOWS\SYSTEM32\kernel.appcore.dll
+0x00007ff9f5da0000 - 0x00007ff9f5daa000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\jimage.dll
+0x00007ffa14600000 - 0x00007ffa14842000 	C:\WINDOWS\SYSTEM32\DBGHELP.DLL
+0x00007ffa19210000 - 0x00007ffa19596000 	C:\WINDOWS\System32\combase.dll
+0x00007ffa18d70000 - 0x00007ffa18e46000 	C:\WINDOWS\System32\OLEAUT32.dll
+0x00007ff9ea940000 - 0x00007ff9ea97c000 	C:\WINDOWS\SYSTEM32\dbgcore.DLL
+0x00007ffa173a0000 - 0x00007ffa17445000 	C:\WINDOWS\System32\bcryptPrimitives.dll
+0x00007ff9d92a0000 - 0x00007ff9d92c1000 	C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\java.dll
+
+JVMTI agents: none
+
+dbghelp: loaded successfully - version: 4.0.5 - missing functions: none
+symbol engine: initialized successfully - sym options: 0x614 - pdb path: .;C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin;C:\WINDOWS\SYSTEM32;C:\WINDOWS\WinSxS\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.26100.7309_none_3e05feeae336a044;C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin\server
+
+VM Arguments:
+java_command: C:\Users\SiberianHusky\AppData\Local\Temp\surefire18301165418783070956\surefirebooter-20260818004107930_3.jar C:\Users\SiberianHusky\AppData\Local\Temp\surefire18301165418783070956 2026-08-18T00-41-03_251-jvmRun1 surefire-20260818004107930_1tmp surefire_0-20260818004107930_2tmp
+java_class_path (initial): C:\Users\SiberianHusky\AppData\Local\Temp\surefire18301165418783070956\surefirebooter-20260818004107930_3.jar
+Launcher Type: SUN_STANDARD
+
+[Global flags]
+     intx CICompilerCount                          = 12                                        {product} {ergonomic}
+     uint ConcGCThreads                            = 3                                         {product} {ergonomic}
+     uint G1ConcRefinementThreads                  = 13                                        {product} {ergonomic}
+   size_t G1HeapRegionSize                         = 8388608                                   {product} {ergonomic}
+    uintx GCDrainStackTargetSize                   = 64                                        {product} {ergonomic}
+   size_t InitialHeapSize                          = 1073741824                                {product} {ergonomic}
+   size_t MarkStackSize                            = 4194304                                   {product} {ergonomic}
+   size_t MaxHeapSize                              = 17163091968                               {product} {ergonomic}
+   size_t MinHeapDeltaBytes                        = 8388608                                   {product} {ergonomic}
+   size_t MinHeapSize                              = 8388608                                   {product} {ergonomic}
+    uintx NonNMethodCodeHeapSize                   = 7602480                                {pd product} {ergonomic}
+    uintx NonProfiledCodeHeapSize                  = 122027880                              {pd product} {ergonomic}
+    uintx ProfiledCodeHeapSize                     = 122027880                              {pd product} {ergonomic}
+    uintx ReservedCodeCacheSize                    = 251658240                              {pd product} {ergonomic}
+     bool SegmentedCodeCache                       = true                                      {product} {ergonomic}
+   size_t SoftMaxHeapSize                          = 17163091968                            {manageable} {ergonomic}
+     bool UseCompressedOops                        = true                           {product lp64_product} {ergonomic}
+     bool UseG1GC                                  = true                                      {product} {ergonomic}
+     bool UseLargePagesIndividualAllocation        = false                                  {pd product} {ergonomic}
+
+Logging:
+Log output configuration:
+ #0: stdout all=warning uptime,level,tags foldmultilines=false
+ #1: stderr all=off uptime,level,tags foldmultilines=false
+
+Release file:
+<release file has not been read>
+Environment Variables:
+JAVA_HOME=C:/Users/SiberianHusky/.jdks/ms-21.0.10
+PATH=C:\Users\SiberianHusky\.jdks\ms-21.0.10\bin;C:\Users\SiberianHusky\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\SiberianHusky\bin;C:\Program Files\MongoDB\Tools\100\bin;C:\Program Files (x86)\VMware\VMware Workstation\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.0\libnvvp;C:\WINDOWS\system32;C:\WINDOWS;C:\WINDOWS\System32\Wbem;C:\WINDOWS\System32\WindowsPowerShell\v1.0;C:\WINDOWS\System32\OpenSSH;C:\Program Files\NVIDIA Corporation\NVIDIA App\NvDLISR;C:\Program Files\Bandizip;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Users\SiberianHusky\AppData\Local\nvm;C:\Users\SiberianHusky\dev\env\nodejs;C:\Program Files\Git\cmd;C:\Users\SiberianHusky\miniconda3;C:\Users\SiberianHusky\miniconda3\Library\bin;C:\Users\SiberianHusky\miniconda3\Scripts;C:\Users\SiberianHusky\.local\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2022.4.0;C:\Program Files\Docker\Docker\resources\bin;C:\Users\SiberianHusky\dev\ide\IntelliJ IDEA\plugins\maven\lib\maven3\bin;C:\Program Files\Microsoft SQL Server\110\Tools\Binn;C:\Users\SiberianHusky\.cargo\bin;C:\Program Files\Tailscale;C:\Program Files (x86)\cloudflared;C:\Program Files\GitHub CLI;C:\Program Files (x86)\glab;C:\Users\SiberianHusky\.kimi-code\bin;C:\Users\SiberianHusky\AppData\Local\pnpm;C:\Users\SiberianHusky\AppData\Local\Microsoft\WindowsApps;C:\Users\SiberianHusky\AppData\Local\JetBrains\Toolbox\scripts;C:\Users\SiberianHusky\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\SiberianHusky\AppData\Local\Programs\Ollama;D:\Program Files (x86)\Warp\bin;C:\Users\SiberianHusky\AppData\Local\OneClaw\bin;C:\Users\SiberianHusky\AppData\Local\Programs\ZCode\resources\tools\ripgrep;C:\Users\SiberianHusky\AppData\Local\Programs\ZCode\resources\tools\ugrep;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+USERNAME=SiberianHusky
+SHELL=C:\Program Files\Git\usr\bin\bash.exe
+LANG=C.UTF-8
+LC_CTYPE=C.UTF-8
+TERM=xterm-256color
+OS=Windows_NT
+PROCESSOR_IDENTIFIER=AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD
+TMP=C:\Users\SIBERI~1\AppData\Local\Temp
+TEMP=C:\Users\SIBERI~1\AppData\Local\Temp
+
+
+
+
+Periodic native trim disabled
+
+---------------  S Y S T E M  ---------------
+
+OS:
+ Windows 11 , 64 bit Build 26100 (10.0.26100.7623)
+OS uptime: 8 days 11:03 hours
+Hyper-V role detected
+
+CPU: total 16 (initial active 16) (16 cores per cpu, 2 threads per core) family 25 model 33 stepping 2 microcode 0xa201204, cx8, cmov, fxsr, ht, mmx, 3dnowpref, sse, sse2, sse3, ssse3, sse4a, sse4.1, sse4.2, popcnt, lzcnt, tsc, tscinvbit, avx, avx2, aes, erms, clmul, bmi1, bmi2, adx, sha, fma, vzeroupper, clflush, clflushopt, hv, rdtscp, rdpid, fsrm, f16c, cet_ss
+Processor Information for the first 16 processors :
+  Max Mhz: 3401, Current Mhz: 3401, Mhz Limit: 3401
+
+Memory: 4k page, system-wide physical 65462M (18144M free)
+TotalPageFile size 126394M (AvailPageFile size 483M)
+current process WorkingSet (physical memory assigned to process): 14M, peak: 14M
+current process commit charge ("private bytes"): 71M, peak: 1095M
+
+vm_info: OpenJDK 64-Bit Server VM (21.0.10+7-LTS) for windows-amd64 JRE (21.0.10+7-LTS), built on 2026-01-15T18:39:42Z by "MicrosoftCorporation" with MS VC++ 17.14 (VS2022)
+
+END.
