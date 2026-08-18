@@ -276,15 +276,25 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
 
   /** v2 客户端工具：真实执行后经同一条 WebSocket 回传结果帧，服务端模型循环据此继续 */
   async function replyToolCall(request: YdChatToolCallRequest) {
+    // 固定本轮请求对应的 socket；工具执行期间不要依赖全局引用是否被其他收尾逻辑清空。
+    const current = socket
     let reply: YdChatToolCallReply
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
     try {
-      reply = options.onToolCallRequest
-        ? await options.onToolCallRequest(request)
-        : { ok: false, error: '当前客户端未注册画布工具执行器' }
+      const execution = options.onToolCallRequest
+        ? options.onToolCallRequest(request)
+        : Promise.resolve<YdChatToolCallReply>({ ok: false, error: '当前客户端未注册画布工具执行器' })
+      const timeout = new Promise<YdChatToolCallReply>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ ok: false, error: '客户端画布工具执行超时' }), 20000)
+      })
+      reply = await Promise.race([execution, timeout])
     } catch (error) {
       reply = { ok: false, error: error instanceof Error ? error.message : '工具执行失败' }
+    } finally {
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId)
+      }
     }
-    const current = socket
     if (current && current.readyState === WebSocket.OPEN) {
       current.send(JSON.stringify({
         type: 'TOOL_RESULT',
