@@ -172,6 +172,8 @@ public class PluginAiFrameworkService implements PluginAiService {
 
     private online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext withPermissions(PluginAiChatRequest request) {
         var context = request.executionContext();
+        // 调用方显式声明通配权限（群策略开放工具调用）时，视为调用方已完成授权，不再用绑定账号权限覆盖
+        if (context != null && context.permissions().contains("*")) return context;
         if (context == null || context.userId() == null) return context;
         List<String> permissions = userRepo.findById(context.userId()).map(user -> roleRepo.findByIds(user.getRoles().stream()
                 .map(item -> item.getValue()).toList()).stream().flatMap(role -> role.getPermissions().stream())
