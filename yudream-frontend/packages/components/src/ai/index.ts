@@ -38,6 +38,8 @@ export type {
   YdChatHistoryTurn,
   YdChatMessage,
   YdChatProtocol,
+  YdChatToolCallReply,
+  YdChatToolCallRequest,
   YdChatToolEvent,
   YdChatTransport,
   UseYdChatStreamOptions,
