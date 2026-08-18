@@ -69,6 +69,8 @@ export interface WikiSearchHit {
   sourceUrl?: string
   spaceSlug?: string
   spaceName?: string
+  /** 命中页面正文引用的站内图片 */
+  images?: { url?: string, caption?: string }[]
 }
 
 export interface WikiIndexSnapshot {
@@ -172,7 +174,7 @@ export interface WikiGraphSnapshot {
 
 export interface WikiResearchPlan { topic: string; rationale: string; queries: string[] }
 
-export interface WikiChatCitation { title: string; path: string; nodeId?: string }
+export interface WikiChatCitation { title: string; path: string; nodeId?: string; excerpt?: string; images?: { url?: string, caption?: string }[] }
 export interface WikiChatResult { answer: string; citations: WikiChatCitation[] }
 export interface WikiChatTurn { role: string; content: string }
 

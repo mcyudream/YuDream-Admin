@@ -16,6 +16,7 @@ import {
   YdWelcome,
 } from '@yudream/components'
 import type { YdAgentChatSession, YdAgentChatSessionMeta, YdAgentChatSessionStore } from './types'
+import { resolveApiFileUrl } from '@/utils/api-file-url'
 
 const props = withDefaults(defineProps<{
   /** 流式端点完整 URL（可为函数读取最新值） */
@@ -346,6 +347,7 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
       <YdChatMessageList
         v-else
         :messages="messages"
+        :image-url-resolver="resolveApiFileUrl"
         compact
         @copy-message="onCopy"
         @regenerate-message="onRegenerate"
