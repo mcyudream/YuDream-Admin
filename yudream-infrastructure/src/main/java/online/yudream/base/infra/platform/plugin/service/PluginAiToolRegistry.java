@@ -23,4 +23,9 @@ public class PluginAiToolRegistry {
     public List<PluginAiTool> tools() {
         return tools.values().stream().flatMap(List::stream).toList();
     }
+
+    public List<PluginAiTool> tools(String pluginCode) {
+        List<PluginAiTool> values = tools.get(pluginCode);
+        return values == null ? List.of() : List.copyOf(values);
+    }
 }

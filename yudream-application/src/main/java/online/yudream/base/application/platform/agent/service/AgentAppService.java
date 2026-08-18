@@ -513,8 +513,24 @@ public class AgentAppService {
                 .filter(tool -> selected.contains(tool.descriptor().name()))
                 .filter(tool -> permissionGateway.hasPermission(tool.descriptor().permissionCode()))
                 .forEach(tool -> result.add(tool.descriptor().name()));
+        // 插件运行时注册的工具：按描述符权限校验后同样视为可用，避免引用插件工具的工作流无法发布
+        Map<String, online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor> pluginTools = new java.util.HashMap<>();
+        pluginToolGateways.stream().flatMap(gateway -> gateway.pluginTools().stream())
+                .forEach(descriptor -> {
+                    if (descriptor != null && descriptor.name() != null) {
+                        pluginTools.putIfAbsent(descriptor.name(), descriptor);
+                    }
+                });
         selected.stream()
                 .filter(code -> !systemToolCodes.contains(code))
+                .filter(code -> {
+                    var descriptor = pluginTools.get(code);
+                    return descriptor != null && permissionGateway.hasPermission(
+                            descriptor.permissionCode() == null ? "" : descriptor.permissionCode());
+                })
+                .forEach(result::add);
+        selected.stream()
+                .filter(code -> !systemToolCodes.contains(code) && !pluginTools.containsKey(code))
                 .map(toolRepo::findByCode)
                 .flatMap(java.util.Optional::stream)
                 .filter(tool -> Boolean.TRUE.equals(tool.getEnabled()))
