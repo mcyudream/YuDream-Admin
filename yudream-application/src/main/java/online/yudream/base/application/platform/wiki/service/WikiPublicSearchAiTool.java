@@ -36,6 +36,7 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
     private static final int SOURCE_EXCERPT_LIMIT = 320;
 
     private final WikiSearchAppService search;
+    private final WikiPublicAppService publicSearch;
 
     @Override
     public AiAgentToolDescriptor descriptor() {
@@ -49,7 +50,7 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
                 "平台能力",
                 "允许 AI Agent 检索公开 Wiki 知识库的已发布页面。",
                 Map.of(
-                        "spaceSlug", Map.of("type", "string", "description", "知识库 slug"),
+                        "spaceSlug", Map.of("type", "string", "description", "知识库 slug；留空则检索全部开启公开阅读的知识库"),
                         "query", Map.of("type", "string", "description", "检索关键词（可含多个词，系统会自动分词）"),
                         "topK", Map.of("type", "integer", "description", "返回条数，默认 8"),
                         "pathPrefix", Map.of("type", "string", "description", "路径前缀过滤（可选）"),
@@ -64,17 +65,20 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
         Map<String, Object> args = call.arguments() == null ? Map.of() : call.arguments();
         String slug = text(args.get("spaceSlug"));
         String query = text(args.get("query"));
-        if (!StringUtils.hasText(slug)) {
-            throw new BizException("wiki.search 缺少 spaceSlug 参数");
-        }
         if (!StringUtils.hasText(query)) {
             throw new BizException("wiki.search 缺少 query 参数");
         }
-        int topK = intValue(args.get("topK"), 8);
-        String pathPrefix = text(args.get("pathPrefix"));
-        boolean graph = bool(args.get("graphExpansion"));
-        // 公开场景强制 sourceGrounded=false，避免读取原始资料全文。
-        List<WikiSearchHitDTO> hits = search.searchForPublicSite(slug, query, topK, pathPrefix, graph, false);
+        List<WikiSearchHitDTO> hits;
+        if (StringUtils.hasText(slug)) {
+            int topK = intValue(args.get("topK"), 8);
+            String pathPrefix = text(args.get("pathPrefix"));
+            boolean graph = bool(args.get("graphExpansion"));
+            // 公开场景强制 sourceGrounded=false，避免读取原始资料全文。
+            hits = search.searchForPublicSite(slug, query, topK, pathPrefix, graph, false);
+        } else {
+            // 未指定知识库：检索全部开启公开阅读的知识库，与匿名全库检索 REST 同语义。
+            hits = publicSearch.searchAll(query, null);
+        }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("spaceSlug", slug);
         payload.put("query", query);
@@ -90,6 +94,8 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
         value.put("sourceId", hit.getSourceId());
         value.put("title", hit.getTitle());
         value.put("path", hit.getPath());
+        value.put("spaceSlug", hit.getSpaceSlug() == null ? "" : hit.getSpaceSlug());
+        value.put("spaceName", hit.getSpaceName() == null ? "" : hit.getSpaceName());
         value.put("content", truncate(hit.getContent(), excerptLimit(hit.getKind())));
         value.put("sourceUrl", hit.getSourceUrl());
         value.put("images", hit.getImages() == null ? List.of() : hit.getImages().stream()

@@ -31,7 +31,7 @@ class WikiPublicSearchAiToolTest {
                         .path("published")
                         .content("内容")
                         .build()));
-        WikiPublicSearchAiTool tool = new WikiPublicSearchAiTool(search);
+        WikiPublicSearchAiTool tool = new WikiPublicSearchAiTool(search, mock(WikiPublicAppService.class));
 
         var result = tool.execute(new AiAgentToolCall("wiki.search", Map.of(
                 "spaceSlug", "demo",
@@ -48,9 +48,36 @@ class WikiPublicSearchAiToolTest {
     }
 
     @Test
+    void blankSpaceSlugSearchesAllPublicSpaces() {
+        WikiSearchAppService search = mock(WikiSearchAppService.class);
+        WikiPublicAppService publicSearch = mock(WikiPublicAppService.class);
+        when(publicSearch.searchAll(eq("登录报错"), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(List.of(WikiSearchHitDTO.builder()
+                        .score(0.8)
+                        .kind("PAGE")
+                        .title("登录排障")
+                        .spaceSlug("tutorial")
+                        .spaceName("教程")
+                        .content("步骤")
+                        .images(List.of(WikiSearchHitDTO.Image.builder().url("/api/files/123/content").caption("截图").build()))
+                        .build()));
+        WikiPublicSearchAiTool tool = new WikiPublicSearchAiTool(search, publicSearch);
+
+        var result = tool.execute(new AiAgentToolCall("wiki.search", Map.of("query", "登录报错")));
+
+        verify(publicSearch).searchAll(eq("登录报错"), org.mockito.ArgumentMatchers.isNull());
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> hits = (List<Map<String, Object>>) result.payload().get("hits");
+        assertThat(hits).singleElement().satisfies(item -> {
+            assertThat(item).containsEntry("spaceSlug", "tutorial").containsEntry("spaceName", "教程");
+            assertThat(item.get("images")).isInstanceOf(List.class);
+        });
+    }
+
+    @Test
     void publicDescriptorSharesWikiSearchToolName() {
         WikiSearchAppService search = mock(WikiSearchAppService.class);
-        WikiPublicSearchAiTool tool = new WikiPublicSearchAiTool(search);
+        WikiPublicSearchAiTool tool = new WikiPublicSearchAiTool(search, mock(WikiPublicAppService.class));
 
         assertThat(tool.descriptor().name()).isEqualTo("wiki.search");
         assertThat(tool.descriptor().inputSchema()).containsKeys("spaceSlug", "query", "sourceGrounded");
