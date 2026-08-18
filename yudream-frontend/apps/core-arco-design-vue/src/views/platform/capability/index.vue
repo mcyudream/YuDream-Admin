@@ -56,10 +56,14 @@ const loading = ref(false)
 const actionLoading = ref('')
 const rows = ref<CapabilityItem[]>([])
 const selectedCode = ref('')
-const configVisible = ref(false)
+/** 内联配置编辑是否展开 */
+const configEditing = ref(false)
+const editingCapabilityCode = ref('')
 const configText = ref('{}')
 const configDraft = ref<Record<string, string>>({})
 const aiProviders = ref<AiProviderDraft[]>([])
+/** 当前编辑的供应商下标 */
+const activeProviderIndex = ref(0)
 const testMessage = ref('YuDream 平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
@@ -104,6 +108,14 @@ const aiProviderOptions = computed(() => aiProviders.value.map((provider, index)
 const aiDefaultModelOptions = computed(() => modelOptions(
   aiProviders.value.find(provider => provider.code === configDraft.value.defaultProvider) || aiProviders.value[0],
 ))
+/** 当前编辑的供应商（钳制下标越界） */
+const activeProvider = computed(() => {
+  if (!aiProviders.value.length) {
+    return undefined
+  }
+  const index = Math.min(Math.max(activeProviderIndex.value, 0), aiProviders.value.length - 1)
+  return aiProviders.value[index]
+})
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
@@ -173,10 +185,17 @@ function openConfig(item: CapabilityItem) {
   }
   if (item.code === 'ai') {
     aiProviders.value = parseAiProvidersConfig(configDraft.value)
+    activeProviderIndex.value = 0
     syncAiDefaults()
   }
   configText.value = JSON.stringify(item.config || {}, null, 2)
-  configVisible.value = true
+  editingCapabilityCode.value = item.code
+  configEditing.value = true
+}
+
+function cancelConfig() {
+  configEditing.value = false
+  editingCapabilityCode.value = ''
 }
 
 function legacyAiProvidersJson(config: Record<string, string>) {
@@ -221,18 +240,19 @@ function legacyAiProviderType(baseUrl: string) {
 }
 
 async function saveConfig() {
-  if (!selected.value) {
+  if (!editingCapabilityCode.value) {
     return
   }
   const config = usesStructuredConfig.value ? normalizedConfig() : parseJsonConfig()
   if (!config) {
     return
   }
-  const res = await apiCapability.updateConfig(selected.value.code, config)
-  replaceItem(res.data)
-  configVisible.value = false
-  toast.success('配置已保存')
-}
+    const res = await apiCapability.updateConfig(editingCapabilityCode.value, config)
+    replaceItem(res.data)
+    configEditing.value = false
+    editingCapabilityCode.value = ''
+    toast.success('配置已保存')
+  }
 
 async function testCapability(item: CapabilityItem) {
   actionLoading.value = `${item.code}:test`
@@ -479,12 +499,20 @@ function addAiProvider() {
     type: 'OPENAI_COMPATIBLE',
     apiKey: '',
   })
+  activeProviderIndex.value = aiProviders.value.length - 1
   syncAiDefaults()
 }
 
 function removeAiProvider(index: number) {
   aiProviders.value.splice(index, 1)
+  if (activeProviderIndex.value >= aiProviders.value.length) {
+    activeProviderIndex.value = Math.max(0, aiProviders.value.length - 1)
+  }
   syncAiDefaults()
+}
+
+function selectAiProvider(index: number) {
+  activeProviderIndex.value = index
 }
 
 function addAiModel(provider: AiProviderDraft) {
@@ -765,6 +793,189 @@ function splitModelList(value: string) {
             </div>
           </div>
 
+          <!-- 内联配置编辑（替代弹窗） -->
+          <div v-if="configEditing" class="inline-config">
+            <div class="inline-config__head">
+              <span class="inline-config__title">编辑配置</span>
+              <div class="inline-config__actions">
+                <FaButton size="sm" variant="ghost" @click="cancelConfig">
+                  取消
+                </FaButton>
+                <FaButton size="sm" @click="saveConfig">
+                  <FaIcon name="i-ri:check-line" />
+                  保存配置
+                </FaButton>
+              </div>
+            </div>
+
+            <!-- AI 能力：供应商列表 + 选中编辑 + 模型表格 -->
+            <div v-if="isAiConfig" class="ai-inline">
+              <div class="ai-inline__topbar">
+                <label class="config-field">
+                  <span>默认供应商</span>
+                  <FaSelect v-model="configDraft.defaultProvider" :options="aiProviderOptions" placeholder="选择默认供应商" class="w-full" />
+                </label>
+                <label class="config-field">
+                  <span>默认模型</span>
+                  <FaSelect v-model="configDraft.defaultModel" :options="aiDefaultModelOptions" placeholder="选择默认模型" class="w-full" />
+                </label>
+              </div>
+
+              <div class="ai-inline__body">
+                <!-- 供应商列表 -->
+                <aside class="ai-provider-nav">
+                  <button
+                    v-for="(provider, providerIndex) in aiProviders"
+                    :key="providerIndex"
+                    type="button"
+                    class="ai-provider-nav__item"
+                    :class="{ 'is-active': providerIndex === activeProviderIndex }"
+                    @click="selectAiProvider(providerIndex)"
+                  >
+                    <FaIcon name="i-ri:cloud-line" class="ai-provider-nav__icon" />
+                    <span class="ai-provider-nav__name">{{ provider.name || provider.code || `供应商 ${providerIndex + 1}` }}</span>
+                    <span class="ai-provider-nav__badge" :class="{ off: !provider.enabled }">{{ provider.enabled ? '启用' : '停用' }}</span>
+                  </button>
+                  <FaButton variant="outline" size="sm" class="ai-provider-nav__add" @click="addAiProvider">
+                    <FaIcon name="i-ri:add-line" />
+                    添加供应商
+                  </FaButton>
+                </aside>
+
+                <!-- 选中供应商编辑 -->
+                <div v-if="activeProvider" class="ai-provider-edit">
+                  <div class="ai-provider-edit__head">
+                    <strong>{{ activeProvider.name || activeProvider.code }}</strong>
+                    <div class="ai-provider-edit__tools">
+                      <span class="ai-switch-label">启用</span>
+                      <FaSwitch v-model="activeProvider.enabled" />
+                      <FaButton size="sm" variant="ghost" :disabled="aiProviders.length <= 1" title="删除供应商" @click="removeAiProvider(activeProviderIndex)">
+                        <FaIcon name="i-ri:delete-bin-line" />
+                      </FaButton>
+                    </div>
+                  </div>
+
+                  <div class="ai-provider-form">
+                    <label class="config-field">
+                      <span>供应商编码</span>
+                      <FaInput v-model="activeProvider.code" placeholder="openai" @blur="syncAiDefaults" />
+                    </label>
+                    <label class="config-field">
+                      <span>显示名称</span>
+                      <FaInput v-model="activeProvider.name" placeholder="OpenAI" />
+                    </label>
+                    <label class="config-field">
+                      <span>供应商类型</span>
+                      <FaSelect v-model="activeProvider.type" :options="aiProviderTypeOptions" class="w-full" />
+                    </label>
+                    <label class="config-field">
+                      <span>默认模型</span>
+                      <FaSelect v-model="activeProvider.defaultModel" :options="modelOptions(activeProvider)" class="w-full" />
+                    </label>
+                    <label class="config-field ai-span-2">
+                      <span>API 地址</span>
+                      <FaInput v-model="activeProvider.baseUrl" placeholder="https://api.openai.com/v1" />
+                    </label>
+                    <label class="config-field">
+                      <span>补全路径</span>
+                      <FaInput v-model="activeProvider.completionsPath" placeholder="/chat/completions" />
+                    </label>
+                    <label class="config-field">
+                      <span>温度</span>
+                      <FaInput v-model="activeProvider.temperature" type="number" placeholder="0.4" />
+                    </label>
+                    <label class="config-field ai-span-2">
+                      <span>API Key</span>
+                      <FaInput v-model="activeProvider.apiKey" type="password" placeholder="sk-..." />
+                    </label>
+                    <label class="config-field ai-span-2">
+                      <span>代理地址</span>
+                      <FaInput v-model="activeProvider.proxyUrl" placeholder="http://127.0.0.1:7890" />
+                    </label>
+                  </div>
+
+                  <!-- 模型表格 -->
+                  <div class="ai-model-table-wrap">
+                    <div class="ai-model-table__head">
+                      <span>模型（{{ activeProvider.models.length }}）</span>
+                      <FaButton size="sm" variant="outline" @click="addAiModel(activeProvider)">
+                        <FaIcon name="i-ri:add-line" />
+                        添加模型
+                      </FaButton>
+                    </div>
+                    <table class="ai-model-table">
+                      <thead>
+                        <tr>
+                          <th>名称</th>
+                          <th>模型名</th>
+                          <th>类型</th>
+                          <th>温度</th>
+                          <th>思考</th>
+                          <th>视觉</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(model, modelIndex) in activeProvider.models" :key="modelIndex">
+                          <td><FaInput v-model="model.name" size="sm" placeholder="显示名" @blur="model.code ||= model.name" /></td>
+                          <td><FaInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" @blur="syncAiDefaults" /></td>
+                          <td><FaSelect v-model="model.kind" size="sm" :options="aiModelKindOptions" class="w-full" /></td>
+                          <td class="ai-model-table__num"><FaInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" /></td>
+                          <td class="ai-model-table__switch"><FaSwitch v-model="model.thinkingEnabled" /></td>
+                          <td class="ai-model-table__switch"><FaSwitch v-model="model.vision" /></td>
+                          <td class="ai-model-table__op">
+                            <FaButton size="sm" variant="ghost" :disabled="activeProvider.models.length <= 1" title="删除模型" @click="removeAiModel(activeProvider, modelIndex)">
+                              <FaIcon name="i-ri:delete-bin-line" />
+                            </FaButton>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <details class="ai-advanced">
+                    <summary>高级：Embedding / Rerank / 额外请求体</summary>
+                    <div class="ai-provider-form ai-advanced__body">
+                      <label class="config-field ai-span-2">
+                        <span>Embedding 模型（每行一个）</span>
+                        <FaTextarea v-model="activeProvider.embeddingModelsText" rows="2" placeholder="text-embedding-3-small" />
+                      </label>
+                      <label class="config-field ai-span-2">
+                        <span>Rerank 模型（每行一个）</span>
+                        <FaTextarea v-model="activeProvider.rerankModelsText" rows="2" placeholder="bge-reranker-v2-m3" />
+                      </label>
+                      <label class="config-field ai-span-4">
+                        <span>供应商额外请求体</span>
+                        <FaTextarea v-model="activeProvider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
+                      </label>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </div>
+
+            <!-- 其他结构化配置 -->
+            <div v-else-if="usesStructuredConfig" class="config-form">
+              <label v-for="field in configFields" :key="field.key" class="config-field">
+                <span>{{ field.label }}</span>
+                <FaTextarea
+                  v-if="field.type === 'textarea'"
+                  v-model="configDraft[field.key]"
+                  rows="5"
+                  input-class="font-mono"
+                  :placeholder="field.placeholder"
+                />
+                <FaInput
+                  v-else
+                  v-model="configDraft[field.key]"
+                  :type="field.type || 'text'"
+                  :placeholder="field.placeholder"
+                />
+              </label>
+            </div>
+            <FaTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
+          </div>
+
           <div class="detail-grid">
             <div class="info-cell">
               <span>类型</span>
@@ -842,215 +1053,6 @@ function splitModelList(value: string) {
       </div>
     </FaPageMain>
 
-    <FaModal
-      v-model="configVisible"
-      title="能力配置"
-      show-cancel-button
-      :class="isAiConfig ? 'sm:max-w-6xl' : 'sm:max-w-2xl'"
-      @confirm="saveConfig"
-    >
-      <div v-if="isAiConfig" class="ai-config-editor">
-        <div class="ai-config-toolbar">
-          <label class="config-field">
-            <span>默认供应商</span>
-            <FaSelect
-              v-model="configDraft.defaultProvider"
-              :options="aiProviderOptions"
-              placeholder="选择默认供应商"
-              class="w-full"
-            />
-          </label>
-          <label class="config-field">
-            <span>默认模型</span>
-            <FaSelect
-              v-model="configDraft.defaultModel"
-              :options="aiDefaultModelOptions"
-              placeholder="选择默认模型"
-              class="w-full"
-            />
-          </label>
-          <FaButton variant="outline" class="ai-add-provider" @click="addAiProvider">
-            <FaIcon name="i-ri:add-line" />
-            添加供应商
-          </FaButton>
-        </div>
-
-        <div class="ai-provider-list">
-          <section v-for="(provider, providerIndex) in aiProviders" :key="providerIndex" class="ai-provider-card">
-            <header class="ai-provider-header">
-              <div>
-                <strong>{{ provider.name || provider.code || `供应商 ${providerIndex + 1}` }}</strong>
-                <span>{{ provider.type }} · {{ provider.baseUrl || '未配置 API 地址' }}</span>
-              </div>
-              <div class="ai-provider-actions">
-                <span>启用</span>
-                <FaSwitch v-model="provider.enabled" />
-                <FaButton
-                  size="sm"
-                  variant="ghost"
-                  :disabled="aiProviders.length <= 1"
-                  @click="removeAiProvider(providerIndex)"
-                >
-                  <FaIcon name="i-ri:delete-bin-line" />
-                </FaButton>
-              </div>
-            </header>
-
-            <div class="ai-provider-grid">
-              <label class="config-field">
-                <span>供应商编码</span>
-                <FaInput v-model="provider.code" placeholder="openai" @blur="syncAiDefaults" />
-              </label>
-              <label class="config-field">
-                <span>显示名称</span>
-                <FaInput v-model="provider.name" placeholder="OpenAI" />
-              </label>
-              <label class="config-field">
-                <span>供应商类型</span>
-                <FaSelect v-model="provider.type" :options="aiProviderTypeOptions" class="w-full" />
-              </label>
-              <label class="config-field">
-                <span>默认模型</span>
-                <FaSelect v-model="provider.defaultModel" :options="modelOptions(provider)" class="w-full" />
-              </label>
-              <label class="config-field ai-span-2">
-                <span>API 地址</span>
-                <FaInput v-model="provider.baseUrl" placeholder="https://api.openai.com/v1" />
-              </label>
-              <label class="config-field">
-                <span>补全路径</span>
-                <FaInput v-model="provider.completionsPath" placeholder="/chat/completions" />
-              </label>
-              <label class="config-field">
-                <span>温度</span>
-                <FaInput v-model="provider.temperature" type="number" placeholder="0.4" />
-              </label>
-              <label class="config-field ai-span-2">
-                <span>API Key</span>
-                <FaInput v-model="provider.apiKey" type="password" placeholder="sk-..." />
-              </label>
-              <label class="config-field ai-span-2">
-                <span>代理地址</span>
-                <FaInput v-model="provider.proxyUrl" placeholder="http://127.0.0.1:7890" />
-              </label>
-              <label class="config-field ai-span-2">
-                <span>Embedding 模型</span>
-                <FaTextarea v-model="provider.embeddingModelsText" rows="2" placeholder="每行一个模型编码" />
-              </label>
-              <label class="config-field ai-span-2">
-                <span>Rerank 模型</span>
-                <FaTextarea v-model="provider.rerankModelsText" rows="2" placeholder="每行一个模型编码" />
-              </label>
-              <label class="config-field ai-span-4">
-                <span>供应商额外请求体</span>
-                <FaTextarea v-model="provider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
-              </label>
-            </div>
-
-            <div class="ai-model-panel">
-              <div class="ai-model-title">
-                <span>模型列表</span>
-                <FaButton size="sm" variant="outline" @click="addAiModel(provider)">
-                  <FaIcon name="i-ri:add-line" />
-                  添加模型
-                </FaButton>
-              </div>
-              <div class="ai-model-list">
-                <div v-for="(model, modelIndex) in provider.models" :key="modelIndex" class="ai-model-card">
-                  <div class="ai-model-card__head">
-                    <div class="ai-model-card__identity">
-                      <strong>{{ model.name || model.code || `模型 ${modelIndex + 1}` }}</strong>
-                      <span>{{ model.model || '未配置模型名' }}</span>
-                    </div>
-                    <FaButton
-                      size="sm"
-                      variant="ghost"
-                      :disabled="provider.models.length <= 1"
-                      title="删除模型"
-                      @click="removeAiModel(provider, modelIndex)"
-                    >
-                      <FaIcon name="i-ri:delete-bin-line" />
-                    </FaButton>
-                  </div>
-
-                  <div class="ai-model-basic">
-                    <label class="config-field">
-                      <span>编码</span>
-                      <FaInput v-model="model.code" placeholder="gpt-4o-mini" @blur="syncAiDefaults" />
-                    </label>
-                    <label class="config-field">
-                      <span>名称</span>
-                      <FaInput v-model="model.name" placeholder="GPT-4o mini" />
-                    </label>
-                    <label class="config-field">
-                      <span>模型名</span>
-                      <FaInput v-model="model.model" placeholder="gpt-4o-mini" />
-                    </label>
-                    <label class="config-field">
-                      <span>类型</span>
-                      <FaSelect v-model="model.kind" :options="aiModelKindOptions" class="w-full" />
-                    </label>
-                  </div>
-
-                  <div class="ai-model-options">
-                    <div class="ai-model-option-group">
-                      <span class="ai-model-group-title">参数</span>
-                      <div class="ai-model-params">
-                        <label class="config-field">
-                          <span>温度</span>
-                          <FaInput v-model="model.temperature" type="number" placeholder="0.4" />
-                        </label>
-                        <label class="config-field">
-                          <span>推理强度</span>
-                          <FaInput v-model="model.reasoningEffort" placeholder="medium" />
-                        </label>
-                      </div>
-                    </div>
-                    <div class="ai-model-option-group">
-                      <span class="ai-model-group-title">能力</span>
-                      <div class="ai-model-switches">
-                        <label>
-                          <span>思考</span>
-                          <FaSwitch v-model="model.thinkingEnabled" />
-                        </label>
-                        <label>
-                          <span>视觉</span>
-                          <FaSwitch v-model="model.vision" />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <label class="config-field ai-model-extra">
-                    <span>模型额外请求体</span>
-                    <FaTextarea v-model="model.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
-                  </label>
-                </div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-      <div v-else-if="usesStructuredConfig" class="config-form">
-        <label v-for="field in configFields" :key="field.key" class="config-field">
-          <span>{{ field.label }}</span>
-          <FaTextarea
-            v-if="field.type === 'textarea'"
-            v-model="configDraft[field.key]"
-            rows="5"
-            input-class="font-mono"
-            :placeholder="field.placeholder"
-          />
-          <FaInput
-            v-else
-            v-model="configDraft[field.key]"
-            :type="field.type || 'text'"
-            :placeholder="field.placeholder"
-          />
-        </label>
-      </div>
-      <FaTextarea v-else v-model="configText" rows="12" class="w-full" input-class="font-mono min-h-72" />
-    </FaModal>
   </div>
 </template>
 
@@ -1165,7 +1167,7 @@ function splitModelList(value: string) {
 
 .capability-item.active,
 .capability-item:hover {
-  border-color: rgb(var(--primary-6));
+  border-color: var(--color-border-3);
   background: var(--color-fill-2);
 }
 
@@ -1308,81 +1310,157 @@ function splitModelList(value: string) {
   font-weight: 600;
 }
 
-.ai-config-editor {
-  display: grid;
-  gap: 14px;
-  max-height: min(72vh, 820px);
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.ai-config-toolbar {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto;
-  gap: 12px;
-  align-items: end;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+/* 内联配置编辑 */
+.inline-config {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--color-border-3);
+  border-radius: 8px;
   background: var(--color-bg-1);
 }
 
-.ai-add-provider {
-  min-height: 36px;
-  white-space: nowrap;
+.inline-config__head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
 
-.ai-provider-list {
+.inline-config__title {
+  color: var(--color-text-1);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.inline-config__actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.ai-inline {
   display: grid;
   gap: 14px;
 }
 
-.ai-provider-card {
+.ai-inline__topbar {
   display: grid;
-  gap: 14px;
-  padding: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 12px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
+  background: var(--color-fill-1);
+}
+
+.ai-inline__body {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.ai-provider-nav {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
   background: var(--color-bg-2);
 }
 
-.ai-provider-header {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
-  min-width: 0;
-}
-
-.ai-provider-header div:first-child {
+.ai-provider-nav__item {
   display: grid;
-  gap: 4px;
-  min-width: 0;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-text-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
 }
 
-.ai-provider-header strong {
-  overflow: hidden;
+.ai-provider-nav__item:hover {
+  background: var(--color-fill-2);
   color: var(--color-text-1);
+}
+
+.ai-provider-nav__item.is-active {
+  border-color: var(--color-border-3);
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
+}
+
+.ai-provider-nav__icon {
+  color: var(--color-text-3);
+}
+
+.ai-provider-nav__item.is-active .ai-provider-nav__icon {
+  color: var(--color-text-1);
+}
+
+.ai-provider-nav__name {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ai-provider-header span {
-  overflow-wrap: anywhere;
-  color: var(--color-text-3);
-  font-size: 12px;
+.ai-provider-nav__badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(var(--success-6), 0.12);
+  color: rgb(var(--success-6));
+  font-size: 11px;
 }
 
-.ai-provider-actions {
+.ai-provider-nav__badge.off {
+  background: var(--color-fill-2);
+  color: var(--color-text-3);
+}
+
+.ai-provider-nav__add {
+  margin-top: 6px;
+  justify-content: center;
+}
+
+.ai-provider-edit {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.ai-provider-edit__head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-provider-edit__head strong {
+  color: var(--color-text-1);
+  font-size: 15px;
+}
+
+.ai-provider-edit__tools {
   display: inline-flex;
-  flex: none;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   color: var(--color-text-2);
   font-size: 12px;
 }
 
-.ai-provider-grid {
+.ai-provider-form {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
@@ -1396,14 +1474,15 @@ function splitModelList(value: string) {
   grid-column: 1 / -1;
 }
 
-.ai-model-panel {
+/* 模型表格 */
+.ai-model-table-wrap {
   display: grid;
   gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--color-border-2);
 }
 
-.ai-model-title {
+.ai-model-table__head {
   display: flex;
   gap: 10px;
   align-items: center;
@@ -1412,112 +1491,75 @@ function splitModelList(value: string) {
   font-weight: 700;
 }
 
-.ai-model-list {
-  display: grid;
-  gap: 10px;
-}
-
-.ai-model-card {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.ai-model-card__head {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  justify-content: space-between;
-  min-width: 0;
-}
-
-.ai-model-card__identity {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.ai-model-card__identity strong,
-.ai-model-card__identity span {
+.ai-model-table {
+  width: 100%;
+  border-collapse: collapse;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-1);
+  font-size: 13px;
 }
 
-.ai-model-card__identity strong {
-  color: var(--color-text-1);
-}
-
-.ai-model-card__identity span {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.ai-model-basic {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  min-width: 0;
-}
-
-.ai-model-options {
-  display: grid;
-  grid-template-columns: minmax(260px, 1fr) minmax(180px, 240px);
-  gap: 10px;
-  align-items: end;
-}
-
-.ai-model-option-group {
-  display: grid;
-  min-width: 0;
-  gap: 6px;
-}
-
-.ai-model-group-title {
+.ai-model-table th {
+  padding: 8px 10px;
+  background: var(--color-fill-1);
   color: var(--color-text-3);
   font-size: 12px;
   font-weight: 600;
+  text-align: left;
 }
 
-.ai-model-params {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+.ai-model-table td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--color-border-2);
+  vertical-align: middle;
 }
 
-.ai-model-switches {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+.ai-model-table__num {
+  width: 84px;
 }
 
-.ai-model-switches label {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 36px;
-  padding: 0 10px;
+.ai-model-table__switch {
+  width: 56px;
+  text-align: center;
+}
+
+.ai-model-table__op {
+  width: 44px;
+  text-align: center;
+}
+
+.ai-advanced {
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
+  background: var(--color-bg-1);
+}
+
+.ai-advanced summary {
+  padding: 10px 14px;
   color: var(--color-text-2);
-  font-size: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  list-style: none;
 }
 
-.ai-model-extra {
-  min-width: 0;
+.ai-advanced summary::-webkit-details-marker {
+  display: none;
 }
 
-.ok {
-  color: rgb(var(--success-6));
+.ai-advanced summary::before {
+  margin-right: 6px;
+  color: var(--color-text-3);
+  content: '▸';
 }
 
-.bad {
-  color: rgb(var(--danger-6));
+.ai-advanced[open] summary::before {
+  content: '▾';
+}
+
+.ai-advanced__body {
+  padding: 0 14px 14px;
 }
 
 @media (max-width: 900px) {
@@ -1527,7 +1569,8 @@ function splitModelList(value: string) {
     align-items: stretch;
   }
 
-  .capability-layout {
+  .capability-layout,
+  .ai-inline__body {
     grid-template-columns: 1fr;
   }
 
@@ -1535,8 +1578,7 @@ function splitModelList(value: string) {
     justify-content: flex-start;
   }
 
-  .ai-config-toolbar,
-  .ai-provider-grid {
+  .ai-provider-form {
     grid-template-columns: 1fr;
   }
 
@@ -1545,22 +1587,9 @@ function splitModelList(value: string) {
     grid-column: auto;
   }
 
-  .ai-provider-header,
-  .ai-model-title,
-  .ai-model-card__head {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .ai-provider-actions {
-    justify-content: flex-start;
-  }
-
-  .ai-model-basic,
-  .ai-model-options,
-  .ai-model-params,
-  .ai-model-switches {
-    grid-template-columns: 1fr;
+  .ai-model-table {
+    display: block;
+    overflow-x: auto;
   }
 }
 </style>
