@@ -83,6 +83,30 @@ public final class AgentToolExecutor {
         return new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), permissionSnapshot);
     }
 
+    /**
+     * 解析调用方（插件经 SPI）为本次运行显式许可的运行时工具：仅覆盖宿主原生工具，
+     * 豁免应用授权清单（调用方许可即授权）但仍按权限快照校验；不是宿主原生工具时返回 null，
+     * 由调用方决定忽略或交给插件工具通道（网关注入）。
+     */
+    public AiAgentTool resolveRuntime(String toolCode, PermissionSnapshot permissionSnapshot) {
+        if (toolCode == null || toolCode.isBlank()) {
+            return null;
+        }
+        String code = toolCode.trim();
+        AiAgentTool systemTool = systemTools.stream()
+                .filter(tool -> code.equals(tool.descriptor().name()))
+                .findFirst()
+                .orElse(null);
+        if (systemTool == null) {
+            return null;
+        }
+        return permissionGateway.hasPermission(
+                systemTool.descriptor().permissionCode(),
+                permissionSnapshot.permissionCodes(),
+                permissionSnapshot.permissionContextExplicit()
+        ) ? systemTool : null;
+    }
+
     /** Makes old tool nodes use the exact same resolution and Python execution contract. */
     public AiAgentToolResult execute(
             String toolCode,

@@ -20,17 +20,28 @@ public final class AgentModelToolResolver {
             AgentApplication application,
             AgentRunCmd command
     ) {
-        if (nodeToolCodes == null || nodeToolCodes.isEmpty()) {
-            return List.of();
-        }
         AgentToolExecutor.PermissionSnapshot permissionSnapshot = toolExecutor.capturePermissionSnapshot(command);
         LinkedHashSet<String> orderedCodes = new LinkedHashSet<>();
-        nodeToolCodes.stream()
-                .filter(code -> code != null && !code.isBlank())
-                .map(String::trim)
-                .forEach(orderedCodes::add);
-        return orderedCodes.stream()
-                .map(code -> toolExecutor.resolve(code, application, permissionSnapshot))
-                .toList();
+        if (nodeToolCodes != null) {
+            nodeToolCodes.stream()
+                    .filter(code -> code != null && !code.isBlank())
+                    .map(String::trim)
+                    .forEach(orderedCodes::add);
+        }
+        List<AiAgentTool> resolved = new java.util.ArrayList<>(
+                orderedCodes.stream()
+                        .map(code -> toolExecutor.resolve(code, application, permissionSnapshot))
+                        .toList()
+        );
+        if (command != null && command.isRuntimeToolCallingEnabled() && command.getRuntimeToolCodes() != null) {
+            command.getRuntimeToolCodes().stream()
+                    .filter(code -> code != null && !code.isBlank())
+                    .map(String::trim)
+                    .filter(code -> !orderedCodes.contains(code))
+                    .map(code -> toolExecutor.resolveRuntime(code, permissionSnapshot))
+                    .filter(tool -> tool != null)
+                    .forEach(resolved::add);
+        }
+        return List.copyOf(resolved);
     }
 }

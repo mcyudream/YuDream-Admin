@@ -464,9 +464,23 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     ) {
         List<AiAgentTool> scopedTools = AiAgentToolExecutionScope.currentTools();
         if (scopedTools != null) {
-            return scopedTools.stream()
+            List<ToolCallback> callbacks = new ArrayList<>(scopedTools.stream()
                     .map(tool -> toolCallback(tool, toolResults, onTool, onProgress))
-                    .toList();
+                    .toList());
+            // 插件发起的 Agent 运行：工作流节点作用域之外，叠加插件声明且本次调用许可的插件工具，
+            // 否则插件勾选的工具在工作流模式下永远不会送达模型（如 ai-chatbot 的查询当前账号）。
+            var pluginScope = PluginAiToolExecutionScope.current();
+            if (pluginScope != null) {
+                java.util.Set<String> scopedNames = scopedTools.stream()
+                        .map(tool -> tool.descriptor().name())
+                        .collect(java.util.stream.Collectors.toSet());
+                pluginAiToolRegistry.tools().stream()
+                        .filter(tool -> tool.descriptor() != null && !scopedNames.contains(tool.descriptor().name()))
+                        .filter(tool -> allowed(tool, pluginScope))
+                        .map(tool -> pluginToolCallback(tool, pluginScope, toolResults, onTool, onProgress))
+                        .forEach(callbacks::add);
+            }
+            return List.copyOf(callbacks);
         }
         var scope = PluginAiToolExecutionScope.current();
         if (scope != null) {
