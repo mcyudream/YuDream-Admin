@@ -2638,12 +2638,11 @@ function selectBreadcrumb(component: any) {
               <div class="ai-panel-actions">
                 <div v-if="aiAgentOptions?.length" class="ai-agent-select" title="切换 Agent">
                   <FaIcon name="i-ri:robot-2-line" />
-                  <a-select
+                  <FaSelect
                     v-model="aiAgentCode"
-                    size="small"
-                    :bordered="false"
-                    placeholder="Agent"
                     :options="aiAgentOptions"
+                    placeholder="Agent"
+                    class="ai-agent-select-trigger"
                   />
                 </div>
                 <label class="ai-thinking-switch">
@@ -3491,7 +3490,9 @@ function selectBreadcrumb(component: any) {
   grid-template-rows: minmax(0, 1fr) 28px;
   min-width: 0;
   min-height: 0;
-  background: #e9edf2;
+  background: #eef1f6;
+  background-image: radial-gradient(circle, #d5dce6 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
 .grapes-editor {
@@ -3663,25 +3664,16 @@ function selectBreadcrumb(component: any) {
   color: #0f172a;
 }
 
-.ai-agent-select :deep(.arco-select) {
-  min-width: 0;
-  flex: 1;
-}
-
-.ai-agent-select :deep(.arco-select-view-single) {
+.ai-agent-select-trigger {
   height: 26px;
   min-width: 0;
-  padding: 0 5px;
+  width: 100%;
+  padding: 0 4px;
   border: 0;
   background: transparent;
+  box-shadow: none;
   color: #475569;
   font-size: 12px;
-}
-
-.ai-agent-select :deep(.arco-select-view-value) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ai-context {
@@ -3944,15 +3936,17 @@ function selectBreadcrumb(component: any) {
 }
 
 :deep(.gjs-cv-canvas) {
-  background: #eef2f7;
+  background: transparent;
 }
 
+/* 与外层画布背景统一，避免 frames 层与 canvas 层底色不一致出现竖向色带 */
 :deep(.gjs-cv-canvas__frames) {
-  background: #f8fafc;
+  background: transparent;
 }
 
 :deep(.gjs-cv-canvas__frame) {
-  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.10);
 }
 
 :deep(.gjs-block-category),
