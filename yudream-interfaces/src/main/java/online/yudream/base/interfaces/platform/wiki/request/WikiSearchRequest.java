@@ -11,4 +11,5 @@ public class WikiSearchRequest {
     private int topK = 8;
     private String pathPrefix;
     private boolean graphExpansion;
+    private boolean sourceGrounded;
 }
