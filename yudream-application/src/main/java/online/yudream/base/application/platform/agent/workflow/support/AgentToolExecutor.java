@@ -9,6 +9,7 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
+import online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
@@ -20,6 +21,7 @@ import online.yudream.base.domain.platform.integration.enumerate.ExecutionStatus
 import online.yudream.base.domain.platform.integration.enumerate.RuntimeLanguage;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import online.yudream.base.domain.platform.integration.valobj.RuntimeExecutionResult;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -35,6 +37,7 @@ public final class AgentToolExecutor {
     private final AgentToolRepo toolRepo;
     private final List<AiAgentTool> systemTools;
     private final AgentPermissionGateway permissionGateway;
+    private final ObjectProvider<AgentPluginToolGateway> pluginToolGateways;
 
     public AgentToolExecutor(
             ObjectMapper objectMapper,
@@ -43,11 +46,23 @@ public final class AgentToolExecutor {
             List<AiAgentTool> systemTools,
             AgentPermissionGateway permissionGateway
     ) {
+        this(objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, null);
+    }
+
+    public AgentToolExecutor(
+            ObjectMapper objectMapper,
+            RuntimeExecutor runtimeExecutor,
+            AgentToolRepo toolRepo,
+            List<AiAgentTool> systemTools,
+            AgentPermissionGateway permissionGateway,
+            ObjectProvider<AgentPluginToolGateway> pluginToolGateways
+    ) {
         this.objectMapper = objectMapper;
         this.runtimeExecutor = runtimeExecutor;
         this.toolRepo = toolRepo;
         this.systemTools = systemTools == null ? List.of() : List.copyOf(systemTools);
         this.permissionGateway = permissionGateway;
+        this.pluginToolGateways = pluginToolGateways;
     }
 
     /** Authorization happens before a model can receive a callback descriptor. */
@@ -75,6 +90,12 @@ public final class AgentToolExecutor {
         if (systemTool != null) {
             ensurePermission(systemTool.descriptor().permissionCode(), systemTool.descriptor().title(), permissionSnapshot);
             return systemTool;
+        }
+        // 插件运行时注册的工具：描述符权限快照校验后交插件通道执行（执行时再按插件触发上下文复核）
+        AiAgentTool pluginTool = pluginTool(code);
+        if (pluginTool != null) {
+            ensurePermission(pluginTool.descriptor().permissionCode(), pluginTool.descriptor().title(), permissionSnapshot);
+            return pluginTool;
         }
         AgentTool pythonTool = toolRepo.findByCode(code)
                 .orElseThrow(() -> new BizException("Tool does not exist: " + code));
@@ -204,6 +225,17 @@ public final class AgentToolExecutor {
         )) {
             throw new BizException("No permission to invoke tool: " + toolName);
         }
+    }
+
+    private AiAgentTool pluginTool(String code) {
+        if (pluginToolGateways == null) {
+            return null;
+        }
+        return pluginToolGateways.stream()
+                .map(gateway -> gateway.pluginTool(code))
+                .filter(tool -> tool != null)
+                .findFirst()
+                .orElse(null);
     }
 
     private String requiredCode(String toolCode) {
