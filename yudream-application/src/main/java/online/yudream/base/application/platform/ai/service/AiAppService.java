@@ -29,6 +29,134 @@ public class AiAppService {
     private final CapabilityAppService capabilityAppService;
     private final AgentAppService agentAppService;
     private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
+    private final online.yudream.base.domain.platform.ai.service.AiGenerationGateway generationGateway;
+    private final List<online.yudream.base.domain.platform.ai.service.AiAgentTool> systemTools;
+
+    /**
+     * CMS Agent v2：coding-agent 式客户端工具闭环。画布工具在浏览器 GrapesJS 上真实执行，
+     * 结果经 bridge 回流模型循环；直连生成网关，不再走一次性开环 patch 的旧工作流。
+     */
+    @Transactional(readOnly = true)
+    public CmsPageGenerateDTO streamCmsPageAgent(
+            CmsPageGenerateCmd cmd,
+            CmsCanvasClientBridge bridge,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
+        capabilityAppService.ensureEnabled(CAPABILITY_CODE, "AI");
+        if (!StringUtils.hasText(cmd.getPrompt()) && !StringUtils.hasText(cmd.getImageDataUrl())) {
+            throw new BizException("生成需求或样图不能为空");
+        }
+        progress(onProgress, "analysis", "正在分析需求，随后将通过客户端工具读取画布。");
+        List<online.yudream.base.domain.platform.ai.service.AiAgentTool> tools = new java.util.ArrayList<>(CmsCanvasClientTools.bind(bridge));
+        systemTools.stream()
+                .filter(tool -> "web.fetch".equals(tool.descriptor().name()))
+                .forEach(tools::add);
+        online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest request =
+                new online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest(
+                        agentSystemPrompt(cmd),
+                        agentUserPrompt(cmd),
+                        cmd.getImageDataUrl(),
+                        StringUtils.hasText(cmd.getProviderCode()) ? cmd.getProviderCode() : null,
+                        StringUtils.hasText(cmd.getModelCode()) ? cmd.getModelCode() : null,
+                        java.util.Map.of(),
+                        cmd.getHistory(),
+                        true,
+                        online.yudream.base.domain.platform.ai.enumerate.AiToolMode.AUTO
+                );
+        online.yudream.base.domain.platform.ai.valobj.AiGenerationResult result;
+        try (online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope ignored =
+                     online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope.open(tools)) {
+            result = generationGateway.generateStream(request, onDelta, onReasoningDelta, onTool, onProgress);
+        }
+        CmsPageGenerateDTO dto = CmsPageGenerateDTO.builder().summary(result.summary()).build();
+        return AiAssembler.withTools(dto, result.toolResults());
+    }
+
+    /** v2 系统提示词：工具真实执行、结果回流，强调小步快跑与改后确认。 */
+    private String agentSystemPrompt(CmsPageGenerateCmd cmd) {
+        String agentPrompt = "";
+        try {
+            String code = StringUtils.hasText(cmd.getAgentCode()) ? cmd.getAgentCode().trim() : BuiltinAgentCodes.CMS_BUILDER;
+            agentPrompt = defaultText(agentAppService.runtimeApplication(code).getSystemPrompt(), "");
+        }
+        catch (Exception ignored) {
+        }
+        return """
+                你是 %s 的 CMS 页面构建 Agent。页面画布运行在浏览器的 GrapesJS 构建器中，你通过客户端画布工具读取和修改它——
+                这些工具会真实执行，结果（含报错）会返回给你。像编程助手一样工作：
+
+                工作方式（重要）：
+                1. 动手前先读：用 cms.canvas.get_outline 看画布结构纲要，需要细节时用 cms.canvas.read_component / cms.canvas.find 读局部；用户说“这个/选中的”时先 cms.canvas.get_selected。
+                2. 小步修改：每次工具调用只做一处明确改动；改完用读取类工具确认结果再决定下一步，不要一次性盲写整页。
+                3. 新增区块优先 cms.canvas.list_blocks / cms.canvas.insert_block 使用预设；预设明显不合适再用 cms.canvas.insert_html 自写，且 css 必须覆盖 html 引入的全部 class。
+                4. 修改已有内容用 update_text / update_html / update_style / update_attributes / remove_component，按组件 id 精确定位。
+                5. 工具报错时不要重试同样的参数，先读取相关组件确认实际状态再修正。
+                6. 需求不明确时用 cms.ask.user 提问澄清；全部完成后用一两句中文总结做了什么，不要把 HTML/CSS/JSON 输出给用户。
+
+                视觉要求：现代、留白克制、响应式、可读性高；不使用外部脚本与远程不可控资源；构建器内效果须接近最终渲染。
+                公开站版式：%s
+                - 页面嵌在站点外壳（固定页头/页脚）中展示：禁止给页面根容器或第一个区块加顶部 padding/margin。
+                - CSS 只允许 yb-ai- 前缀的类选择器（含 @media 内部）；禁止 *、body、html 及裸元素选择器。
+                - 区块需要整屏背景时外层保持 width:100%%，内容居中用内层容器（max-width + margin:0 auto）。
+
+                深度思考模式：%s
+                %s
+                CMS template runtime rules:
+                - Use {{cms.pages.latest.*}} for the latest published CMS pages.
+                - Use {{knowledge.spaces.*}}、{{knowledge.pages.*}}、{{knowledge.latest.*}}、{{knowledge.featured.*}} for public knowledge data.
+                - Use data-yb-repeat="cms.pages.latest|knowledge.pages|knowledge.latest|knowledge.featured|knowledge.spaces" for lists.
+                - Content items expose createdAt, publishedAt, updatedAt; prefer publishedAt for dates.
+                - These values resolve at public runtime. Generate template HTML/CSS only; never claim to publish content.
+                """.formatted(
+                siteName(),
+                templateDescription(cmd.getTemplate()),
+                cmd.isThinkingEnabled() ? "开启" : "关闭",
+                cmd.isThinkingEnabled()
+                        ? "开启时请在自然语言流中简要输出分析阶段、参考判断、布局策略和修改计划，再调用工具。"
+                        : "关闭时请保持过程反馈简短，快速完成读取和工具调用。"
+        ) + (agentPrompt.isBlank() ? "" : "\n该 Agent 的附加人设与要求：\n" + agentPrompt + "\n");
+    }
+
+    /** v2 用户提示词：不再回传整页快照（模型用工具按需读取），只带元信息与选中元素。 */
+    private String agentUserPrompt(CmsPageGenerateCmd cmd) {
+        return """
+                站点：%s
+                页面标题：%s
+                页面类型：%s
+                页面模板：%s
+                风格偏好：%s
+                样图参考：%s
+                深度思考：%s
+
+                CMS 可用动态变量：
+                %s
+
+                当前选中元素：
+                %s
+
+                画布当前结构纲要（可能滞后，动手前用 cms.canvas.get_outline 取最新）：
+                %s
+
+                修改需求：
+                %s
+                """.formatted(
+                defaultText(cmd.getSiteName(), siteName()),
+                defaultText(cmd.getTitle(), "未命名页面"),
+                defaultText(cmd.getPageType(), "通用内容页"),
+                templateDescription(cmd.getTemplate()),
+                defaultText(cmd.getStyle(), "清爽、专业、可读性高"),
+                StringUtils.hasText(cmd.getImageDataUrl()) ? "已提供，请参考样图的布局、视觉层次、色彩和组件组织方式" : "未提供",
+                cmd.isThinkingEnabled() ? "开启" : "关闭",
+                defaultText(cmd.getCmsVariableContextJson(), "无"),
+                defaultText(cmd.getCurrentSelectionJson(), "无"),
+                defaultText(cmd.getCurrentHtml(), "（未提供，先用 cms.canvas.get_outline 读取）"),
+                defaultText(cmd.getPrompt(), "请根据样图生成完整页面")
+        );
+    }
+
 
     @Transactional(readOnly = true)
     public CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd) {

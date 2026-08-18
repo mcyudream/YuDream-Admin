@@ -24,6 +24,8 @@ public class CmsPageGenerateRequest {
     private String currentSelectionJson;
     private String cmsVariableContextJson;
     private boolean thinkingEnabled;
+    /** agent = coding-agent 式客户端工具闭环（v2）；缺省为旧版一次性 patch 协议 */
+    private String mode;
     private List<ChatMessage> history;
 
     @Data
