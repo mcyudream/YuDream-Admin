@@ -61,13 +61,16 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
         );
     }
 
-    /** 插件工具的执行适配：调用时取当前插件触发上下文，按风险/许可/触发/权限逐项校验，与模型工具回调同规则。 */
+    /** 插件工具的执行适配：解析时（工作流调用线程）捕获插件触发上下文——模型工具回调实际运行在 Reactor
+     *  线程上，ThreadLocal 不会传播，执行时再读必定为空；执行时按风险/许可/触发/权限逐项校验。 */
     private static final class PluginAiToolAdapter implements AiAgentTool {
         private final PluginAiTool tool;
         private final AiAgentToolDescriptor descriptor;
+        private final PluginAiExecutionContext context;
 
         private PluginAiToolAdapter(PluginAiTool tool) {
             this.tool = tool;
+            this.context = PluginAiToolExecutionScope.current();
             PluginAiToolDescriptor source = tool.descriptor();
             this.descriptor = new AiAgentToolDescriptor(
                     source.name(),
@@ -89,7 +92,6 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
         @Override
         public AiAgentToolResult execute(AiAgentToolCall call) {
             PluginAiToolDescriptor source = tool.descriptor();
-            PluginAiExecutionContext context = PluginAiToolExecutionScope.current();
             if (context == null) {
                 throw new BizException("插件工具仅可在插件触发的会话中调用：" + source.title());
             }
