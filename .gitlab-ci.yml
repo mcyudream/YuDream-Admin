@@ -256,17 +256,17 @@ build-and-push-images:
     - docker build -f Dockerfile.frontend -t "$FRONTEND_IMAGE" .
     - docker push "$BACKEND_IMAGE"
     - docker push "$FRONTEND_IMAGE"
-    # latest 只随 v* 正式标签更新；推送前显式 re-tag，保证 latest 一定指向本次构建产物
+    # latest 随 v* 正式标签与 d* 部署标签更新；推送前显式 re-tag，保证 latest 一定指向本次构建产物
     - |
       case "$CI_COMMIT_TAG" in
-        v*)
+        v*|d*)
           docker tag "$BACKEND_IMAGE" "$BACKEND_IMAGE_LATEST"
           docker tag "$FRONTEND_IMAGE" "$FRONTEND_IMAGE_LATEST"
           docker push "$BACKEND_IMAGE_LATEST"
           docker push "$FRONTEND_IMAGE_LATEST"
           ;;
         *)
-          echo "非 v* 标签（$CI_COMMIT_TAG），跳过 latest 标签推送"
+          echo "非 v*/d* 标签（$CI_COMMIT_TAG），跳过 latest 标签推送"
           ;;
       esac
   rules:
