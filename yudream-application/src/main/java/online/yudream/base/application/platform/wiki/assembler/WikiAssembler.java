@@ -34,6 +34,7 @@ public final class WikiAssembler {
                 .topK(s.getTopK())
                 .queryExpansionEnabled(s.isQueryExpansionEnabled())
                 .rerankEnabled(s.isRerankEnabled())
+                .hitImageLimit(s.getHitImageLimit())
                 .purpose(s.getPurpose())
                 .schemaContent(s.getSchemaContent())
                 .language(s.getLanguage())

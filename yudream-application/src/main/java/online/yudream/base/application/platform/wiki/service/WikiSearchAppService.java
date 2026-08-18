@@ -555,23 +555,23 @@ public class WikiSearchAppService {
                 .path(hit.path())
                 .content(hit.content())
                 .sourceUrl(sourceUrl(space, hit.path()))
-                .images(extractImages(pageMarkdown))
+                .images(extractImages(pageMarkdown, space.effectiveHitImageLimit()))
                 .build();
     }
 
     /** 页面正文引用的站内图片：![alt](/api/files/{id}/content)，用于检索命中随带相关图片 */
     private static final Pattern PAGE_IMAGE = Pattern.compile(
             "!\\[([^\\]]*)]\\(\\s*(/api/files/\\d+/content)(\\s+(?:\"[^\"]*\"|'[^']*'))?\\s*\\)");
-    private static final int MAX_HIT_IMAGES = 4;
 
-    private List<WikiSearchHitDTO.Image> extractImages(String markdown) {
-        if (markdown == null || markdown.isBlank()) {
+    /** limit 来自知识库设置 hitImageLimit（effectiveHitImageLimit 已兜底默认 4、上限 12），0 表示不带图片 */
+    private List<WikiSearchHitDTO.Image> extractImages(String markdown, int limit) {
+        if (limit <= 0 || markdown == null || markdown.isBlank()) {
             return List.of();
         }
         Matcher matcher = PAGE_IMAGE.matcher(markdown);
         List<WikiSearchHitDTO.Image> images = new ArrayList<>();
         Set<String> seen = new HashSet<>();
-        while (matcher.find() && images.size() < MAX_HIT_IMAGES) {
+        while (matcher.find() && images.size() < limit) {
             String url = matcher.group(2);
             if (seen.add(url)) {
                 images.add(WikiSearchHitDTO.Image.builder().url(url).caption(matcher.group(1)).build());

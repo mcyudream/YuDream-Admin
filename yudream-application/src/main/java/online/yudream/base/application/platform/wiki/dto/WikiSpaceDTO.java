@@ -23,6 +23,7 @@ public class WikiSpaceDTO {
     private int topK;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    private Integer hitImageLimit;
 
     private String purpose;
     private String schemaContent;
