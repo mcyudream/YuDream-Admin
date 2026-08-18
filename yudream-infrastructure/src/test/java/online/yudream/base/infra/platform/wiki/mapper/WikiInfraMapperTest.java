@@ -25,6 +25,6 @@ class WikiInfraMapperTest {
 
         assertEquals(100L, saving.getId());
         assertEquals(3, saving.getVersion());
-        assertEquals("# 文档", saving.getMarkdownDraft());
+        assertEquals("---\ntitle: 快速开始\ntype: concept\n---\n# 文档\n", saving.getMarkdownDraft());
     }
 }

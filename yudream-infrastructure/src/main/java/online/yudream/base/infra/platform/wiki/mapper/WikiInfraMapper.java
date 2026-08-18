@@ -7,6 +7,8 @@ import online.yudream.base.infra.platform.wiki.dataobj.WikiNodeDO;
 import online.yudream.base.infra.platform.wiki.dataobj.WikiPageVersionDO;
 import online.yudream.base.infra.platform.wiki.dataobj.WikiSpaceDO;
 
+import java.util.ArrayList;
+
 public final class WikiInfraMapper {
 
     private WikiInfraMapper() {
@@ -35,6 +37,23 @@ public final class WikiInfraMapper {
                 .topK(dataObj.getTopK())
                 .queryExpansionEnabled(dataObj.isQueryExpansionEnabled())
                 .rerankEnabled(dataObj.isRerankEnabled())
+                .purpose(dataObj.getPurpose())
+                .schemaContent(dataObj.getSchemaContent())
+                .language(dataObj.getLanguage())
+                .chatProviderCode(dataObj.getChatProviderCode())
+                .chatModelCode(dataObj.getChatModelCode())
+                .ingestProviderCode(dataObj.getIngestProviderCode())
+                .ingestModelCode(dataObj.getIngestModelCode())
+                .visionProviderCode(dataObj.getVisionProviderCode())
+                .visionModelCode(dataObj.getVisionModelCode())
+                .webSearchProviderCode(dataObj.getWebSearchProviderCode())
+                .webSearchApiKey(dataObj.getWebSearchApiKey())
+                .webSearchInstanceUrl(dataObj.getWebSearchInstanceUrl())
+                .webSearchEngine(dataObj.getWebSearchEngine())
+                .contextWindowTokens(dataObj.getContextWindowTokens())
+                .sourceGroundedDefault(dataObj.isSourceGroundedDefault())
+                .watchEnabled(dataObj.isWatchEnabled())
+                .watchFolderPath(dataObj.getWatchFolderPath())
                 .build();
     }
 
@@ -58,6 +77,23 @@ public final class WikiInfraMapper {
         dataObj.setTopK(domain.getTopK());
         dataObj.setQueryExpansionEnabled(domain.isQueryExpansionEnabled());
         dataObj.setRerankEnabled(domain.isRerankEnabled());
+        dataObj.setPurpose(domain.getPurpose());
+        dataObj.setSchemaContent(domain.getSchemaContent());
+        dataObj.setLanguage(domain.getLanguage());
+        dataObj.setChatProviderCode(domain.getChatProviderCode());
+        dataObj.setChatModelCode(domain.getChatModelCode());
+        dataObj.setIngestProviderCode(domain.getIngestProviderCode());
+        dataObj.setIngestModelCode(domain.getIngestModelCode());
+        dataObj.setVisionProviderCode(domain.getVisionProviderCode());
+        dataObj.setVisionModelCode(domain.getVisionModelCode());
+        dataObj.setWebSearchProviderCode(domain.getWebSearchProviderCode());
+        dataObj.setWebSearchApiKey(domain.getWebSearchApiKey());
+        dataObj.setWebSearchInstanceUrl(domain.getWebSearchInstanceUrl());
+        dataObj.setWebSearchEngine(domain.getWebSearchEngine());
+        dataObj.setContextWindowTokens(domain.getContextWindowTokens());
+        dataObj.setSourceGroundedDefault(domain.isSourceGroundedDefault());
+        dataObj.setWatchEnabled(domain.isWatchEnabled());
+        dataObj.setWatchFolderPath(domain.getWatchFolderPath());
         return dataObj;
     }
 
@@ -77,6 +113,11 @@ public final class WikiInfraMapper {
                 .sort(dataObj.getSort())
                 .markdownDraft(dataObj.getMarkdownDraft())
                 .publishedVersionId(dataObj.getPublishedVersionId())
+                .pageType(dataObj.getPageType())
+                .sources(dataObj.getSources() == null ? new ArrayList<>() : dataObj.getSources())
+                .related(dataObj.getRelated() == null ? new ArrayList<>() : dataObj.getRelated())
+                .tags(dataObj.getTags() == null ? new ArrayList<>() : dataObj.getTags())
+                .summary(dataObj.getSummary())
                 .build();
     }
 
@@ -93,6 +134,11 @@ public final class WikiInfraMapper {
         dataObj.setSort(domain.getSort());
         dataObj.setMarkdownDraft(domain.getMarkdownDraft());
         dataObj.setPublishedVersionId(domain.getPublishedVersionId());
+        dataObj.setPageType(domain.getPageType());
+        dataObj.setSources(domain.getSources() == null ? new ArrayList<>() : new ArrayList<>(domain.getSources()));
+        dataObj.setRelated(domain.getRelated() == null ? new ArrayList<>() : new ArrayList<>(domain.getRelated()));
+        dataObj.setTags(domain.getTags() == null ? new ArrayList<>() : new ArrayList<>(domain.getTags()));
+        dataObj.setSummary(domain.getSummary());
         return dataObj;
     }
 

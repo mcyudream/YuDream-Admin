@@ -23,6 +23,6 @@ public class WikiSearchAdminController {
     @PostMapping("/search-test")
     @PermissionRegister(code = "platform:wiki:view", name = "测试 Wiki 检索", module = "平台能力", desc = "使用知识库当前向量索引执行管理端检索测试")
     public Result<List<WikiSearchHitDTO>> search(@Valid @RequestBody WikiSearchRequest request) {
-        return Result.ok(search.searchForAdmin(request.getSpaceSlug(), request.getQuery(), request.getTopK(), request.getPathPrefix(), request.isGraphExpansion()));
+        return Result.ok(search.searchForAdmin(request.getSpaceSlug(), request.getQuery(), request.getTopK(), request.getPathPrefix(), request.isGraphExpansion(), request.isSourceGrounded()));
     }
 }
