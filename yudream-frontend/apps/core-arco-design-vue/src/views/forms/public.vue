@@ -10,6 +10,7 @@ interface DynamicFormRendererExpose {
 
 const route = useRoute()
 const appFeatureStore = useAppFeatureStore()
+const appSettingsStore = useAppSettingsStore()
 const toast = useFaToast()
 
 const loading = ref(false)
@@ -68,7 +69,7 @@ function invalid() {
   <main class="public-form-page">
     <section class="public-form-shell">
       <header class="public-form-header">
-        <a :href="brandHref" class="brand-link">YuDream</a>
+        <a :href="brandHref" class="brand-link">{{ appSettingsStore.siteName || '首页' }}</a>
         <span>动态表单</span>
       </header>
 

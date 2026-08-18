@@ -238,7 +238,7 @@ const selectedSourceLocked = computed(() => {
 
 const cmsVariableContext = computed(() => {
   const copyright = appSettingsStore.settings.app.copyright
-  const siteName = appSettingsStore.siteName || 'YuDream'
+  const siteName = appSettingsStore.siteName || ''
   const siteDescription = appSettingsStore.siteDescription || ''
   const logo = appSettingsStore.logo || ''
   const currentYear = String(new Date().getFullYear())
@@ -1189,7 +1189,7 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
   return {
     target: props.historyTargetType,
     title: props.title || '',
-    siteName: appSettingsStore.siteName || 'YuDream',
+    siteName: appSettingsStore.siteName || '',
     prompt: prompt || `参考样图调整当前页面：${image?.fileName || '样图'}`,
     pageType: 'GrapesJS 可视化页面',
     template: props.pageTemplate || 'DEFAULT',

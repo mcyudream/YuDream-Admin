@@ -10,6 +10,7 @@ import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const route = useRoute()
 const router = useRouter()
+const appSettingsStore = useAppSettingsStore()
 const tree = ref<WikiNode[]>([])
 const error = ref('')
 const spaceSlug = computed(() => String(route.params.spaceSlug || ''))
@@ -189,7 +190,7 @@ onBeforeUnmount(clearPublicSeo)
       </main>
     </div>
 
-    <footer class="wiki-public-footer"><div class="wiki-public-shell wiki-public-footer__inner"><span>基于 YuDream Wiki 构建</span><a href="/wiki">知识库</a></div></footer>
+    <footer class="wiki-public-footer"><div class="wiki-public-shell wiki-public-footer__inner"><span>{{ appSettingsStore.siteName ? `${appSettingsStore.siteName} Wiki` : '公开知识库' }}</span><a href="/wiki">知识库</a></div></footer>
   </div>
 </template>
 
