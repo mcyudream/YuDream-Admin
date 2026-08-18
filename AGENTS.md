@@ -56,7 +56,12 @@
 - 使用 EasyExcel；HTTP 文件读写放 `ExcelHttpSupport` 等支撑类，行映射与模板行创建放接口 assembler。
 - 前端导出用 blob，并使用 `src/utils/excel.ts` 的既有工具；新增 `v-auth` 按钮时同步菜单种子枚举权限。
 
-## 7. 构建与验证
+## 7. 前端组件与主题
+
+- 前端实现优先复用项目既有的 `Fa*`、`Yd*` 组件和既有组合式能力；仅在现有组件无法覆盖明确需求时才引入 Arco 原生组件或自定义控件，并说明原因。
+- 不在业务页面自行指定主色、品牌色或固定色板；主题、主色、深浅模式由后台主题配置与组件体系统一控制。业务样式仅使用中性语义变量（如 `--color-bg-*`、`--color-text-*`、`--color-border-*`、`--color-fill-*`），不直接模拟主题组件的激活/强调态。
+
+## 8. 构建与验证
 
 - 环境：JDK 21、Maven 3.9+、Node.js 22.22+/24.15+、pnpm 11.9+；Windows 下跑 Maven 需显式设置 JDK 21 环境，否则会误用 JDK 17 报 `invalid target release: 21`。
 - 后端改动至少执行受影响模块的定向测试或编译：
@@ -65,13 +70,13 @@
   `pnpm --dir yudream-frontend --filter @fantastic-admin/core-arco-design-vue run test:typecheck`
 - 完成后端工作前按 skill 的 Review Checklist 执行 Controller 与乱码定向扫描。
 
-## 8. Git 工作流
+## 9. Git 工作流
 
 - 每个可独立使用的模块完成后，先运行对应验证，只暂存该模块文件并创建中文提交（如 `feat: 完成用户管理模块`），再进入下一模块。
 - 改动或修正架构规则时，必须在同一提交同步更新对应 skill/`knowledge.json`，禁止代码与项目规则脱节。
 - 未经用户明确要求不执行 push/tag 等外部动作；不纳入 IDE 元数据、临时文件等与任务无关的改动。
 
-## 9. 契约发布（SPI / SDK / components）
+## 10. 契约发布（SPI / SDK / components）
 
 - 只发布到 `nexus.yudream.online`；版本号永远从源文件读取，不凭记忆。
 - 顺序：先在本仓升级并验证契约版本 → 提交推送 → tag 流水线发布并等待 verify 通过 → 再到 `yudream-admin-plugins` 同步依赖、刷新 lockfile、运行下游校验并单独提交。
@@ -79,7 +84,7 @@
 - 发布/验签 CI：`publish:maven-plugin-spi`、`publish:npm-plugin-sdk`、`publish:npm-components`、`verify:maven-plugin-spi`、`verify:npm-contracts`；发布前跑 `validate:contract-packages`、`validate:contract-package-tarballs`、`validate:contract-publish-pipeline`。
 - 未验证已发布的版本不得用于下游；未明确要求时不做发布后 snapshot 升版。
 
-## 10. 完成前自检
+## 11. 完成前自检
 
 - 分层归属是否正确？Controller/assembler 是否触碰了禁项？
 - dataobj、Spring Bean、宿主内部类是否泄漏给了插件或接口层？
