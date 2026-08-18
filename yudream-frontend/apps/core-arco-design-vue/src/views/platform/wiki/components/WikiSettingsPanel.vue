@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { AgentModelOption } from '@/api/modules/platform-agent'
+import type { GraphConnection } from '@/api/modules/platform-graph'
 import type { WikiSpace } from '@/api/modules/platform-wiki'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import apiAgent from '@/api/modules/platform-agent'
+import apiGraph from '@/api/modules/platform-graph'
 import { deleteWikiSpace, saveWikiSpace } from '@/api/modules/platform-wiki'
 import { wikiWorkbenchKey } from '../wiki-utils'
 
@@ -14,6 +16,18 @@ const form = ref<Partial<WikiSpace>>({})
 const saving = ref(false)
 const models = ref<AgentModelOption[]>([])
 const catalogLoading = ref(false)
+const graphConnections = ref<GraphConnection[]>([])
+
+// Neo4j 连接下拉：不选则写入服务端默认连接（yudream.platform.wiki.neo4j.*）
+const graphConnectionOptions = computed(() => [
+  { label: '默认（服务端配置）', value: '' },
+  ...graphConnections.value
+    .filter(connection => connection.status === 'ACTIVE')
+    .map(connection => ({
+      label: `${connection.name}（${connection.uri} / ${connection.database}）`,
+      value: connection.code,
+    })),
+])
 
 watch(() => store.space.value, (space) => {
   form.value = space ? { ...space } : {}
@@ -146,7 +160,18 @@ function removeSpace() {
   })
 }
 
+async function loadGraphConnections() {
+  try {
+    const res = await apiGraph.pageConnections({ page: 1, size: 100 })
+    graphConnections.value = res.data?.records || []
+  }
+  catch {
+    graphConnections.value = []
+  }
+}
+
 onMounted(loadCatalog)
+onMounted(loadGraphConnections)
 </script>
 
 <template>
@@ -263,6 +288,11 @@ onMounted(loadCatalog)
             <label class="set-switch">
               <FaSwitch v-model="form.rerankEnabled" />
               <span>重排序<small>检索结果 rerank</small></span>
+            </label>
+            <label class="set-field set-field--full">
+              <span>图数据库连接（Neo4j）</span>
+              <FaSelect v-model="form.neo4jConnectionCode" :options="graphConnectionOptions" placeholder="默认（服务端配置）" />
+              <small class="set-hint">向量索引与知识图谱写入所选连接；不选时写入服务端默认连接（yudream.platform.wiki.neo4j.*），连接在「平台 → 图数据库」维护</small>
             </label>
             <label class="set-field">
               <span>Top K</span>
