@@ -115,13 +115,7 @@ const aiSuggestions = [
   '优化首屏视觉，让层次更清晰',
   '新增三列功能卡片并统一按钮样式',
   '根据样图调整版式和配色',
-  '优化移动端排版和间距',
-]
-const aiBlockSuggestions = [
-  { label: '添加 Hero 首屏', prompt: '在画布末尾添加一个居中的 Hero 首屏区块' },
-  { label: '添加三列特性', prompt: '在画布末尾添加一个三列特性区块' },
-  { label: '添加 CTA 行动召唤', prompt: '在画布末尾添加一个 CTA 行动召唤区块' },
-  { label: '添加客户评价', prompt: '在画布末尾添加一个客户评价区块' },
+  '在画布末尾添加一个 Hero 首屏区块',
 ]
 // AI 需求澄清：当模型调用 cms.ask.user 时，用 TokUI 渲染的一段可点击选项 DSL。
 const pendingAskDsl = ref('')
@@ -671,6 +665,11 @@ onMounted(async () => {
     panels: { defaults: [] },
   })
   localizeCmsPluginBlocks(editor)
+  if (import.meta.env.DEV) {
+    // 开发环境暴露实例，便于用浏览器控制台/远程调试画布状态
+    ;(window as any).__cmsEditor = editor
+    ;(window as any).__cmsCanvasFit = fitCanvasToWorkspace
+  }
   registerDynamicTypes(editor)
   registerBlocks(editor, false)
   loadAndRegisterUserBlocks(editor, false)
@@ -712,6 +711,8 @@ onMounted(async () => {
   const mountedEditor = editor
   requestAnimationFrame(() => {
     if (editor === mountedEditor) {
+      setupCanvasPan()
+      observeCanvasResize()
       void loadAndRegisterBackendBlocks(mountedEditor)
     }
   })
@@ -731,6 +732,21 @@ onBeforeUnmount(() => {
   window.removeEventListener('cms-ai-follow-up', onAiFollowUp as EventListener)
   blockPanelObserver?.disconnect()
   blockPanelObserver = null
+  canvasResizeObserver?.disconnect()
+  canvasResizeObserver = null
+  if (canvasRecenterTimer) {
+    clearTimeout(canvasRecenterTimer)
+    canvasRecenterTimer = null
+  }
+  if (canvasPanMove) {
+    window.removeEventListener('pointermove', canvasPanMove, true)
+    canvasPanMove = null
+  }
+  if (canvasPanEnd) {
+    window.removeEventListener('pointerup', canvasPanEnd, true)
+    window.removeEventListener('pointercancel', canvasPanEnd, true)
+    canvasPanEnd = null
+  }
   runCanvasJsDisposers(editor?.Canvas.getDocument()?.defaultView)
   editor?.destroy()
   editor = null
@@ -874,6 +890,85 @@ function resetCanvasZoom() {
   }
 }
 
+/**
+ * 自定义拖拽平移：画布空白区按住左键拖、页面内按住中键拖（iframe 内事件会被 GrapesJS
+ * 代理回画布容器，因此 window 级监听两种区域都能收到）。页面内左键保留给组件选择。
+ */
+function setupCanvasPan() {
+  const canvasEl = editorEl.value?.querySelector('.gjs-cv-canvas') as HTMLElement | null
+  if (!canvasEl || !editor)
+    return
+  let pan: { startX: number, startY: number, baseX: number, baseY: number } | null = null
+  const framesEl = () => canvasEl.querySelector('.gjs-cv-canvas__frames')
+
+  canvasEl.addEventListener('pointerdown', (ev) => {
+    if (!editor)
+      return
+    const target = ev.target as HTMLElement | null
+    const overFrame = Boolean(target?.closest?.('.gjs-frame-wrapper') || target?.tagName === 'IFRAME')
+    const middleButton = ev.button === 1
+    if (!middleButton && (ev.button !== 0 || overFrame))
+      return
+    const coords = (editor.Canvas as any)?.getCoords?.()
+    if (!coords)
+      return
+    ev.preventDefault()
+    ev.stopPropagation()
+    pan = { startX: ev.clientX, startY: ev.clientY, baseX: coords.x, baseY: coords.y }
+    framesEl()?.classList.add('panning')
+  }, true)
+
+  canvasPanMove = (ev: PointerEvent) => {
+    if (!pan || !editor)
+      return
+    ev.preventDefault()
+    ;(editor.Canvas as any)?.setCoords?.(pan.baseX + ev.clientX - pan.startX, pan.baseY + ev.clientY - pan.startY)
+  }
+  canvasPanEnd = () => {
+    if (!pan)
+      return
+    pan = null
+    framesEl()?.classList.remove('panning')
+  }
+  window.addEventListener('pointermove', canvasPanMove, true)
+  window.addEventListener('pointerup', canvasPanEnd, true)
+  window.addEventListener('pointercancel', canvasPanEnd, true)
+}
+
+let canvasPanMove: ((ev: PointerEvent) => void) | null = null
+let canvasPanEnd: (() => void) | null = null
+let canvasResizeObserver: ResizeObserver | null = null
+let canvasRecenterTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 面板开合/窗口变化导致画布容器尺寸变化时重新居中画框；首次回调做完整适配（首帧缩放+居中） */
+function observeCanvasResize() {
+  canvasResizeObserver?.disconnect()
+  if (!editorEl.value || typeof ResizeObserver === 'undefined')
+    return
+  let first = true
+  canvasResizeObserver = new ResizeObserver(() => {
+    if (canvasRecenterTimer)
+      clearTimeout(canvasRecenterTimer)
+    canvasRecenterTimer = setTimeout(() => {
+      canvasRecenterTimer = null
+      if (first) {
+        first = false
+        fitCanvasToWorkspace()
+      }
+      else {
+        centerCanvasFrame()
+      }
+    }, 160)
+  })
+  canvasResizeObserver.observe(editorEl.value)
+}
+
+/** 可视画布元素（.gjs-cv-canvas）宽度：editorEl 是整排容器，比真实可视画布宽，不能用于居中计算 */
+function canvasViewportWidth(): number {
+  const canvasEl = editorEl.value?.querySelector('.gjs-cv-canvas') as HTMLElement | null
+  return canvasEl?.clientWidth || editorEl.value?.clientWidth || 0
+}
+
 /** 无限画布下把页面画框居中到可视区（顶部留 24px），坐标为屏幕像素。 */
 function centerCanvasFrame() {
   try {
@@ -883,7 +978,7 @@ function centerCanvasFrame() {
     const zoomDecimal = canvas?.getZoomDecimal?.() ?? (canvasZoom.value / 100)
     const device = editor.DeviceManager.getSelected() as any
     const deviceWidth = Number.parseInt(String(device?.get?.('width') || device?.attributes?.width || ''), 10)
-    const canvasWidth = editorEl.value.clientWidth
+    const canvasWidth = canvasViewportWidth()
     const frameWidth = Number.isFinite(deviceWidth) && deviceWidth > 0 ? deviceWidth * zoomDecimal : canvasWidth
     const x = Math.max(16, Math.round((canvasWidth - frameWidth) / 2))
     canvas?.setCoords?.(x, 24)
@@ -1247,14 +1342,10 @@ function fitCanvasToWorkspace() {
   if (!Number.isFinite(width) || width <= 0) {
     return
   }
-  const zoom = canvasFitZoom(editorEl.value.clientWidth, width)
+  const zoom = canvasFitZoom(canvasViewportWidth(), width)
   ;(editor.Canvas as any)?.setZoom?.(zoom)
   canvasZoom.value = zoom
   centerCanvasFrame()
-}
-
-function useBlockSuggestion(prompt: string) {
-  void sendAiPrompt(prompt)
 }
 
 function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], history: CmsChatHistoryMessage[] = []) {
@@ -2627,6 +2718,7 @@ function selectBreadcrumb(component: any) {
           <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><FaIcon name="i-ri:subtract-line" /></button>
           <button type="button" class="workbench-zoom-value" @click="resetCanvasZoom">{{ canvasZoom }}%</button>
           <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><FaIcon name="i-ri:add-line" /></button>
+          <FaTooltip text="适应窗口"><button type="button" class="workbench-icon-button" @click="fitCanvasToWorkspace"><FaIcon name="i-ri:fullscreen-line" /></button></FaTooltip>
         </div>
         <div class="workbench-command-group">
           <FaTooltip :text="previewActive ? '退出预览' : '预览页面'"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'i-ri:edit-box-line' : 'i-ri:eye-line'" /></button></FaTooltip>
@@ -2694,7 +2786,7 @@ function selectBreadcrumb(component: any) {
           <span>{{ activeDevice === 'desktop' ? '桌面' : activeDevice === 'tablet' ? '平板' : '手机' }}</span>
           <span>{{ canvasZoom }}%</span>
           <span v-if="selectedBreadcrumbs.length">{{ selectedBreadcrumbs.at(-1)?.label }}</span>
-          <span class="canvas-statusbar-hint">空格+拖动平移 · Ctrl+滚轮缩放 · 滚轮平移画布</span>
+          <span class="canvas-statusbar-hint">空白处/中键拖拽平移 · Ctrl+滚轮缩放 · 空格+拖动平移</span>
         </footer>
       </main>
 
@@ -2763,15 +2855,9 @@ function selectBreadcrumb(component: any) {
                   </button>
                 </div>
               </section>
-              <p class="ai-tools-hint">AI 可以使用系统预设区块快速搭建页面。</p>
-              <div class="ai-suggestions ai-block-suggestions" aria-label="AI 添加区块">
-                <button v-for="item in aiBlockSuggestions" :key="item.label" type="button" @click="useBlockSuggestion(item.prompt)">
-                  {{ item.label }}
-                </button>
-              </div>
               <div class="ai-context">
                 <span>选中 {{ selectedCanvasSummary }}</span>
-                <span>变量 {{ cmsVariableCount }} 个</span>
+                <span>变量 {{ cmsVariableCount }}</span>
                 <span v-for="item in canvasStats" :key="item.label">
                   {{ item.label }} {{ item.value }}
                 </span>
@@ -3786,10 +3872,77 @@ function selectBreadcrumb(component: any) {
 .ai-context {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 10px;
+  gap: 2px 10px;
   overflow: hidden;
+  padding: 6px 2px 0;
+  border-top: 1px solid #f1f5f9;
   color: #94a3b8;
   font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ---- AI 助手面板：极简中性风（对齐 coding 助手的聊天审美） ---- */
+.ai-panel :deep(.yd-agent-chat__welcome .yd-welcome) {
+  padding: 20px 14px 12px;
+}
+
+.ai-panel :deep(.yd-welcome__mark) {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  font-size: 20px;
+  box-shadow: none;
+}
+
+.ai-panel :deep(.yd-welcome__title) {
+  font-size: 15px;
+}
+
+.ai-panel :deep(.yd-welcome__desc) {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ai-panel :deep(.yd-welcome__grid) {
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.ai-panel :deep(.yd-welcome__prompt) {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+}
+
+.ai-panel :deep(.yd-welcome__prompt:hover) {
+  transform: none;
+}
+
+.ai-panel :deep(.yd-agent-chat__footer) {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
+.ai-panel :deep(.yd-agent-chat__controls) {
+  padding: 0 2px;
+}
+
+.ai-panel :deep(.yd-sender) {
+  padding: 0;
+}
+
+.ai-panel :deep(.yd-sender__composer) {
+  border-color: #e5e7eb;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.ai-panel :deep(.yd-sender__composer.is-focused) {
+  border-color: #cbd5e1;
+  box-shadow: none;
 }
 
 .source-panel.active {
@@ -3943,25 +4096,6 @@ function selectBreadcrumb(component: any) {
   color: #0f172a;
 }
 
-.ai-tools-hint {
-  margin: 0 0 8px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.5;
-}
-
-.ai-block-suggestions button {
-  border-color: #ccfbf1;
-  background: #f0fdfa;
-  color: #0d9488;
-}
-
-.ai-block-suggestions button:hover {
-  border-color: #99f6e4;
-  background: #e6fbf7;
-  color: #0f766e;
-}
-
 .ai-ask {
   padding: 12px;
   margin-bottom: 8px;
@@ -4054,6 +4188,23 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-cv-canvas__frame) {
   border-radius: 10px;
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.10);
+}
+
+/* 关闭 GrapesJS 的 margin:auto 居中：无限画布下平移坐标由 setCoords 精确控制，
+   双重居中会把画框推出可视区（右侧白边/内容被裁） */
+:deep(.gjs-frame-wrapper) {
+  margin: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+}
+
+/* 空白区域显示抓手光标，提示可直接拖拽平移 */
+:deep(.gjs-cv-canvas__frames) {
+  cursor: grab;
+}
+
+:deep(.gjs-cv-canvas__frames.panning) {
+  cursor: grabbing;
 }
 
 :deep(.gjs-block-category),
