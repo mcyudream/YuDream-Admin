@@ -535,10 +535,12 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         onTool.accept(result);
                     }
                     progress(onProgress, "tool-complete", toolProgressMessage("工具调用完成", descriptor, arguments));
-                    log.debug("AI tool call completed, tool={}, action={}, payloadKeys={}",
+                    String payloadPreview = result.payload() == null ? "null" : abbreviate(JSONUtil.toJsonStr(result.payload()));
+                    log.debug("AI tool call completed, tool={}, action={}, payloadKeys={}, payload={}",
                             result.toolName(),
                             result.action(),
-                            result.payload() == null ? List.of() : result.payload().keySet());
+                            result.payload() == null ? List.of() : result.payload().keySet(),
+                            payloadPreview);
                     return result;
                 })
                 .description(descriptor.description())
@@ -686,6 +688,14 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .findFirst()
                 .map(AiAgentToolResult::message)
                 .orElse("画布操作已完成。");
+    }
+
+    /** 日志用截断：工具返回可能很大，只保留前 800 字符。 */
+    private static String abbreviate(String value) {
+        if (value == null || value.length() <= 800) {
+            return value;
+        }
+        return value.substring(0, 800) + "...(truncated, total=" + value.length() + ")";
     }
 
     private int length(String value) {
