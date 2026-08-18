@@ -71,7 +71,7 @@ const navigationItems = computed(() => {
 const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
 const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))
 const footerTitle = computed(() => home.value?.settings?.footerTitle || renderContext.value.site.name)
-const footerDescription = computed(() => home.value?.settings?.footerDescription || renderContext.value.site.description || '由 YuDream CMS 驱动的内容站点')
+const footerDescription = computed(() => home.value?.settings?.footerDescription || renderContext.value.site.description || (renderContext.value.site.name ? `由 ${renderContext.value.site.name} 驱动的内容站点` : ''))
 const footerCopyright = computed(() => home.value?.settings?.footerCopyright || `© ${new Date().getFullYear()} ${renderContext.value.site.name}. All rights reserved.`)
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
 const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
@@ -104,7 +104,7 @@ const renderContext = computed(() => {
     : [{ name: '登录', avatar: appSettingsStore.logo, url: '/login' }]
   const pageItems = publishedPages.value.map(toPageItem)
   const siteInfo = {
-    name: appSettingsStore.siteName || 'YuDream',
+    name: appSettingsStore.siteName || '',
     description: appSettingsStore.siteDescription || home.value?.subtitle || page.value?.summary || '',
     logo: appSettingsStore.logo || '',
     favicon: appSettingsStore.favicon || '',

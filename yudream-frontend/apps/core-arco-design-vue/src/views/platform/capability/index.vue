@@ -64,7 +64,7 @@ const configDraft = ref<Record<string, string>>({})
 const aiProviders = ref<AiProviderDraft[]>([])
 /** 当前编辑的供应商下标 */
 const activeProviderIndex = ref(0)
-const testMessage = ref('YuDream 平台能力测试消息')
+const testMessage = ref('平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
 let eventSource: EventSource | null = null
