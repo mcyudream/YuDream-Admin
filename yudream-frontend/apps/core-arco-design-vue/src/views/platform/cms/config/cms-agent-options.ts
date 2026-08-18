@@ -15,10 +15,13 @@ export function toCmsAgentOptions(applications: CmsAgentApplicationLike[]): CmsA
   return applications
     .filter(application => application.status === 'PUBLISHED')
     .map(application => ({
-      label: String(application.name || application.code || '').trim(),
+      label: application.code === BUILTIN_CMS_AGENT_CODE
+        ? 'YuDream YD 页面引擎'
+        : String(application.name || application.code || '').trim(),
       value: String(application.code || '').trim(),
     }))
     .filter(option => Boolean(option.label && option.value))
+    .sort((left, right) => Number(right.value === BUILTIN_CMS_AGENT_CODE) - Number(left.value === BUILTIN_CMS_AGENT_CODE))
 }
 
 export function resolveCmsAgentCode(options: CmsAgentSelectOption[], current: string): string {

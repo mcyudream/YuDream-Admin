@@ -29,5 +29,6 @@ public class CmsTemplateContextDTO {
         private List<CmsTemplateItemDTO> spaces;
         private List<CmsTemplateItemDTO> pages;
         private List<CmsTemplateItemDTO> latest;
+        private List<CmsTemplateItemDTO> featured;
     }
 }
