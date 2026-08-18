@@ -7,6 +7,7 @@ import lombok.Data;
 @Builder
 public class CmsTemplateItemDTO {
     private String id;
+    private Integer sort;
     private String source;
     private String title;
     private String slug;
@@ -18,5 +19,7 @@ public class CmsTemplateItemDTO {
     private String markdownContent;
     private String spaceSlug;
     private String path;
+    private String createdAt;
+    private String publishedAt;
     private String updatedAt;
 }

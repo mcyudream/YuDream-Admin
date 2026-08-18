@@ -152,45 +152,25 @@ function chromeCss(layoutMode: CmsSiteLayoutMode, editorMarkers: boolean) {
 :where(html, body) {
   min-height: 100%;
   margin: 0;
-  --yb-site-bg: #f8fafc;
-  --yb-site-text: #111827;
-  --yb-site-heading: #0f172a;
-  --yb-site-muted: #64748b;
-  --yb-site-caption: #94a3b8;
-  --yb-site-nav-text: #475569;
-  --yb-site-text-2: #334155;
-  --yb-site-border: #e5e7eb;
-  --yb-site-border-2: #e2e8f0;
-  --yb-site-header-bg: #ffffff;
-  --yb-site-surface: #ffffff;
-  --yb-site-hover: #f1f5f9;
-  --yb-site-primary: #0f766e;
-  --yb-site-primary-text: #ffffff;
-  --yb-site-primary-btn-bg: #111827;
-  --yb-site-primary-btn-text: #ffffff;
-  --yb-site-hero-bg: linear-gradient(135deg, #0f766e, #1f2937);
-  --yb-site-hero-text: #ffffff;
-  --yb-site-danger: #b91c1c;
-}
-:where(html.dark, body.dark) {
-  --yb-site-bg: #0f172a;
-  --yb-site-text: #e2e8f0;
-  --yb-site-heading: #f8fafc;
-  --yb-site-muted: #94a3b8;
-  --yb-site-caption: #64748b;
-  --yb-site-nav-text: #cbd5e1;
-  --yb-site-text-2: #e2e8f0;
-  --yb-site-border: #1e293b;
-  --yb-site-border-2: #334155;
-  --yb-site-header-bg: #1e293b;
-  --yb-site-surface: #1e293b;
-  --yb-site-hover: #334155;
-  --yb-site-primary: #2dd4bf;
-  --yb-site-primary-text: #0f172a;
-  --yb-site-primary-btn-bg: #2dd4bf;
-  --yb-site-primary-btn-text: #0f172a;
-  --yb-site-hero-bg: linear-gradient(135deg, #115e59, #111827);
-  --yb-site-hero-text: #f8fafc;
+  --yb-site-bg: var(--color-bg-1, #fff);
+  --yb-site-text: var(--color-text-1, #1d2129);
+  --yb-site-heading: var(--color-text-1, #1d2129);
+  --yb-site-muted: var(--color-text-3, #86909c);
+  --yb-site-caption: var(--color-text-4, #c9cdd4);
+  --yb-site-nav-text: var(--color-text-2, #4e5969);
+  --yb-site-text-2: var(--color-text-2, #4e5969);
+  --yb-site-border: var(--color-border-2, #e5e6eb);
+  --yb-site-border-2: var(--color-border-3, #c9cdd4);
+  --yb-site-header-bg: var(--color-bg-2, #fff);
+  --yb-site-surface: var(--color-bg-2, #fff);
+  --yb-site-hover: var(--color-fill-2, #f2f3f5);
+  --yb-site-primary: rgb(var(--primary-6, 22 93 255));
+  --yb-site-primary-text: oklch(var(--primary-foreground, 1 0 0));
+  --yb-site-primary-btn-bg: rgb(var(--primary-6, 22 93 255));
+  --yb-site-primary-btn-text: oklch(var(--primary-foreground, 1 0 0));
+  --yb-site-hero-bg: var(--color-fill-2, #f2f3f5);
+  --yb-site-hero-text: var(--color-text-1, #1d2129);
+  --yb-site-danger: rgb(var(--danger-6, 245 63 63));
 }
 :where(.site-layout-header, .site-layout-footer) {
   display: block;

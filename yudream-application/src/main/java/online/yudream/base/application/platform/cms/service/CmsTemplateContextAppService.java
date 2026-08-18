@@ -63,20 +63,28 @@ public class CmsTemplateContextAppService {
     private CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge() {
         if (!capabilities.enabled("wiki")) {
             return CmsTemplateContextDTO.CmsTemplateKnowledgeDTO.builder()
-                    .spaces(List.of()).pages(List.of()).latest(List.of()).build();
+                    .spaces(List.of()).pages(List.of()).latest(List.of()).featured(List.of()).build();
         }
         List<WikiSpace> publicSpaces = wikiSpaces.findAll().stream()
                 .filter(WikiSpace::isPublicReadEnabled)
                 .toList();
         List<CmsTemplateItemDTO> spaces = publicSpaces.stream().map(this::wikiSpace).toList();
-        List<CmsTemplateItemDTO> pages = publicSpaces.stream()
+        List<CmsTemplateItemDTO> publishedPages = publicSpaces.stream()
                 .flatMap(space -> publishedWikiPages(space).stream())
+                .toList();
+        List<CmsTemplateItemDTO> pages = publishedPages.stream()
                 .sorted(Comparator.comparing(CmsTemplateItemDTO::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+        List<CmsTemplateItemDTO> featured = publishedPages.stream()
+                .sorted(Comparator.comparing(CmsTemplateItemDTO::getSort, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(CmsTemplateItemDTO::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(CmsTemplateItemDTO::getId))
                 .toList();
         return CmsTemplateContextDTO.CmsTemplateKnowledgeDTO.builder()
                 .spaces(spaces)
                 .pages(pages)
                 .latest(limit(pages))
+                .featured(limit(featured))
                 .build();
     }
 
@@ -88,6 +96,7 @@ public class CmsTemplateContextAppService {
         return nodes.stream()
                 .filter(node -> node.getNodeType() == WikiNodeType.PAGE)
                 .filter(node -> node.getPublishedVersionId() != null)
+                .sorted(Comparator.comparing(WikiNode::getSort).thenComparing(WikiNode::getId))
                 .map(node -> wikiPage(space, node, byId))
                 .filter(Objects::nonNull)
                 .toList();
@@ -102,6 +111,7 @@ public class CmsTemplateContextAppService {
         String content = limitContent(version.getMarkdown());
         return CmsTemplateItemDTO.builder()
                 .id(String.valueOf(node.getId()))
+                .sort(node.getSort())
                 .source("knowledge")
                 .title(version.getTitle() == null ? node.getTitle() : version.getTitle())
                 .slug(node.getSlug())
@@ -112,6 +122,8 @@ public class CmsTemplateContextAppService {
                 .markdownContent(content)
                 .spaceSlug(space.getSlug())
                 .path(path)
+                .createdAt(format(version.getCreateTime()))
+                .publishedAt(format(version.getCreateTime()))
                 .updatedAt(format(version.getUpdateTime() == null ? version.getCreateTime() : version.getUpdateTime()))
                 .build();
     }
@@ -131,7 +143,9 @@ public class CmsTemplateContextAppService {
                 .content(content)
                 .htmlContent(html)
                 .markdownContent(markdown)
-                .updatedAt(format(page.getPublishedAt() == null ? page.getUpdateTime() : page.getPublishedAt()))
+                .createdAt(format(page.getCreateTime()))
+                .publishedAt(format(page.getPublishedAt()))
+                .updatedAt(format(page.getUpdateTime()))
                 .build();
     }
 
@@ -145,6 +159,8 @@ public class CmsTemplateContextAppService {
                 .excerpt(space.getDescription())
                 .url("/wiki/" + space.getSlug())
                 .spaceSlug(space.getSlug())
+                .createdAt(format(space.getCreateTime()))
+                .updatedAt(format(space.getUpdateTime()))
                 .build();
     }
 

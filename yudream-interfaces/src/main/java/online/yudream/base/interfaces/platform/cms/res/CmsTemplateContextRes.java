@@ -29,5 +29,6 @@ public class CmsTemplateContextRes {
         private List<CmsTemplateItemRes> spaces;
         private List<CmsTemplateItemRes> pages;
         private List<CmsTemplateItemRes> latest;
+        private List<CmsTemplateItemRes> featured;
     }
 }

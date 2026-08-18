@@ -95,6 +95,8 @@ export interface CmsTemplateItem {
   markdownContent?: string
   spaceSlug?: string
   path?: string
+  createdAt?: string
+  publishedAt?: string
   updatedAt?: string
 }
 
@@ -108,6 +110,7 @@ export interface CmsTemplateContext {
     spaces: CmsTemplateItem[]
     pages: CmsTemplateItem[]
     latest: CmsTemplateItem[]
+    featured: CmsTemplateItem[]
   }
 }
 

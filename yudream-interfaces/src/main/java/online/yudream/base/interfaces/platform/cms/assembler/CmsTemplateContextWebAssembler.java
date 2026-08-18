@@ -5,6 +5,8 @@ import online.yudream.base.application.platform.cms.dto.CmsTemplateItemDTO;
 import online.yudream.base.interfaces.platform.cms.res.CmsTemplateContextRes;
 import online.yudream.base.interfaces.platform.cms.res.CmsTemplateItemRes;
 
+import java.util.List;
+
 public final class CmsTemplateContextWebAssembler {
 
     private CmsTemplateContextWebAssembler() {
@@ -21,6 +23,8 @@ public final class CmsTemplateContextWebAssembler {
                         .spaces(dto.getKnowledge().getSpaces().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
                         .pages(dto.getKnowledge().getPages().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
                         .latest(dto.getKnowledge().getLatest().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
+                        .featured((dto.getKnowledge().getFeatured() == null ? List.<CmsTemplateItemDTO>of() : dto.getKnowledge().getFeatured())
+                                .stream().map(CmsTemplateContextWebAssembler::toRes).toList())
                         .build())
                 .build();
     }
@@ -39,6 +43,8 @@ public final class CmsTemplateContextWebAssembler {
                 .markdownContent(item.getMarkdownContent())
                 .spaceSlug(item.getSpaceSlug())
                 .path(item.getPath())
+                .createdAt(item.getCreatedAt())
+                .publishedAt(item.getPublishedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();
     }

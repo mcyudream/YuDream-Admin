@@ -18,5 +18,7 @@ public class CmsTemplateItemRes {
     private String markdownContent;
     private String spaceSlug;
     private String path;
+    private String createdAt;
+    private String publishedAt;
     private String updatedAt;
 }
