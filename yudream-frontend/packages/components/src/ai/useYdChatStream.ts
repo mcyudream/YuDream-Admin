@@ -491,7 +491,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     }
     switch (event.type) {
       case 'delta':
-        answer.pending = false
+        // 首帧正文不解除 pending：pending 表示“本轮运行进行中”，仅在 done/error/终止时收敛，
+        // 否则流式中途就会露出复制/重新回答等完成态操作。
         answer.content += typeof event.text === 'string' ? event.text : ''
         break
       case 'reasoning':
@@ -530,7 +531,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       case 'RUN_STARTED':
         return 'continue'
       case 'TEXT_MESSAGE_CHUNK':
-        answer.pending = false
+        // 同上：正文增量不解除 pending
         answer.content += typeof event.delta === 'string' ? event.delta : ''
         return 'continue'
       case 'THINKING_TEXT_MESSAGE_START':

@@ -52,7 +52,8 @@ public final class CmsCanvasClientBridge {
             return enriched;
         }
         catch (TimeoutException e) {
-            throw new BizException("画布工具响应超时：" + toolName);
+            // 工具级失败作为结果回流模型循环（模型据此自我修正），并保证前端工具行能闭环不再转圈。
+            return errorResult(toolCallId, "画布工具响应超时（" + TIMEOUT_SECONDS + "s）：" + toolName);
         }
         catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -60,11 +61,21 @@ public final class CmsCanvasClientBridge {
         }
         catch (ExecutionException e) {
             Throwable cause = e.getCause() == null ? e : e.getCause();
-            throw new BizException(cause.getMessage() == null ? "画布工具执行失败：" + toolName : cause.getMessage());
+            return errorResult(toolCallId, cause.getMessage() == null ? "画布工具执行失败：" + toolName : cause.getMessage());
         }
         finally {
             pending.remove(toolCallId);
         }
+    }
+
+    /** 工具级失败的统一结果形态：模型可读到 ok=false 与错误信息，前端可据此收起执行中状态。 */
+    private Map<String, Object> errorResult(String toolCallId, String message) {
+        Map<String, Object> result = new java.util.LinkedHashMap<>();
+        result.put("ok", false);
+        result.put("error", message);
+        result.put("message", "画布工具执行失败：" + message);
+        result.put("_toolCallId", toolCallId);
+        return result;
     }
 
     /** 浏览器回帧：ok=false 时 error 作为工具报错抛给模型，让模型自行修正。 */

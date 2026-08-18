@@ -84,13 +84,38 @@ function getOutline(editor: Editor, args: Record<string, unknown>): Record<strin
   }
 }
 
+/** 读取组件标签名：textnode/注释等节点的模型上可能没有 getTagName，做兜底防止整棵纲要树崩掉 */
+function tagNameOf(component: Component): string {
+  try {
+    if (typeof (component as any).getTagName === 'function') {
+      return String((component as any).getTagName() || 'div')
+    }
+    return String((component as any).get?.('tagName') || 'div')
+  }
+  catch {
+    return 'div'
+  }
+}
+
+function classesOf(component: Component): string[] {
+  try {
+    if (typeof (component as any).getClasses === 'function') {
+      return (component as any).getClasses()
+    }
+  }
+  catch {
+    // ignore
+  }
+  return []
+}
+
 function outlineNode(component: Component, depth: number, maxDepth: number, state: { count: number, truncated: boolean }): OutlineNode {
   state.count += 1
   const node: OutlineNode = {
     id: component.getId(),
-    tag: component.getTagName(),
+    tag: tagNameOf(component),
     type: String(component.get('type') || ''),
-    classes: component.getClasses(),
+    classes: classesOf(component),
   }
   const text = textExcerpt(component)
   if (text) {
@@ -128,9 +153,9 @@ function truncate(value: string, max: number): string {
 function summarize(component: Component): Record<string, unknown> {
   return {
     id: component.getId(),
-    tag: component.getTagName(),
+    tag: tagNameOf(component),
     type: String(component.get('type') || ''),
-    classes: component.getClasses(),
+    classes: classesOf(component),
     text: textExcerpt(component),
   }
 }
