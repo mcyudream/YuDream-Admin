@@ -10,7 +10,7 @@ public record PasskeyRelyingPartyContext(
     public PasskeyRelyingPartyContext {
         rpId = requireText(rpId, "Passkey RP ID 不能为空");
         origin = requireText(origin, "Passkey Origin 不能为空");
-        rpName = hasText(rpName) ? rpName.trim() : "YuDream Admin";
+        rpName = hasText(rpName) ? rpName.trim() : "当前站点";
     }
 
     private static String requireText(String value, String message) {

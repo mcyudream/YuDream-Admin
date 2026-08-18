@@ -10,15 +10,14 @@ import java.util.Locale;
 
 public class PasskeyRelyingPartySupport {
 
-    private static final String DEFAULT_RP_NAME = "YuDream Admin";
-
     private PasskeyRelyingPartySupport() {
     }
 
-    public static PasskeyRelyingPartyContext from(HttpServletRequest request) {
+    /** rpName 传入系统设置中的站点名称（认证器弹窗向用户展示），留空时由领域层兜底 */
+    public static PasskeyRelyingPartyContext from(HttpServletRequest request, String rpName) {
         String origin = requestOrigin(request);
         String host = host(origin);
-        return new PasskeyRelyingPartyContext(host, origin, DEFAULT_RP_NAME);
+        return new PasskeyRelyingPartyContext(host, origin, rpName);
     }
 
     private static String requestOrigin(HttpServletRequest request) {

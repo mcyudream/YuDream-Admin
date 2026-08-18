@@ -28,6 +28,7 @@ public class AiAppService {
 
     private final CapabilityAppService capabilityAppService;
     private final AgentAppService agentAppService;
+    private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
 
     @Transactional(readOnly = true)
     public CmsPageGenerateDTO generateCmsPage(CmsPageGenerateCmd cmd) {
@@ -153,10 +154,20 @@ public class AiAppService {
         }
     }
 
+    private String siteName() {
+        try {
+            String name = settingAppService.siteSettings().getSiteName();
+            return StringUtils.hasText(name) ? name : "当前站点";
+        }
+        catch (Exception ignored) {
+            return "当前站点";
+        }
+    }
+
     private String systemPrompt(CmsPageGenerateCmd cmd) {
         return """
-                你是 YuDream CMS 页面构建 Agent，可以读取当前 GrapesJS 画布，并通过工具修改页面。
-
+                你是 %s 的 CMS 页面构建 Agent，可以读取当前 GrapesJS 画布，并通过工具修改页面。
+""".formatted(siteName()) + """
                 工作流必须按顺序执行：
                 1. 先分析当前 HTML、CSS、GrapesJS Project JSON、用户需求和样图信息。
                 2. 如果用户提供了参考网址、竞品网址或明显需要外部页面参考，先调用 web.fetch 抓取公开页面，再结合抓取结果分析。
@@ -231,7 +242,7 @@ public class AiAppService {
                 - 根据用户需求里的「页面模板」决定内容结构：DEFAULT 模板自带文章头（标题/描述/封面），页面内不要重复大标题；LANDING 只有站点页头页脚，页面需自带 hero；DOC 正文会收窄为约 860px 阅读容器，内容按阅读宽度设计；BLANK 无任何站点元素，页面需自带全部结构。
                 - 页面最终嵌在站点外壳（固定页头/页脚）中展示：禁止给页面根容器或第一个区块添加顶部 padding/margin，顶部间距由站点页头负责。
                 - CSS 只允许 yb-ai- 前缀的类选择器（含 @media 内部）；禁止 *、body、html 以及 header/footer/nav/a/img/div 等裸元素选择器，避免污染站点外壳。
-                - 区块需要背景、渐变或图片铺满整屏宽度时，外层区块元素必须保持 width:100%，禁止给外层区块设置 max-width；内容居中一律用内层容器（max-width + margin:0 auto）实现。
+                - 区块需要背景、渐变或图片铺满整屏宽度时，外层区块元素必须保持 width:100%%，禁止给外层区块设置 max-width；内容居中一律用内层容器（max-width + margin:0 auto）实现。
 
                 深度思考模式：%s
                 %s
@@ -284,7 +295,7 @@ public class AiAppService {
                 修改需求：
                 %s
                 """.formatted(
-                defaultText(cmd.getSiteName(), "YuDream"),
+                defaultText(cmd.getSiteName(), siteName()),
                 defaultText(cmd.getTitle(), "未命名页面"),
                 defaultText(cmd.getPageType(), "通用内容页"),
                 templateDescription(cmd.getTemplate()),
