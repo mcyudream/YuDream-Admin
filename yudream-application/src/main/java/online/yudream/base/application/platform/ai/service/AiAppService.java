@@ -75,15 +75,8 @@ public class AiAppService {
         return AiAssembler.withTools(dto, result.toolResults());
     }
 
-    /** v2 系统提示词：工具真实执行、结果回流，强调小步快跑与改后确认。 */
+    /** v2 系统提示词：工具真实执行、结果回流，强调小步快跑与改后确认；v2 已不绑定 Agent 人设，直接按所选模型运行。 */
     private String agentSystemPrompt(CmsPageGenerateCmd cmd) {
-        String agentPrompt = "";
-        try {
-            String code = StringUtils.hasText(cmd.getAgentCode()) ? cmd.getAgentCode().trim() : BuiltinAgentCodes.CMS_BUILDER;
-            agentPrompt = defaultText(agentAppService.runtimeApplication(code).getSystemPrompt(), "");
-        }
-        catch (Exception ignored) {
-        }
         return """
                 你是 %s 的 CMS 页面构建 Agent。页面画布运行在浏览器的 GrapesJS 构建器中，你通过客户端画布工具读取和修改它——
                 这些工具会真实执行，结果（含报错）会返回给你。像编程助手一样工作：
@@ -117,7 +110,7 @@ public class AiAppService {
                 cmd.isThinkingEnabled()
                         ? "开启时请在自然语言流中简要输出分析阶段、参考判断、布局策略和修改计划，再调用工具。"
                         : "关闭时请保持过程反馈简短，快速完成读取和工具调用。"
-        ) + (agentPrompt.isBlank() ? "" : "\n该 Agent 的附加人设与要求：\n" + agentPrompt + "\n");
+        );
     }
 
     /** v2 用户提示词：不再回传整页快照（模型用工具按需读取），只带元信息与选中元素。 */
