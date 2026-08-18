@@ -4313,6 +4313,14 @@ function selectBreadcrumb(component: any) {
   color: #0f172a;
 }
 
+/* 我们的区块/图层面板全部外置，GrapesJS 默认 CSS 给画布预留的 15% 右栏与底部 40px 是纯死区，
+   不收回会把页面画框裁掉一截且右侧留一条白带 */
+:deep(.gjs-cv-canvas) {
+  width: 100% !important;
+  height: 100% !important;
+  top: 0;
+}
+
 :deep(.gjs-cv-canvas) {
   background: transparent;
 }
