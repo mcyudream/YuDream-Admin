@@ -61,11 +61,46 @@ export const useAppSettingsStore = defineStore(
       }
     }
 
+    function hexToRgb(hex?: string) {
+      const color = normalizeHexColor(hex)
+      if (!color) {
+        return null
+      }
+      return [
+        Number.parseInt(color.slice(1, 3), 16),
+        Number.parseInt(color.slice(3, 5), 16),
+        Number.parseInt(color.slice(5, 7), 16),
+      ] as const
+    }
+
+    function mixRgb(source: readonly number[], target: readonly number[], amount: number) {
+      return source.map((channel, index) => Math.round(channel + (target[index] - channel) * amount)).join(' ')
+    }
+
+    function applyPrimaryScale(value?: string) {
+      const primary = hexToRgb(value || settings.value.theme.primaryColor)
+      if (!primary) {
+        return
+      }
+      const white = [255, 255, 255]
+      const black = [0, 0, 0]
+      const lightness = [0.92, 0.78, 0.62, 0.45, 0.24]
+      const darkness = [0.12, 0.24, 0.38, 0.52]
+      lightness.forEach((amount, index) => {
+        document.documentElement.style.setProperty(`--primary-${index + 1}`, mixRgb(primary, white, amount))
+      })
+      document.documentElement.style.setProperty('--primary-6', primary.join(' '))
+      darkness.forEach((amount, index) => {
+        document.documentElement.style.setProperty(`--primary-${index + 7}`, mixRgb(primary, black, amount))
+      })
+    }
+
     function applyPrimaryColor(value?: string) {
       const color = hexToOklch(value || settings.value.theme.primaryColor)
       if (!color) {
         return
       }
+      applyPrimaryScale(value)
       document.documentElement.style.setProperty('--primary', color.primary)
       document.documentElement.style.setProperty('--ring', color.primary)
       document.documentElement.style.setProperty('--primary-foreground', color.foreground)

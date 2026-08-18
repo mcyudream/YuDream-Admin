@@ -56,6 +56,8 @@ const isSubSidebarEnable = computed(() => {
     || (
       ['side', 'head'].includes(appSettingsStore.settings.menu.mode)
       && appMenuStore.sidebarMenus.length !== 0
+      // 单菜单模块（如 AI 助手）不占二级栏，页面直接占满
+      && !appMenuStore.sidebarMenusHasOnlyMenu
       && (
         (
           appSettingsStore.settings.menu.mainMenuClickMode === 'switch'
@@ -70,6 +72,7 @@ const isSubSidebarEnable = computed(() => {
     || (
       ['single'].includes(appSettingsStore.settings.menu.mode)
       && appMenuStore.sidebarMenus.length !== 0
+      && !appMenuStore.sidebarMenusHasOnlyMenu
       && !appMenuStore.sidebarMenus.every(item => item.meta?.menu === false)
     )
 })

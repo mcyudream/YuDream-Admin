@@ -103,6 +103,15 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/wiki/search',
+    name: 'publicWikiSearch',
+    component: () => import('@/views/wiki/search.vue'),
+    meta: {
+      title: '搜索知识库',
+      public: true,
+    },
+  },
+  {
     path: '/wiki/:spaceSlug/:nodePath(.*)*',
     name: 'publicWiki',
     component: () => import('@/views/wiki/index.vue'),
