@@ -598,6 +598,8 @@ onMounted(async () => {
     undoManager: { trackSelection: false },
     selectorManager: { componentFirst: true },
     keepUnusedStyles: true,
+    // 无限画布：滚轮平移、Ctrl/⌘+滚轮以指针为中心缩放、空格+拖动平移，画框高度随内容自适应，避免内容被裁切且无法移动
+    infiniteCanvas: true,
     blockManager: { appendTo: blocksEl.value! },
     layerManager: { appendTo: layersEl.value! },
     traitManager: { appendTo: traitsEl.value! },
@@ -652,6 +654,7 @@ onMounted(async () => {
   canvasRevision.value += 1
   editorReady.value = true
   readCanvasZoom()
+  editor.on('canvas:zoom', readCanvasZoom)
   scheduleCanvasJsSync(250)
   const mountedEditor = editor
   requestAnimationFrame(() => {
@@ -810,7 +813,27 @@ function readCanvasZoom() {
 function resetCanvasZoom() {
   try {
     (editor?.Canvas as any)?.setZoom?.(100)
+    centerCanvasFrame()
     readCanvasZoom()
+  }
+  catch {
+    // ignore
+  }
+}
+
+/** 无限画布下把页面画框居中到可视区（顶部留 24px），坐标为屏幕像素。 */
+function centerCanvasFrame() {
+  try {
+    if (!editor || !editorEl.value)
+      return
+    const canvas = editor.Canvas as any
+    const zoomDecimal = canvas?.getZoomDecimal?.() ?? (canvasZoom.value / 100)
+    const device = editor.DeviceManager.getSelected() as any
+    const deviceWidth = Number.parseInt(String(device?.get?.('width') || device?.attributes?.width || ''), 10)
+    const canvasWidth = editorEl.value.clientWidth
+    const frameWidth = Number.isFinite(deviceWidth) && deviceWidth > 0 ? deviceWidth * zoomDecimal : canvasWidth
+    const x = Math.max(16, Math.round((canvasWidth - frameWidth) / 2))
+    canvas?.setCoords?.(x, 24)
   }
   catch {
     // ignore
@@ -1174,6 +1197,7 @@ function fitCanvasToWorkspace() {
   const zoom = canvasFitZoom(editorEl.value.clientWidth, width)
   ;(editor.Canvas as any)?.setZoom?.(zoom)
   canvasZoom.value = zoom
+  centerCanvasFrame()
 }
 
 function useBlockSuggestion(prompt: string) {
@@ -2595,6 +2619,7 @@ function selectBreadcrumb(component: any) {
           <span>{{ activeDevice === 'desktop' ? '桌面' : activeDevice === 'tablet' ? '平板' : '手机' }}</span>
           <span>{{ canvasZoom }}%</span>
           <span v-if="selectedBreadcrumbs.length">{{ selectedBreadcrumbs.at(-1)?.label }}</span>
+          <span class="canvas-statusbar-hint">空格+拖动平移 · Ctrl+滚轮缩放 · 滚轮平移画布</span>
         </footer>
       </main>
 
@@ -3531,6 +3556,11 @@ function selectBreadcrumb(component: any) {
 
 .canvas-statusbar i.ready {
   background: #10b981;
+}
+
+.canvas-statusbar-hint {
+  margin-left: auto;
+  color: #a3adbb;
 }
 
 .media-head {
