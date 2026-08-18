@@ -140,11 +140,26 @@ export interface UseYdChatStreamOptions {
   historyLimit?: number
   /** 收到工具调用事件（如检索开始/完成） */
   onTool?: (tool: YdChatToolEvent) => void
+  /**
+   * v2 客户端工具请求（AG-UI TOOL_CALL_REQUEST，仅 WebSocket 传输）：
+   * 在调用方真实执行工具并返回结果，框架负责把结果帧回传服务端继续模型循环。
+   */
+  onToolCallRequest?: (request: YdChatToolCallRequest) => Promise<YdChatToolCallReply>
   /** 一条回答完成 */
   onDone?: (message: YdChatMessage) => void
   /** 回答失败 */
   onError?: (message: YdChatMessage, error: unknown) => void
 }
+
+export interface YdChatToolCallRequest {
+  toolCallId: string
+  toolName: string
+  args: Record<string, unknown>
+}
+
+export type YdChatToolCallReply =
+  | { ok: true, result?: Record<string, unknown> }
+  | { ok: false, error: string }
 
 interface SseEventFrame {
   event: string
@@ -257,6 +272,27 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       socket.close()
     }
     socket = null
+  }
+
+  /** v2 客户端工具：真实执行后经同一条 WebSocket 回传结果帧，服务端模型循环据此继续 */
+  async function replyToolCall(request: YdChatToolCallRequest) {
+    let reply: YdChatToolCallReply
+    try {
+      reply = options.onToolCallRequest
+        ? await options.onToolCallRequest(request)
+        : { ok: false, error: '当前客户端未注册画布工具执行器' }
+    } catch (error) {
+      reply = { ok: false, error: error instanceof Error ? error.message : '工具执行失败' }
+    }
+    const current = socket
+    if (current && current.readyState === WebSocket.OPEN) {
+      current.send(JSON.stringify({
+        type: 'TOOL_RESULT',
+        toolCallId: request.toolCallId,
+        ok: reply.ok,
+        ...(reply.ok ? { result: reply.result ?? {} } : { error: reply.error }),
+      }))
+    }
   }
 
   // ---------------------------------------------------------------- SSE
@@ -511,6 +547,17 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         toolHint.value = `正在调用${answer.tools?.at(-1)?.toolName ?? '工具'}…`
         options.onTool?.(answer.tools?.at(-1)!)
         return 'continue'
+      case 'TOOL_CALL_REQUEST': {
+        // v2 客户端工具：服务端挂起模型循环，等待本端在画布真实执行后回传结果
+        const toolCallId = typeof event.toolCallId === 'string' ? event.toolCallId : ''
+        const toolName = typeof event.toolCallName === 'string' ? event.toolCallName : ''
+        const args = (event.content && typeof event.content === 'object' ? event.content : {}) as Record<string, unknown>
+        upsertTool(answer, { toolCallId, toolName, status: 'executing' })
+        toolHint.value = `正在执行${toolName || '画布工具'}…`
+        options.onTool?.(answer.tools?.at(-1)!)
+        void replyToolCall({ toolCallId, toolName, args })
+        return 'continue'
+      }
       case 'TOOL_CALL_RESULT': {
         const content = parseStructuredContent(event.content)
         const payload = normalizePayload(content)

@@ -4,6 +4,8 @@ import type {
   YdChatHistoryTurn,
   YdChatMessage,
   YdChatProtocol,
+  YdChatToolCallReply,
+  YdChatToolCallRequest,
   YdChatToolEvent,
   YdChatTransport,
 } from '@yudream/components'
@@ -49,6 +51,8 @@ const props = withDefaults(defineProps<{
   disclaimer?: string
   /** 可选附件类型 */
   accept?: string
+  /** v2 客户端工具请求处理器（仅 websocket 传输；如 CMS 画布工具在本端真实执行并回传结果） */
+  onToolCallRequest?: (request: YdChatToolCallRequest) => Promise<YdChatToolCallReply>
 }>(), {
   protocol: 'agui',
   transport: 'sse',
@@ -98,6 +102,8 @@ const { messages, streaming, send, stop } = useYdChatStream({
     ? props.buildBody(question, history, currentAttachments)
     : { question, history, attachments: currentAttachments },
   onTool: tool => emits('tool', tool),
+  onToolCallRequest: props.onToolCallRequest,
+  getWebSocketToken: () => localStorage.getItem('token') || undefined,
   onDone: message => emits('done', message),
   onError: (message, error) => emits('error', message, error),
 })

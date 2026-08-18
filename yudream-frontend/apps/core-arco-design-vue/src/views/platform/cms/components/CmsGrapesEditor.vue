@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Editor } from 'grapesjs'
-import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolEvent } from '@yudream/components'
+import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolCallReply, YdChatToolCallRequest, YdChatToolEvent } from '@yudream/components'
 import type { CmsAgentSelectOption } from '../config/cms-agent-options'
 import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
@@ -14,6 +14,7 @@ import apiCms from '@/api/modules/platform-cms'
 import YdAgentChatPanel from '@/components/YdAgentChatPanel/index.vue'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { createCmsAiChatSessionStore, cmsAiChatTargetKey, readActiveCmsAiChatSessionId } from '@/utils/cms-ai-chat-history'
+import { executeCanvasTool, type CanvasToolExecOptions } from '@/utils/cms-canvas-agent-tools'
 import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { resolveCmsAgentCode } from '../config/cms-agent-options'
@@ -468,7 +469,58 @@ const aiSessionStore: YdAgentChatSessionStore = createCmsAiChatSessionStore({
 })
 
 function aiChatEndpoint() {
-  return apiAi.generateCmsPageStreamEndpoint()
+  return apiAi.generateCmsPageAguiWsEndpoint()
+}
+
+/** v2 coding-agent 式画布工具名（客户端真实执行，结果回流模型循环；不走旧 applyAiTool 盲应用） */
+const V2_CANVAS_TOOL_NAMES = new Set([
+  'cms.canvas.get_outline',
+  'cms.canvas.get_selected',
+  'cms.canvas.find',
+  'cms.canvas.read_component',
+  'cms.canvas.update_text',
+  'cms.canvas.update_html',
+  'cms.canvas.update_style',
+  'cms.canvas.update_attributes',
+  'cms.canvas.insert_html',
+  'cms.canvas.remove_component',
+  'cms.canvas.list_blocks',
+  'cms.canvas.insert_block',
+])
+
+function canvasToolExecOptions(): CanvasToolExecOptions {
+  return {
+    appendCss: appendCanvasCss,
+    appendDefault: (html) => {
+      if (props.chromeFrame) {
+        appendHomeContent(html)
+        return []
+      }
+      return (editor?.addComponents(html) || []) as any[]
+    },
+    isProtected: props.chromeFrame ? component => isProtectedChromeComponent(component as any) : undefined,
+    onChanged: () => {
+      canvasRevision.value += 1
+    },
+  }
+}
+
+/** v2 客户端工具请求：在真实 GrapesJS 画布上执行并回传结果/报错，服务端模型循环据此继续 */
+async function handleCanvasToolRequest(request: YdChatToolCallRequest): Promise<YdChatToolCallReply> {
+  if (!editor || !editorReady.value) {
+    return { ok: false, error: '画布尚未就绪，请稍后重试' }
+  }
+  try {
+    if (request.toolName === 'cms.ask.user') {
+      showAskUserUi({ toolName: request.toolName, action: 'ask', message: '需求澄清', payload: request.args })
+      return { ok: true, result: { asked: true, message: '已向用户展示澄清选项' } }
+    }
+    const result = executeCanvasTool(editor, request.toolName, request.args, canvasToolExecOptions())
+    return { ok: true, result }
+  }
+  catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : '画布工具执行失败' }
+  }
 }
 
 function buildAiChatBody(question: string, history: YdChatHistoryTurn[], attachments: YdChatAttachment[] = []) {
@@ -521,7 +573,8 @@ function onAiToolEvent(tool: YdChatToolEvent) {
     message: tool.message,
     payload: tool.payload,
   }
-  if (isCanvasTool(result)) {
+  if (isCanvasTool(result) && !V2_CANVAS_TOOL_NAMES.has(result.toolName || '')) {
+    // v2 客户端工具在请求时已真实应用，结果事件仅作确认展示；旧版 action 工具仍按透传指令应用
     applyAiTool(result)
   }
   if (isAskUserTool(result)) {
@@ -1220,16 +1273,33 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
     style: props.chromeFrame
       ? `当前是首页完整站点画布，布局模式为 ${props.chromeLayout || 'HEADER_FOOTER'}。Header、首页主体和布局对应的 Footer/版权栏是一个整体。只能修改 Header/Footer 的 CSS 和首页主体内容，不能修改固定壳 HTML、菜单层级、Logo、认证入口或数据绑定。`
       : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
+    // v2：coding-agent 式客户端工具闭环（WebSocket 双向）
+    mode: 'agent',
     agentCode: aiAgentCode.value || undefined,
     imageDataUrl: image?.dataUrl || image?.url || undefined,
-    currentHtml: editor.getHtml(),
-    currentCss: fullCanvasCss(),
-    currentJs: pageJsContent.value,
-    currentProjectJson: JSON.stringify(editor.getProjectData()),
+    // v2 不再回传整页快照，只附一份结构纲要；模型用 cms.canvas.* 工具按需读取真实画布
+    currentHtml: canvasOutlineForPrompt(),
     currentSelectionJson: currentSelectionJson(),
     cmsVariableContextJson: cmsVariableContextJson(),
     thinkingEnabled: aiThinkingEnabled.value,
     history,
+  }
+}
+
+/** 生成给模型的画布结构纲要（深度 4，作为初始上下文；后续由模型用工具按需读取） */
+function canvasOutlineForPrompt(): string {
+  if (!editor) {
+    return ''
+  }
+  try {
+    const outline = executeCanvasTool(editor, 'cms.canvas.get_outline', { maxDepth: 4 }, {
+      appendCss: () => {},
+      appendDefault: () => [],
+    })
+    return JSON.stringify(outline.nodes ?? [])
+  }
+  catch {
+    return ''
   }
 }
 
@@ -1674,10 +1744,15 @@ function isAskUserTool(tool?: AiToolCallResult) {
 // 展示 AI 的澄清问题与可点击选项（后端已生成 TokUI DSL）。
 function showAskUserUi(tool?: AiToolCallResult) {
   const dsl = String(tool?.payload?.tokui || '')
+  const options = parseAskOptions(tool?.payload?.options)
+  // v2 结果确认帧没有 options，不能用它清空请求帧已展示的选项
+  if (!dsl && !options.length) {
+    return
+  }
   if (dsl) {
     pendingAskDsl.value = dsl
   }
-  pendingAskOptions.value = parseAskOptions(tool?.payload?.options)
+  pendingAskOptions.value = options
 }
 
 // 用户点击某个选项后，作为下一轮消息发送，形成「AI 问 → 用户选 → 继续」的闭环。
@@ -2646,7 +2721,9 @@ function selectBreadcrumb(component: any) {
           <YdAgentChatPanel
             ref="aiChatPanelRef"
             :endpoint="aiChatEndpoint"
+            transport="websocket"
             :build-body="buildAiChatBody"
+            :on-tool-call-request="handleCanvasToolRequest"
             :session-store="aiSessionStore"
             :sanitize-message="sanitizeCmsAiMessage"
             :session-meta="aiSessionMeta"
