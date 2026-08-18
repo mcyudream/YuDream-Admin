@@ -17,6 +17,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class AgentWorkflowValueResolver {
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AgentWorkflowValueResolver.class);
     private static final TypeReference<LinkedHashMap<String, Object>> MAP_TYPE = new TypeReference<>() {};
     private static final TemplateParserContext TEMPLATE_CONTEXT = new TemplateParserContext("{{", "}}");
 
@@ -77,7 +79,9 @@ public final class AgentWorkflowValueResolver {
                     .getValue(evaluationContext(context), Boolean.class);
             return Boolean.TRUE.equals(matched);
         } catch (RuntimeException exception) {
-            throw new BizException("条件表达式无效：" + exception.getMessage());
+            // 上游节点输出缺字段等运行时求值失败不应打断整条流程：视为条件不成立走默认分支，日志保留现场
+            log.warn("条件表达式求值失败，按不成立处理: expression={}, error={}", expression, exception.getMessage());
+            return false;
         }
     }
 
