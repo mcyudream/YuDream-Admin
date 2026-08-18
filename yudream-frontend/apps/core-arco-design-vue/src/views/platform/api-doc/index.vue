@@ -3,6 +3,11 @@ import type { ApiDocSettings } from '@/api/modules/platform-docs'
 import apiDocs from '@/api/modules/platform-docs'
 
 const toast = useFaToast()
+const appSettingsStore = useAppSettingsStore()
+const defaultDocTitle = computed(() => {
+  const siteName = appSettingsStore.siteName || ''
+  return siteName ? `${siteName} API` : 'API 文档'
+})
 
 const loading = ref(false)
 const saving = ref(false)
@@ -12,8 +17,8 @@ const ticketExpireAt = ref(0)
 const form = reactive<ApiDocSettings>({
   enabled: false,
   apiKeyAccessEnabled: false,
-  title: 'YuDream Admin API',
-  description: 'YuDream Admin 系统接口文档。',
+  title: '',
+  description: '',
   version: '1.0.0',
   openApiPath: '/v3/api-docs',
   swaggerUiPath: '/swagger-ui/index.html',
@@ -58,7 +63,7 @@ async function saveSettings() {
 function assignForm(data: ApiDocSettings) {
   Object.assign(form, {
     ...data,
-    title: data.title || 'YuDream Admin API',
+    title: data.title || defaultDocTitle.value,
     description: data.description || '',
     version: data.version || '1.0.0',
     openApiPath: data.openApiPath || '/v3/api-docs',
@@ -98,7 +103,7 @@ function createSwaggerPreviewHtml(openApi: string, assetBase: string) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YuDream Admin API</title>
+  <title>${defaultDocTitle.value}</title>
   <link rel="stylesheet" href="${assetBase}/swagger-ui.css">
   <style>
     html, body, #swagger-ui { margin: 0; min-height: 100%; background: #fff; }
