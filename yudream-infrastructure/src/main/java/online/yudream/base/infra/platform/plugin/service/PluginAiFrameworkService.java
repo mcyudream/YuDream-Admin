@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.application.platform.agent.service.AgentAppService;
 import online.yudream.base.domain.common.exception.BizException;
@@ -23,6 +24,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PluginAiFrameworkService implements PluginAiService {
@@ -174,10 +176,17 @@ public class PluginAiFrameworkService implements PluginAiService {
         var context = request.executionContext();
         // 调用方显式声明通配权限（群策略开放工具调用）时，视为调用方已完成授权，不再用绑定账号权限覆盖
         if (context != null && context.permissions().contains("*")) return context;
-        if (context == null || context.userId() == null) return context;
+        if (context == null || context.userId() == null) {
+            log.info("[YuDreamAdmin] plugin AI execution without bound user: platformUserId={}, tools may be filtered by permission",
+                    context == null ? null : context.platformUserId());
+            return context;
+        }
         List<String> permissions = userRepo.findById(context.userId()).map(user -> roleRepo.findByIds(user.getRoles().stream()
                 .map(item -> item.getValue()).toList()).stream().flatMap(role -> role.getPermissions().stream())
                 .map(item -> item.getCode()).distinct().toList()).orElse(List.of());
+        if (permissions.isEmpty()) {
+            log.info("[YuDreamAdmin] plugin AI execution permissions resolved empty: userId={}, plugin tools requiring permission will be filtered", context.userId());
+        }
         return new online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext(context.userId(), context.platformUserId(), context.connectionId(), context.channelId(), context.messageId(), context.trigger(), context.traceId(), permissions, context.allowedToolNames());
     }
 }

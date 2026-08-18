@@ -476,7 +476,17 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         .collect(java.util.stream.Collectors.toSet());
                 pluginAiToolRegistry.tools().stream()
                         .filter(tool -> tool.descriptor() != null && !scopedNames.contains(tool.descriptor().name()))
-                        .filter(tool -> allowed(tool, pluginScope))
+                        .filter(tool -> {
+                            boolean ok = allowed(tool, pluginScope);
+                            if (!ok) {
+                                var d = tool.descriptor();
+                                log.info("[YuDreamAdmin] plugin AI tool filtered: {} (risk={}, allowsTool={}, triggerMatch={}, hasPermission={}, permissionCode={}, trigger={})",
+                                        d.name(), d.risk(), pluginScope.allowsTool(d.name()),
+                                        d.allowedTriggers().contains(pluginScope.trigger()),
+                                        pluginScope.hasPermission(d.permissionCode()), d.permissionCode(), pluginScope.trigger());
+                            }
+                            return ok;
+                        })
                         .map(tool -> pluginToolCallback(tool, pluginScope, toolResults, onTool, onProgress))
                         .forEach(callbacks::add);
             }
@@ -484,7 +494,18 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
         var scope = PluginAiToolExecutionScope.current();
         if (scope != null) {
-            return pluginAiToolRegistry.tools().stream().filter(tool -> allowed(tool, scope))
+            return pluginAiToolRegistry.tools().stream().filter(tool -> {
+                boolean ok = allowed(tool, scope);
+                if (!ok) {
+                    var d = tool.descriptor();
+                    if (d != null) {
+                        log.info("[YuDreamAdmin] plugin AI tool filtered: {} (risk={}, allowsTool={}, triggerMatch={}, hasPermission={}, permissionCode={}, trigger={})",
+                                d.name(), d.risk(), scope.allowsTool(d.name()), d.allowedTriggers().contains(scope.trigger()),
+                                scope.hasPermission(d.permissionCode()), d.permissionCode(), scope.trigger());
+                    }
+                }
+                return ok;
+            })
                     .map(tool -> pluginToolCallback(tool, scope, toolResults, onTool, onProgress)).toList();
         }
         var allowedToolNames = AiAgentToolExecutionScope.current();
