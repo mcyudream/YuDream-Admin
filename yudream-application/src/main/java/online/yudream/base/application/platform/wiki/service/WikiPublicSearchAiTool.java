@@ -25,7 +25,12 @@ import java.util.Map;
 public class WikiPublicSearchAiTool implements AiAgentTool {
 
     public static final String TOOL_NAME = WikiSearchAiTool.TOOL_NAME;
-    public static final String PERMISSION_CODE = WikiSearchAiTool.PERMISSION_CODE;
+    /**
+     * 公开检索只返回已发布页面，与匿名公开 REST（/api/public/wiki/{slug}/search）暴露面同级，不绑定平台权限码。
+     * 留空后显式权限上下文（QQ 机器人等插件发起的 Agent 运行）与游客会话均可调用；
+     * 管理侧完整检索（含原始资料）仍由 {@link WikiSearchAiTool} 的 platform:wiki:tool:search 保护。
+     */
+    public static final String PERMISSION_CODE = "";
 
     private static final int PAGE_EXCERPT_LIMIT = 800;
     private static final int SOURCE_EXCERPT_LIMIT = 320;
