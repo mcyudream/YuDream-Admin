@@ -17,6 +17,7 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.stream.Collectors;
 
@@ -64,6 +65,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<Void>> handleNotPermissionException(HttpServletRequest request, NotPermissionException e) {
         return failure(request, e, HttpStatus.FORBIDDEN,
                 Result.fail(ResultCode.FORBIDDEN.getCode(), e.getMessage()));
+    }
+
+    /**
+     * SSE/异步流式响应过程中客户端断开（浏览器刷新、切页）属于正常现象：
+     * 响应头已是 text/event-stream，无法再写 JSON 错误体，静默结束即可，避免刷错误日志。
+     */
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public ResponseEntity<Void> handleAsyncRequestNotUsable(HttpServletRequest request, AsyncRequestNotUsableException e) {
+        log.debug("流式请求客户端断开: method={}, path={}", request.getMethod(), request.getRequestURI());
+        return null;
     }
 
     @ExceptionHandler(Exception.class)
