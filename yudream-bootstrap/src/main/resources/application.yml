@@ -1,5 +1,8 @@
 server:
   port: 8080
+  # 生产拓扑由 docker/nginx.conf 反向代理注入 X-Real-IP / X-Forwarded-For。
+  # 使用容器原生 RemoteIpValve（Tomcat）解析可信内部代理，避免把反向代理地址当作客户端地址。
+  forward-headers-strategy: native
 
 spring.application:
     name: yudream-admin
@@ -156,6 +159,17 @@ yudream.platform.wiki.neo4j:
   username: ${PLATFORM_WIKI_NEO4J_USERNAME:neo4j}
   password: ${PLATFORM_WIKI_NEO4J_PASSWORD:${NEO4J_PASSWORD:yudream123456}}
   database: ${PLATFORM_WIKI_NEO4J_DATABASE:neo4j}
+
+yudream.platform.wiki.chat:
+  public-sse-timeout: ${PUBLIC_WIKI_CHAT_SSE_TIMEOUT:3m}
+
+yudream.platform.chat:
+  sse-timeout: ${PLATFORM_CHAT_SSE_TIMEOUT:30m}
+  public-executor:
+    # 公开 Wiki 问答专用线程池：有界容量，超限立即拒绝，与公开限流理念一致。
+    core-size: ${PUBLIC_WIKI_CHAT_EXECUTOR_CORE:2}
+    max-size: ${PUBLIC_WIKI_CHAT_EXECUTOR_MAX:2}
+    queue-capacity: ${PUBLIC_WIKI_CHAT_EXECUTOR_QUEUE:0}
 
 yudream.platform.render:
   base-url: ${MESSAGE_RENDER_BASE_URL:http://localhost:3000}

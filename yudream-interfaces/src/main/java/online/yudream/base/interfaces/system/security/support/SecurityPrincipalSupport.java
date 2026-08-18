@@ -24,6 +24,18 @@ public class SecurityPrincipalSupport {
         return new SecurityPrincipal(Long.valueOf(String.valueOf(loginId)), StpUtil.getPermissionList());
     }
 
+    /** 依据令牌值解析安全主体，用于 WebSocket 等无 HTTP 请求上下文的边界。 */
+    public static SecurityPrincipal fromToken(String tokenValue) {
+        if (tokenValue == null || tokenValue.isBlank()) {
+            throw new BizException("当前用户未登录");
+        }
+        Object loginId = StpUtil.getLoginIdByToken(tokenValue);
+        if (loginId == null) {
+            throw new BizException("当前用户未登录");
+        }
+        return new SecurityPrincipal(Long.valueOf(String.valueOf(loginId)), StpUtil.getPermissionList(loginId));
+    }
+
     public static boolean hasApiKeyAuthentication() {
         return ApiKeyAuthenticationContext.get() != null;
     }
