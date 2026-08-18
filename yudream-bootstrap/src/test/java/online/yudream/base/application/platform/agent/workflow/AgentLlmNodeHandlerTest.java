@@ -170,8 +170,62 @@ class AgentLlmNodeHandlerTest {
     }
 
     @Test
-    void understandShouldRecoverJsonEmbeddedInProse() {
-        CapturingGateway gateway = new CapturingGateway("好的，分析结果：{\"route\":\"reply\",\"topic\":\"闲聊\"} 希望对你有帮助", List.of());
+    void llmShouldAdoptRuntimeInjectedSystemToolAndEnableCalling() {
+        CapturingGateway gateway = new CapturingGateway("answer", List.of());
+        AgentWorkflowRunState state = state(gateway, List.of(tool("wiki.search")));
+        state.command().setRuntimeToolCallingEnabled(true);
+        state.command().setRuntimeToolCodes(List.of("wiki.search", "ai_chatbot.lookup_current_user"));
+
+        execute("llm", """
+                {"id":"reply","data":{"kind":"llm","providerCode":"p","modelCode":"m"}}
+                """, state, gateway);
+
+        assertThat(gateway.requests.getFirst().toolCallingEnabled()).isTrue();
+        assertThat(gateway.requests.getFirst().toolMode()).isEqualTo(AiToolMode.AUTO);
+        // 运行时名单里的宿主原生工具注入节点作用域；插件工具名不在宿主注册表，跳过并交给网关注入
+        assertThat(gateway.scopedToolNames).containsExactly(List.of("wiki.search"));
+    }
+
+    @Test
+    void runtimeToolInjectionMustRespectRuntimeToolCallingSwitch() {
+        CapturingGateway gateway = new CapturingGateway("answer", List.of());
+        AgentWorkflowRunState state = state(gateway, List.of(tool("wiki.search")));
+        state.command().setRuntimeToolCallingEnabled(false);
+        state.command().setRuntimeToolCodes(List.of("wiki.search"));
+
+        execute("llm", """
+                {"id":"reply","data":{"kind":"llm","providerCode":"p","modelCode":"m"}}
+                """, state, gateway);
+
+        assertThat(gateway.requests.getFirst().toolCallingEnabled()).isFalse();
+        assertThat(gateway.requests.getFirst().toolMode()).isEqualTo(AiToolMode.NONE);
+        assertThat(gateway.scopedToolNames).containsExactly(List.of());
+    }
+
+    @Test
+    void runtimeToolInjectionMustSkipSystemToolWithoutSnapshotPermission() {
+        CapturingGateway gateway = new CapturingGateway("answer", List.of());
+        AgentWorkflowRunState state = state(gateway, List.of(new AiAgentTool() {
+            @Override public AiAgentToolDescriptor descriptor() {
+                return new AiAgentToolDescriptor("risky.tool", "危险工具", "", "risky:perm", "", "", "", Map.of());
+            }
+            @Override public AiAgentToolResult execute(AiAgentToolCall call) {
+                return new AiAgentToolResult("risky.tool", "run", "", "ok", Map.of());
+            }
+        }));
+        state.command().setRuntimeToolCallingEnabled(true);
+        state.command().setRuntimeToolCodes(List.of("risky.tool"));
+
+        execute("llm", """
+                {"id":"reply","data":{"kind":"llm","providerCode":"p","modelCode":"m"}}
+                """, state, gateway);
+
+        // 权限快照（空权限 + 显式上下文）不含 risky:perm，运行时注入被拒绝
+        assertThat(gateway.scopedToolNames).containsExactly(List.of());
+    }
+
+    @Test
+    void understandShouldRecoverJsonEmbeddedInProse() {        CapturingGateway gateway = new CapturingGateway("好的，分析结果：{\"route\":\"reply\",\"topic\":\"闲聊\"} 希望对你有帮助", List.of());
 
         Object output = execute("understand", """
                 {"id":"plan","data":{"kind":"understand","providerCode":"p","modelCode":"m"}}

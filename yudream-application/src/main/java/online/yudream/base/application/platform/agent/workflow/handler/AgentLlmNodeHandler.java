@@ -88,7 +88,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 modelCode,
                 state.aiConfig(),
                 state.command().getHistory(),
-                toolMode != AiToolMode.NONE && !tools.isEmpty(),
+                toolMode != AiToolMode.NONE && (!tools.isEmpty() || !runtimeToolCodes().isEmpty()),
                 toolMode,
                 structuredOutput(node)
         );
@@ -177,7 +177,16 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 throw new BizException("模型节点工具调用策略无效: " + configured);
             }
         }
-        return toolCodes(node).isEmpty() ? AiToolMode.NONE : AiToolMode.AUTO;
+        return toolCodes(node).isEmpty() && runtimeToolCodes().isEmpty() ? AiToolMode.NONE : AiToolMode.AUTO;
+    }
+
+    /** 调用方（插件经 SPI）为本次运行显式许可的工具；仅在运行时工具开关打开时生效。 */
+    private List<String> runtimeToolCodes() {
+        var command = state.command();
+        if (command == null || !command.isRuntimeToolCallingEnabled() || command.getRuntimeToolCodes() == null) {
+            return List.of();
+        }
+        return command.getRuntimeToolCodes();
     }
 
     private List<String> toolCodes(AgentWorkflowNode node) {

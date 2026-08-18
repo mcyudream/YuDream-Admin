@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 public class PluginAiFrameworkService implements PluginAiService {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final ObjectProvider<AiGenerationGateway> gatewayProvider;
+    private final ObjectProvider<online.yudream.base.domain.platform.ai.service.AiAgentTool> systemToolProvider;
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
     private final PluginAiToolRegistry pluginAiToolRegistry;
@@ -89,6 +90,7 @@ public class PluginAiFrameworkService implements PluginAiService {
         command.setProviderCode(request.providerCode());
         command.setModelCode(request.modelCode());
         command.setRuntimeToolCallingEnabled(request.toolCallingEnabled());
+        command.setRuntimeToolCodes(executionContext == null ? List.of() : executionContext.allowedToolNames());
         command.setHistory(request.history().stream()
                 .map(item -> new AiChatMessage(item.role(), item.content()))
                 .toList());
@@ -118,8 +120,31 @@ public class PluginAiFrameworkService implements PluginAiService {
 
     @Override
     public List<online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor> tools() {
-        return pluginAiToolRegistry.tools().stream().map(online.yudream.base.plugin.spi.system.ai.PluginAiTool::descriptor)
-                .filter(java.util.Objects::nonNull).toList();
+        List<online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor> tools = new java.util.ArrayList<>(
+                pluginAiToolRegistry.tools().stream().map(online.yudream.base.plugin.spi.system.ai.PluginAiTool::descriptor)
+                        .filter(java.util.Objects::nonNull).toList());
+        // 宿主公开原生工具（无平台权限码，当前为 wiki.search 公开检索）同样暴露给插件勾选，
+        // 勾选后名称经 allowedToolNames 传入运行时工具注入通道，由工作流模型节点解析。
+        java.util.Set<String> pluginToolNames = tools.stream()
+                .map(online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor::name)
+                .collect(java.util.stream.Collectors.toSet());
+        systemToolProvider.stream()
+                .map(online.yudream.base.domain.platform.ai.service.AiAgentTool::descriptor)
+                .filter(java.util.Objects::nonNull)
+                .filter(descriptor -> descriptor.permissionCode() == null || descriptor.permissionCode().isBlank())
+                .filter(descriptor -> !pluginToolNames.contains(descriptor.name()))
+                .map(descriptor -> new online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor(
+                        descriptor.name(),
+                        descriptor.title(),
+                        descriptor.description(),
+                        "",
+                        online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk.READ,
+                        false,
+                        java.util.Set.of("MENTION", "RANDOM"),
+                        descriptor.inputSchema() == null ? Map.of() : descriptor.inputSchema()
+                ))
+                .forEach(tools::add);
+        return List.copyOf(tools);
     }
 
     @Override

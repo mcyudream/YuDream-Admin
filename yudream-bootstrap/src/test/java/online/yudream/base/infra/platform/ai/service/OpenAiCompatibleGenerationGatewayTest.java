@@ -91,6 +91,42 @@ class OpenAiCompatibleGenerationGatewayTest {
     }
 
     @Test
+    void shouldUnionAllowedPluginToolsIntoWorkflowToolScope() {
+        CountingTool scopedTool = new CountingTool("model.tool");
+        online.yudream.base.plugin.spi.system.ai.PluginAiTool allowedPluginTool = mock(
+                online.yudream.base.plugin.spi.system.ai.PluginAiTool.class);
+        when(allowedPluginTool.descriptor()).thenReturn(new online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor(
+                "ai_chatbot.lookup_current_user", "查询当前 QQ 账号", "查询当前发言 QQ 绑定的系统账号",
+                "", online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk.READ, false,
+                java.util.Set.of("MENTION", "RANDOM"), Map.of()));
+        online.yudream.base.plugin.spi.system.ai.PluginAiTool disallowedPluginTool = mock(
+                online.yudream.base.plugin.spi.system.ai.PluginAiTool.class);
+        when(disallowedPluginTool.descriptor()).thenReturn(new online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor(
+                "wallet.my-balance", "查询我的余额", "查询钱包余额",
+                "", online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk.READ, false,
+                java.util.Set.of("MENTION"), Map.of()));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AiAgentTool> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenAnswer(ignored -> Stream.of());
+        PluginAiToolRegistry registry = mock(PluginAiToolRegistry.class);
+        when(registry.tools()).thenReturn(List.of(allowedPluginTool, disallowedPluginTool));
+        OpenAiCompatibleGenerationGateway gateway = new OpenAiCompatibleGenerationGateway(
+                provider, mock(AiProviderConfigParser.class), List.of(), new AiClientProperties(), registry);
+        PluginAiExecutionContext context = new PluginAiExecutionContext(
+                1L, "10001", "conn", "group", "msg", "MENTION", "trace",
+                List.of(), List.of("ai_chatbot.lookup_current_user"));
+        PluginAiToolExecutionScope.set(context);
+
+        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(scopedTool))) {
+            assertThat(toolCallbacks(gateway))
+                    .extracting(callback -> callback.getToolDefinition().name())
+                    .containsExactlyInAnyOrder("model_tool", "ai_chatbot_lookup_current_user");
+        } finally {
+            PluginAiToolExecutionScope.clear();
+        }
+    }
+
+    @Test
     void shouldRestoreOuterScopeAndCloseIdempotently() {
         CountingTool outerTool = new CountingTool("outer.tool");
         CountingTool innerTool = new CountingTool("inner.tool");

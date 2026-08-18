@@ -7,6 +7,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.plugin.spi.system.ai.PluginAiAgentOption;
 import online.yudream.base.plugin.spi.system.ai.PluginAiChatRequest;
 import online.yudream.base.plugin.spi.system.ai.PluginAiChatResponse;
+import online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext;
 import online.yudream.base.plugin.spi.system.ai.PluginAiProviderOption;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor;
@@ -45,6 +46,7 @@ class PluginAiFrameworkServiceStreamingTest {
                 });
         PluginAiFrameworkService service = new PluginAiFrameworkService(
                 mock(online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo.class),
+                mock(ObjectProvider.class),
                 mock(ObjectProvider.class),
                 mock(online.yudream.base.domain.system.user.repo.UserRepo.class),
                 mock(online.yudream.base.domain.system.user.repo.RoleRepo.class),
@@ -100,6 +102,37 @@ class PluginAiFrameworkServiceStreamingTest {
 
         assertSame(expected, actual);
         assertEquals(List.of("complete"), deltas);
+    }
+
+    @Test
+    void runAgentMapsAllowedToolNamesIntoRuntimeToolCodes() {
+        java.util.concurrent.atomic.AtomicReference<AgentRunCmd> captured = new java.util.concurrent.atomic.AtomicReference<>();
+        AgentAppService agentAppService = mock(AgentAppService.class);
+        when(agentAppService.runByCode(eq("bot"), any(AgentRunCmd.class)))
+                .thenAnswer(invocation -> {
+                    captured.set(invocation.getArgument(1));
+                    return AgentRunDTO.builder().content("ok").toolResults(List.of()).build();
+                });
+        PluginAiFrameworkService service = new PluginAiFrameworkService(
+                mock(online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo.class),
+                mock(ObjectProvider.class),
+                mock(ObjectProvider.class),
+                mock(online.yudream.base.domain.system.user.repo.UserRepo.class),
+                mock(online.yudream.base.domain.system.user.repo.RoleRepo.class),
+                mock(PluginAiToolRegistry.class),
+                mock(online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser.class),
+                agentAppService
+        );
+        PluginAiExecutionContext execution = new PluginAiExecutionContext(
+                null, "10001", "conn", "group", "msg", "MENTION", "trace",
+                List.of(), List.of("wiki.search", "ai_chatbot.lookup_current_user"));
+
+        service.runAgent("bot", new PluginAiChatRequest("system", "user", null, null, List.of(), execution, true))
+                .toCompletableFuture()
+                .join();
+
+        assertEquals(List.of("wiki.search", "ai_chatbot.lookup_current_user"), captured.get().getRuntimeToolCodes());
+        assertEquals(true, captured.get().isRuntimeToolCallingEnabled());
     }
 
     private static PluginAiChatRequest request() {
