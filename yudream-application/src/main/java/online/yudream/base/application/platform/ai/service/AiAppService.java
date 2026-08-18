@@ -29,6 +29,7 @@ public class AiAppService {
     private final CapabilityAppService capabilityAppService;
     private final AgentAppService agentAppService;
     private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
+    private final online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo capabilityModuleRepo;
     private final online.yudream.base.domain.platform.ai.service.AiGenerationGateway generationGateway;
     private final List<online.yudream.base.domain.platform.ai.service.AiAgentTool> systemTools;
 
@@ -61,7 +62,7 @@ public class AiAppService {
                         cmd.getImageDataUrl(),
                         StringUtils.hasText(cmd.getProviderCode()) ? cmd.getProviderCode() : null,
                         StringUtils.hasText(cmd.getModelCode()) ? cmd.getModelCode() : null,
-                        java.util.Map.of(),
+                        aiConfig(),
                         cmd.getHistory(),
                         true,
                         online.yudream.base.domain.platform.ai.enumerate.AiToolMode.AUTO
@@ -283,6 +284,14 @@ public class AiAppService {
         catch (Exception ignored) {
             return "当前站点";
         }
+    }
+
+    /** v2 直连网关必须携带 AI 能力的 providers 配置，否则网关退化为无 Key 的 legacy 默认提供者。 */
+    private java.util.Map<String, String> aiConfig() {
+        return capabilityModuleRepo.findByCode(CAPABILITY_CODE)
+                .filter(online.yudream.base.domain.platform.capability.aggregate.CapabilityModule::enabled)
+                .map(online.yudream.base.domain.platform.capability.aggregate.CapabilityModule::getConfig)
+                .orElseThrow(() -> new BizException("AI 能力未启用"));
     }
 
     private String systemPrompt(CmsPageGenerateCmd cmd) {
