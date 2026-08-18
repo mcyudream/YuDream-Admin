@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Editor } from 'grapesjs'
 import type { YdChatAttachment, YdChatHistoryTurn, YdChatMessage, YdChatToolCallReply, YdChatToolCallRequest, YdChatToolEvent } from '@yudream/components'
-import type { CmsAgentSelectOption } from '../config/cms-agent-options'
+import type { CmsModelSelectOption } from '../config/cms-model-options'
 import type { CmsBlockDefinition, CmsBlockKind } from '../config/cms-blocks'
 import type { FileObject } from '@/api/modules/files'
 import type { AiToolCallResult, CmsChatHistoryMessage } from '@/api/modules/platform-ai'
@@ -17,7 +17,7 @@ import { createCmsAiChatSessionStore, cmsAiChatTargetKey, readActiveCmsAiChatSes
 import { executeCanvasTool, type CanvasToolExecOptions } from '@/utils/cms-canvas-agent-tools'
 import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
 import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
-import { resolveCmsAgentCode } from '../config/cms-agent-options'
+import { findCmsModelOption, resolveCmsModelValue } from '../config/cms-model-options'
 import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
 import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
 import { cmsGrapesPlugins, cmsGrapesPluginsOpts, localizeCmsPluginBlocks } from '../config/cms-grapes-plugins'
@@ -69,7 +69,7 @@ const props = defineProps<{
   /** 当前页面模板（DEFAULT/LANDING/DOC/BLANK），随 AI 请求与画布上下文下发 */
   pageTemplate?: string
   aiEnabled?: boolean
-  aiAgentOptions?: CmsAgentSelectOption[]
+  aiModelOptions?: CmsModelSelectOption[]
   chromeFrame?: boolean
   chromeLayout?: CmsSiteLayoutMode
   templatePreviewContext?: Record<string, any>
@@ -94,13 +94,13 @@ const mediaInput = ref<HTMLInputElement>()
 const aiChatPanelRef = ref<InstanceType<typeof YdAgentChatPanel>>()
 const mediaItems = ref<FileObject[]>([])
 const loadingMedia = ref(false)
-const aiAgentCode = ref('')
-// 本地极简 Agent 下拉：内建 FaSelect 的弹层在本自定义全屏构建器里动画/主题变量不可靠，改用自绘弹层
+// CMS 助手直接选模型（provider/model），不再绑定 Agent
+const aiModelValue = ref('')
+// 本地极简模型下拉：内建 FaSelect 的弹层在本自定义全屏构建器里动画/主题变量不可靠，改用自绘弹层
 const agentSelectOpen = ref(false)
 const agentSelectEl = ref<HTMLElement | null>(null)
-const aiAgentLabel = computed(() =>
-  (props.aiAgentOptions || []).find(option => option.value === aiAgentCode.value)?.label || 'Agent',
-)
+const aiModelOption = computed(() => findCmsModelOption(props.aiModelOptions || [], aiModelValue.value))
+const aiModelLabel = computed(() => aiModelOption.value?.label || '选择模型')
 
 function closeAgentSelect() {
   agentSelectOpen.value = false
@@ -128,7 +128,7 @@ function toggleAgentSelect() {
 }
 
 function pickAgent(value: string) {
-  aiAgentCode.value = value
+  aiModelValue.value = value
   closeAgentSelect()
 }
 const aiThinkingEnabled = ref(false)
@@ -572,7 +572,7 @@ function sanitizeCmsAiMessage(message: YdChatMessage): YdChatMessage {
 
 function aiSessionMeta() {
   return {
-    agentCode: aiAgentCode.value,
+    modelValue: aiModelValue.value,
     thinkingEnabled: aiThinkingEnabled.value,
   }
 }
@@ -584,8 +584,8 @@ function onAiSessionChange(session: YdAgentChatSession | null) {
   if (!meta) {
     return
   }
-  if (typeof meta.agentCode === 'string' && meta.agentCode) {
-    aiAgentCode.value = resolveCmsAgentCode(props.aiAgentOptions || [], meta.agentCode)
+  if (typeof meta.modelValue === 'string' && meta.modelValue) {
+    aiModelValue.value = resolveCmsModelValue(props.aiModelOptions || [], meta.modelValue)
   }
   if (typeof meta.thinkingEnabled === 'boolean') {
     aiThinkingEnabled.value = meta.thinkingEnabled
@@ -645,8 +645,8 @@ watch(() => props.aiEnabled, (enabled) => {
   }
 })
 
-watch(() => props.aiAgentOptions, (options) => {
-  aiAgentCode.value = resolveCmsAgentCode(options || [], aiAgentCode.value)
+watch(() => props.aiModelOptions, (options) => {
+  aiModelValue.value = resolveCmsModelValue(options || [], aiModelValue.value)
 }, { deep: true })
 
 watch([rightPanelTab, chatHistoryTargetKey], () => {
@@ -753,7 +753,7 @@ onMounted(async () => {
     }
   })
   await loadMedia()
-  aiAgentCode.value = resolveCmsAgentCode(props.aiAgentOptions || [], aiAgentCode.value)
+  aiModelValue.value = resolveCmsModelValue(props.aiModelOptions || [], aiModelValue.value)
   registerHandler('pick', onPickOption)
   if (rightPanelTab.value === 'ai') {
     void restoreAiSession()
@@ -1391,6 +1391,9 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
   }
   removeLayoutBlocks(editor)
   const image = firstImageAttachment(attachments)
+  if (image && aiModelOption.value && !aiModelOption.value.vision) {
+    toast.warning(`当前模型「${aiModelOption.value.label}」不支持识图，样图可能无法被参考`)
+  }
   return {
     target: props.historyTargetType,
     title: props.title || '',
@@ -1403,7 +1406,8 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
       : '保持当前页面风格，按用户要求增量修改；如果用户要求重构，可以替换为更完整的设计。',
     // v2：coding-agent 式客户端工具闭环（WebSocket 双向）
     mode: 'agent',
-    agentCode: aiAgentCode.value || undefined,
+    providerCode: aiModelOption.value?.providerCode || undefined,
+    modelCode: aiModelOption.value?.modelCode || undefined,
     imageDataUrl: image?.dataUrl || image?.url || undefined,
     // v2 不再回传整页快照，只附一份结构纲要；模型用 cms.canvas.* 工具按需读取真实画布
     currentHtml: canvasOutlineForPrompt(),
@@ -2867,7 +2871,7 @@ function selectBreadcrumb(component: any) {
           >
             <template #actions>
               <div class="ai-panel-actions">
-                <div v-if="aiAgentOptions?.length" ref="agentSelectEl" class="ai-agent-select" title="切换 Agent">
+                <div v-if="aiModelOptions?.length" ref="agentSelectEl" class="ai-agent-select" title="切换模型">
                   <button
                     type="button"
                     class="ai-agent-select-trigger"
@@ -2876,24 +2880,24 @@ function selectBreadcrumb(component: any) {
                     :aria-expanded="agentSelectOpen"
                     @click.stop="toggleAgentSelect"
                   >
-                    <FaIcon name="i-ri:robot-2-line" class="ai-agent-select-icon" />
-                    <span class="ai-agent-select-label">{{ aiAgentLabel }}</span>
+                    <FaIcon name="i-ri:cpu-line" class="ai-agent-select-icon" />
+                    <span class="ai-agent-select-label">{{ aiModelLabel }}</span>
                     <FaIcon name="i-ri:arrow-down-s-line" class="ai-agent-select-caret" />
                   </button>
                   <!-- 内联向上展开的弹层：teleport 到 body 的固定层在本构建器页面不渲染，故内联 -->
                   <div v-if="agentSelectOpen" class="ai-agent-pop" role="listbox" @click.stop>
                     <button
-                      v-for="opt in aiAgentOptions"
+                      v-for="opt in aiModelOptions"
                       :key="opt.value"
                       type="button"
                       class="ai-agent-pop-item"
-                      :class="{ active: opt.value === aiAgentCode }"
+                      :class="{ active: opt.value === aiModelValue }"
                       role="option"
-                      :aria-selected="opt.value === aiAgentCode"
+                      :aria-selected="opt.value === aiModelValue"
                       @click="pickAgent(opt.value)"
                     >
                       <span class="ai-agent-pop-item-label">{{ opt.label }}</span>
-                      <FaIcon v-if="opt.value === aiAgentCode" name="i-ri:check-line" class="ai-agent-pop-item-check" />
+                      <FaIcon v-if="opt.value === aiModelValue" name="i-ri:check-line" class="ai-agent-pop-item-check" />
                     </button>
                   </div>
                 </div>
