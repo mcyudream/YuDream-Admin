@@ -237,6 +237,22 @@ class AgentLlmNodeHandlerTest {
         assertThat(events).containsExactly(callbackResult);
     }
 
+    @Test
+    void runStateMustAccumulateMultipleReasoningDeltasIndependentlyFromAnswer() {
+        List<String> reasoningEvents = new ArrayList<>();
+        AgentApplication application = AgentApplication.builder().name("Agent").code("agent").toolCodes(List.of()).build();
+        AgentRunCmd command = new AgentRunCmd();
+        AgentWorkflowRunState state = new AgentWorkflowRunState(
+                application, command, Map.of(), java.util.Set.of(), ignored -> { }, reasoningEvents::add,
+                ignored -> { }, null);
+
+        state.emitReasoningDelta("分析一");
+        state.emitReasoningDelta("\n分析二");
+
+        assertThat(reasoningEvents).containsExactly("分析一", "\n分析二");
+        assertThat(state.reasoning()).isEqualTo("分析一\n分析二");
+    }
+
     private Object execute(String kind, String nodeJson, AgentWorkflowRunState state, AiGenerationGateway gateway) {
         ObjectMapper mapper = new ObjectMapper();
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(mapper);

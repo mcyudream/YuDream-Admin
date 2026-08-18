@@ -93,17 +93,30 @@ public class AgentController {
         String runId = UUID.randomUUID().toString();
         var command = AgentWebAssembler.toRunCmd(id, request, SecurityPrincipalSupport.current());
         CompletableFuture.runAsync(() -> {
+            var thinkingStarted = new java.util.concurrent.atomic.AtomicBoolean(false);
             try {
                 send(emitter, AgentWebAssembler.toDebugRunStarted(runId));
                 var result = agentAppService.debug(
                         command,
                         event -> send(emitter, AgentWebAssembler.toDebugNodeEvent(runId, event)),
                         delta -> send(emitter, AgentWebAssembler.toDebugTextChunk(runId, delta)),
+                        reasoning -> {
+                            if (thinkingStarted.compareAndSet(false, true)) {
+                                send(emitter, AgentWebAssembler.toDebugThinkingStart(runId));
+                            }
+                            send(emitter, AgentWebAssembler.toDebugThinkingContent(runId, reasoning));
+                        },
                         tool -> send(emitter, AgentWebAssembler.toDebugToolResult(runId, tool))
                 );
+                if (thinkingStarted.compareAndSet(true, false)) {
+                    send(emitter, AgentWebAssembler.toDebugThinkingEnd(runId));
+                }
                 send(emitter, AgentWebAssembler.toDebugRunFinished(runId, result));
                 emitter.complete();
             } catch (Exception e) {
+                if (thinkingStarted.compareAndSet(true, false)) {
+                    send(emitter, AgentWebAssembler.toDebugThinkingEnd(runId));
+                }
                 send(emitter, AgentWebAssembler.toDebugRunError(runId, e.getMessage()));
                 emitter.complete();
             }

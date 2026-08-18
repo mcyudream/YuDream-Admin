@@ -51,7 +51,8 @@ class BuiltinAgentInitializerServiceTest {
         assertThat(created).extracting(AgentApplication::getCode)
                 .containsExactlyInAnyOrder(
                         BuiltinAgentCodes.CMS_BUILDER,
-                        BuiltinAgentCodes.AGUI_CARD
+                        BuiltinAgentCodes.AGUI_CARD,
+                        BuiltinAgentCodes.WIKI_QA
                 );
         assertThat(created).allMatch(item -> item.getStatus() == AgentApplicationStatus.PUBLISHED);
         assertThat(created).allMatch(item -> item.getWorkflowJson().contains("\"providerCode\":\"openai\""));
@@ -77,6 +78,13 @@ class BuiltinAgentInitializerServiceTest {
         assertThat(nodeData(cmsNodes, "plan").path("toolMode").asText()).isBlank();
         assertThat(textValues(nodeData(cmsNodes, "clarify").path("toolCodes"))).isEmpty();
         assertThat(nodeData(cmsNodes, "clarify").path("toolMode").asText()).isBlank();
+        AgentApplication wikiAgent = created.stream()
+                .filter(item -> BuiltinAgentCodes.WIKI_QA.equals(item.getCode()))
+                .findFirst()
+                .orElseThrow();
+        JsonNode wikiNodes = new ObjectMapper().readTree(wikiAgent.getWorkflowJson()).path("nodes");
+        assertThat(wikiAgent.getSystemPrompt()).contains("graphExpansion=true");
+        assertThat(nodeData(wikiNodes, "answer").path("prompt").asText()).contains("graphExpansion=true");
         AgentApplication cardAgent = created.stream()
                 .filter(item -> BuiltinAgentCodes.AGUI_CARD.equals(item.getCode()))
                 .findFirst()
@@ -100,6 +108,7 @@ class BuiltinAgentInitializerServiceTest {
                 .build();
         when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(existing));
         when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(existing));
+        when(applications.findByCode(BuiltinAgentCodes.WIKI_QA)).thenReturn(Optional.of(existing));
         BuiltinAgentInitializerService service = new BuiltinAgentInitializerService(applications, capabilities, models, new ObjectMapper());
 
         assertThat(service.initialize()).isEmpty();
@@ -137,7 +146,8 @@ class BuiltinAgentInitializerServiceTest {
                 applications, capabilities, models, new ObjectMapper()
         ).initialize();
 
-        assertThat(upgraded).hasSize(2);
+        assertThat(upgraded).extracting(AgentApplication::getCode)
+                .containsExactlyInAnyOrder(BuiltinAgentCodes.CMS_BUILDER, BuiltinAgentCodes.AGUI_CARD, BuiltinAgentCodes.WIKI_QA);
         assertThat(new ObjectMapper().readTree(cms.getWorkflowJson()).path("nodes")).hasSize(8);
         assertThat(new ObjectMapper().readTree(card.getWorkflowJson()).path("nodes")).hasSize(8);
         verify(applications, never()).findByCode(BuiltinAgentCodes.LEGACY_GROUP_CHATBOT);
@@ -222,6 +232,7 @@ class BuiltinAgentInitializerServiceTest {
                 .build();
         when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
         when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(agui));
+        when(applications.findByCode(BuiltinAgentCodes.WIKI_QA)).thenReturn(Optional.of(agui));
 
         List<AgentApplication> initialized = new BuiltinAgentInitializerService(
                 applications, capabilities, models, new ObjectMapper()
@@ -306,6 +317,7 @@ class BuiltinAgentInitializerServiceTest {
                 .build();
         when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
         when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(agui));
+        when(applications.findByCode(BuiltinAgentCodes.WIKI_QA)).thenReturn(Optional.of(agui));
 
         List<AgentApplication> initialized = new BuiltinAgentInitializerService(
                 applications, capabilities, models, new ObjectMapper()
@@ -355,6 +367,54 @@ class BuiltinAgentInitializerServiceTest {
         assertThat(cms.getWorkflowJson())
                 .contains("\"modelCode\":\"gpt-5\"")
                 .doesNotContain("BAAI/bge-m3");
+    }
+
+    @Test
+    void upgradesWikiQaPromptMissingGraphExpansionDefault() throws Exception {
+        AgentApplicationRepo applications = mock(AgentApplicationRepo.class);
+        CapabilityModuleRepo capabilities = mock(CapabilityModuleRepo.class);
+        AgentModelCatalogParser models = mock(AgentModelCatalogParser.class);
+        CapabilityModule ai = mock(CapabilityModule.class);
+        when(ai.getConfig()).thenReturn(Map.of("providers", "[]"));
+        when(capabilities.findByCode("ai")).thenReturn(Optional.of(ai));
+        when(models.parse(any())).thenReturn(List.of(new AgentModelDTO(
+                "openai", "OpenAI", "gpt-5", "GPT-5", "chat", true, true, true
+        )));
+        AgentApplication existing = AgentApplication.builder()
+                .code(BuiltinAgentCodes.WIKI_QA)
+                .name("Wiki 问答 Agent")
+                .status(AgentApplicationStatus.PUBLISHED)
+                .systemPrompt("先调用 wiki.search 再回答")
+                .toolCodes(List.of("wiki.search"))
+                .workflowJson("""
+                        {"nodes":[
+                          {"id":"start","data":{"kind":"start"}},
+                          {"id":"prepare","data":{"kind":"template"}},
+                          {"id":"answer","data":{"kind":"llm","providerCode":"openai","modelCode":"gpt-5",
+                            "prompt":"先调用 wiki.search 再回答","toolMode":"AUTO","toolCodes":["wiki.search"],
+                            "toolConfigDeclared":true}},
+                          {"id":"end","data":{"kind":"end"}}
+                        ]}
+                        """)
+                .build();
+        AgentApplication other = AgentApplication.builder()
+                .code(BuiltinAgentCodes.CMS_BUILDER)
+                .status(AgentApplicationStatus.PUBLISHED)
+                .workflowJson("{\"nodes\":[{},{},{},{}]}")
+                .build();
+        when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(other));
+        when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(other));
+        when(applications.findByCode(BuiltinAgentCodes.WIKI_QA)).thenReturn(Optional.of(existing));
+        when(applications.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<AgentApplication> upgraded = new BuiltinAgentInitializerService(
+                applications, capabilities, models, new ObjectMapper()
+        ).initialize();
+
+        assertThat(upgraded).singleElement().isSameAs(existing);
+        assertThat(existing.getSystemPrompt()).contains("graphExpansion=true");
+        JsonNode nodes = new ObjectMapper().readTree(existing.getWorkflowJson()).path("nodes");
+        assertThat(nodeData(nodes, "answer").path("prompt").asText()).contains("graphExpansion=true");
     }
 
     private JsonNode nodeData(JsonNode nodes, String id) {
@@ -409,6 +469,7 @@ class BuiltinAgentInitializerServiceTest {
                 .build();
         when(applications.findByCode(BuiltinAgentCodes.CMS_BUILDER)).thenReturn(Optional.of(cms));
         when(applications.findByCode(BuiltinAgentCodes.AGUI_CARD)).thenReturn(Optional.of(agui));
+        when(applications.findByCode(BuiltinAgentCodes.WIKI_QA)).thenReturn(Optional.of(agui));
 
         List<AgentApplication> initialized = new BuiltinAgentInitializerService(
                 applications, capabilities, models, new ObjectMapper()

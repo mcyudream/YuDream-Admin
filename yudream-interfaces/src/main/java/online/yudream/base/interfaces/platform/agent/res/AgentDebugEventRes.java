@@ -11,6 +11,7 @@ public class AgentDebugEventRes {
     private String threadId;
     private String runId;
     private Long timestamp;
+    private String messageId;
     private String nodeId;
     private String nodeKind;
     private String nodeTitle;

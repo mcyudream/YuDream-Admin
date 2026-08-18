@@ -12,6 +12,7 @@ public class AgentRunCmd {
     private String providerCode;
     private String modelCode;
     private String imageDataUrl;
+    private List<String> imageDataUrls = List.of();
     private List<AgentAttachmentCmd> attachments = List.of();
     private String runtimeSystemPrompt;
     private boolean runtimeToolCallingEnabled;

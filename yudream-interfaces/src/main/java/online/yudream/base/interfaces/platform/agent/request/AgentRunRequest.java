@@ -14,6 +14,8 @@ public class AgentRunRequest {
     private String modelCode;
     @Size(max = 7_000_000)
     private String imageDataUrl;
+    @Size(max = 5)
+    private List<@Size(max = 7_000_000) String> imageDataUrls = List.of();
     @Valid
     @Size(max = 5)
     private List<AgentAttachmentRequest> attachments = List.of();

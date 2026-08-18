@@ -146,10 +146,11 @@ class AgentAppServiceLifecycleTest {
                 .hasMessageContaining("未发布");
         verify(fixture.workflowRuntime, never()).execute(any(), any(), any(), any(), any(), any());
 
-        when(fixture.workflowRuntime.execute(any(), any(), any(), any(), any(), any()))
-                .thenReturn(new AgentWorkflowRuntimeResult("ok", List.of()));
+        when(fixture.workflowRuntime.execute(any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(new AgentWorkflowRuntimeResult("ok", "分析", List.of()));
         AgentRunDTO result = fixture.service.debug(command, ignored -> {}, ignored -> {}, ignored -> {});
         assertThat(result.getContent()).isEqualTo("ok");
+        assertThat(result.getReasoning()).isEqualTo("分析");
     }
 
     private Fixture fixture() {

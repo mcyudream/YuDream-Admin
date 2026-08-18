@@ -41,6 +41,14 @@ import static org.mockito.Mockito.when;
 class OpenAiCompatibleGenerationGatewayTest {
 
     @Test
+    void shouldPreserveWhitespaceOnlyStreamDeltas() {
+        assertThat(OpenAiCompatibleGenerationGateway.hasStreamDelta(null)).isFalse();
+        assertThat(OpenAiCompatibleGenerationGateway.hasStreamDelta("")).isFalse();
+        assertThat(OpenAiCompatibleGenerationGateway.hasStreamDelta(" ")).isTrue();
+        assertThat(OpenAiCompatibleGenerationGateway.hasStreamDelta("\n\n")).isTrue();
+    }
+
+    @Test
     void shouldUseExactScopedToolInstancesInsteadOfGlobalBeans() {
         CountingTool scopedTool = new CountingTool("shared.tool");
         CountingTool globalToolWithSameName = new CountingTool("shared.tool");
@@ -113,7 +121,7 @@ class OpenAiCompatibleGenerationGatewayTest {
             AiGenerationRequest request = new AiGenerationRequest(
                     "system",
                     "user",
-                    null,
+                    (String) null,
                     "provider",
                     "model",
                     Map.of(),
@@ -138,7 +146,7 @@ class OpenAiCompatibleGenerationGatewayTest {
         );
         AiModelEndpoint model = new AiModelEndpoint("gpt", "GPT", "gpt", null, null, false, null, "chat", false);
         AiGenerationRequest request = new AiGenerationRequest(
-                "system", "user", null, "openai", "gpt", Map.of(), List.of(), true, AiToolMode.REQUIRED
+                "system", "user", (String) null, "openai", "gpt", Map.of(), List.of(), true, AiToolMode.REQUIRED
         );
 
         assertThat(adapter.chatOptions(provider, model, request).getToolChoice()).isEqualTo("required");
@@ -154,7 +162,7 @@ class OpenAiCompatibleGenerationGatewayTest {
         );
         AiModelEndpoint model = new AiModelEndpoint("model", "Model", "model", null, null, false, null, "chat", false);
         AiGenerationRequest request = new AiGenerationRequest(
-                "system", "user", null, "compatible", "model", Map.of(), List.of(), true, AiToolMode.REQUIRED
+                "system", "user", (String) null, "compatible", "model", Map.of(), List.of(), true, AiToolMode.REQUIRED
         );
 
         assertThat(adapter.chatOptions(provider, model, request).getToolChoice()).isNull();

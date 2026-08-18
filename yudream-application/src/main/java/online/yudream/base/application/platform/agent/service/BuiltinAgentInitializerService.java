@@ -63,6 +63,20 @@ public class BuiltinAgentInitializerService {
                 model != null,
                 chatModels
         ).ifPresent(created::add);
+        createIfMissing(
+                BuiltinAgentCodes.WIKI_QA,
+                "Wiki 问答 Agent",
+                "基于知识库内容智能问答，经 wiki.search 原生工具检索页面后作答并引用来源",
+                """
+                        你是 Wiki 问答 Agent。输入形如「知识库 slug: xxx\n问题: yyy」。
+                        必须先用 wiki.search 工具检索该知识库（spaceSlug 取输入中的 slug），调用时默认传 graphExpansion=true，再基于检索结果作答，
+                        答案中用 [[页面标题]] 标注引用的页面；检索不到就如实说明，用中文回答。
+                """,
+                List.of("wiki.search"),
+                wikiWorkflow(model),
+                model != null,
+                chatModels
+        ).ifPresent(created::add);
         return List.copyOf(created);
     }
 
@@ -97,7 +111,7 @@ public class BuiltinAgentInitializerService {
         if (publish && status != AgentApplicationStatus.DISABLED) {
             application.publish();
         }
-        return java.util.Optional.of(applications.save(application));
+        return java.util.Optional.ofNullable(applications.save(application));
     }
 
     private boolean requiresWorkflowUpgrade(
@@ -117,6 +131,10 @@ public class BuiltinAgentInitializerService {
             }
             if (BuiltinAgentCodes.CMS_BUILDER.equals(application.getCode())
                     && requiresCmsModelToolUpgrade(nodes)) {
+                return true;
+            }
+            if (BuiltinAgentCodes.WIKI_QA.equals(application.getCode())
+                    && requiresWikiGraphExpansionUpgrade(application, nodes)) {
                 return true;
             }
             for (var node : nodes) {
@@ -144,6 +162,18 @@ public class BuiltinAgentInitializerService {
         catch (Exception ignored) {
             return true;
         }
+    }
+
+    /**
+     * 检查内置 Wiki 问答是否仍使用未声明图谱扩展默认值的历史提示词。
+     */
+    private boolean requiresWikiGraphExpansionUpgrade(AgentApplication application, JsonNode nodes) {
+        if (application.getSystemPrompt() == null
+                || !application.getSystemPrompt().contains("graphExpansion=true")) {
+            return true;
+        }
+        JsonNode answer = nodeData(nodes, "answer");
+        return answer == null || !answer.path("prompt").asText().contains("graphExpansion=true");
     }
 
     private boolean requiresCmsModelToolUpgrade(JsonNode nodes) {
@@ -305,6 +335,42 @@ public class BuiltinAgentInitializerService {
                 )
         );
         return json(graph);
+    }
+
+    private String wikiWorkflow(AgentModelDTO model) {
+        Map<String, Object> graph = Map.of(
+                "nodes", List.of(
+                        node("start", 60, 260, Map.of(
+                                "kind", "start", "title", "开始", "outputVariable", "query"
+                        )),
+                        node("answer", 380, 260, wikiModelNode(model)),
+                        node("end", 720, 260, Map.of(
+                                "kind", "end", "title", "结束", "inputVariable", "answer"
+                        ))
+                ),
+                "edges", List.of(
+                        edge("start-answer", "start", "answer"),
+                        edge("answer-end", "answer", "end")
+                )
+        );
+        return json(graph);
+    }
+
+    private Map<String, Object> wikiModelNode(AgentModelDTO model) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("kind", "llm");
+        data.put("title", "检索并回答");
+        data.put("providerCode", model == null ? "" : model.providerCode());
+        data.put("modelCode", model == null ? "" : model.modelCode());
+        data.put("vision", false);
+        data.put("prompt", "用户提问（输入形如「知识库 slug: xxx\\n问题: yyy」）。先用 wiki.search 检索该知识库页面，调用时默认传 graphExpansion=true，再作答，答案中用 [[页面标题]] 标注引用来源。");
+        data.put("inputVariable", "query");
+        data.put("outputVariable", "answer");
+        data.put("toolCodes", List.of("wiki.search"));
+        data.put("toolMode", "AUTO");
+        data.put("toolConfigDeclared", true);
+        data.put("allowModelOverride", true);
+        return data;
     }
 
     private Map<String, Object> modelNode(

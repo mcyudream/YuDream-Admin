@@ -72,7 +72,7 @@ class AgentWorkflowRuntimeServiceTest {
                         {"nodes":[
                           {"id":"start","data":{"kind":"start","outputVariable":"query"}},
                           {"id":"extract","data":{"kind":"extract","providerCode":"p","modelCode":"m",
-                            "inputVariable":"query","outputVariable":"result","toolCodes":["web.fetch"],"toolMode":"AUTO"}},
+                            "inputVariable":"query","outputVariable":"result","outputSchema":{"type":"object","properties":{"intent":{"type":"string"}}},"toolCodes":["web.fetch"],"toolMode":"AUTO"}},
                           {"id":"end","data":{"kind":"end","inputVariable":"result"}}
                         ],"edges":[{"source":"start","target":"extract"},{"source":"extract","target":"end"}]}
                         """).build();

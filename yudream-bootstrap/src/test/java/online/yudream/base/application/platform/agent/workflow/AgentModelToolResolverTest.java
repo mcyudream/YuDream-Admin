@@ -135,6 +135,27 @@ class AgentModelToolResolverTest {
     }
 
     @Test
+    void shouldRejectExplicitEmptyPermissionSnapshotWithoutGatewayFallback() {
+        RecordingPermissionGateway permissions = new RecordingPermissionGateway();
+        AgentToolExecutor executor = new AgentToolExecutor(
+                new ObjectMapper(),
+                (script, stdin) -> failRuntime(),
+                emptyToolRepo(),
+                List.of(systemTool()),
+                permissions
+        );
+        AgentRunCmd command = new AgentRunCmd();
+        command.setPermissionCodes(List.of());
+        command.setPermissionContextExplicit(true);
+
+        assertThatThrownBy(() -> executor.execute("system.lookup", Map.of(), application("system.lookup"), command))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("No permission");
+        assertThat(permissions.explicitContexts).containsExactly(true);
+        assertThat(permissions.fallbackCalls).isZero();
+    }
+
+    @Test
     void shouldNotMislabelRuntimeExecutorFailureAsArgumentSerializationFailure() {
         AgentModelToolResolver resolver = resolver(
                 toolRepo(pythonTool(true)),
