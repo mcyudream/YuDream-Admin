@@ -67,6 +67,8 @@ public class WikiSearchAiTool implements AiAgentTool {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("spaceSlug", slug);
         payload.put("query", query);
+        // count 供工作流条件节点直接数值比较（SimpleEvaluationContext 下集合 size() 方法调用不可用）
+        payload.put("count", hits.size());
         payload.put("hits", hits.stream().map(this::hit).toList());
         return new AiAgentToolResult(TOOL_NAME, "search", PERMISSION_CODE, "检索到 " + hits.size() + " 条结果。", payload);
     }
