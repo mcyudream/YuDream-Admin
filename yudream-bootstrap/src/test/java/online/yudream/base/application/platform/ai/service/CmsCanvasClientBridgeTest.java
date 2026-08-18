@@ -37,24 +37,18 @@ class CmsCanvasClientBridgeTest {
     }
 
     @Test
-    void clientErrorBecomesBizExceptionForModelSelfCorrection() {
+    void clientErrorReturnsErrorResultForModelSelfCorrection() {
         CmsCanvasClientBridge bridge = new CmsCanvasClientBridge((id, name, args) -> {
         });
         var pool = Executors.newSingleThreadExecutor();
-        var future = pool.submit(() -> {
-            try {
-                bridge.execute("cms.canvas.remove_component", Map.of("id", "missing"));
-                return null;
-            }
-            catch (Exception e) {
-                return e;
-            }
-        });
+        var future = pool.submit(() -> bridge.execute("cms.canvas.remove_component", Map.of("id", "missing")));
         try {
             Thread.sleep(80);
             bridge.complete("canvas-1", false, null, "组件不存在：missing");
-            Exception error = (Exception) future.get();
-            assertThat(error).isInstanceOf(BizException.class).hasMessageContaining("组件不存在");
+            Map<String, Object> result = future.get();
+            // 工具级失败作为结果（而非异常）回流模型循环，保证前端工具行闭环、模型可自我修正
+            assertThat(result).containsEntry("ok", false).containsEntry("_toolCallId", "canvas-1");
+            assertThat(String.valueOf(result.get("error"))).contains("组件不存在");
         }
         catch (Exception e) {
             throw new AssertionError(e);

@@ -4086,6 +4086,48 @@ function selectBreadcrumb(component: any) {
   box-shadow: none;
 }
 
+/* 工具过程：在 CMS 窄面板里改成紧凑的过程轨道，避免连续胶囊挤满消息区 */
+.ai-panel :deep(.yd-tools) {
+  gap: 4px;
+  margin: 8px 0 12px;
+  padding-left: 10px;
+  border-left: 1px solid var(--color-border-2);
+}
+
+.ai-panel :deep(.yd-tool) {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: var(--color-fill-1);
+  font-size: 11px;
+}
+
+.ai-panel :deep(.yd-tool__name) {
+  min-width: 0;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-panel :deep(.yd-tool__message) {
+  min-width: 0;
+  max-width: 42%;
+  margin-left: auto;
+}
+
+.ai-panel :deep(.yd-tool.is-complete) {
+  color: var(--color-text-3);
+}
+
+.ai-panel :deep(.yd-tool.is-complete .yd-tool__name) {
+  color: var(--color-text-2);
+}
+
+
+
 .source-panel.active {
   grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
