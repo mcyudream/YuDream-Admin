@@ -170,6 +170,28 @@ class AgentLlmNodeHandlerTest {
     }
 
     @Test
+    void understandShouldRecoverJsonEmbeddedInProse() {
+        CapturingGateway gateway = new CapturingGateway("好的，分析结果：{\"route\":\"reply\",\"topic\":\"闲聊\"} 希望对你有帮助", List.of());
+
+        Object output = execute("understand", """
+                {"id":"plan","data":{"kind":"understand","providerCode":"p","modelCode":"m"}}
+                """, state(gateway, List.of()), gateway);
+
+        assertThat(output).isEqualTo(Map.of("route", "reply", "topic", "闲聊"));
+    }
+
+    @Test
+    void understandShouldStillFailWhenNoJsonExistsAtAll() {
+        CapturingGateway gateway = new CapturingGateway("完全不是 JSON 的回复", List.of());
+
+        assertThatThrownBy(() -> execute("understand", """
+                {"id":"plan","data":{"kind":"understand","providerCode":"p","modelCode":"m"}}
+                """, state(gateway, List.of()), gateway))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("问题理解");
+    }
+
+    @Test
     void extractShouldRequireAnExplicitOutputSchemaBeforeCallingTheModel() {
         CapturingGateway gateway = new CapturingGateway("{\"title\":\"Agent\"}", List.of());
 
