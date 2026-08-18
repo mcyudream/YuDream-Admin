@@ -37,6 +37,7 @@ public final class WikiInfraMapper {
                 .topK(dataObj.getTopK())
                 .queryExpansionEnabled(dataObj.isQueryExpansionEnabled())
                 .rerankEnabled(dataObj.isRerankEnabled())
+                .hitImageLimit(dataObj.getHitImageLimit())
                 .purpose(dataObj.getPurpose())
                 .schemaContent(dataObj.getSchemaContent())
                 .language(dataObj.getLanguage())
@@ -77,6 +78,7 @@ public final class WikiInfraMapper {
         dataObj.setTopK(domain.getTopK());
         dataObj.setQueryExpansionEnabled(domain.isQueryExpansionEnabled());
         dataObj.setRerankEnabled(domain.isRerankEnabled());
+        dataObj.setHitImageLimit(domain.getHitImageLimit());
         dataObj.setPurpose(domain.getPurpose());
         dataObj.setSchemaContent(domain.getSchemaContent());
         dataObj.setLanguage(domain.getLanguage());

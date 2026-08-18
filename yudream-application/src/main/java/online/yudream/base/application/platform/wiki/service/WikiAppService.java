@@ -71,6 +71,7 @@ public class WikiAppService {
         space.setNeo4jConnectionCode(command.getNeo4jConnectionCode() == null ? "" : command.getNeo4jConnectionCode().trim());
         space.setQueryExpansionEnabled(command.isQueryExpansionEnabled());
         space.setRerankEnabled(command.isRerankEnabled());
+        space.setHitImageLimit(command.getHitImageLimit() == null ? null : Math.clamp(command.getHitImageLimit(), 0, 12));
         space.applyKnowledgeConfig(command.getPurpose(), command.getSchemaContent(), command.getLanguage());
         space.applyModelRouting(command.getChatProviderCode(), command.getChatModelCode(), command.getIngestProviderCode(),
                 command.getIngestModelCode(), command.getVisionProviderCode(), command.getVisionModelCode());

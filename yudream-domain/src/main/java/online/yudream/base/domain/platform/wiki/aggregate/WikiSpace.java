@@ -38,6 +38,8 @@ public class WikiSpace extends BaseDomain {
     private int topK;
     private boolean queryExpansionEnabled;
     private boolean rerankEnabled;
+    /** 每条检索命中最多随带的相关图片数；null 表示默认 4，0 表示不带图片 */
+    private Integer hitImageLimit;
 
     private String purpose;
     private String schemaContent;
@@ -138,6 +140,10 @@ public class WikiSpace extends BaseDomain {
     public void applyWatch(boolean watchEnabled, String watchFolderPath) {
         this.watchEnabled = watchEnabled;
         this.watchFolderPath = watchFolderPath == null ? "" : watchFolderPath.trim();
+    }
+
+    public int effectiveHitImageLimit() {
+        return hitImageLimit == null ? 4 : Math.clamp(hitImageLimit, 0, 12);
     }
 
     private static String text(String value) {
