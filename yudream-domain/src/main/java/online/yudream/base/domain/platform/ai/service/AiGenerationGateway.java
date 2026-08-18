@@ -30,4 +30,17 @@ public interface AiGenerationGateway {
         }
         return result;
     }
+
+    /**
+     * 流式生成正文与独立 reasoning；默认委托旧签名以兼容既有网关实现。
+     */
+    default AiGenerationResult generateStream(
+            AiGenerationRequest request,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
+        return generateStream(request, onDelta, onTool, onProgress);
+    }
 }

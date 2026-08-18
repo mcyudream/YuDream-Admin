@@ -18,7 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const nodeStyle = computed(() => ({
-  '--node-color': props.data.color || '#2563eb',
+  '--node-color': props.data.color || 'var(--color-text-1)',
 }))
 const sourceHandles = computed(() => agentSourceHandles(props.data.kind))
 const isModelNode = computed(() => Boolean(agentModelKind(props.data.kind)))

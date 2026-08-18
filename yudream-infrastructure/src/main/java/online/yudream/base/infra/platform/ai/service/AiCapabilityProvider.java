@@ -39,11 +39,16 @@ public class AiCapabilityProvider implements CapabilityProvider {
         defaultConfig.put("providers", providerConfigParser.defaultProvidersJson());
         defaultConfig.put("defaultProvider", AiProviderConfigParser.DEFAULT_PROVIDER_CODE);
         defaultConfig.put("defaultModel", AiProviderConfigParser.DEFAULT_OPENAI_MODEL);
+        defaultConfig.put("dailyTokenLimit", "200000");
+        defaultConfig.put("maxAttachmentSize", "10485760");
+        defaultConfig.put("maxAttachmentCount", "5");
+        defaultConfig.put("allowedImageTypes", "image/png,image/jpeg,image/webp,image/gif");
+        defaultConfig.put("allowedDocumentTypes", "application/pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation");
         return new CapabilityDescriptor(
                 CODE,
                 "AI 助手",
                 CapabilityType.AI,
-                "提供多供应商、多模型的文本生成与页面构建能力，支持 OpenAI 兼容、Kimi、DeepSeek 等模型参数适配",
+                "统一的 AI 能力：多供应商多模型文本生成、在线聊天（会话/历史/附件/多模态/每日额度）与页面构建，支持 OpenAI 兼容、Kimi、DeepSeek 等模型参数适配",
                 "i-ri:sparkling-2-line",
                 95,
                 defaultConfig,

@@ -51,13 +51,15 @@ class AgentApplicationConsumerTest {
                 .thenReturn(new PageResult<>(List.of(application), 1, 1, 200));
         when(applicationRepo.findByCode("consumer-agent")).thenReturn(java.util.Optional.of(application));
         when(workflowRuntime.execute(any(), any(), any(), any(), any(), any()))
-                .thenReturn(new AgentWorkflowRuntimeResult("done", List.of()));
+                .thenReturn(new AgentWorkflowRuntimeResult("done", "reasoning", List.of()));
         AgentRunCmd command = new AgentRunCmd();
         command.setInput("hello");
 
         assertThat(service.publishedApplications()).extracting(item -> item.getCode())
                 .containsExactly("consumer-agent");
-        assertThat(service.runByCode("consumer-agent", command).getContent()).isEqualTo("done");
+        var result = service.runByCode("consumer-agent", command);
+        assertThat(result.getContent()).isEqualTo("done");
+        assertThat(result.getReasoning()).isEqualTo("reasoning");
         verify(workflowRuntime).execute(any(), any(), any(), any(), any(), any());
     }
 

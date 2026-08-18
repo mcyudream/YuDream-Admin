@@ -10,5 +10,6 @@ import java.util.List;
 @Builder
 public class AgentRunRes {
     private String content;
+    private String reasoning;
     private List<AiToolCallRes> toolResults;
 }
