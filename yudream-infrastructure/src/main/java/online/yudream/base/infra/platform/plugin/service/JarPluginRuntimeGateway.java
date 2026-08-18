@@ -26,6 +26,8 @@ import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
+import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
+import online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.security.PluginPrincipal;
@@ -50,6 +52,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -168,7 +171,20 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (holder == null) {
             return List.of();
         }
-        return holder.getContext().permissions().stream().map(this::toInfo).toList();
+        List<PluginPermissionInfo> result = new ArrayList<>(holder.getContext().permissions().stream().map(this::toInfo).toList());
+        Set<String> declared = result.stream().map(PluginPermissionInfo::code).collect(Collectors.toSet());
+        // 插件 AI 工具描述的 permissionCode 同样纳入权限同步，否则工作流鉴权会因权限未注册而拒绝发布
+        for (PluginAiTool tool : aiToolRegistry.tools(code)) {
+            PluginAiToolDescriptor descriptor = tool == null ? null : tool.descriptor();
+            if (descriptor == null || descriptor.permissionCode() == null || descriptor.permissionCode().isBlank()
+                    || !declared.add(descriptor.permissionCode())) {
+                continue;
+            }
+            String title = descriptor.title() == null || descriptor.title().isBlank() ? descriptor.name() : descriptor.title();
+            result.add(new PluginPermissionInfo(descriptor.permissionCode(), title + "（工具）", "平台插件",
+                    "调用插件工具 " + descriptor.name() + "：" + (descriptor.description() == null ? "" : descriptor.description())));
+        }
+        return List.copyOf(result);
     }
 
     @Override
