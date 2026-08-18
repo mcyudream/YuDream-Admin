@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CmsAgentSelectOption } from './config/cms-agent-options'
+import type { CmsModelSelectOption } from './config/cms-model-options'
 import type { FileObject } from '@/api/modules/files'
 import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
@@ -11,7 +11,7 @@ import { readChromeCss } from '@/utils/cms-chrome'
 import CmsBlockLibrary from './components/CmsBlockLibrary.vue'
 import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
-import { toCmsAgentOptions } from './config/cms-agent-options'
+import { toCmsModelOptions } from './config/cms-model-options'
 
 type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
 type EditorMode = 'builder' | 'markdown' | 'html'
@@ -45,7 +45,7 @@ const wikiEnabled = ref(false)
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const mediaItems = ref<FileObject[]>([])
 const mediaInput = ref<HTMLInputElement>()
-const aiAgentOptions = ref<CmsAgentSelectOption[]>([])
+const aiModelOptions = ref<CmsModelSelectOption[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
 const search = reactive({ keyword: '' })
 const mediaSearch = reactive({ keyword: '', page: 1, size: 32, total: 0 })
@@ -112,7 +112,7 @@ const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] =
 ]
 
 const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
-const aiEnabled = computed(() => aiAgentOptions.value.length > 0)
+const aiEnabled = computed(() => aiModelOptions.value.length > 0)
 const pagePublicUrl = computed(() => pageForm.slug ? `/site/${pageForm.slug}` : '/site')
 const previewNavigationItems = computed(() => {
   const items = navigationItems.value.filter(item => item.visible !== false)
@@ -286,19 +286,19 @@ watch(activeTab, async () => {
 })
 
 onMounted(async () => {
-  await Promise.all([loadAiApplications(), loadWikiNavigation()])
+  await Promise.all([loadAiModels(), loadWikiNavigation()])
   await loadPages()
   await loadTemplatePreviewContext()
 })
 
-async function loadAiApplications() {
+async function loadAiModels() {
   try {
     // 走 AI 场景端点而非 Agent 管理台端点：CMS 操作者通常没有 platform:agent:view 权限
-    const res = await apiAi.availableAgents()
-    aiAgentOptions.value = toCmsAgentOptions(res.data)
+    const res = await apiAi.availableModels()
+    aiModelOptions.value = toCmsModelOptions(res.data || [])
   }
   catch {
-    aiAgentOptions.value = []
+    aiModelOptions.value = []
   }
 }
 
@@ -924,7 +924,7 @@ function sectionTitle(type: HomeSectionType) {
               <div class="runtime-overview__head">
                 <div>
                   <span>YD 内容引擎</span>
-                  <strong>{{ aiEnabled ? '已连接内置 CMS 页面构建 Agent' : '等待发布内置 CMS Agent' }}</strong>
+                  <strong>{{ aiEnabled ? 'AI 页面构建助手已就绪' : '等待配置 AI 模型' }}</strong>
                 </div>
                 <FaTag :variant="aiEnabled ? 'default' : 'secondary'">{{ aiEnabled ? '可用' : '未就绪' }}</FaTag>
               </div>
@@ -1296,7 +1296,7 @@ function sectionTitle(type: HomeSectionType) {
         :chrome-layout="editorTarget === 'home' ? homeLayoutMode : undefined"
         :template-preview-context="templatePreviewContext"
         :ai-enabled="aiEnabled"
-        :ai-agent-options="aiAgentOptions"
+        :ai-model-options="aiModelOptions"
         :history-target-type="editorTarget"
         :history-target-id="editorTarget === 'home' ? 'home' : (selectedPageId || pageForm.slug || pageForm.title || 'draft')"
         :history-target-label="editorTarget === 'home' ? home.title : pageForm.title"
