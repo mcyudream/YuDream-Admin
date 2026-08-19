@@ -22,6 +22,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginMenuAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginMessageInteractionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
@@ -148,6 +149,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
+    public boolean devModeEnabled() {
+        return devModeProperties.isEnabled();
+    }
+
+    @Override
     public List<PluginDevProjectInfo> devModeProjects() {
         return devModeProjectsInternal().stream()
                 .map(project -> new PluginDevProjectInfo(project.getCode().trim(),
@@ -155,6 +161,45 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                         project.resolvedFrontendDist().toString(),
                         project.isAutoCompile()))
                 .toList();
+    }
+
+    @Override
+    public PluginCommandTestResult testCommand(String pluginCode, String command, List<String> arguments, String content) {
+        if (!StringUtils.hasText(command)) {
+            throw new BizException("指令名不能为空");
+        }
+        PluginRuntimeHolder holder = holder(pluginCode);
+        if (!holder.isEnabled()) {
+            throw new BizException("插件未启用，无法模拟指令");
+        }
+        String commandName = command.trim();
+        List<String> args = arguments == null ? List.of() : List.copyOf(arguments);
+        List<PluginCommandRegistryImpl.Registration> registrations = holder.getContext().commandRegistry()
+                .registrations().stream()
+                .filter(registration -> registration.definition().command().equalsIgnoreCase(commandName))
+                .toList();
+        long startNanos = System.nanoTime();
+        if (registrations.isEmpty()) {
+            return PluginCommandTestResult.notMatched(pluginCode, commandName, elapsedMillis(startNanos));
+        }
+        // 模拟事件仅填充指令调试所需字段，platform 标记为 devtools，handler 若访问真实连接字段需自行判空
+        PluginEvent debugEvent = new PluginEvent(null, "command-test", "devtools", null, null,
+                StringUtils.hasText(content) ? content : "/" + commandName + (args.isEmpty() ? "" : " " + String.join(" ", args)),
+                null, commandName, Map.of(), null, null, null, null, null);
+        try {
+            for (PluginCommandRegistryImpl.Registration registration : registrations) {
+                registration.handler().handle(new PluginCommandContext(debugEvent, commandName, args, null));
+            }
+            return PluginCommandTestResult.succeeded(pluginCode, commandName, elapsedMillis(startNanos));
+        } catch (Exception e) {
+            return PluginCommandTestResult.failed(pluginCode, commandName,
+                    e.getMessage() == null ? "指令处理异常：" + e.getClass().getSimpleName() : e.getMessage(),
+                    elapsedMillis(startNanos));
+        }
+    }
+
+    private long elapsedMillis(long startNanos) {
+        return (System.nanoTime() - startNanos) / 1_000_000L;
     }
 
     @Override
