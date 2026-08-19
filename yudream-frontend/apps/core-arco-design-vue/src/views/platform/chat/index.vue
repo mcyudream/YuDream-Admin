@@ -60,8 +60,8 @@ const welcomeTitle = computed(() => activeAgent.value?.name || '今天想让我�
 const isEmpty = computed(() => messages.value.length === 0)
 const modelValue = computed({
   get: () => providerCode.value && modelCode.value ? `${providerCode.value}::${modelCode.value}` : '',
-  set: (value: string) => {
-    const [provider, model] = value.split('::')
+  set: (value: string | number | boolean | undefined) => {
+    const [provider, model] = String(value ?? '').split('::')
     providerCode.value = provider ?? ''
     modelCode.value = model ?? ''
   },
@@ -253,9 +253,11 @@ onMounted(async () => {
     <aside class="chat-page__sessions">
       <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
     </aside>
-    <a-drawer v-model:visible="sessionDrawerVisible" title="会话记录" :width="320" popup-container="body" class="chat-page__session-drawer">
-      <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
-    </a-drawer>
+    <FaDrawer v-model="sessionDrawerVisible" title="会话记录" :footer="false" content-class="chat-page__session-drawer sm:max-w-[320px]">
+      <div class="-m-4 h-full min-h-0">
+        <YdChatSessionList :sessions="sessions" :active-id="activeId" :loading="sessionsLoading" @select="selectSession" @create="createSession" @rename="renameSession" @pin="pinSession" @remove="removeSession" />
+      </div>
+    </FaDrawer>
     <section class="chat-page__main">
       <header class="chat-page__top">
         <FaTooltip text="会话记录">
@@ -278,13 +280,11 @@ onMounted(async () => {
             </div>
             <div class="chat-control chat-control--select">
               <FaIcon name="i-ri:robot-2-line" />
-              <a-select v-model="agentCode" allow-clear size="small" :bordered="false" placeholder="Agent" :options="agents.map(item => ({ label: item.name, value: item.code }))" />
+              <FaSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
             </div>
             <div class="chat-control chat-control--select chat-control--model" :title="activeModel ? `${activeModel.providerName} · ${activeModel.modelName}` : '选择模型'">
               <FaIcon name="i-ri:cpu-line" />
-              <a-select v-model="modelValue" size="small" :bordered="false" placeholder="选择模型" :options="modelOptions">
-                <template #option="{ data }"><span :title="data.fullLabel">{{ data.fullLabel }}</span></template>
-              </a-select>
+              <FaSelect v-model="modelValue" placeholder="选择模型" :options="modelOptions" class="w-full" />
             </div>
           </div>
         </template>
@@ -315,9 +315,8 @@ onMounted(async () => {
 .chat-context { position: relative; flex-shrink: 0; }
 .chat-control { display: inline-flex; min-width: 0; height: 28px; align-items: center; border-radius: 6px; color: var(--color-text-3); font-size: 12px; }
 .chat-control--select { max-width: 156px; gap: 4px; padding-left: 7px; }
-.chat-control--select :deep(.arco-select) { min-width: 0; flex: 1; }
-.chat-control--select :deep(.arco-select-view-single) { height: 26px; min-width: 0; padding: 0 5px; border: 0; background: transparent; color: var(--color-text-2); font-size: 12px; }
-.chat-control--select :deep(.arco-select-view-value) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-control--select :deep([data-slot='select-trigger']) { height: 26px; min-height: 0; min-width: 0; flex: 1; padding: 0 5px; border: 0; background: transparent; box-shadow: none; color: var(--color-text-2); font-size: 12px; }
+.chat-control--select :deep([data-slot='select-value']) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-control--select:hover, .chat-control--select:focus-within { background: var(--color-bg-1); color: var(--color-text-1); }
 .chat-control--model { width: 260px; max-width: 260px; }
 .chat-control--icon { gap: 5px; max-width: 160px; padding: 0 8px; border: 0; background: transparent; cursor: pointer; font: inherit; text-overflow: ellipsis; white-space: nowrap; }
@@ -334,8 +333,7 @@ onMounted(async () => {
   .chat-page__top { min-height: 42px; padding: 6px 12px; }
   .chat-page__quota { font-size: 11px; }
   .chat-page__empty :deep(.yd-welcome) { padding-inline: 12px; }
-  .chat-page__session-drawer :deep(.arco-drawer-body) { padding: 0; }
-  .chat-page__session-drawer :deep(.yd-session-list) { width: 100%; min-width: 0; min-height: 100%; }
+  :global(.chat-page__session-drawer .yd-session-list) { width: 100%; min-width: 0; min-height: 100%; }
 }
 @media (max-width: 560px) {
   .chat-page__context-controls { order: 2; width: 100%; justify-content: space-between; }
