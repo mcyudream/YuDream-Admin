@@ -6,6 +6,8 @@ import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplication
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
 import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.plugin.spi.annotation.PluginCommand;
 import online.yudream.base.plugin.spi.core.PluginContext;
@@ -155,6 +157,58 @@ class JarPluginRuntimeGatewayTest {
         assertTrue(events.stream().allMatch(event -> "events-plugin".equals(event.pluginCode())));
     }
 
+    @Test
+    void devModeLoadsPluginFromClassesDirectoryAndServesFrontendFromDist() throws IOException {
+        // 构造开发模式目录：target/classes/plugin.yml + 前端 dist/remoteEntry.js
+        Path projectRoot = pluginDir.resolve("yudream-plugin-dev-demo");
+        Path classes = projectRoot.resolve("target").resolve("classes");
+        Files.createDirectories(classes);
+        Files.writeString(classes.resolve("plugin.yml"),
+                "name: dev-demo\nversion: 1.0.0\nmain: " + HealthyPlugin.class.getName() + "\n", StandardCharsets.UTF_8);
+        Path dist = projectRoot.resolve("dist");
+        Files.createDirectories(dist);
+        Files.writeString(dist.resolve("remoteEntry.js"), "export default {}", StandardCharsets.UTF_8);
+
+        PluginDevModeProperties devMode = new PluginDevModeProperties();
+        devMode.setEnabled(true);
+        PluginDevModeProperties.DevProject project = new PluginDevModeProperties.DevProject();
+        project.setCode("dev-demo");
+        project.setPath(projectRoot.toString());
+        project.setFrontendDist(dist.toString());
+        devMode.setProjects(List.of(project));
+
+        JarPluginRuntimeGateway gateway = newGateway(devMode, event -> {
+        });
+
+        PluginDescriptorInfo descriptor = gateway.discover().stream()
+                .filter(info -> info.code().equals("dev-demo"))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(classes.toAbsolutePath().normalize().toString(), descriptor.jarPath());
+        assertTrue(gateway.devModePlugin("dev-demo"));
+        assertEquals(1, gateway.devModeProjects().size());
+
+        PluginModule module = module("dev-demo", classes);
+        gateway.enable(module);
+        assertTrue(gateway.enabled("dev-demo"));
+        assertEquals(1, gateway.commands().size());
+
+        PluginFrontendAssetInfo asset = gateway.frontendAsset("dev-demo", "remoteEntry.js").orElseThrow();
+        assertEquals("text/javascript;charset=UTF-8", asset.contentType());
+        assertEquals("export default {}", new String(asset.body(), StandardCharsets.UTF_8));
+        gateway.unload("dev-demo");
+    }
+
+    @Test
+    void directoryLoadingIsRejectedWithoutDevModeConfiguration() throws IOException {
+        Path classes = pluginDir.resolve("plain-classes");
+        Files.createDirectories(classes);
+        Files.writeString(classes.resolve("plugin.yml"),
+                "name: plain\nversion: 1.0.0\nmain: " + HealthyPlugin.class.getName() + "\n", StandardCharsets.UTF_8);
+        JarPluginRuntimeGateway gateway = newGateway();
+        assertThrows(BizException.class, () -> gateway.load(module("plain", classes)));
+    }
+
     public static class HealthyPlugin implements YuDreamPlugin {
         @PluginCommand(code = "healthy-cmd", command = "healthy", name = "健康指令")
         public void handle(PluginCommandContext context) {
@@ -191,11 +245,15 @@ class JarPluginRuntimeGatewayTest {
     }
 
     private JarPluginRuntimeGateway newGateway() {
-        return newGateway(event -> {
+        return newGateway(new PluginDevModeProperties(), event -> {
         });
     }
 
     private JarPluginRuntimeGateway newGateway(ApplicationEventPublisher eventPublisher) {
+        return newGateway(new PluginDevModeProperties(), eventPublisher);
+    }
+
+    private JarPluginRuntimeGateway newGateway(PluginDevModeProperties devModeProperties, ApplicationEventPublisher eventPublisher) {
         PluginProperties properties = new PluginProperties();
         properties.setDirectories(List.of(pluginDir.toString()));
         return new JarPluginRuntimeGateway(
@@ -221,7 +279,8 @@ class JarPluginRuntimeGatewayTest {
                         return List.of();
                     }
                 },
-                eventPublisher
+                eventPublisher,
+                devModeProperties
         );
     }
 

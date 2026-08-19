@@ -347,6 +347,28 @@ public class PluginAppService {
         pluginModuleRepo.deleteByCode(module.getCode());
     }
 
+    /**
+     * 开发模式热重载：回收后从源码编译产物目录重新加载并恢复原启用状态。
+     * 仅供 PluginDevModeWatcher 与开发者工具调用，不作为常规运维入口。
+     */
+    @Transactional(noRollbackFor = BizException.class)
+    public PluginModuleDTO reloadDevPlugin(String code) {
+        syncPluginRegistry();
+        PluginModule module = module(code);
+        boolean wasEnabled = pluginRuntimeGateway.enabled(code) || module.enabled();
+        stopExistingPlugin(module);
+        if (!jarExists(module)) {
+            throw new BizException("插件开发产物不存在：" + module.getJarPath());
+        }
+        if (!wasEnabled) {
+            pluginRuntimeGateway.load(module);
+            module.markLoaded();
+            return toDTO(pluginModuleRepo.save(module));
+        }
+        module.setRestoreIntentActive(true);
+        return toDTO(enableOwnRuntime(module));
+    }
+
     @Transactional(readOnly = true)
     public PluginFrontendManifestDTO frontendManifest() {
         return frontendManifest(false);
@@ -891,8 +913,13 @@ public class PluginAppService {
         if (!StringUtils.hasText(module.getJarPath())) {
             return;
         }
+        Path jarPath = Path.of(module.getJarPath());
+        if (Files.isDirectory(jarPath)) {
+            // 开发模式插件从源码产物目录加载，删除插件记录时不得触碰源码目录
+            return;
+        }
         try {
-            Files.deleteIfExists(Path.of(module.getJarPath()));
+            Files.deleteIfExists(jarPath);
         } catch (IOException e) {
             throw new BizException("插件文件删除失败：" + e.getMessage());
         }
@@ -1151,7 +1178,9 @@ public class PluginAppService {
 
     private boolean jarExists(PluginModule module) {
         try {
-            return module.getJarPath() != null && Files.isRegularFile(Path.of(module.getJarPath()));
+            // 目录形态是开发模式源码产物，常规形态是插件 JAR
+            return module.getJarPath() != null && (Files.isRegularFile(Path.of(module.getJarPath()))
+                    || Files.isDirectory(Path.of(module.getJarPath())));
         } catch (RuntimeException e) {
             return false;
         }

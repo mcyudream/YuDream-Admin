@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 
 import java.util.List;
@@ -50,4 +51,14 @@ public interface PluginRuntimeGateway {
 
     /** 单个插件运行时贡献资产快照，供开发者工具面板聚合展示。 */
     PluginRuntimeAssets runtimeAssets(String code);
+
+    /** 插件是否来自开发模式的源码目录加载。 */
+    default boolean devModePlugin(String code) {
+        return false;
+    }
+
+    /** 开发模式配置的项目清单，未启用开发模式时为空。 */
+    default List<PluginDevProjectInfo> devModeProjects() {
+        return List.of();
+    }
 }
