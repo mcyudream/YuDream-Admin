@@ -664,9 +664,15 @@ function onAiFollowUp(event: CustomEvent<string>) {
 }
 
 // 重新打开 AI 面板或切换编辑目标时，恢复该目标最近一次打开的会话
+let restoreAiSessionSequence = 0
+
 async function restoreAiSession() {
+  const sequence = ++restoreAiSessionSequence
   await nextTick()
   await aiChatPanelRef.value?.reloadSessions()
+  if (sequence !== restoreAiSessionSequence) {
+    return
+  }
   const sessionId = readActiveCmsAiChatSessionId(chatHistoryTargetKey.value)
   if (sessionId) {
     await aiChatPanelRef.value?.selectSession(sessionId)
@@ -2916,6 +2922,7 @@ function selectBreadcrumb(component: any) {
             ref="aiChatPanelRef"
             :endpoint="aiChatEndpoint"
             transport="websocket"
+            :history-limit="20"
             :build-body="buildAiChatBody"
             :on-tool-call-request="handleCanvasToolRequest"
             :session-store="aiSessionStore"

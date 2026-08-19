@@ -142,6 +142,8 @@ function sortSessions(list: YdAgentChatSessionMeta[]) {
 
 /** 新建会话：立即持久化一个空会话，保证列表与选中状态一致 */
 async function createSession() {
+  // 切换/新建前先保存当前会话，避免正在生成或刚完成的消息因清空引用而丢失。
+  await persistActiveSession()
   stop()
   sessionDrawerOpen.value = false
   if (!props.sessionStore) {
@@ -170,6 +172,7 @@ async function selectSession(id: string) {
     sessionDrawerOpen.value = false
     return
   }
+  await persistActiveSession()
   stop()
   sessionDrawerOpen.value = false
   try {

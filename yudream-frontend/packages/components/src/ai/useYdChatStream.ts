@@ -212,6 +212,9 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     if (message.context && Object.keys(message.context).length) {
       sections.push(`[业务上下文]\n${JSON.stringify(message.context)}`)
     }
+    if (message.attachments?.length) {
+      sections.push(`[附件]\n${message.attachments.map(item => `${item.fileName} (${item.contentType || item.kind || 'file'})`).join(', ')}`)
+    }
     return sections.filter(Boolean).join('\n\n')
   }
 
