@@ -126,6 +126,62 @@ export function extractHomeContent(html: string) {
   return content?.innerHTML?.trim() || ''
 }
 
+const chromeCssTokens = [
+  '.site-layout-header',
+  '.site-layout-footer',
+  '.site-layout-copyright',
+  '.site-layout-frame',
+  '.site-admin-sidebar',
+  '.site-nav-item',
+  '.site-nav-dropdown',
+]
+
+/** 只提取作用于固定 Header/Footer 布局的 CSS；用于把 Grapes 保存的 homeCss 中混入的 chrome 样式纳入 chrome 层。 */
+export function extractChromeCss(css = '') {
+  return transformChromeCss(css, rule => chromeCssTokens.some(token => rule.includes(token)), selectors => selectors)
+}
+
+/** 提升 chrome 自定义规则优先级，避免 Vue scoped 的公开站基础样式覆盖用户/AI 写入的 Header 样式。 */
+function prioritizeChromeCss(css = '') {
+  return transformChromeCss(css, () => true, selectors => selectors
+    .split(',')
+    .map(selector => selector.trim())
+    .filter(Boolean)
+    .map(selector => selector.startsWith(':root') || selector.startsWith('html') || selector.startsWith('body') || selector.startsWith('main.site-page') ? selector : `main.site-page ${selector}`)
+    .join(', '))
+}
+
+function transformChromeCss(css: string, include: (selector: string) => boolean, mapSelectors: (selector: string) => string) {
+  let result = ''
+  let index = 0
+  while (index < css.length) {
+    const open = css.indexOf('{', index)
+    if (open === -1) {
+      break
+    }
+    const selector = css.slice(index, open).trim()
+    let depth = 1
+    let cursor = open + 1
+    while (cursor < css.length && depth > 0) {
+      if (css[cursor] === '{') depth++
+      if (css[cursor] === '}') depth--
+      cursor++
+    }
+    const body = css.slice(open + 1, cursor - 1)
+    if (/^@(media|supports|layer|container)\b/i.test(selector)) {
+      const nested = transformChromeCss(body, include, mapSelectors)
+      if (nested) {
+        result += `${selector}{${nested}}`
+      }
+    }
+    else if (!selector.startsWith('@') && include(selector)) {
+      result += `${mapSelectors(selector)} { ${body.trim()} }\n`
+    }
+    index = cursor
+  }
+  return result.trim()
+}
+
 /** CSS used by both the public site and GrapesJS so fixed chrome has one rendering contract. */
 function chromeCss(layoutMode: CmsSiteLayoutMode, editorMarkers: boolean) {
   const mode = layoutMode || 'HEADER_FOOTER'
@@ -172,6 +228,8 @@ function chromeCss(layoutMode: CmsSiteLayoutMode, editorMarkers: boolean) {
   --yb-site-hero-bg: linear-gradient(135deg, #0f766e, #1f2937);
   --yb-site-hero-text: #ffffff;
   --yb-site-danger: #b91c1c;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "noto sans", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  line-height: 1.5;
 }
 :where(html.dark, body.dark) {
   --yb-site-bg: #0f172a;
@@ -461,5 +519,5 @@ export function chromeCanvasPreviewCss(layoutMode: CmsSiteLayoutMode = 'HEADER_F
 }
 
 export function chromeRuntimeCss(layoutMode: CmsSiteLayoutMode = 'HEADER_FOOTER', customCss = '') {
-  return [chromeCss(layoutMode, false), customCss.trim()].filter(Boolean).join('\n')
+  return [chromeCss(layoutMode, false), prioritizeChromeCss(customCss.trim())].filter(Boolean).join('\n')
 }
