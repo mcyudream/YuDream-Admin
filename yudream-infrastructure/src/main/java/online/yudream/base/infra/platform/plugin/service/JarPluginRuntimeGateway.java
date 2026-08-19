@@ -22,6 +22,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginMenuAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginMessageInteractionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
@@ -76,6 +77,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final PluginSemanticMemoryService semanticMemoryService;
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final ApplicationEventPublisher eventPublisher;
+    private final PluginDevModeProperties devModeProperties;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -84,13 +86,74 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (!pluginProperties.isEnabled()) {
             return List.of();
         }
-        return pluginProperties.getDirectories().stream()
+        Map<String, PluginDescriptorInfo> discovered = new java.util.LinkedHashMap<>();
+        pluginProperties.getDirectories().stream()
                 .map(Path::of)
                 .filter(Files::isDirectory)
                 .flatMap(this::jarFiles)
                 .map(this::readDescriptor)
                 .flatMap(Optional::stream)
+                .forEach(descriptor -> discovered.put(descriptor.code(), descriptor));
+        // 开发模式项目与同 code 的 JAR 并存时以源码目录为准，保证改动即时生效
+        for (PluginDevModeProperties.DevProject project : devModeProjectsInternal()) {
+            readDevDescriptor(project).ifPresent(descriptor -> discovered.put(descriptor.code(), descriptor));
+        }
+        return discovered.values().stream()
                 .sorted(Comparator.comparing(PluginDescriptorInfo::code))
+                .toList();
+    }
+
+    private Optional<PluginDescriptorInfo> readDevDescriptor(PluginDevModeProperties.DevProject project) {
+        try {
+            Path classesDir = project.classesDir();
+            if (!Files.isDirectory(classesDir)) {
+                return Optional.empty();
+            }
+            PluginDescriptor descriptor = readYamlDescriptor(classesDir);
+            if (!project.getCode().trim().equals(descriptor.code())) {
+                log.warn("Dev-mode project code mismatch: configured={}, plugin.yml={}", project.getCode(), descriptor.code());
+                return Optional.empty();
+            }
+            return Optional.of(toInfo(descriptor, classesDir));
+        } catch (Exception e) {
+            log.warn("Failed to read dev-mode plugin descriptor for {}", project.getCode(), e);
+            return Optional.empty();
+        }
+    }
+
+    private List<PluginDevModeProperties.DevProject> devModeProjectsInternal() {
+        if (!devModeProperties.isEnabled()) {
+            return List.of();
+        }
+        return devModeProperties.getProjects().stream()
+                .filter(project -> project != null
+                        && StringUtils.hasText(project.getCode())
+                        && StringUtils.hasText(project.getPath()))
+                .toList();
+    }
+
+    private PluginDevModeProperties.DevProject findDevProject(String code) {
+        if (!StringUtils.hasText(code)) {
+            return null;
+        }
+        return devModeProjectsInternal().stream()
+                .filter(project -> code.trim().equals(project.getCode().trim()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
+    public boolean devModePlugin(String code) {
+        return findDevProject(code) != null;
+    }
+
+    @Override
+    public List<PluginDevProjectInfo> devModeProjects() {
+        return devModeProjectsInternal().stream()
+                .map(project -> new PluginDevProjectInfo(project.getCode().trim(),
+                        project.classesDir().toString(),
+                        project.resolvedFrontendDist().toString(),
+                        project.isAutoCompile()))
                 .toList();
     }
 
@@ -382,12 +445,34 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             throw new BizException("插件未启用");
         }
         String path = normalizeAssetPath(assetPath);
+        // 开发模式优先从源码仓 dist 目录取前端产物，vite build --watch 的更新即时生效
+        Optional<PluginFrontendAssetInfo> devAsset = devFrontendAsset(code, path);
+        if (devAsset.isPresent()) {
+            return devAsset;
+        }
         String resourcePath = "META-INF/yudream-plugin/frontend/" + code + "/" + path;
         try (InputStream inputStream = holder.getClassLoader().getResourceAsStream(resourcePath)) {
             if (inputStream == null) {
                 return Optional.empty();
             }
             return Optional.of(new PluginFrontendAssetInfo(path, contentType(path), inputStream.readAllBytes()));
+        } catch (IOException e) {
+            throw new BizException("插件前端资源读取失败：" + e.getMessage());
+        }
+    }
+
+    private Optional<PluginFrontendAssetInfo> devFrontendAsset(String code, String path) {
+        PluginDevModeProperties.DevProject project = findDevProject(code);
+        if (project == null) {
+            return Optional.empty();
+        }
+        Path dist = project.resolvedFrontendDist();
+        Path file = dist.resolve(path).normalize();
+        if (!file.startsWith(dist) || !Files.isRegularFile(file)) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(new PluginFrontendAssetInfo(path, contentType(path), Files.readAllBytes(file)));
         } catch (IOException e) {
             throw new BizException("插件前端资源读取失败：" + e.getMessage());
         }
@@ -464,16 +549,22 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (!StringUtils.hasText(module.getJarPath())) {
             throw new BizException("插件 JAR 路径为空");
         }
-        Path jarPath = Path.of(module.getJarPath());
-        if (!Files.isRegularFile(jarPath)) {
+        Path pluginPath = Path.of(module.getJarPath());
+        boolean directoryMode = Files.isDirectory(pluginPath);
+        if (!directoryMode && !Files.isRegularFile(pluginPath)) {
             throw new BizException("插件 JAR 不存在：" + module.getJarPath());
         }
+        if (directoryMode && !isDevProjectPath(module.getCode(), pluginPath)) {
+            throw new BizException("仅开发模式配置的插件允许从目录加载：" + module.getCode());
+        }
         try {
-            PluginDescriptor descriptor = readYamlDescriptor(jarPath);
+            PluginDescriptor descriptor = readYamlDescriptor(pluginPath);
             if (!module.getCode().equals(descriptor.code())) {
                 throw new BizException("插件编码不匹配：" + descriptor.code());
             }
-            URLClassLoader classLoader = createClassLoader(jarPath, descriptor);
+            URLClassLoader classLoader = directoryMode
+                    ? createDevClassLoader(pluginPath, descriptor)
+                    : createClassLoader(pluginPath, descriptor);
             try {
                 YuDreamPlugin plugin = instantiatePlugin(classLoader, descriptor);
                 return new PluginRuntimeHolder(
@@ -502,13 +593,48 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         }
     }
 
+    private boolean isDevProjectPath(String code, Path pluginPath) {
+        PluginDevModeProperties.DevProject project = findDevProject(code);
+        return project != null
+                && project.classesDir().equals(pluginPath.toAbsolutePath().normalize());
+    }
+
     private URLClassLoader createClassLoader(Path jarPath, PluginDescriptor descriptor) throws IOException {
         URL[] urls = new URL[]{jarPath.toUri().toURL()};
         return new PluginClassLoader(urls, getClass().getClassLoader(), dependencyClassLoaders(descriptor));
     }
 
-    private PluginDescriptor readYamlDescriptor(Path jarPath) throws IOException {
-        try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(jarPath.toFile())) {
+    /** 开发模式目录类路径：target/classes + target/plugin-dev/lib/*.jar（运行时依赖由插件仓 dev-export 导出）。 */
+    private URLClassLoader createDevClassLoader(Path classesDir, PluginDescriptor descriptor) throws IOException {
+        List<Path> entries = new ArrayList<>();
+        entries.add(classesDir);
+        PluginDevModeProperties.DevProject project = findDevProject(descriptor.code());
+        Path libDir = project == null ? null : project.libDir();
+        if (libDir != null && Files.isDirectory(libDir)) {
+            try (Stream<Path> libs = Files.list(libDir)) {
+                libs.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().endsWith(".jar"))
+                        .sorted()
+                        .forEach(entries::add);
+            }
+        }
+        List<URL> urls = new ArrayList<>();
+        for (Path entry : entries) {
+            urls.add(entry.toUri().toURL());
+        }
+        return new PluginClassLoader(urls.toArray(new URL[0]), getClass().getClassLoader(), dependencyClassLoaders(descriptor));
+    }
+
+    private PluginDescriptor readYamlDescriptor(Path pluginPath) throws IOException {
+        if (Files.isDirectory(pluginPath)) {
+            Path yaml = pluginPath.resolve("plugin.yml");
+            if (!Files.isRegularFile(yaml)) {
+                throw new BizException("插件开发目录缺少 plugin.yml：" + pluginPath);
+            }
+            try (InputStream inputStream = Files.newInputStream(yaml)) {
+                return new PluginYamlDescriptorReader().read(inputStream);
+            }
+        }
+        try (java.util.jar.JarFile jarFile = new java.util.jar.JarFile(pluginPath.toFile())) {
             java.util.jar.JarEntry entry = jarFile.getJarEntry("plugin.yml");
             if (entry == null) {
                 throw new BizException("插件 JAR 缺少 plugin.yml");
