@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.capability.service.CapabilityApp
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiPageVersion;
+import online.yudream.base.domain.platform.wiki.aggregate.WikiSource;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiSpace;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiPageType;
@@ -14,6 +15,7 @@ import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiIndexGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiQueryExpansionGateway;
 import online.yudream.base.domain.platform.wiki.service.WikiRerankGateway;
+import online.yudream.base.domain.platform.wiki.valobj.WikiSourceImage;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -229,6 +231,24 @@ class WikiSearchAppServiceTest {
 
         assertThat(result).isNotEmpty();
         assertThat(result.get(0).getNodeId()).isEqualTo("1");
+    }
+
+    @Test
+    void publicSearchIncludesMarkdownAltAndGeneratedImageCaption() {
+        WikiNode node = page(1L, null, "deploy", "部署教程");
+        publish(node, "部署教程", "先打开设置页。\n\n![设置页截图](/api/files/123456/content)");
+        setupPublicSpace(List.of(node));
+        WikiSource source = WikiSource.url(100L, "/", "部署资料", "https://example.com/deploy", "text/markdown");
+        source.setImages(List.of(new WikiSourceImage(123456L, 0, 1, "设置页右上角的保存按钮", null, null, null, 0, 0, "image/png")));
+        when(sources.findByImageFileObjectIds(100L, List.of(123456L))).thenReturn(List.of(source));
+
+        var result = service.searchForPublicSite("demo", "保存按钮", 5, null, false);
+
+        assertThat(result).singleElement().satisfies(hit -> assertThat(hit.getImages()).singleElement().satisfies(image -> {
+            assertThat(image.getAlt()).isEqualTo("设置页截图");
+            assertThat(image.getGeneratedCaption()).isEqualTo("设置页右上角的保存按钮");
+            assertThat(image.getCaption()).isEqualTo("设置页截图");
+        }));
     }
 
     @Test

@@ -41,6 +41,7 @@ class WikiPublicSearchAiToolTest {
         verify(search).searchForPublicSite(eq("demo"), eq("虚拟线程"), anyInt(), anyString(), anyBoolean(), eq(false));
         assertThat(result.toolName()).isEqualTo("wiki.search");
         Map<String, Object> payload = result.payload();
+        assertThat(payload).containsEntry("count", 1);
         assertThat(payload.get("hits")).isInstanceOf(List.class);
         List<Map<String, Object>> hits = (List<Map<String, Object>>) payload.get("hits");
         assertThat(hits).singleElement().satisfies(item ->
@@ -59,7 +60,12 @@ class WikiPublicSearchAiToolTest {
                         .spaceSlug("tutorial")
                         .spaceName("教程")
                         .content("步骤")
-                        .images(List.of(WikiSearchHitDTO.Image.builder().url("/api/files/123/content").caption("截图").build()))
+                        .images(List.of(WikiSearchHitDTO.Image.builder()
+                                .url("/api/files/123/content")
+                                .alt("配置截图")
+                                .generatedCaption("设置页中的保存按钮")
+                                .caption("配置截图")
+                                .build()))
                         .build()));
         WikiPublicSearchAiTool tool = new WikiPublicSearchAiTool(search, publicSearch);
 
@@ -68,9 +74,17 @@ class WikiPublicSearchAiToolTest {
         verify(publicSearch).searchAll(eq("登录报错"), org.mockito.ArgumentMatchers.isNull());
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> hits = (List<Map<String, Object>>) result.payload().get("hits");
+        assertThat(result.payload()).containsEntry("count", 1);
         assertThat(hits).singleElement().satisfies(item -> {
             assertThat(item).containsEntry("spaceSlug", "tutorial").containsEntry("spaceName", "教程");
             assertThat(item.get("images")).isInstanceOf(List.class);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> images = (List<Map<String, Object>>) item.get("images");
+            assertThat(images).singleElement().satisfies(image -> assertThat(image)
+                    .containsEntry("index", 1)
+                    .containsEntry("alt", "配置截图")
+                    .containsEntry("generatedCaption", "设置页中的保存按钮")
+                    .containsEntry("caption", "配置截图"));
         });
     }
 

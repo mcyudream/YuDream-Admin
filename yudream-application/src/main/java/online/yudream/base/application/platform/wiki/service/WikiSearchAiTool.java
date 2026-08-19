@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 原生 Agent 工具：wiki.search —— 混合检索（关键词 + 向量），支持“只读原文”模式。
@@ -69,11 +70,12 @@ public class WikiSearchAiTool implements AiAgentTool {
         payload.put("query", query);
         // count 供工作流条件节点直接数值比较（SimpleEvaluationContext 下集合 size() 方法调用不可用）
         payload.put("count", hits.size());
-        payload.put("hits", hits.stream().map(this::hit).toList());
+        AtomicInteger imageIndex = new AtomicInteger(1);
+        payload.put("hits", hits.stream().map(hit -> hit(hit, imageIndex)).toList());
         return new AiAgentToolResult(TOOL_NAME, "search", PERMISSION_CODE, "检索到 " + hits.size() + " 条结果。", payload);
     }
 
-    private Map<String, Object> hit(WikiSearchHitDTO hit) {
+    private Map<String, Object> hit(WikiSearchHitDTO hit, AtomicInteger imageIndex) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("score", hit.getScore());
         value.put("kind", hit.getKind());
@@ -84,7 +86,10 @@ public class WikiSearchAiTool implements AiAgentTool {
         value.put("content", hit.getContent());
         value.put("sourceUrl", hit.getSourceUrl());
         value.put("images", hit.getImages() == null ? List.of() : hit.getImages().stream()
-                .map(image -> Map.of("url", image.getUrl() == null ? "" : image.getUrl(),
+                .map(image -> Map.of("index", imageIndex.getAndIncrement(),
+                        "url", image.getUrl() == null ? "" : image.getUrl(),
+                        "alt", image.getAlt() == null ? "" : image.getAlt(),
+                        "generatedCaption", image.getGeneratedCaption() == null ? "" : image.getGeneratedCaption(),
                         "caption", image.getCaption() == null ? "" : image.getCaption()))
                 .toList());
         return value;

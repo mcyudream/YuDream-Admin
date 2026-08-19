@@ -22,8 +22,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -35,6 +38,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @RequiredArgsConstructor
 public class MilkyPluginMessagingService implements PluginMessagingService, PluginMessagingRawService {
+    /** 插件可用 [[wiki-image:1]] 这类标记把附件嵌入文本的指定位置；附件 title 与标记内容对应。 */
+    private static final Pattern INLINE_ATTACHMENT = Pattern.compile("\\[\\[([A-Za-z][A-Za-z0-9:_-]*)\\]\\]");
+
     private final MilkyConnectionRepo connectionRepo;
     private final MilkyApiGateway apiGateway;
     private final PluginUserService pluginUserService;
@@ -162,17 +168,70 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             case COMPOSITE -> Map.of("type", "forward", "data", compositeData(content.content()));
             default -> Map.of("type", "text", "data", Map.of("text", content.content()));
         };
-        List<Map<String, Object>> message = new java.util.ArrayList<>();
-        message.add(segment);
-        // 附件按类型渲染为同一条消息的后续分段（图片/语音/视频/文件），实现图文混排
+        List<Map<String, Object>> message = messageSegments(content, segment);
+        Map<String, Object> result = map(apiGateway.invoke(context(connection), api, Map.of(idKey, peer, "message", message)));
+        return new PluginMessageResult(List.of(String.valueOf(result.getOrDefault("message_seq", ""))), false, false);
+    }
+
+    /** 普通文本保持“正文 + 附件追加”的兼容行为；带标记文本则按标记位置内嵌附件。 */
+    private List<Map<String, Object>> messageSegments(PluginMessageContent content, Map<String, Object> baseSegment) {
+        if (content.type() != PluginMessageContent.Type.TEXT
+                || content.content() == null
+                || content.attachments().isEmpty()
+                || !INLINE_ATTACHMENT.matcher(content.content()).find()) {
+            List<Map<String, Object>> message = new java.util.ArrayList<>();
+            message.add(baseSegment);
+            for (PluginMessageContent.Attachment attachment : content.attachments()) {
+                Map<String, Object> attachmentSegment = attachmentSegment(attachment);
+                if (attachmentSegment != null) {
+                    message.add(attachmentSegment);
+                }
+            }
+            return message;
+        }
+
+        Map<String, PluginMessageContent.Attachment> byToken = new LinkedHashMap<>();
         for (PluginMessageContent.Attachment attachment : content.attachments()) {
+            if (attachment.title() != null && !attachment.title().isBlank()) {
+                byToken.putIfAbsent(attachment.title().trim(), attachment);
+            }
+        }
+        List<Map<String, Object>> message = new java.util.ArrayList<>();
+        LinkedHashSet<PluginMessageContent.Attachment> used = new LinkedHashSet<>();
+        Matcher matcher = INLINE_ATTACHMENT.matcher(content.content());
+        int cursor = 0;
+        while (matcher.find()) {
+            addTextSegment(message, content.content().substring(cursor, matcher.start()));
+            PluginMessageContent.Attachment attachment = byToken.get(matcher.group(1));
+            Map<String, Object> attachmentSegment = attachmentSegment(attachment);
+            if (attachmentSegment == null) {
+                addTextSegment(message, matcher.group());
+            }
+            else {
+                message.add(attachmentSegment);
+                used.add(attachment);
+            }
+            cursor = matcher.end();
+        }
+        addTextSegment(message, content.content().substring(cursor));
+        // 未被显式引用的附件仍追加到末尾，兼容既有“图文混排附件”语义。
+        for (PluginMessageContent.Attachment attachment : content.attachments()) {
+            if (used.contains(attachment)) {
+                continue;
+            }
             Map<String, Object> attachmentSegment = attachmentSegment(attachment);
             if (attachmentSegment != null) {
                 message.add(attachmentSegment);
             }
         }
-        Map<String, Object> result = map(apiGateway.invoke(context(connection), api, Map.of(idKey, peer, "message", message)));
-        return new PluginMessageResult(List.of(String.valueOf(result.getOrDefault("message_seq", ""))), false, false);
+        return message;
+    }
+
+    private void addTextSegment(List<Map<String, Object>> message, String text) {
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        message.add(Map.of("type", "text", "data", Map.of("text", text)));
     }
 
     /** 附件转消息分段：仅支持可内联的媒体类型，未知类型跳过 */
