@@ -101,7 +101,13 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             return;
         }
         PluginRuntimeHolder holder = createHolder(module);
-        holder.getPlugin().onLoad(holder.getContext());
+        try {
+            holder.getPlugin().onLoad(holder.getContext());
+        } catch (RuntimeException | Error e) {
+            holder.getContext().dispose();
+            closeClassLoader(holder.getClassLoader());
+            throw e;
+        }
         holders.put(module.getCode(), holder);
         log.info("Plugin loaded: code={}, jar={}", module.getCode(), module.getJarPath());
     }
@@ -119,7 +125,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             holder.getPlugin().onEnable(holder.getContext());
             holder.setEnabled(true);
             log.info("Plugin enabled: code={}", module.getCode());
-        } catch (RuntimeException e) {
+        } catch (RuntimeException | Error e) {
+            // JAR 损坏等情况会抛 ZipError 等非 RuntimeException，必须同样回滚已注册的菜单/指令等贡献，
+            // 否则残留注册会让后续重试永远报“插件指令编码重复”，只能重启 JVM 恢复
             holder.getContext().clearRuntimeContributions();
             throw e;
         }
@@ -363,23 +371,29 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 throw new BizException("插件编码不匹配：" + descriptor.code());
             }
             URLClassLoader classLoader = createClassLoader(jarPath, descriptor);
-            YuDreamPlugin plugin = instantiatePlugin(classLoader, descriptor);
-            return new PluginRuntimeHolder(
-                    classLoader,
-                    plugin,
-                    descriptor,
-                    new PluginContextImpl(
-                            module.getCode(),
-                            classLoader,
-                            frameworkServices,
-                            pluginServiceRegistry,
-                            declaredDependencies(descriptor),
-                            this::enabled,
-                            aiToolRegistry,
-                            semanticMemoryService,
-                            agentApplicationRegistry
-                    )
-            );
+            try {
+                YuDreamPlugin plugin = instantiatePlugin(classLoader, descriptor);
+                return new PluginRuntimeHolder(
+                        classLoader,
+                        plugin,
+                        descriptor,
+                        new PluginContextImpl(
+                                module.getCode(),
+                                classLoader,
+                                frameworkServices,
+                                pluginServiceRegistry,
+                                declaredDependencies(descriptor),
+                                this::enabled,
+                                aiToolRegistry,
+                                semanticMemoryService,
+                                agentApplicationRegistry
+                        )
+                );
+            } catch (RuntimeException | Error e) {
+                // 实例化失败时释放 ClassLoader，避免句柄泄漏在 Windows 下锁住插件 JAR
+                closeClassLoader(classLoader);
+                throw e;
+            }
         } catch (IOException e) {
             throw new BizException("插件 ClassLoader 创建失败：" + e.getMessage());
         }
