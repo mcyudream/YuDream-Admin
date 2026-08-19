@@ -59,6 +59,17 @@ public class WikiSourceRepoImpl implements WikiSourceRepo {
     }
 
     @Override
+    public List<WikiSource> findByImageFileObjectIds(Long spaceId, List<Long> fileObjectIds) {
+        if (spaceId == null || fileObjectIds == null || fileObjectIds.isEmpty()) {
+            return List.of();
+        }
+        return mongo.find(Query.query(Criteria.where("spaceId").is(spaceId)
+                        .and("images.fileObjectId").in(fileObjectIds)), WikiSourceDO.class).stream()
+                .map(WikiKnowledgeInfraMapper::source)
+                .toList();
+    }
+
+    @Override
     public Optional<WikiSource> findByContentHash(Long spaceId, String contentHash) {
         if (contentHash == null || contentHash.isBlank()) {
             return Optional.empty();
@@ -80,6 +91,7 @@ public class WikiSourceRepoImpl implements WikiSourceRepo {
             fieldCriteria.add(Criteria.where("title").regex(regex, "i"));
             fieldCriteria.add(Criteria.where("fileName").regex(regex, "i"));
             fieldCriteria.add(Criteria.where("extractedText").regex(regex, "i"));
+            fieldCriteria.add(Criteria.where("images.caption").regex(regex, "i"));
         }
         Criteria criteria = Criteria.where("spaceId").is(spaceId).orOperator(fieldCriteria.toArray(new Criteria[0]));
         Query query = Query.query(criteria).with(Sort.by(Sort.Direction.DESC, "createTime")).limit(Math.max(limit, 1));

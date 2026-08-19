@@ -241,7 +241,12 @@ public class WikiSearchAppService {
                 log.warn("向量检索失败，已回退到关键词检索：{}", exception.getMessage());
             }
         }
-        merged.addAll(publicKeywordHits(query, prefix, published, Math.clamp(topK * 2, 4, 30)));
+        Map<Long, String> generatedCaptions = generatedCaptionByFileId(space.getId(), published.values().stream()
+                .flatMap(page -> imageRefs(page.version().getMarkdown(), space.effectiveHitImageLimit()).stream())
+                .map(ImageRef::fileObjectId)
+                .filter(java.util.Objects::nonNull)
+                .toList());
+        merged.addAll(publicKeywordHits(query, prefix, published, Math.clamp(topK * 2, 4, 30), generatedCaptions));
         return dedup(merged);
     }
 
@@ -321,14 +326,16 @@ public class WikiSearchAppService {
     /**
      * 公开关键词召回：直接在已发布的版本 Markdown 上匹配 title/summary/body，不使用草稿关键词仓储。
      */
-    private List<WikiSearchHit> publicKeywordHits(String query, String prefix, Map<Long, PublishedPage> published, int limit) {
+    private List<WikiSearchHit> publicKeywordHits(String query, String prefix, Map<Long, PublishedPage> published, int limit,
+                                                  Map<Long, String> generatedCaptions) {
         List<WikiSearchHit> hits = new ArrayList<>();
         for (PublishedPage page : published.values()) {
             if (!matchesPathPrefix(page.path(), prefix)) {
                 continue;
             }
             WikiFrontmatter frontmatter = WikiFrontmatter.parse(page.version().getMarkdown());
-            double score = keywordScore(query, frontmatter);
+            String imageText = imageSearchText(page.version().getMarkdown(), generatedCaptions);
+            double score = keywordScore(query, frontmatter, imageText);
             if (score <= 0) {
                 continue;
             }
@@ -345,7 +352,7 @@ public class WikiSearchAppService {
     /**
      * 保守分词：按空白与标点拆分，保留中文整词/整短语；命中数越多分数越高，标题/摘要/正文依次降权。
      */
-    private double keywordScore(String query, WikiFrontmatter frontmatter) {
+    private double keywordScore(String query, WikiFrontmatter frontmatter, String imageText) {
         List<String> terms = tokenize(query);
         if (terms.isEmpty()) {
             return 0.0;
@@ -362,6 +369,11 @@ public class WikiSearchAppService {
         double body = fieldScore(frontmatter.bodyOnly(), terms, phrase);
         if (body > 0) {
             return 0.7 + body;
+        }
+        // 图片 alt 与视觉模型 caption 也参与检索；仅图片相关的页面可以作为图文候选交给回答模型判断。
+        double image = fieldScore(imageText, terms, phrase);
+        if (image > 0) {
+            return 0.65 + image;
         }
         return 0.0;
     }
@@ -555,7 +567,7 @@ public class WikiSearchAppService {
                 .path(hit.path())
                 .content(hit.content())
                 .sourceUrl(sourceUrl(space, hit.path()))
-                .images(extractImages(pageMarkdown, space.effectiveHitImageLimit()))
+                .images(extractImages(pageMarkdown, space.effectiveHitImageLimit(), space.getId()))
                 .build();
     }
 
@@ -564,20 +576,91 @@ public class WikiSearchAppService {
             "!\\[([^\\]]*)]\\(\\s*(/api/files/\\d+/content)(\\s+(?:\"[^\"]*\"|'[^']*'))?\\s*\\)");
 
     /** limit 来自知识库设置 hitImageLimit（effectiveHitImageLimit 已兜底默认 4、上限 12），0 表示不带图片 */
-    private List<WikiSearchHitDTO.Image> extractImages(String markdown, int limit) {
+    private List<WikiSearchHitDTO.Image> extractImages(String markdown, int limit, Long spaceId) {
+        List<ImageRef> refs = imageRefs(markdown, limit);
+        if (refs.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, String> generatedCaptions = generatedCaptionByFileId(spaceId, refs.stream()
+                .map(ImageRef::fileObjectId)
+                .filter(java.util.Objects::nonNull)
+                .toList());
+        return refs.stream()
+                .map(ref -> {
+                    String generated = generatedCaptions.getOrDefault(ref.fileObjectId(), "");
+                    String alt = ref.alt() == null ? "" : ref.alt().trim();
+                    return WikiSearchHitDTO.Image.builder()
+                            .url(ref.url())
+                            .alt(alt)
+                            .generatedCaption(generated)
+                            .caption(alt.isBlank() ? generated : alt)
+                            .build();
+                })
+                .toList();
+    }
+
+    private List<ImageRef> imageRefs(String markdown, int limit) {
         if (limit <= 0 || markdown == null || markdown.isBlank()) {
             return List.of();
         }
         Matcher matcher = PAGE_IMAGE.matcher(markdown);
-        List<WikiSearchHitDTO.Image> images = new ArrayList<>();
+        List<ImageRef> refs = new ArrayList<>();
         Set<String> seen = new HashSet<>();
-        while (matcher.find() && images.size() < limit) {
+        while (matcher.find() && refs.size() < limit) {
             String url = matcher.group(2);
             if (seen.add(url)) {
-                images.add(WikiSearchHitDTO.Image.builder().url(url).caption(matcher.group(1)).build());
+                refs.add(new ImageRef(url, matcher.group(1), fileObjectId(url)));
             }
         }
-        return images;
+        return refs;
+    }
+
+    private String imageSearchText(String markdown, Map<Long, String> generatedCaptions) {
+        return imageRefs(markdown, 12).stream()
+                .flatMap(ref -> java.util.stream.Stream.of(
+                        ref.alt() == null ? "" : ref.alt(),
+                        ref.fileObjectId() == null ? "" : generatedCaptions.getOrDefault(ref.fileObjectId(), "")))
+                .filter(value -> value != null && !value.isBlank())
+                .reduce("", (left, right) -> left + " " + right);
+    }
+
+    private Map<Long, String> generatedCaptionByFileId(Long spaceId, List<Long> fileObjectIds) {
+        if (spaceId == null || fileObjectIds == null || fileObjectIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, String> result = new LinkedHashMap<>();
+        sources.findByImageFileObjectIds(spaceId, fileObjectIds).forEach(source -> {
+            if (source.getImages() == null) {
+                return;
+            }
+            source.getImages().forEach(image -> {
+                if (image.fileObjectId() != null && image.caption() != null && !image.caption().isBlank()) {
+                    result.putIfAbsent(image.fileObjectId(), image.caption().trim());
+                }
+            });
+        });
+        return result;
+    }
+
+    private Long fileObjectId(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+        Matcher matcher = PAGE_IMAGE_FILE_ID.matcher(url);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(matcher.group(1));
+        }
+        catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private static final Pattern PAGE_IMAGE_FILE_ID = Pattern.compile("/api/files/(\\d+)/content");
+
+    private record ImageRef(String url, String alt, Long fileObjectId) {
     }
 
     private boolean hasEmbedding(WikiSpace space) {

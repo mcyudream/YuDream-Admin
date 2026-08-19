@@ -195,6 +195,14 @@
     {
       "key": "chat-wiki-permission-snapshot",
       "text": "聊天从前端接收 Wiki slug/all 时，必须在任何空间枚举、检索或目录读取前校验服务端捕获的 Wiki 查看权限快照；聊天目录兜底只能物化已发布版本，禁止复用可能返回 markdownDraft 的管理目录接口。"
+    },
+    {
+      "key": "workflow-map-missing-field",
+      "text": "Agent workflow variables from model/tool JSON are dynamic maps. Template rendering must treat missing map fields as empty values, and workflow templates should use safe navigation for optional model fields, so optional intent metadata cannot abort the whole run."
+    },
+    {
+      "key": "plugin-inline-message-attachments",
+      "text": "QQ/plugin rich replies should let the answer model select image candidates with an indexed placeholder such as [[wiki-image:1]]. The plugin resolves only selected placeholders to attachments, and the messaging adapter interleaves text/image segments by attachment title instead of appending every retrieved image."
     }
   ],
   "utilities": [

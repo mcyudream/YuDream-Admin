@@ -13,6 +13,7 @@ import org.springframework.util.StringUtils;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 公开站点的原生 Agent 工具：wiki.search。
@@ -43,7 +44,8 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
         return new AiAgentToolDescriptor(
                 TOOL_NAME,
                 "Wiki 公开检索",
-                "在公开 Wiki 知识库中检索已发布页面（关键词 + 可选向量/图谱），返回带来源的页面片段。"
+                "在公开 Wiki 知识库中检索已发布页面（关键词 + 可选向量/图谱），返回带来源的页面片段；"
+                        + "命中图片会同时携带全局 index、url、原文 alt、视觉模型 generatedCaption 与兼容 caption。"
                         + "公开检索不读取原始资料，sourceGrounded 参数会被忽略并强制为 false。",
                 PERMISSION_CODE,
                 "AI 检索公开 Wiki",
@@ -82,11 +84,14 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("spaceSlug", slug);
         payload.put("query", query);
-        payload.put("hits", hits.stream().map(this::hit).toList());
+        // count 供工作流条件节点直接数值比较；公开工具与管理工具保持同一 payload 契约。
+        payload.put("count", hits.size());
+        AtomicInteger imageIndex = new AtomicInteger(1);
+        payload.put("hits", hits.stream().map(hit -> hit(hit, imageIndex)).toList());
         return new AiAgentToolResult(TOOL_NAME, "search", PERMISSION_CODE, "检索到 " + hits.size() + " 条结果。", payload);
     }
 
-    private Map<String, Object> hit(WikiSearchHitDTO hit) {
+    private Map<String, Object> hit(WikiSearchHitDTO hit, AtomicInteger imageIndex) {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("score", hit.getScore());
         value.put("kind", hit.getKind());
@@ -99,7 +104,10 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
         value.put("content", truncate(hit.getContent(), excerptLimit(hit.getKind())));
         value.put("sourceUrl", hit.getSourceUrl());
         value.put("images", hit.getImages() == null ? List.of() : hit.getImages().stream()
-                .map(image -> Map.of("url", image.getUrl() == null ? "" : image.getUrl(),
+                .map(image -> Map.of("index", imageIndex.getAndIncrement(),
+                        "url", image.getUrl() == null ? "" : image.getUrl(),
+                        "alt", image.getAlt() == null ? "" : image.getAlt(),
+                        "generatedCaption", image.getGeneratedCaption() == null ? "" : image.getGeneratedCaption(),
                         "caption", image.getCaption() == null ? "" : image.getCaption()))
                 .toList());
         return value;

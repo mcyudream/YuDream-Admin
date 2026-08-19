@@ -70,8 +70,8 @@ export interface WikiSearchHit {
   sourceUrl?: string
   spaceSlug?: string
   spaceName?: string
-  /** 命中页面正文引用的站内图片 */
-  images?: { url?: string, caption?: string }[]
+  /** 命中页面正文引用的站内图片；alt 是原文图注，generatedCaption 是视觉模型描述 */
+  images?: { index?: number, url?: string, alt?: string, generatedCaption?: string, caption?: string }[]
 }
 
 export interface WikiIndexSnapshot {
