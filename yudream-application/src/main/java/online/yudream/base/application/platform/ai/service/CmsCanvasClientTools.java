@@ -22,8 +22,11 @@ public final class CmsCanvasClientTools {
     /** 按一次运行绑定桥，产出可直接进入模型工具循环的工具实例。 */
     public static List<AiAgentTool> bind(CmsCanvasClientBridge bridge) {
         return List.of(
-                tool(bridge, "cms.canvas.get_outline", "读取画布结构纲要", "读取当前画布组件树纲要（节点 id、标签、类名、文本摘要、子节点数），动手改之前先读它", Map.of(
-                        "maxDepth", "可选，纲要最大深度，默认 6")),
+                tool(bridge, "cms.canvas.get_outline", "分段读取画布资源", "按资源类型和游标分段读取当前画布。resource=html 返回 HTML 组件纲要，resource=css 返回 CSS 行，resource=js 返回页面 JS 行；每次读取后根据 nextCursor/hasMore 继续调用，动手修改前先读取相关资源", Map.of(
+                        "resource", "可选：html（默认）、css、js",
+                        "cursor", "可选：分段游标，首次为 0，使用上次返回的 nextCursor",
+                        "limit", "可选：html 为节点数、css/js 为行数，默认 60/120",
+                        "maxDepth", "可选：HTML 纲要最大深度，默认 6")),
                 tool(bridge, "cms.canvas.get_selected", "读取当前选中元素", "读取用户在画布上当前选中元素的 id、标签、类名、样式与文本；未选中时返回空", Map.of()),
                 tool(bridge, "cms.canvas.find", "查找组件", "按 CSS 选择器或包含文本查找画布组件，返回匹配的组件 id 列表与摘要", Map.of(
                         "selector", "可选，CSS 选择器，如 .yb-ai-hero、section 等",

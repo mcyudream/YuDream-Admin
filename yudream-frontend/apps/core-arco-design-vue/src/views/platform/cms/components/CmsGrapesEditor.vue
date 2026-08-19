@@ -520,6 +520,8 @@ const V2_CANVAS_TOOL_NAMES = new Set([
 
 function canvasToolExecOptions(): CanvasToolExecOptions {
   return {
+    getCss: fullCanvasCss,
+    getJs: () => stripScriptTags(pageJsContent.value),
     appendCss: appendCanvasCss,
     appendDefault: (html) => {
       if (props.chromeFrame) {
@@ -1418,17 +1420,15 @@ function buildAiPayload(prompt: string, attachments: YdChatAttachment[] = [], hi
   }
 }
 
-/** 生成给模型的画布结构纲要（深度 4，作为初始上下文；后续由模型用工具按需读取） */
+/** 初始请求只提供轻量统计，HTML/CSS/JS 由模型通过 get_outline 的 resource/cursor 分段读取。 */
 function canvasOutlineForPrompt(): string {
   if (!editor) {
     return ''
   }
   try {
-    const outline = executeCanvasTool(editor, 'cms.canvas.get_outline', { maxDepth: 4 }, {
-      appendCss: () => {},
-      appendDefault: () => [],
-    })
-    return JSON.stringify(outline.nodes ?? [])
+    const wrapper = editor.getWrapper()
+    const rootCount = wrapper?.components().length || 0
+    return JSON.stringify({ resource: 'html', message: '请先使用 cms.canvas.get_outline 分段读取 HTML 纲要；CSS/JS 需按资源类型分别读取', rootCount })
   }
   catch {
     return ''

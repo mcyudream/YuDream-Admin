@@ -6,6 +6,10 @@ import type { Component, Editor } from 'grapesjs'
  */
 
 export interface CanvasToolExecOptions {
+  /** 读取画布完整 CSS，供 get_outline(resource=css) 分页返回 */
+  getCss?: () => string
+  /** 读取页面 JS，供 get_outline(resource=js) 分页返回 */
+  getJs?: () => string
   /** 追加 scoped CSS 到画布样式 */
   appendCss: (css: string) => void
   /** 无定位目标时的默认插入（普通页面追加到末尾；首页画布追加到 Header/Footer 之间的内容区） */
@@ -28,7 +32,7 @@ export function executeCanvasTool(
 ): Record<string, unknown> {
   switch (toolName) {
     case 'cms.canvas.get_outline':
-      return getOutline(editor, args)
+      return getOutline(editor, args, opts)
     case 'cms.canvas.get_selected':
       return getSelected(editor)
     case 'cms.canvas.find':
@@ -69,27 +73,80 @@ interface OutlineNode {
   truncated?: boolean
 }
 
-function getOutline(editor: Editor, args: Record<string, unknown>): Record<string, unknown> {
+function getOutline(editor: Editor, args: Record<string, unknown>, opts: CanvasToolExecOptions): Record<string, unknown> {
+  const resource = typeof args.resource === 'string' ? args.resource.trim().toLowerCase() : 'html'
+  const cursor = Math.max(0, Number(args.cursor) || 0)
+  const limit = Math.min(120, Math.max(1, Number(args.limit) || (resource === 'html' ? 60 : 120)))
+  if (resource === 'css' || resource === 'js') {
+    return getTextResource(resource, resource === 'css' ? (opts.getCss?.() || '') : (opts.getJs?.() || ''), cursor, limit)
+  }
+  if (resource !== 'html') {
+    throw new Error('get_outline 的 resource 只能是 html、css 或 js')
+  }
+  return getHtmlOutlinePage(editor, args, cursor, limit)
+}
+
+function getTextResource(resource: 'css' | 'js', source: string, cursor: number, limit: number): Record<string, unknown> {
+  const lines = source.replace(/\r\n/g, '\n').split('\n')
+  const page = lines.slice(cursor, cursor + limit)
+  const nextCursor = cursor + page.length
+  return {
+    message: page.length ? `已读取 ${resource.toUpperCase()} 第 ${cursor + 1}-${nextCursor} 行` : `${resource.toUpperCase()} 已读取完毕`,
+    resource,
+    cursor,
+    nextCursor: nextCursor < lines.length ? nextCursor : null,
+    hasMore: nextCursor < lines.length,
+    startLine: page.length ? cursor + 1 : null,
+    endLine: page.length ? nextCursor : null,
+    totalLines: lines.length,
+    content: page.join('\n'),
+  }
+}
+
+function getHtmlOutlinePage(editor: Editor, args: Record<string, unknown>, cursor: number, limit: number): Record<string, unknown> {
   const maxDepth = Math.max(1, Number(args.maxDepth) || 6)
-  const state = { count: 0, truncated: false }
   const wrapper = editor.getWrapper()
   if (!wrapper) {
-    return { message: '画布为空', nodes: [] }
+    return { message: '画布为空', resource: 'html', cursor, nextCursor: null, hasMore: false, nodeCount: 0, nodes: [] }
   }
-  const rootChildren = wrapper.components().map(child => child)
-  const nodes: OutlineNode[] = []
-  for (const child of rootChildren) {
-    if (state.count >= OUTLINE_NODE_CAP) {
-      state.truncated = true
-      break
-    }
-    nodes.push(outlineNode(child, 1, maxDepth, state))
-  }
+  const allNodes: Array<OutlineNode & { depth: number, parentId?: string }> = []
+  const state = { truncated: false }
+  collectOutlineNodes(wrapper.components().map(child => child), 1, maxDepth, undefined, allNodes, state)
+  const page = allNodes.slice(cursor, cursor + limit)
+  const nextCursor = cursor + page.length
   return {
-    message: state.truncated ? `纲要已生成（部分层级已截断，最多返回 ${OUTLINE_NODE_CAP} 个节点）` : '纲要已生成',
-    nodeCount: state.count,
+    message: state.truncated ? `已读取 HTML 纲要第 ${cursor + 1}-${nextCursor} 个节点（结果已限制规模）` : page.length ? `已读取 HTML 纲要第 ${cursor + 1}-${nextCursor} 个节点` : 'HTML 纲要已读取完毕',
+    resource: 'html',
+    cursor,
+    nextCursor: nextCursor < allNodes.length ? nextCursor : null,
+    hasMore: nextCursor < allNodes.length,
+    nodeCount: allNodes.length,
     truncated: state.truncated,
-    nodes,
+    nodes: page,
+  }
+}
+
+function collectOutlineNodes(
+  components: Component[],
+  depth: number,
+  maxDepth: number,
+  parentId: string | undefined,
+  output: Array<OutlineNode & { depth: number, parentId?: string }>,
+  state: { truncated: boolean },
+) {
+  for (const component of components) {
+    if (output.length >= OUTLINE_NODE_CAP) {
+      state.truncated = true
+      return
+    }
+    const node = outlineNodeSummary(component)
+    output.push({ ...node, depth, ...(parentId ? { parentId } : {}) })
+    if (depth < maxDepth && component.components().length) {
+      collectOutlineNodes(component.components().map(child => child), depth + 1, maxDepth, node.id, output, state)
+      if (state.truncated) {
+        return
+      }
+    }
   }
 }
 
@@ -118,38 +175,17 @@ function classesOf(component: Component): string[] {
   return []
 }
 
-function outlineNode(component: Component, depth: number, maxDepth: number, state: { count: number, truncated: boolean }): OutlineNode {
-  state.count += 1
+function outlineNodeSummary(component: Component): OutlineNode {
   const node: OutlineNode = {
     id: component.getId(),
     tag: tagNameOf(component),
     type: String(component.get('type') || ''),
     classes: classesOf(component),
+    childCount: component.components().length,
   }
   const text = textExcerpt(component)
   if (text) {
     node.text = text
-  }
-  const children = component.components()
-  node.childCount = children.length
-  if (depth < maxDepth && children.length) {
-    const childNodes: OutlineNode[] = []
-    const childModels = children.map(child => child)
-    for (const child of childModels) {
-      if (state.count >= OUTLINE_NODE_CAP) {
-        state.truncated = true
-        node.truncated = true
-        break
-      }
-      childNodes.push(outlineNode(child, depth + 1, maxDepth, state))
-    }
-    if (childNodes.length) {
-      node.children = childNodes
-    }
-  }
-  else if (children.length) {
-    node.truncated = true
-    state.truncated = true
   }
   return node
 }
