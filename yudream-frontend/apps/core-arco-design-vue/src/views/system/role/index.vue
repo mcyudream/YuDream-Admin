@@ -377,13 +377,12 @@ function importRoles() {
               <div class="permission-title">
                 {{ module }}
               </div>
-              <a-checkbox-group v-model="form.permissions">
-                <a-space wrap>
-                  <a-checkbox v-for="item in items" :key="item.code" :value="item.code">
-                    {{ item.name }}
-                  </a-checkbox>
-                </a-space>
-              </a-checkbox-group>
+              <FaCheckboxGroup
+                :model-value="form.permissions"
+                :options="items.map(item => ({ label: item.name, value: item.code }))"
+                class="flex flex-wrap gap-3"
+                @update:model-value="value => (form.permissions = value as string[])"
+              />
             </div>
           </div>
         </a-form-item>
