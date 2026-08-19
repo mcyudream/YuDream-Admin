@@ -109,6 +109,8 @@ export interface YdChatMessage {
   activities?: YdChatActivity[]
   actions?: YdChatAction[]
   attachments?: YdChatAttachment[]
+  /** 业务侧可恢复上下文（如 CMS 澄清选项、资源分页状态） */
+  context?: Record<string, unknown>
   /** 错误气泡 */
   error?: boolean
   /** 生成中（已占位的 assistant 消息，等待或正在流式输出） */
@@ -184,7 +186,33 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     return messages.value
       .filter(item => !item.error && !item.pending)
       .slice(-limit)
-      .map(item => ({role: item.role, content: item.content}))
+      .map(item => ({role: item.role, content: historyContent(item)}))
+  }
+
+  /** 将工具分页游标和澄清上下文带入下一轮，同时限制历史膨胀。 */
+  function historyContent(message: YdChatMessage): string {
+    const sections = [message.content]
+    const tools = message.tools?.filter(tool => tool.status === 'complete' || tool.status === 'error') || []
+    if (tools.length) {
+      const toolText = tools.map((tool) => {
+        const payload = tool.payload || {}
+        const compactPayload: Record<string, unknown> = {}
+        for (const key of ['resource', 'cursor', 'nextCursor', 'hasMore', 'startLine', 'endLine', 'totalLines', 'nodeCount', 'truncated', 'message', 'error']) {
+          if (payload[key] !== undefined) {
+            compactPayload[key] = payload[key]
+          }
+        }
+        if (typeof payload.content === 'string') {
+          compactPayload.content = payload.content.slice(0, 4000)
+        }
+        return `${tool.toolName || 'tool'}: ${tool.message || ''} ${JSON.stringify(compactPayload)}`.trim()
+      }).join('\n')
+      sections.push(`[工具上下文]\n${toolText}`)
+    }
+    if (message.context && Object.keys(message.context).length) {
+      sections.push(`[业务上下文]\n${JSON.stringify(message.context)}`)
+    }
+    return sections.filter(Boolean).join('\n\n')
   }
 
   async function send(text: string, attachments?: YdChatAttachment[]): Promise<void> {

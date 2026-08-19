@@ -217,6 +217,9 @@ defineExpose({ scrollToBottom })
               {{ action.label }}
             </button>
           </div>
+
+          <!-- 业务侧可将澄清选项等交互内容放在对应 assistant 消息下，而不是固定在输入区。 -->
+          <slot name="message-extra" :message="message" :index="index" />
         </div>
       </div>
     </template>

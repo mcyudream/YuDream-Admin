@@ -357,7 +357,11 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
         compact
         @copy-message="onCopy"
         @regenerate-message="onRegenerate"
-      />
+      >
+        <template #message-extra="slotProps">
+          <slot name="message-extra" v-bind="slotProps" />
+        </template>
+      </YdChatMessageList>
 
       <transition name="yd-agent-chat-fade">
         <div v-if="sessionStore && sessionDrawerOpen" class="yd-agent-chat__drawer">
