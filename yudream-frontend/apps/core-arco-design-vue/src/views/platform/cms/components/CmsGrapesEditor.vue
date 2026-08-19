@@ -3218,8 +3218,8 @@ function selectBreadcrumb(component: any) {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
-  color: #1f2937;
-  background: #eef1f5;
+  color: var(--color-text-1);
+  background: var(--color-fill-2);
 }
 
 .grapes-header,
@@ -3239,8 +3239,8 @@ function selectBreadcrumb(component: any) {
   min-height: 54px;
   gap: 12px;
   padding: 7px 10px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fff;
+  border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
@@ -3258,7 +3258,7 @@ function selectBreadcrumb(component: any) {
   width: 34px;
   height: 34px;
   border-radius: 7px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
   color: #fff !important;
   font-size: 17px !important;
   place-items: center;
@@ -3270,7 +3270,7 @@ function selectBreadcrumb(component: any) {
 }
 
 .grapes-header span {
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 12px;
 }
 
@@ -3297,24 +3297,24 @@ function selectBreadcrumb(component: any) {
   align-items: center;
   gap: 4px;
   padding: 4px 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-2);
   border-radius: 6px;
-  background: #fff;
-  color: #475569;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
   font-size: 11px;
   cursor: pointer;
 }
 
 .grapes-header__breadcrumbs button:hover {
-  border-color: #0f766e;
-  color: #0f766e;
-  background: #f0fdfa;
+  border-color: rgb(var(--primary-6));
+  color: rgb(var(--primary-6));
+  background: rgb(var(--primary-1));
 }
 
 .grapes-header__breadcrumbs button:not(:last-child)::after {
   content: '/';
   margin-left: 4px;
-  color: #cbd5e1;
+  color: var(--color-text-3);
 }
 
 .grapes-header__zoom {
@@ -3327,9 +3327,9 @@ function selectBreadcrumb(component: any) {
   align-items: center;
   gap: 2px;
   padding: 3px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border-2);
   border-radius: 7px;
-  background: #f8fafc;
+  background: var(--color-fill-1);
 }
 
 .workbench-icon-button,
@@ -3343,7 +3343,7 @@ function selectBreadcrumb(component: any) {
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: #526176;
+  color: var(--color-text-2);
   font-size: 15px;
   line-height: 1;
   place-items: center;
@@ -3355,8 +3355,8 @@ function selectBreadcrumb(component: any) {
 .workbench-device-switch button:hover,
 .workbench-device-switch button.active,
 .workbench-icon-button.active {
-  background: #fff;
-  color: #0f766e;
+  background: var(--color-bg-2);
+  color: rgb(var(--primary-6));
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
@@ -3371,22 +3371,22 @@ function selectBreadcrumb(component: any) {
 
 .workbench-zoom-value {
   width: 46px;
-  color: #334155;
+  color: var(--color-text-1);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .block-panel {
-  --yb-block-bg: #fff;
-  --yb-block-bg-hover: #fff;
-  --yb-block-border: #e5e7eb;
-  --yb-block-border-hover: #0f766e;
-  --yb-block-text: #334155;
-  --yb-block-text-hover: #0f766e;
-  --yb-block-muted: #64748b;
-  --yb-block-bg-2: #f8fafc;
-  --yb-primary: #0f766e;
-  --yb-primary-soft: #ecfdf5;
+  --yb-block-bg: var(--color-bg-2);
+  --yb-block-bg-hover: var(--color-bg-2);
+  --yb-block-border: var(--color-border-2);
+  --yb-block-border-hover: rgb(var(--primary-6));
+  --yb-block-text: var(--color-text-1);
+  --yb-block-text-hover: rgb(var(--primary-6));
+  --yb-block-muted: var(--color-text-3);
+  --yb-block-bg-2: var(--color-fill-1);
+  --yb-primary: rgb(var(--primary-6));
+  --yb-primary-soft: rgb(var(--primary-1));
   --yb-star: #f59e0b;
 
   display: grid;
@@ -3394,16 +3394,16 @@ function selectBreadcrumb(component: any) {
 }
 
 :global(.dark) .block-panel {
-  --yb-block-bg: #1e293b;
-  --yb-block-bg-hover: #1e293b;
-  --yb-block-border: #334155;
-  --yb-block-border-hover: #2dd4bf;
-  --yb-block-text: #e2e8f0;
-  --yb-block-text-hover: #2dd4bf;
-  --yb-block-muted: #94a3b8;
-  --yb-block-bg-2: #0f172a;
-  --yb-primary: #2dd4bf;
-  --yb-primary-soft: #134e4a;
+  --yb-block-bg: var(--color-bg-2);
+  --yb-block-bg-hover: var(--color-bg-2);
+  --yb-block-border: var(--color-border-3);
+  --yb-block-border-hover: rgb(var(--primary-6));
+  --yb-block-text: var(--color-text-1);
+  --yb-block-text-hover: rgb(var(--primary-6));
+  --yb-block-muted: var(--color-text-3);
+  --yb-block-bg-2: var(--color-fill-1);
+  --yb-primary: rgb(var(--primary-6));
+  --yb-primary-soft: rgb(var(--primary-1));
   --yb-star: #fbbf24;
 }
 
@@ -3441,11 +3441,11 @@ function selectBreadcrumb(component: any) {
 .block-panel__search:focus {
   border-color: var(--yb-primary);
   background: var(--yb-block-bg);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+  box-shadow: 0 0 0 3px rgb(var(--primary-6) / 0.12);
 }
 
 :global(.dark) .block-panel__search:focus {
-  box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.15);
+  box-shadow: 0 0 0 3px rgb(var(--primary-6) / 0.25);
 }
 
 .block-panel__tabs {
@@ -3722,7 +3722,7 @@ function selectBreadcrumb(component: any) {
   width: min(100%, 400px);
   padding: 20px;
   border-radius: 14px;
-  background: #fff;
+  background: var(--color-bg-2);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
 }
 
@@ -3735,7 +3735,7 @@ function selectBreadcrumb(component: any) {
   display: grid;
   gap: 6px;
   font-size: 12px;
-  color: #475569;
+  color: var(--color-text-2);
 }
 
 .save-block-modal__field input,
@@ -3743,10 +3743,10 @@ function selectBreadcrumb(component: any) {
 .save-block-modal__field textarea {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-2);
   border-radius: 8px;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
   font-size: 13px;
   outline: none;
 }
@@ -3754,8 +3754,8 @@ function selectBreadcrumb(component: any) {
 .save-block-modal__field input:focus,
 .save-block-modal__field select:focus,
 .save-block-modal__field textarea:focus {
-  border-color: #0f766e;
-  background: #fff;
+  border-color: rgb(var(--primary-6));
+  background: var(--color-bg-2);
 }
 
 .save-block-modal__actions {
@@ -3795,8 +3795,8 @@ function selectBreadcrumb(component: any) {
   min-width: 0;
   overflow: auto;
   padding: 12px;
-  border-color: #e5e7eb;
-  background: #fff;
+  border-color: var(--color-border-2);
+  background: var(--color-bg-2);
 }
 
 .grapes-sidebar.collapsed {
@@ -3830,7 +3830,7 @@ function selectBreadcrumb(component: any) {
   gap: 3px;
   padding: 3px;
   border-radius: 7px;
-  background: #f1f5f9;
+  background: var(--color-fill-2);
 }
 
 .left-workspace-tabs button {
@@ -3843,14 +3843,14 @@ function selectBreadcrumb(component: any) {
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 12px;
   cursor: pointer;
 }
 
 .left-workspace-tabs button.active {
-  background: #fff;
-  color: #0f766e;
+  background: var(--color-bg-2);
+  color: rgb(var(--primary-6));
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
@@ -3870,11 +3870,11 @@ function selectBreadcrumb(component: any) {
 }
 
 .sidebar-collapse-button {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border-2);
 }
 
 .grapes-sidebar.left {
-  border-right: 1px solid #e5e7eb;
+  border-right: 1px solid var(--color-border-2);
 }
 
 .grapes-sidebar.right {
@@ -3882,7 +3882,7 @@ function selectBreadcrumb(component: any) {
   align-content: stretch;
   gap: 10px;
   overflow: hidden;
-  border-left: 1px solid #e5e7eb;
+  border-left: 1px solid var(--color-border-2);
 }
 
 .grapes-sidebar section {
@@ -3900,8 +3900,8 @@ function selectBreadcrumb(component: any) {
   grid-template-rows: minmax(0, 1fr) 28px;
   min-width: 0;
   min-height: 0;
-  background: #eef1f6;
-  background-image: radial-gradient(circle, #d5dce6 1px, transparent 1px);
+  background: var(--color-fill-1);
+  background-image: radial-gradient(circle, var(--color-fill-3) 1px, transparent 1px);
   background-size: 22px 22px;
 }
 
@@ -3916,9 +3916,9 @@ function selectBreadcrumb(component: any) {
   gap: 16px;
   min-width: 0;
   padding: 0 12px;
-  border-top: 1px solid #dbe2ea;
-  background: #fff;
-  color: #64748b;
+  border-top: 1px solid var(--color-border-2);
+  background: var(--color-bg-2);
+  color: var(--color-text-3);
   font-size: 11px;
 }
 
@@ -3936,7 +3936,7 @@ function selectBreadcrumb(component: any) {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #94a3b8;
+  background: var(--color-fill-4);
 }
 
 .canvas-statusbar i.ready {
@@ -3945,7 +3945,7 @@ function selectBreadcrumb(component: any) {
 
 .canvas-statusbar-hint {
   margin-left: auto;
-  color: #a3adbb;
+  color: var(--color-text-3);
 }
 
 .media-head {
@@ -3958,7 +3958,7 @@ function selectBreadcrumb(component: any) {
 }
 
 .media-head span {
-  color: #94a3b8;
+  color: var(--color-text-3);
   font-size: 11px;
 }
 
@@ -3971,9 +3971,9 @@ function selectBreadcrumb(component: any) {
 .media-grid button {
   overflow: hidden;
   aspect-ratio: 1;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-2);
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--color-fill-1);
 }
 
 .media-grid img {
@@ -3987,9 +3987,9 @@ function selectBreadcrumb(component: any) {
   grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
   gap: 4px;
   padding: 4px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  background: #f8fafc;
+  background: var(--color-fill-1);
 }
 
 .right-sidebar-head {
@@ -4016,14 +4016,14 @@ function selectBreadcrumb(component: any) {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 12px;
   cursor: pointer;
 }
 
 .right-tabs button.active {
-  background: #fff;
-  color: #0f766e;
+  background: var(--color-bg-2);
+  color: rgb(var(--primary-6));
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
@@ -4077,7 +4077,7 @@ function selectBreadcrumb(component: any) {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: #475569;
+  color: var(--color-text-2);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -4085,13 +4085,13 @@ function selectBreadcrumb(component: any) {
 
 .ai-agent-select-trigger:hover,
 .ai-agent-select-trigger.open {
-  background: #f1f5f9;
-  color: #0f172a;
+  background: var(--color-fill-2);
+  color: var(--color-text-1);
 }
 
 .ai-agent-select-icon {
   flex-shrink: 0;
-  color: #94a3b8;
+  color: var(--color-text-3);
   font-size: 14px;
 }
 
@@ -4106,7 +4106,7 @@ function selectBreadcrumb(component: any) {
 
 .ai-agent-select-caret {
   flex-shrink: 0;
-  color: #94a3b8;
+  color: var(--color-text-3);
   font-size: 14px;
   transition: transform 0.15s;
 }
@@ -4124,9 +4124,9 @@ function selectBreadcrumb(component: any) {
   left: 0;
   max-height: 280px;
   padding: 4px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  background: #fff;
+  background: var(--color-bg-2);
   overflow-y: auto;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
 }
@@ -4140,7 +4140,7 @@ function selectBreadcrumb(component: any) {
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #334155;
+  color: var(--color-text-1);
   font: inherit;
   font-size: 12px;
   text-align: left;
@@ -4148,11 +4148,11 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-agent-pop-item:hover {
-  background: #f1f5f9;
+  background: var(--color-fill-2);
 }
 
 .ai-agent-pop-item.active {
-  color: #0f172a;
+  color: var(--color-text-1);
   font-weight: 500;
 }
 
@@ -4166,7 +4166,7 @@ function selectBreadcrumb(component: any) {
 
 .ai-agent-pop-item-check {
   flex-shrink: 0;
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 13px;
 }
 
@@ -4176,8 +4176,8 @@ function selectBreadcrumb(component: any) {
   gap: 2px 10px;
   overflow: hidden;
   padding: 6px 2px 0;
-  border-top: 1px solid #f1f5f9;
-  color: #94a3b8;
+  border-top: 1px solid var(--color-border-1);
+  color: var(--color-text-3);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -4236,13 +4236,13 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-panel :deep(.yd-sender__composer) {
-  border-color: #e5e7eb;
+  border-color: var(--color-border-2);
   border-radius: 12px;
   box-shadow: none;
 }
 
 .ai-panel :deep(.yd-sender__composer.is-focused) {
-  border-color: #cbd5e1;
+  border-color: var(--color-border-3);
   box-shadow: none;
 }
 
@@ -4318,7 +4318,7 @@ function selectBreadcrumb(component: any) {
   display: block;
   max-width: 190px;
   overflow: hidden;
-  color: #64748b;
+  color: var(--color-text-3);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 11px;
   text-overflow: ellipsis;
@@ -4365,13 +4365,13 @@ function selectBreadcrumb(component: any) {
 }
 
 .source-editor-section__head strong {
-  color: #0f172a;
+  color: var(--color-text-1);
   font-size: 12px;
 }
 
 .source-editor-section__head span {
   overflow: hidden;
-  color: #94a3b8;
+  color: var(--color-text-3);
   font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4385,7 +4385,7 @@ function selectBreadcrumb(component: any) {
 
 .source-panel__status {
   min-height: 20px;
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 12px;
 }
 
@@ -4399,7 +4399,7 @@ function selectBreadcrumb(component: any) {
   align-items: center;
   gap: 6px;
   margin-left: auto;
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -4423,10 +4423,10 @@ function selectBreadcrumb(component: any) {
   gap: 6px;
   padding: 7px 10px;
   overflow: hidden;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border-2);
   border-radius: 999px;
-  background: #fff;
-  color: #475569;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4435,16 +4435,16 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-suggestions button:hover {
-  border-color: #cbd5e1;
-  color: #0f172a;
+  border-color: var(--color-border-3);
+  color: var(--color-text-1);
 }
 
 .ai-ask {
   padding: 12px;
   margin-bottom: 8px;
-  border: 1px solid #dbeafe;
+  border: 1px solid rgb(var(--primary-2));
   border-radius: 14px;
-  background: rgba(239, 246, 255, 0.9);
+  background: rgb(var(--primary-1));
 }
 
 .ai-ask--message {
@@ -4464,17 +4464,17 @@ function selectBreadcrumb(component: any) {
   gap: 3px;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid #bfdbfe;
+  border: 1px solid rgb(var(--primary-2));
   border-radius: 10px;
-  background: #fff;
-  color: #1e3a8a;
+  background: var(--color-bg-2);
+  color: rgb(var(--primary-7));
   text-align: left;
   cursor: pointer;
 }
 
 .ai-ask-options button:hover {
-  border-color: #60a5fa;
-  background: #eff6ff;
+  border-color: rgb(var(--primary-4));
+  background: rgb(var(--primary-1));
 }
 
 .ai-ask-options strong,
@@ -4489,26 +4489,26 @@ function selectBreadcrumb(component: any) {
 }
 
 .ai-ask-options span {
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 11px;
 }
 
 
 :deep(.gjs-one-bg) {
-  background-color: #fff;
+  background-color: var(--color-bg-2);
 }
 
 :deep(.gjs-two-color) {
-  color: #475569;
+  color: var(--color-text-2);
 }
 
 :deep(.gjs-three-bg) {
-  background-color: #f8fafc;
+  background-color: var(--color-fill-1);
 }
 
 :deep(.gjs-four-color),
 :deep(.gjs-four-color-h:hover) {
-  color: #0f766e;
+  color: rgb(var(--primary-6));
 }
 
 :deep(.gjs-editor),
@@ -4520,8 +4520,8 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-sm-sectors),
 :deep(.gjs-layers),
 :deep(.gjs-traits) {
-  background: #fff;
-  color: #0f172a;
+  background: var(--color-bg-2);
+  color: var(--color-text-1);
 }
 
 /* 我们的区块/图层面板全部外置，GrapesJS 默认 CSS 给画布预留的 15% 右栏与底部 40px 是纯死区，
@@ -4567,9 +4567,9 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-sm-sector),
 :deep(.gjs-layer),
 :deep(.gjs-trt-trait) {
-  border-color: #e5e7eb;
-  background: #fff;
-  color: #0f172a;
+  border-color: var(--color-border-2);
+  background: var(--color-bg-2);
+  color: var(--color-text-1);
 }
 
 :deep(.gjs-block-category .gjs-title),
@@ -4577,14 +4577,14 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-trt-header),
 :deep(.gjs-layer-title) {
   border-radius: 6px;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
   font-weight: 700;
 }
 
 :deep(.gjs-sm-sector) {
   border: 0;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--color-border-2);
 }
 
 :deep(.gjs-sm-sector .gjs-sm-sector-title),
@@ -4594,7 +4594,7 @@ function selectBreadcrumb(component: any) {
   padding: 9px 10px;
   border: 0;
   border-radius: 0;
-  background: #f8fafc;
+  background: var(--color-fill-1);
   font-size: 12px;
   letter-spacing: 0;
 }
@@ -4613,7 +4613,7 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-sm-label),
 :deep(.gjs-trt-trait .gjs-label) {
   margin-bottom: 4px;
-  color: #64748b;
+  color: var(--color-text-3);
   font-size: 11px;
 }
 
@@ -4621,34 +4621,34 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-input-holder),
 :deep(.gjs-select) {
   min-height: 32px;
-  border: 1px solid #dfe5ec;
+  border: 1px solid var(--color-border-2);
   border-radius: 6px;
   box-shadow: none;
 }
 
 :deep(.gjs-layer) {
   min-height: 34px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border-1);
 }
 
 :deep(.gjs-layer-title) {
-  background: #fff;
+  background: var(--color-bg-2);
   font-weight: 500;
 }
 
 :deep(.gjs-layer-title:hover) {
-  background: #f8fafc;
+  background: var(--color-fill-1);
 }
 
 :deep(.gjs-layer.gjs-selected .gjs-layer-title) {
-  background: #ecfdf5;
-  color: #0f766e;
+  background: rgb(var(--primary-1));
+  color: rgb(var(--primary-6));
 }
 
 :deep(.gjs-trt-trait) {
   gap: 8px;
   padding: 8px 10px;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border-1);
 }
 
 :deep(.cms-block-preview) {
@@ -4659,9 +4659,9 @@ function selectBreadcrumb(component: any) {
   height: 58px;
   padding: 8px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border-2);
   border-radius: 7px;
-  background: #f8fafc;
+  background: var(--color-fill-1);
 }
 
 :deep(.cms-block-preview span),
@@ -4671,24 +4671,24 @@ function selectBreadcrumb(component: any) {
   display: block;
   min-width: 0;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: var(--color-fill-4);
 }
 
 :deep(.cms-block-preview.section) {
   align-content: end;
-  background: linear-gradient(135deg, #ecfeff, #f8fafc);
+  background: linear-gradient(135deg, rgb(var(--primary-1)), var(--color-fill-1));
 }
 
 :deep(.cms-block-preview.section span) {
   width: 38%;
   height: 8px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.section strong) {
   width: 72%;
   height: 14px;
-  background: #334155;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.container) {
@@ -4698,16 +4698,16 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.container strong) {
   width: 100%;
   height: 30px;
-  border: 1px dashed #94a3b8;
+  border: 1px dashed var(--color-border-3);
   border-radius: 8px;
-  background: #fff;
+  background: var(--color-bg-2);
 }
 
 :deep(.cms-block-preview.container span) {
   position: absolute;
   inset: 18px 28px;
   border-radius: 6px;
-  background: #e2e8f0;
+  background: var(--color-fill-3);
 }
 
 :deep(.cms-block-preview.grid) {
@@ -4721,13 +4721,13 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.grid span) {
   height: 100%;
   border-radius: 7px;
-  background: #e0f2fe;
+  background: rgb(var(--primary-1));
 }
 
 :deep(.cms-block-preview.text.heading strong) {
   width: 80%;
   height: 16px;
-  background: #0f172a;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.text.heading span) {
@@ -4759,30 +4759,30 @@ function selectBreadcrumb(component: any) {
   width: 64px;
   height: 24px;
   border-radius: 7px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.image) {
   place-items: center;
-  background: linear-gradient(135deg, #e2e8f0, #f8fafc);
+  background: linear-gradient(135deg, var(--color-fill-3), var(--color-fill-1));
 }
 
 :deep(.cms-block-preview.image span) {
   width: 54px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, #94a3b8 0 45%, #cbd5e1 45% 100%);
+  background: linear-gradient(135deg, var(--color-fill-4) 0 45%, var(--color-fill-3) 45% 100%);
 }
 
 :deep(.cms-block-preview.card) {
   padding: 10px;
-  background: #fff;
+  background: var(--color-bg-2);
 }
 
 :deep(.cms-block-preview.card strong) {
   width: 64%;
   height: 12px;
-  background: #334155;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.card span) {
@@ -4813,7 +4813,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.repeat span) {
   height: 100%;
   border-radius: 7px;
-  background: #ecfdf5;
+  background: rgb(var(--primary-1));
 }
 
 :deep(.cms-block-preview.page-card) {
@@ -4822,13 +4822,13 @@ function selectBreadcrumb(component: any) {
 
 :deep(.cms-block-preview.page-card i) {
   border-radius: 7px;
-  background: #cbd5e1;
+  background: var(--color-fill-4);
 }
 
 :deep(.cms-block-preview.page-card strong) {
   width: 76%;
   height: 8px;
-  background: #0f172a;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.page-card span) {
@@ -4853,7 +4853,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.visible strong) {
   width: 44%;
   height: 12px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.visible span) {
@@ -4862,14 +4862,14 @@ function selectBreadcrumb(component: any) {
 }
 :deep(.cms-block-preview.spacer) {
   place-items: center;
-  background: #f8fafc;
+  background: var(--color-fill-1);
 }
 
 :deep(.cms-block-preview.spacer span) {
   width: 100%;
   height: 6px;
   border-radius: 2px;
-  background: #cbd5e1;
+  background: var(--color-fill-4);
 }
 
 :deep(.cms-block-preview.badge) {
@@ -4906,11 +4906,11 @@ function selectBreadcrumb(component: any) {
   width: 64%;
   height: 8px;
   border-radius: 2px;
-  background: #64748b;
+  background: var(--color-fill-4);
 }
 
 :deep(.cms-block-preview.quote span) {
-  border-left: 3px solid #0f766e;
+  border-left: 3px solid rgb(var(--primary-6));
   padding-left: 6px;
   width: 78%;
 }
@@ -4919,7 +4919,7 @@ function selectBreadcrumb(component: any) {
   width: 50%;
   height: 7px;
   text-decoration: underline;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.hero-center) {
@@ -4932,7 +4932,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.hero-center strong) {
   width: 62%;
   height: 14px;
-  background: #0f172a;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.hero-center span) {
@@ -4944,7 +4944,7 @@ function selectBreadcrumb(component: any) {
   width: 46px;
   height: 20px;
   border-radius: 4px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.hero-split) {
@@ -4962,7 +4962,7 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.hero-split-text strong) {
   width: 80%;
   height: 12px;
-  background: #0f172a;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.hero-split-text span) {
@@ -4974,13 +4974,13 @@ function selectBreadcrumb(component: any) {
   width: 52px;
   height: 16px;
   border-radius: 4px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.hero-split-media) {
   height: 100%;
   border-radius: 7px;
-  background: #e2e8f0;
+  background: var(--color-fill-3);
 }
 
 :deep(.cms-block-preview.features-3) {
@@ -4991,8 +4991,8 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.features-3 span) {
   height: 100%;
   border-radius: 8px;
-  background: #f0fdfa;
-  border: 1px solid #e5e7eb;
+  background: rgb(var(--primary-1));
+  border: 1px solid var(--color-border-2);
 }
 
 :deep(.cms-block-preview.cta-box) {
@@ -5001,7 +5001,7 @@ function selectBreadcrumb(component: any) {
   text-align: center;
   gap: 8px;
   padding: 10px;
-  background: #0f766e;
+  background: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.cta-box strong) {
@@ -5043,7 +5043,7 @@ function selectBreadcrumb(component: any) {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: #e2e8f0;
+  background: var(--color-fill-3);
 }
 
 :deep(.cms-block-preview.testimonial-avatar div) {
@@ -5054,13 +5054,13 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.testimonial-avatar strong) {
   width: 46px;
   height: 7px;
-  background: #0f172a;
+  background: var(--color-text-1);
 }
 
 :deep(.cms-block-preview.testimonial-avatar em) {
   width: 32px;
   height: 5px;
-  background: #94a3b8;
+  background: var(--color-fill-4);
 }
 
 :deep(.cms-block-preview.pricing-3) {
@@ -5071,12 +5071,12 @@ function selectBreadcrumb(component: any) {
 :deep(.cms-block-preview.pricing-3 span) {
   height: 100%;
   border-radius: 8px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
 }
 
 :deep(.cms-block-preview.pricing-3 span:nth-child(2)) {
-  border-color: #0f766e;
+  border-color: rgb(var(--primary-6));
 }
 
 :deep(.cms-block-preview.footer-simple) {
@@ -5125,9 +5125,9 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-field textarea),
 :deep(.gjs-input-holder input),
 :deep(.gjs-select select) {
-  border-color: #e5e7eb;
-  background: #f8fafc;
-  color: #0f172a;
+  border-color: var(--color-border-2);
+  background: var(--color-fill-1);
+  color: var(--color-text-1);
 }
 
 :deep(.gjs-sm-property),
@@ -5135,7 +5135,7 @@ function selectBreadcrumb(component: any) {
 :deep(.gjs-layer-caret),
 :deep(.gjs-layer-name),
 :deep(.gjs-trt-trait__wrp) {
-  color: #334155;
+  color: var(--color-text-1);
 }
 
 @media (max-width: 1180px) {
@@ -5165,6 +5165,22 @@ function selectBreadcrumb(component: any) {
 
   .grapes-shell.is-preview .grapes-body {
     grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+}
+
+/* 窄屏：固定三栏会把画布挤没，改为侧栏整体隐藏、画布独占整行（侧栏改由顶部操作进出） */
+@media (max-width: 600px) {
+  .grapes-body,
+  .grapes-shell.is-left-collapsed .grapes-body,
+  .grapes-shell.is-right-collapsed .grapes-body,
+  .grapes-shell.is-left-collapsed.is-right-collapsed .grapes-body,
+  .grapes-shell.is-preview .grapes-body {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+
+  .grapes-sidebar {
+    visibility: hidden;
+    pointer-events: none;
   }
 }
 </style>
