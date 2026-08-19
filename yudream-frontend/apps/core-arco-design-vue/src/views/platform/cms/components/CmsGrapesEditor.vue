@@ -156,6 +156,7 @@ const aiSuggestions = [
 // AI 需求澄清：当模型调用 cms.ask.user 时，用 TokUI 渲染的一段可点击选项 DSL。
 const pendingAskDsl = ref('')
 const pendingAskOptions = ref<AskOption[]>([])
+const pendingAskMessageId = ref('')
 let editor: Editor | null = null
 let canvasRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let selectedSourceSyncTimer: ReturnType<typeof setTimeout> | null = null
@@ -562,12 +563,29 @@ function buildAiChatBody(question: string, history: YdChatHistoryTurn[], attachm
   return buildAiPayload(question, attachments, historyMessages)
 }
 
-// 持久化前裁剪消息：剥离工具 payload 与附件 dataUrl 等大字段，避免 IndexedDB 膨胀
+// 持久化前裁剪消息：保留工具分页/澄清上下文，剥离大 HTML、dataUrl 等字段。
+function sanitizeCmsToolPayload(payload?: Record<string, unknown>) {
+  if (!payload) {
+    return undefined
+  }
+  const result: Record<string, unknown> = {}
+  for (const key of ['resource', 'cursor', 'nextCursor', 'hasMore', 'startLine', 'endLine', 'totalLines', 'nodeCount', 'truncated', 'message', 'error']) {
+    if (payload[key] !== undefined) {
+      result[key] = payload[key]
+    }
+  }
+  if (typeof payload.content === 'string') {
+    result.content = payload.content.slice(0, 4000)
+  }
+  return result
+}
+
 function sanitizeCmsAiMessage(message: YdChatMessage): YdChatMessage {
   return {
     ...message,
     pending: false,
-    tools: message.tools?.map(tool => ({ ...tool, payload: undefined })),
+    context: message.context ? JSON.parse(JSON.stringify(message.context)) : undefined,
+    tools: message.tools?.map(tool => ({ ...tool, payload: sanitizeCmsToolPayload(tool.payload) })),
     attachments: message.attachments?.map(({ dataUrl: _dataUrl, ...rest }) => rest),
   }
 }
@@ -576,21 +594,38 @@ function aiSessionMeta() {
   return {
     modelValue: aiModelValue.value,
     thinkingEnabled: aiThinkingEnabled.value,
+    askUser: pendingAskOptions.value.length
+      ? { dsl: pendingAskDsl.value, options: pendingAskOptions.value }
+      : undefined,
   }
 }
 
 function onAiSessionChange(session: YdAgentChatSession | null) {
   pendingAskDsl.value = ''
   pendingAskOptions.value = []
+  pendingAskMessageId.value = ''
   const meta = session?.meta
-  if (!meta) {
-    return
-  }
-  if (typeof meta.modelValue === 'string' && meta.modelValue) {
+  if (meta && typeof meta.modelValue === 'string' && meta.modelValue) {
     aiModelValue.value = resolveCmsModelValue(props.aiModelOptions || [], meta.modelValue)
   }
-  if (typeof meta.thinkingEnabled === 'boolean') {
+  if (meta && typeof meta.thinkingEnabled === 'boolean') {
     aiThinkingEnabled.value = meta.thinkingEnabled
+  }
+  const restoredMessage = [...(session?.messages || [])].reverse().find(item => item.role === 'assistant' && item.context?.askUser && !(item.context.askUser as Record<string, unknown>).answered)
+  const restoredAsk = restoredMessage?.context?.askUser
+  if (restoredAsk && typeof restoredAsk === 'object') {
+    const record = restoredAsk as Record<string, unknown>
+    pendingAskDsl.value = typeof record.dsl === 'string' ? record.dsl : ''
+    pendingAskOptions.value = parseAskOptions(record.options)
+    pendingAskMessageId.value = restoredMessage?.id || ''
+  }
+  else {
+    const askUser = meta?.askUser
+    if (askUser && typeof askUser === 'object') {
+      const record = askUser as Record<string, unknown>
+      pendingAskDsl.value = typeof record.dsl === 'string' ? record.dsl : ''
+      pendingAskOptions.value = parseAskOptions(record.options)
+    }
   }
 }
 
@@ -1885,6 +1920,18 @@ function showAskUserUi(tool?: AiToolCallResult) {
     pendingAskDsl.value = dsl
   }
   pendingAskOptions.value = options
+  const message = getLatestAssistantMessage()
+  if (message) {
+    message.context = {
+      ...message.context,
+      askUser: {
+        dsl: pendingAskDsl.value,
+        options,
+        answered: false,
+      },
+    }
+    pendingAskMessageId.value = message.id || ''
+  }
 }
 
 // 用户点击某个选项后，作为下一轮消息发送，形成「AI 问 → 用户选 → 继续」的闭环。
@@ -1899,9 +1946,23 @@ function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
   chooseAskOption(title)
 }
 
+function getLatestAssistantMessage(): YdChatMessage | null {
+  const raw = aiChatPanelRef.value?.messages as unknown as YdChatMessage[] | { value?: YdChatMessage[] } | undefined
+  const messages = Array.isArray(raw) ? raw : raw?.value || []
+  return [...messages].reverse().find(item => item.role === 'assistant') || null
+}
+
 function chooseAskOption(title: string) {
+  const message = getLatestAssistantMessage()
+  if (message?.context?.askUser && typeof message.context.askUser === 'object') {
+    message.context = {
+      ...message.context,
+      askUser: { ...(message.context.askUser as Record<string, unknown>), answered: true },
+    }
+  }
   pendingAskDsl.value = ''
   pendingAskOptions.value = []
+  pendingAskMessageId.value = ''
   void sendAiPrompt(title)
 }
 
@@ -2869,7 +2930,18 @@ function selectBreadcrumb(component: any) {
             @tool="onAiToolEvent"
             @session-change="onAiSessionChange"
           >
-            <template #actions>
+            <template #message-extra="{ message }">
+               <section v-if="message.id === pendingAskMessageId && (pendingAskDsl || pendingAskOptions.length)" class="ai-ask ai-ask--message" aria-label="AI 需求澄清">
+                 <TokuiBlock v-if="pendingAskDsl" :dsl="pendingAskDsl" />
+                 <div v-if="pendingAskOptions.length" class="ai-ask-options">
+                   <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
+                     <strong>{{ option.title }}</strong>
+                     <span v-if="option.desc">{{ option.desc }}</span>
+                   </button>
+                 </div>
+               </section>
+             </template>
+             <template #actions>
               <div class="ai-panel-actions">
                 <div v-if="aiModelOptions?.length" ref="agentSelectEl" class="ai-agent-select" title="切换模型">
                   <button
@@ -2908,7 +2980,7 @@ function selectBreadcrumb(component: any) {
               </div>
             </template>
             <template #footer>
-              <section v-if="pendingAskDsl" class="ai-ask" aria-label="AI 需求澄清">
+              <section v-if="pendingAskDsl && !pendingAskMessageId" class="ai-ask" aria-label="AI 需求澄清">
                 <TokuiBlock :dsl="pendingAskDsl" />
                 <div v-if="pendingAskOptions.length" class="ai-ask-options">
                   <button v-for="option in pendingAskOptions" :key="option.title" type="button" @click="chooseAskOption(option.title)">
@@ -4285,6 +4357,11 @@ function selectBreadcrumb(component: any) {
   border: 1px solid #dbeafe;
   border-radius: 14px;
   background: rgba(239, 246, 255, 0.9);
+}
+
+.ai-ask--message {
+  margin-top: 8px;
+  margin-bottom: 4px;
 }
 
 .ai-ask-options {
