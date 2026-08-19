@@ -22,6 +22,7 @@ const tree = ref<WikiNode[]>([])
 const selectedNode = ref<WikiNode | null>(null)
 const loadingTree = ref(false)
 const activePanel = ref('directory')
+const spacesOpen = ref(false)
 
 const space = computed(() => spaces.value.find(item => item.id === spaceId.value) || null)
 const flatTree = computed(() => flattenTree(tree.value))
@@ -79,6 +80,7 @@ async function switchSpace(id: string) {
   }
   spaceId.value = id
   selectedNode.value = null
+  spacesOpen.value = false
   await reloadTree()
 }
 
@@ -231,7 +233,8 @@ onMounted(loadSpaces)
       </nav>
 
       <!-- 知识库列表 -->
-      <aside class="wiki-spaces">
+      <div v-if="spacesOpen" class="wiki-spaces-backdrop" @click="spacesOpen = false" />
+      <aside class="wiki-spaces" :class="{ 'wiki-spaces--open': spacesOpen }">
         <div class="wiki-spaces__head">
           <span>知识库</span>
           <FaTooltip text="新建知识库" side="right">
@@ -239,6 +242,9 @@ onMounted(loadSpaces)
               <FaIcon name="i-ri:add-line"/>
             </button>
           </FaTooltip>
+          <button type="button" class="wiki-spaces__close" title="收起知识库列表" @click="spacesOpen = false">
+            <FaIcon name="i-ri:close-line" />
+          </button>
         </div>
         <FaScrollArea class="wiki-spaces__list">
           <button
@@ -275,9 +281,18 @@ onMounted(loadSpaces)
 
       <!-- 主面板 -->
       <main class="wiki-main">
-        <KeepAlive>
-          <component :is="activeComponent" :key="activePanel"/>
-        </KeepAlive>
+        <div class="wiki-main__spacebar">
+          <button type="button" class="wiki-main__spacebtn" @click="spacesOpen = true">
+            <FaIcon name="i-ri:book-shelf-line"/>
+            <span>{{ space ? `${space.name} · /wiki/${space.slug}` : '选择知识库' }}</span>
+            <FaIcon name="i-ri:arrow-down-s-line"/>
+          </button>
+        </div>
+        <div class="wiki-main__panel">
+          <KeepAlive>
+            <component :is="activeComponent" :key="activePanel"/>
+          </KeepAlive>
+        </div>
       </main>
     </div>
 
@@ -398,6 +413,7 @@ onMounted(loadSpaces)
 
 .wiki-spaces__add {
   display: grid;
+  margin-left: auto;
   width: 24px;
   height: 24px;
   place-items: center;
@@ -520,10 +536,27 @@ onMounted(loadSpaces)
 
 /* 主区域 */
 .wiki-main {
+  display: flex;
   flex: 1;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.wiki-main__spacebar {
+  display: none;
+}
+
+.wiki-main__panel {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wiki-spaces__close,
+.wiki-spaces-backdrop {
+  display: none;
 }
 
 .wiki-create-form {
@@ -562,6 +595,97 @@ onMounted(loadSpaces)
     width: 28px;
     height: 28px;
     font-size: 14px;
+  }
+}
+
+/* 移动端：知识库列改为抽屉，主区顶部提供当前知识库切换条 */
+@media (max-width: 720px) {
+  .wiki-shell {
+    position: relative;
+  }
+
+  .wiki-rail {
+    width: 64px;
+    padding: 8px 6px;
+  }
+
+  .wiki-main__spacebar {
+    display: block;
+    flex-shrink: 0;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--color-border-2);
+    background: var(--color-bg-1);
+  }
+
+  .wiki-main__spacebtn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--color-border-2);
+    border-radius: 8px;
+    background: var(--color-bg-2);
+    color: var(--color-text-1);
+    cursor: pointer;
+    font: inherit;
+    font-size: 13px;
+  }
+
+  .wiki-main__spacebtn span {
+    overflow: hidden;
+    flex: 1;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wiki-spaces {
+    position: absolute;
+    z-index: 30;
+    top: 0;
+    bottom: 0;
+    left: 64px;
+    width: min(240px, calc(100vw - 140px));
+    box-shadow: 8px 0 24px rgb(15 23 42 / 0.18);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-16px);
+    transition: opacity 0.18s, transform 0.18s, visibility 0.18s;
+    visibility: hidden;
+  }
+
+  .wiki-spaces--open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: none;
+    visibility: visible;
+  }
+
+  .wiki-spaces-backdrop {
+    display: block;
+    position: absolute;
+    z-index: 25;
+    inset: 0 0 0 64px;
+    background: rgb(15 23 42 / 0.32);
+  }
+
+  .wiki-spaces__close {
+    display: grid;
+    margin-left: 0;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-text-3);
+    cursor: pointer;
+  }
+
+  .wiki-spaces__close:hover {
+    background: var(--color-fill-2);
+    color: var(--color-text-1);
   }
 }
 </style>
