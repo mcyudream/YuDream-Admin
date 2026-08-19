@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
 import apiAgent from '@/api/modules/platform-agent'
+import { useMediaQuery } from '@vueuse/core'
 import AgentJsonCodeEditor from './components/AgentJsonCodeEditor.vue'
 import { defaultAgentToolInputSchema, defaultAgentToolOutputExample, isJsonObject } from './config/agent-json'
 
@@ -12,6 +13,9 @@ const editing = ref<AgentTool | null>(null)
 const rows = ref<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
+// 窄屏下分页隐藏每页条数与跳转输入，避免换行挤压
+const isCompact = useMediaQuery('(max-width: 640px)')
+const toolsPaginationLayout = computed(() => isCompact.value ? 'total, pager' : 'total, sizes, ->, pager, jumper')
 const keyword = ref('')
 const defaultPythonCode = 'def run(params: dict) -> dict:\n    name = str(params.get("name", ""))\n    return {\n        "success": True,\n        "message": f"Hello, {name}",\n    }'
 const form = reactive({ name: '', code: '', description: '', inputSchemaJson: defaultAgentToolInputSchema, outputExampleJson: defaultAgentToolOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
@@ -149,7 +153,7 @@ function remove(row: AgentTool) {
               </div>
             </FaCard>
           </template>
-        </FaResponsiveTable><FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" class="mt-3" @page-change="load" @size-change="load" />
+        </FaResponsiveTable><FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="toolsPaginationLayout" class="mt-3" @page-change="load" @size-change="load" />
       </section>
     </FaPageMain>
     <FaModal v-model="visible" :title="editing ? '编辑 Python 工具' : '新建 Python 工具'" class="sm:max-w-4xl">
@@ -193,4 +197,9 @@ function remove(row: AgentTool) {
 
 <style scoped>
 .system-tools, .custom-tools { display: grid; gap: 16px; }.custom-tools { margin-top: 24px; }.section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }.section-head h3, .section-head p { margin: 0; }.section-head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }.system-tool-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }.system-tool-grid article { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }.system-tool-grid article > :first-child { color: rgb(var(--primary-6)); }.system-tool-grid div { display: grid; gap: 5px; }.system-tool-grid p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.5; }.system-tool-grid code { color: var(--color-text-3); font-size: 11px; }.tool-form { display: grid; gap: 16px; }.form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }.form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }.form-field small { color: var(--color-text-3); font-size: 10px; line-height: 1.5; }.check-line { display: grid; grid-template-columns: 17px minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; cursor: pointer; }.check-line input { margin-top: 2px; accent-color: rgb(var(--primary-6)); }.check-line span { display: grid; gap: 2px; }.check-line b { color: var(--color-text-1); font-weight: 500; }.check-line small { color: var(--color-text-3); font-size: 10px; }
+@media (max-width: 640px) {
+  .section-head { flex-direction: column; align-items: stretch; }
+  .section-head > .w-72 { width: 100%; }
+  .system-tool-grid { grid-template-columns: 1fr; }
+}
 </style>
