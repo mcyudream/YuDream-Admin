@@ -400,12 +400,17 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       let settled = false
       let terminalReceived = false
       let currentSocket: WebSocket
+      let heartbeatId: ReturnType<typeof setInterval> | undefined
 
       function finish(error?: unknown) {
         if (settled) {
           return
         }
         settled = true
+        if (heartbeatId !== undefined) {
+          clearInterval(heartbeatId)
+          heartbeatId = undefined
+        }
         if (socket === currentSocket) {
           socket = null
         }
@@ -431,6 +436,12 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
             ? options.buildBody(question, history, attachments)
             : {question, history, attachments}
         currentSocket.send(JSON.stringify(payload))
+        // 模型推理和客户端工具等待可能长时间没有正文帧；PING/PONG 防止代理层按空闲连接回收 WebSocket。
+        heartbeatId = setInterval(() => {
+          if (currentSocket.readyState === WebSocket.OPEN) {
+            currentSocket.send(JSON.stringify({type: 'PING', timestamp: Date.now()}))
+          }
+        }, 15000)
       }
 
       currentSocket.onmessage = (event) => {
@@ -452,7 +463,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         // onclose 会随后触发；这里仅记录，避免重复 reject
       }
 
-      currentSocket.onclose = () => {
+      currentSocket.onclose = (event) => {
         if (settled) {
           return
         }
@@ -461,7 +472,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
           return
         }
         if (!terminalReceived) {
-          finish(new Error('WebSocket 在回答完成前中断'))
+          const detail = `code=${event.code}${event.reason ? `, reason=${event.reason}` : ''}`
+          finish(new Error(`WebSocket 在回答完成前中断（${detail}）`))
           return
         }
         finish()

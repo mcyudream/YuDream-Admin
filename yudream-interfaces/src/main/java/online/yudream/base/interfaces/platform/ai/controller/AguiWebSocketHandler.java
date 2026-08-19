@@ -47,7 +47,7 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
         // v2 agent 模式：运行期间的后续帧是浏览器回传的画布工具结果
         Object bridge = session.getAttributes().get(BRIDGE_ATTRIBUTE);
         if (bridge instanceof CmsCanvasClientBridge canvasBridge) {
-            handleToolResultFrame(canvasBridge, message.getPayload());
+            handleToolResultFrame(session, canvasBridge, message.getPayload());
             return;
         }
         if (session.getAttributes().putIfAbsent(STARTED_ATTRIBUTE, Boolean.TRUE) != null) {
@@ -88,10 +88,16 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
         }
     }
 
-    private void handleToolResultFrame(CmsCanvasClientBridge bridge, String payload) {
+    private void handleToolResultFrame(WebSocketSession session, CmsCanvasClientBridge bridge, String payload) {
         try {
             var frame = objectMapper.readTree(payload);
-            if (!"TOOL_RESULT".equals(frame.path("type").asText())) {
+            String type = frame.path("type").asText();
+            if ("PING".equals(type)) {
+                // 应用层心跳：浏览器 WebSocket 无法发原生 ping，此响应可防止反向代理在模型思考/工具等待期间误判空闲。
+                sendRaw(session, java.util.Map.of("type", "PONG", "timestamp", System.currentTimeMillis()));
+                return;
+            }
+            if (!"TOOL_RESULT".equals(type)) {
                 return;
             }
             java.util.Map<String, Object> result = frame.hasNonNull("result")
@@ -208,6 +214,15 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
 
     private void send(WebSocketSession session, AguiStreamEventRes data) {
         try {
+            sendRaw(session, data);
+        }
+        catch (Exception e) {
+            log.debug("AG-UI WebSocket send failed, type={}", data.getType(), e);
+        }
+    }
+
+    private void sendRaw(WebSocketSession session, Object data) {
+        try {
             if (!session.isOpen()) {
                 return;
             }
@@ -216,7 +231,7 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
             }
         }
         catch (Exception e) {
-            log.debug("AG-UI WebSocket send failed, type={}", data.getType(), e);
+            log.debug("AG-UI WebSocket raw send failed", e);
         }
     }
 
