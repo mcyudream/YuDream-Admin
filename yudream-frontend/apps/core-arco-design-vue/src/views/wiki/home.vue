@@ -19,7 +19,7 @@ async function load() {
   try {
     spaces.value = (await fetchPublicWikiSpaces()).data
     try {
-      const context = (await apiCms.publicTemplateContext()).data
+      const context = (await apiCms.publicTemplateContext({ knowledgeLatestLimit: 6 })).data
       publicPageCount.value = context.knowledge.pages.length
       recentPages.value = context.knowledge.latest.slice(0, 6).map(item => ({
         title: item.title,

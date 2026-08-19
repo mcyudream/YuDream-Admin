@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { CmsPage, CmsTemplateContext, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
+import type { CmsPage, CmsTemplateContext, CmsTemplateContextQuery, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 import { chromeRuntimeCss, readChromeCss } from '@/utils/cms-chrome'
-import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
+import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
 const route = useRoute()
@@ -229,9 +229,32 @@ async function load() {
   }
 }
 
+function templateContextQuery(): CmsTemplateContextQuery | undefined {
+  const html = page.value?.htmlContent || homeHtml.value
+  if (!html) {
+    return undefined
+  }
+  const doc = new DOMParser().parseFromString(`<div>${sanitizeCmsHtml(html)}</div>`, 'text/html')
+  const query: CmsTemplateContextQuery = {}
+  doc.querySelectorAll('[data-yb-repeat], [data-yb-for]').forEach((element) => {
+    const path = parseCmsTemplateFor(element.getAttribute('data-yb-for'))?.path || element.getAttribute('data-yb-repeat') || ''
+    const limit = resolveCmsTemplateLimit(element.getAttribute('data-yb-limit'), {})
+    if (limit == null) {
+      return
+    }
+    const max = (current?: number) => Math.max(current || 0, limit)
+    if (path === 'cms.pages.latest') query.cmsLatestLimit = max(query.cmsLatestLimit)
+    if (path === 'knowledge.spaces') query.knowledgeSpacesLimit = max(query.knowledgeSpacesLimit)
+    if (path === 'knowledge.pages') query.knowledgePagesLimit = max(query.knowledgePagesLimit)
+    if (path === 'knowledge.latest') query.knowledgeLatestLimit = max(query.knowledgeLatestLimit)
+    if (path === 'knowledge.featured') query.knowledgeFeaturedLimit = max(query.knowledgeFeaturedLimit)
+  })
+  return Object.keys(query).length ? query : undefined
+}
+
 async function loadTemplateContext() {
   try {
-    const res = await apiCms.publicTemplateContext()
+    const res = await apiCms.publicTemplateContext(templateContextQuery())
     templateContext.value = res.data
   }
   catch {
@@ -393,11 +416,40 @@ function renderDynamicHtml(value?: string) {
       el.remove()
     }
   })
-  doc.querySelectorAll('[data-yb-repeat]').forEach((el) => {
-    const key = el.getAttribute('data-yb-repeat')
-    const rows = resolveCmsTemplateRows(key || '', renderContext.value)
+  doc.querySelectorAll('[data-yb-if]').forEach((el) => {
+    const insideRepeat = el.closest('[data-yb-repeat], [data-yb-for]')
+    const isRepeat = el.hasAttribute('data-yb-repeat') || el.hasAttribute('data-yb-for')
+    if (insideRepeat && !isRepeat) {
+      return
+    }
+    if (!evaluateCmsTemplateCondition(el.getAttribute('data-yb-if'), renderContext.value)) {
+      el.remove()
+    }
+    else {
+      el.removeAttribute('data-yb-if')
+    }
+  })
+  doc.querySelectorAll('[data-yb-repeat], [data-yb-for]').forEach((el) => {
+    const directive = parseCmsTemplateFor(el.getAttribute('data-yb-for'))
+    const key = directive?.path || el.getAttribute('data-yb-repeat') || ''
+    const itemName = directive?.itemName || 'item'
+    const limit = resolveCmsTemplateLimit(el.getAttribute('data-yb-limit'), renderContext.value)
+    const rows = resolveCmsTemplateRows(key, renderContext.value)
+    const visibleRows = limit == null ? rows : rows.slice(0, limit)
     const template = el.innerHTML
-    el.innerHTML = rows.map((item, index) => renderCmsVariables(template, { item, index: String(index + 1) }, renderContext.value)).join('')
+    el.innerHTML = visibleRows.map((item, index) => renderCmsVariables(
+      template,
+      { [itemName]: item, item, index: String(index + 1) },
+      renderContext.value,
+    )).join('')
+  })
+  doc.querySelectorAll('[data-yb-if]').forEach((el) => {
+    if (!evaluateCmsTemplateCondition(el.getAttribute('data-yb-if'), renderContext.value)) {
+      el.remove()
+    }
+    else {
+      el.removeAttribute('data-yb-if')
+    }
   })
   doc.querySelectorAll('[data-yb-html]').forEach((el) => {
     el.innerHTML = sanitizeCmsHtml(el.getAttribute('data-yb-html') || '')

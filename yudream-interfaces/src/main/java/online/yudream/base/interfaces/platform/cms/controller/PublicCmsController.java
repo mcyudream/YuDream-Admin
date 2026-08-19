@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.cms.controller;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.cms.query.CmsPageQuery;
+import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
 import online.yudream.base.application.platform.cms.service.CmsAppService;
 import online.yudream.base.application.platform.cms.service.CmsTemplateContextAppService;
 import online.yudream.base.domain.common.PageResult;
@@ -40,7 +41,7 @@ public class PublicCmsController {
     }
 
     @GetMapping("/template-context")
-    public Result<CmsTemplateContextRes> templateContext() {
-        return Result.ok(CmsTemplateContextWebAssembler.toRes(templateContextAppService.query()));
+    public Result<CmsTemplateContextRes> templateContext(CmsTemplateContextQuery query) {
+        return Result.ok(CmsTemplateContextWebAssembler.toRes(templateContextAppService.query(query)));
     }
 }
