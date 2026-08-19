@@ -15,6 +15,7 @@ import online.yudream.base.interfaces.system.security.support.SecurityPrincipalS
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport.SecurityPrincipal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
@@ -246,7 +247,7 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
     private void close(WebSocketSession session) {
         try {
             if (session.isOpen()) {
-                session.close();
+                session.close(CloseStatus.NORMAL);
             }
         }
         catch (Exception ignored) {
