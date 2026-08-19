@@ -101,7 +101,9 @@ public class AiAppService {
                 CMS template runtime rules:
                 - Use {{cms.pages.latest.*}} for the latest published CMS pages.
                 - Use {{knowledge.spaces.*}}、{{knowledge.pages.*}}、{{knowledge.latest.*}}、{{knowledge.featured.*}} for public knowledge data.
-                - Use data-yb-repeat="cms.pages.latest|knowledge.pages|knowledge.latest|knowledge.featured|knowledge.spaces" for lists.
+                - Prefer data-yb-for="item in knowledge.latest" for new lists; data-yb-repeat="cms.pages.latest|knowledge.pages|knowledge.latest|knowledge.featured|knowledge.spaces" remains supported.
+                - Add data-yb-limit="6" when the design needs a bounded number of items; the public runtime passes this requested count to the template-context API and also slices at render time.
+                - Use data-yb-if="knowledge.latest.count > 0" or simple equality/number comparisons for conditional blocks; JavaScript expressions are not allowed.
                 - Content items expose createdAt, publishedAt, updatedAt; prefer publishedAt for dates.
                 - These values resolve at public runtime. Generate template HTML/CSS only; never claim to publish content.
                 """.formatted(
@@ -381,7 +383,9 @@ public class AiAppService {
                 - Use {{knowledge.spaces.*}} for public knowledge spaces and {{knowledge.pages.*}} for all public published knowledge pages.
                 - Use {{knowledge.latest.*}} for the most recently updated public knowledge pages.
                 - Use {{knowledge.featured.*}} for editor-recommended public knowledge pages ordered by Wiki sort; it is not a popularity or hotness ranking.
-                - Use data-yb-repeat="cms.pages.latest", data-yb-repeat="knowledge.pages", data-yb-repeat="knowledge.latest", data-yb-repeat="knowledge.featured" or data-yb-repeat="knowledge.spaces" for lists.
+                - Prefer data-yb-for="item in knowledge.latest" for new lists; legacy data-yb-repeat remains supported for cms.pages.latest, knowledge.pages, knowledge.latest, knowledge.featured and knowledge.spaces.
+                - Add data-yb-limit="6" when a block should show only recent N items; the public page requests that amount from the template-context data layer and the renderer also enforces it.
+                - Use data-yb-if="knowledge.latest.count > 0" or simple equality/number comparisons for conditional blocks; do not generate arbitrary JavaScript expressions.
                 - Content items expose createdAt, publishedAt and updatedAt. Prefer publishedAt for publication dates and updatedAt for update dates.
                 - Use data-yb-html="{{item.htmlContent}}" or data-yb-markdown="{{item.markdownContent}}" only when the template needs rendered content; never insert draft or private data.
                 - These values are resolved at public page runtime. Generate template HTML/CSS only; never claim to publish content or call a publish action.

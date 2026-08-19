@@ -114,6 +114,14 @@ export interface CmsTemplateContext {
   }
 }
 
+export interface CmsTemplateContextQuery {
+  cmsLatestLimit?: number
+  knowledgeSpacesLimit?: number
+  knowledgePagesLimit?: number
+  knowledgeLatestLimit?: number
+  knowledgeFeaturedLimit?: number
+}
+
 export interface CmsBlock {
   id: string
   code: string
@@ -200,8 +208,8 @@ export default {
   publicPages: (params: CmsPageParams) => {
     return systemClient.get<unknown, ApiResponse<PageResult<CmsPage>>>('api/public/cms/pages/list', { params })
   },
-  publicTemplateContext: () => {
-    return systemClient.get<unknown, ApiResponse<CmsTemplateContext>>('api/public/cms/template-context')
+  publicTemplateContext: (params?: CmsTemplateContextQuery) => {
+    return systemClient.get<unknown, ApiResponse<CmsTemplateContext>>('api/public/cms/template-context', { params })
   },
   blockList: (params: { page: number, size: number, keyword?: string, category?: string, kind?: CmsBlockKind }) => {
     return systemClient.get<unknown, ApiResponse<PageResult<CmsBlock>>>('api/platform/cms/blocks', { params })

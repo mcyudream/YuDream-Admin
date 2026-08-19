@@ -19,6 +19,71 @@ export function renderCmsVariables(value: string, localContext: CmsTemplateObjec
   return value.replace(/\{\{\s*([\w.]+)\s*}}/g, (_, path: string) => escapeCmsHtml(String(resolveCmsTemplatePath(path, context) ?? '')))
 }
 
+/** `data-yb-for="item in knowledge.latest"` 的安全解析结果。 */
+export function parseCmsTemplateFor(value?: string | null) {
+  const matched = String(value || '').trim().match(/^([A-Za-z_]\w*)\s+in\s+([\w.]+)$/)
+  return matched ? { itemName: matched[1], path: matched[2] } : null
+}
+
+/** 读取 data-yb-limit，支持固定数字或 {{site.xxx}} 变量；最大值由调用方控制。 */
+export function resolveCmsTemplateLimit(value: string | null | undefined, context: CmsTemplateObject = {}, fallback?: number) {
+  const raw = String(value || '').trim()
+  if (!raw) {
+    return fallback
+  }
+  const variable = raw.match(/^\{\{\s*([\w.]+)\s*}}$/)
+  const resolved = variable ? resolveCmsTemplatePath(variable[1], context) : raw
+  const numeric = Number(resolved)
+  return Number.isInteger(numeric) && numeric >= 0 ? numeric : fallback
+}
+
+/**
+ * 供 data-yb-if 使用的受限条件表达式：支持路径真假、!路径、==/!= 与数字比较。
+ * 不执行 JavaScript，避免模板内容通过 eval 触达公开页运行时。
+ */
+export function evaluateCmsTemplateCondition(expression: string | null | undefined, context: CmsTemplateObject = {}): boolean {
+  const source = String(expression || '').trim()
+  if (!source) {
+    return false
+  }
+  if (source.includes('||')) {
+    return source.split('||').some(part => evaluateCmsTemplateCondition(part, context))
+  }
+  if (source.includes('&&')) {
+    return source.split('&&').every(part => evaluateCmsTemplateCondition(part, context))
+  }
+  if (source.startsWith('!') && !source.startsWith('!=')) {
+    return !evaluateCmsTemplateCondition(source.slice(1), context)
+  }
+  const comparison = source.match(/^(.+?)\s*(===|==|!==|!=|>=|<=|>|<)\s*(.+)$/)
+  if (comparison) {
+    const left = resolveCmsConditionValue(comparison[1], context)
+    const right = resolveCmsConditionValue(comparison[3], context)
+    switch (comparison[2]) {
+      case '===':
+      case '==': return String(left ?? '') === String(right ?? '')
+      case '!==':
+      case '!=': return String(left ?? '') !== String(right ?? '')
+      case '>': return Number(left) > Number(right)
+      case '>=': return Number(left) >= Number(right)
+      case '<': return Number(left) < Number(right)
+      case '<=': return Number(left) <= Number(right)
+    }
+  }
+  return Boolean(resolveCmsConditionValue(source, context))
+}
+
+function resolveCmsConditionValue(raw: string, context: CmsTemplateObject): unknown {
+  const value = raw.trim()
+  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+    return value.slice(1, -1)
+  }
+  if (value === 'true') return true
+  if (value === 'false') return false
+  if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value)
+  return resolveCmsTemplatePath(value, context)
+}
+
 export function sanitizeCmsHtml(value?: string) {
   return (value || '')
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')

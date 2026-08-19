@@ -16,7 +16,7 @@ import { toBackendAssetUrl } from '@/utils/backend-url'
 import { createCmsAiChatSessionStore, cmsAiChatTargetKey, readActiveCmsAiChatSessionId } from '@/utils/cms-ai-chat-history'
 import { executeCanvasTool, type CanvasToolExecOptions } from '@/utils/cms-canvas-agent-tools'
 import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
-import { renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
+import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { findCmsModelOption, resolveCmsModelValue } from '../config/cms-model-options'
 import { cmsBlocks, toBlockDefinition } from '../config/cms-blocks'
 import { orderedAddHtmlAssets } from '../config/cms-canvas-tool-order'
@@ -303,6 +303,7 @@ const cmsVariableContext = computed(() => {
       { key: 'data-yb-repeat="cms.pages.latest"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: 'Latest published CMS pages' },
       { key: 'data-yb-repeat="knowledge.pages"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: 'Published knowledge pages' },
       { key: 'data-yb-repeat="knowledge.latest"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.content}}'], description: 'Latest knowledge content' },
+      { key: 'data-yb-for="wiki in knowledge.latest"', itemFields: ['{{wiki.title}}', '{{wiki.url}}', '{{wiki.summary}}'], description: 'Latest knowledge content with explicit for syntax' },
       { key: 'data-yb-repeat="knowledge.spaces"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: 'Public knowledge spaces' },
       { key: 'data-yb-repeat="navigation"', itemFields: ['{{item.label}}', '{{item.url}}'], description: '重复渲染导航项' },
       { key: 'data-yb-repeat="pages"', itemFields: ['{{item.title}}', '{{item.url}}', '{{item.summary}}'], description: '重复渲染公开页面卡片' },
@@ -312,6 +313,8 @@ const cmsVariableContext = computed(() => {
     visibility: [
       { key: 'data-visible-when="guest"', description: '仅访客可见' },
       { key: 'data-visible-when="logged-in"', description: '仅登录用户可见' },
+      { key: 'data-yb-if="knowledge.latest.count > 0"', description: '条件表达式：有最新知识内容时显示' },
+      { key: 'data-yb-limit="6"', description: '循环最多展示 6 条，可换数字或变量' },
     ],
   }
 })
@@ -356,6 +359,9 @@ const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
     { label: 'src', type: 'property', apply: 'src=""', detail: '资源地址' },
     { label: 'alt', type: 'property', apply: 'alt=""', detail: '图片替代文本' },
     { label: 'data-yb-repeat', type: 'property', apply: 'data-yb-repeat=""', detail: 'CMS 循环数据' },
+    { label: 'data-yb-for', type: 'property', apply: 'data-yb-for="item in knowledge.latest"', detail: 'CMS 显式循环' },
+    { label: 'data-yb-limit', type: 'property', apply: 'data-yb-limit="6"', detail: 'CMS 循环条数上限' },
+    { label: 'data-yb-if', type: 'property', apply: 'data-yb-if="knowledge.latest.count > 0"', detail: 'CMS 条件渲染' },
     { label: 'data-visible-when', type: 'property', apply: 'data-visible-when=""', detail: 'CMS 可见条件' },
   ]
   const variableCompletions = context.variables.map(item => ({
@@ -380,7 +386,8 @@ const htmlSourceCompletions = computed<CodeCompletionItem[]>(() => {
   }))
   const snippetCompletions: CodeCompletionItem[] = [
     { label: 'repeat.cms.latest', type: 'property', apply: '<section data-yb-repeat="cms.pages.latest">\n  <a href="{{item.url}}">{{item.title}}</a>\n  <p>{{item.summary}}</p>\n</section>', detail: 'Latest CMS pages' },
-    { label: 'repeat.knowledge.latest', type: 'property', apply: '<section data-yb-repeat="knowledge.latest">\n  <a href="{{item.url}}">{{item.title}}</a>\n  <p>{{item.summary}}</p>\n</section>', detail: 'Latest knowledge pages' },
+    { label: 'repeat.knowledge.latest', type: 'property', apply: '<section data-yb-for="item in knowledge.latest" data-yb-limit="6">\n  <a href="{{item.url}}">{{item.title}}</a>\n  <p>{{item.summary}}</p>\n</section>', detail: 'Latest knowledge pages' },
+    { label: 'if.knowledge.latest', type: 'property', apply: '<section data-yb-if="knowledge.latest.count > 0">\n  <div data-yb-for="item in knowledge.latest" data-yb-limit="6">\n    <a href="{{item.url}}">{{item.title}}</a>\n  </div>\n</section>', detail: 'Conditional latest knowledge' },
     { label: 'content.html', type: 'property', apply: '<div data-yb-html="{{item.htmlContent}}"></div>', detail: 'Sanitized HTML content' },
     { label: 'content.markdown', type: 'property', apply: '<div data-yb-markdown="{{item.markdownContent}}"></div>', detail: 'Markdown content' },
     { label: 'section.yb-ai-section', type: 'class', apply: '<section class="yb-ai-section">\n  \n</section>', detail: 'CMS 区块片段' },
@@ -2350,16 +2357,33 @@ function injectCanvasTemplatePreview(instance: Editor) {
       return
     }
     renderCanvasNavigation(doc, context)
-    doc.querySelectorAll('[data-yb-repeat]').forEach((element) => {
+    doc.querySelectorAll('[data-yb-if]').forEach((element) => {
+      const insideRepeat = element.closest('[data-yb-repeat], [data-yb-for]')
+      const isRepeat = element.hasAttribute('data-yb-repeat') || element.hasAttribute('data-yb-for')
+      if (insideRepeat && !isRepeat) {
+        return
+      }
+      const visible = evaluateCmsTemplateCondition(element.getAttribute('data-yb-if'), context)
+      ;(element as HTMLElement).style.display = visible ? '' : 'none'
+    })
+    doc.querySelectorAll('[data-yb-repeat], [data-yb-for]').forEach((element) => {
       const template = element.getAttribute('data-yb-preview-template') || element.innerHTML
       element.setAttribute('data-yb-preview-template', template)
-      const key = element.getAttribute('data-yb-repeat') || ''
+      const directive = parseCmsTemplateFor(element.getAttribute('data-yb-for'))
+      const key = directive?.path || element.getAttribute('data-yb-repeat') || ''
+      const itemName = directive?.itemName || 'item'
+      const limit = resolveCmsTemplateLimit(element.getAttribute('data-yb-limit'), context)
       const rows = resolveCmsTemplateRows(key, context)
-      element.innerHTML = rows.map((item, index) => renderCmsVariables(
+      const visibleRows = limit == null ? rows : rows.slice(0, limit)
+      element.innerHTML = visibleRows.map((item, index) => renderCmsVariables(
         template,
-        { item, index: String(index + 1) },
+        { [itemName]: item, item, index: String(index + 1) },
         context,
       )).join('')
+    })
+    doc.querySelectorAll('[data-yb-if]').forEach((element) => {
+      const visible = evaluateCmsTemplateCondition(element.getAttribute('data-yb-if'), context)
+      ;(element as HTMLElement).style.display = visible ? '' : 'none'
     })
     replaceCanvasTemplateValues(doc.body, context)
     doc.querySelectorAll('[data-yb-html]').forEach((element) => {
@@ -2700,21 +2724,53 @@ function insertImage(item: FileObject) {
 
 function registerDynamicTypes(instance: Editor) {
   instance.DomComponents.addType('yb-repeat', {
-    isComponent: el => el.hasAttribute?.('data-yb-repeat'),
+    isComponent: el => el.hasAttribute?.('data-yb-repeat') || el.hasAttribute?.('data-yb-for'),
     model: {
       defaults: {
         traits: [
           {
             type: 'select',
             name: 'data-yb-repeat',
-            label: '动态数据',
+            label: '动态数据（兼容）',
             options: [
               { id: 'pages', name: '公开页面' },
               { id: 'categories', name: '分类' },
               { id: 'tags', name: '标签' },
               { id: 'navigation', name: '导航' },
               { id: 'navUsers', name: '头像用户' },
+              { id: 'cms.pages.latest', name: '最新 CMS 页面' },
+              { id: 'knowledge.pages', name: '知识库页面' },
+              { id: 'knowledge.latest', name: '最新知识库内容' },
+              { id: 'knowledge.featured', name: '编辑推荐知识库内容' },
+              { id: 'knowledge.spaces', name: '公开知识库' },
             ],
+          },
+          {
+            type: 'text',
+            name: 'data-yb-for',
+            label: '循环表达式',
+            placeholder: 'item in knowledge.latest',
+          },
+          {
+            type: 'text',
+            name: 'data-yb-limit',
+            label: '最多展示',
+            placeholder: '6 或 {{site.latestLimit}}',
+          },
+        ],
+      },
+    },
+  })
+  instance.DomComponents.addType('yb-if', {
+    isComponent: el => el.hasAttribute?.('data-yb-if'),
+    model: {
+      defaults: {
+        traits: [
+          {
+            type: 'text',
+            name: 'data-yb-if',
+            label: '条件表达式',
+            placeholder: 'knowledge.latest.count > 0',
           },
         ],
       },

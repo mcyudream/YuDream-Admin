@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.cms;
 
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
+import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
 import online.yudream.base.application.platform.cms.service.CmsTemplateContextAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
@@ -26,6 +27,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 
@@ -70,6 +72,22 @@ class CmsTemplateContextAppServiceTest {
                 .extracting(item -> item.getSlug())
                 .containsExactly("published");
         assertThat(context.getKnowledge().getPages()).isEmpty();
+    }
+
+    @Test
+    void passesTemplateListLimitsToTheDataLayer() {
+        CmsPage first = CmsPage.builder().id(1L).title("One").slug("one").status(PageStatus.PUBLISHED).build();
+        CmsPage second = CmsPage.builder().id(2L).title("Two").slug("two").status(PageStatus.PUBLISHED).build();
+        when(cmsPages.publishedPage(isNull(), isNull(), isNull(), eq(1), eq(2)))
+                .thenReturn(new PageResult<>(List.of(first, second), 1, 2, 2));
+        when(capabilities.enabled("wiki")).thenReturn(false);
+        CmsTemplateContextQuery query = new CmsTemplateContextQuery();
+        query.setCmsLatestLimit(2);
+
+        CmsTemplateContextDTO context = service.query(query);
+
+        assertThat(context.getCms().getPages().getLatest()).hasSize(2);
+        org.mockito.Mockito.verify(cmsPages).publishedPage(isNull(), isNull(), isNull(), eq(1), eq(2));
     }
 
     @Test

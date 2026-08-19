@@ -271,6 +271,9 @@ const cmsVariables = [
   { key: 'data-yb-repeat="knowledge.latest"', label: '循环最新知识库内容' },
   { key: 'data-yb-repeat="knowledge.featured"', label: '循环编辑推荐知识库内容' },
   { key: 'data-yb-repeat="knowledge.spaces"', label: '循环公开知识库' },
+  { key: 'data-yb-for="item in knowledge.latest"', label: '最新知识库 for 循环' },
+  { key: 'data-yb-limit="6"', label: '限制最多展示 6 条' },
+  { key: 'data-yb-if="knowledge.latest.count > 0"', label: '有知识内容时显示' },
 ]
 
 watch(activeTab, async () => {

@@ -1,6 +1,7 @@
 package online.yudream.base.interfaces.platform.cms;
 
 import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
+import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
 import online.yudream.base.application.platform.cms.service.CmsAppService;
 import online.yudream.base.application.platform.cms.service.CmsTemplateContextAppService;
 import online.yudream.base.domain.common.PageResult;
@@ -28,12 +29,14 @@ class PublicCmsControllerTemplateContextTest {
                 .knowledge(CmsTemplateContextDTO.CmsTemplateKnowledgeDTO.builder()
                         .spaces(List.of()).pages(List.of()).latest(List.of()).build())
                 .build();
-        when(templateService.query()).thenReturn(context);
+        CmsTemplateContextQuery query = new CmsTemplateContextQuery();
+        query.setKnowledgeLatestLimit(6);
+        when(templateService.query(query)).thenReturn(context);
         PublicCmsController controller = new PublicCmsController(mock(CmsAppService.class), templateService);
 
-        Result<CmsTemplateContextRes> result = controller.templateContext();
+        Result<CmsTemplateContextRes> result = controller.templateContext(query);
 
         assertThat(result.getData().getKnowledge().getLatest()).isEmpty();
-        verify(templateService).query();
+        verify(templateService).query(query);
     }
 }

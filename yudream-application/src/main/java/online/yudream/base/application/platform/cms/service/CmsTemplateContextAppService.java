@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
 import online.yudream.base.application.platform.cms.dto.CmsTemplateItemDTO;
+import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
@@ -31,8 +32,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CmsTemplateContextAppService {
 
-    private static final int PAGE_LIMIT = 50;
     private static final int LATEST_LIMIT = 12;
+    private static final int MAX_LIST_LIMIT = 50;
     private static final int CONTENT_LIMIT = 20_000;
 
     private final CapabilityAppService capabilities;
@@ -43,24 +44,33 @@ public class CmsTemplateContextAppService {
 
     @Transactional(readOnly = true)
     public CmsTemplateContextDTO query() {
+        return query(new CmsTemplateContextQuery());
+    }
+
+    @Transactional(readOnly = true)
+    public CmsTemplateContextDTO query(CmsTemplateContextQuery query) {
         capabilities.ensureEnabled("cms", "CMS 内容");
-        List<CmsTemplateItemDTO> pages = cmsPages.publishedPage(null, null, null, 1, PAGE_LIMIT)
+        CmsTemplateContextQuery safeQuery = query == null ? new CmsTemplateContextQuery() : query;
+        int cmsLatestLimit = bounded(safeQuery.getCmsLatestLimit(), LATEST_LIMIT);
+        List<CmsTemplateItemDTO> pages = cmsLatestLimit == 0
+                ? List.of()
+                : cmsPages.publishedPage(null, null, null, 1, cmsLatestLimit)
                 .getRecords().stream()
                 .map(this::cmsPage)
                 .sorted(Comparator.comparing(CmsTemplateItemDTO::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
-        CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge = knowledge();
+        CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge = knowledge(safeQuery);
         return CmsTemplateContextDTO.builder()
                 .cms(CmsTemplateContextDTO.CmsTemplateCmsDTO.builder()
                         .pages(CmsTemplateContextDTO.CmsTemplatePagesDTO.builder()
-                                .latest(limit(pages))
+                                .latest(limit(pages, cmsLatestLimit))
                                 .build())
                         .build())
                 .knowledge(knowledge)
                 .build();
     }
 
-    private CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge() {
+    private CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge(CmsTemplateContextQuery query) {
         if (!capabilities.enabled("wiki")) {
             return CmsTemplateContextDTO.CmsTemplateKnowledgeDTO.builder()
                     .spaces(List.of()).pages(List.of()).latest(List.of()).featured(List.of()).build();
@@ -80,11 +90,15 @@ public class CmsTemplateContextAppService {
                         .thenComparing(CmsTemplateItemDTO::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(CmsTemplateItemDTO::getId))
                 .toList();
+        int spacesLimit = bounded(query.getKnowledgeSpacesLimit(), MAX_LIST_LIMIT);
+        int pagesLimit = bounded(query.getKnowledgePagesLimit(), MAX_LIST_LIMIT);
+        int latestLimit = bounded(query.getKnowledgeLatestLimit(), LATEST_LIMIT);
+        int featuredLimit = bounded(query.getKnowledgeFeaturedLimit(), LATEST_LIMIT);
         return CmsTemplateContextDTO.CmsTemplateKnowledgeDTO.builder()
-                .spaces(spaces)
-                .pages(pages)
-                .latest(limit(pages))
-                .featured(limit(featured))
+                .spaces(limit(spaces, spacesLimit))
+                .pages(limit(pages, pagesLimit))
+                .latest(limit(pages, latestLimit))
+                .featured(limit(featured, featuredLimit))
                 .build();
     }
 
@@ -173,8 +187,19 @@ public class CmsTemplateContextAppService {
         return parentPath == null || parentPath.isBlank() ? node.getSlug() : parentPath + "/" + node.getSlug();
     }
 
-    private <T> List<T> limit(List<T> values) {
-        return values.size() <= LATEST_LIMIT ? values : new ArrayList<>(values.subList(0, LATEST_LIMIT));
+    private <T> List<T> limit(List<T> values, int limit) {
+        int safeLimit = bounded(limit, LATEST_LIMIT);
+        return values.size() <= safeLimit ? values : new ArrayList<>(values.subList(0, safeLimit));
+    }
+
+    private int bounded(Integer requested, int fallback) {
+        if (requested == null) {
+            return fallback;
+        }
+        if (requested <= 0) {
+            return 0;
+        }
+        return Math.min(requested, MAX_LIST_LIMIT);
     }
 
     private String limitContent(String value) {
