@@ -16,7 +16,8 @@ export interface CanvasToolExecOptions {
   onChanged?: () => void
 }
 
-const OUTLINE_NODE_CAP = 200
+// 纲要通过单个 WebSocket TOOL_RESULT 帧回传；限制节点数，避免复杂页面生成过大的模型上下文与传输帧。
+const OUTLINE_NODE_CAP = 120
 const HTML_EXCERPT_CAP = 3000
 
 export function executeCanvasTool(
@@ -75,9 +76,17 @@ function getOutline(editor: Editor, args: Record<string, unknown>): Record<strin
   if (!wrapper) {
     return { message: '画布为空', nodes: [] }
   }
-  const nodes = wrapper.components().map(child => outlineNode(child, 1, maxDepth, state))
+  const rootChildren = wrapper.components().map(child => child)
+  const nodes: OutlineNode[] = []
+  for (const child of rootChildren) {
+    if (state.count >= OUTLINE_NODE_CAP) {
+      state.truncated = true
+      break
+    }
+    nodes.push(outlineNode(child, 1, maxDepth, state))
+  }
   return {
-    message: state.truncated ? `纲要已生成（超出 ${OUTLINE_NODE_CAP} 节点上限，已截断）` : '纲要已生成',
+    message: state.truncated ? `纲要已生成（部分层级已截断，最多返回 ${OUTLINE_NODE_CAP} 个节点）` : '纲要已生成',
     nodeCount: state.count,
     truncated: state.truncated,
     nodes,
@@ -123,13 +132,23 @@ function outlineNode(component: Component, depth: number, maxDepth: number, stat
   }
   const children = component.components()
   node.childCount = children.length
-  if (depth < maxDepth && children.length && state.count < OUTLINE_NODE_CAP) {
-    node.children = children.map(child => outlineNode(child, depth + 1, maxDepth, state))
+  if (depth < maxDepth && children.length) {
+    const childNodes: OutlineNode[] = []
+    const childModels = children.map(child => child)
+    for (const child of childModels) {
+      if (state.count >= OUTLINE_NODE_CAP) {
+        state.truncated = true
+        node.truncated = true
+        break
+      }
+      childNodes.push(outlineNode(child, depth + 1, maxDepth, state))
+    }
+    if (childNodes.length) {
+      node.children = childNodes
+    }
   }
   else if (children.length) {
     node.truncated = true
-  }
-  if (state.count >= OUTLINE_NODE_CAP) {
     state.truncated = true
   }
   return node
