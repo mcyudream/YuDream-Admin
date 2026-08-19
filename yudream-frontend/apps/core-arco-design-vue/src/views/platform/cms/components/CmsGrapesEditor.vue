@@ -738,8 +738,6 @@ onMounted(async () => {
     undoManager: { trackSelection: false },
     selectorManager: { componentFirst: true },
     keepUnusedStyles: true,
-    // 无限画布：滚轮平移、Ctrl/⌘+滚轮以指针为中心缩放、空格+拖动平移，画框高度随内容自适应，避免内容被裁切且无法移动
-    infiniteCanvas: true,
     blockManager: { appendTo: blocksEl.value! },
     layerManager: { appendTo: layersEl.value! },
     traitManager: { appendTo: traitsEl.value! },

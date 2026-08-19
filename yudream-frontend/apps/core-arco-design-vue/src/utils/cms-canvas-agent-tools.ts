@@ -1,4 +1,4 @@
-import type { Component, Editor } from 'grapesjs'
+import type { Block, Component, Editor } from 'grapesjs'
 
 /**
  * CMS Agent v2 客户端画布工具执行器：工具在浏览器 GrapesJS 画布上真实执行，
@@ -111,7 +111,7 @@ function getHtmlOutlinePage(editor: Editor, args: Record<string, unknown>, curso
   }
   const allNodes: Array<OutlineNode & { depth: number, parentId?: string }> = []
   const state = { truncated: false }
-  collectOutlineNodes(wrapper.components().map(child => child), 1, maxDepth, undefined, allNodes, state)
+  collectOutlineNodes(wrapper.components().map((child: Component) => child), 1, maxDepth, undefined, allNodes, state)
   const page = allNodes.slice(cursor, cursor + limit)
   const nextCursor = cursor + page.length
   return {
@@ -142,7 +142,7 @@ function collectOutlineNodes(
     const node = outlineNodeSummary(component)
     output.push({ ...node, depth, ...(parentId ? { parentId } : {}) })
     if (depth < maxDepth && component.components().length) {
-      collectOutlineNodes(component.components().map(child => child), depth + 1, maxDepth, node.id, output, state)
+      collectOutlineNodes(component.components().map((child: Component) => child), depth + 1, maxDepth, node.id, output, state)
       if (state.truncated) {
         return
       }
@@ -400,7 +400,7 @@ function removeComponent(component: Component, opts: CanvasToolExecOptions): Rec
 
 function listBlocks(editor: Editor): Record<string, unknown> {
   const blocks = editor.BlockManager.getAll()
-    .map(block => ({
+    .map((block: Block) => ({
       id: block.get('id'),
       label: block.get('label'),
       category: typeof block.get('category') === 'string' ? block.get('category') : (block.get('category') as { getLabel?: () => string })?.getLabel?.() || '',
