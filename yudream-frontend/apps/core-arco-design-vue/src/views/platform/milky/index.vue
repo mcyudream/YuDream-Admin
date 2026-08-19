@@ -169,10 +169,13 @@ onMounted(load)
           <FaInput v-model="form.token" type="password" />
         </a-form-item>
         <a-form-item label="指令菜单图片格式">
-          <a-select v-model="form.commandMenuImageMode">
-            <a-option value="base64">Base64（开发环境推荐）</a-option>
-            <a-option value="url">公开链接（公网部署）</a-option>
-          </a-select>
+          <FaSelect
+            v-model="form.commandMenuImageMode"
+            :options="[
+              { label: 'Base64（开发环境推荐）', value: 'base64' },
+              { label: '公开链接（公网部署）', value: 'url' },
+            ]"
+          />
         </a-form-item>
         <a-form-item v-if="form.commandMenuImageMode === 'url'" label="公开访问基础地址">
           <FaInput v-model="form.commandMenuPublicBaseUrl" placeholder="https://admin.example.com" />
