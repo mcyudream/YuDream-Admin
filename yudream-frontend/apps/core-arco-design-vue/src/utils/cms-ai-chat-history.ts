@@ -146,7 +146,7 @@ export function createCmsAiChatSessionStore(options: {
     save: async (session) => {
       const now = Date.now()
       const existing = await getCmsAiChatSession(session.id)
-      await saveCmsAiChatSession({
+      await saveCmsAiChatSession(toPersistableSession({
         ...session,
         targetKey: options.targetKey(),
         targetType: options.targetType(),
@@ -154,7 +154,7 @@ export function createCmsAiChatSessionStore(options: {
         targetLabel: options.targetLabel(),
         createdAt: existing?.createdAt ?? now,
         updatedAt: session.updatedAt ?? now,
-      })
+      }))
       writeActiveCmsAiChatSessionId(options.targetKey(), session.id)
     },
     remove: async (id) => {
@@ -164,6 +164,11 @@ export function createCmsAiChatSessionStore(options: {
       }
     },
   }
+}
+
+function toPersistableSession(session: CmsAiChatSession): CmsAiChatSession {
+  // Vue ref/reactive 中的 Proxy 不能直接被 IndexedDB structuredClone；先转成纯 JSON 数据再保存。
+  return JSON.parse(JSON.stringify(session)) as CmsAiChatSession
 }
 
 function openDb() {

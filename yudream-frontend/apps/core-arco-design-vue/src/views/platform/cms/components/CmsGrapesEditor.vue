@@ -602,7 +602,10 @@ function aiSessionMeta() {
     modelValue: aiModelValue.value,
     thinkingEnabled: aiThinkingEnabled.value,
     askUser: pendingAskOptions.value.length
-      ? { dsl: pendingAskDsl.value, options: pendingAskOptions.value }
+      ? {
+          dsl: pendingAskDsl.value,
+          options: JSON.parse(JSON.stringify(pendingAskOptions.value)) as AskOption[],
+        }
       : undefined,
   }
 }
@@ -710,7 +713,7 @@ watch([rightPanelTab, chatHistoryTargetKey], () => {
   if (rightPanelTab.value === 'source') {
     syncSelectedSource()
   }
-})
+}, { immediate: true })
 
 watch(pageJsContent, () => {
   canvasRevision.value += 1
@@ -2337,6 +2340,9 @@ function injectCanvasChromePreviewStyle(instance: Editor) {
     const style = doc.getElementById('yb-cms-chrome-preview-style') || doc.createElement('style')
     style.id = 'yb-cms-chrome-preview-style'
     style.textContent = chromeCanvasPreviewCss(props.chromeLayout)
+    // iframe 不继承宿主 html.dark；同步主题类，让公开站和构建器使用同一套站点色板。
+    doc.documentElement.classList.toggle('dark', document.documentElement.classList.contains('dark'))
+    doc.body?.classList.toggle('dark', document.documentElement.classList.contains('dark'))
     if (!style.parentNode) {
       doc.head?.appendChild(style)
     }
