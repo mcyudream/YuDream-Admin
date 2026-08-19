@@ -31,6 +31,7 @@ import online.yudream.base.application.platform.agent.workflow.support.AgentWork
 import online.yudream.base.application.platform.agent.workflow.support.AgentWorkflowValueResolver;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
+import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
@@ -61,6 +62,7 @@ public class AgentWorkflowRuntimeService {
     private final ObjectProvider<online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway> pluginToolGateways;
     private final AgentPermissionGateway permissionGateway;
     private final CapabilityAppService capabilityAppService;
+    private final AgentExecutionTracer executionTracer;
 
     public AgentWorkflowRuntimeResult execute(
             AgentApplication application,
@@ -95,6 +97,33 @@ public class AgentWorkflowRuntimeService {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
+        return execute(application, command, aiConfig, null, onNode, onDelta, onReasoningDelta, onTool, onProgress);
+    }
+
+    public AgentWorkflowRuntimeResult execute(
+            AgentApplication application,
+            AgentRunCmd command,
+            Map<String, String> aiConfig,
+            AgentTraceSource sourceHint,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
+        AgentTraceSession trace = executionTracer.begin(application, command, sourceHint);
+        Consumer<String> tracedReasoningDelta = delta -> {
+            trace.reasoningDelta(delta);
+            if (onReasoningDelta != null) {
+                onReasoningDelta.accept(delta);
+            }
+        };
+        Consumer<AiAgentToolResult> tracedTool = tool -> {
+            trace.toolResult(tool);
+            if (onTool != null) {
+                onTool.accept(tool);
+            }
+        };
         List<AiAgentTool> systemTools = systemToolProvider.stream().toList();
         Set<String> systemToolCodes = systemTools.stream()
                 .map(tool -> tool.descriptor().name())
@@ -108,8 +137,8 @@ public class AgentWorkflowRuntimeService {
                 aiConfig,
                 systemToolCodes,
                 onDelta,
-                onReasoningDelta,
-                onTool,
+                tracedReasoningDelta,
+                tracedTool,
                 onProgress,
                 new AgentModelToolResolver(toolExecutor)
         );
@@ -120,18 +149,25 @@ public class AgentWorkflowRuntimeService {
         AgentWorkflowExecutor executor = new AgentWorkflowExecutor(
                 graphParser, handlers(values, application, state, toolExecutor)
         );
-        AgentWorkflowExecution execution = executor.execute(
-                application.getWorkflowJson(),
-                initialInput(command),
-                listener(onNode, values)
-        );
-        Object output = graph.topologicalOrder().stream()
-                .filter(node -> "end".equals(node.kind()))
-                .filter(node -> execution.executedNodeIds().contains(node.id()))
-                .map(node -> execution.context().nodeOutput(node.id()))
-                .reduce((left, right) -> right)
-                .orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("工作流未执行结束节点"));
-        return new AgentWorkflowRuntimeResult(content(output), state.reasoning(), state.toolResults(), state.usage());
+        try {
+            AgentWorkflowExecution execution = executor.execute(
+                    application.getWorkflowJson(),
+                    initialInput(command),
+                    listener(onNode, values, trace)
+            );
+            Object output = graph.topologicalOrder().stream()
+                    .filter(node -> "end".equals(node.kind()))
+                    .filter(node -> execution.executedNodeIds().contains(node.id()))
+                    .map(node -> execution.context().nodeOutput(node.id()))
+                    .reduce((left, right) -> right)
+                    .orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("工作流未执行结束节点"));
+            AgentWorkflowRuntimeResult result = new AgentWorkflowRuntimeResult(content(output), state.reasoning(), state.toolResults(), state.usage());
+            trace.succeed(result);
+            return result;
+        } catch (RuntimeException e) {
+            trace.fail(e);
+            throw e;
+        }
     }
 
     private List<AgentWorkflowNodeHandler> handlers(
@@ -168,15 +204,20 @@ public class AgentWorkflowRuntimeService {
 
     private AgentWorkflowEventListener listener(
             Consumer<AgentDebugEventDTO> onNode,
-            AgentWorkflowValueResolver values
+            AgentWorkflowValueResolver values,
+            AgentTraceSession trace
     ) {
-        if (onNode == null) {
+        if (onNode == null && !trace.active()) {
             return AgentWorkflowEventListener.NOOP;
         }
         return new AgentWorkflowEventListener() {
             @Override
             public void onNodeStarted(AgentWorkflowNode node, online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context) {
-                onNode.accept(event(node, "RUNNING", "输入：" + summary(values.input(node, context))));
+                String inputSummary = summary(values.input(node, context));
+                trace.nodeStarted(node.id(), node.kind(), node.title(), inputSummary);
+                if (onNode != null) {
+                    onNode.accept(event(node, "RUNNING", "输入：" + inputSummary));
+                }
             }
 
             @Override
@@ -185,7 +226,11 @@ public class AgentWorkflowRuntimeService {
                     AgentWorkflowNodeResult result,
                     online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context
             ) {
-                onNode.accept(event(node, "COMPLETED", "输出：" + summary(result.output())));
+                String outputSummary = summary(result.output());
+                trace.nodeCompleted(node.id(), outputSummary);
+                if (onNode != null) {
+                    onNode.accept(event(node, "COMPLETED", "输出：" + outputSummary));
+                }
             }
 
             @Override
@@ -194,7 +239,10 @@ public class AgentWorkflowRuntimeService {
                     RuntimeException error,
                     online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context
             ) {
-                onNode.accept(event(node, "FAILED", error.getMessage() == null ? "节点执行失败" : error.getMessage()));
+                trace.nodeFailed(node.id(), error.getMessage());
+                if (onNode != null) {
+                    onNode.accept(event(node, "FAILED", error.getMessage() == null ? "节点执行失败" : error.getMessage()));
+                }
             }
 
             @Override
@@ -202,7 +250,10 @@ public class AgentWorkflowRuntimeService {
                     AgentWorkflowNode node,
                     online.yudream.base.application.platform.agent.workflow.AgentWorkflowContext context
             ) {
-                onNode.accept(event(node, "SKIPPED", "条件分支未命中"));
+                trace.nodeSkipped(node.id(), node.kind(), node.title());
+                if (onNode != null) {
+                    onNode.accept(event(node, "SKIPPED", "条件分支未命中"));
+                }
             }
         };
     }

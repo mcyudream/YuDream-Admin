@@ -11,6 +11,7 @@ import online.yudream.base.application.platform.ai.cmd.CmsPageGenerateCmd;
 import online.yudream.base.application.platform.ai.dto.CmsPageGenerateDTO;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import org.springframework.stereotype.Service;
@@ -232,13 +233,14 @@ public class AiAppService {
                 ? agentAppService.debugByCode(
                         agentCode,
                         agentCmd,
+                        AgentTraceSource.CMS,
                         event -> progress(onProgress, progressAction(event), progressContent(event)),
                         onDelta,
                         onReasoningDelta,
                         onTool,
                         onProgress
                 )
-                : agentAppService.runByCode(agentCode, agentCmd);
+                : agentAppService.runByCode(agentCode, agentCmd, AgentTraceSource.CMS);
         ensureCanvasValidationPassed(result.getToolResults());
         CmsPageGenerateDTO dto = CmsPageGenerateDTO.builder().summary(result.getContent()).build();
         return AiAssembler.withTools(dto, result.getToolResults());

@@ -45,6 +45,19 @@ class AgentWorkflowRuntimeServiceTest {
         return provider;
     }
 
+    private static AgentExecutionTracer disabledTracer() {
+        AgentTraceProperties properties = new AgentTraceProperties();
+        properties.setEnabled(false);
+        return new AgentExecutionTracer(
+                properties,
+                mock(online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo.class),
+                mock(online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry.class),
+                event -> {
+                },
+                new ObjectMapper()
+        );
+    }
+
     @Test
     void shouldRunExtractNodeWithoutEnablingIntegrationForSystemModelTool() {
         ObjectProvider<AiGenerationGateway> gateways = mock(ObjectProvider.class);
@@ -71,7 +84,8 @@ class AgentWorkflowRuntimeServiceTest {
         var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability,
+                disabledTracer()
         );
         AgentApplication application = AgentApplication.builder().name("Extract").code("extract")
                 .toolCodes(List.of("web.fetch"))
@@ -107,7 +121,8 @@ class AgentWorkflowRuntimeServiceTest {
         var capability = mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class);
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), toolRepo, gateways, tools,
-                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability
+                mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true, capability,
+                disabledTracer()
         );
         AgentApplication application = AgentApplication.builder().name("Python model").code("python-model")
                 .toolCodes(List.of("risk_score"))
@@ -132,7 +147,8 @@ class AgentWorkflowRuntimeServiceTest {
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), mock(ObjectProvider.class), mock(ObjectProvider.class),
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true,
-                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class),
+                disabledTracer()
         );
         var data = new ObjectMapper().createObjectNode()
                 .put("toolMode", "NONE")
@@ -158,7 +174,8 @@ class AgentWorkflowRuntimeServiceTest {
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(),
                 permission -> { throw new AssertionError("Thread permission context must not be read"); },
-                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class),
+                disabledTracer()
         );
         AgentApplication application = AgentApplication.builder()
                 .name("Async debug application").code("async-debug").toolCodes(List.of("cms.patch"))
@@ -191,7 +208,8 @@ class AgentWorkflowRuntimeServiceTest {
                 mock(AgentKnowledgeOperations.class),
                 mock(DocumentTextExtractor.class), emptyPluginToolGateways(),
                 permission -> true,
-                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+                mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class),
+                disabledTracer()
         );
         AgentApplication application = AgentApplication.builder()
                 .name("模板应用")
@@ -231,7 +249,8 @@ class AgentWorkflowRuntimeServiceTest {
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> true
-                , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+                , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class),
+                disabledTracer()
         );
         AgentApplication application = AgentApplication.builder()
                 .name("分支应用").code("branch").toolCodes(List.of())
@@ -268,7 +287,8 @@ class AgentWorkflowRuntimeServiceTest {
         AgentWorkflowRuntimeService service = new AgentWorkflowRuntimeService(
                 new ObjectMapper(), mock(RuntimeExecutor.class), mock(AgentToolRepo.class), gateways, tools,
                 mock(AgentKnowledgeOperations.class), mock(DocumentTextExtractor.class), emptyPluginToolGateways(), permission -> false
-                , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class)
+                , mock(online.yudream.base.application.platform.capability.service.CapabilityAppService.class),
+                disabledTracer()
         );
         AgentApplication application = AgentApplication.builder()
                 .name("受限应用").code("protected").toolCodes(List.of("cms.patch"))

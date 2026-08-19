@@ -7,6 +7,7 @@ import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.service.AgentAppService;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.chat.enumerate.ChatScopeType;
 import online.yudream.base.domain.platform.chat.valobj.ChatActivity;
 import org.springframework.stereotype.Component;
@@ -44,10 +45,12 @@ public class AgentChatDispatcher implements ChatDispatcher {
         AgentRunDTO result = agentAppService.debugByCode(
                 context.agentCode(),
                 command,
+                AgentTraceSource.CHAT,
                 node -> context.onActivity().accept(toActivity(node)),
                 context.onDelta(),
                 context.onReasoningDelta(),
-                context.onTool());
+                context.onTool(),
+                null);
         return ChatDispatchResult.of(result.getContent(), result.getUsage());
     }
 
