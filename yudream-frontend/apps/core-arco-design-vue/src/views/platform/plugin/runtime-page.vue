@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import type { Component } from 'vue'
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
-import { loadPluginFrontendAssets } from '@/plugins/frontend-assets'
+import type { Component } from 'vue'
+import { loadPluginFrontendAssets, reloadPluginFrontendAssets } from '@/plugins/frontend-assets'
 import { createPluginSdk } from '@/plugins/sdk'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import eventBus from '@/utils/eventBus'
 
 interface PluginRouteMeta {
   pluginCode: string
@@ -19,11 +20,35 @@ const route = useRoute()
 const remoteComponent = shallowRef<Component | null>(null)
 const remoteError = ref('')
 const remoteLoading = ref(false)
+const reloadVersion = ref(0)
 
 const plugin = computed(() => (route.meta.plugin || {}) as PluginRouteMeta)
 const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
 
 watch(plugin, loadRemoteComponent, { immediate: true })
+
+onMounted(() => {
+  eventBus.on('plugin-devtools:remote-reload', handleRemoteReload)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('plugin-devtools:remote-reload', handleRemoteReload)
+})
+
+/** 开发者工具热重载联动：当前页面属于被重载插件时，以版本戳重挂载 remote（状态重置，非 HMR） */
+async function handleRemoteReload(code: string) {
+  if (!code || code !== plugin.value.pluginCode) {
+    return
+  }
+  reloadVersion.value = Date.now()
+  try {
+    await reloadPluginFrontendAssets(code, String(reloadVersion.value))
+  }
+  catch {
+    // 样式刷新失败不阻断 remote 重挂载
+  }
+  await loadRemoteComponent()
+}
 
 async function loadRemoteComponent() {
   remoteComponent.value = null
@@ -38,7 +63,11 @@ async function loadRemoteComponent() {
   try {
     await loadPluginFrontendAssets(plugin.value)
     const entry = plugin.value.entry || `/api/platform/plugins/${plugin.value.pluginCode}/assets/remoteEntry.js`
-    const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
+    const entryUrl = toBackendAssetUrl(entry)
+    const versionedUrl = reloadVersion.value
+      ? `${entryUrl}${entryUrl.includes('?') ? '&' : '?'}v=${reloadVersion.value}`
+      : entryUrl
+    const module = await import(/* @vite-ignore */ versionedUrl)
     await mountPluginModule(module)
   }
   catch (error: any) {

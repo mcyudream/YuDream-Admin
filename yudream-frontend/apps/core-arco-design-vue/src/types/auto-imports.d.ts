@@ -98,6 +98,7 @@ declare global {
   const useLink: typeof import('vue-router').useLink
   const useModel: typeof import('vue').useModel
   const usePagination: typeof import('@fantastic-admin/composables').usePagination
+  const usePluginDevtoolsStore: typeof import('../store/modules/app/plugin-devtools').usePluginDevtoolsStore
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
@@ -112,6 +113,9 @@ declare global {
   // @ts-ignore
   export type { Component, Slot, Slots, ComponentPublicInstance, ComputedRef, DirectiveBinding, ExtractDefaultPropTypes, ExtractPropTypes, ExtractPublicPropTypes, InjectionKey, PropType, Ref, ShallowRef, MaybeRef, MaybeRefOrGetter, VNode, WritableComputedRef } from 'vue'
   import('vue')
+  // @ts-ignore
+  export type { LiveTrace } from '../store/modules/app/plugin-devtools'
+  import('../store/modules/app/plugin-devtools')
   // @ts-ignore
   export type { PluginRuntimeRouteMeta } from '../store/modules/app/plugin-route-runtime'
   import('../store/modules/app/plugin-route-runtime')
