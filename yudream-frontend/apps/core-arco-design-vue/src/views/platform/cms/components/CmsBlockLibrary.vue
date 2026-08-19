@@ -225,39 +225,34 @@ function onPageSizeChange(size: number) {
 </script>
 
 <template>
-  <a-modal
-    :visible="props.visible"
-    :width="960"
-    :footer="false"
-    :mask-closable="false"
-    :esc-to-close="false"
+  <FaModal
+    :model-value="props.visible"
     title="CMS 区块库"
-    @cancel="close"
+    class="sm:max-w-[960px]"
+    :footer="false"
+    :close-on-click-overlay="false"
+    :close-on-press-escape="false"
+    @update:model-value="emit('update:visible', $event)"
+    @close="close"
   >
     <div class="block-library">
       <div class="block-library__toolbar">
-        <a-input
+        <FaInput
           v-model="keyword"
           placeholder="搜索编码、名称"
-          allow-clear
-          style="width: 220px"
-          @press-enter="loadBlocks"
-          @clear="loadBlocks"
+          clearable
+          class="w-[220px]"
         />
-        <a-select
+        <FaSelect
           v-model="categoryFilter"
           :options="categoryOptions"
           placeholder="选择分类"
-          allow-clear
-          style="width: 160px"
-          @change="loadBlocks"
+          class="w-[160px]"
         />
-        <a-button type="primary" @click="openCreate">
-          <template #icon>
-            <FaIcon name="i-ri:add-line" />
-          </template>
+        <FaButton @click="openCreate">
+          <FaIcon name="i-ri:add-line" />
           新增区块
-        </a-button>
+        </FaButton>
       </div>
 
       <FaResponsiveTable
@@ -345,54 +340,54 @@ function onPageSizeChange(size: number) {
       />
     </div>
 
-    <a-modal
-      v-model:visible="formVisible"
+    <FaModal
+      v-model="formVisible"
       :title="editingBlock ? '编辑区块' : '新增区块'"
-      :width="720"
-      :mask-closable="false"
-      @cancel="closeForm"
+      class="sm:max-w-[720px]"
+      :close-on-click-overlay="false"
+      @close="closeForm"
     >
       <a-form :model="form" layout="vertical">
         <div class="block-form-grid">
           <a-form-item label="编码" required>
-            <a-input v-model="form.code" placeholder="block-hero-center" :disabled="Boolean(editingBlock)" />
+            <FaInput v-model="form.code" placeholder="block-hero-center" :disabled="Boolean(editingBlock)" />
           </a-form-item>
           <a-form-item label="名称" required>
-            <a-input v-model="form.name" placeholder="区块名称" />
+            <FaInput v-model="form.name" placeholder="区块名称" />
           </a-form-item>
           <a-form-item label="分类">
-            <a-input v-model="form.category" placeholder="预制" />
+            <FaInput v-model="form.category" placeholder="预制" />
           </a-form-item>
           <a-form-item label="类型">
-            <a-select v-model="form.kind" :options="kindOptions" />
+            <FaSelect v-model="form.kind" :options="kindOptions" />
           </a-form-item>
           <a-form-item label="启用" class="block-form-switch">
-            <a-switch v-model="form.enabled" />
+            <FaSwitch v-model="form.enabled" />
           </a-form-item>
           <a-form-item label="描述" class="block-form-span-2">
-            <a-textarea v-model="form.description" :auto-size="{ minRows: 2, maxRows: 4 }" placeholder="可选描述" />
+            <FaTextarea v-model="form.description" rows="2" placeholder="可选描述" />
           </a-form-item>
           <a-form-item label="HTML 内容" class="block-form-span-2">
-            <a-textarea v-model="form.htmlContent" :auto-size="{ minRows: 6, maxRows: 12 }" placeholder="<section>...</section>" />
+            <FaTextarea v-model="form.htmlContent" rows="6" placeholder="<section>...</section>" />
           </a-form-item>
           <a-form-item label="CSS 内容" class="block-form-span-2">
-            <a-textarea v-model="form.cssContent" :auto-size="{ minRows: 4, maxRows: 8 }" placeholder="可选 CSS" />
+            <FaTextarea v-model="form.cssContent" rows="4" placeholder="可选 CSS" />
           </a-form-item>
           <a-form-item label="JS 内容" class="block-form-span-2">
-            <a-textarea v-model="form.jsContent" :auto-size="{ minRows: 3, maxRows: 6 }" placeholder="可选 JS" />
+            <FaTextarea v-model="form.jsContent" rows="3" placeholder="可选 JS" />
           </a-form-item>
         </div>
       </a-form>
       <template #footer>
-        <a-space>
-          <a-button @click="closeForm">取消</a-button>
-          <a-button type="primary" :loading="saving" @click="saveForm">
+        <div class="flex justify-end gap-2">
+          <FaButton variant="outline" @click="closeForm">取消</FaButton>
+          <FaButton :loading="saving" @click="saveForm">
             保存
-          </a-button>
-        </a-space>
+          </FaButton>
+        </div>
       </template>
-    </a-modal>
-  </a-modal>
+    </FaModal>
+  </FaModal>
 </template>
 
 <style scoped>
