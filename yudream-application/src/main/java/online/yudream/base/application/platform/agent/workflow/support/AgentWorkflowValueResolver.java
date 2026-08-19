@@ -6,8 +6,9 @@ import online.yudream.base.application.platform.agent.workflow.AgentWorkflowCont
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNode;
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowNodeResult;
 import online.yudream.base.domain.common.exception.BizException;
-import org.springframework.context.expression.MapAccessor;
 import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.PropertyAccessor;
+import org.springframework.expression.TypedValue;
 import org.springframework.expression.common.TemplateParserContext;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.SimpleEvaluationContext;
@@ -116,9 +117,37 @@ public final class AgentWorkflowValueResolver {
     private EvaluationContext evaluationContext(AgentWorkflowContext context) {
         Map<String, Object> values = objectMapper.convertValue(context.variables(), MAP_TYPE);
         values.put("nodes", objectMapper.convertValue(context.nodeOutputs(), MAP_TYPE));
-        return SimpleEvaluationContext.forPropertyAccessors(new MapAccessor())
+        return SimpleEvaluationContext.forPropertyAccessors(new LenientMapAccessor())
                 .withAssignmentDisabled()
                 .withRootObject(values)
                 .build();
+    }
+
+    /** 工作流模型/工具输出是动态 JSON Map；缺失字段视为空值，避免可选字段把整条流程打挂。 */
+    private static final class LenientMapAccessor implements PropertyAccessor {
+        @Override
+        public Class<?>[] getSpecificTargetClasses() {
+            return new Class<?>[]{Map.class};
+        }
+
+        @Override
+        public boolean canRead(EvaluationContext context, Object target, String name) {
+            return target instanceof Map<?, ?>;
+        }
+
+        @Override
+        public TypedValue read(EvaluationContext context, Object target, String name) {
+            Object value = ((Map<?, ?>) target).get(name);
+            return value == null ? TypedValue.NULL : new TypedValue(value);
+        }
+
+        @Override
+        public boolean canWrite(EvaluationContext context, Object target, String name) {
+            return false;
+        }
+
+        @Override
+        public void write(EvaluationContext context, Object target, String name, Object newValue) {
+        }
     }
 }
