@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 
 import java.util.List;
 import java.util.Optional;
@@ -46,4 +47,7 @@ public interface PluginRuntimeGateway {
     Optional<PluginFrontendAssetInfo> frontendAsset(String code, String assetPath);
 
     PluginHttpDispatchResult dispatch(PluginHttpDispatchRequest request);
+
+    /** 单个插件运行时贡献资产快照，供开发者工具面板聚合展示。 */
+    PluginRuntimeAssets runtimeAssets(String code);
 }

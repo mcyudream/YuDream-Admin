@@ -5,7 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
+import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.domain.platform.plugin.valobj.PluginAiToolInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginCapabilityAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
@@ -14,8 +18,12 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMenuAssetInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMessageInteractionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -33,6 +41,7 @@ import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.security.PluginPrincipal;
 import online.yudream.base.plugin.spi.system.messaging.PluginEvent;
 import online.yudream.base.plugin.spi.system.command.PluginCommandContext;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -66,6 +75,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final PluginAiToolRegistry aiToolRegistry;
     private final PluginSemanticMemoryService semanticMemoryService;
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
+    private final ApplicationEventPublisher eventPublisher;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -100,16 +110,23 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (holders.containsKey(module.getCode())) {
             return;
         }
-        PluginRuntimeHolder holder = createHolder(module);
+        long startNanos = System.nanoTime();
         try {
-            holder.getPlugin().onLoad(holder.getContext());
+            PluginRuntimeHolder holder = createHolder(module);
+            try {
+                holder.getPlugin().onLoad(holder.getContext());
+            } catch (RuntimeException | Error e) {
+                holder.getContext().dispose();
+                closeClassLoader(holder.getClassLoader());
+                throw e;
+            }
+            holders.put(module.getCode(), holder);
+            log.info("Plugin loaded: code={}, jar={}", module.getCode(), module.getJarPath());
+            publishLifecycle(module.getCode(), PluginLifecycleAction.LOAD, holder.getDescriptor().version(), startNanos, null);
         } catch (RuntimeException | Error e) {
-            holder.getContext().dispose();
-            closeClassLoader(holder.getClassLoader());
+            publishLifecycle(module.getCode(), PluginLifecycleAction.LOAD, null, startNanos, e);
             throw e;
         }
-        holders.put(module.getCode(), holder);
-        log.info("Plugin loaded: code={}, jar={}", module.getCode(), module.getJarPath());
     }
 
     @Override
@@ -119,16 +136,19 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (holder.isEnabled()) {
             return;
         }
+        long startNanos = System.nanoTime();
         try {
             annotationRegistrar.register(holder.getPlugin(), holder.getContext());
             registerDeclaredAgents(holder);
             holder.getPlugin().onEnable(holder.getContext());
             holder.setEnabled(true);
             log.info("Plugin enabled: code={}", module.getCode());
+            publishLifecycle(module.getCode(), PluginLifecycleAction.ENABLE, holder.getDescriptor().version(), startNanos, null);
         } catch (RuntimeException | Error e) {
             // JAR 损坏等情况会抛 ZipError 等非 RuntimeException，必须同样回滚已注册的菜单/指令等贡献，
             // 否则残留注册会让后续重试永远报“插件指令编码重复”，只能重启 JVM 恢复
             holder.getContext().clearRuntimeContributions();
+            publishLifecycle(module.getCode(), PluginLifecycleAction.ENABLE, holder.getDescriptor().version(), startNanos, e);
             throw e;
         }
     }
@@ -140,10 +160,17 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             return;
         }
         ensureNoEnabledHardDependents(code);
-        holder.getPlugin().onDisable(holder.getContext());
-        holder.getContext().clearRuntimeContributions();
-        holder.setEnabled(false);
-        log.info("Plugin disabled: code={}", code);
+        long startNanos = System.nanoTime();
+        try {
+            holder.getPlugin().onDisable(holder.getContext());
+            holder.getContext().clearRuntimeContributions();
+            holder.setEnabled(false);
+            log.info("Plugin disabled: code={}", code);
+            publishLifecycle(code, PluginLifecycleAction.DISABLE, holder.getDescriptor().version(), startNanos, null);
+        } catch (RuntimeException | Error e) {
+            publishLifecycle(code, PluginLifecycleAction.DISABLE, holder.getDescriptor().version(), startNanos, e);
+            throw e;
+        }
     }
 
     @Override
@@ -153,13 +180,21 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         if (holder == null) {
             return;
         }
-        if (holder.isEnabled()) {
-            holder.getPlugin().onDisable(holder.getContext());
+        long startNanos = System.nanoTime();
+        String version = holder.getDescriptor() == null ? null : holder.getDescriptor().version();
+        try {
+            if (holder.isEnabled()) {
+                holder.getPlugin().onDisable(holder.getContext());
+            }
+            holder.getPlugin().onUnload(holder.getContext());
+            holder.getContext().dispose();
+            closeClassLoader(holder.getClassLoader());
+            log.info("Plugin unloaded: code={}", code);
+            publishLifecycle(code, PluginLifecycleAction.UNLOAD, version, startNanos, null);
+        } catch (RuntimeException | Error e) {
+            publishLifecycle(code, PluginLifecycleAction.UNLOAD, version, startNanos, e);
+            throw e;
         }
-        holder.getPlugin().onUnload(holder.getContext());
-        holder.getContext().dispose();
-        closeClassLoader(holder.getClassLoader());
-        log.info("Plugin unloaded: code={}", code);
     }
 
     @Override
@@ -251,6 +286,74 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                                 registration.definition().allowAnonymous())))
                 .sorted(java.util.Comparator.comparing(PluginCommandInfo::pluginCode).thenComparing(PluginCommandInfo::code))
                 .toList();
+    }
+
+    @Override
+    public PluginRuntimeAssets runtimeAssets(String code) {
+        PluginRuntimeHolder holder = holders.get(code);
+        if (holder == null) {
+            return PluginRuntimeAssets.unloaded(code);
+        }
+        PluginContextImpl context = holder.getContext();
+        return new PluginRuntimeAssets(
+                code,
+                true,
+                holder.isEnabled(),
+                context.menus().stream()
+                        .map(item -> new PluginMenuAssetInfo(item.title(), item.path(), item.icon(), item.permission(), item.parentPath(), item.sort()))
+                        .toList(),
+                permissions(code),
+                context.capabilities().stream()
+                        .map(item -> new PluginCapabilityAssetInfo(item.code(), item.name(), item.type(), item.description(), item.icon(), item.dependencies()))
+                        .toList(),
+                context.dashboardCards().stream().map(card -> toInfo(code, card)).toList(),
+                context.frontendModules().stream().map(module -> toInfo(code, module)).toList(),
+                context.httpEndpoints(),
+                context.commandRegistry().registrations().stream()
+                        .map(registration -> new PluginCommandInfo(code, registration.definition().code(),
+                                registration.definition().command(), registration.definition().name(),
+                                registration.definition().permission(), registration.definition().description(),
+                                registration.definition().allowAnonymous()))
+                        .sorted(Comparator.comparing(PluginCommandInfo::code))
+                        .toList(),
+                context.interactionRegistry().registrations().stream()
+                        .map(registration -> new PluginMessageInteractionInfo(code, registration.kind(),
+                                registration.filter() == null ? List.of() : List.copyOf(registration.filter().eventTypes()),
+                                registration.filter() == null ? null : registration.filter().platform(),
+                                registration.filter() == null ? null : registration.filter().channelId(),
+                                registration.filter() == null ? null : registration.filter().command()))
+                        .toList(),
+                aiToolRegistry.tools(code).stream()
+                        .map(tool -> toAssetInfo(code, tool))
+                        .toList(),
+                agentApplicationRegistry.applicationsByOwner(code).stream()
+                        .map(application -> new PluginRuntimeAgentInfo(code,
+                                application.getId() == null ? null : String.valueOf(application.getId()),
+                                application.getCode(), application.getName(), application.getDescription(),
+                                application.getIcon(),
+                                application.getStatus() == null ? null : application.getStatus().name()))
+                        .toList(),
+                pluginServiceRegistry.exportedServiceNames(code)
+        );
+    }
+
+    private PluginAiToolInfo toAssetInfo(String code, PluginAiTool tool) {
+        PluginAiToolDescriptor descriptor = tool.descriptor();
+        return new PluginAiToolInfo(code, descriptor.name(), descriptor.title(), descriptor.description(),
+                descriptor.permissionCode(), descriptor.risk() == null ? null : descriptor.risk().name(),
+                descriptor.requiresConfirmation(), List.copyOf(descriptor.allowedTriggers()));
+    }
+
+    private void publishLifecycle(String code, PluginLifecycleAction action, String version, long startNanos, Throwable error) {
+        try {
+            long durationMs = (System.nanoTime() - startNanos) / 1_000_000L;
+            eventPublisher.publishEvent(error == null
+                    ? PluginLifecycleEvent.succeeded(code, action, version, durationMs)
+                    : PluginLifecycleEvent.failed(code, action, version, durationMs, error.getMessage()));
+        } catch (RuntimeException publishError) {
+            // 事件发布失败不得影响插件生命周期主流程
+            log.debug("Publish plugin lifecycle event failed: code={}, action={}", code, action, publishError);
+        }
     }
 
     public void publishCommand(PluginEvent event, String command, List<String> arguments, Long userId,

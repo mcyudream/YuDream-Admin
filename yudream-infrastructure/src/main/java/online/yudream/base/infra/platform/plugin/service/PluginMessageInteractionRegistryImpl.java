@@ -42,6 +42,14 @@ public class PluginMessageInteractionRegistryImpl implements PluginMessageIntera
     public void afterSend(PluginEvent event) { publish(Kind.AFTER_SEND, event); }
     public int count() { return registrations.values().stream().mapToInt(List::size).sum(); }
 
+    /** 开发者工具资产快照：列出当前全部消息交互注册（类别 + 过滤条件）。 */
+    public List<InteractionRegistration> registrations() {
+        return registrations.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .map(registration -> new InteractionRegistration(entry.getKey().name(), registration.filter())))
+                .toList();
+    }
+
     private AutoCloseable add(Kind kind, PluginInteractionFilter filter, PluginMessageHandler handler) {
         if (handler == null) throw new IllegalArgumentException("插件消息处理器不能为空");
         Registration registration = new Registration(filter, handler);
@@ -89,4 +97,5 @@ public class PluginMessageInteractionRegistryImpl implements PluginMessageIntera
 
     private enum Kind { MESSAGE, NATIVE, COMMAND, BUTTON, BEFORE_SEND, AFTER_SEND }
     private record Registration(PluginInteractionFilter filter, PluginMessageHandler handler) { }
+    public record InteractionRegistration(String kind, PluginInteractionFilter filter) { }
 }

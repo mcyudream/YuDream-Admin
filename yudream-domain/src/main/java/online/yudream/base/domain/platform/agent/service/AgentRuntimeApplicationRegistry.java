@@ -15,5 +15,10 @@ public interface AgentRuntimeApplicationRegistry {
         return Optional.empty();
     }
 
+    /** Lists runtime definitions owned by one plugin, for developer tooling asset snapshots. */
+    default List<AgentApplication> applicationsByOwner(String ownerCode) {
+        return List.of();
+    }
+
     List<AgentApplication> applications();
 }
