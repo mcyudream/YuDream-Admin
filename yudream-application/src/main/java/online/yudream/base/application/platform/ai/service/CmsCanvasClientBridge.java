@@ -18,8 +18,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class CmsCanvasClientBridge {
 
-    /** 工具调用超时：前端执行画布操作通常毫秒级，180 秒足以覆盖异常卡顿。 */
+    /** 普通画布工具超时：前端执行通常毫秒级，足以覆盖异常卡顿。 */
     private static final long TIMEOUT_SECONDS = 180;
+    /** 用户澄清属于显式交互，允许用户阅读并选择，连接保活由 WebSocket PING/PONG 负责。 */
+    private static final long USER_INTERACTION_TIMEOUT_SECONDS = 900;
 
     @FunctionalInterface
     public interface Outbound {
@@ -45,7 +47,10 @@ public final class CmsCanvasClientBridge {
         pending.put(toolCallId, future);
         try {
             outbound.send(toolCallId, toolName, args == null ? Map.of() : args);
-            Map<String, Object> result = future.get(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            long timeoutSeconds = "cms.ask.user".equals(toolName)
+                    ? USER_INTERACTION_TIMEOUT_SECONDS
+                    : TIMEOUT_SECONDS;
+            Map<String, Object> result = future.get(timeoutSeconds, TimeUnit.SECONDS);
             // 结果附带 toolCallId，供 TOOL_CALL_RESULT 事件与前端请求行关联。
             Map<String, Object> enriched = new java.util.LinkedHashMap<>(result == null ? Map.of() : result);
             enriched.put("_toolCallId", toolCallId);

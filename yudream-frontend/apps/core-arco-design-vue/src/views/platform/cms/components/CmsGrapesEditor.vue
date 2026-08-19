@@ -157,6 +157,7 @@ const aiSuggestions = [
 const pendingAskDsl = ref('')
 const pendingAskOptions = ref<AskOption[]>([])
 const pendingAskMessageId = ref('')
+let pendingAskResolver: ((reply: YdChatToolCallReply) => void) | null = null
 let editor: Editor | null = null
 let canvasRefreshTimer: ReturnType<typeof setTimeout> | null = null
 let selectedSourceSyncTimer: ReturnType<typeof setTimeout> | null = null
@@ -545,8 +546,7 @@ async function handleCanvasToolRequest(request: YdChatToolCallRequest): Promise<
   }
   try {
     if (request.toolName === 'cms.ask.user') {
-      showAskUserUi({ toolName: request.toolName, action: 'ask', message: '需求澄清', payload: request.args })
-      return { ok: true, result: { asked: true, message: '已向用户展示澄清选项' } }
+      return await waitForAskUser(request)
     }
     const result = executeCanvasTool(editor, request.toolName, request.args, canvasToolExecOptions())
     return { ok: true, result }
@@ -601,6 +601,10 @@ function aiSessionMeta() {
 }
 
 function onAiSessionChange(session: YdAgentChatSession | null) {
+  if (pendingAskResolver) {
+    pendingAskResolver({ ok: false, error: '会话已切换，已取消等待中的澄清问题' })
+    pendingAskResolver = null
+  }
   pendingAskDsl.value = ''
   pendingAskOptions.value = []
   pendingAskMessageId.value = ''
@@ -1914,6 +1918,16 @@ function isAskUserTool(tool?: AiToolCallResult) {
   return tool?.toolName === 'cms.ask.user'
 }
 
+async function waitForAskUser(request: YdChatToolCallRequest): Promise<YdChatToolCallReply> {
+  if (pendingAskResolver) {
+    pendingAskResolver({ ok: false, error: '新的澄清问题已替代上一条问题' })
+  }
+  showAskUserUi({ toolName: request.toolName, action: 'ask', message: '需求澄清', payload: request.args })
+  return await new Promise<YdChatToolCallReply>((resolve) => {
+    pendingAskResolver = resolve
+  })
+}
+
 // 展示 AI 的澄清问题与可点击选项（后端已生成 TokUI DSL）。
 function showAskUserUi(tool?: AiToolCallResult) {
   const dsl = String(tool?.payload?.tokui || '')
@@ -1940,7 +1954,7 @@ function showAskUserUi(tool?: AiToolCallResult) {
   }
 }
 
-// 用户点击某个选项后，作为下一轮消息发送，形成「AI 问 → 用户选 → 继续」的闭环。
+// 用户点击某个选项后，回传挂起的工具结果，恢复同一条 WebSocket 上的模型循环。
 function onPickOption(_data: unknown, _event: Event, element: HTMLElement) {
   const card = element.closest('.tokui-suggestion') as HTMLElement | null
   const title = card?.querySelector('.tokui-suggestion__title')?.textContent?.trim()
@@ -1969,6 +1983,13 @@ function chooseAskOption(title: string) {
   pendingAskDsl.value = ''
   pendingAskOptions.value = []
   pendingAskMessageId.value = ''
+  const resolver = pendingAskResolver
+  pendingAskResolver = null
+  if (resolver) {
+    resolver({ ok: true, result: { selectedOption: title, message: `用户选择了：${title}` } })
+    return
+  }
+  // 恢复历史会话后原 WebSocket 已不存在，点击旧问题时退化为普通追问。
   void sendAiPrompt(title)
 }
 
