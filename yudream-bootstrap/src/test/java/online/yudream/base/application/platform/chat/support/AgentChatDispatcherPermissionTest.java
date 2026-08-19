@@ -23,7 +23,7 @@ class AgentChatDispatcherPermissionTest {
     @Test
     void dispatchPassesImmutableExplicitPermissionSnapshotToAgent() {
         AgentAppService agentAppService = mock(AgentAppService.class);
-        when(agentAppService.debugByCode(eq("wiki-agent"), any(), any(), any(), any(), any()))
+        when(agentAppService.debugByCode(eq("wiki-agent"), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(AgentRunDTO.builder().content("ok").toolResults(List.of()).usage(AiUsage.empty()).build());
         AgentChatDispatcher dispatcher = new AgentChatDispatcher(agentAppService);
         List<String> permissions = new ArrayList<>(List.of("platform:wiki:search"));
@@ -32,7 +32,7 @@ class AgentChatDispatcherPermissionTest {
         permissions.clear();
 
         ArgumentCaptor<AgentRunCmd> commandCaptor = ArgumentCaptor.forClass(AgentRunCmd.class);
-        verify(agentAppService).debugByCode(eq("wiki-agent"), commandCaptor.capture(), any(), any(), any(), any());
+        verify(agentAppService).debugByCode(eq("wiki-agent"), commandCaptor.capture(), any(), any(), any(), any(), any(), any());
         AgentRunCmd command = commandCaptor.getValue();
         assertThat(command.getPermissionCodes()).containsExactly("platform:wiki:search");
         assertThat(command.isPermissionContextExplicit()).isTrue();
@@ -43,14 +43,14 @@ class AgentChatDispatcherPermissionTest {
     @Test
     void dispatchMarksEmptyPermissionSnapshotExplicit() {
         AgentAppService agentAppService = mock(AgentAppService.class);
-        when(agentAppService.debugByCode(eq("wiki-agent"), any(), any(), any(), any(), any()))
+        when(agentAppService.debugByCode(eq("wiki-agent"), any(), any(), any(), any(), any(), any(), any()))
                 .thenReturn(AgentRunDTO.builder().content("ok").toolResults(List.of()).usage(AiUsage.empty()).build());
         AgentChatDispatcher dispatcher = new AgentChatDispatcher(agentAppService);
 
         dispatcher.dispatch(context(List.of()));
 
         ArgumentCaptor<AgentRunCmd> commandCaptor = ArgumentCaptor.forClass(AgentRunCmd.class);
-        verify(agentAppService).debugByCode(eq("wiki-agent"), commandCaptor.capture(), any(), any(), any(), any());
+        verify(agentAppService).debugByCode(eq("wiki-agent"), commandCaptor.capture(), any(), any(), any(), any(), any(), any());
         assertThat(commandCaptor.getValue().getPermissionCodes()).isEmpty();
         assertThat(commandCaptor.getValue().isPermissionContextExplicit()).isTrue();
     }

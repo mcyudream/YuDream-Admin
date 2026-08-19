@@ -26,6 +26,7 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
 import online.yudream.base.domain.platform.agent.enumerate.AgentApplicationStatus;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
+import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.repo.AgentApplicationRepo;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
@@ -303,6 +304,14 @@ public class AgentAppService {
     }
 
     @Transactional(readOnly = true)
+    public AgentRunDTO runByCode(String code, AgentRunCmd cmd, AgentTraceSource source) {
+        ensureEnabled();
+        AgentApplication application = publishedApplication(code);
+        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), source, null, null, null, null, null);
+        return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
+    }
+
+    @Transactional(readOnly = true)
     public AgentRunDTO debugByCode(
             String code,
             AgentRunCmd cmd,
@@ -335,9 +344,23 @@ public class AgentAppService {
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress
     ) {
+        return debugByCode(code, cmd, AgentTraceSource.DEBUG, onNode, onDelta, onReasoningDelta, onTool, onProgress);
+    }
+
+    @Transactional(readOnly = true)
+    public AgentRunDTO debugByCode(
+            String code,
+            AgentRunCmd cmd,
+            AgentTraceSource source,
+            Consumer<AgentDebugEventDTO> onNode,
+            Consumer<String> onDelta,
+            Consumer<String> onReasoningDelta,
+            Consumer<AiAgentToolResult> onTool,
+            Consumer<AiGenerationProgress> onProgress
+    ) {
         ensureEnabled();
         AgentApplication application = publishedApplication(code);
-        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), onNode, onDelta, onReasoningDelta, onTool, onProgress);
+        var result = workflowRuntime.execute(application, cmd, optionalAiConfig(), source, onNode, onDelta, onReasoningDelta, onTool, onProgress);
         return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
     }
 
@@ -362,7 +385,7 @@ public class AgentAppService {
         ensureEnabled();
         AgentApplication application = debuggableApplication(cmd.getApplicationId());
         var result = workflowRuntime.execute(
-                application, cmd, optionalAiConfig(), onNode, onDelta, onReasoningDelta, onTool);
+                application, cmd, optionalAiConfig(), AgentTraceSource.DEBUG, onNode, onDelta, onReasoningDelta, onTool, null);
         return AgentRunDTO.builder().content(result.content()).reasoning(result.reasoning()).toolResults(result.toolResults()).usage(result.usage()).build();
     }
 
