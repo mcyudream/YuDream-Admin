@@ -428,8 +428,10 @@ function dateText(value?: string) {
           </button>
           <input ref="avatarInput" type="file" accept="image/*" hidden @change="uploadAvatar">
         </div>
-        <strong>{{ profile.username || '当前用户' }}</strong>
-        <span>{{ form.email || '未设置邮箱' }}</span>
+        <div class="profile-card__identity">
+          <strong>{{ profile.username || '当前用户' }}</strong>
+          <span>{{ form.email || '未设置邮箱' }}</span>
+        </div>
       </div>
 
       <nav class="profile-nav">
@@ -657,7 +659,7 @@ function dateText(value?: string) {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   width: 100%;
-  height: min(760px, calc(100vh - 64px));
+  height: min(760px, calc(100dvh - 64px));
   overflow: hidden;
   background: var(--color-bg-1);
 }
@@ -682,7 +684,14 @@ function dateText(value?: string) {
   text-align: center;
 }
 
-.profile-card span {
+.profile-card__identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  justify-items: center;
+}
+
+.profile-card__identity span {
   max-width: 100%;
   overflow: hidden;
   color: var(--color-text-3);
@@ -817,6 +826,7 @@ function dateText(value?: string) {
 
 .panel-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -965,7 +975,7 @@ function dateText(value?: string) {
 @media (max-width: 860px) {
   .profile-shell {
     grid-template-columns: 1fr;
-    width: min(100vw - 24px, 680px);
+    height: calc(100dvh - 32px);
   }
 
   .profile-aside {
@@ -979,8 +989,12 @@ function dateText(value?: string) {
     text-align: left;
   }
 
+  .profile-card__identity {
+    justify-items: start;
+  }
+
   .profile-nav {
-    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 
   .form-grid,
@@ -1009,6 +1023,19 @@ function dateText(value?: string) {
 
   .permission-toolbar > div {
     justify-content: flex-end;
+  }
+
+  .profile-main {
+    padding: 16px;
+    padding-bottom: 80px;
+  }
+
+  .panel-head > :deep(.fa-input) {
+    width: 100%;
+  }
+
+  .api-key-form :deep(.arco-form-item-label-col) {
+    min-width: 0;
   }
 }
 </style>

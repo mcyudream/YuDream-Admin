@@ -55,7 +55,8 @@ public class DashboardCardRegistry {
                 3,
                 3,
                 2,
-                10
+                10,
+                false
         ));
         cards.add(new DashboardCardDefinition(
                 "system.quick-actions",
@@ -74,7 +75,8 @@ public class DashboardCardRegistry {
                 3,
                 4,
                 2,
-                20
+                20,
+                false
         ));
         cards.add(new DashboardCardDefinition(
                 "system.monitor",
@@ -93,7 +95,8 @@ public class DashboardCardRegistry {
                 3,
                 3,
                 2,
-                30
+                30,
+                false
         ));
         cards.add(new DashboardCardDefinition(
                 "platform.capability",
@@ -112,7 +115,8 @@ public class DashboardCardRegistry {
                 3,
                 3,
                 2,
-                40
+                40,
+                false
         ));
         cards.add(new DashboardCardDefinition(
                 "platform.plugins",
@@ -131,7 +135,8 @@ public class DashboardCardRegistry {
                 3,
                 3,
                 2,
-                50
+                50,
+                false
         ));
         if (datavizEnabled()) {
             cards.add(new DashboardCardDefinition(
@@ -151,7 +156,8 @@ public class DashboardCardRegistry {
                     3,
                     3,
                     2,
-                    60
+                    60,
+                    false
             ));
             cards.add(new DashboardCardDefinition(
                     "system.dataviz.user-registration",
@@ -170,7 +176,8 @@ public class DashboardCardRegistry {
                     4,
                     4,
                     3,
-                    61
+                    61,
+                    false
             ));
             cards.add(new DashboardCardDefinition(
                     "system.dataviz.dept-created",
@@ -189,7 +196,8 @@ public class DashboardCardRegistry {
                     4,
                     3,
                     3,
-                    62
+                    62,
+                    false
             ));
             cards.add(new DashboardCardDefinition(
                     "system.dataviz.log-activity",
@@ -208,7 +216,8 @@ public class DashboardCardRegistry {
                     4,
                     3,
                     3,
-                    63
+                    63,
+                    false
             ));
         }
         return cards;
@@ -244,7 +253,8 @@ public class DashboardCardRegistry {
                 card.defaultH(),
                 card.minW(),
                 card.minH(),
-                card.sort()
+                card.sort(),
+                card.defaultOnFirstVisit()
         );
     }
 }

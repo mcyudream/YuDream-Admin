@@ -142,7 +142,8 @@ class PluginAnnotationRegistrar {
                     card.defaultH(),
                     card.minW(),
                     card.minH(),
-                    card.sort()
+                    card.sort(),
+                    card.defaultOnFirstVisit()
             ));
         }
     }

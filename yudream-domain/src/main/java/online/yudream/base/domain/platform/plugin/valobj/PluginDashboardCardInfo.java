@@ -16,6 +16,7 @@ public record PluginDashboardCardInfo(
         int defaultH,
         int minW,
         int minH,
-        int sort
+        int sort,
+        boolean defaultOnFirstVisit
 ) {
 }

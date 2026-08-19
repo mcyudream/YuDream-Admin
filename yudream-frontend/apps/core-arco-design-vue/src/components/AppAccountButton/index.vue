@@ -114,8 +114,8 @@ const dropdownItems = computed(() => [
 
 <style scoped>
 :global(.profile-account-modal) {
-  width: min(1080px, calc(100vw - 48px)) !important;
-  max-width: min(1080px, calc(100vw - 48px)) !important;
+  width: min(1080px, calc(100vw - 32px)) !important;
+  max-width: min(1080px, calc(100vw - 32px)) !important;
 }
 
 :global(.profile-account-modal [data-slot="dialog-content"]) {

@@ -7,6 +7,7 @@ import { useAppFeatureStore } from '@/store/modules/app/features'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
+import DashboardGuideCard from './dashboard/DashboardGuideCard.vue'
 import DashboardModuleCard from './dashboard/DashboardModuleCard.vue'
 import DashboardMonitorCard from './dashboard/DashboardMonitorCard.vue'
 import DashboardPluginStatsCard from './dashboard/DashboardPluginStatsCard.vue'
@@ -541,6 +542,8 @@ function resolveCardComponent(card?: DashboardCard) {
       return DashboardChartStatsCard
     case 'ENDPOINT_CARD':
       return DashboardEndpointCard
+    case 'GUIDE_CARD':
+      return DashboardGuideCard
     default:
       return DashboardModuleCard
   }

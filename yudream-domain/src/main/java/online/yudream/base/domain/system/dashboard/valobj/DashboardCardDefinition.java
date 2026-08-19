@@ -19,7 +19,8 @@ public record DashboardCardDefinition(
         int defaultH,
         int minW,
         int minH,
-        int sort
+        int sort,
+        boolean defaultOnFirstVisit
 ) {
     public DashboardCardDefinition {
         if (isBlank(code)) {

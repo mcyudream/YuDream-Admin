@@ -45,6 +45,7 @@ export interface DashboardCard {
   minW: number
   minH: number
   sort: number
+  defaultOnFirstVisit: boolean
 }
 
 export interface DashboardWorkspace {
