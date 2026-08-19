@@ -10,6 +10,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 
@@ -57,8 +58,21 @@ public interface PluginRuntimeGateway {
         return false;
     }
 
+    /** 开发模式是否启用（独立于是否配置了项目）。 */
+    default boolean devModeEnabled() {
+        return false;
+    }
+
     /** 开发模式配置的项目清单，未启用开发模式时为空。 */
     default List<PluginDevProjectInfo> devModeProjects() {
         return List.of();
+    }
+
+    /**
+     * 开发调试用：在指定插件作用域内同步模拟触发指令处理器，绕过权限与匿名检查并捕获异常。
+     * content 用于构造模拟事件原文，为空时按指令与参数拼接。
+     */
+    default PluginCommandTestResult testCommand(String pluginCode, String command, List<String> arguments, String content) {
+        throw new UnsupportedOperationException("当前运行时网关不支持指令模拟");
     }
 }
