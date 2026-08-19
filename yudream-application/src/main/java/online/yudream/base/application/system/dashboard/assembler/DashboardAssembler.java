@@ -31,6 +31,7 @@ public final class DashboardAssembler {
                 .minW(card.minW())
                 .minH(card.minH())
                 .sort(card.sort())
+                .defaultOnFirstVisit(card.defaultOnFirstVisit())
                 .build();
     }
 

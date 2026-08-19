@@ -40,4 +40,9 @@ public @interface PluginDashboardCard {
     int minH() default 2;
 
     int sort() default 500;
+
+    /**
+     * 将卡片作为首次访问首页的默认指引；用户保存个人布局后不再自动展示。
+     */
+    boolean defaultOnFirstVisit() default false;
 }

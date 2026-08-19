@@ -27,4 +27,5 @@ public class DashboardCardRes {
     private int minW;
     private int minH;
     private int sort;
+    private boolean defaultOnFirstVisit;
 }

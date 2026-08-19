@@ -15,6 +15,14 @@ public record PluginDashboardCard(
         int defaultH,
         int minW,
         int minH,
-        int sort
+        int sort,
+        boolean defaultOnFirstVisit
 ) {
+
+    public PluginDashboardCard(String code, String title, String description, String icon, String category,
+                               String permission, String component, String actionPath, String dragPayloadTemplate,
+                               String tone, int defaultW, int defaultH, int minW, int minH, int sort) {
+        this(code, title, description, icon, category, permission, component, actionPath, dragPayloadTemplate,
+                tone, defaultW, defaultH, minW, minH, sort, false);
+    }
 }

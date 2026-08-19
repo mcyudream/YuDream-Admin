@@ -569,7 +569,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 card.defaultH(),
                 card.minW(),
                 card.minH(),
-                card.sort()
+                card.sort(),
+                card.defaultOnFirstVisit()
         );
     }
 

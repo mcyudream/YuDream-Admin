@@ -51,7 +51,8 @@ public class DashboardAppService {
         DashboardLayout defaultLayout = defaultLayout(cards);
         DashboardLayout userLayout = dashboardLayoutRepo.findByOwner(DashboardLayoutOwnerType.USER, userId).orElse(null);
         DashboardLayout overrideLayout = isLegacyAutoStackedLayout(userLayout, cards) ? null : userLayout;
-        DashboardLayout effectiveLayout = mergeLayout(userId, defaultLayout, overrideLayout, cards, DashboardLayoutOwnerType.USER);
+        DashboardLayout effectiveDefaultLayout = applyFirstVisitGuideCondition(defaultLayout, cards, userLayout == null);
+        DashboardLayout effectiveLayout = mergeLayout(userId, effectiveDefaultLayout, overrideLayout, cards, DashboardLayoutOwnerType.USER);
         return DashboardWorkspaceDTO.builder()
                 .cards(cards.stream().map(DashboardAssembler::toDTO).toList())
                 .defaultLayout(DashboardAssembler.toDTO(defaultLayout))
@@ -117,6 +118,24 @@ public class DashboardAppService {
         return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, appendMissingSystemItems(normalized, cards));
     }
 
+    private DashboardLayout applyFirstVisitGuideCondition(DashboardLayout defaultLayout, List<DashboardCardDefinition> cards,
+                                                            boolean firstVisit) {
+        if (firstVisit) {
+            return defaultLayout;
+        }
+        Set<String> firstVisitGuideCodes = cards.stream()
+                .filter(DashboardCardDefinition::defaultOnFirstVisit)
+                .map(DashboardCardDefinition::code)
+                .collect(Collectors.toSet());
+        if (firstVisitGuideCodes.isEmpty()) {
+            return defaultLayout;
+        }
+        List<DashboardLayoutItem> filteredItems = defaultLayout.getItems().stream()
+                .filter(item -> !firstVisitGuideCodes.contains(item.cardCode()))
+                .toList();
+        return DashboardLayout.create(DashboardLayoutOwnerType.DEFAULT, null, filteredItems);
+    }
+
     private DashboardLayout mergeLayout(Long ownerId, DashboardLayout defaultLayout, DashboardLayout overrideLayout,
                                         List<DashboardCardDefinition> cards, DashboardLayoutOwnerType ownerType) {
         Map<String, DashboardCardDefinition> cardMap = cards.stream()
@@ -166,7 +185,7 @@ public class DashboardAppService {
             columnHeights.put(breakpoint, new int[BREAKPOINT_COLUMNS.getOrDefault(breakpoint, 12)]);
         }
         for (DashboardCardDefinition card : cards) {
-            if (!"SYSTEM".equals(card.source())) {
+            if (!"SYSTEM".equals(card.source()) && !card.defaultOnFirstVisit()) {
                 continue;
             }
             Map<String, DashboardGridPlacement> placements = new HashMap<>();
@@ -184,7 +203,7 @@ public class DashboardAppService {
         Set<String> existingCodes = next.stream().map(DashboardLayoutItem::cardCode).collect(Collectors.toSet());
         Map<String, int[]> columnHeights = currentColumnHeights(next);
         for (DashboardCardDefinition card : cards) {
-            if (!"SYSTEM".equals(card.source()) || existingCodes.contains(card.code())) {
+            if ((!"SYSTEM".equals(card.source()) && !card.defaultOnFirstVisit()) || existingCodes.contains(card.code())) {
                 continue;
             }
             Map<String, DashboardGridPlacement> placements = new HashMap<>();

@@ -78,6 +78,7 @@ public final class DashboardWebAssembler {
                 .minW(dto.getMinW())
                 .minH(dto.getMinH())
                 .sort(dto.getSort())
+                .defaultOnFirstVisit(dto.isDefaultOnFirstVisit())
                 .build();
     }
 
