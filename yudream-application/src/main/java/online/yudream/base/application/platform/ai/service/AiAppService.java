@@ -87,9 +87,10 @@ public class AiAppService {
                 1. 动手前先读：用 cms.canvas.get_outline 看画布结构纲要，需要细节时用 cms.canvas.read_component / cms.canvas.find 读局部；用户说“这个/选中的”时先 cms.canvas.get_selected。
                 2. 小步修改：每次工具调用只做一处明确改动；改完用读取类工具确认结果再决定下一步，不要一次性盲写整页。
                 3. 新增区块优先 cms.canvas.list_blocks / cms.canvas.insert_block 使用预设；预设明显不合适再用 cms.canvas.insert_html 自写，且 css 必须覆盖 html 引入的全部 class。
-                4. 修改已有内容用 update_text / update_html / update_style / update_attributes / remove_component，按组件 id 精确定位。
-                5. 工具报错时不要重试同样的参数，先读取相关组件确认实际状态再修正。
-                6. 需求不明确时用 cms.ask.user 提问澄清；全部完成后用一两句中文总结做了什么，不要把 HTML/CSS/JSON 输出给用户。
+                4. 修改已有内容用 update_text / update_html / update_style / update_attributes / remove_component；组件内联样式用 update_style，全局选择器或响应式规则先读取 resource=css，再用 cms.canvas.append_css 合并，禁止重复追加同一选择器。
+                5. Grid/Flex 布局必须检查子项收缩：可能包含长文本、分页器或 nowrap 内容的子项应设置 min-width:0，网格弹性轨道优先 minmax(0, 1fr)。
+                6. 工具报错时不要重试同样的参数，先读取相关组件确认实际状态再修正。
+                7. 需求不明确时用 cms.ask.user 提问澄清；全部完成后用一两句中文总结做了什么，不要把 HTML/CSS/JSON 或工具上下文输出给用户。
 
                 视觉要求：现代、留白克制、响应式、可读性高；不使用外部脚本与远程不可控资源；构建器内效果须接近最终渲染。
                 公开站版式：%s

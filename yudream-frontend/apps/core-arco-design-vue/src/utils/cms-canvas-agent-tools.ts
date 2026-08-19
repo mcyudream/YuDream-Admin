@@ -45,6 +45,8 @@ export function executeCanvasTool(
       return updateHtml(requireTarget(editor, args, opts), args, opts)
     case 'cms.canvas.update_style':
       return updateStyle(requireTarget(editor, args, opts), args, opts)
+    case 'cms.canvas.append_css':
+      return appendCss(args, opts)
     case 'cms.canvas.update_attributes':
       return updateAttributes(requireTarget(editor, args, opts), args, opts)
     case 'cms.canvas.insert_html':
@@ -301,6 +303,16 @@ function updateStyle(component: Component, args: Record<string, unknown>, opts: 
   component.addStyle(styles as Record<string, string>)
   opts.onChanged?.()
   return { message: '样式已更新', ...summarize(component), styles: component.getStyle() }
+}
+
+function appendCss(args: Record<string, unknown>, opts: CanvasToolExecOptions): Record<string, unknown> {
+  const css = typeof args.css === 'string' ? args.css.trim() : ''
+  if (!css) {
+    throw new Error('append_css 缺少 css 内容')
+  }
+  opts.appendCss(css)
+  opts.onChanged?.()
+  return { message: 'CSS 规则已合并', cssLength: css.length }
 }
 
 function updateAttributes(component: Component, args: Record<string, unknown>, opts: CanvasToolExecOptions): Record<string, unknown> {

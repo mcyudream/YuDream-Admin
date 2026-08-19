@@ -41,9 +41,11 @@ public final class CmsCanvasClientTools {
                         "id", "必填，组件 id",
                         "html", "必填，新的内部 HTML 片段",
                         "css", "可选但推荐，覆盖本次 html 全部新 class 的 scoped CSS（yb-ai- 前缀）")),
-                tool(bridge, "cms.canvas.update_style", "修改组件样式", "以对象形式合并修改指定组件的样式，如 {\"color\":\"#0f172a\",\"margin-top\":\"24px\"}", Map.of(
+                tool(bridge, "cms.canvas.update_style", "修改组件样式", "以对象形式合并修改指定组件的内联样式，如 {\"color\":\"#0f172a\",\"margin-top\":\"24px\"}", Map.of(
                         "id", "必填，组件 id",
                         "styles", "必填，样式键值对象")),
+                tool(bridge, "cms.canvas.append_css", "合并全局 CSS 规则", "向画布 CSS 合并选择器规则；同一媒体查询上下文中的相同选择器会合并声明，后传声明覆盖同名旧声明，避免重复定义", Map.of(
+                        "css", "必填，要合并的完整 CSS 规则；修改既有布局前先读取 resource=css")),
                 tool(bridge, "cms.canvas.update_attributes", "修改组件属性", "以对象形式合并修改指定组件的属性，如 href、src、data-*；值传 null 表示删除该属性", Map.of(
                         "id", "必填，组件 id",
                         "attributes", "必填，属性键值对象")),

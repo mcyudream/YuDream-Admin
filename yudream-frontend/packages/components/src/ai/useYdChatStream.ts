@@ -140,6 +140,8 @@ export interface UseYdChatStreamOptions {
   getWebSocketToken?: () => string | undefined
   /** 携带历史的最大轮数（默认 10） */
   historyLimit?: number
+  /** 自定义历史消息序列化；默认会附加工具分页上下文 */
+  historyContent?: (message: YdChatMessage) => string
   /** 收到工具调用事件（如检索开始/完成） */
   onTool?: (tool: YdChatToolEvent) => void
   /**
@@ -186,7 +188,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
     return messages.value
       .filter(item => !item.error && !item.pending)
       .slice(-limit)
-      .map(item => ({role: item.role, content: historyContent(item)}))
+      .map(item => ({role: item.role, content: options.historyContent?.(item) ?? historyContent(item)}))
   }
 
   /** 将工具分页游标和澄清上下文带入下一轮，同时限制历史膨胀。 */
@@ -270,7 +272,7 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
       answer.pending = false
       answer.error = true
       settleRunningState(answer, 'error')
-      answer.content = answer.content || (error instanceof Error ? error.message : '问答失败，请稍后重试')
+      answer.content = stripInternalContext(answer.content || (error instanceof Error ? error.message : '问答失败，请稍后重试'))
       options.onError?.(answer, error)
     } finally {
       closeTransport()
@@ -281,9 +283,17 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
 
   function finalizeAnswer(answer: YdChatMessage) {
     answer.pending = false
+    answer.content = stripInternalContext(answer.content)
     if (!answer.content && !answer.reasoning && !answer.tools?.length && !answer.activities?.length) {
       answer.content = '（没有回答）'
     }
+  }
+
+  function stripInternalContext(content: string): string {
+    return content
+      .replace(/\n?\[工具上下文\][\s\S]*?(?=\n\n\[业务上下文\]|\n\n\[附件\]|$)/g, '')
+      .replace(/\n?\[业务上下文\][\s\S]*?(?=\n\n\[附件\]|$)/g, '')
+      .trim()
   }
 
   function isAbort(error: unknown): boolean {

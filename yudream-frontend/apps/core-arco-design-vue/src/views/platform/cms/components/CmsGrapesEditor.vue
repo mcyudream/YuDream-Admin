@@ -15,6 +15,7 @@ import YdAgentChatPanel from '@/components/YdAgentChatPanel/index.vue'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { createCmsAiChatSessionStore, cmsAiChatTargetKey, readActiveCmsAiChatSessionId } from '@/utils/cms-ai-chat-history'
 import { executeCanvasTool, type CanvasToolExecOptions } from '@/utils/cms-canvas-agent-tools'
+import { extractRelatedCss as extractRelatedCssRules, mergeCss as mergeCanvasCss, replaceRelatedCss as replaceRelatedCssRules } from '@/utils/cms-related-css'
 import { canvasFitZoom, chromeCanvasPreviewCss, chromeFrameTemplate, cmsCanvasDevices, extractHomeContent } from '@/utils/cms-chrome'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsHtml } from '@/utils/cms-template-render'
 import { findCmsModelOption, resolveCmsModelValue } from '../config/cms-model-options'
@@ -142,6 +143,10 @@ const editorDirty = ref(false)
 const editorReady = ref(false)
 const canvasRevision = ref(0)
 const selectedSourceCode = ref('')
+const selectedCssCode = ref('')
+const selectedCssDirty = ref(false)
+const selectedCssError = ref('')
+const selectedCssDrafts = new Map<string, string>()
 const selectedSourceDirty = ref(false)
 const selectedSourceError = ref('')
 const pageJsContent = ref(props.jsContent || '')
@@ -481,19 +486,6 @@ const jsSourceCompletions = computed<CodeCompletionItem[]>(() => {
   ]
 })
 
-const selectedRelatedCss = computed(() => {
-  if (rightPanelTab.value !== 'source') {
-    return '/* 打开源码面板后显示关联 CSS */'
-  }
-  canvasRevision.value
-  const snapshot = currentSelectionSnapshot()
-  if (!snapshot) {
-    return '/* 选择画布元素后显示关联 CSS */'
-  }
-  const relatedCss = extractRelatedCss(fullCanvasCss(), snapshot)
-  return relatedCss ? formatCssText(relatedCss) : '/* 暂未匹配到选中元素的关联 CSS */'
-})
-
 const chatHistoryTargetType = computed(() => props.historyTargetType || 'page')
 const chatHistoryTargetId = computed(() => String(props.historyTargetId || props.title || 'draft'))
 const chatHistoryTargetKey = computed(() => cmsAiChatTargetKey(chatHistoryTargetType.value, chatHistoryTargetId.value))
@@ -520,6 +512,7 @@ const V2_CANVAS_TOOL_NAMES = new Set([
   'cms.canvas.update_text',
   'cms.canvas.update_html',
   'cms.canvas.update_style',
+  'cms.canvas.append_css',
   'cms.canvas.update_attributes',
   'cms.canvas.insert_html',
   'cms.canvas.remove_component',
@@ -879,7 +872,7 @@ function scheduleCanvasRefresh(delay = 160) {
 }
 
 function scheduleSelectedSourceSync(delay = 160) {
-  if (rightPanelTab.value !== 'source' || selectedSourceDirty.value) {
+  if (rightPanelTab.value !== 'source' || selectedSourceDirty.value || selectedCssDirty.value) {
     return
   }
   if (selectedSourceSyncTimer) {
@@ -1335,15 +1328,6 @@ function genericBlockPreview() {
   </svg>`
 }
 
-function formatCanvasCss() {
-  if (!editor)
-    return
-  const css = fullCanvasCss()
-  editor.setStyle(formatCssText(css))
-  canvasRevision.value += 1
-  toast.success('CSS 已格式化')
-}
-
 function formatPageJs() {
   const formatted = formatJsCode(pageJsContent.value)
   if (formatted && formatted !== pageJsContent.value) {
@@ -1525,24 +1509,73 @@ function syncSelectedSource(force = false) {
   if (!force && rightPanelTab.value !== 'source') {
     return
   }
-  if (selectedSourceDirty.value && !force) {
+  if ((selectedSourceDirty.value || selectedCssDirty.value) && !force) {
     return
   }
   const component = editor?.getSelected() as any
   if (!component) {
     selectedSourceCode.value = ''
+    selectedCssCode.value = ''
     selectedSourceDirty.value = false
+    selectedCssDirty.value = false
     selectedSourceError.value = ''
+    selectedCssError.value = ''
     return
   }
   selectedSourceCode.value = String(component.toHTML?.() || '')
+  const componentId = String(component.getId?.() || '')
+  const relatedCss = selectedCssDrafts.get(componentId) || extractRelatedCssRules(fullCanvasCss(), currentSelectionSnapshot()!)
+  selectedCssCode.value = relatedCss ? formatCssText(relatedCss) : ''
   selectedSourceDirty.value = false
+  selectedCssDirty.value = false
   selectedSourceError.value = ''
+  selectedCssError.value = ''
 }
 
 function markSelectedSourceDirty() {
   selectedSourceDirty.value = true
   selectedSourceError.value = ''
+}
+
+function markSelectedCssDirty() {
+  selectedCssDirty.value = true
+  selectedCssError.value = ''
+  const component = editor?.getSelected() as any
+  const componentId = String(component?.getId?.() || '')
+  if (componentId) selectedCssDrafts.set(componentId, selectedCssCode.value)
+}
+
+function formatSelectedCss() {
+  if (!selectedCssCode.value.trim()) return
+  selectedCssCode.value = formatCssText(selectedCssCode.value)
+  markSelectedCssDirty()
+}
+
+function applySelectedCss() {
+  if (!editor || !hasSelectedComponent.value) {
+    toast.warning('请先在画布中选择一个元素')
+    return
+  }
+  if (!selectedCssCode.value.trim()) {
+    selectedCssError.value = '当前元素没有可应用的关联 CSS'
+    return
+  }
+  try {
+    const original = extractRelatedCssRules(fullCanvasCss(), currentSelectionSnapshot()!)
+    editor.setStyle(replaceRelatedCssRules(fullCanvasCss(), original, selectedCssCode.value))
+    selectedCssDirty.value = false
+    selectedCssError.value = ''
+    const componentId = String(editor.getSelected()?.getId?.() || '')
+    if (componentId) selectedCssDrafts.delete(componentId)
+    canvasRevision.value += 1
+    syncSelectedSource(true)
+    toast.success('关联 CSS 已应用')
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : 'CSS 应用失败'
+    selectedCssError.value = message
+    toast.error('CSS 应用失败', { description: message })
+  }
 }
 
 function formatSelectedSource() {
@@ -1681,176 +1714,6 @@ function escapeHtmlAttribute(value: string) {
   return escapeHtmlText(value).replace(/"/g, '&quot;')
 }
 
-function extractRelatedCss(css: string, snapshot: CanvasSelectionSnapshot) {
-  if (!css.trim()) {
-    return ''
-  }
-  const matches = collectMatchingCssRules(css, snapshot)
-  return matches.join('\n\n').trim()
-}
-
-function collectMatchingCssRules(css: string, snapshot: CanvasSelectionSnapshot): string[] {
-  const matches: string[] = []
-  let index = 0
-  while (index < css.length) {
-    const openIndex = findNextCssChar(css, '{', index)
-    if (openIndex < 0) {
-      break
-    }
-    const prelude = css.slice(index, openIndex).trim()
-    const closeIndex = findMatchingCssBrace(css, openIndex)
-    if (closeIndex < 0) {
-      break
-    }
-    const body = css.slice(openIndex + 1, closeIndex)
-    if (prelude.startsWith('@')) {
-      const nestedMatches = collectMatchingCssRules(body, snapshot)
-      if (nestedMatches.length > 0) {
-        matches.push(`${prelude} {\n${indentCssLines(nestedMatches.join('\n\n'))}\n}`)
-      }
-    }
-    else if (cssSelectorPreludeMatches(prelude, snapshot)) {
-      matches.push(`${prelude} {${body}}`)
-    }
-    index = closeIndex + 1
-  }
-  return matches
-}
-
-function cssSelectorPreludeMatches(prelude: string, snapshot: CanvasSelectionSnapshot) {
-  return prelude
-    .split(',')
-    .map(selector => selector.trim())
-    .some(selector => cssSelectorMatchesSnapshot(selector, snapshot))
-}
-
-function cssSelectorMatchesSnapshot(selector: string, snapshot: CanvasSelectionSnapshot) {
-  const normalized = selector
-    .replace(/::?[\w-]+(?:\([^)]*\))?/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
-  if (!normalized) {
-    return false
-  }
-  const id = String(snapshot.attributes.id || '').trim()
-  if (id && containsCssIdentifier(normalized, `#${id}`)) {
-    return true
-  }
-  if (snapshot.classes.some(item => containsCssIdentifier(normalized, `.${item}`))) {
-    return true
-  }
-  if (snapshot.tagName && new RegExp(`(^|[\\s>+~,(])${escapeRegExp(snapshot.tagName)}(?=$|[\\s.#:[>+~,)])`, 'i').test(normalized)) {
-    return true
-  }
-  if (Object.keys(snapshot.attributes).some(key => key && normalized.includes(`[${key}`))) {
-    return true
-  }
-  return cssElementMatchesSelector(normalized, snapshot)
-}
-
-function cssElementMatchesSelector(selector: string, snapshot: CanvasSelectionSnapshot) {
-  if (typeof document === 'undefined') {
-    return false
-  }
-  try {
-    const element = document.createElement(snapshot.tagName || 'div')
-    const id = String(snapshot.attributes.id || '').trim()
-    if (id) {
-      element.id = id
-    }
-    snapshot.classes.forEach(item => element.classList.add(item))
-    Object.entries(snapshot.attributes).forEach(([key, value]) => {
-      if (key && value !== undefined && value !== null) {
-        element.setAttribute(key, String(value))
-      }
-    })
-    return element.matches(selector)
-  }
-  catch {
-    return false
-  }
-}
-
-function containsCssIdentifier(selector: string, identifier: string) {
-  const raw = escapeRegExp(identifier)
-  const escaped = cssEscape(identifier.slice(1))
-  const prefix = identifier[0] === '#' ? '#' : '\\.'
-  return new RegExp(`(^|[^a-zA-Z0-9_-])(?:${raw}|${prefix}${escapeRegExp(escaped)})(?=$|[^a-zA-Z0-9_-])`).test(selector)
-}
-
-function findNextCssChar(css: string, char: string, from: number) {
-  let quote = ''
-  for (let index = from; index < css.length; index += 1) {
-    const current = css[index]
-    const next = css[index + 1]
-    if (!quote && current === '/' && next === '*') {
-      index = css.indexOf('*/', index + 2)
-      if (index < 0) {
-        return -1
-      }
-      index += 1
-      continue
-    }
-    if (quote) {
-      if (current === '\\') {
-        index += 1
-      }
-      else if (current === quote) {
-        quote = ''
-      }
-      continue
-    }
-    if (current === '"' || current === '\'') {
-      quote = current
-      continue
-    }
-    if (current === char) {
-      return index
-    }
-  }
-  return -1
-}
-
-function findMatchingCssBrace(css: string, openIndex: number) {
-  let depth = 0
-  let quote = ''
-  for (let index = openIndex; index < css.length; index += 1) {
-    const current = css[index]
-    const next = css[index + 1]
-    if (!quote && current === '/' && next === '*') {
-      index = css.indexOf('*/', index + 2)
-      if (index < 0) {
-        return -1
-      }
-      index += 1
-      continue
-    }
-    if (quote) {
-      if (current === '\\') {
-        index += 1
-      }
-      else if (current === quote) {
-        quote = ''
-      }
-      continue
-    }
-    if (current === '"' || current === '\'') {
-      quote = current
-      continue
-    }
-    if (current === '{') {
-      depth += 1
-    }
-    if (current === '}') {
-      depth -= 1
-      if (depth === 0) {
-        return index
-      }
-    }
-  }
-  return -1
-}
-
 function formatCssText(css: string) {
   let result = ''
   let indent = 0
@@ -1905,10 +1768,6 @@ function formatCssText(css: string) {
     result += current
   }
   return result.trim()
-}
-
-function indentCssLines(css: string) {
-  return css.split('\n').map(line => line.trim() ? `  ${line}` : line).join('\n')
 }
 
 function firstImageAttachment(attachments: YdChatAttachment[]) {
@@ -2496,13 +2355,7 @@ function appendCanvasCss(css: string) {
   if (!editor || !css.trim()) {
     return
   }
-  const existing = fullCanvasCss()
-  // 模型每次 patch 常附带同一段基础样式（如 reset），已存在时跳过避免重复累积
-  const normalize = (value: string) => value.replace(/\s+/g, '')
-  if (normalize(existing).includes(normalize(css))) {
-    return
-  }
-  editor.setStyle(`${existing}\n${css}`.trim())
+  editor.setStyle(mergeCanvasCss(fullCanvasCss(), css))
 }
 
 function fullCanvasCss(instance: Editor | null = editor) {
@@ -2677,10 +2530,6 @@ function normalizeObject(value: unknown): Record<string, unknown> {
 
 function cssEscape(value: string) {
   return globalThis.CSS?.escape ? globalThis.CSS.escape(value) : value.replace(/[^a-zA-Z0-9_-]/g, '\\$&')
-}
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 async function loadMedia() {
@@ -3004,6 +2853,7 @@ function selectBreadcrumb(component: any) {
             :endpoint="aiChatEndpoint"
             transport="websocket"
             :history-limit="20"
+            :history-content="message => message.content"
             :build-body="buildAiChatBody"
             :on-tool-call-request="handleCanvasToolRequest"
             :session-store="aiSessionStore"
@@ -3136,19 +2986,24 @@ function selectBreadcrumb(component: any) {
               <div class="source-editor-section__head">
                 <strong>关联 CSS</strong>
                 <div class="source-editor-section__actions">
-                  <FaButton variant="outline" size="sm" @click="formatCanvasCss">
+                  <FaButton variant="outline" size="sm" :disabled="!selectedCssCode.trim()" @click="formatSelectedCss">
                     <FaIcon name="i-ri:align-left" />
                     格式化
                   </FaButton>
-                  <span>根据当前选择自动匹配</span>
+                  <FaButton size="sm" :disabled="!hasSelectedComponent || !selectedCssDirty || !selectedCssCode.trim()" @click="applySelectedCss">
+                    <FaIcon name="i-ri:check-line" />
+                    应用
+                  </FaButton>
+                  <span>根据当前选择匹配规则</span>
                 </div>
               </div>
               <CmsCodeEditor
+                v-model="selectedCssCode"
                 class="source-panel__editor"
-                :model-value="selectedRelatedCss"
                 language="css"
-                disabled
+                :disabled="!hasSelectedComponent"
                 :completions="cssSourceCompletions"
+                @update:model-value="markSelectedCssDirty"
               />
             </section>
             <section class="source-editor-section source-editor-section--js">
@@ -3170,9 +3025,9 @@ function selectBreadcrumb(component: any) {
               />
             </section>
           </div>
-          <div class="source-panel__status" :class="{ error: selectedSourceError }">
-            <span v-if="selectedSourceError">{{ selectedSourceError }}</span>
-            <span v-else-if="selectedSourceDirty">未应用</span>
+          <div class="source-panel__status" :class="{ error: selectedSourceError || selectedCssError }">
+            <span v-if="selectedSourceError || selectedCssError">{{ selectedSourceError || selectedCssError }}</span>
+            <span v-else-if="selectedSourceDirty || selectedCssDirty">未应用</span>
             <span v-else-if="selectedSourceLocked">Header/Footer 固定结构只读</span>
             <span v-else>{{ hasSelectedComponent ? '已同步' : '未选择元素' }}</span>
           </div>
