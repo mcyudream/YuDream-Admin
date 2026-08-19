@@ -2,7 +2,7 @@
 import type { CmsPage, CmsTemplateContext, CmsTemplateContextQuery, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
-import { chromeRuntimeCss, readChromeCss } from '@/utils/cms-chrome'
+import { chromeRuntimeCss, extractChromeCss, readChromeCss } from '@/utils/cms-chrome'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 
@@ -55,11 +55,13 @@ const slug = computed(() => {
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 // 首页内容 CSS 只应在首页注入；全站只保留页头/页脚的 chrome 自定义样式，
 // 否则首页 CSS 里的通用类（如 .yb-ai-hero）会污染其它页面。
+const homeContentCss = computed(() => home.value?.settings?.homeCss || '')
 const chromeCustomCss = computed(() => [
   readChromeCss(home.value?.settings, 'header'),
   readChromeCss(home.value?.settings, 'footer'),
+  // 兼容 Grapes 曾把 Header/Footer 样式合并保存进 homeCss 的历史数据。
+  extractChromeCss(homeContentCss.value),
 ].filter(Boolean).join('\n'))
-const homeContentCss = computed(() => home.value?.settings?.homeCss || '')
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
 const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : homeJs.value)
 const navigationItems = computed(() => {

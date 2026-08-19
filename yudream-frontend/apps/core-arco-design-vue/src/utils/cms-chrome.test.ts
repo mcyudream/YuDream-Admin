@@ -8,6 +8,7 @@ import {
   chromeFrameTemplate,
   chromeRuntimeCss,
   chromeTemplate,
+  extractChromeCss,
   isChromeStyleAction,
   readChromeCss,
   writeChromeCss,
@@ -83,6 +84,17 @@ test('keeps public and canvas chrome palettes identical by default', () => {
   assert.match(previewCss, /--yb-site-header-bg:\s*rgba\(255, 255, 255, 0\.94\)/)
   assert.match(previewCss, /html\.dark, body\.dark/)
   assert.match(previewCss, /--yb-site-header-bg:\s*rgba\(15, 23, 42, 0\.86\)/)
+})
+
+test('extracts and prioritizes chrome CSS stored inside page CSS', () => {
+  const pageCss = `.yb-ai-hero { color: white; }\n.site-layout-header { background: #080817; }\n@media (max-width: 760px) { .site-layout-header__nav { gap: 2px; } .yb-ai-hero { gap: 10px; } }`
+  const chromeOnly = extractChromeCss(pageCss)
+  const runtimeCss = chromeRuntimeCss('HEADER_FOOTER', chromeOnly)
+
+  assert.match(chromeOnly, /\.site-layout-header \{ background: #080817; \}/)
+  assert.match(chromeOnly, /\.site-layout-header__nav \{ gap: 2px; \}/)
+  assert.doesNotMatch(chromeOnly, /yb-ai-hero/)
+  assert.match(runtimeCss, /main\.site-page \.site-layout-header \{ background: #080817; \}/)
 })
 
 test('uses stable CMS device widths and calculates a fit zoom', () => {
