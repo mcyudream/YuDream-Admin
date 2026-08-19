@@ -917,12 +917,12 @@ function splitModelList(value: string) {
                       </thead>
                       <tbody>
                         <tr v-for="(model, modelIndex) in activeProvider.models" :key="modelIndex">
-                          <td><FaInput v-model="model.name" size="sm" placeholder="显示名" @blur="model.code ||= model.name" /></td>
-                          <td><FaInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" @blur="syncAiDefaults" /></td>
-                          <td><FaSelect v-model="model.kind" size="sm" :options="aiModelKindOptions" class="w-full" /></td>
-                          <td class="ai-model-table__num"><FaInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" /></td>
-                          <td class="ai-model-table__switch"><FaSwitch v-model="model.thinkingEnabled" /></td>
-                          <td class="ai-model-table__switch"><FaSwitch v-model="model.vision" /></td>
+                          <td class="ai-model-table__wide" data-label="名称"><FaInput v-model="model.name" size="sm" placeholder="显示名" @blur="model.code ||= model.name" /></td>
+                          <td class="ai-model-table__wide" data-label="模型名"><FaInput v-model="model.model" size="sm" placeholder="gpt-4o-mini" @blur="syncAiDefaults" /></td>
+                          <td data-label="类型"><FaSelect v-model="model.kind" size="sm" :options="aiModelKindOptions" class="w-full" /></td>
+                          <td class="ai-model-table__num" data-label="温度"><FaInput v-model="model.temperature" size="sm" type="number" placeholder="0.4" /></td>
+                          <td class="ai-model-table__switch" data-label="思考"><FaSwitch v-model="model.thinkingEnabled" /></td>
+                          <td class="ai-model-table__switch" data-label="视觉"><FaSwitch v-model="model.vision" /></td>
                           <td class="ai-model-table__op">
                             <FaButton size="sm" variant="ghost" :disabled="activeProvider.models.length <= 1" title="删除模型" @click="removeAiModel(activeProvider, modelIndex)">
                               <FaIcon name="i-ri:delete-bin-line" />
@@ -1587,9 +1587,89 @@ function splitModelList(value: string) {
     grid-column: auto;
   }
 
-  .ai-model-table {
-    display: block;
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .ai-model-table-wrap {
     overflow-x: auto;
+  }
+
+  .ai-model-table {
+    min-width: 680px;
+  }
+}
+
+/* 窄屏：模型表转为卡片列表，避免列被压缩成竖排文字 */
+@media (max-width: 640px) {
+  .ai-model-table {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .ai-model-table,
+  .ai-model-table tbody {
+    display: block;
+  }
+
+  .ai-model-table thead {
+    display: none;
+  }
+
+  .ai-model-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 12px;
+    border: 1px solid var(--color-border-2);
+    border-radius: 8px;
+    background: var(--color-bg-1);
+  }
+
+  .ai-model-table td {
+    display: block;
+    padding: 0;
+    border-top: 0;
+  }
+
+  .ai-model-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--color-text-3);
+    font-size: 11px;
+  }
+
+  .ai-model-table__wide {
+    flex: 1 1 100%;
+  }
+
+  .ai-model-table td[data-label='类型'] {
+    flex: 1 1 52%;
+  }
+
+  .ai-model-table__num {
+    flex: 1 1 30%;
+    width: auto;
+  }
+
+  .ai-model-table__switch {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 6px;
+    width: auto;
+  }
+
+  .ai-model-table__switch::before {
+    margin-bottom: 0;
+  }
+
+  .ai-model-table__op {
+    width: auto;
+    margin-left: auto;
+    text-align: right;
   }
 }
 </style>
