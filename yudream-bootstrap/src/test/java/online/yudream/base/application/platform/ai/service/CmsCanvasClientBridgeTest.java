@@ -59,6 +59,18 @@ class CmsCanvasClientBridgeTest {
     }
 
     @Test
+    void exposesGlobalCssMergeToolToTheModel() {
+        CmsCanvasClientBridge bridge = new CmsCanvasClientBridge((id, name, args) -> {
+        });
+
+        var descriptors = CmsCanvasClientTools.bind(bridge).stream()
+                .map(tool -> tool.descriptor().name())
+                .toList();
+
+        assertThat(descriptors).contains("cms.canvas.append_css");
+    }
+
+    @Test
     void failAllWakesPendingCalls() {
         CmsCanvasClientBridge bridge = new CmsCanvasClientBridge((id, name, args) -> {
         });

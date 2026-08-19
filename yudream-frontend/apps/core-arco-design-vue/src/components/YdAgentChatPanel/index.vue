@@ -31,6 +31,8 @@ const props = withDefaults(defineProps<{
   historyLimit?: number
   /** 构造请求体，history 为不含本轮问题的历史；缺省为 { question, history, attachments } */
   buildBody?: (question: string, history: YdChatHistoryTurn[], attachments?: YdChatAttachment[]) => Record<string, unknown>
+  /** 历史消息序列化；默认由共享流处理器附加工具上下文 */
+  historyContent?: (message: YdChatMessage) => string
   /** 会话持久化适配器；不传则为单会话模式（不显示会话管理） */
   sessionStore?: YdAgentChatSessionStore
   /** 保存会话前对消息做裁剪（如剥离工具 payload 中的大字段） */
@@ -98,6 +100,7 @@ const { messages, streaming, send, stop } = useYdChatStream({
   protocol: props.protocol,
   transport: props.transport,
   historyLimit: props.historyLimit,
+  historyContent: props.historyContent,
   buildBody: (question, history, currentAttachments) => props.buildBody
     ? props.buildBody(question, history, currentAttachments)
     : { question, history, attachments: currentAttachments },

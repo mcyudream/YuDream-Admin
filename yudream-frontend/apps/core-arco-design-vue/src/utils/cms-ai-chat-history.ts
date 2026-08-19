@@ -57,6 +57,23 @@ export function writeActiveCmsAiChatSessionId(targetKey: string, sessionId: stri
   }
 }
 
+export function sanitizeCmsVisibleContent(content: string) {
+  return String(content || '')
+    .replace(/\n?\[工具上下文\][\s\S]*?(?=\n\n\[业务上下文\]|\n\n\[附件\]|$)/g, '')
+    .replace(/\n?\[业务上下文\][\s\S]*?(?=\n\n\[附件\]|$)/g, '')
+    .trim()
+}
+
+function sanitizeSessionMessages(session: CmsAiChatSession): CmsAiChatSession {
+  return {
+    ...session,
+    messages: (session.messages || []).map(message => ({
+      ...message,
+      content: message.role === 'assistant' ? sanitizeCmsVisibleContent(message.content) : message.content,
+    })),
+  }
+}
+
 export async function saveCmsAiChatSession(session: CmsAiChatSession) {
   const db = await openDb()
   const tx = db.transaction(STORE_NAME, 'readwrite')
@@ -67,7 +84,8 @@ export async function saveCmsAiChatSession(session: CmsAiChatSession) {
 export async function getCmsAiChatSession(id: string) {
   const db = await openDb()
   const tx = db.transaction(STORE_NAME, 'readonly')
-  return requestToPromise<CmsAiChatSession | undefined>(tx.objectStore(STORE_NAME).get(id))
+  const session = await requestToPromise<CmsAiChatSession | undefined>(tx.objectStore(STORE_NAME).get(id))
+  return session ? sanitizeSessionMessages(session) : undefined
 }
 
 export async function listCmsAiChatSessionMetas(targetKey: string): Promise<CmsAiChatSessionMeta[]> {
@@ -168,7 +186,7 @@ export function createCmsAiChatSessionStore(options: {
 
 function toPersistableSession(session: CmsAiChatSession): CmsAiChatSession {
   // Vue ref/reactive 中的 Proxy 不能直接被 IndexedDB structuredClone；先转成纯 JSON 数据再保存。
-  return JSON.parse(JSON.stringify(session)) as CmsAiChatSession
+  return JSON.parse(JSON.stringify(sanitizeSessionMessages(session))) as CmsAiChatSession
 }
 
 function openDb() {
