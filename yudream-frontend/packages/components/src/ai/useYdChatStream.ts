@@ -316,7 +316,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         ? options.onToolCallRequest(request)
         : Promise.resolve<YdChatToolCallReply>({ ok: false, error: '当前客户端未注册画布工具执行器' })
       const timeout = new Promise<YdChatToolCallReply>((resolve) => {
-        timeoutId = setTimeout(() => resolve({ ok: false, error: '客户端画布工具执行超时' }), 20000)
+        const timeoutMs = request.toolName === 'cms.ask.user' ? 14 * 60 * 1000 : 20000
+        timeoutId = setTimeout(() => resolve({ ok: false, error: request.toolName === 'cms.ask.user' ? '等待用户选择超时' : '客户端画布工具执行超时' }), timeoutMs)
       })
       reply = await Promise.race([execution, timeout])
     } catch (error) {
