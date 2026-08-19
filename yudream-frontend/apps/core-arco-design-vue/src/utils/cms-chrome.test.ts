@@ -77,6 +77,14 @@ test('lets the authenticated account button inherit custom header styling', () =
   assert.match(runtimeCss, /site-layout-header__account summary[^{]*\{[^}]*color:\s*inherit/i)
 })
 
+test('keeps public and canvas chrome palettes identical by default', () => {
+  const previewCss = chromeCanvasPreviewCss()
+
+  assert.match(previewCss, /--yb-site-header-bg:\s*rgba\(255, 255, 255, 0\.94\)/)
+  assert.match(previewCss, /html\.dark, body\.dark/)
+  assert.match(previewCss, /--yb-site-header-bg:\s*rgba\(15, 23, 42, 0\.86\)/)
+})
+
 test('uses stable CMS device widths and calculates a fit zoom', () => {
   assert.deepEqual(cmsCanvasDevices(), [
     { id: 'desktop', name: '桌面', width: '1440px' },
