@@ -1,0 +1,347 @@
+import type { ApiResponse } from './system-client'
+import { toBackendAssetUrl } from '@/utils/backend-url'
+import systemClient from './system-client'
+
+/** 开发模式项目配置（后端 PluginDevModeProperties.DevProject 的只读镜像） */
+export interface PluginDevProject {
+  code: string
+  path: string
+  frontendDist?: string
+  autoCompile: boolean
+}
+
+export interface PluginDevtoolsStatus {
+  devModeEnabled: boolean
+  traceEnabled: boolean
+  devProjects: PluginDevProject[]
+  installedCount: number
+  loadedCount: number
+  enabledCount: number
+}
+
+export type PluginDevStatus = 'INSTALLED' | 'LOADED' | 'ENABLED' | 'DISABLED' | 'ERROR'
+
+export interface PluginDevPlugin {
+  code: string
+  name: string
+  version?: string
+  description?: string
+  status: PluginDevStatus
+  loaded: boolean
+  enabled: boolean
+  devMode: boolean
+  devProject?: PluginDevProject
+}
+
+export interface PluginMenuAsset {
+  title: string
+  path: string
+  icon?: string
+  permission?: string
+  parentPath?: string
+  sort?: number
+}
+
+export interface PluginPermissionAsset {
+  code: string
+  name: string
+  module?: string
+  description?: string
+}
+
+export interface PluginCapabilityAsset {
+  code: string
+  name: string
+  type?: string
+  description?: string
+  icon?: string
+  dependencies?: string[]
+}
+
+export interface PluginDashboardCardAsset {
+  pluginCode: string
+  code: string
+  title: string
+  description?: string
+  icon?: string
+  category?: string
+  permission?: string
+  component?: string
+  actionPath?: string
+}
+
+export interface PluginFrontendRouteAsset {
+  path: string
+  name?: string
+  title?: string
+  icon?: string
+  component?: string
+  permission?: string
+  sort?: number
+  hideInMenu?: boolean
+}
+
+export interface PluginFrontendModuleAsset {
+  pluginCode: string
+  entry?: string
+  moduleName?: string
+  sdkVersion?: string
+  menuTitle?: string
+  menuIcon?: string
+  menuSort?: number
+  routes: PluginFrontendRouteAsset[]
+  styles?: string[]
+  scripts?: string[]
+}
+
+export interface PluginHttpEndpointAsset {
+  pluginCode: string
+  method: string
+  path: string
+  fullPath: string
+  permission?: string
+  wrapResult: boolean
+}
+
+export interface PluginCommandAsset {
+  pluginCode: string
+  code: string
+  command: string
+  name: string
+  permission?: string
+  description?: string
+  allowAnonymous: boolean
+}
+
+export interface PluginMessageInteractionAsset {
+  pluginCode: string
+  kind: string
+  eventTypes: string[]
+  platform?: string
+  channelId?: string
+  command?: string
+}
+
+export interface PluginAiToolAsset {
+  pluginCode: string
+  name: string
+  title?: string
+  description?: string
+  permissionCode?: string
+  risk?: string
+  requiresConfirmation: boolean
+  allowedTriggers: string[]
+}
+
+export interface PluginRuntimeAgentAsset {
+  pluginCode: string
+  id: string
+  code: string
+  name: string
+  description?: string
+  icon?: string
+  status?: string
+}
+
+export interface PluginRuntimeAssets {
+  pluginCode: string
+  loaded: boolean
+  enabled: boolean
+  menus: PluginMenuAsset[]
+  permissions: PluginPermissionAsset[]
+  capabilities: PluginCapabilityAsset[]
+  dashboardCards: PluginDashboardCardAsset[]
+  frontendModules: PluginFrontendModuleAsset[]
+  httpEndpoints: PluginHttpEndpointAsset[]
+  commands: PluginCommandAsset[]
+  messageInteractions: PluginMessageInteractionAsset[]
+  aiTools: PluginAiToolAsset[]
+  agents: PluginRuntimeAgentAsset[]
+  exposedServices: string[]
+}
+
+export interface PluginCommandTestPayload {
+  command: string
+  arguments?: string[]
+  content?: string
+}
+
+export interface PluginCommandTestResult {
+  pluginCode: string
+  command: string
+  matched: boolean
+  success: boolean
+  errorMessage?: string
+  durationMs?: number
+}
+
+export type AgentTraceSource = 'CHAT' | 'WIKI' | 'CMS' | 'DEBUG' | 'PLUGIN' | 'SYSTEM'
+export type AgentTraceStatus = 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+
+export interface AiUsage {
+  promptTokens: number
+  completionTokens: number
+  totalTokens: number
+}
+
+export interface AgentTraceSummary {
+  traceId: string
+  source: AgentTraceSource
+  ownerPluginCode?: string
+  agentId?: string
+  agentCode?: string
+  agentName?: string
+  status: AgentTraceStatus
+  input?: string
+  error?: string
+  stepCount: number
+  durationMs?: number
+  startTime?: string
+}
+
+export interface AgentTraceStep {
+  seq: number
+  nodeId?: string
+  nodeKind?: string
+  nodeTitle?: string
+  status: 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED' | string
+  inputSummary?: string
+  outputSummary?: string
+  reasoning?: string
+  toolName?: string
+  toolDetail?: string
+  message?: string
+  startTime?: string
+  endTime?: string
+  durationMs?: number
+}
+
+export interface AgentTraceDetail extends AgentTraceSummary {
+  finalOutput?: string
+  reasoning?: string
+  usage?: AiUsage
+  steps: AgentTraceStep[]
+  endTime?: string
+}
+
+export interface AgentTracePage {
+  total: number
+  page: number
+  size: number
+  list: AgentTraceSummary[]
+}
+
+export type PluginLifecycleAction = 'LOAD' | 'ENABLE' | 'DISABLE' | 'UNLOAD' | 'RELOAD' | 'FRONTEND_RELOAD' | 'COMPILE'
+
+/** 生命周期 SSE 事件载荷（domain PluginLifecycleEvent 的 JSON 镜像） */
+export interface PluginLifecycleEventPayload {
+  pluginCode: string
+  action: PluginLifecycleAction
+  success: boolean
+  version?: string
+  durationMs?: number
+  errorMessage?: string
+  occurredAt?: string
+}
+
+/** Agent 追踪 SSE 事件载荷（domain AgentTraceEvent 的 JSON 镜像） */
+export interface AgentTraceEventPayload {
+  traceId: string
+  action: 'STARTED' | 'STEP' | 'COMPLETED' | 'FAILED'
+  source: AgentTraceSource
+  ownerPluginCode?: string
+  agentCode?: string
+  agentName?: string
+  status: AgentTraceStatus
+  step?: AgentTraceStep
+  error?: string
+  durationMs?: number
+  usage?: AiUsage
+  occurredAt?: string
+}
+
+export interface AgentTraceQueryParams {
+  source?: string
+  pluginCode?: string
+  status?: string
+  page?: number
+  size?: number
+}
+
+/** 端点测试器结果，保留原始 HTTP 信息便于调试 */
+export interface EndpointTestResult {
+  ok: boolean
+  status: number
+  statusText: string
+  durationMs: number
+  body: string
+}
+
+export default {
+  status: () =>
+    systemClient.get<unknown, ApiResponse<PluginDevtoolsStatus>>('api/platform/plugin-devtools/status'),
+
+  plugins: () =>
+    systemClient.get<unknown, ApiResponse<PluginDevPlugin[]>>('api/platform/plugin-devtools/plugins'),
+
+  assets: (code: string) =>
+    systemClient.get<unknown, ApiResponse<PluginRuntimeAssets>>(`api/platform/plugin-devtools/plugins/${code}/assets`),
+
+  reload: (code: string) =>
+    systemClient.post<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/plugins/${code}/reload`),
+
+  commandTest: (code: string, data: PluginCommandTestPayload) =>
+    systemClient.post<unknown, ApiResponse<PluginCommandTestResult>>(`api/platform/plugin-devtools/plugins/${code}/command-test`, data),
+
+  traces: (params: AgentTraceQueryParams) =>
+    systemClient.get<unknown, ApiResponse<AgentTracePage>>('api/platform/plugin-devtools/agent-traces', { params }),
+
+  traceDetail: (traceId: string) =>
+    systemClient.get<unknown, ApiResponse<AgentTraceDetail>>(`api/platform/plugin-devtools/agent-traces/${traceId}`),
+
+  lifecycleStreamUrl: () => toBackendAssetUrl('/api/platform/plugin-devtools/events/stream'),
+
+  traceStreamUrl: () => toBackendAssetUrl('/api/platform/plugin-devtools/agent-traces/stream'),
+
+  /**
+   * 端点测试器：绕过 axios 封装直连目标端点，保留真实状态码与响应体。
+   * 若目标端点启用接口加密，返回体可能是密文，面板按原文展示。
+   */
+  async testEndpoint(method: string, path: string, body?: string): Promise<EndpointTestResult> {
+    const url = toBackendAssetUrl(path)
+    const headers: Record<string, string> = { 'Accept-Language': 'zh-CN' }
+    const token = localStorage.getItem('token')
+    if (token) {
+      headers.Authorization = token
+    }
+    const hasBody = body !== undefined && body.trim() !== '' && !['GET', 'HEAD'].includes(method.toUpperCase())
+    if (hasBody) {
+      headers['Content-Type'] = 'application/json'
+    }
+    const started = performance.now()
+    try {
+      const response = await fetch(url, {
+        method: method.toUpperCase(),
+        headers,
+        body: hasBody ? body : undefined,
+      })
+      const text = await response.text()
+      return {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+        durationMs: Math.round(performance.now() - started),
+        body: text,
+      }
+    }
+    catch (error: any) {
+      return {
+        ok: false,
+        status: 0,
+        statusText: '网络错误',
+        durationMs: Math.round(performance.now() - started),
+        body: error?.message || '请求未能发出',
+      }
+    }
+  },
+}

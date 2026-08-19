@@ -8,6 +8,7 @@ import FloatingSidebarMenuButton from './components/FloatingSidebarMenuButton/in
 import Header from './components/Header/index.vue'
 import Hotkeys from './components/Hotkeys/index.vue'
 import MainSidebar from './components/MainSidebar/index.vue'
+import PluginDevtools from './components/PluginDevtools/index.vue'
 import SubSidebar from './components/SubSidebar/index.vue'
 import Topbar from './components/Topbar/index.vue'
 import LinkView from './components/views/link.vue'
@@ -145,7 +146,6 @@ async function resendVerificationEmail() {
     verificationMailSending.value = false
   }
 }
-
 </script>
 
 <template>
@@ -176,6 +176,7 @@ async function resendVerificationEmail() {
       <!-- 移动端下，展开侧边栏时的遮罩层 -->
       <div :class="cn('invisible fixed inset-0 z-1009 bg-black/50 op-0 backdrop-blur-sm transition-opacity', { 'op-100 visible': appSettingsStore.mode === 'mobile' && !appSettingsStore.settings.menu.subMenuCollapse })" @click="appSettingsStore.toggleSidebarCollapse()" />
       <FloatingSidebarMenuButton />
+      <PluginDevtools />
       <div class="main-container pb-[calc(var(--g-slots-layout-bottom-height)+var(--g-main-container-padding-bottom,0px))] pt-[calc(var(--g-slots-layout-top-height)+var(--g-header-actual-height)+var(--g-topbar-actual-height))]">
         <div
           class="fixed-content-around-area w-full inset-t-[calc(var(--g-slots-layout-top-height)+var(--g-header-actual-height))] inset-inline-1/2 fixed z-1005" :style="{

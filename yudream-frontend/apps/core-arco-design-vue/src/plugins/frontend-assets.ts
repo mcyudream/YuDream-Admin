@@ -25,6 +25,42 @@ export function loadPluginFrontendAssetsByCode(pluginCode: string) {
     .then(item => item ? loadPluginFrontendAssets(item) : undefined)
 }
 
+/**
+ * 开发模式热重载：以版本戳强制刷新该插件已注入的样式与脚本节点。
+ * 去重键为完整 URL，因此需先移除旧节点再以带 ?v= 的新 URL 重新注入；
+ * 这是整页重挂载级别的刷新（状态不保留），不是状态保持型 HMR。
+ */
+export function reloadPluginFrontendAssets(pluginCode: string, version: string) {
+  const prefix = normalizeSegment(pluginCode, '插件编码')
+  const nodes = document.head.querySelectorAll<HTMLElement>(`[${ASSET_ATTRIBUTE}]`)
+  const reloads: Promise<void>[] = []
+  nodes.forEach((node) => {
+    const url = node.getAttribute(ASSET_ATTRIBUTE) || ''
+    if (!url.includes(`/api/platform/plugins/${prefix}/assets/`)) {
+      return
+    }
+    const refreshed = `${url.split('?')[0]}?v=${version}`
+    node.remove()
+    if (node instanceof HTMLLinkElement) {
+      const element = document.createElement('link')
+      element.rel = 'stylesheet'
+      element.href = refreshed
+      element.setAttribute(ASSET_ATTRIBUTE, refreshed)
+      document.head.appendChild(element)
+      reloads.push(awaitAsset(element))
+    }
+    else if (node instanceof HTMLScriptElement) {
+      const element = document.createElement('script')
+      element.type = 'module'
+      element.src = refreshed
+      element.setAttribute(ASSET_ATTRIBUTE, refreshed)
+      document.head.appendChild(element)
+      reloads.push(awaitAsset(element))
+    }
+  })
+  return Promise.all(reloads)
+}
+
 function loadStyle(pluginCode: string, path: string) {
   const url = pluginFrontendAssetUrl(pluginCode, path)
   const selector = `link[${ASSET_ATTRIBUTE}="${cssEscape(url)}"]`
