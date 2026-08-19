@@ -106,6 +106,7 @@ function createSwaggerPreviewHtml(openApi: string, assetBase: string) {
   <title>${defaultDocTitle.value}</title>
   <link rel="stylesheet" href="${assetBase}/swagger-ui.css">
   <style>
+    /* Swagger UI 在独立 iframe 文档中渲染，无法继承宿主主题变量，有意使用固定浅色背景 */
     html, body, #swagger-ui { margin: 0; min-height: 100%; background: #fff; }
     .swagger-ui .topbar { display: none; }
   </style>
@@ -230,7 +231,7 @@ function appendQuery(url: string, params: Record<string, string>) {
                 <FaInput v-model="form.swaggerUiPath" class="w-full" />
               </a-form-item>
               <a-form-item label="描述" class="md:col-span-2">
-                <a-textarea v-model="form.description" :auto-size="{ minRows: 3, maxRows: 5 }" />
+                <FaTextarea v-model="form.description" rows="3" class="w-full" />
               </a-form-item>
             </div>
           </a-form>
