@@ -93,7 +93,7 @@ const hiddenCardGroups = computed(() => {
 const canConfigureDefault = computed(() => accountStore.permissions.includes('*') || accountStore.permissions.includes('system:dashboard:config'))
 const roleSummary = computed(() => accountStore.currentRole ? `${accountStore.currentRole.name} / ${accountStore.currentRole.code}` : '未选择角色')
 const deptSummary = computed(() => accountStore.currentDept?.name || '未选择部门')
-const drawerWidth = computed(() => viewportWidth.value < 640 ? '100%' : 460)
+const drawerContentClass = computed(() => viewportWidth.value < 640 ? 'w-full sm:max-w-full' : 'sm:max-w-[460px]')
 const quickActions = computed(() => preferredMenuActions(menuActions()).slice(0, 8))
 
 function canViewCard(card: DashboardCard) {
@@ -694,7 +694,7 @@ function cardProps(card: DashboardCard) {
       </div>
     </div>
 
-    <a-drawer v-model:visible="drawerVisible" :width="drawerWidth" title="添加首页卡片" unmount-on-close>
+    <FaDrawer v-model="drawerVisible" title="添加首页卡片" :footer="false" :content-class="drawerContentClass">
       <div class="card-picker">
         <div v-for="group in hiddenCardGroups" :key="group.name" class="card-picker-group">
           <div class="card-picker-group__title">
@@ -723,7 +723,7 @@ function cardProps(card: DashboardCard) {
           <strong>所有卡片已显示</strong>
         </div>
       </div>
-    </a-drawer>
+    </FaDrawer>
   </div>
 </template>
 

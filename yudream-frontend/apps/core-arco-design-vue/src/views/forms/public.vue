@@ -99,9 +99,9 @@ function invalid() {
 .public-form-page {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(22, 93, 255, 0.12), transparent 30%),
-    linear-gradient(180deg, #f7f8fb 0%, #eef2f7 100%);
-  color: #172033;
+    radial-gradient(circle at top left, rgb(var(--primary-6) / 0.12), transparent 30%),
+    linear-gradient(180deg, var(--color-bg-2) 0%, var(--color-bg-3) 100%);
+  color: var(--color-text-1);
 }
 
 .public-form-shell {
@@ -115,11 +115,11 @@ function invalid() {
   align-items: center;
   justify-content: space-between;
   height: 48px;
-  color: #566176;
+  color: var(--color-text-2);
 }
 
 .brand-link {
-  color: #172033;
+  color: var(--color-text-1);
   font-weight: 800;
   text-decoration: none;
 }
@@ -129,9 +129,9 @@ function invalid() {
   gap: 20px;
   margin-top: 28px;
   padding: 28px;
-  border: 1px solid rgba(42, 53, 71, 0.08);
+  border: 1px solid var(--color-border-2);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--color-bg-1);
   box-shadow: 0 24px 70px rgba(21, 31, 48, 0.1);
 }
 
@@ -139,7 +139,7 @@ function invalid() {
   display: grid;
   min-height: 260px;
   place-items: center;
-  color: #667085;
+  color: var(--color-text-3);
 }
 
 @media (max-width: 640px) {

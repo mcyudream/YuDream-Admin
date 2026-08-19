@@ -209,6 +209,12 @@ const statusOptions = [
   { label: '停用', value: 'DISABLED' },
 ]
 
+const grantTypeOptions: { label: string, value: OAuthGrantType }[] = [
+  { label: 'authorization_code', value: 'AUTHORIZATION_CODE' },
+  { label: 'refresh_token', value: 'REFRESH_TOKEN' },
+  { label: 'client_credentials', value: 'CLIENT_CREDENTIALS' },
+]
+
 onMounted(async () => {
   await loadPolicy()
   await loadFeatureData()
@@ -959,7 +965,7 @@ function normalizeDateTime(value?: string) {
       <section v-if="activeTab === 'external'" class="panel">
         <div class="key-toolbar"><div class="section-title"><FaIcon name="i-ri:links-line" />第三方登录</div></div>
         <FaAlert icon="i-ri:information-line" title="Wwoyun 外置登录" description="配置后可使用 QQ、微信、Google、Gitee、GitHub 登录或在个人设置中绑定账号。回调地址需与 Wwoyun 后台登记一致。" />
-        <a-form :model="externalLoginForm" layout="vertical" class="mt-4"><div class="form-grid"><a-form-item label="提供方编码"><FaInput v-model="externalLoginForm.code" disabled /></a-form-item><a-form-item label="名称"><FaInput v-model="externalLoginForm.name" /></a-form-item><a-form-item label="AppId" required><FaInput v-model="externalLoginForm.appId" /></a-form-item><a-form-item label="AppKey" required><FaInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时请重新输入" /></a-form-item></div><a-form-item label="回调地址" required><FaInput v-model="externalLoginForm.callbackUrl" /></a-form-item><a-form-item label="启用平台"><FaSelect v-model="selectedExternalTypes" multiple :options="externalTypeOptions" class="w-full" /></a-form-item><a-form-item label="状态"><a-switch v-model="externalLoginForm.enabled" /></a-form-item><div class="flex justify-end"><FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin"><FaIcon name="i-ri:save-3-line" />保存配置</FaButton></div></a-form>
+        <a-form :model="externalLoginForm" layout="vertical" class="mt-4"><div class="form-grid"><a-form-item label="提供方编码"><FaInput v-model="externalLoginForm.code" disabled /></a-form-item><a-form-item label="名称"><FaInput v-model="externalLoginForm.name" /></a-form-item><a-form-item label="AppId" required><FaInput v-model="externalLoginForm.appId" /></a-form-item><a-form-item label="AppKey" required><FaInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时请重新输入" /></a-form-item></div><a-form-item label="回调地址" required><FaInput v-model="externalLoginForm.callbackUrl" /></a-form-item><a-form-item label="启用平台"><FaSelect v-model="selectedExternalTypes" multiple :options="externalTypeOptions" class="w-full" /></a-form-item><a-form-item label="状态"><FaSwitch v-model="externalLoginForm.enabled" /></a-form-item><div class="flex justify-end"><FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin"><FaIcon name="i-ri:save-3-line" />保存配置</FaButton></div></a-form>
       </section>
 
       <section v-if="activeTab === 'passkey'" class="panel">
@@ -1089,13 +1095,12 @@ function normalizeDateTime(value?: string) {
           </a-form-item>
         </div>
         <a-form-item label="授权模式">
-          <a-checkbox-group v-model="oauthClientForm.grantTypes">
-            <a-space wrap>
-              <a-checkbox value="AUTHORIZATION_CODE">authorization_code</a-checkbox>
-              <a-checkbox value="REFRESH_TOKEN">refresh_token</a-checkbox>
-              <a-checkbox value="CLIENT_CREDENTIALS">client_credentials</a-checkbox>
-            </a-space>
-          </a-checkbox-group>
+          <FaCheckboxGroup
+            :model-value="oauthClientForm.grantTypes"
+            :options="grantTypeOptions"
+            class="flex flex-wrap gap-3"
+            @update:model-value="value => (oauthClientForm.grantTypes = value as OAuthGrantType[])"
+          />
         </a-form-item>
         <a-form-item label="回调地址（一行一个）">
           <FaTextarea :model-value="splitTextarea(oauthClientForm.redirectUris || [])" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />

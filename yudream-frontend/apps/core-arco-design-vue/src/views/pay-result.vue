@@ -208,8 +208,8 @@ function goHome() {
   place-items: center;
   padding: 24px;
   background:
-    linear-gradient(135deg, rgba(24, 144, 255, 0.08), transparent 42%),
-    linear-gradient(315deg, rgba(34, 197, 94, 0.08), transparent 38%),
+    linear-gradient(135deg, rgb(var(--primary-6) / 0.08), transparent 42%),
+    linear-gradient(315deg, rgb(var(--success-6) / 0.08), transparent 38%),
     var(--color-bg-1);
 }
 
@@ -228,19 +228,19 @@ function goHome() {
   height: 58px;
   place-items: center;
   border-radius: 50%;
-  background: rgba(34, 197, 94, 0.12);
-  color: rgb(22, 163, 74);
+  background: rgb(var(--success-6) / 0.12);
+  color: rgb(var(--success-6));
   font-size: 32px;
 }
 
 .pay-result-icon.is-paid {
-  background: rgba(34, 197, 94, 0.12);
-  color: rgb(22, 163, 74);
+  background: rgb(var(--success-6) / 0.12);
+  color: rgb(var(--success-6));
 }
 
 .pay-result-icon.is-warning {
-  background: rgba(245, 158, 11, 0.14);
-  color: rgb(217, 119, 6);
+  background: rgb(var(--warning-6) / 0.14);
+  color: rgb(var(--warning-6));
 }
 
 .pay-result-content {
@@ -276,7 +276,7 @@ function goHome() {
   margin-top: 22px;
   padding: 12px 14px;
   border-radius: 8px;
-  background: rgba(24, 144, 255, 0.1);
+  background: rgb(var(--primary-6) / 0.1);
   color: rgb(var(--primary-6));
   font-size: 14px;
   font-weight: 600;
