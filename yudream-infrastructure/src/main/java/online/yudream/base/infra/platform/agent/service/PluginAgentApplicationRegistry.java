@@ -48,6 +48,19 @@ public class PluginAgentApplicationRegistry implements AgentRuntimeApplicationRe
     }
 
     @Override
+    public List<AgentApplication> applicationsByOwner(String ownerCode) {
+        if (!StringUtils.hasText(ownerCode)) {
+            return List.of();
+        }
+        String normalized = ownerCode.trim();
+        return applications.values().stream()
+                .filter(registration -> registration.ownerCode().equals(normalized))
+                .map(Registration::application)
+                .sorted(Comparator.comparing(AgentApplication::getCode))
+                .toList();
+    }
+
+    @Override
     public List<AgentApplication> applications() {
         return applications.values().stream()
                 .map(Registration::application)

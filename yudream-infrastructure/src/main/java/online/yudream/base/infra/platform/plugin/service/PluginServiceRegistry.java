@@ -56,6 +56,18 @@ public class PluginServiceRegistry {
         }
     }
 
+    /** 开发者工具资产快照：列出插件已导出的服务类型全限定名。 */
+    public List<String> exportedServiceNames(String pluginCode) {
+        if (!StringUtils.hasText(pluginCode)) {
+            return List.of();
+        }
+        Map<Class<?>, Object> pluginServices = services.get(pluginCode.trim());
+        if (pluginServices == null) {
+            return List.of();
+        }
+        return pluginServices.keySet().stream().map(Class::getName).sorted().toList();
+    }
+
     private String requirePluginCode(String pluginCode) {
         if (!StringUtils.hasText(pluginCode)) {
             throw new BizException("插件编码不能为空");

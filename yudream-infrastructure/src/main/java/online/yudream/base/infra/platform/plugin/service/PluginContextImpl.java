@@ -237,6 +237,14 @@ public class PluginContextImpl implements PluginContext {
         return List.copyOf(permissions);
     }
 
+    public List<PluginMenuItem> menus() {
+        return List.copyOf(menus);
+    }
+
+    public List<PluginCapabilityItem> capabilities() {
+        return List.copyOf(capabilities);
+    }
+
     public List<PluginFrontendModule> frontendModules() {
         return List.copyOf(frontendModules);
     }

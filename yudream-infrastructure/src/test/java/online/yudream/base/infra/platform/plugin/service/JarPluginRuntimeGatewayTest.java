@@ -4,6 +4,9 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
+import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
+import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.plugin.spi.annotation.PluginCommand;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -12,12 +15,14 @@ import online.yudream.base.plugin.spi.system.command.PluginCommandContext;
 import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.io.IOException;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.jar.JarEntry;
@@ -101,6 +106,55 @@ class JarPluginRuntimeGatewayTest {
         gateway.unload("load-fail");
     }
 
+    @Test
+    void runtimeAssetsSnapshotReflectsRuntimeContributions() throws IOException {
+        Path jar = writePluginJar("assets-plugin.jar", "assets-plugin", HealthyPlugin.class.getName());
+        JarPluginRuntimeGateway gateway = newGateway();
+        PluginModule module = module("assets-plugin", jar);
+
+        assertFalse(gateway.runtimeAssets("assets-plugin").loaded());
+
+        gateway.enable(module);
+        PluginRuntimeAssets assets = gateway.runtimeAssets("assets-plugin");
+        assertTrue(assets.loaded());
+        assertTrue(assets.enabled());
+        assertEquals(1, assets.commands().size());
+        assertEquals("healthy-cmd", assets.commands().get(0).code());
+        assertEquals("assets-plugin", assets.commands().get(0).pluginCode());
+
+        gateway.disable("assets-plugin");
+        PluginRuntimeAssets disabled = gateway.runtimeAssets("assets-plugin");
+        assertTrue(disabled.loaded());
+        assertFalse(disabled.enabled());
+        assertTrue(disabled.commands().isEmpty());
+        gateway.unload("assets-plugin");
+    }
+
+    @Test
+    void lifecycleEventsArePublishedWithOutcomeOnTransitions() throws IOException {
+        Path jar = writePluginJar("events-plugin.jar", "events-plugin", HealthyPlugin.class.getName());
+        List<PluginLifecycleEvent> events = new ArrayList<>();
+        JarPluginRuntimeGateway gateway = newGateway(event -> {
+            if (event instanceof PluginLifecycleEvent lifecycleEvent) {
+                events.add(lifecycleEvent);
+            }
+        });
+        PluginModule module = module("events-plugin", jar);
+
+        gateway.enable(module);
+        gateway.disable("events-plugin");
+        gateway.unload("events-plugin");
+
+        assertEquals(List.of(
+                        PluginLifecycleAction.LOAD,
+                        PluginLifecycleAction.ENABLE,
+                        PluginLifecycleAction.DISABLE,
+                        PluginLifecycleAction.UNLOAD),
+                events.stream().map(PluginLifecycleEvent::action).toList());
+        assertTrue(events.stream().allMatch(PluginLifecycleEvent::success));
+        assertTrue(events.stream().allMatch(event -> "events-plugin".equals(event.pluginCode())));
+    }
+
     public static class HealthyPlugin implements YuDreamPlugin {
         @PluginCommand(code = "healthy-cmd", command = "healthy", name = "健康指令")
         public void handle(PluginCommandContext context) {
@@ -137,6 +191,11 @@ class JarPluginRuntimeGatewayTest {
     }
 
     private JarPluginRuntimeGateway newGateway() {
+        return newGateway(event -> {
+        });
+    }
+
+    private JarPluginRuntimeGateway newGateway(ApplicationEventPublisher eventPublisher) {
         PluginProperties properties = new PluginProperties();
         properties.setDirectories(List.of(pluginDir.toString()));
         return new JarPluginRuntimeGateway(
@@ -161,7 +220,8 @@ class JarPluginRuntimeGatewayTest {
                     public List<AgentApplication> applications() {
                         return List.of();
                     }
-                }
+                },
+                eventPublisher
         );
     }
 
