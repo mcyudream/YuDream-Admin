@@ -229,6 +229,14 @@
     {
       "key": "form-create-arco-designer",
       "text": "Vue3 + Arco 动态表单优先使用 @form-create/arco-design 和 form-create-designer-arco-design；main.ts 全局 app.use(formCreate) 与 app.use(FcDesigner)，设计器用 fc-designer.getRule/getOption 保存 JSON，公开端用 form-create 渲染并自定义提交按钮。"
+    },
+    {
+      "key": "devtools-sse-fetch",
+      "text": "sa-token 只读 Authorization 头，EventSource 无法携带；devtools/agent SSE 一律 fetch + ReadableStream 手工解析 event:/data: 分块，断线 3s 退避重连（先例：plugin-devtools store 与 agent-debug-stream.ts）"
+    },
+    {
+      "key": "plugin-devmode-reload",
+      "text": "插件开发模式：dev-mode.enabled + projects 配置目录加载（target/classes + target/plugin-dev/lib），watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令"
     }
   ],
   "pitfalls": [
@@ -287,6 +295,10 @@
     {
       "key": "agent-model-native-tool-scope",
       "text": "Agent 的原生工具调用必须由具体聊天模型节点声明 toolCodes 和 toolMode，并在每次模型调用前解析为受作用域限制的 AiAgentTool 回调；应用级 toolCodes 仅作为后端从工作流推导出的授权并集。独立 tool 节点只能保留为可迁移的历史兼容路径，不能再作为新编排的默认能力。"
+    },
+    {
+      "key": "eslint-full-fix-mass-rewrite",
+      "text": "根 pnpm lint:eslint 带 --fix 且 eslint.config.js 变更会使缓存失效，全量跑会批量改写无关文件（含 pnpm catalog fixer 加条目）；验证规则用 npx eslint <paths> --no-cache 定向跑，提交前 git checkout 还原非本项文件"
     }
   ]
 }
