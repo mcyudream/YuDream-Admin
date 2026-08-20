@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.service.MilkyApiGateway;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxRandomMode;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageContent;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import org.junit.jupiter.api.Test;
@@ -130,6 +132,79 @@ class MilkyPluginMessagingServiceTest {
         service.shutdown();
 
         assertTrue(threadName.get().startsWith("milky-plugin-messaging-"));
+    }
+
+    @Test
+    void capturesSandboxMessagingWithoutRepositoryOrGatewayCalls() {
+        AtomicInteger repositoryCalls = new AtomicInteger();
+        AtomicInteger gatewayCalls = new AtomicInteger();
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> {
+                    repositoryCalls.incrementAndGet();
+                    return null;
+                });
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    gatewayCalls.incrementAndGet();
+                    return null;
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+        QqSandboxSession session = QqSandboxSession.create("sandbox", "demo", "1", "2", "3", null, "4", "group",
+                QqSandboxRandomMode.REAL, 1_000L, java.time.Instant.now());
+
+        try (QqSandboxExecutionScope ignored = QqSandboxExecutionScope.open(session)) {
+            service.sendToChannel(session.connectionId(), session.channelId(),
+                    new PluginMessageContent(PluginMessageContent.Type.TEXT, "captured", List.of(), Map.of()))
+                    .toCompletableFuture().join();
+            service.invoke(session.connectionId(), "send_group_message", Map.of("group_id", session.channelId()))
+                    .toCompletableFuture().join();
+        }
+
+        assertEquals(0, repositoryCalls.get());
+        assertEquals(0, gatewayCalls.get());
+        assertTrue(session.timeline().stream().anyMatch(event -> "messaging.sendToChannel".equals(event.action())));
+        assertTrue(session.timeline().stream().anyMatch(event -> "messaging.raw.invoke".equals(event.action())));
+    }
+
+    @Test
+    void capturesAsyncSandboxReplyWithoutThreadLocalAndTracksAgentActivity() {
+        AtomicInteger repositoryCalls = new AtomicInteger();
+        AtomicInteger gatewayCalls = new AtomicInteger();
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> {
+                    repositoryCalls.incrementAndGet();
+                    return null;
+                });
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    gatewayCalls.incrementAndGet();
+                    return null;
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+        InMemoryQqSandboxSessionRepo sessions = new InMemoryQqSandboxSessionRepo();
+        service.setSandboxSessions(sessions);
+        QqSandboxSession session = QqSandboxSession.create("async", "ai-chatbot", "1", "2", "3", null, "4", "group",
+                QqSandboxRandomMode.FORCE_HIT, 1_000L, java.time.Instant.now());
+        sessions.save(session);
+
+        service.invoke(session.connectionId(), "devtools_sandbox_diagnostic",
+                Map.of("milestone", "agent_pending", "traceId", "trace-1")).toCompletableFuture().join();
+        assertTrue(session.hasActiveOperations());
+        service.sendToChannel(session.connectionId(), session.channelId(),
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, "async reply", List.of(), Map.of()))
+                .toCompletableFuture().join();
+        service.invoke(session.connectionId(), "devtools_sandbox_diagnostic",
+                Map.of("milestone", "agent_complete", "traceId", "trace-1")).toCompletableFuture().join();
+
+        assertEquals(0, repositoryCalls.get());
+        assertEquals(0, gatewayCalls.get());
+        assertEquals(false, session.hasActiveOperations());
+        assertTrue(session.timeline().stream().anyMatch(event -> "messaging.sendToChannel".equals(event.action())
+                && "async reply".equals(event.payload().get("content"))));
     }
 
     @Test

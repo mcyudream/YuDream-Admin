@@ -6,7 +6,9 @@ import online.yudream.base.application.platform.agent.cmd.AgentRunCmd;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.aggregate.AgentTool;
+import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
+import online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway;
@@ -28,9 +30,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Resolves and executes Agent tools with the caller's permission snapshot. */
+/**
+ * Resolves and executes Agent tools with the caller's permission snapshot.
+ */
 public final class AgentToolExecutor {
-    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() { };
+    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
+    };
 
     private final ObjectMapper objectMapper;
     private final RuntimeExecutor runtimeExecutor;
@@ -38,6 +43,7 @@ public final class AgentToolExecutor {
     private final List<AiAgentTool> systemTools;
     private final AgentPermissionGateway permissionGateway;
     private final ObjectProvider<AgentPluginToolGateway> pluginToolGateways;
+    private final AgentToolExecutionGuard executionGuard;
 
     public AgentToolExecutor(
             ObjectMapper objectMapper,
@@ -46,7 +52,8 @@ public final class AgentToolExecutor {
             List<AiAgentTool> systemTools,
             AgentPermissionGateway permissionGateway
     ) {
-        this(objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, null);
+        this(objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, null,
+                AgentToolExecutionGuard.ALLOW_ALL);
     }
 
     public AgentToolExecutor(
@@ -57,15 +64,31 @@ public final class AgentToolExecutor {
             AgentPermissionGateway permissionGateway,
             ObjectProvider<AgentPluginToolGateway> pluginToolGateways
     ) {
+        this(objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, pluginToolGateways,
+                AgentToolExecutionGuard.ALLOW_ALL);
+    }
+
+    public AgentToolExecutor(
+            ObjectMapper objectMapper,
+            RuntimeExecutor runtimeExecutor,
+            AgentToolRepo toolRepo,
+            List<AiAgentTool> systemTools,
+            AgentPermissionGateway permissionGateway,
+            ObjectProvider<AgentPluginToolGateway> pluginToolGateways,
+            AgentToolExecutionGuard executionGuard
+    ) {
         this.objectMapper = objectMapper;
         this.runtimeExecutor = runtimeExecutor;
         this.toolRepo = toolRepo;
         this.systemTools = systemTools == null ? List.of() : List.copyOf(systemTools);
         this.permissionGateway = permissionGateway;
         this.pluginToolGateways = pluginToolGateways;
+        this.executionGuard = executionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : executionGuard;
     }
 
-    /** Authorization happens before a model can receive a callback descriptor. */
+    /**
+     * Authorization happens before a model can receive a callback descriptor.
+     */
     public AiAgentTool resolve(String toolCode, AgentApplication application, AgentRunCmd command) {
         return resolve(toolCode, application, capturePermissionSnapshot(command));
     }
@@ -74,9 +97,9 @@ public final class AgentToolExecutor {
         List<String> permissionCodes = command == null || command.getPermissionCodes() == null
                 ? List.of()
                 : command.getPermissionCodes().stream()
-                .filter(code -> code != null && !code.isBlank())
-                .map(String::trim)
-                .toList();
+                  .filter(code -> code != null && !code.isBlank())
+                  .map(String::trim)
+                  .toList();
         return new PermissionSnapshot(permissionCodes, command != null && command.isPermissionContextExplicit());
     }
 
@@ -89,19 +112,19 @@ public final class AgentToolExecutor {
                 .orElse(null);
         if (systemTool != null) {
             ensurePermission(systemTool.descriptor().permissionCode(), systemTool.descriptor().title(), permissionSnapshot);
-            return systemTool;
+            return guarded(systemTool);
         }
         // 插件运行时注册的工具：描述符权限快照校验后交插件通道执行（执行时再按插件触发上下文复核）
         AiAgentTool pluginTool = pluginTool(code);
         if (pluginTool != null) {
             ensurePermission(pluginTool.descriptor().permissionCode(), pluginTool.descriptor().title(), permissionSnapshot);
-            return pluginTool;
+            return guarded(pluginTool);
         }
         AgentTool pythonTool = toolRepo.findByCode(code)
                 .orElseThrow(() -> new BizException("Tool does not exist: " + code));
         ensurePythonAvailable(pythonTool);
         ensurePermission(pythonTool.getPermissionCode(), pythonTool.getName(), permissionSnapshot);
-        return new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), permissionSnapshot);
+        return guarded(new PythonToolAdapter(pythonTool, pythonDescriptor(pythonTool), permissionSnapshot));
     }
 
     /**
@@ -125,10 +148,12 @@ public final class AgentToolExecutor {
                 systemTool.descriptor().permissionCode(),
                 permissionSnapshot.permissionCodes(),
                 permissionSnapshot.permissionContextExplicit()
-        ) ? systemTool : null;
+        ) ? guarded(systemTool) : null;
     }
 
-    /** Makes old tool nodes use the exact same resolution and Python execution contract. */
+    /**
+     * Makes old tool nodes use the exact same resolution and Python execution contract.
+     */
     public AiAgentToolResult execute(
             String toolCode,
             Map<String, Object> arguments,
@@ -142,6 +167,28 @@ public final class AgentToolExecutor {
             ensurePermission(tool.descriptor().permissionCode(), tool.descriptor().title(), permissionSnapshot);
             return tool.execute(new AiAgentToolCall(tool.descriptor().name(), safeArguments));
         }
+    }
+
+    private AiAgentTool guarded(AiAgentTool delegate) {
+        if (executionGuard == AgentToolExecutionGuard.ALLOW_ALL) return delegate;
+        return new AiAgentTool() {
+            @Override
+            public AiAgentToolDescriptor descriptor() {
+                return delegate.descriptor();
+            }
+
+            @Override
+            public AgentToolRisk risk() {
+                return delegate.risk();
+            }
+
+            @Override
+            public AiAgentToolResult execute(AiAgentToolCall call) {
+                AiAgentToolDescriptor descriptor = delegate.descriptor();
+                executionGuard.check(descriptor.name(), delegate.risk(), descriptor.permissionCode());
+                return delegate.execute(call);
+            }
+        };
     }
 
     private AiAgentToolDescriptor pythonDescriptor(AgentTool tool) {

@@ -9,6 +9,7 @@ import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.plugin.spi.system.command.PluginCommandService;
@@ -54,17 +55,30 @@ public class MilkyPluginEventDispatcher {
 
     @EventListener
     public void dispatch(MilkyEventPublished published) {
+        dispatch(published == null || published.connectionId() == null ? null : String.valueOf(published.connectionId()),
+                published == null ? null : published.event(), Map.of());
+    }
+
+    void dispatchSandbox(String connectionId,
+                         online.yudream.base.domain.platform.milky.model.MilkyModels.Event event,
+                         Map<String, Object> sandboxReferrer) {
+        dispatch(connectionId, event, sandboxReferrer == null ? Map.of() : sandboxReferrer);
+    }
+
+    private void dispatch(String connectionId,
+                          online.yudream.base.domain.platform.milky.model.MilkyModels.Event sourceEvent,
+                          Map<String, Object> additionalReferrer) {
         online.yudream.base.domain.platform.milky.model.MilkyModels.Event event = null;
         String messageSeq = null;
         try {
-            event = published == null ? null : published.event();
+            event = sourceEvent;
             Map<String, Object> data = eventData(event);
             messageSeq = text(data.get("message_seq"));
             if (event == null) {
                 return;
             }
             if ("group_request".equals(event.eventType()) || "group_join_request".equals(event.eventType())) {
-                dispatchGroupRequest(published, data);
+                dispatchGroupRequest(connectionId, event, data, additionalReferrer);
                 return;
             }
             if (!isMessageEvent(event.eventType())) {
@@ -73,12 +87,12 @@ public class MilkyPluginEventDispatcher {
             String userId = messageUserId(data);
             String channelId = messageChannelId(data);
             String content = messageContent(data);
-            Map<String, Object> referrer = new java.util.LinkedHashMap<>();
+            Map<String, Object> referrer = new java.util.LinkedHashMap<>(additionalReferrer);
             referrer.put("mentions", mentions(data.get("segments")));
             String replyMessageId = replyMessageId(data.get("segments"));
             if (replyMessageId != null) referrer.put("replyMessageId", replyMessageId);
             PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
-                    content, null, null, referrer, event.eventType(), data, String.valueOf(published.connectionId()),
+                    content, null, null, referrer, event.eventType(), data, connectionId,
                     event.selfId(), messageSeq);
             runtime.publishMessagingEvent(pluginEvent);
 
@@ -99,27 +113,28 @@ public class MilkyPluginEventDispatcher {
                     permission -> allowed(user, permission));
         } catch (Exception error) {
             log.error("Milky plugin event dispatch failed: connectionId={}, eventType={}, selfId={}, messageSeq={}, errorType={}",
-                    published == null ? null : published.connectionId(), event == null ? null : event.eventType(),
-                    event == null ? null : event.selfId(), messageSeq, error.getClass().getSimpleName());
+                    connectionId, event == null ? null : event.eventType(), event == null ? null : event.selfId(),
+                    messageSeq, error.getClass().getSimpleName());
         }
     }
 
-    private void dispatchGroupRequest(MilkyEventPublished published, Map<String, Object> data) {
-        var event = published.event();
+    private void dispatchGroupRequest(String connectionId,
+                                      online.yudream.base.domain.platform.milky.model.MilkyModels.Event event,
+                                      Map<String, Object> data, Map<String, Object> additionalReferrer) {
         GroupRequest request = groupRequest(data);
         if (request == null) {
             log.warn("Ignoring incomplete Milky group request event: connectionId={}, eventType={}, selfId={}, messageSeq={}",
-                    published.connectionId(), event.eventType(), event.selfId(), text(data.get("message_seq")));
+                    connectionId, event.eventType(), event.selfId(), text(data.get("message_seq")));
             return;
         }
-        Map<String, Object> referrer = new java.util.LinkedHashMap<>();
+        Map<String, Object> referrer = new java.util.LinkedHashMap<>(additionalReferrer);
         referrer.put("requestId", request.requestId());
         String comment = request.comment();
         if (comment != null) {
             referrer.put("comment", comment);
         }
         PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), "group_request", "milky", request.userId(), request.groupId(),
-                comment, null, null, referrer, event.eventType(), data, String.valueOf(published.connectionId()),
+                comment, null, null, referrer, event.eventType(), data, connectionId,
                 event.selfId(), request.requestId());
         runtime.publishMessagingEvent(pluginEvent);
     }
@@ -148,14 +163,27 @@ public class MilkyPluginEventDispatcher {
         try {
             var commandList = commands.listAccessible(user == null ? null : user.getId());
             String nickname = user == null ? "访客" : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
-            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname, commandList)).thenCompose(image -> {
-                var connection = connections.findById(Long.valueOf(event.connectionId())).orElse(null);
-                String mode = connection == null ? "base64" : connection.getCommandMenuImageMode();
-                String uri = "url".equalsIgnoreCase(mode) ? uploadMenuImage(image, connection == null ? null : connection.getCommandMenuPublicBaseUrl()) : "base64://" + Base64.getEncoder().encodeToString(image.content());
-                return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
-                        new PluginMessageContent(PluginMessageContent.Type.IMAGE, uri, null, Map.of())));
-            });
-            fallbackOnMenuImageFailure(withMenuDeadline(imageSend), fallbackStarted, () -> menu(event, user), event);
+            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname, commandList))
+                    .thenCompose(QqSandboxExecutionScope.wrap(image -> {
+                        QqSandboxSession sandbox = QqSandboxExecutionScope.current();
+                        String mode;
+                        String publicBaseUrl;
+                        if (sandbox != null) {
+                            mode = "base64";
+                            publicBaseUrl = null;
+                        } else {
+                            var connection = connections.findById(Long.valueOf(event.connectionId())).orElse(null);
+                            mode = connection == null ? "base64" : connection.getCommandMenuImageMode();
+                            publicBaseUrl = connection == null ? null : connection.getCommandMenuPublicBaseUrl();
+                        }
+                        String uri = "url".equalsIgnoreCase(mode) ? uploadMenuImage(image, publicBaseUrl)
+                                : "base64://" + Base64.getEncoder().encodeToString(image.content());
+                        return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
+                                new PluginMessageContent(PluginMessageContent.Type.IMAGE, uri, null, Map.of())));
+                    }));
+            CompletionStage<?> deadline = withMenuDeadline(imageSend);
+            QqSandboxExecutionScope.track(deadline);
+            fallbackOnMenuImageFailure(deadline, fallbackStarted, () -> menu(event, user), event);
         } catch (Exception error) {
             fallbackOnMenuImageFailure(failedStage(error), fallbackStarted, () -> menu(event, user), event);
         }
@@ -177,24 +205,24 @@ public class MilkyPluginEventDispatcher {
 
     private void fallbackOnMenuImageFailure(CompletionStage<?> imageSend, AtomicBoolean fallbackStarted,
                                             java.util.function.Supplier<CompletionStage<?>> fallback, PluginEvent event) {
-        imageSend.whenComplete((ignored, error) -> {
+        imageSend.whenComplete(QqSandboxExecutionScope.wrap((ignored, error) -> {
             if (error == null || !fallbackStarted.compareAndSet(false, true)) {
                 return;
             }
             log.warn("Milky 菜单图片渲染或发送失败，降级为文本菜单: connectionId={}, channelId={}",
                     event.connectionId(), event.channelId(), error);
             try {
-                fallback.get().whenComplete((fallbackIgnored, fallbackError) -> {
+                fallback.get().whenComplete(QqSandboxExecutionScope.wrap((fallbackIgnored, fallbackError) -> {
                     if (fallbackError != null) {
                         log.error("Milky 菜单文本降级发送失败: connectionId={}, channelId={}",
                                 event.connectionId(), event.channelId(), fallbackError);
                     }
-                });
+                }));
             } catch (Exception fallbackError) {
                 log.error("Milky 菜单文本降级构建失败: connectionId={}, channelId={}",
                         event.connectionId(), event.channelId(), fallbackError);
             }
-        });
+        }));
     }
 
     private CompletionStage<?> sendMenuText(PluginEvent event, String content) {
@@ -224,7 +252,8 @@ public class MilkyPluginEventDispatcher {
                 .append("<div style='width:132px;color:#2563eb;font-size:16px;font-weight:700;'>/").append(escape(command.command())).append("</div>")
                 .append("<div style='width:150px;color:#1f2937;font-weight:600;'>").append(escape(command.name())).append("</div>")
                 .append("<div style='flex:1;color:#667085;font-size:13px;line-height:1.5;'>").append(escape(command.description())).append("</div></div>"));
-        if (rows.isEmpty()) rows.append("<div style='padding:24px;text-align:center;color:#98a2b3;'>暂无可用指令</div>");
+        if (rows.isEmpty())
+            rows.append("<div style='padding:24px;text-align:center;color:#98a2b3;'>暂无可用指令</div>");
         String initial = escape(nickname == null || nickname.isBlank() ? "访" : nickname.substring(0, 1));
         String avatar = avatarUri == null ? "<div style='width:54px;height:54px;border-radius:50%;background:#dbeafe;color:#2563eb;text-align:center;line-height:54px;font-size:24px;font-weight:700;'>" + initial + "</div>" : "<img src='" + escape(avatarUri) + "' style='width:54px;height:54px;border-radius:50%;object-fit:cover;'>";
         return "<html><body style='display:inline-block;margin:0;padding:16px;background:#f4f7fb;font-family:Arial,Microsoft YaHei,sans-serif;color:#1d2939;'><div id='command-menu-card' style='display:inline-block;min-width:520px;max-width:760px;box-sizing:border-box;padding:22px;background:#ffffff;border:1px solid #e4e7ec;border-radius:16px;'><div style='display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid #eef1f5;'>" + avatar + "<div><div style='font-size:22px;font-weight:700;line-height:1.3;'>可用指令</div><div style='margin-top:4px;color:#667085;font-size:13px;'>" + escape(nickname) + " · 根据当前权限展示</div></div></div><div style='padding-top:8px;'>" + rows + "</div></div></body></html>";
@@ -234,8 +263,10 @@ public class MilkyPluginEventDispatcher {
         if (user == null || user.getQq() == null || user.getQq().getValue() == null) return null;
         try {
             var response = HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("https://q1.qlogo.cn/g?b=qq&nk=" + user.getQq().getValue() + "&s=100")).GET().build(), HttpResponse.BodyHandlers.ofByteArray());
-            if (response.statusCode() / 100 == 2 && response.body().length > 0) return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(response.body());
-        } catch (Exception ignored) { }
+            if (response.statusCode() / 100 == 2 && response.body().length > 0)
+                return "data:image/jpeg;base64," + Base64.getEncoder().encodeToString(response.body());
+        } catch (Exception ignored) {
+        }
         return null;
     }
 
@@ -251,7 +282,8 @@ public class MilkyPluginEventDispatcher {
             commands.forEach(command -> cards.append("<div style='padding:7px 0;border-top:1px solid #e5e7eb;line-height:1.55;'><span style='font-weight:700;color:#17202a;'>/").append(escape(command.command())).append("</span><span style='color:#344054;'> · ").append(escape(command.name())).append("</span><div style='font-size:12px;color:#667085;'>").append(escape(command.description())).append("</div></div>"));
             sections.append("<div style='padding:16px 18px;background:#fff;border:1px solid #d9dde3;border-radius:6px;box-shadow:0 1px 2px #00000008;'><div style='padding-bottom:10px;border-bottom:1px solid #d9dde3;font-size:22px;color:#009688;'>").append(escape(plugin)).append("</div><div style='padding-top:4px;'>").append(cards).append("</div></div>");
         });
-        if (sections.isEmpty()) sections.append("<div style='padding:28px;text-align:center;color:#98a2b3;'>暂时没有可用指令</div>");
+        if (sections.isEmpty())
+            sections.append("<div style='padding:28px;text-align:center;color:#98a2b3;'>暂时没有可用指令</div>");
         return "<html><body style='display:inline-block;margin:0;padding:10px;background:#f1f1f1;font-family:Arial,Microsoft YaHei,sans-serif;color:#182230;'><div id='command-menu-card' style='display:inline-block;width:720px;box-sizing:border-box;padding:10px;'><div style='text-align:center;margin-bottom:18px;'><span style='display:inline-block;padding:8px 16px;background:#009688;color:#fff;border-radius:5px;font-size:22px;font-weight:700;'>指令菜单</span></div><div style='margin:0 0 14px;padding:0 4px;color:#4b5563;font-size:13px;'>您好，" + escape(nickname) + "。以下是您当前有权限使用的指令：</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;'>" + sections + "</div><div style='margin-top:14px;font-size:11px;color:#98a2b3;text-align:right;'>" + escape(siteName()) + " · 权限菜单</div></div></body></html>";
     }
 
@@ -269,7 +301,9 @@ public class MilkyPluginEventDispatcher {
         return templateEngine.process("plugin-command-menu", context);
     }
 
-    /** 指令菜单卡片落款使用系统设置的站点名称 */
+    /**
+     * 指令菜单卡片落款使用系统设置的站点名称
+     */
     private String siteName() {
         try {
             return settings.findByCategory("site").stream()
@@ -278,8 +312,7 @@ public class MilkyPluginEventDispatcher {
                     .filter(value -> value != null && !value.isBlank())
                     .findFirst()
                     .orElse("站点");
-        }
-        catch (Exception ignored) {
+        } catch (Exception ignored) {
             return "站点";
         }
     }
@@ -336,13 +369,17 @@ public class MilkyPluginEventDispatcher {
                 .orElse(false);
     }
 
-    /** 判断指令是否为仅绑定用户可用（allowAnonymous=false）。 */
+    /**
+     * 判断指令是否为仅绑定用户可用（allowAnonymous=false）。
+     */
     private boolean commandRequiresBound(String commandName) {
         return runtime.commands().stream()
                 .anyMatch(command -> commandName.equalsIgnoreCase(command.command()) && !command.allowAnonymous());
     }
 
-    /** 未绑定用户使用需要绑定的指令时，给出明确提示而非静默忽略。 */
+    /**
+     * 未绑定用户使用需要绑定的指令时，给出明确提示而非静默忽略。
+     */
     private void replyBindHint(PluginEvent event) {
         sendMenuText(event, "当前 QQ 未绑定系统账号，请先完成绑定后再使用该指令。");
     }
@@ -422,7 +459,8 @@ public class MilkyPluginEventDispatcher {
     private String replyMessageId(Object value) {
         if (!(value instanceof List<?> parts)) return null;
         for (Object part : parts) {
-            if (!(part instanceof Map<?, ?> map) || !"reply".equals(String.valueOf(map.get("type"))) || !(map.get("data") instanceof Map<?, ?> data)) continue;
+            if (!(part instanceof Map<?, ?> map) || !"reply".equals(String.valueOf(map.get("type"))) || !(map.get("data") instanceof Map<?, ?> data))
+                continue;
             Object id = data.containsKey("message_id") ? data.get("message_id") : data.get("message_seq");
             if (id != null && !String.valueOf(id).isBlank()) return String.valueOf(id);
         }
@@ -432,5 +470,6 @@ public class MilkyPluginEventDispatcher {
     record Parsed(String name, List<String> arguments) {
     }
 
-    record GroupRequest(String groupId, String userId, String requestId, String comment) { }
+    record GroupRequest(String groupId, String userId, String requestId, String comment) {
+    }
 }

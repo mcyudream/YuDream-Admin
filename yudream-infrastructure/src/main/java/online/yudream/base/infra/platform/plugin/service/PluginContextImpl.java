@@ -74,7 +74,8 @@ public class PluginContextImpl implements PluginContext {
         this.templateRenderService = new PluginTemplateRenderFrameworkService(pluginClassLoader, frameworkServices.render());
         this.aiToolRegistry = aiToolRegistry;
         this.agentApplicationRegistry = agentApplicationRegistry;
-        this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode, semanticMemoryService);
+        this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode,
+                new SandboxAwarePluginSemanticMemoryService(pluginCode, semanticMemoryService));
         onDispose(interactionRegistry);
         onDispose(commandRegistry);
     }
