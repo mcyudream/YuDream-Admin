@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.plugin.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
@@ -9,6 +10,9 @@ import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
+import online.yudream.base.infra.platform.plugin.devmode.DevModeEnvironment;
+import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrowser;
+import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.plugin.spi.annotation.PluginCommand;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -280,7 +284,17 @@ class JarPluginRuntimeGatewayTest {
                     }
                 },
                 eventPublisher,
-                devModeProperties
+                devModeProperties,
+                new PluginDevProjectCatalog(devModeProperties, new ObjectMapper()),
+                new PluginDevDirectoryBrowser(),
+                // 单测从 target/test-classes 运行会被自动检测为源码运行，固定按 jar 运行处理，
+                // 未显式开启 devMode 的用例（如目录加载拒绝）才能保持原语义
+                new DevModeEnvironment() {
+                    @Override
+                    public boolean runningFromSource() {
+                        return false;
+                    }
+                }
         );
     }
 

@@ -31,7 +31,10 @@ public class PluginModuleRepoImpl implements PluginModuleRepo {
             dataObj.setCreateTime(LocalDateTime.now());
         }
         dataObj.setUpdateTime(LocalDateTime.now());
-        return PluginModuleInfraMapper.toDomain(mongoTemplate.save(dataObj));
+        PluginModuleDO saved = mongoTemplate.save(dataObj);
+        // 乐观锁版本只随保存结果递增，必须回写传入实例，否则同一实例二次保存（如 dev reload 先停后启）必抛 OptimisticLockingFailureException
+        module.setVersion(saved.getVersion());
+        return PluginModuleInfraMapper.toDomain(saved);
     }
 
     @Override
