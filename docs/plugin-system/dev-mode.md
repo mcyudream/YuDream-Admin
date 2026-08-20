@@ -31,7 +31,7 @@
 - **CONFIG**：yml `dev-mode.projects` 列表，面板只读；
 - **FILE**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，与插件 JAR 目录同约定，已被 `.gitignore` 的 `/plugins/` 覆盖；可用 `dev-mode.store-file` 覆盖路径）。此文件是有意选择的**非数据库存储**——coding agent 与用户都能直接读取它来定位插件源码目录。
 
-合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），面板登记后若插件已启用会立即触发一次热切重载。登记时 `code` 可留空，宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
+合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），面板登记后若插件已启用会立即触发一次热切重载。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
 
 ### 配置
 
@@ -71,7 +71,7 @@ yudream:
 
 悬浮按钮**常驻管理后台布局层**（与路由无关，公开页无布局不显示），带未读事件计数徽标：可拖拽换位，松手吸附最近屏幕边缘；松手点距边缘 24px 以内会收成**半隐边缘条**（悬停提透明度并加宽，点击边缘条一步展开浮窗）。位置以 `{side, topRatio, docked}` 比例形式持久化在 localStorage（`pluginDevtoolsFab`），窗口缩放自动适配；「设置」页可一键重置位置。
 
-面板本体是 **Teleport 到 `body` 的非模态置顶浮窗**（对齐 Vue DevTools 的独立窗口心智），不是抽屉：无遮罩、不锁页面滚动，浮窗打开时系统照常可用；`z-index` 2100，高于侧栏（1010）、顶栏（1020）与宿主模态（2000），浮窗内弹出的模态再提到 2200，任何页面、任何情况下浮窗都在最上层。拖标题栏移动、拖右下角手柄缩放，几何 `{left, top, width, height}` 持久化在 localStorage（`pluginDevtoolsPanel`），视口缩放自动 clamp 回可见区；「设置」页可重置位置与尺寸。全局快捷键 `Ctrl/Cmd+Shift+D` 开关浮窗（`Esc` 关闭，输入框与已开模态内不劫持）。
+面板本体是 **Teleport 到 `body` 的非模态置顶浮窗**（对齐 Vue DevTools 的独立窗口心智），不是抽屉：无遮罩、不锁页面滚动，浮窗打开时系统照常可用；`z-index` 2100，高于侧栏（1010）、顶栏（1020）与宿主模态（2000），浮窗内登记项目模态为 2200，宿主目录选择模态为 2300，任何页面、任何情况下浮窗及其嵌套交互都在最上层。拖标题栏移动、拖右下角手柄缩放，几何 `{left, top, width, height}` 持久化在 localStorage（`pluginDevtoolsPanel`），视口缩放自动 clamp 回可见区；「设置」页可重置位置与尺寸。全局快捷键 `Ctrl/Cmd+Shift+D` 开关浮窗（`Esc` 关闭，输入框与已开模态内不劫持）。
 
 浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分五页，激活页持久化（`pluginDevtoolsPage`）：
 
@@ -97,6 +97,7 @@ yudream:
 | `POST /plugins/{code}/reload` | manage | 手动重载（开发模式插件） |
 | `POST /plugins/{code}/command-test` | manage | QQ 指令模拟触发（见 5.1） |
 | `GET /dev-projects` | view | 开发项目合并清单（CONFIG+FILE，含来源与路径/编译/描述符状态位，不受开关过滤） |
+| `GET /dev-projects/browse?path=...` | manage | 逐层浏览宿主机目录；path 为空返回文件系统根，返回 Maven/插件模块标记与可推断编码 |
 | `POST /dev-projects` | manage | 面板登记开发目录（code 可留空自动推断；已启用插件立即热切） |
 | `DELETE /dev-projects/{code}` | manage | 移除 FILE 源项目（CONFIG 源需在 yml 中移除） |
 | `GET /agent-traces` | view | 追踪分页查询（source/plugin/状态过滤） |
