@@ -1,12 +1,14 @@
 import type { PluginOption } from 'vite'
+import { existsSync, readFileSync } from 'node:fs'
 import process from 'node:process'
-import { ComponentsAutoImports as FantasticAdminComponentsAutoImports, ComponentsResolver as FantasticAdminComponentsResolver, ComponentsType as FantasticAdminComponentsType } from '@yudream/components/resolver'
+import { fileURLToPath } from 'node:url'
 import { ComposablesAutoImports as FantasticAdminComposablesAutoImports } from '@fantastic-admin/composables/resolver'
 import { createCopyrightPlugins as createFantasticAdminCopyrightPlugins } from '@fantastic-admin/copyright'
 import VitePluginSvgSpritemap from '@spiriit/vite-plugin-svg-spritemap'
 import vueLegacy from '@vitejs/plugin-legacy'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
+import { ComponentsAutoImports as FantasticAdminComponentsAutoImports, ComponentsResolver as FantasticAdminComponentsResolver, ComponentsType as FantasticAdminComponentsType } from '@yudream/components/resolver'
 import Unocss from 'unocss/vite'
 import autoImport from 'unplugin-auto-import/vite'
 import TurboConsole from 'unplugin-turbo-console/vite'
@@ -141,6 +143,28 @@ export function warnKeepAliveComponentNameMissing() {}
     })(),
 
     createFantasticAdminCopyrightPlugins(),
+
+    // 插件开发者调试抽屉「前端审查」页数据源：暴露 pnpm audit:ui 生成的报告，
+    // 每次请求实时读文件，重新执行 pnpm audit:ui 后面板刷新即可看到最新结果
+    !isBuild && {
+      name: 'yudream-devtools-audit-report',
+      configureServer(server) {
+        server.middlewares.use('/__yudream-devtools/audit.json', (_req, res) => {
+          const reportPath = fileURLToPath(new URL('../../../audit-report.json', import.meta.url))
+          res.setHeader('Content-Type', 'application/json; charset=utf-8')
+          res.setHeader('Cache-Control', 'no-store')
+          if (existsSync(reportPath)) {
+            res.end(readFileSync(reportPath, 'utf-8'))
+          }
+          else {
+            res.statusCode = 404
+            res.end(JSON.stringify({
+              error: '审查报告不存在，请先在 yudream-frontend 根目录执行 pnpm audit:ui 生成',
+            }))
+          }
+        })
+      },
+    } satisfies PluginOption,
 
     {
       name: 'vite-plugin-debug-plugin',

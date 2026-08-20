@@ -15,6 +15,8 @@
     "lint:tsc": "pnpm --filter './apps/*' -r run lint",
     "lint:eslint": "eslint . --cache --fix",
     "lint:stylelint": "stylelint \"{apps,packages}/**/*.{css,scss,vue}\" --cache --fix",
+    "audit:ui": "node scripts/audit-ui.mjs",
+    "test:eslint-rules": "node --test \"eslint-rules/__tests__/*.test.mjs\"",
     "preinstall": "npx only-allow pnpm",
     "postinstall": "simple-git-hooks",
     "taze": "taze minor -wIr",
