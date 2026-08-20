@@ -1,0 +1,132 @@
+# 插件开发模式与开发者工具
+
+本文说明 YuDream Admin 宿主内置的插件开发者工具套件：**插件开发模式（源码热重载）**、**开发者调试抽屉**、**Agent 执行链路追踪** 与 **前端审查工具**。全部能力由宿主侧实现，插件无需任何适配。
+
+> 插件仓侧的目录约定、`dev-export` profile 与首次准备步骤见插件仓 `docs/plugin-dev-mode.md`，本文聚焦宿主机制与面板使用。
+
+## 1. 能力总览
+
+| 能力 | 入口 | 配置门 |
+| --- | --- | --- |
+| 开发模式（目录加载 + 监听热重载） | 宿主配置 | `yudream.platform.plugin.dev-mode.enabled`（默认 `false`） |
+| 开发者工具 REST/SSE API | `/api/platform/plugin-devtools/**` | 权限码 `platform:plugin-devtools:view` / `manage` |
+| Agent 执行链路追踪 | 调试抽屉「Agent 追踪」页 | `yudream.platform.agent.trace.enabled`（默认 `true`） |
+| 前端悬浮调试抽屉 | 管理后台右下角悬浮按钮 | 后端 status 可用 + 权限，或前端 DEV 模式 |
+| 前端审查（Fa 组件优先/品牌色令牌） | `pnpm audit:ui` + eslint | 无（warn 级，不阻断构建） |
+
+## 2. 插件开发模式
+
+开发模式下宿主不打包 JAR，直接从插件模块的 `target/classes` 加载插件，并监听源码、编译产物与前端 dist 的变化自动热重载。**仅限本地开发，生产环境禁止开启**；开启时启动日志会输出显著警告。
+
+### 配置
+
+```yaml
+yudream:
+  platform:
+    plugin:
+      dev-mode:
+        enabled: true
+        poll-interval-ms: 1000   # 文件轮询间隔
+        debounce-ms: 800         # 变化防抖窗口
+        projects:
+          - code: demo            # 必须与 plugin.yml 的 name 一致
+            path: D:/code/yudream-admin-plugins/yudream-plugins/yudream-plugin-demo
+            auto-compile: true    # 监听到 .java 变化自动执行 compile-command
+            compile-command: mvn -q compile -DskipTests -P dev-export
+            # frontend-dist: ...  # 可选，默认推导 {path}/../../yudream-frontend/packages/plugin-{code}/dist
+```
+
+### 工作原理
+
+- **目录加载**：`plugin.yml` 读 `target/classes/plugin.yml`；ClassLoader 由 `target/classes/` 与 `target/plugin-dev/lib/*.jar`（runtime 依赖，`dev-export` profile 导出）组成。同 code 的开发模式项目优先于 `plugins/` 目录中的 JAR，插件列表/详情带 `devMode` 标记。
+- **前端资源**：开发模式插件的前端资产直接从 `frontend-dist` 目录取文件并做内容协商，不再走 JAR 内 classpath。
+- **监听管线**（`PluginDevModeWatcher`，受配置门控制）：
+  1. `src/main/java` 变化且 `auto-compile` → 防抖后在模块目录执行 `compile-command`；编译失败作为事件推送，**不会**用陈旧产物重载，也不会影响宿主进程；
+  2. `target/classes` 变化 → 防抖 → 走 禁用 → 卸载 → 目录加载 → 恢复启用 管线；
+  3. 前端 `dist` 变化 → 发布前端重载事件，经 SSE 桥到调试抽屉，触发当前插件运行时页面重挂载远程模块（重挂载会重置页面状态，不是状态保持的 HMR）。
+
+### 限制
+
+- 热重载只重建本插件 ClassLoader；硬/软依赖提供者必须已启用，依赖方遇到 ABI 变化需手动重载。
+- 开发模式插件不要走市场安装/更新/回滚流程；删除插件记录不会删除源码目录。
+- Windows 下 `compile-command` 需要 `mvn`（或 `mvn.cmd`）在 PATH，否则填绝对路径。
+
+## 3. 开发者调试抽屉
+
+管理后台右下角的悬浮按钮（带未读事件计数徽标）打开调试抽屉，四个页签：
+
+- **插件资产**：选择插件后分组展示其运行时贡献——HTTP 端点、QQ 指令、菜单、权限、前端模块路由、AI 工具、声明式 Agent、平台能力、消息交互、首页卡片、服务导出。开发模式插件可一键「重载」。
+- **Agent 追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
+- **事件流**：插件生命周期（LOAD/ENABLE/DISABLE/UNLOAD/RELOAD/COMPILE/FRONTEND_RELOAD）与追踪事件的实时 feed，断线自动重连。
+- **前端审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 6 节）。
+
+可见性：拥有 `platform:plugin-devtools:view` 权限且后端 status 端点可用；纯前端 DEV 模式（`import.meta.env.DEV`）下按钮始终可见，后端不可用时抽屉内降级提示。
+
+## 4. 开发者工具 API
+
+统一挂载 `/api/platform/plugin-devtools/**`，仅管理员：
+
+| 方法与路径 | 权限码 | 说明 |
+| --- | --- | --- |
+| `GET /status` | view | 开发模式与追踪开关状态 |
+| `GET /plugins` | view | 插件清单（含 devMode 标记） |
+| `GET /plugins/{code}/assets` | view | 单插件运行时资产快照 |
+| `POST /plugins/{code}/reload` | manage | 手动重载（开发模式插件） |
+| `POST /plugins/{code}/command-test` | manage | QQ 指令模拟触发（见 5.1） |
+| `GET /agent-traces` | view | 追踪分页查询（source/plugin/状态过滤） |
+| `GET /agent-traces/{traceId}` | view | 单条追踪全步骤 |
+| `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件 |
+| `GET /agent-traces/stream` | view | SSE：步骤增量 + trace 完成事件 |
+
+> 宿主 sa-token 只从请求头读 token，SSE 不能用 `EventSource`（无法携带 `Authorization`），抽屉通过 fetch + ReadableStream 手工解析事件流，新页面复用 `plugin-devtools` store 即可。
+
+### 5.1 指令模拟器
+
+`POST /plugins/{code}/command-test` 接收 `{ command, arguments, content }`，构造指令上下文直接走运行时指令发布管线，返回匹配到的指令、handler 输出/异常与耗时——无需真实 QQ 环境即可调试插件注册的指令。资产页指令行的「模拟触发」按钮即调此接口。
+
+### 5.2 端点测试器
+
+资产页 HTTP 端点行的「试用」按钮在面板内发起真实请求：自动提取路径参数、支持查询字符串与请求体，展示真实 HTTP 状态码、耗时与响应原文。该请求走原生 fetch 而非 axios 封装，因此非 2xx 不会被拦截器吞掉；若目标端点启用了接口加密，响应体可能是密文，面板按原文展示。
+
+## 6. Agent 执行链路追踪
+
+`AgentWorkflowRuntimeService.execute(...)` 是全入口唯一汇聚点，追踪器在应用层装饰其回调，chat/wiki/cms/debug/plugin 全部入口自动生效，上层零改动。
+
+- **来源标记**：`AgentTraceSource` = `CHAT` / `WIKI` / `CMS` / `DEBUG` / `PLUGIN` / `SYSTEM`；插件 Agent（负数 ID）自动反查 ownerPluginCode 标为 `PLUGIN`。
+- **记录内容**：trace 级（输入、最终输出、错误、token 用量、起止耗时）+ step 级（节点、状态、输入/输出摘要、思考过程、工具名与入出参、耗时）。
+- **持久化**：Mongo 存储，TTL 索引默认 7 天，并按来源限量清理。
+- **实时推送**：每步经应用事件发布到 SSE 桥，抽屉实时渲染。
+
+配置（`yudream.platform.agent.trace`）：
+
+| 键 | 默认值 | 说明 |
+| --- | --- | --- |
+| `enabled` | `true` | 是否记录追踪 |
+| `max-text-length` | `4000` | 单段输入/输出/工具详情截断长度 |
+| `max-reasoning-length` | `8000` | 单步思考过程截断长度 |
+| `retention-days` | `7` | Mongo TTL 保留天数 |
+| `max-per-source` | `500` | 每个来源最多保留条数 |
+
+## 7. 前端审查工具
+
+宿主前端内置两条本地 eslint 规则（`yudream-frontend/eslint-rules/`，根 `eslint.config.js` 以 `yudream/*` 命名空间注册，`apps/**` 启用 **warn** 级，不阻断构建）：
+
+- `yudream/prefer-fa-component`：模板 `<a-*>` 标签与 `import { X } from '@arco-design/web-vue'` 双检测，命中 47 项 Arco→Fa 映射（`eslint-rules/fa-component-map.mjs`）时告警并给出替代组件；AI 对话场景文件追加 Yd* 元件提示。Form/Grid/Tree 等无 Fa 等价物的不告警。确需 Arco 时 `eslint-disable` 本行并注明原因。
+- `yudream/no-brand-color-token`：业务样式出现 Arco 品牌色阶梯令牌 `--primary-N`（如 `rgb(var(--primary-6))`）时告警，引导改用 `--color-bg-*` / `--color-text-*` 等中性语义变量。组件主题系统自身的 `--primary` / `--primary-foreground`（oklch 形式）不受影响。
+
+配套命令（`yudream-frontend` 根目录）：
+
+```bash
+pnpm audit:ui           # 全仓扫描 apps/*/src，生成 audit-report.json（含 Arco 使用分布）
+pnpm test:eslint-rules  # 规则用例测试（node:test + RuleTester）
+```
+
+vite dev 中间件把 `audit-report.json` 暴露在 `/__yudream-devtools/audit.json`（每次请求实时读文件，重跑 `pnpm audit:ui` 后面板刷新即最新），调试抽屉「前端审查」页直接展示；报告不存在时中间件返回 404 与引导文案。报告文件已加入 `.gitignore`，不入库。
+
+## 8. 故障排查
+
+- **抽屉按钮不出现**：确认当前账号有 `platform:plugin-devtools:view` 权限；后端不可用时仅前端 DEV 模式可见降级面板。
+- **改代码不重载**：看事件流页的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。
+- **前端改动不生效**：确认插件前端在 `vite build --watch`，且事件流出现 FRONTEND_RELOAD；重挂载会重置页面状态属预期行为。
+- **追踪页查不到运行中的执行**：完成才落库，运行中的 trace 在「实时执行」区（SSE 累积）查看。
+- **审查面板 404**：先在 `yudream-frontend` 根目录执行 `pnpm audit:ui` 生成报告；该中间件仅在 vite dev 模式存在。
