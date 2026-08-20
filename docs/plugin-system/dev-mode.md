@@ -46,7 +46,7 @@ yudream:
         debounce-ms: 800         # 变化防抖窗口
         projects:                # CONFIG 源，面板只读
           - code: demo            # 必须与 plugin.yml 的 name 一致
-            path: D:/code/yudream-admin-plugins/yudream-plugins/yudream-plugin-demo
+            path: /path/to/yudream-admin-plugins/yudream-plugins/yudream-plugin-demo
             auto-compile: true    # 监听到 .java 变化自动执行 compile-command
             compile-command: mvn -q compile -DskipTests -P dev-export
             # frontend-dist: ...  # 可选，默认推导 {path}/../../yudream-frontend/packages/plugin-{code}/dist
