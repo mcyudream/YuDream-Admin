@@ -128,7 +128,6 @@ const ruleGroups = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 12px 0;
 }
 
 .audit-toolbar {

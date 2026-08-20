@@ -417,7 +417,7 @@ async function runCommandTest() {
     </template>
 
     <!-- 端点测试器 -->
-    <FaModal v-model="endpointTesterOpen" title="端点测试" :footer="false" content-class="sm:max-w-xl">
+    <FaModal v-model="endpointTesterOpen" title="端点测试" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
       <div v-if="endpointTarget" class="tester">
         <div class="tester__target">
           <FaTag variant="outline" class="text-xs">
@@ -465,7 +465,7 @@ async function runCommandTest() {
     </FaModal>
 
     <!-- 指令模拟器 -->
-    <FaModal v-model="commandTestOpen" title="模拟触发指令" :footer="false" content-class="sm:max-w-xl">
+    <FaModal v-model="commandTestOpen" title="模拟触发指令" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
       <div v-if="commandTarget" class="tester">
         <div class="tester__target">
           <FaTag variant="outline" class="text-xs">
@@ -519,7 +519,6 @@ async function runCommandTest() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
   min-width: 0;
 }
 
