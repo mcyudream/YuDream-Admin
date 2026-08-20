@@ -1,6 +1,6 @@
 # 插件开发模式与开发者工具
 
-本文说明 YuDream Admin 宿主内置的插件开发者工具套件：**插件开发模式（源码热重载）**、**开发者调试抽屉**、**Agent 执行链路追踪** 与 **前端审查工具**。全部能力由宿主侧实现，插件无需任何适配。
+本文说明 YuDream Admin 宿主内置的插件开发者工具套件：**插件开发模式（源码热重载）**、**开发者调试浮窗**、**Agent 执行链路追踪** 与 **前端审查工具**。全部能力由宿主侧实现，插件无需任何适配。
 
 > 插件仓侧的目录约定、`dev-export` profile 与首次准备步骤见插件仓 `docs/plugin-dev-mode.md`，本文聚焦宿主机制与面板使用。
 
@@ -10,8 +10,8 @@
 | --- | --- | --- |
 | 开发模式（目录加载 + 监听热重载） | 宿主配置或面板登记 | `yudream.platform.plugin.dev-mode.enabled`（默认不配置→自动检测：源码运行开、JAR 运行关） |
 | 开发者工具 REST/SSE API | `/api/platform/plugin-devtools/**` | 权限码 `platform:plugin-devtools:view` / `manage` |
-| Agent 执行链路追踪 | 调试抽屉「追踪」页 | `yudream.platform.agent.trace.enabled`（默认 `true`） |
-| 前端悬浮调试抽屉 | 管理后台常驻悬浮按钮（可拖拽、贴边收起） | 后端 status 可用 + 权限，或前端 DEV 模式 |
+| Agent 执行链路追踪 | 调试浮窗「追踪」页 | `yudream.platform.agent.trace.enabled`（默认 `true`） |
+| 前端悬浮调试浮窗（非模态） | 管理后台常驻悬浮按钮（可拖拽、贴边收起） | 后端 status 可用 + 权限，或前端 DEV 模式 |
 | 前端审查（Fa 组件优先/品牌色令牌） | `pnpm audit:ui` + eslint | 无（warn 级，不阻断构建） |
 
 ## 2. 插件开发模式
@@ -20,7 +20,7 @@
 
 ### 开启方式：自动检测优先，配置兜底
 
-`enabled` 为三态：不配置（缺省）时按宿主运行方式**自动检测**——`DevModeEnvironment` 读取网关类的代码源位置，类来自目录（IDE / `spring-boot:run`，即源码运行）则开启，来自 JAR 则关闭；显式配置 `true/false` 时以配置为准。状态端点返回 `hostRunMode`（SOURCE/JAR）与 `devModeAuto`（是否自动检测生效），抽屉「概览」页会展示「已启用（自动检测）」或「已启用（配置开启）」。
+`enabled` 为三态：不配置（缺省）时按宿主运行方式**自动检测**——`DevModeEnvironment` 读取网关类的代码源位置，类来自目录（IDE / `spring-boot:run`，即源码运行）则开启，来自 JAR 则关闭；显式配置 `true/false` 时以配置为准。状态端点返回 `hostRunMode`（SOURCE/JAR）与 `devModeAuto`（是否自动检测生效），浮窗「概览」页会展示「已启用（自动检测）」或「已启用（配置开启）」。
 
 监听器（`PluginDevModeWatcher`）因此**不能用 `@ConditionalOnProperty` 硬门控**（它感知不到自动判定值），改为启动时按生效值决定是否起轮询线程，告警日志注明闸门来源。
 
@@ -29,7 +29,7 @@
 开发项目有两个来源，合并后统一参与目录加载与热重载：
 
 - **CONFIG**：yml `dev-mode.projects` 列表，面板只读；
-- **FILE**：调试抽屉「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，与插件 JAR 目录同约定，已被 `.gitignore` 的 `/plugins/` 覆盖；可用 `dev-mode.store-file` 覆盖路径）。此文件是有意选择的**非数据库存储**——coding agent 与用户都能直接读取它来定位插件源码目录。
+- **FILE**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，与插件 JAR 目录同约定，已被 `.gitignore` 的 `/plugins/` 覆盖；可用 `dev-mode.store-file` 覆盖路径）。此文件是有意选择的**非数据库存储**——coding agent 与用户都能直接读取它来定位插件源码目录。
 
 合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），面板登记后若插件已启用会立即触发一次热切重载。登记时 `code` 可留空，宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
 
@@ -59,7 +59,7 @@ yudream:
 - **监听管线**（`PluginDevModeWatcher`，启动时按生效开关决定是否起线程）：
   1. `src/main/java` 变化且 `auto-compile` → 防抖后在模块目录执行 `compile-command`；编译失败作为事件推送，**不会**用陈旧产物重载，也不会影响宿主进程；
   2. `target/classes` 变化 → 防抖 → 走 禁用 → 卸载 → 目录加载 → 恢复启用 管线；
-  3. 前端 `dist` 变化 → 发布前端重载事件，经 SSE 桥到调试抽屉，触发当前插件运行时页面重挂载远程模块（重挂载会重置页面状态，不是状态保持的 HMR）。
+  3. 前端 `dist` 变化 → 发布前端重载事件，经 SSE 桥到调试浮窗，触发当前插件运行时页面重挂载远程模块（重挂载会重置页面状态，不是状态保持的 HMR）。
 
 ### 限制
 
@@ -67,21 +67,23 @@ yudream:
 - 开发模式插件不要走市场安装/更新/回滚流程；删除插件记录不会删除源码目录。
 - Windows 下 `compile-command` 需要 `mvn`（或 `mvn.cmd`）在 PATH，否则填绝对路径。
 
-## 3. 开发者调试抽屉
+## 3. 开发者调试浮窗
 
-悬浮按钮**常驻管理后台布局层**（与路由无关，公开页无布局不显示），带未读事件计数徽标：可拖拽换位，松手吸附最近屏幕边缘；松手点距边缘 24px 以内会收成**半隐边缘条**（点击边缘条展开回完整按钮）。位置以 `{side, topRatio, docked}` 比例形式持久化在 localStorage（`pluginDevtoolsFab`），窗口缩放自动适配；「设置」页可一键重置位置。
+悬浮按钮**常驻管理后台布局层**（与路由无关，公开页无布局不显示），带未读事件计数徽标：可拖拽换位，松手吸附最近屏幕边缘；松手点距边缘 24px 以内会收成**半隐边缘条**（悬停提透明度并加宽，点击边缘条一步展开浮窗）。位置以 `{side, topRatio, docked}` 比例形式持久化在 localStorage（`pluginDevtoolsFab`），窗口缩放自动适配；「设置」页可一键重置位置。
 
-抽屉本体对齐 Vue DevTools 的信息架构：左侧图标+文字竖向导航（窄屏收成纯图标 + tooltip），按开发动线分五页，激活页持久化（`pluginDevtoolsPage`）：
+面板本体是 **Teleport 到 `body` 的非模态置顶浮窗**（对齐 Vue DevTools 的独立窗口心智），不是抽屉：无遮罩、不锁页面滚动，浮窗打开时系统照常可用；`z-index` 2100，高于侧栏（1010）、顶栏（1020）与宿主模态（2000），浮窗内弹出的模态再提到 2200，任何页面、任何情况下浮窗都在最上层。拖标题栏移动、拖右下角手柄缩放，几何 `{left, top, width, height}` 持久化在 localStorage（`pluginDevtoolsPanel`），视口缩放自动 clamp 回可见区；「设置」页可重置位置与尺寸。全局快捷键 `Ctrl/Cmd+Shift+D` 开关浮窗（`Esc` 关闭，输入框与已开模态内不劫持）。
+
+浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分五页，激活页持久化（`pluginDevtoolsPage`）：
 
 - **概览**：状态卡（开发模式含自动检测标记与宿主运行方式、Agent 追踪、插件计数、开发项目清单文件路径）+ 最近动态 feed（插件生命周期 LOAD/ENABLE/DISABLE/UNLOAD/RELOAD/COMPILE/FRONTEND_RELOAD 事件流，取最新 20 条，可清空）。
 - **插件**：主从结构——先插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献，按开发关注度排序：HTTP 端点、QQ 指令、前端模块与路由 → 权限、菜单 → AI 工具、声明式 Agent → 平台能力、消息交互、首页卡片、服务导出。端点测试器与指令模拟器在插件详情内，开发模式插件可一键「重载」。
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
-- **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 面板偏好（悬浮按钮位置重置）。
+- **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
 
-抽屉头部只保留标题与双 SSE（生命周期流/追踪流）连接状态点，状态明细移入「概览」页。
+浮窗头部只保留标题与双 SSE（生命周期流/追踪流）连接状态点，状态明细移入「概览」页。
 
-可见性：拥有 `platform:plugin-devtools:view` 权限且后端 status 端点可用；纯前端 DEV 模式（`import.meta.env.DEV`）下按钮始终可见，后端不可用时抽屉内降级提示。
+可见性：拥有 `platform:plugin-devtools:view` 权限且后端 status 端点可用；纯前端 DEV 模式（`import.meta.env.DEV`）下按钮始终可见，后端不可用时浮窗内降级提示。
 
 ## 4. 开发者工具 API
 
@@ -102,7 +104,7 @@ yudream:
 | `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件 |
 | `GET /agent-traces/stream` | view | SSE：步骤增量 + trace 完成事件 |
 
-> 宿主 sa-token 只从请求头读 token，SSE 不能用 `EventSource`（无法携带 `Authorization`），抽屉通过 fetch + ReadableStream 手工解析事件流，新页面复用 `plugin-devtools` store 即可。
+> 宿主 sa-token 只从请求头读 token，SSE 不能用 `EventSource`（无法携带 `Authorization`），浮窗通过 fetch + ReadableStream 手工解析事件流，新页面复用 `plugin-devtools` store 即可。
 
 ### 5.1 指令模拟器
 
@@ -119,7 +121,7 @@ yudream:
 - **来源标记**：`AgentTraceSource` = `CHAT` / `WIKI` / `CMS` / `DEBUG` / `PLUGIN` / `SYSTEM`；插件 Agent（负数 ID）自动反查 ownerPluginCode 标为 `PLUGIN`。
 - **记录内容**：trace 级（输入、最终输出、错误、token 用量、起止耗时）+ step 级（节点、状态、输入/输出摘要、思考过程、工具名与入出参、耗时）。
 - **持久化**：Mongo 存储，TTL 索引默认 7 天，并按来源限量清理。
-- **实时推送**：每步经应用事件发布到 SSE 桥，抽屉实时渲染。
+- **实时推送**：每步经应用事件发布到 SSE 桥，浮窗实时渲染。
 
 配置（`yudream.platform.agent.trace`）：
 
@@ -145,11 +147,11 @@ pnpm audit:ui           # 全仓扫描 apps/*/src，生成 audit-report.json（�
 pnpm test:eslint-rules  # 规则用例测试（node:test + RuleTester）
 ```
 
-vite dev 中间件把 `audit-report.json` 暴露在 `/__yudream-devtools/audit.json`（每次请求实时读文件，重跑 `pnpm audit:ui` 后面板刷新即最新），调试抽屉「前端审查」页直接展示；报告不存在时中间件返回 404 与引导文案。报告文件已加入 `.gitignore`，不入库。
+vite dev 中间件把 `audit-report.json` 暴露在 `/__yudream-devtools/audit.json`（每次请求实时读文件，重跑 `pnpm audit:ui` 后面板刷新即最新），调试浮窗「前端审查」页直接展示；报告不存在时中间件返回 404 与引导文案。报告文件已加入 `.gitignore`，不入库。
 
 ## 8. 故障排查
 
-- **抽屉按钮不出现**：确认当前账号有 `platform:plugin-devtools:view` 权限；后端不可用时仅前端 DEV 模式可见降级面板。按钮可能被拖到了屏幕边缘收成半隐边缘条——沿左右边缘找一下，或在 localStorage 删除 `pluginDevtoolsFab` 重置位置。
+- **悬浮按钮不出现**：确认当前账号有 `platform:plugin-devtools:view` 权限；后端不可用时仅前端 DEV 模式可见降级面板。按钮可能被拖到了屏幕边缘收成半隐边缘条——沿左右边缘找一下（悬停会提亮加宽），或按 `Ctrl/Cmd+Shift+D` 直接开关浮窗，或在 localStorage 删除 `pluginDevtoolsFab` 重置位置。
 - **开发模式未按预期开启/关闭**：看「概览」页状态卡的「自动检测/配置开启」标记——未显式配置 `enabled` 时按源码/JAR 运行自动判定，显式配置优先于自动检测。
 - **面板登记的目录不生效**：看「设置」页项目行的三个状态点（源码目录存在/类产物已编译/plugin.yml 可读）；登记清单在 `devProjectStoreFile` 指向的 JSON 文件，可直接检查其内容。
 - **改代码不重载**：看「概览」页最近动态的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。
