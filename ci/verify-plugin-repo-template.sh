@@ -75,7 +75,7 @@ fi
 echo "[verify-plugin-repo-template] checking npm registry example"
 grep -q '^registry=https://registry.npmjs.org/$' templates/plugin-repo/.npmrc.example || fail "template .npmrc must keep a public registry for third-party packages"
 grep -q '^@yudream:registry=https://nexus.yudream.online/repository/npm-public/$' templates/plugin-repo/.npmrc.example || fail "template @yudream scope must use Nexus npm-public"
-grep -q "'@yudream/components': 1.1.1$" templates/plugin-repo/pnpm-workspace.yaml.example || fail "template must consume stable @yudream/components 1.1.1"
+grep -q "'@yudream/components': 1.1.2$" templates/plugin-repo/pnpm-workspace.yaml.example || fail "template must consume stable @yudream/components 1.1.2"
 grep -q "'@yudream/plugin-sdk': 1.1.0$" templates/plugin-repo/pnpm-workspace.yaml.example || fail "template must consume stable @yudream/plugin-sdk 1.1.0"
 grep -q 'NEXUS_MAVEN_PUBLIC_URL: "https://nexus.yudream.online/repository/maven-public/"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must use Nexus maven-public"
 grep -q 'NEXUS_NPM_PUBLIC_URL: "https://nexus.yudream.online/repository/npm-public/"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must use Nexus npm-public"
