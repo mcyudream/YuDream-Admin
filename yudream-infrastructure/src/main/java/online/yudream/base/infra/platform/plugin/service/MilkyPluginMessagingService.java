@@ -9,6 +9,8 @@ import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.service.MilkyApiGateway;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSessionRepo;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageContent;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageRequest;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageResult;
@@ -18,6 +20,7 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import jakarta.annotation.PreDestroy;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -45,9 +48,15 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
     private final MilkyApiGateway apiGateway;
     private final PluginUserService pluginUserService;
     private final ObjectMapper objectMapper;
+    private QqSandboxSessionRepo sandboxSessions;
     private final ExecutorService executor = new ThreadPoolExecutor(2, 4, 60L, TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(100), Thread.ofVirtual().name("milky-plugin-messaging-", 0).factory(),
             new ThreadPoolExecutor.AbortPolicy());
+
+    @Autowired
+    void setSandboxSessions(QqSandboxSessionRepo sandboxSessions) {
+        this.sandboxSessions = sandboxSessions;
+    }
 
     @Override
     public List<PluginMessagingConnection> connections() {
@@ -60,6 +69,13 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public List<PluginMessagingGroup> groups(String connectionId) {
+        QqSandboxSession sandbox = sandbox(connectionId);
+        if (sandbox != null) {
+            return inSandbox(sandbox, () -> {
+                sandbox.append("output", "messaging.groups", sandbox.pluginCode(), Map.of("connectionId", connectionId));
+                return List.of();
+            });
+        }
         Object data = apiGateway.invoke(context(connection(connectionId)), "get_group_list", Map.of());
         Object rowsValue = groupRows(data);
         if (!(rowsValue instanceof Iterable<?> rows)) return List.of();
@@ -84,6 +100,11 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public CompletionStage<PluginMessageResult> send(PluginMessageRequest request) {
+        QqSandboxSession sandbox = sandbox(request == null ? null : request.connectionId());
+        if (sandbox != null) {
+            return inSandbox(sandbox, () -> captureMessage(sandbox, "messaging.send", request.connectionId(),
+                    request.channelId(), request.content()));
+        }
         return async("send", request == null ? null : request.connectionId(), "group", () -> {
             if (request == null || request.content() == null) {
                 throw new BizException("插件消息请求不能为空");
@@ -94,6 +115,9 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public CompletionStage<PluginMessageResult> sendDirectToBoundUser(String userId, PluginMessageContent content) {
+        QqSandboxSession sandbox = QqSandboxExecutionScope.requireActive();
+        if (sandbox != null) return inSandbox(sandbox,
+                () -> captureMessage(sandbox, "messaging.sendDirect", sandbox.connectionId(), userId, content));
         return async("sendDirect", null, "private", () -> {
             if (content == null) {
                 throw new BizException("私聊内容不能为空");
@@ -118,12 +142,77 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     @Override
     public CompletionStage<PluginMessageResult> sendToChannel(String connectionId, String channelId, PluginMessageContent content) {
+        QqSandboxSession sandbox = sandbox(connectionId);
+        if (sandbox != null) return inSandbox(sandbox,
+                () -> captureMessage(sandbox, "messaging.sendToChannel", connectionId, channelId, content));
         return async("sendToChannel", connectionId, "group", () -> sendNow(connection(connectionId), channelId, "group", content));
     }
 
     @Override
     public CompletionStage<Map<String, Object>> invoke(String connectionId, String method, Map<String, Object> payload) {
+        QqSandboxSession sandbox = sandbox(connectionId);
+        if (sandbox != null) {
+            return inSandbox(sandbox, () -> captureRaw(sandbox, connectionId, method, payload));
+        }
         return async("invoke", connectionId, "api", () -> map(apiGateway.invoke(context(connection(connectionId)), method, payload == null ? Map.of() : payload)));
+    }
+
+    private CompletionStage<Map<String, Object>> captureRaw(QqSandboxSession sandbox, String connectionId,
+                                                             String method, Map<String, Object> payload) {
+        Map<String, Object> body = payload == null ? Map.of() : payload;
+        updateActivity(sandbox, method, body);
+        Map<String, Object> captured = new LinkedHashMap<>();
+        captured.put("connectionId", connectionId);
+        captured.put("method", method);
+        captured.put("payload", body);
+        sandbox.append("output", "messaging.raw.invoke", sandbox.pluginCode(), captured);
+        return CompletableFuture.completedFuture(Map.of("sandbox", true, "method", method == null ? "" : method));
+    }
+
+    private void updateActivity(QqSandboxSession sandbox, String method, Map<String, Object> payload) {
+        if (!"devtools_sandbox_diagnostic".equals(method)) return;
+        String milestone = String.valueOf(payload.getOrDefault("milestone", ""));
+        String operationId = String.valueOf(payload.getOrDefault("traceId", "agent"));
+        if ("agent_pending".equals(milestone) || "agent_start".equals(milestone)) {
+            sandbox.beginOperation(operationId);
+        } else if ("agent_complete".equals(milestone) || "agent_error".equals(milestone)
+                || "trigger_blocked".equals(milestone)) {
+            sandbox.finishOperation(operationId);
+        }
+    }
+
+    private QqSandboxSession sandbox(String connectionId) {
+        QqSandboxSession current = QqSandboxExecutionScope.requireActive();
+        if (current != null) return current;
+        if (connectionId == null || !connectionId.startsWith("devtools-sandbox:")) return null;
+        if (sandboxSessions == null) throw new BizException("QQ 沙箱会话注册表不可用");
+        return sandboxSessions.findByConnectionId(connectionId)
+                .orElseThrow(() -> new BizException("QQ 沙箱会话不存在或已关闭"));
+    }
+
+    private <T> T inSandbox(QqSandboxSession sandbox, java.util.function.Supplier<T> action) {
+        if (QqSandboxExecutionScope.current() == sandbox) return action.get();
+        try (QqSandboxExecutionScope ignored = QqSandboxExecutionScope.open(sandbox)) {
+            QqSandboxExecutionScope.requireActive();
+            T result = action.get();
+            if (result instanceof CompletionStage<?> stage) QqSandboxExecutionScope.wrapCompletion(sandbox, stage);
+            return result;
+        }
+    }
+
+    private CompletionStage<PluginMessageResult> captureMessage(QqSandboxSession sandbox, String action,
+                                                                 String connectionId, String channelId,
+                                                                 PluginMessageContent content) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("connectionId", connectionId == null ? "" : connectionId);
+        payload.put("channelId", channelId == null ? "" : channelId);
+        payload.put("type", content == null || content.type() == null ? "" : content.type().name());
+        payload.put("content", content == null || content.content() == null ? "" : content.content());
+        payload.put("referrer", content == null || content.referrer() == null ? Map.of() : content.referrer());
+        payload.put("attachments", content == null || content.attachments() == null ? List.of() : content.attachments());
+        sandbox.append("output", action, sandbox.pluginCode(), payload);
+        return CompletableFuture.completedFuture(new PluginMessageResult(
+                List.of("sandbox-" + sandbox.timeline().size()), false, false));
     }
 
     private <T> CompletionStage<T> async(String operation, String connectionId, String channelType, java.util.function.Supplier<T> action) {

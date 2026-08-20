@@ -9,6 +9,7 @@ import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSessionRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
@@ -16,6 +17,7 @@ import online.yudream.base.plugin.spi.system.ai.PluginAiChatRequest;
 import online.yudream.base.plugin.spi.system.ai.PluginAiChatResponse;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -23,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 @Slf4j
 @Service
@@ -36,6 +39,12 @@ public class PluginAiFrameworkService implements PluginAiService {
     private final PluginAiToolRegistry pluginAiToolRegistry;
     private final AiProviderConfigParser providerConfigParser;
     private final AgentAppService agentAppService;
+    private QqSandboxSessionRepo sandboxSessions;
+
+    @Autowired
+    void setSandboxSessions(QqSandboxSessionRepo sandboxSessions) {
+        this.sandboxSessions = sandboxSessions;
+    }
 
     @Override
     public List<online.yudream.base.plugin.spi.system.ai.PluginAiAgentOption> agents() {
@@ -48,18 +57,17 @@ public class PluginAiFrameworkService implements PluginAiService {
 
     @Override
     public CompletionStage<PluginAiChatResponse> runAgent(String agentCode, PluginAiChatRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+        return QqSandboxExecutionScope.track(CompletableFuture.supplyAsync(sandboxAware(request, () -> {
             var executionContext = withPermissions(request);
             PluginAiToolExecutionScope.set(executionContext);
             try {
                 return agentResponse(agentAppService.runByCode(
                         agentCode, agentCommand(request, executionContext)
                 ));
-            }
-            finally {
+            } finally {
                 PluginAiToolExecutionScope.clear();
             }
-        });
+        })));
     }
 
     @Override
@@ -68,18 +76,17 @@ public class PluginAiFrameworkService implements PluginAiService {
             PluginAiChatRequest request,
             Consumer<String> onDelta
     ) {
-        return CompletableFuture.supplyAsync(() -> {
+        return QqSandboxExecutionScope.track(CompletableFuture.supplyAsync(sandboxAware(request, () -> {
             var executionContext = withPermissions(request);
             PluginAiToolExecutionScope.set(executionContext);
             try {
                 return agentResponse(agentAppService.debugByCode(
                         agentCode, agentCommand(request, executionContext), null, onDelta, null
                 ));
-            }
-            finally {
+            } finally {
                 PluginAiToolExecutionScope.clear();
             }
-        });
+        })));
     }
 
     private AgentRunCmd agentCommand(
@@ -151,7 +158,7 @@ public class PluginAiFrameworkService implements PluginAiService {
 
     @Override
     public CompletionStage<PluginAiChatResponse> chat(PluginAiChatRequest request) {
-        return CompletableFuture.supplyAsync(() -> {
+        return QqSandboxExecutionScope.track(CompletableFuture.supplyAsync(sandboxAware(request, () -> {
             if (!capabilityModuleRepo.findByCode("ai").map(item -> Boolean.TRUE.equals(item.getEnabled())).orElse(false)) {
                 throw new BizException("AI 能力未启用");
             }
@@ -168,8 +175,24 @@ public class PluginAiFrameworkService implements PluginAiService {
                 var result = gateway.generate(new AiGenerationRequest(request.systemPrompt(), request.userPrompt(), null,
                         request.providerCode(), request.modelCode(), config, history, request.toolCallingEnabled()));
                 return new PluginAiChatResponse(result.summary(), List.of());
-            } finally { PluginAiToolExecutionScope.clear(); }
-        });
+            } finally {
+                PluginAiToolExecutionScope.clear();
+            }
+        })));
+    }
+
+    private <T> Supplier<T> sandboxAware(PluginAiChatRequest request, Supplier<T> action) {
+        if (sandboxSessions == null) return action;
+        String connectionId = request == null || request.executionContext() == null
+                ? null : request.executionContext().connectionId();
+        return () -> sandboxSessions.findByConnectionId(connectionId)
+                .map(session -> {
+                    try (QqSandboxExecutionScope ignored = QqSandboxExecutionScope.open(session)) {
+                        QqSandboxExecutionScope.requireActive();
+                        return action.get();
+                    }
+                })
+                .orElseGet(action);
     }
 
     private online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext withPermissions(PluginAiChatRequest request) {
@@ -182,7 +205,7 @@ public class PluginAiFrameworkService implements PluginAiService {
             return context;
         }
         List<String> permissions = userRepo.findById(context.userId()).map(user -> roleRepo.findByIds(user.getRoles().stream()
-                .map(item -> item.getValue()).toList()).stream().flatMap(role -> role.getPermissions().stream())
+                        .map(item -> item.getValue()).toList()).stream().flatMap(role -> role.getPermissions().stream())
                 .map(item -> item.getCode()).distinct().toList()).orElse(List.of());
         if (permissions.isEmpty()) {
             log.info("[YuDreamAdmin] plugin AI execution permissions resolved empty: userId={}, plugin tools requiring permission will be filtered", context.userId());

@@ -134,7 +134,8 @@ public class DefaultFrameworkServices implements FrameworkServices {
 
     @Override
     public PluginDocumentStore documents(String pluginCode) {
-        return documentStores.computeIfAbsent(pluginCode, code -> new MongoPluginDocumentStore(code, mongoTemplate));
+        return documentStores.computeIfAbsent(pluginCode, code ->
+                new SandboxAwarePluginDocumentStore(code, new MongoPluginDocumentStore(code, mongoTemplate)));
     }
 
     @Override

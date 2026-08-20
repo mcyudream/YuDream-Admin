@@ -3,6 +3,7 @@ package online.yudream.base.application.platform.wiki.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
@@ -48,6 +49,9 @@ public class WikiSearchAiTool implements AiAgentTool {
                 )
         );
     }
+
+    @Override
+    public AgentToolRisk risk() { return AgentToolRisk.READ; }
 
     @Override
     public AiAgentToolResult execute(AiAgentToolCall call) {

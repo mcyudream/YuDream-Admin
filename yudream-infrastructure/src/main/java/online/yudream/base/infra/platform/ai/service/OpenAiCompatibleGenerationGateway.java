@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.observation.ObservationRegistry;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
+import online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
@@ -38,6 +40,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
@@ -85,6 +88,12 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     private final List<AiProviderAdapter> providerAdapters;
     private final AiClientProperties aiClientProperties;
     private final PluginAiToolRegistry pluginAiToolRegistry;
+    private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
+
+    @Autowired(required = false)
+    void setToolExecutionGuard(AgentToolExecutionGuard toolExecutionGuard) {
+        this.toolExecutionGuard = toolExecutionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : toolExecutionGuard;
+    }
 
     public OpenAiCompatibleGenerationGateway(
             ObjectProvider<AiAgentTool> aiAgentToolProvider,
@@ -173,40 +182,40 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                         attempt.imageDataUrls().size(),
                         attempt.structuredOutput().mode());
                 requestSpec(attempt, resolved, toolResults, onTool, onProgress)
-                    .stream()
-                    .chatResponse()
-                    .doFirst(() -> {
-                        log.debug("AI stream subscribed, provider={}, model={}",
-                                resolved.provider().code(),
-                                resolved.model().modelName());
-                        progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。");
-                    })
-                    .doOnNext(response -> {
-                        AiUsage chunkUsage = usageOf(response);
-                        if (chunkUsage.totalTokens() > 0) {
-                            usage.set(chunkUsage);
-                        }
-                        String reasoning = reasoningDelta(response);
-                        if (hasStreamDelta(reasoning)) {
-                            log.debug("AI stream reasoning received, length={}, preview={}", reasoning.length(), preview(reasoning));
-                            if (onReasoningDelta != null) {
-                                onReasoningDelta.accept(reasoning);
+                        .stream()
+                        .chatResponse()
+                        .doFirst(() -> {
+                            log.debug("AI stream subscribed, provider={}, model={}",
+                                    resolved.provider().code(),
+                                    resolved.model().modelName());
+                            progress(onProgress, "subscribed", "模型流已建立，正在等待首个响应。");
+                        })
+                        .doOnNext(response -> {
+                            AiUsage chunkUsage = usageOf(response);
+                            if (chunkUsage.totalTokens() > 0) {
+                                usage.set(chunkUsage);
                             }
-                        }
-                        String delta = contentDelta(response);
-                        if (!hasStreamDelta(delta)) {
-                            return;
-                        }
-                        if (content.isEmpty()) {
-                            progress(onProgress, "first-delta", "模型已开始输出内容。");
-                        }
-                        content.append(delta);
-                        log.debug("AI stream delta received, length={}, preview={}", delta.length(), preview(delta));
-                        if (onDelta != null) {
-                            onDelta.accept(delta);
-                        }
-                    })
-                    .doOnComplete(() -> progress(onProgress, "stream-complete", "模型流式输出已完成，正在汇总结果。"))
+                            String reasoning = reasoningDelta(response);
+                            if (hasStreamDelta(reasoning)) {
+                                log.debug("AI stream reasoning received, length={}, preview={}", reasoning.length(), preview(reasoning));
+                                if (onReasoningDelta != null) {
+                                    onReasoningDelta.accept(reasoning);
+                                }
+                            }
+                            String delta = contentDelta(response);
+                            if (!hasStreamDelta(delta)) {
+                                return;
+                            }
+                            if (content.isEmpty()) {
+                                progress(onProgress, "first-delta", "模型已开始输出内容。");
+                            }
+                            content.append(delta);
+                            log.debug("AI stream delta received, length={}, preview={}", delta.length(), preview(delta));
+                            if (onDelta != null) {
+                                onDelta.accept(delta);
+                            }
+                        })
+                        .doOnComplete(() -> progress(onProgress, "stream-complete", "模型流式输出已完成，正在汇总结果。"))
                         .blockLast(aiClientProperties.getReadTimeout());
                 log.debug("AI stream call completed, contentLength={}, toolResults={}", content.length(), toolResults.size());
                 progress(onProgress, "complete", "AI 处理完成。");
@@ -496,17 +505,17 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         var scope = PluginAiToolExecutionScope.current();
         if (scope != null) {
             return pluginAiToolRegistry.tools().stream().filter(tool -> {
-                boolean ok = allowed(tool, scope);
-                if (!ok) {
-                    var d = tool.descriptor();
-                    if (d != null) {
-                        log.info("[YuDreamAdmin] plugin AI tool filtered: {} (risk={}, allowsTool={}, triggerMatch={}, hasPermission={}, permissionCode={}, trigger={})",
-                                d.name(), d.risk(), scope.allowsTool(d.name()), d.allowedTriggers().contains(scope.trigger()),
-                                scope.hasPermission(d.permissionCode()), d.permissionCode(), scope.trigger());
-                    }
-                }
-                return ok;
-            })
+                        boolean ok = allowed(tool, scope);
+                        if (!ok) {
+                            var d = tool.descriptor();
+                            if (d != null) {
+                                log.info("[YuDreamAdmin] plugin AI tool filtered: {} (risk={}, allowsTool={}, triggerMatch={}, hasPermission={}, permissionCode={}, trigger={})",
+                                        d.name(), d.risk(), scope.allowsTool(d.name()), d.allowedTriggers().contains(scope.trigger()),
+                                        scope.hasPermission(d.permissionCode()), d.permissionCode(), scope.trigger());
+                            }
+                        }
+                        return ok;
+                    })
                     .map(tool -> pluginToolCallback(tool, scope, toolResults, onTool, onProgress)).toList();
         }
         var allowedToolNames = AiAgentToolExecutionScope.current();
@@ -530,6 +539,7 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                             descriptor.name(),
                             arguments.get("action"),
                             arguments.keySet());
+                    toolExecutionGuard.check(descriptor.name(), tool.risk(), descriptor.permissionCode());
                     AiAgentToolResult result = tool.execute(new AiAgentToolCall(descriptor.name(), arguments));
                     toolResults.add(result);
                     if (onTool != null) {
@@ -659,20 +669,29 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
     }
 
     private ToolCallback pluginToolCallback(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context,
-                                             List<AiAgentToolResult> results, Consumer<AiAgentToolResult> onTool, Consumer<AiGenerationProgress> onProgress) {
+                                            List<AiAgentToolResult> results, Consumer<AiAgentToolResult> onTool, Consumer<AiGenerationProgress> onProgress) {
         var descriptor = tool.descriptor();
         return FunctionToolCallback.<Map<String, Object>, AiAgentToolResult>builder(safeToolName(descriptor.name()), args -> {
-            if (!allowed(tool, context)) throw new BizException("当前用户无权调用 AI 工具：" + descriptor.title());
-            progress(onProgress, "tool-start", "正在调用工具：" + descriptor.title());
-            var value = tool.execute(context, new online.yudream.base.plugin.spi.system.ai.PluginAiToolCall(descriptor.name(), args));
-            AiAgentToolResult result = new AiAgentToolResult(descriptor.name(), value.action(), context.traceId(), value.message(), value.payload());
-            results.add(result); if (onTool != null) onTool.accept(result); progress(onProgress, "tool-complete", "工具调用完成：" + descriptor.title()); return result;
-        }).description(descriptor.description()).inputType(new ParameterizedTypeReference<Map<String, Object>>() {})
+                    if (!allowed(tool, context)) throw new BizException("当前用户无权调用 AI 工具：" + descriptor.title());
+                    toolExecutionGuard.check(descriptor.name(),
+                            descriptor.risk() == PluginAiToolRisk.READ ? AgentToolRisk.READ : AgentToolRisk.WRITE,
+                            descriptor.permissionCode());
+                    progress(onProgress, "tool-start", "正在调用工具：" + descriptor.title());
+                    var value = tool.execute(context, new online.yudream.base.plugin.spi.system.ai.PluginAiToolCall(descriptor.name(), args));
+                    AiAgentToolResult result = new AiAgentToolResult(descriptor.name(), value.action(), context.traceId(), value.message(), value.payload());
+                    results.add(result);
+                    if (onTool != null) onTool.accept(result);
+                    progress(onProgress, "tool-complete", "工具调用完成：" + descriptor.title());
+                    return result;
+                }).description(descriptor.description()).inputType(new ParameterizedTypeReference<Map<String, Object>>() {
+                })
                 .inputSchema(inputSchema(new AiAgentToolDescriptor(descriptor.name(), descriptor.title(), descriptor.description(), descriptor.permissionCode(), descriptor.title(), "插件工具", descriptor.description(), descriptor.inputSchema())))
                 .toolCallResultConverter((result, type) -> toolResultJson(result)).build();
     }
 
-    /** 工具结果序列化给模型：Hutool 不认 Java record 访问器会把 DTO 输出成 {}，统一用 Jackson。 */
+    /**
+     * 工具结果序列化给模型：Hutool 不认 Java record 访问器会把 DTO 输出成 {}，统一用 Jackson。
+     */
     private static final ObjectMapper TOOL_RESULT_MAPPER = new ObjectMapper();
 
     private static String toolResultJson(Object value) {
@@ -702,7 +721,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
                 .orElse("画布操作已完成。");
     }
 
-    /** 日志用截断：工具返回可能很大，只保留前 800 字符。 */
+    /**
+     * 日志用截断：工具返回可能很大，只保留前 800 字符。
+     */
     private static String abbreviate(String value) {
         if (value == null || value.length() <= 800) {
             return value;
@@ -747,7 +768,9 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         }
     }
 
-    /** 工具进度带上参数里的摘要/标题（如 CMS 区块名），让前端展示「正在构建：Hero 区块」。 */
+    /**
+     * 工具进度带上参数里的摘要/标题（如 CMS 区块名），让前端展示「正在构建：Hero 区块」。
+     */
     private String toolProgressMessage(String prefix, AiAgentToolDescriptor descriptor, Map<String, Object> arguments) {
         String detail = firstText(
                 stringArg(arguments, "summary"),

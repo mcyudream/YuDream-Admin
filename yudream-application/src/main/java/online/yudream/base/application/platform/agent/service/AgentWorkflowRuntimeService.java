@@ -34,6 +34,7 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
+import online.yudream.base.domain.platform.agent.service.AgentToolExecutionGuard;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
@@ -41,6 +42,7 @@ import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.document.service.DocumentTextExtractor;
 import online.yudream.base.domain.platform.integration.service.RuntimeExecutor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -63,6 +65,12 @@ public class AgentWorkflowRuntimeService {
     private final AgentPermissionGateway permissionGateway;
     private final CapabilityAppService capabilityAppService;
     private final AgentExecutionTracer executionTracer;
+    private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
+
+    @Autowired(required = false)
+    void setToolExecutionGuard(AgentToolExecutionGuard toolExecutionGuard) {
+        this.toolExecutionGuard = toolExecutionGuard == null ? AgentToolExecutionGuard.ALLOW_ALL : toolExecutionGuard;
+    }
 
     public AgentWorkflowRuntimeResult execute(
             AgentApplication application,
@@ -129,7 +137,8 @@ public class AgentWorkflowRuntimeService {
                 .map(tool -> tool.descriptor().name())
                 .collect(java.util.stream.Collectors.toUnmodifiableSet());
         AgentToolExecutor toolExecutor = new AgentToolExecutor(
-                objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, pluginToolGateways
+                objectMapper, runtimeExecutor, toolRepo, systemTools, permissionGateway, pluginToolGateways,
+                toolExecutionGuard
         );
         AgentWorkflowRunState state = new AgentWorkflowRunState(
                 application,
@@ -311,20 +320,20 @@ public class AgentWorkflowRuntimeService {
         List<Map<String, Object>> attachments = command.getAttachments() == null
                 ? List.of()
                 : command.getAttachments().stream().map(item -> Map.<String, Object>of(
-                        "name", item.name() == null ? "" : item.name(),
-                        "fileName", item.name() == null ? "" : item.name(),
-                        "contentType", item.contentType() == null ? "" : item.contentType(),
-                        "size", item.size() == null ? 0L : item.size(),
-                        "dataUrl", item.dataUrl() == null ? "" : item.dataUrl()
-                )).toList();
+                "name", item.name() == null ? "" : item.name(),
+                "fileName", item.name() == null ? "" : item.name(),
+                "contentType", item.contentType() == null ? "" : item.contentType(),
+                "size", item.size() == null ? 0L : item.size(),
+                "dataUrl", item.dataUrl() == null ? "" : item.dataUrl()
+        )).toList();
         Map<String, Object> variables = new java.util.LinkedHashMap<>();
         variables.put("attachments", attachments);
         variables.put("attachment", attachments.isEmpty() ? Map.of() : attachments.getFirst());
         variables.put("imageDataUrl", command.getImageDataUrl() == null ? "" : command.getImageDataUrl());
         List<String> imageDataUrls = command.getImageDataUrls() == null || command.getImageDataUrls().isEmpty()
                 ? (command.getImageDataUrl() == null || command.getImageDataUrl().isBlank()
-                    ? List.of()
-                    : List.of(command.getImageDataUrl()))
+                   ? List.of()
+                   : List.of(command.getImageDataUrl()))
                 : command.getImageDataUrls();
         variables.put("imageDataUrls", imageDataUrls);
         return new AgentWorkflowInitialInput(command.getInput() == null ? "" : command.getInput(), variables);

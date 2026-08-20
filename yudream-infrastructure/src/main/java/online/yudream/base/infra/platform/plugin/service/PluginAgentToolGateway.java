@@ -1,11 +1,13 @@
 package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
 import online.yudream.base.domain.platform.agent.service.AgentPluginToolGateway;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 import online.yudream.base.plugin.spi.system.ai.PluginAiToolCall;
@@ -90,10 +92,22 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
         }
 
         @Override
+        public AgentToolRisk risk() {
+            PluginAiToolRisk risk = tool.descriptor().risk();
+            return risk == PluginAiToolRisk.READ ? AgentToolRisk.READ : AgentToolRisk.WRITE;
+        }
+
+        @Override
         public AiAgentToolResult execute(AiAgentToolCall call) {
             PluginAiToolDescriptor source = tool.descriptor();
             if (context == null) {
                 throw new BizException("插件工具仅可在插件触发的会话中调用：" + source.title());
+            }
+            QqSandboxSession sandbox = QqSandboxExecutionScope.current();
+            if (sandbox != null && source.risk() != PluginAiToolRisk.READ) {
+                sandbox.append("guard", "ai.tool.blocked", sandbox.pluginCode(),
+                        Map.of("tool", source.name(), "risk", source.risk().name()));
+                throw new BizException("QQ 沙箱仅允许调用只读 AI 工具：" + source.title());
             }
             if (source.risk() != PluginAiToolRisk.READ
                     || !context.allowsTool(source.name())
@@ -102,6 +116,10 @@ public class PluginAgentToolGateway implements AgentPluginToolGateway {
                 throw new BizException("当前用户无权调用 AI 工具：" + source.title());
             }
             Map<String, Object> arguments = call == null || call.arguments() == null ? Map.of() : call.arguments();
+            if (sandbox != null) {
+                sandbox.append("guard", "ai.tool.read", sandbox.pluginCode(),
+                        Map.of("tool", source.name(), "arguments", arguments));
+            }
             var value = tool.execute(context, new PluginAiToolCall(source.name(), arguments));
             return new AiAgentToolResult(source.name(), value.action(), source.permissionCode(), value.message(), value.payload());
         }

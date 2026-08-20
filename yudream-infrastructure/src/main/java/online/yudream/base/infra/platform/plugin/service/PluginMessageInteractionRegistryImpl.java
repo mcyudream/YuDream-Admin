@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -61,7 +62,9 @@ public class PluginMessageInteractionRegistryImpl implements PluginMessageIntera
         List<Registration> handlers = registrations.getOrDefault(kind, List.of());
         for (Registration registration : List.copyOf(handlers)) {
             if (!matches(kind, registration.filter(), event)) continue;
-            executor.submit(() -> invoke(kind, registration.handler(), event));
+            CompletableFuture<Void> future = CompletableFuture.runAsync(
+                    QqSandboxExecutionScope.wrap(() -> invoke(kind, registration.handler(), event)), executor);
+            QqSandboxExecutionScope.track(future);
         }
     }
 

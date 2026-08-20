@@ -432,9 +432,10 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     public void publishMessagingEvent(PluginEvent event) {
-        holders.values().stream()
-                .filter(PluginRuntimeHolder::isEnabled)
-                .map(PluginRuntimeHolder::getContext)
+        holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .filter(entry -> QqSandboxExecutionScope.accepts(entry.getKey()))
+                .map(entry -> entry.getValue().getContext())
                 .forEach(context -> context.interactionRegistry().publish(event,
                         "internal".equals(event.type()) || "group_request".equals(event.type())));
     }
@@ -530,9 +531,10 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
 
     public void publishCommand(PluginEvent event, String command, List<String> arguments, Long userId,
                                java.util.function.Predicate<String> permissionChecker) {
-        holders.values().stream()
-                .filter(PluginRuntimeHolder::isEnabled)
-                .map(PluginRuntimeHolder::getContext)
+        holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .filter(entry -> QqSandboxExecutionScope.accepts(entry.getKey()))
+                .map(entry -> entry.getValue().getContext())
                 .flatMap(context -> context.commandRegistry().registrations().stream())
                 .filter(registration -> registration.definition().command().equalsIgnoreCase(command))
                 .filter(registration -> registration.definition().allowAnonymous() || userId != null)
