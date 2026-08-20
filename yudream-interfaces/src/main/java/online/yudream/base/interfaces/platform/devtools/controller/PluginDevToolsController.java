@@ -3,10 +3,12 @@ package online.yudream.base.interfaces.platform.devtools.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.devtools.service.PluginDevToolsAppService;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.devtools.assembler.PluginDevToolsWebAssembler;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
+import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
@@ -17,6 +19,7 @@ import online.yudream.base.interfaces.platform.devtools.service.PluginDevToolsSs
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -69,6 +72,25 @@ public class PluginDevToolsController {
                                                     @Valid @RequestBody PluginCommandTestRequest request) {
         return Result.ok(PluginDevToolsWebAssembler.toRes(
                 devToolsAppService.commandTest(code, PluginDevToolsWebAssembler.toCmd(request))));
+    }
+
+    @GetMapping("/dev-projects")
+    @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看开发模式项目", module = "开发者工具", desc = "查看配置与面板登记的开发模式插件项目及目录状态")
+    public Result<List<PluginDevProjectInfo>> devProjects() {
+        return Result.ok(devToolsAppService.devProjects());
+    }
+
+    @PostMapping("/dev-projects")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "登记开发模式项目", module = "开发者工具", desc = "将插件源码目录登记到面板清单并持久化，已启用插件立即切换源码加载")
+    public Result<PluginDevProjectInfo> addDevProject(@Valid @RequestBody PluginDevProjectSaveRequest request) {
+        return Result.ok(devToolsAppService.addDevProject(PluginDevToolsWebAssembler.toCmd(request)));
+    }
+
+    @DeleteMapping("/dev-projects/{code}")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "移除开发模式项目", module = "开发者工具", desc = "从面板清单移除开发模式项目登记")
+    public Result<Void> removeDevProject(@PathVariable String code) {
+        devToolsAppService.removeDevProject(code);
+        return Result.ok();
     }
 
     @GetMapping("/agent-traces")

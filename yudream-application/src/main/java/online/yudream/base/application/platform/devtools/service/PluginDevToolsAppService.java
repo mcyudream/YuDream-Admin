@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.assembler.PluginDevToolsAssembler;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
@@ -14,9 +15,12 @@ import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
+import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -36,12 +40,16 @@ public class PluginDevToolsAppService {
     private final PluginAppService pluginAppService;
     private final AgentExecutionTraceRepo traceRepo;
     private final AgentTraceProperties traceProperties;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PluginDevToolsStatusDTO status() {
         List<PluginModuleDTO> installed = pluginAppService.listInstalled();
         return PluginDevToolsStatusDTO.builder()
                 .devModeEnabled(runtimeGateway.devModeEnabled())
                 .traceEnabled(traceProperties.isEnabled())
+                .hostRunMode(runtimeGateway.hostRunMode())
+                .devModeAuto(runtimeGateway.devModeAutoDetected())
+                .devProjectStoreFile(runtimeGateway.devProjectStoreFile())
                 .devProjects(runtimeGateway.devModeProjects())
                 .installedCount(installed.size())
                 .loadedCount((int) installed.stream().filter(PluginModuleDTO::isLoaded).count())
@@ -91,6 +99,29 @@ public class PluginDevToolsAppService {
             throw new BizException("指令名不能为空");
         }
         return runtimeGateway.testCommand(code.trim(), cmd.getCommand(), cmd.getArguments(), cmd.getContent());
+    }
+
+    /** 开发项目管理视图：不受启用开关过滤，开发模式关闭时也可预登记。 */
+    public List<PluginDevProjectInfo> devProjects() {
+        return runtimeGateway.managedDevProjects();
+    }
+
+    public PluginDevProjectInfo addDevProject(PluginDevProjectSaveCmd cmd) {
+        if (cmd == null || !StringUtils.hasText(cmd.getPath())) {
+            throw new BizException("插件目录不能为空");
+        }
+        PluginDevProjectInfo saved = runtimeGateway.registerDevProject(cmd.getCode(), cmd.getPath().trim(),
+                cmd.getFrontendDist(), cmd.getAutoCompile() == null || cmd.getAutoCompile(), cmd.getCompileCommand());
+        // 插件已启用时立即切到源码目录加载，免去手动重载
+        if (runtimeGateway.enabled(saved.code())) {
+            eventPublisher.publishEvent(PluginDevReloadRequested.of(saved.code()));
+        }
+        return saved;
+    }
+
+    public void removeDevProject(String code) {
+        requireCode(code);
+        runtimeGateway.removeDevProject(code.trim());
     }
 
     private void requireCode(String code) {

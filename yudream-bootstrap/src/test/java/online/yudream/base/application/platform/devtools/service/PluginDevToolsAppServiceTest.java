@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.devtools.service;
 
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
@@ -13,6 +14,8 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
+import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
@@ -25,6 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class PluginDevToolsAppServiceTest {
@@ -33,15 +38,18 @@ class PluginDevToolsAppServiceTest {
     private final PluginAppService pluginAppService = mock(PluginAppService.class);
     private final AgentExecutionTraceRepo traceRepo = mock(AgentExecutionTraceRepo.class);
     private final AgentTraceProperties traceProperties = new AgentTraceProperties();
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher =
+            mock(org.springframework.context.ApplicationEventPublisher.class);
     private final PluginDevToolsAppService service = new PluginDevToolsAppService(
-            runtimeGateway, pluginAppService, traceRepo, traceProperties);
+            runtimeGateway, pluginAppService, traceRepo, traceProperties, eventPublisher);
 
     @Test
     void statusAggregatesRuntimeCountsAndSwitches() {
         traceProperties.setEnabled(true);
         when(runtimeGateway.devModeEnabled()).thenReturn(true);
         when(runtimeGateway.devModeProjects()).thenReturn(List.of(
-                new PluginDevProjectInfo("demo", "D:/plugins/demo/target/classes", "D:/plugins/demo/dist", true)));
+                new PluginDevProjectInfo("demo", "D:/plugins/demo", "D:/plugins/demo/dist", true,
+                        PluginDevProjectSource.FILE, true, true, true)));
         when(pluginAppService.listInstalled()).thenReturn(List.of(
                 PluginModuleDTO.builder().code("demo").loaded(true).enabled(true).build(),
                 PluginModuleDTO.builder().code("store").loaded(true).enabled(false).build()));
@@ -59,7 +67,8 @@ class PluginDevToolsAppServiceTest {
     @Test
     void pluginsMarkDevModeFromGatewayProjects() {
         when(runtimeGateway.devModeProjects()).thenReturn(List.of(
-                new PluginDevProjectInfo("demo", "classes", "dist", true)));
+                new PluginDevProjectInfo("demo", "classes", "dist", true,
+                        PluginDevProjectSource.CONFIG, true, false, false)));
         when(pluginAppService.listInstalled()).thenReturn(List.of(
                 PluginModuleDTO.builder().code("demo").name("演示").build(),
                 PluginModuleDTO.builder().code("store").name("商店").build()));
@@ -71,6 +80,46 @@ class PluginDevToolsAppServiceTest {
         assertThat(plugins.get(0).getDevProject().code()).isEqualTo("demo");
         assertThat(plugins.get(1).isDevMode()).isFalse();
         assertThat(plugins.get(1).getDevProject()).isNull();
+    }
+
+    @Test
+    void addDevProjectRequiresPath() {
+        assertThatThrownBy(() -> service.addDevProject(new PluginDevProjectSaveCmd()))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("插件目录不能为空");
+    }
+
+    @Test
+    void addDevProjectRegistersAndReloadsEnabledPlugin() {
+        PluginDevProjectSaveCmd cmd = new PluginDevProjectSaveCmd();
+        cmd.setPath("D:/plugins/demo");
+        PluginDevProjectInfo saved = new PluginDevProjectInfo("demo", "D:/plugins/demo",
+                "D:/plugins/demo/dist", true, PluginDevProjectSource.FILE, true, true, true);
+        when(runtimeGateway.registerDevProject(null, "D:/plugins/demo", null, true, null))
+                .thenReturn(saved);
+        when(runtimeGateway.enabled("demo")).thenReturn(true);
+
+        PluginDevProjectInfo result = service.addDevProject(cmd);
+
+        assertThat(result.code()).isEqualTo("demo");
+        assertThat(result.source()).isEqualTo(PluginDevProjectSource.FILE);
+        verify(eventPublisher).publishEvent(any(PluginDevReloadRequested.class));
+    }
+
+    @Test
+    void addDevProjectSkipsReloadWhenPluginNotEnabled() {
+        PluginDevProjectSaveCmd cmd = new PluginDevProjectSaveCmd();
+        cmd.setPath("D:/plugins/demo");
+        cmd.setCode("demo");
+        PluginDevProjectInfo saved = new PluginDevProjectInfo("demo", "D:/plugins/demo",
+                "D:/plugins/demo/dist", true, PluginDevProjectSource.FILE, true, true, true);
+        when(runtimeGateway.registerDevProject("demo", "D:/plugins/demo", null, true, null))
+                .thenReturn(saved);
+        when(runtimeGateway.enabled("demo")).thenReturn(false);
+
+        service.addDevProject(cmd);
+
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
