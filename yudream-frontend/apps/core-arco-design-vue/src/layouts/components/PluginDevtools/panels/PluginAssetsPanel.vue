@@ -8,6 +8,7 @@ import type {
   PluginRuntimeAssets,
 } from '@/api/modules/platform-devtools'
 import apiDevtools from '@/api/modules/platform-devtools'
+import AssetSection from './AssetSection.vue'
 
 const toast = useFaToast()
 
