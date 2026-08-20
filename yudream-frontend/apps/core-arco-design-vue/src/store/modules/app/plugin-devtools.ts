@@ -3,11 +3,16 @@ import type {
   AgentTraceEventPayload,
   AgentTraceStatus,
   AgentTraceStep,
+  PluginDevProject,
+  PluginDevProjectSavePayload,
   PluginDevtoolsStatus,
   PluginLifecycleEventPayload,
 } from '@/api/modules/platform-devtools'
 import apiDevtools from '@/api/modules/platform-devtools'
 import eventBus from '@/utils/eventBus'
+
+/** 抽屉页面标识，与左侧竖向导航一一对应 */
+export type PluginDevtoolsPage = 'overview' | 'plugins' | 'traces' | 'audit' | 'settings'
 
 /** 正在执行（或刚结束）的 Agent 追踪，经 SSE 增量累积，完成落库后可从详情接口取全量 */
 export interface LiveTrace {
@@ -24,9 +29,15 @@ export interface LiveTrace {
 }
 
 const LIFECYCLE_EVENT_LIMIT = 100
-const TRACE_EVENT_LIMIT = 100
 const LIVE_TRACE_LIMIT = 20
 const RECONNECT_DELAY_MS = 3_000
+const ACTIVE_PAGE_STORAGE_KEY = 'pluginDevtoolsPage'
+const DEVTOOLS_PAGES: PluginDevtoolsPage[] = ['overview', 'plugins', 'traces', 'audit', 'settings']
+
+function hydrateActivePage(): PluginDevtoolsPage {
+  const saved = localStorage.getItem(ACTIVE_PAGE_STORAGE_KEY) as PluginDevtoolsPage | null
+  return saved && DEVTOOLS_PAGES.includes(saved) ? saved : 'overview'
+}
 
 export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   const status = ref<PluginDevtoolsStatus | null>(null)
@@ -34,9 +45,12 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   const statusError = ref('')
   const drawerOpen = ref(false)
   const unreadCount = ref(0)
+  const activePage = ref<PluginDevtoolsPage>(hydrateActivePage())
+
+  const devProjects = ref<PluginDevProject[]>([])
+  const devProjectsLoading = ref(false)
 
   const lifecycleEvents = ref<PluginLifecycleEventPayload[]>([])
-  const traceEvents = ref<AgentTraceEventPayload[]>([])
   const liveTraces = ref<LiveTrace[]>([])
 
   const lifecycleConnected = ref(false)
@@ -60,6 +74,37 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
       status.value = null
       statusError.value = error?.message || '开发者工具状态接口不可用'
     }
+  }
+
+  function setActivePage(page: PluginDevtoolsPage) {
+    activePage.value = page
+    localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, page)
+  }
+
+  /** 面板登记与配置文件合并后的开发项目清单（不受开发模式开关过滤） */
+  async function loadDevProjects() {
+    devProjectsLoading.value = true
+    try {
+      const res = await apiDevtools.devProjects()
+      devProjects.value = res.data || []
+    }
+    finally {
+      devProjectsLoading.value = false
+    }
+  }
+
+  async function addDevProject(payload: PluginDevProjectSavePayload) {
+    await apiDevtools.addDevProject(payload)
+    await Promise.all([loadDevProjects(), loadStatus(true)])
+  }
+
+  async function removeDevProject(code: string) {
+    await apiDevtools.removeDevProject(code)
+    await Promise.all([loadDevProjects(), loadStatus(true)])
+  }
+
+  async function reloadDevPlugin(code: string) {
+    await apiDevtools.reload(code)
   }
 
   /** 状态可用且已授权后启动双 SSE 流；布局常驻，只需启动一次 */
@@ -95,7 +140,6 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
 
   function clearEvents() {
     lifecycleEvents.value = []
-    traceEvents.value = []
   }
 
   function notify() {
@@ -117,10 +161,6 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   }
 
   function handleTraceEvent(payload: AgentTraceEventPayload) {
-    traceEvents.value.unshift(payload)
-    if (traceEvents.value.length > TRACE_EVENT_LIMIT) {
-      traceEvents.value.length = TRACE_EVENT_LIMIT
-    }
     notify()
 
     const existing = liveTraces.value.find(item => item.traceId === payload.traceId)
@@ -256,12 +296,19 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     statusError,
     drawerOpen,
     unreadCount,
+    activePage,
+    devProjects,
+    devProjectsLoading,
     lifecycleEvents,
-    traceEvents,
     liveTraces,
     lifecycleConnected,
     traceConnected,
     loadStatus,
+    setActivePage,
+    loadDevProjects,
+    addDevProject,
+    removeDevProject,
+    reloadDevPlugin,
     connect,
     disconnect,
     openDrawer,

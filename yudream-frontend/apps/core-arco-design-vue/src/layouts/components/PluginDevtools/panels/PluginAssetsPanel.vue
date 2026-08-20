@@ -18,11 +18,6 @@ const selectedCode = ref<string>()
 const assets = ref<PluginRuntimeAssets | null>(null)
 const assetsLoading = ref(false)
 
-const pluginOptions = computed(() => plugins.value.map(item => ({
-  label: `${item.name}（${item.code}）${item.devMode ? ' · 开发模式' : ''}`,
-  value: item.code,
-})))
-
 const selectedPlugin = computed(() => plugins.value.find(item => item.code === selectedCode.value))
 
 onMounted(loadPlugins)
@@ -32,13 +27,19 @@ async function loadPlugins() {
   try {
     const res = await apiDevtools.plugins()
     plugins.value = res.data || []
-    if (!selectedCode.value && plugins.value.length > 0) {
-      selectedCode.value = (plugins.value.find(item => item.devMode) || plugins.value[0]).code
-    }
   }
   finally {
     pluginsLoading.value = false
   }
+}
+
+function openPlugin(code: string) {
+  selectedCode.value = code
+}
+
+function backToList() {
+  selectedCode.value = undefined
+  assets.value = null
 }
 
 watch(selectedCode, async (code) => {
@@ -54,16 +55,27 @@ watch(selectedCode, async (code) => {
   finally {
     assetsLoading.value = false
   }
-}, { immediate: true })
+})
+
+function statusVariant(plugin: PluginDevPlugin) {
+  if (plugin.status === 'ERROR') {
+    return 'destructive' as const
+  }
+  if (plugin.status === 'ENABLED') {
+    return 'default' as const
+  }
+  return 'secondary' as const
+}
 
 const reloading = ref(false)
-async function reloadPlugin() {
-  if (!selectedCode.value) {
+async function reloadPlugin(code?: string) {
+  const target = code || selectedCode.value
+  if (!target) {
     return
   }
   reloading.value = true
   try {
-    await apiDevtools.reload(selectedCode.value)
+    await apiDevtools.reload(target)
     toast.success('重载指令已提交')
   }
   catch {
@@ -171,199 +183,238 @@ async function runCommandTest() {
 </script>
 
 <template>
-  <div class="assets-panel">
-    <div class="assets-toolbar">
-      <FaSelect
-        v-model="selectedCode"
-        :options="pluginOptions"
-        placeholder="选择插件"
-        class="flex-1 min-w-0"
-      />
-      <FaButton variant="outline" size="icon" :loading="pluginsLoading" title="刷新插件列表" @click="loadPlugins">
-        <FaIcon name="i-ri:refresh-line" />
-      </FaButton>
-      <FaTooltip text="对开发模式插件执行 disable→unload→load→enable 重载" side="bottom">
-        <FaButton
-          variant="outline"
-          size="icon"
-          :disabled="!selectedPlugin?.devMode"
-          :loading="reloading"
-          title="重载开发插件"
-          @click="reloadPlugin"
-        >
-          <FaIcon name="i-ri:restart-line" />
+  <div class="plugins-panel">
+    <!-- 插件清单 -->
+    <template v-if="!selectedPlugin">
+      <div class="plugins-toolbar">
+        <span class="plugins-toolbar__title">已安装插件</span>
+        <FaTag variant="secondary" class="text-xs">
+          {{ plugins.length }}
+        </FaTag>
+        <div class="flex-1" />
+        <FaButton variant="outline" size="icon" :loading="pluginsLoading" title="刷新插件列表" @click="loadPlugins">
+          <FaIcon name="i-ri:refresh-line" />
         </FaButton>
-      </FaTooltip>
-    </div>
-
-    <div v-if="selectedPlugin" class="plugin-brief">
-      <div class="plugin-brief__title">
-        <span class="font-medium">{{ selectedPlugin.name }}</span>
-        <FaTag variant="outline" class="text-xs">
-          {{ selectedPlugin.status }}
-        </FaTag>
-        <FaTag v-if="selectedPlugin.devMode" class="text-xs">
-          开发模式
-        </FaTag>
       </div>
-      <div v-if="selectedPlugin.devProject" class="plugin-brief__path">
-        {{ selectedPlugin.devProject.path }}
-      </div>
-    </div>
 
-    <div v-if="assetsLoading" class="panel-empty">
-      正在加载运行时资产…
-    </div>
-    <template v-else-if="assets">
-      <AssetSection title="HTTP 端点" icon="i-ri:global-line" :count="assets.httpEndpoints.length" default-open>
-        <div v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`" class="asset-row">
-          <FaTag variant="outline" class="method-tag text-xs">
-            {{ endpoint.method }}
-          </FaTag>
-          <span class="asset-row__main text-xs font-mono">{{ endpoint.fullPath }}</span>
-          <FaButton variant="ghost" size="sm" class="shrink-0" @click="openEndpointTester(endpoint)">
-            试用
-          </FaButton>
-        </div>
-        <div v-if="!assets.httpEndpoints.length" class="asset-empty">
-          该插件未注册 HTTP 端点
-        </div>
-      </AssetSection>
-
-      <AssetSection title="QQ 指令" icon="i-ri:terminal-box-line" :count="assets.commands.length" default-open>
-        <div v-for="command in assets.commands" :key="command.code" class="asset-row">
-          <span class="text-xs font-mono">/{{ command.command }}</span>
-          <span class="asset-row__main text-xs">{{ command.name }}{{ command.description ? `：${command.description}` : '' }}</span>
-          <FaButton variant="ghost" size="sm" class="shrink-0" @click="openCommandTest(command)">
-            模拟触发
-          </FaButton>
-        </div>
-        <div v-if="!assets.commands.length" class="asset-empty">
-          该插件未注册指令
-        </div>
-      </AssetSection>
-
-      <AssetSection title="菜单" icon="i-ri:menu-line" :count="assets.menus.length">
-        <div v-for="menu in assets.menus" :key="menu.path" class="asset-row">
-          <FaIcon v-if="menu.icon" :name="menu.icon" class="size-3.5" />
-          <span class="text-xs">{{ menu.title }}</span>
-          <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ menu.path }}</span>
-          <FaTag v-if="menu.permission" variant="secondary" class="text-xs shrink-0">
-            {{ menu.permission }}
-          </FaTag>
-        </div>
-        <div v-if="!assets.menus.length" class="asset-empty">
-          无注册菜单
-        </div>
-      </AssetSection>
-
-      <AssetSection title="权限" icon="i-ri:shield-keyhole-line" :count="assets.permissions.length">
-        <div v-for="permission in assets.permissions" :key="permission.code" class="asset-row">
-          <span class="text-xs font-mono">{{ permission.code }}</span>
-          <span class="asset-row__main text-xs">{{ permission.name }}</span>
-        </div>
-        <div v-if="!assets.permissions.length" class="asset-empty">
-          无注册权限
-        </div>
-      </AssetSection>
-
-      <AssetSection title="前端模块与路由" icon="i-ri:window-line" :count="assets.frontendModules.length">
-        <div v-for="module in assets.frontendModules" :key="module.pluginCode" class="frontend-module">
-          <div class="asset-row">
-            <FaTag variant="outline" class="text-xs">
-              {{ module.menuTitle || module.moduleName || '未命名模块' }}
+      <div
+        v-for="plugin in plugins"
+        :key="plugin.code"
+        class="plugin-row"
+        @click="openPlugin(plugin.code)"
+      >
+        <div class="plugin-row__main">
+          <div class="plugin-row__title">
+            <span class="font-medium">{{ plugin.name }}</span>
+            <FaTag :variant="statusVariant(plugin)" class="text-xs">
+              {{ plugin.status }}
             </FaTag>
-            <span class="asset-row__main text-xs font-mono">{{ module.entry }}</span>
+            <FaTag v-if="plugin.devMode" class="text-xs">
+              开发模式
+            </FaTag>
+            <FaTag v-if="plugin.devMode && plugin.devProject" variant="outline" class="text-xs">
+              {{ plugin.devProject.source === 'CONFIG' ? '配置文件' : '面板登记' }}
+            </FaTag>
           </div>
-          <div v-for="route in module.routes" :key="route.path" class="asset-row asset-row--sub">
-            <FaIcon v-if="route.icon" :name="route.icon" class="size-3.5" />
-            <span class="text-xs">{{ route.title || route.name }}</span>
-            <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ route.path }}</span>
+          <div class="plugin-row__sub">
+            {{ plugin.code }}<span v-if="plugin.version"> · v{{ plugin.version }}</span>
           </div>
         </div>
-        <div v-if="!assets.frontendModules.length" class="asset-empty">
-          无前端模块
-        </div>
-      </AssetSection>
-
-      <AssetSection title="AI 工具" icon="i-ri:tools-line" :count="assets.aiTools.length">
-        <div v-for="tool in assets.aiTools" :key="tool.name" class="asset-row">
-          <span class="text-xs font-mono">{{ tool.name }}</span>
-          <span class="asset-row__main text-xs">{{ tool.title || tool.description }}</span>
-          <FaTag v-if="tool.risk" :variant="tool.risk === 'HIGH' ? 'destructive' : 'secondary'" class="text-xs shrink-0">
-            {{ tool.risk }}
-          </FaTag>
-        </div>
-        <div v-if="!assets.aiTools.length" class="asset-empty">
-          无 AI 工具
-        </div>
-      </AssetSection>
-
-      <AssetSection title="声明式 Agent" icon="i-ri:robot-2-line" :count="assets.agents.length">
-        <div v-for="agent in assets.agents" :key="agent.id" class="asset-row">
-          <FaIcon v-if="agent.icon" :name="agent.icon" class="size-3.5" />
-          <span class="text-xs">{{ agent.name }}</span>
-          <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ agent.code }}</span>
-          <FaTag v-if="agent.status" variant="secondary" class="text-xs shrink-0">
-            {{ agent.status }}
-          </FaTag>
-        </div>
-        <div v-if="!assets.agents.length" class="asset-empty">
-          无声明式 Agent
-        </div>
-      </AssetSection>
-
-      <AssetSection title="平台能力" icon="i-ri:apps-2-line" :count="assets.capabilities.length">
-        <div v-for="capability in assets.capabilities" :key="capability.code" class="asset-row">
-          <span class="text-xs">{{ capability.name }}</span>
-          <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ capability.code }}</span>
-          <FaTag v-if="capability.type" variant="secondary" class="text-xs shrink-0">
-            {{ capability.type }}
-          </FaTag>
-        </div>
-        <div v-if="!assets.capabilities.length" class="asset-empty">
-          无平台能力
-        </div>
-      </AssetSection>
-
-      <AssetSection title="消息交互" icon="i-ri:message-3-line" :count="assets.messageInteractions.length">
-        <div v-for="(interaction, index) in assets.messageInteractions" :key="index" class="asset-row">
-          <FaTag variant="outline" class="text-xs">
-            {{ interaction.kind }}
-          </FaTag>
-          <span class="asset-row__main text-xs">{{ interaction.eventTypes.join('、') }}</span>
-          <span v-if="interaction.command" class="text-xs font-mono shrink-0">/{{ interaction.command }}</span>
-        </div>
-        <div v-if="!assets.messageInteractions.length" class="asset-empty">
-          无消息交互
-        </div>
-      </AssetSection>
-
-      <AssetSection title="首页卡片" icon="i-ri:dashboard-line" :count="assets.dashboardCards.length">
-        <div v-for="card in assets.dashboardCards" :key="card.code" class="asset-row">
-          <span class="text-xs">{{ card.title }}</span>
-          <span class="asset-row__main text-xs text-secondary-foreground/60">{{ card.description }}</span>
-        </div>
-        <div v-if="!assets.dashboardCards.length" class="asset-empty">
-          无首页卡片
-        </div>
-      </AssetSection>
-
-      <AssetSection title="服务导出" icon="i-ri:share-forward-line" :count="assets.exposedServices.length">
-        <div v-for="service in assets.exposedServices" :key="service" class="asset-row">
-          <span class="text-xs font-mono">{{ service }}</span>
-        </div>
-        <div v-if="!assets.exposedServices.length" class="asset-empty">
-          未导出服务
-        </div>
-      </AssetSection>
+        <FaIcon name="i-ri:arrow-right-s-line" class="text-secondary-foreground/60 shrink-0 size-4" />
+      </div>
+      <div v-if="!plugins.length && !pluginsLoading" class="panel-empty">
+        暂无已安装插件
+      </div>
     </template>
-    <div v-else-if="selectedCode" class="panel-empty">
-      未能获取插件资产
-    </div>
-    <div v-else class="panel-empty">
-      暂无可选插件
-    </div>
+
+    <!-- 插件详情 -->
+    <template v-else>
+      <div class="plugins-toolbar">
+        <FaButton variant="ghost" size="sm" @click="backToList">
+          <FaIcon name="i-ri:arrow-left-s-line" />
+          插件清单
+        </FaButton>
+        <div class="flex-1" />
+        <FaTooltip text="对开发模式插件执行 disable→unload→load→enable 重载" side="bottom">
+          <FaButton
+            variant="outline"
+            size="sm"
+            :disabled="!selectedPlugin.devMode"
+            :loading="reloading"
+            @click="reloadPlugin()"
+          >
+            <FaIcon name="i-ri:restart-line" />
+            重载
+          </FaButton>
+        </FaTooltip>
+      </div>
+
+      <div class="plugin-brief">
+        <div class="plugin-brief__title">
+          <span class="font-medium">{{ selectedPlugin.name }}</span>
+          <FaTag :variant="statusVariant(selectedPlugin)" class="text-xs">
+            {{ selectedPlugin.status }}
+          </FaTag>
+          <FaTag v-if="selectedPlugin.devMode" class="text-xs">
+            开发模式
+          </FaTag>
+        </div>
+        <div v-if="selectedPlugin.devProject" class="plugin-brief__path">
+          {{ selectedPlugin.devProject.path }}
+        </div>
+      </div>
+
+      <div v-if="assetsLoading" class="panel-empty">
+        正在加载运行时资产…
+      </div>
+      <template v-else-if="assets">
+        <AssetSection title="HTTP 端点" icon="i-ri:global-line" :count="assets.httpEndpoints.length" default-open>
+          <div v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`" class="asset-row">
+            <FaTag variant="outline" class="method-tag text-xs">
+              {{ endpoint.method }}
+            </FaTag>
+            <span class="asset-row__main text-xs font-mono">{{ endpoint.fullPath }}</span>
+            <FaButton variant="ghost" size="sm" class="shrink-0" @click="openEndpointTester(endpoint)">
+              试用
+            </FaButton>
+          </div>
+          <div v-if="!assets.httpEndpoints.length" class="asset-empty">
+            该插件未注册 HTTP 端点
+          </div>
+        </AssetSection>
+
+        <AssetSection title="QQ 指令" icon="i-ri:terminal-box-line" :count="assets.commands.length" default-open>
+          <div v-for="command in assets.commands" :key="command.code" class="asset-row">
+            <span class="text-xs font-mono">/{{ command.command }}</span>
+            <span class="asset-row__main text-xs">{{ command.name }}{{ command.description ? `：${command.description}` : '' }}</span>
+            <FaButton variant="ghost" size="sm" class="shrink-0" @click="openCommandTest(command)">
+              模拟触发
+            </FaButton>
+          </div>
+          <div v-if="!assets.commands.length" class="asset-empty">
+            该插件未注册指令
+          </div>
+        </AssetSection>
+
+        <AssetSection title="前端模块与路由" icon="i-ri:window-line" :count="assets.frontendModules.length">
+          <div v-for="module in assets.frontendModules" :key="module.pluginCode" class="frontend-module">
+            <div class="asset-row">
+              <FaTag variant="outline" class="text-xs">
+                {{ module.menuTitle || module.moduleName || '未命名模块' }}
+              </FaTag>
+              <span class="asset-row__main text-xs font-mono">{{ module.entry }}</span>
+            </div>
+            <div v-for="route in module.routes" :key="route.path" class="asset-row asset-row--sub">
+              <FaIcon v-if="route.icon" :name="route.icon" class="size-3.5" />
+              <span class="text-xs">{{ route.title || route.name }}</span>
+              <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ route.path }}</span>
+            </div>
+          </div>
+          <div v-if="!assets.frontendModules.length" class="asset-empty">
+            无前端模块
+          </div>
+        </AssetSection>
+
+        <AssetSection title="权限" icon="i-ri:shield-keyhole-line" :count="assets.permissions.length">
+          <div v-for="permission in assets.permissions" :key="permission.code" class="asset-row">
+            <span class="text-xs font-mono">{{ permission.code }}</span>
+            <span class="asset-row__main text-xs">{{ permission.name }}</span>
+          </div>
+          <div v-if="!assets.permissions.length" class="asset-empty">
+            无注册权限
+          </div>
+        </AssetSection>
+
+        <AssetSection title="菜单" icon="i-ri:menu-line" :count="assets.menus.length">
+          <div v-for="menu in assets.menus" :key="menu.path" class="asset-row">
+            <FaIcon v-if="menu.icon" :name="menu.icon" class="size-3.5" />
+            <span class="text-xs">{{ menu.title }}</span>
+            <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ menu.path }}</span>
+            <FaTag v-if="menu.permission" variant="secondary" class="text-xs shrink-0">
+              {{ menu.permission }}
+            </FaTag>
+          </div>
+          <div v-if="!assets.menus.length" class="asset-empty">
+            无注册菜单
+          </div>
+        </AssetSection>
+
+        <AssetSection title="AI 工具" icon="i-ri:tools-line" :count="assets.aiTools.length">
+          <div v-for="tool in assets.aiTools" :key="tool.name" class="asset-row">
+            <span class="text-xs font-mono">{{ tool.name }}</span>
+            <span class="asset-row__main text-xs">{{ tool.title || tool.description }}</span>
+            <FaTag v-if="tool.risk" :variant="tool.risk === 'HIGH' ? 'destructive' : 'secondary'" class="text-xs shrink-0">
+              {{ tool.risk }}
+            </FaTag>
+          </div>
+          <div v-if="!assets.aiTools.length" class="asset-empty">
+            无 AI 工具
+          </div>
+        </AssetSection>
+
+        <AssetSection title="声明式 Agent" icon="i-ri:robot-2-line" :count="assets.agents.length">
+          <div v-for="agent in assets.agents" :key="agent.id" class="asset-row">
+            <FaIcon v-if="agent.icon" :name="agent.icon" class="size-3.5" />
+            <span class="text-xs">{{ agent.name }}</span>
+            <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ agent.code }}</span>
+            <FaTag v-if="agent.status" variant="secondary" class="text-xs shrink-0">
+              {{ agent.status }}
+            </FaTag>
+          </div>
+          <div v-if="!assets.agents.length" class="asset-empty">
+            无声明式 Agent
+          </div>
+        </AssetSection>
+
+        <AssetSection title="平台能力" icon="i-ri:apps-2-line" :count="assets.capabilities.length">
+          <div v-for="capability in assets.capabilities" :key="capability.code" class="asset-row">
+            <span class="text-xs">{{ capability.name }}</span>
+            <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ capability.code }}</span>
+            <FaTag v-if="capability.type" variant="secondary" class="text-xs shrink-0">
+              {{ capability.type }}
+            </FaTag>
+          </div>
+          <div v-if="!assets.capabilities.length" class="asset-empty">
+            无平台能力
+          </div>
+        </AssetSection>
+
+        <AssetSection title="消息交互" icon="i-ri:message-3-line" :count="assets.messageInteractions.length">
+          <div v-for="(interaction, index) in assets.messageInteractions" :key="index" class="asset-row">
+            <FaTag variant="outline" class="text-xs">
+              {{ interaction.kind }}
+            </FaTag>
+            <span class="asset-row__main text-xs">{{ interaction.eventTypes.join('、') }}</span>
+            <span v-if="interaction.command" class="text-xs font-mono shrink-0">/{{ interaction.command }}</span>
+          </div>
+          <div v-if="!assets.messageInteractions.length" class="asset-empty">
+            无消息交互
+          </div>
+        </AssetSection>
+
+        <AssetSection title="首页卡片" icon="i-ri:dashboard-line" :count="assets.dashboardCards.length">
+          <div v-for="card in assets.dashboardCards" :key="card.code" class="asset-row">
+            <span class="text-xs">{{ card.title }}</span>
+            <span class="asset-row__main text-xs text-secondary-foreground/60">{{ card.description }}</span>
+          </div>
+          <div v-if="!assets.dashboardCards.length" class="asset-empty">
+            无首页卡片
+          </div>
+        </AssetSection>
+
+        <AssetSection title="服务导出" icon="i-ri:share-forward-line" :count="assets.exposedServices.length">
+          <div v-for="service in assets.exposedServices" :key="service" class="asset-row">
+            <span class="text-xs font-mono">{{ service }}</span>
+          </div>
+          <div v-if="!assets.exposedServices.length" class="asset-empty">
+            未导出服务
+          </div>
+        </AssetSection>
+      </template>
+      <div v-else class="panel-empty">
+        未能获取插件资产
+      </div>
+    </template>
 
     <!-- 端点测试器 -->
     <FaModal v-model="endpointTesterOpen" title="端点测试" :footer="false" content-class="sm:max-w-xl">
@@ -464,17 +515,61 @@ async function runCommandTest() {
 </template>
 
 <style scoped>
-.assets-panel {
+.plugins-panel {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 0;
+  padding: 12px;
+  min-width: 0;
 }
 
-.assets-toolbar {
+.plugins-toolbar {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.plugins-toolbar__title {
+  color: var(--color-text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plugin-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+  cursor: pointer;
+}
+
+.plugin-row:hover {
+  background: var(--color-fill-1, var(--color-bg-3));
+}
+
+.plugin-row__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.plugin-row__title {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--color-text-1);
+  font-size: 13px;
+}
+
+.plugin-row__sub {
+  margin-top: 2px;
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-family: monospace;
 }
 
 .plugin-brief {
@@ -607,6 +702,6 @@ async function runCommandTest() {
 }
 
 .tester__result-body--error {
-  color: var(--color-danger-5, #f53f3f);
+  color: var(--color-danger-5, var(--color-danger, #f53f3f));
 }
 </style>
