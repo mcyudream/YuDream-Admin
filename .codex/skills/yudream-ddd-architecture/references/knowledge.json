@@ -211,6 +211,10 @@
     {
       "key": "devtools-project-catalog",
       "text": "开发项目双来源由 PluginDevProjectCatalog 合并：CONFIG(yml，面板只读) 优先于 FILE(面板登记，默认 plugins/dev-projects.json，gitignore 已覆盖，tmp+原子 move 写入，mtime 缓存自动重载)；同 code 冲突 CONFIG 胜并告警；面板增删仅作用 FILE；登记已启用插件立即发 PluginDevReloadRequested 热切；code 留空从 target/classes 或 src/main/resources 的 plugin.yml 推断。"
+    },
+    {
+      "key": "plugin-mongo-version-writeback",
+      "text": "MongoTemplate.save 会递增 dataobj 的 @Version，但不会更新原领域实例；仓储 save 若允许调用方继续复用该实例，必须像 WikiSourceRepoImpl 一样把 saved.getVersion() 回写领域对象。插件 dev reload 会对同一 PluginModule 先保存 unloaded 再保存 enabled，漏回写会稳定触发 OptimisticLockingFailureException。"
     }
   ],
   "utilities": [
@@ -314,7 +318,11 @@
     },
     {
       "key": "host-zindex-scale-floating-overlay",
-      "text": "宿主 z-index 尺度：侧栏 1010、顶栏 1020、FaModal/FaDrawer 默认 2000（内联 style）。布局内任何 fixed 浮层若低于 1010 会被侧栏压住。宿主级浮动工具（如开发者浮窗）必须 Teleport 到 body 脱离布局 stacking context，且 z-index 至少 2100，其内部再弹模态用 2200；FaDrawer 的 overlay 会锁 body 滚动并盖 50% 黑遮罩，需要面板与系统并行使用时不要用抽屉，改用非模态浮窗。"
+      "text": "宿主 z-index 尺度：侧栏 1010、顶栏 1020、FaModal/FaDrawer 默认 2000（内联 style）。布局内任何 fixed 浮层若低于 1010 会被侧栏压住。宿主级浮动工具（如开发者浮窗）必须 Teleport 到 body 脱离布局 stacking context，且 z-index 至少 2100，其内部登记模态用 2200、再嵌套的宿主目录选择模态用 2300；FaDrawer 的 overlay 会锁 body 滚动并盖 50% 黑遮罩，需要面板与系统并行使用时不要用抽屉，改用非模态浮窗。"
+    },
+    {
+      "key": "reka-presence-background-animation-throttle",
+      "text": "IAB/Chromium 后台标签页会节流动画帧，reka-ui Presence 可能迟迟收不到 animationend，使 data-state=closed、opacity=0 的 FaModal DOM 暂留在无障碍树并短暂拦截指针。自动化验证关闭不能只看 getByRole(dialog).count()；应以截图/可见性确认，或激活标签页强制出帧后等待节点卸载。"
     },
     {
       "key": "unresolved-local-component-silent-degrade",
