@@ -518,7 +518,7 @@ async function runCommandTest() {
 .plugins-panel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -536,12 +536,12 @@ async function runCommandTest() {
 
 .plugin-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   min-width: 0;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-bg-2);
   cursor: pointer;
 }
@@ -565,16 +565,16 @@ async function runCommandTest() {
 }
 
 .plugin-row__sub {
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--color-text-3);
   font-size: 12px;
   font-family: monospace;
 }
 
 .plugin-brief {
-  padding: 8px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-fill-1, var(--color-bg-3));
 }
 
@@ -586,7 +586,7 @@ async function runCommandTest() {
 }
 
 .plugin-brief__path {
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--color-text-3);
   font-size: 12px;
   font-family: monospace;
@@ -595,15 +595,15 @@ async function runCommandTest() {
 
 .asset-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: center;
   min-width: 0;
-  padding: 5px 0;
+  padding: 6px 2px;
   color: var(--color-text-2);
 }
 
 .asset-row--sub {
-  padding-left: 16px;
+  padding-left: 18px;
 }
 
 .asset-row__main {
@@ -634,10 +634,16 @@ async function runCommandTest() {
 }
 
 .frontend-module {
+  padding: 2px 0 6px;
   border-bottom: 1px dashed var(--color-border-2);
 }
 
+.frontend-module:first-child {
+  padding-top: 0;
+}
+
 .frontend-module:last-child {
+  padding-bottom: 0;
   border-bottom: 0;
 }
 

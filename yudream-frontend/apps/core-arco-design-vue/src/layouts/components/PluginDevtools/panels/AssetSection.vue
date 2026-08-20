@@ -34,7 +34,7 @@ const open = ref(props.defaultOpen)
 <style scoped>
 .asset-section {
   border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--color-bg-2);
 }
 
@@ -43,7 +43,7 @@ const open = ref(props.defaultOpen)
   gap: 8px;
   align-items: center;
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 14px;
   color: var(--color-text-2);
   cursor: pointer;
   user-select: none;
@@ -57,6 +57,7 @@ const open = ref(props.defaultOpen)
 }
 
 .asset-section__body {
-  padding: 4px 12px 10px;
+  padding: 4px 14px 12px;
+  border-top: 1px solid var(--color-border-2);
 }
 </style>
