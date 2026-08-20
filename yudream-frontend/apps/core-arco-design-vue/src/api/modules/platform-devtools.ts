@@ -2,11 +2,28 @@ import type { ApiResponse } from './system-client'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import systemClient from './system-client'
 
-/** 开发模式项目配置（后端 PluginDevModeProperties.DevProject 的只读镜像） */
+/** 开发项目来源：yml 配置（面板只读）或面板登记的本地清单文件 */
+export type PluginDevProjectSource = 'CONFIG' | 'FILE'
+
+/** 开发模式项目配置（domain PluginDevProjectInfo 的 JSON 镜像，含有效性状态位） */
 export interface PluginDevProject {
   code: string
+  /** 插件模块根目录 */
   path: string
   frontendDist?: string
+  autoCompile: boolean
+  source: PluginDevProjectSource
+  pathExists: boolean
+  classesBuilt: boolean
+  descriptorReady: boolean
+}
+
+/** 面板登记开发项目的保存载荷，code 留空时后端从 plugin.yml 推断 */
+export interface PluginDevProjectSavePayload {
+  path: string
+  code?: string
+  frontendDist?: string
+  compileCommand?: string
   autoCompile: boolean
 }
 
@@ -17,6 +34,12 @@ export interface PluginDevtoolsStatus {
   installedCount: number
   loadedCount: number
   enabledCount: number
+  /** 宿主运行方式：SOURCE（源码/IDE）或 JAR */
+  hostRunMode?: string
+  /** 开发模式开关是否来自自动检测（未显式配置 enabled） */
+  devModeAuto?: boolean
+  /** 面板登记的开发项目清单文件绝对路径，可供 coding agent 读取定位插件源码 */
+  devProjectStoreFile?: string
 }
 
 export type PluginDevStatus = 'INSTALLED' | 'LOADED' | 'ENABLED' | 'DISABLED' | 'ERROR'
@@ -289,6 +312,15 @@ export default {
 
   reload: (code: string) =>
     systemClient.post<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/plugins/${code}/reload`),
+
+  devProjects: () =>
+    systemClient.get<unknown, ApiResponse<PluginDevProject[]>>('api/platform/plugin-devtools/dev-projects'),
+
+  addDevProject: (data: PluginDevProjectSavePayload) =>
+    systemClient.post<unknown, ApiResponse<PluginDevProject>>('api/platform/plugin-devtools/dev-projects', data),
+
+  removeDevProject: (code: string) =>
+    systemClient.delete<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/dev-projects/${code}`),
 
   commandTest: (code: string, data: PluginCommandTestPayload) =>
     systemClient.post<unknown, ApiResponse<PluginCommandTestResult>>(`api/platform/plugin-devtools/plugins/${code}/command-test`, data),
