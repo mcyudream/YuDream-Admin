@@ -315,6 +315,10 @@
     {
       "key": "host-zindex-scale-floating-overlay",
       "text": "宿主 z-index 尺度：侧栏 1010、顶栏 1020、FaModal/FaDrawer 默认 2000（内联 style）。布局内任何 fixed 浮层若低于 1010 会被侧栏压住。宿主级浮动工具（如开发者浮窗）必须 Teleport 到 body 脱离布局 stacking context，且 z-index 至少 2100，其内部再弹模态用 2200；FaDrawer 的 overlay 会锁 body 滚动并盖 50% 黑遮罩，需要面板与系统并行使用时不要用抽屉，改用非模态浮窗。"
+    },
+    {
+      "key": "unresolved-local-component-silent-degrade",
+      "text": "前端只全局注册 Fa*/Yd* 组件（components.d.ts），本地兄弟组件必须显式 import，不会自动解析。漏导入时 Vue 把标签降级成原生元素：默认插槽内容照常渲染，但组件外壳/触发器/props 全部静默丢失，vue-tsc 与 eslint 都不报错，只在运行时报 Failed to resolve component 警告。页面缺结构但内容还在时先查模板里每个非 Fa/Yd 大写标签是否有对应 import。"
     }
   ]
 }
