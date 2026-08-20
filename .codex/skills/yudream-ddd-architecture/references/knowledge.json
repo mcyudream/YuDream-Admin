@@ -311,6 +311,10 @@
     {
       "key": "bash-heredoc-backslash-fold",
       "text": "ZCode Bash 工具通道会把命令串里的双反斜杠折叠成单反斜杠：heredoc 内 python 正则写 r'\\\\u...' 实际收到 '\\u...' 触发 re.PatternError，连普通字符串字面量里的 \\\\u 也会被折成 \\u 报 unicodeescape SyntaxError；构造含反斜杠文本一律用 chr(92) 拼接，命令串中不出现字面反斜杠+u。"
+    },
+    {
+      "key": "host-zindex-scale-floating-overlay",
+      "text": "宿主 z-index 尺度：侧栏 1010、顶栏 1020、FaModal/FaDrawer 默认 2000（内联 style）。布局内任何 fixed 浮层若低于 1010 会被侧栏压住。宿主级浮动工具（如开发者浮窗）必须 Teleport 到 body 脱离布局 stacking context，且 z-index 至少 2100，其内部再弹模态用 2200；FaDrawer 的 overlay 会锁 body 滚动并盖 50% 黑遮罩，需要面板与系统并行使用时不要用抽屉，改用非模态浮窗。"
     }
   ]
 }
