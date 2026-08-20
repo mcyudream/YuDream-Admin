@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
 import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
@@ -27,6 +28,8 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
+import online.yudream.base.infra.platform.plugin.devmode.DevModeEnvironment;
+import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
@@ -79,6 +82,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final ApplicationEventPublisher eventPublisher;
     private final PluginDevModeProperties devModeProperties;
+    private final PluginDevProjectCatalog devProjectCatalog;
+    private final DevModeEnvironment devModeEnvironment;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
@@ -96,8 +101,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .flatMap(Optional::stream)
                 .forEach(descriptor -> discovered.put(descriptor.code(), descriptor));
         // 开发模式项目与同 code 的 JAR 并存时以源码目录为准，保证改动即时生效
-        for (PluginDevModeProperties.DevProject project : devModeProjectsInternal()) {
-            readDevDescriptor(project).ifPresent(descriptor -> discovered.put(descriptor.code(), descriptor));
+        for (PluginDevProjectCatalog.CatalogEntry entry : devModeProjectsInternal()) {
+            readDevDescriptor(entry.project()).ifPresent(descriptor -> discovered.put(descriptor.code(), descriptor));
         }
         return discovered.values().stream()
                 .sorted(Comparator.comparing(PluginDescriptorInfo::code))
@@ -122,15 +127,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         }
     }
 
-    private List<PluginDevModeProperties.DevProject> devModeProjectsInternal() {
-        if (!devModeProperties.isEnabled()) {
+    private List<PluginDevProjectCatalog.CatalogEntry> devModeProjectsInternal() {
+        if (!devModeProperties.effectiveEnabled(devModeEnvironment)) {
             return List.of();
         }
-        return devModeProperties.getProjects().stream()
-                .filter(project -> project != null
-                        && StringUtils.hasText(project.getCode())
-                        && StringUtils.hasText(project.getPath()))
-                .toList();
+        return devProjectCatalog.projects();
     }
 
     private PluginDevModeProperties.DevProject findDevProject(String code) {
@@ -138,6 +139,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             return null;
         }
         return devModeProjectsInternal().stream()
+                .map(PluginDevProjectCatalog.CatalogEntry::project)
                 .filter(project -> code.trim().equals(project.getCode().trim()))
                 .findFirst()
                 .orElse(null);
@@ -150,17 +152,71 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
 
     @Override
     public boolean devModeEnabled() {
-        return devModeProperties.isEnabled();
+        return devModeProperties.effectiveEnabled(devModeEnvironment);
     }
 
     @Override
     public List<PluginDevProjectInfo> devModeProjects() {
         return devModeProjectsInternal().stream()
-                .map(project -> new PluginDevProjectInfo(project.getCode().trim(),
-                        project.classesDir().toString(),
-                        project.resolvedFrontendDist().toString(),
-                        project.isAutoCompile()))
+                .map(entry -> toDevProjectInfo(entry.project(), entry.source()))
                 .toList();
+    }
+
+    @Override
+    public List<PluginDevProjectInfo> managedDevProjects() {
+        return devProjectCatalog.projects().stream()
+                .map(entry -> toDevProjectInfo(entry.project(), entry.source()))
+                .toList();
+    }
+
+    @Override
+    public String hostRunMode() {
+        return devModeEnvironment.hostRunMode();
+    }
+
+    @Override
+    public boolean devModeAutoDetected() {
+        return devModeProperties.autoDetected();
+    }
+
+    @Override
+    public String devProjectStoreFile() {
+        return devProjectCatalog.storeFile().toString();
+    }
+
+    @Override
+    public PluginDevProjectInfo registerDevProject(String code, String path, String frontendDist,
+                                                   boolean autoCompile, String compileCommand) {
+        PluginDevModeProperties.DevProject project = new PluginDevModeProperties.DevProject();
+        project.setCode(StringUtils.hasText(code) ? code.trim() : null);
+        project.setPath(path);
+        project.setFrontendDist(frontendDist);
+        project.setAutoCompile(autoCompile);
+        if (StringUtils.hasText(compileCommand)) {
+            project.setCompileCommand(compileCommand.trim());
+        }
+        PluginDevModeProperties.DevProject saved = devProjectCatalog.add(project);
+        return toDevProjectInfo(saved, PluginDevProjectSource.FILE);
+    }
+
+    @Override
+    public void removeDevProject(String code) {
+        devProjectCatalog.remove(code);
+    }
+
+    private PluginDevProjectInfo toDevProjectInfo(PluginDevModeProperties.DevProject project,
+                                                  PluginDevProjectSource source) {
+        Path root = Path.of(project.getPath()).toAbsolutePath().normalize();
+        return new PluginDevProjectInfo(project.getCode().trim(),
+                root.toString(),
+                project.resolvedFrontendDist().toString(),
+                project.isAutoCompile(),
+                source,
+                Files.isDirectory(root),
+                Files.isDirectory(project.classesDir()),
+                Files.isRegularFile(project.classesDir().resolve("plugin.yml"))
+                        || Files.isRegularFile(root.resolve("src").resolve("main")
+                        .resolve("resources").resolve("plugin.yml")));
     }
 
     @Override

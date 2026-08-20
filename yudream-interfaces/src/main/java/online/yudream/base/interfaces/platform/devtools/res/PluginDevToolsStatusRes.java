@@ -26,6 +26,13 @@ public class PluginDevToolsStatusRes implements Serializable {
     private boolean devModeEnabled;
     private boolean traceEnabled;
 
+    /** 宿主运行形态：SOURCE / JAR */
+    private String hostRunMode;
+    /** 开发模式生效值是否来自自动检测 */
+    private boolean devModeAuto;
+    /** 面板维护的开发项目清单文件绝对路径 */
+    private String devProjectStoreFile;
+
     @Builder.Default
     private List<PluginDevProjectInfo> devProjects = new ArrayList<>();
 

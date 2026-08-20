@@ -5,9 +5,9 @@ import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.infra.platform.plugin.service.PluginDevModeProperties;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -29,32 +29,41 @@ import java.util.stream.Stream;
 /**
  * 插件开发模式监听器：轮询插件源码仓的 src/main/java、target/classes 与前端 dist 产物，
  * Java 变化按需触发编译，类产物变化触发宿主热重载，前端产物变化通知调试抽屉重挂载远程模块。
- * 仅限本地开发，由 yudream.platform.plugin.dev-mode.enabled 显式开启。
+ * 仅限本地开发；enabled 未显式配置时按宿主运行形态自动判定（源码运行自动开启），
+ * 因此不能用 ConditionalOnProperty 硬门控，改在启动时按生效值决定是否起监听线程。
  */
 @Slf4j
 @Component
-@ConditionalOnProperty(prefix = "yudream.platform.plugin.dev-mode", name = "enabled", havingValue = "true")
 public class PluginDevModeWatcher {
 
     private static final long MISSING = -1;
 
     private final PluginDevModeProperties properties;
+    private final PluginDevProjectCatalog catalog;
+    private final DevModeEnvironment environment;
     private final ApplicationEventPublisher eventPublisher;
     private final Map<String, WatchState> states = new ConcurrentHashMap<>();
     private ScheduledExecutorService executor;
 
-    public PluginDevModeWatcher(PluginDevModeProperties properties, ApplicationEventPublisher eventPublisher) {
+    public PluginDevModeWatcher(PluginDevModeProperties properties, PluginDevProjectCatalog catalog,
+                                DevModeEnvironment environment, ApplicationEventPublisher eventPublisher) {
         this.properties = properties;
+        this.catalog = catalog;
+        this.environment = environment;
         this.eventPublisher = eventPublisher;
     }
 
     @PostConstruct
     void start() {
-        List<PluginDevModeProperties.DevProject> projects = properties.getProjects() == null
-                ? List.of() : properties.getProjects();
-        log.warn("插件开发模式已启用：监听 {} 个源码项目并自动热重载，请勿在生产环境开启", projects.size());
-        for (PluginDevModeProperties.DevProject project : projects) {
-            log.warn("插件开发模式项目：{} -> {}", project.getCode(), project.getPath());
+        if (!properties.effectiveEnabled(environment)) {
+            return;
+        }
+        List<PluginDevProjectCatalog.CatalogEntry> projects = catalog.projects();
+        String gate = properties.autoDetected() ? "自动检测：源码运行" : "配置开启";
+        log.warn("插件开发模式已启用（{}）：监听 {} 个源码项目并自动热重载，请勿在生产环境开启", gate, projects.size());
+        for (PluginDevProjectCatalog.CatalogEntry entry : projects) {
+            log.warn("插件开发模式项目：{} -> {}（{}）", entry.project().getCode(), entry.project().getPath(),
+                    entry.source() == PluginDevProjectSource.FILE ? "面板登记" : "配置文件");
         }
         executor = Executors.newSingleThreadScheduledExecutor(
                 Thread.ofVirtual().name("plugin-dev-watcher", 0).factory());
@@ -79,7 +88,15 @@ public class PluginDevModeWatcher {
 
     private void poll() {
         long now = System.currentTimeMillis();
-        for (PluginDevModeProperties.DevProject project : properties.getProjects()) {
+        List<PluginDevModeProperties.DevProject> projects = catalog.projects().stream()
+                .map(PluginDevProjectCatalog.CatalogEntry::project)
+                .toList();
+        // 目录册中已移除的项目不再监听，避免陈旧状态滞留
+        states.keySet().retainAll(projects.stream()
+                .map(PluginDevModeProperties.DevProject::getCode)
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.toSet()));
+        for (PluginDevModeProperties.DevProject project : projects) {
             if (project == null || !StringUtils.hasText(project.getCode()) || !StringUtils.hasText(project.getPath())) {
                 continue;
             }

@@ -1,6 +1,7 @@
 package online.yudream.base.interfaces.platform.devtools.assembler;
 
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceSummaryDTO;
@@ -13,6 +14,7 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
+import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceSummaryRes;
@@ -31,6 +33,19 @@ import java.util.Locale;
 public final class PluginDevToolsWebAssembler {
 
     private PluginDevToolsWebAssembler() {
+    }
+
+    public static PluginDevProjectSaveCmd toCmd(PluginDevProjectSaveRequest request) {
+        PluginDevProjectSaveCmd cmd = new PluginDevProjectSaveCmd();
+        if (request == null) {
+            return cmd;
+        }
+        cmd.setPath(request.getPath());
+        cmd.setCode(request.getCode());
+        cmd.setFrontendDist(request.getFrontendDist());
+        cmd.setAutoCompile(request.getAutoCompile());
+        cmd.setCompileCommand(request.getCompileCommand());
+        return cmd;
     }
 
     public static PluginCommandTestCmd toCmd(PluginCommandTestRequest request) {
@@ -56,6 +71,9 @@ public final class PluginDevToolsWebAssembler {
         return PluginDevToolsStatusRes.builder()
                 .devModeEnabled(dto.isDevModeEnabled())
                 .traceEnabled(dto.isTraceEnabled())
+                .hostRunMode(dto.getHostRunMode())
+                .devModeAuto(dto.isDevModeAuto())
+                .devProjectStoreFile(dto.getDevProjectStoreFile())
                 .devProjects(dto.getDevProjects())
                 .installedCount(dto.getInstalledCount())
                 .loadedCount(dto.getLoadedCount())
