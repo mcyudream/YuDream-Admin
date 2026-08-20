@@ -321,7 +321,6 @@ function exportTrace() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px 0;
 }
 
 .traces-filters {

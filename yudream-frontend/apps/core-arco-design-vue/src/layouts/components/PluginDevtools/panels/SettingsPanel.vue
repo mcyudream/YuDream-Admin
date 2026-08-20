@@ -4,8 +4,9 @@ import type { PluginDevProject } from '@/api/modules/platform-devtools'
 const store = usePluginDevtoolsStore()
 const toast = useFaToast()
 
-// 悬浮按钮位置重置由外层 index.vue 注入（位置状态在 useDevtoolsFab 内）
+// 悬浮按钮/浮窗位置重置由外层 index.vue 注入（位置状态在 useDevtoolsFab / useDevtoolsPanel 内）
 const resetFab = inject<(() => Promise<void>) | undefined>('pluginDevtoolsFabReset', undefined)
+const resetPanel = inject<(() => void) | undefined>('pluginDevtoolsPanelReset', undefined)
 
 onMounted(() => {
   store.loadDevProjects()
@@ -97,6 +98,14 @@ async function handleResetFab() {
   await resetFab()
   toast.success('悬浮按钮位置已重置')
 }
+
+function handleResetPanel() {
+  if (!resetPanel) {
+    return
+  }
+  resetPanel()
+  toast.success('浮窗位置与尺寸已重置')
+}
 </script>
 
 <template>
@@ -175,10 +184,23 @@ async function handleResetFab() {
           重置位置
         </FaButton>
       </div>
+      <div class="pref-row">
+        <div class="pref-row__main">
+          <div class="pref-row__title">
+            浮窗位置与尺寸
+          </div>
+          <div class="pref-row__desc">
+            拖动标题栏移动浮窗，拖右下角缩放；重置可恢复默认居中位置与尺寸
+          </div>
+        </div>
+        <FaButton variant="outline" size="sm" :disabled="!resetPanel" @click="handleResetPanel">
+          重置浮窗
+        </FaButton>
+      </div>
     </div>
 
     <!-- 登记开发项目 -->
-    <FaModal v-model="addOpen" title="登记开发项目" :footer="false" content-class="sm:max-w-lg">
+    <FaModal v-model="addOpen" title="登记开发项目" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
       <div class="add-form">
         <div class="add-form__field">
           <span class="add-form__label">插件模块根目录（必填，宿主机绝对路径）</span>
@@ -218,7 +240,6 @@ async function handleResetFab() {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 12px;
   min-width: 0;
 }
 

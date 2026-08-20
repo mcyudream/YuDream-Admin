@@ -241,6 +241,16 @@ export function useDevtoolsFab(fabRef: Ref<HTMLElement | null>) {
     window.addEventListener('resize', handleViewportResize, { passive: true })
   })
 
+  // 可见性异步就绪（鉴权/状态请求完成后 v-if 才渲染按钮）时重新量测并锚定
+  watch(fabRef, async (el) => {
+    if (!el || !state.initialized) {
+      return
+    }
+    await nextTick()
+    syncMetrics()
+    applyAnchoredPosition()
+  })
+
   onUnmounted(() => {
     window.removeEventListener('resize', handleViewportResize)
   })
