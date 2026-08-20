@@ -27,6 +27,27 @@ export interface PluginDevProjectSavePayload {
   autoCompile: boolean
 }
 
+/** 宿主机目录条目（domain PluginDevDirectoryEntryInfo 的 JSON 镜像），仅目录与插件模块标记 */
+export interface PluginDevDirectoryEntry {
+  name: string
+  path: string
+  hasPom: boolean
+  hasPluginYml: boolean
+  inferredCode?: string
+}
+
+/** 宿主机目录浏览结果（domain PluginDevDirectoryBrowseInfo 的 JSON 镜像）；rootList 时 path 为空、entries 为盘符根 */
+export interface PluginDevDirectoryBrowse {
+  path: string
+  parent?: string
+  rootList: boolean
+  /** 当前目录自身的模块标记，供「选择当前目录」时提示 */
+  hasPom: boolean
+  hasPluginYml: boolean
+  inferredCode?: string
+  entries: PluginDevDirectoryEntry[]
+}
+
 export interface PluginDevtoolsStatus {
   devModeEnabled: boolean
   traceEnabled: boolean
@@ -321,6 +342,10 @@ export default {
 
   removeDevProject: (code: string) =>
     systemClient.delete<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/dev-projects/${code}`),
+
+  /** 浏览宿主机目录：path 为空时返回盘符根列表；仅列目录，不读文件内容 */
+  browseDevDirectories: (path?: string) =>
+    systemClient.get<unknown, ApiResponse<PluginDevDirectoryBrowse>>('api/platform/plugin-devtools/dev-projects/browse', { params: { path } }),
 
   commandTest: (code: string, data: PluginCommandTestPayload) =>
     systemClient.post<unknown, ApiResponse<PluginCommandTestResult>>(`api/platform/plugin-devtools/plugins/${code}/command-test`, data),

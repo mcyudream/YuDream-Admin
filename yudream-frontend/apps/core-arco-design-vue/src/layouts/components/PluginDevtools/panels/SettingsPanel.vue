@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PluginDevProject } from '@/api/modules/platform-devtools'
+import DevProjectDirectoryBrowser from './DevProjectDirectoryBrowser.vue'
 
 const store = usePluginDevtoolsStore()
 const toast = useFaToast()
@@ -53,6 +54,7 @@ async function remove(project: PluginDevProject) {
 // ---------- 添加开发项目 ----------
 const addOpen = ref(false)
 const addSaving = ref(false)
+const browseOpen = ref(false)
 const addForm = ref({
   path: '',
   code: '',
@@ -88,6 +90,13 @@ async function submitAdd() {
   }
   finally {
     addSaving.value = false
+  }
+}
+
+function handleBrowseSelect(path: string, inferredCode?: string) {
+  addForm.value.path = path
+  if (inferredCode && !addForm.value.code.trim()) {
+    addForm.value.code = inferredCode
   }
 }
 
@@ -204,7 +213,13 @@ function handleResetPanel() {
       <div class="add-form">
         <div class="add-form__field">
           <span class="add-form__label">插件模块根目录（必填，宿主机绝对路径）</span>
-          <FaInput v-model="addForm.path" placeholder="D:/code/yudream-admin-plugins/yudream-plugin-xxx" />
+          <div class="add-form__path">
+            <FaInput v-model="addForm.path" class="flex-1" placeholder="D:/code/yudream-admin-plugins/yudream-plugin-xxx" />
+            <FaButton variant="outline" @click="browseOpen = true">
+              <FaIcon name="i-ri:folder-open-line" />
+              浏览
+            </FaButton>
+          </div>
         </div>
         <div class="add-form__field">
           <span class="add-form__label">插件编码（留空则从 plugin.yml 自动推断）</span>
@@ -232,6 +247,9 @@ function handleResetPanel() {
         </div>
       </div>
     </FaModal>
+
+    <!-- 宿主机目录浏览（嵌套于登记表单之上） -->
+    <DevProjectDirectoryBrowser v-model="browseOpen" @select="handleBrowseSelect" />
   </div>
 </template>
 
@@ -370,6 +388,12 @@ function handleResetPanel() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.add-form__path {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .add-form__label {
