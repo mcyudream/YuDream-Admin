@@ -73,10 +73,11 @@ yudream:
 
 面板本体是 **Teleport 到 `body` 的非模态置顶浮窗**（对齐 Vue DevTools 的独立窗口心智），不是抽屉：无遮罩、不锁页面滚动，浮窗打开时系统照常可用；`z-index` 2100，高于侧栏（1010）、顶栏（1020）与宿主模态（2000），浮窗内登记项目模态为 2200，宿主目录选择模态为 2300，任何页面、任何情况下浮窗及其嵌套交互都在最上层。拖标题栏移动、拖右下角手柄缩放，几何 `{left, top, width, height}` 持久化在 localStorage（`pluginDevtoolsPanel`），视口缩放自动 clamp 回可见区；「设置」页可重置位置与尺寸。全局快捷键 `Ctrl/Cmd+Shift+D` 开关浮窗（`Esc` 关闭，输入框与已开模态内不劫持）。
 
-浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分五页，激活页持久化（`pluginDevtoolsPage`）：
+浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分六页，激活页持久化（`pluginDevtoolsPage`）：
 
 - **概览**：状态卡（开发模式含自动检测标记与宿主运行方式、Agent 追踪、插件计数、开发项目清单文件路径）+ 最近动态 feed（插件生命周期 LOAD/ENABLE/DISABLE/UNLOAD/RELOAD/COMPILE/FRONTEND_RELOAD 事件流，取最新 20 条，可清空）。
 - **插件**：主从结构——先插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献，按开发关注度排序：HTTP 端点、QQ 指令、前端模块与路由 → 权限、菜单 → AI 工具、声明式 Agent → 平台能力、消息交互、首页卡片、服务导出。端点测试器与指令模拟器在插件详情内，开发模式插件可一键「重载」。
+- **QQ 沙盒**：构造真实 Milky `message_receive` 事件，按生产顺序执行消息交互、`/`/`!` 指令解析、QQ 绑定与角色权限，并支持 @机器人、额外提及、回复消息和随机触发三态（真实概率/强制命中/强制未命中）。真实策略连接只用于读取群策略与历史种子；所有回复写入 synthetic connection 时间线，不发送到 QQ。
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
 - **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
@@ -102,6 +103,11 @@ yudream:
 | `DELETE /dev-projects/{code}` | manage | 移除 FILE 源项目（CONFIG 源需在 yml 中移除） |
 | `GET /agent-traces` | view | 追踪分页查询（source/plugin/状态过滤） |
 | `GET /agent-traces/{traceId}` | view | 单条追踪全步骤 |
+| `GET /qq-sandbox/presets` | view | QQ 沙盒消息形态预设 |
+| `POST /qq-sandbox/sessions` | manage | 创建会话；指定已启用插件、真实策略连接、群/用户/机器人 ID 与随机三态 |
+| `POST /qq-sandbox/sessions/{sessionId}/messages` | manage | 注入合成 Milky 消息（文本、@、reply、发送者均使用 string ID） |
+| `GET /qq-sandbox/sessions/{sessionId}/events/stream` | view | SSE：标准化、触发/阻断、Agent、工具和捕获回复时间线 |
+| `DELETE /qq-sandbox/sessions/{sessionId}` | manage | 结束会话并清理内存覆盖层与异步执行 |
 | `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件 |
 | `GET /agent-traces/stream` | view | SSE：步骤增量 + trace 完成事件 |
 
@@ -114,6 +120,20 @@ yudream:
 ### 5.2 端点测试器
 
 「插件」页详情内 HTTP 端点行的「试用」按钮在面板内发起真实请求：自动提取路径参数、支持查询字符串与请求体，展示真实 HTTP 状态码、耗时与响应原文。该请求走原生 fetch 而非 axios 封装，因此非 2xx 不会被拦截器吞掉；若目标端点启用了接口加密，响应体可能是密文，面板按原文展示。
+
+### 5.3 QQ 群聊沙盒
+
+沙盒使用 `devtools-sandbox:{sessionId}` 作为 synthetic connection。生产 Milky 入站和沙盒共用标准化、interaction filter、指令 grammar、QQ 绑定与权限分发代码；所选真实 `policyConnectionId` 必须存在且启用，只用于 ai-chatbot 读取对应群策略、短期历史种子和语义记忆 namespace，不能作为发送连接。
+
+安全仿真边界：
+
+- `messaging()` / `messagingRaw()` 输出只写会话时间线，synthetic connection 永不查询 `MilkyConnectionRepo` 或调用 `MilkyApiGateway`；插件异步回调也可按 connection 重新附着会话。
+- 插件文档写删落会话内存覆盖层；生产文档只读。语义记忆允许真实检索，index/delete 只记录不落库。
+- Agent 所有工具统一经过风险闸门；未声明风险默认 `WRITE`，沙盒只允许显式 `READ` 且仍满足原权限/触发/allowedToolNames 的工具。Python 与未知工具默认拒绝。
+- ai-chatbot 沙盒历史、活动、画像、限流计数与语义索引不写生产数据；`agent_pending` 到 terminal 诊断使 HTTP 等待回复捕获完成。120 秒超时会取消已跟踪模型/工具 future 并拒绝迟到写入。
+- 会话进程内保存，空闲 30 分钟过期、最多 200 个；删除、超时、过期或 LRU 淘汰都会清理 listener、覆盖层与 pending future。
+
+沙盒隔离宿主官方 SPI/Agent/消息/文档/语义记忆边界；第三方插件自行创建线程且不调用 synthetic messaging/diagnostic，或自行创建网络/文件客户端的行为无法在不修改 SPI/JVM 沙箱的前提下透明拦截，调试时仍应只加载可信插件。
 
 ## 6. Agent 执行链路追踪
 

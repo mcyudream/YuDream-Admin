@@ -8,11 +8,12 @@ import type {
   PluginDevtoolsStatus,
   PluginLifecycleEventPayload,
 } from '@/api/modules/platform-devtools'
+import type { QqSandboxLaunchPayload } from '@/api/modules/platform-devtools-qq-sandbox'
 import apiDevtools from '@/api/modules/platform-devtools'
 import eventBus from '@/utils/eventBus'
 
 /** 抽屉页面标识，与左侧竖向导航一一对应 */
-export type PluginDevtoolsPage = 'overview' | 'plugins' | 'traces' | 'audit' | 'settings'
+export type PluginDevtoolsPage = 'overview' | 'plugins' | 'qq-sandbox' | 'traces' | 'audit' | 'settings'
 
 /** 正在执行（或刚结束）的 Agent 追踪，经 SSE 增量累积，完成落库后可从详情接口取全量 */
 export interface LiveTrace {
@@ -32,7 +33,7 @@ const LIFECYCLE_EVENT_LIMIT = 100
 const LIVE_TRACE_LIMIT = 20
 const RECONNECT_DELAY_MS = 3_000
 const ACTIVE_PAGE_STORAGE_KEY = 'pluginDevtoolsPage'
-const DEVTOOLS_PAGES: PluginDevtoolsPage[] = ['overview', 'plugins', 'traces', 'audit', 'settings']
+const DEVTOOLS_PAGES: PluginDevtoolsPage[] = ['overview', 'plugins', 'qq-sandbox', 'traces', 'audit', 'settings']
 
 function hydrateActivePage(): PluginDevtoolsPage {
   const saved = localStorage.getItem(ACTIVE_PAGE_STORAGE_KEY) as PluginDevtoolsPage | null
@@ -46,6 +47,7 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   const drawerOpen = ref(false)
   const unreadCount = ref(0)
   const activePage = ref<PluginDevtoolsPage>(hydrateActivePage())
+  const qqSandboxLaunch = ref<QqSandboxLaunchPayload | null>(null)
 
   const devProjects = ref<PluginDevProject[]>([])
   const devProjectsLoading = ref(false)
@@ -79,6 +81,19 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   function setActivePage(page: PluginDevtoolsPage) {
     activePage.value = page
     localStorage.setItem(ACTIVE_PAGE_STORAGE_KEY, page)
+  }
+
+  function launchQqSandbox(payload: QqSandboxLaunchPayload) {
+    qqSandboxLaunch.value = payload
+    setActivePage('qq-sandbox')
+    openDrawer()
+    eventBus.emit('plugin-devtools:qq-sandbox-launch', payload)
+  }
+
+  function consumeQqSandboxLaunch() {
+    const payload = qqSandboxLaunch.value
+    qqSandboxLaunch.value = null
+    return payload
   }
 
   /** 面板登记与配置文件合并后的开发项目清单（不受开发模式开关过滤） */
@@ -305,6 +320,8 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     traceConnected,
     loadStatus,
     setActivePage,
+    launchQqSandbox,
+    consumeQqSandboxLaunch,
     loadDevProjects,
     addDevProject,
     removeDevProject,

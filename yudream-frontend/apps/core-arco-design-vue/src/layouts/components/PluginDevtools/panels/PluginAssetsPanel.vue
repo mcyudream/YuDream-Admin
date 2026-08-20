@@ -11,6 +11,7 @@ import apiDevtools from '@/api/modules/platform-devtools'
 import AssetSection from './AssetSection.vue'
 
 const toast = useFaToast()
+const devtoolsStore = usePluginDevtoolsStore()
 
 const plugins = ref<PluginDevPlugin[]>([])
 const pluginsLoading = ref(false)
@@ -69,6 +70,7 @@ function statusVariant(plugin: PluginDevPlugin) {
 }
 
 const reloading = ref(false)
+
 async function reloadPlugin(code?: string) {
   const target = code || selectedCode.value
   if (!target) {
@@ -158,6 +160,17 @@ function openCommandTest(command: PluginCommandAsset) {
   commandContent.value = ''
   commandResult.value = null
   commandTestOpen.value = true
+}
+
+function launchQqSandbox(command?: string) {
+  if (!selectedCode.value) {
+    return
+  }
+  devtoolsStore.launchQqSandbox({
+    pluginCode: selectedCode.value,
+    command,
+    content: command ? `/${command} ` : undefined,
+  })
 }
 
 async function runCommandTest() {
@@ -270,7 +283,10 @@ async function runCommandTest() {
       </div>
       <template v-else-if="assets">
         <AssetSection title="HTTP 端点" icon="i-ri:global-line" :count="assets.httpEndpoints.length" default-open>
-          <div v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`" class="asset-row">
+          <div
+            v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`"
+            class="asset-row"
+          >
             <FaTag variant="outline" class="method-tag text-xs">
               {{ endpoint.method }}
             </FaTag>
@@ -287,10 +303,17 @@ async function runCommandTest() {
         <AssetSection title="QQ 指令" icon="i-ri:terminal-box-line" :count="assets.commands.length" default-open>
           <div v-for="command in assets.commands" :key="command.code" class="asset-row">
             <span class="text-xs font-mono">/{{ command.command }}</span>
-            <span class="asset-row__main text-xs">{{ command.name }}{{ command.description ? `：${command.description}` : '' }}</span>
-            <FaButton variant="ghost" size="sm" class="shrink-0" @click="openCommandTest(command)">
-              模拟触发
-            </FaButton>
+            <span class="asset-row__main text-xs">{{
+              command.name
+            }}{{ command.description ? `：${command.description}` : '' }}</span>
+            <div class="asset-row__actions">
+              <FaButton variant="ghost" size="sm" class="shrink-0" @click="launchQqSandbox(command.command)">
+                QQ沙盒
+              </FaButton>
+              <FaButton variant="ghost" size="sm" class="shrink-0" @click="openCommandTest(command)">
+                模拟触发
+              </FaButton>
+            </div>
           </div>
           <div v-if="!assets.commands.length" class="asset-empty">
             该插件未注册指令
@@ -344,7 +367,10 @@ async function runCommandTest() {
           <div v-for="tool in assets.aiTools" :key="tool.name" class="asset-row">
             <span class="text-xs font-mono">{{ tool.name }}</span>
             <span class="asset-row__main text-xs">{{ tool.title || tool.description }}</span>
-            <FaTag v-if="tool.risk" :variant="tool.risk === 'HIGH' ? 'destructive' : 'secondary'" class="text-xs shrink-0">
+            <FaTag
+              v-if="tool.risk" :variant="tool.risk === 'HIGH' ? 'destructive' : 'secondary'"
+              class="text-xs shrink-0"
+            >
               {{ tool.risk }}
             </FaTag>
           </div>
@@ -387,6 +413,9 @@ async function runCommandTest() {
             </FaTag>
             <span class="asset-row__main text-xs">{{ interaction.eventTypes.join('、') }}</span>
             <span v-if="interaction.command" class="text-xs font-mono shrink-0">/{{ interaction.command }}</span>
+            <FaButton variant="ghost" size="sm" class="shrink-0" @click="launchQqSandbox(interaction.command)">
+              QQ沙盒
+            </FaButton>
           </div>
           <div v-if="!assets.messageInteractions.length" class="asset-empty">
             无消息交互
@@ -613,6 +642,13 @@ async function runCommandTest() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.asset-row__actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .method-tag {

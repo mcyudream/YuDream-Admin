@@ -4,6 +4,7 @@ import AgentTracesPanel from './panels/AgentTracesPanel.vue'
 import AuditPanel from './panels/AuditPanel.vue'
 import OverviewPanel from './panels/OverviewPanel.vue'
 import PluginAssetsPanel from './panels/PluginAssetsPanel.vue'
+import QqSandboxPanel from './panels/QqSandboxPanel.vue'
 import SettingsPanel from './panels/SettingsPanel.vue'
 import { useDevtoolsFab } from './useDevtoolsFab'
 import { useDevtoolsPanel } from './useDevtoolsPanel'
@@ -98,6 +99,7 @@ useEventListener('keydown', (event: KeyboardEvent) => {
 const navItems = [
   { label: '概览', value: 'overview', icon: 'i-ri:dashboard-line' },
   { label: '插件', value: 'plugins', icon: 'i-ri:puzzle-2-line' },
+  { label: 'QQ沙盒', value: 'qq-sandbox', icon: 'i-ri:qq-line' },
   { label: '追踪', value: 'traces', icon: 'i-ri:node-tree' },
   { label: '审查', value: 'audit', icon: 'i-ri:search-eye-line' },
   { label: '设置', value: 'settings', icon: 'i-ri:settings-3-line' },
@@ -133,7 +135,10 @@ onMounted(async () => {
           <span v-if="store.unreadCount" class="devtools-fab__dot" />
         </div>
         <FaBadge v-else :value="store.unreadCount" variant="destructive">
-          <FaTooltip text="插件开发者工具（可拖拽，拖到屏幕边缘收起）" :side="fabState.side === 'right' ? 'left' : 'right'">
+          <FaTooltip
+            text="插件开发者工具（可拖拽，拖到屏幕边缘收起）"
+            :side="fabState.side === 'right' ? 'left' : 'right'"
+          >
             <FaButton
               size="icon-lg"
               class="rounded-full select-none shadow-md touch-none"
@@ -217,6 +222,9 @@ onMounted(async () => {
               </div>
               <div v-show="store.activePage === 'plugins'" class="devtools-page">
                 <PluginAssetsPanel />
+              </div>
+              <div v-show="store.activePage === 'qq-sandbox'" class="devtools-page">
+                <QqSandboxPanel />
               </div>
               <div v-show="store.activePage === 'traces'" class="devtools-page">
                 <AgentTracesPanel />
@@ -437,14 +445,12 @@ onMounted(async () => {
   height: 18px;
   cursor: nwse-resize;
   touch-action: none;
-  background:
-    linear-gradient(135deg, transparent 55%, var(--color-fill-4, var(--color-border-3)) 55%, var(--color-fill-4, var(--color-border-3)) 64%, transparent 64%, transparent 72%, var(--color-fill-4, var(--color-border-3)) 72%, var(--color-fill-4, var(--color-border-3)) 81%, transparent 81%);
+  background: linear-gradient(135deg, transparent 55%, var(--color-fill-4, var(--color-border-3)) 55%, var(--color-fill-4, var(--color-border-3)) 64%, transparent 64%, transparent 72%, var(--color-fill-4, var(--color-border-3)) 72%, var(--color-fill-4, var(--color-border-3)) 81%, transparent 81%);
   border-bottom-right-radius: 10px;
 }
 
 .devtools-panel__resize--active {
-  background:
-    linear-gradient(135deg, transparent 55%, var(--color-text-3) 55%, var(--color-text-3) 64%, transparent 64%, transparent 72%, var(--color-text-3) 72%, var(--color-text-3) 81%, transparent 81%);
+  background: linear-gradient(135deg, transparent 55%, var(--color-text-3) 55%, var(--color-text-3) 64%, transparent 64%, transparent 72%, var(--color-text-3) 72%, var(--color-text-3) 81%, transparent 81%);
 }
 
 @media (max-width: 640px) {

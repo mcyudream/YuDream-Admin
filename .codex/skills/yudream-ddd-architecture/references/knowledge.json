@@ -215,6 +215,14 @@
     {
       "key": "plugin-mongo-version-writeback",
       "text": "MongoTemplate.save 会递增 dataobj 的 @Version，但不会更新原领域实例；仓储 save 若允许调用方继续复用该实例，必须像 WikiSourceRepoImpl 一样把 saved.getVersion() 回写领域对象。插件 dev reload 会对同一 PluginModule 先保存 unloaded 再保存 enabled，漏回写会稳定触发 OptimisticLockingFailureException。"
+    },
+    {
+      "key": "qq-sandbox-synthetic-connection",
+      "text": "QQ 插件安全沙盒复用生产 Milky 标准化/指令/绑定/权限分发，但 PluginEvent.connectionId 必须使用 devtools-sandbox:{sessionId} 截获 messaging/raw；真实 policyConnectionId 只读加载群策略与历史。插件异步回调可按 synthetic connection 从会话仓重新附着 context；会话 overlay 必须跨多轮保持，并在删除/超时/30 分钟 TTL/LRU 淘汰时取消 pending future 和完整清理。"
+    },
+    {
+      "key": "agent-tool-risk-default-write",
+      "text": "Agent 安全仿真的工具闸门必须覆盖 system/plugin/runtime/Python 和模型 native callback 的统一执行入口；AiAgentTool 未声明风险时默认 WRITE，只有显式 READ 且通过原权限、触发和 allowedToolNames 校验的工具可在沙盒运行。仅在 PluginAgentToolGateway 拦插件工具会漏掉宿主写工具。"
     }
   ],
   "utilities": [
