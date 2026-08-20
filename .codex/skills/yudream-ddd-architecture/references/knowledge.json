@@ -203,6 +203,14 @@
     {
       "key": "plugin-inline-message-attachments",
       "text": "QQ/plugin rich replies should let the answer model select image candidates with an indexed placeholder such as [[wiki-image:1]]. The plugin resolves only selected placeholders to attachments, and the messaging adapter interleaves text/image segments by attachment title instead of appending every retrieved image."
+    },
+    {
+      "key": "devtools-run-mode-autodetect",
+      "text": "插件开发模式 enabled 为三态：不配置时由 DevModeEnvironment 按网关类代码源位置自动判定（CodeSource location 是目录=源码运行开启，JAR 关闭），显式配置优先；@ConditionalOnProperty 感知不到自动值，watcher 只能在 @PostConstruct 按 effectiveEnabled 决定是否起线程。"
+    },
+    {
+      "key": "devtools-project-catalog",
+      "text": "开发项目双来源由 PluginDevProjectCatalog 合并：CONFIG(yml，面板只读) 优先于 FILE(面板登记，默认 plugins/dev-projects.json，gitignore 已覆盖，tmp+原子 move 写入，mtime 缓存自动重载)；同 code 冲突 CONFIG 胜并告警；面板增删仅作用 FILE；登记已启用插件立即发 PluginDevReloadRequested 热切；code 留空从 target/classes 或 src/main/resources 的 plugin.yml 推断。"
     }
   ],
   "utilities": [
@@ -236,7 +244,7 @@
     },
     {
       "key": "plugin-devmode-reload",
-      "text": "插件开发模式：dev-mode.enabled + projects 配置目录加载（target/classes + target/plugin-dev/lib），watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令"
+      "text": "插件开发模式：dev-mode.enabled 三态（缺省自动检测源码/JAR 运行）+ 开发项目双来源（yml CONFIG 优先 / 面板登记 FILE 持久化到 plugins/dev-projects.json），从 target/classes + target/plugin-dev/lib 加载，watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令；面板端点 GET/POST/DELETE /api/platform/plugin-devtools/dev-projects[/{code}] 管理 FILE 源项目。"
     }
   ],
   "pitfalls": [
@@ -299,6 +307,10 @@
     {
       "key": "eslint-full-fix-mass-rewrite",
       "text": "根 pnpm lint:eslint 带 --fix 且 eslint.config.js 变更会使缓存失效，全量跑会批量改写无关文件（含 pnpm catalog fixer 加条目）；验证规则用 npx eslint <paths> --no-cache 定向跑，提交前 git checkout 还原非本项文件"
+    },
+    {
+      "key": "bash-heredoc-backslash-fold",
+      "text": "ZCode Bash 工具通道会把命令串里的双反斜杠折叠成单反斜杠：heredoc 内 python 正则写 r'\\\\u...' 实际收到 '\\u...' 触发 re.PatternError，连普通字符串字面量里的 \\\\u 也会被折成 \\u 报 unicodeescape SyntaxError；构造含反斜杠文本一律用 chr(92) 拼接，命令串中不出现字面反斜杠+u。"
     }
   ]
 }
