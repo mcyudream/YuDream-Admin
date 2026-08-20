@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.platform.devtools.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.devtools.service.PluginDevToolsAppService;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -78,6 +79,12 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看开发模式项目", module = "开发者工具", desc = "查看配置与面板登记的开发模式插件项目及目录状态")
     public Result<List<PluginDevProjectInfo>> devProjects() {
         return Result.ok(devToolsAppService.devProjects());
+    }
+
+    @GetMapping("/dev-projects/browse")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "浏览宿主机目录", module = "开发者工具", desc = "登记开发项目时浏览宿主机目录，仅列子目录与插件模块标记，不读取文件内容")
+    public Result<PluginDevDirectoryBrowseInfo> browseDevDirectories(@RequestParam(required = false) String path) {
+        return Result.ok(devToolsAppService.browseDevDirectories(path));
     }
 
     @PostMapping("/dev-projects")

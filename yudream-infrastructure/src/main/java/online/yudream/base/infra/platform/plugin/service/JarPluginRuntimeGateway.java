@@ -24,11 +24,13 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginMessageInteractio
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.infra.platform.plugin.devmode.DevModeEnvironment;
+import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrowser;
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -83,6 +85,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final ApplicationEventPublisher eventPublisher;
     private final PluginDevModeProperties devModeProperties;
     private final PluginDevProjectCatalog devProjectCatalog;
+    private final PluginDevDirectoryBrowser devDirectoryBrowser;
     private final DevModeEnvironment devModeEnvironment;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
@@ -202,6 +205,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     @Override
     public void removeDevProject(String code) {
         devProjectCatalog.remove(code);
+    }
+
+    @Override
+    public PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
+        return devDirectoryBrowser.browse(path);
     }
 
     private PluginDevProjectInfo toDevProjectInfo(PluginDevModeProperties.DevProject project,

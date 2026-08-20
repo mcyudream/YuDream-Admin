@@ -11,6 +11,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 
@@ -100,6 +101,14 @@ public interface PluginRuntimeGateway {
     /** 移除面板登记的开发模式项目；配置文件登记的项目不可移除。 */
     default void removeDevProject(String code) {
         throw new UnsupportedOperationException("当前运行时网关不支持开发项目管理");
+    }
+
+    /**
+     * 浏览宿主机目录，供面板登记开发项目时选择插件源码目录。
+     * 仅列子目录与插件模块标记，不读取文件内容；path 为空时返回文件系统根（Windows 盘符）。
+     */
+    default PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
+        throw new UnsupportedOperationException("当前运行时网关不支持目录浏览");
     }
 
     /**

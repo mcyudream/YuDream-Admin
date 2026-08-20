@@ -17,8 +17,8 @@ import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
-import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -122,6 +122,11 @@ public class PluginDevToolsAppService {
     public void removeDevProject(String code) {
         requireCode(code);
         runtimeGateway.removeDevProject(code.trim());
+    }
+
+    /** 浏览宿主机目录供登记开发项目时选择插件源码目录；仅列目录与模块标记，不读文件内容。 */
+    public PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
+        return runtimeGateway.browseDevDirectories(path);
     }
 
     private void requireCode(String code) {
