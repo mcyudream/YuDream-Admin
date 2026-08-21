@@ -223,6 +223,14 @@
     {
       "key": "agent-tool-risk-default-write",
       "text": "Agent 安全仿真的工具闸门必须覆盖 system/plugin/runtime/Python 和模型 native callback 的统一执行入口；AiAgentTool 未声明风险时默认 WRITE，只有显式 READ 且通过原权限、触发和 allowedToolNames 校验的工具可在沙盒运行。仅在 PluginAgentToolGateway 拦插件工具会漏掉宿主写工具。"
+    },
+    {
+      "key": "qq-sandbox-identity-simulation",
+      "text": "沙盒身份模拟走 SandboxAwarePluginUserService（@Primary 装饰 PluginUserFrameworkService），仅 QqSandboxExecutionScope 激活时改写：forceUnbound 让 findByQq 返回 empty，simulateRoles 三态（null=真实角色/空列表=无角色/code 列表=指定角色，未知 code 入 unknownRoles）；沙盒内 bindQqOnce/create/updateProfile 抛 BizException。每次改写追加 sandbox/identity.override 时间线事件；presets 端点下发发送人与角色选项，前端默认发送人取首个已绑定系统用户。"
+    },
+    {
+      "key": "qq-sandbox-error-diagnostics",
+      "text": "沙盒错误可观测性三层兜底：QqSandboxDiagnostics.appendError 把指令（command.error）/交互处理器（handler.error）/分发（dispatch.error）逃逸异常以 {errorType,message,stackTrace} 入时间线；QqSandboxLogAppender（logback）在作用域激活时桥接插件包 online.yudream.base.plugin.* 的 WARN/ERROR 日志为 log.warn/log.error 事件并从 logger 名推导插件编码。插件自己 catch 且不记日志的异常宿主不可见——面板时间线标签显示 action 并按 errorType/stackTrace 标红，检查器堆栈单独渲染。"
     }
   ],
   "utilities": [

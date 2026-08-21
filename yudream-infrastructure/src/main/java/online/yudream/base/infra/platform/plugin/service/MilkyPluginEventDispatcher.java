@@ -112,6 +112,11 @@ public class MilkyPluginEventDispatcher {
             runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
                     permission -> allowed(user, permission));
         } catch (Exception error) {
+            java.util.Map<String, Object> context = new java.util.LinkedHashMap<>();
+            context.put("connectionId", connectionId);
+            context.put("eventType", event == null ? null : event.eventType());
+            context.put("messageSeq", messageSeq);
+            QqSandboxDiagnostics.appendError("dispatch.error", null, error, context);
             log.error("Milky plugin event dispatch failed: connectionId={}, eventType={}, selfId={}, messageSeq={}, errorType={}",
                     connectionId, event == null ? null : event.eventType(), event == null ? null : event.selfId(),
                     messageSeq, error.getClass().getSimpleName());

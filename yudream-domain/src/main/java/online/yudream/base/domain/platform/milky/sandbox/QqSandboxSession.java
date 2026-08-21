@@ -19,6 +19,9 @@ public final class QqSandboxSession {
     private final String channelId;
     private final String scene;
     private final QqSandboxRandomMode randomMode;
+    // 身份模拟开关：forceUnbound 强制插件侧视为未绑定；simulateRoles 为 null 走真实角色，空列表表示无角色
+    private final boolean forceUnbound;
+    private final List<String> simulateRoles;
     private final long timeoutMillis;
     private final Instant createdAt;
     private volatile Instant lastAccessAt;
@@ -32,7 +35,7 @@ public final class QqSandboxSession {
 
     private QqSandboxSession(String id, String pluginCode, String policyConnectionId, String selfId, String userId,
                              String nickname, String channelId, String scene, QqSandboxRandomMode randomMode,
-                             long timeoutMillis, Instant createdAt) {
+                             boolean forceUnbound, List<String> simulateRoles, long timeoutMillis, Instant createdAt) {
         this.id = id;
         this.pluginCode = pluginCode;
         this.connectionId = "devtools-sandbox:" + id;
@@ -43,17 +46,30 @@ public final class QqSandboxSession {
         this.channelId = channelId;
         this.scene = scene;
         this.randomMode = randomMode;
+        this.forceUnbound = forceUnbound;
+        this.simulateRoles = simulateRoles;
         this.timeoutMillis = timeoutMillis;
         this.createdAt = createdAt;
         this.lastAccessAt = createdAt;
     }
 
+    /** 插件范围为空串时表示不限定插件，沙盒消息广播给全部已启用插件，与真实 QQ 群一致 */
+    public static final String ALL_PLUGINS = "";
+
     public static QqSandboxSession create(String id, String pluginCode, String policyConnectionId, String selfId,
                                           String userId, String nickname, String channelId, String scene,
                                           QqSandboxRandomMode randomMode, long timeoutMillis, Instant createdAt) {
-        return new QqSandboxSession(require(id), require(pluginCode), policyConnectionId, require(selfId), require(userId),
+        return create(id, pluginCode, policyConnectionId, selfId, userId, nickname, channelId, scene, randomMode,
+                false, null, timeoutMillis, createdAt);
+    }
+
+    public static QqSandboxSession create(String id, String pluginCode, String policyConnectionId, String selfId,
+                                          String userId, String nickname, String channelId, String scene,
+                                          QqSandboxRandomMode randomMode, boolean forceUnbound, List<String> simulateRoles,
+                                          long timeoutMillis, Instant createdAt) {
+        return new QqSandboxSession(require(id), normalizePluginCode(pluginCode), policyConnectionId, require(selfId), require(userId),
                 normalizeNickname(nickname), require(channelId), normalizeScene(scene),
-                randomMode == null ? QqSandboxRandomMode.REAL : randomMode,
+                randomMode == null ? QqSandboxRandomMode.REAL : randomMode, forceUnbound, normalizeSimulateRoles(simulateRoles),
                 Math.min(Math.max(timeoutMillis, 1L), 120_000L), createdAt == null ? Instant.now() : createdAt);
     }
 
@@ -146,6 +162,15 @@ public final class QqSandboxSession {
         return randomMode;
     }
 
+    public boolean forceUnbound() {
+        return forceUnbound;
+    }
+
+    /** null 表示走真实角色；空列表表示模拟无角色；否则为模拟角色 code 列表 */
+    public List<String> simulateRoles() {
+        return simulateRoles;
+    }
+
     public long timeoutMillis() {
         return timeoutMillis;
     }
@@ -205,6 +230,11 @@ public final class QqSandboxSession {
         return text;
     }
 
+    private static String normalizePluginCode(String pluginCode) {
+        if (pluginCode == null || pluginCode.isBlank()) return ALL_PLUGINS;
+        return pluginCode.trim();
+    }
+
     private static String normalizeNickname(String nickname) {
         if (nickname == null || nickname.isBlank()) return null;
         return nickname.trim();
@@ -216,5 +246,15 @@ public final class QqSandboxSession {
             throw new IllegalArgumentException("QQ 沙箱会话类型无效");
         }
         return value;
+    }
+
+    private static List<String> normalizeSimulateRoles(List<String> simulateRoles) {
+        if (simulateRoles == null) return null;
+        List<String> normalized = simulateRoles.stream()
+                .filter(role -> role != null && !role.isBlank())
+                .map(String::trim)
+                .distinct()
+                .toList();
+        return List.copyOf(normalized);
     }
 }

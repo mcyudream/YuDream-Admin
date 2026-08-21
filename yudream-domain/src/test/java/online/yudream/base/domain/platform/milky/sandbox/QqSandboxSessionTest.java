@@ -25,6 +25,17 @@ class QqSandboxSessionTest {
     }
 
     @Test
+    void blankPluginCodeMeansAllPlugins() {
+        QqSandboxSession nullCode = QqSandboxSession.create("session-all-1", null, "1", "10001", "20002",
+                null, "30003", "group", QqSandboxRandomMode.REAL, 3_000L, Instant.parse("2026-08-20T00:00:00Z"));
+        QqSandboxSession blankCode = QqSandboxSession.create("session-all-2", "  ", "1", "10001", "20002",
+                null, "30003", "group", QqSandboxRandomMode.REAL, 3_000L, Instant.parse("2026-08-20T00:00:00Z"));
+
+        assertEquals(QqSandboxSession.ALL_PLUGINS, nullCode.pluginCode());
+        assertEquals(QqSandboxSession.ALL_PLUGINS, blankCode.pluginCode());
+    }
+
+    @Test
     void trimsAndKeepsNickname() {
         QqSandboxSession session = QqSandboxSession.create("session-nick", "demo", "1", "10001", "20002",
                 "  沙盒用户  ", "30003", "group", QqSandboxRandomMode.REAL, 3_000L,

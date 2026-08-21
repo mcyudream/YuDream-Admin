@@ -2,15 +2,25 @@ package online.yudream.base.interfaces.platform.milky.assembler;
 
 import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxCreateCmd;
 import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxMessageCmd;
+import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxConnectionOptionDTO;
+import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxGroupsDTO;
+import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxRoleOptionDTO;
+import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxSenderOptionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxSessionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxTimelineEventDTO;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxRandomMode;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxTimelineEvent;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxCreateRequest;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxMessageRequest;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxConnectionOptionRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxEventRes;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxGroupOptionRes;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxGroupsRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxMessageRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxPresetRes;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxPresetsRes;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxRoleOptionRes;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxSenderOptionRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxSessionRes;
 
 import java.time.Instant;
@@ -27,7 +37,8 @@ public final class QqSandboxWebAssembler {
         String channelId = group ? requireGroupId(request.groupId()) : request.userId();
         return new QqSandboxCreateCmd(request.pluginCode(), request.policyConnectionId(), botId, request.userId(),
                 request.nickname(), channelId,
-                group ? "group" : "private", randomMode(request), 120_000L);
+                group ? "group" : "private", randomMode(request),
+                Boolean.TRUE.equals(request.forceUnbound()), request.simulateRoles(), 120_000L);
     }
 
     public static QqSandboxMessageCmd toCmd(QqSandboxMessageRequest request) {
@@ -66,12 +77,34 @@ public final class QqSandboxWebAssembler {
                 event.timestamp(), event.payload());
     }
 
-    public static List<QqSandboxPresetRes> presets() {
-        return List.of(
+    public static QqSandboxPresetsRes presets(List<QqSandboxConnectionOptionDTO> connections,
+                                              List<QqSandboxSenderOptionDTO> senders,
+                                              List<QqSandboxRoleOptionDTO> roles) {
+        List<QqSandboxConnectionOptionRes> connectionOptions = connections == null ? List.of()
+                : connections.stream()
+                .map(item -> new QqSandboxConnectionOptionRes(item.connectionId(), item.name()))
+                .toList();
+        List<QqSandboxSenderOptionRes> senderOptions = senders == null ? List.of()
+                : senders.stream()
+                .map(item -> new QqSandboxSenderOptionRes(item.qq(), item.nickname(), item.userId(), item.roles()))
+                .toList();
+        List<QqSandboxRoleOptionRes> roleOptions = roles == null ? List.of()
+                : roles.stream()
+                .map(item -> new QqSandboxRoleOptionRes(item.code(), item.name()))
+                .toList();
+        return new QqSandboxPresetsRes(List.of(
                 preset("group-real", "群聊真实随机", "GROUP", "REAL", "/帮助"),
                 preset("group-force-hit", "群聊强制触发", "GROUP", "FORCE_HIT", "@机器人 你好"),
                 preset("group-force-miss", "群聊强制不触发", "GROUP", "FORCE_MISS", "普通群聊消息"),
-                preset("private-real", "私聊真实随机", "PRIVATE", "REAL", "/帮助"));
+                preset("private-real", "私聊真实随机", "PRIVATE", "REAL", "/帮助")), connectionOptions, senderOptions, roleOptions);
+    }
+
+    public static QqSandboxGroupsRes groups(QqSandboxGroupsDTO dto) {
+        List<QqSandboxGroupOptionRes> groupOptions = dto.groups() == null ? List.of()
+                : dto.groups().stream()
+                .map(item -> new QqSandboxGroupOptionRes(item.groupId(), item.groupName()))
+                .toList();
+        return new QqSandboxGroupsRes(dto.selfId(), groupOptions);
     }
 
     private static QqSandboxPresetRes preset(String code, String name, String conversationType,

@@ -25,7 +25,8 @@ public class QqSandboxRuntimeGatewayImpl implements QqSandboxRuntimeGateway {
 
     @Override
     public CompletionStage<Void> dispatch(QqSandboxSession session, QqSandboxMessageCmd message) {
-        if (!pluginRuntime.enabled(session.pluginCode())) {
+        // 空插件范围表示对标真实群聊广播给全部已启用插件，无需做单插件启用校验
+        if (!session.pluginCode().isEmpty() && !pluginRuntime.enabled(session.pluginCode())) {
             throw new BizException("QQ 沙箱目标插件不存在或未启用");
         }
         try (QqSandboxExecutionScope ignored = QqSandboxExecutionScope.open(session)) {
