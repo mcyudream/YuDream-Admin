@@ -62,6 +62,11 @@ export function ensurePublicPluginRoutes(router: Router): Promise<string[]> {
   return publicPluginRoutesPromise
 }
 
+/** 插件热重载后清空 memo，下次未登录导航时按新 manifest 重新注册（已存在的路由由 hasRoute 跳过） */
+export function resetPublicPluginRoutes() {
+  publicPluginRoutesPromise = null
+}
+
 async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
   const res = await apiPlugin.frontendManifest()
   const paths: string[] = []
