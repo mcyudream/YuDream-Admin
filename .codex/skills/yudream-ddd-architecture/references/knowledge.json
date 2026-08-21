@@ -265,6 +265,10 @@
     {
       "key": "plugin-devmode-reload",
       "text": "插件开发模式：dev-mode.enabled 三态（缺省自动检测源码/JAR 运行）+ 开发项目双来源（yml CONFIG 优先 / 面板登记 FILE 持久化到 plugins/dev-projects.json），从 target/classes + target/plugin-dev/lib 加载，watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令；面板端点 GET/POST/DELETE /api/platform/plugin-devtools/dev-projects[/{code}] 管理 FILE 源项目。浮窗 SSE 收到 RELOAD/FRONTEND_RELOAD 成功事件后除重挂载当前插件页外，还会防抖 refreshDynamicRoutes 重建动态路由与菜单（动态路由登录后只注册一次，不重建需手动刷新才能看到新插件菜单），并重置 publicAccess 公开路由 memo。"
+    },
+    {
+      "key": "plugin-devtools-log-stream",
+      "text": "开发者工具插件日志流：SystemLogQuery 增加 loggerPrefix 组件（startsWith 匹配），domain PluginLoggerPrefix.of(mainClass, code) 从 mainClass 截取 online.yudream.base.plugin. 根包后第一段（与 QqSandboxLogAppender 同一包约定），查不到插件或未遵循约定兜底 根包+code。PluginDevToolsAppService.recentPluginLogs/subscribePluginLogs 经 SystemLogRepo 过滤（默认 100、上限 500），接口层 PluginLogStreamBridge 每连接一条订阅（GET /api/platform/plugin-devtools/plugins/{code}/logs[/stream]），前端 usePluginLogs 组合 REST 最近清单 + fetch 手工解析 SSE，按 sequence 去重、500 条封顶、暂停期缓存缓冲区。"
     }
   ],
   "pitfalls": [

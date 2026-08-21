@@ -15,17 +15,25 @@ import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
+import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
+import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginLoggerPrefix;
+import online.yudream.base.domain.system.log.model.SystemLogEntry;
+import online.yudream.base.domain.system.log.model.SystemLogQuery;
+import online.yudream.base.domain.system.log.repo.SystemLogRepo;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,11 +44,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PluginDevToolsAppService {
 
+    private static final int PLUGIN_LOG_DEFAULT_LIMIT = 100;
+    private static final int PLUGIN_LOG_MAX_LIMIT = 500;
+
     private final PluginRuntimeGateway runtimeGateway;
     private final PluginAppService pluginAppService;
     private final AgentExecutionTraceRepo traceRepo;
     private final AgentTraceProperties traceProperties;
     private final ApplicationEventPublisher eventPublisher;
+    private final PluginModuleRepo pluginModuleRepo;
+    private final SystemLogRepo systemLogRepo;
 
     public PluginDevToolsStatusDTO status() {
         List<PluginModuleDTO> installed = pluginAppService.listInstalled();
@@ -127,6 +140,50 @@ public class PluginDevToolsAppService {
     /** 浏览宿主机目录供登记开发项目时选择插件源码目录；仅列目录与模块标记，不读文件内容。 */
     public PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
         return runtimeGateway.browseDevDirectories(path);
+    }
+
+    /** 查询指定插件最近的运行日志，按插件 logger 前缀过滤。 */
+    public List<SystemLogEntry> recentPluginLogs(String code, String level, String keyword, Integer limit) {
+        String prefix = pluginLoggerPrefix(requireCodeTrimmed(code));
+        return systemLogRepo.recent(new SystemLogQuery(
+                StringUtils.hasText(level) ? level.trim() : null,
+                Set.of(),
+                StringUtils.hasText(keyword) ? keyword.trim() : null,
+                resolvePluginLogLimit(limit),
+                prefix));
+    }
+
+    /** 订阅指定插件的实时日志流，返回的句柄关闭后取消订阅。 */
+    public AutoCloseable subscribePluginLogs(String code, String level, Consumer<SystemLogEntry> consumer) {
+        String prefix = pluginLoggerPrefix(requireCodeTrimmed(code));
+        return systemLogRepo.subscribe(new SystemLogQuery(
+                StringUtils.hasText(level) ? level.trim() : null,
+                Set.of(),
+                null,
+                PLUGIN_LOG_DEFAULT_LIMIT,
+                prefix), consumer);
+    }
+
+    private int resolvePluginLogLimit(Integer limit) {
+        if (limit == null || limit <= 0) {
+            return PLUGIN_LOG_DEFAULT_LIMIT;
+        }
+        return Math.min(limit, PLUGIN_LOG_MAX_LIMIT);
+    }
+
+    /**
+     * 推导插件 logger 前缀：优先从 mainClass 截取包段，查不到插件或未遵循包约定时兜底 根包+编码。
+     */
+    private String pluginLoggerPrefix(String code) {
+        return pluginModuleRepo.findByCode(code)
+                .map(PluginModule::getMainClass)
+                .map(main -> PluginLoggerPrefix.of(main, code))
+                .orElse(PluginLoggerPrefix.of(null, code));
+    }
+
+    private String requireCodeTrimmed(String code) {
+        requireCode(code);
+        return code.trim();
     }
 
     private void requireCode(String code) {
