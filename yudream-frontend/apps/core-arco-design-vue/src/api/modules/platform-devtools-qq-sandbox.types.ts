@@ -21,23 +21,62 @@ export interface QqSandboxPreset {
   randomMode?: QqSandboxRandomMode
 }
 
+export interface QqSandboxConnectionOption {
+  connectionId: string
+  name: string
+}
+
+export interface QqSandboxSenderOption {
+  qq: string
+  nickname: string
+  userId: string
+  roles: string[]
+}
+
+export interface QqSandboxGroupOption {
+  groupId: string
+  groupName: string
+}
+
+export interface QqSandboxGroups {
+  selfId?: string
+  groups: QqSandboxGroupOption[]
+}
+
+export interface QqSandboxRoleOption {
+  code: string
+  name: string
+}
+
+export interface QqSandboxPresets {
+  presets: QqSandboxPreset[]
+  connections: QqSandboxConnectionOption[]
+  senders: QqSandboxSenderOption[]
+  roles: QqSandboxRoleOption[]
+}
+
 export interface QqSandboxCreateSessionPayload {
   presetCode?: string
   conversationType: QqSandboxConversationType
-  pluginCode: string
+  /** 留空表示不限定插件，消息广播给全部已启用插件，与真实 QQ 群一致 */
+  pluginCode?: string
   policyConnectionId?: string
   botId?: string
   userId: string
   groupId?: string
   nickname?: string
   randomMode: QqSandboxRandomMode
+  /** 开启后插件侧判定为未绑定 QQ，用于验证未绑定分支 */
+  forceUnbound?: boolean
+  /** 角色模拟：null/缺省走真实角色，空数组表示无角色，否则为角色 code 列表 */
+  simulateRoles?: string[] | null
 }
 
 export interface QqSandboxSession {
   sessionId: string
   status: QqSandboxSessionStatus
   conversationType: QqSandboxConversationType
-  pluginCode: string
+  pluginCode?: string
   policyConnectionId?: string
   botId?: string
   userId: string

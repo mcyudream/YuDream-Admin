@@ -76,8 +76,8 @@ yudream:
 浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分六页，激活页持久化（`pluginDevtoolsPage`）：
 
 - **概览**：状态卡（开发模式含自动检测标记与宿主运行方式、Agent 追踪、插件计数、开发项目清单文件路径）+ 最近动态 feed（插件生命周期 LOAD/ENABLE/DISABLE/UNLOAD/RELOAD/COMPILE/FRONTEND_RELOAD 事件流，取最新 20 条，可清空）。
-- **插件**：主从结构——先插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献，按开发关注度排序：HTTP 端点、QQ 指令、前端模块与路由 → 权限、菜单 → AI 工具、声明式 Agent → 平台能力、消息交互、首页卡片、服务导出。端点测试器与指令模拟器在插件详情内，开发模式插件可一键「重载」。
-- **QQ 沙盒**：构造真实 Milky `message_receive` 事件，按生产顺序执行消息交互、`/`/`!` 指令解析、QQ 绑定与角色权限，并支持 @机器人、额外提及、回复消息和随机触发三态（真实概率/强制命中/强制未命中）。真实策略连接只用于读取群策略与历史种子；所有回复写入 synthetic connection 时间线，不发送到 QQ。
+- **插件**：主从结构——先插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献，按开发关注度排序：HTTP 端点、QQ 指令、前端模块与路由 → 权限、菜单 → AI 工具、声明式 Agent → 平台能力、消息交互、首页卡片、服务导出。端点测试器与指令模拟器在插件详情内，开发模式插件可一键「重载」。未启用（LOADED/ERROR）的插件详情提供「启用」按钮，且资产区展示未启用横幅——重载不会自动启用从未启用过的插件，贡献全 0 属预期。
+- **QQ 沙盒**：构造真实 Milky `message_receive` 事件，按生产顺序执行消息交互、`/`/`!` 指令解析、QQ 绑定与角色权限，并支持 @机器人、额外提及、回复消息和随机触发三态（真实概率/强制命中/强制未命中）。支持身份模拟（模拟未绑定 QQ、模拟角色）；插件处理器逃逸异常与插件 WARN/ERROR 日志以结构化负载进时间线。真实策略连接只用于读取群策略与历史种子；所有回复写入 synthetic connection 时间线，不发送到 QQ。
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
 - **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
@@ -103,8 +103,8 @@ yudream:
 | `DELETE /dev-projects/{code}` | manage | 移除 FILE 源项目（CONFIG 源需在 yml 中移除） |
 | `GET /agent-traces` | view | 追踪分页查询（source/plugin/状态过滤） |
 | `GET /agent-traces/{traceId}` | view | 单条追踪全步骤 |
-| `GET /qq-sandbox/presets` | view | QQ 沙盒消息形态预设 |
-| `POST /qq-sandbox/sessions` | manage | 创建会话；指定已启用插件、真实策略连接、群/用户/机器人 ID 与随机三态 |
+| `GET /qq-sandbox/presets` | view | QQ 沙盒消息形态预设（发送人、群、角色选项） |
+| `POST /qq-sandbox/sessions` | manage | 创建会话；指定已启用插件、真实策略连接、群/用户/机器人 ID、随机三态与身份模拟（forceUnbound/simulateRoles） |
 | `POST /qq-sandbox/sessions/{sessionId}/messages` | manage | 注入合成 Milky 消息（文本、@、reply、发送者均使用 string ID） |
 | `GET /qq-sandbox/sessions/{sessionId}/events/stream` | view | SSE：标准化、触发/阻断、Agent、工具和捕获回复时间线 |
 | `DELETE /qq-sandbox/sessions/{sessionId}` | manage | 结束会话并清理内存覆盖层与异步执行 |
@@ -132,6 +132,16 @@ yudream:
 - Agent 所有工具统一经过风险闸门；未声明风险默认 `WRITE`，沙盒只允许显式 `READ` 且仍满足原权限/触发/allowedToolNames 的工具。Python 与未知工具默认拒绝。
 - ai-chatbot 沙盒历史、活动、画像、限流计数与语义索引不写生产数据；`agent_pending` 到 terminal 诊断使 HTTP 等待回复捕获完成。120 秒超时会取消已跟踪模型/工具 future 并拒绝迟到写入。
 - 会话进程内保存，空闲 30 分钟过期、最多 200 个；删除、超时、过期或 LRU 淘汰都会清理 listener、覆盖层与 pending future。
+
+身份模拟（`SandboxAwarePluginUserService`，`@Primary` 装饰 SPI 实现，仅沙盒作用域激活时改写）：
+
+- 会话创建可携带 `forceUnbound`（插件侧 `findByQq` 判定为未绑定）与 `simulateRoles` 三态：`null` 走发送人真实角色（默认）、空列表为无角色、非空为角色 code 列表（未知 code 记入 `unknownRoles`）；角色选项经 `GET /qq-sandbox/presets` 下发。面板默认发送人取首个已绑定系统用户，避免默认匿名导致插件全被「未绑定」阻断。
+- 沙盒会话内 `bindQqOnce`/`create`/`updateProfile` 抛 `BizException` 禁止写系统用户数据；每次身份改写追加 `sandbox/identity.override` 时间线事件。
+
+错误诊断可观测性：
+
+- 指令处理器（`command.error`）、消息交互处理器（`handler.error`）、分发链路（`dispatch.error`）逃逸出的异常都会以 `{errorType, message, stackTrace}` 结构化负载追加到会话时间线（`QqSandboxDiagnostics`），检查器单独渲染堆栈。
+- `QqSandboxLogAppender`（logback appender）在沙盒作用域激活时把插件包 `online.yudream.base.plugin.*` 的 WARN/ERROR 日志（含堆栈）桥接为 `log/log.warn|log.error` 时间线事件，并从 logger 名推导插件编码归属；插件 catch 后只记日志的失败也能定位。生产链路作用域为空，直接透传。
 
 沙盒隔离宿主官方 SPI/Agent/消息/文档/语义记忆边界；第三方插件自行创建线程且不调用 synthetic messaging/diagnostic，或自行创建网络/文件客户端的行为无法在不修改 SPI/JVM 沙箱的前提下透明拦截，调试时仍应只加载可信插件。
 

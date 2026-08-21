@@ -223,7 +223,7 @@ onMounted(async () => {
               <div v-show="store.activePage === 'plugins'" class="devtools-page">
                 <PluginAssetsPanel />
               </div>
-              <div v-show="store.activePage === 'qq-sandbox'" class="devtools-page">
+              <div v-show="store.activePage === 'qq-sandbox'" class="devtools-page devtools-page--fill">
                 <QqSandboxPanel />
               </div>
               <div v-show="store.activePage === 'traces'" class="devtools-page">
@@ -437,6 +437,11 @@ onMounted(async () => {
   min-height: 100%;
 }
 
+/* 沙盒等工作台页填满浮窗可用高度，由页内区域自行滚动 */
+.devtools-page--fill {
+  height: 100%;
+}
+
 .devtools-panel__resize {
   position: absolute;
   right: 0;
@@ -457,5 +462,12 @@ onMounted(async () => {
   .devtools-panel__shortcut {
     display: none;
   }
+}
+</style>
+
+<style>
+/* 浮窗 z-index 2100 高于 FaSelect 下拉默认的 z-2000，下拉 teleport 到 body 后会被浮窗挡住导致"点击无反应"，这里显式抬升 */
+body [data-slot="select-content"] {
+  z-index: 2200;
 }
 </style>
