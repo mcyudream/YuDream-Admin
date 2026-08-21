@@ -9,6 +9,7 @@ import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
+import online.yudream.base.application.platform.devtools.dto.PluginDisablePreviewDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
@@ -30,6 +31,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,6 +81,94 @@ public class PluginDevToolsAppService {
         return pluginAppService.listInstalled().stream()
                 .map(module -> PluginDevToolsAssembler.toPluginDTO(module, devProjects.get(module.getCode())))
                 .toList();
+    }
+
+    /**
+     * 禁用级联预览：禁用/卸载前列出受影响的依赖方。
+     * 启用/加载状态以运行时网关为准（与禁用、卸载的实际校验同源），持久化状态可能滞后。
+     */
+    public PluginDisablePreviewDTO disablePreview(String code) {
+        String target = requireCodeTrimmed(code);
+        List<PluginModuleDTO> modules = pluginAppService.listInstalled();
+        Map<String, PluginModuleDTO> byCode = modules.stream()
+                .collect(Collectors.toMap(PluginModuleDTO::getCode, Function.identity(), (left, right) -> left));
+        if (!byCode.containsKey(target)) {
+            throw new BizException("插件不存在：" + target);
+        }
+        // 仅沿硬依赖边扩张：硬依赖方不先禁用，运行时就会拒绝禁用目标
+        Set<String> hardClosure = new HashSet<>();
+        hardClosure.add(target);
+        boolean changed;
+        do {
+            changed = false;
+            for (PluginModuleDTO module : modules) {
+                if (!hardClosure.contains(module.getCode())
+                        && dependencies(module.getDependencies()).stream().anyMatch(hardClosure::contains)) {
+                    changed |= hardClosure.add(module.getCode());
+                }
+            }
+        } while (changed);
+        Map<String, List<String>> hardDependents = new HashMap<>();
+        for (String member : hardClosure) {
+            for (String dependency : dependencies(byCode.get(member).getDependencies())) {
+                if (hardClosure.contains(dependency)) {
+                    hardDependents.computeIfAbsent(dependency, key -> new ArrayList<>()).add(member);
+                }
+            }
+        }
+        Map<String, Integer> depthMemo = new HashMap<>();
+        // 按依赖方深度升序：链路上无更外层依赖方的插件在前，顺次禁用后即可禁用目标
+        List<String> blockers = hardClosure.stream()
+                .filter(member -> !member.equals(target) && runtimeGateway.enabled(member))
+                .sorted(Comparator
+                        .comparingInt((String member) -> hardDependentDepth(member, hardDependents, depthMemo, new HashSet<>()))
+                        .thenComparing(Function.identity()))
+                .toList();
+        List<String> softDependents = modules.stream()
+                .filter(module -> !module.getCode().equals(target)
+                        && dependencies(module.getSoftDependencies()).contains(target)
+                        && runtimeGateway.enabled(module.getCode()))
+                .map(PluginModuleDTO::getCode)
+                .sorted()
+                .toList();
+        List<String> unloadBlockers = modules.stream()
+                .filter(module -> !module.getCode().equals(target)
+                        && (dependencies(module.getDependencies()).contains(target)
+                                || dependencies(module.getSoftDependencies()).contains(target))
+                        && runtimeGateway.loaded(module.getCode()))
+                .map(PluginModuleDTO::getCode)
+                .sorted()
+                .toList();
+        return PluginDisablePreviewDTO.builder()
+                .code(target)
+                .blockers(blockers)
+                .softDependents(softDependents)
+                .unloadBlockers(unloadBlockers)
+                .build();
+    }
+
+    /** 依赖方在硬依赖链上的深度：闭包内没有更外层依赖方时为 0，用于建议禁用顺序。 */
+    private static int hardDependentDepth(String code, Map<String, List<String>> hardDependents,
+                                          Map<String, Integer> memo, Set<String> visiting) {
+        Integer cached = memo.get(code);
+        if (cached != null) {
+            return cached;
+        }
+        // 硬依赖环在启用流程已被拒绝，这里仅作防御
+        if (!visiting.add(code)) {
+            return 0;
+        }
+        int depth = 0;
+        for (String dependent : hardDependents.getOrDefault(code, List.of())) {
+            depth = Math.max(depth, 1 + hardDependentDepth(dependent, hardDependents, memo, visiting));
+        }
+        visiting.remove(code);
+        memo.put(code, depth);
+        return depth;
+    }
+
+    private static List<String> dependencies(List<String> dependencies) {
+        return dependencies == null ? List.of() : dependencies;
     }
 
     public PluginRuntimeAssetsDTO assets(String code) {

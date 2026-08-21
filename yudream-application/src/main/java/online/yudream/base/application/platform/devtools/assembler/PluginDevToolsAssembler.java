@@ -30,6 +30,8 @@ public final class PluginDevToolsAssembler {
                 .enabled(module.isEnabled())
                 .devMode(devProject != null)
                 .devProject(devProject)
+                .dependencies(module.getDependencies() == null ? List.of() : List.copyOf(module.getDependencies()))
+                .softDependencies(module.getSoftDependencies() == null ? List.of() : List.copyOf(module.getSoftDependencies()))
                 .build();
     }
 
