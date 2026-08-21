@@ -269,6 +269,10 @@
     {
       "key": "plugin-devtools-log-stream",
       "text": "开发者工具插件日志流：SystemLogQuery 增加 loggerPrefix 组件（startsWith 匹配），domain PluginLoggerPrefix.of(mainClass, code) 从 mainClass 截取 online.yudream.base.plugin. 根包后第一段（与 QqSandboxLogAppender 同一包约定），查不到插件或未遵循约定兜底 根包+code。PluginDevToolsAppService.recentPluginLogs/subscribePluginLogs 经 SystemLogRepo 过滤（默认 100、上限 500），接口层 PluginLogStreamBridge 每连接一条订阅（GET /api/platform/plugin-devtools/plugins/{code}/logs[/stream]），前端 usePluginLogs 组合 REST 最近清单 + fetch 手工解析 SSE，按 sequence 去重、500 条封顶、暂停期缓存缓冲区。"
+    },
+    {
+      "key": "qq-sandbox-cases",
+      "text": "QQ 沙盒用例保存/回放：domain QqSandboxCase(id/name/description/createdAt/updatedAt/setup/steps) + QqSandboxCaseSetup（镜像 QqSandboxCreateCmd 去 timeoutMillis）+ QqSandboxCaseStep（镜像 QqSandboxMessageCmd 去 clientMessageId）+ QqSandboxCaseRepo 端口；infra JsonQqSandboxCaseRepo 落 plugins/qq-sandbox-cases.json（resolvedStoreFile().resolveSibling，tmp+ATOMIC_MOVE 与 PluginDevProjectCatalog 同约定）。QqSandboxAppService.saveCase/replayCase：回放=create(setup) + 逐条同步 send()，会话时间线追加 session/case.replay 事件。端点 GET/POST/DELETE /qq-sandbox/cases 与 POST /cases/{id}/replay；前端从 message.synthetic 事件 payload 收割步骤、从 preferences 组装 setup，replay 返回会话接入既有 connectStream。"
     }
   ],
   "pitfalls": [

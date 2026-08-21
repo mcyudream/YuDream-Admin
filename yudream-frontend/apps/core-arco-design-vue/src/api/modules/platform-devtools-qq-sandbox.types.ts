@@ -123,3 +123,45 @@ export interface QqSandboxLaunchPayload {
   command?: string
   content?: string
 }
+
+export interface QqSandboxCaseSetup {
+  /** 留空表示不限定插件 */
+  pluginCode?: string
+  policyConnectionId: string
+  selfId?: string
+  userId: string
+  nickname?: string
+  channelId: string
+  scene: 'group' | 'private' | string
+  randomMode: QqSandboxRandomMode
+  forceUnbound: boolean
+  /** null/缺省走真实角色，空数组表示无角色 */
+  simulateRoles?: string[] | null
+}
+
+export interface QqSandboxCaseStep {
+  senderId?: string
+  nickname?: string
+  content: string
+  mentionSelf: boolean
+  mentions: string[]
+  replyMessageId?: string
+}
+
+export interface QqSandboxCase {
+  id: string
+  name: string
+  description?: string
+  createdAt?: string
+  updatedAt?: string
+  setup: QqSandboxCaseSetup
+  steps: QqSandboxCaseStep[]
+}
+
+export interface QqSandboxCaseSavePayload {
+  id?: string
+  name: string
+  description?: string
+  setup: QqSandboxCaseSetup
+  steps: QqSandboxCaseStep[]
+}

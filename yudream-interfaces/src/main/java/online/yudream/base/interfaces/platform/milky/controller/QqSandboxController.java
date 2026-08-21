@@ -6,8 +6,10 @@ import online.yudream.base.application.platform.milky.sandbox.service.QqSandboxA
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.milky.assembler.QqSandboxWebAssembler;
+import online.yudream.base.interfaces.platform.milky.request.QqSandboxCaseSaveRequest;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxCreateRequest;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxMessageRequest;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxCaseRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxGroupsRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxMessageRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxPresetsRes;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/platform/plugin-devtools/qq-sandbox")
@@ -69,5 +73,30 @@ public class QqSandboxController {
     public Result<Void> delete(@PathVariable String sessionId) {
         appService.delete(sessionId);
         return Result.ok();
+    }
+
+    @GetMapping("/cases")
+    @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看 QQ 沙箱用例", module = "插件开发者工具", desc = "查看已保存的 QQ 沙箱用例")
+    public Result<List<QqSandboxCaseRes>> cases() {
+        return Result.ok(QqSandboxWebAssembler.toCaseResList(appService.listCases()));
+    }
+
+    @PostMapping("/cases")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "保存 QQ 沙箱用例", module = "插件开发者工具", desc = "保存或覆盖 QQ 沙箱用例")
+    public Result<QqSandboxCaseRes> saveCase(@Valid @RequestBody QqSandboxCaseSaveRequest request) {
+        return Result.ok(QqSandboxWebAssembler.toCaseRes(appService.saveCase(QqSandboxWebAssembler.toCmd(request))));
+    }
+
+    @DeleteMapping("/cases/{caseId}")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "删除 QQ 沙箱用例", module = "插件开发者工具", desc = "删除 QQ 沙箱用例")
+    public Result<Void> deleteCase(@PathVariable String caseId) {
+        appService.deleteCase(caseId);
+        return Result.ok();
+    }
+
+    @PostMapping("/cases/{caseId}/replay")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "回放 QQ 沙箱用例", module = "插件开发者工具", desc = "按用例新建会话并逐条回放消息")
+    public Result<QqSandboxSessionRes> replayCase(@PathVariable String caseId) {
+        return Result.ok(QqSandboxWebAssembler.toRes(appService.replayCase(caseId)));
     }
 }

@@ -2,8 +2,10 @@ package online.yudream.base.application.platform.milky.sandbox.service;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.milky.sandbox.assembler.QqSandboxAssembler;
+import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxCaseSaveCmd;
 import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxCreateCmd;
 import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxMessageCmd;
+import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxCaseDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxConnectionOptionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxGroupOptionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxGroupsDTO;
@@ -15,6 +17,9 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxCase;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxCaseRepo;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxCaseStep;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSessionRepo;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxTimelineEvent;
@@ -41,6 +46,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class QqSandboxAppService {
     private final QqSandboxSessionRepo sessions;
+    private final QqSandboxCaseRepo caseRepo;
     private final QqSandboxRuntimeGateway runtime;
     private final UserRepo userRepo;
     private final RoleRepo roleRepo;
@@ -201,6 +207,68 @@ public class QqSandboxAppService {
 
     public QqSandboxSessionDTO detail(String id) {
         return QqSandboxAssembler.toDTO(session(id));
+    }
+
+    public List<QqSandboxCaseDTO> listCases() {
+        return caseRepo.findAll().stream().map(QqSandboxAssembler::toCaseDTO).toList();
+    }
+
+    /** 保存或覆盖沙盒用例：id 为空新建，非空则保留原创建时间；name/步骤内容做兜底校验 */
+    public QqSandboxCaseDTO saveCase(QqSandboxCaseSaveCmd cmd) {
+        if (cmd == null || cmd.name() == null || cmd.name().isBlank()) {
+            throw new BizException("沙盒用例名称不能为空");
+        }
+        if (cmd.setup() == null) {
+            throw new BizException("沙盒用例缺少会话初始参数");
+        }
+        if (cmd.steps() == null || cmd.steps().isEmpty()) {
+            throw new BizException("沙盒用例至少包含一条消息步骤");
+        }
+        for (QqSandboxCaseStep step : cmd.steps()) {
+            if (step == null || step.content() == null || step.content().isBlank()) {
+                throw new BizException("沙盒用例存在内容为空的消息步骤");
+            }
+        }
+        Instant now = Instant.now();
+        Instant createdAt = now;
+        String id = cmd.id() == null || cmd.id().isBlank() ? UUID.randomUUID().toString() : cmd.id().trim();
+        if (cmd.id() != null && !cmd.id().isBlank()) {
+            QqSandboxCase existing = caseRepo.findById(id)
+                    .orElseThrow(() -> new BizException("沙盒用例不存在"));
+            createdAt = existing.createdAt();
+        }
+        QqSandboxCase sandboxCase = new QqSandboxCase(id, cmd.name().trim(), cmd.description(), createdAt, now,
+                cmd.setup(), cmd.steps());
+        caseRepo.save(sandboxCase);
+        return QqSandboxAssembler.toCaseDTO(sandboxCase);
+    }
+
+    public void deleteCase(String id) {
+        if (caseRepo.findById(id).isEmpty()) {
+            throw new BizException("沙盒用例不存在");
+        }
+        caseRepo.delete(id);
+    }
+
+    /**
+     * 一键回放用例：按保存的初始参数新建会话，再逐步同步发送保存的消息，
+     * 逐步执行保证时间线顺序与会话状态机语义与手工逐条发送完全一致。
+     */
+    public QqSandboxSessionDTO replayCase(String caseId) {
+        QqSandboxCase sandboxCase = caseRepo.findById(caseId)
+                .orElseThrow(() -> new BizException("沙盒用例不存在"));
+        QqSandboxSessionDTO session = create(QqSandboxAssembler.toCreateCmd(sandboxCase.setup()));
+        QqSandboxSession live = session(session.id());
+        Map<String, Object> replayPayload = new LinkedHashMap<>();
+        replayPayload.put("caseId", sandboxCase.id());
+        replayPayload.put("caseName", sandboxCase.name());
+        replayPayload.put("steps", sandboxCase.steps().size());
+        live.append("session", "case.replay", live.pluginCode(), replayPayload);
+        sessions.save(live);
+        for (QqSandboxCaseStep step : sandboxCase.steps()) {
+            send(session.id(), QqSandboxAssembler.toMessageCmd(step));
+        }
+        return detail(session.id());
     }
 
     public AutoCloseable subscribe(String id, Consumer<QqSandboxTimelineEvent> listener) {
