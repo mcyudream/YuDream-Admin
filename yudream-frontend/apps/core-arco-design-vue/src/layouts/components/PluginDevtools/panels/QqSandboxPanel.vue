@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  QqSandboxCase,
+  QqSandboxCaseSetup,
   QqSandboxConversationType,
   QqSandboxEvent,
   QqSandboxLaunchPayload,
@@ -425,6 +427,137 @@ function handleComposerKeydown(event: KeyboardEvent) {
     void send()
   }
 }
+
+const showCasesModal = ref(false)
+const showSaveCaseModal = ref(false)
+const savingCase = ref(false)
+const caseName = ref('')
+const caseDescription = ref('')
+
+interface SyntheticMessagePayload {
+  senderId?: string
+  nickname?: string
+  content?: string
+  mentionSelf?: boolean
+  mentions?: string[]
+  replyMessageId?: string
+}
+
+/** 从当前会话时间线收割合成消息步骤（message.synthetic 事件 payload 与后端 inputPayload 同构） */
+const collectableSteps = computed(() =>
+  sandbox.events
+    .filter(event => event.action === 'message.synthetic')
+    .map((event) => {
+      const payload = event.payload as SyntheticMessagePayload
+      return {
+        senderId: payload.senderId || undefined,
+        nickname: payload.nickname || undefined,
+        content: (payload.content || '').trim(),
+        mentionSelf: payload.mentionSelf !== false,
+        mentions: Array.isArray(payload.mentions) ? payload.mentions : [],
+        replyMessageId: payload.replyMessageId || undefined,
+      }
+    })
+    .filter(step => step.content),
+)
+
+function buildCaseSetup(): QqSandboxCaseSetup {
+  const group = preferences.conversationType === 'GROUP'
+  return {
+    pluginCode: pluginCode.value.trim() || undefined,
+    policyConnectionId: preferences.policyConnectionId.trim(),
+    selfId: preferences.botId.trim() || undefined,
+    userId: preferences.userId.trim(),
+    nickname: preferences.nickname.trim() || undefined,
+    channelId: group ? preferences.groupId.trim() : preferences.userId.trim(),
+    scene: group ? 'group' : 'private',
+    randomMode: preferences.randomMode,
+    forceUnbound: preferences.forceUnbound,
+    simulateRoles: preferences.roleMode === 'REAL'
+      ? null
+      : preferences.roleMode === 'NONE' ? [] : [...preferences.simulateRoles],
+  }
+}
+
+function openSaveCase() {
+  if (!collectableSteps.value.length) {
+    toast.warning('当前时间线没有可保存的合成消息，请先发送消息')
+    return
+  }
+  caseName.value = ''
+  caseDescription.value = ''
+  showSaveCaseModal.value = true
+}
+
+async function confirmSaveCase() {
+  const name = caseName.value.trim()
+  if (!name) {
+    toast.warning('请填写用例名称')
+    return
+  }
+  savingCase.value = true
+  try {
+    await sandbox.saveCase({
+      name,
+      description: caseDescription.value.trim() || undefined,
+      setup: buildCaseSetup(),
+      steps: collectableSteps.value,
+    })
+    showSaveCaseModal.value = false
+    toast.success('沙盒用例已保存')
+  }
+  catch {
+    // 请求拦截器已提示
+  }
+  finally {
+    savingCase.value = false
+  }
+}
+
+async function openCases() {
+  showCasesModal.value = true
+  try {
+    await sandbox.loadCases()
+  }
+  catch {
+    // 请求拦截器已提示
+  }
+}
+
+async function runReplayCase(caseId: string) {
+  try {
+    await sandbox.replayCase(caseId)
+    showCasesModal.value = false
+    toast.success('用例已回放，新会话已接管事件流')
+  }
+  catch {
+    // 请求拦截器已提示
+  }
+}
+
+async function removeCase(caseId: string) {
+  try {
+    await sandbox.deleteCase(caseId)
+    toast.success('沙盒用例已删除')
+  }
+  catch {
+    // 请求拦截器已提示
+  }
+}
+
+function caseSummary(item: QqSandboxCase) {
+  const scene = item.setup.scene === 'group' ? `群 ${item.setup.channelId}` : '私聊'
+  const scope = item.setup.pluginCode || '全部插件'
+  return `${scene} · ${scope} · ${item.steps.length} 步`
+}
+
+function caseTime(item: QqSandboxCase) {
+  if (!item.updatedAt) {
+    return ''
+  }
+  const date = new Date(item.updatedAt)
+  return Number.isNaN(date.getTime()) ? item.updatedAt : date.toLocaleString()
+}
 </script>
 
 <template>
@@ -439,6 +572,22 @@ function handleComposerKeydown(event: KeyboardEvent) {
         </button>
       </span>
       <div class="flex-1" />
+      <FaTooltip text="用例列表" side="bottom">
+        <FaButton
+          variant="outline" size="icon" aria-label="用例列表"
+          :loading="sandbox.replaying" @click="openCases"
+        >
+          <FaIcon name="i-ri:play-list-add-line" />
+        </FaButton>
+      </FaTooltip>
+      <FaTooltip :text="collectableSteps.length ? `把当前时间线存为用例（${collectableSteps.length} 步）` : '先发送消息后才能存为用例'" side="bottom">
+        <FaButton
+          variant="outline" size="icon" aria-label="存为用例"
+          :disabled="!collectableSteps.length" @click="openSaveCase"
+        >
+          <FaIcon name="i-ri:save-3-line" />
+        </FaButton>
+      </FaTooltip>
       <FaTooltip :text="showConfig ? '收起身份模拟设置' : '身份模拟设置（默认自动模拟）'" side="bottom">
         <FaButton
           :variant="showConfig ? 'secondary' : 'outline'" size="icon"
@@ -650,6 +799,52 @@ function handleComposerKeydown(event: KeyboardEvent) {
       <div class="image-preview">
         <img v-if="imagePreviewSrc" :src="imagePreviewSrc" alt="图片预览">
       </div>
+    </FaModal>
+
+    <FaModal v-model="showSaveCaseModal" title="存为沙盒用例" :z-index="2200" content-class="sm:max-w-lg">
+      <div class="case-form">
+        <FaInput v-model="caseName" placeholder="用例名称，例如：词令冒烟流程" maxlength="60" />
+        <FaTextarea v-model="caseDescription" placeholder="用例描述（可选）" :rows="2" />
+        <p class="case-form__hint">
+          将保存当前会话的初始参数与 {{ collectableSteps.length }} 条合成消息，回放时会新建会话并逐条发送
+        </p>
+      </div>
+      <template #footer>
+        <FaButton variant="outline" @click="showSaveCaseModal = false">
+          取消
+        </FaButton>
+        <FaButton :loading="savingCase" :disabled="!caseName.trim()" @click="confirmSaveCase">
+          保存
+        </FaButton>
+      </template>
+    </FaModal>
+
+    <FaModal v-model="showCasesModal" title="沙盒用例" :footer="false" :z-index="2200" content-class="sm:max-w-xl">
+      <div v-if="sandbox.casesLoading" class="case-list__empty">
+        正在加载用例…
+      </div>
+      <div v-else-if="!sandbox.cases.length" class="case-list__empty">
+        暂无用例，先在沙盒中跑一轮对话后点击工具栏的「存为用例」
+      </div>
+      <ul v-else class="case-list">
+        <li v-for="item in sandbox.cases" :key="item.id" class="case-list__item">
+          <div class="case-list__info">
+            <span class="case-list__name">{{ item.name }}</span>
+            <span class="case-list__meta">{{ caseSummary(item) }}</span>
+            <span v-if="item.description" class="case-list__desc">{{ item.description }}</span>
+            <span class="case-list__time">{{ caseTime(item) }}</span>
+          </div>
+          <div class="case-list__actions">
+            <FaButton size="sm" :loading="sandbox.replaying" @click="runReplayCase(item.id)">
+              <FaIcon name="i-ri:play-line" />
+              回放
+            </FaButton>
+            <FaButton variant="outline" size="sm" @click="removeCase(item.id)">
+              <FaIcon name="i-ri:delete-bin-line" />
+            </FaButton>
+          </div>
+        </li>
+      </ul>
     </FaModal>
   </div>
 </template>
@@ -904,6 +1099,78 @@ function handleComposerKeydown(event: KeyboardEvent) {
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-fill-1);
+}
+
+.case-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.case-form__hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.case-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60vh;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.case-list__empty {
+  padding: 24px 0;
+  font-size: 13px;
+  color: var(--color-text-3);
+  text-align: center;
+}
+
+.case-list__item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.case-list__info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.case-list__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-1);
+}
+
+.case-list__meta,
+.case-list__desc,
+.case-list__time {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--color-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-list__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  align-items: center;
 }
 
 .composer-options {

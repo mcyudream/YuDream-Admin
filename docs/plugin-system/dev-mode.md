@@ -110,6 +110,10 @@ yudream:
 | `POST /qq-sandbox/sessions/{sessionId}/messages` | manage | 注入合成 Milky 消息（文本、@、reply、发送者均使用 string ID） |
 | `GET /qq-sandbox/sessions/{sessionId}/events/stream` | view | SSE：标准化、触发/阻断、Agent、工具和捕获回复时间线 |
 | `DELETE /qq-sandbox/sessions/{sessionId}` | manage | 结束会话并清理内存覆盖层与异步执行 |
+| `GET /qq-sandbox/cases` | view | 列出已保存的 QQ 沙盒用例（按更新时间倒序） |
+| `POST /qq-sandbox/cases` | manage | 保存或覆盖用例（body 携带 id 则覆盖同名项；setup 为会话初始参数，steps 为有序合成消息） |
+| `DELETE /qq-sandbox/cases/{caseId}` | manage | 删除用例 |
+| `POST /qq-sandbox/cases/{caseId}/replay` | manage | 按用例初始参数新建会话并逐条同步回放消息，返回新会话 |
 | `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件 |
 | `GET /agent-traces/stream` | view | SSE：步骤增量 + trace 完成事件 |
 | `GET /plugins/{code}/logs` | view | 插件运行日志查询（level/keyword/limit 过滤，上限 500） |
@@ -148,6 +152,12 @@ yudream:
 - `QqSandboxLogAppender`（logback appender）在沙盒作用域激活时把插件包 `online.yudream.base.plugin.*` 的 WARN/ERROR 日志（含堆栈）桥接为 `log/log.warn|log.error` 时间线事件，并从 logger 名推导插件编码归属；插件 catch 后只记日志的失败也能定位。生产链路作用域为空，直接透传。
 
 沙盒隔离宿主官方 SPI/Agent/消息/文档/语义记忆边界；第三方插件自行创建线程且不调用 synthetic messaging/diagnostic，或自行创建网络/文件客户端的行为无法在不修改 SPI/JVM 沙箱的前提下透明拦截，调试时仍应只加载可信插件。
+
+用例保存与回放：
+
+- 面板工具栏「存为用例」把当前时间线中的 `message.synthetic` 合成消息按序收割为步骤，连同当前会话初始参数（插件范围、策略连接、群/用户/机器人、随机三态、身份模拟）保存为用例；「用例」列表支持回放与删除。
+- 用例持久化在本地 JSON 文件 `plugins/qq-sandbox-cases.json`（与开发模式项目清单同目录），跨宿主重启保留。
+- 回放（`POST /qq-sandbox/cases/{caseId}/replay`）按保存的初始参数新建会话，追加 `session/case.replay` 时间线事件（caseId/caseName/steps），再逐条同步发送保存的消息；新会话接管事件流，语义与手工逐条发送完全一致。
 
 ## 6. Agent 执行链路追踪
 

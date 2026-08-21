@@ -1,17 +1,23 @@
 package online.yudream.base.interfaces.platform.milky.assembler;
 
+import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxCaseSaveCmd;
 import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxCreateCmd;
 import online.yudream.base.application.platform.milky.sandbox.cmd.QqSandboxMessageCmd;
+import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxCaseDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxConnectionOptionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxGroupsDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxRoleOptionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxSenderOptionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxSessionDTO;
 import online.yudream.base.application.platform.milky.sandbox.dto.QqSandboxTimelineEventDTO;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxCaseSetup;
+import online.yudream.base.domain.platform.milky.sandbox.QqSandboxCaseStep;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxRandomMode;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxTimelineEvent;
+import online.yudream.base.interfaces.platform.milky.request.QqSandboxCaseSaveRequest;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxCreateRequest;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxMessageRequest;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxCaseRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxConnectionOptionRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxEventRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxGroupOptionRes;
@@ -44,6 +50,37 @@ public final class QqSandboxWebAssembler {
     public static QqSandboxMessageCmd toCmd(QqSandboxMessageRequest request) {
         return new QqSandboxMessageCmd(request.senderId(), request.nickname(), request.content(), request.mentionSelf(),
                 request.mentions(), request.replyMessageId(), request.clientMessageId());
+    }
+
+    public static QqSandboxCaseSaveCmd toCmd(QqSandboxCaseSaveRequest request) {
+        QqSandboxCaseSaveRequest.QqSandboxCaseSetupRequest setup = request.setup();
+        QqSandboxCaseSetup caseSetup = new QqSandboxCaseSetup(setup.pluginCode(), setup.policyConnectionId(),
+                setup.selfId(), setup.userId(), setup.nickname(), setup.channelId(), setup.scene(),
+                QqSandboxRandomMode.from(setup.randomMode()), Boolean.TRUE.equals(setup.forceUnbound()),
+                setup.simulateRoles());
+        List<QqSandboxCaseStep> steps = request.steps().stream()
+                .map(step -> new QqSandboxCaseStep(step.senderId(), step.nickname(), step.content(),
+                        step.mentionSelf(), step.mentions(), step.replyMessageId()))
+                .toList();
+        return new QqSandboxCaseSaveCmd(request.id(), request.name(), request.description(), caseSetup, steps);
+    }
+
+    public static QqSandboxCaseRes toCaseRes(QqSandboxCaseDTO dto) {
+        QqSandboxCaseSetup setup = dto.setup();
+        QqSandboxCaseRes.QqSandboxCaseSetupRes setupRes = new QqSandboxCaseRes.QqSandboxCaseSetupRes(
+                setup.pluginCode(), setup.policyConnectionId(), setup.selfId(), setup.userId(), setup.nickname(),
+                setup.channelId(), setup.scene(), setup.randomMode().name(), setup.forceUnbound(),
+                setup.simulateRoles());
+        List<QqSandboxCaseRes.QqSandboxCaseStepRes> steps = dto.steps().stream()
+                .map(step -> new QqSandboxCaseRes.QqSandboxCaseStepRes(step.senderId(), step.nickname(),
+                        step.content(), step.mentionSelf(), step.mentions(), step.replyMessageId()))
+                .toList();
+        return new QqSandboxCaseRes(dto.id(), dto.name(), dto.description(), dto.createdAt(), dto.updatedAt(),
+                setupRes, steps);
+    }
+
+    public static List<QqSandboxCaseRes> toCaseResList(List<QqSandboxCaseDTO> cases) {
+        return cases.stream().map(QqSandboxWebAssembler::toCaseRes).toList();
     }
 
     public static QqSandboxSessionRes toRes(QqSandboxSessionDTO dto) {

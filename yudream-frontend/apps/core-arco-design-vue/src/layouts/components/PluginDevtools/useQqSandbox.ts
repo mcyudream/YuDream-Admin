@@ -1,4 +1,6 @@
 import type {
+  QqSandboxCase,
+  QqSandboxCaseSavePayload,
   QqSandboxConnectionOption,
   QqSandboxCreateSessionPayload,
   QqSandboxEvent,
@@ -54,6 +56,9 @@ export function useQqSandbox() {
   const sending = ref(false)
   const connected = ref(false)
   const streamError = ref('')
+  const cases = ref<QqSandboxCase[]>([])
+  const casesLoading = ref(false)
+  const replaying = ref(false)
 
   let streamAbort: AbortController | null = null
   const seenEventKeys = new Set<string>()
@@ -142,6 +147,49 @@ export function useQqSandbox() {
     session.value = null
     if (active?.sessionId) {
       await apiQqSandbox.deleteSession(active.sessionId)
+    }
+  }
+
+  async function loadCases() {
+    casesLoading.value = true
+    try {
+      const res = await apiQqSandbox.listCases()
+      cases.value = res.data || []
+    }
+    finally {
+      casesLoading.value = false
+    }
+  }
+
+  async function saveCase(payload: QqSandboxCaseSavePayload) {
+    const res = await apiQqSandbox.saveCase(payload)
+    await loadCases()
+    return res.data
+  }
+
+  async function deleteCase(caseId: string) {
+    await apiQqSandbox.deleteCase(caseId)
+    cases.value = cases.value.filter(item => item.id !== caseId)
+  }
+
+  /** 一键回放：后端新建会话并逐条同步回放，返回的会话接入现有事件流 */
+  async function replayCase(caseId: string) {
+    await closeSession()
+    replaying.value = true
+    events.value = []
+    seenEventKeys.clear()
+    selectedEvent.value = null
+    streamError.value = ''
+    try {
+      const res = await apiQqSandbox.replayCase(caseId)
+      session.value = res.data
+      if (res.data?.sessionId) {
+        connectStream(res.data.sessionId)
+      }
+      return res.data
+    }
+    finally {
+      replaying.value = false
     }
   }
 
@@ -259,11 +307,18 @@ export function useQqSandbox() {
     sending,
     connected,
     streamError,
+    cases,
+    casesLoading,
+    replaying,
     loadPresets,
     loadGroups,
     createSession,
     sendMessage,
     closeSession,
     resetTimeline,
+    loadCases,
+    saveCase,
+    deleteCase,
+    replayCase,
   }
 }
