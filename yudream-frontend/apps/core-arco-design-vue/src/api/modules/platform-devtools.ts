@@ -277,6 +277,13 @@ export interface AgentTracePage {
 
 export type PluginLifecycleAction = 'LOAD' | 'ENABLE' | 'DISABLE' | 'UNLOAD' | 'RELOAD' | 'FRONTEND_RELOAD' | 'COMPILE'
 
+/** 单类别资产差异（domain PluginRuntimeAssetsDiff.Entry 的 JSON 镜像），category 与 PluginRuntimeAssets 字段同名 */
+export interface PluginRuntimeAssetsDiffEntry {
+  category: string
+  added: string[]
+  removed: string[]
+}
+
 /** 生命周期 SSE 事件载荷（domain PluginLifecycleEvent 的 JSON 镜像） */
 export interface PluginLifecycleEventPayload {
   pluginCode: string
@@ -286,6 +293,8 @@ export interface PluginLifecycleEventPayload {
   durationMs?: number
   errorMessage?: string
   occurredAt?: string
+  /** 仅开发模式 RELOAD 成功时携带：重载前后运行时资产差异 */
+  assetsDiff?: { entries?: PluginRuntimeAssetsDiffEntry[] }
 }
 
 /** Agent 追踪 SSE 事件载荷（domain AgentTraceEvent 的 JSON 镜像） */

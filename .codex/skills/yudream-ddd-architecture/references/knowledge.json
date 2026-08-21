@@ -273,6 +273,10 @@
     {
       "key": "qq-sandbox-cases",
       "text": "QQ 沙盒用例保存/回放：domain QqSandboxCase(id/name/description/createdAt/updatedAt/setup/steps) + QqSandboxCaseSetup（镜像 QqSandboxCreateCmd 去 timeoutMillis）+ QqSandboxCaseStep（镜像 QqSandboxMessageCmd 去 clientMessageId）+ QqSandboxCaseRepo 端口；infra JsonQqSandboxCaseRepo 落 plugins/qq-sandbox-cases.json（resolvedStoreFile().resolveSibling，tmp+ATOMIC_MOVE 与 PluginDevProjectCatalog 同约定）。QqSandboxAppService.saveCase/replayCase：回放=create(setup) + 逐条同步 send()，会话时间线追加 session/case.replay 事件。端点 GET/POST/DELETE /qq-sandbox/cases 与 POST /cases/{id}/replay；前端从 message.synthetic 事件 payload 收割步骤、从 preferences 组装 setup，replay 返回会话接入既有 connectStream。"
+    },
+    {
+      "key": "plugin-reload-assets-diff",
+      "text": "重载资产差异：domain valobj PluginRuntimeAssetsDiff.diff(before, after) 按类别（menus/permissions/capabilities/dashboardCards/frontendModules/httpEndpoints/commands/messageInteractions/aiTools/agents/exposedServices）产出 Entry(category, added, removed)，仅收录有变化的类别；各类标识=菜单 path、权限/能力/卡片 code、前端模块 moduleName、端点 method+fullPath、指令 command、交互 command(空则 kind)、AI 工具 name、Agent code、exposedServices 原串。PluginLifecycleEvent 增加 assetsDiff 分量（保留 7 参重载构造兼容），PluginDevModeReloadListener 在 reloadDevPlugin 前后各取 runtimeGateway.runtimeAssets(code) 快照，RELOAD 成功事件携带 diff；概览页动态行可展开 +/- 类别摘要与明细。"
     }
   ],
   "pitfalls": [
