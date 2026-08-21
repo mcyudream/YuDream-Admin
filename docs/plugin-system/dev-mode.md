@@ -33,6 +33,8 @@
 
 合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），面板登记后若插件已启用会立即触发一次热切重载。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
 
+「设置」页的「新建插件」可免去手工搭骨架：填父目录与 kebab-case 编码（可选显示名、版本、描述、depend/softdepend），宿主在 `{父目录}/yudream-plugin-{code}` 生成**独立 pom**（无 parent，SPI 依赖经本机 `~/.m2` 解析，默认版本跟随宿主根 pom 的 `yudream.plugin.spi.version`，可用 `spiVersion` 覆盖）、`plugin.yml`、含 ping 自检指令的入口类（包名 `online.yudream.base.plugin.{code去连字符}`）与 domain/application/infrastructure/interfaces 四个空分包。`register` 默认开启，生成即登记为开发模式项目，执行一次 `mvn compile` 后开发模式自动加载；目标目录已存在且非空时拒绝生成。
+
 ### 配置
 
 ```yaml
@@ -82,7 +84,7 @@ yudream:
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
 - **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条，级别/关键字过滤）+ SSE 实时追加，按 sequence 去重；可暂停（暂停期日志缓存于缓冲区）、清空与展开异常堆栈。过滤依据插件包名前缀（`PluginLoggerPrefix`：从 mainClass 截取 `online.yudream.base.plugin.` 根包后的第一段，第三方未遵循包约定的插件兜底用 根包+编码），数据源为宿主 SystemLogBuffer 环形缓冲，与沙盒日志桥同一包约定。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
-- **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
+- **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 新建插件骨架（表单填父目录与编码，宿主生成独立 Maven 模块并默认登记为开发模式项目）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
 
 浮窗头部只保留标题与双 SSE（生命周期流/追踪流）连接状态点，状态明细移入「概览」页。
 
@@ -104,6 +106,7 @@ yudream:
 | `GET /dev-projects/browse?path=...` | manage | 逐层浏览宿主机目录；path 为空返回文件系统根，返回 Maven/插件模块标记与可推断编码 |
 | `POST /dev-projects` | manage | 面板登记开发目录（code 可留空自动推断；已启用插件立即热切） |
 | `DELETE /dev-projects/{code}` | manage | 移除 FILE 源项目（CONFIG 源需在 yml 中移除） |
+| `POST /scaffold` | manage | 新建插件骨架：在宿主机生成独立 Maven 模块（pom/plugin.yml/入口类/分包目录），`register` 默认 true 同时登记为开发模式项目 |
 | `GET /agent-traces` | view | 追踪分页查询（source/plugin/状态过滤） |
 | `GET /agent-traces/{traceId}` | view | 单条追踪全步骤 |
 | `GET /qq-sandbox/presets` | view | QQ 沙盒消息形态预设（发送人、群、角色选项） |

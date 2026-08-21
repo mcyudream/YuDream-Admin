@@ -10,6 +10,7 @@ import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.devtools.assembler.PluginDevToolsWebAssembler;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
+import online.yudream.base.interfaces.platform.devtools.request.PluginScaffoldRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
@@ -18,6 +19,7 @@ import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatus
 import online.yudream.base.interfaces.platform.devtools.res.PluginDisablePreviewRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
+import online.yudream.base.interfaces.platform.devtools.res.PluginScaffoldRes;
 import online.yudream.base.interfaces.platform.devtools.service.PluginDevToolsSseBridge;
 import online.yudream.base.interfaces.platform.devtools.service.PluginLogStreamBridge;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
@@ -101,6 +103,13 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "登记开发模式项目", module = "开发者工具", desc = "将插件源码目录登记到面板清单并持久化，已启用插件立即切换源码加载")
     public Result<PluginDevProjectInfo> addDevProject(@Valid @RequestBody PluginDevProjectSaveRequest request) {
         return Result.ok(devToolsAppService.addDevProject(PluginDevToolsWebAssembler.toCmd(request)));
+    }
+
+    @PostMapping("/scaffold")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "新建插件骨架", module = "开发者工具", desc = "在宿主机生成插件 Maven 模块骨架，可选同时登记为开发模式项目")
+    public Result<PluginScaffoldRes> scaffold(@Valid @RequestBody PluginScaffoldRequest request) {
+        return Result.ok(PluginDevToolsWebAssembler.toRes(
+                devToolsAppService.scaffold(PluginDevToolsWebAssembler.toCmd(request))));
     }
 
     @DeleteMapping("/dev-projects/{code}")

@@ -28,10 +28,13 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrows
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.infra.platform.plugin.devmode.DevModeEnvironment;
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrowser;
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
+import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
@@ -86,6 +89,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final PluginDevModeProperties devModeProperties;
     private final PluginDevProjectCatalog devProjectCatalog;
     private final PluginDevDirectoryBrowser devDirectoryBrowser;
+    private final PluginScaffoldGenerator scaffoldGenerator;
     private final DevModeEnvironment devModeEnvironment;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
@@ -210,6 +214,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     @Override
     public PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
         return devDirectoryBrowser.browse(path);
+    }
+
+    @Override
+    public PluginScaffoldResult scaffoldPlugin(PluginScaffoldSpec spec) {
+        return scaffoldGenerator.generate(spec);
     }
 
     private PluginDevProjectInfo toDevProjectInfo(PluginDevModeProperties.DevProject project,

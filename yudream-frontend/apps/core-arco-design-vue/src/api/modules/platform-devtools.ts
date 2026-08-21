@@ -27,6 +27,40 @@ export interface PluginDevProjectSavePayload {
   autoCompile: boolean
 }
 
+/** 新建插件骨架的载荷：在宿主机生成 Maven 模块，可选同时登记为开发模式项目 */
+export interface PluginScaffoldPayload {
+  /** 生成目录的父目录，模块落在 {parentDir}/yudream-plugin-{code} */
+  parentDir: string
+  /** 插件编码，kebab-case */
+  code: string
+  displayName?: string
+  description?: string
+  /** 版本，默认 1.0.0 */
+  version?: string
+  /** SPI 依赖版本，留空用宿主内置默认值 */
+  spiVersion?: string
+  /** 硬依赖插件编码列表 */
+  depend?: string[]
+  /** 软依赖插件编码列表 */
+  softdepend?: string[]
+  /** 生成后是否登记为开发模式项目，默认 true */
+  register?: boolean
+}
+
+/** 新建插件骨架的结果 */
+export interface PluginScaffoldResult {
+  code: string
+  /** 生成的模块根目录绝对路径 */
+  projectPath: string
+  /** 入口类全限定名 */
+  mainClass: string
+  spiVersion: string
+  /** 已写入文件的相对路径 */
+  files: string[]
+  /** 是否已登记为开发模式项目 */
+  registered: boolean
+}
+
 /** 宿主机目录条目（domain PluginDevDirectoryEntryInfo 的 JSON 镜像），仅目录与插件模块标记 */
 export interface PluginDevDirectoryEntry {
   name: string
@@ -393,6 +427,10 @@ export default {
   /** 浏览宿主机目录：path 为空时返回盘符根列表；仅列目录，不读文件内容 */
   browseDevDirectories: (path?: string) =>
     systemClient.get<unknown, ApiResponse<PluginDevDirectoryBrowse>>('api/platform/plugin-devtools/dev-projects/browse', { params: { path } }),
+
+  /** 新建插件骨架：生成 Maven 模块，默认同时登记为开发模式项目 */
+  scaffold: (data: PluginScaffoldPayload) =>
+    systemClient.post<unknown, ApiResponse<PluginScaffoldResult>>('api/platform/plugin-devtools/scaffold', data),
 
   commandTest: (code: string, data: PluginCommandTestPayload) =>
     systemClient.post<unknown, ApiResponse<PluginCommandTestResult>>(`api/platform/plugin-devtools/plugins/${code}/command-test`, data),

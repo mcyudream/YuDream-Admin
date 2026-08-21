@@ -14,6 +14,8 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
 
 import java.util.List;
 import java.util.Optional;
@@ -109,6 +111,14 @@ public interface PluginRuntimeGateway {
      */
     default PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
         throw new UnsupportedOperationException("当前运行时网关不支持目录浏览");
+    }
+
+    /**
+     * 在宿主机生成插件 Maven 模块骨架（pom.xml/plugin.yml/入口类/分层分包目录）。
+     * 目标目录已存在且非空时抛出业务异常；只写文件，不触发编译与登记。
+     */
+    default PluginScaffoldResult scaffoldPlugin(PluginScaffoldSpec spec) {
+        throw new UnsupportedOperationException("当前运行时网关不支持插件脚手架生成");
     }
 
     /**

@@ -3,6 +3,7 @@ package online.yudream.base.application.platform.devtools.service;
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
@@ -20,8 +21,11 @@ import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
 import online.yudream.base.domain.system.log.repo.SystemLogRepo;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Optional;
@@ -218,5 +222,68 @@ class PluginDevToolsAppServiceTest {
         assertThat(preview.getBlockers()).isEmpty();
         assertThat(preview.getSoftDependents()).isEmpty();
         assertThat(preview.getUnloadBlockers()).isEmpty();
+    }
+
+    @Test
+    void scaffoldRejectsInvalidCode() {
+        PluginScaffoldCmd cmd = new PluginScaffoldCmd();
+        cmd.setParentDir("D:/plugins");
+        cmd.setCode("Invalid_Code");
+
+        assertThatThrownBy(() -> service.scaffold(cmd))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("kebab-case");
+        verify(runtimeGateway, never()).scaffoldPlugin(any());
+    }
+
+    @Test
+    void scaffoldRejectsSelfDependency() {
+        PluginScaffoldCmd cmd = new PluginScaffoldCmd();
+        cmd.setParentDir("D:/plugins");
+        cmd.setCode("demo");
+        cmd.setDepend(List.of("demo"));
+
+        assertThatThrownBy(() -> service.scaffold(cmd))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("不能依赖自身");
+    }
+
+    @Test
+    void scaffoldGeneratesAndRegistersByDefault() {
+        PluginScaffoldCmd cmd = new PluginScaffoldCmd();
+        cmd.setParentDir("D:/plugins");
+        cmd.setCode("demo-tool");
+        PluginScaffoldResult generated = new PluginScaffoldResult("demo-tool", "D:/plugins/yudream-plugin-demo-tool",
+                "online.yudream.base.plugin.demotool.bootstrap.DemoToolPlugin", "2.7.0", List.of("pom.xml"));
+        when(runtimeGateway.scaffoldPlugin(any(PluginScaffoldSpec.class))).thenReturn(generated);
+
+        var dto = service.scaffold(cmd);
+
+        assertThat(dto.getCode()).isEqualTo("demo-tool");
+        assertThat(dto.isRegistered()).isTrue();
+        assertThat(dto.getMainClass()).isEqualTo("online.yudream.base.plugin.demotool.bootstrap.DemoToolPlugin");
+        // 领域规格负责编码→包名/类名推导：连字符段去横线后首字母大写拼接
+        ArgumentCaptor<PluginScaffoldSpec> specCaptor = ArgumentCaptor.forClass(PluginScaffoldSpec.class);
+        verify(runtimeGateway).scaffoldPlugin(specCaptor.capture());
+        assertThat(specCaptor.getValue().basePackage()).isEqualTo("online.yudream.base.plugin.demotool");
+        assertThat(specCaptor.getValue().entryClassName()).isEqualTo("DemoToolPlugin");
+        assertThat(specCaptor.getValue().moduleDirName()).isEqualTo("yudream-plugin-demo-tool");
+        verify(runtimeGateway).registerDevProject("demo-tool", "D:/plugins/yudream-plugin-demo-tool", null, true, null);
+    }
+
+    @Test
+    void scaffoldSkipsRegistrationWhenDisabled() {
+        PluginScaffoldCmd cmd = new PluginScaffoldCmd();
+        cmd.setParentDir("D:/plugins");
+        cmd.setCode("demo");
+        cmd.setRegister(false);
+        PluginScaffoldResult generated = new PluginScaffoldResult("demo", "D:/plugins/yudream-plugin-demo",
+                "online.yudream.base.plugin.demo.bootstrap.DemoPlugin", "2.7.0", List.of("pom.xml"));
+        when(runtimeGateway.scaffoldPlugin(any(PluginScaffoldSpec.class))).thenReturn(generated);
+
+        var dto = service.scaffold(cmd);
+
+        assertThat(dto.isRegistered()).isFalse();
+        verify(runtimeGateway, never()).registerDevProject(any(), any(), any(), any(Boolean.class), any());
     }
 }
