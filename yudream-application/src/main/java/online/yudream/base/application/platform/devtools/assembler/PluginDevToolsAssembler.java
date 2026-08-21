@@ -4,10 +4,12 @@ import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO
 import online.yudream.base.application.platform.devtools.dto.AgentTraceSummaryDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
+import online.yudream.base.application.platform.devtools.dto.PluginScaffoldDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.domain.platform.agent.aggregate.AgentExecutionTrace;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
 
 import java.util.List;
 
@@ -32,6 +34,17 @@ public final class PluginDevToolsAssembler {
                 .devProject(devProject)
                 .dependencies(module.getDependencies() == null ? List.of() : List.copyOf(module.getDependencies()))
                 .softDependencies(module.getSoftDependencies() == null ? List.of() : List.copyOf(module.getSoftDependencies()))
+                .build();
+    }
+
+    public static PluginScaffoldDTO toScaffoldDTO(PluginScaffoldResult result, boolean registered) {
+        return PluginScaffoldDTO.builder()
+                .code(result.code())
+                .projectPath(result.projectPath())
+                .mainClass(result.mainClass())
+                .spiVersion(result.spiVersion())
+                .files(result.files())
+                .registered(registered)
                 .build();
     }
 

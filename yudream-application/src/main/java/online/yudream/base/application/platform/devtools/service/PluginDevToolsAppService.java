@@ -5,12 +5,14 @@ import online.yudream.base.application.platform.agent.service.AgentTraceProperti
 import online.yudream.base.application.platform.devtools.assembler.PluginDevToolsAssembler;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDisablePreviewDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
+import online.yudream.base.application.platform.devtools.dto.PluginScaffoldDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.domain.common.exception.BizException;
@@ -24,6 +26,8 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginLoggerPrefix;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
 import online.yudream.base.domain.system.log.model.SystemLogQuery;
 import online.yudream.base.domain.system.log.repo.SystemLogRepo;
@@ -233,6 +237,24 @@ public class PluginDevToolsAppService {
     /** 浏览宿主机目录供登记开发项目时选择插件源码目录；仅列目录与模块标记，不读文件内容。 */
     public PluginDevDirectoryBrowseInfo browseDevDirectories(String path) {
         return runtimeGateway.browseDevDirectories(path);
+    }
+
+    /**
+     * 新建插件骨架：在宿主机生成 Maven 模块，默认随后登记为开发模式项目。
+     * 登记失败时生成的文件保留，可在设置页手动登记。
+     */
+    public PluginScaffoldDTO scaffold(PluginScaffoldCmd cmd) {
+        if (cmd == null) {
+            throw new BizException("脚手架参数不能为空");
+        }
+        PluginScaffoldSpec spec = PluginScaffoldSpec.of(cmd.getCode(), cmd.getDisplayName(), cmd.getDescription(),
+                cmd.getVersion(), cmd.getSpiVersion(), cmd.getParentDir(), cmd.getDepend(), cmd.getSoftdepend());
+        PluginScaffoldResult result = runtimeGateway.scaffoldPlugin(spec);
+        boolean register = cmd.getRegister() == null || cmd.getRegister();
+        if (register) {
+            runtimeGateway.registerDevProject(spec.code(), result.projectPath(), null, true, null);
+        }
+        return PluginDevToolsAssembler.toScaffoldDTO(result, register);
     }
 
     /** 查询指定插件最近的运行日志，按插件 logger 前缀过滤。 */

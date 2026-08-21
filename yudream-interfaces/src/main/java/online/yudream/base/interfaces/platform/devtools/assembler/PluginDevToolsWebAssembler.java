@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.devtools.assembler;
 
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceSummaryDTO;
@@ -9,6 +10,7 @@ import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDisablePreviewDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
+import online.yudream.base.application.platform.devtools.dto.PluginScaffoldDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
@@ -17,6 +19,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
+import online.yudream.base.interfaces.platform.devtools.request.PluginScaffoldRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceSummaryRes;
@@ -26,6 +29,7 @@ import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatus
 import online.yudream.base.interfaces.platform.devtools.res.PluginDisablePreviewRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
+import online.yudream.base.interfaces.platform.devtools.res.PluginScaffoldRes;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
@@ -66,6 +70,23 @@ public final class PluginDevToolsWebAssembler {
         cmd.setCommand(request.getCommand());
         cmd.setArguments(request.getArguments());
         cmd.setContent(request.getContent());
+        return cmd;
+    }
+
+    public static PluginScaffoldCmd toCmd(PluginScaffoldRequest request) {
+        PluginScaffoldCmd cmd = new PluginScaffoldCmd();
+        if (request == null) {
+            return cmd;
+        }
+        cmd.setParentDir(request.getParentDir());
+        cmd.setCode(request.getCode());
+        cmd.setDisplayName(request.getDisplayName());
+        cmd.setDescription(request.getDescription());
+        cmd.setVersion(request.getVersion());
+        cmd.setSpiVersion(request.getSpiVersion());
+        cmd.setDepend(request.getDepend());
+        cmd.setSoftdepend(request.getSoftdepend());
+        cmd.setRegister(request.getRegister());
         return cmd;
     }
 
@@ -117,6 +138,17 @@ public final class PluginDevToolsWebAssembler {
                 .blockers(dto.getBlockers())
                 .softDependents(dto.getSoftDependents())
                 .unloadBlockers(dto.getUnloadBlockers())
+                .build();
+    }
+
+    public static PluginScaffoldRes toRes(PluginScaffoldDTO dto) {
+        return PluginScaffoldRes.builder()
+                .code(dto.getCode())
+                .projectPath(dto.getProjectPath())
+                .mainClass(dto.getMainClass())
+                .spiVersion(dto.getSpiVersion())
+                .files(dto.getFiles())
+                .registered(dto.isRegistered())
                 .build();
     }
 

@@ -100,6 +100,69 @@ function handleBrowseSelect(path: string, inferredCode?: string) {
   }
 }
 
+// ---------- 新建插件骨架 ----------
+const scaffoldOpen = ref(false)
+const scaffoldSaving = ref(false)
+const scaffoldBrowseOpen = ref(false)
+const scaffoldForm = ref({
+  parentDir: '',
+  code: '',
+  displayName: '',
+  version: '',
+  description: '',
+  depend: '',
+  softdepend: '',
+  register: true,
+})
+
+function openScaffold() {
+  scaffoldForm.value = { parentDir: '', code: '', displayName: '', version: '', description: '', depend: '', softdepend: '', register: true }
+  scaffoldOpen.value = true
+}
+
+function splitCodes(raw: string): string[] | undefined {
+  const codes = raw.split(/[,，\s]+/).map(item => item.trim()).filter(Boolean)
+  return codes.length ? codes : undefined
+}
+
+async function submitScaffold() {
+  const parentDir = scaffoldForm.value.parentDir.trim()
+  const code = scaffoldForm.value.code.trim()
+  if (!parentDir) {
+    toast.warning('父目录不能为空')
+    return
+  }
+  if (!code) {
+    toast.warning('插件编码不能为空')
+    return
+  }
+  scaffoldSaving.value = true
+  try {
+    const result = await store.scaffoldPlugin({
+      parentDir,
+      code,
+      displayName: scaffoldForm.value.displayName.trim() || undefined,
+      version: scaffoldForm.value.version.trim() || undefined,
+      description: scaffoldForm.value.description.trim() || undefined,
+      depend: splitCodes(scaffoldForm.value.depend),
+      softdepend: splitCodes(scaffoldForm.value.softdepend),
+      register: scaffoldForm.value.register,
+    })
+    toast.success(`骨架已生成：${result.projectPath}；执行一次 mvn compile 后开发模式自动加载`)
+    scaffoldOpen.value = false
+  }
+  catch {
+    // 拦截器已提示
+  }
+  finally {
+    scaffoldSaving.value = false
+  }
+}
+
+function handleScaffoldBrowseSelect(path: string) {
+  scaffoldForm.value.parentDir = path
+}
+
 async function handleResetFab() {
   if (!resetFab) {
     return
@@ -128,6 +191,10 @@ function handleResetPanel() {
         <div class="flex-1" />
         <FaButton variant="outline" size="icon" :loading="store.devProjectsLoading" title="刷新" @click="store.loadDevProjects()">
           <FaIcon name="i-ri:refresh-line" />
+        </FaButton>
+        <FaButton variant="outline" size="sm" @click="openScaffold">
+          <FaIcon name="i-ri:magic-line" />
+          新建插件
         </FaButton>
         <FaButton size="sm" @click="openAdd">
           <FaIcon name="i-ri:add-line" />
@@ -250,6 +317,61 @@ function handleResetPanel() {
 
     <!-- 宿主机目录浏览（嵌套于登记表单之上） -->
     <DevProjectDirectoryBrowser v-model="browseOpen" @select="handleBrowseSelect" />
+
+    <!-- 新建插件骨架 -->
+    <FaModal v-model="scaffoldOpen" title="新建插件骨架" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+      <div class="add-form">
+        <div class="add-form__field">
+          <span class="add-form__label">父目录（必填，模块生成到 父目录/yudream-plugin-{编码}）</span>
+          <div class="add-form__path">
+            <FaInput v-model="scaffoldForm.parentDir" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
+            <FaButton variant="outline" @click="scaffoldBrowseOpen = true">
+              <FaIcon name="i-ri:folder-open-line" />
+              浏览
+            </FaButton>
+          </div>
+        </div>
+        <div class="add-form__field">
+          <span class="add-form__label">插件编码（必填，kebab-case，如 demo-tool）</span>
+          <FaInput v-model="scaffoldForm.code" placeholder="小写字母开头，仅小写字母/数字/连字符" />
+        </div>
+        <div class="add-form__field">
+          <span class="add-form__label">显示名称（可选，默认用编码）</span>
+          <FaInput v-model="scaffoldForm.displayName" placeholder="演示工具" />
+        </div>
+        <div class="add-form__field">
+          <span class="add-form__label">版本（可选，默认 1.0.0）</span>
+          <FaInput v-model="scaffoldForm.version" placeholder="1.0.0" />
+        </div>
+        <div class="add-form__field">
+          <span class="add-form__label">描述（可选）</span>
+          <FaInput v-model="scaffoldForm.description" placeholder="插件用途一句话说明" />
+        </div>
+        <div class="add-form__field">
+          <span class="add-form__label">硬依赖（可选，逗号分隔的插件编码）</span>
+          <FaInput v-model="scaffoldForm.depend" placeholder="如 minecraft-utils" />
+        </div>
+        <div class="add-form__field">
+          <span class="add-form__label">软依赖（可选，逗号分隔；缺失时不阻塞启用）</span>
+          <FaInput v-model="scaffoldForm.softdepend" placeholder="如 qq-binding" />
+        </div>
+        <div class="add-form__switch">
+          <FaSwitch v-model="scaffoldForm.register" />
+          <span class="add-form__label">生成后登记为开发模式项目</span>
+        </div>
+        <div class="add-form__actions">
+          <FaButton variant="outline" @click="scaffoldOpen = false">
+            取消
+          </FaButton>
+          <FaButton :loading="scaffoldSaving" @click="submitScaffold">
+            生成
+          </FaButton>
+        </div>
+      </div>
+    </FaModal>
+
+    <!-- 宿主机目录浏览（脚手架选父目录，嵌套于脚手架表单之上） -->
+    <DevProjectDirectoryBrowser v-model="scaffoldBrowseOpen" @select="handleScaffoldBrowseSelect" />
   </div>
 </template>
 

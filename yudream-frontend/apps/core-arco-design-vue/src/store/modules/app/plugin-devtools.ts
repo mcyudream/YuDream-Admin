@@ -7,6 +7,8 @@ import type {
   PluginDevProjectSavePayload,
   PluginDevtoolsStatus,
   PluginLifecycleEventPayload,
+  PluginScaffoldPayload,
+  PluginScaffoldResult,
 } from '@/api/modules/platform-devtools'
 import type { QqSandboxLaunchPayload } from '@/api/modules/platform-devtools-qq-sandbox'
 import apiDevtools from '@/api/modules/platform-devtools'
@@ -121,6 +123,13 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   async function removeDevProject(code: string) {
     await apiDevtools.removeDevProject(code)
     await Promise.all([loadDevProjects(), loadStatus(true)])
+  }
+
+  /** 新建插件骨架：登记成功后清单与状态同步刷新，结果交回页面展示生成路径 */
+  async function scaffoldPlugin(payload: PluginScaffoldPayload): Promise<PluginScaffoldResult> {
+    const res = await apiDevtools.scaffold(payload)
+    await Promise.all([loadDevProjects(), loadStatus(true)])
+    return res.data
   }
 
   async function reloadDevPlugin(code: string) {
@@ -360,6 +369,7 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     addDevProject,
     removeDevProject,
     reloadDevPlugin,
+    scaffoldPlugin,
     connect,
     disconnect,
     openDrawer,

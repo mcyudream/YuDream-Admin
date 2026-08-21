@@ -298,6 +298,18 @@
         "yudream-interfaces/src/main/java/online/yudream/base/interfaces/platform/devtools/controller/PluginDevToolsController.java",
         "yudream-frontend/apps/core-arco-design-vue/src/layouts/components/PluginDevtools/panels/PluginAssetsPanel.vue"
       ]
+    },
+    {
+      "key": "plugin-scaffold-generator",
+      "title": "插件脚手架向导（新建插件骨架）",
+      "summary": "devtools POST /scaffold 在宿主机生成独立 Maven 插件模块：模板为 yudream-infrastructure classpath 资源 devtools/scaffold/*.tpl，{{TOKEN}} 替换，Java 注解与 YAML 双引号标量共用 escapeQuoted 转义。生成独立 pom（无 parent/repositories，SPI 经本机 ~/.m2 解析，默认版本常量 PluginScaffoldGenerator.DEFAULT_SPI_VERSION 需与宿主根 pom yudream.plugin.spi.version 同步，可用请求 spiVersion 覆盖）、plugin.yml、含 ping 自检指令的入口类（包名 online.yudream.base.plugin.{code 去连字符}，类名各段首字母大写+Plugin）与四个空分包。分层：domain PluginScaffoldSpec.of() 纯 Java 校验（禁 Spring StringUtils），PluginRuntimeGateway 默认方法抛 UnsupportedOperationException 由 JarPluginRuntimeGateway 覆盖，写文件在 infra PluginScaffoldGenerator，应用层编排生成+默认登记 registerDevProject。前端设置页「新建插件」表单复用 DevProjectDirectoryBrowser 选父目录（只用 path 忽略 inferredCode）。",
+      "files": [
+        "yudream-domain/src/main/java/online/yudream/base/domain/platform/plugin/valobj/PluginScaffoldSpec.java",
+        "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/devmode/PluginScaffoldGenerator.java",
+        "yudream-infrastructure/src/main/resources/devtools/scaffold/pom.xml.tpl",
+        "yudream-interfaces/src/main/java/online/yudream/base/interfaces/platform/devtools/controller/PluginDevToolsController.java",
+        "yudream-frontend/apps/core-arco-design-vue/src/layouts/components/PluginDevtools/panels/SettingsPanel.vue"
+      ]
     }
   ],
   "pitfalls": [

@@ -13,6 +13,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.infra.platform.plugin.devmode.DevModeEnvironment;
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrowser;
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
+import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.annotation.PluginCommand;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
@@ -287,6 +288,7 @@ class JarPluginRuntimeGatewayTest {
                 devModeProperties,
                 new PluginDevProjectCatalog(devModeProperties, new ObjectMapper()),
                 new PluginDevDirectoryBrowser(),
+                new PluginScaffoldGenerator(),
                 // 单测从 target/test-classes 运行会被自动检测为源码运行，固定按 jar 运行处理，
                 // 未显式开启 devMode 的用例（如目录加载拒绝）才能保持原语义
                 new DevModeEnvironment() {
