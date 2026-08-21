@@ -114,7 +114,7 @@ yudream:
 | `POST /qq-sandbox/cases` | manage | 保存或覆盖用例（body 携带 id 则覆盖同名项；setup 为会话初始参数，steps 为有序合成消息） |
 | `DELETE /qq-sandbox/cases/{caseId}` | manage | 删除用例 |
 | `POST /qq-sandbox/cases/{caseId}/replay` | manage | 按用例初始参数新建会话并逐条同步回放消息，返回新会话 |
-| `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件 |
+| `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件；RELOAD 成功时 payload 携带 `assetsDiff`（重载前后运行时资产差异，按类别列出 added/removed 标识） |
 | `GET /agent-traces/stream` | view | SSE：步骤增量 + trace 完成事件 |
 | `GET /plugins/{code}/logs` | view | 插件运行日志查询（level/keyword/limit 过滤，上限 500） |
 | `GET /plugins/{code}/logs/stream` | view | SSE：按插件 logger 前缀过滤的实时日志 |

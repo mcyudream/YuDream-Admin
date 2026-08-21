@@ -1,9 +1,66 @@
 <script setup lang="ts">
-import type { PluginLifecycleAction } from '@/api/modules/platform-devtools'
+import type { PluginLifecycleAction, PluginLifecycleEventPayload, PluginRuntimeAssetsDiffEntry } from '@/api/modules/platform-devtools'
 
 const store = usePluginDevtoolsStore()
 
 const recentEvents = computed(() => store.lifecycleEvents.slice(0, 20))
+// 动态行展开状态：key 为事件在列表中的索引，值变化时整体重置即可
+const expandedDiffs = ref<Set<number>>(new Set())
+
+const DIFF_CATEGORY_TEXT: Record<string, string> = {
+  menus: '菜单',
+  permissions: '权限',
+  capabilities: '能力',
+  dashboardCards: '仪表盘卡片',
+  frontendModules: '前端模块',
+  httpEndpoints: '端点',
+  commands: '指令',
+  messageInteractions: '消息交互',
+  aiTools: 'AI 工具',
+  agents: 'Agent',
+  exposedServices: '暴露服务',
+}
+
+function diffEntries(event: PluginLifecycleEventPayload): PluginRuntimeAssetsDiffEntry[] {
+  return event.assetsDiff?.entries || []
+}
+
+function diffSummary(event: PluginLifecycleEventPayload) {
+  const parts: string[] = []
+  for (const entry of diffEntries(event)) {
+    const label = DIFF_CATEGORY_TEXT[entry.category] || entry.category
+    if (entry.added.length) {
+      parts.push(`+${entry.added.length} ${label}`)
+    }
+    if (entry.removed.length) {
+      parts.push(`-${entry.removed.length} ${label}`)
+    }
+  }
+  return parts.join('、')
+}
+
+function diffEntryText(entry: PluginRuntimeAssetsDiffEntry) {
+  const label = DIFF_CATEGORY_TEXT[entry.category] || entry.category
+  const parts: string[] = []
+  if (entry.added.length) {
+    parts.push(`新增 ${entry.added.join('、')}`)
+  }
+  if (entry.removed.length) {
+    parts.push(`移除 ${entry.removed.join('、')}`)
+  }
+  return `${label}：${parts.join('；')}`
+}
+
+function toggleDiff(index: number) {
+  const next = new Set(expandedDiffs.value)
+  if (next.has(index)) {
+    next.delete(index)
+  }
+  else {
+    next.add(index)
+  }
+  expandedDiffs.value = next
+}
 
 const devModeText = computed(() => {
   if (!store.status) {
@@ -126,6 +183,18 @@ function formatDuration(ms?: number) {
         <div v-if="event.errorMessage" class="event-row__error">
           {{ event.errorMessage }}
         </div>
+        <button
+          v-if="diffEntries(event).length" type="button" class="event-row__diff"
+          :aria-expanded="expandedDiffs.has(index)" @click="toggleDiff(index)"
+        >
+          <FaIcon :name="expandedDiffs.has(index) ? 'i-ri:arrow-down-s-line' : 'i-ri:arrow-right-s-line'" class="size-3" />
+          {{ diffSummary(event) }}
+        </button>
+        <ul v-if="expandedDiffs.has(index)" class="event-row__diff-detail">
+          <li v-for="entry in diffEntries(event)" :key="entry.category">
+            {{ diffEntryText(entry) }}
+          </li>
+        </ul>
       </div>
       <span class="text-xs text-secondary-foreground/60 shrink-0">
         {{ formatDuration(event.durationMs) }} {{ formatTime(event.occurredAt) }}
@@ -234,6 +303,37 @@ function formatDuration(ms?: number) {
 .event-row__error {
   color: var(--color-danger-6, var(--color-danger, #f53f3f));
   font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.event-row__diff {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  padding: 1px 0;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-3);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.event-row__diff:hover {
+  color: var(--color-text-1);
+}
+
+.event-row__diff-detail {
+  padding: 4px 8px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-3);
+  list-style: none;
+  background: var(--color-fill-1);
+  border-radius: 4px;
+}
+
+.event-row__diff-detail li {
   overflow-wrap: anywhere;
 }
 
