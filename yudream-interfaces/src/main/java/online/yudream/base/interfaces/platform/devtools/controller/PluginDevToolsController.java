@@ -15,6 +15,7 @@ import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevPluginRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatusRes;
+import online.yudream.base.interfaces.platform.devtools.res.PluginDisablePreviewRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
 import online.yudream.base.interfaces.platform.devtools.service.PluginDevToolsSseBridge;
@@ -62,6 +63,12 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看插件运行时资产", module = "开发者工具", desc = "查看插件注册的端点、权限、菜单、指令、工具等资产")
     public Result<PluginRuntimeAssetsRes> assets(@PathVariable String code) {
         return Result.ok(PluginDevToolsWebAssembler.toRes(devToolsAppService.assets(code)));
+    }
+
+    @GetMapping("/plugins/{code}/disable-preview")
+    @PermissionRegister(code = "platform:plugin-devtools:view", name = "预览插件禁用影响", module = "开发者工具", desc = "计算禁用指定插件时受影响的启用中硬依赖方、软依赖方与卸载阻塞")
+    public Result<PluginDisablePreviewRes> disablePreview(@PathVariable String code) {
+        return Result.ok(PluginDevToolsWebAssembler.toRes(devToolsAppService.disablePreview(code)));
     }
 
     @PostMapping("/plugins/{code}/reload")

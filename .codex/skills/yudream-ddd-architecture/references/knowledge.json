@@ -287,6 +287,17 @@
         "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/service/MilkyPluginEventDispatcher.java",
         "yudream-frontend/apps/core-arco-design-vue/src/layouts/components/PluginDevtools/panels/QqSandboxPanel.vue"
       ]
+    },
+    {
+      "key": "plugin-dependency-graph-preview",
+      "title": "插件依赖图与禁用级联预览",
+      "summary": "devtools 插件清单（GET /plugins）携带 depend/softdepend 依赖列表供前端构依赖图；GET /plugins/{code}/disable-preview 按运行时网关状态计算禁用影响：blockers=启用中的传递硬依赖方（按建议禁用顺序，最外层在前）、softDependents=启用中的直接软依赖方、unloadBlockers=已加载的直接硬/软依赖方。注意 PluginAppService.listInstalled() 的 DTO loaded/enabled 恒为 false，需要真实运行状态时必须用 PluginRuntimeGateway.loaded/enabled。前端在 PluginAssetsPanel 清单工具栏切换依赖图视图，卡片「禁用预览」弹窗展示三段影响。",
+      "files": [
+        "yudream-application/src/main/java/online/yudream/base/application/platform/devtools/service/PluginDevToolsAppService.java",
+        "yudream-application/src/main/java/online/yudream/base/application/platform/devtools/dto/PluginDisablePreviewDTO.java",
+        "yudream-interfaces/src/main/java/online/yudream/base/interfaces/platform/devtools/controller/PluginDevToolsController.java",
+        "yudream-frontend/apps/core-arco-design-vue/src/layouts/components/PluginDevtools/panels/PluginAssetsPanel.vue"
+      ]
     }
   ],
   "pitfalls": [

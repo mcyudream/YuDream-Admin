@@ -7,6 +7,7 @@ import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceSummaryDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
+import online.yudream.base.application.platform.devtools.dto.PluginDisablePreviewDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
@@ -22,6 +23,7 @@ import online.yudream.base.interfaces.platform.devtools.res.AgentTraceSummaryRes
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevPluginRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatusRes;
+import online.yudream.base.interfaces.platform.devtools.res.PluginDisablePreviewRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
 import org.springframework.util.StringUtils;
@@ -104,6 +106,17 @@ public final class PluginDevToolsWebAssembler {
                 .enabled(dto.isEnabled())
                 .devMode(dto.isDevMode())
                 .devProject(dto.getDevProject())
+                .dependencies(dto.getDependencies())
+                .softDependencies(dto.getSoftDependencies())
+                .build();
+    }
+
+    public static PluginDisablePreviewRes toRes(PluginDisablePreviewDTO dto) {
+        return PluginDisablePreviewRes.builder()
+                .code(dto.getCode())
+                .blockers(dto.getBlockers())
+                .softDependents(dto.getSoftDependents())
+                .unloadBlockers(dto.getUnloadBlockers())
                 .build();
     }
 

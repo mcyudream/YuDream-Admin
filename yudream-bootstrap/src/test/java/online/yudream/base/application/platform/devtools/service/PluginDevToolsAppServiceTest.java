@@ -16,9 +16,11 @@ import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
+import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.system.log.repo.SystemLogRepo;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -40,8 +42,11 @@ class PluginDevToolsAppServiceTest {
     private final AgentTraceProperties traceProperties = new AgentTraceProperties();
     private final org.springframework.context.ApplicationEventPublisher eventPublisher =
             mock(org.springframework.context.ApplicationEventPublisher.class);
+    private final PluginModuleRepo pluginModuleRepo = mock(PluginModuleRepo.class);
+    private final SystemLogRepo systemLogRepo = mock(SystemLogRepo.class);
     private final PluginDevToolsAppService service = new PluginDevToolsAppService(
-            runtimeGateway, pluginAppService, traceRepo, traceProperties, eventPublisher);
+            runtimeGateway, pluginAppService, traceRepo, traceProperties, eventPublisher,
+            pluginModuleRepo, systemLogRepo);
 
     @Test
     void statusAggregatesRuntimeCountsAndSwitches() {
@@ -165,5 +170,53 @@ class PluginDevToolsAppServiceTest {
         assertThat(page.getList()).hasSize(1);
         assertThat(page.getList().getFirst().getAgentId()).isEqualTo("-1");
         assertThat(page.getList().getFirst().getStatus()).isEqualTo(AgentTraceStatus.RUNNING);
+    }
+
+    @Test
+    void disablePreviewRejectsUnknownPlugin() {
+        when(pluginAppService.listInstalled()).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.disablePreview("missing"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("插件不存在");
+    }
+
+    @Test
+    void disablePreviewComputesTransitiveHardBlockersInDisableOrder() {
+        // c 硬依赖 b、b 硬依赖 a；soft 软依赖 a 且已启用；loaded-only 硬依赖 a 但仅加载未启用
+        when(pluginAppService.listInstalled()).thenReturn(List.of(
+                PluginModuleDTO.builder().code("a").build(),
+                PluginModuleDTO.builder().code("b").dependencies(List.of("a")).build(),
+                PluginModuleDTO.builder().code("c").dependencies(List.of("b")).build(),
+                PluginModuleDTO.builder().code("soft").softDependencies(List.of("a")).build(),
+                PluginModuleDTO.builder().code("loaded-only").dependencies(List.of("a")).build(),
+                PluginModuleDTO.builder().code("unrelated").build()));
+        when(runtimeGateway.enabled(any())).thenReturn(false);
+        when(runtimeGateway.enabled("b")).thenReturn(true);
+        when(runtimeGateway.enabled("c")).thenReturn(true);
+        when(runtimeGateway.enabled("soft")).thenReturn(true);
+        when(runtimeGateway.loaded(any())).thenReturn(false);
+        when(runtimeGateway.loaded("b")).thenReturn(true);
+        when(runtimeGateway.loaded("loaded-only")).thenReturn(true);
+
+        var preview = service.disablePreview("a");
+
+        assertThat(preview.getCode()).isEqualTo("a");
+        // 建议禁用顺序：最外层依赖方 c 在前，b 随后；loaded-only 未启用不构成禁用阻塞
+        assertThat(preview.getBlockers()).containsExactly("c", "b");
+        assertThat(preview.getSoftDependents()).containsExactly("soft");
+        assertThat(preview.getUnloadBlockers()).containsExactly("b", "loaded-only");
+    }
+
+    @Test
+    void disablePreviewReturnsEmptyListsWhenNoDependents() {
+        when(pluginAppService.listInstalled()).thenReturn(List.of(
+                PluginModuleDTO.builder().code("solo").build()));
+
+        var preview = service.disablePreview("solo");
+
+        assertThat(preview.getBlockers()).isEmpty();
+        assertThat(preview.getSoftDependents()).isEmpty();
+        assertThat(preview.getUnloadBlockers()).isEmpty();
     }
 }

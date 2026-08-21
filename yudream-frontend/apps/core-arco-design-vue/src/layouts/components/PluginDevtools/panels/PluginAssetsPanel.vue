@@ -4,6 +4,7 @@ import type {
   PluginCommandAsset,
   PluginCommandTestResult,
   PluginDevPlugin,
+  PluginDisablePreview,
   PluginHttpEndpointAsset,
   PluginRuntimeAssets,
 } from '@/api/modules/platform-devtools'
@@ -22,6 +23,67 @@ const assets = ref<PluginRuntimeAssets | null>(null)
 const assetsLoading = ref(false)
 
 const selectedPlugin = computed(() => plugins.value.find(item => item.code === selectedCode.value))
+
+// ---------- 依赖图与禁用级联预览 ----------
+const viewMode = ref<'list' | 'graph'>('list')
+
+const pluginCodeSet = computed(() => new Set(plugins.value.map(plugin => plugin.code)))
+
+/** 反向依赖索引：被依赖插件编码 → 依赖方编码列表（硬/软分开） */
+const reverseDependencies = computed(() => {
+  const hard = new Map<string, string[]>()
+  const soft = new Map<string, string[]>()
+  for (const plugin of plugins.value) {
+    for (const dependency of plugin.dependencies || []) {
+      hard.set(dependency, [...(hard.get(dependency) || []), plugin.code])
+    }
+    for (const dependency of plugin.softDependencies || []) {
+      soft.set(dependency, [...(soft.get(dependency) || []), plugin.code])
+    }
+  }
+  return { hard, soft }
+})
+
+function dependencyMissing(code: string) {
+  return !pluginCodeSet.value.has(code)
+}
+
+function hasAnyDependency(plugin: PluginDevPlugin) {
+  return Boolean(
+    plugin.dependencies?.length
+    || plugin.softDependencies?.length
+    || reverseDependencies.value.hard.get(plugin.code)?.length
+    || reverseDependencies.value.soft.get(plugin.code)?.length,
+  )
+}
+
+const previewOpen = ref(false)
+const previewLoading = ref(false)
+const preview = ref<PluginDisablePreview | null>(null)
+
+const previewSafe = computed(() => Boolean(
+  preview.value
+  && !preview.value.blockers.length
+  && !preview.value.softDependents.length
+  && !preview.value.unloadBlockers.length,
+))
+
+async function openDisablePreview(code: string) {
+  previewOpen.value = true
+  previewLoading.value = true
+  preview.value = null
+  try {
+    const res = await apiDevtools.disablePreview(code)
+    preview.value = res.data
+  }
+  catch {
+    // 拦截器已提示
+    previewOpen.value = false
+  }
+  finally {
+    previewLoading.value = false
+  }
+}
 
 onMounted(loadPlugins)
 
@@ -230,36 +292,107 @@ async function runCommandTest() {
           {{ plugins.length }}
         </FaTag>
         <div class="flex-1" />
+        <FaButton
+          variant="outline"
+          size="icon"
+          :title="viewMode === 'graph' ? '返回清单视图' : '依赖图：查看插件间硬/软依赖与禁用影响'"
+          @click="viewMode = viewMode === 'graph' ? 'list' : 'graph'"
+        >
+          <FaIcon :name="viewMode === 'graph' ? 'i-ri:list-check-2' : 'i-ri:node-tree'" />
+        </FaButton>
         <FaButton variant="outline" size="icon" :loading="pluginsLoading" title="刷新插件列表" @click="loadPlugins">
           <FaIcon name="i-ri:refresh-line" />
         </FaButton>
       </div>
 
-      <div
-        v-for="plugin in plugins"
-        :key="plugin.code"
-        class="plugin-row"
-        @click="openPlugin(plugin.code)"
-      >
-        <div class="plugin-row__main">
-          <div class="plugin-row__title">
-            <span class="font-medium">{{ plugin.name }}</span>
+      <template v-if="viewMode === 'graph'">
+        <div v-for="plugin in plugins" :key="plugin.code" class="dep-card">
+          <div class="dep-card__head">
+            <span class="dep-card__name font-medium">{{ plugin.name }}</span>
             <FaTag :variant="statusVariant(plugin)" class="text-xs">
               {{ plugin.status }}
             </FaTag>
             <FaTag v-if="plugin.devMode" class="text-xs">
               开发模式
             </FaTag>
-            <FaTag v-if="plugin.devMode && plugin.devProject" variant="outline" class="text-xs">
-              {{ plugin.devProject.source === 'CONFIG' ? '配置文件' : '面板登记' }}
-            </FaTag>
+            <div class="flex-1" />
+            <FaButton variant="ghost" size="sm" title="预览禁用该插件时的级联影响" @click="openDisablePreview(plugin.code)">
+              <FaIcon name="i-ri:eye-line" />
+              禁用预览
+            </FaButton>
           </div>
-          <div class="plugin-row__sub">
+          <div class="dep-card__code">
             {{ plugin.code }}<span v-if="plugin.version"> · v{{ plugin.version }}</span>
           </div>
+          <div v-if="plugin.dependencies?.length" class="dep-row">
+            <span class="dep-label">依赖</span>
+            <FaTag
+              v-for="dependency in plugin.dependencies"
+              :key="dependency"
+              :variant="dependencyMissing(dependency) ? 'destructive' : 'outline'"
+              class="text-xs font-mono"
+              :title="dependencyMissing(dependency) ? '硬依赖未安装，该插件无法启用' : ''"
+            >
+              {{ dependency }}
+            </FaTag>
+          </div>
+          <div v-if="plugin.softDependencies?.length" class="dep-row">
+            <span class="dep-label">可选依赖</span>
+            <FaTag
+              v-for="dependency in plugin.softDependencies"
+              :key="dependency"
+              :variant="dependencyMissing(dependency) ? 'destructive' : 'secondary'"
+              class="text-xs font-mono"
+              :title="dependencyMissing(dependency) ? '可选依赖未安装，相关集成不可用' : ''"
+            >
+              {{ dependency }}
+            </FaTag>
+          </div>
+          <div v-if="reverseDependencies.hard.get(plugin.code)?.length" class="dep-row">
+            <span class="dep-label">被依赖</span>
+            <FaTag v-for="dependent in reverseDependencies.hard.get(plugin.code)" :key="dependent" variant="outline" class="text-xs font-mono">
+              {{ dependent }}
+            </FaTag>
+          </div>
+          <div v-if="reverseDependencies.soft.get(plugin.code)?.length" class="dep-row">
+            <span class="dep-label">被可选依赖</span>
+            <FaTag v-for="dependent in reverseDependencies.soft.get(plugin.code)" :key="dependent" variant="secondary" class="text-xs font-mono">
+              {{ dependent }}
+            </FaTag>
+          </div>
+          <div v-if="!hasAnyDependency(plugin)" class="dep-row dep-row--empty">
+            无依赖关系
+          </div>
         </div>
-        <FaIcon name="i-ri:arrow-right-s-line" class="text-secondary-foreground/60 shrink-0 size-4" />
-      </div>
+      </template>
+
+      <template v-else>
+        <div
+          v-for="plugin in plugins"
+          :key="plugin.code"
+          class="plugin-row"
+          @click="openPlugin(plugin.code)"
+        >
+          <div class="plugin-row__main">
+            <div class="plugin-row__title">
+              <span class="font-medium">{{ plugin.name }}</span>
+              <FaTag :variant="statusVariant(plugin)" class="text-xs">
+                {{ plugin.status }}
+              </FaTag>
+              <FaTag v-if="plugin.devMode" class="text-xs">
+                开发模式
+              </FaTag>
+              <FaTag v-if="plugin.devMode && plugin.devProject" variant="outline" class="text-xs">
+                {{ plugin.devProject.source === 'CONFIG' ? '配置文件' : '面板登记' }}
+              </FaTag>
+            </div>
+            <div class="plugin-row__sub">
+              {{ plugin.code }}<span v-if="plugin.version"> · v{{ plugin.version }}</span>
+            </div>
+          </div>
+          <FaIcon name="i-ri:arrow-right-s-line" class="text-secondary-foreground/60 shrink-0 size-4" />
+        </div>
+      </template>
       <div v-if="!plugins.length && !pluginsLoading" class="panel-empty">
         暂无已安装插件
       </div>
@@ -575,6 +708,62 @@ async function runCommandTest() {
         </div>
       </div>
     </FaModal>
+
+    <!-- 禁用级联预览 -->
+    <FaModal v-model="previewOpen" title="禁用级联预览" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+      <div v-if="previewLoading" class="panel-empty">
+        正在计算依赖影响…
+      </div>
+      <div v-else-if="preview" class="preview">
+        <div class="preview__target">
+          <span class="text-xs text-secondary-foreground/70">目标插件</span>
+          <span class="text-xs font-mono">{{ preview.code }}</span>
+        </div>
+        <div v-if="previewSafe" class="preview-safe">
+          <FaIcon name="i-ri:checkbox-circle-line" class="shrink-0 size-4" />
+          <span>没有其他插件依赖它，可安全禁用或卸载。</span>
+        </div>
+        <template v-else>
+          <div v-if="preview.blockers.length" class="preview-section">
+            <div class="preview-section__title">
+              禁用将被运行时拒绝 — 以下已启用插件硬依赖它，需按顺序先禁用：
+            </div>
+            <div class="preview-chain">
+              <template v-for="blocker in preview.blockers" :key="blocker">
+                <FaTag variant="destructive" class="text-xs font-mono">
+                  {{ blocker }}
+                </FaTag>
+                <FaIcon name="i-ri:arrow-right-line" class="text-secondary-foreground/60 shrink-0 size-3.5" />
+              </template>
+              <FaTag variant="outline" class="text-xs font-mono">
+                {{ preview.code }}
+              </FaTag>
+            </div>
+            <span class="preview-hint">顺次禁用左侧插件后，目标插件即可禁用。</span>
+          </div>
+          <div v-if="preview.softDependents.length" class="preview-section">
+            <div class="preview-section__title">
+              可选集成将降级 — 以下已启用插件可选依赖它：
+            </div>
+            <div class="preview-chain">
+              <FaTag v-for="dependent in preview.softDependents" :key="dependent" variant="secondary" class="text-xs font-mono">
+                {{ dependent }}
+              </FaTag>
+            </div>
+          </div>
+          <div v-if="preview.unloadBlockers.length" class="preview-section">
+            <div class="preview-section__title">
+              卸载/重载将被拒绝 — 以下插件已加载且依赖它（需先禁用并卸载）：
+            </div>
+            <div class="preview-chain">
+              <FaTag v-for="dependent in preview.unloadBlockers" :key="dependent" variant="outline" class="text-xs font-mono">
+                {{ dependent }}
+              </FaTag>
+            </div>
+          </div>
+        </template>
+      </div>
+    </FaModal>
   </div>
 </template>
 
@@ -792,5 +981,105 @@ async function runCommandTest() {
 
 .tester__result-body--error {
   color: var(--color-danger-5, var(--color-danger, #f53f3f));
+}
+
+.dep-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+}
+
+.dep-card__head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dep-card__name {
+  color: var(--color-text-1);
+  font-size: 13px;
+}
+
+.dep-card__code {
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-family: monospace;
+}
+
+.dep-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dep-label {
+  flex-shrink: 0;
+  width: 64px;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.dep-row--empty {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview__target {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--color-fill-2);
+}
+
+.preview-safe {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-fill-1, var(--color-bg-3));
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.preview-section__title {
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.preview-chain {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.preview-hint {
+  color: var(--color-text-3);
+  font-size: 12px;
 }
 </style>

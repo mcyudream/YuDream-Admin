@@ -75,6 +75,21 @@ export interface PluginDevPlugin {
   enabled: boolean
   devMode: boolean
   devProject?: PluginDevProject
+  /** 硬依赖插件编码（plugin.yml depend），用于依赖图构图 */
+  dependencies?: string[]
+  /** 软依赖插件编码（plugin.yml softdepend），缺失不阻塞启用但相关集成降级 */
+  softDependencies?: string[]
+}
+
+/** 插件禁用级联预览（后端按运行时状态计算） */
+export interface PluginDisablePreview {
+  code: string
+  /** 已启用的传递硬依赖方，按建议禁用顺序排列 */
+  blockers: string[]
+  /** 已启用的直接软依赖方，禁用后其可选集成降级 */
+  softDependents: string[]
+  /** 已加载的直接依赖方，存在时卸载/重载将被拒绝 */
+  unloadBlockers: string[]
 }
 
 export interface PluginMenuAsset {
@@ -358,6 +373,10 @@ export default {
 
   assets: (code: string) =>
     systemClient.get<unknown, ApiResponse<PluginRuntimeAssets>>(`api/platform/plugin-devtools/plugins/${code}/assets`),
+
+  /** 禁用级联预览：列出启用中的传递硬依赖方、软依赖方与卸载阻塞 */
+  disablePreview: (code: string) =>
+    systemClient.get<unknown, ApiResponse<PluginDisablePreview>>(`api/platform/plugin-devtools/plugins/${code}/disable-preview`),
 
   reload: (code: string) =>
     systemClient.post<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/plugins/${code}/reload`),

@@ -9,6 +9,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 
 import java.io.Serial;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * 开发者工具插件清单项响应。
@@ -31,4 +32,8 @@ public class PluginDevPluginRes implements Serializable {
     private boolean enabled;
     private boolean devMode;
     private PluginDevProjectInfo devProject;
+    /** 硬依赖插件编码（plugin.yml depend） */
+    private List<String> dependencies;
+    /** 软依赖插件编码（plugin.yml softdepend） */
+    private List<String> softDependencies;
 }
