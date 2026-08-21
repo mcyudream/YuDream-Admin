@@ -136,7 +136,8 @@ public final class QqSandboxExecutionScope implements AutoCloseable {
         State state = CURRENT.get();
         if (state == null) return CompletableFuture.completedFuture(null);
         CompletableFuture<Void> result = new CompletableFuture<>();
-        CompletableFuture.runAsync(() -> {
+        // 轮询等待可能持续整个沙盒超时窗口，用独立虚拟线程而不是 commonPool，避免长时间占用共享池
+        Thread.ofVirtual().name("qq-sandbox-await-", 0).start(() -> {
             try {
                 int seen = -1;
                 while (!result.isCancelled()) {
