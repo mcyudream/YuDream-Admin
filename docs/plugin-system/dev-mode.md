@@ -60,6 +60,7 @@ yudream:
   1. `src/main/java` 变化且 `auto-compile` → 防抖后在模块目录执行 `compile-command`；编译失败作为事件推送，**不会**用陈旧产物重载，也不会影响宿主进程；
   2. `target/classes` 变化 → 防抖 → 走 禁用 → 卸载 → 目录加载 → 恢复启用 管线；
   3. 前端 `dist` 变化 → 发布前端重载事件，经 SSE 桥到调试浮窗，触发当前插件运行时页面重挂载远程模块（重挂载会重置页面状态，不是状态保持的 HMR）。
+- **路由/菜单自动重建**：浮窗 SSE 收到 RELOAD 或 FRONTEND_RELOAD 成功事件后，除重挂载当前插件页面外，还会防抖调用 `refreshDynamicRoutes` 重新拉取后端菜单与前端 manifest 重建动态路由，插件新增/变更的菜单项无需手动刷新页面即可出现；同时清空公开路由（publicAccess）memo，下次未登录导航按新 manifest 注册。
 
 ### 限制
 

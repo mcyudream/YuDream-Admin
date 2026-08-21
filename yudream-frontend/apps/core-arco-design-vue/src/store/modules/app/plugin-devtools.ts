@@ -10,7 +10,10 @@ import type {
 } from '@/api/modules/platform-devtools'
 import type { QqSandboxLaunchPayload } from '@/api/modules/platform-devtools-qq-sandbox'
 import apiDevtools from '@/api/modules/platform-devtools'
+import router from '@/router'
+import { refreshDynamicRoutes } from '@/router/dynamic'
 import eventBus from '@/utils/eventBus'
+import { resetPublicPluginRoutes } from './plugin-route-runtime'
 
 /** 抽屉页面标识，与左侧竖向导航一一对应 */
 export type PluginDevtoolsPage = 'overview' | 'plugins' | 'qq-sandbox' | 'traces' | 'audit' | 'settings'
@@ -32,6 +35,7 @@ export interface LiveTrace {
 const LIFECYCLE_EVENT_LIMIT = 100
 const LIVE_TRACE_LIMIT = 20
 const RECONNECT_DELAY_MS = 3_000
+const ROUTE_REFRESH_DEBOUNCE_MS = 800
 const ACTIVE_PAGE_STORAGE_KEY = 'pluginDevtoolsPage'
 const DEVTOOLS_PAGES: PluginDevtoolsPage[] = ['overview', 'plugins', 'qq-sandbox', 'traces', 'audit', 'settings']
 
@@ -61,6 +65,7 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   let started = false
   let lifecycleAbort: AbortController | null = null
   let traceAbort: AbortController | null = null
+  let routeRefreshTimer: ReturnType<typeof setTimeout> | null = null
 
   async function loadStatus(force = false) {
     if (statusLoaded.value && !force) {
@@ -140,6 +145,10 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     traceAbort?.abort()
     lifecycleAbort = null
     traceAbort = null
+    if (routeRefreshTimer) {
+      clearTimeout(routeRefreshTimer)
+      routeRefreshTimer = null
+    }
     lifecycleConnected.value = false
     traceConnected.value = false
   }
@@ -169,10 +178,35 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
       lifecycleEvents.value.length = LIFECYCLE_EVENT_LIMIT
     }
     notify()
-    // 热重载联动：前端产物或整体重载成功后，通知当前插件页面重挂载 remote
+    // 热重载联动：前端产物或整体重载成功后，通知当前插件页面重挂载 remote；
+    // 同时防抖重建动态路由与菜单（路由只在登录后一次性注册，不重建必须手动刷新才能看到新插件菜单）
     if (payload.success && (payload.action === 'FRONTEND_RELOAD' || payload.action === 'RELOAD')) {
       eventBus.emit('plugin-devtools:remote-reload', payload.pluginCode)
+      scheduleRouteRefresh()
     }
+  }
+
+  function scheduleRouteRefresh() {
+    const appAccountStore = useAppAccountStore()
+    const appRouteStore = useAppRouteStore()
+    if (!appAccountStore.isLogin || !appRouteStore.isGenerate) {
+      return
+    }
+    if (routeRefreshTimer) {
+      clearTimeout(routeRefreshTimer)
+    }
+    routeRefreshTimer = setTimeout(() => {
+      routeRefreshTimer = null
+      void (async () => {
+        try {
+          resetPublicPluginRoutes()
+          await refreshDynamicRoutes(router)
+        }
+        catch {
+          // 路由重建失败不影响面板事件流，下次导航守卫仍可兜底生成
+        }
+      })()
+    }, ROUTE_REFRESH_DEBOUNCE_MS)
   }
 
   function handleTraceEvent(payload: AgentTraceEventPayload) {
