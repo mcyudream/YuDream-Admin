@@ -789,13 +789,17 @@ function caseTime(item: QqSandboxCase) {
 
       <main class="sandbox-chat">
         <div ref="timelineRef" class="sandbox-timeline">
-          <button
+          <!-- Chromium/WebKit 会把 button 后代的点击重定到 button 本身，img 的 click 永远收不到；用 div+role 保持整卡可选中 -->
+          <div
             v-for="(event, index) in sandbox.events"
             :key="`${event.timestamp || index}:${event.event}`"
-            type="button"
+            role="button"
+            tabindex="0"
             class="timeline-event"
             :class="{ 'timeline-event--selected': sandbox.selectedEvent === event }"
             @click="sandbox.selectedEvent = event"
+            @keydown.enter.prevent="sandbox.selectedEvent = event"
+            @keydown.space.prevent="sandbox.selectedEvent = event"
           >
             <span class="timeline-event__meta">
               <FaTag :variant="isErrorEvent(event) ? 'destructive' : 'secondary'" class="text-xs">
@@ -809,7 +813,7 @@ function caseTime(item: QqSandboxCase) {
               alt="捕获的图片消息" @click.stop="openImagePreview(eventImageSrc(event)!)"
             >
             <span v-else class="timeline-event__content">{{ eventContent(event) }}</span>
-          </button>
+          </div>
           <div v-if="!sandbox.events.length" class="sandbox-empty">
             {{ sessionActive ? '等待 QQ 消息与处理事件' : '点击「启动」即可开聊，消息会广播给全部已启用插件' }}
           </div>
@@ -1144,6 +1148,7 @@ function caseTime(item: QqSandboxCase) {
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-2);
+  cursor: pointer;
 }
 
 .timeline-event:hover,
