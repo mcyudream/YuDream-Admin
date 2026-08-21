@@ -60,6 +60,7 @@ declare global {
   const reactive: typeof import('vue').reactive
   const readonly: typeof import('vue').readonly
   const ref: typeof import('vue').ref
+  const resetPublicPluginRoutes: typeof import('../store/modules/app/plugin-route-runtime').resetPublicPluginRoutes
   const resolveComponent: typeof import('vue').resolveComponent
   const resolvePluginRuntimeRoute: typeof import('../store/modules/app/plugin-route-runtime').resolvePluginRuntimeRoute
   const setActivePinia: typeof import('pinia').setActivePinia
