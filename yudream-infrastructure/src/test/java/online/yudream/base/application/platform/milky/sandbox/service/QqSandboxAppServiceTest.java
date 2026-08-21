@@ -32,11 +32,11 @@ class QqSandboxAppServiceTest {
             session.append("normalized", "plugin.event", session.pluginCode(), Map.of("content", message.content()));
             return CompletableFuture.completedFuture(null);
         };
-        QqSandboxAppService service = new QqSandboxAppService(repo, runtime, null, null, null);
+        QqSandboxAppService service = new QqSandboxAppService(repo, null, runtime, null, null, null);
         var created = service.create(new QqSandboxCreateCmd("demo", "1", "456", "789", "Tester", "999", "group",
                 QqSandboxRandomMode.FORCE_HIT, false, null, 1_000L));
         QqSandboxMessageCmd message = new QqSandboxMessageCmd("789", "Tester", "/hello world", true,
-                List.of("111", "222"), "9007199254740995", "client-1");
+                List.of("111", "222"), "9007199254740995", "client-1", null, null);
 
         var result = service.send(created.id(), message);
 
@@ -50,12 +50,12 @@ class QqSandboxAppServiceTest {
     @Test
     void marksTimedOutDispatchAndReturnsSessionSnapshot() {
         MemoryRepo repo = new MemoryRepo();
-        QqSandboxAppService service = new QqSandboxAppService(repo, (session, message) -> new CompletableFuture<>(), null, null, null);
+        QqSandboxAppService service = new QqSandboxAppService(repo, null, (session, message) -> new CompletableFuture<>(), null, null, null);
         var created = service.create(new QqSandboxCreateCmd("demo", "1", "2", "3", null, "4", "group",
                 QqSandboxRandomMode.FORCE_MISS, false, null, 1L));
 
         var result = service.send(created.id(), new QqSandboxMessageCmd("3", "Tester", "/slow", false,
-                List.of(), null, "client-2"));
+                List.of(), null, "client-2", null, null));
 
         assertEquals("TIMED_OUT", result.status());
         assertTrue(result.timeline().stream().anyMatch(event -> "dispatch.timeout".equals(event.action())));
@@ -63,11 +63,37 @@ class QqSandboxAppServiceTest {
 
     @Test
     void rejectsUnknownSession() {
-        QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(),
+        QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(), null,
                 (session, message) -> CompletableFuture.completedFuture(null), null, null, null);
 
         assertThrows(RuntimeException.class, () -> service.send("missing",
-                new QqSandboxMessageCmd("3", null, "/hello", false, List.of(), null, null)));
+                new QqSandboxMessageCmd("3", null, "/hello", false, List.of(), null, null, null, null)));
+    }
+
+    @Test
+    void validatesMessageRequirementsByEventType() {
+        MemoryRepo repo = new MemoryRepo();
+        QqSandboxAppService service = new QqSandboxAppService(repo, null,
+                (session, message) -> CompletableFuture.completedFuture(null), null, null, null);
+        var created = service.create(createCmd());
+
+        // message 类型必须有内容
+        assertThrows(RuntimeException.class, () -> service.send(created.id(),
+                new QqSandboxMessageCmd("3", null, "  ", false, List.of(), null, null, null, null)));
+        // button 类型必须有按钮 ID，内容可空
+        assertThrows(RuntimeException.class, () -> service.send(created.id(),
+                new QqSandboxMessageCmd("3", null, null, false, List.of(), null, null, "button", " ")));
+        // 未知类型直接拒绝
+        assertThrows(RuntimeException.class, () -> service.send(created.id(),
+                new QqSandboxMessageCmd("3", null, "x", false, List.of(), null, null, "poke", null)));
+
+        var buttonResult = service.send(created.id(),
+                new QqSandboxMessageCmd("3", null, null, false, List.of(), null, null, "button", "wordle:guess"));
+        assertTrue(buttonResult.timeline().stream().anyMatch(event -> "button.synthetic".equals(event.action())));
+
+        var groupResult = service.send(created.id(),
+                new QqSandboxMessageCmd("3", null, null, false, List.of(), null, null, "group_request", null));
+        assertTrue(groupResult.timeline().stream().anyMatch(event -> "group_request.synthetic".equals(event.action())));
     }
 
     @Test
@@ -85,7 +111,7 @@ class QqSandboxAppServiceTest {
     }
 
     private QqSandboxAppService serviceWithConnection(Optional<MilkyConnection> connection) {
-        QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(),
+        QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(), null,
                 (session, message) -> CompletableFuture.completedFuture(null), null, null, null);
         MilkyConnectionRepo repo = (MilkyConnectionRepo) java.lang.reflect.Proxy.newProxyInstance(
                 getClass().getClassLoader(), new Class<?>[]{MilkyConnectionRepo.class},

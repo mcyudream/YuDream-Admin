@@ -31,6 +31,8 @@ public record QqSandboxCaseRes(
             String content,
             boolean mentionSelf,
             List<String> mentions,
-            String replyMessageId
+            String replyMessageId,
+            String type,
+            String buttonId
     ) { }
 }

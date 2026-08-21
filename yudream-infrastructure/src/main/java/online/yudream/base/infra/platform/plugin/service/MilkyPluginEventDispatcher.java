@@ -81,6 +81,10 @@ public class MilkyPluginEventDispatcher {
                 dispatchGroupRequest(connectionId, event, data, additionalReferrer);
                 return;
             }
+            if ("button_click".equals(event.eventType())) {
+                dispatchButtonClick(connectionId, event, data, additionalReferrer);
+                return;
+            }
             if (!isMessageEvent(event.eventType())) {
                 return;
             }
@@ -146,6 +150,27 @@ public class MilkyPluginEventDispatcher {
 
     static Map<String, Object> eventData(online.yudream.base.domain.platform.milky.model.MilkyModels.Event event) {
         return event == null || event.data() == null ? Map.of() : event.data();
+    }
+
+    /**
+     * 按钮回调事件：buttonId 路由到插件 onButton 交互；生产链路暂不产生该事件类型，仅 QQ 沙盒合成
+     */
+    private void dispatchButtonClick(String connectionId,
+                                     online.yudream.base.domain.platform.milky.model.MilkyModels.Event event,
+                                     Map<String, Object> data, Map<String, Object> additionalReferrer) {
+        String buttonId = firstText(data, "button_id", "buttonId", "id");
+        if (buttonId == null) {
+            log.warn("Ignoring Milky button click without button id: connectionId={}, selfId={}, messageSeq={}",
+                    connectionId, event.selfId(), text(data.get("message_seq")));
+            return;
+        }
+        String userId = messageUserId(data);
+        String channelId = messageChannelId(data);
+        Map<String, Object> referrer = new java.util.LinkedHashMap<>(additionalReferrer);
+        PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), "button_click", "milky", userId, channelId,
+                null, buttonId, null, referrer, event.eventType(), data, connectionId,
+                event.selfId(), text(data.get("message_seq")));
+        runtime.publishMessagingEvent(pluginEvent);
     }
 
     static GroupRequest groupRequest(Map<String, Object> data) {

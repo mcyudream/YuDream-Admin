@@ -120,7 +120,10 @@ export function useQqSandbox() {
   }
 
   async function sendMessage(payload: QqSandboxSendMessagePayload) {
-    if (!session.value || !payload.content.trim()) {
+    const type = payload.type || 'message'
+    // 内容必填仅针对普通消息；按钮回调用 buttonId，入群请求的验证留言可空
+    const ready = type === 'button' ? Boolean(payload.buttonId?.trim()) : type === 'message' ? Boolean(payload.content.trim()) : true
+    if (!session.value || !ready) {
       return
     }
     sending.value = true
@@ -128,6 +131,7 @@ export function useQqSandbox() {
       const res = await apiQqSandbox.sendMessage(session.value.sessionId, {
         ...payload,
         content: payload.content.trim(),
+        buttonId: payload.buttonId?.trim() || undefined,
       })
       // 不在本地回显消息事件：SSE 的 message.synthetic 会立即投递同一条消息，本地再追加会让时间线出现重复
       if (res.data) {

@@ -27,12 +27,15 @@ public record QqSandboxCaseSaveRequest(
             List<String> simulateRoles
     ) { }
 
+    // content 是否必填取决于 type（message 必填、button 用 buttonId、group_request 可空），由应用层按类型校验
     public record QqSandboxCaseStepRequest(
             String senderId,
             String nickname,
-            @NotBlank(message = "消息步骤内容不能为空") String content,
+            String content,
             boolean mentionSelf,
             List<String> mentions,
-            String replyMessageId
+            String replyMessageId,
+            String type,
+            String buttonId
     ) { }
 }

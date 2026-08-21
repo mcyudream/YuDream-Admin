@@ -277,6 +277,16 @@
     {
       "key": "plugin-reload-assets-diff",
       "text": "重载资产差异：domain valobj PluginRuntimeAssetsDiff.diff(before, after) 按类别（menus/permissions/capabilities/dashboardCards/frontendModules/httpEndpoints/commands/messageInteractions/aiTools/agents/exposedServices）产出 Entry(category, added, removed)，仅收录有变化的类别；各类标识=菜单 path、权限/能力/卡片 code、前端模块 moduleName、端点 method+fullPath、指令 command、交互 command(空则 kind)、AI 工具 name、Agent code、exposedServices 原串。PluginLifecycleEvent 增加 assetsDiff 分量（保留 7 参重载构造兼容），PluginDevModeReloadListener 在 reloadDevPlugin 前后各取 runtimeGateway.runtimeAssets(code) 快照，RELOAD 成功事件携带 diff；概览页动态行可展开 +/- 类别摘要与明细。"
+    },
+    {
+      "key": "qq-sandbox-event-types",
+      "summary": "QQ 沙盒事件类型：注入消息 type 支持 message/group_request/button；group_request 复用生产 dispatchGroupRequest（data 需 group_id/user_id/request_id/comment），button 合成 button_click 由 MilkyPluginEventDispatcher 新分支构造带 buttonId 的 PluginEvent 路由 onButton，JarPluginRuntimeGateway 把 button_click 按 native 判定；入站 action 区分 message.synthetic/group_request.synthetic/button.synthetic，用例步骤持久化 type/buttonId（旧 JSON 缺省 message）；面板支持时间线导出 JSON（纯前端 Blob 下载）。",
+      "files": [
+        "yudream-application/src/main/java/online/yudream/base/application/platform/milky/sandbox/cmd/QqSandboxMessageCmd.java",
+        "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/service/QqSandboxRuntimeGatewayImpl.java",
+        "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/service/MilkyPluginEventDispatcher.java",
+        "yudream-frontend/apps/core-arco-design-vue/src/layouts/components/PluginDevtools/panels/QqSandboxPanel.vue"
+      ]
     }
   ],
   "pitfalls": [

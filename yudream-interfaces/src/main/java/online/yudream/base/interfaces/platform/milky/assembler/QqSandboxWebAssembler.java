@@ -49,7 +49,8 @@ public final class QqSandboxWebAssembler {
 
     public static QqSandboxMessageCmd toCmd(QqSandboxMessageRequest request) {
         return new QqSandboxMessageCmd(request.senderId(), request.nickname(), request.content(), request.mentionSelf(),
-                request.mentions(), request.replyMessageId(), request.clientMessageId());
+                request.mentions(), request.replyMessageId(), request.clientMessageId(), request.type(),
+                request.buttonId());
     }
 
     public static QqSandboxCaseSaveCmd toCmd(QqSandboxCaseSaveRequest request) {
@@ -60,7 +61,7 @@ public final class QqSandboxWebAssembler {
                 setup.simulateRoles());
         List<QqSandboxCaseStep> steps = request.steps().stream()
                 .map(step -> new QqSandboxCaseStep(step.senderId(), step.nickname(), step.content(),
-                        step.mentionSelf(), step.mentions(), step.replyMessageId()))
+                        step.mentionSelf(), step.mentions(), step.replyMessageId(), step.type(), step.buttonId()))
                 .toList();
         return new QqSandboxCaseSaveCmd(request.id(), request.name(), request.description(), caseSetup, steps);
     }
@@ -73,7 +74,8 @@ public final class QqSandboxWebAssembler {
                 setup.simulateRoles());
         List<QqSandboxCaseRes.QqSandboxCaseStepRes> steps = dto.steps().stream()
                 .map(step -> new QqSandboxCaseRes.QqSandboxCaseStepRes(step.senderId(), step.nickname(),
-                        step.content(), step.mentionSelf(), step.mentions(), step.replyMessageId()))
+                        step.content(), step.mentionSelf(), step.mentions(), step.replyMessageId(), step.type(),
+                        step.buttonId()))
                 .toList();
         return new QqSandboxCaseRes(dto.id(), dto.name(), dto.description(), dto.createdAt(), dto.updatedAt(),
                 setupRes, steps);

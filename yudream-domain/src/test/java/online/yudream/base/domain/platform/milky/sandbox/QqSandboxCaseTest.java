@@ -17,7 +17,15 @@ class QqSandboxCaseTest {
     }
 
     private static QqSandboxCaseStep step(String content) {
-        return new QqSandboxCaseStep(null, null, content, true, null, null);
+        return new QqSandboxCaseStep(null, null, content, true, null, null, null, null);
+    }
+
+    @Test
+    void stepDefaultsTypeToMessage() {
+        QqSandboxCaseStep step = step("你好");
+        // 旧版用例 JSON 没有 type 字段，反序列化后必须归一化为 message
+        assertEquals("message", step.type());
+        assertNull(step.buttonId());
     }
 
     @Test

@@ -77,11 +77,9 @@ public class QqSandboxAppService {
 
     public QqSandboxSessionDTO send(String sessionId, QqSandboxMessageCmd cmd) {
         QqSandboxSession session = session(sessionId);
-        if (cmd == null || cmd.content() == null || cmd.content().isBlank()) {
-            throw new BizException("QQ 沙箱消息不能为空");
-        }
+        validateMessage(cmd);
         session.running();
-        session.append("input", "message.synthetic", session.pluginCode(), inputPayload(session, cmd));
+        session.append("input", syntheticAction(cmd), session.pluginCode(), inputPayload(session, cmd));
         java.util.concurrent.CompletableFuture<Void> execution = runtime.dispatch(session, cmd).toCompletableFuture();
         try {
             execution.get(session.timeoutMillis(), TimeUnit.MILLISECONDS);
@@ -225,8 +223,23 @@ public class QqSandboxAppService {
             throw new BizException("沙盒用例至少包含一条消息步骤");
         }
         for (QqSandboxCaseStep step : cmd.steps()) {
-            if (step == null || step.content() == null || step.content().isBlank()) {
+            if (step == null) {
                 throw new BizException("沙盒用例存在内容为空的消息步骤");
+            }
+            switch (step.type()) {
+                case "message" -> {
+                    if (step.content() == null || step.content().isBlank()) {
+                        throw new BizException("沙盒用例存在内容为空的消息步骤");
+                    }
+                }
+                case "button" -> {
+                    if (step.buttonId() == null || step.buttonId().isBlank()) {
+                        throw new BizException("沙盒用例存在缺少按钮 ID 的按钮回调步骤");
+                    }
+                }
+                case "group_request" -> {
+                }
+                default -> throw new BizException("沙盒用例存在不支持的事件类型: " + step.type());
             }
         }
         Instant now = Instant.now();
@@ -283,14 +296,46 @@ public class QqSandboxAppService {
 
     private Map<String, Object> inputPayload(QqSandboxSession session, QqSandboxMessageCmd cmd) {
         Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", cmd.type());
         payload.put("senderId", senderId(session, cmd));
         payload.put("nickname", cmd.nickname() == null ? "" : cmd.nickname());
-        payload.put("content", cmd.content());
+        payload.put("content", cmd.content() == null ? "" : cmd.content());
         payload.put("mentionSelf", cmd.mentionSelf());
         payload.put("mentions", cmd.mentions());
         payload.put("replyMessageId", cmd.replyMessageId() == null ? "" : cmd.replyMessageId());
         payload.put("clientMessageId", cmd.clientMessageId() == null ? "" : cmd.clientMessageId());
+        payload.put("buttonId", cmd.buttonId() == null ? "" : cmd.buttonId());
         return payload;
+    }
+
+    /** 事件类型决定必填项：消息要内容，按钮回调要按钮 ID，入群请求的验证留言可空 */
+    private void validateMessage(QqSandboxMessageCmd cmd) {
+        if (cmd == null) {
+            throw new BizException("QQ 沙箱消息不能为空");
+        }
+        switch (cmd.type()) {
+            case "message" -> {
+                if (cmd.content() == null || cmd.content().isBlank()) {
+                    throw new BizException("QQ 沙箱消息不能为空");
+                }
+            }
+            case "button" -> {
+                if (cmd.buttonId() == null || cmd.buttonId().isBlank()) {
+                    throw new BizException("QQ 沙箱按钮回调必须提供按钮 ID");
+                }
+            }
+            case "group_request" -> {
+            }
+            default -> throw new BizException("QQ 沙箱不支持的事件类型: " + cmd.type());
+        }
+    }
+
+    private String syntheticAction(QqSandboxMessageCmd cmd) {
+        return switch (cmd.type()) {
+            case "button" -> "button.synthetic";
+            case "group_request" -> "group_request.synthetic";
+            default -> "message.synthetic";
+        };
     }
 
     private String senderId(QqSandboxSession session, QqSandboxMessageCmd cmd) {

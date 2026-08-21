@@ -107,7 +107,7 @@ yudream:
 | `GET /agent-traces/{traceId}` | view | 单条追踪全步骤 |
 | `GET /qq-sandbox/presets` | view | QQ 沙盒消息形态预设（发送人、群、角色选项） |
 | `POST /qq-sandbox/sessions` | manage | 创建会话；指定已启用插件、真实策略连接、群/用户/机器人 ID、随机三态与身份模拟（forceUnbound/simulateRoles） |
-| `POST /qq-sandbox/sessions/{sessionId}/messages` | manage | 注入合成 Milky 消息（文本、@、reply、发送者均使用 string ID） |
+| `POST /qq-sandbox/sessions/{sessionId}/messages` | manage | 注入合成 Milky 事件（文本、@、reply、发送者均使用 string ID）；`type` 支持 `message`（默认）/ `group_request`（入群请求，content 为验证留言可空）/ `button`（按钮回调，必填 `buttonId`） |
 | `GET /qq-sandbox/sessions/{sessionId}/events/stream` | view | SSE：标准化、触发/阻断、Agent、工具和捕获回复时间线 |
 | `DELETE /qq-sandbox/sessions/{sessionId}` | manage | 结束会话并清理内存覆盖层与异步执行 |
 | `GET /qq-sandbox/cases` | view | 列出已保存的 QQ 沙盒用例（按更新时间倒序） |
@@ -153,10 +153,16 @@ yudream:
 
 沙盒隔离宿主官方 SPI/Agent/消息/文档/语义记忆边界；第三方插件自行创建线程且不调用 synthetic messaging/diagnostic，或自行创建网络/文件客户端的行为无法在不修改 SPI/JVM 沙箱的前提下透明拦截，调试时仍应只加载可信插件。
 
+事件类型补全（message 之外的合成事件）：
+
+- 注入消息的 `type` 字段决定合成的事件形态：`message`（默认，走 `message_receive` 全链路）、`group_request`（入群请求，复用生产 `dispatchGroupRequest` 分支，data 携带 `group_id/user_id/request_id/comment`，`clientMessageId` 可作 `request_id`）、`button`（按钮回调，合成 `button_click` 事件，`buttonId` 精确路由到插件 `onButton` 交互；`button_click` 按 native 事件对待，与 `internal`/`group_request` 同列）。
+- 入站时间线 action 按类型区分：`message.synthetic` / `group_request.synthetic` / `button.synthetic`；必填校验随类型变化（消息要内容、按钮要 `buttonId`、入群请求留言可空）。
+- 面板状态栏「导出时间线」把当前会话快照与全部内存事件下载为 JSON（纯前端导出，不占端点）。
+
 用例保存与回放：
 
-- 面板工具栏「存为用例」把当前时间线中的 `message.synthetic` 合成消息按序收割为步骤，连同当前会话初始参数（插件范围、策略连接、群/用户/机器人、随机三态、身份模拟）保存为用例；「用例」列表支持回放与删除。
-- 用例持久化在本地 JSON 文件 `plugins/qq-sandbox-cases.json`（与开发模式项目清单同目录），跨宿主重启保留。
+- 面板工具栏「存为用例」把当前时间线中的 `message.synthetic` / `group_request.synthetic` / `button.synthetic` 合成事件按序收割为步骤（含类型与按钮 ID），连同当前会话初始参数（插件范围、策略连接、群/用户/机器人、随机三态、身份模拟）保存为用例；「用例」列表支持回放与删除。
+- 用例持久化在本地 JSON 文件 `plugins/qq-sandbox-cases.json`（与开发模式项目清单同目录），跨宿主重启保留；旧版没有 `type` 字段的用例按 `message` 兼容回放。
 - 回放（`POST /qq-sandbox/cases/{caseId}/replay`）按保存的初始参数新建会话，追加 `session/case.replay` 时间线事件（caseId/caseName/steps），再逐条同步发送保存的消息；新会话接管事件流，语义与手工逐条发送完全一致。
 
 ## 6. Agent 执行链路追踪

@@ -4,6 +4,7 @@ import type {
   QqSandboxCaseSetup,
   QqSandboxConversationType,
   QqSandboxEvent,
+  QqSandboxEventType,
   QqSandboxLaunchPayload,
   QqSandboxRandomMode,
 } from '@/api/modules/platform-devtools-qq-sandbox'
@@ -56,6 +57,8 @@ const preferences = reactive(hydratePreferences())
 // 插件范围默认空串 = 全部插件，与真实 QQ 群一致；仅「在沙盒中测试」入口会限定单个插件
 const pluginCode = ref('')
 const composer = ref('')
+const eventType = ref<QqSandboxEventType>('message')
+const buttonId = ref('')
 const senderId = ref('')
 const messageNickname = ref('')
 const mentionSelf = ref(true)
@@ -93,11 +96,38 @@ const roleModeOptions = [
   { label: '无角色', value: 'NONE' },
   { label: '指定角色', value: 'CUSTOM' },
 ]
+const eventTypeOptions = [
+  { label: '消息', value: 'message' },
+  { label: '入群请求', value: 'group_request' },
+  { label: '按钮回调', value: 'button' },
+]
 const connectionOptions = computed(() =>
   sandbox.connections.map(item => ({ label: `${item.name}（${item.connectionId}）`, value: item.connectionId })),
 )
 const sessionActive = computed(() => Boolean(sandbox.session))
 const pluginScopeLabel = computed(() => sandbox.session?.pluginCode || pluginCode.value || '全部插件')
+const composerPlaceholder = computed(() => {
+  if (eventType.value === 'group_request') {
+    return '模拟用户申请入群，内容作为验证留言（可留空），Enter 发送'
+  }
+  if (eventType.value === 'button') {
+    return '模拟点击机器人消息按钮，内容作为附带文本（可留空），Enter 发送'
+  }
+  return '像真实 QQ 群一样输入消息，/帮助 触发指令，Enter 发送'
+})
+// 内容只对普通消息必填；按钮回调要求按钮 ID，入群请求可直接发送
+const sendReady = computed(() => {
+  if (!sessionActive.value) {
+    return false
+  }
+  if (eventType.value === 'button') {
+    return Boolean(buttonId.value.trim())
+  }
+  if (eventType.value === 'group_request') {
+    return true
+  }
+  return Boolean(composer.value.trim())
+})
 
 function senderLabel(sender: { qq: string, nickname: string, roles: string[] }) {
   const roles = sender.roles.length ? ` · ${sender.roles.join('/')}` : ' · 无角色'
@@ -306,24 +336,30 @@ async function stopSession() {
 }
 
 async function send() {
+  const type = eventType.value
   const content = composer.value.trim()
   // FaTextarea 会把 keydown 同时绑到根节点和内部 textarea（冒泡双触发），必须用 sending 闸门保证一次按键只发一次
-  if (!content || !sandbox.session || sandbox.sending) {
+  if (!sendReady.value || sandbox.sending) {
     return
   }
   try {
-    const mentions = [
-      ...mentionSelected.value,
-      ...mentionsInput.value.split(/[\s,，]+/).map(item => item.trim()).filter(Boolean),
-    ]
+    // 提及与回复仅普通消息有意义，入群请求/按钮回调不带
+    const mentions = type === 'message'
+      ? [
+          ...mentionSelected.value,
+          ...mentionsInput.value.split(/[\s,，]+/).map(item => item.trim()).filter(Boolean),
+        ]
+      : []
     await sandbox.sendMessage({
+      type,
       content,
       senderId: senderId.value.trim() || undefined,
       nickname: messageNickname.value.trim() || undefined,
-      mentionSelf: mentionSelf.value,
+      mentionSelf: type === 'message' ? mentionSelf.value : false,
       mentions: [...new Set(mentions)],
-      replyMessageId: replyMessageId.value.trim() || undefined,
+      replyMessageId: type === 'message' ? replyMessageId.value.trim() || undefined : undefined,
       clientMessageId: clientMessageId.value.trim() || undefined,
+      buttonId: type === 'button' ? buttonId.value.trim() : undefined,
     })
     composer.value = ''
     replyMessageId.value = ''
@@ -334,9 +370,30 @@ async function send() {
   }
 }
 
+// 沙盒自有 action 的中文标签，插件侧 handler/agent 等 action 保持原文
+const ACTION_TEXT: Record<string, string> = {
+  'session.created': '会话创建',
+  'case.replay': '用例回放',
+  'message.synthetic': '发送消息',
+  'group_request.synthetic': '入群请求',
+  'button.synthetic': '按钮回调',
+  'milky.dispatch': '事件分发',
+  'dispatch.completed': '分发完成',
+  'dispatch.timeout': '分发超时',
+  'dispatch.failed': '分发失败',
+  'identity.override': '身份模拟',
+}
+
+function actionText(event: QqSandboxEvent) {
+  return ACTION_TEXT[event.action || ''] || event.action || event.event
+}
+
 function eventTitle(event: QqSandboxEvent) {
   const payload = event.payload as Record<string, unknown> | undefined
-  return String(payload?.senderName || payload?.direction || event.action || event.event)
+  if (event.action === 'button.synthetic' && payload?.buttonId) {
+    return `按钮 ${String(payload.buttonId)}`
+  }
+  return String(payload?.senderName || payload?.nickname || payload?.direction || event.action || event.event)
 }
 
 // 沙盒诊断事件（handler.error/command.error/log.error 等）在时间线用 destructive 标红
@@ -435,31 +492,57 @@ const caseName = ref('')
 const caseDescription = ref('')
 
 interface SyntheticMessagePayload {
+  type?: QqSandboxEventType
   senderId?: string
   nickname?: string
   content?: string
   mentionSelf?: boolean
   mentions?: string[]
   replyMessageId?: string
+  buttonId?: string
 }
 
-/** 从当前会话时间线收割合成消息步骤（message.synthetic 事件 payload 与后端 inputPayload 同构） */
+const SYNTHETIC_ACTIONS: Record<string, QqSandboxEventType> = {
+  'message.synthetic': 'message',
+  'group_request.synthetic': 'group_request',
+  'button.synthetic': 'button',
+}
+
+/** 从当前会话时间线收割合成事件步骤（*.synthetic 事件 payload 与后端 inputPayload 同构） */
 const collectableSteps = computed(() =>
   sandbox.events
-    .filter(event => event.action === 'message.synthetic')
+    .filter(event => event.action && event.action in SYNTHETIC_ACTIONS)
     .map((event) => {
       const payload = event.payload as SyntheticMessagePayload
       return {
+        type: payload.type || SYNTHETIC_ACTIONS[event.action!],
         senderId: payload.senderId || undefined,
         nickname: payload.nickname || undefined,
         content: (payload.content || '').trim(),
         mentionSelf: payload.mentionSelf !== false,
         mentions: Array.isArray(payload.mentions) ? payload.mentions : [],
         replyMessageId: payload.replyMessageId || undefined,
+        buttonId: payload.buttonId || undefined,
       }
     })
-    .filter(step => step.content),
+    .filter(step => step.type === 'button' ? Boolean(step.buttonId) : step.type === 'group_request' ? true : Boolean(step.content)),
 )
+
+/** 导出当前时间线为 JSON 文件，含会话快照，便于离线分析或附在 issue 中 */
+function exportTimeline() {
+  const data = {
+    session: sandbox.session,
+    exportedAt: new Date().toISOString(),
+    events: sandbox.events,
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `qq-sandbox-${sandbox.session?.sessionId || 'timeline'}.json`
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 function buildCaseSetup(): QqSandboxCaseSetup {
   const group = preferences.conversationType === 'GROUP'
@@ -621,6 +704,12 @@ function caseTime(item: QqSandboxCase) {
       <span v-if="sandbox.streamError" class="sandbox-status__error">{{ sandbox.streamError }}</span>
       <div class="flex-1" />
       <FaButton
+        variant="ghost" size="icon-sm" title="导出时间线 JSON" :disabled="!sandbox.events.length"
+        aria-label="导出时间线 JSON" @click="exportTimeline"
+      >
+        <FaIcon name="i-ri:download-2-line" />
+      </FaButton>
+      <FaButton
         variant="ghost" size="icon-sm" title="清空内存时间线" :disabled="!sandbox.events.length"
         @click="sandbox.resetTimeline"
       >
@@ -710,7 +799,7 @@ function caseTime(item: QqSandboxCase) {
           >
             <span class="timeline-event__meta">
               <FaTag :variant="isErrorEvent(event) ? 'destructive' : 'secondary'" class="text-xs">
-                {{ event.action || event.event }}
+                {{ actionText(event) }}
               </FaTag>
               <span>{{ eventTitle(event) }}</span>
               <time>{{ eventTime(event) }}</time>
@@ -734,24 +823,35 @@ function caseTime(item: QqSandboxCase) {
             <FaInput v-model="senderId" placeholder="自定义发送者 QQ" />
             <FaInput v-model="messageNickname" placeholder="发送者昵称（默认会话昵称）" />
           </template>
-          <FaSelect
-            v-model="mentionSelected" multiple :options="mentionOptions"
-            placeholder="提及人（可多选系统用户）" class="w-full"
-          />
-          <FaInput v-model="mentionsInput" placeholder="额外提及 QQ，逗号或空格分隔" />
-          <FaInput v-model="replyMessageId" placeholder="回复消息 ID（可选）" />
-          <FaInput v-model="clientMessageId" placeholder="客户端消息 ID（可选）" />
+          <template v-if="eventType === 'message'">
+            <FaSelect
+              v-model="mentionSelected" multiple :options="mentionOptions"
+              placeholder="提及人（可多选系统用户）" class="w-full"
+            />
+            <FaInput v-model="mentionsInput" placeholder="额外提及 QQ，逗号或空格分隔" />
+            <FaInput v-model="replyMessageId" placeholder="回复消息 ID（可选）" />
+          </template>
+          <FaInput v-model="clientMessageId" placeholder="客户端消息 ID（可选，入群请求作为 request_id）" />
         </div>
         <div class="sandbox-composer">
-          <FaTextarea
-            v-model="composer"
-            :rows="2"
-            :disabled="!sessionActive"
-            placeholder="像真实 QQ 群一样输入消息，/帮助 触发指令，Enter 发送"
-            @keydown="handleComposerKeydown"
-          />
+          <div class="composer-main">
+            <div class="composer-meta">
+              <FaSelect v-model="eventType" :options="eventTypeOptions" class="composer-type" />
+              <FaInput
+                v-if="eventType === 'button'" v-model="buttonId" class="flex-1"
+                placeholder="按钮 ID（插件 onButton 注册的标识）"
+              />
+            </div>
+            <FaTextarea
+              v-model="composer"
+              :rows="2"
+              :disabled="!sessionActive"
+              :placeholder="composerPlaceholder"
+              @keydown="handleComposerKeydown"
+            />
+          </div>
           <div class="composer-actions">
-            <FaTooltip text="开启后本条消息模拟 @机器人（触发 Agent）" side="left">
+            <FaTooltip v-if="eventType === 'message'" text="开启后本条消息模拟 @机器人（触发 Agent）" side="left">
               <label class="mention-self">
                 <FaSwitch v-model="mentionSelf" />
               </label>
@@ -764,10 +864,10 @@ function caseTime(item: QqSandboxCase) {
                 <FaIcon name="i-ri:equalizer-line" />
               </FaButton>
             </FaTooltip>
-            <FaTooltip text="发送消息" side="left">
+            <FaTooltip text="发送" side="left">
               <FaButton
-                size="icon" :loading="sandbox.sending" :disabled="!sessionActive || !composer.trim()"
-                aria-label="发送消息" @click="send"
+                size="icon" :loading="sandbox.sending" :disabled="!sendReady"
+                aria-label="发送" @click="send"
               >
                 <FaIcon name="i-ri:send-plane-2-line" />
               </FaButton>
@@ -1192,6 +1292,24 @@ function caseTime(item: QqSandboxCase) {
 
 .sandbox-composer > :first-child {
   flex: 1;
+}
+
+.composer-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.composer-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.composer-type {
+  width: 108px;
+  flex-shrink: 0;
 }
 
 .composer-actions {

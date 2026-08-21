@@ -437,7 +437,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 .filter(entry -> QqSandboxExecutionScope.accepts(entry.getKey()))
                 .map(entry -> entry.getValue().getContext())
                 .forEach(context -> context.interactionRegistry().publish(event,
-                        "internal".equals(event.type()) || "group_request".equals(event.type())));
+                        "internal".equals(event.type()) || "group_request".equals(event.type())
+                                || "button_click".equals(event.type())));
     }
 
     public String displayName(String pluginCode) {

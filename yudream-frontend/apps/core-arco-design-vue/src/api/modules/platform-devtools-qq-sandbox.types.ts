@@ -87,6 +87,8 @@ export interface QqSandboxSession {
   expiresAt?: string
 }
 
+export type QqSandboxEventType = 'message' | 'group_request' | 'button'
+
 export interface QqSandboxSendMessagePayload {
   content: string
   senderId?: string
@@ -95,6 +97,10 @@ export interface QqSandboxSendMessagePayload {
   mentions: string[]
   replyMessageId?: string
   clientMessageId?: string
+  /** 事件类型：message 普通消息 / group_request 入群请求 / button 按钮回调 */
+  type?: QqSandboxEventType
+  /** type 为 button 时必填，路由到插件 onButton 交互 */
+  buttonId?: string
 }
 
 export interface QqSandboxMessage {
@@ -146,6 +152,8 @@ export interface QqSandboxCaseStep {
   mentionSelf: boolean
   mentions: string[]
   replyMessageId?: string
+  type?: QqSandboxEventType
+  buttonId?: string
 }
 
 export interface QqSandboxCase {
