@@ -1,7 +1,8 @@
 import type {
   QqSandboxCreateSessionPayload,
+  QqSandboxGroups,
   QqSandboxMessage,
-  QqSandboxPreset,
+  QqSandboxPresets,
   QqSandboxSendMessagePayload,
   QqSandboxSession,
 } from './platform-devtools-qq-sandbox.types'
@@ -13,7 +14,10 @@ const basePath = 'api/platform/plugin-devtools/qq-sandbox'
 
 export default {
   presets: () =>
-    systemClient.get<unknown, ApiResponse<QqSandboxPreset[]>>(`${basePath}/presets`),
+    systemClient.get<unknown, ApiResponse<QqSandboxPresets>>(`${basePath}/presets`),
+
+  groups: (connectionId: string) =>
+    systemClient.get<unknown, ApiResponse<QqSandboxGroups>>(`${basePath}/presets/groups`, { params: { connectionId } }),
 
   createSession: (data: QqSandboxCreateSessionPayload) =>
     systemClient.post<unknown, ApiResponse<QqSandboxSession>>(`${basePath}/sessions`, data),

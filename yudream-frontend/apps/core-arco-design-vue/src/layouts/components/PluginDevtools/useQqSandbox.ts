@@ -1,7 +1,11 @@
 import type {
+  QqSandboxConnectionOption,
   QqSandboxCreateSessionPayload,
   QqSandboxEvent,
+  QqSandboxGroupOption,
   QqSandboxPreset,
+  QqSandboxRoleOption,
+  QqSandboxSenderOption,
   QqSandboxSendMessagePayload,
   QqSandboxSession,
 } from '@/api/modules/platform-devtools-qq-sandbox'
@@ -37,6 +41,11 @@ function parseEventBlock(block: string): QqSandboxEvent | null {
 
 export function useQqSandbox() {
   const presets = ref<QqSandboxPreset[]>([])
+  const connections = ref<QqSandboxConnectionOption[]>([])
+  const senders = ref<QqSandboxSenderOption[]>([])
+  const roles = ref<QqSandboxRoleOption[]>([])
+  const groupOptions = ref<QqSandboxGroupOption[]>([])
+  const groupsLoading = ref(false)
   const presetsLoading = ref(false)
   const session = ref<QqSandboxSession | null>(null)
   const events = ref<QqSandboxEvent[]>([])
@@ -47,15 +56,43 @@ export function useQqSandbox() {
   const streamError = ref('')
 
   let streamAbort: AbortController | null = null
+  const seenEventKeys = new Set<string>()
+
+  function eventDedupeKey(event: QqSandboxEvent) {
+    return `${event.event}|${event.action ?? ''}|${event.timestamp ?? ''}|${event.traceId ?? ''}`
+  }
 
   async function loadPresets() {
     presetsLoading.value = true
     try {
       const res = await apiQqSandbox.presets()
-      presets.value = res.data || []
+      presets.value = res.data?.presets || []
+      connections.value = res.data?.connections || []
+      senders.value = res.data?.senders || []
+      roles.value = res.data?.roles || []
     }
     finally {
       presetsLoading.value = false
+    }
+  }
+
+  async function loadGroups(connectionId: string) {
+    if (!connectionId) {
+      groupOptions.value = []
+      return null
+    }
+    groupsLoading.value = true
+    try {
+      const res = await apiQqSandbox.groups(connectionId)
+      groupOptions.value = res.data?.groups || []
+      return res.data?.selfId || null
+    }
+    catch {
+      groupOptions.value = []
+      return null
+    }
+    finally {
+      groupsLoading.value = false
     }
   }
 
@@ -63,6 +100,7 @@ export function useQqSandbox() {
     await closeSession()
     creating.value = true
     events.value = []
+    seenEventKeys.clear()
     selectedEvent.value = null
     streamError.value = ''
     try {
@@ -86,9 +124,9 @@ export function useQqSandbox() {
         ...payload,
         content: payload.content.trim(),
       })
+      // 不在本地回显消息事件：SSE 的 message.synthetic 会立即投递同一条消息，本地再追加会让时间线出现重复
       if (res.data) {
         updateSessionStatus(res.data.metadata?.status)
-        appendEvent({ event: 'message.accepted', timestamp: res.data.occurredAt, payload: res.data })
       }
     }
     finally {
@@ -109,6 +147,7 @@ export function useQqSandbox() {
 
   function resetTimeline() {
     events.value = []
+    seenEventKeys.clear()
     selectedEvent.value = null
   }
 
@@ -122,6 +161,16 @@ export function useQqSandbox() {
     const payload = event.payload as Record<string, unknown> | null
     if (payload && typeof payload === 'object') {
       updateSessionStatus(payload.status)
+    }
+    // 防御性去重：同一信封（重连重放、双订阅竞争）只进一次时间线
+    const key = eventDedupeKey(event)
+    if (seenEventKeys.has(key)) {
+      return
+    }
+    seenEventKeys.add(key)
+    if (seenEventKeys.size > EVENT_LIMIT * 4) {
+      seenEventKeys.clear()
+      seenEventKeys.add(key)
     }
     events.value.push(event)
     if (events.value.length > EVENT_LIMIT) {
@@ -197,6 +246,11 @@ export function useQqSandbox() {
 
   return {
     presets,
+    connections,
+    senders,
+    roles,
+    groupOptions,
+    groupsLoading,
     presetsLoading,
     session,
     events,
@@ -206,6 +260,7 @@ export function useQqSandbox() {
     connected,
     streamError,
     loadPresets,
+    loadGroups,
     createSession,
     sendMessage,
     closeSession,

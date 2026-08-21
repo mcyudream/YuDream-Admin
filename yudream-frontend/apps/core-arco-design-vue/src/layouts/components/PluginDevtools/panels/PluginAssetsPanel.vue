@@ -8,6 +8,7 @@ import type {
   PluginRuntimeAssets,
 } from '@/api/modules/platform-devtools'
 import apiDevtools from '@/api/modules/platform-devtools'
+import apiPlugin from '@/api/modules/platform-plugin'
 import AssetSection from './AssetSection.vue'
 
 const toast = useFaToast()
@@ -70,6 +71,29 @@ function statusVariant(plugin: PluginDevPlugin) {
 }
 
 const reloading = ref(false)
+const enabling = ref(false)
+
+// 重载不会自动启用从未启用过的插件，LOADED 状态插件需要显式启用入口
+async function enablePlugin() {
+  const target = selectedCode.value
+  if (!target) {
+    return
+  }
+  enabling.value = true
+  try {
+    await apiPlugin.enable(target)
+    toast.success('插件已启用')
+    await loadPlugins()
+    const res = await apiDevtools.assets(target)
+    assets.value = res.data
+  }
+  catch {
+    // 拦截器已提示
+  }
+  finally {
+    enabling.value = false
+  }
+}
 
 async function reloadPlugin(code?: string) {
   const target = code || selectedCode.value
@@ -249,11 +273,17 @@ async function runCommandTest() {
           插件清单
         </FaButton>
         <div class="flex-1" />
+        <FaTooltip v-if="selectedPlugin.status !== 'ENABLED'" text="启用插件，注册端点、指令、权限等运行时贡献" side="bottom">
+          <FaButton size="sm" :loading="enabling" @click="enablePlugin">
+            <FaIcon name="i-ri:play-line" />
+            启用
+          </FaButton>
+        </FaTooltip>
         <FaTooltip text="对开发模式插件执行 disable→unload→load→enable 重载" side="bottom">
           <FaButton
             variant="outline"
             size="sm"
-            :disabled="!selectedPlugin.devMode"
+            :disabled="!selectedPlugin.devMode || selectedPlugin.status !== 'ENABLED'"
             :loading="reloading"
             @click="reloadPlugin()"
           >
@@ -282,6 +312,10 @@ async function runCommandTest() {
         正在加载运行时资产…
       </div>
       <template v-else-if="assets">
+        <div v-if="!assets.enabled" class="plugin-not-enabled">
+          <FaIcon name="i-ri:information-line" class="shrink-0 size-4" />
+          <span>插件当前未启用，下方运行时贡献为空属预期；点击右上角「启用」后才会注册端点、指令、权限等。</span>
+        </div>
         <AssetSection title="HTTP 端点" icon="i-ri:global-line" :count="assets.httpEndpoints.length" default-open>
           <div
             v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`"
@@ -621,6 +655,19 @@ async function runCommandTest() {
   font-size: 12px;
   font-family: monospace;
   overflow-wrap: anywhere;
+}
+
+.plugin-not-enabled {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-fill-1, var(--color-bg-3));
+  color: var(--color-text-2);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .asset-row {
