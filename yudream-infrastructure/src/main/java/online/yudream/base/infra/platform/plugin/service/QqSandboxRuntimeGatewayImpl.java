@@ -31,9 +31,14 @@ public class QqSandboxRuntimeGatewayImpl implements QqSandboxRuntimeGateway {
         }
         try (QqSandboxExecutionScope ignored = QqSandboxExecutionScope.open(session)) {
             Map<String, Object> data = eventData(session, message);
+            String eventType = switch (message.type()) {
+                case "group_request" -> "group_request";
+                case "button" -> "button_click";
+                default -> "message_receive";
+            };
             String messageSeq = String.valueOf(data.get("message_seq"));
             MilkyModels.Event event = new MilkyModels.Event(Instant.now().getEpochSecond(), session.selfId(),
-                    "message_receive", data);
+                    eventType, data);
             session.append("runtime", "milky.dispatch", session.pluginCode(), Map.of(
                     "eventType", event.eventType(), "messageSeq", messageSeq,
                     "connectionId", session.connectionId(), "randomMode", session.randomMode().name()));
@@ -55,6 +60,44 @@ public class QqSandboxRuntimeGatewayImpl implements QqSandboxRuntimeGateway {
     }
 
     static Map<String, Object> eventData(QqSandboxSession session, QqSandboxMessageCmd message) {
+        return switch (message.type()) {
+            case "group_request" -> groupRequestData(session, message);
+            case "button" -> buttonClickData(session, message);
+            default -> messageData(session, message);
+        };
+    }
+
+    /** 入群请求事件载荷，字段名对齐生产 dispatchGroupRequest 解析的 group_id/user_id/request_id/comment */
+    private static Map<String, Object> groupRequestData(QqSandboxSession session, QqSandboxMessageCmd message) {
+        String senderId = textOrDefault(message.senderId(), session.userId());
+        String requestId = textOrDefault(message.clientMessageId(), UUID.randomUUID().toString());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("group_id", session.channelId());
+        data.put("user_id", senderId);
+        data.put("sender_id", senderId);
+        data.put("request_id", requestId);
+        data.put("message_seq", requestId);
+        if (message.content() != null && !message.content().isBlank()) {
+            data.put("comment", message.content().trim());
+        }
+        return Map.copyOf(data);
+    }
+
+    /** 按钮回调事件载荷，button_id 驱动插件 onButton 交互 */
+    private static Map<String, Object> buttonClickData(QqSandboxSession session, QqSandboxMessageCmd message) {
+        String senderId = textOrDefault(message.senderId(), session.userId());
+        String messageSeq = textOrDefault(message.clientMessageId(), UUID.randomUUID().toString());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("button_id", message.buttonId().trim());
+        data.put("sender_id", senderId);
+        data.put("user_id", senderId);
+        data.put("peer_id", session.channelId());
+        if ("group".equals(session.scene())) data.put("group_id", session.channelId());
+        data.put("message_seq", messageSeq);
+        return Map.copyOf(data);
+    }
+
+    private static Map<String, Object> messageData(QqSandboxSession session, QqSandboxMessageCmd message) {
         String senderId = textOrDefault(message.senderId(), session.userId());
         String messageSeq = textOrDefault(message.clientMessageId(), UUID.randomUUID().toString());
         List<Map<String, Object>> segments = segments(session, message);

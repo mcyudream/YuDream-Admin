@@ -20,7 +20,8 @@ class QqSandboxRuntimeGatewayImplTest {
                 "9007199254740995", null, "9007199254740997", "group", QqSandboxRandomMode.FORCE_HIT,
                 1_000L, Instant.now());
         QqSandboxMessageCmd message = new QqSandboxMessageCmd("9007199254740999", "测试用户", "你好", true,
-                List.of("9007199254741001", "9007199254741003"), "9007199254741005", "client-9007199254741007");
+                List.of("9007199254741001", "9007199254741003"), "9007199254741005", "client-9007199254741007",
+                null, null);
 
         Map<String, Object> data = QqSandboxRuntimeGatewayImpl.eventData(session, message);
 
@@ -43,6 +44,28 @@ class QqSandboxRuntimeGatewayImplTest {
         assertTrue(segments.stream().anyMatch(segment -> mention(segment, "9007199254741001")));
         assertTrue(segments.stream().anyMatch(segment -> mention(segment, "9007199254741003")));
         assertTrue(segments.stream().anyMatch(segment -> reply(segment, "9007199254741005")));
+    }
+
+    @Test
+    void buildsGroupRequestAndButtonClickData() {
+        QqSandboxSession session = QqSandboxSession.create("session-2", "demo", "1", "10000",
+                "10001", null, "20001", "group", QqSandboxRandomMode.REAL,
+                1_000L, Instant.now());
+        QqSandboxMessageCmd groupRequest = new QqSandboxMessageCmd("10002", null, "求通过", false,
+                List.of(), null, "req-1", "group_request", null);
+        Map<String, Object> requestData = QqSandboxRuntimeGatewayImpl.eventData(session, groupRequest);
+        // 字段名对齐生产 dispatchGroupRequest 的解析键
+        assertEquals("20001", requestData.get("group_id"));
+        assertEquals("10002", requestData.get("user_id"));
+        assertEquals("req-1", requestData.get("request_id"));
+        assertEquals("求通过", requestData.get("comment"));
+
+        QqSandboxMessageCmd button = new QqSandboxMessageCmd("10002", null, null, false,
+                List.of(), null, null, "button", "wordle:guess");
+        Map<String, Object> buttonData = QqSandboxRuntimeGatewayImpl.eventData(session, button);
+        assertEquals("wordle:guess", buttonData.get("button_id"));
+        assertEquals("10002", buttonData.get("sender_id"));
+        assertEquals("20001", buttonData.get("peer_id"));
     }
 
     private boolean mention(Map<String, Object> segment, String id) {

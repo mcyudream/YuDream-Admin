@@ -42,6 +42,6 @@ public final class QqSandboxAssembler {
 
     public static QqSandboxMessageCmd toMessageCmd(QqSandboxCaseStep step) {
         return new QqSandboxMessageCmd(step.senderId(), step.nickname(), step.content(), step.mentionSelf(),
-                step.mentions(), step.replyMessageId(), null);
+                step.mentions(), step.replyMessageId(), null, step.type(), step.buttonId());
     }
 }
