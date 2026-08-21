@@ -321,6 +321,25 @@ export interface EndpointTestResult {
   body: string
 }
 
+/** 插件运行日志条目（interfaces PluginLogEntryRes 的 JSON 镜像） */
+export interface PluginLogEntry {
+  sequence: number
+  timestamp: number
+  time: string
+  level: string
+  logger: string
+  thread: string
+  traceId?: string
+  message: string
+  throwable?: string
+}
+
+export interface PluginLogQueryParams {
+  level?: string
+  keyword?: string
+  limit?: number
+}
+
 export default {
   status: () =>
     systemClient.get<unknown, ApiResponse<PluginDevtoolsStatus>>('api/platform/plugin-devtools/status'),
@@ -359,6 +378,14 @@ export default {
   lifecycleStreamUrl: () => toBackendAssetUrl('/api/platform/plugin-devtools/events/stream'),
 
   traceStreamUrl: () => toBackendAssetUrl('/api/platform/plugin-devtools/agent-traces/stream'),
+
+  pluginLogs: (code: string, params: PluginLogQueryParams) =>
+    systemClient.get<unknown, ApiResponse<PluginLogEntry[]>>(`api/platform/plugin-devtools/plugins/${code}/logs`, { params }),
+
+  pluginLogsStreamUrl: (code: string, level?: string) => {
+    const query = level ? `?level=${encodeURIComponent(level)}` : ''
+    return toBackendAssetUrl(`/api/platform/plugin-devtools/plugins/${code}/logs/stream${query}`)
+  },
 
   /**
    * 端点测试器：绕过 axios 封装直连目标端点，保留真实状态码与响应体。

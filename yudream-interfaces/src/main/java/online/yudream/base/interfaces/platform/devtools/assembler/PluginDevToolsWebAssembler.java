@@ -13,6 +13,7 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
+import online.yudream.base.domain.system.log.model.SystemLogEntry;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
@@ -21,9 +22,13 @@ import online.yudream.base.interfaces.platform.devtools.res.AgentTraceSummaryRes
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevPluginRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatusRes;
+import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 
@@ -31,6 +36,9 @@ import java.util.Locale;
  * 开发者工具接口装配器：request → cmd、查询参数解析、DTO → res。
  */
 public final class PluginDevToolsWebAssembler {
+
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS")
+            .withZone(ZoneId.systemDefault());
 
     private PluginDevToolsWebAssembler() {
     }
@@ -174,6 +182,23 @@ public final class PluginDevToolsWebAssembler {
                 .endTime(dto.getEndTime())
                 .durationMs(dto.getDurationMs())
                 .build();
+    }
+
+    public static PluginLogEntryRes toLogRes(SystemLogEntry entry) {
+        return new PluginLogEntryRes(
+                entry.sequence(),
+                entry.timestamp(),
+                TIME.format(Instant.ofEpochMilli(entry.timestamp())),
+                entry.level().name(),
+                entry.logger(),
+                entry.thread(),
+                entry.traceId(),
+                entry.message(),
+                entry.throwable());
+    }
+
+    public static List<PluginLogEntryRes> toLogResList(List<SystemLogEntry> entries) {
+        return entries.stream().map(PluginDevToolsWebAssembler::toLogRes).toList();
     }
 
     private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String label) {

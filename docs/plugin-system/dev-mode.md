@@ -74,12 +74,13 @@ yudream:
 
 面板本体是 **Teleport 到 `body` 的非模态置顶浮窗**（对齐 Vue DevTools 的独立窗口心智），不是抽屉：无遮罩、不锁页面滚动，浮窗打开时系统照常可用；`z-index` 2100，高于侧栏（1010）、顶栏（1020）与宿主模态（2000），浮窗内登记项目模态为 2200，宿主目录选择模态为 2300，任何页面、任何情况下浮窗及其嵌套交互都在最上层。拖标题栏移动、拖右下角手柄缩放，几何 `{left, top, width, height}` 持久化在 localStorage（`pluginDevtoolsPanel`），视口缩放自动 clamp 回可见区；「设置」页可重置位置与尺寸。全局快捷键 `Ctrl/Cmd+Shift+D` 开关浮窗（`Esc` 关闭，输入框与已开模态内不劫持）。
 
-浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分六页，激活页持久化（`pluginDevtoolsPage`）：
+浮窗信息架构对齐 Vue DevTools：左侧图标导航栏，按开发动线分七页，激活页持久化（`pluginDevtoolsPage`）：
 
 - **概览**：状态卡（开发模式含自动检测标记与宿主运行方式、Agent 追踪、插件计数、开发项目清单文件路径）+ 最近动态 feed（插件生命周期 LOAD/ENABLE/DISABLE/UNLOAD/RELOAD/COMPILE/FRONTEND_RELOAD 事件流，取最新 20 条，可清空）。
 - **插件**：主从结构——先插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献，按开发关注度排序：HTTP 端点、QQ 指令、前端模块与路由 → 权限、菜单 → AI 工具、声明式 Agent → 平台能力、消息交互、首页卡片、服务导出。端点测试器与指令模拟器在插件详情内，开发模式插件可一键「重载」。未启用（LOADED/ERROR）的插件详情提供「启用」按钮，且资产区展示未启用横幅——重载不会自动启用从未启用过的插件，贡献全 0 属预期。
 - **QQ 沙盒**：构造真实 Milky `message_receive` 事件，按生产顺序执行消息交互、`/`/`!` 指令解析、QQ 绑定与角色权限，并支持 @机器人、额外提及、回复消息和随机触发三态（真实概率/强制命中/强制未命中）。支持身份模拟（模拟未绑定 QQ、模拟角色）；插件处理器逃逸异常与插件 WARN/ERROR 日志以结构化负载进时间线。真实策略连接只用于读取群策略与历史种子；所有回复写入 synthetic connection 时间线，不发送到 QQ。
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
+- **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条，级别/关键字过滤）+ SSE 实时追加，按 sequence 去重；可暂停（暂停期日志缓存于缓冲区）、清空与展开异常堆栈。过滤依据插件包名前缀（`PluginLoggerPrefix`：从 mainClass 截取 `online.yudream.base.plugin.` 根包后的第一段，第三方未遵循包约定的插件兜底用 根包+编码），数据源为宿主 SystemLogBuffer 环形缓冲，与沙盒日志桥同一包约定。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
 - **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
 
@@ -111,6 +112,8 @@ yudream:
 | `DELETE /qq-sandbox/sessions/{sessionId}` | manage | 结束会话并清理内存覆盖层与异步执行 |
 | `GET /events/stream` | view | SSE：生命周期/编译/前端重载事件 |
 | `GET /agent-traces/stream` | view | SSE：步骤增量 + trace 完成事件 |
+| `GET /plugins/{code}/logs` | view | 插件运行日志查询（level/keyword/limit 过滤，上限 500） |
+| `GET /plugins/{code}/logs/stream` | view | SSE：按插件 logger 前缀过滤的实时日志 |
 
 > 宿主 sa-token 只从请求头读 token，SSE 不能用 `EventSource`（无法携带 `Authorization`），浮窗通过 fetch + ReadableStream 手工解析事件流，新页面复用 `plugin-devtools` store 即可。
 

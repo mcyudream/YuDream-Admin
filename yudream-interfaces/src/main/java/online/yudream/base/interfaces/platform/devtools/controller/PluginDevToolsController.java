@@ -15,8 +15,10 @@ import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevPluginRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatusRes;
+import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
 import online.yudream.base.interfaces.platform.devtools.service.PluginDevToolsSseBridge;
+import online.yudream.base.interfaces.platform.devtools.service.PluginLogStreamBridge;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import org.springframework.http.MediaType;
@@ -42,6 +44,7 @@ public class PluginDevToolsController {
 
     private final PluginDevToolsAppService devToolsAppService;
     private final PluginDevToolsSseBridge sseBridge;
+    private final PluginLogStreamBridge logStreamBridge;
 
     @GetMapping("/status")
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看开发者工具", module = "开发者工具", desc = "查看开发模式状态、插件资产与 Agent 追踪")
@@ -127,5 +130,22 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "订阅 Agent 追踪流", module = "开发者工具", desc = "实时接收 Agent 执行步骤增量与完成事件")
     public SseEmitter traceStream() {
         return sseBridge.connectTraces();
+    }
+
+    @GetMapping("/plugins/{code}/logs")
+    @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看插件运行日志", module = "开发者工具", desc = "按插件 logger 前缀查询最近的运行日志")
+    public Result<List<PluginLogEntryRes>> logs(@PathVariable String code,
+                                                @RequestParam(required = false) String level,
+                                                @RequestParam(required = false) String keyword,
+                                                @RequestParam(required = false) Integer limit) {
+        return Result.ok(PluginDevToolsWebAssembler.toLogResList(
+                devToolsAppService.recentPluginLogs(code, level, keyword, limit)));
+    }
+
+    @GetMapping(value = "/plugins/{code}/logs/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PermissionRegister(code = "platform:plugin-devtools:view", name = "订阅插件日志流", module = "开发者工具", desc = "实时接收指定插件的运行日志")
+    public SseEmitter logStream(@PathVariable String code,
+                                @RequestParam(required = false) String level) {
+        return logStreamBridge.connect(code, level);
     }
 }

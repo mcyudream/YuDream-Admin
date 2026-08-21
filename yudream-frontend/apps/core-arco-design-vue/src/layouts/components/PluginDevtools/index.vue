@@ -4,6 +4,7 @@ import AgentTracesPanel from './panels/AgentTracesPanel.vue'
 import AuditPanel from './panels/AuditPanel.vue'
 import OverviewPanel from './panels/OverviewPanel.vue'
 import PluginAssetsPanel from './panels/PluginAssetsPanel.vue'
+import PluginLogsPanel from './panels/PluginLogsPanel.vue'
 import QqSandboxPanel from './panels/QqSandboxPanel.vue'
 import SettingsPanel from './panels/SettingsPanel.vue'
 import { useDevtoolsFab } from './useDevtoolsFab'
@@ -101,6 +102,7 @@ const navItems = [
   { label: '插件', value: 'plugins', icon: 'i-ri:puzzle-2-line' },
   { label: 'QQ沙盒', value: 'qq-sandbox', icon: 'i-ri:qq-line' },
   { label: '追踪', value: 'traces', icon: 'i-ri:node-tree' },
+  { label: '日志', value: 'logs', icon: 'i-ri:file-list-3-line' },
   { label: '审查', value: 'audit', icon: 'i-ri:search-eye-line' },
   { label: '设置', value: 'settings', icon: 'i-ri:settings-3-line' },
 ] as const
@@ -228,6 +230,9 @@ onMounted(async () => {
               </div>
               <div v-show="store.activePage === 'traces'" class="devtools-page">
                 <AgentTracesPanel />
+              </div>
+              <div v-show="store.activePage === 'logs'" class="devtools-page devtools-page--fill">
+                <PluginLogsPanel />
               </div>
               <div v-show="store.activePage === 'audit'" class="devtools-page">
                 <AuditPanel />
