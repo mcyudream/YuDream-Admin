@@ -54,7 +54,8 @@ public final class QqSandboxExecutionScope implements AutoCloseable {
 
     static boolean accepts(String pluginCode) {
         QqSandboxSession session = current();
-        return session == null || session.pluginCode().equals(pluginCode);
+        // 会话未限定插件（空串）时广播给全部插件，与真实 QQ 群的触发语义一致
+        return session == null || session.pluginCode().isEmpty() || session.pluginCode().equals(pluginCode);
     }
 
     public static Runnable wrap(Runnable task) {

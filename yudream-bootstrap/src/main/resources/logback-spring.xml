@@ -7,8 +7,12 @@
     <!-- 采集到内存环形缓冲，供系统日志页面实时查看、筛选与下载 -->
     <appender name="SYSTEM_LOG" class="online.yudream.base.infra.system.log.logback.SystemLogAppender"/>
 
+    <!-- QQ 沙盒会话期间把插件 WARN/ERROR 日志（含堆栈）桥接到沙盒时间线 -->
+    <appender name="QQ_SANDBOX_LOG" class="online.yudream.base.infra.platform.plugin.service.QqSandboxLogAppender"/>
+
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="SYSTEM_LOG"/>
+        <appender-ref ref="QQ_SANDBOX_LOG"/>
     </root>
 </configuration>

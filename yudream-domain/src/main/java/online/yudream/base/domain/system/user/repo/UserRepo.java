@@ -30,6 +30,11 @@ public interface UserRepo {
 
     Optional<User> findByQQ(String qq);
 
+    /**
+     * 列出已填写 QQ 号的用户，供 QQ 沙盒等场景提供发送人/提及人选择项
+     */
+    List<User> findAllWithQq();
+
     List<User> findByEmailAll(String email);
 
     Optional<User> findById(Long id);

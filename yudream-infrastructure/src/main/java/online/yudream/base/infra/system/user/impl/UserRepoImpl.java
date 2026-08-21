@@ -108,6 +108,16 @@ public class UserRepoImpl implements UserRepo {
     }
 
     @Override
+    public List<User> findAllWithQq() {
+        Query query = Query.query(Criteria.where("qq").exists(true).ne(""))
+                .with(Sort.by(Sort.Direction.DESC, "createTime"))
+                .limit(200);
+        return mongoTemplate.find(query, UserDO.class).stream()
+                .map(UserInfraMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<User> findByEmailAll(String email) {
         return findAllByField("email", email);
     }

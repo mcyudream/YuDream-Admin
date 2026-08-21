@@ -32,9 +32,9 @@ class QqSandboxAppServiceTest {
             session.append("normalized", "plugin.event", session.pluginCode(), Map.of("content", message.content()));
             return CompletableFuture.completedFuture(null);
         };
-        QqSandboxAppService service = new QqSandboxAppService(repo, runtime);
+        QqSandboxAppService service = new QqSandboxAppService(repo, runtime, null, null, null);
         var created = service.create(new QqSandboxCreateCmd("demo", "1", "456", "789", "Tester", "999", "group",
-                QqSandboxRandomMode.FORCE_HIT, 1_000L));
+                QqSandboxRandomMode.FORCE_HIT, false, null, 1_000L));
         QqSandboxMessageCmd message = new QqSandboxMessageCmd("789", "Tester", "/hello world", true,
                 List.of("111", "222"), "9007199254740995", "client-1");
 
@@ -50,9 +50,9 @@ class QqSandboxAppServiceTest {
     @Test
     void marksTimedOutDispatchAndReturnsSessionSnapshot() {
         MemoryRepo repo = new MemoryRepo();
-        QqSandboxAppService service = new QqSandboxAppService(repo, (session, message) -> new CompletableFuture<>());
+        QqSandboxAppService service = new QqSandboxAppService(repo, (session, message) -> new CompletableFuture<>(), null, null, null);
         var created = service.create(new QqSandboxCreateCmd("demo", "1", "2", "3", null, "4", "group",
-                QqSandboxRandomMode.FORCE_MISS, 1L));
+                QqSandboxRandomMode.FORCE_MISS, false, null, 1L));
 
         var result = service.send(created.id(), new QqSandboxMessageCmd("3", "Tester", "/slow", false,
                 List.of(), null, "client-2"));
@@ -64,7 +64,7 @@ class QqSandboxAppServiceTest {
     @Test
     void rejectsUnknownSession() {
         QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(),
-                (session, message) -> CompletableFuture.completedFuture(null));
+                (session, message) -> CompletableFuture.completedFuture(null), null, null, null);
 
         assertThrows(RuntimeException.class, () -> service.send("missing",
                 new QqSandboxMessageCmd("3", null, "/hello", false, List.of(), null, null)));
@@ -86,7 +86,7 @@ class QqSandboxAppServiceTest {
 
     private QqSandboxAppService serviceWithConnection(Optional<MilkyConnection> connection) {
         QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(),
-                (session, message) -> CompletableFuture.completedFuture(null));
+                (session, message) -> CompletableFuture.completedFuture(null), null, null, null);
         MilkyConnectionRepo repo = (MilkyConnectionRepo) java.lang.reflect.Proxy.newProxyInstance(
                 getClass().getClassLoader(), new Class<?>[]{MilkyConnectionRepo.class},
                 (proxy, method, args) -> "findById".equals(method.getName()) ? connection : null);
@@ -96,7 +96,7 @@ class QqSandboxAppServiceTest {
 
     private QqSandboxCreateCmd createCmd() {
         return new QqSandboxCreateCmd("demo", "1", "2", "3", null, "4", "group",
-                QqSandboxRandomMode.REAL, 1_000L);
+                QqSandboxRandomMode.REAL, false, null, 1_000L);
     }
 
     private MilkyConnection connection(Long id) {

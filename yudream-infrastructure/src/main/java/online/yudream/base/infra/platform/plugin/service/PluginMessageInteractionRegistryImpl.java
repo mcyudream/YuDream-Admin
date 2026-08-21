@@ -82,6 +82,12 @@ public class PluginMessageInteractionRegistryImpl implements PluginMessageIntera
         try {
             handler.handle(event);
         } catch (Exception ex) {
+            Map<String, Object> context = new java.util.LinkedHashMap<>();
+            context.put("kind", kind.name());
+            context.put("eventType", event.type());
+            context.put("command", event.command());
+            context.put("buttonId", event.buttonId());
+            QqSandboxDiagnostics.appendError("handler.error", pluginCode, ex, context);
             log.warn("Plugin message handler failed, plugin={}, kind={}, event={}", pluginCode, kind, event.type(), ex);
         }
     }

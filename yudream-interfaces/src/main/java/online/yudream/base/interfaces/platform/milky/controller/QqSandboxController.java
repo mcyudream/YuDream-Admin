@@ -8,8 +8,9 @@ import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.milky.assembler.QqSandboxWebAssembler;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxCreateRequest;
 import online.yudream.base.interfaces.platform.milky.request.QqSandboxMessageRequest;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxGroupsRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxMessageRes;
-import online.yudream.base.interfaces.platform.milky.res.QqSandboxPresetRes;
+import online.yudream.base.interfaces.platform.milky.res.QqSandboxPresetsRes;
 import online.yudream.base.interfaces.platform.milky.res.QqSandboxSessionRes;
 import online.yudream.base.interfaces.platform.milky.support.QqSandboxStreamSupport;
 import org.springframework.http.MediaType;
@@ -19,10 +20,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/platform/plugin-devtools/qq-sandbox")
@@ -33,8 +33,15 @@ public class QqSandboxController {
 
     @GetMapping("/presets")
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看 QQ 沙箱预设", module = "插件开发者工具", desc = "查看 QQ 沙箱预设")
-    public Result<List<QqSandboxPresetRes>> presets() {
-        return Result.ok(QqSandboxWebAssembler.presets());
+    public Result<QqSandboxPresetsRes> presets() {
+        return Result.ok(QqSandboxWebAssembler.presets(appService.connectionOptions(), appService.senderOptions(),
+                appService.roleOptions()));
+    }
+
+    @GetMapping("/presets/groups")
+    @PermissionRegister(code = "platform:plugin-devtools:view", name = "查看 QQ 沙箱群选项", module = "插件开发者工具", desc = "读取策略连接的真实群列表与机器人 ID")
+    public Result<QqSandboxGroupsRes> groups(@RequestParam String connectionId) {
+        return Result.ok(QqSandboxWebAssembler.groups(appService.groupOptions(connectionId)));
     }
 
     @PostMapping("/sessions")

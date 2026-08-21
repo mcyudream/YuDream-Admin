@@ -92,6 +92,17 @@ class QqSandboxExecutionScopeTest {
     }
 
     @Test
+    void emptyPluginScopeBroadcastsToEveryPlugin() {
+        QqSandboxSession session = QqSandboxSession.create("scope-all", null, "1", "2", "3", null, "4", "group",
+                QqSandboxRandomMode.REAL, 1_000L, Instant.now());
+
+        try (QqSandboxExecutionScope ignored = QqSandboxExecutionScope.open(session)) {
+            assertEquals(true, QqSandboxExecutionScope.accepts("demo"));
+            assertEquals(true, QqSandboxExecutionScope.accepts("other"));
+        }
+    }
+
+    @Test
     void rejectsLateCapturesAfterSessionTimeout() {
         QqSandboxSession session = session("timed-out");
         session.timedOut();

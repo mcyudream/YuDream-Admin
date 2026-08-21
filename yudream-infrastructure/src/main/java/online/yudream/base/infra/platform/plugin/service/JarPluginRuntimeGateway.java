@@ -534,19 +534,20 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         holders.entrySet().stream()
                 .filter(entry -> entry.getValue().isEnabled())
                 .filter(entry -> QqSandboxExecutionScope.accepts(entry.getKey()))
-                .map(entry -> entry.getValue().getContext())
-                .flatMap(context -> context.commandRegistry().registrations().stream())
-                .filter(registration -> registration.definition().command().equalsIgnoreCase(command))
-                .filter(registration -> registration.definition().allowAnonymous() || userId != null)
-                .filter(registration -> registration.definition().permission().isBlank()
-                        || permissionChecker.test(registration.definition().permission()))
-                .forEach(registration -> {
-                    try {
-                        registration.handler().handle(new PluginCommandContext(event, command, arguments, userId));
-                    } catch (Exception exception) {
-                        log.warn("Plugin command handler failed: command={}", command, exception);
-                    }
-                });
+                .forEach(entry -> entry.getValue().getContext().commandRegistry().registrations().stream()
+                        .filter(registration -> registration.definition().command().equalsIgnoreCase(command))
+                        .filter(registration -> registration.definition().allowAnonymous() || userId != null)
+                        .filter(registration -> registration.definition().permission().isBlank()
+                                || permissionChecker.test(registration.definition().permission()))
+                        .forEach(registration -> {
+                            try {
+                                registration.handler().handle(new PluginCommandContext(event, command, arguments, userId));
+                            } catch (Exception exception) {
+                                QqSandboxDiagnostics.appendError("command.error", entry.getKey(), exception,
+                                        Map.of("command", command, "commandCode", registration.definition().code()));
+                                log.warn("Plugin command handler failed: command={}", command, exception);
+                            }
+                        }));
     }
 
     @Override
