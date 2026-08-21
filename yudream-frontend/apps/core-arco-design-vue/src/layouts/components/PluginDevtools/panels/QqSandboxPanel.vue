@@ -899,7 +899,8 @@ function caseTime(item: QqSandboxCase) {
       </aside>
     </div>
 
-    <FaModal :model-value="!!imagePreviewSrc" title="图片预览" :footer="false" :z-index="2200" content-class="sm:max-w-3xl" @update:model-value="imagePreviewSrc = null">
+    <!-- FaModal 打开时也会回发 update:modelValue(true)，用 @close 清空避免回显把 src 立即置空 -->
+    <FaModal :model-value="!!imagePreviewSrc" title="图片预览" :footer="false" :z-index="2200" content-class="sm:max-w-3xl" @close="imagePreviewSrc = null">
       <div class="image-preview">
         <img v-if="imagePreviewSrc" :src="imagePreviewSrc" alt="图片预览">
       </div>
