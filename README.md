@@ -18,11 +18,12 @@
   <img alt="Vue" src="https://img.shields.io/badge/Vue-3-42B883?style=flat-square&logo=vuedotjs&logoColor=white">
   <img alt="pnpm" src="https://img.shields.io/badge/pnpm-11.9-F69220?style=flat-square&logo=pnpm&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
+  <a href="https://ydadocs.yudream.online/"><img alt="文档站" src="https://img.shields.io/badge/Docs-在线文档站-2563EB?style=flat-square&logo=readthedocs&logoColor=white"></a>
 </p>
 
-YuDream Admin 是一个以 Java 21、Spring Boot 3 和 Vue 3 构建的管理平台。它提供用户与权限、内容管理、知识库、集成编排、可视化数据、AI Agent 等平台能力，并通过插件运行时将业务功能与平台核心解耦。
+YuDream Admin 是一个后端由 YuDream 原创实现的企业级管理平台。后端基于 Java 21、Spring Boot 3 和 DDD 分层，提供用户与权限、内容管理、知识库、集成编排、可视化数据、AI Agent 等平台能力，并通过插件运行时将业务功能与平台核心解耦。
 
-项目既可以作为一套完整的后台系统使用，也可以作为团队构建独立业务插件的宿主平台。
+前端基于 [Fantastic-admin](https://fantastic-admin.hurui.me/)，使用 Vue 3、Arco Design Vue 和 UnoCSS。项目既可以作为一套完整的后台系统使用，也可以作为团队构建独立业务插件的宿主平台。
 
 ## 核心能力
 
@@ -177,8 +178,10 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 
 ## 文档
 
+- [在线文档站](https://ydadocs.yudream.online/)
 - [插件系统规范](docs/plugin-system/specification.md)
 - [插件开发教程](docs/plugin-system/tutorial.md)
+- [文档站源码与维护说明](yd-docs/README.md)
 - [第三方插件市场投稿](docs/third-party-plugin-submission.md)
 - [插件市场发布边界](docs/plugin-store-release.md)
 - [平台能力说明](docs/platform/)
