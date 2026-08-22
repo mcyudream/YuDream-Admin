@@ -298,7 +298,10 @@ deploy:docs-ftp:
         fi
       done
   script:
-    - cd yd-docs
+    # yd-docs/uno.config.ts 复用前端 Uno 配置，先安装前端 workspace 依赖以解析 themes 与组件依赖。
+    - cd yudream-frontend
+    - pnpm install --frozen-lockfile
+    - cd ../yd-docs
     - pnpm install --frozen-lockfile
     - pnpm build
     - |
