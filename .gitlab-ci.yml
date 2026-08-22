@@ -11,6 +11,7 @@ default:
 workflow:
   rules:
     - if: $CI_COMMIT_TAG =~ /[pdv]/
+    - if: $CI_COMMIT_TAG =~ /[wW]/
     - when: never
 
 variables:
@@ -42,6 +43,7 @@ stages:
   - verify-packages
   - artifacts
   - build-images
+  - deploy-docs
 
 validate:repo-split:
   stage: validate-boundary
@@ -271,3 +273,57 @@ build-and-push-images:
       esac
   rules:
     - if: $CI_COMMIT_TAG =~ /[dv]/
+
+# 文档站仅在名称包含 w/W 的 Git tag 上构建并通过 FTP/FTPS 发布。
+deploy:docs-ftp:
+  stage: deploy-docs
+  image: *node_image
+  variables:
+    FTP_PORT: "21"
+    FTP_TLS: "true"
+    FTP_SSL_VERIFY: "true"
+    FTP_DELETE: "true"
+  before_script:
+    - apt-get update -qq && apt-get install -y -qq --no-install-recommends lftp ca-certificates
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+    - node -v
+    - pnpm -v
+    - |
+      for required in FTP_HOST FTP_USER FTP_PASSWORD FTP_REMOTE_DIR; do
+        if [ -z "${!required:-}" ]; then
+          echo "缺少 GitLab CI/CD 变量: $required"
+          exit 1
+        fi
+      done
+  script:
+    - cd yd-docs
+    - pnpm install --frozen-lockfile
+    - pnpm build
+    - |
+      mirror_args="--reverse --verbose"
+      if [ "$FTP_DELETE" = "true" ]; then
+        mirror_args="$mirror_args --delete"
+      fi
+      echo "发布文档到 FTP 目录: $FTP_REMOTE_DIR"
+      lftp <<LFTP
+      set net:timeout 30
+      set net:max-retries 2
+      set net:reconnect-interval-base 5
+      set ftp:ssl-force $FTP_TLS
+      set ftp:ssl-protect-data $FTP_TLS
+      set ssl:verify-certificate $FTP_SSL_VERIFY
+      open -p $FTP_PORT -u "$FTP_USER","$FTP_PASSWORD" ftp://$FTP_HOST
+      mirror $mirror_args "$CI_PROJECT_DIR/yd-docs/docs/.vitepress/dist" "$FTP_REMOTE_DIR"
+      bye
+      LFTP
+  artifacts:
+    name: "yd-docs-${CI_COMMIT_TAG}-${CI_COMMIT_SHORT_SHA}"
+    paths:
+      - yd-docs/docs/.vitepress/dist/
+    expire_in: 1 week
+  environment:
+    name: production/docs
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /[wW]/'
