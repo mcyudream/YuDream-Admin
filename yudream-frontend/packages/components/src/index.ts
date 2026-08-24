@@ -1,3 +1,5 @@
+// yd AI 对话元件
+export * from './ai/index'
 // 基础版组件
 export { default as FaAlert } from './basic/alert/index.vue'
 export { default as FaAvatar } from './basic/avatar/index.vue'
@@ -17,10 +19,11 @@ export { useDrawer as useFaDrawer } from './basic/drawer/index'
 export { default as FaDrawer } from './basic/drawer/index.vue'
 export { default as FaDropdown } from './basic/dropdown/index.vue'
 export { default as FaFileUpload } from './basic/file-upload/index.vue'
-export { default as FaGraphCanvas } from './basic/graph-canvas/index.vue'
-export type { GraphCanvasEdge, GraphCanvasNode } from './basic/graph-canvas/index.vue'
 export type { FileItem, FileUploadRequestOptions } from './basic/file-upload/index.vue'
 export { default as FaFixedBar } from './basic/fixed-bar/index.vue'
+// yd 数据可视化元件
+export { default as YdGraphCanvas } from './basic/graph-canvas/index.vue'
+export type { YdGraphEdge, YdGraphEdgeEvent, YdGraphEdgeReducer, YdGraphNode, YdGraphNodeEvent, YdGraphNodeReducer, YdGraphStageEvent } from './basic/graph-canvas/index.vue'
 export { default as FaHoverCard } from './basic/hover-card/index.vue'
 export { default as FaIcon } from './basic/icon/index.vue'
 export { useImagePreview as useFaImagePreview } from './basic/image-preview/index'
@@ -43,8 +46,8 @@ export { default as FaPasswordStrength } from './basic/password-strength/index.v
 export { default as FaPopover } from './basic/popover/index.vue'
 export { default as FaProgress } from './basic/progress/index.vue'
 export { default as FaRadioGroup } from './basic/radio-group/index.vue'
-export { default as FaResponsiveTable } from './basic/responsive-table/index.vue'
 export { useIsMobile } from './basic/responsive-table/index'
+export { default as FaResponsiveTable } from './basic/responsive-table/index.vue'
 export { default as FaScrollArea } from './basic/scroll-area/index.vue'
 export { default as FaSearchBar } from './basic/search-bar/index.vue'
 export { default as FaSelect } from './basic/select/index.vue'
@@ -56,9 +59,8 @@ export { default as FaTabs } from './basic/tabs/index.vue'
 export { default as FaTag } from './basic/tag/index.vue'
 export { default as FaTextarea } from './basic/textarea/index.vue'
 export { useToast as useFaToast } from './basic/toast/index'
+
 export { default as FaToast } from './basic/toast/index.vue'
 export { default as FaTooltip } from './basic/tooltip/index.vue'
-export { default as FaTrend } from './basic/trend/index.vue'
 
-// yd AI 对话元件
-export * from './ai/index'
+export { default as FaTrend } from './basic/trend/index.vue'
