@@ -18,8 +18,7 @@ const { auth } = useAppAuth()
 const store = usePluginDevtoolsStore()
 
 const permitted = computed(() => auth('platform:plugin-devtools:view'))
-// 后端开发者工具不可用（旧版本/未部署）时，vite dev 环境仍可打开浮窗查看降级提示
-const visible = computed(() => permitted.value && (!!store.status || import.meta.env.DEV))
+const visible = computed(() => permitted.value && store.status?.devModeEnabled === true)
 
 function togglePanel() {
   if (store.drawerOpen) {

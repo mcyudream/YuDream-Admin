@@ -86,7 +86,7 @@ public class PluginAppService {
     public List<PluginModuleDTO> listInstalled() {
         return pluginModuleRepo.findAll().stream()
                 .sorted(Comparator.comparing(PluginModule::getCode))
-                .map(module -> PluginAssembler.toDTO(module, false, false))
+                .map(this::toDTO)
                 .toList();
     }
 
@@ -500,7 +500,7 @@ public class PluginAppService {
             if (dependency == null) {
                 throw new BizException("插件依赖不存在：" + dependencyCode);
             }
-            if (!dependency.enabled() && !Boolean.TRUE.equals(dependency.getRestoreIntentActive())) {
+            if (!restoreCandidate(dependency)) {
                 throw new BizException("请先启用插件依赖：" + dependency.getName());
             }
             if (!enabled.contains(dependencyCode)) {
@@ -1173,7 +1173,9 @@ public class PluginAppService {
     }
 
     private boolean restoreCandidate(PluginModule module) {
-        return Boolean.TRUE.equals(module.getRestoreIntentActive()) || module.enabled();
+        return Boolean.TRUE.equals(module.getRestoreIntentActive()) || module.enabled()
+                || pluginRuntimeGateway.devModeEnabled() && pluginRuntimeGateway.devModeProjects().stream()
+                .anyMatch(project -> project.code().equals(module.getCode()));
     }
 
     private boolean jarExists(PluginModule module) {
