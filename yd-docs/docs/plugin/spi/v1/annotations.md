@@ -51,6 +51,8 @@ TYPE。声明前端 remote 模块及路由。
 | `menuIcon` | String | `""` | 顶级菜单图标（Iconify 名称） |
 | `menuSort` | int | 0 | 顶级菜单排序，越大越靠前 |
 | `parentCode` | String | `""` | 父模块 code |
+| `styles` | `String[]` | `{}` | 附加样式资源相对路径列表，随 remote 模块一同由宿主加载 |
+| `scripts` | `String[]` | `{}` | 附加脚本资源相对路径列表，随 remote 模块一同由宿主加载 |
 | `routes` | `PluginRoute[]` | `{}` | 路由列表 |
 
 ## @PluginRoute

@@ -251,7 +251,9 @@ const componentSidebar = [
       { text: 'YdPrompts 提示词', link: '/components/yd-prompts' },
       { text: 'YdCitationList 引用列表', link: '/components/yd-citation-list' },
       { text: 'YdAttachmentList 附件列表', link: '/components/yd-attachment-list' },
-      { text: 'YdWelcome 欢迎', link: '/components/yd-welcome' }
+      { text: 'YdWelcome 欢迎', link: '/components/yd-welcome' },
+      { text: 'YdGraphCanvas 关系图谱画布', link: '/components/yd-graph-canvas' },
+      { text: 'YdTablePicker 弹出式选择输入框', link: '/components/yd-table-picker' }
     ]
   }
 ]

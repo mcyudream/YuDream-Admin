@@ -1,6 +1,6 @@
 # SPI 版本说明与升级指引
 
-`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前准备版本：2.12.0（尚未发布）**。
+`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前准备版本：2.13.0（尚未发布）**。
 
 ## 版本化文档结构
 
@@ -15,7 +15,7 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
     http                   HTTP 端点
     frontend               前端元数据
     framework-services     框架能力端口
-    graph                  待发布的平台 Neo4j 图数据库端口
+    graph                  平台 Neo4j 图数据库投影端口
 ```
 
 每个页面按统一结构编写：**作用说明 → 方法签名表（名称/签名/参数/返回/说明）→ 使用示例 → 注意事项**。这保证任意版本教程可独立阅读，也便于机器比对。
@@ -24,7 +24,7 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
 
 | 版本 | 状态 | 说明 |
 |---|---|---|
-| [v1 (2.12.0)](/plugin/spi/v1/core) | 🚧 待发布 | 全量 API 教程，含 `PluginContext.graph()` 逻辑图表投影端口 |
+| [v1 (2.13.0)](/plugin/spi/v1/core) | 🚧 待发布 | 全量 API 教程，含 `PluginContext.graph()` 逻辑图表投影端口与 `@PluginFrontend` 附加样式/脚本资源声明 |
 
 ## 升级指引
 

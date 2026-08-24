@@ -19,13 +19,13 @@ pnpm add @yudream/components
   // Components({ resolvers: [FaResolver()] })
   ```
 
-- `Yd*` 推荐从 `@yudream/components/ai` 导入。该入口名称沿用历史命名，但其中组件与 composable 均为 YuDream 原创，不以 AI 或非 AI 作为归属标准。
+- `Yd*` 为 YuDream 原创组件：AI 对话元件推荐从 `@yudream/components/ai` 导入（该入口名称沿用历史命名）；数据元件 `YdGraphCanvas`、`YdTablePicker` 与 `Fa*` 一样从根入口 `@yudream/components` 导入，且已注册进 resolver（`Fa`/`Yd` 前缀均支持自动导入）。
 
 显式导入示例：
 
 ```vue
 <script setup>
-import { FaButton } from '@yudream/components'
+import { FaButton, YdGraphCanvas, YdTablePicker } from '@yudream/components'
 import { YdBubble } from '@yudream/components/ai'
 </script>
 ```
@@ -35,7 +35,7 @@ import { YdBubble } from '@yudream/components/ai'
 | 系列 | 数量 | 定位与来源 |
 |---|---|---|
 | `Fa*` | 47 个 | Fantastic-admin 框架自带的通用后台 UI 基础组件（reka-ui 封装 + Tailwind 样式，shadcn 风格）；`FaResponsiveTable` 是 YuDream 原创的例外，统一从 `@yudream/components` 导入 |
-| `Yd*` | 16 个组件 + 3 个 composable | YuDream 原创组件与 composable，统一从 `@yudream/components/ai` 导入 |
+| `Yd*` | 18 个组件 + 3 个 composable | YuDream 原创组件与 composable；AI 对话元件从 `@yudream/components/ai` 导入，数据元件（`YdGraphCanvas`、`YdTablePicker`）从根入口导入 |
 
 业务代码**优先使用 Fa\*/Yd\***；ESLint 规则 `yudream/prefer-fa-component` 会检测 Arco `<a-*>` 直接使用并给出替代建议。
 
@@ -93,3 +93,4 @@ import { YdBubble } from '@yudream/components/ai'
 - [YdChatReasoning 思维链](/components/yd-chat-reasoning) · [YdChatLoading 加载态](/components/yd-chat-loading) · [YdThoughtChain 步骤链](/components/yd-thought-chain)
 - [YdSuggestion 建议](/components/yd-suggestion) · [YdPrompts 提示词](/components/yd-prompts) · [YdCitationList 引用列表](/components/yd-citation-list)
 - [YdAttachmentList 附件列表](/components/yd-attachment-list) · [YdWelcome 欢迎](/components/yd-welcome)
+- [YdGraphCanvas 关系图谱画布](/components/yd-graph-canvas) · [YdTablePicker 弹出式选择输入框](/components/yd-table-picker)
