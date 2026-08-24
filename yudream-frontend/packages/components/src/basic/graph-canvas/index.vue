@@ -1,14 +1,22 @@
 <script setup lang="ts">
+import type Sigma from 'sigma'
 import type { NodeHoverDrawingFunction, NodeLabelDrawingFunction } from 'sigma/rendering'
 import type { Settings } from 'sigma/settings'
 import type { EdgeDisplayData, NodeDisplayData, SigmaEdgeEventPayload, SigmaNodeEventPayload, SigmaStageEventPayload } from 'sigma/types'
-import { createNodeImageProgram } from '@sigma/node-image'
 import { omit } from 'es-toolkit'
 import Graph from 'graphology'
-import Sigma from 'sigma'
-import { EdgeArrowProgram, EdgeDoubleArrowProgram, EdgeLineProgram } from 'sigma/rendering'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Icon from '../icon/index.vue'
+
+// sigma 模块顶层引用浏览器 WebGL2RenderingContext，SSR 环境（如文档站构建）求值即崩溃；
+// 因此 sigma 本体与渲染程序全部在 onMounted 中动态加载，保持本组件模块 SSR 安全。
+interface SigmaModules {
+  SigmaCtor: typeof Sigma
+  createNodeImageProgram: typeof import('@sigma/node-image').createNodeImageProgram
+  EdgeLineProgram: typeof import('sigma/rendering').EdgeLineProgram
+  EdgeArrowProgram: typeof import('sigma/rendering').EdgeArrowProgram
+  EdgeDoubleArrowProgram: typeof import('sigma/rendering').EdgeDoubleArrowProgram
+}
 
 defineOptions({
   name: 'YdGraphCanvas',
@@ -224,7 +232,7 @@ function createDrawHover(boxColor: string, textColor: string): NodeHoverDrawingF
   }
 }
 
-function resolveSettings(): Partial<Settings> {
+function resolveSettings(modules: SigmaModules): Partial<Settings> {
   const textColor = resolveCssVar('--color-text-1', '#1f2328')
   const boxColor = resolveCssVar('--color-bg-1', '#ffffff')
   return {
@@ -240,8 +248,8 @@ function resolveSettings(): Partial<Settings> {
     defaultEdgeType: 'line',
     defaultDrawNodeLabel: createDrawLabel(boxColor, textColor),
     defaultDrawNodeHover: createDrawHover(boxColor, textColor),
-    nodeProgramClasses: { image: createNodeImageProgram({ size: { mode: 'force', value: 256 } }) },
-    edgeProgramClasses: { line: EdgeLineProgram, arrow: EdgeArrowProgram, doubleArrow: EdgeDoubleArrowProgram },
+    nodeProgramClasses: { image: modules.createNodeImageProgram({ size: { mode: 'force', value: 256 } }) },
+    edgeProgramClasses: { line: modules.EdgeLineProgram, arrow: modules.EdgeArrowProgram, doubleArrow: modules.EdgeDoubleArrowProgram },
     allowInvalidContainer: true,
     zIndex: true,
     ...props.settings,
@@ -420,12 +428,27 @@ defineExpose({
   getGraph: () => graph,
 })
 
-onMounted(() => {
+onMounted(async () => {
   if (!host.value) {
     return
   }
+  const [sigma, nodeImage, rendering] = await Promise.all([
+    import('sigma'),
+    import('@sigma/node-image'),
+    import('sigma/rendering'),
+  ])
+  if (!host.value) {
+    return
+  }
+  const modules: SigmaModules = {
+    SigmaCtor: sigma.default,
+    createNodeImageProgram: nodeImage.createNodeImageProgram,
+    EdgeLineProgram: rendering.EdgeLineProgram,
+    EdgeArrowProgram: rendering.EdgeArrowProgram,
+    EdgeDoubleArrowProgram: rendering.EdgeDoubleArrowProgram,
+  }
   graph = new Graph()
-  renderer = new Sigma(graph, host.value, resolveSettings())
+  renderer = new modules.SigmaCtor(graph, host.value, resolveSettings(modules))
   applyReducers()
   bindEvents()
   syncData()
