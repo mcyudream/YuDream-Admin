@@ -18,6 +18,7 @@ import online.yudream.base.plugin.spi.system.command.PluginCommandRegistry;
 import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
+import online.yudream.base.plugin.spi.system.graph.PluginGraphService;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -57,11 +58,13 @@ public class PluginContextImpl implements PluginContext {
     private final PluginTemplateRenderService templateRenderService;
     private final PluginAiToolRegistry aiToolRegistry;
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
+    private final PluginGraphService graph;
     private final PluginSemanticMemoryService semanticMemory;
 
     public PluginContextImpl(String pluginCode, URLClassLoader pluginClassLoader, FrameworkServices frameworkServices,
                              PluginServiceRegistry pluginServiceRegistry, Set<String> declaredDependencies,
                              Predicate<String> dependencyEnabled, PluginAiToolRegistry aiToolRegistry,
+                             PluginGraphService graphService,
                              PluginSemanticMemoryService semanticMemoryService,
                              AgentRuntimeApplicationRegistry agentApplicationRegistry) {
         this.pluginCode = pluginCode;
@@ -74,6 +77,7 @@ public class PluginContextImpl implements PluginContext {
         this.templateRenderService = new PluginTemplateRenderFrameworkService(pluginClassLoader, frameworkServices.render());
         this.aiToolRegistry = aiToolRegistry;
         this.agentApplicationRegistry = agentApplicationRegistry;
+        this.graph = graphService;
         this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode,
                 new SandboxAwarePluginSemanticMemoryService(pluginCode, semanticMemoryService));
         onDispose(interactionRegistry);
@@ -88,6 +92,11 @@ public class PluginContextImpl implements PluginContext {
     @Override
     public FrameworkServices framework() {
         return frameworkServices;
+    }
+
+    @Override
+    public PluginGraphService graph() {
+        return graph;
     }
 
     @Override
@@ -379,6 +388,9 @@ public class PluginContextImpl implements PluginContext {
 
     private PluginFrontendModule withDefaultFrontendEntry(PluginFrontendModule module, String moduleName) {
         String entry = StringUtils.hasText(module.entry()) ? module.entry().trim() : defaultFrontendEntry();
+        validateFrontendAssetPath(entry, "插件前端入口路径非法");
+        List<String> styles = validateFrontendAssetPaths(module.styles(), "插件前端样式路径非法");
+        List<String> scripts = validateFrontendAssetPaths(module.scripts(), "插件前端脚本路径非法");
         return new PluginFrontendModule(
                 entry,
                 moduleName,
@@ -388,8 +400,33 @@ public class PluginContextImpl implements PluginContext {
                 module.menuIcon(),
                 module.menuSort(),
                 module.parentCode(),
+                styles,
+                scripts,
                 module.routes()
         );
+    }
+
+    private List<String> validateFrontendAssetPaths(List<String> paths, String message) {
+        return paths == null ? List.of() : paths.stream()
+                .map(path -> validateFrontendAssetPath(path, message))
+                .toList();
+    }
+
+    private String validateFrontendAssetPath(String path, String message) {
+        if (!StringUtils.hasText(path)) {
+            throw new BizException(message);
+        }
+        String normalized = path.trim();
+        String assetPrefix = "/api/platform/plugins/" + pluginCode + "/assets/";
+        if (normalized.startsWith(assetPrefix)) {
+            normalized = normalized.substring(assetPrefix.length());
+        } else if (normalized.startsWith("/") || normalized.contains(":")) {
+            throw new BizException(message);
+        }
+        if (normalized.isBlank() || normalized.indexOf('\\') >= 0 || normalized.contains("..")) {
+            throw new BizException(message);
+        }
+        return path.trim();
     }
 
     private String defaultFrontendEntry() {

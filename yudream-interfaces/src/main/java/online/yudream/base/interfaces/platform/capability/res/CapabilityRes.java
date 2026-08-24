@@ -21,6 +21,7 @@ public class CapabilityRes {
     private Boolean enabled;
     private List<String> dependencies;
     private Map<String, String> config;
+    private Map<String, Boolean> secretConfigured;
     private CapabilityStatus status;
     private String healthMessage;
     private LocalDateTime checkedAt;

@@ -12,6 +12,7 @@ import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.capability.service.CapabilityProvider;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
+import online.yudream.base.domain.platform.capability.enumerate.CapabilityStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -43,11 +44,17 @@ public class CapabilityAppService {
     @Transactional
     public CapabilityDTO updateConfig(CapabilityConfigUpdateCmd cmd) {
         CapabilityModule module = module(cmd.getCode());
-        module.updateConfig(cmd.getConfig());
+        module.updateConfig(mergedConfig(module, cmd.getConfig()));
         CapabilityModule saved = capabilityModuleRepo.save(module);
         if (saved.enabled()) {
             assertDependenciesEnabled(saved);
-            provider(saved.getCode()).enable(saved.getConfig());
+            try {
+                provider(saved.getCode()).enable(saved.getConfig());
+            } catch (RuntimeException ex) {
+                saved.disable();
+                capabilityModuleRepo.save(saved);
+                throw ex;
+            }
         } else {
             provider(saved.getCode()).disable();
         }
@@ -58,9 +65,9 @@ public class CapabilityAppService {
     public CapabilityDTO enable(String code) {
         CapabilityModule module = module(code);
         assertDependenciesEnabled(module);
+        provider(code).enable(module.getConfig());
         module.enable();
         CapabilityModule saved = capabilityModuleRepo.save(module);
-        provider(code).enable(saved.getConfig());
         return CapabilityAssembler.toDTO(saved, healthOf(saved));
     }
 
@@ -122,7 +129,13 @@ public class CapabilityAppService {
                     capabilityModuleRepo.save(module);
                     continue;
                 }
-                provider.enable(module.getConfig());
+                try {
+                    provider.enable(module.getConfig());
+                } catch (RuntimeException e) {
+                    module.disable();
+                    capabilityModuleRepo.save(module);
+                    provider.disable();
+                }
             }
         }
     }
@@ -141,10 +154,11 @@ public class CapabilityAppService {
     }
 
     private CapabilityHealth healthOf(CapabilityModule module) {
-        if (!module.enabled()) {
+        CapabilityHealth health = provider(module.getCode()).health();
+        if (!module.enabled() && health.status() != CapabilityStatus.ERROR) {
             return CapabilityHealth.disabled("能力未启用");
         }
-        return provider(module.getCode()).health();
+        return health;
     }
 
     private void assertDependenciesEnabled(CapabilityModule module) {
@@ -193,6 +207,17 @@ public class CapabilityAppService {
 
     private List<String> append(List<String> values, String value) {
         return java.util.stream.Stream.concat(values.stream(), java.util.stream.Stream.of(value)).toList();
+    }
+
+    private Map<String, String> mergedConfig(CapabilityModule module, Map<String, String> requestedConfig) {
+        Map<String, String> config = new java.util.HashMap<>(requestedConfig == null ? Map.of() : requestedConfig);
+        if ("neo4j".equals(module.getCode()) && !StringUtils.hasText(config.get("password"))) {
+            String existingPassword = module.getConfig() == null ? null : module.getConfig().get("password");
+            if (StringUtils.hasText(existingPassword)) {
+                config.put("password", existingPassword);
+            }
+        }
+        return config;
     }
 
     private Map<String, CapabilityProvider> providerMap() {

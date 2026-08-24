@@ -55,7 +55,7 @@ public class GraphQueryLogRepoImpl implements GraphQueryLogRepo {
         if (StringUtils.hasText(keyword)) {
             String pattern = ".*" + Pattern.quote(keyword.trim()) + ".*";
             query.addCriteria(new Criteria().orOperator(
-                    Criteria.where("connectionCode").regex(pattern, "i"),
+                    Criteria.where("tableCode").regex(pattern, "i"),
                     Criteria.where("cypher").regex(pattern, "i"),
                     Criteria.where("summary").regex(pattern, "i")
             ));

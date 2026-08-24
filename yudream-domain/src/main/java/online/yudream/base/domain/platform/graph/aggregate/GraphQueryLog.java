@@ -19,8 +19,8 @@ import java.util.Map;
 @AllArgsConstructor
 public class GraphQueryLog extends BaseDomain {
 
-    private Long connectionId;
-    private String connectionCode;
+    private Long tableId;
+    private String tableCode;
     private String cypher;
     private Map<String, Object> params;
     private List<Map<String, Object>> rows;

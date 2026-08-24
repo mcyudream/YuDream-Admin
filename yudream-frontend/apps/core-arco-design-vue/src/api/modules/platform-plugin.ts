@@ -66,6 +66,7 @@ export interface PluginFrontendModule {
   moduleName?: string
   sdkVersion?: string
   integrity?: string
+  assetRevision?: string
   styles?: string[]
   scripts?: string[]
   menuTitle?: string

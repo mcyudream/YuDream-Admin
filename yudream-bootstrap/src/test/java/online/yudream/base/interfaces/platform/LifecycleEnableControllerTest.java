@@ -29,12 +29,12 @@ class LifecycleEnableControllerTest {
     }
 
     @Test
-    void exposesGraphConnectionEnableAction() throws Exception {
+    void exposesGraphTableEnableAction() throws Exception {
         GraphAppService service = mock(GraphAppService.class);
-        new GraphController(service).enableConnection(2L);
+        new GraphController(service).enable(2L);
 
-        verify(service).enableConnection(2L);
-        assertPostPath(GraphController.class, "enableConnection", "/connections/{id}/enable");
+        verify(service).enableTable(2L);
+        assertPostPath(GraphController.class, "enable", "/tables/{id}/enable");
     }
 
     @Test

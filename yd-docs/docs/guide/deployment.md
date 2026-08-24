@@ -111,7 +111,7 @@ flowchart LR
 | `PLATFORM_DATAVIZ_ENABLED` | 否 | 数据可视化能力，默认 `true`。 |
 | `PLATFORM_MILKY_ENABLED` | 否 | Milky 能力，默认 `true`。 |
 | `PLATFORM_MESSAGE_RENDER_ENABLED` | 否 | 消息渲染能力，默认 `true`；启用需 render-server。 |
-| `YUDREAM_MILKY_CREDENTIAL_KEY` | 启用 Milky 时 | Milky 凭据 AES-GCM 密钥，默认空；Base64 解码后必须为 16/24/32 字节，生产启用时必须配置。 |
+| `YUDREAM_CREDENTIAL_KEY` | 保存任意受管凭据时 | 部署级 AES-256-GCM 主密钥，统一加密 Neo4j、Milky 与插件 SecretStore；必须为 Base64 编码且解码后恰为 32 字节。旧的三个专用变量仅用于历史密文解密，不用于新写入。 |
 
 #### AI、Wiki、Chat 与渲染
 
@@ -120,11 +120,7 @@ flowchart LR
 | `PLATFORM_AI_CONNECT_TIMEOUT` | 否 | AI 客户端连接超时，默认 `30s`。 |
 | `PLATFORM_AI_READ_TIMEOUT` | 否 | AI 客户端读取超时，默认 `30m`。 |
 | `PLATFORM_AI_SSE_TIMEOUT` | 否 | AI 客户端 SSE 超时，默认 `30m`。 |
-| `PLATFORM_WIKI_NEO4J_URI` | 启用 Wiki 时 | Wiki Neo4j URI，默认 `bolt://localhost:7687`；启用 Wiki 需可用 Neo4j。 |
-| `PLATFORM_WIKI_NEO4J_USERNAME` | 启用 Wiki 时 | Wiki Neo4j 用户名，默认 `neo4j`。 |
-| `PLATFORM_WIKI_NEO4J_PASSWORD` | 启用 Wiki 时 | Wiki Neo4j 密码，默认回退 `${NEO4J_PASSWORD:yudream123456}`；生产必须改为真实密钥。 |
-| `NEO4J_PASSWORD` | 启用 Wiki 且未设置上项时 | Wiki Neo4j 密码的后备变量，默认 `yudream123456`；生产不要使用默认值。 |
-| `PLATFORM_WIKI_NEO4J_DATABASE` | 启用 Wiki 时 | Wiki Neo4j database，默认 `neo4j`。 |
+| `YUDREAM_CREDENTIAL_KEY` | 保存任意受管凭据时 | 部署级 AES-256-GCM 主密钥，统一加密 Neo4j、Milky 与插件 SecretStore；必须为 Base64 编码且解码后恰为 32 字节。生产通过 Secret 安全注入，不能使用默认值或提交到仓库。 |
 | `PUBLIC_WIKI_CHAT_SSE_TIMEOUT` | 否 | 公开 Wiki 问答 SSE 超时，默认 `3m`。 |
 | `PLATFORM_CHAT_SSE_TIMEOUT` | 否 | 平台 Chat SSE 超时，默认 `30m`。 |
 | `PUBLIC_WIKI_CHAT_EXECUTOR_CORE` | 否 | 公开 Wiki 问答线程池核心线程数，默认 `2`。 |
@@ -134,6 +130,8 @@ flowchart LR
 | `MESSAGE_RENDER_TOKEN` | 否 | 后端渲染 token，默认空。当前 render-server 未校验 token，不应因此公开服务。 |
 | `MESSAGE_RENDER_TIMEOUT` | 否 | 后端渲染请求超时，默认 `30s`。 |
 | `MESSAGE_RENDER_MAX_RESPONSE_SIZE` | 否 | 后端渲染响应最大大小，默认 `16MB`。 |
+
+`PLATFORM_NEO4J_ENABLED` 只控制 Neo4j provider 是否注册。项目闸门允许后，管理员在“平台 → 能力管理 → Neo4j”保存物理 URI、用户名、密码和 database；密码不会通过 API 返回，留空更新时保留既有密码。`YUDREAM_CREDENTIAL_KEY` 是唯一的持久化加密主密钥，使用 AES-256-GCM，必须由部署 Secret 注入。图数据库页面、Wiki 和插件只使用逻辑图表：它们不保存、返回或接收连接凭据，所有写入仍按 `tableCode` 与业务空间隔离。
 
 #### S3
 
@@ -150,7 +148,7 @@ flowchart LR
 
 | 变量 | 必填 | 作用与源码默认值 |
 |---|---:|---|
-| `YUDREAM_PLUGIN_SECRET_KEY` | 是 | 插件运行时密钥；源码为 `${YUDREAM_PLUGIN_SECRET_KEY}`，无默认值，生产必须配置并妥善保管。 |
+| `YUDREAM_CREDENTIAL_KEY` | 保存插件 SecretStore 时 | 插件 SecretStore 与 Neo4j、Milky 共用的部署级 AES-256-GCM 主密钥；必须为 Base64 编码且解码后恰为 32 字节。 |
 | `PLATFORM_PLUGIN_HOST_VERSION` | 否 | 插件兼容性矩阵中的宿主版本，默认 `1.0.0`。 |
 | `PLATFORM_PLUGIN_SPI_VERSION` | 否 | 插件兼容性矩阵中的 SPI 版本，默认 `2.6.0`。 |
 | `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | 否 | 插件兼容性矩阵中的前端 SDK 版本，默认 `1.0.1`。 |
@@ -172,7 +170,7 @@ flowchart LR
 
 根目录 Compose 中的 `RENDER_CONCURRENCY`、`RENDER_TIMEOUT_MS` 不是当前 render-server 源码读取的变量，不列入实际运行时参考；需要调整队列/并发时使用上表变量。
 
-生产至少应替换插件密钥、S3 凭据（启用对象存储时）、邮件账号密码（启用邮件时）和 Wiki/Neo4j 密码（启用 Wiki 时），并提供 MongoDB、Redis 及所启用平台能力所需的外部服务。两套 Compose 模板仍见[快速启动：Docker Compose 模板](/guide/getting-started#方式一docker-compose-部署推荐)：模板 A 使用已有 MongoDB/Redis，模板 B 在 Compose 内创建并持久化 MongoDB/Redis；未使用的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky 应保持模板中的关闭开关。
+生产至少应安全注入并备份 `YUDREAM_CREDENTIAL_KEY`、替换 S3 凭据（启用对象存储时）与邮件账号密码（启用邮件时）。切勿随意更换主密钥：否则历史密文必须临时通过其对应旧变量解密，并在保存后迁移。管理员随后在能力管理中保存 Neo4j 物理凭据；不要通过 `PLATFORM_NEO4J_URI`、`PLATFORM_NEO4J_USERNAME`、`PLATFORM_NEO4J_PASSWORD` 或 `PLATFORM_NEO4J_DATABASE` 部署变量配置它们。两套 Compose 模板仍见[快速启动：Docker Compose 模板](/guide/getting-started#方式一docker-compose-部署推荐)：模板 A 使用已有 MongoDB/Redis，模板 B 在 Compose 内创建并持久化 MongoDB/Redis；未使用的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky 应保持模板中的关闭开关。
 
 ### 启动、停止与检查
 
@@ -195,7 +193,7 @@ docker compose down -v    # 删除 MongoDB/Redis 数据卷，谨慎执行
 
 ### 可选中间件与外层代理
 
-仓库的 `docker-compose.platform.yml` 另提供 RabbitMQ 4.3.2-management（profile `mq`）和 Neo4j 5.26.7（profile `graph`）。只有提供对应连接配置并打开能力开关时才启用：
+仓库的 `docker-compose.platform.yml` 另提供 RabbitMQ 4.3.2-management（profile `mq`）和 Neo4j 5.26.7（profile `graph`）。`NEO4J_USERNAME` 与 `NEO4J_PASSWORD` 只初始化该 Compose Neo4j 容器；后端物理 URI、用户名、密码和 database 必须在能力管理中保存，并由 `YUDREAM_CREDENTIAL_KEY` 加密。后台的「逻辑图表」、Wiki 与插件均不保存凭据，只通过选中的/授权的逻辑表隔离数据。只有打开对应项目闸门后才启用：
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.platform.yml --profile mq --profile graph up -d

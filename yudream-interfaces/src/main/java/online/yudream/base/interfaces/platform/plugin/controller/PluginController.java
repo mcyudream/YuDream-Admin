@@ -11,6 +11,7 @@ import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembl
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -94,8 +96,16 @@ public class PluginController {
     @GetMapping("/{code}/assets/**")
     public ResponseEntity<byte[]> frontendAsset(@PathVariable String code, HttpServletRequest request) {
         PluginFrontendAssetDTO asset = pluginAppService.frontendAsset(code, PluginWebAssembler.frontendAssetPath(code, request));
+        CacheControl cacheControl = asset.isImmutable()
+                ? CacheControl.maxAge(Duration.ofDays(365)).cachePublic().immutable()
+                : CacheControl.noCache();
+        if (asset.getEtag() != null && request.getHeaders(HttpHeaders.IF_NONE_MATCH).asIterator()
+                .hasNext() && request.getHeader(HttpHeaders.IF_NONE_MATCH).contains(asset.getEtag())) {
+            return ResponseEntity.status(304).eTag(asset.getEtag()).cacheControl(cacheControl).build();
+        }
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.noCache())
+                .eTag(asset.getEtag())
+                .cacheControl(cacheControl)
                 .contentType(MediaType.parseMediaType(asset.getContentType()))
                 .body(asset.getBody());
     }

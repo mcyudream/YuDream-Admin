@@ -178,6 +178,9 @@ async function toggleCapability(item: CapabilityItem) {
 function openConfig(item: CapabilityItem) {
   selectedCode.value = item.code
   configDraft.value = { ...(item.config || {}) }
+  if (item.code === 'neo4j') {
+    configDraft.value.password = ''
+  }
   if (item.code === 'ai' && !configDraft.value.providers) {
     configDraft.value.providers = legacyAiProvidersJson(item.config || {})
     configDraft.value.defaultProvider ||= 'default'
@@ -375,6 +378,12 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
   const map: Record<string, CapabilityConfigField[]> = {
     sse: [
       { key: 'timeout', label: '连接超时（毫秒）', placeholder: '300000', type: 'number' },
+    ],
+    neo4j: [
+      { key: 'uri', label: 'Neo4j URI', placeholder: 'bolt://localhost:7687' },
+      { key: 'username', label: '用户名', placeholder: 'neo4j' },
+      { key: 'password', label: '密码', placeholder: '留空不修改', type: 'password' },
+      { key: 'database', label: '数据库', placeholder: 'neo4j' },
     ],
     rabbitmq: [
       { key: 'host', label: '主机', placeholder: 'localhost' },
@@ -958,6 +967,9 @@ function splitModelList(value: string) {
             <div v-else-if="usesStructuredConfig" class="config-form">
               <label v-for="field in configFields" :key="field.key" class="config-field">
                 <span>{{ field.label }}</span>
+                <small v-if="selected?.code === 'neo4j' && field.key === 'password' && selected.secretConfigured?.password" class="config-field__hint">
+                  已配置，留空不修改
+                </small>
                 <FaTextarea
                   v-if="field.type === 'textarea'"
                   v-model="configDraft[field.key]"

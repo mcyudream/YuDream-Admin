@@ -30,7 +30,7 @@ public final class WikiWebAssembler {
         c.setGraphEnabled(r.isGraphEnabled());
         c.setGraphProviderCode(r.getGraphProviderCode());
         c.setGraphModelCode(r.getGraphModelCode());
-        c.setNeo4jConnectionCode(r.getNeo4jConnectionCode());
+        c.setGraphTableCode(r.getGraphTableCode());
         c.setChunkSize(r.getChunkSize());
         c.setChunkOverlap(r.getChunkOverlap());
         c.setTopK(r.getTopK());

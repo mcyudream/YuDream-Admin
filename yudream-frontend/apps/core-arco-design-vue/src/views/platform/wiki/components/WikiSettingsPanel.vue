@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AgentModelOption } from '@/api/modules/platform-agent'
-import type { GraphConnection } from '@/api/modules/platform-graph'
+import type { GraphTable } from '@/api/modules/platform-graph'
 import type { WikiSpace } from '@/api/modules/platform-wiki'
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import apiAgent from '@/api/modules/platform-agent'
@@ -16,18 +16,12 @@ const form = ref<Partial<WikiSpace>>({})
 const saving = ref(false)
 const models = ref<AgentModelOption[]>([])
 const catalogLoading = ref(false)
-const graphConnections = ref<GraphConnection[]>([])
+const graphTables = ref<GraphTable[]>([])
 
-// Neo4j 连接下拉：不选则写入服务端默认连接（yudream.platform.wiki.neo4j.*）
-const graphConnectionOptions = computed(() => [
-  { label: '默认（服务端配置）', value: '' },
-  ...graphConnections.value
-    .filter(connection => connection.status === 'ACTIVE')
-    .map(connection => ({
-      label: `${connection.name}（${connection.uri} / ${connection.database}）`,
-      value: connection.code,
-    })),
-])
+// 图表必须显式选择，避免任何未隔离的默认范围。
+const graphTableOptions = computed(() => graphTables.value
+  .filter(table => table.status === 'ACTIVE')
+  .map(table => ({ label: `${table.name}（${table.code}）`, value: table.code })))
 
 watch(() => store.space.value, (space) => {
   form.value = space ? { ...space } : {}
@@ -160,18 +154,18 @@ function removeSpace() {
   })
 }
 
-async function loadGraphConnections() {
+async function loadGraphTables() {
   try {
-    const res = await apiGraph.pageConnections({ page: 1, size: 100 })
-    graphConnections.value = res.data?.records || []
+    const res = await apiGraph.pageTables({ page: 1, size: 100 })
+    graphTables.value = res.data?.records || []
   }
   catch {
-    graphConnections.value = []
+    graphTables.value = []
   }
 }
 
 onMounted(loadCatalog)
-onMounted(loadGraphConnections)
+onMounted(loadGraphTables)
 </script>
 
 <template>
@@ -290,9 +284,9 @@ onMounted(loadGraphConnections)
               <span>重排序<small>检索结果 rerank</small></span>
             </label>
             <label class="set-field set-field--full">
-              <span>图数据库连接（Neo4j）</span>
-              <FaSelect v-model="form.neo4jConnectionCode" :options="graphConnectionOptions" placeholder="默认（服务端配置）" />
-              <small class="set-hint">向量索引与知识图谱写入所选连接；不选时写入服务端默认连接（yudream.platform.wiki.neo4j.*），连接在「平台 → 图数据库」维护</small>
+              <span>逻辑图表（Neo4j）</span>
+              <FaSelect v-model="form.graphTableCode" :options="graphTableOptions" placeholder="请选择逻辑图表" />
+              <small class="set-hint">向量索引与知识图谱必须写入所选逻辑图表；未选择时不允许索引，图表在「平台 → 图数据库」维护。</small>
             </label>
             <label class="set-field">
               <span>命中图片上限（hitImageLimit）</span>
@@ -440,7 +434,7 @@ onMounted(loadGraphConnections)
 }
 
 .set-model__label :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-2);
 }
 
 .set-danger {
@@ -506,7 +500,7 @@ onMounted(loadGraphConnections)
 }
 
 .set-empty :deep(svg) {
-  color: rgb(var(--primary-6));
+  color: var(--color-text-2);
   font-size: 36px;
 }
 

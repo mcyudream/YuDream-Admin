@@ -15,123 +15,27 @@ import online.yudream.base.domain.platform.graph.aggregate.GraphQueryLog;
 import online.yudream.base.domain.platform.graph.repo.GraphConnectionRepo;
 import online.yudream.base.domain.platform.graph.repo.GraphQueryLogRepo;
 import online.yudream.base.domain.platform.graph.service.GraphDatabaseGateway;
-import online.yudream.base.domain.platform.graph.valobj.GraphQueryResult;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
 import java.time.LocalDateTime;
-import java.util.Map;
+import java.util.*;
 
-@Service
-@RequiredArgsConstructor
+/** Application service for logical graph tables. */
+@Service @RequiredArgsConstructor
 public class GraphAppService {
-
-    private static final String GRAPH_CAPABILITY_CODE = "neo4j";
-
-    private final CapabilityAppService capabilityAppService;
-    private final GraphConnectionRepo graphConnectionRepo;
-    private final GraphQueryLogRepo graphQueryLogRepo;
-    private final GraphDatabaseGateway graphDatabaseGateway;
-
-    @Transactional(readOnly = true)
-    public PageResult<GraphConnectionDTO> pageConnections(GraphPageQuery query) {
-        ensureGraphEnabled();
-        PageResult<GraphConnection> page = graphConnectionRepo.page(query.getKeyword(), query.getPage(), query.getSize());
-        return new PageResult<>(page.getRecords().stream().map(GraphAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
-    }
-
-    @Transactional
-    public GraphConnectionDTO saveConnection(GraphConnectionSaveCmd cmd) {
-        ensureGraphEnabled();
-        GraphConnection connection = cmd.getId() == null ? createConnection(cmd) : connection(cmd.getId());
-        connection.update(cmd.getName(), cmd.getUri(), cmd.getUsername(), cmd.getPassword(), cmd.getDatabase(), cmd.getStatus());
-        GraphConnection saved = graphConnectionRepo.save(connection);
-        if (cmd.getId() != null) {
-            graphDatabaseGateway.close(saved.getCode());
-        }
-        return GraphAssembler.toDTO(saved);
-    }
-
-    @Transactional
-    public void disableConnection(Long id) {
-        ensureGraphEnabled();
-        GraphConnection connection = connection(id);
-        connection.disable();
-        graphConnectionRepo.save(connection);
-        graphDatabaseGateway.close(connection.getCode());
-    }
-
-    @Transactional
-    public void enableConnection(Long id) {
-        ensureGraphEnabled();
-        GraphConnection connection = connection(id);
-        connection.activate();
-        graphConnectionRepo.save(connection);
-    }
-
-    @Transactional
-    public GraphQueryLogDTO testConnection(Long id) {
-        ensureGraphEnabled();
-        GraphConnection connection = activeConnection(id);
-        GraphQueryResult result = graphDatabaseGateway.test(connection);
-        return GraphAssembler.toDTO(saveLog(connection, "RETURN 1 AS ok", Map.of(), result));
-    }
-
-    @Transactional
-    public GraphQueryLogDTO query(GraphQueryCmd cmd) {
-        ensureGraphEnabled();
-        if (!StringUtils.hasText(cmd.getCypher())) {
-            throw new BizException("Cypher 不能为空");
-        }
-        GraphConnection connection = activeConnection(cmd.getConnectionId());
-        GraphQueryResult result = graphDatabaseGateway.query(connection, cmd.getCypher(), cmd.getParams());
-        return GraphAssembler.toDTO(saveLog(connection, cmd.getCypher(), cmd.getParams(), result));
-    }
-
-    @Transactional(readOnly = true)
-    public PageResult<GraphQueryLogDTO> pageLogs(GraphPageQuery query) {
-        ensureGraphEnabled();
-        PageResult<GraphQueryLog> page = graphQueryLogRepo.page(query.getKeyword(), query.getPage(), query.getSize());
-        return new PageResult<>(page.getRecords().stream().map(GraphAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
-    }
-
-    private GraphConnection createConnection(GraphConnectionSaveCmd cmd) {
-        if (graphConnectionRepo.findByCode(cmd.getCode()).isPresent()) {
-            throw new BizException("连接编码已存在");
-        }
-        return GraphConnection.create(cmd.getName(), cmd.getCode(), cmd.getUri(), cmd.getUsername(), cmd.getPassword(), cmd.getDatabase());
-    }
-
-    private GraphConnection activeConnection(Long id) {
-        GraphConnection connection = connection(id);
-        if (!connection.active()) {
-            throw new BizException("图数据库连接已停用");
-        }
-        return connection;
-    }
-
-    private GraphConnection connection(Long id) {
-        return graphConnectionRepo.findById(id).orElseThrow(() -> new BizException("图数据库连接不存在"));
-    }
-
-    private GraphQueryLog saveLog(GraphConnection connection, String cypher, Map<String, Object> params, GraphQueryResult result) {
-        GraphQueryLog log = GraphQueryLog.builder()
-                .connectionId(connection.getId())
-                .connectionCode(connection.getCode())
-                .cypher(cypher)
-                .params(params == null ? Map.of() : params)
-                .rows(result.rows())
-                .summary(result.summary())
-                .durationMillis(result.durationMillis())
-                .status(result.status())
-                .errorMessage(result.errorMessage())
-                .executedAt(LocalDateTime.now())
-                .build();
-        return graphQueryLogRepo.save(log);
-    }
-
-    private void ensureGraphEnabled() {
-        capabilityAppService.ensureEnabled(GRAPH_CAPABILITY_CODE, "Neo4j 图数据库");
-    }
+    private static final String GRAPH_CAPABILITY_CODE="neo4j";
+    private final CapabilityAppService capabilityAppService; private final GraphConnectionRepo graphConnectionRepo;
+    private final GraphQueryLogRepo graphQueryLogRepo; private final GraphDatabaseGateway graphDatabaseGateway;
+    @Transactional(readOnly=true) public PageResult<GraphConnectionDTO> pageTables(GraphPageQuery q){ensureGraphEnabled();PageResult<GraphConnection>p=graphConnectionRepo.page(q.getKeyword(),q.getPage(),q.getSize());return new PageResult<>(p.getRecords().stream().map(GraphAssembler::toDTO).toList(),p.getTotal(),p.getPage(),p.getSize());}
+    @Transactional public GraphConnectionDTO saveTable(GraphConnectionSaveCmd cmd){ensureGraphEnabled();GraphConnection table=cmd.getId()==null?create(cmd):table(cmd.getId());table.update(cmd.getName(),cmd.getDescription(),cmd.getStatus());table.replaceAuthorizedPlugins(plugins(cmd.getAuthorizedPluginCodes()));return GraphAssembler.toDTO(graphConnectionRepo.save(table));}
+    @Transactional public void disableTable(Long id){ensureGraphEnabled();GraphConnection t=table(id);t.disable();graphConnectionRepo.save(t);}
+    @Transactional public void enableTable(Long id){ensureGraphEnabled();GraphConnection t=table(id);t.activate();graphConnectionRepo.save(t);}
+    @Transactional public GraphQueryLogDTO testTable(Long id){ensureGraphEnabled();GraphConnection t=active(id);return GraphAssembler.toDTO(log(t,"diagnostic",Map.of(),graphDatabaseGateway.test(t)));}
+    @Transactional(readOnly=true) public PageResult<GraphQueryLogDTO> pageLogs(GraphPageQuery q){ensureGraphEnabled();PageResult<GraphQueryLog>p=graphQueryLogRepo.page(q.getKeyword(),q.getPage(),q.getSize());return new PageResult<>(p.getRecords().stream().map(GraphAssembler::toDTO).toList(),p.getTotal(),p.getPage(),p.getSize());}
+    private GraphConnection create(GraphConnectionSaveCmd c){if(graphConnectionRepo.findByCode(c.getCode()).isPresent())throw new BizException("逻辑图表编码已存在");return GraphConnection.create(c.getName(),c.getCode(),c.getDescription());}
+    private Set<String> plugins(Set<String> values){LinkedHashSet<String>out=new LinkedHashSet<>();if(values!=null)for(String v:values){if(v==null||v.isBlank())throw new BizException("授权插件编码不能为空");out.add(v.trim());}return out;}
+    private GraphConnection active(Long id){GraphConnection t=table(id);if(!t.active())throw new BizException("逻辑图表已停用");return t;}
+    private GraphConnection table(Long id){return graphConnectionRepo.findById(id).orElseThrow(()->new BizException("逻辑图表不存在"));}
+    private GraphQueryLog log(GraphConnection t,String cypher,Map<String,Object>params,online.yudream.base.domain.platform.graph.valobj.GraphQueryResult r){return graphQueryLogRepo.save(GraphQueryLog.builder().tableId(t.getId()).tableCode(t.getCode()).cypher(cypher).params(params).rows(r.rows()).summary(r.summary()).durationMillis(r.durationMillis()).status(r.status()).errorMessage(r.errorMessage()).executedAt(LocalDateTime.now()).build());}
+    private void ensureGraphEnabled(){capabilityAppService.ensureEnabled(GRAPH_CAPABILITY_CODE,"Neo4j 图数据库");}
 }

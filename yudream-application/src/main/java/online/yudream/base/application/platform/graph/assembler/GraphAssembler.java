@@ -6,37 +6,16 @@ import online.yudream.base.domain.platform.graph.aggregate.GraphConnection;
 import online.yudream.base.domain.platform.graph.aggregate.GraphQueryLog;
 
 public class GraphAssembler {
-
-    private GraphAssembler() {
+    private GraphAssembler() { }
+    public static GraphConnectionDTO toDTO(GraphConnection table) {
+        return GraphConnectionDTO.builder().id(table.getId()).name(table.getName()).code(table.getCode())
+                .description(table.getDescription()).status(table.getStatus()).authorizedPluginCodes(table.normalizedAuthorizedPluginCodes())
+                .createTime(table.getCreateTime()).updateTime(table.getUpdateTime()).build();
     }
-
-    public static GraphConnectionDTO toDTO(GraphConnection connection) {
-        return GraphConnectionDTO.builder()
-                .id(connection.getId())
-                .name(connection.getName())
-                .code(connection.getCode())
-                .uri(connection.getUri())
-                .username(connection.getUsername())
-                .database(connection.getDatabase())
-                .status(connection.getStatus())
-                .createTime(connection.getCreateTime())
-                .updateTime(connection.getUpdateTime())
-                .build();
-    }
-
     public static GraphQueryLogDTO toDTO(GraphQueryLog log) {
-        return GraphQueryLogDTO.builder()
-                .id(log.getId())
-                .connectionId(log.getConnectionId())
-                .connectionCode(log.getConnectionCode())
-                .cypher(log.getCypher())
-                .params(log.getParams())
-                .rows(log.getRows())
-                .summary(log.getSummary())
-                .durationMillis(log.getDurationMillis())
-                .status(log.getStatus())
-                .errorMessage(log.getErrorMessage())
-                .executedAt(log.getExecutedAt())
-                .build();
+        return GraphQueryLogDTO.builder().id(log.getId()).tableId(log.getTableId()).tableCode(log.getTableCode())
+                .cypher(log.getCypher()).params(log.getParams()).rows(log.getRows()).summary(log.getSummary())
+                .durationMillis(log.getDurationMillis()).status(log.getStatus()).errorMessage(log.getErrorMessage())
+                .executedAt(log.getExecutedAt()).build();
     }
 }

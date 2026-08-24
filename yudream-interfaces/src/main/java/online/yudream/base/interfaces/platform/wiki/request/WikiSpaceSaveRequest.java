@@ -17,7 +17,7 @@ public class WikiSpaceSaveRequest {
     private boolean graphEnabled;
     private String graphProviderCode;
     private String graphModelCode;
-    private String neo4jConnectionCode;
+    private String graphTableCode;
     private int chunkSize = 1200;
     private int chunkOverlap = 160;
     private int topK = 8;

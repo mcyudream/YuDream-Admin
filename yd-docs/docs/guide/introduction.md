@@ -21,7 +21,7 @@
 | `sse` | `PLATFORM_SSE_ENABLED` | SSE 服务端推送 |
 | `websocket` | `PLATFORM_WEBSOCKET_ENABLED` | WebSocket 实时通信 |
 | `rabbitmq` | `PLATFORM_RABBITMQ_ENABLED` | RabbitMQ 消息能力 |
-| `neo4j` | `PLATFORM_NEO4J_ENABLED` | 图数据库（供 Wiki 图谱等使用） |
+| `neo4j` | `PLATFORM_NEO4J_ENABLED` | 单一部署级图数据库；后台逻辑图表隔离 Wiki 与插件数据 |
 | `ai` | `PLATFORM_AI_ENABLED` | 多 provider AI（OpenAI / OpenAI 兼容 / Kimi / DeepSeek），Spring AI 原生工具调用 |
 | `agent` | `PLATFORM_AGENT_ENABLED` | Agent 编排 + 执行追踪 |
 | `cms` | `PLATFORM_CMS_ENABLED` | GrapesJS 可视化建站 CMS |

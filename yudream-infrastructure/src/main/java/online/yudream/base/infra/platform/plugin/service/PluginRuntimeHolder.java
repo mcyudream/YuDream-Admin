@@ -17,5 +17,6 @@ public class PluginRuntimeHolder {
     private final YuDreamPlugin plugin;
     private final PluginDescriptor descriptor;
     private final PluginContextImpl context;
+    private final String assetRevision;
     private boolean enabled;
 }

@@ -15,7 +15,9 @@ import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrows
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.annotation.PluginCommand;
+import online.yudream.base.plugin.spi.annotation.PluginFrontend;
 import online.yudream.base.plugin.spi.core.PluginContext;
+import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.command.PluginCommandContext;
@@ -214,6 +216,37 @@ class JarPluginRuntimeGatewayTest {
         assertThrows(BizException.class, () -> gateway.load(module("plain", classes)));
     }
 
+    @Test
+    void frontendManifestPreservesProgrammaticAndAnnotatedAssetsAndAddsRevision() throws IOException {
+        Path jar = writePluginJar("frontend-assets.jar", "frontend-assets", FrontendAssetsPlugin.class.getName());
+        JarPluginRuntimeGateway gateway = newGateway();
+
+        gateway.enable(module("frontend-assets", jar));
+        List<online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo> modules = gateway.frontendModules();
+        assertEquals(2, modules.size());
+        assertTrue(modules.stream().allMatch(module -> module.entry()
+                .equals("/api/platform/plugins/frontend-assets/assets/remoteEntry.js")));
+        assertTrue(modules.stream().anyMatch(module -> module.moduleName().equals("annotated")
+                && module.styles().equals(List.of("assets/annotated.css"))
+                && module.scripts().equals(List.of("assets/annotated.js"))));
+        assertTrue(modules.stream().anyMatch(module -> module.moduleName().equals("programmatic")
+                && module.styles().equals(List.of("assets/programmatic.css"))
+                && module.scripts().equals(List.of("assets/programmatic.js"))));
+        assertTrue(modules.stream().allMatch(module -> module.assetRevision().startsWith("1.0.0-")));
+        gateway.unload("frontend-assets");
+    }
+
+    @PluginFrontend(moduleName = "annotated", styles = {"assets/annotated.css"}, scripts = {"assets/annotated.js"})
+    public static class FrontendAssetsPlugin implements YuDreamPlugin {
+        @Override
+        public void onEnable(PluginContext context) {
+            context.registerFrontend(new PluginFrontendModule(
+                    "", "programmatic", "", "", "", "", 0, "",
+                    List.of("assets/programmatic.css"), List.of("assets/programmatic.js"), List.of()
+            ));
+        }
+    }
+
     public static class HealthyPlugin implements YuDreamPlugin {
         @PluginCommand(code = "healthy-cmd", command = "healthy", name = "健康指令")
         public void handle(PluginCommandContext context) {
@@ -266,6 +299,7 @@ class JarPluginRuntimeGatewayTest {
                 nullReturningProxy(FrameworkServices.class),
                 new PluginServiceRegistry(),
                 new PluginAiToolRegistry(),
+                new PluginGraphFrameworkService(null, null, null),
                 nullReturningProxy(PluginSemanticMemoryService.class),
                 new AgentRuntimeApplicationRegistry() {
                     @Override

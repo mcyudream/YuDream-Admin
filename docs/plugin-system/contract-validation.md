@@ -61,6 +61,10 @@
 在空白本地 Maven 仓中，从阿里云解析 Maven 插件，并通过 Nexus `maven-public` 重新解析 YuDream 契约
 `online.yudream.base:yudream-plugin-spi`。
 
+## Graph 完整投影 SPI
+
+`PluginGraphService.replaceCompleteProjection(PluginGraphCompleteProjection)` 仅接收 namespace、version、节点和关系；它不接受 tableCode 或 Cypher。宿主每次调用都会检查 Neo4j capability，并自动解析调用插件唯一的 ACTIVE 且已授权图表绑定。完整投影上限为 20,000 个节点、50,000 条关系和 8 MiB UTF-8 JSON 负载；超出时返回结构化 `PROJECTION_LIMIT_EXCEEDED`，不会触发图数据库 gateway。普通 `replaceProjection` 仍保持每类 1,000 条限制。
+
 ### 2. npm 契约
 
 ```powershell

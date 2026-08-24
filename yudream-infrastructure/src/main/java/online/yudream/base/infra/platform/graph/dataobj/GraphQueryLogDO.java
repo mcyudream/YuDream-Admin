@@ -18,8 +18,8 @@ import java.util.Map;
 @AllArgsConstructor
 @Document(collection = "platformGraphQueryLog")
 public class GraphQueryLogDO extends BaseDO {
-    private Long connectionId;
-    private String connectionCode;
+    private Long tableId;
+    private String tableCode;
     private String cypher;
     private Map<String, Object> params;
     private List<Map<String, Object>> rows;

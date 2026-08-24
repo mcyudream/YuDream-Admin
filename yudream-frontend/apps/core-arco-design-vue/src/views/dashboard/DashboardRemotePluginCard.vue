@@ -1,26 +1,36 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
+import apiPlugin from '@/api/modules/platform-plugin'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
-import { loadPluginFrontendAssetsByCode } from '@/plugins/frontend-assets'
+import { acquirePluginRemoteModule, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
 import { createPluginSdk } from '@/plugins/sdk'
-import { toBackendAssetUrl } from '@/utils/backend-url'
 
 interface Props {
   card: DashboardCard
   onOpen?: (card?: DashboardCard) => void
 }
 
+type RemoteModule = YuDreamPluginFrontendModule & Record<string, any>
+
 const props = defineProps<Props>()
 
 const remoteComponent = shallowRef<Component | null>(null)
 const remoteError = ref('')
 const remoteLoading = ref(false)
+const remoteLease = shallowRef<PluginRemoteModuleLease | null>(null)
+let loadSequence = 0
 const sdk = computed(() => createPluginSdk(props.card.pluginCode || ''))
 
-watch(() => [props.card.pluginCode, props.card.component], loadRemoteComponent, { immediate: true })
+watch(() => [props.card.pluginCode, props.card.component], () => void loadRemoteComponent(), { immediate: true })
+
+onBeforeUnmount(() => {
+  loadSequence += 1
+  void releaseRemoteModule()
+})
 
 async function loadRemoteComponent() {
+  const sequence = ++loadSequence
   remoteComponent.value = null
   remoteError.value = ''
 
@@ -30,38 +40,44 @@ async function loadRemoteComponent() {
   }
 
   remoteLoading.value = true
+  await releaseRemoteModule()
   try {
-    await loadPluginFrontendAssetsByCode(props.card.pluginCode)
-    const entry = `/api/platform/plugins/${props.card.pluginCode}/assets/remoteEntry.js`
-    const module = await import(/* @vite-ignore */ toBackendAssetUrl(entry))
-    await mountPluginModule(module)
+    const manifest = await apiPlugin.frontendManifest()
+    const module = (manifest.data.modules || []).find(item => item.pluginCode === props.card.pluginCode)
+    if (!module) {
+      throw new Error('未找到插件前端模块')
+    }
+    const lease = await acquirePluginRemoteModule(module)
+    if (sequence !== loadSequence) {
+      await lease.release()
+      return
+    }
+    remoteLease.value = lease
+    remoteComponent.value = resolveRemoteComponent(lease.module)
+    if (!remoteComponent.value) {
+      remoteError.value = `插件未导出首页卡片：${props.card.component || '-'}`
+      await releaseRemoteModule()
+    }
   }
   catch (error: any) {
-    remoteError.value = resolveLoadError(error)
+    if (sequence === loadSequence) {
+      remoteError.value = resolveLoadError(error)
+    }
   }
   finally {
-    remoteLoading.value = false
+    if (sequence === loadSequence) {
+      remoteLoading.value = false
+    }
   }
 }
 
-async function mountPluginModule(module: YuDreamPluginFrontendModule & Record<string, any>) {
-  await installPluginModule(module)
-  remoteComponent.value = resolveRemoteComponent(module)
-  if (!remoteComponent.value) {
-    remoteError.value = `插件未导出首页卡片：${props.card.component || '-'}`
-  }
+async function releaseRemoteModule() {
+  const lease = remoteLease.value
+  remoteLease.value = null
+  await lease?.release()
 }
 
-async function installPluginModule(module: YuDreamPluginFrontendModule & Record<string, any>) {
-  if (typeof module.install === 'function') {
-    await module.install()
-  }
-  if (module.default && typeof module.default === 'object' && 'install' in module.default && typeof module.default.install === 'function') {
-    await module.default.install()
-  }
-}
-
-function resolveRemoteComponent(module: YuDreamPluginFrontendModule & Record<string, any>): Component | null {
+function resolveRemoteComponent(module: RemoteModule): Component | null {
   const component = props.card.component || ''
   const routeComponent = component.includes('/') ? component.split('/').pop() || component : component
   if (component && module.routes?.[component]) {
@@ -77,7 +93,7 @@ function resolveRemoteComponent(module: YuDreamPluginFrontendModule & Record<str
     return module[routeComponent]
   }
   if (module.default && typeof module.default === 'object' && 'routes' in module.default) {
-    return resolveRemoteComponent(module.default as YuDreamPluginFrontendModule & Record<string, any>)
+    return resolveRemoteComponent(module.default as RemoteModule)
   }
   return null
 }
@@ -92,13 +108,14 @@ function resolveLoadError(error: any) {
 </script>
 
 <template>
-  <component
-    :is="remoteComponent"
-    v-if="remoteComponent"
-    :sdk="sdk"
-    :card="card"
-    :on-open="onOpen"
-  />
+  <div v-if="remoteComponent" :data-yudream-plugin="card.pluginCode">
+    <component
+      :is="remoteComponent"
+      :sdk="sdk"
+      :card="card"
+      :on-open="onOpen"
+    />
+  </div>
   <div v-else class="dashboard-card__content dashboard-remote-state">
     <FaIcon :name="remoteLoading ? 'i-ri:loader-4-line' : 'i-ri:puzzle-2-line'" :class="{ 'animate-spin': remoteLoading }" />
     <div>

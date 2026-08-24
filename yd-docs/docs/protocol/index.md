@@ -23,7 +23,7 @@ Milky 是 QQ 机器人协议，宿主以「连接」为单位管理多个 Milky 
 
 - **HTTP API**：宿主经 `ReactorMilkyApiGateway.invoke(context, api, body)` 调用对端接口（如 `get_group_list`、发送消息等），返回 JSON；
 - **事件流**：连接启用后，`ReactorMilkyEventGateway` 以 WebSocket 长连消费对端 `/event?access_token=<token>` 端点，事件解析为 `MilkyModels.Event`（含 `eventType`，如 `message_receive`）；
-- **凭据安全**：连接 token 等配置经 `AesGcmMilkyCredentialCipher` 加密落库，密钥来自环境变量 `YUDREAM_MILKY_CREDENTIAL_KEY`；
+- **凭据安全**：连接 token 等配置经 `AesGcmMilkyCredentialCipher` 加密落库；新写入使用 Base64 解码后恰为 32 字节的 `YUDREAM_CREDENTIAL_KEY` 及连接作用域 AAD，旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（16/24/32 字节）仅用于解密历史密文；
 - **插件入口**：插件不直接触碰协议，统一经 [MessagingSpi](/plugin/spi/v1/messaging) 的平台无关端口收发消息，需要原生方法时走 `invoke(connectionId, method, payload)`。
 
 完整字段、端点与事件分发链路见 [Milky 协议详解](/protocol/milky)。

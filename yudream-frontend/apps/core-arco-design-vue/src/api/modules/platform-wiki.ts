@@ -13,7 +13,7 @@ export interface WikiSpace {
   graphEnabled: boolean
   graphProviderCode?: string
   graphModelCode?: string
-  neo4jConnectionCode?: string
+  graphTableCode?: string
   chunkSize: number
   chunkOverlap: number
   topK: number

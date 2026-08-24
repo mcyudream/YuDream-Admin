@@ -162,6 +162,8 @@ class PluginAnnotationRegistrar {
                 frontend.menuIcon(),
                 frontend.menuSort(),
                 frontend.parentCode(),
+                List.of(frontend.styles()),
+                List.of(frontend.scripts()),
                 Arrays.stream(frontend.routes()).map(this::toRoute).toList()
         ));
     }

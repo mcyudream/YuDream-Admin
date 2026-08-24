@@ -23,7 +23,7 @@ SNOWFLAKE_MI=1
 MESSAGE_RENDER_BASE_URL=http://render-server:3000
 MESSAGE_RENDER_TOKEN=
 RENDER_TOKEN=
-YUDREAM_MILKY_CREDENTIAL_KEY=
+YUDREAM_CREDENTIAL_KEY=
 PLATFORM_RABBITMQ_ENABLED=false
 PLATFORM_NEO4J_ENABLED=false
 PLATFORM_WIKI_ENABLED=false
@@ -51,7 +51,7 @@ services:
       SNOWFLAKE_MI: ${SNOWFLAKE_MI:-1}
       MESSAGE_RENDER_BASE_URL: ${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       MESSAGE_RENDER_TOKEN: ${MESSAGE_RENDER_TOKEN:-}
-      YUDREAM_MILKY_CREDENTIAL_KEY: ${YUDREAM_MILKY_CREDENTIAL_KEY:-}
+      YUDREAM_CREDENTIAL_KEY: ${YUDREAM_CREDENTIAL_KEY:-}
       PLATFORM_RABBITMQ_ENABLED: ${PLATFORM_RABBITMQ_ENABLED:-false}
       PLATFORM_NEO4J_ENABLED: ${PLATFORM_NEO4J_ENABLED:-false}
       PLATFORM_WIKI_ENABLED: ${PLATFORM_WIKI_ENABLED:-false}
@@ -90,7 +90,7 @@ networks:
     driver: bridge
 ```
 
-A 中 `MONGO_URI`、`REDIS_HOST` 必填，分别是已有 MongoDB 的完整连接串和 Redis 的可达 hostname；其余变量均可省略并采用表中默认值。`TAG` 控制三枚应用镜像 tag；三个 `*_PORT` 是宿主端口，容器端口固定为 backend `8080`、frontend `80`、render-server `3000`。`MESSAGE_RENDER_BASE_URL` 必须使用 Compose hostname，而不是宿主机 `localhost`。`MESSAGE_RENDER_TOKEN` 是后端配置名，`RENDER_TOKEN` 是渲染容器兼容配置名，若使用 token 应保持一致；当前 render-server 源码只注册 `/health` 和渲染接口，未实现 token 校验，因此生产环境不要发布 render 端口。`SNOWFLAKE_DCI`/`SNOWFLAKE_MI` 是数据中心/机器编号，多实例必须错开。`YUDREAM_MILKY_CREDENTIAL_KEY` 启用 Milky 时才需要，必须是 Base64 编码且解码后为 16/24/32 字节；不启用可留空。`PLATFORM_*_ENABLED` 是平台能力的项目闸门，模板关闭未提供的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky，消息渲染默认开启。
+A 中 `MONGO_URI`、`REDIS_HOST` 必填，分别是已有 MongoDB 的完整连接串和 Redis 的可达 hostname；其余变量均可省略并采用表中默认值。`TAG` 控制三枚应用镜像 tag；三个 `*_PORT` 是宿主端口，容器端口固定为 backend `8080`、frontend `80`、render-server `3000`。`MESSAGE_RENDER_BASE_URL` 必须使用 Compose hostname，而不是宿主机 `localhost`。`MESSAGE_RENDER_TOKEN` 是后端配置名，`RENDER_TOKEN` 是渲染容器兼容配置名，若使用 token 应保持一致；当前 render-server 源码只注册 `/health` 和渲染接口，未实现 token 校验，因此生产环境不要发布 render 端口。`SNOWFLAKE_DCI`/`SNOWFLAKE_MI` 是数据中心/机器编号，多实例必须错开。`YUDREAM_CREDENTIAL_KEY` 统一加密 Neo4j、Milky 和插件 SecretStore 的持久化凭据，必须是 Base64 编码且解码后恰为 32 字节的随机值。务必妥善备份且不要随意更换；历史密文迁移期间，三个旧专用变量仅可作为解密回退。`PLATFORM_*_ENABLED` 是平台能力的项目闸门，模板关闭未提供的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky，消息渲染默认开启。
 
 ### 模板 B：Compose 内置 MongoDB / Redis
 
@@ -111,7 +111,7 @@ SNOWFLAKE_MI=1
 MESSAGE_RENDER_BASE_URL=http://render-server:3000
 MESSAGE_RENDER_TOKEN=
 RENDER_TOKEN=
-YUDREAM_MILKY_CREDENTIAL_KEY=
+YUDREAM_CREDENTIAL_KEY=
 PLATFORM_RABBITMQ_ENABLED=false
 PLATFORM_NEO4J_ENABLED=false
 PLATFORM_WIKI_ENABLED=false
@@ -164,7 +164,7 @@ services:
       SNOWFLAKE_MI: ${SNOWFLAKE_MI:-1}
       MESSAGE_RENDER_BASE_URL: ${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       MESSAGE_RENDER_TOKEN: ${MESSAGE_RENDER_TOKEN:-}
-      YUDREAM_MILKY_CREDENTIAL_KEY: ${YUDREAM_MILKY_CREDENTIAL_KEY:-}
+      YUDREAM_CREDENTIAL_KEY: ${YUDREAM_CREDENTIAL_KEY:-}
       PLATFORM_RABBITMQ_ENABLED: ${PLATFORM_RABBITMQ_ENABLED:-false}
       PLATFORM_NEO4J_ENABLED: ${PLATFORM_NEO4J_ENABLED:-false}
       PLATFORM_WIKI_ENABLED: ${PLATFORM_WIKI_ENABLED:-false}
@@ -227,7 +227,7 @@ B 中除 `TAG`、宿主端口、雪花编号、能力开关和渲染配置外，
 | `MESSAGE_RENDER_BASE_URL` | 否 | backend 调用渲染服务的 URL，必须使用服务 hostname。 | `http://render-server:3000` |
 | `MESSAGE_RENDER_TOKEN` | 否 | backend 的渲染 token 配置。 | 空；与 `RENDER_TOKEN` 保持一致 |
 | `RENDER_TOKEN` | 否 | 注入 render-server 的兼容 token 配置。 | 空；取 `MESSAGE_RENDER_TOKEN` |
-| `YUDREAM_MILKY_CREDENTIAL_KEY` | Milky 启用时 | Milky 凭据 AES-GCM 密钥，Base64 解码后为 16/24/32 字节。 | 空；可用 `openssl rand -base64 32` 生成 |
+| `YUDREAM_CREDENTIAL_KEY` | 保存任意受管凭据时 | 统一加密 Neo4j、Milky 和插件 SecretStore；Base64 解码后必须恰为 32 字节。 | 空；可用 `openssl rand -base64 32` 生成 |
 | `PLATFORM_RABBITMQ_ENABLED` | 否 | RabbitMQ 项目闸门；模板未提供 RabbitMQ。 | `false` |
 | `PLATFORM_NEO4J_ENABLED` | 否 | Neo4j 项目闸门；模板未提供 Neo4j。 | `false` |
 | `PLATFORM_WIKI_ENABLED` | 否 | Wiki 项目闸门；模板未提供 Neo4j。 | `false` |
@@ -242,7 +242,7 @@ render-server 当前源码实际提供 `GET /health` 和 `/v1/render/*`，没有
 
 上面的两套 Compose 只提供**模板最小运行变量**：模板 A 必须补充 `MONGO_URI`、`REDIS_HOST`，模板 B 将它们固定为 Compose 服务名；其余变量用于雪花 ID、渲染服务和能力开关。下面是当前后端 `application.yml`、基础设施插件配置和 render-server 配置支持的**完整可选配置**。未出现在两套模板中的变量不会自动注入，只有启用对应能力或功能时才需要设置。
 
-Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；`${VAR}` 没有默认值，Spring 在解析配置时要求变量存在。特别是 `MAIL_USERNAME`、`MAIL_PASSWORD` 和 `YUDREAM_PLUGIN_SECRET_KEY` 缺失时，应用会在启动配置/Bean 初始化阶段失败，而不是“使用空值继续运行”。`MAIL_FROM` 未设置时继承 `MAIL_USERNAME`，因此邮件配置仍要求提供用户名和密码。
+Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；`${VAR}` 没有默认值，Spring 在解析配置时要求变量存在。特别是 `MAIL_USERNAME`、`MAIL_PASSWORD` 缺失时，应用会在启动配置/Bean 初始化阶段失败，而不是“使用空值继续运行”。`YUDREAM_CREDENTIAL_KEY` 缺失不会阻止无凭据功能启动，但不能写入 Neo4j、Milky 或插件 SecretStore 的新凭据。`MAIL_FROM` 未设置时继承 `MAIL_USERNAME`，因此邮件配置仍要求提供用户名和密码。
 
 ### 后端基础、邮件与缓存
 
@@ -314,11 +314,11 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 | `PLATFORM_AI_CONNECT_TIMEOUT` | `30s` | 否 | AI provider 建连超时。 | AI | 按网络环境调整。 |
 | `PLATFORM_AI_READ_TIMEOUT` | `30m` | 否 | AI 普通读取超时。 | AI | 长超时会占用连接和线程资源。 |
 | `PLATFORM_AI_SSE_TIMEOUT` | `30m` | 否 | AI SSE 读取超时。 | AI 流式请求 | 需与反向代理超时一致。 |
-| `PLATFORM_WIKI_NEO4J_URI` | `bolt://localhost:7687` | 否 | Wiki Neo4j URI。 | Wiki + Neo4j | Compose 网络应使用 Neo4j 服务名，生产不要暴露数据库。 |
-| `PLATFORM_WIKI_NEO4J_USERNAME` | `neo4j` | 否 | Wiki Neo4j 用户名。 | Wiki + Neo4j | 生产更换默认账号。 |
-| `PLATFORM_WIKI_NEO4J_PASSWORD` | `${NEO4J_PASSWORD}`，再回退 `yudream123456` | 否 | Wiki Neo4j 密码。 | Wiki + Neo4j | 生产必须显式设置强密码；不要依赖示例默认值。 |
-| `PLATFORM_WIKI_NEO4J_DATABASE` | `neo4j` | 否 | Wiki Neo4j database。 | Wiki + Neo4j | 与实际数据库名称一致。 |
-| `NEO4J_PASSWORD` | `yudream123456`（仅作为上项回退） | 否 | 为 Wiki Neo4j 密码提供兼容回退。 | 未设置 `PLATFORM_WIKI_NEO4J_PASSWORD` 时 | 生产不要使用该默认密码，应直接设置 `PLATFORM_WIKI_NEO4J_PASSWORD`。 |
+| `YUDREAM_CREDENTIAL_KEY` | 无 | 保存受管凭据时 | Neo4j、Milky 和插件 SecretStore 共用的 AES-256-GCM 主密钥。 | 受管凭据 | 必须是 Base64 编码且解码后恰为 32 字节的随机值；通过 Secret 注入，备份后不得随意更换。旧专用变量只可解密历史密文。 |
+| `NEO4J_USERNAME` | `neo4j` | 否 | Compose Neo4j 容器初始化用户名。 | 使用 graph profile | 只配置 Neo4j 容器自身，不会作为后端物理连接配置。 |
+| `NEO4J_PASSWORD` | 空 | 使用 graph profile 时 | Compose Neo4j 容器初始化密码。 | 使用 graph profile | 只配置 Neo4j 容器自身；后端凭据必须单独在能力管理中保存。 |
+
+`PLATFORM_NEO4J_ENABLED` 仅为项目闸门。启用后，在「平台 → 能力管理 → Neo4j」保存物理 URI、用户名、密码和 database；密码在接口响应中不会返回，编辑时留空即保留既有值。该密码经 `YUDREAM_CREDENTIAL_KEY` 以 AES-256-GCM 加密后持久化。图数据库页面只创建逻辑图表，Wiki 选择活动 `graphTableCode`，插件只能选择被授权的逻辑表；这些范围用于隔离业务数据，不保存或暴露连接凭据。
 | `PUBLIC_WIKI_CHAT_SSE_TIMEOUT` | `3m` | 否 | 公开 Wiki 问答 SSE 超时。 | 公开 Wiki 问答 | 与代理超时协调。 |
 | `PLATFORM_CHAT_SSE_TIMEOUT` | `30m` | 否 | 平台聊天 SSE 超时。 | 聊天 | 长连接需配合网关配置。 |
 | `PUBLIC_WIKI_CHAT_EXECUTOR_CORE` | `2` | 否 | 公开问答线程池核心线程数。 | 公开 Wiki 问答 | 按 CPU 和并发限制调整。 |
@@ -339,8 +339,7 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 | `S3_BUCKET` | `yudream-admin` | 否 | 对象存储 bucket。 | 对象存储 | 按环境隔离并配置最小权限。 |
 | `S3_REGION` | `us-east-1` | 否 | S3 region。 | 对象存储 | 与服务端配置一致。 |
 | `S3_PATH_STYLE_ACCESS` | `true` | 否 | 使用 path-style 访问。 | S3 兼容服务 | 按对象存储兼容性选择。 |
-| `YUDREAM_MILKY_CREDENTIAL_KEY` | 空 | Milky 保存凭据时 | Milky 凭据 AES-GCM 密钥。 | Milky | 必须是 Base64 且解码后为 16/24/32 字节；缺失时应用可启动，但加解密操作会失败。 |
-| `YUDREAM_PLUGIN_SECRET_KEY` | 无 | 是（插件密钥存储） | 插件 SecretStore 的 AES-GCM 密钥。 | 插件 secret 存储/插件框架初始化 | 缺失、非 Base64 或解码后不是 32 字节会使相关 Bean 初始化失败；使用 `openssl rand -base64 32` 生成并安全注入。 |
+| `YUDREAM_CREDENTIAL_KEY` | 空 | 保存任意受管凭据时 | Neo4j、Milky 与插件 SecretStore 共用的 AES-256-GCM 主密钥。 | Neo4j、Milky、插件 secret 存储 | 必须是 Base64 编码且解码后恰为 32 字节；缺失时应用可启动，但不能写入新凭据。使用 `openssl rand -base64 32` 生成、安全注入并妥善备份。 |
 | `PLATFORM_PLUGIN_HOST_VERSION` | `1.0.0` | 否 | 插件宿主兼容版本。 | 插件兼容性检查 | 只在确认插件契约兼容时修改。 |
 | `PLATFORM_PLUGIN_SPI_VERSION` | `2.6.0` | 否 | 插件 SPI 兼容版本。 | 插件兼容性检查 | 必须与实际宿主 SPI 契约匹配。 |
 | `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | `1.0.1` | 否 | 插件前端 SDK 兼容版本。 | 插件前端兼容性检查 | 与宿主实际 SDK 版本保持一致。 |

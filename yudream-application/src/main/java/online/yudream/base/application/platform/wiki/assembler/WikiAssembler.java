@@ -28,7 +28,7 @@ public final class WikiAssembler {
                 .graphEnabled(s.isGraphEnabled())
                 .graphProviderCode(s.getGraphProviderCode())
                 .graphModelCode(s.getGraphModelCode())
-                .neo4jConnectionCode(s.getNeo4jConnectionCode())
+                .graphTableCode(s.getGraphTableCode())
                 .chunkSize(s.getChunkSize())
                 .chunkOverlap(s.getChunkOverlap())
                 .topK(s.getTopK())

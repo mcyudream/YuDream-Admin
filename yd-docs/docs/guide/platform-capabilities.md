@@ -50,7 +50,7 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 | sse | `PLATFORM_SSE_ENABLED` | SSE 服务端推送 |
 | websocket | `PLATFORM_WEBSOCKET_ENABLED` | WebSocket |
 | rabbitmq | `PLATFORM_RABBITMQ_ENABLED` | RabbitMQ 消息能力 |
-| neo4j | `PLATFORM_NEO4J_ENABLED` | 图数据库 |
+| neo4j | `PLATFORM_NEO4J_ENABLED` | 单一部署连接上的逻辑图表图数据库 |
 | ai | `PLATFORM_AI_ENABLED` | 多 provider AI（OpenAI/OpenAI 兼容/Kimi/DeepSeek），Spring AI 原生工具调用 |
 | agent | `PLATFORM_AGENT_ENABLED` | Agent 编排 + 执行追踪 |
 | cms | `PLATFORM_CMS_ENABLED` | GrapesJS 可视化建站 CMS |
@@ -64,7 +64,7 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 
 \* 以上均映射到同名环境变量（见 `yudream-bootstrap/src/main/resources/application.yml` 的 `yudream.platform.capabilities.*`），compose 部署时可直接以 `PLATFORM_*_ENABLED=true/false` 控制项目闸门。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
 
-Milky 能力的连接凭据经 AES-GCM 加密落库，密钥来自环境变量 `YUDREAM_MILKY_CREDENTIAL_KEY`（Base64，长度 16/24/32 字节）；协议与连接管理详见 [Milky 协议](/protocol/milky)。
+Milky 能力的连接凭据经 AES-GCM 加密落库；新写入使用 Base64 解码后恰为 32 字节的统一主密钥 `YUDREAM_CREDENTIAL_KEY` 与连接作用域 AAD。旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（Base64，长度 16/24/32 字节）仅用于解密历史密文；协议与连接管理详见 [Milky 协议](/protocol/milky)。
 
 ## AI 能力要点
 

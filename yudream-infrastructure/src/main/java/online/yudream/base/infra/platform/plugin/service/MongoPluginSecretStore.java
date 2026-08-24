@@ -17,10 +17,10 @@ final class MongoPluginSecretStore implements PluginSecretStore {
     private final MongoTemplate mongoTemplate;
     private final PluginSecretCipher cipher;
 
-    MongoPluginSecretStore(String pluginCode, MongoTemplate mongoTemplate, String encodedKey) {
+    MongoPluginSecretStore(String pluginCode, MongoTemplate mongoTemplate, String credentialKey, String legacyEncodedKey) {
         this.pluginCode = requireText(pluginCode, "pluginCode");
         this.mongoTemplate = mongoTemplate;
-        this.cipher = new PluginSecretCipher(encodedKey);
+        this.cipher = new PluginSecretCipher(credentialKey, legacyEncodedKey);
     }
 
     @Override
@@ -29,7 +29,7 @@ final class MongoPluginSecretStore implements PluginSecretStore {
         if (secret == null || secret.length == 0) {
             throw new IllegalArgumentException("secret must not be empty");
         }
-        PluginSecretCipher.Encrypted encrypted = cipher.encrypt(pluginCode, secret);
+        PluginSecretCipher.Encrypted encrypted = cipher.encrypt(pluginCode, safeKey, secret);
         mongoTemplate.save(new Document("_id", id(safeKey))
                 .append("pluginCode", pluginCode)
                 .append("secretKey", safeKey)
@@ -47,7 +47,7 @@ final class MongoPluginSecretStore implements PluginSecretStore {
         }
         byte[] iv = Base64.getDecoder().decode(document.getString("iv"));
         byte[] encrypted = Base64.getDecoder().decode(document.getString("ciphertext"));
-        return Optional.of(cipher.decrypt(pluginCode, iv, encrypted));
+        return Optional.of(cipher.decrypt(pluginCode, safeKey, iv, encrypted));
     }
 
     @Override

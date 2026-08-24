@@ -31,7 +31,7 @@ public final class WikiInfraMapper {
                 .graphEnabled(dataObj.isGraphEnabled())
                 .graphProviderCode(dataObj.getGraphProviderCode())
                 .graphModelCode(dataObj.getGraphModelCode())
-                .neo4jConnectionCode(dataObj.getNeo4jConnectionCode())
+                .graphTableCode(dataObj.getGraphTableCode())
                 .chunkSize(dataObj.getChunkSize())
                 .chunkOverlap(dataObj.getChunkOverlap())
                 .topK(dataObj.getTopK())
@@ -72,7 +72,7 @@ public final class WikiInfraMapper {
         dataObj.setGraphEnabled(domain.isGraphEnabled());
         dataObj.setGraphProviderCode(domain.getGraphProviderCode());
         dataObj.setGraphModelCode(domain.getGraphModelCode());
-        dataObj.setNeo4jConnectionCode(domain.getNeo4jConnectionCode());
+        dataObj.setGraphTableCode(domain.getGraphTableCode());
         dataObj.setChunkSize(domain.getChunkSize());
         dataObj.setChunkOverlap(domain.getChunkOverlap());
         dataObj.setTopK(domain.getTopK());

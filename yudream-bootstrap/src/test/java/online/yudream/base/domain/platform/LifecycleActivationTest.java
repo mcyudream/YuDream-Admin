@@ -40,23 +40,20 @@ class LifecycleActivationTest {
     }
 
     @Test
-    void activatesGraphConnectionWithoutChangingConfiguration() {
-        GraphConnection connection = GraphConnection.builder()
+    void activatesLogicalGraphTableWithoutChangingItsDefinition() {
+        GraphConnection table = GraphConnection.builder()
                 .name("Main graph")
                 .code("main")
-                .uri("bolt://graph:7687")
-                .username("neo4j")
-                .password("secret")
-                .database("yudream")
+                .description("Wiki and plugin data scope")
                 .status(GraphConnectionStatus.DISABLED)
                 .build();
 
-        connection.activate();
+        table.activate();
 
-        assertThat(connection.getStatus()).isEqualTo(GraphConnectionStatus.ACTIVE);
-        assertThat(connection.getUri()).isEqualTo("bolt://graph:7687");
-        assertThat(connection.getPassword()).isEqualTo("secret");
-        assertThat(connection.getDatabase()).isEqualTo("yudream");
+        assertThat(table.getStatus()).isEqualTo(GraphConnectionStatus.ACTIVE);
+        assertThat(table.getName()).isEqualTo("Main graph");
+        assertThat(table.getCode()).isEqualTo("main");
+        assertThat(table.getDescription()).isEqualTo("Wiki and plugin data scope");
     }
 
     @Test

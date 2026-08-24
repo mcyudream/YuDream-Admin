@@ -1,6 +1,6 @@
 # SPI 版本说明与升级指引
 
-`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前版本：2.7.0**。
+`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前准备版本：2.12.0（尚未发布）**。
 
 ## 版本化文档结构
 
@@ -15,6 +15,7 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
     http                   HTTP 端点
     frontend               前端元数据
     framework-services     框架能力端口
+    graph                  待发布的平台 Neo4j 图数据库端口
 ```
 
 每个页面按统一结构编写：**作用说明 → 方法签名表（名称/签名/参数/返回/说明）→ 使用示例 → 注意事项**。这保证任意版本教程可独立阅读，也便于机器比对。
@@ -23,13 +24,13 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
 
 | 版本 | 状态 | 说明 |
 |---|---|---|
-| [v1 (2.7.0)](/plugin/spi/v1/core) | ✅ 当前 | 全量 API 教程 |
+| [v1 (2.12.0)](/plugin/spi/v1/core) | 🚧 待发布 | 全量 API 教程，含 `PluginContext.graph()` 逻辑图表投影端口 |
 
 ## 升级指引
 
 - 插件侧升级 SPI 只需修改依赖版本并按下方变更记录适配；宿主与 SPI 版本兼容矩阵见插件商店索引。
 - SPI 遵循语义化原则：新增接口/方法为 minor；删除或改变签名为 major，会提前在变更页给出迁移代码对照。
-- 未验证发布的版本不得用于下游（发布流水线 verify 通过后才可用）。
+- 未验证发布的版本不得用于下游（发布流水线 verify 通过后才可用）。新增 `PluginContext.graph()` 等框架能力端口时，必须先在 SPI 源码和宿主适配中实现，再补齐精确签名文档并发布；插件不得读取 Neo4j 环境变量或自行创建 Driver 暂时代替逻辑图表契约。
 
 ## 面向 Coding Agent 的增量更新规范
 

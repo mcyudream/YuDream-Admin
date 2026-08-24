@@ -20,4 +20,6 @@ public class PluginFrontendAssetDTO implements Serializable {
     private String path;
     private String contentType;
     private byte[] body;
+    private String etag;
+    private boolean immutable;
 }

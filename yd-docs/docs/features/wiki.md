@@ -1,6 +1,6 @@
 # 知识库 Wiki（RAG）
 
-Wiki 能力（`wiki`）提供完整的知识库 + RAG 检索增强：空间/节点管理、多源数据摄入、发布流水线、向量与关键词搜索、Neo4j 知识图谱、问答与深度研究。它依赖 `ai`（嵌入与生成）与 `neo4j`（图谱）。
+Wiki 能力（`wiki`）提供完整的知识库 + RAG 检索增强：空间/节点管理、多源数据摄入、发布流水线、向量与关键词搜索、Neo4j 知识图谱、问答与深度研究。它依赖 `ai`（嵌入与生成）与 `neo4j`（图谱）。每个知识库必须选择一个启用的逻辑图表；图表复用部署配置的单一物理 Neo4j，写入按图表编码和知识库空间双重隔离。
 
 > 源码：`yudream-application/src/main/java/online/yudream/base/application/platform/wiki/`（17 个服务）、`yudream-interfaces/src/main/java/online/yudream/base/interfaces/platform/wiki/`
 
