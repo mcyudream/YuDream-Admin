@@ -14,7 +14,7 @@ new CapabilityDescriptor("milky", "Milky", CapabilityType.MESSAGING,
 
 - **项目闸门**：`PLATFORM_MILKY_ENABLED`（默认 `true`），决定 provider 是否装配、端点是否注册；
 - **应用闸门**：每次用例前 `ensureEnabled("milky", ...)` 校验持久化开关；
-- 连接凭据（平台地址、token）经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库，密钥来自 `YUDREAM_MILKY_CREDENTIAL_KEY`。
+- 连接凭据（平台地址、token）经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库，统一使用 `YUDREAM_CREDENTIAL_KEY`（Base64 解码后恰为 32 字节）。旧 `YUDREAM_MILKY_CREDENTIAL_KEY` 仅用于读取历史密文；后续保存会使用统一主密钥重加密。
 
 ## 连接管理
 
@@ -60,7 +60,7 @@ flowchart LR
 | 配置 | 说明 |
 |---|---|
 | `PLATFORM_MILKY_ENABLED` | 项目闸门（默认 `true`） |
-| `YUDREAM_MILKY_CREDENTIAL_KEY` | 连接凭据加密密钥（Base64 编码 AES 密钥） |
+| `YUDREAM_CREDENTIAL_KEY` | 连接凭据加密主密钥（Base64 编码、解码后恰为 32 字节） |
 
 ::: warning ID 类型
 `connectionId`、`channelId`、`userId`、`messageId` 等在 JSON / TS / URL 中一律是 `string`，禁止 `Number(id)`。

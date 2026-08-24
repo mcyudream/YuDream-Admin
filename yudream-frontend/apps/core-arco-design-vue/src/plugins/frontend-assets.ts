@@ -3,20 +3,78 @@ import apiPlugin from '@/api/modules/platform-plugin'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
 const ASSET_ATTRIBUTE = 'data-yudream-plugin-asset'
+const PLUGIN_CODE_ATTRIBUTE = 'data-yudream-plugin-code'
+const ASSET_PATH_ATTRIBUTE = 'data-yudream-plugin-asset-path'
+const ASSET_REVISION_ATTRIBUTE = 'data-yudream-plugin-asset-revision'
 
-export function pluginFrontendAssetUrl(pluginCode: string, path: string) {
-  const code = normalizeSegment(pluginCode, '插件编码')
-  const assetPath = normalizeAssetPath(path)
-  return toBackendAssetUrl(`/api/platform/plugins/${code}/assets/${assetPath}`)
+type PluginFrontendAssets = Pick<PluginFrontendModule, 'pluginCode' | 'styles' | 'scripts'> & {
+  assetRevision?: string
 }
 
-export async function loadPluginFrontendAssets(module: Pick<PluginFrontendModule, 'pluginCode' | 'styles' | 'scripts'>) {
-  for (const path of module.styles || []) {
-    await loadStyle(module.pluginCode, path)
+type AssetKind = 'style' | 'script'
+
+interface AssetRecord {
+  element: HTMLLinkElement | HTMLScriptElement
+  kind: AssetKind
+  references: number
+  promise: Promise<void>
+}
+
+export interface PluginFrontendAssetLease {
+  release: () => void
+}
+
+const assetRegistry = new Map<string, AssetRecord>()
+const retainedLeases = new Map<string, PluginFrontendAssetLease>()
+const latestModules = new Map<string, PluginFrontendAssets>()
+
+export function pluginFrontendAssetUrl(pluginCode: string, path: string, assetRevision?: string) {
+  const code = normalizeSegment(pluginCode, '插件编码')
+  const assetPath = normalizeAssetPath(path)
+  const url = toBackendAssetUrl(`/api/platform/plugins/${code}/assets/${assetPath}`)
+  const revision = normalizeRevision(assetRevision)
+  return revision ? appendQuery(url, 'v', revision) : url
+}
+
+/** Acquire plugin-declared assets and release them when their consumer unmounts. */
+export async function acquirePluginFrontendAssets(module: PluginFrontendAssets): Promise<PluginFrontendAssetLease> {
+  const pluginCode = normalizeSegment(module.pluginCode, '插件编码')
+  const revision = normalizeRevision(module.assetRevision)
+  const acquired: string[] = []
+
+  try {
+    for (const path of module.styles || []) {
+      acquired.push(await acquireAsset(pluginCode, path, revision, 'style'))
+    }
+    for (const path of module.scripts || []) {
+      acquired.push(await acquireAsset(pluginCode, path, revision, 'script'))
+    }
   }
-  for (const path of module.scripts || []) {
-    await loadModuleScript(module.pluginCode, path)
+  catch (error) {
+    releaseAssets(acquired)
+    throw error
   }
+
+  let released = false
+  return {
+    release() {
+      if (released) {
+        return
+      }
+      released = true
+      releaseAssets(acquired)
+    },
+  }
+}
+
+/** Compatibility entry point for callers that do not yet own a release lifecycle. */
+export async function loadPluginFrontendAssets(module: PluginFrontendAssets) {
+  const pluginCode = normalizeSegment(module.pluginCode, '插件编码')
+  const lease = await acquirePluginFrontendAssets(module)
+  const previous = retainedLeases.get(pluginCode)
+  retainedLeases.set(pluginCode, lease)
+  latestModules.set(pluginCode, { ...module, pluginCode })
+  previous?.release()
 }
 
 export function loadPluginFrontendAssetsByCode(pluginCode: string) {
@@ -26,79 +84,86 @@ export function loadPluginFrontendAssetsByCode(pluginCode: string) {
 }
 
 /**
- * 开发模式热重载：以版本戳强制刷新该插件已注入的样式与脚本节点。
- * 去重键为完整 URL，因此需先移除旧节点再以带 ?v= 的新 URL 重新注入；
- * 这是整页重挂载级别的刷新（状态不保留），不是状态保持型 HMR。
+ * Compatibility reload for the developer tools event. New styles load before
+ * the previous retained lease is released, so a failed refresh keeps old CSS.
  */
-export function reloadPluginFrontendAssets(pluginCode: string, version: string) {
-  const prefix = normalizeSegment(pluginCode, '插件编码')
-  const nodes = document.head.querySelectorAll<HTMLElement>(`[${ASSET_ATTRIBUTE}]`)
-  const reloads: Promise<void>[] = []
-  nodes.forEach((node) => {
-    const url = node.getAttribute(ASSET_ATTRIBUTE) || ''
-    if (!url.includes(`/api/platform/plugins/${prefix}/assets/`)) {
-      return
-    }
-    const refreshed = `${url.split('?')[0]}?v=${version}`
-    node.remove()
-    if (node instanceof HTMLLinkElement) {
-      const element = document.createElement('link')
-      element.rel = 'stylesheet'
-      element.href = refreshed
-      element.setAttribute(ASSET_ATTRIBUTE, refreshed)
-      document.head.appendChild(element)
-      reloads.push(awaitAsset(element))
-    }
-    else if (node instanceof HTMLScriptElement) {
-      const element = document.createElement('script')
-      element.type = 'module'
-      element.src = refreshed
-      element.setAttribute(ASSET_ATTRIBUTE, refreshed)
-      document.head.appendChild(element)
-      reloads.push(awaitAsset(element))
-    }
-  })
-  return Promise.all(reloads)
+export async function reloadPluginFrontendAssets(pluginCode: string, version: string) {
+  const code = normalizeSegment(pluginCode, '插件编码')
+  const module = latestModules.get(code)
+  if (!module) {
+    return
+  }
+  await loadPluginFrontendAssets({ ...module, assetRevision: version })
 }
 
-function loadStyle(pluginCode: string, path: string) {
-  const url = pluginFrontendAssetUrl(pluginCode, path)
-  const selector = `link[${ASSET_ATTRIBUTE}="${cssEscape(url)}"]`
-  const existing = document.head.querySelector<HTMLLinkElement>(selector)
-  if (existing) {
-    return awaitAsset(existing)
+async function acquireAsset(pluginCode: string, path: string, revision: string, kind: AssetKind) {
+  const assetPath = normalizeAssetPath(path)
+  const key = `${pluginCode}\u0000${revision}\u0000${kind}\u0000${assetPath}`
+  let record = assetRegistry.get(key)
+  if (!record) {
+    record = createAssetRecord(pluginCode, assetPath, revision, kind)
+    assetRegistry.set(key, record)
   }
 
-  const element = document.createElement('link')
-  element.rel = 'stylesheet'
-  element.href = url
-  element.setAttribute(ASSET_ATTRIBUTE, url)
-  document.head.appendChild(element)
-  return awaitAsset(element)
+  try {
+    await record.promise
+    record.references += 1
+    return key
+  }
+  catch (error) {
+    if (assetRegistry.get(key) === record) {
+      assetRegistry.delete(key)
+      record.element.remove()
+    }
+    throw error
+  }
 }
 
-function loadModuleScript(pluginCode: string, path: string) {
-  const url = pluginFrontendAssetUrl(pluginCode, path)
-  const selector = `script[${ASSET_ATTRIBUTE}="${cssEscape(url)}"]`
-  const existing = document.head.querySelector<HTMLScriptElement>(selector)
-  if (existing) {
-    return awaitAsset(existing)
-  }
+function createAssetRecord(pluginCode: string, path: string, revision: string, kind: AssetKind): AssetRecord {
+  const url = pluginFrontendAssetUrl(pluginCode, path, revision)
+  const element = kind === 'style'
+    ? document.createElement('link')
+    : document.createElement('script')
 
-  const element = document.createElement('script')
-  element.type = 'module'
-  element.src = url
+  if (element instanceof HTMLLinkElement) {
+    element.rel = 'stylesheet'
+    element.href = url
+  }
+  else {
+    element.type = 'module'
+    element.src = url
+  }
   element.setAttribute(ASSET_ATTRIBUTE, url)
+  element.setAttribute(PLUGIN_CODE_ATTRIBUTE, pluginCode)
+  element.setAttribute(ASSET_PATH_ATTRIBUTE, path)
+  element.setAttribute(ASSET_REVISION_ATTRIBUTE, revision)
   document.head.appendChild(element)
-  return awaitAsset(element)
+
+  return {
+    element,
+    kind,
+    references: 0,
+    promise: awaitAsset(element),
+  }
+}
+
+function releaseAssets(keys: string[]) {
+  for (const key of keys) {
+    const record = assetRegistry.get(key)
+    if (!record) {
+      continue
+    }
+    record.references -= 1
+    if (record.references <= 0) {
+      assetRegistry.delete(key)
+      record.element.remove()
+    }
+  }
 }
 
 function awaitAsset(element: HTMLElement) {
   if (element.dataset.yudreamPluginAssetLoaded === 'true') {
     return Promise.resolve()
-  }
-  if (element.dataset.yudreamPluginAssetFailed === 'true') {
-    return Promise.reject(new Error(`插件资源加载失败：${element.getAttribute('src') || element.getAttribute('href')}`))
   }
 
   return new Promise<void>((resolve, reject) => {
@@ -107,7 +172,6 @@ function awaitAsset(element: HTMLElement) {
       resolve()
     }, { once: true })
     element.addEventListener('error', () => {
-      element.dataset.yudreamPluginAssetFailed = 'true'
       reject(new Error(`插件资源加载失败：${element.getAttribute('src') || element.getAttribute('href')}`))
     }, { once: true })
   })
@@ -129,6 +193,11 @@ function normalizeAssetPath(value: string) {
   return path
 }
 
-function cssEscape(value: string) {
-  return value.replace(/(["\\])/g, '\\$1')
+function normalizeRevision(value?: string) {
+  return value?.trim() || ''
+}
+
+function appendQuery(url: string, name: string, value: string) {
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}${encodeURIComponent(name)}=${encodeURIComponent(value)}`
 }

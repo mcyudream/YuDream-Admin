@@ -65,7 +65,10 @@ export interface YuDreamPluginPageProps {
 export interface YuDreamPluginFrontendModule {
   routes?: Record<string, Component>
   default?: Component | YuDreamPluginFrontendModule
+  /** Called at most once for each loaded remote-module revision; implementations must be idempotent. */
   install?: () => void | Promise<void>
+  /** Optional cleanup hook invoked when the host releases this remote-module revision. */
+  dispose?: () => void | Promise<void>
 }
 
 export function defineYuDreamPlugin(module: YuDreamPluginFrontendModule) {

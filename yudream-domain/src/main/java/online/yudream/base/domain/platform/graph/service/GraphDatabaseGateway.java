@@ -5,7 +5,7 @@ import online.yudream.base.domain.platform.graph.valobj.GraphQueryResult;
 
 import java.util.Map;
 
-public interface GraphDatabaseGateway {
+public interface GraphDatabaseGateway extends GraphProjectionGateway {
 
     GraphQueryResult test(GraphConnection connection);
 

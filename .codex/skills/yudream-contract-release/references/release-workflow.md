@@ -18,7 +18,7 @@ Use this checklist when the user asks to release contract packages or to sync do
 
 ## 2. Update Versions In The Core Repo
 
-Edit only the contract package versions that are part of the release. When releasing SPI, update both its artifact version and the core root `yudream.plugin.spi.version` consumer property to the same value.
+Edit only the contract package versions that are part of the release. When releasing SPI, update both its artifact version and the core root `yudream.plugin.spi.version` consumer property to the same value. For a new framework capability port such as `FrameworkServices.graph()`, verify before release that the SPI source declares the port, the host runtime supplies its adapter, the versioned SPI docs document the exact signature, and plugins cannot bypass it with environment variables or a privately created external client/Driver.
 
 Typical locations:
 

@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
 import type { Component } from 'vue'
-import { loadPluginFrontendAssets, reloadPluginFrontendAssets } from '@/plugins/frontend-assets'
+import { acquirePluginRemoteModule, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
 import { createPluginSdk } from '@/plugins/sdk'
-import { toBackendAssetUrl } from '@/utils/backend-url'
 import eventBus from '@/utils/eventBus'
 
 interface PluginRouteMeta {
@@ -12,45 +11,43 @@ interface PluginRouteMeta {
   entry?: string
   moduleName?: string
   sdkVersion?: string
+  assetRevision?: string
   styles?: string[]
   scripts?: string[]
 }
+
+type RemoteModule = YuDreamPluginFrontendModule & Record<string, any>
 
 const route = useRoute()
 const remoteComponent = shallowRef<Component | null>(null)
 const remoteError = ref('')
 const remoteLoading = ref(false)
-const reloadVersion = ref(0)
+const remoteLease = shallowRef<PluginRemoteModuleLease | null>(null)
+let loadSequence = 0
 
 const plugin = computed(() => (route.meta.plugin || {}) as PluginRouteMeta)
 const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
 
-watch(plugin, loadRemoteComponent, { immediate: true })
+watch(plugin, () => void loadRemoteComponent(), { immediate: true })
 
 onMounted(() => {
   eventBus.on('plugin-devtools:remote-reload', handleRemoteReload)
 })
 
 onBeforeUnmount(() => {
+  loadSequence += 1
   eventBus.off('plugin-devtools:remote-reload', handleRemoteReload)
+  void releaseRemoteModule()
 })
 
-/** 开发者工具热重载联动：当前页面属于被重载插件时，以版本戳重挂载 remote（状态重置，非 HMR） */
 async function handleRemoteReload(code: string) {
-  if (!code || code !== plugin.value.pluginCode) {
-    return
+  if (code && code === plugin.value.pluginCode) {
+    await loadRemoteComponent()
   }
-  reloadVersion.value = Date.now()
-  try {
-    await reloadPluginFrontendAssets(code, String(reloadVersion.value))
-  }
-  catch {
-    // 样式刷新失败不阻断 remote 重挂载
-  }
-  await loadRemoteComponent()
 }
 
 async function loadRemoteComponent() {
+  const sequence = ++loadSequence
   remoteComponent.value = null
   remoteError.value = ''
 
@@ -60,42 +57,39 @@ async function loadRemoteComponent() {
   }
 
   remoteLoading.value = true
+  await releaseRemoteModule()
   try {
-    await loadPluginFrontendAssets(plugin.value)
-    const entry = plugin.value.entry || `/api/platform/plugins/${plugin.value.pluginCode}/assets/remoteEntry.js`
-    const entryUrl = toBackendAssetUrl(entry)
-    const versionedUrl = reloadVersion.value
-      ? `${entryUrl}${entryUrl.includes('?') ? '&' : '?'}v=${reloadVersion.value}`
-      : entryUrl
-    const module = await import(/* @vite-ignore */ versionedUrl)
-    await mountPluginModule(module)
+    const lease = await acquirePluginRemoteModule(plugin.value)
+    if (sequence !== loadSequence) {
+      await lease.release()
+      return
+    }
+    remoteLease.value = lease
+    remoteComponent.value = resolveRemoteComponent(lease.module)
+    if (!remoteComponent.value) {
+      remoteError.value = `远程入口未导出组件：${plugin.value.component || '-'}`
+      await releaseRemoteModule()
+    }
   }
   catch (error: any) {
-    remoteError.value = resolveLoadError(error)
+    if (sequence === loadSequence) {
+      remoteError.value = resolveLoadError(error)
+    }
   }
   finally {
-    remoteLoading.value = false
+    if (sequence === loadSequence) {
+      remoteLoading.value = false
+    }
   }
 }
 
-async function mountPluginModule(module: YuDreamPluginFrontendModule & Record<string, any>) {
-  await installPluginModule(module)
-  remoteComponent.value = resolveRemoteComponent(module)
-  if (!remoteComponent.value) {
-    remoteError.value = `远程入口未导出组件：${plugin.value.component || '-'}`
-  }
+async function releaseRemoteModule() {
+  const lease = remoteLease.value
+  remoteLease.value = null
+  await lease?.release()
 }
 
-async function installPluginModule(module: YuDreamPluginFrontendModule & Record<string, any>) {
-  if (typeof module.install === 'function') {
-    await module.install()
-  }
-  if (module.default && typeof module.default === 'object' && 'install' in module.default && typeof module.default.install === 'function') {
-    await module.default.install()
-  }
-}
-
-function resolveRemoteComponent(module: YuDreamPluginFrontendModule & Record<string, any>): Component | null {
+function resolveRemoteComponent(module: RemoteModule): Component | null {
   const component = plugin.value.component || ''
   const routeComponent = component.includes('/') ? component.split('/').pop() || component : component
   if (component && module.routes?.[component]) {
@@ -111,7 +105,7 @@ function resolveRemoteComponent(module: YuDreamPluginFrontendModule & Record<str
     return module[routeComponent]
   }
   if (module.default && typeof module.default === 'object' && 'routes' in module.default) {
-    return resolveRemoteComponent(module.default as YuDreamPluginFrontendModule & Record<string, any>)
+    return resolveRemoteComponent(module.default as RemoteModule)
   }
   return (module.default as Component) || null
 }
@@ -130,12 +124,13 @@ function resolveLoadError(error: any) {
     <FaPageHeader :title="String(route.meta.title || '插件页面')" class="mb-0" />
 
     <FaPageMain>
-      <component
-        :is="remoteComponent"
-        v-if="remoteComponent"
-        :sdk="sdk"
-        :route="route"
-      />
+      <div v-if="remoteComponent" :data-yudream-plugin="plugin.pluginCode">
+        <component
+          :is="remoteComponent"
+          :sdk="sdk"
+          :route="route"
+        />
+      </div>
       <div v-else class="plugin-runtime-empty">
         <div class="runtime-icon">
           <FaIcon name="i-ri:puzzle-2-line" />

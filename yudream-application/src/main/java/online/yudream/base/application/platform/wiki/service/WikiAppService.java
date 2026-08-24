@@ -68,7 +68,7 @@ public class WikiAppService {
                 command.isExternalSearchEnabled(), command.getEmbeddingProviderCode(), command.getEmbeddingModelCode(),
                 command.isGraphEnabled(), command.getGraphProviderCode(), command.getGraphModelCode(),
                 command.getChunkSize(), command.getChunkOverlap(), command.getTopK());
-        space.setNeo4jConnectionCode(command.getNeo4jConnectionCode() == null ? "" : command.getNeo4jConnectionCode().trim());
+        space.setGraphTableCode(command.getGraphTableCode() == null ? "" : command.getGraphTableCode().trim());
         space.setQueryExpansionEnabled(command.isQueryExpansionEnabled());
         space.setRerankEnabled(command.isRerankEnabled());
         space.setHitImageLimit(command.getHitImageLimit() == null ? null : Math.clamp(command.getHitImageLimit(), 0, 12));

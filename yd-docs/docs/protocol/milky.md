@@ -15,7 +15,7 @@
 | `POST /api/platform/milky/connections/{id}/disable` | 停用（断开事件流，`MilkyRuntimeShutdownRequested` 触发清理） |
 | `POST /api/platform/milky/connections/{id}/test` | 连通性测试 |
 
-- 每个连接持有平台地址（base URL）与访问 token；token 经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库，密钥来自环境变量 `YUDREAM_MILKY_CREDENTIAL_KEY`，管理接口永不回传明文；
+- 每个连接持有平台地址（base URL）与访问 token；token 经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库。新写入统一使用 `YUDREAM_CREDENTIAL_KEY`（Base64 解码后恰为 32 字节）及连接作用域 AAD，管理接口永不回传明文；旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（16/24/32 字节）仅可解密历史密文。
 - 能力描述符：能力码 `milky`，类型 `MESSAGING`，项目闸门为 `PLATFORM_MILKY_ENABLED`（默认开启），应用层每次用例前经 `ensureEnabled(...)` 二次校验。
 
 ## 出站：HTTP API 调用
@@ -86,11 +86,12 @@ sequenceDiagram
 | 配置 | 说明 |
 |---|---|
 | `PLATFORM_MILKY_ENABLED` | 项目闸门开关（默认 `true`） |
-| `YUDREAM_MILKY_CREDENTIAL_KEY` | 连接凭据加密密钥（Base64 编码 AES 密钥） |
+| `YUDREAM_CREDENTIAL_KEY` | 新写入的统一凭据主密钥（Base64 解码后恰为 32 字节） |
+| `YUDREAM_MILKY_CREDENTIAL_KEY` | 仅解密历史 Milky 密文的回退密钥（Base64 解码后为 16/24/32 字节） |
 
 ## 与旧 Satori 协议的关系
 
 历史版本通过 Satori v1 协议（HTTP/WebSocket/WebHook + 操作码帧）对接机器人，现已整体弃用并移除，相关文档（`docs/satori/protocol-v1-contract.md` 等）仅为历史存档。迁移要点：
 
-- 协议入口从 Satori 连接切换为 Milky 连接，凭据密钥由 `YUDREAM_SATORI_CREDENTIAL_KEY` 更名为 `YUDREAM_MILKY_CREDENTIAL_KEY`；
+- 协议入口从 Satori 连接切换为 Milky 连接；早期 Milky 密文可继续通过 `YUDREAM_MILKY_CREDENTIAL_KEY` 解密，但后续保存统一迁移到 `YUDREAM_CREDENTIAL_KEY`；
 - 插件侧 API 不变：仍使用 `framework().messaging()` 平台无关端口与 `invoke()` 原生通道，无需改代码。

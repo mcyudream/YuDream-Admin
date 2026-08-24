@@ -14,6 +14,7 @@ export interface CapabilityItem {
   enabled: boolean
   dependencies?: string[]
   config: Record<string, string>
+  secretConfigured?: Record<string, boolean>
   status: CapabilityStatus
   healthMessage?: string
   checkedAt?: string

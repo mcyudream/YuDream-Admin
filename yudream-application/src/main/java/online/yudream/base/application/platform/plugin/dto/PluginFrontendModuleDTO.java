@@ -26,6 +26,7 @@ public class PluginFrontendModuleDTO implements Serializable {
     private String moduleName;
     private String sdkVersion;
     private String integrity;
+    private String assetRevision;
     private String menuTitle;
     private String menuIcon;
     private Integer menuSort;

@@ -17,7 +17,7 @@ public class WikiSpaceDTO {
     private boolean graphEnabled;
     private String graphProviderCode;
     private String graphModelCode;
-    private String neo4jConnectionCode;
+    private String graphTableCode;
     private int chunkSize;
     private int chunkOverlap;
     private int topK;

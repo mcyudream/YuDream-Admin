@@ -154,11 +154,13 @@ yudream.platform.ai.client:
   read-timeout: ${PLATFORM_AI_READ_TIMEOUT:30m}
   sse-timeout: ${PLATFORM_AI_SSE_TIMEOUT:30m}
 
-yudream.platform.wiki.neo4j:
-  uri: ${PLATFORM_WIKI_NEO4J_URI:bolt://localhost:7687}
-  username: ${PLATFORM_WIKI_NEO4J_USERNAME:neo4j}
-  password: ${PLATFORM_WIKI_NEO4J_PASSWORD:${NEO4J_PASSWORD:yudream123456}}
-  database: ${PLATFORM_WIKI_NEO4J_DATABASE:neo4j}
+# 统一加密 Neo4j、Milky 与插件 SecretStore 已持久化凭据的主密钥。
+# YUDREAM_CREDENTIAL_KEY 必须是 Base64 编码且解码后恰为 32 字节的 AES-256 密钥。
+# legacy-* 仅解密历史密文；所有新写入始终使用 key。
+yudream.credential:
+  key: ${YUDREAM_CREDENTIAL_KEY:}
+  capability-legacy-key: ${YUDREAM_CAPABILITY_CREDENTIAL_KEY:}
+  plugin-legacy-key: ${YUDREAM_PLUGIN_SECRET_KEY:}
 
 yudream.platform.wiki.chat:
   public-sse-timeout: ${PUBLIC_WIKI_CHAT_SSE_TIMEOUT:3m}
@@ -184,14 +186,11 @@ yudream.storage.s3:
   bucket: ${S3_BUCKET:yudream-admin}
   region: ${S3_REGION:us-east-1}
   path-style-access: ${S3_PATH_STYLE_ACCESS:true}
-yudream:
-  plugin:
-    secret-key: ${YUDREAM_PLUGIN_SECRET_KEY}
 
 yudream.platform.plugin:
   compatibility:
     host: ${PLATFORM_PLUGIN_HOST_VERSION:1.0.0}
-    spi: ${PLATFORM_PLUGIN_SPI_VERSION:2.6.0}
+    spi: ${PLATFORM_PLUGIN_SPI_VERSION:2.13.0}
     frontend-sdk: ${PLATFORM_PLUGIN_FRONTEND_SDK_VERSION:1.0.1}
   store-root-url: ${PLATFORM_PLUGIN_STORE_ROOT_URL:https://nexus.yudream.online/repository/plugin-store-releases/index.json}
   store-connect-timeout-millis: ${PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS:5000}

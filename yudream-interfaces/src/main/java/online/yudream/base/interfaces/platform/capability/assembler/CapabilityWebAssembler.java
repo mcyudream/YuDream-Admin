@@ -42,6 +42,7 @@ public class CapabilityWebAssembler {
                 .enabled(dto.getEnabled())
                 .dependencies(dto.getDependencies())
                 .config(dto.getConfig())
+                .secretConfigured(dto.getSecretConfigured())
                 .status(dto.getStatus())
                 .healthMessage(dto.getHealthMessage())
                 .checkedAt(dto.getCheckedAt())

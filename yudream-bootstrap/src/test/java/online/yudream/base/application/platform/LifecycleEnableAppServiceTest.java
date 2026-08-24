@@ -61,20 +61,20 @@ class LifecycleEnableAppServiceTest {
     }
 
     @Test
-    void enablesGraphConnectionWithoutOpeningExternalConnection() {
+    void enablesGraphTableWithoutOpeningExternalConnection() {
         CapabilityAppService capabilityService = mock(CapabilityAppService.class);
         GraphConnectionRepo repo = mock(GraphConnectionRepo.class);
         GraphDatabaseGateway gateway = mock(GraphDatabaseGateway.class);
-        GraphConnection connection = GraphConnection.builder().id(2L)
+        GraphConnection table = GraphConnection.builder().id(2L)
                 .status(GraphConnectionStatus.DISABLED).build();
-        when(repo.findById(2L)).thenReturn(Optional.of(connection));
+        when(repo.findById(2L)).thenReturn(Optional.of(table));
         GraphAppService service = new GraphAppService(
                 capabilityService, repo, mock(GraphQueryLogRepo.class), gateway);
 
-        service.enableConnection(2L);
+        service.enableTable(2L);
 
-        assertThat(connection.getStatus()).isEqualTo(GraphConnectionStatus.ACTIVE);
-        verify(repo).save(connection);
+        assertThat(table.getStatus()).isEqualTo(GraphConnectionStatus.ACTIVE);
+        verify(repo).save(table);
         verifyNoInteractions(gateway);
     }
 

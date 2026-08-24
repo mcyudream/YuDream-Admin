@@ -29,6 +29,10 @@
       "text": "平台能力禁用时必须同步释放运行时资源，例如关闭 WebSocket/SSE 会话、RabbitMQ 连接工厂、Neo4j Driver 缓存；不能只改 enabled 状态。"
     },
     {
+      "key": "plugin-graph-framework-service-only",
+      "text": "插件访问 Neo4j 图数据库必须经已发布的 FrameworkServices.graph() SPI 端口，由宿主负责平台连接、能力闸门与 Driver 生命周期；插件禁止读取 NEO4J_* 环境变量、直接依赖 org.neo4j.driver 或自建/缓存 Driver。新增图能力必须先扩展并发布 SPI，再允许独立插件仓消费。"
+    },
+    {
       "key": "platform-capability-menu-filter",
       "text": "除 platform:capability 能力管理入口外，平台功能菜单应在对应能力关闭时从 /api/menu/routes 隐藏；能力 Provider 必须保持懒初始化，关闭状态不能连接中间件。"
     },

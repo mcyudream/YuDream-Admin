@@ -1,6 +1,5 @@
 import type { Router } from 'vue-router'
 import type { PluginFrontendModule } from '@/api/modules/platform-plugin'
-import apiPlugin from '@/api/modules/platform-plugin'
 
 export interface PluginRuntimeRouteMeta {
   pluginCode: string
@@ -8,6 +7,7 @@ export interface PluginRuntimeRouteMeta {
   entry?: string
   moduleName: string
   sdkVersion?: string
+  assetRevision?: string
   styles?: string[]
   scripts?: string[]
 }
@@ -41,6 +41,7 @@ export function resolvePluginRuntimeRoute(
     entry: module?.entry,
     moduleName,
     sdkVersion: module?.sdkVersion || manifestSdkVersion,
+    ...(module?.assetRevision ? { assetRevision: module.assetRevision } : {}),
     styles: module?.styles || [],
     scripts: module?.scripts || [],
   }
@@ -68,6 +69,7 @@ export function resetPublicPluginRoutes() {
 }
 
 async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
+  const { default: apiPlugin } = await import('@/api/modules/platform-plugin')
   const res = await apiPlugin.frontendManifest()
   const paths: string[] = []
   for (const module of res.data.modules || []) {
@@ -96,6 +98,7 @@ async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
             entry: module.entry,
             moduleName: module.moduleName,
             sdkVersion: module.sdkVersion || res.data.sdkVersion,
+            assetRevision: module.assetRevision,
             styles: module.styles || [],
             scripts: module.scripts || [],
           },

@@ -25,5 +25,9 @@ public @interface PluginFrontend {
 
     String parentCode() default "";
 
+    String[] styles() default {};
+
+    String[] scripts() default {};
+
     PluginRoute[] routes() default {};
 }

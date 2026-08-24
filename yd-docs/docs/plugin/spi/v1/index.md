@@ -21,6 +21,7 @@ online.yudream.base.plugin.spi
 │   ├── document          Word 文档模板渲染
 │   ├── render            HTML/Markdown 渲染成图 + Thymeleaf 模板截图
 │   ├── ai                AI 对话 / Agent / 自定义工具
+│   ├── graph             图数据库（经 PluginContext.graph() 使用平台 Neo4j）
 │   ├── messaging         消息收发与交互注册（Milky/QQ）
 │   ├── command           命令注册
 │   └── memory            语义记忆（向量检索）
@@ -34,7 +35,8 @@ online.yudream.base.plugin.spi
 | 文档 | 内容 | 获取方式 |
 |---|---|---|
 | [core](/plugin/spi/v1/core) | YuDreamPlugin 生命周期、PluginContext 全量方法 | 入口类参数注入 |
-| [framework-services](/plugin/spi/v1/framework-services) | FrameworkServices 门面 15 个入口 | `context.framework()` |
+| [framework-services](/plugin/spi/v1/framework-services) | FrameworkServices 门面 16 个入口 | `context.framework()` |
+| [graph](/plugin/spi/v1/graph) | 当前插件版本化用途化资源图投影的原子替换与分页读取 | `context.graph()` |
 | [user](/plugin/spi/v1/user) | 用户查询/创建、部门角色、QQ 绑定 | `framework().users()` 等 |
 | [security](/plugin/spi/v1/security) | 权限校验、Principal、权限码约定 | `framework().security()` |
 | [storage](/plugin/spi/v1/storage) | 文档/文件/密钥三类作用域存储 | `context.documents()/files()/secrets()` |

@@ -42,6 +42,7 @@
   "dependencies": {
     "@iconify/vue": "catalog:",
     "@lucide/vue": "catalog:",
+    "@sigma/node-image": "catalog:",
     "@tanstack/vue-table": "catalog:",
     "axios": "catalog:",
     "class-variance-authority": "catalog:",
@@ -49,8 +50,10 @@
     "echarts": "catalog:",
     "es-toolkit": "catalog:",
     "filesize": "catalog:",
+    "graphology": "catalog:",
     "md-editor-v3": "catalog:",
     "reka-ui": "catalog:",
+    "sigma": "catalog:",
     "tailwind-merge": "catalog:",
     "vue-input-otp": "catalog:",
     "vue-sonner": "catalog:"

@@ -24,8 +24,8 @@ public class MilkyConnectionRepoImpl implements MilkyConnectionRepo {
     private final IdGenerator idGenerator;
     private final MilkyCredentialCipher cipher;
     @Override public MilkyConnection save(MilkyConnection connection) {
+        if (connection.getId() == null) { connection.setId(idGenerator.nextId()); connection.setCreateTime(LocalDateTime.now()); }
         MilkyConnectionDO data = MilkyInfraMapper.toDataObj(connection, cipher);
-        if (data.getId() == null) { data.setId(idGenerator.nextId()); data.setCreateTime(LocalDateTime.now()); }
         data.setUpdateTime(LocalDateTime.now());
         return MilkyInfraMapper.toDomain(mongoTemplate.save(data), cipher);
     }

@@ -181,6 +181,7 @@ public class PluginAssembler {
                 .moduleName(module.moduleName())
                 .sdkVersion(module.sdkVersion())
                 .integrity(module.integrity())
+                .assetRevision(module.assetRevision())
                 .menuTitle(module.menuTitle())
                 .menuIcon(module.menuIcon())
                 .menuSort(module.menuSort())
@@ -197,6 +198,7 @@ public class PluginAssembler {
                 .moduleName(module.moduleName())
                 .sdkVersion(module.sdkVersion())
                 .integrity(module.integrity())
+                .assetRevision(module.assetRevision())
                 .menuTitle(module.menuTitle())
                 .menuIcon(module.menuIcon())
                 .menuSort(module.menuSort())
@@ -255,6 +257,8 @@ public class PluginAssembler {
                 .path(asset.path())
                 .contentType(asset.contentType())
                 .body(asset.body())
+                .etag(asset.etag())
+                .immutable(asset.immutable())
                 .build();
     }
 

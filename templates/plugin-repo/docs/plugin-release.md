@@ -61,7 +61,13 @@ yudream-plugin-yudream-skin
 
 发布脚本为每个选择的插件模块只选择一个最终包：优先 `*-shaded.jar`，否则普通 `*.jar`。`ci/verify-plugin-jar-assets.sh` 还应保证最终插件 JAR 包含 `META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js`，且不包含 `online/yudream/base/plugin/spi/*` 类文件。
 
-前端产物应将 `remoteEntry.js`、其独立 JS chunk、CSS、图片和字体一并放入 `META-INF/yudream-plugin/frontend/{pluginCode}/`。需要由宿主预加载的 CSS 或 module script 在 `PluginFrontendModule.styles` / `scripts` 声明相对路径；动态 import chunk 不必重复声明。仍可使用 `styles.css?inline` 在 `install()` 注入样式，作为无需独立 CSS 的兼容方式。
+前端产物应将 `remoteEntry.js`、其独立 JS chunk、CSS、图片和字体一并放入 `META-INF/yudream-plugin/frontend/{pluginCode}/`。需要由宿主预加载的 CSS 或 module script 在 `PluginFrontendModule.styles` / `scripts` 声明相对路径；每个声明都必须指向该目录中实际打包的文件，不能使用空路径、反斜杠、`..` 或 `/` 开头的宿主根绝对路径。动态 import chunk 不必重复声明。仍可使用 `styles.css?inline` 在 `install()` 注入样式，作为无需独立 CSS 的兼容方式。
+
+构建 remote 时必须让 `remoteEntry.js`、chunk、CSS、图片和字体引用使用相对 URL，并为可缓存产物使用 hash 文件名；禁止把宿主部署根路径写入前端资源引用。`ci/verify-plugin-jar-assets.sh` 会检查最终 JAR 的资源路径，以及 `remoteEntry.js` 和 CSS 中可静态识别的根绝对路径、父级相对路径引用；它不会猜测运行时 API URL 或动态生成的资源名。
+
+### CSS 隔离约定
+
+宿主为 remote 挂载根提供稳定的 `data-yudream-plugin="{pluginCode}"` 属性。业务 CSS 应以 `[data-yudream-plugin="{pluginCode}"]` 作用域或插件专有 class 前缀开始，避免污染宿主和其他插件。禁止使用 `html`、`body`、`:root`、无范围的元素 reset、宿主组件 class 覆盖和通用 `@keyframes` 名称；动画名称也应使用插件专有前缀。
 
 ## 前端工作区边界
 

@@ -231,6 +231,7 @@ public class PluginWebAssembler {
                 .moduleName(dto.getModuleName())
                 .sdkVersion(dto.getSdkVersion())
                 .integrity(dto.getIntegrity())
+                .assetRevision(dto.getAssetRevision())
                 .menuTitle(dto.getMenuTitle())
                 .menuIcon(dto.getMenuIcon())
                 .menuSort(dto.getMenuSort())
@@ -306,10 +307,12 @@ public class PluginWebAssembler {
     public static String frontendAssetPath(String pluginCode, HttpServletRequest request) {
         String prefix = "/api/platform/plugins/" + pluginCode + "/assets";
         String uri = request.getRequestURI();
-        if (!uri.startsWith(prefix)) {
+        String contextPath = request.getContextPath();
+        String pathWithinApplication = uri.startsWith(contextPath) ? uri.substring(contextPath.length()) : uri;
+        if (!pathWithinApplication.startsWith(prefix)) {
             return "";
         }
-        String path = uri.substring(prefix.length());
+        String path = pathWithinApplication.substring(prefix.length());
         return path.isBlank() ? "" : path;
     }
 

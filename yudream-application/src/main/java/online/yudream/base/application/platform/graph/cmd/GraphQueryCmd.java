@@ -6,7 +6,7 @@ import java.util.Map;
 
 @Data
 public class GraphQueryCmd {
-    private Long connectionId;
+    private Long tableId;
     private String cypher;
     private Map<String, Object> params;
 }

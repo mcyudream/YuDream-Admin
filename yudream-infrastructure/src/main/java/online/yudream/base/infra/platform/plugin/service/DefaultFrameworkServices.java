@@ -60,6 +60,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final MilkyPluginMessagingService pluginMessagingFrameworkService;
     private final PluginRenderFrameworkService pluginRenderFrameworkService;
     private final PluginAiFrameworkService pluginAiFrameworkService;
+    private final PluginGraphFrameworkService pluginGraphFrameworkService;
     private final MongoTemplate mongoTemplate;
     private final ObjectStorage objectStorage;
     private final WordTemplateRenderer wordTemplateRenderer;
@@ -146,7 +147,10 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginSecretStore secrets(String pluginCode) {
         return secretStores.computeIfAbsent(pluginCode, code -> new MongoPluginSecretStore(
-                code, mongoTemplate, environment.getProperty("yudream.plugin.secret-key")));
+                code,
+                mongoTemplate,
+                environment.getProperty("yudream.credential.key"),
+                environment.getProperty("yudream.credential.plugin-legacy-key")));
     }
 
     @Override

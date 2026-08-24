@@ -1,8 +1,8 @@
 # 框架能力端口 FrameworkServices
 
-> SPI v1（2.7.0）· 包 `online.yudream.base.plugin.spi.system`
+> SPI v1（2.13.0）· 包 `online.yudream.base.plugin.spi.system`
 
-`context.framework()` 返回 `FrameworkServices`，是插件访问宿主稳定能力的唯一入口。**需要新能力时先扩展 SPI 端口/DTO 再由宿主实现适配，禁止直接引用宿主 Spring Bean 或仓储实现。**
+`context.framework()` 返回 `FrameworkServices`，是插件访问宿主稳定能力的唯一入口。**需要新能力时先扩展 SPI 端口/DTO 再由宿主实现适配，禁止直接引用宿主 Spring Bean 或仓储实现。** 用途化资源图投影由 `context.graph()` 提供，不属于 `FrameworkServices`；运行时绑定可信插件 scope。除兼容的显式 `tableCode` 接口外，插件可调用无 `tableCode` 的自动绑定读写与完整闭合快照接口；宿主只会解析唯一 ACTIVE 且已授权的逻辑图表，没有或不唯一时受控失败。完整快照限制为 20,000 个节点、50,000 条关系和 8 MiB，超限返回 `PROJECTION_LIMIT_EXCEEDED`。`context.graph()` 禁止读取环境变量或在插件内自行创建 Neo4j `Driver`。详见 [GraphSpi](/plugin/spi/v1/graph)。
 
 ## 端口总览
 
@@ -12,6 +12,7 @@
 | `qqBindings()` | `PluginQqBindingService` | QQ 绑定码签发/核销 |
 | `commands()` | `PluginCommandService` | 查询当前用户可用命令 |
 | `ai()` | `PluginAiService` | AI 对话 / Agent / 工具 |
+| `PluginContext.graph()` | `PluginGraphService` | 原子替换并按 tableCode + namespace + versionId 分页读取当前插件用途化资源图投影；请求必须提供逻辑图表编码，不接受 Cypher 或 pluginCode |
 | `security()` | `PluginSecurityService` | 权限校验 |
 | `mail()` | `PluginMailService` | 邮件发送 |
 | `wordTemplates()` | `PluginWordTemplateService` | Word 模板渲染 |

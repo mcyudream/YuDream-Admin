@@ -7,6 +7,7 @@ const modules = indexPluginRuntimeModules([{
   moduleName: 'minecraftServer',
   entry: '/plugins/minecraft-server/remoteEntry.js',
   sdkVersion: '1.2.0',
+  assetRevision: '1.20.4-ls8x0-abc123',
   styles: ['assets/minecraft.css'],
   scripts: ['assets/bootstrap.js'],
   routes: [],
@@ -24,6 +25,7 @@ test('binds the persisted menu component to its enabled remote module', () => {
     entry: '/plugins/minecraft-server/remoteEntry.js',
     moduleName: 'minecraftServer',
     sdkVersion: '1.2.0',
+    assetRevision: '1.20.4-ls8x0-abc123',
     styles: ['assets/minecraft.css'],
     scripts: ['assets/bootstrap.js'],
   })
