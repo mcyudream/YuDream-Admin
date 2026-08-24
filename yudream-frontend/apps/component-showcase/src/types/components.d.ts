@@ -62,6 +62,7 @@ declare module 'vue' {
     FaTrend: typeof import('@yudream/components')['FaTrend']
     ThemePanel: typeof import('./../components/ThemePanel.vue')['default']
     YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
+    YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
   }
 }
 
@@ -117,4 +118,5 @@ declare global {
   const FaTrend: typeof import('@yudream/components')['FaTrend']
   const ThemePanel: typeof import('./../components/ThemePanel.vue')['default']
   const YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
+  const YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
 }
