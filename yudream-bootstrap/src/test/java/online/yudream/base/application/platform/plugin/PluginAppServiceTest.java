@@ -5,9 +5,11 @@ import online.yudream.base.application.platform.plugin.service.PluginMenuProject
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.system.user.service.PermissionDomainService;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import org.junit.jupiter.api.BeforeEach;
@@ -146,6 +148,21 @@ class PluginAppServiceTest {
     }
 
     @Test
+    void listInstalledUsesRuntimeLoadedAndEnabledFlags() throws IOException {
+        PluginModule module = module(writeJar("demo-plugin.jar", NEW_BYTES), "1.0.0", "Demo plugin");
+        when(pluginRuntimeGateway.loaded(PLUGIN_CODE)).thenReturn(true);
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(true);
+        when(pluginModuleRepo.findAll()).thenReturn(List.of(module));
+
+        var plugins = service.listInstalled();
+
+        assertThat(plugins).singleElement().satisfies(plugin -> {
+            assertThat(plugin.isLoaded()).isTrue();
+            assertThat(plugin.isEnabled()).isTrue();
+        });
+    }
+
+    @Test
     void restoreEnabledPluginsLoadsAndEnablesInstalledModuleWithRestoreIntentThenClearsIntent() throws IOException {
         PluginModule module = module(writeJar("demo-plugin.jar", NEW_BYTES), "1.0.0", "Demo plugin");
         module.setRestoreIntentActive(true);
@@ -162,6 +179,26 @@ class PluginAppServiceTest {
         lifecycle.verify(pluginRuntimeGateway).enable(module);
         assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
         assertThat(module.getRestoreIntentActive()).isFalse();
+    }
+
+    @Test
+    void restoreEnabledPluginsStartsRegisteredDevProject() throws IOException {
+        PluginModule module = module(writeJar("demo-plugin.jar", NEW_BYTES), "1.0.0", "Demo plugin");
+        when(pluginRuntimeGateway.discover()).thenReturn(List.of());
+        when(pluginRuntimeGateway.devModeEnabled()).thenReturn(true);
+        when(pluginRuntimeGateway.devModeProjects()).thenReturn(List.of(
+                new PluginDevProjectInfo(PLUGIN_CODE, tempDir.toString(), tempDir.toString(), true,
+                        PluginDevProjectSource.FILE, true, true, true)));
+        when(pluginRuntimeGateway.loaded(PLUGIN_CODE)).thenReturn(false, true);
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(false, false, false, true);
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        stubRepository(module);
+
+        service.restoreEnabledPlugins();
+
+        verify(pluginRuntimeGateway).load(module);
+        verify(pluginRuntimeGateway).enable(module);
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
     }
 
     @Test

@@ -14,6 +14,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCapabilityAssetIn
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginLoggerPrefix;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
@@ -62,6 +63,8 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -83,6 +86,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final FrameworkServices frameworkServices;
     private final PluginServiceRegistry pluginServiceRegistry;
     private final PluginAiToolRegistry aiToolRegistry;
+    private final PluginGraphFrameworkService pluginGraphFrameworkService;
     private final PluginSemanticMemoryService semanticMemoryService;
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final ApplicationEventPublisher eventPublisher;
@@ -260,9 +264,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 StringUtils.hasText(content) ? content : "/" + commandName + (args.isEmpty() ? "" : " " + String.join(" ", args)),
                 null, commandName, Map.of(), null, null, null, null, null);
         try {
+            pluginLogger(pluginCode, holder).info("开始模拟指令：{}", commandName);
             for (PluginCommandRegistryImpl.Registration registration : registrations) {
                 registration.handler().handle(new PluginCommandContext(debugEvent, commandName, args, null));
             }
+            pluginLogger(pluginCode, holder).info("模拟指令完成：{}", commandName);
             return PluginCommandTestResult.succeeded(pluginCode, commandName, elapsedMillis(startNanos));
         } catch (Exception e) {
             return PluginCommandTestResult.failed(pluginCode, commandName,
@@ -303,6 +309,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             }
             holders.put(module.getCode(), holder);
             log.info("Plugin loaded: code={}, jar={}", module.getCode(), module.getJarPath());
+            pluginLogger(module).info("插件已加载，来源={}", module.getJarPath());
             publishLifecycle(module.getCode(), PluginLifecycleAction.LOAD, holder.getDescriptor().version(), startNanos, null);
         } catch (RuntimeException | Error e) {
             publishLifecycle(module.getCode(), PluginLifecycleAction.LOAD, null, startNanos, e);
@@ -324,6 +331,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             holder.getPlugin().onEnable(holder.getContext());
             holder.setEnabled(true);
             log.info("Plugin enabled: code={}", module.getCode());
+            pluginLogger(module).info("插件已启用");
             publishLifecycle(module.getCode(), PluginLifecycleAction.ENABLE, holder.getDescriptor().version(), startNanos, null);
         } catch (RuntimeException | Error e) {
             // JAR 损坏等情况会抛 ZipError 等非 RuntimeException，必须同样回滚已注册的菜单/指令等贡献，
@@ -347,6 +355,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             holder.getContext().clearRuntimeContributions();
             holder.setEnabled(false);
             log.info("Plugin disabled: code={}", code);
+            pluginLogger(code, holder).info("插件已禁用");
             publishLifecycle(code, PluginLifecycleAction.DISABLE, holder.getDescriptor().version(), startNanos, null);
         } catch (RuntimeException | Error e) {
             publishLifecycle(code, PluginLifecycleAction.DISABLE, holder.getDescriptor().version(), startNanos, e);
@@ -371,6 +380,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             holder.getContext().dispose();
             closeClassLoader(holder.getClassLoader());
             log.info("Plugin unloaded: code={}", code);
+            pluginLogger(code, holder).info("插件已卸载");
             publishLifecycle(code, PluginLifecycleAction.UNLOAD, version, startNanos, null);
         } catch (RuntimeException | Error e) {
             publishLifecycle(code, PluginLifecycleAction.UNLOAD, version, startNanos, e);
@@ -387,6 +397,15 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     public boolean enabled(String code) {
         PluginRuntimeHolder holder = holders.get(code);
         return holder != null && holder.isEnabled();
+    }
+
+    private org.slf4j.Logger pluginLogger(PluginModule module) {
+        return org.slf4j.LoggerFactory.getLogger(PluginLoggerPrefix.of(module.getMainClass(), module.getCode()));
+    }
+
+    private org.slf4j.Logger pluginLogger(String code, PluginRuntimeHolder holder) {
+        String mainClass = holder.getDescriptor() == null ? null : holder.getDescriptor().mainClass();
+        return org.slf4j.LoggerFactory.getLogger(PluginLoggerPrefix.of(mainClass, code));
     }
 
     @Override
@@ -416,7 +435,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         return holders.entrySet().stream()
                 .filter(entry -> entry.getValue().isEnabled())
                 .flatMap(entry -> entry.getValue().getContext().frontendModules().stream()
-                        .map(module -> toInfo(entry.getKey(), module)))
+                        .map(module -> toInfo(entry.getKey(), module, entry.getValue().getAssetRevision())))
                 .toList();
     }
 
@@ -490,7 +509,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                         .map(item -> new PluginCapabilityAssetInfo(item.code(), item.name(), item.type(), item.description(), item.icon(), item.dependencies()))
                         .toList(),
                 context.dashboardCards().stream().map(card -> toInfo(code, card)).toList(),
-                context.frontendModules().stream().map(module -> toInfo(code, module)).toList(),
+                context.frontendModules().stream().map(module -> toInfo(code, module, holder.getAssetRevision())).toList(),
                 context.httpEndpoints(),
                 context.commandRegistry().registrations().stream()
                         .map(registration -> new PluginCommandInfo(code, registration.definition().code(),
@@ -577,7 +596,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             if (inputStream == null) {
                 return Optional.empty();
             }
-            return Optional.of(new PluginFrontendAssetInfo(path, contentType(path), inputStream.readAllBytes()));
+            return Optional.of(frontendAssetInfo(path, inputStream.readAllBytes()));
         } catch (IOException e) {
             throw new BizException("插件前端资源读取失败：" + e.getMessage());
         }
@@ -594,7 +613,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             return Optional.empty();
         }
         try {
-            return Optional.of(new PluginFrontendAssetInfo(path, contentType(path), Files.readAllBytes(file)));
+            return Optional.of(frontendAssetInfo(path, Files.readAllBytes(file)));
         } catch (IOException e) {
             throw new BizException("插件前端资源读取失败：" + e.getMessage());
         }
@@ -619,7 +638,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         );
         PluginHttpResponse response;
         try {
+            pluginLogger(request.pluginCode(), holder).info("开始处理 HTTP 请求：{} {}", request.method(), request.path());
             response = handler.handle(pluginRequest);
+            pluginLogger(request.pluginCode(), holder).info("HTTP 请求处理完成：{} {}，状态={}", request.method(), request.path(), response.status());
         } catch (IllegalArgumentException e) {
             response = PluginHttpResponse.rawJson(400, Map.of("message", messageOrDefault(e, "请求参数不正确")));
         } catch (RuntimeException e) {
@@ -701,9 +722,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                                 declaredDependencies(descriptor),
                                 this::enabled,
                                 aiToolRegistry,
+                                pluginGraphFrameworkService.scoped(module.getCode()),
                                 semanticMemoryService,
                                 agentApplicationRegistry
-                        )
+                        ),
+                        assetRevision(module.getCode(), pluginPath, descriptor)
                 );
             } catch (RuntimeException | Error e) {
                 // 实例化失败时释放 ClassLoader，避免句柄泄漏在 Windows 下锁住插件 JAR
@@ -880,7 +903,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         return new PluginPermissionInfo(item.code(), item.name(), item.module(), item.description());
     }
 
-    private PluginFrontendModuleInfo toInfo(String pluginCode, PluginFrontendModule module) {
+    private PluginFrontendModuleInfo toInfo(String pluginCode, PluginFrontendModule module, String assetRevision) {
         return new PluginFrontendModuleInfo(
                 pluginCode,
                 module.entry(),
@@ -895,7 +918,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 true,
                 MenuStatus.ACTIVE,
                 module.styles(),
-                module.scripts()
+                module.scripts(),
+                assetRevision
         );
     }
 
@@ -939,15 +963,50 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         );
     }
 
+    private String assetRevision(String code, Path pluginPath, PluginDescriptor descriptor) {
+        Path assetSource = pluginPath;
+        PluginDevModeProperties.DevProject project = findDevProject(code);
+        if (project != null && Files.isDirectory(project.resolvedFrontendDist())) {
+            assetSource = project.resolvedFrontendDist();
+        }
+        try {
+            long latestModified = Files.getLastModifiedTime(assetSource).toMillis();
+            long totalSize = Files.isRegularFile(assetSource) ? Files.size(assetSource) : 0L;
+            if (Files.isDirectory(assetSource)) {
+                try (Stream<Path> files = Files.walk(assetSource)) {
+                    for (Path file : files.filter(Files::isRegularFile).toList()) {
+                        latestModified = Math.max(latestModified, Files.getLastModifiedTime(file).toMillis());
+                        totalSize += Files.size(file);
+                    }
+                }
+            }
+            return descriptor.version() + "-" + Long.toUnsignedString(latestModified, 36)
+                    + "-" + Long.toUnsignedString(totalSize, 36);
+        } catch (IOException exception) {
+            log.warn("Failed to calculate frontend asset revision: plugin={}", code, exception);
+            return descriptor.version();
+        }
+    }
+
     private String normalizeAssetPath(String assetPath) {
-        String path = assetPath == null ? "" : assetPath.replace('\\', '/');
+        String path = assetPath == null ? "" : assetPath.trim();
         while (path.startsWith("/")) {
             path = path.substring(1);
         }
-        if (!StringUtils.hasText(path) || path.contains("..")) {
+        if (!StringUtils.hasText(path) || path.indexOf('\\') >= 0 || path.contains("..")) {
             throw new BizException("插件前端资源路径非法");
         }
         return path;
+    }
+
+    private PluginFrontendAssetInfo frontendAssetInfo(String path, byte[] body) {
+        try {
+            String etag = "\"" + java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(body)) + "\"";
+            boolean immutable = path.matches(".*[._-][0-9a-fA-F]{8,}[._-].*");
+            return new PluginFrontendAssetInfo(path, contentType(path), body, etag, immutable);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 不可用", exception);
+        }
     }
 
     private String contentType(String path) {

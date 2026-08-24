@@ -11,7 +11,7 @@
 | 开发模式（目录加载 + 监听热重载） | 宿主配置或面板登记 | `yudream.platform.plugin.dev-mode.enabled`（默认不配置→自动检测：源码运行开、JAR 运行关） |
 | 开发者工具 REST/SSE API | `/api/platform/plugin-devtools/**` | 权限码 `platform:plugin-devtools:view` / `manage` |
 | Agent 执行链路追踪 | 调试浮窗「追踪」页 | `yudream.platform.agent.trace.enabled`（默认 `true`） |
-| 前端悬浮调试浮窗（非模态） | 管理后台常驻悬浮按钮（可拖拽、贴边收起） | 后端 status 可用 + 权限，或前端 DEV 模式 |
+| 前端悬浮调试浮窗（非模态） | 管理后台常驻悬浮按钮（可拖拽、贴边收起） | 后端开发模式实际开启 + 权限 |
 | 前端审查（Fa 组件优先/品牌色令牌） | `pnpm audit:ui` + eslint | 无（warn 级，不阻断构建） |
 
 ## 2. 插件开发模式
@@ -31,7 +31,7 @@
 - **CONFIG**：yml `dev-mode.projects` 列表，面板只读；
 - **FILE**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，与插件 JAR 目录同约定，已被 `.gitignore` 的 `/plugins/` 覆盖；可用 `dev-mode.store-file` 覆盖路径）。此文件是有意选择的**非数据库存储**——coding agent 与用户都能直接读取它来定位插件源码目录。
 
-合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），面板登记后若插件已启用会立即触发一次热切重载。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
+合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），开发模式开启时已登记且产物可用的项目会在宿主启动后按依赖顺序恢复启用；设置页也可直接点击启用。登记后若插件已启用会立即触发一次热切重载。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
 
 「设置」页的「新建插件」可免去手工搭骨架：填父目录与 kebab-case 编码（可选显示名、版本、描述、depend/softdepend），宿主在 `{父目录}/yudream-plugin-{code}` 生成**独立 pom**（无 parent，SPI 依赖经本机 `~/.m2` 解析，默认版本跟随宿主根 pom 的 `yudream.plugin.spi.version`，可用 `spiVersion` 覆盖）、`plugin.yml`、含 ping 自检指令的入口类（包名 `online.yudream.base.plugin.{code去连字符}`）与 domain/application/infrastructure/interfaces 四个空分包。`register` 默认开启，生成即登记为开发模式项目，执行一次 `mvn compile` 后开发模式自动加载；目标目录已存在且非空时拒绝生成。
 
@@ -82,13 +82,13 @@ yudream:
 - **插件**：主从结构——先插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献，按开发关注度排序：HTTP 端点、QQ 指令、前端模块与路由 → 权限、菜单 → AI 工具、声明式 Agent → 平台能力、消息交互、首页卡片、服务导出。端点测试器与指令模拟器在插件详情内，开发模式插件可一键「重载」。未启用（LOADED/ERROR）的插件详情提供「启用」按钮，且资产区展示未启用横幅——重载不会自动启用从未启用过的插件，贡献全 0 属预期。清单工具栏可切换「依赖图」视图：按插件展示依赖（depend）/可选依赖（softdepend）/被依赖/被可选依赖四向关系，指向未安装插件的依赖标红；每张卡片提供「禁用预览」，弹窗列出禁用该插件的级联影响——启用中的传递硬依赖方（按建议禁用顺序排列，运行时拒绝禁用存在启用中硬依赖方的插件）、启用中的直接软依赖方（禁用后其可选集成降级）、已加载的直接依赖方（存在时卸载/重载将被拒绝）。
 - **QQ 沙盒**：构造真实 Milky `message_receive` 事件，按生产顺序执行消息交互、`/`/`!` 指令解析、QQ 绑定与角色权限，并支持 @机器人、额外提及、回复消息和随机触发三态（真实概率/强制命中/强制未命中）。支持身份模拟（模拟未绑定 QQ、模拟角色）；插件处理器逃逸异常与插件 WARN/ERROR 日志以结构化负载进时间线。真实策略连接只用于读取群策略与历史种子；所有回复写入 synthetic connection 时间线，不发送到 QQ。
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
-- **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条，级别/关键字过滤）+ SSE 实时追加，按 sequence 去重；可暂停（暂停期日志缓存于缓冲区）、清空与展开异常堆栈。过滤依据插件包名前缀（`PluginLoggerPrefix`：从 mainClass 截取 `online.yudream.base.plugin.` 根包后的第一段，第三方未遵循包约定的插件兜底用 根包+编码），数据源为宿主 SystemLogBuffer 环形缓冲，与沙盒日志桥同一包约定。
+- **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条，级别/关键字过滤）+ SSE 实时追加，按 sequence 去重；可暂停（暂停期日志缓存于缓冲区）、清空与展开异常堆栈。过滤依据插件包名前缀（`PluginLoggerPrefix`：从 mainClass 截取 `online.yudream.base.plugin.` 根包后的第一段，第三方未遵循包约定的插件兜底用 根包+编码），数据源为宿主 SystemLogBuffer 环形缓冲，与沙盒日志桥同一包约定。宿主会自动记录插件加载、启用、禁用、卸载，以及开发者工具的模拟指令和 HTTP 分发过程，无需插件额外接入日志 API。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
-- **设置**：开发项目管理（登记/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 新建插件骨架（表单填父目录与编码，宿主生成独立 Maven 模块并默认登记为开发模式项目）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
+- **设置**：开发项目管理（登记/启用/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 新建插件骨架（表单填父目录与编码，宿主生成独立 Maven 模块并默认登记为开发模式项目）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
 
 浮窗头部只保留标题与双 SSE（生命周期流/追踪流）连接状态点，状态明细移入「概览」页。
 
-可见性：拥有 `platform:plugin-devtools:view` 权限且后端 status 端点可用；纯前端 DEV 模式（`import.meta.env.DEV`）下按钮始终可见，后端不可用时浮窗内降级提示。
+可见性：拥有 `platform:plugin-devtools:view` 权限且后端 status 表明开发模式实际开启。JAR 运行且未显式开启开发模式时，即使前端以 Vite DEV 模式运行也不显示按钮。
 
 ## 4. 开发者工具 API
 

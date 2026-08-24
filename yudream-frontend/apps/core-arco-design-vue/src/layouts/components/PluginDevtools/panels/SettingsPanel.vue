@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PluginDevProject } from '@/api/modules/platform-devtools'
+import apiPlugin from '@/api/modules/platform-plugin'
 import DevProjectDirectoryBrowser from './DevProjectDirectoryBrowser.vue'
 
 const store = usePluginDevtoolsStore()
@@ -22,6 +23,23 @@ function statusDots(project: PluginDevProject) {
 }
 
 const reloadingCode = ref('')
+const enablingCode = ref('')
+
+async function enable(project: PluginDevProject) {
+  enablingCode.value = project.code
+  try {
+    await apiPlugin.enable(project.code)
+    await store.loadStatus(true)
+    toast.success(`插件 ${project.code} 已启用`)
+  }
+  catch {
+    // 拦截器已提示
+  }
+  finally {
+    enablingCode.value = ''
+  }
+}
+
 async function reload(project: PluginDevProject) {
   reloadingCode.value = project.code
   try {
@@ -227,6 +245,11 @@ function handleResetPanel() {
             <span class="status-dot" :class="dot.ok ? 'status-dot--ok' : 'status-dot--bad'" />
           </FaTooltip>
         </div>
+        <FaTooltip text="加载并启用该插件" side="top">
+          <FaButton variant="ghost" size="icon" :loading="enablingCode === project.code" @click="enable(project)">
+            <FaIcon name="i-ri:play-line" />
+          </FaButton>
+        </FaTooltip>
         <FaTooltip text="立即重载该插件" side="top">
           <FaButton variant="ghost" size="icon" :loading="reloadingCode === project.code" @click="reload(project)">
             <FaIcon name="i-ri:restart-line" />

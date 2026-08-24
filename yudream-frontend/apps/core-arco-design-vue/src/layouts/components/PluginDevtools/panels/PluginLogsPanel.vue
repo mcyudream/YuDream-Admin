@@ -28,10 +28,12 @@ const levelOptions = [
   { label: 'ERROR', value: 'ERROR' },
 ]
 
-const pluginOptions = computed(() => plugins.value.map(item => ({
-  label: `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`,
-  value: item.code,
-})))
+const pluginOptions = computed(() => [...plugins.value]
+  .sort((left, right) => Number(right.enabled) - Number(left.enabled) || left.code.localeCompare(right.code))
+  .map(item => ({
+    label: `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`,
+    value: item.code,
+  })))
 
 const listRef = ref<HTMLElement | null>(null)
 const expandedSequences = ref<Set<number>>(new Set())
