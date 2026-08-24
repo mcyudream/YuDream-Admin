@@ -61,5 +61,7 @@ export const FaTooltip = components.FaTooltip
 export const FaTrend = components.FaTrend
 export const FaResponsiveTable = components.FaResponsiveTable
 export const useIsMobile = components.useIsMobile
+export const YdGraphCanvas = components.YdGraphCanvas
+export const YdTablePicker = components.YdTablePicker
 
 export default components
