@@ -61,6 +61,7 @@ declare module 'vue' {
     FaTooltip: typeof import('@yudream/components')['FaTooltip']
     FaTrend: typeof import('@yudream/components')['FaTrend']
     ThemePanel: typeof import('./../components/ThemePanel.vue')['default']
+    YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
   }
 }
 
@@ -115,4 +116,5 @@ declare global {
   const FaTooltip: typeof import('@yudream/components')['FaTooltip']
   const FaTrend: typeof import('@yudream/components')['FaTrend']
   const ThemePanel: typeof import('./../components/ThemePanel.vue')['default']
+  const YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
 }

@@ -2,7 +2,7 @@ import type { ImportsMap } from 'unplugin-auto-import/types'
 import type { ComponentResolver, TypeImport } from 'unplugin-vue-components'
 import { createRequire } from 'node:module'
 
-const COMPONENT_PREFIX = 'Fa'
+const COMPONENT_PREFIXES = ['Fa', 'Yd']
 const PACKAGE_NAME = createRequire(import.meta.url)('./package.json').name
 
 const BASIC_COMPONENT_NAMES = [
@@ -55,8 +55,13 @@ const BASIC_COMPONENT_NAMES = [
   'FaTrend',
 ] as const
 
+const YD_COMPONENT_NAMES = [
+  'YdGraphCanvas',
+] as const
+
 const COMPONENT_NAMES = [
   ...BASIC_COMPONENT_NAMES,
+  ...YD_COMPONENT_NAMES,
 ] as const
 
 const AUTO_IMPORT_NAMES = [
@@ -76,7 +81,7 @@ export function ComponentsResolver(): ComponentResolver {
   return {
     type: 'component',
     resolve(name: string) {
-      if (name.startsWith(COMPONENT_PREFIX) && names.has(name)) {
+      if (COMPONENT_PREFIXES.some(prefix => name.startsWith(prefix)) && names.has(name)) {
         return {
           name,
           from: PACKAGE_NAME,
