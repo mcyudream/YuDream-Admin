@@ -392,6 +392,10 @@
     {
       "key": "unresolved-local-component-silent-degrade",
       "text": "前端只全局注册 Fa*/Yd* 组件（components.d.ts），本地兄弟组件必须显式 import，不会自动解析。漏导入时 Vue 把标签降级成原生元素：默认插槽内容照常渲染，但组件外壳/触发器/props 全部静默丢失，vue-tsc 与 eslint 都不报错，只在运行时报 Failed to resolve component 警告。页面缺结构但内容还在时先查模板里每个非 Fa/Yd 大写标签是否有对应 import。"
+    },
+    {
+      "key": "plugin-runtime-lifecycle-lock",
+      "text": "JarPluginRuntimeGateway 的 load/enable/disable/unload 必须用 synchronized 串行化：dev-mode watcher 重载（watcher 线程）、管理端启用/禁用（HTTP 线程）与启动恢复会并发触发同一插件生命周期；containsKey/isEnabled 检查与注解注册之间的竞态会让同一 PluginContextImpl 重复注册并报『插件权限/菜单/端点重复』，失败方 catch 里的 clearRuntimeContributions 还会清掉并发成功方的贡献。修复见 68a6ebcf。"
     }
   ]
 }
