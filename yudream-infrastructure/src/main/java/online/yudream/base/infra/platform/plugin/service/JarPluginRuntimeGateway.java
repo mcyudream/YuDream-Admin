@@ -289,8 +289,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         return readDescriptor(jarPath);
     }
 
+    // 生命周期操作串行化：dev-mode watcher 重载、管理端启用/禁用与启动恢复可能并发触发同一插件的
+    // load/enable，否则 containsKey/isEnabled 检查与注册之间的竞态会让同一 context 被重复注册，
+    // 报出“插件权限/菜单/端点重复”，失败方的回滚还会清掉并发成功方的贡献。
     @Override
-    public void load(PluginModule module) {
+    public synchronized void load(PluginModule module) {
         if (!pluginProperties.isEnabled()) {
             throw new BizException("插件系统未启用");
         }
@@ -318,7 +321,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
-    public void enable(PluginModule module) {
+    public synchronized void enable(PluginModule module) {
         load(module);
         PluginRuntimeHolder holder = holder(module.getCode());
         if (holder.isEnabled()) {
@@ -343,7 +346,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
-    public void disable(String code) {
+    public synchronized void disable(String code) {
         PluginRuntimeHolder holder = holders.get(code);
         if (holder == null || !holder.isEnabled()) {
             return;
@@ -364,7 +367,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
-    public void unload(String code) {
+    public synchronized void unload(String code) {
         ensureNoLoadedDependents(code);
         PluginRuntimeHolder holder = holders.remove(code);
         if (holder == null) {
