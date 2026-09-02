@@ -427,7 +427,7 @@ class PluginGraphFrameworkServiceTest {
             }
             return disabledConnection.getCode().equals(code) ? Optional.of(disabledConnection) : Optional.empty();
         }
-        @Override public PageResult<GraphConnection> page(String keyword, int page, int size) { return new PageResult<>(List.of(connection), 1, page, size); }
+        @Override public PageResult<GraphConnection> page(String keyword, GraphConnectionStatus status, int page, int size) { return new PageResult<>(List.of(connection), 1, page, size); }
         @Override public List<GraphConnection> findActiveAuthorizedByPluginCode(String pluginCode, int limit) {
             return activeAuthorizedConnections.stream().filter(connection -> connection.authorizedFor(pluginCode))
                     .limit(limit).toList();
