@@ -11,7 +11,9 @@ import online.yudream.base.interfaces.common.RequestFailureContext;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.common.ResultCode;
 import org.springframework.context.support.DefaultMessageSourceResolvable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -92,6 +94,15 @@ public class GlobalExceptionHandler {
         else {
             log.warn("HTTP request failed: method={}, path={}, status={}, type={}",
                     request.getMethod(), request.getRequestURI(), status.value(), e.getClass().getSimpleName());
+        }
+        // SSE 请求（Accept: text/event-stream）协商不出 JSON 错误体：异常发生在进入流式阶段之前，
+        // 强写 Result 会抛 HttpMediaTypeNotAcceptableException，连带原始异常被容器以 ERROR 刷屏。
+        String accept = request.getHeader(HttpHeaders.ACCEPT);
+        if (accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
+            @SuppressWarnings("unchecked")
+            ResponseEntity<Result<Void>> empty = (ResponseEntity<Result<Void>>) (ResponseEntity<?>)
+                    ResponseEntity.status(status).build();
+            return empty;
         }
         return ResponseEntity.status(status).body(result);
     }
