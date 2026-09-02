@@ -28,6 +28,11 @@ export interface UserManageItem {
   updateTime?: string
 }
 
+export interface UserPickerRow {
+  id: IdValue
+  username: string
+  nickname?: string
+}
 export interface UserPageParams {
   page: number
   size: number
