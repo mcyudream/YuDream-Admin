@@ -1,4 +1,4 @@
-import type { ApiResponse } from './system-client'
+import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export type MenuNodeType = 'CATEGORY' | 'LAYOUT' | 'MENU' | 'LINK' | 'BUTTON'
@@ -33,6 +33,27 @@ export interface MenuTreeParams {
   status?: MenuStatus
 }
 
+export interface MenuCandidate {
+  code: string
+  name: string
+  type: MenuNodeType
+  parentCode?: string
+  module?: string
+  icon?: string
+  sort?: number
+  source?: MenuSource
+  pluginCode?: string
+  pluginModuleName?: string
+}
+
+export interface MenuCandidateParams {
+  page: number
+  size: number
+  keyword?: string
+  currentCode?: string
+  source?: MenuSource
+}
+
 export interface MenuPayload {
   code?: string
   name: string
@@ -51,6 +72,7 @@ export interface MenuPayload {
 
 export default {
   tree: (params?: MenuTreeParams) => systemClient.get<unknown, ApiResponse<MenuManageItem[]>>('api/system/menus', { params }),
+  candidates: (params: MenuCandidateParams) => systemClient.get<unknown, ApiResponse<PageResult<MenuCandidate>>>('api/system/menus/candidates', { params }),
   create: (data: MenuPayload) => systemClient.post<unknown, ApiResponse<MenuManageItem>>('api/system/menus', data),
   update: (code: string, data: MenuPayload) => systemClient.put<unknown, ApiResponse<MenuManageItem>>('api/system/menus', data, { params: { code } }),
   enable: (code: string) => systemClient.post<unknown, ApiResponse<null>>('api/system/menus/enable', undefined, { params: { code } }),

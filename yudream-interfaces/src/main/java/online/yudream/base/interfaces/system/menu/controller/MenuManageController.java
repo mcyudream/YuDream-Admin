@@ -3,13 +3,16 @@ package online.yudream.base.interfaces.system.menu.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.menu.query.MenuCandidatePageQuery;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
 import online.yudream.base.application.system.menu.service.MenuAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.menu.assembler.MenuWebAssembler;
 import online.yudream.base.interfaces.system.menu.request.MenuCreateRequest;
 import online.yudream.base.interfaces.system.menu.request.MenuUpdateRequest;
+import online.yudream.base.interfaces.system.menu.res.MenuCandidateRes;
 import online.yudream.base.interfaces.system.menu.res.MenuManageRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +37,12 @@ public class MenuManageController {
     public Result<List<MenuManageRes>> tree(MenuTreeQuery query) {
         StpUtil.checkLogin();
         return Result.ok(MenuWebAssembler.toResList(menuAppService.tree(query)));
+    }
+
+    @GetMapping("/candidates")
+    public Result<PageResult<MenuCandidateRes>> candidates(MenuCandidatePageQuery query) {
+        StpUtil.checkLogin();
+        return Result.ok(MenuWebAssembler.toCandidatePage(menuAppService.pageCandidates(query)));
     }
 
     @PostMapping

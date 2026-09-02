@@ -1,10 +1,14 @@
 package online.yudream.base.application.system.menu.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.menu.assembler.MenuAssembler;
 import online.yudream.base.application.system.menu.cmd.MenuCreateCmd;
 import online.yudream.base.application.system.menu.cmd.MenuUpdateCmd;
+import online.yudream.base.application.system.menu.dto.MenuCandidateDTO;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
+import online.yudream.base.application.system.menu.query.MenuCandidatePageQuery;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
@@ -68,6 +72,61 @@ public class MenuAppService {
         return buildManageTree(nodes);
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<MenuCandidateDTO> pageCandidates(MenuCandidatePageQuery query) {
+        List<Menu> allMenus = menuRepo.findAll();
+        Map<String, Menu> menuMap = allMenus.stream()
+                .filter(menu -> StringUtils.hasText(menu.getCode()))
+                .collect(Collectors.toMap(Menu::getCode, menu -> menu, (left, right) -> left));
+        Set<String> excludedCodes = descendantCodes(query == null ? null : query.getCurrentCode(), menuMap);
+        String keyword = query == null ? null : query.getKeyword();
+        MenuSource source = query == null ? null : query.getSource();
+        List<Menu> candidates = allMenus.stream()
+                .filter(menu -> menu.getStatus() == MenuStatus.ACTIVE)
+                .filter(Menu::isAvailableForRuntime)
+                .filter(this::platformCapabilityVisible)
+                .filter(menu -> menu.getType() != MenuNodeType.BUTTON && menu.getType() != MenuNodeType.LINK)
+                .filter(menu -> !excludedCodes.contains(menu.getCode()))
+                .filter(menu -> source == null || menu.getSource() == source)
+                .filter(menu -> !StringUtils.hasText(keyword) || matchesCandidateKeyword(menu, keyword))
+                .sorted(Comparator.comparing(Menu::getSort, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(Menu::getCode, Comparator.nullsLast(String::compareTo)))
+                .toList();
+        int page = query == null ? 1 : Math.max(query.getPage(), 1);
+        int size = query == null ? 10 : Math.max(query.getSize(), 1);
+        long offset = (long) (page - 1) * size;
+        int from = (int) Math.min(offset, candidates.size());
+        int to = Math.min(from + size, candidates.size());
+        return new PageResult<>(candidates.subList(from, to).stream().map(MenuAssembler::toCandidateDTO).toList(), candidates.size(), page, size);
+    }
+
+    private boolean matchesCandidateKeyword(Menu menu, String keyword) {
+        return contains(menu.getCode(), keyword)
+                || contains(menu.getName(), keyword)
+                || contains(menu.getModule(), keyword);
+    }
+
+    private Set<String> descendantCodes(String currentCode, Map<String, Menu> menuMap) {
+        if (!StringUtils.hasText(currentCode) || !menuMap.containsKey(currentCode)) {
+            return Collections.emptySet();
+        }
+        Set<String> excluded = new HashSet<>();
+        Set<String> visited = new HashSet<>();
+        excluded.add(currentCode);
+        boolean changed;
+        do {
+            changed = false;
+            for (Menu menu : menuMap.values()) {
+                if (excluded.contains(menu.getCode()) && StringUtils.hasText(menu.getCode())) {
+                    continue;
+                }
+                if (excluded.contains(blankToNull(menu.getParentCode())) && visited.add(menu.getCode())) {
+                    changed = excluded.add(menu.getCode()) || changed;
+                }
+            }
+        } while (changed);
+        return excluded;
+    }
     @Transactional
     public MenuManageDTO create(MenuCreateCmd cmd) {
         if (menuRepo.existsByCode(cmd.getCode())) {

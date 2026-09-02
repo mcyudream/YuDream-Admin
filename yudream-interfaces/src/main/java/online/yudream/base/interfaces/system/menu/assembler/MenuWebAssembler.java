@@ -2,9 +2,12 @@ package online.yudream.base.interfaces.system.menu.assembler;
 
 import online.yudream.base.application.system.menu.cmd.MenuCreateCmd;
 import online.yudream.base.application.system.menu.cmd.MenuUpdateCmd;
+import online.yudream.base.application.system.menu.dto.MenuCandidateDTO;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.system.menu.request.MenuCreateRequest;
 import online.yudream.base.interfaces.system.menu.request.MenuUpdateRequest;
+import online.yudream.base.interfaces.system.menu.res.MenuCandidateRes;
 import online.yudream.base.interfaces.system.menu.res.MenuManageRes;
 
 import java.util.List;
@@ -49,6 +52,24 @@ public class MenuWebAssembler {
         return cmd;
     }
 
+    public static PageResult<MenuCandidateRes> toCandidatePage(PageResult<MenuCandidateDTO> page) {
+        return new PageResult<>(page.getRecords().stream().map(MenuWebAssembler::toCandidateRes).toList(), page.getTotal(), page.getPage(), page.getSize());
+    }
+
+    public static MenuCandidateRes toCandidateRes(MenuCandidateDTO dto) {
+        return MenuCandidateRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .type(dto.getType())
+                .parentCode(dto.getParentCode())
+                .module(dto.getModule())
+                .icon(dto.getIcon())
+                .sort(dto.getSort())
+                .source(dto.getSource())
+                .pluginCode(dto.getPluginCode())
+                .pluginModuleName(dto.getPluginModuleName())
+                .build();
+    }
     public static List<MenuManageRes> toResList(List<MenuManageDTO> items) {
         return items == null ? List.of() : items.stream().map(MenuWebAssembler::toRes).toList();
     }
