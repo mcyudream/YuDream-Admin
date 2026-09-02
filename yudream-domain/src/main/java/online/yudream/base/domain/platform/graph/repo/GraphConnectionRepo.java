@@ -2,6 +2,7 @@ package online.yudream.base.domain.platform.graph.repo;
 
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.graph.aggregate.GraphConnection;
+import online.yudream.base.domain.platform.graph.enumerate.GraphConnectionStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,9 +20,13 @@ public interface GraphConnectionRepo {
     }
 
     default List<GraphConnection> findActiveAuthorizedByPluginCode(String pluginCode, int limit) {
-        return page("", 1, Math.clamp(limit, 1, 100)).getRecords().stream()
-                .filter(connection -> connection.active() && connection.authorizedFor(pluginCode)).toList();
+        return page("", GraphConnectionStatus.ACTIVE, 1, Math.clamp(limit, 1, 100)).getRecords().stream()
+                .filter(connection -> connection.authorizedFor(pluginCode)).toList();
     }
 
-    PageResult<GraphConnection> page(String keyword, int page, int size);
+    default PageResult<GraphConnection> page(String keyword, int page, int size) {
+        return page(keyword, null, page, size);
+    }
+
+    PageResult<GraphConnection> page(String keyword, GraphConnectionStatus status, int page, int size);
 }
