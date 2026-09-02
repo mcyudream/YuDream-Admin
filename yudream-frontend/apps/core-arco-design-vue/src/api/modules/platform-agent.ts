@@ -53,6 +53,12 @@ export interface AgentToolCandidate {
   source?: string
 }
 
+export interface AgentToolCandidateParams {
+  page: number
+  size: number
+  keyword?: string
+}
+
 export interface SystemAgentTool extends AgentToolCandidate {
   inputSchema?: Record<string, unknown>
 }
@@ -141,7 +147,7 @@ export default {
     return { method: 'POST', headers, body: JSON.stringify(body) }
   },
   pageTools: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentTool>>>('api/platform/agents/tools', { params }),
-  pageToolCandidates: (params: Record<string, unknown>) => systemClient.get<unknown, ApiResponse<PageResult<AgentToolCandidate>>>('api/platform/agents/tools/available', { params }),
+  pageToolCandidates: (params: AgentToolCandidateParams) => systemClient.get<unknown, ApiResponse<PageResult<AgentToolCandidate>>>('api/platform/agents/tools/available', { params }),
   catalog: () => systemClient.get<unknown, ApiResponse<AgentCatalog>>('api/platform/agents/catalog'),
   models: () => systemClient.get<unknown, ApiResponse<AgentModelOption[]>>('api/platform/agents/models'),
   systemTools: () => systemClient.get<unknown, ApiResponse<SystemAgentTool[]>>('api/platform/agents/tools/system'),
