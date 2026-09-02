@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AgentFlowNode, AgentNodeData } from './types'
-import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import AgentJsonCodeEditor from './AgentJsonCodeEditor.vue'
 import { agentModelKind, extractOutputSchemaDefault, isAgentChatModelNode, isAgentToolConfigModelNode } from '../config/agent-node-data'
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   node: AgentFlowNode
   systemTools: SystemAgentTool[]
   customTools: AgentTool[]
+  toolFetcher: (query: YdTablePickerQuery) => Promise<YdTablePickerResult<AgentToolCandidate>>
   models: AgentModelOption[]
   knowledgeSpaces: AgentKnowledgeSpaceOption[]
 }>()
@@ -18,7 +20,19 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const toolSearch = ref('')
+const toolColumns: TableColumn<AgentToolCandidate>[] = [
+  { accessorKey: 'name', header: '工具名称', minWidth: 180 },
+  { accessorKey: 'code', header: '编码', minWidth: 180 },
+  { accessorKey: 'source', header: '来源', width: 100 },
+]
+
+const toolInitialLabels = computed<Record<string, string>>(() => {
+  const labels: Record<string, string> = {}
+  for (const tool of [...props.systemTools, ...props.customTools]) {
+    labels[tool.code] = `${tool.name} (${tool.code})`
+  }
+  return labels
+})
 const toolModeOptions = [
   { label: '禁用工具', value: 'NONE' },
   { label: '模型自主调用', value: 'AUTO' },
@@ -26,11 +40,8 @@ const toolModeOptions = [
 ]
 
 const modelToolOptions = computed(() => {
-  const keyword = toolSearch.value.trim().toLocaleLowerCase()
-  const matches = (tool: { name: string, code: string, description?: string }) => !keyword
-    || `${tool.name} ${tool.code} ${tool.description || ''}`.toLocaleLowerCase().includes(keyword)
-  const system = props.systemTools.filter(matches).map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))
-  const custom = props.customTools.filter(matches).map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))
+  const system = props.systemTools.map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))
+  const custom = props.customTools.map(tool => ({ label: `${tool.name} (${tool.code})`, value: tool.code }))
   return [
     ...(system.length ? [{ label: '系统工具', options: system }] : []),
     ...(custom.length ? [{ label: '自定义 Python 工具', options: custom }] : []),
@@ -202,18 +213,20 @@ function changeClasses(value: unknown) {
         </label>
         <label class="form-field" :class="{ disabled: node.data.toolMode === 'NONE' }">
           <span>可用工具</span>
-          <FaInput v-model="toolSearch" class="w-full" placeholder="搜索系统工具或 Python 工具" :disabled="node.data.toolMode === 'NONE'" />
-          <FaSelect
+          <YdTablePicker
             :model-value="node.data.toolCodes"
             class="w-full"
-            multiple
             :disabled="node.data.toolMode === 'NONE'"
-            :options="modelToolOptions"
-            placeholder="按分组选择此模型可调用的工具"
+            :columns="toolColumns"
+            :fetcher="toolFetcher"
+            row-key="code"
+            label-key="name"
+            :initial-labels="toolInitialLabels"
+            title="选择可用工具"
+            placeholder="按名称或编码选择工具"
             @update:model-value="changeToolCodes"
           />
           <small v-if="node.data.toolMode === 'NONE'">当前模型不会调用工具。</small>
-          <small v-else-if="!modelToolOptions.length" class="field-error">没有匹配的已启用工具，请调整搜索条件或先在工具页启用工具。</small>
           <small v-else>应用授权会从所有模型节点的选择自动汇总。</small>
         </label>
       </section>

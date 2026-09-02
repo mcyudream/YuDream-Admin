@@ -14,8 +14,10 @@ import online.yudream.base.application.platform.agent.dto.AgentDebugEventDTO;
 import online.yudream.base.application.platform.agent.dto.AgentKnowledgeSpaceDTO;
 import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
+import online.yudream.base.application.platform.agent.dto.AgentToolCandidateDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
+import online.yudream.base.application.platform.agent.query.AgentToolCandidatePageQuery;
 import online.yudream.base.application.platform.agent.query.AgentToolPageQuery;
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowValidator;
 import online.yudream.base.application.platform.agent.workflow.AgentWorkflowToolCodes;
@@ -32,6 +34,7 @@ import online.yudream.base.domain.platform.agent.repo.AgentToolRepo;
 import online.yudream.base.domain.platform.agent.service.AgentPermissionGateway;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
+import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -182,6 +185,53 @@ public class AgentAppService {
         );
     }
 
+    @Transactional(readOnly = true)
+    public PageResult<AgentToolCandidateDTO> pageToolCandidates(AgentToolCandidatePageQuery query) {
+        ensureEnabled();
+        Map<String, AgentToolCandidateDTO> candidates = new java.util.LinkedHashMap<>();
+        toolRepo.page(null, 1, 10000).getRecords().stream()
+                .filter(tool -> Boolean.TRUE.equals(tool.getEnabled()))
+                .map(AgentAssembler::toCandidate)
+                .forEach(candidate -> candidates.put(candidate.getCode(), candidate));
+        systemToolProvider.stream()
+                .map(AiAgentTool::descriptor)
+                .map(descriptor -> toCandidate(descriptor, "system"))
+                .forEach(candidate -> candidates.putIfAbsent(candidate.getCode(), candidate));
+        pluginToolGateways.stream()
+                .flatMap(gateway -> gateway.pluginTools().stream())
+                .filter(Objects::nonNull)
+                .map(descriptor -> toCandidate(descriptor, "plugin"))
+                .forEach(candidate -> candidates.putIfAbsent(candidate.getCode(), candidate));
+
+        String keyword = query.getKeyword() == null ? "" : query.getKeyword().trim().toLowerCase();
+        List<AgentToolCandidateDTO> filtered = candidates.values().stream()
+                .filter(candidate -> keyword.isBlank()
+                        || contains(candidate.getName(), keyword)
+                        || contains(candidate.getCode(), keyword)
+                        || contains(candidate.getDescription(), keyword))
+                .sorted(java.util.Comparator.comparing(AgentToolCandidateDTO::getName, String.CASE_INSENSITIVE_ORDER)
+                        .thenComparing(AgentToolCandidateDTO::getCode, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        int page = Math.max(1, query.getPage());
+        int size = Math.max(1, Math.min(200, query.getSize()));
+        int start = Math.min((page - 1) * size, filtered.size());
+        int end = Math.min(start + size, filtered.size());
+        return new PageResult<>(filtered.subList(start, end), filtered.size(), page, size);
+    }
+
+    private AgentToolCandidateDTO toCandidate(AiAgentToolDescriptor descriptor, String source) {
+        return AgentToolCandidateDTO.builder()
+                .code(descriptor.name())
+                .name(descriptor.title() == null || descriptor.title().isBlank() ? descriptor.name() : descriptor.title())
+                .description(descriptor.description() == null ? "" : descriptor.description())
+                .permissionCode(descriptor.permissionCode() == null ? "" : descriptor.permissionCode())
+                .source(source)
+                .build();
+    }
+
+    private boolean contains(String value, String keyword) {
+        return value != null && value.toLowerCase().contains(keyword);
+    }
     @Transactional(readOnly = true)
     public AgentToolDTO toolDetail(Long id) {
         ensureEnabled();

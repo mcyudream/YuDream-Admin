@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.platform.agent.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.query.AgentPageQuery;
+import online.yudream.base.application.platform.agent.query.AgentToolCandidatePageQuery;
 import online.yudream.base.application.platform.agent.query.AgentToolPageQuery;
 import online.yudream.base.application.platform.agent.service.AgentAppService;
 import online.yudream.base.domain.common.PageResult;
@@ -17,6 +18,7 @@ import online.yudream.base.interfaces.platform.agent.res.AgentCatalogRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentDebugEventRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentModelRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentToolCandidateRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.beans.factory.annotation.Value;
@@ -137,6 +139,9 @@ public class AgentController {
     @GetMapping("/tools")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看 Agent 工具", module = "平台能力", desc = "查看自定义 Agent 工具")
     public Result<PageResult<AgentToolRes>> tools(AgentToolPageQuery query) { return Result.ok(AgentWebAssembler.toToolPage(agentAppService.pageTools(query))); }
+    @GetMapping("/tools/available")
+    @PermissionRegister(code = "platform:agent:tool:view", name = "查看可用 Agent 工具", module = "平台能力", desc = "分页查看系统、插件与 Python 工具")
+    public Result<PageResult<AgentToolCandidateRes>> availableTools(AgentToolCandidatePageQuery query) { return Result.ok(AgentWebAssembler.toToolCandidatePage(agentAppService.pageToolCandidates(query))); }
     @GetMapping("/tools/system")
     @PermissionRegister(code = "platform:agent:tool:view", name = "查看系统 Agent 工具", module = "平台能力", desc = "查看系统提供的 Agent 工具")
     public Result<List<Map<String, Object>>> systemTools() { return Result.ok(agentAppService.systemTools()); }
