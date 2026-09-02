@@ -14,6 +14,7 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
+import online.yudream.base.plugin.spi.system.form.PluginFormService;
 
 import java.util.Optional;
 
@@ -32,6 +33,15 @@ public interface FrameworkServices {
     PluginMailService mail();
 
     PluginWordTemplateService wordTemplates();
+
+    /**
+     * 动态表单能力端口：查询平台已发布表单、核验用户提交记录。
+     * 默认实现表示宿主未提供该能力（enabled() 恒 false、查询为空）。
+     */
+    default PluginFormService forms() {
+        return new PluginFormService() {
+        };
+    }
 
     PluginDocumentStore documents(String pluginCode);
 

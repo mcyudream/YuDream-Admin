@@ -1,6 +1,6 @@
 # 框架能力端口 FrameworkServices
 
-> SPI v1（2.13.0）· 包 `online.yudream.base.plugin.spi.system`
+> SPI v1（2.14.0）· 包 `online.yudream.base.plugin.spi.system`
 
 `context.framework()` 返回 `FrameworkServices`，是插件访问宿主稳定能力的唯一入口。**需要新能力时先扩展 SPI 端口/DTO 再由宿主实现适配，禁止直接引用宿主 Spring Bean 或仓储实现。** 用途化资源图投影由 `context.graph()` 提供，不属于 `FrameworkServices`；运行时绑定可信插件 scope。除兼容的显式 `tableCode` 接口外，插件可调用无 `tableCode` 的自动绑定读写与完整闭合快照接口；宿主只会解析唯一 ACTIVE 且已授权的逻辑图表，没有或不唯一时受控失败。完整快照限制为 20,000 个节点、50,000 条关系和 8 MiB，超限返回 `PROJECTION_LIMIT_EXCEEDED`。`context.graph()` 禁止读取环境变量或在插件内自行创建 Neo4j `Driver`。详见 [GraphSpi](/plugin/spi/v1/graph)。
 
@@ -16,6 +16,7 @@
 | `security()` | `PluginSecurityService` | 权限校验 |
 | `mail()` | `PluginMailService` | 邮件发送 |
 | `wordTemplates()` | `PluginWordTemplateService` | Word 模板渲染 |
+| `forms()` | `default PluginFormService` | 动态表单：已发布表单搜索、按 code 取摘要、提交核验；宿主未提供时 `enabled()` 恒 false |
 | `documents(pluginCode)` | `PluginDocumentStore` | 插件作用域文档存储 |
 | `files(pluginCode)` | `PluginFileStore` | 插件作用域二进制文件存储 |
 | `secrets(pluginCode)` | `default PluginSecretStore` | 密钥存取；宿主未开启时抛 `UnsupportedOperationException` |
@@ -99,6 +100,17 @@ void delete(String objectKey);
 | `render(templateContent, data)` | `PluginRenderedDocument render(byte[], Map<String,Object>)` | 用模板字节流渲染，占位符来自 data |
 
 `PluginRenderedDocument(byte[] content, String contentType)`；`PluginWordTemplateSummary(id, code, name, originalFilename, updatedAt)`。按模板 ID 渲染是否支持取决于宿主实现，默认抛 `IllegalArgumentException`。
+
+## form（动态表单）
+
+| 方法 | 签名 | 说明 |
+|---|---|---|
+| `enabled()` | `default boolean enabled()` | 能力 `form` 是否可用（默认恒 false） |
+| `publishedForms(keyword, page, size)` | `default List<PluginDynamicFormSummary>` | 分页搜索已发布表单，供 options/selector |
+| `formByCode(code)` | `default Optional<PluginDynamicFormSummary>` | 按 code 取表单摘要（不限状态） |
+| `submittedBy(formCode, submitterId, from, to)` | `default boolean` | 核验用户是否在 epoch 毫秒时间窗口内提交过该表单；任一端 ≤ 0 表示不限制 |
+
+`PluginDynamicFormSummary(id, code, name, description, status, publishedAt)`。能力 code 为 `form`，未启用时查询方法抛 `IllegalArgumentException`。详见 [动态表单 FormSpi](/plugin/spi/v1/form)。
 
 ## mail
 

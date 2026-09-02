@@ -6,6 +6,10 @@ import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.document.aggregate.WordTemplate;
 import online.yudream.base.domain.platform.document.enumerate.TemplateStatus;
 import online.yudream.base.domain.platform.document.repo.WordTemplateRepo;
+import online.yudream.base.domain.platform.form.aggregate.DynamicForm;
+import online.yudream.base.domain.platform.form.enumerate.DynamicFormStatus;
+import online.yudream.base.domain.platform.form.repo.DynamicFormRepo;
+import online.yudream.base.domain.platform.form.repo.FormSubmissionRepo;
 import online.yudream.base.domain.system.file.service.ObjectStorage;
 import online.yudream.base.domain.system.file.aggregate.FileObject;
 import online.yudream.base.domain.system.file.repo.FileObjectRepo;
@@ -18,6 +22,8 @@ import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.document.PluginRenderedDocument;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateSummary;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateService;
+import online.yudream.base.plugin.spi.system.form.PluginDynamicFormSummary;
+import online.yudream.base.plugin.spi.system.form.PluginFormService;
 import online.yudream.base.plugin.spi.system.mail.PluginMailService;
 import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
@@ -38,6 +44,7 @@ import org.springframework.util.StringUtils;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -51,6 +58,7 @@ import java.util.concurrent.ConcurrentMap;
 public class DefaultFrameworkServices implements FrameworkServices {
 
     private static final String WORD_TEMPLATE_CAPABILITY_CODE = "document-template";
+    private static final String FORM_CAPABILITY_CODE = "form";
 
     private final PluginUserService pluginUserService;
     private final PluginQqBindingService pluginQqBindingService;
@@ -65,6 +73,8 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final ObjectStorage objectStorage;
     private final WordTemplateRenderer wordTemplateRenderer;
     private final WordTemplateRepo wordTemplateRepo;
+    private final DynamicFormRepo dynamicFormRepo;
+    private final FormSubmissionRepo formSubmissionRepo;
     private final FileObjectRepo fileObjectRepo;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final SettingRepo settingRepo;
@@ -129,6 +139,31 @@ public class DefaultFrameworkServices implements FrameworkServices {
             @Override
             public PluginRenderedDocument render(Long templateId, Map<String, Object> data) {
                 return renderWordTemplate(templateId, data);
+            }
+        };
+    }
+
+    @Override
+    public PluginFormService forms() {
+        return new PluginFormService() {
+            @Override
+            public boolean enabled() {
+                return formEnabled();
+            }
+
+            @Override
+            public List<PluginDynamicFormSummary> publishedForms(String keyword, int page, int size) {
+                return publishedFormList(keyword, page, size);
+            }
+
+            @Override
+            public Optional<PluginDynamicFormSummary> formByCode(String code) {
+                return dynamicFormByCode(code);
+            }
+
+            @Override
+            public boolean submittedBy(String formCode, Long submitterId, long fromEpochMillis, long toEpochMillis) {
+                return formSubmittedBy(formCode, submitterId, fromEpochMillis, toEpochMillis);
             }
         };
     }
@@ -272,6 +307,62 @@ public class DefaultFrameworkServices implements FrameworkServices {
 
     private boolean activeTemplate(WordTemplate template) {
         return template != null && template.getStatus() == TemplateStatus.ACTIVE;
+    }
+
+    private List<PluginDynamicFormSummary> publishedFormList(String keyword, int page, int size) {
+        ensureFormEnabled();
+        PageResult<DynamicForm> forms = dynamicFormRepo.page(keyword, DynamicFormStatus.PUBLISHED,
+                Math.max(page, 1), Math.max(Math.min(size <= 0 ? 20 : size, 200), 1));
+        return forms.getRecords().stream()
+                .map(this::toFormSummary)
+                .toList();
+    }
+
+    private Optional<PluginDynamicFormSummary> dynamicFormByCode(String code) {
+        if (!StringUtils.hasText(code)) {
+            return Optional.empty();
+        }
+        ensureFormEnabled();
+        return dynamicFormRepo.findByCode(code.trim())
+                .map(this::toFormSummary);
+    }
+
+    private boolean formSubmittedBy(String formCode, Long submitterId, long fromEpochMillis, long toEpochMillis) {
+        if (!StringUtils.hasText(formCode) || submitterId == null) {
+            return false;
+        }
+        ensureFormEnabled();
+        return formSubmissionRepo.existsByFormCodeAndSubmitterIdAndSubmittedAtBetween(
+                formCode.trim(), submitterId, epochToLocalDateTime(fromEpochMillis), epochToLocalDateTime(toEpochMillis));
+    }
+
+    private PluginDynamicFormSummary toFormSummary(DynamicForm form) {
+        return new PluginDynamicFormSummary(
+                form.getId(),
+                form.getCode(),
+                form.getName(),
+                form.getDescription(),
+                form.getStatus() == null ? null : form.getStatus().name(),
+                epochMillis(form.getPublishedAt())
+        );
+    }
+
+    private void ensureFormEnabled() {
+        if (!formEnabled()) {
+            throw new IllegalArgumentException("动态表单能力未启用，请先在能力管理中启用 form");
+        }
+    }
+
+    private boolean formEnabled() {
+        return capabilityModuleRepo.findByCode(FORM_CAPABILITY_CODE)
+                .map(module -> Boolean.TRUE.equals(module.getEnabled()))
+                .orElse(false);
+    }
+
+    private LocalDateTime epochToLocalDateTime(long epochMillisValue) {
+        return epochMillisValue <= 0
+                ? null
+                : LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillisValue), ZoneId.systemDefault());
     }
 
     private void ensureWordTemplateEnabled() {

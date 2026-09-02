@@ -17,4 +17,9 @@ public interface FormSubmissionRepo {
     long countByFormId(Long formId);
 
     long countByFormIdAndSubmittedAtAfter(Long formId, LocalDateTime time);
+
+    /**
+     * 判断指定用户是否在时间窗口内提交过指定表单（按表单 code）。from/to 为 null 表示该端不限制。
+     */
+    boolean existsByFormCodeAndSubmitterIdAndSubmittedAtBetween(String formCode, Long submitterId, LocalDateTime from, LocalDateTime to);
 }
