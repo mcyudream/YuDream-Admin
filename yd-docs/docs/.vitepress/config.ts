@@ -94,6 +94,7 @@ const spiV1Items = [
   { text: '对象存储 StorageSpi', link: '/plugin/spi/v1/storage' },
   { text: '邮件 MailSpi', link: '/plugin/spi/v1/mail' },
   { text: '文档渲染 DocumentRender', link: '/plugin/spi/v1/document-render' },
+  { text: '动态表单 FormSpi', link: '/plugin/spi/v1/form' },
   { text: 'AI 能力 AiSpi', link: '/plugin/spi/v1/ai' },
   { text: '图数据库 GraphSpi', link: '/plugin/spi/v1/graph' },
   { text: '消息与 Milky MessagingSpi', link: '/plugin/spi/v1/messaging' },

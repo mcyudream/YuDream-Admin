@@ -19,6 +19,7 @@ online.yudream.base.plugin.spi
 │   ├── secret            密钥存储
 │   ├── mail              邮件发送
 │   ├── document          Word 文档模板渲染
+│   ├── form              动态表单（已发布表单查询与提交核验）
 │   ├── render            HTML/Markdown 渲染成图 + Thymeleaf 模板截图
 │   ├── ai                AI 对话 / Agent / 自定义工具
 │   ├── graph             图数据库（经 PluginContext.graph() 使用平台 Neo4j）
@@ -42,6 +43,7 @@ online.yudream.base.plugin.spi
 | [storage](/plugin/spi/v1/storage) | 文档/文件/密钥三类作用域存储 | `context.documents()/files()/secrets()` |
 | [mail](/plugin/spi/v1/mail) | 邮件发送（文本/HTML/抄送密送） | `framework().mail()` |
 | [document-render](/plugin/spi/v1/document-render) | Word 模板、渲染成图、Thymeleaf | `framework().wordTemplates()` 等 |
+| [form](/plugin/spi/v1/form) | 动态表单：已发布表单查询、提交核验 | `framework().forms()` |
 | [ai](/plugin/spi/v1/ai) | AI 对话、Agent 调用、自定义 AI 工具 | `framework().ai()`、`registerAiTool` |
 | [messaging](/plugin/spi/v1/messaging) | 消息发送、事件订阅、按钮/命令回调 | `framework().messaging()`、`context.interactions()` |
 | [command](/plugin/spi/v1/command) | 命令注册与分发 | `context.commands()` |

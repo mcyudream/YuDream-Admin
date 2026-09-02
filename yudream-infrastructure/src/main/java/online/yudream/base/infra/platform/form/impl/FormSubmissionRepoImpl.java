@@ -70,6 +70,22 @@ public class FormSubmissionRepoImpl implements FormSubmissionRepo {
         return mongoTemplate.count(query, FormSubmissionDO.class);
     }
 
+    @Override
+    public boolean existsByFormCodeAndSubmitterIdAndSubmittedAtBetween(String formCode, Long submitterId, LocalDateTime from, LocalDateTime to) {
+        Query query = Query.query(Criteria.where("formCode").is(formCode).and("submitterId").is(submitterId));
+        if (from != null || to != null) {
+            Criteria window = Criteria.where("submittedAt");
+            if (from != null) {
+                window = window.gte(from);
+            }
+            if (to != null) {
+                window = window.lte(to);
+            }
+            query.addCriteria(window);
+        }
+        return mongoTemplate.exists(query, FormSubmissionDO.class);
+    }
+
     private Query formQuery(Long formId) {
         return Query.query(Criteria.where("formId").is(formId));
     }
