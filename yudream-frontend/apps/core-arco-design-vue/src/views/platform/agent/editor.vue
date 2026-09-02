@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Connection, Edge } from '@vue-flow/core'
 import type { AgentConnectionStyle, AgentDebugAttachment, AgentDebugMessage, AgentDebugStatus, AgentFlowEdgeView, AgentFlowNode, AgentNodeData, AgentNodeKind, AgentNodeTemplate } from './components/types'
-import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { AgentApplicationPayload, AgentDebugStreamEvent, AgentKnowledgeSpaceOption, AgentModelOption, AgentTool, AgentToolCandidate, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MarkerType, useVueFlow, VueFlow } from '@vue-flow/core'
@@ -94,6 +95,10 @@ onBeforeUnmount(() => {
   debugAbortController?.abort()
 })
 
+async function fetchToolCandidates(query: YdTablePickerQuery): Promise<YdTablePickerResult<AgentToolCandidate>> {
+  const page = (await apiAgent.pageToolCandidates(query)).data
+  return { list: page.records, total: page.total }
+}
 async function loadTools() {
   try {
     const [result, system] = await Promise.all([apiAgent.pageTools({ page: 1, size: 200 }), apiAgent.systemTools()])
@@ -104,6 +109,7 @@ async function loadTools() {
     toast.error('加载 Agent 工具失败')
   }
 }
+
 
 async function loadCatalog() {
   try {
@@ -813,6 +819,7 @@ function validateCurrentWorkflow() {
         :node="selectedNode"
         :system-tools="systemTools"
         :custom-tools="customTools"
+        :tool-fetcher="fetchToolCandidates"
         :models="agentModels"
         :knowledge-spaces="knowledgeSpaces"
         @update="updateSelectedNode"
