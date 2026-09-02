@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { DeptManageItem, DeptPayload, DeptStatus } from '@/api/modules/system-dept'
+import type { UserManageItem, UserPickerRow } from '@/api/modules/system-user'
 import apiDept from '@/api/modules/system-dept'
+import apiUser from '@/api/modules/system-user'
 import apiExcel from '@/api/modules/system-excel'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
 
@@ -31,12 +33,29 @@ const statusOptions = [
 const deptOptions = computed(() => flattenDepts(rows.value)
   .filter(item => String(item.id) !== String(editing.value?.id ?? ''))
   .map(item => ({ label: item.name, value: item.id })))
-const leaderIdValue = computed({
-  get: () => form.leaderId === undefined ? '' : String(form.leaderId),
-  set: (value: string) => {
-    form.leaderId = value || undefined
-  },
+const leaderColumns: TableColumn<UserPickerRow>[] = [
+  { accessorKey: 'nickname', header: '姓名', minWidth: 140 },
+  { accessorKey: 'username', header: '账号', minWidth: 160 },
+]
+
+const leaderPickerValue = computed<string[]>({
+  get: () => form.leaderId ? [String(form.leaderId)] : [],
+  set: (value) => { form.leaderId = value[0] || undefined },
 })
+
+const leaderInitialLabels = computed<Record<string, string>>(() => {
+  const id = form.leaderId ? String(form.leaderId) : ''
+  const name = editing.value?.leaderName
+  return id && name ? { [id]: name } : {}
+})
+
+async function fetchLeaders(query: YdTablePickerQuery): Promise<YdTablePickerResult<UserPickerRow>> {
+  const result = (await apiUser.page({ page: query.page, size: query.size, keyword: query.keyword })).data
+  return {
+    list: result.records.map((user: UserManageItem) => ({ id: String(user.id), username: user.username, nickname: user.nickname || user.username })),
+    total: result.total,
+  }
+}
 const sortOrderValue = computed({
   get: () => form.sortOrder ?? 0,
   set: (value: number) => {
@@ -321,7 +340,17 @@ function importDepts() {
           </a-grid-item>
           <a-grid-item>
             <a-form-item label="负责人ID">
-              <FaInput v-model="leaderIdValue" class="w-full" />
+              <YdTablePicker
+                v-model="leaderPickerValue"
+                :columns="leaderColumns"
+                :fetcher="fetchLeaders"
+                row-key="id"
+                label-key="nickname"
+                :multiple="false"
+                :initial-labels="leaderInitialLabels"
+                title="选择部门负责人"
+                placeholder="请选择负责人"
+              />
             </a-form-item>
           </a-grid-item>
           <a-grid-item>
