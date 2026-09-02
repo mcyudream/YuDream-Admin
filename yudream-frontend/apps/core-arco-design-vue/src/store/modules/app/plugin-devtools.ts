@@ -275,6 +275,12 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
         if (signal.aborted || error?.name === 'AbortError') {
           return
         }
+        // 登录态失效（401/403）时继续重连只会空转刷错：停流并复位 started，
+        // 重新登录后布局重新挂载 connect() 会再次启动双流
+        if (error?.status === 401 || error?.status === 403) {
+          started = false
+          return
+        }
       }
       if (!signal.aborted) {
         await new Promise(resolve => setTimeout(resolve, RECONNECT_DELAY_MS))
@@ -290,7 +296,9 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     }
     const response = await fetch(url, { headers, signal })
     if (!response.ok || !response.body) {
-      throw new Error(`事件流连接失败（HTTP ${response.status}）`)
+      const error: any = new Error(`事件流连接失败（HTTP ${response.status}）`)
+      error.status = response.status
+      throw error
     }
 
     const reader = response.body.getReader()
