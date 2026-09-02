@@ -73,8 +73,8 @@ public class GraphConnectionRepoImpl implements GraphConnectionRepo {
     }
 
     @Override
-    public PageResult<GraphConnection> page(String keyword, int page, int size) {
-        Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
+    public PageResult<GraphConnection> page(String keyword, GraphConnectionStatus status, int page, int size) {
+        Query query = query(keyword, status).with(Sort.by(Sort.Direction.DESC, "createTime"));
         long total = mongoTemplate.count(query, GraphConnectionDO.class);
         int currentPage = Math.max(page, 1);
         int pageSize = Math.max(size, 1);
@@ -87,8 +87,11 @@ public class GraphConnectionRepoImpl implements GraphConnectionRepo {
         );
     }
 
-    private Query query(String keyword) {
+    private Query query(String keyword, GraphConnectionStatus status) {
         Query query = new Query();
+        if (status != null) {
+            query.addCriteria(Criteria.where("status").is(status));
+        }
         if (StringUtils.hasText(keyword)) {
             String pattern = ".*" + Pattern.quote(keyword.trim()) + ".*";
             query.addCriteria(new Criteria().orOperator(

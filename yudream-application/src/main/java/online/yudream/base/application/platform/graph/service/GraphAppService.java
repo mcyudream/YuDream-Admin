@@ -26,7 +26,7 @@ public class GraphAppService {
     private static final String GRAPH_CAPABILITY_CODE="neo4j";
     private final CapabilityAppService capabilityAppService; private final GraphConnectionRepo graphConnectionRepo;
     private final GraphQueryLogRepo graphQueryLogRepo; private final GraphDatabaseGateway graphDatabaseGateway;
-    @Transactional(readOnly=true) public PageResult<GraphConnectionDTO> pageTables(GraphPageQuery q){ensureGraphEnabled();PageResult<GraphConnection>p=graphConnectionRepo.page(q.getKeyword(),q.getPage(),q.getSize());return new PageResult<>(p.getRecords().stream().map(GraphAssembler::toDTO).toList(),p.getTotal(),p.getPage(),p.getSize());}
+    @Transactional(readOnly=true) public PageResult<GraphConnectionDTO> pageTables(GraphPageQuery q){ensureGraphEnabled();PageResult<GraphConnection>p=graphConnectionRepo.page(q.getKeyword(),q.getStatus(),q.getPage(),q.getSize());return new PageResult<>(p.getRecords().stream().map(GraphAssembler::toDTO).toList(),p.getTotal(),p.getPage(),p.getSize());}
     @Transactional public GraphConnectionDTO saveTable(GraphConnectionSaveCmd cmd){ensureGraphEnabled();GraphConnection table=cmd.getId()==null?create(cmd):table(cmd.getId());table.update(cmd.getName(),cmd.getDescription(),cmd.getStatus());table.replaceAuthorizedPlugins(plugins(cmd.getAuthorizedPluginCodes()));return GraphAssembler.toDTO(graphConnectionRepo.save(table));}
     @Transactional public void disableTable(Long id){ensureGraphEnabled();GraphConnection t=table(id);t.disable();graphConnectionRepo.save(t);}
     @Transactional public void enableTable(Long id){ensureGraphEnabled();GraphConnection t=table(id);t.activate();graphConnectionRepo.save(t);}

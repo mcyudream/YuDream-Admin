@@ -67,6 +67,8 @@ declare module 'vue' {
     FaTooltip: typeof import('@yudream/components')['FaTooltip']
     FaTrend: typeof import('@yudream/components')['FaTrend']
     YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
+    YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
+    YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
   }
 }
 
@@ -127,4 +129,6 @@ declare global {
   const FaTooltip: typeof import('@yudream/components')['FaTooltip']
   const FaTrend: typeof import('@yudream/components')['FaTrend']
   const YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
+  const YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
+  const YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
 }

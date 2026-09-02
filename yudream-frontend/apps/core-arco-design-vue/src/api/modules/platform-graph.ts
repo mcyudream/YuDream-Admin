@@ -3,7 +3,7 @@ import systemClient from './system-client'
 
 export type GraphTableStatus = 'ACTIVE' | 'DISABLED'
 export type GraphQueryStatus = 'SUCCESS' | 'FAILED'
-export interface GraphPageParams { page: number; size: number; keyword?: string }
+export interface GraphPageParams { page: number; size: number; keyword?: string; status?: GraphTableStatus }
 export interface GraphTable { id: string; name: string; code: string; description?: string; status: GraphTableStatus; authorizedPluginCodes?: string[]; createTime?: string; updateTime?: string }
 export interface GraphTablePayload { name: string; code: string; description?: string; status: GraphTableStatus; authorizedPluginCodes?: string[] }
 export interface GraphQueryLog { id: string; tableId: string; tableCode: string; cypher: string; params: Record<string, unknown>; rows: Record<string, unknown>[]; summary?: string; durationMillis: number; status: GraphQueryStatus; errorMessage?: string; executedAt?: string }

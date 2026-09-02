@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type { AgentModelOption } from '@/api/modules/platform-agent'
 import type { GraphTable } from '@/api/modules/platform-graph'
 import type { WikiSpace } from '@/api/modules/platform-wiki'
@@ -18,10 +19,27 @@ const models = ref<AgentModelOption[]>([])
 const catalogLoading = ref(false)
 const graphTables = ref<GraphTable[]>([])
 
-// 图表必须显式选择，避免任何未隔离的默认范围。
-const graphTableOptions = computed(() => graphTables.value
-  .filter(table => table.status === 'ACTIVE')
-  .map(table => ({ label: `${table.name}（${table.code}）`, value: table.code })))
+const graphTableColumns: TableColumn<GraphTable>[] = [
+  { accessorKey: 'name', header: '图表名称', minWidth: 180 },
+  { accessorKey: 'code', header: '编码', minWidth: 180 },
+  { accessorKey: 'status', header: '状态', width: 100 },
+]
+
+const graphTableValue = computed<string[]>({
+  get: () => form.value.graphTableCode ? [form.value.graphTableCode] : [],
+  set: (value) => { form.value.graphTableCode = value[0] || undefined },
+})
+
+const graphTableInitialLabels = computed<Record<string, string>>(() => {
+  const selected = graphTables.value.find(table => table.code === form.value.graphTableCode)
+  return selected ? { [selected.code]: `${selected.name}（${selected.code}）` } : {}
+})
+
+async function fetchGraphTables(query: YdTablePickerQuery): Promise<YdTablePickerResult<GraphTable>> {
+  const result = (await apiGraph.pageTables({ ...query, status: 'ACTIVE' })).data
+  return { list: result.records, total: result.total }
+}
+
 
 watch(() => store.space.value, (space) => {
   form.value = space ? { ...space } : {}
@@ -285,7 +303,17 @@ onMounted(loadGraphTables)
             </label>
             <label class="set-field set-field--full">
               <span>逻辑图表（Neo4j）</span>
-              <FaSelect v-model="form.graphTableCode" :options="graphTableOptions" placeholder="请选择逻辑图表" />
+              <YdTablePicker
+                v-model="graphTableValue"
+                :columns="graphTableColumns"
+                :fetcher="fetchGraphTables"
+                row-key="code"
+                label-key="name"
+                :multiple="false"
+                :initial-labels="graphTableInitialLabels"
+                title="选择逻辑图表"
+                placeholder="请选择逻辑图表"
+              />
               <small class="set-hint">向量索引与知识图谱必须写入所选逻辑图表；未选择时不允许索引，图表在「平台 → 图数据库」维护。</small>
             </label>
             <label class="set-field">
