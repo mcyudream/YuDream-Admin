@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
-import type { MenuManageItem, MenuNodeType, MenuPayload, MenuSource, MenuStatus } from '@/api/modules/system-menu'
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
+import type { MenuCandidate, MenuManageItem, MenuNodeType, MenuPayload, MenuSource, MenuStatus } from '@/api/modules/system-menu'
 import apiExcel from '@/api/modules/system-excel'
 import apiMenu from '@/api/modules/system-menu'
 import { refreshDynamicRoutes } from '@/router/dynamic'
@@ -76,19 +76,31 @@ const selectedActualParentLabel = computed(() => {
     : selectedMenu.value.parentCode
 })
 
-const parentOptions = computed(() => {
-  const disabledCodes = editing.value ? new Set([editing.value.code, ...collectDescendantCodes(editing.value)]) : new Set<string>()
-  const allowPluginParents = editing.value?.source === 'PLUGIN'
-  const options = flattenMenus(rows.value)
-    .filter(item => item.type !== 'BUTTON' && item.type !== 'LINK')
-    .filter(item => allowPluginParents || item.source !== 'PLUGIN')
-    .filter(item => !disabledCodes.has(item.code))
-    .map(item => ({
-      label: `${item.name} (${item.code})`,
-      value: item.code,
-    }))
-  return [{ label: ROOT_LABEL, value: '' }, ...options]
+const parentColumns: TableColumn<MenuCandidate>[] = [
+  { accessorKey: 'name', header: '菜单名称', minWidth: 180 },
+  { accessorKey: 'code', header: '编码', minWidth: 180 },
+  { accessorKey: 'module', header: '模块', width: 140 },
+]
+
+const parentPickerValue = computed<string[]>({
+  get: () => form.parentCode ? [form.parentCode] : [],
+  set: (value) => { form.parentCode = value[0] || undefined },
 })
+
+const parentInitialLabels = computed<Record<string, string>>(() => {
+  const parent = form.parentCode ? findMenu(rows.value, form.parentCode) : undefined
+  return parent ? { [parent.code]: `${parent.name} (${parent.code})` } : {}
+})
+
+async function fetchParentCandidates(query: YdTablePickerQuery): Promise<YdTablePickerResult<MenuCandidate>> {
+  const result = (await apiMenu.candidates({
+    ...query,
+    currentCode: editing.value?.code,
+    source: editing.value?.source === 'PLUGIN' ? undefined : 'SYSTEM',
+  })).data
+  return { list: result.records, total: result.total }
+}
+
 
 const sortValue = computed({
   get: () => form.sort ?? 0,
@@ -371,10 +383,6 @@ function findMenu(items: MenuManageItem[], code?: string): MenuManageItem | unde
     }
   }
   return undefined
-}
-
-function collectDescendantCodes(item: MenuManageItem): string[] {
-  return (item.children || []).flatMap(child => [child.code, ...collectDescendantCodes(child)])
 }
 
 async function exportMenus() {
@@ -705,7 +713,18 @@ function importMenus() {
           </a-grid-item>
           <a-grid-item>
             <a-form-item label="上级菜单">
-              <FaSelect v-model="form.parentCode" :options="parentOptions" placeholder="根节点" class="w-full" />
+              <YdTablePicker
+                v-model="parentPickerValue"
+                :columns="parentColumns"
+                :fetcher="fetchParentCandidates"
+                row-key="code"
+                label-key="name"
+                :multiple="false"
+                :initial-labels="parentInitialLabels"
+                title="选择父级菜单"
+                placeholder="根目录"
+                class="w-full"
+              />
             </a-form-item>
           </a-grid-item>
           <a-grid-item>
