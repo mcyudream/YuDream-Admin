@@ -70,6 +70,25 @@ public interface PluginContext {
 
     void registerAiTool(PluginAiTool tool);
 
+    /**
+     * 以默认优先级 0 注册一个扩展实现。扩展点接口 extensionPoint 可以由宿主
+     * （如 system/auth 下的契约）或 provider 插件的 *.api 包定义；实现会随
+     * 插件 disable/unload 自动从扩展管线移除，无需手工注销。
+     */
+    default <I> void registerExtension(Class<I> extensionPoint, I extension) {
+        registerExtension(extensionPoint, extension, 0);
+    }
+
+    /**
+     * 注册一个扩展实现并指定优先级，数值越小越先被消费（同优先级按注册先后）。
+     */
+    <I> void registerExtension(Class<I> extensionPoint, I extension, int priority);
+
+    /**
+     * 查询某个扩展点当前全部已启用插件注册的实现，按优先级从小到大排序。
+     */
+    <I> List<I> extensions(Class<I> extensionPoint);
+
     <T> void exposeService(Class<T> serviceType, T service);
 
     <T> Optional<T> service(String pluginCode, Class<T> serviceType);

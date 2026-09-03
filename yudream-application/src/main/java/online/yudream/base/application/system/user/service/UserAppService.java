@@ -20,6 +20,8 @@ import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
+import online.yudream.base.domain.system.user.event.LoginSucceededDomainEvent;
+import online.yudream.base.domain.system.user.event.UserRegisteredDomainEvent;
 import online.yudream.base.domain.system.user.repo.DeptRepo;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
@@ -35,15 +37,28 @@ import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
 import online.yudream.base.domain.valobj.Phone;
 import online.yudream.base.domain.valobj.QQ;
+import online.yudream.base.plugin.spi.system.auth.ExtensionVeto;
+import online.yudream.base.plugin.spi.system.auth.IdentityVerificationMethod;
+import online.yudream.base.plugin.spi.system.auth.IdentityVerificationProvider;
+import online.yudream.base.plugin.spi.system.auth.IdentityVerificationResult;
+import online.yudream.base.plugin.spi.system.auth.LoginAttempt;
+import online.yudream.base.plugin.spi.system.auth.LoginInterceptor;
+import online.yudream.base.plugin.spi.system.auth.RegisterAttempt;
+import online.yudream.base.plugin.spi.system.auth.RegisterInterceptor;
+import online.yudream.base.plugin.spi.system.auth.VerificationSubject;
+import online.yudream.base.plugin.spi.system.extension.PluginExtensionQuery;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingCode;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -52,9 +67,13 @@ import java.util.Optional;
 @Service
 public class UserAppService {
 
+    /** 站点设置键：注册必需的身份核验方式编码（逗号分隔），为空表示不要求额外核验 */
+    public static final String REQUIRED_VERIFICATIONS_SETTING_KEY = "system.auth.registration.required-verifications";
+
     private final UserRepo userRepo;
     private final SettingRepo settingRepo;
     private final PluginQqBindingService pluginQqBindingService;
+    private final PluginExtensionQuery pluginExtensionQuery;
     private final RoleRepo roleRepo;
     private final DeptRepo deptRepo;
     private final PasswordEncoder passwordEncoder;
@@ -63,6 +82,7 @@ public class UserAppService {
     private final UserRegisterMailSender userRegisterMailSender;
     private final FileAppService fileAppService;
     private final ExternalLoginBindingAppService externalLoginBindingAppService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public User login(UserLoginCmd cmd) {
@@ -71,17 +91,21 @@ public class UserAppService {
 
     @Transactional
     public User login(UserLoginCmd cmd, String bindingToken) {
+        ensureLoginAllowed(cmd);
         User user = findLoginUser(cmd);
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
         }
         externalLoginBindingAppService.claim(bindingToken, user.getId());
         log.info("用户登录成功: id={}, username={}", user.getId(), user.getUsername());
+        eventPublisher.publishEvent(LoginSucceededDomainEvent.of(user.getId(), cmd.getUsername()));
         return user;
     }
 
     @Transactional
     public UserRegisterDTO register(UserRegisterCmd cmd) {
+        ensureRegisterAllowed(cmd);
+        ensureRequiredVerifications(cmd);
         if (userRepo.existsVerifiedByUsername(cmd.getUsername())) {
             throw new BizException("用户名已存在");
         }
@@ -113,7 +137,26 @@ public class UserAppService {
 
         log.info("用户注册成功: id={}, username={}, email={}, deptId={}, roleId={}",
                 saved.getId(), saved.getUsername(), email.getValue(), rootDept.getId(), userRole.getId());
+        eventPublisher.publishEvent(UserRegisteredDomainEvent.of(saved.getId(), saved.getUsername(), email.getValue()));
         return UserAssembler.toRegisterDTO(saved);
+    }
+
+    /**
+     * 当前可用的身份核验方式清单（注册页展示用），按 sort 升序。
+     * 单个提供器元数据读取异常时跳过该方式并记录日志，不影响其余方式。
+     */
+    @Transactional(readOnly = true)
+    public List<IdentityVerificationMethod> availableVerificationMethods() {
+        List<IdentityVerificationMethod> methods = new ArrayList<>();
+        for (IdentityVerificationProvider provider : pluginExtensionQuery.extensions(IdentityVerificationProvider.class)) {
+            try {
+                methods.add(provider.method());
+            } catch (RuntimeException e) {
+                log.warn("身份核验方式元数据读取失败: provider={}", provider.getClass().getName(), e);
+            }
+        }
+        methods.sort(Comparator.comparingInt(IdentityVerificationMethod::sort));
+        return List.copyOf(methods);
     }
 
     @Transactional
@@ -275,6 +318,84 @@ public class UserAppService {
         if (userRepo.existsByQQExcludeId(qq, userId)) throw new BizException("QQ 已被其他账号绑定");
         user.updateProfile(user.getNickname(), user.getEmail(), user.getPhone(), QQ.of(qq), null);
         userRepo.save(user);
+    }
+
+    private void ensureLoginAllowed(UserLoginCmd cmd) {
+        LoginAttempt attempt = new LoginAttempt(cmd == null ? null : cmd.getUsername(), Map.of());
+        for (LoginInterceptor interceptor : pluginExtensionQuery.extensions(LoginInterceptor.class)) {
+            ExtensionVeto veto;
+            try {
+                veto = interceptor.onBeforeLogin(attempt);
+            } catch (RuntimeException e) {
+                log.warn("登录拦截器执行异常: interceptor={}", interceptor.getClass().getName(), e);
+                throw new BizException("登录校验服务异常，请稍后再试");
+            }
+            if (veto != null && !veto.allowed()) {
+                throw new BizException(StringUtils.hasText(veto.reason()) ? veto.reason() : "当前账号不允许登录");
+            }
+        }
+    }
+
+    private void ensureRegisterAllowed(UserRegisterCmd cmd) {
+        RegisterAttempt attempt = new RegisterAttempt(cmd.getUsername(), cmd.getNickname(), cmd.getEmail(), Map.of());
+        for (RegisterInterceptor interceptor : pluginExtensionQuery.extensions(RegisterInterceptor.class)) {
+            ExtensionVeto veto;
+            try {
+                veto = interceptor.onBeforeRegister(attempt);
+            } catch (RuntimeException e) {
+                log.warn("注册拦截器执行异常: interceptor={}", interceptor.getClass().getName(), e);
+                throw new BizException("注册校验服务异常，请稍后再试");
+            }
+            if (veto != null && !veto.allowed()) {
+                throw new BizException(StringUtils.hasText(veto.reason()) ? veto.reason() : "当前账号不允许注册");
+            }
+        }
+    }
+
+    private void ensureRequiredVerifications(UserRegisterCmd cmd) {
+        List<String> requiredCodes = requiredVerificationCodes();
+        if (requiredCodes.isEmpty()) {
+            return;
+        }
+        List<IdentityVerificationProvider> providers = pluginExtensionQuery.extensions(IdentityVerificationProvider.class);
+        VerificationSubject subject = new VerificationSubject(cmd.getUsername(), cmd.getEmail(), Map.of());
+        for (String code : requiredCodes) {
+            IdentityVerificationProvider provider = providers.stream()
+                    .filter(candidate -> code.equals(verificationCode(candidate)))
+                    .findFirst()
+                    .orElseThrow(() -> new BizException("身份核验方式不可用：" + code + "，请联系管理员"));
+            IdentityVerificationResult result;
+            try {
+                result = provider.check(subject);
+            } catch (RuntimeException e) {
+                log.warn("身份核验执行异常: code={}, provider={}", code, provider.getClass().getName(), e);
+                throw new BizException("身份核验服务异常，请稍后再试");
+            }
+            if (result != null && !result.verified()) {
+                String displayName = provider.method().displayName();
+                throw new BizException(StringUtils.hasText(result.message()) ? result.message() : "未完成身份核验：" + displayName);
+            }
+        }
+    }
+
+    private List<String> requiredVerificationCodes() {
+        return settingRepo.findByKey(REQUIRED_VERIFICATIONS_SETTING_KEY)
+                .map(online.yudream.base.domain.system.setting.aggregate.Setting::getValue)
+                .stream()
+                .flatMap(value -> java.util.Arrays.stream(value.split(",")))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private String verificationCode(IdentityVerificationProvider provider) {
+        try {
+            IdentityVerificationMethod method = provider.method();
+            return method == null ? null : method.code();
+        } catch (RuntimeException e) {
+            log.warn("身份核验方式元数据读取失败: provider={}", provider.getClass().getName(), e);
+            return null;
+        }
     }
 
     private User findLoginUser(UserLoginCmd cmd) {

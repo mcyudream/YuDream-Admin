@@ -36,7 +36,9 @@ import online.yudream.base.interfaces.system.user.res.UserProfileRes;
 import online.yudream.base.interfaces.system.user.res.UserRegisterRes;
 import online.yudream.base.interfaces.system.user.res.UserRoleRes;
 import online.yudream.base.interfaces.system.user.res.UserRes;
+import online.yudream.base.interfaces.system.user.res.UserVerificationMethodRes;
 import online.yudream.base.interfaces.system.user.vo.PermissionListVO;
+import online.yudream.base.plugin.spi.system.auth.IdentityVerificationMethod;
 
 import java.util.List;
 
@@ -246,6 +248,20 @@ public class UserWebAssembler {
                 .email(dto.getEmail())
                 .nickname(dto.getNickname())
                 .emailVerified(dto.isEmailVerified())
+                .build();
+    }
+
+    public static List<UserVerificationMethodRes> toVerificationMethodResList(List<IdentityVerificationMethod> methods) {
+        return methods.stream().map(UserWebAssembler::toVerificationMethodRes).toList();
+    }
+
+    public static UserVerificationMethodRes toVerificationMethodRes(IdentityVerificationMethod method) {
+        return UserVerificationMethodRes.builder()
+                .code(method.code())
+                .displayName(method.displayName())
+                .description(method.description())
+                .icon(method.icon())
+                .sort(method.sort())
                 .build();
     }
 }

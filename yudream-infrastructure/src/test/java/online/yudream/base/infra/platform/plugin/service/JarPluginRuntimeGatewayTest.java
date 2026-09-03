@@ -299,6 +299,7 @@ class JarPluginRuntimeGatewayTest {
                 nullReturningProxy(FrameworkServices.class),
                 new PluginServiceRegistry(),
                 new PluginAiToolRegistry(),
+                new PluginExtensionRegistry(),
                 new PluginGraphFrameworkService(null, null, null),
                 nullReturningProxy(PluginSemanticMemoryService.class),
                 new AgentRuntimeApplicationRegistry() {
@@ -319,6 +320,7 @@ class JarPluginRuntimeGatewayTest {
                     }
                 },
                 eventPublisher,
+                null,
                 devModeProperties,
                 new PluginDevProjectCatalog(devModeProperties, new ObjectMapper()),
                 new PluginDevDirectoryBrowser(),

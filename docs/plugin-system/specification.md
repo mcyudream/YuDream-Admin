@@ -96,8 +96,17 @@ Controller 必须薄：
 - `registerFrontend`
 - `registerHttpHandler`
 - `registerHttpController`
+- `registerExtension` / `extensions`
 - `exposeService`
 - `onDispose`
+
+`registerExtension(ExtensionPoint.class, implementation, priority)` 是通用扩展点注册口：扩展点接口可以由宿主定义（如 `system/auth` 包下的认证契约），也可以由 provider 插件在自己的 `*.api` 包定义。priority 数值越小越先执行（默认 0，同值按注册先后）；注册句柄随插件 disable/unload 自动回收，消费方通过 `PluginContext.extensions(...)` 或宿主应用层注入的 `PluginExtensionQuery` 查询，永远看不到已禁用/已卸载插件的残留实现。
+
+宿主内置认证扩展点（`online.yudream.base.plugin.spi.system.auth`）：
+
+- `RegisterInterceptor` / `LoginInterceptor`：veto 型前置拦截器，同步执行、可否决，fail-closed（实现抛异常时本次注册/登录被拒绝）。
+- `IdentityVerificationProvider`：声明一种身份核验方式（学信网、教育邮箱、CARSI、人工审核等）；站点设置 `system.auth.registration.required-verifications`（逗号分隔方式编码）声明必需方式，注册时逐一 `check(...)`，缺失或未通过即拒绝。核验交互界面由插件自身端点与前端承载，前端可通过匿名端点 `GET /api/user/register/verification-methods` 获取当前可用方式清单。
+- `AuthEventListener`：注册成功 / 登录成功事件订阅，事务提交后派发，fail-open（监听器异常只记日志，不影响源用例）。
 
 插件图片模板必须放在插件 JAR 自身的 `templates/` 目录，并通过 `PluginContext.templateRenderer()` 渲染。运行时为每个插件绑定独立 ClassLoader，不允许插件模板落入框架 `templates/` 目录，也不允许使用 `..` 或绝对路径跨插件读取资源。模板渲染支持 Thymeleaf 变量和可选 CSS selector；selector 存在时必须使用原生元素截图。
 
