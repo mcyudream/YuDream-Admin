@@ -37,6 +37,7 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.ai.PluginAiService;
+import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
 import org.springframework.core.env.Environment;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
@@ -69,6 +70,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final PluginRenderFrameworkService pluginRenderFrameworkService;
     private final PluginAiFrameworkService pluginAiFrameworkService;
     private final PluginGraphFrameworkService pluginGraphFrameworkService;
+    private final PluginFilePreviewFrameworkService pluginFilePreviewFrameworkService;
     private final MongoTemplate mongoTemplate;
     private final ObjectStorage objectStorage;
     private final WordTemplateRenderer wordTemplateRenderer;
@@ -206,6 +208,11 @@ public class DefaultFrameworkServices implements FrameworkServices {
     @Override
     public PluginAiService ai() {
         return pluginAiFrameworkService;
+    }
+
+    @Override
+    public PluginFilePreviewService filePreview() {
+        return pluginFilePreviewFrameworkService;
     }
 
     @Override

@@ -65,6 +65,12 @@ services:
       - MESSAGE_RENDER_BASE_URL=${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       - MESSAGE_RENDER_TOKEN=${MESSAGE_RENDER_TOKEN:-}
       - MESSAGE_RENDER_TIMEOUT=${MESSAGE_RENDER_TIMEOUT:-30s}
+      # 文件预览（平台能力，双闸门）：部署闸门决定「平台能力」页是否出现该能力；
+      # 运行闸门为管理后台「平台能力 > 文件预览」的启用开关与 kkFileView 配置
+      - PLATFORM_FILE_PREVIEW_ENABLED=${PLATFORM_FILE_PREVIEW_ENABLED:-true}
+      # kkFileView 容器内网地址，供能力「测试」连通性兜底探测
+      # （浏览器经 frontend nginx 同源反代 /kkfileview/** 访问，后端容器直连站点地址未必可达）
+      - FILE_PREVIEW_KKFILEVIEW_INTERNAL_URL=${KKFILEVIEW_INTERNAL_URL:-http://kkfileview:8012}
       - YUDREAM_SATORI_CREDENTIAL_KEY=${YUDREAM_SATORI_CREDENTIAL_KEY:-}
       # 统一加密 Neo4j、Milky 和插件 SecretStore 的已持久化凭据。
       - YUDREAM_CREDENTIAL_KEY=${YUDREAM_CREDENTIAL_KEY:-}
@@ -133,6 +139,37 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
     ports:
       - "${FRONTEND_PORT:-80}:80"
+    networks:
+      - yudream
+
+  # kkFileView 在线文件预览（平台能力，管理入口：系统配置 > 文件预览）
+  kkfileview:
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
+    container_name: yudream-kkfileview
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    # 查看链路经 frontend nginx 同源反代（/kkfileview/**），此端口仅用于本机调试；
+    # 生产可删除该端口映射，只保留 docker 内网通信
+    ports:
+      - "${KKFILEVIEW_PORT:-8012}:8012"
+    environment:
+      # kkFileView 生成页面资源/跳转地址时使用的外部基址：
+      # default = 按浏览器实际请求自动生成（反代场景由 frontend nginx 注入 X-Base-Url 头，优先于该值）；
+      # 仅当 kk 前面没有会注入该头的反代时才需要显式覆盖为浏览器可达地址（含 /kkfileview 前缀）
+      - KK_BASE_URL=${KK_BASE_URL:-default}
+      # 允许回源拉取文件的地址主机（即文件预览设置中回源地址的 host；多个用逗号分隔）
+      # host.docker.internal 覆盖混合开发拓扑：后端跑在宿主机（IDE/命令行）、kk 在 docker 内
+      - KK_TRUST_HOST=${KK_TRUST_HOST:-backend,localhost,127.0.0.1,host.docker.internal}
+      # 预览结果缓存：默认 jdk 堆内缓存；多实例部署时改 redis 并配置下面的 redisson 地址
+      - KK_CACHE_TYPE=${KK_CACHE_TYPE:-jdk}
+      # - KK_SPRING_REDISSON_ADDRESS=redis://redis:6379
+      # - KK_SPRING_REDISSON_PASSWORD=
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
     networks:
       - yudream
 
