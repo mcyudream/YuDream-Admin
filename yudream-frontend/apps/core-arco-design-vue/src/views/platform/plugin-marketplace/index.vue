@@ -3,19 +3,11 @@ import type { PluginModule } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceUpdatePlan, PluginStorePlugin, PluginStorePluginDescriptor, PluginStorePluginDetail, PluginStorePluginVersion } from '@/api/modules/platform-plugin-marketplace'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
+import { compareSemVer } from './semver'
+import VersionCard from './version-card.vue'
 
 type MarketplaceVersion = PluginStorePluginVersion
-type VersionOperation = 'install' | 'update' | 'installed' | 'local-newer' | 'unavailable'
 type MarketplaceStatus = 'all' | 'uninstalled' | 'update' | 'installed' | 'local-newer'
-
-interface ParsedSemVer {
-  major: number
-  minor: number
-  patch: number
-  prerelease: string[]
-}
-
-const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]+)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]+))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/
 
 const loading = ref(false)
 const keyword = ref('')
@@ -57,6 +49,20 @@ const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
 const localModule = computed(() => modules.value.find(item => item.code === selectedCode.value))
 const canRollback = computed(() => Boolean(localModule.value?.rollbackAvailable && !localModule.value.loaded && !localModule.value.enabled))
+
+const sortedVersions = computed(() => {
+  const versions = detail.value?.versions || []
+  return [...versions].sort((left, right) =>
+    compareSemVer(right.releaseVersion, left.releaseVersion) ?? right.releaseVersion.localeCompare(left.releaseVersion),
+  )
+})
+const latestVersion = computed(() => sortedVersions.value[0])
+const historyVersions = computed(() => sortedVersions.value.slice(1))
+const showHistory = ref(false)
+
+watch(selectedCode, () => {
+  showHistory.value = false
+})
 
 watch([keyword, status], () => {
   pagination.page = 1
@@ -124,72 +130,6 @@ function getDescriptor(item: PluginStorePlugin | MarketplaceVersion): PluginStor
   return item as PluginStorePluginDescriptor
 }
 
-function isInstallable(item: MarketplaceVersion) {
-  const descriptor = getDescriptor(item)
-  return item.installable !== false && descriptor.installable !== false
-}
-
-function installDisabledReason(item: MarketplaceVersion) {
-  const descriptor = getDescriptor(item)
-  return item.installDisabledReason || descriptor.installDisabledReason
-}
-
-function parseSemVer(version?: string): ParsedSemVer | undefined {
-  if (!version) {
-    return undefined
-  }
-  const match = SEMVER_PATTERN.exec(version)
-  if (!match) {
-    return undefined
-  }
-  return {
-    major: Number(match[1]),
-    minor: Number(match[2]),
-    patch: Number(match[3]),
-    prerelease: match[4]?.split('.') || [],
-  }
-}
-
-function compareSemVer(left: string, right: string): number | undefined {
-  const leftVersion = parseSemVer(left)
-  const rightVersion = parseSemVer(right)
-  if (!leftVersion || !rightVersion) {
-    return undefined
-  }
-  for (const key of ['major', 'minor', 'patch'] as const) {
-    if (leftVersion[key] !== rightVersion[key]) {
-      return leftVersion[key] > rightVersion[key] ? 1 : -1
-    }
-  }
-  if (!leftVersion.prerelease.length || !rightVersion.prerelease.length) {
-    if (leftVersion.prerelease.length === rightVersion.prerelease.length) {
-      return 0
-    }
-    return leftVersion.prerelease.length ? -1 : 1
-  }
-  const length = Math.max(leftVersion.prerelease.length, rightVersion.prerelease.length)
-  for (let index = 0; index < length; index += 1) {
-    const leftPart = leftVersion.prerelease[index]
-    const rightPart = rightVersion.prerelease[index]
-    if (leftPart === undefined || rightPart === undefined) {
-      return leftPart === undefined ? -1 : 1
-    }
-    if (leftPart === rightPart) {
-      continue
-    }
-    const leftNumeric = /^\d+$/.test(leftPart)
-    const rightNumeric = /^\d+$/.test(rightPart)
-    if (leftNumeric && rightNumeric) {
-      return Number(leftPart) > Number(rightPart) ? 1 : -1
-    }
-    if (leftNumeric !== rightNumeric) {
-      return leftNumeric ? -1 : 1
-    }
-    return leftPart > rightPart ? 1 : -1
-  }
-  return 0
-}
-
 function marketplaceStatus(item: PluginStorePlugin | MarketplaceVersion): Exclude<MarketplaceStatus, 'all'> {
   const descriptor = getDescriptor(item)
   const code = item.code ?? descriptor.code
@@ -214,20 +154,6 @@ function marketplaceStatusLabel(item: PluginStorePlugin | MarketplaceVersion) {
   }
 }
 
-function versionOperation(item: MarketplaceVersion): VersionOperation {
-  if (!localModule.value) {
-    return 'install'
-  }
-  const comparison = compareSemVer(item.releaseVersion, localModule.value.version || '')
-  if (comparison === undefined) {
-    return 'unavailable'
-  }
-  if (comparison > 0) {
-    return 'update'
-  }
-  return comparison === 0 ? 'installed' : 'local-newer'
-}
-
 function clampPage() {
   pagination.total = filteredRows.value.length
   const maxPage = Math.max(1, Math.ceil(pagination.total / pagination.size))
@@ -237,22 +163,6 @@ function clampPage() {
 function resetFilters() {
   keyword.value = ''
   status.value = 'all'
-}
-
-function operationLabel(item: MarketplaceVersion) {
-  switch (versionOperation(item)) {
-    case 'installed': return '已安装'
-    case 'local-newer': return '本地版本较新'
-    case 'unavailable': return '版本不可比较'
-    default: return ''
-  }
-}
-
-function operationTitle(item: MarketplaceVersion) {
-  if (versionOperation(item) === 'unavailable') {
-    return `本地版本 ${localModule.value?.version || '未知'} 或市场版本 ${item.releaseVersion} 不符合 SemVer，无法判断更新关系`
-  }
-  return undefined
 }
 
 function operationsPending() {
@@ -393,7 +303,9 @@ function rollbackConfirmationContent() {
             <div class="plugin-card-meta">
               <FaTag variant="secondary">{{ marketplaceStatusLabel(item) }}</FaTag>
             </div>
-            <p>{{ getDescriptor(item).description || '暂无插件简介。' }}</p>
+            <p class="plugin-card-description" :title="getDescriptor(item).description || '暂无插件简介。'">
+              {{ getDescriptor(item).description || '暂无插件简介。' }}
+            </p>
           </div>
         </button>
       </div>
@@ -428,98 +340,40 @@ function rollbackConfirmationContent() {
           </FaButton>
         </div>
 
-        <div class="version-list">
-          <article v-for="item in detail.versions" :key="item.releaseVersion" class="version-card">
-            <div class="detail-header">
-              <div>
-                <div class="version-title">
-                  <h3>{{ item.releaseVersion }}</h3>
-                  <FaTag v-if="operationLabel(item)" variant="secondary" :title="operationTitle(item)">{{ operationLabel(item) }}</FaTag>
-                </div>
-                <p>{{ getDescriptor(item).description || '暂无插件简介。' }}</p>
-              </div>
-              <div class="version-actions">
-                <FaButton
-                  v-if="versionOperation(item) === 'install'"
-                  v-auth="'platform:plugin:manage'"
-                  size="sm"
-                  :title="installDisabledReason(item)"
-                  :loading="installingVersion === item.releaseVersion"
-                  :disabled="!isInstallable(item) || operationsPending()"
-                  @click="install(item.releaseVersion)"
-                >
-                  安装
-                </FaButton>
-                <FaButton
-                  v-else-if="versionOperation(item) === 'update'"
-                  v-auth="'platform:plugin:manage'"
-                  size="sm"
-                  variant="outline"
-                  :loading="updatingVersion === item.releaseVersion"
-                  :disabled="operationsPending()"
-                  @click="previewAndConfirmUpdate(item.releaseVersion)"
-                >
-                  更新
-                </FaButton>
-              </div>
-            </div>
+        <template v-if="latestVersion">
+          <div class="version-section-title">
+            最新版本
+          </div>
+          <VersionCard
+            :item="latestVersion"
+            :local-module="localModule"
+            :installing-version="installingVersion"
+            :updating-version="updatingVersion"
+            :pending="operationsPending()"
+            @install="install"
+            @update="previewAndConfirmUpdate"
+          />
+        </template>
 
-            <div class="release-notes-panel">
-              <div class="section-title">发布说明</div>
-              <p class="release-notes">{{ getDescriptor(item).releaseNotes || '该版本暂无发布说明。' }}</p>
-            </div>
-
-            <div v-if="getDescriptor(item).compatibility && Object.values(getDescriptor(item).compatibility || {}).some(Boolean)" class="metadata-panel">
-              <div class="section-title">兼容性要求</div>
-              <div class="compatibility-list">
-                <FaTag v-if="getDescriptor(item).compatibility?.host" variant="secondary">宿主：{{ getDescriptor(item).compatibility?.host }}</FaTag>
-                <FaTag v-if="getDescriptor(item).compatibility?.spi" variant="secondary">SPI：{{ getDescriptor(item).compatibility?.spi }}</FaTag>
-                <FaTag v-if="getDescriptor(item).compatibility?.frontendSdk" variant="secondary">前端 SDK：{{ getDescriptor(item).compatibility?.frontendSdk }}</FaTag>
-              </div>
-            </div>
-            <div v-if="getDescriptor(item).dependencies?.length" class="metadata-panel">
-              <div class="section-title">插件依赖</div>
-              <div class="dependency-list">
-                <FaTag v-for="dependency in getDescriptor(item).dependencies" :key="dependency.code" variant="secondary">
-                  {{ dependency.code }}{{ dependency.range ? ` (${dependency.range})` : '' }} · {{ dependency.required === false ? '可选' : '必需' }}
-                </FaTag>
-              </div>
-            </div>
-            <div v-if="getDescriptor(item).publisher || getDescriptor(item).license" class="metadata-panel">
-              <div class="section-title">发布者与许可证</div>
-              <div class="metadata-list">
-                <template v-if="getDescriptor(item).publisher">
-                  <strong>{{ getDescriptor(item).publisher?.name }}</strong>
-                  <span>{{ getDescriptor(item).publisher?.id }}</span>
-                  <FaTag v-if="getDescriptor(item).publisher?.verified" variant="secondary">已验证</FaTag>
-                  <a v-if="getDescriptor(item).publisher?.url" :href="getDescriptor(item).publisher?.url" target="_blank" rel="noopener noreferrer" class="metadata-link">
-                    发布者主页
-                  </a>
-                </template>
-                <span v-if="getDescriptor(item).license">许可证：{{ getDescriptor(item).license }}</span>
-              </div>
-            </div>
-            <div v-if="!isInstallable(item) && installDisabledReason(item)" class="install-blocked-reason">
-              {{ installDisabledReason(item) }}
-            </div>
-            <div v-if="getDescriptor(item).screenshots?.length" class="screenshot-list">
-              <img v-for="screenshot in getDescriptor(item).screenshots" :key="screenshot" :src="screenshot" :alt="`${getDescriptor(item).displayName || getDescriptor(item).code} 截图`">
-            </div>
-
-            <details class="technical-details">
-              <summary>技术详情</summary>
-              <div class="detail-grid">
-                <div><span>插件编码</span><strong>{{ getDescriptor(item).code }}</strong></div>
-                <div><span>描述符版本</span><strong>{{ getDescriptor(item).version }}</strong></div>
-                <div><span>入口</span><strong class="break-all">{{ getDescriptor(item).main }}</strong></div>
-                <div v-if="getDescriptor(item).jar"><span>Maven 坐标</span><strong class="break-all">{{ getDescriptor(item).jar?.mavenCoordinates }}</strong></div>
-                <div v-if="getDescriptor(item).jar"><span>JAR 地址</span><strong class="break-all">{{ getDescriptor(item).jar?.url }}</strong></div>
-                <div v-if="getDescriptor(item).jar"><span>SHA-256</span><strong class="break-all">{{ getDescriptor(item).jar?.sha256 }}</strong></div>
-                <div v-if="getDescriptor(item).source?.repository"><span>源码仓库</span><strong class="break-all">{{ getDescriptor(item).source?.repository }}</strong></div>
-                <div v-if="getDescriptor(item).source?.commit"><span>源码提交</span><strong class="break-all">{{ getDescriptor(item).source?.commit }}</strong></div>
-              </div>
-            </details>
-          </article>
+        <div v-if="historyVersions.length" class="history-versions">
+          <button class="history-toggle" type="button" @click="showHistory = !showHistory">
+            <FaIcon name="i-ri:arrow-right-s-line" class="history-caret" :class="{ expanded: showHistory }" />
+            历史版本（{{ historyVersions.length }}）
+          </button>
+          <div v-show="showHistory" class="history-list">
+            <VersionCard
+              v-for="item in historyVersions"
+              :key="item.releaseVersion"
+              collapsible
+              :item="item"
+              :local-module="localModule"
+              :installing-version="installingVersion"
+              :updating-version="updatingVersion"
+              :pending="operationsPending()"
+              @install="install"
+              @update="previewAndConfirmUpdate"
+            />
+          </div>
         </div>
       </section>
     </FaPageMain>
@@ -583,7 +437,9 @@ function rollbackConfirmationContent() {
 .plugin-card {
   display: flex;
   gap: 12px;
+  align-items: flex-start;
   min-width: 0;
+  height: 100%;
   padding: 14px;
   color: var(--color-text-1);
   text-align: left;
@@ -630,8 +486,7 @@ function rollbackConfirmationContent() {
 }
 
 .plugin-card-title,
-.detail-header,
-.version-title {
+.detail-header {
   display: flex;
   gap: 12px;
   align-items: flex-start;
@@ -644,21 +499,16 @@ function rollbackConfirmationContent() {
   white-space: nowrap;
 }
 
-.version-title {
-  justify-content: flex-start;
-}
-
-.version-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.plugin-card p,
-.detail-header p {
+.plugin-card-description {
+  display: -webkit-box;
+  min-height: 2.6em;
   margin: 6px 0;
+  overflow: hidden;
   color: var(--color-text-3);
   font-size: 13px;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .plugin-detail {
@@ -666,150 +516,60 @@ function rollbackConfirmationContent() {
   padding: 16px;
 }
 
-.detail-header h2,
-.detail-header h3 {
+.detail-header h2 {
   margin: 0;
   color: var(--color-text-1);
-}
-
-.detail-header h2 {
   font-size: 18px;
 }
 
-.detail-header h3 {
-  font-size: 15px;
+.detail-header p {
+  margin: 6px 0;
+  color: var(--color-text-3);
+  font-size: 13px;
 }
 
-.version-list {
-  display: grid;
-  gap: 16px;
+.version-section-title {
   margin-top: 16px;
-}
-
-.version-card {
-  padding-top: 16px;
-  border-top: 1px solid var(--color-border-2);
-}
-
-.release-notes-panel,
-.metadata-panel,
-.install-blocked-reason,
-.technical-details {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-1);
-}
-
-.section-title {
   margin-bottom: 8px;
   color: var(--color-text-2);
   font-size: 13px;
   font-weight: 700;
 }
 
-.compatibility-list,
-.dependency-list {
+.history-versions {
+  margin-top: 16px;
+}
+
+.history-toggle {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.compatibility-list :deep(.fa-tag),
-.dependency-list :deep(.fa-tag) {
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.metadata-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  color: var(--color-text-2);
-  font-size: 13px;
-}
-
-.metadata-link {
-  max-width: 100%;
-  color: rgb(var(--primary-6));
-  overflow-wrap: anywhere;
-}
-
-.release-notes {
-  margin: 0;
-  color: var(--color-text-2);
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.install-blocked-reason {
-  color: rgb(var(--danger-6));
-  font-size: 13px;
-}
-
-.screenshot-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.screenshot-list img {
-  width: min(100%, 260px);
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  object-fit: cover;
-}
-
-.technical-details {
-  color: var(--color-text-2);
-}
-
-.technical-details summary {
-  cursor: pointer;
-  color: var(--color-text-1);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.detail-grid div {
-  display: grid;
   gap: 6px;
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
-}
-
-.detail-grid span {
-  color: var(--color-text-3);
-  font-size: 12px;
-}
-
-.detail-grid strong {
-  overflow: hidden;
-  color: var(--color-text-1);
+  align-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-text-2);
+  font-size: 13px;
   font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  cursor: pointer;
 }
 
-.break-all {
-  white-space: normal !important;
-  overflow-wrap: anywhere;
+.history-toggle:hover {
+  color: rgb(var(--primary-6));
+}
+
+.history-caret {
+  color: var(--color-text-3);
+  transition: transform 0.15s;
+}
+
+.history-caret.expanded {
+  transform: rotate(90deg);
+}
+
+.history-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .empty-state {
