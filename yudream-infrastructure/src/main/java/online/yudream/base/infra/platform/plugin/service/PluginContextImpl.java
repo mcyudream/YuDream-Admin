@@ -62,6 +62,7 @@ public class PluginContextImpl implements PluginContext {
     private final PluginGraphService graph;
     private final PluginSemanticMemoryService semanticMemory;
     private final BiConsumer<String, Boolean> menuVisibilityUpdater;
+    private final PluginExtensionRegistry extensionRegistry;
 
     public PluginContextImpl(String pluginCode, URLClassLoader pluginClassLoader, FrameworkServices frameworkServices,
                              PluginServiceRegistry pluginServiceRegistry, Set<String> declaredDependencies,
@@ -69,7 +70,8 @@ public class PluginContextImpl implements PluginContext {
                              PluginGraphService graphService,
                              PluginSemanticMemoryService semanticMemoryService,
                              AgentRuntimeApplicationRegistry agentApplicationRegistry,
-                             BiConsumer<String, Boolean> menuVisibilityUpdater) {
+                             BiConsumer<String, Boolean> menuVisibilityUpdater,
+                             PluginExtensionRegistry extensionRegistry) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
         this.pluginServiceRegistry = pluginServiceRegistry;
@@ -84,6 +86,7 @@ public class PluginContextImpl implements PluginContext {
         this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode,
                 new SandboxAwarePluginSemanticMemoryService(pluginCode, semanticMemoryService));
         this.menuVisibilityUpdater = menuVisibilityUpdater;
+        this.extensionRegistry = extensionRegistry;
         onDispose(interactionRegistry);
         onDispose(commandRegistry);
     }
@@ -220,6 +223,19 @@ public class PluginContextImpl implements PluginContext {
     @Override
     public <T> void exposeService(Class<T> serviceType, T service) {
         pluginServiceRegistry.export(pluginCode, serviceType, service);
+    }
+
+    @Override
+    public <I> void registerExtension(Class<I> extensionPoint, I extension, int priority) {
+        if (extensionPoint == null || extension == null) {
+            throw new BizException("扩展点与扩展实现不能为空");
+        }
+        onDispose(extensionRegistry.register(pluginCode, extensionPoint, extension, priority));
+    }
+
+    @Override
+    public <I> List<I> extensions(Class<I> extensionPoint) {
+        return extensionRegistry.extensions(extensionPoint);
     }
 
     @Override

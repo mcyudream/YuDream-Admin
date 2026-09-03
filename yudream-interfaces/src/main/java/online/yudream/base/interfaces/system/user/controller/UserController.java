@@ -34,6 +34,7 @@ import online.yudream.base.interfaces.system.user.res.UserProfileRes;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingCode;
 import online.yudream.base.interfaces.system.user.res.UserRegisterRes;
 import online.yudream.base.interfaces.system.user.res.UserRoleRes;
+import online.yudream.base.interfaces.system.user.res.UserVerificationMethodRes;
 import online.yudream.base.interfaces.system.user.vo.PermissionListVO;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -63,6 +64,11 @@ public class UserController {
     @PostMapping("/register")
     public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request) {
         return Result.ok(UserWebAssembler.toRegisterRes(userAppService.register(UserWebAssembler.toRegisterCmd(request))));
+    }
+
+    @GetMapping("/register/verification-methods")
+    public Result<List<UserVerificationMethodRes>> registerVerificationMethods() {
+        return Result.ok(UserWebAssembler.toVerificationMethodResList(userAppService.availableVerificationMethods()));
     }
 
     @PostMapping("/password-reset/email")

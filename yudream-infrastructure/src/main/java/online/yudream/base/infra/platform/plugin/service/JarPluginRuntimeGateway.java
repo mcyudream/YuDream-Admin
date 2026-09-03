@@ -87,6 +87,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final FrameworkServices frameworkServices;
     private final PluginServiceRegistry pluginServiceRegistry;
     private final PluginAiToolRegistry aiToolRegistry;
+    private final PluginExtensionRegistry extensionRegistry;
     private final PluginGraphFrameworkService pluginGraphFrameworkService;
     private final PluginSemanticMemoryService semanticMemoryService;
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
@@ -731,7 +732,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                                 semanticMemoryService,
                                 agentApplicationRegistry,
                                 (routePath, visible) -> pluginMenuProjectionService.setRouteMenuVisible(
-                                        module.getCode(), routePath, visible)
+                                        module.getCode(), routePath, visible),
+                                extensionRegistry
                         ),
                         assetRevision(module.getCode(), pluginPath, descriptor)
                 );
