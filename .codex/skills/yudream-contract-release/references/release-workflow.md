@@ -53,8 +53,14 @@ sh ci/verify-core-contract-publish-pipeline.sh
 
 1. Commit the version change in the core repo.
 2. Push the branch.
-3. Create the tag in the form `vX.Y.Z` unless the project has explicitly chosen a different tag convention.
+3. Create the tag. Tag names decide which contract packages get published:
+   - `vX.Y.Z` or a bare `p*` tag (for example `p2.15.0`) publishes and verifies all three contract packages;
+   - `pspi-*` (for example `pspi-2.15.0`) publishes only `yudream-plugin-spi`;
+   - `psdk-*` publishes only `@yudream/plugin-sdk`;
+   - `pcomp-*` publishes only `@yudream/components`.
 4. Push the tag so GitLab runs the publish pipeline.
+
+Only the packages whose versions actually moved should be released; use the per-package tags instead of republishing unchanged contracts.
 
 Recommended report items:
 
@@ -70,6 +76,8 @@ Watch the tag pipeline and confirm the relevant jobs:
 - Nexus npm publish: `publish:npm-plugin-sdk`, `publish:npm-components`
 - SPI verify: `verify:maven-plugin-spi`
 - npm verify: `verify:npm-contracts`
+
+On per-package tags only the matching jobs run: `pspi-*` runs the two SPI jobs (npm verify is skipped), `psdk-*`/`pcomp-*` run the matching npm publish plus a `verify:npm-contracts` scoped by `VERIFY_NPM_PACKAGES` (SPI jobs are skipped). When checking a split pipeline with `ci/verify-core-remote-release-evidence.sh`, the script auto-skips the other family's jobs based on the tag name (`RELEASE_TAG`/`CI_COMMIT_TAG`), or you can force it with `EXPECT_MAVEN_SPI_PUBLISH=false` / `EXPECT_NEXUS_NPM_PUBLISH=false`.
 
 Do not update `yudream-admin-plugins` until the needed packages are verifiably available.
 

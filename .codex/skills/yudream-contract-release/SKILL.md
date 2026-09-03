@@ -25,6 +25,7 @@ description: Release and synchronize YuDream plugin contract packages through Ne
 - Bump `@yudream/plugin-sdk` when plugin frontend API clients, TypeScript contracts, host-plugin frontend runtime APIs, or shared SDK exports change.
 - Bump `@yudream/components` when shared plugin-facing UI components or component exports change, or when the SDK release depends on a new components surface.
 - If the change crosses backend and frontend contracts, prefer releasing all affected contract packages together so the plugin repo can move in one sync.
+- Packages can also be released separately: tag `pspi-*` publishes only the SPI, `psdk-*` only `@yudream/plugin-sdk`, `pcomp-*` only `@yudream/components`; `v*`/bare `p*` still publish all three. Only release packages whose versions actually moved.
 
 ## Standard Workflow
 

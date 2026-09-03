@@ -82,6 +82,7 @@
 - 顺序：先在本仓升级并验证契约版本 → 提交推送 → tag 流水线发布并等待 verify 通过 → 再到 `yudream-admin-plugins` 同步依赖、刷新 lockfile、运行下游校验并单独提交。
 - SPI 版本在 `yudream-plugins/yudream-plugin-spi/pom.xml` 与本仓根 `pom.xml` 的 `yudream.plugin.spi.version` 同步维护；下游只改其根属性。SDK/components 版本在 `yudream-frontend/packages/*/package.json`，下游经 `pnpm-workspace.yaml` catalog 消费并刷新 `pnpm-lock.yaml`。
 - 发布/验签 CI：`publish:maven-plugin-spi`、`publish:npm-plugin-sdk`、`publish:npm-components`、`verify:maven-plugin-spi`、`verify:npm-contracts`；发布前跑 `validate:contract-packages`、`validate:contract-package-tarballs`、`validate:contract-publish-pipeline`。
+- 契约包可分开发布：`v*`/裸 `p*` tag 发布并验签全部三个契约包；`pspi-*` 只发 SPI、`psdk-*` 只发 plugin-sdk、`pcomp-*` 只发 components（`verify:npm-contracts` 按 `VERIFY_NPM_PACKAGES` 收窄验签范围）。只发布版本实际变动的包。
 - 未验证已发布的版本不得用于下游；未明确要求时不做发布后 snapshot 升版。
 
 ## 11. 完成前自检
