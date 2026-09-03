@@ -85,10 +85,22 @@ for (const job of data) {
 }')
 fi
 
-require_job_status "publish:maven-plugin-spi" "success"
-require_job_status "verify:maven-plugin-spi" "success"
+# 分包发布 tag 只验对应作业：pspi-* 跳过 npm 检查，psdk-*/pcomp-* 跳过 SPI 检查；
+# 也可用 EXPECT_MAVEN_SPI_PUBLISH / EXPECT_NEXUS_NPM_PUBLISH 显式覆盖。
+TAG_NAME="${RELEASE_TAG:-${CI_COMMIT_TAG:-}}"
+EXPECT_SPI_DEFAULT=true
+EXPECT_NPM_DEFAULT=true
+case "$TAG_NAME" in
+  pspi*) EXPECT_NPM_DEFAULT=false ;;
+  psdk*|pcomp*) EXPECT_SPI_DEFAULT=false ;;
+esac
 
-if [ "${EXPECT_NEXUS_NPM_PUBLISH:-true}" = "true" ]; then
+if [ "${EXPECT_MAVEN_SPI_PUBLISH:-$EXPECT_SPI_DEFAULT}" = "true" ]; then
+  require_job_status "publish:maven-plugin-spi" "success"
+  require_job_status "verify:maven-plugin-spi" "success"
+fi
+
+if [ "${EXPECT_NEXUS_NPM_PUBLISH:-$EXPECT_NPM_DEFAULT}" = "true" ]; then
   require_job_status "publish:npm-plugin-sdk" "success"
   require_job_status "publish:npm-components" "success"
   require_job_status "verify:npm-contracts" "success"

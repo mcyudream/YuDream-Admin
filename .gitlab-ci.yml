@@ -135,6 +135,12 @@ build:frontend-main:
   rules:
     - if: $CI_COMMIT_TAG =~ /[dv]/
 
+# 契约包发布 tag 约定：
+#   v* / 裸 p*（如 p2.15.0）发布并验签全部契约包（SPI + plugin-sdk + components）；
+#   pspi-* 只发布/验签 yudream-plugin-spi（Maven）；
+#   psdk-* 只发布/验签 @yudream/plugin-sdk；
+#   pcomp-* 只发布/验签 @yudream/components。
+# 各作业用「排除其他分包 tag 后回落到 [pv]」的 rules 实现该拆分。
 publish:maven-plugin-spi:
   stage: publish-packages
   image: *maven_image
@@ -142,6 +148,8 @@ publish:maven-plugin-spi:
     - echo "Deploy yudream-plugin-spi to Nexus"
     - mvn -s ci/maven-settings-nexus.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests deploy -B -ntp -e
   rules:
+    - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 verify:maven-plugin-spi:
@@ -150,6 +158,8 @@ verify:maven-plugin-spi:
   script:
     - sh ci/verify-plugin-spi-registry.sh
   rules:
+    - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 verify:npm-contracts:
@@ -164,6 +174,15 @@ verify:npm-contracts:
   script:
     - VERIFY_NPM_REGISTRY="$NEXUS_NPM_PUBLIC_URL" sh ci/verify-published-npm-contracts.sh
   rules:
+    # VERIFY_NPM_PACKAGES 限定验签范围；pspi 标签不涉及 npm 契约，直接跳过
+    - if: $CI_COMMIT_TAG =~ /^pspi/
+      when: never
+    - if: $CI_COMMIT_TAG =~ /^psdk/
+      variables:
+        VERIFY_NPM_PACKAGES: "@yudream/plugin-sdk"
+    - if: $CI_COMMIT_TAG =~ /^pcomp/
+      variables:
+        VERIFY_NPM_PACKAGES: "@yudream/components"
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-plugin-sdk:
@@ -189,6 +208,8 @@ publish:npm-plugin-sdk:
     - cd packages/plugin-sdk
     - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
+    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^pcomp/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-components:
@@ -214,6 +235,8 @@ publish:npm-components:
     - cd packages/components
     - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
+    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/
+      when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 collect:artifacts:

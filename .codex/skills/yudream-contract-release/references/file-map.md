@@ -35,7 +35,14 @@ Tag-triggered publish jobs:
 Tag-triggered verify jobs:
 
 - `verify:maven-plugin-spi`
-- `verify:npm-contracts`
+- `verify:npm-contracts` (package scope narrowed by `VERIFY_NPM_PACKAGES` on split tags)
+
+Tag name decides which jobs run:
+
+- `v*` / bare `p*`: all publish and verify jobs;
+- `pspi-*`: SPI publish/verify only;
+- `psdk-*`: plugin-sdk publish + scoped npm verify only;
+- `pcomp-*`: components publish + scoped npm verify only.
 
 Validation jobs worth running before release:
 
