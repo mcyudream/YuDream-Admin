@@ -15,6 +15,7 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.form.PluginFormService;
+import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
 
 import java.util.Optional;
 
@@ -69,6 +70,15 @@ public interface FrameworkServices {
      * 用于插件消费经平台通用上传接口进入的大文件（如存档压缩包）。
      */
     Optional<PluginStoredFile> platformFile(String fileId);
+
+    /**
+     * 平台文件预览能力端口：kkFileView 统一配置、签名文件地址签发与预览决策。
+     * 默认实现表示宿主未提供该能力（enabled() 恒 false、预览恒为 NONE）。
+     */
+    default PluginFilePreviewService filePreview() {
+        return new PluginFilePreviewService() {
+        };
+    }
 
     Optional<String> setting(String key);
 

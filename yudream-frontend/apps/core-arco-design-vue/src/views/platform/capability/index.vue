@@ -400,6 +400,13 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'defaultProvider', label: '默认供应商编码', placeholder: 'openai' },
       { key: 'defaultModel', label: '默认模型编码', placeholder: 'gpt-4o-mini' },
     ],
+    'file-preview': [
+      { key: 'baseUrl', label: 'kkFileView 服务地址（浏览器可达）', placeholder: 'http(s)://站点/kkfileview' },
+      { key: 'callbackBaseUrl', label: '回源基址（留空按请求推导）', placeholder: 'http://backend:8080' },
+      { key: 'officePreviewType', label: 'Office 预览类型', placeholder: 'pdf' },
+      { key: 'tokenTtlSeconds', label: '签名地址时效（秒）', placeholder: '1800', type: 'number' },
+      { key: 'maxPreviewSizeMb', label: '预览大小上限（MB）', placeholder: '200', type: 'number' },
+    ],
   }
   return code ? map[code] || [] : []
 }
