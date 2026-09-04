@@ -58,6 +58,7 @@ const roleOptions = computed(() => roles.value.map(item => ({
   label: item.deptName ? `${item.deptName} / ${item.label}` : item.label,
   value: item.id,
 })))
+const searchRoleOptions = computed(() => search.deptId == null ? roleOptions.value : roleOptionsByDept(search.deptId))
 const defaultDeptOptions = computed(() => selectedDeptIds.value.map(id => ({
   label: deptOptions.value.find(item => sameId(item.value, id))?.label || String(id),
   value: id,
@@ -89,6 +90,12 @@ onMounted(async () => {
 watch([selectedDeptIds, roles], () => {
   normalizeDefaultDept()
   pruneSelectedRoleIdsByDepts()
+})
+
+watch(() => search.deptId, () => {
+  if (search.roleId != null && !searchRoleOptions.value.some(item => sameId(item.value, search.roleId))) {
+    search.roleId = undefined
+  }
 })
 
 async function loadOptions() {
@@ -410,7 +417,7 @@ function importUsers() {
             <div class="gap-3 grid grid-cols-1 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
               <FaInput v-model="search.keyword" clearable placeholder="用户名 / 昵称 / 邮箱" class="w-full" @keydown.enter="loadUsers" @clear="loadUsers" />
               <FaSelect v-model="search.deptId" :options="deptOptions" placeholder="部门" class="w-full" />
-              <FaSelect v-model="search.roleId" :options="roleOptions" placeholder="角色" class="w-full" />
+              <FaSelect v-model="search.roleId" :options="searchRoleOptions" placeholder="角色" class="w-full" />
               <FaSelect v-model="search.emailVerified" :options="emailVerifiedOptions" placeholder="邮箱验证" class="w-full" />
               <FaSelect v-model="search.status" :options="statusOptions" placeholder="状态" class="w-full" />
               <div class="flex gap-2 col-end--1 justify-end">
