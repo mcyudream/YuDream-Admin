@@ -43,4 +43,11 @@ public @interface PluginRoute {
      * make sure the backing HTTP endpoints do not require permissions either.
      */
     boolean publicAccess() default false;
+
+    /**
+     * Injects the route into the CMS public site header navigation ({@code /site}).
+     * Only effective together with {@link #publicAccess()}; the page is rendered
+     * inside the site chrome (shared header/footer) instead of the admin layout.
+     */
+    boolean siteNav() default false;
 }

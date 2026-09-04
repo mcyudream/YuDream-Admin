@@ -215,6 +215,8 @@ META-INF/yudream-plugin/frontend/demo-plugin/remoteEntry.js
 
 - `sort`：当前页面排序，值越大越靠前。
 - `parentTitle` / `parentPath` / `parentIcon` / `parentSort`：把多个页面归到插件目录下。
+- `publicAccess`：匿名可访问的公开页面，无需登录。
+- `siteNav`：配合 `publicAccess` 使用，把页面注入 `/site` 公开站页头导航，并以站点页头/页脚布局渲染。
 
 运行后可在插件管理中查看插件注册的菜单路由，并调整排序。
 

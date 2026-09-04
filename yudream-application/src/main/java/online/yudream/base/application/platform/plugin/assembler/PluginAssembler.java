@@ -249,6 +249,7 @@ public class PluginAssembler {
                 .parentVisible(route.parentVisible())
                 .parentStatus(route.parentStatus())
                 .publicAccess(route.publicAccess())
+                .siteNav(route.siteNav())
                 .build();
     }
 

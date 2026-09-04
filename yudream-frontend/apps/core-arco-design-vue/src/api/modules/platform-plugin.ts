@@ -42,6 +42,7 @@ export interface PluginFrontendRoute {
   sort?: number
   hideInMenu?: boolean
   publicAccess?: boolean
+  siteNav?: boolean
   parentCode?: string
   visible?: boolean
   status?: 'ACTIVE' | 'DISABLED'

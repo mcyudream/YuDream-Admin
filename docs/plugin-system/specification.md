@@ -242,6 +242,8 @@ Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图
 - `permission` 与页面访问权限一致。
 - `sort` 控制同级页面排序。
 - 多页面插件应使用 `parentTitle`、`parentPath`、`parentSort` 形成菜单目录。
+- `publicAccess` 标记匿名可访问的公开路由，公开路由随未登录 manifest 下发并注册为顶级路由。
+- `siteNav` 必须与 `publicAccess` 一起使用：页面注入 `/site` 公开站页头导航，并以站点页头/页脚布局渲染；导航项默认排在 CMS 导航之后、知识库入口之前，在 CMS 导航中配置同 URL 条目可覆盖其位置。
 
 不需要展示在菜单中的页面，应由运行时或 manifest 显式标记为隐藏路由；隐藏路由仍必须有权限控制。
 
