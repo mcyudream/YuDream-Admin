@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
@@ -90,6 +91,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final PluginSemanticMemoryService semanticMemoryService;
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final ApplicationEventPublisher eventPublisher;
+    private final PluginMenuProjectionService pluginMenuProjectionService;
     private final PluginDevModeProperties devModeProperties;
     private final PluginDevProjectCatalog devProjectCatalog;
     private final PluginDevDirectoryBrowser devDirectoryBrowser;
@@ -727,7 +729,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                                 aiToolRegistry,
                                 pluginGraphFrameworkService.scoped(module.getCode()),
                                 semanticMemoryService,
-                                agentApplicationRegistry
+                                agentApplicationRegistry,
+                                (routePath, visible) -> pluginMenuProjectionService.setRouteMenuVisible(
+                                        module.getCode(), routePath, visible)
                         ),
                         assetRevision(module.getCode(), pluginPath, descriptor)
                 );
