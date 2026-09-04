@@ -18,6 +18,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -136,6 +137,25 @@ public class PluginMenuProjectionService {
                 throw e;
             }
         });
+    }
+
+    /**
+     * 按路由路径调整插件菜单可见性（SPI setMenuVisible 的落点，功能开关联动菜单入口显隐）。
+     * 仅影响已投影的菜单记录；路径匹配不到记录时静默忽略。
+     */
+    public void setRouteMenuVisible(String pluginCode, String routePath, boolean visible) {
+        if (!StringUtils.hasText(pluginCode) || !StringUtils.hasText(routePath)) {
+            return;
+        }
+        String normalized = routePath.trim();
+        menuRepo.findByPluginCode(pluginCode).stream()
+                .filter(menu -> normalized.equals(menu.getPath()))
+                .forEach(menu -> {
+                    if (!Objects.equals(menu.getVisible(), visible)) {
+                        menu.setVisible(visible);
+                        menuRepo.save(menu);
+                    }
+                });
     }
 
     private ProjectionPlan validate(String pluginCode, List<PluginFrontendModuleInfo> modules) {

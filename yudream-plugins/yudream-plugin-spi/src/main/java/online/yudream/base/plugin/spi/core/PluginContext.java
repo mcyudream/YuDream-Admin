@@ -78,5 +78,12 @@ public interface PluginContext {
 
     boolean dependencyAvailable(String pluginCode);
 
+    /**
+     * 调整本插件路由菜单在侧边栏的可见性（按路由路径匹配，如 /platform/plugins/xxx）。
+     * 用于功能开关联动入口显隐；匹配不到菜单记录或宿主不支持时静默忽略。
+     */
+    default void setMenuVisible(String routePath, boolean visible) {
+    }
+
     void onDispose(AutoCloseable closeable);
 }

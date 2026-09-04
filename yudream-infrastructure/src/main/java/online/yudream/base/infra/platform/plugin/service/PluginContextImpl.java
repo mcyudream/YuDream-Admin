@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.net.URLClassLoader;
 
@@ -60,13 +61,15 @@ public class PluginContextImpl implements PluginContext {
     private final AgentRuntimeApplicationRegistry agentApplicationRegistry;
     private final PluginGraphService graph;
     private final PluginSemanticMemoryService semanticMemory;
+    private final BiConsumer<String, Boolean> menuVisibilityUpdater;
 
     public PluginContextImpl(String pluginCode, URLClassLoader pluginClassLoader, FrameworkServices frameworkServices,
                              PluginServiceRegistry pluginServiceRegistry, Set<String> declaredDependencies,
                              Predicate<String> dependencyEnabled, PluginAiToolRegistry aiToolRegistry,
                              PluginGraphService graphService,
                              PluginSemanticMemoryService semanticMemoryService,
-                             AgentRuntimeApplicationRegistry agentApplicationRegistry) {
+                             AgentRuntimeApplicationRegistry agentApplicationRegistry,
+                             BiConsumer<String, Boolean> menuVisibilityUpdater) {
         this.pluginCode = pluginCode;
         this.frameworkServices = frameworkServices;
         this.pluginServiceRegistry = pluginServiceRegistry;
@@ -80,6 +83,7 @@ public class PluginContextImpl implements PluginContext {
         this.graph = graphService;
         this.semanticMemory = new PluginScopedSemanticMemoryService(pluginCode,
                 new SandboxAwarePluginSemanticMemoryService(pluginCode, semanticMemoryService));
+        this.menuVisibilityUpdater = menuVisibilityUpdater;
         onDispose(interactionRegistry);
         onDispose(commandRegistry);
     }
@@ -236,6 +240,14 @@ public class PluginContextImpl implements PluginContext {
     public boolean dependencyAvailable(String targetPluginCode) {
         requireDeclaredDependency(targetPluginCode);
         return dependencyEnabled.test(targetPluginCode);
+    }
+
+    @Override
+    public void setMenuVisible(String routePath, boolean visible) {
+        if (menuVisibilityUpdater == null || !StringUtils.hasText(routePath)) {
+            return;
+        }
+        menuVisibilityUpdater.accept(normalizePath(routePath), visible);
     }
 
     @Override
