@@ -26,6 +26,7 @@ public class DynamicFormDTO implements Serializable {
     private String optionJson;
     private Boolean allowAnonymous;
     private DynamicFormStatus status;
+    private Long maxUploadSizeMb;
     private LocalDateTime publishedAt;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.application.platform.form.dto.DynamicFormDTO;
 import online.yudream.base.application.platform.form.dto.FormSubmissionDTO;
 import online.yudream.base.application.platform.form.dto.FormSubmissionExportDTO;
+import online.yudream.base.application.platform.form.dto.FormSubmissionExportFileDTO;
+import online.yudream.base.application.platform.form.support.DynamicFormSchemaSupport;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -13,6 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class FormSubmissionExcelAssembler {
@@ -43,17 +46,19 @@ public class FormSubmissionExcelAssembler {
 
     public static List<List<Object>> rows(FormSubmissionExportDTO export) {
         List<FormField> fields = fields(export);
+        Map<Long, String> fileNames = fileNames(export);
         return safeSubmissions(export).stream()
-                .map(submission -> row(submission, fields))
+                .map(submission -> row(submission, fields, fileNames))
                 .toList();
     }
 
-    private static List<Object> row(FormSubmissionDTO submission, List<FormField> fields) {
+    private static List<Object> row(FormSubmissionDTO submission, List<FormField> fields, Map<Long, String> fileNames) {
         Map<String, Object> data = submission.getData() == null ? Map.of() : submission.getData();
         List<Object> row = new ArrayList<>();
         row.add(submission.getId());
         for (FormField field : fields) {
-            row.add(valueText(data.get(field.field())));
+            Object value = data.get(field.field());
+            row.add(field.upload() ? uploadText(value, fileNames) : valueText(value));
         }
         row.add(submission.getSubmitterId());
         row.add(submission.getSubmitterIp());
@@ -61,15 +66,42 @@ public class FormSubmissionExcelAssembler {
         return row;
     }
 
+    private static Map<Long, String> fileNames(FormSubmissionExportDTO export) {
+        Map<Long, String> names = new LinkedHashMap<>();
+        for (FormSubmissionExportFileDTO file : export.getFiles() == null ? List.<FormSubmissionExportFileDTO>of() : export.getFiles()) {
+            if (file.getFileId() != null && file.getOriginalName() != null && !file.getOriginalName().isBlank()) {
+                names.putIfAbsent(file.getFileId(), file.getOriginalName());
+            }
+        }
+        return names;
+    }
+
+    private static String uploadText(Object value, Map<Long, String> fileNames) {
+        if (value == null || Objects.equals(value, "")) {
+            return "";
+        }
+        if (value instanceof Iterable<?> iterable) {
+            return java.util.stream.StreamSupport.stream(iterable.spliterator(), false)
+                    .map(item -> uploadText(item, fileNames))
+                    .collect(Collectors.joining(", "));
+        }
+        Long fileId = DynamicFormSchemaSupport.fileId(String.valueOf(value));
+        if (fileId == null) {
+            return String.valueOf(value);
+        }
+        return fileNames.getOrDefault(fileId, String.valueOf(value));
+    }
+
     private static List<FormField> fields(FormSubmissionExportDTO export) {
         DynamicFormDTO form = export.getForm();
         Map<String, String> fields = parseSchemaFields(form == null ? null : form.getSchemaJson());
+        Set<String> uploadFields = DynamicFormSchemaSupport.uploadFields(form == null ? null : form.getSchemaJson());
         for (FormSubmissionDTO submission : safeSubmissions(export)) {
             Map<String, Object> data = submission.getData() == null ? Map.of() : submission.getData();
             data.keySet().forEach(key -> fields.putIfAbsent(key, key));
         }
         return fields.entrySet().stream()
-                .map(entry -> new FormField(entry.getKey(), entry.getValue()))
+                .map(entry -> new FormField(entry.getKey(), entry.getValue(), uploadFields.contains(entry.getKey())))
                 .toList();
     }
 
@@ -142,6 +174,6 @@ public class FormSubmissionExcelAssembler {
         return filename.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
 
-    private record FormField(String field, String title) {
+    private record FormField(String field, String title, boolean upload) {
     }
 }

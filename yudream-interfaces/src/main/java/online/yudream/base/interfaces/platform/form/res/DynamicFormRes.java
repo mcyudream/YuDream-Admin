@@ -17,6 +17,7 @@ public class DynamicFormRes {
     private String optionJson;
     private Boolean allowAnonymous;
     private DynamicFormStatus status;
+    private Long maxUploadSizeMb;
     private LocalDateTime publishedAt;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

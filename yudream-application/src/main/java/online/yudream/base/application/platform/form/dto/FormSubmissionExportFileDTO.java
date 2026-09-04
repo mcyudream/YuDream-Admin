@@ -7,23 +7,21 @@ import lombok.NoArgsConstructor;
 
 import java.io.Serial;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 
+/**
+ * 表单提交导出附件元数据：导出时按 fileId 惰性读取文件内容打包。
+ */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class FormSubmissionExportDTO implements Serializable {
+public class FormSubmissionExportFileDTO implements Serializable {
 
     @Serial
     private static final long serialVersionUID = 1L;
 
-    private DynamicFormDTO form;
-
-    @Builder.Default
-    private List<FormSubmissionDTO> submissions = new ArrayList<>();
-
-    @Builder.Default
-    private List<FormSubmissionExportFileDTO> files = new ArrayList<>();
+    private Long submissionId;
+    private String field;
+    private Long fileId;
+    private String originalName;
 }
