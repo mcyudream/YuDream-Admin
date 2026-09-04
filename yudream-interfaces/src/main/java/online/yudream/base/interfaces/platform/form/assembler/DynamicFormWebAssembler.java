@@ -78,6 +78,7 @@ public class DynamicFormWebAssembler {
                 .optionJson(dto.getOptionJson())
                 .allowAnonymous(dto.getAllowAnonymous())
                 .status(dto.getStatus())
+                .maxUploadSizeMb(dto.getMaxUploadSizeMb())
                 .publishedAt(dto.getPublishedAt())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())

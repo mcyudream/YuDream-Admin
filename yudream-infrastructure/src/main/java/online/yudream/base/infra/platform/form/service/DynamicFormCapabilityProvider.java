@@ -5,6 +5,7 @@ import online.yudream.base.domain.platform.capability.service.CapabilityProvider
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
+import online.yudream.base.domain.platform.form.valobj.FormUploadConfig;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +29,8 @@ public class DynamicFormCapabilityProvider implements CapabilityProvider {
                 "提供可视化表单设计、发布、填写、结果收集与统计能力",
                 "i-ri:survey-line",
                 55,
-                Map.of("designer", "form-create")
+                Map.of("designer", "form-create",
+                        FormUploadConfig.CONFIG_MAX_UPLOAD_SIZE_MB, String.valueOf(FormUploadConfig.DEFAULT_MAX_UPLOAD_SIZE_MB))
         );
     }
 

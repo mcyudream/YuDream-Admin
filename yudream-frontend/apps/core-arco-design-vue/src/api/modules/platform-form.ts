@@ -14,6 +14,8 @@ export interface DynamicForm {
   optionJson?: string
   allowAnonymous: boolean
   status: DynamicFormStatus
+  /** 后端 Long 全局序列化为字符串，运行时实际为 string */
+  maxUploadSizeMb?: number | string
   publishedAt?: string
   createTime?: string
   updateTime?: string
@@ -82,9 +84,9 @@ export default {
   unpublish: (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/forms/${id}/unpublish`),
   delete: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/forms/${id}`),
   submissions: (id: string, params: FormSubmissionPageParams) => systemClient.get<unknown, ApiResponse<PageResult<FormSubmission>>>(`api/platform/forms/${id}/submissions`, { params }),
-  exportSubmissions: (id: string) => systemClient.get<unknown, ExcelBlobResponse>(`api/platform/forms/${id}/submissions/export`, { responseType: 'blob' }),
+  exportSubmissions: (id: string) => systemClient.get<unknown, ExcelBlobResponse>(`api/platform/forms/${id}/submissions/export`, { responseType: 'blob', timeout: 0 }),
   statistics: (id: string) => systemClient.get<unknown, ApiResponse<FormStatistics>>(`api/platform/forms/${id}/statistics`),
   publicForm: (code: string) => systemClient.get<unknown, ApiResponse<DynamicForm>>(`api/public/forms/${code}`, { skipTokenRefresh: true }),
-  uploadPublicFile: (code: string, data: FormData) => systemClient.post<unknown, ApiResponse<FileObject>>(`api/public/forms/${code}/files`, data, { skipTokenRefresh: true }),
+  uploadPublicFile: (code: string, data: FormData) => systemClient.post<unknown, ApiResponse<FileObject>>(`api/public/forms/${code}/files`, data, { skipTokenRefresh: true, timeout: 0 }),
   submitPublic: (code: string, data: Record<string, unknown>) => systemClient.post<unknown, ApiResponse<FormSubmission>>(`api/public/forms/${code}/submissions`, { data }, { skipTokenRefresh: true }),
 }

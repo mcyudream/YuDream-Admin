@@ -23,4 +23,7 @@ public class FormSubmissionExportDTO implements Serializable {
 
     @Builder.Default
     private List<FormSubmissionDTO> submissions = new ArrayList<>();
+
+    @Builder.Default
+    private List<FormSubmissionExportFileDTO> files = new ArrayList<>();
 }

@@ -54,6 +54,17 @@ public class FileAppService {
     }
 
     @Transactional(readOnly = true)
+    public FileObjectDTO tryGet(Long id) {
+        if (id == null) {
+            return null;
+        }
+        return fileObjectRepo.findById(id)
+                .filter(fileObject -> !fileObject.isDeleted())
+                .map(this::toDTO)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
     public PageResult<FileObjectDTO> page(FileObjectPageQuery query) {
         int page = query == null ? 1 : query.getPage();
         int size = query == null ? 20 : query.getSize();

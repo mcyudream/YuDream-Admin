@@ -407,6 +407,9 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'tokenTtlSeconds', label: '签名地址时效（秒）', placeholder: '1800', type: 'number' },
       { key: 'maxPreviewSizeMb', label: '预览大小上限（MB）', placeholder: '200', type: 'number' },
     ],
+    form: [
+      { key: 'maxUploadSizeMb', label: '上传文件大小上限（MB）', placeholder: '100', type: 'number' },
+    ],
   }
   return code ? map[code] || [] : []
 }

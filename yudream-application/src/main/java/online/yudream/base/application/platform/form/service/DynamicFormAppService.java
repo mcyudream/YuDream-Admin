@@ -9,9 +9,12 @@ import online.yudream.base.application.platform.form.dto.FormFieldStatDTO;
 import online.yudream.base.application.platform.form.dto.FormStatisticsDTO;
 import online.yudream.base.application.platform.form.dto.FormSubmissionDTO;
 import online.yudream.base.application.platform.form.dto.FormSubmissionExportDTO;
+import online.yudream.base.application.platform.form.dto.FormSubmissionExportFileDTO;
 import online.yudream.base.application.platform.form.dto.FormValueCountDTO;
 import online.yudream.base.application.platform.form.query.DynamicFormPageQuery;
 import online.yudream.base.application.platform.form.query.FormSubmissionPageQuery;
+import online.yudream.base.application.platform.form.support.DynamicFormSchemaSupport;
+import online.yudream.base.application.system.file.dto.FileContentDTO;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.domain.common.PageResult;
@@ -23,17 +26,20 @@ import online.yudream.base.domain.platform.form.enumerate.DynamicFormStatus;
 import online.yudream.base.domain.platform.form.repo.DynamicFormRepo;
 import online.yudream.base.domain.platform.form.repo.FormSubmissionRepo;
 import online.yudream.base.domain.platform.form.valobj.FormCode;
+import online.yudream.base.domain.platform.form.valobj.FormUploadConfig;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,7 +65,7 @@ public class DynamicFormAppService {
     @Transactional(readOnly = true)
     public DynamicFormDTO detail(Long id) {
         ensureEnabled();
-        return DynamicFormAssembler.toDTO(form(id));
+        return withUploadLimit(DynamicFormAssembler.toDTO(form(id)));
     }
 
     @Transactional
@@ -98,7 +104,7 @@ public class DynamicFormAppService {
     @Transactional(readOnly = true)
     public DynamicFormDTO publicForm(String code) {
         ensureEnabled();
-        return DynamicFormAssembler.toDTO(publishedForm(code));
+        return withUploadLimit(DynamicFormAssembler.toDTO(publishedForm(code)));
     }
 
     @Transactional
@@ -116,6 +122,10 @@ public class DynamicFormAppService {
         ensureEnabled();
         DynamicForm form = publishedForm(code);
         ensureSubmitAllowed(form, submitterId);
+        long maxSizeMb = maxUploadSizeMb();
+        if (size > maxSizeMb * 1024L * 1024L) {
+            throw new BizException("文件大小超过限制，最大允许 " + maxSizeMb + "MB");
+        }
         return fileAppService.upload(inputStream, originalName, contentType, size, "dynamic-form", submitterId, false);
     }
 
@@ -149,12 +159,58 @@ public class DynamicFormAppService {
     public FormSubmissionExportDTO exportSubmissions(Long formId) {
         ensureEnabled();
         DynamicForm form = form(formId);
+        List<FormSubmissionDTO> submissions = formSubmissionRepo.findByFormId(formId, EXPORT_SUBMISSION_LIMIT).stream()
+                .map(DynamicFormAssembler::toDTO)
+                .toList();
         return FormSubmissionExportDTO.builder()
                 .form(DynamicFormAssembler.toDTO(form))
-                .submissions(formSubmissionRepo.findByFormId(formId, EXPORT_SUBMISSION_LIMIT).stream()
-                        .map(DynamicFormAssembler::toDTO)
-                        .toList())
+                .submissions(submissions)
+                .files(exportFiles(form, submissions))
                 .build();
+    }
+
+    private List<FormSubmissionExportFileDTO> exportFiles(DynamicForm form, List<FormSubmissionDTO> submissions) {
+        Set<String> uploadFields = DynamicFormSchemaSupport.uploadFields(form.getSchemaJson());
+        if (uploadFields.isEmpty()) {
+            return List.of();
+        }
+        List<FormSubmissionExportFileDTO> files = new ArrayList<>();
+        for (FormSubmissionDTO submission : submissions) {
+            Map<String, Object> data = submission.getData() == null ? Map.of() : submission.getData();
+            for (String field : uploadFields) {
+                for (Long fileId : DynamicFormSchemaSupport.fileIds(data.get(field))) {
+                    FileObjectDTO file = fileAppService.tryGet(fileId);
+                    if (file != null) {
+                        files.add(FormSubmissionExportFileDTO.builder()
+                                .submissionId(submission.getId())
+                                .field(field)
+                                .fileId(file.getId())
+                                .originalName(file.getOriginalName())
+                                .build());
+                    }
+                }
+            }
+        }
+        return files;
+    }
+
+    private DynamicFormDTO withUploadLimit(DynamicFormDTO dto) {
+        if (dto != null) {
+            dto.setMaxUploadSizeMb(maxUploadSizeMb());
+        }
+        return dto;
+    }
+
+    private long maxUploadSizeMb() {
+        return capabilityModuleRepo.findByCode(CAPABILITY_CODE)
+                .map(module -> module.getConfig() == null ? null : module.getConfig().get(FormUploadConfig.CONFIG_MAX_UPLOAD_SIZE_MB))
+                .map(FormUploadConfig::parseMaxUploadSizeMb)
+                .orElse(FormUploadConfig.DEFAULT_MAX_UPLOAD_SIZE_MB);
+    }
+
+    @Transactional(readOnly = true)
+    public FileContentDTO exportAttachmentContent(Long fileId) {
+        return fileAppService.content(fileId);
     }
 
     private DynamicForm create(DynamicFormSaveCmd cmd) {

@@ -11,12 +11,11 @@ import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.form.assembler.DynamicFormWebAssembler;
-import online.yudream.base.interfaces.platform.form.assembler.FormSubmissionExcelAssembler;
 import online.yudream.base.interfaces.platform.form.request.DynamicFormSaveRequest;
 import online.yudream.base.interfaces.platform.form.res.DynamicFormRes;
 import online.yudream.base.interfaces.platform.form.res.FormStatisticsRes;
 import online.yudream.base.interfaces.platform.form.res.FormSubmissionRes;
-import online.yudream.base.interfaces.system.excel.support.ExcelHttpSupport;
+import online.yudream.base.interfaces.platform.form.support.FormSubmissionExportHttpSupport;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -89,16 +88,10 @@ public class DynamicFormController {
     }
 
     @GetMapping("/{id}/submissions/export")
-    @PermissionRegister(code = "platform:form:submission:export", name = "导出表单提交", module = "平台能力", desc = "导出动态表单提交结果 Excel")
+    @PermissionRegister(code = "platform:form:submission:export", name = "导出表单提交", module = "平台能力", desc = "导出动态表单提交结果，含上传附件时打包 ZIP")
     public void exportSubmissions(@PathVariable Long id, HttpServletResponse response) throws IOException {
         FormSubmissionExportDTO export = dynamicFormAppService.exportSubmissions(id);
-        ExcelHttpSupport.writeDynamic(
-                response,
-                FormSubmissionExcelAssembler.filename(export),
-                "提交结果",
-                FormSubmissionExcelAssembler.head(export),
-                FormSubmissionExcelAssembler.rows(export)
-        );
+        FormSubmissionExportHttpSupport.write(response, export, dynamicFormAppService::exportAttachmentContent);
     }
 
     @GetMapping("/{id}/statistics")
