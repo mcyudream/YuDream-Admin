@@ -42,11 +42,34 @@ const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ labe
 const permissionGroups = computed(() => {
   const groups: Record<string, PermissionItem[]> = {}
   permissions.value.forEach((item) => {
+    if (item.status === 'DEPRECATED') {
+      return
+    }
     const key = item.module || 'default'
     groups[key] ||= []
     groups[key].push(item)
   })
   return groups
+})
+const permissionCodeSet = computed(() => new Set(permissions.value.map(item => item.code)))
+const permissionKeyword = ref('')
+const expandedKeys = ref<string[]>([])
+const permissionTreeData = computed(() => {
+  const keyword = permissionKeyword.value.trim().toLowerCase()
+  return Object.entries(permissionGroups.value).map(([module, items]) => {
+    const matched = keyword
+      ? items.filter(item =>
+          item.name.toLowerCase().includes(keyword)
+          || item.code.toLowerCase().includes(keyword)
+          || module.toLowerCase().includes(keyword),
+        )
+      : items
+    return {
+      key: `module:${module}`,
+      title: `${module}（${matched.length}）`,
+      children: matched.map(item => ({ key: item.code, title: item.name, code: item.code })),
+    }
+  }).filter(node => node.children.length > 0)
 })
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
@@ -61,6 +84,12 @@ const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
 
 onMounted(async () => {
   await Promise.all([loadOptions(), loadRoles()])
+})
+
+watch(permissionKeyword, (keyword) => {
+  if (keyword.trim()) {
+    expandAllPermissions()
+  }
 })
 
 async function loadOptions() {
@@ -95,6 +124,35 @@ function resetSearch() {
   loadRoles()
 }
 
+function moduleKeys() {
+  return Object.keys(permissionGroups.value).map(module => `module:${module}`)
+}
+
+function expandAllPermissions() {
+  expandedKeys.value = moduleKeys()
+}
+
+function collapseAllPermissions() {
+  expandedKeys.value = []
+}
+
+function selectAllPermissions() {
+  form.permissions = [...permissionCodeSet.value]
+}
+
+function clearPermissions() {
+  form.permissions = []
+}
+
+function onPermissionCheck(checkedKeys: (string | number)[]) {
+  form.permissions = checkedKeys.filter((key): key is string => typeof key === 'string' && permissionCodeSet.value.has(key))
+}
+
+function resetPermissionPanel() {
+  permissionKeyword.value = ''
+  expandAllPermissions()
+}
+
 function openCreate() {
   editing.value = null
   Object.assign(form, {
@@ -105,6 +163,7 @@ function openCreate() {
     status: 'ACTIVE' as RoleStatus,
     permissions: [],
   })
+  resetPermissionPanel()
   formVisible.value = true
 }
 
@@ -118,6 +177,7 @@ function openEdit(row: RoleManageItem) {
     status: row.status,
     permissions: [...row.permissions],
   })
+  resetPermissionPanel()
   formVisible.value = true
 }
 
@@ -373,16 +433,40 @@ function importRoles() {
 
         <a-form-item label="权限">
           <div class="permission-panel">
-            <div v-for="(items, module) in permissionGroups" :key="module" class="permission-group">
-              <div class="permission-title">
-                {{ module }}
+            <div class="permission-toolbar">
+              <FaInput v-model="permissionKeyword" clearable placeholder="搜索权限名称 / 编码" class="min-w-[200px] flex-1" />
+              <span class="permission-count">已选 {{ form.permissions.length }} 项</span>
+              <FaButton size="sm" variant="outline" @click="selectAllPermissions">
+                全选
+              </FaButton>
+              <FaButton size="sm" variant="outline" @click="clearPermissions">
+                清空
+              </FaButton>
+              <FaButton size="sm" variant="outline" @click="expandAllPermissions">
+                展开
+              </FaButton>
+              <FaButton size="sm" variant="outline" @click="collapseAllPermissions">
+                收起
+              </FaButton>
+            </div>
+            <div class="permission-tree">
+              <a-tree
+                v-model:expanded-keys="expandedKeys"
+                :checked-keys="form.permissions"
+                :data="permissionTreeData"
+                :selectable="false"
+                checkable
+                block-node
+                @check="onPermissionCheck"
+              >
+                <template #title="node">
+                  <span>{{ node.title }}</span>
+                  <span v-if="node.code" class="permission-code">{{ node.code }}</span>
+                </template>
+              </a-tree>
+              <div v-if="!permissionTreeData.length" class="permission-empty">
+                无匹配权限
               </div>
-              <FaCheckboxGroup
-                :model-value="form.permissions"
-                :options="items.map(item => ({ label: item.name, value: item.code }))"
-                class="flex flex-wrap gap-3"
-                @update:model-value="value => (form.permissions = value as string[])"
-              />
             </div>
           </div>
         </a-form-item>
@@ -393,20 +477,42 @@ function importRoles() {
 
 <style scoped>
 .permission-panel {
-  display: grid;
-  gap: 12px;
-  max-height: 320px;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.permission-group {
-  padding: 12px;
+.permission-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.permission-count {
+  font-size: 12px;
+  color: var(--color-text-3);
+  white-space: nowrap;
+}
+
+.permission-tree {
+  max-height: 360px;
+  padding: 4px 8px;
+  overflow: auto;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
 }
 
-.permission-title {
-  margin-bottom: 8px;
-  font-weight: 600;
+.permission-code {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.permission-empty {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--color-text-3);
+  text-align: center;
 }
 </style>
