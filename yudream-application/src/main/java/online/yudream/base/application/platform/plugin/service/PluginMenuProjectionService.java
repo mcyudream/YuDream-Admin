@@ -157,6 +157,10 @@ public class PluginMenuProjectionService {
                 if (route == null) {
                     throw new BizException("插件前端路由声明不能为空");
                 }
+                // publicAccess 路由注册为无布局公开页面，不投影为菜单记录
+                if (route.publicAccess()) {
+                    continue;
+                }
                 String parentPath = normalizeOptionalText(route.parentPath());
                 if (parentPath != null) {
                     String parentKey = "parent:" + moduleName + ":" + parentPath;

@@ -56,6 +56,18 @@ function setupRoutes(router: Router) {
     const appMenuStore = useAppMenuStore()
     // 是否已登录
     if (appAccountStore.isLogin) {
+      // 已登录访问插件公开页面（publicAccess 无布局路由）：命中 notFound 时先注册公开路由再重进当前导航
+      if (to.name === 'notFound') {
+        const publicPluginPaths = await ensurePublicPluginRoutes(router)
+        if (publicPluginPaths.some(path => to.path === path || to.path.startsWith(`${path}/`))) {
+          return {
+            path: to.path,
+            query: to.query,
+            hash: to.hash,
+            replace: true,
+          }
+        }
+      }
       // 是否已根据权限动态生成并注册路由
       if (appRouteStore.isGenerate) {
         // 导航菜单如果不是 single 模式，则需要根据 path 定位主导航菜单的选中状态
