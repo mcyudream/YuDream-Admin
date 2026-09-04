@@ -184,6 +184,12 @@ Assembler hard rules:
   - `OVERWRITE`: save every seed menu and overwrite records with the same code.
 - Seed strategy judgment belongs in domain services. Infrastructure reads configuration and passes the strategy into the domain service during startup.
 
+## Permission Codes
+
+- Permission code shape: `{domain}:{resource}:{action}` (optionally `{domain}:{subdomain}:{resource}:{action}`); plugins use `plugin:{pluginCode}:{action}`; `@PermissionRegister.module` is a Chinese module name.
+- The trailing action word drives the role permission tree's business grouping and color; pick from the vocabulary in root `AGENTS.md` section "权限码业务分类" (view: `view`/`export`/`download`; operate: `create`/`edit`/`import`/`upload`/`use`/`generate`/`publish`/`connect`/`send`/`test`/`run`/`invoke`/`execute`/`enable`/`disable`/`assign-*`/`dataset`/`report`/`accept`; manage: `manage`/`config`; danger: `delete`/`kickout`/`revoke`/`impersonate`). Unknown actions fall into the "其他" group. Adding a new action word requires updating AGENTS.md, the role page `permissionCategoryMeta`, and `knowledge.json` in the same commit.
+- Split permissions per resource into independent `view`/write/`delete` codes; do not register a single `manage` and re-check finer levels in code.
+
 ## Excel / Import Export
 
 - Use EasyExcel for `.xlsx` import/export.

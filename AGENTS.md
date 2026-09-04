@@ -85,10 +85,22 @@
 - 契约包可分开发布：`v*`/裸 `p*` tag 发布并验签全部三个契约包；`pspi-*` 只发 SPI、`psdk-*` 只发 plugin-sdk、`pcomp-*` 只发 components（`verify:npm-contracts` 按 `VERIFY_NPM_PACKAGES` 收窄验签范围）。只发布版本实际变动的包。
 - 未验证已发布的版本不得用于下游；未明确要求时不做发布后 snapshot 升版。
 
-## 11. 完成前自检
+## 11. 权限码业务分类
+
+- 权限码结构：`{域}:{资源}:{动作}`（必要时 `{域}:{子域}:{资源}:{动作}`）；插件统一 `plugin:{pluginCode}:{动作}`；`@PermissionRegister` 的 `module` 使用中文模块名。
+- 末段动作词决定角色权限树的业务分组与色彩，必须从既定词表选择，禁止自造同义词：
+  - 查看：`view`、`export`、`download`
+  - 操作：`create`、`edit`、`import`、`upload`、`use`、`generate`、`publish`、`connect`、`send`、`test`、`run`、`invoke`、`execute`、`enable`、`disable`、`assign-*`、`dataset`、`report`、`accept`
+  - 管理：`manage`、`config`
+  - 危险：`delete`、`kickout`、`revoke`、`impersonate`
+  - 词表外动作归入"其他"分组；确需新动作词时，在同一提交同步本表、角色页 `permissionCategoryMeta` 与 skill `knowledge.json`。
+- 查看/操作/管理/危险的分级语义靠动作词区分：新权限按资源拆分为独立的 `view`/`edit`/`delete` 等权限码，不得只注册一个 `manage` 再在代码内二次判断。
+
+## 12. 完成前自检
 
 - 分层归属是否正确？Controller/assembler 是否触碰了禁项？
 - dataobj、Spring Bean、宿主内部类是否泄漏给了插件或接口层？
 - 平台能力是否遵守双闸门与依赖级联？长 ID 是否全程字符串？
+- 新权限码末段动作词是否落入第 11 节词表，并拆分了查看/写/删除级别？
 - 插件 JAR 的 `plugin.yml`、前端 remote 产物是否完整？软依赖路径是否条件注册？
 - 是否完成目标构建/测试与定向扫描，中文文案无乱码，并同步了受影响的 skill/文档？

@@ -235,6 +235,10 @@
     {
       "key": "qq-sandbox-error-diagnostics",
       "text": "沙盒错误可观测性三层兜底：QqSandboxDiagnostics.appendError 把指令（command.error）/交互处理器（handler.error）/分发（dispatch.error）逃逸异常以 {errorType,message,stackTrace} 入时间线；QqSandboxLogAppender（logback）在作用域激活时桥接插件包 online.yudream.base.plugin.* 的 WARN/ERROR 日志为 log.warn/log.error 事件并从 logger 名推导插件编码。插件自己 catch 且不记日志的异常宿主不可见——面板时间线标签显示 action 并按 errorType/stackTrace 标红，检查器堆栈单独渲染。"
+    },
+    {
+      "key": "permission-code-action-vocabulary",
+      "text": "权限码结构为 {domain}:{resource}:{action}（可选 {domain}:{subdomain}:{resource}:{action}），插件统一 plugin:{pluginCode}:{action}，@PermissionRegister.module 用中文模块名。末段动作词决定角色权限树的业务分组与色彩：查看=view/export/download；操作=create/edit/import/upload/use/generate/publish/connect/send/test/run/invoke/execute/enable/disable/assign-*/dataset/report/accept；管理=manage/config；危险=delete/kickout/revoke/impersonate；词表外动作归入\"其他\"。新增动作词必须同一提交同步主仓 AGENTS.md「权限码业务分类」、角色页 permissionCategoryMeta 与本条目；新权限按资源拆分 view/写/delete 独立权限码，禁止只注册 manage 再在代码内二次判断。"
     }
   ],
   "utilities": [

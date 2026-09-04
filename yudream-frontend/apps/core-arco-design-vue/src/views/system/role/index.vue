@@ -52,6 +52,30 @@ const permissionGroups = computed(() => {
   return groups
 })
 const permissionCodeSet = computed(() => new Set(permissions.value.map(item => item.code)))
+
+type PermissionCategoryVariant = 'default' | 'secondary' | 'outline' | 'destructive'
+
+interface PermissionCategoryMeta {
+  key: string
+  label: string
+  actions: string[]
+  variant: PermissionCategoryVariant
+}
+
+// 与 AGENTS.md「权限码业务分类」词表保持一致，新增动作词需同步两边
+const permissionCategoryMeta: PermissionCategoryMeta[] = [
+  { key: 'view', label: '查看', actions: ['view', 'export', 'download'], variant: 'secondary' },
+  { key: 'operate', label: '操作', actions: ['create', 'edit', 'import', 'upload', 'use', 'generate', 'publish', 'connect', 'send', 'test', 'run', 'invoke', 'execute', 'enable', 'disable', 'assign-role', 'assign-dept', 'dataset', 'report', 'accept'], variant: 'outline' },
+  { key: 'manage', label: '管理', actions: ['manage', 'config'], variant: 'default' },
+  { key: 'danger', label: '危险', actions: ['delete', 'kickout', 'revoke', 'impersonate'], variant: 'destructive' },
+  { key: 'other', label: '其他', actions: [], variant: 'outline' },
+]
+
+function permissionCategoryOf(code: string): PermissionCategoryMeta {
+  const action = code.split(':').pop() || ''
+  return permissionCategoryMeta.find(item => item.actions.includes(action)) || permissionCategoryMeta[permissionCategoryMeta.length - 1]
+}
+
 const permissionKeyword = ref('')
 const expandedKeys = ref<string[]>([])
 const permissionTreeData = computed(() => {
@@ -61,13 +85,23 @@ const permissionTreeData = computed(() => {
       ? items.filter(item =>
           item.name.toLowerCase().includes(keyword)
           || item.code.toLowerCase().includes(keyword)
-          || module.toLowerCase().includes(keyword),
+          || module.toLowerCase().includes(keyword)
+          || permissionCategoryOf(item.code).label.includes(keyword),
         )
       : items
     return {
       key: `module:${module}`,
       title: `${module}（${matched.length}）`,
-      children: matched.map(item => ({ key: item.code, title: item.name, code: item.code })),
+      children: permissionCategoryMeta
+        .map(meta => ({
+          key: `cat:${module}:${meta.key}`,
+          title: `${meta.label}（${matched.filter(item => permissionCategoryOf(item.code).key === meta.key).length}）`,
+          variant: meta.variant as PermissionCategoryVariant,
+          children: matched
+            .filter(item => permissionCategoryOf(item.code).key === meta.key)
+            .map(item => ({ key: item.code, title: item.name, code: item.code })),
+        }))
+        .filter(group => group.children.length > 0),
     }
   }).filter(node => node.children.length > 0)
 })
@@ -124,12 +158,12 @@ function resetSearch() {
   loadRoles()
 }
 
-function moduleKeys() {
-  return Object.keys(permissionGroups.value).map(module => `module:${module}`)
+function treeGroupKeys() {
+  return permissionTreeData.value.flatMap(module => [module.key, ...module.children.map(group => group.key)])
 }
 
 function expandAllPermissions() {
-  expandedKeys.value = moduleKeys()
+  expandedKeys.value = treeGroupKeys()
 }
 
 function collapseAllPermissions() {
@@ -460,8 +494,13 @@ function importRoles() {
                 @check="onPermissionCheck"
               >
                 <template #title="node">
-                  <span>{{ node.title }}</span>
-                  <span v-if="node.code" class="permission-code">{{ node.code }}</span>
+                  <FaTag v-if="node.variant" :variant="node.variant">
+                    {{ node.title }}
+                  </FaTag>
+                  <template v-else>
+                    <span :class="{ 'font-semibold': !node.code }">{{ node.title }}</span>
+                    <span v-if="node.code" class="permission-code">{{ node.code }}</span>
+                  </template>
                 </template>
               </a-tree>
               <div v-if="!permissionTreeData.length" class="permission-empty">
