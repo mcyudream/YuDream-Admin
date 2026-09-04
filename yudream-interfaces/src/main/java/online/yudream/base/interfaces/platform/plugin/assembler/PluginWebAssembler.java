@@ -282,6 +282,7 @@ public class PluginWebAssembler {
                 .parentVisible(dto.getParentVisible())
                 .parentStatus(dto.getParentStatus())
                 .publicAccess(dto.getPublicAccess())
+                .siteNav(dto.getSiteNav())
                 .build();
     }
 

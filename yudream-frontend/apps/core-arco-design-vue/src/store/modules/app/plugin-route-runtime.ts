@@ -66,6 +66,8 @@ export function ensurePublicPluginRoutes(router: Router): Promise<string[]> {
 /** 插件热重载后清空 memo，下次未登录导航时按新 manifest 重新注册（已存在的路由由 hasRoute 跳过） */
 export function resetPublicPluginRoutes() {
   publicPluginRoutesPromise = null
+  // 站点导航项同样来自 manifest，一并复位
+  void import('@/views/site/site-navigation').then(module => module.resetSiteNavigationCache())
 }
 
 async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
@@ -88,7 +90,10 @@ async function registerPublicPluginRoutes(router: Router): Promise<string[]> {
       router.addRoute({
         path: route.path,
         name,
-        component: () => import('@/views/platform/plugin/runtime-page.vue'),
+        // siteNav 路由套公开站点页头/页脚，其余公开路由保持控制台极简布局
+        component: route.siteNav
+          ? () => import('@/views/platform/plugin/runtime-site-page.vue')
+          : () => import('@/views/platform/plugin/runtime-page.vue'),
         meta: {
           public: true,
           title: route.title,

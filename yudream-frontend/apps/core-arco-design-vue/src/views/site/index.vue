@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { CmsPage, CmsTemplateContext, CmsTemplateContextQuery, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
-import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
-import { chromeRuntimeCss, extractChromeCss, readChromeCss } from '@/utils/cms-chrome'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
+import SiteChrome from './site-chrome.vue'
+import { useSiteNavigation } from './site-navigation'
 
 const route = useRoute()
 const appAccountStore = useAppAccountStore()
@@ -33,16 +33,6 @@ const articleCss = computed(() => scopeCmsCss(sanitizeCmsCss(page.value?.cssCont
 const publishedPages = ref<CmsPage[]>([])
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
-const wikiEnabled = ref(false)
-interface SiteNavigationItem {
-  id?: string
-  label: string
-  url: string
-  parentId?: string
-  visible?: boolean
-  sort?: number
-  children?: SiteNavigationItem[]
-}
 type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
 
 const slug = computed(() => {
@@ -53,32 +43,14 @@ const slug = computed(() => {
   return value ? String(value) : ''
 })
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
-// 首页内容 CSS 只应在首页注入；全站只保留页头/页脚的 chrome 自定义样式，
+// 首页内容 CSS 只应在首页注入；页头/页脚的 chrome 自定义样式由 SiteChrome 统一注入，
 // 否则首页 CSS 里的通用类（如 .yb-ai-hero）会污染其它页面。
 const homeContentCss = computed(() => home.value?.settings?.homeCss || '')
-const chromeCustomCss = computed(() => [
-  readChromeCss(home.value?.settings, 'header'),
-  readChromeCss(home.value?.settings, 'footer'),
-  // 兼容 Grapes 曾把 Header/Footer 样式合并保存进 homeCss 的历史数据。
-  extractChromeCss(homeContentCss.value),
-].filter(Boolean).join('\n'))
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
 const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : homeJs.value)
-const navigationItems = computed(() => {
-  const items = parseNavigationItems(home.value?.settings?.navigationJson).filter(item => !isAuthNavigationUrl(item.url))
-  return wikiEnabled.value && !items.some(item => item.url === '/wiki')
-    ? [...items, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
-    : items
-})
-const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
-const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))
-const footerTitle = computed(() => home.value?.settings?.footerTitle || renderContext.value.site.name)
-const footerDescription = computed(() => home.value?.settings?.footerDescription || renderContext.value.site.description || (renderContext.value.site.name ? `由 ${renderContext.value.site.name} 驱动的内容站点` : ''))
-const footerCopyright = computed(() => home.value?.settings?.footerCopyright || `© ${new Date().getFullYear()} ${renderContext.value.site.name}. All rights reserved.`)
+// 站点导航 = CMS navigationJson + 插件 siteNav 路由 + 知识库入口，与公开插件页的站点 chrome 共用同一份合并逻辑
+const { navigationItems, navigationTree } = useSiteNavigation(() => home.value?.settings?.navigationJson)
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
-const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
-const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
-const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, chromeCustomCss.value))
 const archiveFilter = computed(() => ({
   category: queryValue(route.query.category),
   tag: queryValue(route.query.tag),
@@ -185,7 +157,6 @@ async function load() {
   home.value = null
   page.value = null
   templateContext.value = emptyTemplateContext()
-  void loadWikiNavigation()
   try {
     if (slug.value) {
       const res = await apiCms.publicPage(slug.value)
@@ -271,10 +242,6 @@ function emptyTemplateContext(): CmsTemplateContext {
   }
 }
 
-async function loadWikiNavigation() {
-  wikiEnabled.value = await hasPublicWikiSpaces()
-}
-
 async function loadPublicPages() {
   try {
     const res = await apiCms.publicPages({
@@ -334,60 +301,6 @@ function sectionStyle(section: HomeSection) {
   return section.mediaUrl
     ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.74), rgba(15, 23, 42, 0.18)), url(${section.mediaUrl})` }
     : undefined
-}
-
-function parseNavigationItems(value?: string): SiteNavigationItem[] {
-  if (!value) {
-    return []
-  }
-  try {
-    const parsed = JSON.parse(value) as SiteNavigationItem[]
-    return Array.isArray(parsed)
-      ? parsed.filter(item => item.visible !== false).sort((a, b) => (a.sort || 0) - (b.sort || 0))
-      : []
-  }
-  catch {
-    return []
-  }
-}
-
-function buildNavigationTree(items: SiteNavigationItem[]) {
-  const itemMap = new Map<string, SiteNavigationItem>()
-  const roots: SiteNavigationItem[] = []
-  items.forEach((item) => {
-    const cloned = { ...item, children: [] }
-    if (cloned.id) {
-      itemMap.set(cloned.id, cloned)
-    }
-  })
-  items.forEach((item) => {
-    const current = item.id ? itemMap.get(item.id) : { ...item, children: [] }
-    if (!current) {
-      return
-    }
-    const parent = item.parentId ? itemMap.get(item.parentId) : undefined
-    if (parent) {
-      parent.children = [...(parent.children || []), current]
-    }
-    else {
-      roots.push(current)
-    }
-  })
-  const sortItems = (list: SiteNavigationItem[]) => {
-    list.sort((a, b) => (a.sort || 0) - (b.sort || 0))
-    list.forEach(item => item.children?.sort((a, b) => (a.sort || 0) - (b.sort || 0)))
-    return list
-  }
-  return sortItems(roots)
-}
-
-function flattenNavigation(items: SiteNavigationItem[]) {
-  return items.flatMap(item => [item, ...(item.children || [])])
-}
-
-function isAuthNavigationUrl(url?: string) {
-  const normalized = (url || '').trim().toLowerCase()
-  return normalized === '/login' || normalized === '/register' || normalized === '/signup'
 }
 
 function renderDynamicHtml(value?: string) {
@@ -540,128 +453,73 @@ function dateText(value?: string) {
     </div>
 
     <template v-else>
-      <component :is="'style'">
-        {{ siteRuntimeCss }}
-      </component>
-      <header v-if="!isBlankPage" data-yb-chrome="header" class="site-layout-header">
-        <div class="site-layout-header__bar">
-          <a data-yb-chrome-slot="logo" class="site-layout-header__brand" href="/site">
-            <img v-if="renderContext.site.logo" :src="renderContext.site.logo" :alt="renderContext.site.name">
-            <span>{{ renderContext.site.name }}</span>
-          </a>
-          <nav data-yb-chrome-slot="navigation" class="site-layout-header__nav">
-            <div v-for="item in navigationTree" :key="item.id || item.url" class="site-nav-item" :class="{ 'has-children': item.children?.length }">
-              <a :href="item.url">
-                {{ item.label }}
-                <span v-if="item.children?.length">⌄</span>
-              </a>
-              <div v-if="item.children?.length" class="site-nav-dropdown">
-                <a v-for="child in item.children" :key="child.id || child.url" :href="child.url">{{ child.label }}</a>
-              </div>
-            </div>
-          </nav>
-          <div data-yb-chrome-slot="auth" class="site-layout-header__auth">
-            <div v-if="!appAccountStore.isLogin" data-visible-when="guest">
-              <a href="/login" class="ghost">登录</a>
-              <a href="/register" class="primary">注册</a>
-            </div>
-            <details v-else data-visible-when="logged-in" class="site-layout-header__account">
-              <summary class="ghost site-layout-header__action">
-                <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
-                <span>{{ appAccountStore.account }}</span>
-                <i>⌄</i>
-              </summary>
-              <div>
-                <a href="/">控制台</a>
-                <a href="/profile">个人资料</a>
-                <a href="/logout" class="danger">退出登录</a>
-              </div>
-            </details>
+      <SiteChrome :settings="home?.settings" :blank="isBlankPage">
+        <div class="site-layout-frame">
+          <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">
+            <strong>{{ renderContext.site.name }}</strong>
+            <a href="/site">首页</a>
+            <template v-for="item in navigationTree" :key="`side-${item.id || item.url}`">
+              <a :href="item.url">{{ item.label }}</a>
+              <a v-for="child in item.children" :key="`side-child-${child.id || child.url}`" class="child" :href="child.url">{{ child.label }}</a>
+            </template>
+          </aside>
+
+          <div class="site-layout-content">
+            <template v-if="!page && home">
+              <component :is="'style'" v-if="homeContentCss">
+                {{ homeContentCss }}
+              </component>
+              <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
+              <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
+                <div class="site-shell">
+                  <h1>{{ home.title }}</h1>
+                  <p>{{ home.subtitle }}</p>
+                </div>
+              </section>
+              <section v-if="!homeHtml" class="site-shell site-sections">
+                <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
+                  <div>
+                    <span>{{ section.type }}</span>
+                    <h2>{{ section.title }}</h2>
+                    <p>{{ section.subtitle }}</p>
+                    <a v-if="section.actionUrl" :href="section.actionUrl">{{ section.actionText || '了解更多' }}</a>
+                  </div>
+                </article>
+              </section>
+            </template>
+
+            <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
+              <component :is="'style'" v-if="articleCss">
+                {{ articleCss }}
+              </component>
+              <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
+                <div class="site-shell">
+                  <span>{{ page.slug }}</span>
+                  <h1>{{ page.title }}</h1>
+                  <p>{{ page.excerpt || page.summary }}</p>
+                  <div v-if="page.categories?.length || page.tags?.length" class="site-article__terms">
+                    <span v-for="item in page.categories" :key="`cat-${item}`">{{ item }}</span>
+                    <span v-for="item in page.tags" :key="`tag-${item}`">#{{ item }}</span>
+                  </div>
+                </div>
+              </header>
+              <header v-if="articleDocHeaderVisible" class="site-article__doc-header">
+                <div class="site-shell">
+                  <h1>{{ page.title }}</h1>
+                  <p v-if="page.excerpt || page.summary">
+                    {{ page.excerpt || page.summary }}
+                  </p>
+                </div>
+              </header>
+              <div
+                class="site-article__body"
+                :class="[articleFullWidth ? 'site-article__body--full' : 'site-article__body--prose site-shell']"
+                v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : renderCmsMarkdown(page.markdownContent)"
+              />
+            </article>
           </div>
         </div>
-      </header>
-
-      <div class="site-layout-frame">
-        <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">
-          <strong>{{ renderContext.site.name }}</strong>
-          <a href="/site">首页</a>
-          <template v-for="item in navigationTree" :key="`side-${item.id || item.url}`">
-            <a :href="item.url">{{ item.label }}</a>
-            <a v-for="child in item.children" :key="`side-child-${child.id || child.url}`" class="child" :href="child.url">{{ child.label }}</a>
-          </template>
-        </aside>
-
-        <div class="site-layout-content">
-          <template v-if="!page && home">
-            <component :is="'style'" v-if="homeContentCss">
-              {{ homeContentCss }}
-            </component>
-            <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
-            <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
-              <div class="site-shell">
-                <h1>{{ home.title }}</h1>
-                <p>{{ home.subtitle }}</p>
-              </div>
-            </section>
-            <section v-if="!homeHtml" class="site-shell site-sections">
-              <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
-                <div>
-                  <span>{{ section.type }}</span>
-                  <h2>{{ section.title }}</h2>
-                  <p>{{ section.subtitle }}</p>
-                  <a v-if="section.actionUrl" :href="section.actionUrl">{{ section.actionText || '了解更多' }}</a>
-                </div>
-              </article>
-            </section>
-          </template>
-
-          <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
-            <component :is="'style'" v-if="articleCss">
-              {{ articleCss }}
-            </component>
-            <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
-              <div class="site-shell">
-                <span>{{ page.slug }}</span>
-                <h1>{{ page.title }}</h1>
-                <p>{{ page.excerpt || page.summary }}</p>
-                <div v-if="page.categories?.length || page.tags?.length" class="site-article__terms">
-                  <span v-for="item in page.categories" :key="`cat-${item}`">{{ item }}</span>
-                  <span v-for="item in page.tags" :key="`tag-${item}`">#{{ item }}</span>
-                </div>
-              </div>
-            </header>
-            <header v-if="articleDocHeaderVisible" class="site-article__doc-header">
-              <div class="site-shell">
-                <h1>{{ page.title }}</h1>
-                <p v-if="page.excerpt || page.summary">
-                  {{ page.excerpt || page.summary }}
-                </p>
-              </div>
-            </header>
-            <div
-              class="site-article__body"
-              :class="[articleFullWidth ? 'site-article__body--full' : 'site-article__body--prose site-shell']"
-              v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : renderCmsMarkdown(page.markdownContent)"
-            />
-          </article>
-        </div>
-      </div>
-
-      <footer v-if="showFooter && !isBlankPage" data-yb-chrome="footer" class="site-layout-footer">
-        <div class="site-shell">
-          <div data-yb-chrome-slot="footer-brand">
-            <strong>{{ footerTitle }}</strong>
-            <p>{{ footerDescription }}</p>
-            <small>{{ footerCopyright }}</small>
-          </div>
-          <nav data-yb-chrome-slot="footer-navigation">
-            <a v-for="item in footerNavigationItems" :key="`foot-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
-          </nav>
-        </div>
-      </footer>
-      <footer v-else-if="showCopyright && !isBlankPage" data-yb-chrome="footer" class="site-layout-copyright">
-        {{ footerCopyright }}
-      </footer>
+      </SiteChrome>
     </template>
   </main>
 </template>
@@ -728,223 +586,6 @@ function dateText(value?: string) {
   color: var(--yb-site-muted);
 }
 
-.site-layout-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  border-bottom: 1px solid var(--yb-site-border);
-  background: var(--yb-site-header-bg);
-  backdrop-filter: blur(12px);
-  isolation: isolate;
-}
-
-.site-layout-header__bar {
-  display: flex;
-  width: min(1240px, calc(100% - 40px));
-  min-height: 62px;
-  margin: 0 auto;
-  gap: 22px;
-  align-items: center;
-}
-
-.site-layout-header__brand,
-.site-layout-header__nav,
-.site-layout-header__auth,
-.site-layout-header__account summary {
-  display: flex;
-  align-items: center;
-}
-
-.site-layout-header__brand {
-  min-width: 0;
-  gap: 10px;
-  color: var(--yb-site-heading);
-  font-size: 18px;
-  font-weight: 900;
-  text-decoration: none;
-}
-
-.site-layout-header__brand img {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  object-fit: cover;
-}
-
-.site-layout-header__nav {
-  flex: 1 1 auto;
-  justify-content: flex-start;
-  gap: 4px;
-  min-width: 0;
-}
-
-.site-nav-item {
-  position: relative;
-}
-
-.site-layout-header__nav a,
-.site-nav-item > a {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 9px;
-  border-radius: 7px;
-  color: var(--yb-site-nav-text);
-  font-size: 14px;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.site-layout-header__nav a:hover,
-.site-nav-item:hover > a {
-  background: var(--yb-site-hover);
-  color: var(--yb-site-heading);
-}
-
-.site-nav-dropdown {
-  position: absolute;
-  top: 100%;
-  left: -8px;
-  z-index: 20;
-  display: none;
-  min-width: 168px;
-  padding: 14px 8px 8px;
-  border-radius: 10px;
-  isolation: isolate;
-}
-
-.site-nav-dropdown::before {
-  position: absolute;
-  inset: 8px 0 0;
-  z-index: -1;
-  border: 1px solid var(--yb-site-border);
-  border-radius: 8px;
-  background: var(--yb-site-surface);
-  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
-  content: "";
-}
-
-.site-nav-item:hover .site-nav-dropdown,
-.site-nav-item:focus-within .site-nav-dropdown {
-  display: grid;
-  gap: 2px;
-}
-
-.site-nav-dropdown a {
-  position: relative;
-  display: flex;
-  white-space: nowrap;
-}
-
-.site-layout-header__auth {
-  gap: 8px;
-}
-
-.site-layout-header__auth > div[data-visible-when="guest"] {
-  display: flex;
-  gap: 8px;
-}
-
-.site-layout-header__auth a,
-.site-layout-header__account summary {
-  min-height: 34px;
-  padding: 0 12px;
-  border-radius: 7px;
-  font-size: 14px;
-  font-weight: 750;
-  line-height: 1;
-  text-decoration: none;
-}
-
-.site-layout-header__auth a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 34px;
-}
-
-.site-layout-header__auth .ghost,
-.site-layout-header__account summary {
-  background: var(--yb-site-surface);
-  color: var(--yb-site-text-2);
-}
-
-.site-layout-header__auth .ghost {
-  border: 1px solid var(--yb-site-border-2);
-}
-
-.site-layout-header__auth .primary {
-  background: var(--yb-site-primary-btn-bg);
-  color: var(--yb-site-primary-btn-text);
-}
-
-.site-layout-header__account {
-  position: relative;
-}
-
-.site-layout-header__account summary {
-  gap: 7px;
-  border: 0;
-  list-style: none;
-  cursor: pointer;
-  outline: none;
-  transition: background-color 0.18s ease, box-shadow 0.18s ease;
-}
-
-.site-layout-header__account summary::-webkit-details-marker {
-  display: none;
-}
-
-.site-layout-header__account summary:hover,
-.site-layout-header__account[open] summary {
-  background: var(--yb-site-bg);
-}
-
-.site-layout-header__account summary:focus-visible {
-  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
-}
-
-.site-layout-header__account img {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
-.site-layout-header__account i {
-  color: var(--yb-site-caption);
-  font-size: 12px;
-  font-style: normal;
-}
-
-.site-layout-header__account > div {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  display: grid;
-  min-width: 142px;
-  padding: 7px;
-  border: 1px solid var(--yb-site-border);
-  border-radius: 8px;
-  background: var(--yb-site-surface);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
-}
-
-.site-layout-header__account a {
-  padding: 9px 10px;
-  border-radius: 8px;
-  color: var(--yb-site-text-2);
-  text-decoration: none;
-}
-
-.site-layout-header__account a:hover {
-  background: var(--yb-site-hover);
-}
-
-.site-layout-header__account a.danger {
-  color: var(--yb-site-danger);
-}
-
 .site-layout-frame {
   position: relative;
   z-index: 1;
@@ -992,61 +633,6 @@ function dateText(value?: string) {
   padding-left: 18px;
   color: var(--yb-site-muted);
   font-size: 13px;
-}
-
-.site-layout-footer {
-  position: relative;
-  z-index: 1;
-  padding: 36px 0;
-  border-top: 1px solid var(--yb-site-border);
-  background: var(--yb-site-surface);
-  color: var(--yb-site-heading);
-}
-
-.site-layout-footer .site-shell {
-  display: flex;
-  gap: 18px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.site-layout-footer strong {
-  font-size: 20px;
-}
-
-.site-layout-footer p {
-  margin: 8px 0 0;
-  color: var(--yb-site-muted);
-}
-
-.site-layout-footer small {
-  display: block;
-  margin-top: 12px;
-  color: var(--yb-site-caption);
-}
-
-.site-layout-footer nav {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.site-layout-footer a {
-  color: var(--yb-site-nav-text);
-  text-decoration: none;
-}
-
-.site-layout-footer a:hover {
-  color: var(--yb-site-primary);
-}
-
-.site-layout-copyright {
-  padding: 18px;
-  border-top: 1px solid var(--yb-site-border);
-  background: var(--yb-site-surface);
-  color: var(--yb-site-muted);
-  text-align: center;
 }
 
 .site-builder-home :deep(main) {
@@ -1318,26 +904,6 @@ function dateText(value?: string) {
 }
 
 @media (max-width: 760px) {
-  .site-layout-header {
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-  }
-
-  .site-layout-header__bar {
-    align-items: stretch;
-    flex-direction: column;
-    width: calc(100% - 28px);
-    min-height: 0;
-    padding: 12px 0;
-    gap: 10px;
-  }
-
-  .site-layout-header__nav {
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
   .site-layout-frame {
     display: block;
   }
@@ -1348,14 +914,6 @@ function dateText(value?: string) {
     height: auto;
     border-right: 0;
     border-bottom: 1px solid var(--yb-site-border);
-  }
-
-  .site-layout-footer .site-shell {
-    flex-direction: column;
-  }
-
-  .site-layout-footer nav {
-    justify-content: flex-start;
   }
 
   .site-hero,

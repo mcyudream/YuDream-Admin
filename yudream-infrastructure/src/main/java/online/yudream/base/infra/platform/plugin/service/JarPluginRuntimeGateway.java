@@ -946,7 +946,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 route.permission(),
                 route.sort(),
                 route.hideInMenu(),
-                route.publicAccess()
+                route.publicAccess(),
+                route.siteNav()
         );
     }
 

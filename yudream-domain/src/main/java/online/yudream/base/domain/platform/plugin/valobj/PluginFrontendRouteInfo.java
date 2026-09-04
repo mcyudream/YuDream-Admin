@@ -18,27 +18,36 @@ public record PluginFrontendRouteInfo(
         boolean hideInMenu,
         PluginMenuOverrideInfo menuOverride,
         PluginMenuOverrideInfo parentOverride,
-        boolean publicAccess
+        boolean publicAccess,
+        boolean siteNav
 ) {
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort) {
         this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, false,
-                null, null, false);
+                null, null, false, false);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort, boolean hideInMenu) {
         this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, hideInMenu,
-                null, null, false);
+                null, null, false, false);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
                                    String parentTitle, String parentIcon, Integer parentSort, String component,
                                    String permission, Integer sort, boolean hideInMenu, boolean publicAccess) {
         this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, hideInMenu,
-                null, null, publicAccess);
+                null, null, publicAccess, false);
+    }
+
+    public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
+                                   String parentTitle, String parentIcon, Integer parentSort, String component,
+                                   String permission, Integer sort, boolean hideInMenu, boolean publicAccess,
+                                   boolean siteNav) {
+        this(path, name, title, icon, parentPath, parentTitle, parentIcon, parentSort, component, permission, sort, hideInMenu,
+                null, null, publicAccess, siteNav);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
@@ -65,7 +74,7 @@ public record PluginFrontendRouteInfo(
                         .path(parentPath)
                         .sort(parentSort)
                         .build(),
-                false);
+                false, false);
     }
 
     public PluginFrontendRouteInfo(String path, String name, String title, String icon, String parentPath,
@@ -106,7 +115,7 @@ public record PluginFrontendRouteInfo(
                         .permission(parentPermission)
                         .status(parentStatus)
                         .build(),
-                false);
+                false, false);
     }
 
     public static PluginFrontendRouteInfo withMenuOverrides(PluginFrontendRouteInfo declaration,
@@ -119,7 +128,7 @@ public record PluginFrontendRouteInfo(
                 parentOverride == null ? null : parentOverride.icon(),
                 parentOverride == null ? null : parentOverride.sort(),
                 override.component(), override.permission(), override.sort(), declaration.hideInMenu(), override, parentOverride,
-                declaration.publicAccess()
+                declaration.publicAccess(), declaration.siteNav()
         );
     }
 
@@ -129,7 +138,7 @@ public record PluginFrontendRouteInfo(
                 component, permission, overriddenSort, hideInMenu,
                 menuOverride == null ? null : menuOverride.withSort(overriddenSort),
                 parentOverride == null ? null : parentOverride.withSort(overriddenParentSort),
-                publicAccess
+                publicAccess, siteNav
         );
     }
 

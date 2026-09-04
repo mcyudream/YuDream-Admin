@@ -48,4 +48,5 @@ public class PluginFrontendRouteDTO implements Serializable {
     private Boolean parentVisible;
     private MenuStatus parentStatus;
     private Boolean publicAccess;
+    private Boolean siteNav;
 }
