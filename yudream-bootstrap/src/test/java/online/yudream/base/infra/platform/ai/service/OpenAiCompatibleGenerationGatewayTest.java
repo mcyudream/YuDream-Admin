@@ -127,6 +127,46 @@ class OpenAiCompatibleGenerationGatewayTest {
     }
 
     @Test
+    void shouldFilterWritePluginToolsUnlessExplicitlyGranted() {
+        online.yudream.base.plugin.spi.system.ai.PluginAiTool writeTool = mock(
+                online.yudream.base.plugin.spi.system.ai.PluginAiTool.class);
+        when(writeTool.descriptor()).thenReturn(new online.yudream.base.plugin.spi.system.ai.PluginAiToolDescriptor(
+                "questionbank.create_question", "创建题目", "AI 导入时逐题创建题目",
+                "questionbank:manage", online.yudream.base.plugin.spi.system.ai.PluginAiToolRisk.WRITE, false,
+                java.util.Set.of("PLUGIN"), Map.of()));
+        PluginAiToolRegistry registry = mock(PluginAiToolRegistry.class);
+        when(registry.tools()).thenReturn(List.of(writeTool));
+        @SuppressWarnings("unchecked")
+        ObjectProvider<AiAgentTool> provider = mock(ObjectProvider.class);
+        when(provider.stream()).thenAnswer(ignored -> Stream.of());
+        OpenAiCompatibleGenerationGateway gateway = new OpenAiCompatibleGenerationGateway(
+                provider, mock(AiProviderConfigParser.class), List.of(), new AiClientProperties(), registry);
+
+        PluginAiExecutionContext ungranted = new PluginAiExecutionContext(
+                1L, null, null, null, null, "PLUGIN", "trace",
+                List.of("questionbank:manage"), List.of("questionbank.create_question"));
+        PluginAiToolExecutionScope.set(ungranted);
+        try {
+            assertThat(toolCallbacks(gateway)).isEmpty();
+        } finally {
+            PluginAiToolExecutionScope.clear();
+        }
+
+        PluginAiExecutionContext granted = new PluginAiExecutionContext(
+                1L, null, null, null, null, "PLUGIN", "trace",
+                List.of("questionbank:manage"), List.of("questionbank.create_question"),
+                List.of("questionbank.create_question"));
+        PluginAiToolExecutionScope.set(granted);
+        try {
+            assertThat(toolCallbacks(gateway))
+                    .extracting(callback -> callback.getToolDefinition().name())
+                    .containsExactly("questionbank_create_question");
+        } finally {
+            PluginAiToolExecutionScope.clear();
+        }
+    }
+
+    @Test
     void shouldRestoreOuterScopeAndCloseIdempotently() {
         CountingTool outerTool = new CountingTool("outer.tool");
         CountingTool innerTool = new CountingTool("inner.tool");
@@ -323,6 +363,34 @@ class OpenAiCompatibleGenerationGatewayTest {
         );
 
         assertThat(inputSchema(gateway, descriptor)).isEqualTo("{}");
+    }
+
+    @Test
+    void shouldPassFullJsonSchemaGivenViaInputSchemaWithoutRewrapping() {
+        OpenAiCompatibleGenerationGateway gateway = gatewayWithGlobalTools();
+        AiAgentToolDescriptor descriptor = new AiAgentToolDescriptor(
+                "create_question",
+                "Create question",
+                "Create one question",
+                "questionbank:manage",
+                "Create question",
+                "插件工具",
+                "Create one question",
+                Map.of(
+                        "type", "object",
+                        "required", List.of("type", "content"),
+                        "properties", Map.of(
+                                "type", Map.of("type", "string", "enum", List.of("SINGLE", "SHORT")),
+                                "content", Map.of("type", "string")
+                        )
+                )
+        );
+
+        String schema = inputSchema(gateway, descriptor);
+
+        assertThat(schema)
+                .contains("\"required\":[\"type\",\"content\"]", "\"enum\":[\"SINGLE\",\"SHORT\"]")
+                .doesNotContain("additionalProperties");
     }
 
     @SuppressWarnings("unchecked")
