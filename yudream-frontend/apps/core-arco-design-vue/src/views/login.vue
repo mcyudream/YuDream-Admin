@@ -7,6 +7,7 @@ import ColorScheme from '@/layouts/components/Topbar/Toolbar/ColorScheme/index.v
 import settingsDefault from '@/settings'
 import systemClient from '@/api/modules/system-client'
 import apiSecurity from '@/api/modules/system-security'
+import { sanitizeRedirect, stashExternalLoginRedirect } from '@/utils/login-redirect'
 
 defineOptions({
   name: 'Login',
@@ -18,7 +19,7 @@ const appSettingsStore = useAppSettingsStore()
 
 const loginBanner = computed(() => appSettingsStore.loginBanner || new URL('@/assets/images/login-banner.png', import.meta.url).href)
 
-const redirect = ref(route.query.redirect?.toString() ?? appSettingsStore.settings.app.home.fullPath)
+const redirect = ref(sanitizeRedirect(route.query.redirect, appSettingsStore.settings.app.home.fullPath))
 
 // 布局对齐方式
 const layoutAlign = ref<'left' | 'center' | 'right'>('center')
@@ -43,6 +44,8 @@ function handleLogin() {
 
 async function loginWithExternal(type: string) {
   const res = await systemClient.get<any, { data: { authorizationUrl: string } }>(`api/external-login/wwoyun/${type}/authorize`)
+  // 第三方授权为整页跳转，登录目标路由暂存 sessionStorage，回调完成后原路返回
+  stashExternalLoginRedirect(redirect.value)
   window.location.assign(res.data.authorizationUrl)
 }
 

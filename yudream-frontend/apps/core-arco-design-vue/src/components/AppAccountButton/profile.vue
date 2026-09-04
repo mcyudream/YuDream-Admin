@@ -6,12 +6,14 @@ import apiProfile from '@/api/modules/profile'
 import apiRole from '@/api/modules/system-role'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { stashExternalLoginRedirect } from '@/utils/login-redirect'
 import { createPasskeyRegistrationResponse } from '@/utils/webauthn'
 
 type ProfileTab = 'profile' | 'security' | 'external' | 'apiKey'
 
 const modal = useFaModal()
 const toast = useFaToast()
+const router = useRouter()
 const appAccountStore = useAppAccountStore()
 const appFeatureStore = useAppFeatureStore()
 
@@ -254,6 +256,8 @@ async function loadExternalAccounts() {
 
 async function bindExternal(type: string) {
   const res = await apiProfile.externalBindAuthorize('wwoyun', type)
+  // 绑定授权为整页跳转，暂存当前路由，回调完成后回到当前页
+  stashExternalLoginRedirect(router.currentRoute.value.fullPath)
   window.location.assign(res.data.authorizationUrl)
 }
 

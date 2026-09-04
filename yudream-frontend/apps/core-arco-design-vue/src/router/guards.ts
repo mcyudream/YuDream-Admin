@@ -117,8 +117,17 @@ function setupRoutes(router: Router) {
         }
       }
       if (to.name !== 'login' && !to.meta?.public) {
+        // 未登录访问根路径：引导至 CMS 站点首页（CMS 未开启时回退登录页）
+        if (to.path === '/' && appFeatureStore.cmsEnabled) {
+          return {
+            name: 'publicSiteHome',
+            replace: true,
+          }
+        }
+        // 未登录访问受保护路由：记住目标路由，登录完成后原路返回
         return {
-          name: appFeatureStore.cmsEnabled ? 'publicSiteHome' : 'login',
+          name: 'login',
+          query: to.fullPath === '/' ? undefined : { redirect: to.fullPath },
           replace: true,
         }
       }

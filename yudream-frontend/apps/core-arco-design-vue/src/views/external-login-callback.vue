@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import externalLogin from '@/api/modules/external-login'
 import router from '@/router'
+import { consumeExternalLoginRedirect } from '@/utils/login-redirect'
 
 const route = useRoute()
 const accountStore = useAppAccountStore()
@@ -15,16 +16,18 @@ onMounted(async () => {
     return
   }
 
+  // 登录前暂存的目标路由（由登录页在跳转授权前写入），登录完成后原路返回
+  const redirect = consumeExternalLoginRedirect()
   try {
     const result = (await externalLogin.callback('wwoyun', type, { code, state })).data
     switch (result.outcome) {
       case 'LOGIN':
         await accountStore.initializeSession(result.session)
-        await router.replace('/')
+        await router.replace(redirect ?? '/')
         return
       case 'BOUND':
         message.value = '第三方账号已绑定'
-        await router.replace('/')
+        await router.replace(redirect ?? '/')
         break
       case 'BIND_REQUIRED':
         await router.replace({
@@ -33,6 +36,7 @@ onMounted(async () => {
             externalLoginBindingToken: result.bindingToken,
             externalLoginProvider: result.providerCode,
             externalLoginType: result.type,
+            ...(redirect && redirect !== '/' && { redirect }),
           },
         })
         break
