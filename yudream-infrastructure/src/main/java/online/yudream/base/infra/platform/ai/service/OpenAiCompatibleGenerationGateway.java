@@ -566,8 +566,13 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
         if (descriptor.inputSchemaDefinition() != null) {
             return JSONUtil.toJsonStr(descriptor.inputSchemaDefinition());
         }
-        JSONObject properties = JSONUtil.createObj();
         Map<String, Object> schema = descriptor.inputSchema() == null ? Map.of() : descriptor.inputSchema();
+        // 插件工具可以直接提供完整 JSON Schema（含 properties 键）：原样序列化，
+        // 避免被当成扁平「属性名 → 描述」简写二次包装成非法 schema。
+        if (schema.get("properties") instanceof Map) {
+            return JSONUtil.toJsonStr(schema);
+        }
+        JSONObject properties = JSONUtil.createObj();
         schema.forEach((key, value) -> properties.set(key, propertySchema(value)));
         return JSONUtil.createObj()
                 .set("type", "object")
@@ -664,7 +669,11 @@ public class OpenAiCompatibleGenerationGateway implements AiGenerationGateway {
 
     private boolean allowed(PluginAiTool tool, online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext context) {
         var descriptor = tool.descriptor();
-        return descriptor != null && descriptor.risk() == PluginAiToolRisk.READ && context.allowsTool(descriptor.name())
+        // READ 工具默认可用；WRITE/DESTRUCTIVE 仅当调用方在 grantedWriteToolNames 中逐个点名授权才放行
+        // （插件自助场景，如题库 AI 导入逐题入库），未授权时维持只读语义。
+        boolean riskOk = descriptor != null
+                && (descriptor.risk() == PluginAiToolRisk.READ || context.grantsWriteTool(descriptor.name()));
+        return descriptor != null && riskOk && context.allowsTool(descriptor.name())
                 && descriptor.allowedTriggers().contains(context.trigger()) && context.hasPermission(descriptor.permissionCode());
     }
 

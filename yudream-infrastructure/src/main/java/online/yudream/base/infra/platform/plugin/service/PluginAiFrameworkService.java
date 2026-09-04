@@ -174,11 +174,55 @@ public class PluginAiFrameworkService implements PluginAiService {
             try {
                 var result = gateway.generate(new AiGenerationRequest(request.systemPrompt(), request.userPrompt(), null,
                         request.providerCode(), request.modelCode(), config, history, request.toolCallingEnabled()));
-                return new PluginAiChatResponse(result.summary(), List.of());
+                return new PluginAiChatResponse(result.summary(), toolResults(result));
             } finally {
                 PluginAiToolExecutionScope.clear();
             }
         })));
+    }
+
+    @Override
+    public CompletionStage<PluginAiChatResponse> chatStream(
+            PluginAiChatRequest request,
+            Consumer<String> onDelta,
+            Consumer<online.yudream.base.plugin.spi.system.ai.PluginAiToolResult> onTool
+    ) {
+        return QqSandboxExecutionScope.track(CompletableFuture.supplyAsync(sandboxAware(request, () -> {
+            if (!capabilityModuleRepo.findByCode("ai").map(item -> Boolean.TRUE.equals(item.getEnabled())).orElse(false)) {
+                throw new BizException("AI 能力未启用");
+            }
+            AiGenerationGateway gateway = gatewayProvider.getIfAvailable();
+            if (gateway == null) {
+                throw new BizException("AI 生成服务不可用");
+            }
+            List<AiChatMessage> history = request.history().stream()
+                    .map(item -> new AiChatMessage(item.role(), item.content())).toList();
+            Map<String, String> config = capabilityModuleRepo.findByCode("ai")
+                    .map(item -> item.getConfig() == null ? Map.<String, String>of() : item.getConfig()).orElse(Map.of());
+            PluginAiToolExecutionScope.set(withPermissions(request));
+            try {
+                var result = gateway.generateStream(new AiGenerationRequest(request.systemPrompt(), request.userPrompt(), null,
+                                request.providerCode(), request.modelCode(), config, history, request.toolCallingEnabled()),
+                        onDelta,
+                        onTool == null ? null : tool -> onTool.accept(new online.yudream.base.plugin.spi.system.ai.PluginAiToolResult(
+                                tool.action(), tool.message(), tool.payload())),
+                        null);
+                return new PluginAiChatResponse(result.summary(), toolResults(result));
+            } finally {
+                PluginAiToolExecutionScope.clear();
+            }
+        })));
+    }
+
+    private static List<online.yudream.base.plugin.spi.system.ai.PluginAiToolResult> toolResults(
+            online.yudream.base.domain.platform.ai.valobj.AiGenerationResult result) {
+        if (result.toolResults() == null) {
+            return List.of();
+        }
+        return result.toolResults().stream()
+                .map(item -> new online.yudream.base.plugin.spi.system.ai.PluginAiToolResult(
+                        item.action(), item.message(), item.payload()))
+                .toList();
     }
 
     private <T> Supplier<T> sandboxAware(PluginAiChatRequest request, Supplier<T> action) {
@@ -210,6 +254,6 @@ public class PluginAiFrameworkService implements PluginAiService {
         if (permissions.isEmpty()) {
             log.info("[YuDreamAdmin] plugin AI execution permissions resolved empty: userId={}, plugin tools requiring permission will be filtered", context.userId());
         }
-        return new online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext(context.userId(), context.platformUserId(), context.connectionId(), context.channelId(), context.messageId(), context.trigger(), context.traceId(), permissions, context.allowedToolNames());
+        return new online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext(context.userId(), context.platformUserId(), context.connectionId(), context.channelId(), context.messageId(), context.trigger(), context.traceId(), permissions, context.allowedToolNames(), context.grantedWriteToolNames());
     }
 }
