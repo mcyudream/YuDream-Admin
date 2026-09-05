@@ -1,0 +1,92 @@
+/* Fa 风格的日期/时间选择器外观，基于主题 token 覆盖 Arco 默认样式 */
+/* 由 date-picker / range-picker / time-picker 通过 <style scoped src> 共用 */
+
+/* 输入框 */
+.fa-picker {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid oklch(var(--input));
+  border-radius: calc(var(--radius) - 2px);
+  background-color: transparent;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 5%);
+  transition: border-color 0.2s, box-shadow 0.2s, background-color 0.2s;
+}
+
+.fa-picker:hover {
+  border-color: oklch(var(--input));
+  background-color: transparent;
+}
+
+.fa-picker.arco-picker-focused {
+  border-color: oklch(var(--ring));
+  background-color: transparent;
+  box-shadow: 0 0 0 3px oklch(var(--ring) / 50%);
+}
+
+.fa-picker.arco-picker-error {
+  border-color: oklch(var(--destructive));
+}
+
+.fa-picker.arco-picker-error.arco-picker-focused {
+  box-shadow: 0 0 0 3px oklch(var(--destructive) / 25%);
+}
+
+.fa-picker.arco-picker-disabled {
+  border-color: oklch(var(--input));
+  background-color: oklch(var(--muted) / 50%);
+  opacity: 0.6;
+}
+
+.fa-picker input,
+.fa-picker :deep(input) {
+  font-size: 0.875rem;
+  color: oklch(var(--foreground));
+  background-color: transparent;
+}
+
+.fa-picker input::placeholder,
+.fa-picker :deep(input::placeholder) {
+  color: oklch(var(--muted-foreground));
+}
+
+.fa-picker :deep(.arco-picker-suffix-icon),
+.fa-picker :deep(.arco-picker-clear-icon),
+.fa-picker :deep(.arco-picker-separator) {
+  color: oklch(var(--muted-foreground));
+}
+
+/* 弹层：内容被 teleport 到 body，只能全局覆盖 */
+/* 层级修复：Arco 弹层基础 z-index 为 1000，低于 FaModal / FaDrawer 的 2000 */
+:global(.arco-trigger-popup) {
+  z-index: 3000 !important;
+}
+
+:global(.arco-trigger-popup .arco-picker-container),
+:global(.arco-trigger-popup .arco-timepicker-container) {
+  border: 1px solid oklch(var(--border));
+  border-radius: calc(var(--radius) - 2px);
+  background-color: oklch(var(--popover));
+  color: oklch(var(--popover-foreground));
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -4px rgb(0 0 0 / 10%);
+  overflow: hidden;
+}
+
+:global(.arco-trigger-popup .arco-picker-cell-selected .arco-picker-date-value),
+:global(.arco-trigger-popup .arco-picker-cell-range-start .arco-picker-date-value),
+:global(.arco-trigger-popup .arco-picker-cell-range-end .arco-picker-date-value) {
+  color: oklch(var(--primary-foreground));
+  background-color: oklch(var(--primary));
+  border-radius: calc(var(--radius) - 4px);
+}
+
+:global(.arco-trigger-popup .arco-picker-cell-in-range .arco-picker-date),
+:global(.arco-trigger-popup .arco-picker-cell-hover-in-range .arco-picker-date) {
+  background-color: oklch(var(--accent));
+}
+
+:global(.arco-trigger-popup .arco-timepicker-cell-selected .arco-timepicker-cell-inner) {
+  color: oklch(var(--primary-foreground));
+  background-color: oklch(var(--primary));
+  border-radius: calc(var(--radius) - 4px);
+}
