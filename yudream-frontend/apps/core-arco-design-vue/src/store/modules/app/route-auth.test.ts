@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createRouterMatcher } from 'vue-router'
 import {
+  collectBackendMatcherRoutes,
   filterBackendMenuTreeByAuth,
   flattenBackendRouteGroups,
   mergeBackendStructuralRoutes,
@@ -72,6 +74,37 @@ test('backend route groups remove a plugin category nested below a system layout
     '/platform/plugins/web-card/admin/studio',
   ])
   assert.equal(routes[0].children?.[0].component, 'web-card/Studio')
+})
+
+test('matcher routes flatten a plugin category nested under system config before createRouterMatcher', () => {
+  const routesRaw = [{
+    children: [{
+      path: '/system/config',
+      component: 'Layout',
+      meta: { title: '系统配置' },
+      children: [{
+        meta: { title: '大事记' },
+        children: [{
+          path: '/platform/plugins/timeline/admin',
+          component: 'timeline/Admin',
+          meta: { auth: 'plugin:timeline:manage' },
+        }],
+      }],
+    }],
+  }]
+  const unflattened = routesRaw.flatMap(route => route.children ?? [])
+  const flattened = collectBackendMatcherRoutes(routesRaw)
+
+  assert.throws(
+    () => createRouterMatcher(unflattened as never, {}),
+    (error: unknown) => error instanceof Error && /path|undefined/i.test(error.message),
+  )
+  assert.doesNotThrow(() => createRouterMatcher(flattened as never, {}))
+  assert.equal(flattened.length, 1)
+  assert.equal(flattened[0].path, '/system/config')
+  assert.deepEqual(flattened[0].children?.map(route => route.path), [
+    '/platform/plugins/timeline/admin',
+  ])
 })
 
 test('backend routes merge duplicated plugin layout paths and retain every child page', () => {

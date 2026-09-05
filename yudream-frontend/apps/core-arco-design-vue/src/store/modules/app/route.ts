@@ -8,7 +8,7 @@ import apiApp from '@/api/modules/app'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { systemRoutes as systemRoutesRaw } from '@/router/routes'
 import { indexPluginRuntimeModules, resolvePluginRuntimeRoute } from './plugin-route-runtime'
-import { flattenBackendRouteGroups, mergeBackendStructuralRoutes, stripBackendStructuralAuth } from './route-auth'
+import { collectBackendMatcherRoutes, flattenBackendRouteGroups, mergeBackendStructuralRoutes, stripBackendStructuralAuth } from './route-auth'
 
 export const useAppRouteStore = defineStore(
   'appRoute',
@@ -240,14 +240,10 @@ export const useAppRouteStore = defineStore(
       ) as any
         // 设置 routes 数据
       routesRaw.value = sortAsyncRoutes(staticRoutes)
-        // 创建路由匹配器
-      const routes: RouteRecordRaw[] = []
-      routesRaw.value.forEach((route) => {
-        if (route.children) {
-          routes.push(...route.children)
-        }
-      })
-      routesMatcher.value = createRouterMatcher(routes, {})
+      routesMatcher.value = createRouterMatcher(
+        collectBackendMatcherRoutes(routesRaw.value as unknown as AuthRouteNode[]) as RouteRecordRaw[],
+        {},
+      )
       isGenerate.value = true
     }
     function setCurrentRemoveRoutes(routes: (() => void)[]) {
