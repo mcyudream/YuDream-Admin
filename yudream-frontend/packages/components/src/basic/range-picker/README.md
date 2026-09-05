@@ -1,4 +1,4 @@
-# FaRangePicker 日期范围选择器
+# YdRangePicker 日期范围选择器
 
 日期范围选择器组件，基于 Arco RangePicker 封装并适配 Fa 主题风格，覆盖日期、周、月、季度、年全部模式，支持日期时间联动选择。
 

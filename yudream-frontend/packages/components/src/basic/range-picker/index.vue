@@ -6,7 +6,7 @@ import { computed } from 'vue'
 import { cn } from '#utils'
 
 defineOptions({
-  name: 'FaRangePicker',
+  name: 'YdRangePicker',
 })
 
 const props = withDefaults(defineProps<{
@@ -69,7 +69,7 @@ function onOk(v: (string | number | Date | undefined)[] | undefined) {
     :shortcuts="props.shortcuts"
     :shortcuts-position="props.shortcutsPosition"
     :popup-container="props.popupContainer"
-    :class="cn('fa-picker', props.class)"
+    :class="cn('yd-picker', props.class)"
     @change="onChange"
     @ok="onOk"
     @clear="emits('clear')"
