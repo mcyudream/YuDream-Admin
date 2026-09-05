@@ -1,4 +1,4 @@
-# FaTimePicker 时间选择器
+# YdTimePicker 时间选择器
 
 时间选择器组件，基于 Arco TimePicker 封装并适配 Fa 主题风格，支持单时间选择与时间范围选择。
 

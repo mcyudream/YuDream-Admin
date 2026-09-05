@@ -5,7 +5,7 @@ import { computed } from 'vue'
 import { cn } from '#utils'
 
 defineOptions({
-  name: 'FaTimePicker',
+  name: 'YdTimePicker',
 })
 
 const props = withDefaults(defineProps<{
@@ -70,7 +70,7 @@ function onChange(v: string | (string | undefined)[] | undefined) {
     :disabled-seconds="props.disabledSeconds"
     :hide-disabled-options="props.hideDisabledOptions"
     :popup-container="props.popupContainer"
-    :class="cn('fa-picker', props.class)"
+    :class="cn('yd-picker', props.class)"
     @change="onChange"
     @clear="emits('clear')"
     @popup-visible-change="(visible: boolean) => emits('popupVisibleChange', visible)"

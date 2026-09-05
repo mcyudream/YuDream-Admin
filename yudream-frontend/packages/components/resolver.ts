@@ -16,7 +16,6 @@ const BASIC_COMPONENT_NAMES = [
   'FaCheckboxGroup',
   'FaCollapsible',
   'FaContextMenu',
-  'FaDatePicker',
   'FaDescriptions',
   'FaDivider',
   'FaDrawer',
@@ -41,7 +40,6 @@ const BASIC_COMPONENT_NAMES = [
   'FaPopover',
   'FaProgress',
   'FaRadioGroup',
-  'FaRangePicker',
   'FaResponsiveTable',
   'FaScrollArea',
   'FaSearchBar',
@@ -52,15 +50,17 @@ const BASIC_COMPONENT_NAMES = [
   'FaTabs',
   'FaTag',
   'FaTextarea',
-  'FaTimePicker',
   'FaToast',
   'FaTooltip',
   'FaTrend',
 ] as const
 
 const YD_COMPONENT_NAMES = [
+  'YdDatePicker',
   'YdGraphCanvas',
+  'YdRangePicker',
   'YdTablePicker',
+  'YdTimePicker',
 ] as const
 
 const COMPONENT_NAMES = [
