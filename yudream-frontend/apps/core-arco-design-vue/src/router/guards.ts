@@ -91,7 +91,10 @@ function setupRoutes(router: Router) {
         try {
           await refreshDynamicRoutes(router)
         }
-        catch {}
+        catch (error) {
+          console.error('[router] failed to generate dynamic routes', error)
+          return false
+        }
         // 动态路由生成并注册后，重新进入当前路由
         return {
           path: to.path,

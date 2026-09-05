@@ -39,6 +39,18 @@ export function flattenBackendRouteGroups<T extends AuthRouteNode>(routes: T[]):
   })
 }
 
+/**
+ * 后端路由树交给 Vue Router matcher 之前必须先拍平无 path/component 的目录节点。
+ * 菜单管理把插件 CATEGORY 挂到系统 LAYOUT 下是合法操作，未拍平时 createRouterMatcher 会抛错。
+ */
+export function collectBackendMatcherRoutes<T extends AuthRouteNode>(
+  routesRaw: Array<{ children?: T[] }>,
+): AuthRouteNode[] {
+  return flattenBackendRouteGroups(
+    routesRaw.flatMap(route => route.children ?? []),
+  )
+}
+
 export function mergeBackendStructuralRoutes<T extends AuthRouteNode>(routes: T[]): T[] {
   const merged = new Map<string, T>()
   const result: T[] = []
