@@ -77,4 +77,4 @@ function onChange(v: string | (string | undefined)[] | undefined) {
   />
 </template>
 
-<style scoped src="../picker-styles.css"></style>
+<style src="../picker-styles.css"></style>
