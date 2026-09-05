@@ -254,7 +254,10 @@ const componentSidebar = [
       { text: 'YdAttachmentList 附件列表', link: '/components/yd-attachment-list' },
       { text: 'YdWelcome 欢迎', link: '/components/yd-welcome' },
       { text: 'YdGraphCanvas 关系图谱画布', link: '/components/yd-graph-canvas' },
-      { text: 'YdTablePicker 弹出式选择输入框', link: '/components/yd-table-picker' }
+      { text: 'YdTablePicker 弹出式选择输入框', link: '/components/yd-table-picker' },
+      { text: 'YdDatePicker 日期选择器', link: '/components/yd-date-picker' },
+      { text: 'YdRangePicker 日期范围选择器', link: '/components/yd-range-picker' },
+      { text: 'YdTimePicker 时间选择器', link: '/components/yd-time-picker' }
     ]
   }
 ]
