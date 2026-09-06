@@ -12,11 +12,12 @@ const editing = ref<MilkyConnection | null>(null)
 const chatConnection = ref<MilkyConnection | null>(null)
 const chatVisible = ref(false)
 const page = reactive({ page: 1, size: 20, total: 0 })
-const form = reactive<MilkyConnectionPayload>({ name: '', baseUrl: 'http://127.0.0.1:3010', token: '', commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
+const form = reactive<MilkyConnectionPayload>({ name: '', protocol: 'milky', baseUrl: 'http://127.0.0.1:3010', token: '', appId: '', appSecret: '', sandbox: false, commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
 
 const columns: TableColumn<MilkyConnection>[] = [
   { accessorKey: 'name', header: '连接名称', width: 180 },
-  { accessorKey: 'baseUrl', header: 'Milky 服务地址', width: 320 },
+  { id: 'protocol', header: '协议', width: 120 },
+  { accessorKey: 'baseUrl', header: '服务地址', width: 280 },
   { id: 'status', header: '状态', width: 100 },
   { accessorKey: 'updateTime', header: '更新时间', width: 180 },
   { id: 'actions', header: '操作', width: 240, fixed: 'right' },
@@ -34,15 +35,39 @@ async function load() {
   }
 }
 
+function emptyForm(protocol: MilkyConnectionPayload['protocol'] = 'milky'): MilkyConnectionPayload {
+  return {
+    name: '',
+    protocol,
+    baseUrl: protocol === 'official' ? 'https://api.bot.qq.com' : 'http://127.0.0.1:3010',
+    token: '',
+    appId: '',
+    appSecret: '',
+    sandbox: false,
+    commandMenuImageMode: 'base64',
+    commandMenuPublicBaseUrl: '',
+  }
+}
+
 function openCreate() {
   editing.value = null
-  Object.assign(form, { name: '', baseUrl: 'http://127.0.0.1:3010', token: '', commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
+  Object.assign(form, emptyForm())
   formVisible.value = true
 }
 
 function openEdit(connection: MilkyConnection) {
   editing.value = connection
-  Object.assign(form, { name: connection.name, baseUrl: connection.baseUrl, token: '', commandMenuImageMode: connection.commandMenuImageMode || 'base64', commandMenuPublicBaseUrl: connection.commandMenuPublicBaseUrl || '' })
+  Object.assign(form, {
+    name: connection.name,
+    protocol: connection.protocol || 'milky',
+    baseUrl: connection.baseUrl,
+    token: '',
+    appId: connection.appId || '',
+    appSecret: '',
+    sandbox: !!connection.sandbox,
+    commandMenuImageMode: connection.commandMenuImageMode || 'base64',
+    commandMenuPublicBaseUrl: connection.commandMenuPublicBaseUrl || '',
+  })
   formVisible.value = true
 }
 
@@ -87,7 +112,7 @@ onMounted(load)
 
 <template>
   <div>
-    <FaPageHeader title="Milky 消息平台">
+    <FaPageHeader title="QQ 消息平台">
       <FaButton v-auth="'platform:milky:config'" @click="openCreate">
         <FaIcon name="i-ri:add-line" />
         新增连接
@@ -96,6 +121,11 @@ onMounted(load)
 
     <FaPageMain>
       <FaResponsiveTable v-loading="loading" :columns="columns" :data="rows" row-key="id" border stripe>
+        <template #cell-protocol="{ row }">
+          <FaTag variant="secondary">
+            {{ row.original.protocol === 'official' ? '官方机器人' : 'Milky' }}
+          </FaTag>
+        </template>
         <template #cell-status="{ row }">
           <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
             {{ row.original.enabled ? '已启用' : '已停用' }}
@@ -157,17 +187,44 @@ onMounted(load)
       <FaPagination v-model:page="page.page" v-model:size="page.size" :total="page.total" class="mt-3" @page-change="load" @size-change="load" />
     </FaPageMain>
 
-    <FaModal v-model="formVisible" :title="editing ? '编辑 Milky 连接' : '新增 Milky 连接'" show-cancel-button @confirm="save">
+    <FaModal v-model="formVisible" :title="editing ? '编辑 QQ 连接' : '新增 QQ 连接'" show-cancel-button @confirm="save">
       <a-form :model="form" layout="vertical">
         <a-form-item label="名称" required>
           <FaInput v-model="form.name" />
         </a-form-item>
-        <a-form-item label="Milky HTTP 地址" required>
-          <FaInput v-model="form.baseUrl" placeholder="http://127.0.0.1:3010" />
+        <a-form-item label="协议" required>
+          <FaSelect
+            v-model="form.protocol"
+            :disabled="!!editing"
+            :options="[
+              { label: 'Milky（非官方协议）', value: 'milky' },
+              { label: '官方 QQ 机器人 OpenAPI', value: 'official' },
+            ]"
+            @update:model-value="(value: string) => { if (!editing) Object.assign(form, emptyForm(value as MilkyConnectionPayload['protocol']), { name: form.name }) }"
+          />
         </a-form-item>
-        <a-form-item :label="editing ? 'Access Token（留空不修改）' : 'Access Token'" :required="!editing">
-          <FaInput v-model="form.token" type="password" />
-        </a-form-item>
+        <template v-if="form.protocol === 'official'">
+          <a-form-item label="AppID" required>
+            <FaInput v-model="form.appId" placeholder="QQ 开放平台 AppID" />
+          </a-form-item>
+          <a-form-item :label="editing ? 'AppSecret（留空不修改）' : 'AppSecret'" :required="!editing">
+            <FaInput v-model="form.appSecret" type="password" />
+          </a-form-item>
+          <a-form-item label="沙箱环境">
+            <FaSwitch v-model="form.sandbox" @update:model-value="(value: boolean) => { form.baseUrl = value ? 'https://sandbox.api.bot.qq.com' : 'https://api.bot.qq.com' }" />
+          </a-form-item>
+          <a-form-item label="API 地址">
+            <FaInput v-model="form.baseUrl" placeholder="https://api.bot.qq.com" />
+          </a-form-item>
+        </template>
+        <template v-else>
+          <a-form-item label="Milky HTTP 地址" required>
+            <FaInput v-model="form.baseUrl" placeholder="http://127.0.0.1:3010" />
+          </a-form-item>
+          <a-form-item :label="editing ? 'Access Token（留空不修改）' : 'Access Token'" :required="!editing">
+            <FaInput v-model="form.token" type="password" />
+          </a-form-item>
+        </template>
         <a-form-item label="指令菜单图片格式">
           <FaSelect
             v-model="form.commandMenuImageMode"
@@ -183,8 +240,8 @@ onMounted(load)
       </a-form>
     </FaModal>
 
-    <FaModal v-model="chatVisible" :title="`${chatConnection?.name || 'Milky'} WebQQ`" :show-cancel-button="false" class="sm:max-w-6xl">
-      <MilkyChatWorkspace v-if="chatConnection" :connection-id="chatConnection.id" />
+    <FaModal v-model="chatVisible" :title="`${chatConnection?.name || 'QQ'} WebQQ`" :show-cancel-button="false" class="sm:max-w-6xl">
+      <MilkyChatWorkspace v-if="chatConnection" :connection-id="chatConnection.id" :protocol="chatConnection.protocol || 'milky'" />
     </FaModal>
   </div>
 </template>

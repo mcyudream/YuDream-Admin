@@ -1,8 +1,8 @@
-# Milky 协议详解
+# QQ 机器人协议详解
 
-宿主通过 **Milky 协议**接入 QQ 机器人：以「连接」为单位管理多个机器人实例，出站走 HTTP API，入站走 WebSocket 事件长连。插件不直接接触协议细节，统一经 [MessagingSpi](/plugin/spi/v1/messaging) 收发消息。
+宿主以「连接」为单位管理多个机器人实例。出站统一走 `MilkyApiGateway.invoke(context, api, body)`：共享方法名由传输适配器映射；官方 OpenAPI 路径可作为特异化入口透传。入站 Milky 走 WebSocket `/event`，官方走 Gateway 或 Webhook，归一成 `MilkyModels.Event` 后再进插件分发与 WebQQ。插件不直接接触协议细节，统一经 [MessagingSpi](/plugin/spi/v1/messaging) 收发消息。
 
-> 源码依据：`yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/milky/`（网关与凭据）、`yudream-infrastructure/.../infra/platform/plugin/service/MilkyPluginMessagingService.java`（SPI 适配）、`yudream-interfaces/.../platform/milky/controller/`（管理端点）
+> 源码依据：`yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/milky/`（网关与凭据）、`.../milky/official/`（官方适配器）、`yudream-infrastructure/.../infra/platform/plugin/service/MilkyPluginMessagingService.java`（SPI 适配）、`yudream-interfaces/.../platform/milky/controller/`（管理端点）
 
 ## 连接模型
 
@@ -15,47 +15,71 @@
 | `POST /api/platform/milky/connections/{id}/disable` | 停用（断开事件流，`MilkyRuntimeShutdownRequested` 触发清理） |
 | `POST /api/platform/milky/connections/{id}/test` | 连通性测试 |
 
-- 每个连接持有平台地址（base URL）与访问 token；token 经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库。新写入统一使用 `YUDREAM_CREDENTIAL_KEY`（Base64 解码后恰为 32 字节）及连接作用域 AAD，管理接口永不回传明文；旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（16/24/32 字节）仅可解密历史密文。
-- 能力描述符：能力码 `milky`，类型 `MESSAGING`，项目闸门为 `PLATFORM_MILKY_ENABLED`（默认开启），应用层每次用例前经 `ensureEnabled(...)` 二次校验。
+- 每个连接持有 `protocol`（`milky` 默认 / `official`）。Milky 连接保存平台地址与 Access Token；官方连接保存 AppID、AppSecret，默认 API 地址 `https://api.bot.qq.com`（沙箱 `https://sandbox.api.bot.qq.com`）。凭据经 `AesGcmMilkyCredentialCipher` AES-GCM 加密落库。新写入统一使用 `YUDREAM_CREDENTIAL_KEY`（Base64 解码后恰为 32 字节）及连接作用域 AAD，管理接口永不回传明文；旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（16/24/32 字节）仅可解密历史密文。
+- 能力描述符：能力码 `milky`，类型 `MESSAGING`，展示名 **QQ 消息平台**。项目闸门为 `PLATFORM_MILKY_ENABLED`（默认开启），应用层每次用例前经 `ensureEnabled("milky", "QQ 消息平台")` 二次校验。
+- 官方 Webhook：`POST /api/public/qqbot/{connectionId}/webhook`。回调校验（op=13）返回 `plain_token` + Ed25519 `signature`；业务事件验签后归一发布。
 
-## 出站：HTTP API 调用
+## 出站：共享端口 + 协议适配
 
-所有对端调用收敛在 `ReactorMilkyApiGateway.invoke(context, api, body)`：
+所有对端调用收敛在 `RoutingMilkyApiGateway.invoke(context, api, body)`：
 
 ```mermaid
 sequenceDiagram
     participant P as 插件 (SPI)
     participant S as MilkyPluginMessagingService
-    participant G as ReactorMilkyApiGateway
-    participant Q as QQ (Milky 对端)
+    participant R as RoutingMilkyApiGateway
+    participant M as ReactorMilkyApiGateway
+    participant O as OfficialQqBotApiAdapter
+    participant Q as QQ
     P->>S: sendToChannel(connectionId, channelId, content)
-    S->>G: invoke(context, api, body)
-    G->>Q: POST {baseUrl}/{api} (token 鉴权)
-    Q-->>G: JSON 响应
-    G-->>S: Map<String, Object>
+    S->>R: invoke(context, send_group_message, body)
+    alt protocol=milky
+        R->>M: POST {baseUrl}/api/{api}
+        M->>Q: Milky HTTP
+    else protocol=official
+        R->>O: 映射或透传 OpenAPI
+        O->>Q: POST /v2/groups/{openid}/messages
+    end
+    Q-->>R: JSON 响应
+    R-->>S: Map<String, Object>
     S-->>P: CompletionStage<PluginMessageResult>
 ```
 
-- 典型 API：`get_group_list`（群组列表）、按 peer 发送消息等；富文本（MARKDOWN / HTML）在消息渲染能力开启时先经 render-server 转图片再发送，结果中的 `rendered` / `degraded` 字段标记是否发生降级；
-- 插件需要未封装的对端方法时，走 `PluginMessagingRawService.invoke(connectionId, method, payload)` 直透调用（返回 `CompletionStage<Map<String,Object>>`），调用会同步记录到开发者工具沙盒时间线。
+- 共享方法名（双方走同一入口）：`get_login_info`、`get_group_list`、`get_friend_list`、`get_group_info`、`get_group_member_list`、`send_group_message`、`send_private_message`、`recall_group_message`、`upload_group_file`、`set_group_kick`、`set_group_ban`、`get_group_join_requests`、`set_group_add_request`。官方侧把这些名字映射到 OpenAPI；被动回复会自动附带最近的 `msg_id` / `event_id`。
+- 特异化入口覆盖官方 sitemap 中全部 47 条 REST（消息、群管理、入群审批、菜单/面板、频道、网关）。方法名写成 `GET /v2/groups/{group_openid}/info` 这类路径即可，插件走 `PluginMessagingRawService.invoke`，WebQQ 原生工作台同样支持。
+- 富文本（MARKDOWN / HTML）在消息渲染能力开启时先经 render-server 转图片再发送，结果中的 `rendered` / `degraded` 字段标记是否发生降级。
+- 官方身份是 **openid**（`user_openid` / `group_openid` / `member_openid`），不能当成 QQ 号去查头像或做账号绑定。
 
-## 入站：WebSocket 事件流
+## 入站：WebSocket / Gateway / Webhook
 
-连接启用后，`ReactorMilkyEventGateway.connect(...)` 以 WebSocket 长连消费对端事件：
+Milky 连接启用后走：
 
 ```
 ws://{base-url}/event?access_token={token}
 ```
 
+官方连接启用后走 Gateway（Hello / Identify / Heartbeat / Resume），也可把回调 URL 配到 `/api/public/qqbot/{connectionId}/webhook`。官方事件先归一：
+
+| 官方事件 | 内部 eventType |
+|---|---|
+| `GROUP_AT_MESSAGE_CREATE` / `GROUP_MESSAGE_CREATE` / `C2C_MESSAGE_CREATE` | `message_receive` |
+| `INTERACTION_CREATE` | `button_click` |
+| `GROUP_ADD_ROBOT` / `GROUP_JOIN_REQUEST` | `group_request` |
+| `GROUP_DEL_ROBOT` | `group_leave` |
+| `GROUP_MEMBER_ADD` / `GROUP_MEMBER_REMOVE` | `group_member_increase` / `group_member_decrease` |
+| `FRIEND_ADD` / `FRIEND_DEL` | `friend_add` / `friend_del` |
+| `GROUP_MSG_REJECT` / `C2C_MSG_REJECT` | `message_reject` |
+| 其他官方事件 | 保留 `t` 的小写名，`native_type` 仍为官方原名 |
+
 ```mermaid
 sequenceDiagram
-    participant Q as QQ (Milky 对端)
-    participant E as ReactorMilkyEventGateway
+    participant Q as QQ
+    participant E as 事件适配器
     participant B as Spring 事件总线
     participant D as MilkyPluginEventDispatcher
     participant C as MilkyChatAppService (WebQQ SSE)
-    Q-->>E: event JSON (eventType=message_receive 等)
-    E->>E: 反序列化 MilkyModels.Event（非法事件丢弃并告警）
+    Q-->>E: Milky /event 或官方 Gateway/Webhook
+    E->>E: 归一成 MilkyModels.Event（非法事件丢弃并告警）
     E->>B: 发布内部事件 → MilkyEventPublished
     par 插件分发
         B->>D: dispatch(published)

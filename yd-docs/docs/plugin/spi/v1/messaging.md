@@ -167,7 +167,7 @@ CompletionStage<Map<String, Object>> invoke(String connectionId, String method, 
 | method | `String` | 协议方法名 |
 | payload | `Map<String,Object>` | 协议参数 |
 
-按连接所选协议（Milky）**原生方法透传**：`method` 为协议方法名，`payload` 为协议参数，返回协议原始响应。适合 SPI 未抽象的平台能力。注意原生调用绕过了宿主的渲染降级等增强逻辑，需自行处理协议约束。
+按连接所选协议**原生方法透传**：`method` 为协议方法名，`payload` 为协议参数，返回协议原始响应。Milky 连接使用方法名（如 `get_friend_list`）；官方连接既可使用同一套共享方法名（适配器映射到 OpenAPI），也可传入特异化路径（如 `GET /v2/groups/{openid}/info`、`POST /v2/groups/{openid}/files`）。管理端原生工作台列出官方 sitemap 全部 REST。注意原生调用绕过了宿主的渲染降级等增强逻辑，需自行处理协议约束。
 
 ```java
 Map<String, Object> resp = context.framework().messagingRaw()
@@ -289,7 +289,7 @@ public void onEnable(PluginContext context) {
 - `sendDirectToBoundUser` 依赖系统的账号绑定数据（见 [用户端口](/plugin/spi/v1/user)），目标用户未绑定机器人账号时失败。
 - 所有 ID（connectionId/channelId/userId/messageId 等）在 SPI 中均为 `String`，不要转成数值。
 - 高频场景请在 filter 中尽量收窄条件，避免每个事件都进入 handler。
-- 需要 Milky 协议细节（连接模型、事件流、API 列表等）参见 [Milky 协议详解](/protocol/milky)。
+- 需要协议细节（连接模型、事件流、共享方法名与官方特异化入口）参见 [QQ 机器人协议详解](/protocol/milky)。
 
 ---
 

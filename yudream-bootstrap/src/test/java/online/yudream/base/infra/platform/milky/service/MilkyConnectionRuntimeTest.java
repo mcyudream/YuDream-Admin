@@ -4,6 +4,7 @@ import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
+import online.yudream.base.infra.platform.milky.official.OfficialQqBotEventGateway;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -31,7 +32,7 @@ class MilkyConnectionRuntimeTest {
         when(capabilityRepo.findByCode("milky")).thenReturn(Optional.of(capability));
         when(connectionRepo.findEnabled()).thenReturn(List.of(connection));
 
-        new MilkyConnectionRuntime(gateway, connectionRepo, capabilityRepo, publisher).restore();
+        new MilkyConnectionRuntime(gateway, mock(OfficialQqBotEventGateway.class), connectionRepo, capabilityRepo, publisher).restore();
 
         verifyNoInteractions(connectionRepo, gateway, publisher);
     }
@@ -58,7 +59,7 @@ class MilkyConnectionRuntimeTest {
         doThrow(new IllegalStateException("connection failed")).when(gateway).connect(org.mockito.ArgumentMatchers.eq(failed), any());
         when(gateway.connect(org.mockito.ArgumentMatchers.eq(healthy), any())).thenReturn(mock(reactor.core.Disposable.class));
 
-        assertDoesNotThrow(() -> new MilkyConnectionRuntime(gateway, connectionRepo, capabilityRepo, publisher).restore());
+        assertDoesNotThrow(() -> new MilkyConnectionRuntime(gateway, mock(OfficialQqBotEventGateway.class), connectionRepo, capabilityRepo, publisher).restore());
 
         verify(gateway).connect(org.mockito.ArgumentMatchers.eq(failed), any());
         verify(gateway).connect(org.mockito.ArgumentMatchers.eq(healthy), any());
