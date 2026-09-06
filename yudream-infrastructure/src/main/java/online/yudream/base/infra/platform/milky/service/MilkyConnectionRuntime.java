@@ -7,6 +7,7 @@ import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.service.MilkyEventGateway;
+import online.yudream.base.infra.platform.milky.official.OfficialQqBotEventGateway;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class MilkyConnectionRuntime implements MilkyEventGateway {
     private final ReactorMilkyEventGateway gateway;
+    private final OfficialQqBotEventGateway officialGateway;
     private final MilkyConnectionRepo repo;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final SpringMilkyEventPublisher publisher;
@@ -37,15 +39,18 @@ public class MilkyConnectionRuntime implements MilkyEventGateway {
             log.info("Milky connection skipped because it is disabled: connectionId={}", id);
             return;
         }
-        log.info("Starting Milky connection: connectionId={}", id);
-        sessions.put(id, gateway.connect(connection, (event, raw) -> publisher.publish(id, event)));
+        log.info("Starting messaging connection: connectionId={}, protocol={}", id, connection.protocolCode());
+        Disposable session = connection.official()
+                ? officialGateway.connect(connection, (event, raw) -> publisher.publish(id, event))
+                : gateway.connect(connection, (event, raw) -> publisher.publish(id, event));
+        sessions.put(id, session);
     }
 
     @Override
     public void close(Long id) {
         Disposable session = sessions.remove(id);
         if (session != null) {
-            log.info("Closing Milky connection: connectionId={}", id);
+            log.info("Closing messaging connection: connectionId={}", id);
             session.dispose();
         }
     }

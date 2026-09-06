@@ -9,7 +9,6 @@ import online.yudream.base.application.platform.milky.dto.MilkyConnectionDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
-import online.yudream.base.domain.platform.milky.model.MilkyModels;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.service.MilkyApiGateway;
 import online.yudream.base.domain.platform.milky.service.MilkyEventGateway;
@@ -29,14 +28,19 @@ public class MilkyConnectionAppService {
     @Transactional
     public MilkyConnectionDTO create(MilkyConnectionCreateCmd cmd) {
         ready();
-        return MilkyConnectionAssembler.toDTO(connectionRepo.save(MilkyConnection.create(cmd.getName(), cmd.getBaseUrl(), cmd.getToken(), cmd.getCommandMenuImageMode(), cmd.getCommandMenuPublicBaseUrl())));
+        return MilkyConnectionAssembler.toDTO(connectionRepo.save(MilkyConnection.create(
+                cmd.getName(), cmd.getProtocol(), cmd.getBaseUrl(), cmd.getToken(),
+                cmd.getAppId(), cmd.getAppSecret(), cmd.getSandbox(), cmd.getIntents(),
+                cmd.getCommandMenuImageMode(), cmd.getCommandMenuPublicBaseUrl())));
     }
 
     @Transactional
     public MilkyConnectionDTO update(MilkyConnectionUpdateCmd cmd) {
         ready();
         MilkyConnection connection = item(cmd.getId());
-        connection.update(cmd.getName(), cmd.getBaseUrl(), cmd.getToken(), cmd.getCommandMenuImageMode(), cmd.getCommandMenuPublicBaseUrl());
+        connection.update(cmd.getName(), cmd.getProtocol(), cmd.getBaseUrl(), cmd.getToken(),
+                cmd.getAppId(), cmd.getAppSecret(), cmd.getSandbox(), cmd.getIntents(),
+                cmd.getCommandMenuImageMode(), cmd.getCommandMenuPublicBaseUrl());
         return MilkyConnectionAssembler.toDTO(connectionRepo.save(connection));
     }
 
@@ -70,7 +74,7 @@ public class MilkyConnectionAppService {
     public Object test(Long id) {
         ready();
         MilkyConnection connection = item(id);
-        return apiGateway.invoke(new MilkyModels.Context(connection.getBaseUrl(), connection.getToken(), null), "get_login_info", Map.of());
+        return apiGateway.invoke(connection.toApiContext(), "get_login_info", Map.of());
     }
 
     private MilkyConnection item(Long id) {
@@ -78,6 +82,6 @@ public class MilkyConnectionAppService {
     }
 
     private void ready() {
-        capabilityAppService.ensureEnabled("milky", "Milky 消息平台");
+        capabilityAppService.ensureEnabled("milky", "QQ 消息平台");
     }
 }

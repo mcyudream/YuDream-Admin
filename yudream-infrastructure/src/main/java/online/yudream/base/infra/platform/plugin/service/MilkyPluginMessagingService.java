@@ -259,7 +259,14 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         };
         List<Map<String, Object>> message = messageSegments(content, segment);
         Map<String, Object> result = map(apiGateway.invoke(context(connection), api, Map.of(idKey, peer, "message", message)));
-        return new PluginMessageResult(List.of(String.valueOf(result.getOrDefault("message_seq", ""))), false, false);
+        Object messageId = result.get("message_seq");
+        if (messageId == null) {
+            messageId = result.get("message_id");
+        }
+        if (messageId == null) {
+            messageId = result.get("id");
+        }
+        return new PluginMessageResult(List.of(String.valueOf(messageId == null ? "" : messageId)), false, false);
     }
 
     /** 普通文本保持“正文 + 附件追加”的兼容行为；带标记文本则按标记位置内嵌附件。 */
@@ -363,7 +370,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
     }
 
     private MilkyModels.Context context(MilkyConnection connection) {
-        return new MilkyModels.Context(connection.getBaseUrl(), connection.getToken(), null);
+        return connection.toApiContext();
     }
 
     private Map<String, Object> map(Object value) {

@@ -2,6 +2,7 @@
 import apiFiles from '@/api/modules/files'
 import systemClient from '@/api/modules/system-client'
 import { milkyApiCatalog } from '@/api/modules/milky-api-catalog'
+import { officialQqBotApiCatalog } from '@/api/modules/official-qqbot-api-catalog'
 
 type View = 'recent' | 'friends' | 'groups' | 'notifications'
 type Scene = 'friend' | 'group'
@@ -11,8 +12,9 @@ interface Peer { id: string; scene: Scene; name: string; avatar?: string; remark
 interface ChatMessage { message_seq: string; sender_id?: string; sender_nickname?: string; sender_avatar?: string; time?: number; segments?: Segment[] }
 interface GroupMember { user_id: string; nickname?: string; card?: string; avatar?: string; role?: string }
 
-const props = defineProps<{ connectionId: string }>()
+const props = defineProps<{ connectionId: string; protocol?: 'milky' | 'official' }>()
 const toast = useFaToast()
+const apiCatalog = computed(() => props.protocol === 'official' ? officialQqBotApiCatalog : milkyApiCatalog)
 const activeView = ref<View>('recent')
 const search = ref('')
 const loading = ref(false)
@@ -95,7 +97,8 @@ function mediaUrl(value: unknown) {
 }
 
 async function invoke(api: string, payload: Record<string, any> = {}) {
-  const response: any = await systemClient.post(`api/platform/milky/connections/${props.connectionId}/chat/api/${api}`, payload)
+  const encoded = encodeURIComponent(api)
+  const response: any = await systemClient.post(`api/platform/milky/connections/${props.connectionId}/chat/api/${encoded}`, payload)
   return response.data
 }
 
@@ -413,7 +416,7 @@ onBeforeUnmount(() => { eventAbort?.abort(); eventAbort = null })
 
     <aside v-if="showMembers && selected?.scene === 'group'" class="detail-rail"><header><div><b>群成员</b><small>{{ groupInfo?.member_count || selected.memberCount || members.length }} 人</small></div><button @click="showMembers = false"><FaIcon name="i-ri:close-line" /></button></header><div v-if="groupInfo" class="group-summary"><FaAvatar :src="selected.avatar || ''" :fallback="selected.name.slice(0, 1)" class="size-[54px]" /><b>{{ groupInfo.group_name || selected.name }}</b><small>{{ selected.id }}</small></div><div class="member-scroll"><div v-for="member in members" :key="member.user_id" class="member-row"><FaAvatar :src="member.avatar || ''" :fallback="String(member.card || member.nickname || member.user_id).slice(0, 1)" class="size-[34px]" /><span><b>{{ member.card || member.nickname || member.user_id }}</b><small>{{ member.role || '成员' }}</small></span></div></div></aside>
 
-    <FaDrawer v-model="showApi" title="Milky API 工作台" :z-index="3000" :footer="false" content-class="sm:max-w-[560px]"><div class="api-workbench"><FaSelect v-model="apiName" :options="milkyApiCatalog.map(api => ({ label: `${api.category} / ${api.name}`, value: api.name }))" /><FaTextarea v-model="apiPayload" rows="12" placeholder="请求 JSON" /><FaButton @click="runApi">调用 {{ apiName }}</FaButton><pre v-if="apiResult">{{ apiResult }}</pre></div></FaDrawer>
+    <FaDrawer v-model="showApi" :title="props.protocol === 'official' ? '官方 OpenAPI 工作台' : 'Milky API 工作台'" :z-index="3000" :footer="false" content-class="sm:max-w-[560px]"><div class="api-workbench"><FaSelect v-model="apiName" :options="apiCatalog.map(api => ({ label: `${api.category} / ${api.name}`, value: api.name }))" /><FaTextarea v-model="apiPayload" rows="12" placeholder="请求 JSON" /><FaButton @click="runApi">调用 {{ apiName }}</FaButton><pre v-if="apiResult">{{ apiResult }}</pre></div></FaDrawer>
   </section>
 </template>
 

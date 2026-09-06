@@ -84,7 +84,7 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
         if (STATUS_PATH.equals(path) || PUBLIC_KEY_PATH.equals(path) || isBinaryAssetPath(path)) {
             return false;
         }
-        if (path != null && path.startsWith("/api/public/cms")) {
+        if (path != null && (path.startsWith("/api/public/cms") || path.startsWith("/api/public/qqbot"))) {
             return false;
         }
         if (path != null && (path.startsWith("/api/system/excel") || path.startsWith("/api/system/files"))) {

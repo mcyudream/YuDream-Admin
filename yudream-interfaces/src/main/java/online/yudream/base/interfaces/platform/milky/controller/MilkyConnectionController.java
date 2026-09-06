@@ -26,7 +26,7 @@ public class MilkyConnectionController {
     private final MilkyConnectionAppService appService;
 
     @GetMapping
-    @PermissionRegister(code = "platform:milky:view", name = "查看 Milky 连接", module = "Milky", desc = "查看连接")
+    @PermissionRegister(code = "platform:milky:view", name = "查看 QQ 消息连接", module = "QQ 消息平台", desc = "查看连接")
     public Result<PageResult<MilkyConnectionRes>> page(@RequestParam(required = false) String keyword,
                                                         @RequestParam(defaultValue = "1") int page,
                                                         @RequestParam(defaultValue = "20") int size) {
@@ -34,31 +34,31 @@ public class MilkyConnectionController {
     }
 
     @PostMapping
-    @PermissionRegister(code = "platform:milky:config", name = "配置 Milky 连接", module = "Milky", desc = "创建连接")
+    @PermissionRegister(code = "platform:milky:config", name = "配置 QQ 消息连接", module = "QQ 消息平台", desc = "创建连接")
     public Result<MilkyConnectionRes> create(@Valid @RequestBody MilkyConnectionCreateRequest request) {
         return Result.ok(MilkyConnectionWebAssembler.toRes(appService.create(MilkyConnectionWebAssembler.toCmd(request))));
     }
 
     @PutMapping("/{id}")
-    @PermissionRegister(code = "platform:milky:config", name = "配置 Milky 连接", module = "Milky", desc = "更新连接")
+    @PermissionRegister(code = "platform:milky:config", name = "配置 QQ 消息连接", module = "QQ 消息平台", desc = "更新连接")
     public Result<MilkyConnectionRes> update(@PathVariable Long id, @Valid @RequestBody MilkyConnectionUpdateRequest request) {
         return Result.ok(MilkyConnectionWebAssembler.toRes(appService.update(MilkyConnectionWebAssembler.toCmd(id, request))));
     }
 
     @PostMapping("/{id}/enable")
-    @PermissionRegister(code = "platform:milky:connect", name = "启用 Milky 连接", module = "Milky", desc = "启用连接")
+    @PermissionRegister(code = "platform:milky:connect", name = "启用 QQ 消息连接", module = "QQ 消息平台", desc = "启用连接")
     public Result<MilkyConnectionRes> enable(@PathVariable Long id) {
         return Result.ok(MilkyConnectionWebAssembler.toRes(appService.enable(id)));
     }
 
     @PostMapping("/{id}/disable")
-    @PermissionRegister(code = "platform:milky:connect", name = "停用 Milky 连接", module = "Milky", desc = "停用连接")
+    @PermissionRegister(code = "platform:milky:connect", name = "停用 QQ 消息连接", module = "QQ 消息平台", desc = "停用连接")
     public Result<MilkyConnectionRes> disable(@PathVariable Long id) {
         return Result.ok(MilkyConnectionWebAssembler.toRes(appService.disable(id)));
     }
 
     @PostMapping("/{id}/test")
-    @PermissionRegister(code = "platform:milky:connect", name = "测试 Milky 连接", module = "Milky", desc = "测试连接")
+    @PermissionRegister(code = "platform:milky:connect", name = "测试 QQ 消息连接", module = "QQ 消息平台", desc = "测试连接")
     public Result<Object> test(@PathVariable Long id) {
         return Result.ok(appService.test(id));
     }

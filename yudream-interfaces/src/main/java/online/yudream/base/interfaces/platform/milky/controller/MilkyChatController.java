@@ -22,20 +22,20 @@ public class MilkyChatController {
     private final MilkyChatAppService appService;
 
     @GetMapping("/conversations")
-    @PermissionRegister(code = "platform:milky:view", name = "查看 Milky 会话", module = "Milky", desc = "查看好友与群聊")
+    @PermissionRegister(code = "platform:milky:view", name = "查看 QQ 会话", module = "QQ 消息平台", desc = "查看好友与群聊")
     public Result<Object> conversations(@PathVariable Long connectionId) {
         return Result.ok(appService.conversations(connectionId));
     }
 
     @GetMapping("/history")
-    @PermissionRegister(code = "platform:milky:view", name = "查看 Milky 历史消息", module = "Milky", desc = "查看消息历史")
+    @PermissionRegister(code = "platform:milky:view", name = "查看 QQ 历史消息", module = "QQ 消息平台", desc = "查看消息历史")
     public Result<Object> history(@PathVariable Long connectionId, @RequestParam String scene, @RequestParam String peerId,
                                   @RequestParam(required = false) String start, @RequestParam(defaultValue = "20") int limit) {
         return Result.ok(appService.history(connectionId, scene, peerId, start, limit));
     }
 
     @GetMapping(value = "/events", produces = "text/event-stream")
-    @PermissionRegister(code = "platform:milky:view", name = "订阅 Milky 消息", module = "Milky", desc = "订阅实时消息")
+    @PermissionRegister(code = "platform:milky:view", name = "订阅 QQ 消息", module = "QQ 消息平台", desc = "订阅实时消息")
     public SseEmitter events(@PathVariable Long connectionId) {
         SseEmitter emitter = new SseEmitter(0L);
         try { emitter.send(SseEmitter.event().name("connected").data(Map.of("connectionId", String.valueOf(connectionId)))); }
@@ -63,14 +63,25 @@ public class MilkyChatController {
     }
 
     @PostMapping("/messages")
-    @PermissionRegister(code = "platform:milky:send", name = "发送 Milky 消息", module = "Milky", desc = "发送 QQ 消息")
+    @PermissionRegister(code = "platform:milky:send", name = "发送 QQ 消息", module = "QQ 消息平台", desc = "发送 QQ 消息")
     public Result<Object> send(@PathVariable Long connectionId, @RequestBody Map<String, Object> body) {
         return Result.ok(appService.send(connectionId, String.valueOf(body.get("scene")), String.valueOf(body.get("peerId")), body.get("message")));
     }
 
     @PostMapping("/api/{api}")
-    @PermissionRegister(code = "platform:milky:internal", name = "调用 Milky 原生接口", module = "Milky", desc = "调用全部 Milky API")
+    @PermissionRegister(code = "platform:milky:internal", name = "调用 QQ 原生接口", module = "QQ 消息平台", desc = "调用全部原生 API")
     public Result<Object> invoke(@PathVariable Long connectionId, @PathVariable String api, @RequestBody(required = false) Map<String, Object> payload) {
-        return Result.ok(appService.invoke(connectionId, api, payload));
+        return Result.ok(appService.invoke(connectionId, decodeApi(api), payload));
+    }
+
+    private String decodeApi(String api) {
+        if (api == null) {
+            return null;
+        }
+        try {
+            return java.net.URLDecoder.decode(api, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (RuntimeException exception) {
+            return api;
+        }
     }
 }

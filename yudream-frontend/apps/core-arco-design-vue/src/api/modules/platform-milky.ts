@@ -1,10 +1,16 @@
 import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
+export type MilkyProtocol = 'milky' | 'official'
+
 export interface MilkyConnection {
   id: string
   name: string
+  protocol?: MilkyProtocol
   baseUrl: string
+  appId?: string
+  sandbox?: boolean
+  intents?: number
   enabled: boolean
   credentialConfigured: boolean
   commandMenuImageMode?: 'base64' | 'url'
@@ -15,8 +21,13 @@ export interface MilkyConnection {
 
 export interface MilkyConnectionPayload {
   name: string
-  baseUrl: string
+  protocol?: MilkyProtocol
+  baseUrl?: string
   token?: string
+  appId?: string
+  appSecret?: string
+  sandbox?: boolean
+  intents?: number
   commandMenuImageMode?: 'base64' | 'url'
   commandMenuPublicBaseUrl?: string
 }
