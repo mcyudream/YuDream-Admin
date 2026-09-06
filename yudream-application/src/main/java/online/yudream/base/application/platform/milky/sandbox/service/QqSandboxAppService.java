@@ -157,7 +157,7 @@ public class QqSandboxAppService {
      */
     public QqSandboxGroupsDTO groupOptions(String connectionId) {
         MilkyConnection connection = enabledPolicyConnection(connectionId);
-        MilkyModels.Context context = new MilkyModels.Context(connection.getBaseUrl(), connection.getToken(), null);
+        MilkyModels.Context context = connection.toApiContext();
         Object data = milkyApiGateway.invoke(context, "get_group_list", Map.of());
         List<QqSandboxGroupOptionDTO> groups = new java.util.ArrayList<>();
         Object rows = groupRows(data);

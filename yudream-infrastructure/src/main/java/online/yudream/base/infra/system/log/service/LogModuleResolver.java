@@ -10,7 +10,7 @@ import java.util.Locale;
 public final class LogModuleResolver {
 
     private static final List<Rule> RULES = List.of(
-            new Rule("milky", "Milky 消息平台"),
+            new Rule("milky", "QQ 消息平台"),
             new Rule("aichatbot", "AI 群聊机器人"),
             new Rule("ai-chatbot", "AI 群聊机器人"),
             new Rule("qqbotautomation", "QQ 群自动化"),
