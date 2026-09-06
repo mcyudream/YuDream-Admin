@@ -88,14 +88,19 @@ public class MilkyChatAppService {
     @Transactional(readOnly = true)
     public Object invoke(Long id, String api, Object payload) {
         ready();
-        if (api == null || !api.matches("[a-z][a-z0-9_]{0,127}")) {
+        if (api == null || api.isBlank()) {
             throw new BizException("Milky API 名称无效");
         }
-        return call(connection(id), api, payload == null ? Map.of() : payload);
+        String method = api.trim();
+        boolean officialPath = method.startsWith("/") || method.contains("/");
+        if (!officialPath && !method.matches("[a-zA-Z][a-zA-Z0-9_.:/-]{0,255}")) {
+            throw new BizException("Milky API 名称无效");
+        }
+        return call(connection(id), method, payload == null ? Map.of() : payload);
     }
 
     private Object call(MilkyConnection connection, String api, Object body) {
-        return apiGateway.invoke(new MilkyModels.Context(connection.getBaseUrl(), connection.getToken(), null), api, body);
+        return apiGateway.invoke(connection.toApiContext(), api, body);
     }
 
     private MilkyConnection connection(Long id) {
@@ -107,6 +112,6 @@ public class MilkyChatAppService {
     }
 
     private void ready() {
-        capabilityAppService.ensureEnabled("milky", "Milky 消息平台");
+        capabilityAppService.ensureEnabled("milky", "QQ 消息平台");
     }
 }

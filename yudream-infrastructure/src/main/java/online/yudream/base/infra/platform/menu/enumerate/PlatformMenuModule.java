@@ -32,28 +32,28 @@ public enum PlatformMenuModule {
             parentName = "WIKI", permission = "platform:wiki:manage")
     WIKI_MANAGE,
 
-    @MenuNode(code = "platform:milky", name = "Milky 消息平台", type = MenuNodeType.MENU,
+    @MenuNode(code = "platform:milky", name = "QQ 消息平台", type = MenuNodeType.MENU,
             path = "/platform/milky", component = "platform/milky/index.vue",
             icon = "i-ri:chat-3-line", sort = 76)
     MILKY,
 
-    @MenuNode(code = "platform:milky:view", name = "查看 Milky 消息平台", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:milky:view", name = "查看 QQ 消息平台", type = MenuNodeType.BUTTON,
             parentName = "MILKY", permission = "platform:milky:view")
     MILKY_VIEW,
 
-    @MenuNode(code = "platform:milky:config", name = "配置 Milky 连接", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:milky:config", name = "配置 QQ 消息连接", type = MenuNodeType.BUTTON,
             parentName = "MILKY", permission = "platform:milky:config")
     MILKY_CONFIG,
 
-    @MenuNode(code = "platform:milky:connect", name = "连接 Milky 平台", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:milky:connect", name = "连接 QQ 消息平台", type = MenuNodeType.BUTTON,
             parentName = "MILKY", permission = "platform:milky:connect")
     MILKY_CONNECT,
 
-    @MenuNode(code = "platform:milky:send", name = "发送 Milky 消息", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:milky:send", name = "发送 QQ 消息", type = MenuNodeType.BUTTON,
             parentName = "MILKY", permission = "platform:milky:send")
     MILKY_SEND,
 
-    @MenuNode(code = "platform:milky:internal", name = "调用 Milky 原生接口", type = MenuNodeType.BUTTON,
+    @MenuNode(code = "platform:milky:internal", name = "调用 QQ 原生接口", type = MenuNodeType.BUTTON,
             parentName = "MILKY", permission = "platform:milky:internal")
     MILKY_INTERNAL,
 

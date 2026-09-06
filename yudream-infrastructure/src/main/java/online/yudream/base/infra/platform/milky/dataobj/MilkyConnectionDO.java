@@ -14,8 +14,13 @@ import org.springframework.data.mongodb.core.mapping.Document;
 @Document(collection = "platformMilkyConnection")
 public class MilkyConnectionDO extends BaseDO {
     private String name;
+    private String protocol;
     private String baseUrl;
     private String encryptedToken;
+    private String appId;
+    private String encryptedAppSecret;
+    private boolean sandbox;
+    private Integer intents;
     private boolean enabled;
     private String commandMenuImageMode;
     private String commandMenuPublicBaseUrl;
