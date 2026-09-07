@@ -92,10 +92,17 @@ public class MilkyPluginEventDispatcher {
             String channelId = messageChannelId(data);
             String content = messageContent(data);
             Map<String, Object> referrer = new java.util.LinkedHashMap<>(additionalReferrer);
-            referrer.put("mentions", mentionsFromSegments(data.get("segments")));
+            java.util.List<String> mentions = new java.util.ArrayList<>(mentionsFromSegments(data.get("segments")));
             if (officialDirectedAtBot(data)) {
                 referrer.put("mentionSelf", true);
+                // 官方 OpenAPI 的 @机器人/私聊事件没有机器人 mention 段（normalizer 已剥离），补入 selfId 对齐
+                // Milky/onebot "@bot 携带 mention 段" 语义，插件只按 mentions 判定也能命中官方定向消息
+                String selfId = text(event.selfId());
+                if (selfId != null && !mentions.contains(selfId)) {
+                    mentions.add(selfId);
+                }
             }
+            referrer.put("mentions", mentions);
             copyOfficialReplyIds(data, referrer);
             String replyMessageId = replyMessageId(data.get("segments"));
             if (replyMessageId != null) referrer.put("replyMessageId", replyMessageId);
