@@ -52,6 +52,8 @@ public class MilkyPluginEventDispatcher {
     private final TemplateEngine templateEngine;
 
     static final long MENU_IMAGE_DEADLINE_SECONDS = 15;
+    /** 无插件归属指令在菜单中的分组名，也是 /菜单 过滤系统指令的伪 code。 */
+    static final String SYSTEM_MENU_GROUP = "系统";
 
     @EventListener
     public void dispatch(MilkyEventPublished published) {
@@ -116,7 +118,7 @@ public class MilkyPluginEventDispatcher {
             }
             User user = userId == null ? null : users.findByQQ(userId).orElse(null);
             if (isMenuAlias(command.name())) {
-                menuImage(pluginEvent, user);
+                menuImage(pluginEvent, user, command.arguments());
                 return;
             }
             if (user == null && !"绑定".equals(command.name()) && (requiresBound() || commandRequiresBound(command.name()))) {
@@ -192,21 +194,23 @@ public class MilkyPluginEventDispatcher {
                 : new GroupRequest(groupId, userId, requestId, firstText(data, "comment", "message", "verify_message"));
     }
 
-    private CompletionStage<?> menu(PluginEvent event, User user) {
-        var commandList = commands.listAccessible(user == null ? null : user.getId());
+    private CompletionStage<?> menu(PluginEvent event, User user, String pluginFilter) {
+        var accessible = commands.listAccessible(user == null ? null : user.getId());
+        String filter = effectiveMenuFilter(accessible, pluginFilter);
+        var commandList = filterCommands(accessible, filter);
         if (officialConnection(event.connectionId())) {
-            String nickname = user == null ? "访客" : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
             return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
                     new PluginMessageContent(PluginMessageContent.Type.MARKDOWN,
-                            commandMenuMarkdown(nickname, commandList), null, event.referrer(), commandButtons(commandList))));
+                            commandMenuMarkdown(nickname(user), commandList), null, event.referrer(),
+                            menuButtons(commandList, filter))));
         }
-        StringBuilder content = new StringBuilder("可用指令：");
+        StringBuilder content = new StringBuilder(filter == null ? "可用指令：" : "可用指令（" + filter + "）：");
         commandList.forEach(command -> content
                 .append("\n/").append(command.command()).append(" - ").append(command.description()));
         return sendMenuText(event, content.toString());
     }
 
-    /** 官方连接具备原生 markdown + keyboard, 菜单直接走交互消息, 不再渲染图片。 */
+    /** 官方连接具备原生图片 + markdown keyboard：菜单以卡片图片为主，按钮仅作交互辅助。 */
     private boolean officialConnection(String connectionId) {
         try {
             return connections.findById(Long.valueOf(connectionId))
@@ -217,30 +221,54 @@ public class MilkyPluginEventDispatcher {
         }
     }
 
-    /** 菜单指令按钮：点击即以指令原文发出，指令过多时只取前 20 条(4 列 x 5 行上限)。 */
-    private List<PluginMessageContent.Button> commandButtons(List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
+    /**
+     * 官方菜单辅助按钮。一级菜单每个插件一个入口（点击发出 /菜单 {插件} 进入二级），
+     * 二级菜单展示该插件子指令并附"返回菜单"。officialKeyboard 控制每排最多 2 个、最多 5 排。
+     */
+    private List<PluginMessageContent.Button> menuButtons(List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list, String pluginFilter) {
         List<PluginMessageContent.Button> buttons = new java.util.ArrayList<>();
+        if (pluginFilter == null) {
+            Map<String, String> plugins = new java.util.LinkedHashMap<>();
+            list.forEach(command -> {
+                String code = command.pluginCode() == null || command.pluginCode().isBlank() ? SYSTEM_MENU_GROUP : command.pluginCode();
+                plugins.putIfAbsent(code, SYSTEM_MENU_GROUP.equals(code) ? SYSTEM_MENU_GROUP : runtime.displayName(code));
+            });
+            int index = 0;
+            for (Map.Entry<String, String> plugin : plugins.entrySet()) {
+                if (index >= 10) {
+                    break;
+                }
+                buttons.add(PluginMessageContent.Button.command("menu-plugin-" + index,
+                        buttonLabel(plugin.getValue()), "/菜单 " + plugin.getKey()));
+                index++;
+            }
+            return buttons;
+        }
         int index = 0;
         for (online.yudream.base.plugin.spi.system.command.PluginCommandInfo command : list) {
-            if (index >= 20) {
+            if (index >= 9) {
                 break;
             }
-            buttons.add(PluginMessageContent.Button.command("menu-cmd-" + index, "/" + command.command(), "/" + command.command()));
+            buttons.add(PluginMessageContent.Button.command("menu-cmd-" + index,
+                    buttonLabel(command.name()), "/" + command.command()));
             index++;
         }
+        buttons.add(PluginMessageContent.Button.command("menu-back", "🔙 返回菜单", "/菜单"));
         return buttons;
     }
 
-    private void menuImage(PluginEvent event, User user) {
+    private void menuImage(PluginEvent event, User user, List<String> arguments) {
+        String pluginFilter = menuPluginFilter(arguments);
         if (officialConnection(event.connectionId())) {
-            menu(event, user);
+            officialMenuImage(event, user, pluginFilter);
             return;
         }
         AtomicBoolean fallbackStarted = new AtomicBoolean();
         try {
-            var commandList = commands.listAccessible(user == null ? null : user.getId());
-            String nickname = user == null ? "访客" : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
-            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname, commandList))
+            var accessible = commands.listAccessible(user == null ? null : user.getId());
+            String filter = effectiveMenuFilter(accessible, pluginFilter);
+            var commandList = filterCommands(accessible, filter);
+            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList))
                     .thenCompose(QqSandboxExecutionScope.wrap(image -> {
                         QqSandboxSession sandbox = QqSandboxExecutionScope.current();
                         String mode;
@@ -260,10 +288,101 @@ public class MilkyPluginEventDispatcher {
                     }));
             CompletionStage<?> deadline = withMenuDeadline(imageSend);
             QqSandboxExecutionScope.track(deadline);
-            fallbackOnMenuImageFailure(deadline, fallbackStarted, () -> menu(event, user), event);
+            fallbackOnMenuImageFailure(deadline, fallbackStarted, () -> menu(event, user, filter), event);
         } catch (Exception error) {
-            fallbackOnMenuImageFailure(failedStage(error), fallbackStarted, () -> menu(event, user), event);
+            fallbackOnMenuImageFailure(failedStage(error), fallbackStarted, () -> menu(event, user, pluginFilter), event);
         }
+    }
+
+    /**
+     * 官方连接菜单：渲染卡片图片先行发出（图片为主），随后一条短 markdown 携带辅助按钮；
+     * 渲染或图片发送失败时降级为 markdown 文字菜单 + 同一组按钮。
+     */
+    private void officialMenuImage(PluginEvent event, User user, String pluginFilter) {
+        var accessible = commands.listAccessible(user == null ? null : user.getId());
+        String filter = effectiveMenuFilter(accessible, pluginFilter);
+        var commandList = filterCommands(accessible, filter);
+        AtomicBoolean fallbackStarted = new AtomicBoolean();
+        try {
+            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList))
+                    .thenCompose(QqSandboxExecutionScope.wrap(image -> {
+                        return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
+                                new PluginMessageContent(PluginMessageContent.Type.IMAGE,
+                                        "base64://" + Base64.getEncoder().encodeToString(image.content()), null, event.referrer())));
+                    }));
+            CompletionStage<?> deadline = withMenuDeadline(imageSend);
+            QqSandboxExecutionScope.track(deadline);
+            fallbackOnMenuImageFailure(deadline, fallbackStarted, () -> menu(event, user, filter), event);
+            deadline.thenCompose(QqSandboxExecutionScope.wrap(ignored -> {
+                        return sendOfficialMenuButtons(event, commandList, filter);
+                    }))
+                    .whenComplete((ignored, error) -> {
+                        if (error != null && !fallbackStarted.get()) {
+                            log.error("官方菜单按钮消息发送失败: connectionId={}, channelId={}",
+                                    event.connectionId(), event.channelId(), error);
+                        }
+                    });
+        } catch (Exception error) {
+            fallbackOnMenuImageFailure(failedStage(error), fallbackStarted, () -> menu(event, user, filter), event);
+        }
+    }
+
+    /** 官方菜单辅助按钮消息：一条短 markdown 携带 keyboard，菜单卡片图片已先行发出。 */
+    private CompletionStage<?> sendOfficialMenuButtons(PluginEvent event,
+                                                       List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> commandList,
+                                                       String pluginFilter) {
+        List<PluginMessageContent.Button> buttons = menuButtons(commandList, pluginFilter);
+        if (buttons.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+        String text = pluginFilter == null
+                ? "**🤖 指令菜单**\n\n> 菜单卡片见上方图片，点击按钮查看对应插件的指令"
+                : "**" + markdown(SYSTEM_MENU_GROUP.equals(pluginFilter) ? SYSTEM_MENU_GROUP : runtime.displayName(pluginFilter))
+                        + "** 指令\n\n> 点击按钮直接发送对应指令";
+        return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
+                new PluginMessageContent(PluginMessageContent.Type.MARKDOWN, text, null, event.referrer(), buttons)));
+    }
+
+    /** 菜单指令参数：/菜单 {插件名或插件 code}。 */
+    private String menuPluginFilter(List<String> arguments) {
+        if (arguments == null || arguments.isEmpty()) {
+            return null;
+        }
+        String value = String.join(" ", arguments).trim();
+        return value.isEmpty() ? null : value;
+    }
+
+    /** 过滤参数无匹配插件时回退为全量菜单，避免空白卡片。 */
+    private String effectiveMenuFilter(List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> accessible, String pluginFilter) {
+        if (pluginFilter == null) {
+            return null;
+        }
+        return filterCommands(accessible, pluginFilter).isEmpty() ? null : pluginFilter;
+    }
+
+    private List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> filterCommands(
+            List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list, String pluginFilter) {
+        if (pluginFilter == null) {
+            return list;
+        }
+        return list.stream().filter(command -> {
+            String code = command.pluginCode();
+            if (code == null || code.isBlank()) {
+                return SYSTEM_MENU_GROUP.equals(pluginFilter);
+            }
+            return code.equalsIgnoreCase(pluginFilter) || runtime.displayName(code).equalsIgnoreCase(pluginFilter);
+        }).toList();
+    }
+
+    private String nickname(User user) {
+        return user == null ? "访客"
+                : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
+    }
+
+    /** 官方按钮显示文案保护：过长截断，避免一排两个时挤压换行。 */
+    private String buttonLabel(String value) {
+        String label = value == null || value.isBlank() ? "指令" : value.trim();
+        return label.length() > 12 ? label.substring(0, 11) + "…" : label;
     }
 
     static <T> CompletionStage<T> withMenuDeadline(CompletionStage<T> stage) {

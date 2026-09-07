@@ -427,7 +427,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         return "![" + title + "](" + attachment.url() + ")";
     }
 
-    /** SPI 按钮 → 官方 keyboard：指令按钮 action.type=2，回调按钮 action.type=1；4 列一行、最多 5 行。 */
+    /** SPI 按钮 → 官方 keyboard：指令按钮 action.type=2，回调按钮 action.type=1；每排最多 2 个、最多 5 行。 */
     private static Map<String, Object> officialKeyboard(List<PluginMessageContent.Button> buttons) {
         if (buttons == null || buttons.isEmpty()) {
             return null;
@@ -456,7 +456,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             button.put("action", action);
             row.add(button);
             index++;
-            if (row.size() == 4) {
+            if (row.size() == 2) {
                 rows.add(Map.of("buttons", List.copyOf(row)));
                 row.clear();
             }
