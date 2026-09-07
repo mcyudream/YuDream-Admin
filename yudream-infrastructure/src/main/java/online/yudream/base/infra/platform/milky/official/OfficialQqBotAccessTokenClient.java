@@ -57,11 +57,15 @@ public class OfficialQqBotAccessTokenClient {
         }
     }
 
+    static HttpClient officialHttpClient() {
+        return HttpClient.create().protocol(reactor.netty.http.HttpProtocol.HTTP11);
+    }
+
     private CachedToken fetch(Context context) {
         String response;
         try {
             response = WebClient.builder()
-                    .clientConnector(new ReactorClientHttpConnector(HttpClient.create().responseTimeout(TIMEOUT)))
+                    .clientConnector(new ReactorClientHttpConnector(officialHttpClient().responseTimeout(TIMEOUT)))
                     .build()
                     .post()
                     .uri(MilkyConnectionProtocol.OFFICIAL_TOKEN_URL)

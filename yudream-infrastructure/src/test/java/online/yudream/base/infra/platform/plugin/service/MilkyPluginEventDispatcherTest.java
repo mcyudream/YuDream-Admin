@@ -97,6 +97,52 @@ class MilkyPluginEventDispatcherTest {
     }
 
     @Test
+    void stripsOfficialBotMentionsBeforeParsingCommands() {
+        assertEquals("菜单", MilkyPluginEventDispatcher.parseCommand("<@!bot-open> 菜单").name());
+        assertEquals("签到", MilkyPluginEventDispatcher.parseCommand("<@123> /签到 extra").name());
+        assertEquals(List.of("extra"), MilkyPluginEventDispatcher.parseCommand("<@123> /签到 extra").arguments());
+        assertNull(MilkyPluginEventDispatcher.parseCommand("<@!bot-open> hello"));
+        assertNull(MilkyPluginEventDispatcher.parseCommand("[图片] 菜单"));
+    }
+
+    @Test
+    void officialDirectedChatKeepsNativeMentionSelfWithoutFakingMentionSegments() {
+        Map<String, Object> data = Map.of(
+                "native_type", "GROUP_AT_MESSAGE_CREATE",
+                "mention_self", true,
+                "segments", List.of(
+                        Map.of("type", "text", "data", Map.of("text", "你好")),
+                        Map.of("type", "mention", "data", Map.of("user_id", "member-2"))
+                )
+        );
+
+        assertNull(MilkyPluginEventDispatcher.parseCommand("你好"));
+        assertEquals(List.of("member-2"), MilkyPluginEventDispatcher.mentionsFromSegments(data.get("segments")));
+        assertTrue(MilkyPluginEventDispatcher.officialDirectedAtBot(data));
+        assertTrue(MilkyPluginEventDispatcher.officialDirectedAtBot(Map.of(
+                "native_type", "INTERACTION_CREATE",
+                "mention_self", true
+        )));
+        assertTrue(!MilkyPluginEventDispatcher.officialDirectedAtBot(Map.of(
+                "native_type", "GROUP_MESSAGE_CREATE",
+                "mention_self", false
+        )));
+        assertTrue(!MilkyPluginEventDispatcher.officialDirectedAtBot(Map.of(
+                "native_type", "INTERACTION_CREATE"
+        )));
+        Map<String, Object> referrer = new java.util.LinkedHashMap<>();
+        MilkyPluginEventDispatcher.copyOfficialReplyIds(Map.of(
+                "message_scene", "group",
+                "msg_id", "msg-1",
+                "event_id", "evt-1",
+                "interaction_id", "i-1"
+        ), referrer);
+        assertEquals("group", referrer.get("message_scene"));
+        assertEquals("msg-1", referrer.get("msg_id"));
+        assertEquals("i-1", referrer.get("interaction_id"));
+    }
+
+    @Test
     void preservesFailureCauseForMenuFallbackHandling() {
         IllegalStateException expected = new IllegalStateException("render failed");
 
