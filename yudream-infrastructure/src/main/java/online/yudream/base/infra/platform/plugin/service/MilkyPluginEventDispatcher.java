@@ -270,21 +270,9 @@ public class MilkyPluginEventDispatcher {
             var commandList = filterCommands(accessible, filter);
             CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList))
                     .thenCompose(QqSandboxExecutionScope.wrap(image -> {
-                        QqSandboxSession sandbox = QqSandboxExecutionScope.current();
-                        String mode;
-                        String publicBaseUrl;
-                        if (sandbox != null) {
-                            mode = "base64";
-                            publicBaseUrl = null;
-                        } else {
-                            var connection = connections.findById(Long.valueOf(event.connectionId())).orElse(null);
-                            mode = connection == null ? "base64" : connection.getCommandMenuImageMode();
-                            publicBaseUrl = connection == null ? null : connection.getCommandMenuPublicBaseUrl();
-                        }
-                        String uri = "url".equalsIgnoreCase(mode) ? uploadMenuImage(image, publicBaseUrl)
-                                : "base64://" + Base64.getEncoder().encodeToString(image.content());
                         return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
-                                new PluginMessageContent(PluginMessageContent.Type.IMAGE, uri, null, Map.of())));
+                                new PluginMessageContent(PluginMessageContent.Type.IMAGE,
+                                        resolveMenuImageUri(event, image), null, Map.of())));
                     }));
             CompletionStage<?> deadline = withMenuDeadline(imageSend);
             QqSandboxExecutionScope.track(deadline);
@@ -308,7 +296,7 @@ public class MilkyPluginEventDispatcher {
                     .thenCompose(QqSandboxExecutionScope.wrap(image -> {
                         return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
                                 new PluginMessageContent(PluginMessageContent.Type.IMAGE,
-                                        "base64://" + Base64.getEncoder().encodeToString(image.content()), null, event.referrer())));
+                                        resolveMenuImageUri(event, image), null, event.referrer())));
                     }));
             CompletionStage<?> deadline = withMenuDeadline(imageSend);
             QqSandboxExecutionScope.track(deadline);
@@ -424,6 +412,23 @@ public class MilkyPluginEventDispatcher {
     private CompletionStage<?> sendMenuText(PluginEvent event, String content) {
         return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
                 new PluginMessageContent(PluginMessageContent.Type.TEXT, content, null, event.referrer())));
+    }
+
+    private String resolveMenuImageUri(PluginEvent event, online.yudream.base.plugin.spi.system.render.PluginRenderedImage image) {
+        QqSandboxSession sandbox = QqSandboxExecutionScope.current();
+        String mode;
+        String publicBaseUrl;
+        if (sandbox != null) {
+            mode = "base64";
+            publicBaseUrl = null;
+        } else {
+            var connection = connections.findById(Long.valueOf(event.connectionId())).orElse(null);
+            mode = connection == null ? "base64" : connection.getCommandMenuImageMode();
+            publicBaseUrl = connection == null ? null : connection.getCommandMenuPublicBaseUrl();
+        }
+        return "url".equalsIgnoreCase(mode)
+                ? uploadMenuImage(image, publicBaseUrl)
+                : "base64://" + Base64.getEncoder().encodeToString(image.content());
     }
 
     private String uploadMenuImage(online.yudream.base.plugin.spi.system.render.PluginRenderedImage image, String publicBaseUrl) {
