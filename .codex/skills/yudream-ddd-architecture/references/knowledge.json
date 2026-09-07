@@ -400,6 +400,17 @@
     {
       "key": "plugin-runtime-lifecycle-lock",
       "text": "JarPluginRuntimeGateway 的 load/enable/disable/unload 必须用 synchronized 串行化：dev-mode watcher 重载（watcher 线程）、管理端启用/禁用（HTTP 线程）与启动恢复会并发触发同一插件生命周期；containsKey/isEnabled 检查与注解注册之间的竞态会让同一 PluginContextImpl 重复注册并报『插件权限/菜单/端点重复』，失败方 catch 里的 clearRuntimeContributions 还会清掉并发成功方的贡献。修复见 68a6ebcf。"
+    },
+    {
+      "key": "official-qq-interactive-reply",
+      "title": "官方 QQ 机器人交互回复（按钮 + markdown 兜底）",
+      "summary": "PluginMessageContent 增加 List<Button> buttons（record Button(id,label,data,enter)，Button.command/callback 静态工厂，四参数旧构造保留兼容）。发送链路 MilkyPluginMessagingService.buildOfficialBody：官方连接无媒体一律 msg_type=2 markdown 兜底（TEXT/MARKDOWN 的 http(s) image/* 附件以 [[title]] 标记内嵌为 ![title](url)），buttons 映射 keyboard（一行 4 个、最多 5 行，enter=true→action.type=2 指令，false→1 回调，permission type=2 群成员可用），referrer 的 msg_id/event_id 透传为被动回复凭证；Milky 连接带按钮置 degraded=true。指令菜单 MilkyPluginEventDispatcher.commandMenuMarkdown 用 QQ 安全模板（标题/分组/列表/引用/***分割线，无表格）并附前 20 条指令按钮。插件侧投降/开局/互跳场景以 Button.command 接入（mcguess/wordle/pony/questionbank/wallet/project-progress/minecraft-server/qq-binding）。",
+      "files": [
+        "yudream-plugins/yudream-plugin-spi/src/main/java/online/yudream/base/plugin/spi/system/messaging/PluginMessageContent.java",
+        "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/service/MilkyPluginMessagingService.java",
+        "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/service/MilkyPluginEventDispatcher.java",
+        "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/milky/official/OfficialQqBotApiAdapter.java"
+      ]
     }
   ]
 }
