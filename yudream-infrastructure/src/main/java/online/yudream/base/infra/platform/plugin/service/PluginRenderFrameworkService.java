@@ -61,13 +61,14 @@ public class PluginRenderFrameworkService implements PluginRenderService {
                 return new PluginRenderedImage(rendered.contentType(), rendered.content(), rendered.width(), rendered.height());
             }, executor).whenComplete((result, exception) -> {
                 if (exception != null) {
-                    log.error("Plugin render operation failed: sourceType={}, errorType={}",
-                            sourceType, exception.getClass().getSimpleName());
+                    Throwable cause = rootCause(exception);
+                    log.error("Plugin render operation failed: sourceType={}, errorType={}, message={}",
+                            sourceType, cause.getClass().getSimpleName(), cause.getMessage());
                 }
             });
         } catch (RuntimeException exception) {
-            log.error("Plugin render operation rejected: sourceType={}, errorType={}",
-                    sourceType, exception.getClass().getSimpleName());
+            log.error("Plugin render operation rejected: sourceType={}, errorType={}, message={}",
+                    sourceType, exception.getClass().getSimpleName(), exception.getMessage());
             return CompletableFuture.failedFuture(exception);
         }
     }
@@ -83,5 +84,15 @@ public class PluginRenderFrameworkService implements PluginRenderService {
             executor.shutdownNow();
             Thread.currentThread().interrupt();
         }
+    }
+
+    private static Throwable rootCause(Throwable exception) {
+        Throwable current = exception;
+        while (current.getCause() != null && current.getCause() != current
+                && (current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)) {
+            current = current.getCause();
+        }
+        return current;
     }
 }

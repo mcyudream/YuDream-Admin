@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -829,8 +830,11 @@ public class OfficialQqBotApiAdapter {
         Map<String, Object> upload = new LinkedHashMap<>();
         upload.put(group ? "group_id" : "user_id", peerId);
         Object fileType = media.get("file_type");
-        upload.put("file_type", fileType instanceof Number number ? number.intValue() : 1);
+        int fileTypeValue = fileType instanceof Number number ? number.intValue() : 1;
+        upload.put("file_type", fileTypeValue);
         upload.put("srv_send_msg", false);
+        // QQ 依 file_name 扩展名识别媒体类型，缺失时客户端可能只显示占位卡片而不展示图片
+        upload.put("file_name", mediaFileName(media, source, fileTypeValue));
         if (base64Payload(source) != null) {
             upload.put("file_data", base64Payload(source));
         } else if (source.startsWith("http://") || source.startsWith("https://")) {
@@ -839,11 +843,77 @@ public class OfficialQqBotApiAdapter {
             throw new BizException("官方机器人图片需使用公网 URL 或 base64");
         }
         Object result = uploadFile(context, group, upload);
-        String uploaded = firstNonBlank(text(map(result), "file_info", "fileInfo"));
+        Map<String, Object> uploadedResult = map(result);
+        String uploaded = firstNonBlank(text(uploadedResult, "file_info", "fileInfo"));
         if (blank(uploaded)) {
             throw new BizException("官方机器人文件上传未返回 file_info");
         }
+        log.debug("Official QQ bot media uploaded: connectionId={}, fileType={}, ttl={}",
+                context == null ? "" : context.connectionId(), fileTypeValue, text(uploadedResult, "ttl"));
         return Map.of("file_info", uploaded);
+    }
+
+    /** 上传文件名：优先沿用调用方命名，URL 取路径末段，base64 嗅探魔数，最后按 file_type 兜底。 */
+    private static String mediaFileName(Map<String, Object> media, String source, int fileType) {
+        String named = text(media, "file_name", "fileName", "name");
+        if (!blank(named)) {
+            return named.trim();
+        }
+        if (source.startsWith("http://") || source.startsWith("https://")) {
+            String path = source;
+            int query = path.indexOf('?');
+            if (query >= 0) {
+                path = path.substring(0, query);
+            }
+            int slash = path.lastIndexOf('/');
+            String last = slash >= 0 ? path.substring(slash + 1) : path;
+            if (last.contains(".") && !last.startsWith(".") && last.length() <= 64) {
+                return last;
+            }
+        }
+        String base64 = base64Payload(source);
+        if (base64 != null) {
+            String extension = sniffImageExtension(base64);
+            if (extension != null) {
+                return "image." + extension;
+            }
+        }
+        return switch (fileType) {
+            case 2 -> "video.mp4";
+            case 3 -> "audio.mp3";
+            case 4 -> "file.bin";
+            default -> "image.png";
+        };
+    }
+
+    /** 解码 base64 头部识别常见图片格式，无法识别时返回 null。 */
+    private static String sniffImageExtension(String base64) {
+        try {
+            int length = Math.min(base64.length(), 32);
+            length -= length % 4;
+            if (length <= 0) {
+                return null;
+            }
+            byte[] head = Base64.getDecoder().decode(base64.substring(0, length));
+            if (head.length >= 4 && (head[0] & 0xFF) == 0x89 && head[1] == 'P' && head[2] == 'N' && head[3] == 'G') {
+                return "png";
+            }
+            if (head.length >= 3 && (head[0] & 0xFF) == 0xFF && (head[1] & 0xFF) == 0xD8 && (head[2] & 0xFF) == 0xFF) {
+                return "jpg";
+            }
+            if (head.length >= 4 && head[0] == 'G' && head[1] == 'I' && head[2] == 'F' && head[3] == '8') {
+                return "gif";
+            }
+            if (head.length >= 12 && head[0] == 'R' && head[1] == 'I' && head[2] == 'F' && head[3] == 'F'
+                    && head[8] == 'W' && head[9] == 'E' && head[10] == 'B' && head[11] == 'P') {
+                return "webp";
+            }
+            if (head.length >= 2 && head[0] == 'B' && head[1] == 'M') {
+                return "bmp";
+            }
+        } catch (IllegalArgumentException ignored) {
+        }
+        return null;
     }
 
     private static boolean inlineMediaSource(String value) {
