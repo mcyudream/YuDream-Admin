@@ -1,6 +1,7 @@
 package online.yudream.base.interfaces.platform.devtools.assembler;
 
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectBatchCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
@@ -18,6 +19,7 @@ import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
+import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectBatchRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginScaffoldRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
@@ -59,6 +61,14 @@ public final class PluginDevToolsWebAssembler {
         cmd.setFrontendDist(request.getFrontendDist());
         cmd.setAutoCompile(request.getAutoCompile());
         cmd.setCompileCommand(request.getCompileCommand());
+        return cmd;
+    }
+
+    public static PluginDevProjectBatchCmd toCmd(PluginDevProjectBatchRequest request) {
+        PluginDevProjectBatchCmd cmd = new PluginDevProjectBatchCmd();
+        if (request != null) {
+            cmd.setPath(request.getPath());
+        }
         return cmd;
     }
 

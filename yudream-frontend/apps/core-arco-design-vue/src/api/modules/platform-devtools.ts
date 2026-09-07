@@ -27,6 +27,19 @@ export interface PluginDevProjectSavePayload {
   autoCompile: boolean
 }
 
+/** 批量扫描中跳过的目录 */
+export interface PluginDevProjectScanSkipped {
+  code?: string
+  path: string
+  reason: string
+}
+
+/** 从父目录批量登记开发项目的结果 */
+export interface PluginDevProjectScanResult {
+  registered: PluginDevProject[]
+  skipped: PluginDevProjectScanSkipped[]
+}
+
 /** 新建插件骨架的载荷：在宿主机生成 Maven 模块，可选同时登记为开发模式项目 */
 export interface PluginScaffoldPayload {
   /** 生成目录的父目录，模块落在 {parentDir}/yudream-plugin-{code} */
@@ -420,6 +433,10 @@ export default {
 
   addDevProject: (data: PluginDevProjectSavePayload) =>
     systemClient.post<unknown, ApiResponse<PluginDevProject>>('api/platform/plugin-devtools/dev-projects', data),
+
+  /** 扫描父目录下的插件模块并去重登记；自身若是插件模块也会纳入 */
+  batchAddDevProjects: (path: string) =>
+    systemClient.post<unknown, ApiResponse<PluginDevProjectScanResult>>('api/platform/plugin-devtools/dev-projects/batch', { path }),
 
   removeDevProject: (code: string) =>
     systemClient.delete<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/dev-projects/${code}`),

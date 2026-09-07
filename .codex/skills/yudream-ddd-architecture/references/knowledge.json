@@ -214,7 +214,7 @@
     },
     {
       "key": "devtools-project-catalog",
-      "text": "开发项目双来源由 PluginDevProjectCatalog 合并：CONFIG(yml，面板只读) 优先于 FILE(面板登记，默认 plugins/dev-projects.json，gitignore 已覆盖，tmp+原子 move 写入，mtime 缓存自动重载)；同 code 冲突 CONFIG 胜并告警；面板增删仅作用 FILE；登记已启用插件立即发 PluginDevReloadRequested 热切；code 留空从 target/classes 或 src/main/resources 的 plugin.yml 推断。"
+      "text": "开发项目双来源由 PluginDevProjectCatalog 合并：CONFIG(yml，面板只读) 优先于 FILE(面板登记，默认 plugins/dev-projects.json，gitignore 已覆盖，tmp+原子 move 写入，mtime 缓存自动重载)；同 code 冲突 CONFIG 胜并告警；面板增删仅作用 FILE；登记已启用插件立即发 PluginDevReloadRequested.ofRegister 热切；code 留空从 target/classes 或 src/main/resources 的 plugin.yml 推断。POST /dev-projects/batch 走 Catalog.addFromDirectory：有界扫描深度≤3、跳过 node_modules/target/dist/src/.git/隐藏目录、上限 100 候选，扫描内同 code 保留排序后第一项，已在 CONFIG/FILE 或同路径重复则 skipped，只 persist 一次。"
     },
     {
       "key": "plugin-mongo-version-writeback",
@@ -272,7 +272,7 @@
     },
     {
       "key": "plugin-devmode-reload",
-      "text": "插件开发模式：dev-mode.enabled 三态（缺省自动检测源码/JAR 运行）+ 开发项目双来源（yml CONFIG 优先 / 面板登记 FILE 持久化到 plugins/dev-projects.json），从 target/classes + target/plugin-dev/lib 加载，watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令；面板端点 GET/POST/DELETE /api/platform/plugin-devtools/dev-projects[/{code}] 管理 FILE 源项目。浮窗 SSE 收到 RELOAD/FRONTEND_RELOAD 成功事件后除重挂载当前插件页外，还会防抖 refreshDynamicRoutes 重建动态路由与菜单（动态路由登录后只注册一次，不重建需手动刷新才能看到新插件菜单），并重置 publicAccess 公开路由 memo。"
+      "text": "插件开发模式：dev-mode.enabled 三态（缺省自动检测源码/JAR 运行）+ 开发项目双来源（yml CONFIG 优先 / 面板登记 FILE 持久化到 plugins/dev-projects.json），从 target/classes + target/plugin-dev/lib 加载，watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；reloadDevPlugin 定向 describeDevPlugin 同步描述符，按 code 分段锁串行，级联停启硬/软依赖方（外层先停、依赖序恢复，依赖方失败不阻断目标），wasEnabled 含 restoreIntentActive；REGISTER 触发的源码切换在约 30s 窗口内可抑制，WATCHER 不抑制。指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令；面板端点 GET/POST/DELETE /api/platform/plugin-devtools/dev-projects[/{code}] 与 POST /dev-projects/batch 管理 FILE 源项目。浮窗 SSE 收到 RELOAD/FRONTEND_RELOAD 成功事件后除重挂载当前插件页外，还会防抖 refreshDynamicRoutes 重建动态路由与菜单（动态路由登录后只注册一次，不重建需手动刷新才能看到新插件菜单），并重置 publicAccess 公开路由 memo。"
     },
     {
       "key": "plugin-devtools-log-stream",

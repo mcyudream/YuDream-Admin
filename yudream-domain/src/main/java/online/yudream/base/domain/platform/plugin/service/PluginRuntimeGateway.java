@@ -1,6 +1,6 @@
 package online.yudream.base.domain.platform.plugin.service;
 
-import online.yudream.base.domain.platform.plugin.aggregate .PluginModule;
+import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
@@ -13,6 +13,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectScanResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
@@ -26,6 +27,14 @@ public interface PluginRuntimeGateway {
     List<PluginDescriptorInfo> discover();
 
     Optional<PluginDescriptorInfo> describe(Path jarPath);
+
+    /**
+     * 读取开发模式项目的 plugin.yml 描述符（源码编译产物目录），未登记或产物未编译时为空。
+     * 供开发模式热重载做定向描述符同步，避免全量扫描插件目录。
+     */
+    default Optional<PluginDescriptorInfo> describeDevPlugin(String code) {
+        return Optional.empty();
+    }
 
     void load(PluginModule module);
 
@@ -98,6 +107,14 @@ public interface PluginRuntimeGateway {
     default PluginDevProjectInfo registerDevProject(String code, String path, String frontendDist,
                                                     boolean autoCompile, String compileCommand) {
         throw new UnsupportedOperationException("当前运行时网关不支持开发项目管理");
+    }
+
+    /**
+     * 从父目录批量登记开发模式项目：有界扫描子目录中的插件模块，按编码与路径去重。
+     * 已在配置文件或面板清单中的项目会被跳过并列入 skipped。
+     */
+    default PluginDevProjectScanResult registerDevProjects(String path) {
+        throw new UnsupportedOperationException("当前运行时网关不支持开发项目批量登记");
     }
 
     /** 移除面板登记的开发模式项目；配置文件登记的项目不可移除。 */

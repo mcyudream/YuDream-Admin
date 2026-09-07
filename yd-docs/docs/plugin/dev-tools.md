@@ -36,7 +36,7 @@
 - **CONFIG 源**：yml 的 `dev-mode.projects` 列表，面板只读；
 - **FILE 源**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，可用 `dev-mode.store-file` 覆盖路径）。这是有意选择的非数据库存储——开发者与 coding agent 都能直接读取它来定位插件源码目录。
 
-合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源项目。登记时宿主依次读取 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断插件 code；都读不到会报错提示先执行一次 `mvn compile`。
+合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源项目。设置页「批量登记」可选择插件仓根目录，宿主有界扫描（深度 ≤ 3）其中的插件模块并去重写入清单。登记时宿主依次读取 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断插件 code；都读不到会报错提示先执行一次 `mvn compile`。
 
 ### 2.3 配置示例
 
@@ -72,10 +72,10 @@ flowchart TD
     C -->|编译失败| C1[推送 COMPILE 错误事件<br/>不用陈旧产物重载]
     C -->|编译成功| D
     B -->|target/classes 变化| D[防抖]
-    D --> E[禁用插件]
-    E --> F[卸载插件]
+    D --> E[禁用目标及其启用中的依赖方]
+    E --> F[卸载]
     F --> G[从 target/classes 目录重新加载]
-    G --> H[恢复启用]
+    G --> H[恢复启用目标，再按依赖序恢复依赖方]
     B -->|前端 dist 变化| I[发布 FRONTEND_RELOAD 事件]
     I --> J[SSE 桥到调试浮窗<br/>重挂载当前插件的远程模块]
     H --> K[刷新动态路由与公开路由 memo]
@@ -113,7 +113,7 @@ flowchart TD
 - **插件**：主从结构——先列插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献：HTTP 端点、QQ 指令、前端模块与路由、权限菜单、AI 工具、平台能力等。端点测试器与指令模拟器在详情内；开发模式插件可一键「重载」。清单工具栏可切换「依赖图」视图（depend/softdepend/被依赖四向关系），每张卡片提供「禁用预览」——列出禁用该插件的级联影响。
 - **追踪**：Agent 执行链路实时执行区（SSE 增量累积）+ 分页历史记录；详情逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，可导出 JSON 用于缺陷上报。
 - **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条）+ SSE 实时追加，支持暂停、清空与展开异常堆栈。
-- **设置**：开发项目管理（登记/移除/立即重载）、新建插件骨架、面板偏好重置。
+- **设置**：开发项目管理（登记/批量登记子目录/移除/立即重载）、新建插件骨架、面板偏好重置。
 
 可见性规则：拥有 `platform:plugin-devtools:view` 权限且后端 status 端点可用时显示；纯前端 DEV 模式（`import.meta.env.DEV`）下按钮始终可见，后端不可用时浮窗内降级提示。
 
@@ -131,6 +131,7 @@ flowchart TD
 | `POST /plugins/{code}/reload` | 手动重载（开发模式插件） |
 | `GET /dev-projects` | 开发项目合并清单（CONFIG+FILE，含来源标记） |
 | `POST /dev-projects` | 登记开发目录（code 可留空自动推断；已启用插件立即热切） |
+| `POST /dev-projects/batch` | 扫描父目录下的插件模块并去重登记，返回 registered 与 skipped |
 | `DELETE /dev-projects/{code}` | 移除 FILE 源项目（CONFIG 源需在 yml 中移除） |
 | `POST /scaffold` | 新建插件骨架 Maven 模块并默认登记为开发模式项目 |
 | `POST /plugins/{code}/command-test` | QQ 指令模拟触发，返回匹配指令、handler 输出/异常与耗时 |

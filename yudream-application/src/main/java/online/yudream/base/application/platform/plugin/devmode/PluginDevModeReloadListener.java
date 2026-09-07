@@ -3,6 +3,7 @@ package online.yudream.base.application.platform.plugin.devmode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginDevReloadTrigger;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
 import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
@@ -28,6 +29,12 @@ public class PluginDevModeReloadListener {
 
     @EventListener
     public void onReloadRequested(PluginDevReloadRequested request) {
+        if (request.trigger() == PluginDevReloadTrigger.REGISTER
+                && pluginAppService.shouldSuppressRegisterReload(request.pluginCode())) {
+            log.info("Skip register-triggered reload for {} because it was just reloaded or cascade-restored",
+                    request.pluginCode());
+            return;
+        }
         long startNanos = System.nanoTime();
         PluginRuntimeAssets before = snapshot(request.pluginCode());
         try {

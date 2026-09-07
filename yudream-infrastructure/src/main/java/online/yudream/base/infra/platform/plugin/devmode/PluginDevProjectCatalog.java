@@ -15,10 +15,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * 开发模式插件项目目录册：合并 yml 静态登记（CONFIG，面板只读）与开发者面板维护的
@@ -31,6 +35,11 @@ import java.util.Optional;
 public class PluginDevProjectCatalog {
 
     private static final long MISSING = -1;
+    /** 官方插件仓模块在仓库根下两层，深度 3 覆盖再包一层的目录 */
+    private static final int MAX_SCAN_DEPTH = 3;
+    private static final int MAX_CANDIDATES = 100;
+    private static final Set<String> SKIP_DIR_NAMES = Set.of(
+            "node_modules", "target", "dist", "src", "build", "out", ".git", ".idea");
 
     private final PluginDevModeProperties properties;
     private final ObjectMapper objectMapper;
@@ -87,6 +96,74 @@ public class PluginDevProjectCatalog {
         return project;
     }
 
+    /**
+     * 从父目录有界扫描插件模块并批量写入 FILE 清单，只 persist 一次。
+     * 已在 CONFIG/FILE 登记、扫描内编码冲突、同路径重复的条目列入 skipped。
+     */
+    public synchronized CatalogBatchResult addFromDirectory(Path parent) {
+        if (parent == null) {
+            throw new BizException("插件目录不能为空");
+        }
+        Path root = parent.toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) {
+            throw new BizException("插件目录不存在：" + root);
+        }
+        List<Path> candidates = new ArrayList<>();
+        collectPluginDirs(root, 0, candidates);
+        candidates.sort(Comparator.comparing(Path::toString));
+
+        Map<String, PluginDevModeProperties.DevProject> file = new LinkedHashMap<>(refreshIfChanged());
+        Set<String> existingPaths = new HashSet<>();
+        for (PluginDevModeProperties.DevProject project : configProjects()) {
+            existingPaths.add(normalizePath(project.getPath()));
+        }
+        for (PluginDevModeProperties.DevProject project : file.values()) {
+            existingPaths.add(normalizePath(project.getPath()));
+        }
+
+        List<PluginDevModeProperties.DevProject> registered = new ArrayList<>();
+        List<Skipped> skipped = new ArrayList<>();
+        Set<String> scanCodes = new HashSet<>();
+        for (Path candidate : candidates) {
+            String pathStr = candidate.toString();
+            Optional<String> inferred = inferCode(candidate);
+            if (inferred.isEmpty()) {
+                skipped.add(new Skipped(null, pathStr, "无法推断编码"));
+                continue;
+            }
+            String code = inferred.get();
+            if (!scanCodes.add(code)) {
+                skipped.add(new Skipped(code, pathStr, "编码冲突"));
+                continue;
+            }
+            if (findConfig(code).isPresent()) {
+                skipped.add(new Skipped(code, pathStr, "已在配置文件登记"));
+                continue;
+            }
+            if (file.containsKey(code)) {
+                skipped.add(new Skipped(code, pathStr, "已登记"));
+                continue;
+            }
+            if (!existingPaths.add(pathStr)) {
+                skipped.add(new Skipped(code, pathStr, "目录已登记"));
+                continue;
+            }
+            PluginDevModeProperties.DevProject project = new PluginDevModeProperties.DevProject();
+            project.setCode(code);
+            project.setPath(pathStr);
+            project.setAutoCompile(true);
+            file.put(code, project);
+            registered.add(project);
+        }
+        if (!registered.isEmpty()) {
+            persist(file);
+            for (PluginDevModeProperties.DevProject project : registered) {
+                log.warn("插件开发模式项目已由面板登记：{} -> {}", project.getCode(), project.getPath());
+            }
+        }
+        return new CatalogBatchResult(List.copyOf(registered), List.copyOf(skipped));
+    }
+
     public synchronized void remove(String code) {
         if (!StringUtils.hasText(code)) {
             throw new BizException("插件编码不能为空");
@@ -123,6 +200,45 @@ public class PluginDevProjectCatalog {
         return configProjects().stream()
                 .filter(project -> code.equals(project.getCode().trim()))
                 .findFirst();
+    }
+
+    private void collectPluginDirs(Path dir, int depth, List<Path> candidates) {
+        if (candidates.size() >= MAX_CANDIDATES) {
+            return;
+        }
+        if (isPluginModule(dir)) {
+            candidates.add(dir.toAbsolutePath().normalize());
+            return;
+        }
+        if (depth >= MAX_SCAN_DEPTH) {
+            return;
+        }
+        try (Stream<Path> stream = Files.list(dir)) {
+            List<Path> children = stream.filter(Files::isDirectory)
+                    .sorted()
+                    .toList();
+            for (Path child : children) {
+                if (candidates.size() >= MAX_CANDIDATES) {
+                    return;
+                }
+                String name = child.getFileName().toString();
+                if (name.startsWith(".") || SKIP_DIR_NAMES.contains(name)) {
+                    continue;
+                }
+                collectPluginDirs(child, depth + 1, candidates);
+            }
+        } catch (IOException e) {
+            log.warn("扫描开发项目目录失败：{}：{}", dir, e.getMessage());
+        }
+    }
+
+    private boolean isPluginModule(Path dir) {
+        return Files.isRegularFile(dir.resolve("target").resolve("classes").resolve("plugin.yml"))
+                || Files.isRegularFile(dir.resolve("src").resolve("main").resolve("resources").resolve("plugin.yml"));
+    }
+
+    private String normalizePath(String path) {
+        return Path.of(path).toAbsolutePath().normalize().toString();
     }
 
     /** 依次尝试编译产物与源码资源目录中的 plugin.yml 推断插件编码 */
@@ -211,6 +327,13 @@ public class PluginDevProjectCatalog {
 
     /** 目录册条目：项目配置 + 登记来源 */
     public record CatalogEntry(PluginDevModeProperties.DevProject project, PluginDevProjectSource source) {
+    }
+
+    /** 批量扫描结果：新写入 FILE 的项目与跳过原因 */
+    public record CatalogBatchResult(List<PluginDevModeProperties.DevProject> registered, List<Skipped> skipped) {
+    }
+
+    public record Skipped(String code, String path, String reason) {
     }
 
     /** 清单文件结构：{"version":1,"projects":[...]} */
