@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.enumerate.MilkyConnectionProtocol;
 import online.yudream.base.domain.platform.milky.model.MilkyModels.Context;
+import online.yudream.base.domain.platform.milky.model.MilkyModels.Event;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -18,7 +19,11 @@ import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -47,14 +52,16 @@ public class OfficialQqBotApiAdapter {
         }
         return switch (method) {
             case "get_login_info" -> loginInfo(context);
-            case "get_group_list" -> Map.of("groups", sessions.groupList(context.connectionId()));
+            case "get_group_list" -> resolveGroupList(context);
             case "get_friend_list" -> Map.of("friends", sessions.friendList(context.connectionId()));
             case "get_group_info" -> groupInfo(context, payload);
             case "get_group_member_info" -> groupMember(context, payload);
             case "get_group_member_list" -> groupMembers(context, payload);
+            case "get_resource_temp_url" -> resourceTempUrl(payload);
             case "get_friend_info" -> friendInfo(text(payload, "user_id", "user_openid", "openid"));
-            case "get_history_messages", "get_message", "get_forwarded_messages" ->
-                    unsupported("官方机器人不提供历史消息拉取，请使用事件流");
+            case "get_history_messages" -> history(context, payload);
+            case "get_message" -> message(context, payload);
+            case "get_forwarded_messages" -> Map.of("messages", List.of());
             case "send_group_message" -> sendMessage(context, true, payload);
             case "send_private_message" -> sendMessage(context, false, payload);
             case "send_private_stream_message" -> streamPrivateMessage(context, payload);
@@ -66,8 +73,85 @@ public class OfficialQqBotApiAdapter {
             case "get_group_ban" -> restrictChat(context, payload, false);
             case "get_group_join_requests" -> joinRequests(context, payload);
             case "set_group_add_request" -> approveJoin(context, payload);
+            case "get_official_menu" -> request(context, HttpMethod.GET, "/v2/menu", null);
+            case "set_official_menu" -> request(context, HttpMethod.PUT, "/v2/menu", payload);
+            case "get_official_panels" -> request(context, HttpMethod.GET, panelsQueryPath(payload), null);
+            case "create_official_panel" -> request(context, HttpMethod.POST, "/v2/panels", payload);
+            case "set_official_panel" -> updatePanel(context, payload);
+            case "ack_official_interaction" -> ackInteraction(context, payload);
+            case "send_channel_message" -> sendChannelMessage(context, payload);
+            case "send_guild_dm" -> sendGuildDm(context, payload);
+            case "create_guild_dm" -> createGuildDm(context, payload);
+            case "recall_channel_message" -> recallChannelMessage(context, payload);
+            case "get_guild_list" -> guildList(context, payload);
+            case "set_guild_mute" -> setGuildMute(context, payload);
+            case "set_guild_member_mute" -> setGuildMemberMute(context, payload);
+            case "set_guild_members_mute" -> setGuildMembersMute(context, payload);
+            case "get_group_bot_state" -> groupBotState(context, payload);
+            case "get_join_approval_strategy" -> joinApprovalStrategy(context, payload);
             default -> raw(context, method, payload);
         };
+    }
+
+    private Object updatePanel(Context context, Map<String, Object> payload) {
+        String panelId = required(text(payload, "panel_id"), "面板 ID 不能为空");
+        Map<String, Object> body = new LinkedHashMap<>(payload);
+        body.remove("panel_id");
+        if (!body.containsKey("panel")) {
+            body = Map.of("panel", new LinkedHashMap<>(body));
+        }
+        return request(context, HttpMethod.PUT, "/v2/panels/" + panelId, body);
+    }
+
+    public void ackInteractionIfNeeded(Context context, Event event) {
+        if (event == null || event.data() == null) {
+            return;
+        }
+        if (!"INTERACTION_CREATE".equals(String.valueOf(event.data().get("native_type")))) {
+            return;
+        }
+        String interactionId = firstNonBlank(
+                text(event.data(), "interaction_id"),
+                text(event.data(), "id"));
+        if (blank(interactionId)) {
+            return;
+        }
+        try {
+            ackInteraction(context, Map.of("interaction_id", interactionId));
+        } catch (RuntimeException exception) {
+            log.warn("Official interaction ack failed: connectionId={}, interactionId={}",
+                    context == null ? null : context.connectionId(), interactionId);
+        }
+    }
+
+    private Object ackInteraction(Context context, Map<String, Object> payload) {
+        String interactionId = required(text(payload, "interaction_id", "id"), "交互 ID 不能为空");
+        Map<String, Object> body = new LinkedHashMap<>();
+        int code = payload.get("code") instanceof Number number ? number.intValue() : 0;
+        body.put("code", code);
+        Object ackPayload = payload.get("payload");
+        if (ackPayload instanceof Map<?, ?> map) {
+            body.put("data", map);
+        }
+        return request(context, HttpMethod.PUT, "/interactions/" + interactionId, body);
+    }
+
+    private static String panelsQueryPath(Map<String, Object> payload) {
+        String scope = required(text(payload, "scope"), "指令面板场景不能为空");
+        StringBuilder path = new StringBuilder("/v2/panels?scope=").append(encodeQuery(scope));
+        String cursor = text(payload, "cursor");
+        String limit = text(payload, "limit");
+        if (!blank(cursor)) {
+            path.append("&cursor=").append(encodeQuery(cursor));
+        }
+        if (!blank(limit)) {
+            path.append("&limit=").append(encodeQuery(limit));
+        }
+        return path.toString();
+    }
+
+    private static String encodeQuery(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private Object loginInfo(Context context) {
@@ -85,14 +169,42 @@ public class OfficialQqBotApiAdapter {
         return result;
     }
 
+    private Object resolveGroupList(Context context) {
+        List<Map<String, Object>> groups = sessions.groupList(context.connectionId());
+        for (Map<String, Object> group : groups) {
+            String groupId = text(group, "group_id", "group_openid");
+            if (!sessions.needsGroupName(context.connectionId(), groupId)) {
+                continue;
+            }
+            try {
+                groupInfo(context, Map.of("group_id", groupId));
+            } catch (RuntimeException exception) {
+                log.debug("官方群资料拉取失败，保留 openid 作为展示名: groupId={}, errorType={}",
+                        groupId, exception.getClass().getSimpleName());
+            }
+        }
+        return Map.of("groups", sessions.groupList(context.connectionId()));
+    }
+
     private Object groupInfo(Context context, Map<String, Object> payload) {
         String groupId = required(text(payload, "group_id", "group_openid"), "群 openid 不能为空");
         Object result = request(context, HttpMethod.GET, "/v2/groups/" + groupId + "/info", null);
         Map<String, Object> mapped = new LinkedHashMap<>(map(result));
         mapped.putIfAbsent("group_id", firstNonBlank(text(mapped, "group_openid", "group_id"), groupId));
-        mapped.putIfAbsent("group_name", firstNonBlank(text(mapped, "group_name"), groupId));
-        sessions.rememberGroup(context.connectionId(), groupId, text(mapped, "group_name"));
+        String groupName = firstNonBlank(
+                text(mapped, "group_name", "name", "group_remark"),
+                nestedName(mapped.get("group")));
+        mapped.put("group_name", firstNonBlank(groupName, groupId));
+        sessions.rememberGroup(context.connectionId(), groupId, groupName);
         return mapped;
+    }
+
+    private static String nestedName(Object value) {
+        if (!(value instanceof Map<?, ?> nested)) {
+            return null;
+        }
+        Object name = nested.containsKey("group_name") ? nested.get("group_name") : nested.get("name");
+        return name == null ? null : String.valueOf(name);
     }
 
     private Object groupMember(Context context, Map<String, Object> payload) {
@@ -107,6 +219,10 @@ public class OfficialQqBotApiAdapter {
 
     private Object groupMembers(Context context, Map<String, Object> payload) {
         String groupId = required(text(payload, "group_id", "group_openid"), "群 openid 不能为空");
+        List<Map<String, Object>> cached = sessions.groupMembers(context.connectionId(), groupId);
+        if (!cached.isEmpty()) {
+            return Map.of("members", cached, "cached", true);
+        }
         StringBuilder path = new StringBuilder("/v2/groups/").append(groupId).append("/members");
         String start = text(payload, "start_index", "start");
         String limit = text(payload, "limit");
@@ -122,7 +238,41 @@ public class OfficialQqBotApiAdapter {
                 path.append("limit=").append(limit);
             }
         }
-        return request(context, HttpMethod.GET, path.toString(), null);
+        try {
+            Object result = request(context, HttpMethod.GET, path.toString(), null);
+            List<?> rows = result instanceof List<?> list ? list : listValue(map(result).get("members"));
+            for (Object row : rows) {
+                Map<String, Object> member = map(row);
+                sessions.rememberGroupMember(context.connectionId(), groupId,
+                        firstNonBlank(text(member, "member_openid", "user_openid", "user_id", "openid"), null),
+                        firstNonBlank(text(member, "nickname", "member_name", "name"), null));
+            }
+            List<Map<String, Object>> stored = sessions.groupMembers(context.connectionId(), groupId);
+            return stored.isEmpty() ? Map.of("members", rows) : Map.of("members", stored);
+        } catch (BizException exception) {
+            if (officialPermissionDenied(exception)) {
+                log.debug("官方群成员接口无权限，回落会话缓存: groupId={}", groupId);
+                return Map.of("members", cached, "cached", true);
+            }
+            throw exception;
+        }
+    }
+
+    private Object resourceTempUrl(Map<String, Object> payload) {
+        String url = firstNonBlank(text(payload, "url", "uri", "file", "temp_url"));
+        if (!blank(url) && (url.startsWith("http://") || url.startsWith("https://"))) {
+            return Map.of("url", url, "temp_url", url);
+        }
+        return Map.of();
+    }
+
+    private static boolean officialPermissionDenied(BizException exception) {
+        Throwable cause = exception.getCause();
+        if (cause instanceof OfficialHttpException http) {
+            return http.status() == 400 || http.status() == 403;
+        }
+        String message = exception.getMessage();
+        return message != null && (message.contains("11253") || message.contains("无接口访问权限"));
     }
 
     private Object streamPrivateMessage(Context context, Map<String, Object> payload) {
@@ -156,7 +306,58 @@ public class OfficialQqBotApiAdapter {
     private Object restrictChat(Context context, Map<String, Object> payload, boolean write) {
         String groupId = required(text(payload, "group_id", "group_openid"), "群 openid 不能为空");
         String path = "/v2/groups/" + groupId + "/restrict_chat_setting";
-        return request(context, write ? HttpMethod.POST : HttpMethod.GET, path, write ? payload : null);
+        return request(context, write ? HttpMethod.POST : HttpMethod.GET, path, write ? officialMuteBody(payload) : null);
+    }
+
+    private Map<String, Object> officialMuteBody(Map<String, Object> payload) {
+        Map<String, Object> body = new LinkedHashMap<>(payload);
+        body.remove("group_id");
+        body.remove("group_openid");
+        body.remove("user_id");
+        body.remove("duration");
+        body.remove("ban_duration");
+        body.remove("time");
+        if (payload.get("members") instanceof List<?> existing && !existing.isEmpty()) {
+            body.put("members", existing);
+            return body;
+        }
+        String memberId = text(payload, "user_id", "member_openid", "openid");
+        if (blank(memberId)) {
+            return body;
+        }
+        long seconds = durationSeconds(payload);
+        Map<String, Object> member = new LinkedHashMap<>();
+        member.put("member_openid", memberId);
+        if (seconds <= 0) {
+            member.put("op", "del");
+            member.put("mute_expire_at", "");
+        } else {
+            member.put("op", "add");
+            member.put("mute_expire_at", OffsetDateTime.now().plusSeconds(Math.min(seconds, 30L * 24 * 3600)).toString());
+        }
+        body.put("members", List.of(member));
+        return body;
+    }
+
+    private static long durationSeconds(Map<String, Object> payload) {
+        Object value = payload.get("duration");
+        if (value == null) {
+            value = payload.get("ban_duration");
+        }
+        if (value == null) {
+            value = payload.get("time");
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value != null && !String.valueOf(value).isBlank()) {
+            try {
+                return Long.parseLong(String.valueOf(value).trim());
+            } catch (NumberFormatException ignored) {
+                return 0;
+            }
+        }
+        return 0;
     }
 
     private Object joinRequests(Context context, Map<String, Object> payload) {
@@ -177,19 +378,203 @@ public class OfficialQqBotApiAdapter {
         return Map.of("user_id", userId, "nickname", userId);
     }
 
+    private Object sendChannelMessage(Context context, Map<String, Object> payload) {
+        String channelId = required(text(payload, "channel_id", "peer_id"), "子频道 ID 不能为空");
+        OfficialMessage message = encode(payload.get("message"), payload);
+        OfficialQqBotSessionStore.LastInbound inbound = sessions.lastInbound(context.connectionId(), channelId);
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (!blank(message.content())) {
+            body.put("content", message.content());
+        }
+        if (message.markdown() != null) {
+            body.put("markdown", message.markdown());
+        }
+        if (message.ark() != null) {
+            body.put("ark", message.ark());
+        }
+        if (message.keyboard() != null) {
+            body.put("keyboard", message.keyboard());
+        }
+        String image = text(payload, "image");
+        if (!blank(image)) {
+            body.put("image", image);
+        }
+        String msgId = firstNonBlank(text(payload, "msg_id", "message_id", "message_seq"), inbound == null ? null : inbound.msgId());
+        String eventId = firstNonBlank(text(payload, "event_id"), inbound == null ? null : inbound.eventId());
+        if (!blank(msgId)) {
+            body.put("msg_id", msgId);
+        }
+        if (!blank(eventId)) {
+            body.put("event_id", eventId);
+        }
+        Object result = request(context, HttpMethod.POST, "/channels/" + channelId + "/messages", body);
+        Map<String, Object> mapped = new LinkedHashMap<>(map(result));
+        mapped.putIfAbsent("message_seq", firstNonBlank(text(mapped, "id", "msg_id"), msgId));
+        mapped.putIfAbsent("message_id", firstNonBlank(text(mapped, "id", "msg_id"), msgId));
+        rememberOutbound(context, "channel", channelId, payload, mapped);
+        return mapped;
+    }
+
+    private Object createGuildDm(Context context, Map<String, Object> payload) {
+        String recipientId = required(text(payload, "recipient_id", "user_id", "user_openid"), "接收者 ID 不能为空");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("recipient_id", recipientId);
+        String sourceGuildId = text(payload, "source_guild_id", "guild_id");
+        if (!blank(sourceGuildId)) {
+            body.put("source_guild_id", sourceGuildId);
+        }
+        return request(context, HttpMethod.POST, "/users/@me/dms", body);
+    }
+
+    private Object sendGuildDm(Context context, Map<String, Object> payload) {
+        String guildId = required(text(payload, "guild_id", "peer_id"), "频道私信会话 ID 不能为空");
+        OfficialMessage message = encode(payload.get("message"), payload);
+        OfficialQqBotSessionStore.LastInbound inbound = sessions.lastInbound(context.connectionId(), guildId);
+        Map<String, Object> body = new LinkedHashMap<>();
+        if (!blank(message.content())) {
+            body.put("content", message.content());
+        }
+        if (message.markdown() != null) {
+            body.put("markdown", message.markdown());
+        }
+        if (message.ark() != null) {
+            body.put("ark", message.ark());
+        }
+        if (message.keyboard() != null) {
+            body.put("keyboard", message.keyboard());
+        }
+        String msgId = firstNonBlank(text(payload, "msg_id", "message_id", "message_seq"), inbound == null ? null : inbound.msgId());
+        String eventId = firstNonBlank(text(payload, "event_id"), inbound == null ? null : inbound.eventId());
+        if (!blank(msgId)) {
+            body.put("msg_id", msgId);
+        }
+        if (!blank(eventId)) {
+            body.put("event_id", eventId);
+        }
+        Object result = request(context, HttpMethod.POST, "/dms/" + guildId + "/messages", body);
+        Map<String, Object> mapped = new LinkedHashMap<>(map(result));
+        mapped.putIfAbsent("message_seq", firstNonBlank(text(mapped, "id", "msg_id"), msgId));
+        mapped.putIfAbsent("message_id", firstNonBlank(text(mapped, "id", "msg_id"), msgId));
+        rememberOutbound(context, "dm", guildId, payload, mapped);
+        return mapped;
+    }
+
+    private Object recallChannelMessage(Context context, Map<String, Object> payload) {
+        String channelId = required(text(payload, "channel_id", "peer_id"), "子频道 ID 不能为空");
+        String messageId = required(text(payload, "message_seq", "message_id", "msg_id", "id"), "消息 ID 不能为空");
+        String hidetip = text(payload, "hidetip");
+        String path = "/channels/" + channelId + "/messages/" + messageId;
+        if (!blank(hidetip)) {
+            path += "?hidetip=" + encodeQuery(hidetip);
+        }
+        return request(context, HttpMethod.DELETE, path, null);
+    }
+
+    private Object guildList(Context context, Map<String, Object> payload) {
+        StringBuilder path = new StringBuilder("/users/@me/guilds");
+        String after = text(payload, "after");
+        String before = text(payload, "before");
+        String limit = text(payload, "limit");
+        List<String> query = new ArrayList<>();
+        if (!blank(after)) {
+            query.add("after=" + encodeQuery(after));
+        }
+        if (!blank(before)) {
+            query.add("before=" + encodeQuery(before));
+        }
+        if (!blank(limit)) {
+            query.add("limit=" + encodeQuery(limit));
+        }
+        if (!query.isEmpty()) {
+            path.append('?').append(String.join("&", query));
+        }
+        Object result = request(context, HttpMethod.GET, path.toString(), null);
+        List<?> rows = result instanceof List<?> list ? list : listValue(map(result).get("guilds"));
+        for (Object row : rows) {
+            Map<String, Object> guild = map(row);
+            sessions.rememberGuild(context.connectionId(),
+                    firstNonBlank(text(guild, "id", "guild_id"), null),
+                    firstNonBlank(text(guild, "name", "guild_name"), null));
+        }
+        return Map.of("guilds", sessions.guildList(context.connectionId()).isEmpty() ? rows : sessions.guildList(context.connectionId()));
+    }
+
+    private static List<?> listValue(Object value) {
+        return value instanceof List<?> list ? list : List.of();
+    }
+
+    private Object setGuildMute(Context context, Map<String, Object> payload) {
+        String guildId = required(text(payload, "guild_id"), "频道 ID 不能为空");
+        return request(context, HttpMethod.PATCH, "/guilds/" + guildId + "/mute", guildMuteBody(payload));
+    }
+
+    private Object setGuildMemberMute(Context context, Map<String, Object> payload) {
+        String guildId = required(text(payload, "guild_id"), "频道 ID 不能为空");
+        String userId = required(text(payload, "user_id", "member_id"), "成员 ID 不能为空");
+        return request(context, HttpMethod.PATCH, "/guilds/" + guildId + "/members/" + userId + "/mute", guildMuteBody(payload));
+    }
+
+    private Object setGuildMembersMute(Context context, Map<String, Object> payload) {
+        String guildId = required(text(payload, "guild_id"), "频道 ID 不能为空");
+        Map<String, Object> body = guildMuteBody(payload);
+        Object userIds = payload.get("user_ids");
+        if (userIds != null) {
+            body.put("user_ids", userIds);
+        }
+        return request(context, HttpMethod.PATCH, "/guilds/" + guildId + "/mute", body);
+    }
+
+    private Map<String, Object> guildMuteBody(Map<String, Object> payload) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        String seconds = firstNonBlank(text(payload, "mute_seconds"), durationSeconds(payload) > 0 ? String.valueOf(durationSeconds(payload)) : null);
+        String until = text(payload, "mute_end_timestamp");
+        if (!blank(until)) {
+            body.put("mute_end_timestamp", until);
+        }
+        if (!blank(seconds)) {
+            body.put("mute_seconds", seconds);
+        }
+        return body;
+    }
+
+    private Object groupBotState(Context context, Map<String, Object> payload) {
+        String groupId = required(text(payload, "group_id", "group_openid"), "群 openid 不能为空");
+        return request(context, HttpMethod.GET, "/v2/groups/" + groupId + "/bot_state", null);
+    }
+
+    private Object joinApprovalStrategy(Context context, Map<String, Object> payload) {
+        StringBuilder path = new StringBuilder("/v2/groups/join_approval_strategy");
+        String cursor = text(payload, "cursor");
+        String limit = text(payload, "limit");
+        if (!blank(cursor) || !blank(limit)) {
+            path.append('?');
+            if (!blank(cursor)) {
+                path.append("cursor=").append(encodeQuery(cursor));
+            }
+            if (!blank(limit)) {
+                if (!blank(cursor)) {
+                    path.append('&');
+                }
+                path.append("limit=").append(encodeQuery(limit));
+            }
+        }
+        return request(context, HttpMethod.GET, path.toString(), null);
+    }
+
     private Object sendMessage(Context context, boolean group, Map<String, Object> payload) {
         String peerId = group
                 ? required(text(payload, "group_id", "group_openid", "peer_id"), "群 openid 不能为空")
                 : required(text(payload, "user_id", "user_openid", "openid", "peer_id"), "用户 openid 不能为空");
         OfficialMessage message = encode(payload.get("message"), payload);
         OfficialQqBotSessionStore.LastInbound inbound = sessions.lastInbound(context.connectionId(), peerId);
+        Map<String, Object> media = resolveUploadedMedia(context, group, peerId, message.media());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("msg_type", message.msgType());
         if (!blank(message.content())) {
             body.put("content", message.content());
         }
-        if (message.media() != null) {
-            body.put("media", message.media());
+        if (media != null) {
+            body.put("media", media);
         }
         if (message.ark() != null) {
             body.put("ark", message.ark());
@@ -214,20 +599,79 @@ public class OfficialQqBotApiAdapter {
         Map<String, Object> mapped = new LinkedHashMap<>(map(result));
         mapped.putIfAbsent("message_seq", firstNonBlank(text(mapped, "id", "msg_id"), msgId));
         mapped.putIfAbsent("message_id", firstNonBlank(text(mapped, "id", "msg_id"), msgId));
+        rememberOutbound(context, group ? "group" : "friend", peerId, payload, mapped);
         return mapped;
+    }
+
+    private Object history(Context context, Map<String, Object> payload) {
+        String scene = firstNonBlank(text(payload, "message_scene", "scene"), "group");
+        String peerId = required(text(payload, "peer_id", "group_id", "user_id", "user_openid", "group_openid"), "会话对象不能为空");
+        int limit = 20;
+        Object rawLimit = payload.get("limit");
+        if (rawLimit instanceof Number number) {
+            limit = number.intValue();
+        } else if (rawLimit != null && !String.valueOf(rawLimit).isBlank()) {
+            try {
+                limit = Integer.parseInt(String.valueOf(rawLimit));
+            } catch (NumberFormatException ignored) {
+                limit = 20;
+            }
+        }
+        return Map.of("messages", sessions.history(context.connectionId(), scene, peerId, text(payload, "start_message_seq", "start"), limit));
+    }
+
+    private Object message(Context context, Map<String, Object> payload) {
+        String messageSeq = required(text(payload, "message_seq", "message_id", "msg_id", "id"), "消息 ID 不能为空");
+        Map<String, Object> stored = sessions.message(context.connectionId(), messageSeq);
+        if (stored == null) {
+            return Map.of();
+        }
+        return stored;
+    }
+
+    private void rememberOutbound(Context context, String scene, String peerId, Map<String, Object> payload, Map<String, Object> result) {
+        Map<String, Object> stored = new LinkedHashMap<>();
+        stored.put("message_scene", scene);
+        stored.put("peer_id", peerId);
+        if ("group".equals(scene)) {
+            stored.put("group_id", peerId);
+        } else if ("channel".equals(scene)) {
+            stored.put("channel_id", peerId);
+        } else if ("dm".equals(scene)) {
+            stored.put("guild_id", peerId);
+        } else {
+            stored.put("user_id", peerId);
+        }
+        stored.put("sender_id", firstNonBlank(sessions.selfId(context.connectionId()), context.appId()));
+        stored.put("message_seq", firstNonBlank(text(result, "message_seq", "message_id", "id", "msg_id")));
+        stored.put("message_id", firstNonBlank(text(result, "message_id", "message_seq", "id", "msg_id")));
+        stored.put("time", System.currentTimeMillis() / 1000);
+        Object message = payload.get("message");
+        if (message instanceof List<?> list) {
+            stored.put("segments", list);
+        } else {
+            String outboundText = message instanceof String value && !value.isBlank()
+                    ? value
+                    : firstNonBlank(text(payload, "content"), " ");
+            stored.put("segments", List.of(Map.of("type", "text", "data", Map.of("text", outboundText))));
+        }
+        sessions.rememberMessage(context.connectionId(), scene, peerId, stored);
     }
 
     private Object recall(Context context, Map<String, Object> payload) {
         String groupId = text(payload, "group_id", "group_openid");
         String userId = text(payload, "user_id", "user_openid", "openid");
+        String channelId = text(payload, "channel_id");
         String messageId = required(text(payload, "message_seq", "message_id", "msg_id", "id"), "消息 ID 不能为空");
         String path;
         if (!blank(groupId)) {
             path = "/v2/groups/" + groupId + "/messages/" + messageId;
         } else if (!blank(userId)) {
             path = "/v2/users/" + userId + "/messages/" + messageId;
+        } else if (!blank(channelId)) {
+            path = "/channels/" + channelId + "/messages/" + messageId;
         } else {
-            throw new BizException("撤回消息需要群或用户 openid");
+            throw new BizException("撤回消息需要群、用户或子频道 ID");
         }
         return request(context, HttpMethod.DELETE, path, null);
     }
@@ -263,7 +707,7 @@ public class OfficialQqBotApiAdapter {
         String response;
         try {
             WebClient client = WebClient.builder().baseUrl(base.toString())
-                    .clientConnector(new ReactorClientHttpConnector(HttpClient.create().responseTimeout(TIMEOUT)))
+                    .clientConnector(new ReactorClientHttpConnector(OfficialQqBotAccessTokenClient.officialHttpClient().responseTimeout(TIMEOUT)))
                     .defaultHeader(HttpHeaders.AUTHORIZATION, tokens.authorization(context))
                     .defaultHeader("X-Union-Appid", context.appId())
                     .build();
@@ -283,6 +727,10 @@ public class OfficialQqBotApiAdapter {
             }
             throw failure("官方机器人请求失败（HTTP " + exception.status() + "）", method, path, base, exception.status(), startedAt, exception);
         } catch (RuntimeException exception) {
+            if (isConnectionReset(exception)) {
+                log.warn("Official QQ bot request reset: method={}, path={}, host={}, elapsedMs={}",
+                        method, path, base.getHost(), Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+            }
             throw failure("官方机器人请求失败", method, path, base, null, startedAt, exception);
         }
         if (response == null || response.isBlank()) {
@@ -302,7 +750,8 @@ public class OfficialQqBotApiAdapter {
     }
 
     private OfficialMessage encode(Object message, Map<String, Object> payload) {
-        if (payload.containsKey("msg_type") || payload.containsKey("content") || payload.containsKey("media")) {
+        if (payload.containsKey("msg_type") || payload.containsKey("content") || payload.containsKey("media")
+                || payload.containsKey("markdown") || payload.containsKey("keyboard") || payload.containsKey("ark")) {
             int msgType = payload.get("msg_type") instanceof Number number ? number.intValue() : 0;
             return new OfficialMessage(msgType, text(payload, "content"), mapOrNull(payload.get("media")),
                     mapOrNull(payload.get("ark")), mapOrNull(payload.get("markdown")), mapOrNull(payload.get("keyboard")));
@@ -348,17 +797,77 @@ public class OfficialQqBotApiAdapter {
 
     private Map<String, Object> uploadHint(Map<String, Object> data, int fileType) {
         Map<String, Object> media = new LinkedHashMap<>();
+        media.put("file_type", fileType);
         String fileInfo = firstNonBlank(text(data, "file_info", "fileInfo"));
-        if (!blank(fileInfo)) {
+        if (!blank(fileInfo) && !inlineMediaSource(fileInfo)) {
             media.put("file_info", fileInfo);
             return media;
         }
-        String url = firstNonBlank(text(data, "uri", "url", "file"));
-        if (!blank(url)) {
-            media.put("url", url);
-            media.put("file_type", fileType);
+        String source = firstNonBlank(fileInfo, text(data, "uri", "url", "file", "file_data"));
+        if (!blank(source)) {
+            media.put("url", source);
         }
-        return media.isEmpty() ? null : media;
+        return media.size() <= 1 ? null : media;
+    }
+
+    /**
+     * 官方富媒体必须先 POST /files 拿到 file_info，再随 msg_type=7 被动发出。
+     * URL/base64 不能直接塞进 messages.media。
+     */
+    private Map<String, Object> resolveUploadedMedia(Context context, boolean group, String peerId, Map<String, Object> media) {
+        if (media == null || media.isEmpty()) {
+            return null;
+        }
+        String fileInfo = text(media, "file_info", "fileInfo");
+        if (!blank(fileInfo) && !inlineMediaSource(fileInfo)) {
+            return Map.of("file_info", fileInfo);
+        }
+        String source = firstNonBlank(fileInfo, text(media, "url", "uri", "file", "file_data"));
+        if (blank(source)) {
+            throw new BizException("官方机器人图片缺少文件内容");
+        }
+        Map<String, Object> upload = new LinkedHashMap<>();
+        upload.put(group ? "group_id" : "user_id", peerId);
+        Object fileType = media.get("file_type");
+        upload.put("file_type", fileType instanceof Number number ? number.intValue() : 1);
+        upload.put("srv_send_msg", false);
+        if (base64Payload(source) != null) {
+            upload.put("file_data", base64Payload(source));
+        } else if (source.startsWith("http://") || source.startsWith("https://")) {
+            upload.put("url", source);
+        } else {
+            throw new BizException("官方机器人图片需使用公网 URL 或 base64");
+        }
+        Object result = uploadFile(context, group, upload);
+        String uploaded = firstNonBlank(text(map(result), "file_info", "fileInfo"));
+        if (blank(uploaded)) {
+            throw new BizException("官方机器人文件上传未返回 file_info");
+        }
+        return Map.of("file_info", uploaded);
+    }
+
+    private static boolean inlineMediaSource(String value) {
+        if (blank(value)) {
+            return false;
+        }
+        String source = value.trim();
+        return source.startsWith("http://") || source.startsWith("https://")
+                || source.startsWith("base64://") || source.startsWith("data:");
+    }
+
+    private static String base64Payload(String source) {
+        if (blank(source)) {
+            return null;
+        }
+        String value = source.trim();
+        if (value.startsWith("base64://")) {
+            return value.substring("base64://".length());
+        }
+        int dataIndex = value.indexOf("base64,");
+        if (value.startsWith("data:") && dataIndex > 0) {
+            return value.substring(dataIndex + "base64,".length());
+        }
+        return null;
     }
 
     private List<?> segments(Object message) {
@@ -369,10 +878,6 @@ public class OfficialQqBotApiAdapter {
             return list;
         }
         return List.of();
-    }
-
-    private Object unsupported(String message) {
-        throw new BizException(message);
     }
 
     private URI base(Context context) {
@@ -391,13 +896,32 @@ public class OfficialQqBotApiAdapter {
     }
 
     private BizException failure(String message, HttpMethod method, String path, URI base, Integer status, long startedAt, Throwable cause) {
-        log.error("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
-                method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
+        if (status != null && (status == 400 || status == 403 || status == 404)) {
+            log.warn("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
+                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+        } else if (isConnectionReset(cause)) {
+            log.warn("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
+                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+        } else {
+            log.error("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
+                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
+        }
         BizException exception = new BizException(message);
         if (cause != null) {
             exception.initCause(cause);
         }
         return exception;
+    }
+
+    static boolean isConnectionReset(Throwable cause) {
+        Throwable current = cause;
+        while (current != null) {
+            if (current instanceof java.net.SocketException && String.valueOf(current.getMessage()).contains("Connection reset")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private static Map<String, Object> map(Object value) {

@@ -92,16 +92,19 @@ public class MilkyPluginEventDispatcher {
             String channelId = messageChannelId(data);
             String content = messageContent(data);
             Map<String, Object> referrer = new java.util.LinkedHashMap<>(additionalReferrer);
-            referrer.put("mentions", mentions(data.get("segments")));
+            referrer.put("mentions", mentionsFromSegments(data.get("segments")));
+            if (officialDirectedAtBot(data)) {
+                referrer.put("mentionSelf", true);
+            }
+            copyOfficialReplyIds(data, referrer);
             String replyMessageId = replyMessageId(data.get("segments"));
             if (replyMessageId != null) referrer.put("replyMessageId", replyMessageId);
-            PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
-                    content, null, null, referrer, event.eventType(), data, connectionId,
-                    event.selfId(), messageSeq);
-            runtime.publishMessagingEvent(pluginEvent);
-
             Parsed command = parseCommand(content);
+            PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
+                    content, null, command == null ? null : command.name(), referrer, event.eventType(), data, connectionId,
+                    event.selfId(), messageSeq);
             if (command == null) {
+                runtime.publishMessagingEvent(pluginEvent);
                 return;
             }
             User user = userId == null ? null : users.findByQQ(userId).orElse(null);
@@ -158,15 +161,16 @@ public class MilkyPluginEventDispatcher {
     private void dispatchButtonClick(String connectionId,
                                      online.yudream.base.domain.platform.milky.model.MilkyModels.Event event,
                                      Map<String, Object> data, Map<String, Object> additionalReferrer) {
-        String buttonId = firstText(data, "button_id", "buttonId", "id");
+        String buttonId = firstText(data, "button_id", "buttonId");
         if (buttonId == null) {
-            log.warn("Ignoring Milky button click without button id: connectionId={}, selfId={}, messageSeq={}",
-                    connectionId, event.selfId(), text(data.get("message_seq")));
+            log.warn("Ignoring Milky button click without button id: connectionId={}, selfId={}, messageSeq={}, nativeType={}",
+                    connectionId, event.selfId(), text(data.get("message_seq")), data.get("native_type"));
             return;
         }
         String userId = messageUserId(data);
         String channelId = messageChannelId(data);
         Map<String, Object> referrer = new java.util.LinkedHashMap<>(additionalReferrer);
+        copyOfficialReplyIds(data, referrer);
         PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), "button_click", "milky", userId, channelId,
                 null, buttonId, null, referrer, event.eventType(), data, connectionId,
                 event.selfId(), text(data.get("message_seq")));
@@ -182,13 +186,49 @@ public class MilkyPluginEventDispatcher {
     }
 
     private CompletionStage<?> menu(PluginEvent event, User user) {
+        var commandList = commands.listAccessible(user == null ? null : user.getId());
+        if (officialConnection(event.connectionId())) {
+            String nickname = user == null ? "访客" : (user.getNickname() == null || user.getNickname().isBlank() ? user.getUsername() : user.getNickname());
+            return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
+                    new PluginMessageContent(PluginMessageContent.Type.MARKDOWN,
+                            commandMenuMarkdown(nickname, commandList), null, event.referrer(), commandButtons(commandList))));
+        }
         StringBuilder content = new StringBuilder("可用指令：");
-        commands.listAccessible(user == null ? null : user.getId()).forEach(command -> content
+        commandList.forEach(command -> content
                 .append("\n/").append(command.command()).append(" - ").append(command.description()));
         return sendMenuText(event, content.toString());
     }
 
+    /** 官方连接具备原生 markdown + keyboard, 菜单直接走交互消息, 不再渲染图片。 */
+    private boolean officialConnection(String connectionId) {
+        try {
+            return connections.findById(Long.valueOf(connectionId))
+                    .map(online.yudream.base.domain.platform.milky.aggregate.MilkyConnection::official)
+                    .orElse(false);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    /** 菜单指令按钮：点击即以指令原文发出，指令过多时只取前 20 条(4 列 x 5 行上限)。 */
+    private List<PluginMessageContent.Button> commandButtons(List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
+        List<PluginMessageContent.Button> buttons = new java.util.ArrayList<>();
+        int index = 0;
+        for (online.yudream.base.plugin.spi.system.command.PluginCommandInfo command : list) {
+            if (index >= 20) {
+                break;
+            }
+            buttons.add(PluginMessageContent.Button.command("menu-cmd-" + index, "/" + command.command(), "/" + command.command()));
+            index++;
+        }
+        return buttons;
+    }
+
     private void menuImage(PluginEvent event, User user) {
+        if (officialConnection(event.connectionId())) {
+            menu(event, user);
+            return;
+        }
         AtomicBoolean fallbackStarted = new AtomicBoolean();
         try {
             var commandList = commands.listAccessible(user == null ? null : user.getId());
@@ -257,7 +297,7 @@ public class MilkyPluginEventDispatcher {
 
     private CompletionStage<?> sendMenuText(PluginEvent event, String content) {
         return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
-                new PluginMessageContent(PluginMessageContent.Type.TEXT, content, null, Map.of())));
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, content, null, event.referrer())));
     }
 
     private String uploadMenuImage(online.yudream.base.plugin.spi.system.render.PluginRenderedImage image, String publicBaseUrl) {
@@ -372,16 +412,27 @@ public class MilkyPluginEventDispatcher {
                 + "<div style='margin-top:2px;font-size:11px;color:#98a2b3;text-align:right;'>" + escape(siteName()) + " · 权限菜单</div></div></body></html>";
     }
 
+    /**
+     * 官方 QQ 机器人指令菜单。QQ markdown 不支持表格，使用标题分组 + 列表 + 引用 + 分割线的版式。
+     */
     private String commandMenuMarkdown(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
         Map<String, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo>> groups = new java.util.LinkedHashMap<>();
-        list.forEach(command -> groups.computeIfAbsent(command.pluginCode() == null || command.pluginCode().isBlank() ? "系统" : command.pluginCode(), ignored -> new java.util.ArrayList<>()).add(command));
-        StringBuilder text = new StringBuilder("# 指令菜单\n\n您好，**").append(markdown(nickname)).append("**。以下是您当前有权限使用的指令：\n\n");
+        list.forEach(command -> {
+            String pluginCode = command.pluginCode();
+            String groupName = pluginCode == null || pluginCode.isBlank() ? "系统" : runtime.displayName(pluginCode);
+            groups.computeIfAbsent(groupName, ignored -> new java.util.ArrayList<>()).add(command);
+        });
+        StringBuilder text = new StringBuilder("# 🤖 指令菜单\n\n您好，**").append(markdown(nickname)).append("**，以下是您当前可用的指令：\n\n");
+        if (groups.isEmpty()) {
+            text.append("> 暂无可用指令\n\n");
+        }
         groups.forEach((plugin, commands) -> {
-            text.append("## ").append(markdown(plugin)).append("\n\n| 指令 | 名称 | 用法 |\n| --- | --- | --- |\n");
-            commands.forEach(command -> text.append("| `/").append(markdown(command.command())).append("` | ").append(markdown(command.name())).append(" | ").append(markdown(command.description())).append(" |\n"));
+            text.append("## ").append(markdown(plugin)).append("\n\n");
+            commands.forEach(command -> text.append("- `/").append(markdown(command.command())).append("` **")
+                    .append(markdown(command.name())).append("** — ").append(markdown(command.description())).append("\n"));
             text.append("\n");
         });
-        text.append("---\n*").append(markdown(siteName())).append(" · 权限菜单*");
+        text.append("***\n\n> ").append(markdown(siteName())).append(" · 菜单按当前权限展示");
         return text.toString();
     }
 
@@ -443,7 +494,10 @@ public class MilkyPluginEventDispatcher {
         if (value == null) {
             return null;
         }
-        String source = value.trim();
+        String source = stripLeadingMentions(value);
+        if (source.isEmpty()) {
+            return null;
+        }
         if (isMenuAlias(source)) {
             return new Parsed(source, List.of());
         }
@@ -452,6 +506,14 @@ public class MilkyPluginEventDispatcher {
         }
         String[] parts = source.substring(1).trim().split("\\s+");
         return parts.length == 0 || parts[0].isBlank() ? null : new Parsed(parts[0], Arrays.stream(parts).skip(1).toList());
+    }
+
+    static String stripLeadingMentions(String value) {
+        String source = value.trim();
+        source = source.replaceAll("(?i)^(?:<@!?[^>]+>\\s*)+", "");
+        source = source.replaceAll("(?i)^(?:\\[@?[A-Za-z0-9._-]{4,}\\]\\s*)+", "");
+        source = source.replaceAll("(?i)^(?:@\\S+\\s+)+", "");
+        return source.trim();
     }
 
     private static String text(Object value) {
@@ -478,7 +540,45 @@ public class MilkyPluginEventDispatcher {
         return null;
     }
 
-    private List<String> mentions(Object value) {
+    static boolean officialDirectedAtBot(Map<String, Object> data) {
+        if (data == null) {
+            return false;
+        }
+        Object flag = data.get("mention_self");
+        if (Boolean.TRUE.equals(flag) || "true".equalsIgnoreCase(String.valueOf(flag))) {
+            return true;
+        }
+        String nativeType = text(data.get("native_type"));
+        return "GROUP_AT_MESSAGE_CREATE".equals(nativeType)
+                || "AT_MESSAGE_CREATE".equals(nativeType)
+                || "C2C_MESSAGE_CREATE".equals(nativeType)
+                || "DIRECT_MESSAGE_CREATE".equals(nativeType)
+                || ("INTERACTION_CREATE".equals(nativeType) && Boolean.TRUE.equals(data.get("mention_self")));
+    }
+
+    static void copyOfficialReplyIds(Map<String, Object> data, Map<String, Object> referrer) {
+        if (data == null || referrer == null) {
+            return;
+        }
+        copyIfPresent(data, referrer, "message_scene");
+        copyIfPresent(data, referrer, "msg_id");
+        copyIfPresent(data, referrer, "event_id");
+        copyIfPresent(data, referrer, "interaction_id");
+        Object messageId = data.get("message_id");
+        if (messageId != null && !String.valueOf(messageId).isBlank()) {
+            referrer.putIfAbsent("message_id", String.valueOf(messageId));
+            referrer.putIfAbsent("msg_id", String.valueOf(messageId));
+        }
+    }
+
+    private static void copyIfPresent(Map<String, Object> data, Map<String, Object> referrer, String key) {
+        Object value = data.get(key);
+        if (value != null && !String.valueOf(value).isBlank()) {
+            referrer.putIfAbsent(key, String.valueOf(value));
+        }
+    }
+
+    static List<String> mentionsFromSegments(Object value) {
         if (!(value instanceof List<?> parts)) return List.of();
         return parts.stream().filter(Map.class::isInstance).map(Map.class::cast)
                 .filter(part -> "mention".equals(String.valueOf(part.get("type"))))

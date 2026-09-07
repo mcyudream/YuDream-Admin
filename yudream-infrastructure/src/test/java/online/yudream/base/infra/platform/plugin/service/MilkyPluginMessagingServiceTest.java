@@ -7,6 +7,7 @@ import online.yudream.base.domain.platform.milky.service.MilkyApiGateway;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxRandomMode;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageContent;
+import online.yudream.base.plugin.spi.system.messaging.PluginMessageResult;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import org.junit.jupiter.api.Test;
 
@@ -68,6 +69,50 @@ class MilkyPluginMessagingServiceTest {
     }
 
     @Test
+    void routesOfficialChannelAndPrivateScenesFromReferrer() {
+        AtomicReference<String> api = new AtomicReference<>();
+        AtomicReference<Map<String, Object>> payload = new AtomicReference<>();
+        MilkyConnection connection = MilkyConnection.create("Official", "http://127.0.0.1:3000", "token", "base64", null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "findById" -> Optional.of(connection);
+                    case "findEnabled" -> List.of(connection);
+                    default -> null;
+                });
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    api.set((String) args[1]);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> body = (Map<String, Object>) args[2];
+                    payload.set(body);
+                    return Map.of("id", "official-msg");
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        service.send(new online.yudream.base.plugin.spi.system.messaging.PluginMessageRequest(
+                "1", "qq", "bot", "ch-1",
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, "hello channel", List.of(),
+                        Map.of("message_scene", "channel", "msg_id", "inbound-ch", "event_id", "evt-ch"))))
+                .toCompletableFuture().join();
+        assertEquals("send_channel_message", api.get());
+        assertEquals("ch-1", payload.get().get("channel_id"));
+        assertEquals("inbound-ch", payload.get().get("msg_id"));
+        assertEquals("evt-ch", payload.get().get("event_id"));
+
+        service.send(new online.yudream.base.plugin.spi.system.messaging.PluginMessageRequest(
+                "1", "qq", "bot", "user-open",
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, "hello friend", List.of(),
+                        Map.of("message_scene", "friend", "message_id", "p1"))))
+                .toCompletableFuture().join();
+        assertEquals("send_private_message", api.get());
+        assertEquals("user-open", payload.get().get("user_id"));
+        assertEquals("p1", payload.get().get("msg_id"));
+    }
+
+    @Test
     void acceptsSuccessfulMilkyResponsesWithoutData() {
         MilkyConnection connection = MilkyConnection.create("Milky", "http://127.0.0.1:3000", "token", "base64", null);
         connection.setId(1L);
@@ -107,8 +152,55 @@ class MilkyPluginMessagingServiceTest {
 
         assertEquals(1, connections.size());
         assertEquals("1", connections.getFirst().id());
+        assertEquals("qq", connections.getFirst().platform());
+        assertEquals("milky", connections.getFirst().protocol());
         assertNull(connections.getFirst().userId());
         assertEquals(0, calls.get());
+    }
+
+    @Test
+    void listsOfficialConnectionsWithOfficialProtocol() {
+        MilkyConnection connection = MilkyConnection.create(
+                "官Q", "official", null, null, "app-id", "app-secret", false, null, "base64", null);
+        connection.setId(9L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> "findEnabled".equals(method.getName()) ? List.of(connection) : null);
+        AtomicInteger calls = new AtomicInteger();
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    calls.incrementAndGet();
+                    return Map.of();
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        var connections = service.connections();
+
+        assertEquals(1, connections.size());
+        assertEquals("9", connections.getFirst().id());
+        assertEquals("官Q", connections.getFirst().name());
+        assertEquals("qq", connections.getFirst().platform());
+        assertEquals("official", connections.getFirst().protocol());
+        assertEquals(0, calls.get());
+    }
+
+    @Test
+    void listsGroupsWithoutFailingWhenOfficialCacheIsEmpty() {
+        MilkyConnection connection = MilkyConnection.create(
+                "官Q", "official", null, null, "app-id", "app-secret", false, null, "base64", null);
+        connection.setId(9L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> "findById".equals(method.getName()) ? Optional.of(connection) : null);
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    throw new IllegalStateException("gateway unavailable");
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        assertTrue(service.groups("9").isEmpty());
     }
 
     @Test
@@ -223,5 +315,72 @@ class MilkyPluginMessagingServiceTest {
 
         assertThrows(java.util.concurrent.CompletionException.class, () -> service.sendToChannel("1", "1064685901",
                 new PluginMessageContent(PluginMessageContent.Type.TEXT, "private message", List.of(), Map.of())).toCompletableFuture().join());
+    }
+
+    @Test
+    void officialTextFallsBackToMarkdownWithKeyboardAndInlineImages() {
+        AtomicReference<String> api = new AtomicReference<>();
+        AtomicReference<Map<String, Object>> payload = new AtomicReference<>();
+        MilkyConnection connection = MilkyConnection.create("Official", "official", null, null,
+                "app-id", "app-secret", false, null, null, null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "findById" -> Optional.of(connection);
+                    case "findEnabled" -> List.of(connection);
+                    default -> null;
+                });
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> {
+                    api.set((String) args[1]);
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> body = (Map<String, Object>) args[2];
+                    payload.set(body);
+                    return Map.of("id", "official-msg");
+                });
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        PluginMessageContent content = new PluginMessageContent(PluginMessageContent.Type.TEXT,
+                "结果见下图\n[[shot]]", List.of(new PluginMessageContent.Attachment("https://img.example.test/a.png", "shot", "image/png")),
+                Map.of("msg_id", "inbound-1"),
+                List.of(PluginMessageContent.Button.command("b1", "再来一局", "/再来一局"),
+                        PluginMessageContent.Button.callback("b2", "查看详情", "detail:1")));
+        PluginMessageResult result = service.sendToChannel("1", "1064685901", content).toCompletableFuture().join();
+
+        assertEquals("send_group_message", api.get());
+        assertEquals(2, payload.get().get("msg_type"));
+        assertEquals("inbound-1", payload.get().get("msg_id"));
+        String markdown = String.valueOf(((Map<?, ?>) payload.get().get("markdown")).get("content"));
+        assertTrue(markdown.contains("结果见下图\n![shot](https://img.example.test/a.png)"));
+        List<?> rows = (List<?>) ((Map<?, ?>) ((Map<?, ?>) payload.get().get("keyboard")).get("content")).get("rows");
+        List<?> firstRow = (List<?>) ((Map<?, ?>) rows.getFirst()).get("buttons");
+        Map<?, ?> command = (Map<?, ?>) firstRow.get(0);
+        assertEquals("b1", command.get("id"));
+        assertEquals(2, ((Map<?, ?>) command.get("action")).get("type"));
+        assertEquals("/再来一局", ((Map<?, ?>) command.get("action")).get("data"));
+        Map<?, ?> callback = (Map<?, ?>) firstRow.get(1);
+        assertEquals(1, ((Map<?, ?>) callback.get("action")).get("type"));
+        assertEquals(false, result.degraded());
+        assertEquals(List.of("official-msg"), result.messageIds());
+    }
+
+    @Test
+    void milkySendMarksButtonOnlyMessagesAsDegraded() {
+        MilkyConnection connection = MilkyConnection.create("Milky", "http://127.0.0.1:3000", "token", "base64", null);
+        connection.setId(1L);
+        MilkyConnectionRepo repository = (MilkyConnectionRepo) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyConnectionRepo.class}, (proxy, method, args) -> "findById".equals(method.getName()) ? Optional.of(connection) : null);
+        MilkyApiGateway gateway = (MilkyApiGateway) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{MilkyApiGateway.class}, (proxy, method, args) -> Map.of("message_seq", 7));
+        PluginUserService users = (PluginUserService) Proxy.newProxyInstance(getClass().getClassLoader(),
+                new Class<?>[]{PluginUserService.class}, (proxy, method, args) -> null);
+        MilkyPluginMessagingService service = new MilkyPluginMessagingService(repository, gateway, users, new ObjectMapper());
+
+        PluginMessageResult result = service.sendToChannel("1", "1064685901",
+                new PluginMessageContent(PluginMessageContent.Type.TEXT, "带按钮的文本", List.of(), Map.of(),
+                        List.of(PluginMessageContent.Button.command("b1", "/菜单", "/菜单")))).toCompletableFuture().join();
+        assertTrue(result.degraded());
     }
 }

@@ -23,6 +23,7 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -63,7 +64,12 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         return connectionRepo.findEnabled().stream()
                 // A picker must only read local connection configuration. Calling get_login_info
                 // here turns every plugin page load into a potentially long remote Milky request.
-                .map(connection -> new PluginMessagingConnection(String.valueOf(connection.getId()), connection.getName(), "qq", null))
+                .map(connection -> new PluginMessagingConnection(
+                        String.valueOf(connection.getId()),
+                        connection.getName(),
+                        "qq",
+                        null,
+                        connection.protocolCode()))
                 .toList();
     }
 
@@ -76,18 +82,23 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
                 return List.of();
             });
         }
-        Object data = apiGateway.invoke(context(connection(connectionId)), "get_group_list", Map.of());
-        Object rowsValue = groupRows(data);
-        if (!(rowsValue instanceof Iterable<?> rows)) return List.of();
-        List<PluginMessagingGroup> groups = new java.util.ArrayList<>();
-        for (Object row : rows) {
-            if (!(row instanceof Map<?, ?> value)) continue;
-            Object id = value.containsKey("group_id") ? value.get("group_id") : value.containsKey("group_uin") ? value.get("group_uin") : value.get("id");
-            if (id == null) continue;
-            Object name = value.containsKey("group_name") ? value.get("group_name") : value.get("name");
-            groups.add(new PluginMessagingGroup(String.valueOf(id), name == null ? String.valueOf(id) : String.valueOf(name)));
+        try {
+            Object data = apiGateway.invoke(context(connection(connectionId)), "get_group_list", Map.of());
+            Object rowsValue = groupRows(data);
+            if (!(rowsValue instanceof Iterable<?> rows)) return List.of();
+            List<PluginMessagingGroup> groups = new java.util.ArrayList<>();
+            for (Object row : rows) {
+                if (!(row instanceof Map<?, ?> value)) continue;
+                Object id = value.containsKey("group_id") ? value.get("group_id") : value.containsKey("group_uin") ? value.get("group_uin") : value.get("id");
+                if (id == null) continue;
+                Object name = value.containsKey("group_name") ? value.get("group_name") : value.get("name");
+                groups.add(new PluginMessagingGroup(String.valueOf(id), name == null ? String.valueOf(id) : String.valueOf(name)));
+            }
+            return List.copyOf(groups);
+        } catch (RuntimeException exception) {
+            log.warn("列出消息连接群失败: connectionId={}, errorType={}", connectionId, exception.getClass().getSimpleName());
+            return List.of();
         }
-        return List.copyOf(groups);
     }
 
     private Object groupRows(Object value) {
@@ -109,7 +120,8 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             if (request == null || request.content() == null) {
                 throw new BizException("插件消息请求不能为空");
             }
-            return sendNow(connection(request.connectionId()), request.channelId(), "group", request.content());
+            return sendNow(connection(request.connectionId()), request.channelId(),
+                    sendScene(request.content()), request.content());
         });
     }
 
@@ -210,6 +222,8 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         payload.put("content", content == null || content.content() == null ? "" : content.content());
         payload.put("referrer", content == null || content.referrer() == null ? Map.of() : content.referrer());
         payload.put("attachments", content == null || content.attachments() == null ? List.of() : content.attachments());
+        payload.put("buttons", content == null || content.buttons() == null ? List.of()
+                : content.buttons().stream().map(button -> button == null ? "" : button.label()).toList());
         sandbox.append("output", action, sandbox.pluginCode(), payload);
         return CompletableFuture.completedFuture(new PluginMessageResult(
                 List.of("sandbox-" + sandbox.timeline().size()), false, false));
@@ -247,18 +261,44 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         if (peer == null || peer.isBlank()) {
             throw new BizException("消息目标不能为空");
         }
-        String api = "group".equals(scene) ? "send_group_message" : "send_private_message";
-        String idKey = "group".equals(scene) ? "group_id" : "user_id";
-        Map<String, Object> segment = switch (content.type()) {
-            case IMAGE -> Map.of("type", "image", "data", Map.of("uri", content.content()));
-            case AUDIO -> Map.of("type", "record", "data", Map.of("uri", content.content()));
-            case VIDEO -> Map.of("type", "video", "data", Map.of("uri", content.content()));
-            case FILE -> Map.of("type", "file", "data", Map.of("uri", content.content()));
-            case COMPOSITE -> Map.of("type", "forward", "data", compositeData(content.content()));
-            default -> Map.of("type", "text", "data", Map.of("text", content.content()));
+        String resolved = blank(scene) ? "group" : scene.trim().toLowerCase();
+        String api = switch (resolved) {
+            case "channel" -> "send_channel_message";
+            case "dm" -> "send_guild_dm";
+            case "friend", "private" -> "send_private_message";
+            default -> "send_group_message";
         };
-        List<Map<String, Object>> message = messageSegments(content, segment);
-        Map<String, Object> result = map(apiGateway.invoke(context(connection), api, Map.of(idKey, peer, "message", message)));
+        String idKey = switch (resolved) {
+            case "channel" -> "channel_id";
+            case "dm" -> "guild_id";
+            case "friend", "private" -> "user_id";
+            default -> "group_id";
+        };
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put(idKey, peer);
+        if ("dm".equals(resolved)) {
+            body.put("channel_id", peer);
+        }
+        boolean degraded = false;
+        if (connection.official()) {
+            degraded = buildOfficialBody(body, content);
+        } else {
+            Map<String, Object> segment = switch (content.type()) {
+                case IMAGE -> Map.of("type", "image", "data", Map.of("uri", content.content()));
+                case AUDIO -> Map.of("type", "record", "data", Map.of("uri", content.content()));
+                case VIDEO -> Map.of("type", "video", "data", Map.of("uri", content.content()));
+                case FILE -> Map.of("type", "file", "data", Map.of("uri", content.content()));
+                case COMPOSITE -> Map.of("type", "forward", "data", compositeData(content.content()));
+                default -> Map.of("type", "text", "data", Map.of("text", content.content()));
+            };
+            body.put("message", messageSegments(content, segment));
+            degraded = !content.buttons().isEmpty();
+            if (degraded) {
+                log.debug("消息连接的协议不支持交互按钮，已降级忽略: connectionId={}", connection.getId());
+            }
+        }
+        copyReplyIds(content.referrer(), body);
+        Map<String, Object> result = map(apiGateway.invoke(context(connection), api, body));
         Object messageId = result.get("message_seq");
         if (messageId == null) {
             messageId = result.get("message_id");
@@ -266,7 +306,168 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         if (messageId == null) {
             messageId = result.get("id");
         }
-        return new PluginMessageResult(List.of(String.valueOf(messageId == null ? "" : messageId)), false, false);
+        return new PluginMessageResult(List.of(String.valueOf(messageId == null ? "" : messageId)), false, degraded);
+    }
+
+    /**
+     * 官方 QQ 机器人特异化出站：无富媒体时一律以 msg_type=2 markdown 被动回复，
+     * 文本中的 [[token]] 附件标记内嵌为 markdown 图片；带可上传媒体时降级为 msg_type=7
+     * 并把正文作为 caption。按钮映射为 keyboard；msg_id/event_id 由 copyReplyIds 与
+     * 适配器的 lastInbound 兜底共同保证被动回复。
+     *
+     * @return 是否有内容被降级丢弃
+     */
+    private boolean buildOfficialBody(Map<String, Object> body, PluginMessageContent content) {
+        boolean degraded = false;
+        Map<String, Object> media = officialMedia(content);
+        List<PluginMessageContent.Attachment> inlineImages = List.of();
+        if (media == null && !content.attachments().isEmpty()
+                && (content.type() == PluginMessageContent.Type.TEXT || content.type() == PluginMessageContent.Type.MARKDOWN)) {
+            List<PluginMessageContent.Attachment> remoteImages = new ArrayList<>();
+            List<PluginMessageContent.Attachment> others = new ArrayList<>();
+            for (PluginMessageContent.Attachment attachment : content.attachments()) {
+                if (remoteImage(attachment)) {
+                    remoteImages.add(attachment);
+                } else {
+                    others.add(attachment);
+                }
+            }
+            if (others.isEmpty()) {
+                inlineImages = remoteImages;
+            } else {
+                PluginMessageContent.Attachment first = others.getFirst();
+                media = Map.of("file_type", officialFileType(first.contentType()), "url", first.url());
+                degraded = others.size() > 1 || !remoteImages.isEmpty();
+            }
+        }
+        String text = content.content() == null ? "" : content.content();
+        if (media != null) {
+            body.put("msg_type", 7);
+            body.put("media", media);
+            body.put("content", text.isBlank() ? " " : text);
+        } else {
+            body.put("msg_type", 2);
+            body.put("content", text.isBlank() ? " " : text);
+            body.put("markdown", Map.of("content", markdownWithInlineImages(text, inlineImages)));
+        }
+        Map<String, Object> keyboard = officialKeyboard(content.buttons());
+        if (keyboard != null) {
+            body.put("keyboard", keyboard);
+        }
+        return degraded;
+    }
+
+    private static Map<String, Object> officialMedia(PluginMessageContent content) {
+        return switch (content.type()) {
+            case IMAGE -> Map.of("file_type", 1, "url", content.content());
+            case VIDEO -> Map.of("file_type", 2, "url", content.content());
+            case AUDIO -> Map.of("file_type", 3, "url", content.content());
+            case FILE -> Map.of("file_type", 4, "url", content.content());
+            default -> null;
+        };
+    }
+
+    private static int officialFileType(String contentType) {
+        String value = contentType == null ? "" : contentType.toLowerCase(java.util.Locale.ROOT);
+        if (value.startsWith("video/")) {
+            return 2;
+        }
+        if (value.startsWith("audio/")) {
+            return 3;
+        }
+        return value.startsWith("image/") ? 1 : 4;
+    }
+
+    private static boolean remoteImage(PluginMessageContent.Attachment attachment) {
+        if (attachment == null || attachment.url() == null) {
+            return false;
+        }
+        String contentType = attachment.contentType() == null ? "" : attachment.contentType().toLowerCase(java.util.Locale.ROOT);
+        String url = attachment.url();
+        return contentType.startsWith("image/") && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    /** 官方 markdown 支持 ![标题](url) 内嵌公网图片，复用 [[token]] 标记位置；未引用图片追加到末尾。 */
+    private static String markdownWithInlineImages(String text, List<PluginMessageContent.Attachment> inlineImages) {
+        if (inlineImages.isEmpty()) {
+            return text;
+        }
+        Map<String, PluginMessageContent.Attachment> byToken = new LinkedHashMap<>();
+        for (PluginMessageContent.Attachment attachment : inlineImages) {
+            if (attachment.title() != null && !attachment.title().isBlank()) {
+                byToken.putIfAbsent(attachment.title().trim(), attachment);
+            }
+        }
+        StringBuilder markdown = new StringBuilder();
+        LinkedHashSet<PluginMessageContent.Attachment> used = new LinkedHashSet<>();
+        Matcher matcher = INLINE_ATTACHMENT.matcher(text);
+        int cursor = 0;
+        while (matcher.find()) {
+            markdown.append(text, cursor, matcher.start());
+            PluginMessageContent.Attachment attachment = byToken.get(matcher.group(1));
+            if (attachment == null) {
+                markdown.append(matcher.group());
+            } else {
+                markdown.append(markdownImage(attachment));
+                used.add(attachment);
+            }
+            cursor = matcher.end();
+        }
+        markdown.append(text.substring(cursor));
+        for (PluginMessageContent.Attachment attachment : inlineImages) {
+            if (!used.contains(attachment)) {
+                markdown.append('\n').append(markdownImage(attachment));
+            }
+        }
+        return markdown.toString();
+    }
+
+    private static String markdownImage(PluginMessageContent.Attachment attachment) {
+        String title = attachment.title() == null || attachment.title().isBlank() ? "图片" : attachment.title().trim();
+        return "![" + title + "](" + attachment.url() + ")";
+    }
+
+    /** SPI 按钮 → 官方 keyboard：指令按钮 action.type=2，回调按钮 action.type=1；4 列一行、最多 5 行。 */
+    private static Map<String, Object> officialKeyboard(List<PluginMessageContent.Button> buttons) {
+        if (buttons == null || buttons.isEmpty()) {
+            return null;
+        }
+        List<Map<String, Object>> rows = new ArrayList<>();
+        List<Map<String, Object>> row = new ArrayList<>();
+        int index = 0;
+        for (PluginMessageContent.Button item : buttons) {
+            if (item == null || blank(item.label()) || blank(item.data())) {
+                continue;
+            }
+            Map<String, Object> render = new LinkedHashMap<>();
+            render.put("label", item.label());
+            render.put("visited_label", item.label());
+            render.put("style", 1);
+            Map<String, Object> action = new LinkedHashMap<>();
+            action.put("type", item.enter() ? 2 : 1);
+            action.put("permission", Map.of("type", 2));
+            action.put("click_limit", 0);
+            action.put("data", item.data());
+            action.put("enter", item.enter());
+            action.put("reply", false);
+            Map<String, Object> button = new LinkedHashMap<>();
+            button.put("id", blank(item.id()) ? "btn-" + index : item.id());
+            button.put("render_data", render);
+            button.put("action", action);
+            row.add(button);
+            index++;
+            if (row.size() == 4) {
+                rows.add(Map.of("buttons", List.copyOf(row)));
+                row.clear();
+            }
+            if (rows.size() == 5) {
+                break;
+            }
+        }
+        if (!row.isEmpty() && rows.size() < 5) {
+            rows.add(Map.of("buttons", List.copyOf(row)));
+        }
+        return rows.isEmpty() ? null : Map.of("content", Map.of("rows", rows));
     }
 
     /** 普通文本保持“正文 + 附件追加”的兼容行为；带标记文本则按标记位置内嵌附件。 */
@@ -358,6 +559,49 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         } catch (Exception exception) {
             throw new BizException("Composite plugin message is not valid JSON");
         }
+    }
+
+    private static String sendScene(PluginMessageContent content) {
+        if (content == null || content.referrer() == null) {
+            return "group";
+        }
+        Object scene = content.referrer().get("message_scene");
+        if (scene == null) {
+            scene = content.referrer().get("messageScene");
+        }
+        if (scene == null) {
+            return "group";
+        }
+        String value = String.valueOf(scene).trim().toLowerCase();
+        if ("private".equals(value)) {
+            return "friend";
+        }
+        if ("channel".equals(value) || "dm".equals(value) || "friend".equals(value) || "group".equals(value)) {
+            return value;
+        }
+        return "group";
+    }
+
+    private static void copyReplyIds(Map<String, Object> referrer, Map<String, Object> body) {
+        if (referrer == null || referrer.isEmpty()) {
+            return;
+        }
+        putReplyId(body, "msg_id", referrer.get("msg_id"), referrer.get("message_id"), referrer.get("messageId"));
+        putReplyId(body, "message_id", referrer.get("message_id"), referrer.get("msg_id"), referrer.get("messageId"));
+        putReplyId(body, "event_id", referrer.get("event_id"), referrer.get("eventId"));
+    }
+
+    private static void putReplyId(Map<String, Object> body, String key, Object... values) {
+        for (Object value : values) {
+            if (value != null && !String.valueOf(value).isBlank()) {
+                body.putIfAbsent(key, String.valueOf(value));
+                return;
+            }
+        }
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
     private MilkyConnection connection(String id) {

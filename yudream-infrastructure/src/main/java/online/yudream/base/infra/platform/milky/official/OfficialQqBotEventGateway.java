@@ -7,6 +7,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
+import online.yudream.base.domain.platform.milky.enumerate.MilkyConnectionProtocol;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
 import online.yudream.base.infra.platform.milky.service.ReactorMilkyEventGateway;
 import org.springframework.stereotype.Service;
@@ -61,12 +62,18 @@ public class OfficialQqBotEventGateway {
 
     private Mono<Void> connectOnce(MilkyConnection connection, ReactorMilkyEventGateway.Listener listener,
                                    AtomicReference<Session> session, AtomicBoolean resumable) {
+        return Mono.fromCallable(() -> gatewayUrl(connection))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(gateway -> connectWebsocket(connection, listener, session, resumable, gateway));
+    }
+
+    private Mono<Void> connectWebsocket(MilkyConnection connection, ReactorMilkyEventGateway.Listener listener,
+                                        AtomicReference<Session> session, AtomicBoolean resumable, URI gateway) {
         Long connectionId = connection.getId();
-        URI gateway = gatewayUrl(connection);
         log.info("Official QQ bot gateway connecting: connectionId={}, endpoint={}", connectionId, gateway);
         AtomicLong heartbeatInterval = new AtomicLong(45_000);
         AtomicReference<Disposable> heartbeat = new AtomicReference<>();
-        return HttpClient.create()
+        return OfficialQqBotAccessTokenClient.officialHttpClient()
                 .headers(headers -> {
                     headers.set(HttpHeaderNames.AUTHORIZATION, tokens.authorization(connection.toApiContext()));
                     headers.set("X-Union-Appid", connection.getAppId());
@@ -134,12 +141,12 @@ public class OfficialQqBotEventGateway {
         Session current = session.get();
         if (resumable.get() && current != null && current.sessionId() != null) {
             return send(outbound, op(OP_RESUME, Map.of(
-                    "token", tokens.token(connection.toApiContext()),
+                    "token", tokens.authorization(connection.toApiContext()),
                     "session_id", current.sessionId(),
                     "seq", current.lastSequence().get())));
         }
         return send(outbound, op(OP_IDENTIFY, Map.of(
-                "token", tokens.token(connection.toApiContext()),
+                "token", tokens.authorization(connection.toApiContext()),
                 "intents", connection.officialIntents(),
                 "shard", new int[]{0, 1})));
     }
@@ -157,6 +164,7 @@ public class OfficialQqBotEventGateway {
         if (event == null) {
             return;
         }
+        apiAdapter.ackInteractionIfNeeded(connection.toApiContext(), event);
         try {
             listener.onEvent(event, raw(payload));
         } catch (Exception exception) {
@@ -201,15 +209,21 @@ public class OfficialQqBotEventGateway {
     }
 
     private URI gatewayUrl(MilkyConnection connection) {
-        Object result = apiAdapter.invoke(connection.toApiContext(), "GET /gateway", Map.of());
-        String url = null;
-        if (result instanceof Map<?, ?> map && map.get("url") != null) {
-            url = String.valueOf(map.get("url"));
+        try {
+            Object result = apiAdapter.invoke(connection.toApiContext(), "GET /gateway/bot", Map.of());
+            if (result instanceof Map<?, ?> map && map.get("url") != null) {
+                String url = String.valueOf(map.get("url"));
+                if (!url.isBlank()) {
+                    return URI.create(url);
+                }
+            }
+        } catch (RuntimeException exception) {
+            log.warn("Official QQ bot gateway discovery failed, using default endpoint: connectionId={}",
+                    connection.getId());
         }
-        if (url == null || url.isBlank()) {
-            url = "wss://api.sgroup.qq.com/websocket";
-        }
-        return URI.create(url);
+        return URI.create(connection.isSandbox()
+                ? MilkyConnectionProtocol.OFFICIAL_SANDBOX_GATEWAY
+                : MilkyConnectionProtocol.OFFICIAL_GATEWAY);
     }
 
     private String raw(JsonNode payload) {
