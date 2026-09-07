@@ -5,6 +5,7 @@ import type {
   AgentTraceStep,
   PluginDevProject,
   PluginDevProjectSavePayload,
+  PluginDevProjectScanResult,
   PluginDevtoolsStatus,
   PluginLifecycleEventPayload,
   PluginScaffoldPayload,
@@ -118,6 +119,13 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
   async function addDevProject(payload: PluginDevProjectSavePayload) {
     await apiDevtools.addDevProject(payload)
     await Promise.all([loadDevProjects(), loadStatus(true)])
+  }
+
+  /** 一键扫描父目录下的插件模块并去重登记，返回新登记与跳过清单 */
+  async function batchAddDevProjects(path: string): Promise<PluginDevProjectScanResult> {
+    const res = await apiDevtools.batchAddDevProjects(path)
+    await Promise.all([loadDevProjects(), loadStatus(true)])
+    return res.data
   }
 
   async function removeDevProject(code: string) {
@@ -375,6 +383,7 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     consumeQqSandboxLaunch,
     loadDevProjects,
     addDevProject,
+    batchAddDevProjects,
     removeDevProject,
     reloadDevPlugin,
     scaffoldPlugin,

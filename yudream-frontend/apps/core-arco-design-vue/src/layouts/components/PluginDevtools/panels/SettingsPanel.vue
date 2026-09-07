@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PluginDevProject } from '@/api/modules/platform-devtools'
+import type { PluginDevProject, PluginDevProjectScanResult } from '@/api/modules/platform-devtools'
 import apiPlugin from '@/api/modules/platform-plugin'
 import DevProjectDirectoryBrowser from './DevProjectDirectoryBrowser.vue'
 
@@ -118,6 +118,49 @@ function handleBrowseSelect(path: string, inferredCode?: string) {
   }
 }
 
+// ---------- 批量登记子目录 ----------
+const batchOpen = ref(false)
+const batchSaving = ref(false)
+const batchBrowseOpen = ref(false)
+const batchPath = ref('')
+const batchResult = ref<PluginDevProjectScanResult | null>(null)
+
+function openBatch() {
+  batchPath.value = ''
+  batchResult.value = null
+  batchOpen.value = true
+}
+
+function handleBatchBrowseSelect(path: string) {
+  batchPath.value = path
+}
+
+async function submitBatch() {
+  const path = batchPath.value.trim()
+  if (!path) {
+    toast.warning('父目录不能为空')
+    return
+  }
+  batchSaving.value = true
+  try {
+    batchResult.value = await store.batchAddDevProjects(path)
+    const registered = batchResult.value.registered.length
+    const skipped = batchResult.value.skipped.length
+    if (registered === 0 && skipped === 0) {
+      toast.warning('未发现可登记的插件模块')
+    }
+    else {
+      toast.success(`已登记 ${registered} 个插件，跳过 ${skipped} 个`)
+    }
+  }
+  catch {
+    // 拦截器已提示
+  }
+  finally {
+    batchSaving.value = false
+  }
+}
+
 // ---------- 新建插件骨架 ----------
 const scaffoldOpen = ref(false)
 const scaffoldSaving = ref(false)
@@ -214,6 +257,10 @@ function handleResetPanel() {
           <FaIcon name="i-ri:magic-line" />
           新建插件
         </FaButton>
+        <FaButton variant="outline" size="sm" @click="openBatch">
+          <FaIcon name="i-ri:folder-add-line" />
+          批量登记
+        </FaButton>
         <FaButton size="sm" @click="openAdd">
           <FaIcon name="i-ri:add-line" />
           登记目录
@@ -262,7 +309,7 @@ function handleResetPanel() {
         </FaTooltip>
       </div>
       <div v-if="!store.devProjects.length && !store.devProjectsLoading" class="settings-empty">
-        暂无开发项目；点击「登记目录」选择插件源码目录，或在 yml 的 yudream.platform.plugin.dev-mode.projects 中配置
+        暂无开发项目；点击「批量登记」选择插件仓根目录一键扫描子模块，或「登记目录」登记单个插件，也可在 yml 的 yudream.platform.plugin.dev-mode.projects 中配置
       </div>
     </div>
 
@@ -340,6 +387,51 @@ function handleResetPanel() {
 
     <!-- 宿主机目录浏览（嵌套于登记表单之上） -->
     <DevProjectDirectoryBrowser v-model="browseOpen" @select="handleBrowseSelect" />
+
+    <!-- 批量登记子目录 -->
+    <FaModal v-model="batchOpen" title="批量登记子目录" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
+      <div class="add-form">
+        <div class="add-form__field">
+          <span class="add-form__label">父目录（必填，扫描其中的插件模块并去重登记）</span>
+          <div class="add-form__path">
+            <FaInput v-model="batchPath" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
+            <FaButton variant="outline" @click="batchBrowseOpen = true">
+              <FaIcon name="i-ri:folder-open-line" />
+              浏览
+            </FaButton>
+          </div>
+        </div>
+        <div class="settings-section__hint">
+          最多向下扫描 3 层，跳过 node_modules / target / dist / .git 等目录；已在配置文件或面板清单中的插件会被跳过。
+        </div>
+        <div v-if="batchResult" class="batch-result">
+          <div class="batch-result__title">
+            新登记 {{ batchResult.registered.length }} 个
+          </div>
+          <div v-for="item in batchResult.registered" :key="item.code" class="batch-result__row">
+            <span class="font-mono">{{ item.code }}</span>
+            <span class="batch-result__path">{{ item.path }}</span>
+          </div>
+          <div v-if="batchResult.skipped.length" class="batch-result__title">
+            已跳过 {{ batchResult.skipped.length }} 个
+          </div>
+          <div v-for="item in batchResult.skipped" :key="`${item.code || ''}:${item.path}`" class="batch-result__row">
+            <span class="font-mono">{{ item.code || '—' }}</span>
+            <span>{{ item.reason }}</span>
+            <span class="batch-result__path">{{ item.path }}</span>
+          </div>
+        </div>
+        <div class="add-form__actions">
+          <FaButton variant="outline" @click="batchOpen = false">
+            {{ batchResult ? '关闭' : '取消' }}
+          </FaButton>
+          <FaButton :loading="batchSaving" @click="submitBatch">
+            {{ batchResult ? '再次扫描' : '扫描并登记' }}
+          </FaButton>
+        </div>
+      </div>
+    </FaModal>
+    <DevProjectDirectoryBrowser v-model="batchBrowseOpen" @select="handleBatchBrowseSelect" />
 
     <!-- 新建插件骨架 -->
     <FaModal v-model="scaffoldOpen" title="新建插件骨架" :footer="false" :z-index="2200" content-class="sm:max-w-lg">
@@ -429,6 +521,38 @@ function handleResetPanel() {
   font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
+}
+
+.batch-result {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.batch-result__title {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.batch-result__row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.batch-result__path {
+  min-width: 0;
+  color: var(--color-text-3);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-row {

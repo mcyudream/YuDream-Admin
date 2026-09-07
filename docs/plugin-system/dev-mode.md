@@ -31,7 +31,7 @@
 - **CONFIG**：yml `dev-mode.projects` 列表，面板只读；
 - **FILE**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，与插件 JAR 目录同约定，已被 `.gitignore` 的 `/plugins/` 覆盖；可用 `dev-mode.store-file` 覆盖路径）。此文件是有意选择的**非数据库存储**——coding agent 与用户都能直接读取它来定位插件源码目录。
 
-合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），开发模式开启时已登记且产物可用的项目会在宿主启动后按依赖顺序恢复启用；设置页也可直接点击启用。登记后若插件已启用会立即触发一次热切重载。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
+合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），开发模式开启时已登记且产物可用的项目会在宿主启动后按依赖顺序恢复启用；设置页也可直接点击启用。登记后若插件已启用会立即触发一次热切重载。设置页「批量登记」可选择插件仓根目录，宿主有界扫描（深度 ≤ 3，跳过 `node_modules`/`target`/`dist`/`src`/隐藏目录，上限 100 个候选）其中的插件模块并一次性写入清单：扫描内同 code 保留路径排序后的第一项，已在 CONFIG/FILE 登记或同路径重复的条目跳过并返回原因。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
 
 「设置」页的「新建插件」可免去手工搭骨架：填父目录与 kebab-case 编码（可选显示名、版本、描述、depend/softdepend），宿主在 `{父目录}/yudream-plugin-{code}` 生成**独立 pom**（无 parent，SPI 依赖经本机 `~/.m2` 解析，默认版本跟随宿主根 pom 的 `yudream.plugin.spi.version`，可用 `spiVersion` 覆盖）、`plugin.yml`、含 ping 自检指令的入口类（包名 `online.yudream.base.plugin.{code去连字符}`）与 domain/application/infrastructure/interfaces 四个空分包。`register` 默认开启，生成即登记为开发模式项目，执行一次 `mvn compile` 后开发模式自动加载；目标目录已存在且非空时拒绝生成。
 
@@ -60,13 +60,13 @@ yudream:
 - **前端资源**：开发模式插件的前端资产直接从 `frontend-dist` 目录取文件并做内容协商，不再走 JAR 内 classpath。
 - **监听管线**（`PluginDevModeWatcher`，启动时按生效开关决定是否起线程）：
   1. `src/main/java` 变化且 `auto-compile` → 防抖后在模块目录执行 `compile-command`；编译失败作为事件推送，**不会**用陈旧产物重载，也不会影响宿主进程；
-  2. `target/classes` 变化 → 防抖 → 走 禁用 → 卸载 → 目录加载 → 恢复启用 管线；
+  2. `target/classes` 变化 → 防抖 → 走 禁用 → 卸载 → 目录加载 → 恢复启用 管线；若目标有已启用的硬/软依赖方，会先按外层优先停掉依赖方并记下恢复意图，目标重载成功后再按依赖顺序恢复，单个依赖方失败只记错误不阻断目标。热重载只定向同步该插件的 `plugin.yml`（`describeDevPlugin`），不再全量扫描插件目录。同一插件的手动重载与监听重载按 code 串行。面板登记触发的源码切换若落在刚完成的重载/级联恢复窗口（约 30s）内会被抑制，避免批量登记 provider+consumer 时重复重载；监听器发现 classes 变化的请求不会被抑制。
   3. 前端 `dist` 变化 → 发布前端重载事件，经 SSE 桥到调试浮窗，触发当前插件运行时页面重挂载远程模块（重挂载会重置页面状态，不是状态保持的 HMR）。
 - **路由/菜单自动重建**：浮窗 SSE 收到 RELOAD 或 FRONTEND_RELOAD 成功事件后，除重挂载当前插件页面外，还会防抖调用 `refreshDynamicRoutes` 重新拉取后端菜单与前端 manifest 重建动态路由，插件新增/变更的菜单项无需手动刷新页面即可出现；同时清空公开路由（publicAccess）memo，下次未登录导航按新 manifest 注册。
 
 ### 限制
 
-- 热重载只重建本插件 ClassLoader；硬/软依赖提供者必须已启用，依赖方遇到 ABI 变化需手动重载。
+- 热重载会级联停启硬/软依赖方；依赖方 ABI 变化后随 provider 重载一起恢复，单个依赖方失败不会阻断目标。
 - 开发模式插件不要走市场安装/更新/回滚流程；删除插件记录不会删除源码目录。
 - Windows 下 `compile-command` 需要 `mvn`（或 `mvn.cmd`）在 PATH，否则填绝对路径。
 
@@ -84,7 +84,7 @@ yudream:
 - **追踪**：实时执行区（SSE 增量累积，运行中的 trace 只能在这里看步骤）+ 历史记录（分页、按来源/状态过滤）。详情页逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，失败步骤红标，可导出 JSON 用于缺陷上报。
 - **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条，级别/关键字过滤）+ SSE 实时追加，按 sequence 去重；可暂停（暂停期日志缓存于缓冲区）、清空与展开异常堆栈。过滤依据插件包名前缀（`PluginLoggerPrefix`：从 mainClass 截取 `online.yudream.base.plugin.` 根包后的第一段，第三方未遵循包约定的插件兜底用 根包+编码），数据源为宿主 SystemLogBuffer 环形缓冲，与沙盒日志桥同一包约定。宿主会自动记录插件加载、启用、禁用、卸载，以及开发者工具的模拟指令和 HTTP 分发过程，无需插件额外接入日志 API。
 - **审查**：读取 vite dev 中间件 `/__yudream-devtools/audit.json` 展示的审查报告（见第 7 节）。
-- **设置**：开发项目管理（登记/启用/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 新建插件骨架（表单填父目录与编码，宿主生成独立 Maven 模块并默认登记为开发模式项目）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
+- **设置**：开发项目管理（登记/批量登记子目录/启用/移除/立即重载，含来源标记与路径/编译/描述符状态位）+ 新建插件骨架（表单填父目录与编码，宿主生成独立 Maven 模块并默认登记为开发模式项目）+ 面板偏好（悬浮按钮位置、浮窗位置与尺寸一键重置）。
 
 浮窗头部只保留标题与双 SSE（生命周期流/追踪流）连接状态点，状态明细移入「概览」页。
 
@@ -105,6 +105,7 @@ yudream:
 | `GET /dev-projects` | view | 开发项目合并清单（CONFIG+FILE，含来源与路径/编译/描述符状态位，不受开关过滤） |
 | `GET /dev-projects/browse?path=...` | manage | 逐层浏览宿主机目录；path 为空返回文件系统根，返回 Maven/插件模块标记与可推断编码 |
 | `POST /dev-projects` | manage | 面板登记开发目录（code 可留空自动推断；已启用插件立即热切） |
+| `POST /dev-projects/batch` | manage | 扫描父目录下的插件模块并去重登记；返回 `registered` 与 `skipped`（含原因） |
 | `DELETE /dev-projects/{code}` | manage | 移除 FILE 源项目（CONFIG 源需在 yml 中移除） |
 | `POST /scaffold` | manage | 新建插件骨架：在宿主机生成独立 Maven 模块（pom/plugin.yml/入口类/分包目录），`register` 默认 true 同时登记为开发模式项目 |
 | `GET /agent-traces` | view | 追踪分页查询（source/plugin/状态过滤） |

@@ -222,6 +222,105 @@ class PluginAppServiceTest {
     }
 
     @Test
+    void reloadDevPluginStopsEnabledDependentsThenRestoresThemAfterTarget() throws IOException {
+        Path classes = writeJar("demo-plugin-classes", NEW_BYTES);
+        PluginModule module = module(classes, "1.0.0", "Demo plugin");
+        module.markEnabled();
+        PluginModule dependent = PluginModule.builder()
+                .code("dependent-plugin")
+                .name("Dependent")
+                .pluginVersion("1.0.0")
+                .jarPath(classes.toAbsolutePath().normalize().toString())
+                .dependencies(List.of(PLUGIN_CODE))
+                .status(PluginStatus.ENABLED)
+                .build();
+        java.util.Set<String> runtimeEnabled = new java.util.HashSet<>(java.util.Set.of(PLUGIN_CODE, "dependent-plugin"));
+        java.util.Set<String> runtimeLoaded = new java.util.HashSet<>(java.util.Set.of(PLUGIN_CODE, "dependent-plugin"));
+        when(pluginRuntimeGateway.describeDevPlugin(PLUGIN_CODE)).thenReturn(Optional.of(
+                descriptor("1.0.0", "Demo plugin", classes)));
+        when(pluginRuntimeGateway.enabled(anyString())).thenAnswer(invocation ->
+                runtimeEnabled.contains(invocation.getArgument(0)));
+        when(pluginRuntimeGateway.loaded(anyString())).thenAnswer(invocation ->
+                runtimeLoaded.contains(invocation.getArgument(0)));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeEnabled.remove(invocation.getArgument(0));
+            return null;
+        }).when(pluginRuntimeGateway).disable(anyString());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeLoaded.remove(invocation.getArgument(0));
+            return null;
+        }).when(pluginRuntimeGateway).unload(anyString());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeLoaded.add(((PluginModule) invocation.getArgument(0)).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).load(any());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeEnabled.add(((PluginModule) invocation.getArgument(0)).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).enable(any());
+        when(pluginRuntimeGateway.permissions(anyString())).thenReturn(List.of());
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of());
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        stubRepository(module, dependent);
+
+        service.reloadDevPlugin(PLUGIN_CODE);
+
+        InOrder lifecycle = org.mockito.Mockito.inOrder(pluginRuntimeGateway);
+        lifecycle.verify(pluginRuntimeGateway).disable("dependent-plugin");
+        lifecycle.verify(pluginRuntimeGateway).unload("dependent-plugin");
+        lifecycle.verify(pluginRuntimeGateway).disable(PLUGIN_CODE);
+        lifecycle.verify(pluginRuntimeGateway).unload(PLUGIN_CODE);
+        lifecycle.verify(pluginRuntimeGateway).load(module);
+        lifecycle.verify(pluginRuntimeGateway).enable(module);
+        lifecycle.verify(pluginRuntimeGateway).load(dependent);
+        lifecycle.verify(pluginRuntimeGateway).enable(dependent);
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
+        assertThat(dependent.getStatus()).isEqualTo(PluginStatus.ENABLED);
+        assertThat(dependent.getRestoreIntentActive()).isFalse();
+        assertThat(service.shouldSuppressRegisterReload(PLUGIN_CODE)).isTrue();
+        assertThat(service.shouldSuppressRegisterReload("dependent-plugin")).isTrue();
+    }
+
+    @Test
+    void reloadDevPluginDoesNotEnableNeverEnabledPlugin() throws IOException {
+        Path classes = writeJar("demo-plugin-classes", NEW_BYTES);
+        PluginModule module = module(classes, "1.0.0", "Demo plugin");
+        when(pluginRuntimeGateway.describeDevPlugin(PLUGIN_CODE)).thenReturn(Optional.of(
+                descriptor("1.0.0", "Demo plugin", classes)));
+        when(pluginRuntimeGateway.loaded(PLUGIN_CODE)).thenReturn(false, true);
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(false);
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        stubRepository(module);
+
+        service.reloadDevPlugin(PLUGIN_CODE);
+
+        verify(pluginRuntimeGateway).load(module);
+        verify(pluginRuntimeGateway, never()).enable(any());
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.LOADED);
+    }
+
+    @Test
+    void reloadDevPluginReenablesCascadeStoppedDependentViaRestoreIntent() throws IOException {
+        Path classes = writeJar("demo-plugin-classes", NEW_BYTES);
+        PluginModule module = module(classes, "1.0.0", "Demo plugin");
+        module.setRestoreIntentActive(true);
+        when(pluginRuntimeGateway.describeDevPlugin(PLUGIN_CODE)).thenReturn(Optional.of(
+                descriptor("1.0.0", "Demo plugin", classes)));
+        when(pluginRuntimeGateway.loaded(PLUGIN_CODE)).thenReturn(false, false, true);
+        when(pluginRuntimeGateway.enabled(PLUGIN_CODE)).thenReturn(false, false, false, true);
+        when(pluginRuntimeGateway.permissions(PLUGIN_CODE)).thenReturn(List.of());
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of());
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        stubRepository(module);
+
+        service.reloadDevPlugin(PLUGIN_CODE);
+
+        verify(pluginRuntimeGateway).load(module);
+        verify(pluginRuntimeGateway).enable(module);
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
+    }
+
+    @Test
     void rollbackStoreJarRestoresStoppedPluginAndSwapsControlledBackupMetadata() throws IOException {
         Path active = writeJar("demo-plugin.jar", NEW_BYTES);
         Path backup = writeJar("../.plugin-rollback/demo-plugin-1.0.0.jar", OLD_BYTES);
@@ -326,8 +425,12 @@ class PluginAppServiceTest {
         List<PluginModule> modules = new java.util.ArrayList<>();
         modules.add(module);
         modules.addAll(List.of(others));
-        when(pluginModuleRepo.findByCode(anyString())).thenAnswer(invocation ->
-                PLUGIN_CODE.equals(invocation.getArgument(0)) ? Optional.of(module) : Optional.empty());
+        when(pluginModuleRepo.findByCode(anyString())).thenAnswer(invocation -> {
+            String code = invocation.getArgument(0);
+            return modules.stream()
+                    .filter(item -> item.getCode().equals(code))
+                    .findFirst();
+        });
         when(pluginModuleRepo.findAll()).thenReturn(modules);
     }
 

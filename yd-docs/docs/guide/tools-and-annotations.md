@@ -44,7 +44,7 @@ YuDream Admin 在通用后台能力之外，提供了一系列框架独创的工
 
 宿主内置的插件开发调试工具（后端 `platform/devtools` 四层 + 前端 `plugin-devtools` 浮动面板），插件零适配：
 
-- **dev-mode 热重载**：门控 `yudream.platform.plugin.dev-mode.enabled`（三态：缺省自动探测——源码运行开启、JAR 运行关闭；显式 true/false 优先）。dev 项目来自 yml 配置（CONFIG）或面板注册（FILE，默认 `plugins/dev-projects.json`，文件形式方便编码代理读取）。watcher 将源码/编译产物/前端 dist 变更去抖为 **编译 → 禁用→卸载→加载→启用 → 前端 remount** 全链路事件；编译失败只发事件，绝不重载旧产物。
+- **dev-mode 热重载**：门控 `yudream.platform.plugin.dev-mode.enabled`（三态：缺省自动探测——源码运行开启、JAR 运行关闭；显式 true/false 优先）。dev 项目来自 yml 配置（CONFIG）或面板注册（FILE，默认 `plugins/dev-projects.json`，文件形式方便编码代理读取；设置页支持批量扫描子目录并去重）。watcher 将源码/编译产物/前端 dist 变更去抖为 **编译 → 级联禁用/卸载 → 加载 → 启用 → 前端 remount** 全链路事件；编译失败只发事件，绝不重载旧产物。
 - **浮动面板**：根布局 FAB（可拖拽贴边、`Ctrl/Cmd+Shift+D` 唤起、Esc 关闭），Teleport 到 body 的非模态浮窗（不锁滚动、可拖动/缩放、记忆几何位置），五个页面：概览（状态卡片+生命周期流）、插件（资源总览）、追踪（Agent 执行链路）、审计（UI 规则审计）、设置（dev 项目管理）。SSE 桥广播 `plugin-lifecycle` / `agent-trace` 事件。
 - 权限码：`platform:plugin-devtools:view` / `platform:plugin-devtools:manage`。
 

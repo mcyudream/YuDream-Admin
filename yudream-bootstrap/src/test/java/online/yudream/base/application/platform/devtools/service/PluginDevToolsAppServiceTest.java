@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.devtools.service;
 
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectBatchCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
@@ -16,11 +17,13 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginDevReloadTrigger;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectScanResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
 import online.yudream.base.domain.system.log.repo.SystemLogRepo;
@@ -129,6 +132,37 @@ class PluginDevToolsAppServiceTest {
         service.addDevProject(cmd);
 
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void addDevProjectsRequiresPath() {
+        assertThatThrownBy(() -> service.addDevProjects(new PluginDevProjectBatchCmd()))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("插件目录不能为空");
+    }
+
+    @Test
+    void addDevProjectsRegistersThenReloadsEnabledPlugins() {
+        PluginDevProjectBatchCmd cmd = new PluginDevProjectBatchCmd();
+        cmd.setPath("D:/plugins");
+        PluginDevProjectInfo demo = new PluginDevProjectInfo("demo", "D:/plugins/demo",
+                "D:/plugins/demo/dist", true, PluginDevProjectSource.FILE, true, true, true);
+        PluginDevProjectInfo store = new PluginDevProjectInfo("store", "D:/plugins/store",
+                "D:/plugins/store/dist", true, PluginDevProjectSource.FILE, true, true, true);
+        when(runtimeGateway.registerDevProjects("D:/plugins"))
+                .thenReturn(new PluginDevProjectScanResult(List.of(demo, store), List.of(
+                        new PluginDevProjectScanResult.Skipped("wiki", "D:/plugins/wiki", "已登记"))));
+        when(runtimeGateway.enabled("demo")).thenReturn(true);
+        when(runtimeGateway.enabled("store")).thenReturn(false);
+
+        PluginDevProjectScanResult result = service.addDevProjects(cmd);
+
+        assertThat(result.registered()).containsExactly(demo, store);
+        assertThat(result.skipped()).hasSize(1);
+        ArgumentCaptor<PluginDevReloadRequested> captor = ArgumentCaptor.forClass(PluginDevReloadRequested.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().pluginCode()).isEqualTo("demo");
+        assertThat(captor.getValue().trigger()).isEqualTo(PluginDevReloadTrigger.REGISTER);
     }
 
     @Test

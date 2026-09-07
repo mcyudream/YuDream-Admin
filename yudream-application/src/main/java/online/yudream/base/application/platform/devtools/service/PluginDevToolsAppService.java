@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.assembler.PluginDevToolsAssembler;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
+import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectBatchCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
 import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
@@ -25,6 +26,7 @@ import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectScanResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginLoggerPrefix;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
@@ -224,9 +226,26 @@ public class PluginDevToolsAppService {
                 cmd.getFrontendDist(), cmd.getAutoCompile() == null || cmd.getAutoCompile(), cmd.getCompileCommand());
         // 插件已启用时立即切到源码目录加载，免去手动重载
         if (runtimeGateway.enabled(saved.code())) {
-            eventPublisher.publishEvent(PluginDevReloadRequested.of(saved.code()));
+            eventPublisher.publishEvent(PluginDevReloadRequested.ofRegister(saved.code()));
         }
         return saved;
+    }
+
+    /**
+     * 从父目录批量登记插件模块：先一次性写入清单，再对已启用的新项目发源码切换重载。
+     * 全部登记完成后再发事件，级联恢复才能看到完整目录册。
+     */
+    public PluginDevProjectScanResult addDevProjects(PluginDevProjectBatchCmd cmd) {
+        if (cmd == null || !StringUtils.hasText(cmd.getPath())) {
+            throw new BizException("插件目录不能为空");
+        }
+        PluginDevProjectScanResult result = runtimeGateway.registerDevProjects(cmd.getPath().trim());
+        for (PluginDevProjectInfo saved : result.registered()) {
+            if (runtimeGateway.enabled(saved.code())) {
+                eventPublisher.publishEvent(PluginDevReloadRequested.ofRegister(saved.code()));
+            }
+        }
+        return result;
     }
 
     public void removeDevProject(String code) {

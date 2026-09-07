@@ -5,10 +5,12 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.devtools.service.PluginDevToolsAppService;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectScanResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.devtools.assembler.PluginDevToolsWebAssembler;
 import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTestRequest;
+import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectBatchRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginScaffoldRequest;
 import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
@@ -103,6 +105,12 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "登记开发模式项目", module = "开发者工具", desc = "将插件源码目录登记到面板清单并持久化，已启用插件立即切换源码加载")
     public Result<PluginDevProjectInfo> addDevProject(@Valid @RequestBody PluginDevProjectSaveRequest request) {
         return Result.ok(devToolsAppService.addDevProject(PluginDevToolsWebAssembler.toCmd(request)));
+    }
+
+    @PostMapping("/dev-projects/batch")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "批量登记开发模式项目", module = "开发者工具", desc = "扫描父目录下的插件模块并去重登记到面板清单，已启用插件立即切换源码加载")
+    public Result<PluginDevProjectScanResult> addDevProjects(@Valid @RequestBody PluginDevProjectBatchRequest request) {
+        return Result.ok(devToolsAppService.addDevProjects(PluginDevToolsWebAssembler.toCmd(request)));
     }
 
     @PostMapping("/scaffold")

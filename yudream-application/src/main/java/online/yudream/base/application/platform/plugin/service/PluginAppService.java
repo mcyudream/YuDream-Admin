@@ -41,7 +41,11 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -53,6 +57,9 @@ public class PluginAppService {
     private static final String LEGACY_SKIN_PLUGIN_CODE = "blessing-skin";
     private static final String YUDREAM_SKIN_PLUGIN_CODE = "yudream-skin";
     private static final int MENU_CLEANUP_ATTEMPTS = 3;
+    private static final int MARKETPLACE_RESTORE_ATTEMPTS = 3;
+    private static final long MARKETPLACE_RESTORE_RETRY_MILLIS = 150L;
+    private static final long REGISTER_SUPPRESS_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(30);
 
     private final PluginModuleRepo pluginModuleRepo;
     private final PluginRuntimeGateway pluginRuntimeGateway;
@@ -65,6 +72,9 @@ public class PluginAppService {
 
     @Value("${yudream.system.seed.menu.sync-mode:MISSING_ONLY}")
     private SeedSyncMode menuSeedSyncMode = SeedSyncMode.MISSING_ONLY;
+
+    private final ConcurrentHashMap<String, ReentrantLock> reloadLocks = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> recentReloadNanos = new ConcurrentHashMap<>();
 
     @Transactional
     public List<PluginModuleDTO> list() {
@@ -122,7 +132,9 @@ public class PluginAppService {
 
     @Transactional
     public List<PluginModuleDTO> updateStoreJar(Path stagedJar, String expectedCode, String expectedVersion, String expectedMain) {
-        return installStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain);
+        installStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain);
+        // 市场更新会先受控停止受影响插件，替换完成后立即按依赖顺序恢复原先启用的插件。
+        return restoreEnabledPlugins();
     }
 
     @Transactional
@@ -348,25 +360,114 @@ public class PluginAppService {
     }
 
     /**
-     * 开发模式热重载：回收后从源码编译产物目录重新加载并恢复原启用状态。
+     * 开发模式热重载：定向同步描述符后回收，必要时级联停启硬/软依赖方，再从源码产物重新加载。
      * 仅供 PluginDevModeWatcher 与开发者工具调用，不作为常规运维入口。
      */
     @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO reloadDevPlugin(String code) {
-        syncPluginRegistry();
-        PluginModule module = module(code);
-        boolean wasEnabled = pluginRuntimeGateway.enabled(code) || module.enabled();
+        if (!StringUtils.hasText(code)) {
+            throw new BizException("插件代码不能为空");
+        }
+        String trimmed = code.trim();
+        ReentrantLock lock = reloadLocks.computeIfAbsent(trimmed, key -> new ReentrantLock());
+        lock.lock();
+        try {
+            return doReloadDevPlugin(trimmed);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * 登记触发的重载在短窗口内可跳过：目标刚被手动/监听重载或作为依赖方被级联恢复时无需再切一次。
+     * 监听器发现 classes 变化的请求不得走此抑制。
+     */
+    public boolean shouldSuppressRegisterReload(String code) {
+        if (!StringUtils.hasText(code)) {
+            return false;
+        }
+        Long stamp = recentReloadNanos.get(code.trim());
+        return stamp != null && System.nanoTime() - stamp < REGISTER_SUPPRESS_WINDOW_NANOS;
+    }
+
+    private PluginModuleDTO doReloadDevPlugin(String code) {
+        PluginModule module = syncDevPluginDescriptor(code);
+        Map<String, PluginModule> modules = modulesByCode();
+        modules.put(module.getCode(), module);
+        List<PluginModule> affected = affectedModules(module, modules);
+        List<PluginModule> dependents = affected.stream()
+                .filter(item -> !item.getCode().equals(code))
+                .toList();
+        boolean wasEnabled = pluginRuntimeGateway.enabled(code)
+                || module.enabled()
+                || Boolean.TRUE.equals(module.getRestoreIntentActive());
+        Set<String> toRestore = new HashSet<>();
+        if (!dependents.isEmpty()) {
+            stopAffectedForDevReload(dependents);
+            for (PluginModule dependent : dependents) {
+                if (Boolean.TRUE.equals(dependent.getRestoreIntentActive())) {
+                    toRestore.add(dependent.getCode());
+                }
+            }
+        }
         stopExistingPlugin(module);
         if (!jarExists(module)) {
             throw new BizException("插件开发产物不存在：" + module.getJarPath());
         }
+        PluginModuleDTO result;
         if (!wasEnabled) {
             pluginRuntimeGateway.load(module);
             module.markLoaded();
-            return toDTO(pluginModuleRepo.save(module));
+            result = toDTO(pluginModuleRepo.save(module));
+        } else {
+            module.setRestoreIntentActive(true);
+            result = toDTO(enableOwnRuntime(module));
         }
-        module.setRestoreIntentActive(true);
-        return toDTO(enableOwnRuntime(module));
+        markReloaded(code);
+        if (!toRestore.isEmpty()) {
+            Set<String> restored = new HashSet<>();
+            restored.add(code);
+            Set<String> visiting = new HashSet<>();
+            Map<String, PluginModule> latest = modulesByCode();
+            List<PluginModule> restoreOrder = new ArrayList<>();
+            for (int i = dependents.size() - 1; i >= 0; i--) {
+                PluginModule dependent = latest.get(dependents.get(i).getCode());
+                if (dependent != null && toRestore.contains(dependent.getCode())) {
+                    restoreOrder.add(dependent);
+                }
+            }
+            for (PluginModule dependent : restoreOrder) {
+                restoreEnabledModule(dependent, latest, restored, visiting);
+                if (restored.contains(dependent.getCode())) {
+                    markReloaded(dependent.getCode());
+                } else {
+                    log.warn("Dev-mode cascade restore failed for dependent {}", dependent.getCode());
+                }
+            }
+        }
+        return result;
+    }
+
+    private PluginModule syncDevPluginDescriptor(String code) {
+        Optional<PluginDescriptorInfo> descriptor = pluginRuntimeGateway.describeDevPlugin(code);
+        Optional<PluginModule> existing = pluginModuleRepo.findByCode(code);
+        if (existing.isEmpty()) {
+            if (descriptor.isPresent()) {
+                return pluginModuleRepo.save(PluginModule.fromDescriptor(descriptor.get()));
+            }
+            syncPluginRegistry();
+            return module(code);
+        }
+        PluginModule module = existing.get();
+        if (descriptor.isPresent()) {
+            module.refreshDescriptor(descriptor.get());
+            return pluginModuleRepo.save(module);
+        }
+        return module;
+    }
+
+    private void markReloaded(String code) {
+        recentReloadNanos.put(code, System.nanoTime());
     }
 
     @Transactional(readOnly = true)
@@ -418,7 +519,7 @@ public class PluginAppService {
     }
 
     @Transactional
-    public void restoreEnabledPlugins() {
+    public List<PluginModuleDTO> restoreEnabledPlugins() {
         syncPluginRegistry();
         Map<String, PluginModule> modules = modulesByCode();
         Set<String> restored = new HashSet<>();
@@ -434,6 +535,10 @@ public class PluginAppService {
             }
             restoreEnabledModule(module, modules, restored, visiting);
         }
+        return modules.values().stream()
+                .sorted(Comparator.comparing(PluginModule::getCode))
+                .map(this::toDTO)
+                .toList();
     }
 
     private void restoreEnabledModule(PluginModule module, Map<String, PluginModule> modules, Set<String> restored, Set<String> visiting) {
@@ -445,23 +550,40 @@ public class PluginAppService {
         if (!restoreCandidate(module)) {
             return;
         }
-        try {
-            PluginModule restoredModule;
-            if (pluginRuntimeGateway.enabled(code)) {
-                restoredModule = projectRuntimeMenus(module);
-            } else {
-                restoredModule = enableRuntimeWithDependencies(module, modules, restored, visiting);
+        Exception lastFailure = null;
+        for (int attempt = 1; attempt <= MARKETPLACE_RESTORE_ATTEMPTS; attempt++) {
+            try {
+                PluginModule restoredModule;
+                if (pluginRuntimeGateway.enabled(code)) {
+                    restoredModule = projectRuntimeMenus(module);
+                } else {
+                    restoredModule = enableRuntimeWithDependencies(module, modules, restored, visiting);
+                }
+                if (!pluginRuntimeGateway.enabled(code)) {
+                    throw new BizException("插件恢复后未处于启用状态");
+                }
+                restoredModule.setRestoreIntentActive(false);
+                pluginModuleRepo.save(restoredModule);
+                modules.put(code, restoredModule);
+                restored.add(code);
+                return;
+            } catch (Exception e) {
+                lastFailure = e;
+                log.warn("Failed to restore plugin {} on attempt {}/{}: {}", code, attempt,
+                        MARKETPLACE_RESTORE_ATTEMPTS, rootMessage(e));
+                if (attempt < MARKETPLACE_RESTORE_ATTEMPTS) {
+                    try {
+                        Thread.sleep(MARKETPLACE_RESTORE_RETRY_MILLIS);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
             }
-            restoredModule.setRestoreIntentActive(false);
-            pluginModuleRepo.save(restoredModule);
-            modules.put(code, restoredModule);
-            restored.add(code);
-        } catch (Exception e) {
-            log.warn("Failed to restore plugin {}", code, e);
-            String failure = rootMessage(e);
-            String cleanupFailure = cleanupFailedEnable(code);
-            markError(module, appendCleanupFailure(failure, cleanupFailure));
         }
+        String failure = rootMessage(lastFailure == null ? new BizException("插件恢复失败") : lastFailure);
+        String cleanupFailure = cleanupFailedEnable(code);
+        markError(module, appendCleanupFailure(failure, cleanupFailure));
     }
 
     private PluginModule enableRuntimeWithDependencies(PluginModule module, Map<String, PluginModule> modules, Set<String> enabled, Set<String> visiting) {
@@ -591,6 +713,17 @@ public class PluginAppService {
     }
 
     private void stopAffectedForMarketplaceUpdate(List<PluginModule> affected) {
+        stopAffectedPlugins(affected, true);
+    }
+
+    /**
+     * 开发模式重载级联停机：只停依赖方，菜单清理失败记日志但不阻断目标重载。
+     */
+    private void stopAffectedForDevReload(List<PluginModule> dependents) {
+        stopAffectedPlugins(dependents, false);
+    }
+
+    private void stopAffectedPlugins(List<PluginModule> affected, boolean failOnMenuError) {
         for (PluginModule module : affected) {
             String code = module.getCode();
             boolean enabled = pluginRuntimeGateway.enabled(code);
@@ -607,7 +740,10 @@ public class PluginAppService {
             pluginModuleRepo.save(module);
             String menuFailure = reconcileUnavailableMenus(code);
             if (menuFailure != null) {
-                throw new BizException(menuFailure);
+                if (failOnMenuError) {
+                    throw new BizException(menuFailure);
+                }
+                log.warn("Failed to hide plugin menus while cascading reload of {}: {}", code, menuFailure);
             }
         }
     }

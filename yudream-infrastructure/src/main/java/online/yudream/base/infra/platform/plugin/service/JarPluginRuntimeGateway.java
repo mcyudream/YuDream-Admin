@@ -28,6 +28,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevDirectoryBrowseInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectScanResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
@@ -211,6 +212,30 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         }
         PluginDevModeProperties.DevProject saved = devProjectCatalog.add(project);
         return toDevProjectInfo(saved, PluginDevProjectSource.FILE);
+    }
+
+    @Override
+    public PluginDevProjectScanResult registerDevProjects(String path) {
+        if (!StringUtils.hasText(path)) {
+            throw new BizException("插件目录不能为空");
+        }
+        PluginDevProjectCatalog.CatalogBatchResult result = devProjectCatalog.addFromDirectory(Path.of(path.trim()));
+        List<PluginDevProjectInfo> registered = result.registered().stream()
+                .map(project -> toDevProjectInfo(project, PluginDevProjectSource.FILE))
+                .toList();
+        List<PluginDevProjectScanResult.Skipped> skipped = result.skipped().stream()
+                .map(item -> new PluginDevProjectScanResult.Skipped(item.code(), item.path(), item.reason()))
+                .toList();
+        return new PluginDevProjectScanResult(registered, skipped);
+    }
+
+    @Override
+    public Optional<PluginDescriptorInfo> describeDevPlugin(String code) {
+        PluginDevModeProperties.DevProject project = findDevProject(code);
+        if (project == null) {
+            return Optional.empty();
+        }
+        return readDevDescriptor(project);
     }
 
     @Override
