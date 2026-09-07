@@ -51,8 +51,12 @@ public class OfficialQqBotEventGateway {
         AtomicBoolean resumable = new AtomicBoolean();
         return Mono.defer(() -> connectOnce(connection, listener, session, resumable))
                 .retryWhen(Retry.backoff(Long.MAX_VALUE, Duration.ofSeconds(1)).maxBackoff(Duration.ofMinutes(1)).jitter(0.25d)
-                        .doBeforeRetry(signal -> log.warn("Official QQ bot gateway retrying: connectionId={}, attempt={}",
-                                connectionId, signal.totalRetries() + 1, signal.failure())))
+                        .doBeforeRetry(signal -> {
+                            Session current = session.get();
+                            resumable.set(current != null && current.sessionId() != null);
+                            log.warn("Official QQ bot gateway retrying: connectionId={}, attempt={}, reason={}",
+                                    connectionId, signal.totalRetries() + 1, String.valueOf(signal.failure()));
+                        }))
                 .doFinally(signal -> {
                     sessions.forget(connectionId);
                     log.info("Official QQ bot gateway closed: connectionId={}, signal={}", connectionId, signal);
@@ -84,7 +88,14 @@ public class OfficialQqBotEventGateway {
                         .publishOn(Schedulers.boundedElastic())
                         .concatMap(raw -> handle(connection, raw, outbound, listener, session, resumable, heartbeatInterval, heartbeat))
                         .then())
-                .doOnError(error -> log.error("Official QQ bot gateway transport failed: connectionId={}", connectionId, error))
+                .doOnError(error -> {
+                    if (expectedTransportError(error)) {
+                        log.warn("Official QQ bot gateway transport interrupted: connectionId={}, reason={}",
+                                connectionId, error.toString());
+                    } else {
+                        log.error("Official QQ bot gateway transport failed: connectionId={}", connectionId, error);
+                    }
+                })
                 .doFinally(signal -> {
                     Disposable beat = heartbeat.getAndSet(null);
                     if (beat != null) {
@@ -232,6 +243,17 @@ public class OfficialQqBotEventGateway {
         } catch (Exception exception) {
             return payload.toString();
         }
+    }
+
+    private boolean expectedTransportError(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof java.io.IOException) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private record Session(String sessionId, AtomicLong lastSequence) { }
