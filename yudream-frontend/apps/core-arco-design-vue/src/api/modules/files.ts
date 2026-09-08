@@ -24,6 +24,6 @@ export default {
     return systemClient.get<unknown, ApiResponse<PageResult<FileObject>>>('api/files', { params })
   },
   upload: (data: FormData) => {
-    return systemClient.post<unknown, ApiResponse<FileObject>>('api/files/upload', data)
+    return systemClient.post<unknown, ApiResponse<FileObject>>('api/files/upload', data, { timeout: 0 })
   },
 }

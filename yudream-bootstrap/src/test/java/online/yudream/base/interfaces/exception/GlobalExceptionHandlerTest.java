@@ -34,4 +34,40 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody()).extracting("code", "message").containsExactly(500, "系统内部错误");
         assertThat(RequestFailureContext.getSummary(request)).isEqualTo("IllegalStateException");
     }
+
+    @Test
+    void mapsMaxUploadSizeExceededToBadRequestWithClearMessage() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        var response = handler.handleMaxUploadSizeExceeded(request,
+                new org.springframework.web.multipart.MaxUploadSizeExceededException(1024L));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).extracting("code", "message")
+                .containsExactly(400, "上传文件超过大小限制");
+        assertThat(RequestFailureContext.getSummary(request)).isEqualTo("MaxUploadSizeExceededException");
+    }
+
+    @Test
+    void mapsNestedFileSizeLimitToBadRequest() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        org.springframework.web.multipart.MultipartException nested = new org.springframework.web.multipart.MultipartException(
+                "parse failed", new org.springframework.web.multipart.MaxUploadSizeExceededException(1024L));
+
+        var response = handler.handleMultipartException(request, nested);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).extracting("message").isEqualTo("上传文件超过大小限制");
+    }
+
+    @Test
+    void mapsOtherMultipartFailuresToBadRequestWithoutCallingThemInternalError() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        var response = handler.handleMultipartException(request,
+                new org.springframework.web.multipart.MultipartException("unexpected eof"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).extracting("message").isEqualTo("上传文件解析失败");
+    }
 }

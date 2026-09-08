@@ -20,6 +20,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.stream.Collectors;
 
@@ -69,6 +71,20 @@ public class GlobalExceptionHandler {
                 Result.fail(ResultCode.FORBIDDEN.getCode(), e.getMessage()));
     }
 
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Result<Void>> handleMaxUploadSizeExceeded(HttpServletRequest request,
+                                                                    MaxUploadSizeExceededException e) {
+        return uploadSizeExceeded(request, e);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<Result<Void>> handleMultipartException(HttpServletRequest request, MultipartException e) {
+        if (isUploadSizeExceeded(e)) {
+            return uploadSizeExceeded(request, e);
+        }
+        return failure(request, e, HttpStatus.BAD_REQUEST, Result.fail(ResultCode.BAD_REQUEST.getCode(), "上传文件解析失败"));
+    }
+
     /**
      * SSE/异步流式响应过程中客户端断开（浏览器刷新、切页）属于正常现象：
      * 响应头已是 text/event-stream，无法再写 JSON 错误体，静默结束即可，避免刷错误日志。
@@ -105,5 +121,26 @@ public class GlobalExceptionHandler {
             return empty;
         }
         return ResponseEntity.status(status).body(result);
+    }
+
+    private ResponseEntity<Result<Void>> uploadSizeExceeded(HttpServletRequest request, Exception e) {
+        return failure(request, e, HttpStatus.BAD_REQUEST,
+                Result.fail(ResultCode.BAD_REQUEST.getCode(), "上传文件超过大小限制"));
+    }
+
+    static boolean isUploadSizeExceeded(Throwable error) {
+        Throwable current = error;
+        while (current != null) {
+            if (current instanceof MaxUploadSizeExceededException) {
+                return true;
+            }
+            String typeName = current.getClass().getName();
+            if (typeName.endsWith("FileSizeLimitExceededException")
+                    || typeName.endsWith("SizeLimitExceededException")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

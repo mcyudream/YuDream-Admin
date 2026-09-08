@@ -198,6 +198,7 @@ Assembler hard rules:
 - Put row mapping and template row creation in interface assemblers.
 - Export endpoints return blob responses from the frontend; frontend utilities should use `saveExcelResponse`, `pickExcelFile`, `excelForm`, and `importResultMessage` from `src/utils/excel.ts`.
 - Add matching permissions to menu seed enum when adding `v-auth` buttons.
+- Host common file uploads (`/api/files/upload`) must keep `spring.servlet.multipart.max-file-size`/`max-request-size` aligned with nginx `client_max_body_size` (currently `10240MB`). Set Tomcat `max-http-form-post-size`/`max-swallow-size` to `-1` so Tomcat does not truncate the body a second time. `GlobalExceptionHandler` must map `MaxUploadSizeExceededException` and nested size-limit exceptions to HTTP 400 with the Chinese business message `上传文件超过大小限制`, never the 500 fallback. Large XHR uploads (host `files.upload` and plugin blob uploads) must use `timeout: 0`; the axios default 60s will abort Minecraft map ZIPs.
 
 ## UTF-8 / Chinese Text
 
