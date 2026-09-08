@@ -371,7 +371,42 @@ public class OfficialQqBotApiAdapter {
     private Object approveJoin(Context context, Map<String, Object> payload) {
         String groupId = required(text(payload, "group_id", "group_openid"), "群 openid 不能为空");
         String memberId = required(text(payload, "user_id", "member_openid", "openid"), "成员 openid 不能为空");
-        return request(context, HttpMethod.POST, "/v2/groups/" + groupId + "/approval_join_request/" + memberId, payload);
+        Map<String, Object> body = new LinkedHashMap<>();
+        String op = firstNonBlank(text(payload, "op"));
+        if (blank(op)) {
+            op = approveFlag(payload) ? "approve" : "decline";
+        }
+        body.put("op", op);
+        String joinRequestId = firstNonBlank(text(payload, "join_request_id", "request_id"));
+        if (!blank(joinRequestId)) {
+            body.put("join_request_id", joinRequestId);
+        }
+        String rejectReason = firstNonBlank(text(payload, "reject_reason", "reason"));
+        if (!blank(rejectReason) && "decline".equalsIgnoreCase(op)) {
+            body.put("reject_reason", rejectReason);
+        }
+        Object blacklist = payload.get("add_to_member_blacklist");
+        if (blacklist instanceof Boolean value) {
+            body.put("add_to_member_blacklist", value);
+        }
+        return request(context, HttpMethod.POST, "/v2/groups/" + groupId + "/approval_join_request/" + memberId, body);
+    }
+
+    private static boolean approveFlag(Map<String, Object> payload) {
+        Object value = payload.get("approve");
+        if (value instanceof Boolean result) {
+            return result;
+        }
+        if (value != null && !String.valueOf(value).isBlank()) {
+            String text = String.valueOf(value).trim();
+            if ("true".equalsIgnoreCase(text) || "approve".equalsIgnoreCase(text) || "1".equals(text)) {
+                return true;
+            }
+            if ("false".equalsIgnoreCase(text) || "decline".equalsIgnoreCase(text) || "0".equals(text)) {
+                return false;
+            }
+        }
+        return "approve".equalsIgnoreCase(text(payload, "op"));
     }
 
     private Object friendInfo(String userId) {

@@ -456,6 +456,66 @@ class OfficialQqBotApiAdapterTest {
         }
     }
 
+    @Test
+    void mapsApproveJoinBooleanOntoOfficialOpAndJoinRequestId() throws Exception {
+        AtomicReference<String> path = new AtomicReference<>();
+        AtomicReference<String> body = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/v2/groups/g-open/approval_join_request/member-open", exchange -> {
+            path.set(exchange.getRequestURI().getPath());
+            body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        try {
+            server.start();
+            OfficialQqBotApiAdapter adapter = new OfficialQqBotApiAdapter(fixedTokenClient(), new OfficialQqBotSessionStore());
+            adapter.invoke(context(server.getAddress().getPort()), "set_group_add_request", Map.of(
+                    "group_id", "g-open",
+                    "user_id", "member-open",
+                    "approve", true,
+                    "request_id", "jr-42"));
+            assertEquals("/v2/groups/g-open/approval_join_request/member-open", path.get());
+            assertTrue(body.get().contains("\"op\":\"approve\""));
+            assertTrue(body.get().contains("\"join_request_id\":\"jr-42\""));
+            assertTrue(!body.get().contains("\"approve\":"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void mapsDeclineJoinWithRejectReason() throws Exception {
+        AtomicReference<String> body = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/v2/groups/g-open/approval_join_request/member-open", exchange -> {
+            body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        try {
+            server.start();
+            OfficialQqBotApiAdapter adapter = new OfficialQqBotApiAdapter(fixedTokenClient(), new OfficialQqBotSessionStore());
+            adapter.invoke(context(server.getAddress().getPort()), "set_group_add_request", Map.of(
+                    "group_id", "g-open",
+                    "user_id", "member-open",
+                    "approve", false,
+                    "join_request_id", "jr-43",
+                    "reject_reason", "入群验证未通过"));
+            assertTrue(body.get().contains("\"op\":\"decline\""));
+            assertTrue(body.get().contains("\"join_request_id\":\"jr-43\""));
+            assertTrue(body.get().contains("\"reject_reason\":\"入群验证未通过\""));
+        } finally {
+            server.stop(0);
+        }
+    }
+
     private OfficialQqBotAccessTokenClient fixedTokenClient() {
         return new OfficialQqBotAccessTokenClient() {
             @Override

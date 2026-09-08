@@ -200,10 +200,50 @@ public class MilkyPluginEventDispatcher {
 
     static GroupRequest groupRequest(Map<String, Object> data) {
         String groupId = firstText(data, "group_id", "group_uin", "peer_id");
-        String userId = firstText(data, "user_id", "applicant_id", "initiator_id", "sender_id");
-        String requestId = firstText(data, "request_id", "notification_seq", "flag", "id");
+        String userId = firstText(data, "user_id", "applicant_id", "initiator_id", "sender_id", "member_openid");
+        String requestId = firstText(data, "request_id", "join_request_id", "notification_seq", "flag", "id");
+        String comment = firstText(data, "comment", "message", "verify_message");
+        if (comment == null || comment.isBlank()) {
+            comment = verifyInfoComment(data.get("verify_info"));
+            if (comment == null && data.get("native") instanceof Map<?, ?> nativeData) {
+                comment = verifyInfoComment(nativeData.get("verify_info"));
+            }
+        }
         return groupId == null || userId == null || requestId == null ? null
-                : new GroupRequest(groupId, userId, requestId, firstText(data, "comment", "message", "verify_message"));
+                : new GroupRequest(groupId, userId, requestId, comment);
+    }
+
+    private static String verifyInfoComment(Object raw) {
+        if (!(raw instanceof Map<?, ?> info)) {
+            return null;
+        }
+        Object message = info.get("verify_message");
+        if (message != null && !String.valueOf(message).isBlank()) {
+            return String.valueOf(message);
+        }
+        Object list = info.get("review_qa_list");
+        if (!(list instanceof List<?> qaList) || qaList.isEmpty()) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Object item : qaList) {
+            if (!(item instanceof Map<?, ?> qa)) {
+                continue;
+            }
+            String question = qa.get("question") == null ? "" : String.valueOf(qa.get("question")).trim();
+            String answer = qa.get("answer") == null ? "" : String.valueOf(qa.get("answer")).trim();
+            if (question.isEmpty() && answer.isEmpty()) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append('\n');
+            }
+            if (!question.isEmpty()) {
+                builder.append(question).append('：');
+            }
+            builder.append(answer);
+        }
+        return builder.isEmpty() ? null : builder.toString();
     }
 
     private CompletionStage<?> menu(PluginEvent event, User user, String pluginFilter) {

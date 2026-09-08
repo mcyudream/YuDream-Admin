@@ -74,6 +74,21 @@ class MilkyPluginEventDispatcherTest {
     }
 
     @Test
+    void normalizesOfficialJoinRequestIdAndVerifyInfo() {
+        MilkyPluginEventDispatcher.GroupRequest request = MilkyPluginEventDispatcher.groupRequest(Map.of(
+                "group_id", "g-open",
+                "user_id", "member-open",
+                "join_request_id", "jr-42",
+                "verify_info", Map.of("method", "verify_message", "verify_message", "allow")));
+
+        assertNotNull(request);
+        assertEquals("g-open", request.groupId());
+        assertEquals("member-open", request.userId());
+        assertEquals("jr-42", request.requestId());
+        assertEquals("allow", request.comment());
+    }
+
+    @Test
     void recognizesUnprefixedMenuAliasesWithSurroundingWhitespace() {
         for (String alias : List.of("菜单", "帮助", "菜单指令")) {
             MilkyPluginEventDispatcher.Parsed command = MilkyPluginEventDispatcher.parseCommand(" \t" + alias + "\n");
