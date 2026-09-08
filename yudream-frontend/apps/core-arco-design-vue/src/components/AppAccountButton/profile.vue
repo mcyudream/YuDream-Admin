@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ApiKeyCredential, ApiKeyCreatePayload, CredentialStatus, ExternalAccount, PasskeyCredential, PasskeyStatus, QqBindingCode, UserProfilePayload } from '@/api/modules/profile'
+import type { ApiKeyCredential, ApiKeyCreatePayload, CredentialStatus, ExternalAccount, MessagingBindingCode, MessagingBindingTarget, MessagingIdentity, PasskeyCredential, PasskeyStatus, UserProfilePayload } from '@/api/modules/profile'
 import type { PermissionItem } from '@/api/modules/system-role'
 import EditPassword from '@/components/AppAccountForm/edit-password.vue'
 import apiProfile from '@/api/modules/profile'
@@ -32,7 +32,11 @@ const availablePermissions = ref<PermissionItem[]>([])
 const apiKeySearch = reactive({ keyword: '', page: 1, size: 20, total: 0 })
 const createdApiKeyPlaintext = ref('')
 const issuingQqBindingCode = ref(false)
-const qqBindingCode = ref<QqBindingCode | null>(null)
+const issuingConnectionId = ref('')
+const qqBindingCode = ref<MessagingBindingCode | null>(null)
+const messagingIdentities = ref<MessagingIdentity[]>([])
+const bindingTargets = ref<MessagingBindingTarget[]>([])
+const loadingBindingTargets = ref(false)
 const externalAccounts = ref<ExternalAccount[]>([])
 const loadingExternalAccounts = ref(false)
 
@@ -92,6 +96,50 @@ const permissionSelectOptions = computed(() => Object.entries(permissionGroups.v
 })))
 
 const permissionNameMap = computed(() => new Map(availablePermissions.value.map(item => [item.code, item.name])))
+
+function protocolLabel(protocol?: string) {
+  if (protocol === 'official') {
+    return '官方 QQ 机器人'
+  }
+  if (protocol === 'milky') {
+    return 'Milky'
+  }
+  return protocol || '消息协议'
+}
+
+function identityTypeLabel(type?: string) {
+  if (type === 'qq') {
+    return 'QQ 号'
+  }
+  if (type === 'user_openid') {
+    return '用户 OpenID'
+  }
+  if (type === 'member_openid') {
+    return '群成员 OpenID'
+  }
+  return type || '身份'
+}
+
+function identityKey(item: MessagingIdentity, index: string | number) {
+  return [item.protocol, item.identityType, item.identity, item.groupOpenid, item.appId, item.connectionId, String(index)].join(':')
+}
+
+function bindingTargetLabel(target: { botName?: string; name?: string; connectionName?: string }) {
+  return target.botName?.trim() || target.connectionName?.trim() || target.name?.trim() || '未命名连接'
+}
+
+async function loadBindingTargets() {
+  loadingBindingTargets.value = true
+  try {
+    bindingTargets.value = (await apiProfile.listMessagingBindingTargets()).data || []
+  }
+  catch {
+    bindingTargets.value = []
+  }
+  finally {
+    loadingBindingTargets.value = false
+  }
+}
 
 onMounted(async () => {
   await appFeatureStore.load()
@@ -155,9 +203,11 @@ async function loadProfile() {
       phone: data.phone || '',
       qq: data.qq || '',
     })
+    messagingIdentities.value = data.messagingIdentities || []
     appAccountStore.setAccount(data.username)
     appAccountStore.setAvatar(data.avatar)
     appAccountStore.setEmailVerified(data.emailVerified)
+    await loadBindingTargets()
   }
   finally {
     loading.value = false
@@ -230,8 +280,10 @@ async function saveProfile() {
       phone: res.data.phone || '',
       qq: res.data.qq || '',
     })
+    messagingIdentities.value = res.data.messagingIdentities || []
     appAccountStore.setAccount(res.data.username)
     appAccountStore.setEmailVerified(res.data.emailVerified)
+    await loadBindingTargets()
     toast.success('资料已保存')
   }
   finally {
@@ -239,13 +291,17 @@ async function saveProfile() {
   }
 }
 
-async function issueQqBindingCode() {
+async function issueQqBindingCode(connectionId: string) {
   issuingQqBindingCode.value = true
+  issuingConnectionId.value = connectionId
   try {
-    qqBindingCode.value = (await apiProfile.issueQqBindingCode()).data
-    toast.success('绑定码已生成，请在群聊中使用')
+    qqBindingCode.value = (await apiProfile.issueMessagingBindingCode(connectionId)).data
+    toast.success('绑定码已生成，请向对应机器人发送 /绑定 绑定码')
   }
-  finally { issuingQqBindingCode.value = false }
+  finally {
+    issuingQqBindingCode.value = false
+    issuingConnectionId.value = ''
+  }
 }
 
 async function loadExternalAccounts() {
@@ -456,6 +512,7 @@ function dateText(value?: string) {
             <h2>个人资料</h2>
             <p>维护你的基础资料、头像和联系方式。</p>
           </div>
+          <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
         </div>
 
         <a-form :model="form" layout="vertical" class="form-grid">
@@ -471,16 +528,45 @@ function dateText(value?: string) {
           <a-form-item label="手机号">
             <FaInput v-model="form.phone" placeholder="请输入手机号" />
           </a-form-item>
-          <a-form-item label="QQ">
-            <FaInput v-model="form.qq" placeholder="请输入 QQ" />
+          <a-form-item label="QQ 号">
+            <FaInput v-model="form.qq" placeholder="仅 Milky 协议使用真实 QQ 号" />
           </a-form-item>
         </a-form>
-        <div v-if="!form.qq" class="inner-panel mt-4">
+        <div class="inner-panel mt-4">
           <div class="panel-head">
-            <div><h3>群聊绑定 QQ</h3><p>生成一次性绑定码后，在群聊中发送 `/绑定 绑定码`。</p></div>
-            <FaButton :loading="issuingQqBindingCode" @click="issueQqBindingCode"><FaIcon name="i-ri:key-2-line" />生成绑定码</FaButton>
+            <div>
+              <h3>消息协议绑定</h3>
+              <p>每个已启用的机器人连接都有独立绑定入口。生成绑定码后，向该连接对应的机器人发送 `/绑定 绑定码`。官方身份写入 OpenID，不会覆盖 QQ 号。</p>
+            </div>
           </div>
-          <div v-if="qqBindingCode" class="mt-3 flex flex-wrap items-center gap-3"><code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ qqBindingCode.code }}</code><span class="text-sm text-muted-foreground">有效至 {{ qqBindingCode.expiresAt }}</span></div>
+          <div v-if="qqBindingCode" class="mt-3 flex flex-wrap items-center gap-3">
+            <code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ qqBindingCode.code }}</code>
+            <span class="text-sm text-muted-foreground">
+              向「{{ bindingTargetLabel(qqBindingCode) }}」发送 `/绑定 {{ qqBindingCode.code }}`，有效至 {{ qqBindingCode.expiresAt }}
+            </span>
+          </div>
+          <div class="credential-list mt-3" :class="{ loading: loadingBindingTargets }" :aria-busy="loadingBindingTargets">
+            <article v-for="target in bindingTargets" :key="target.connectionId" class="credential-item">
+              <div class="credential-info">
+                <strong>{{ bindingTargetLabel(target) }}</strong>
+                <span>{{ protocolLabel(target.protocol) }}{{ target.botName && target.name && target.botName !== target.name ? ` · ${target.name}` : '' }}</span>
+              </div>
+              <FaTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</FaTag>
+              <FaButton size="sm" :loading="issuingQqBindingCode && issuingConnectionId === target.connectionId" @click="issueQqBindingCode(target.connectionId)">
+                <FaIcon name="i-ri:key-2-line" />生成绑定码
+              </FaButton>
+            </article>
+            <div v-if="!loadingBindingTargets && !bindingTargets.length" class="text-sm text-muted-foreground">暂无已启用的机器人连接。</div>
+          </div>
+          <div v-if="messagingIdentities.length" class="credential-list mt-3">
+            <article v-for="(item, index) in messagingIdentities" :key="identityKey(item, index)" class="credential-item">
+              <div class="credential-info">
+                <strong>{{ protocolLabel(item.protocol) }} · {{ identityTypeLabel(item.identityType) }}</strong>
+                <span class="break-all">{{ item.identity }}</span>
+              </div>
+            </article>
+          </div>
+          <div v-else class="mt-3 text-sm text-muted-foreground">尚未绑定消息协议身份。</div>
         </div>
       </section>
 
@@ -534,7 +620,7 @@ function dateText(value?: string) {
       </section>
 
       <section v-else-if="active === 'external'" class="profile-section">
-        <div class="section-head"><div><h2>第三方账号</h2><p>通过已配置的平台绑定账号，QQ 绑定会同步到系统资料。</p></div></div>
+        <div class="section-head"><div><h2>第三方账号</h2><p>通过已配置的平台绑定账号。官方 QQ 机器人身份在个人资料的消息协议绑定中查看，不会写入 QQ 号。</p></div></div>
         <section class="inner-panel">
           <div class="panel-head"><div><h3>添加绑定</h3><p>需要管理员先在系统安全中配置 Wwoyun AppId、AppKey 与回调地址。</p></div></div>
           <div class="panel-actions"><FaButton @click="bindExternal('qq')"><FaIcon name="i-ri:qq-line" />QQ</FaButton><FaButton variant="outline" @click="bindExternal('wx')">微信</FaButton><FaButton variant="outline" @click="bindExternal('github')">GitHub</FaButton><FaButton variant="outline" @click="bindExternal('gitee')">Gitee</FaButton><FaButton variant="outline" @click="bindExternal('google')">Google</FaButton></div>
@@ -651,9 +737,6 @@ function dateText(value?: string) {
         </section>
       </section>
 
-      <div v-if="active === 'profile'" class="profile-save-bar">
-        <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
-      </div>
     </main>
   </div>
 </template>
@@ -762,16 +845,6 @@ function dateText(value?: string) {
   min-width: 0;
   overflow: auto;
   padding: 22px;
-  padding-bottom: 86px;
-}
-
-.profile-save-bar {
-  position: absolute;
-  right: 22px;
-  bottom: 22px;
-  z-index: 2;
-  display: flex;
-  justify-content: flex-end;
 }
 
 .profile-section,
@@ -816,6 +889,18 @@ function dateText(value?: string) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0 14px;
+}
+
+.form-grid :deep(.arco-form-item-label-col) {
+  position: relative;
+  padding-left: 12px;
+}
+
+.form-grid :deep(.arco-form-item-label-required-symbol) {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin-right: 0;
 }
 
 .inner-panel,
@@ -867,10 +952,8 @@ function dateText(value?: string) {
 
 .credential-info span,
 .credential-info small {
-  overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--color-text-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .permission-line {
@@ -1013,11 +1096,6 @@ function dateText(value?: string) {
     align-items: stretch;
     flex-direction: column;
     grid-template-columns: 1fr;
-  }
-
-  .profile-save-bar {
-    right: 16px;
-    bottom: 16px;
   }
 
   .permission-toolbar {

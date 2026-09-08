@@ -15,9 +15,10 @@ import java.util.Map;
 
 @PluginSpec(
         code = "sample-plugin",
-        name = "样例插件",
+        name = "示例插件",
         version = "1.0.0",
-        description = "YuDream 插件系统样例，演示菜单、权限、HTTP 接口和框架能力调用。"
+        description = "演示 YuDream 插件的元数据、菜单、权限和 HTTP 接口注册。",
+        icon = "i-ri:puzzle-2-line"
 )
 @PluginPermission(
         code = "plugin:sample:view",

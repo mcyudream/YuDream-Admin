@@ -211,6 +211,15 @@ public enum SystemMenuModule {
             path = "/system/monitor", component = "Layout", icon = "i-ri:dashboard-3-line", sort = 20)
     MONITOR,
 
+    @MenuNode(code = "system:resource-monitor", name = "资源监控", type = MenuNodeType.MENU,
+            parentName = "MONITOR", path = "/system/resource-monitor", component = "system/resource-monitor/index.vue",
+            icon = "i-ri:cpu-line", sort = 30)
+    RESOURCE_MONITOR,
+
+    @MenuNode(code = "system:resource-monitor:view", name = "查看资源监控", type = MenuNodeType.BUTTON,
+            parentName = "RESOURCE_MONITOR", permission = "system:monitor:resource:view")
+    RESOURCE_MONITOR_VIEW,
+
     @MenuNode(code = "system:redis-monitor", name = "Redis监控", type = MenuNodeType.MENU,
             parentName = "MONITOR", path = "/system/redis-monitor", component = "system/redis-monitor/index.vue",
             icon = "i-ri:database-2-line", sort = 20)

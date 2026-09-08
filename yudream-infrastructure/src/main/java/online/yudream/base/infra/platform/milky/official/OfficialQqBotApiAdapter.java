@@ -40,6 +40,8 @@ import java.util.regex.Pattern;
 @Slf4j
 public class OfficialQqBotApiAdapter {
     private static final Duration TIMEOUT = Duration.ofMinutes(2);
+    /** 官方富媒体必填但不可见的 caption，避免普通空格把图片压成缩略图。 */
+    static final String RICH_MEDIA_PLACEHOLDER = "\u200B";
     private static final Pattern HTTP_PREFIX = Pattern.compile("^(GET|POST|PUT|PATCH|DELETE)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
     private final OfficialQqBotAccessTokenClient tokens;
     private final OfficialQqBotSessionStore sessions;
@@ -571,11 +573,13 @@ public class OfficialQqBotApiAdapter {
         Map<String, Object> media = resolveUploadedMedia(context, group, peerId, message.media());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("msg_type", message.msgType());
-        if (!blank(message.content())) {
-            body.put("content", message.content());
-        }
         if (media != null) {
             body.put("media", media);
+            // 官方 msg_type=7 必须带非空 content；可见空格/换行会作为 caption 把图片压小。
+            // 富媒体独占气泡，忽略调用方传入的说明文字。
+            body.put("content", RICH_MEDIA_PLACEHOLDER);
+        } else if (!blank(message.content())) {
+            body.put("content", message.content());
         }
         if (message.ark() != null) {
             body.put("ark", message.ark());
@@ -754,7 +758,9 @@ public class OfficialQqBotApiAdapter {
         if (payload.containsKey("msg_type") || payload.containsKey("content") || payload.containsKey("media")
                 || payload.containsKey("markdown") || payload.containsKey("keyboard") || payload.containsKey("ark")) {
             int msgType = payload.get("msg_type") instanceof Number number ? number.intValue() : 0;
-            return new OfficialMessage(msgType, text(payload, "content"), mapOrNull(payload.get("media")),
+            Map<String, Object> media = mapOrNull(payload.get("media"));
+            String content = media != null ? RICH_MEDIA_PLACEHOLDER : text(payload, "content");
+            return new OfficialMessage(msgType, content, media,
                     mapOrNull(payload.get("ark")), mapOrNull(payload.get("markdown")), mapOrNull(payload.get("keyboard")));
         }
         List<?> segments = segments(message);
@@ -790,8 +796,9 @@ public class OfficialQqBotApiAdapter {
                 default -> content.append(firstNonBlank(text(data, "text", "content"), ""));
             }
         }
-        if (media != null && content.isEmpty()) {
-            content.append(" ");
+        if (media != null) {
+            content.setLength(0);
+            content.append(RICH_MEDIA_PLACEHOLDER);
         }
         return new OfficialMessage(msgType, content.toString(), media, null, null, null);
     }

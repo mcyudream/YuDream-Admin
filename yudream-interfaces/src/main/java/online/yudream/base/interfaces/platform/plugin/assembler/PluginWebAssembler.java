@@ -5,6 +5,7 @@ import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginGlobalWidgetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdatePlanDTO;
@@ -18,9 +19,17 @@ import online.yudream.base.application.platform.plugin.dto.PluginStorePluginJarD
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginPublisherDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSourceDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMessagingConnectionDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMessagingGroupDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginAiAgentCatalogDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginAiProviderCatalogDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginDeptCatalogDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginRoleCatalogDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginUserCatalogDTO;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendRouteRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginGlobalWidgetRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdatePlanRes;
@@ -34,6 +43,14 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginPubli
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginSourceRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginVersionRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingConnectionRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingGroupRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginAiAgentCatalogRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginAiModelCatalogRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginAiProviderCatalogRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDeptCatalogRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginRoleCatalogRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginUserCatalogRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 
 import java.util.Arrays;
@@ -58,6 +75,7 @@ public class PluginWebAssembler {
                 .name(dto.getName())
                 .version(dto.getVersion())
                 .description(dto.getDescription())
+                .icon(dto.getIcon())
                 .mainClass(dto.getMainClass())
                 .jarPath(dto.getJarPath())
                 .dependencies(dto.getDependencies())
@@ -221,6 +239,18 @@ public class PluginWebAssembler {
         return PluginFrontendManifestRes.builder()
                 .sdkVersion(dto.getSdkVersion())
                 .modules(dto.getModules().stream().map(PluginWebAssembler::toRes).toList())
+                .globalWidgets(dto.getGlobalWidgets() == null ? List.of() : dto.getGlobalWidgets().stream()
+                        .map(PluginWebAssembler::toRes).toList())
+                .build();
+    }
+
+    public static PluginGlobalWidgetRes toRes(PluginGlobalWidgetDTO dto) {
+        return PluginGlobalWidgetRes.builder()
+                .pluginCode(dto.getPluginCode())
+                .code(dto.getCode())
+                .component(dto.getComponent())
+                .permission(dto.getPermission())
+                .sort(dto.getSort())
                 .build();
     }
 
@@ -303,6 +333,106 @@ public class PluginWebAssembler {
         cmd.setUserId(principal.userId());
         cmd.setPermissions(principal.permissions());
         return cmd;
+    }
+
+    public static List<PluginMessagingConnectionRes> toMessagingConnectionResList(List<PluginMessagingConnectionDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toMessagingConnectionRes).toList();
+    }
+
+    public static PluginMessagingConnectionRes toMessagingConnectionRes(PluginMessagingConnectionDTO dto) {
+        return PluginMessagingConnectionRes.builder()
+                .id(dto.getId())
+                .name(dto.getName())
+                .platform(dto.getPlatform())
+                .userId(dto.getUserId())
+                .protocol(dto.getProtocol())
+                .build();
+    }
+
+    public static List<PluginMessagingGroupRes> toMessagingGroupResList(List<PluginMessagingGroupDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toMessagingGroupRes).toList();
+    }
+
+    public static PluginMessagingGroupRes toMessagingGroupRes(PluginMessagingGroupDTO dto) {
+        return PluginMessagingGroupRes.builder()
+                .id(dto.getId())
+                .name(dto.getName())
+                .build();
+    }
+
+    public static List<PluginUserCatalogRes> toUserCatalogResList(List<PluginUserCatalogDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toUserCatalogRes).toList();
+    }
+
+    public static PluginUserCatalogRes toUserCatalogRes(PluginUserCatalogDTO dto) {
+        return PluginUserCatalogRes.builder()
+                .id(dto.getId())
+                .username(dto.getUsername())
+                .nickname(dto.getNickname())
+                .email(dto.getEmail())
+                .avatar(dto.getAvatar())
+                .status(dto.getStatus())
+                .deptIds(dto.getDeptIds() == null ? List.of() : dto.getDeptIds())
+                .deptNames(dto.getDeptNames() == null ? List.of() : dto.getDeptNames())
+                .build();
+    }
+
+    public static List<PluginDeptCatalogRes> toDeptCatalogResList(List<PluginDeptCatalogDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toDeptCatalogRes).toList();
+    }
+
+    public static PluginDeptCatalogRes toDeptCatalogRes(PluginDeptCatalogDTO dto) {
+        return PluginDeptCatalogRes.builder()
+                .id(dto.getId())
+                .name(dto.getName())
+                .label(dto.getLabel())
+                .parentId(dto.getParentId())
+                .status(dto.getStatus())
+                .children(toDeptCatalogResList(dto.getChildren()))
+                .build();
+    }
+
+    public static List<PluginRoleCatalogRes> toRoleCatalogResList(List<PluginRoleCatalogDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toRoleCatalogRes).toList();
+    }
+
+    public static PluginRoleCatalogRes toRoleCatalogRes(PluginRoleCatalogDTO dto) {
+        return PluginRoleCatalogRes.builder()
+                .id(dto.getId())
+                .code(dto.getCode())
+                .name(dto.getName())
+                .deptId(dto.getDeptId())
+                .deptName(dto.getDeptName())
+                .build();
+    }
+
+    public static List<PluginAiAgentCatalogRes> toAiAgentCatalogResList(List<PluginAiAgentCatalogDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toAiAgentCatalogRes).toList();
+    }
+
+    public static PluginAiAgentCatalogRes toAiAgentCatalogRes(PluginAiAgentCatalogDTO dto) {
+        return PluginAiAgentCatalogRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .build();
+    }
+
+    public static List<PluginAiProviderCatalogRes> toAiProviderCatalogResList(List<PluginAiProviderCatalogDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toAiProviderCatalogRes).toList();
+    }
+
+    public static PluginAiProviderCatalogRes toAiProviderCatalogRes(PluginAiProviderCatalogDTO dto) {
+        return PluginAiProviderCatalogRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .models(dto.getModels() == null ? List.of() : dto.getModels().stream()
+                        .map(model -> PluginAiModelCatalogRes.builder()
+                                .code(model.getCode())
+                                .name(model.getName())
+                                .build())
+                        .toList())
+                .build();
     }
 
     public static String frontendAssetPath(String pluginCode, HttpServletRequest request) {

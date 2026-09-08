@@ -7,6 +7,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -28,6 +29,12 @@ public class UserManageRes {
     @Builder.Default
     private List<String> deptNames = new ArrayList<>();
     private Long defaultDeptId;
+    @Builder.Default
+    private List<UserTagRes> tags = new ArrayList<>();
+    @Builder.Default
+    private Map<String, Map<String, String>> fields = Map.of();
+    @Builder.Default
+    private List<MessagingIdentityRes> messagingIdentities = new ArrayList<>();
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -14,6 +14,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginAiToolInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCapabilityAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginLoggerPrefix;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
@@ -480,6 +481,19 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
+    public List<PluginGlobalWidgetInfo> globalWidgets() {
+        return holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .flatMap(entry -> entry.getValue().getContext().globalWidgets().stream()
+                        .map(widget -> new PluginGlobalWidgetInfo(entry.getKey(), widget.code(),
+                                widget.component(), widget.permission(), widget.sort())))
+                .sorted(Comparator.comparingInt(PluginGlobalWidgetInfo::sort)
+                        .thenComparing(PluginGlobalWidgetInfo::pluginCode)
+                        .thenComparing(PluginGlobalWidgetInfo::code))
+                .toList();
+    }
+
+    @Override
     public List<PluginHttpEndpointInfo> httpEndpoints() {
         return holders.values().stream()
                 .filter(PluginRuntimeHolder::isEnabled)
@@ -929,7 +943,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 descriptor.mainClass(),
                 jarPath.toAbsolutePath().normalize().toString(),
                 descriptor.dependencies(),
-                descriptor.softDependencies()
+                descriptor.softDependencies(),
+                descriptor.icon()
         );
     }
 
@@ -938,6 +953,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     private PluginFrontendModuleInfo toInfo(String pluginCode, PluginFrontendModule module, String assetRevision) {
+        PluginRuntimeHolder holder = holders.get(pluginCode);
+        String pluginIcon = holder == null || holder.getDescriptor() == null ? null : holder.getDescriptor().icon();
+        String menuIcon = StringUtils.hasText(module.menuIcon()) ? module.menuIcon() : pluginIcon;
         return new PluginFrontendModuleInfo(
                 pluginCode,
                 module.entry(),
@@ -945,9 +963,9 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 module.sdkVersion(),
                 module.integrity(),
                 module.menuTitle(),
-                module.menuIcon(),
+                menuIcon,
                 module.menuSort(),
-                module.routes().stream().map(this::toInfo).toList(),
+                module.routes().stream().map(route -> toInfo(route, pluginIcon)).toList(),
                 module.parentCode(),
                 true,
                 MenuStatus.ACTIVE,
@@ -957,15 +975,15 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         );
     }
 
-    private PluginFrontendRouteInfo toInfo(PluginFrontendRoute route) {
+    private PluginFrontendRouteInfo toInfo(PluginFrontendRoute route, String pluginIcon) {
         return new PluginFrontendRouteInfo(
                 route.path(),
                 route.name(),
                 route.title(),
-                route.icon(),
+                StringUtils.hasText(route.icon()) ? route.icon() : pluginIcon,
                 route.parentPath(),
                 route.parentTitle(),
-                route.parentIcon(),
+                StringUtils.hasText(route.parentIcon()) ? route.parentIcon() : pluginIcon,
                 route.parentSort(),
                 route.component(),
                 route.permission(),

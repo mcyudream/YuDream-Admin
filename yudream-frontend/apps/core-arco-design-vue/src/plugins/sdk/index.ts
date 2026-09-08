@@ -9,7 +9,7 @@ import { toBackendAssetUrl } from '@/utils/backend-url'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
-export const YUDREAM_PLUGIN_SDK_VERSION = '1.0.0'
+export const YUDREAM_PLUGIN_SDK_VERSION = '1.3.0'
 
 export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
   const accountStore = useAppAccountStore()
@@ -62,6 +62,58 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
     assets: {
       url(path: string) {
         return pluginFrontendAssetUrl(pluginCode, path)
+      },
+    },
+    messaging: {
+      async connections() {
+        const res = await apiPlugin.messagingConnections()
+        return res.data || []
+      },
+      async groups(connectionId: string) {
+        if (!connectionId) {
+          return []
+        }
+        const res = await apiPlugin.messagingGroups(connectionId)
+        return res.data || []
+      },
+    },
+    users: {
+      async search(query = {}) {
+        const res = await apiPlugin.userCatalog({
+          keyword: query.keyword,
+          deptId: query.deptId,
+          page: query.page ?? 1,
+          size: query.size ?? 20,
+        })
+        return res.data || []
+      },
+      async resolve(ids: string[]) {
+        if (!ids.length) {
+          return []
+        }
+        const res = await apiPlugin.resolveUsers(ids)
+        return res.data || []
+      },
+      async departments(query = {}) {
+        const res = await apiPlugin.departmentCatalog({
+          keyword: query.keyword,
+          flatten: query.flatten,
+        })
+        return res.data || []
+      },
+      async roles() {
+        const res = await apiPlugin.roleCatalog()
+        return res.data || []
+      },
+    },
+    ai: {
+      async agents() {
+        const res = await apiPlugin.aiAgentCatalog()
+        return res.data || []
+      },
+      async providers() {
+        const res = await apiPlugin.aiProviderCatalog()
+        return res.data || []
       },
     },
   }

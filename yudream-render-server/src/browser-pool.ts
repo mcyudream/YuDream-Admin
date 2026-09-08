@@ -43,7 +43,22 @@ export class BrowserPool {
 
   private async getBrowser(): Promise<Browser> {
     if (this.browser?.isConnected()) return this.browser;
-    this.starting ??= chromium.launch({ headless: true, args: ["--disable-dev-shm-usage"] });
+    // Full Chromium (not chrome-headless-shell). Aliyun WAF rejects the
+    // HeadlessChrome client hint that Playwright's default headless binary sends.
+    this.starting ??= chromium.launch({
+      channel: "chromium",
+      headless: true,
+      ignoreDefaultArgs: ["--enable-automation"],
+      args: [
+        "--disable-dev-shm-usage",
+        "--disable-blink-features=AutomationControlled",
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--no-sandbox",
+        "--disable-crash-reporter",
+        "--crash-dumps-dir=/tmp"
+      ]
+    });
     try { this.browser = await this.starting; return this.browser; }
     finally { this.starting = undefined; }
   }

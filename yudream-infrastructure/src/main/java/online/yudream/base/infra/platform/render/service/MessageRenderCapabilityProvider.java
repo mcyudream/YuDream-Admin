@@ -27,8 +27,8 @@ public class MessageRenderCapabilityProvider implements CapabilityProvider {
     @Override
     public CapabilityDescriptor descriptor() {
         return new CapabilityDescriptor(CODE, "消息渲染", CapabilityType.MESSAGING,
-                "通过独立 Headless Chromium 服务将 HTML、Markdown 或 URL 渲染为图片", "i-ri:image-line", 74,
-                Map.of("baseUrl", "http://render-server:3000", "timeout", "30s"), List.of());
+                "通过独立 Headless Chromium 服务将 HTML、Markdown 或 URL 渲染为图片，也可抓取公开页 HTML（抓取时开启 JavaScript）", "i-ri:image-line", 74,
+                Map.of("baseUrl", "http://render-server:3000", "timeout", "45s"), List.of());
     }
 
     @Override

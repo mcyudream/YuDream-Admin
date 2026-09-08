@@ -67,8 +67,11 @@ declare module 'vue' {
     FaTooltip: typeof import('@yudream/components')['FaTooltip']
     FaTrend: typeof import('@yudream/components')['FaTrend']
     YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
+    YdDatePicker: typeof import('@yudream/components')['YdDatePicker']
     YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
+    YdRangePicker: typeof import('@yudream/components')['YdRangePicker']
     YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
+    YdTimePicker: typeof import('@yudream/components')['YdTimePicker']
   }
 }
 
@@ -129,6 +132,9 @@ declare global {
   const FaTooltip: typeof import('@yudream/components')['FaTooltip']
   const FaTrend: typeof import('@yudream/components')['FaTrend']
   const YdAgentChatPanel: typeof import('./../components/YdAgentChatPanel/index.vue')['default']
+  const YdDatePicker: typeof import('@yudream/components')['YdDatePicker']
   const YdGraphCanvas: typeof import('@yudream/components')['YdGraphCanvas']
+  const YdRangePicker: typeof import('@yudream/components')['YdRangePicker']
   const YdTablePicker: typeof import('@yudream/components')['YdTablePicker']
+  const YdTimePicker: typeof import('@yudream/components')['YdTimePicker']
 }

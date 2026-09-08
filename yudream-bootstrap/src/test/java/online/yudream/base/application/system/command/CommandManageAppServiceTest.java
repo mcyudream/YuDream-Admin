@@ -1,6 +1,7 @@
 package online.yudream.base.application.system.command;
 
 import online.yudream.base.application.system.command.service.CommandManageAppService;
+import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
@@ -28,6 +29,8 @@ class CommandManageAppServiceTest {
     private UserRepo userRepo;
     @Mock
     private PluginQqBindingService pluginQqBindingService;
+    @Mock
+    private MessagingIdentityAppService messagingIdentityAppService;
 
     @Test
     void listIncludesSystemMenuAliasesBeforePluginsAndKeepsPluginOrder() {
@@ -36,7 +39,7 @@ class CommandManageAppServiceTest {
         PluginCommandInfo duplicateSystemMenu = command("SYSTEM", "system.menu", "菜单");
         when(pluginRuntimeGateway.commands()).thenReturn(List.of(alpha, beta, duplicateSystemMenu));
         CommandManageAppService service = new CommandManageAppService(
-                pluginRuntimeGateway, settingRepo, userRepo, pluginQqBindingService);
+                pluginRuntimeGateway, settingRepo, userRepo, pluginQqBindingService, messagingIdentityAppService);
 
         List<PluginCommandInfo> commands = service.list();
 

@@ -11,6 +11,8 @@
 | 方法 | 签名 | 说明 |
 |---|---|---|
 | chat | `CompletionStage<PluginAiChatResponse> chat(PluginAiChatRequest request)` | 单轮模型调用（可带历史与工具开关） |
+| chatStream | `default CompletionStage<PluginAiChatResponse> chatStream(PluginAiChatRequest request, Consumer<String> onDelta)` | 流式对话；默认实现退化为一次性 `chat` 后整段回放，宿主可覆盖为真流式 |
+| chatStream | `default CompletionStage<PluginAiChatResponse> chatStream(PluginAiChatRequest request, Consumer<String> onDelta, Consumer<PluginAiToolResult> onTool)` | 流式对话 + 工具完成回调；写工具需在 `executionContext.grantedWriteToolNames` 中点名授权，否则宿主只放行 READ 工具 |
 | tools | `List<PluginAiToolDescriptor> tools()` | 当前已注册的全部 AI 工具描述 |
 | providers | `List<PluginAiProviderOption> providers()` | 平台配置的模型 provider 清单（code/name/models） |
 | agents | `List<PluginAiAgentOption> agents()` | 可调用的 Agent 清单 |
@@ -22,10 +24,30 @@
 ```java
 public interface PluginAiService {
     CompletionStage<PluginAiChatResponse> chat(PluginAiChatRequest request);
-    List<PluginAiToolDescriptor> tools();
-    List<PluginAiProviderOption> providers();
-    List<PluginAiAgentOption> agents();
+    java.util.List<PluginAiToolDescriptor> tools();
+    java.util.List<PluginAiProviderOption> providers();
+    java.util.List<PluginAiAgentOption> agents();
     CompletionStage<PluginAiChatResponse> runAgent(String agentCode, PluginAiChatRequest request);
+
+    default CompletionStage<PluginAiChatResponse> chatStream(PluginAiChatRequest request, Consumer<String> onDelta) {
+        return chatStream(request, onDelta, null);
+    }
+
+    default CompletionStage<PluginAiChatResponse> chatStream(
+            PluginAiChatRequest request,
+            Consumer<String> onDelta,
+            Consumer<PluginAiToolResult> onTool
+    ) {
+        return chat(request).thenApply(response -> {
+            if (onDelta != null && response.content() != null && !response.content().isEmpty()) {
+                onDelta.accept(response.content());
+            }
+            if (onTool != null && response.toolResults() != null) {
+                response.toolResults().forEach(onTool);
+            }
+            return response;
+        });
+    }
 
     default CompletionStage<PluginAiChatResponse> runAgentStream(
             String agentCode,
@@ -42,7 +64,7 @@ public interface PluginAiService {
 }
 ```
 
-获取方式：`context.framework().ai()`（`FrameworkServices.ai()`）。除 `tools()` / `providers()` / `agents()` 三个同步清单方法外，其余方法返回 `CompletionStage`，异步执行，不要在调用线程阻塞等待。
+获取方式：`context.framework().ai()`（`FrameworkServices.ai()`）。除 `tools()` / `providers()` / `agents()` 三个同步清单方法外，其余方法返回 `CompletionStage`，异步执行，不要在调用线程阻塞等待。插件前端选择器应使用宿主 SDK `sdk.ai.agents()/providers()`，不要再为 Agent/供应商目录单独写插件 HTTP；AI 能力未启用时 SDK 返回空列表。
 
 ```java
 PluginAiService ai = context.framework().ai();
@@ -341,13 +363,13 @@ public class ReportPlugin extends YuDreamPlugin {
 
 ## 注意事项
 
-- `runAgentStream` 的默认实现是"完成后一次性回调"，若你的宿主版本未覆盖真流式，前端不应依赖逐字渲染。
+- `chatStream` / `runAgentStream` 的默认实现都是"完成后一次性回调"，若你的宿主版本未覆盖真流式，前端不应依赖逐字渲染。写工具必须在 `executionContext.grantedWriteToolNames` 中逐个点名，否则宿主只放行 READ 工具。
 - 工具的 `description` 与 `inputSchema` 直接决定模型调用质量，请把参数格式、单位、约束写在 description 里。
 - `DESTRUCTIVE` 级别工具建议同时设置 `requiresConfirmation = true`。
 - 工具随插件 disable/unload 自动注销，无需手动反注册。
 - **Long ID 序列化**：`PluginAiExecutionContext.userId` 为雪花 `Long`。凡进入 JSON、URL 参数、表单的一律用 string 承载，插件内用 `Long.valueOf(str)` 解析，禁止 `Number(id)` 截断。
 - **不可变 DTO**：所有 record 的集合字段经紧凑构造器做 `List.copyOf` / `Map.copyOf` / `Set.copyOf` 规整——传 `null` 得到空集合（`allowedToolNames` 例外，`null` 得到 `["*"]`），传入的集合会被复制，构造后再修改原集合不影响 DTO。
-- **异步语义**：`chat` / `runAgent` / `runAgentStream` 返回 `CompletionStage`，失败体现为 failed stage，务必链式 `exceptionally(...)` 降级，不要在请求线程 `join()` 死等。
+- **异步语义**：`chat` / `chatStream` / `runAgent` / `runAgentStream` 返回 `CompletionStage`，失败体现为 failed stage，务必链式 `exceptionally(...)` 降级，不要在请求线程 `join()` 死等。
 - **能力前置检查**：调用前用 `providers().isEmpty()` / `agents()` 判断平台 AI 是否可用，避免必然失败的调用。
 
 ---

@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.plugin.assembler;
 
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginGlobalWidgetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
@@ -20,6 +21,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSour
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
@@ -49,6 +51,7 @@ public class PluginAssembler {
                 .name(module.getName())
                 .version(module.getPluginVersion())
                 .description(module.getDescription())
+                .icon(module.getIcon())
                 .mainClass(module.getMainClass())
                 .jarPath(module.getJarPath())
                 .dependencies(module.getDependencies())
@@ -167,10 +170,22 @@ public class PluginAssembler {
                 .build();
     }
 
-    public static PluginFrontendManifestDTO toManifestDTO(List<PluginFrontendModuleInfo> modules) {
+    public static PluginFrontendManifestDTO toManifestDTO(List<PluginFrontendModuleInfo> modules,
+                                                          List<PluginGlobalWidgetInfo> globalWidgets) {
         return PluginFrontendManifestDTO.builder()
-                .sdkVersion("1.0.0")
+                .sdkVersion("1.3.0")
                 .modules(modules == null ? List.of() : modules.stream().map(PluginAssembler::toRuntimeDTO).toList())
+                .globalWidgets(globalWidgets == null ? List.of() : globalWidgets.stream().map(PluginAssembler::toDTO).toList())
+                .build();
+    }
+
+    public static PluginGlobalWidgetDTO toDTO(PluginGlobalWidgetInfo widget) {
+        return PluginGlobalWidgetDTO.builder()
+                .pluginCode(widget.pluginCode())
+                .code(widget.code())
+                .component(widget.component())
+                .permission(widget.permission())
+                .sort(widget.sort())
                 .build();
     }
 

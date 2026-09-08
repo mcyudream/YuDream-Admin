@@ -6,6 +6,7 @@ import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
+import online.yudream.base.plugin.spi.widget.PluginGlobalWidget;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
@@ -61,6 +62,12 @@ public interface PluginContext {
     void registerCapability(PluginCapabilityItem item);
 
     void registerDashboardCard(PluginDashboardCard card);
+
+    /**
+     * 注册全局挂件：宿主登录后的控制台布局常驻挂载的远程组件声明，
+     * 随插件 disable/unload 自动移除，无需手工注销。
+     */
+    void registerGlobalWidget(PluginGlobalWidget widget);
 
     void registerFrontend(PluginFrontendModule module);
 

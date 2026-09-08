@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.milky.official;
 
+import online.yudream.base.domain.platform.milky.service.MessagingBotNameLookup;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -8,6 +9,7 @@ import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -16,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 以及事件流落地的本地历史（官方 OpenAPI 不提供历史拉取）。
  */
 @Component
-public class OfficialQqBotSessionStore {
+public class OfficialQqBotSessionStore implements MessagingBotNameLookup {
     static final int MAX_HISTORY = 200;
 
     private final Map<Long, Map<String, Group>> groups = new ConcurrentHashMap<>();
@@ -26,16 +28,34 @@ public class OfficialQqBotSessionStore {
     private final Map<Long, Map<String, LastInbound>> lastInbound = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, AtomicInteger>> sequences = new ConcurrentHashMap<>();
     private final Map<Long, String> selfIds = new ConcurrentHashMap<>();
+    private final Map<Long, String> selfNames = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, Deque<Map<String, Object>>>> histories = new ConcurrentHashMap<>();
 
     public void rememberSelf(Long connectionId, String selfId) {
+        rememberSelf(connectionId, selfId, null);
+    }
+
+    public void rememberSelf(Long connectionId, String selfId, String selfName) {
         if (connectionId != null && selfId != null && !selfId.isBlank()) {
             selfIds.put(connectionId, selfId);
         }
+        if (connectionId != null && selfName != null && !selfName.isBlank()) {
+            selfNames.put(connectionId, selfName.trim());
+        }
+    }
+
+    @Override
+    public Optional<String> botName(Long connectionId) {
+        String name = selfName(connectionId);
+        return name == null || name.isBlank() ? Optional.empty() : Optional.of(name);
     }
 
     public String selfId(Long connectionId) {
         return connectionId == null ? null : selfIds.get(connectionId);
+    }
+
+    public String selfName(Long connectionId) {
+        return connectionId == null ? null : selfNames.get(connectionId);
     }
 
     public void rememberGroup(Long connectionId, String groupOpenId, String groupName) {
@@ -309,6 +329,7 @@ public class OfficialQqBotSessionStore {
         lastInbound.remove(connectionId);
         sequences.remove(connectionId);
         selfIds.remove(connectionId);
+        selfNames.remove(connectionId);
         histories.remove(connectionId);
     }
 

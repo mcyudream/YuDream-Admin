@@ -1,6 +1,6 @@
 # 框架能力端口 FrameworkServices
 
-> SPI v1（2.14.0）· 包 `online.yudream.base.plugin.spi.system`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system`
 
 `context.framework()` 返回 `FrameworkServices`，是插件访问宿主稳定能力的唯一入口。**需要新能力时先扩展 SPI 端口/DTO 再由宿主实现适配，禁止直接引用宿主 Spring Bean 或仓储实现。** 用途化资源图投影由 `context.graph()` 提供，不属于 `FrameworkServices`；运行时绑定可信插件 scope。除兼容的显式 `tableCode` 接口外，插件可调用无 `tableCode` 的自动绑定读写与完整闭合快照接口；宿主只会解析唯一 ACTIVE 且已授权的逻辑图表，没有或不唯一时受控失败。完整快照限制为 20,000 个节点、50,000 条关系和 8 MiB，超限返回 `PROJECTION_LIMIT_EXCEEDED`。`context.graph()` 禁止读取环境变量或在插件内自行创建 Neo4j `Driver`。详见 [GraphSpi](/plugin/spi/v1/graph)。
 
@@ -42,8 +42,11 @@ void requirePermission(PluginPrincipal principal, String permission); // 无权�
 | `authenticate` | `Optional<PluginUserProfile> authenticate(String usernameOrEmail, String password)` | 用户名或邮箱 + 密码认证 |
 | `create` | `PluginUserProfile create(PluginUserCreate create)` | 创建用户 |
 | `findById` | `Optional<PluginUserProfile> findById(Long userId)` | 按 ID 查询 |
-| `findByUsername` / `findByEmail` / `findByQq` | `Optional<PluginUserProfile> findByXxx(String)` | 唯一索引查询 |
-| `bindQqOnce` | `void bindQqOnce(Long userId, String qq)` | 首次绑定 QQ（已绑则拒绝） |
+| `findByUsername` / `findByEmail` / `findByQq` | `Optional<PluginUserProfile> findByXxx(String)` | 唯一索引查询。`findByQq` 在当前消息事件作用域内会按协议身份查找 |
+| `bindQqOnce` | `void bindQqOnce(Long userId, String qq)` | 首次绑定当前消息身份。Milky 写入数字 QQ；官方写入 openid 身份，不覆盖 `User.qq` |
+| `findByMessagingIdentity` | `default Optional<PluginUserProfile> findByMessagingIdentity(PluginMessagingIdentity)` | 按协议身份查找；默认回退 `findByQq` |
+| `bindMessagingIdentityOnce` | `default void bindMessagingIdentityOnce(Long userId, PluginMessagingIdentity)` | 显式绑定协议身份；默认回退 `bindQqOnce` |
+| `listMessagingIdentities` | `default List<PluginMessagingIdentity> listMessagingIdentities(Long userId)` | 列出用户全部消息身份 |
 | `searchUsers` | `List<PluginUserOption> searchUsers(String keyword, Long deptId, int page, int size)` | 关键字 + 部门分页搜索 |
 | `listDepartments(keyword)` | `List<PluginDeptOption>` | 部门树（选项形态） |
 | `listRoles(userId)` | `List<PluginUserRole>` | 用户角色列表 |
@@ -55,6 +58,7 @@ DTO 字段：
 | DTO | 字段 |
 |---|---|
 | `PluginUserProfile` | `id, username, nickname, email, phone, qq, avatar, status` |
+| `PluginMessagingIdentity` | `protocol(milky/official), identityType(qq/user_openid/member_openid), identity, appId, groupOpenid, connectionId` |
 | `PluginUserCreate` | `username, nickname, email, phone, qq, password, encodedPassword(可选), emailVerified` |
 | `PluginUserProfileUpdate` | `nickname, email, phone, qq, avatar` |
 | `PluginUserRole` | `id, code, name` |
@@ -62,7 +66,9 @@ DTO 字段：
 | `PluginUserOption` | `id(string), username, nickname, email, avatar, status, deptIds, deptNames` |
 | `PluginDeptOption` | `id(string), name, parentId, status, children(List<PluginDeptOption>)` |
 
-QQ 绑定：`issue(userId)` → `PluginQqBindingCode(String code, Instant expiresAt)`；`consume(code)` 核销并返回 `Long userId`。
+QQ 绑定：`issue(userId)` → `PluginQqBindingCode(String code, Instant expiresAt)`；`consume(code)` 核销并返回 `Long userId`。官方 OpenAPI 没有真实 QQ 号，群 `member_openid` 与私聊 `user_openid` 不是同一身份，需分别绑定。历史 `User.qq` 会在启动时迁入身份表。
+
+插件前端选择器使用宿主 SDK `sdk.users.search()/resolve()/departments()/roles()`，不要再为用户/部门/角色目录单独写插件 HTTP。`roles()` 是全站角色选项；按用户查角色仍走本端口的 `listRoles(userId)`。
 
 ## storage（文档 / 文件 / 密钥）
 
@@ -152,17 +158,18 @@ CompletionStage<PluginRenderedImage> image = context.templateRenderer().render(
 
 | 方法 | 说明 |
 |---|---|
-| `connections()` | `List<PluginMessagingConnection(id, name, platform, userId)>` 可用连接列表 |
+| `connections()` | `List<PluginMessagingConnection(id, name, platform, userId, protocol)>` 可用连接列表。`platform` 当前为 `qq`；`protocol` 为 `milky` 或 `official`（四参数构造缺省 null） |
 | `groups(connectionId)` | 该连接可见群组 `List<PluginMessagingGroup(id, name)>` |
 | `send(request)` | 平台无关内容发送，宿主按目标平台渲染，不支持时降级 |
-| `sendDirectToBoundUser(userId, content)` | 打开系统用户绑定 QQ 的私聊并发送（自动选择启用的 Milky 连接，配置歧义时拒绝） |
+| `sendDirectToBoundUser(userId, content)` | 打开系统用户绑定 QQ 的私聊并发送（自动选择启用连接，多连接歧义时拒绝） |
 | `sendToChannel(connectionId, channelId, content)` | 发送到指定频道/群 |
 
 - `PluginMessageRequest(connectionId, platform, userId, channelId, PluginMessageContent content)`
 - `PluginMessageResult(List<String> messageIds, boolean rendered, boolean degraded)`——`degraded=true` 表示发生降级渲染
 - `PluginMessageContent(type(TEXT/MARKDOWN/HTML/IMAGE/AUDIO/VIDEO/FILE/COMPOSITE), content, attachments(url/title/contentType), referrer(Map))`
+- 插件前端选择器使用宿主 SDK `sdk.messaging.connections()/groups()`，不要再为连接/群目录单独写插件 HTTP，也不要打 `/api/platform/milky/**`。官方连接的群列表来自本进程事件缓存，重启后为空直到再次收到该群消息。详见 [MessagingSpi](/plugin/spi/v1/messaging) 与 [QQ 协议详解](/protocol/milky)。
 
-**`PluginMessagingRawService`**：`invoke(connectionId, method, payload)` → 直连协议原生方法调用（如 Milky API），返回 `CompletionStage<Map<String,Object>>`。
+**`PluginMessagingRawService`**：`invoke(connectionId, method, payload)` → 直连协议原生方法调用。Milky 用方法名（如 `get_friend_list`）；官方连接可用同一套共享方法名（适配器映射到 OpenAPI）或特异化路径（如 `GET /v2/groups/{openid}/info`）。返回 `CompletionStage<Map<String,Object>>`。
 
 **`PluginMessageInteractionRegistry`**（全部返回 `AutoCloseable` 句柄，disable 时自动回收）：
 
@@ -188,6 +195,8 @@ CompletionStage<PluginRenderedImage> image = context.templateRenderer().render(
 | 方法 | 说明 |
 |---|---|
 | `chat(PluginAiChatRequest)` | 单轮对话（可带工具调用）→ `CompletionStage<PluginAiChatResponse>` |
+| `chatStream(request, onDelta)` | 流式对话；默认实现退化为一次性 `chat` 后整段回放，宿主可覆盖为真流式 |
+| `chatStream(request, onDelta, onTool)` | 流式对话 + 工具完成回调；写工具需在 `executionContext.grantedWriteToolNames` 中点名授权，否则宿主只放行 READ 工具 |
 | `tools()` | 平台已注册工具清单 |
 | `providers()` | AI provider 及模型清单（provider-first 结构） |
 | `agents()` | 可用 Agent 清单 |
@@ -220,6 +229,7 @@ context.registerAiTool(new PluginAiTool() {
 
 - `PluginAiToolDescriptor(name, title, description, permissionCode, risk(READ/WRITE/DESTRUCTIVE), requiresConfirmation, allowedTriggers(null→{"MENTION"}), inputSchema(JSON Schema Map))`
 - `PluginAiToolCall(toolName, arguments)`；`PluginAiToolResult(action, message, payload)`
+- 插件前端选择器使用宿主 SDK `sdk.ai.agents()/providers()`，不要再为 Agent/供应商目录单独写插件 HTTP。真正对话 / 跑 Agent 仍走本端口。AI 能力未启用时 SDK 返回空列表。
 
 ## memory（语义记忆）
 

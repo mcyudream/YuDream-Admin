@@ -290,6 +290,46 @@ class OfficialQqBotApiAdapterTest {
     }
 
     @Test
+    void stripsInlineBase64CaptionFromOfficialRichMedia() throws Exception {
+        AtomicReference<String> sendBody = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/v2/groups/group-open/files", exchange -> {
+            byte[] response = "{\"file_info\":\"uploaded-file\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/messages", exchange -> {
+            sendBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"id\":\"img-1\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        try {
+            server.start();
+            OfficialQqBotSessionStore sessions = new OfficialQqBotSessionStore();
+            sessions.rememberInbound(8L, "group-open", "inbound-1", "event-1");
+            OfficialQqBotApiAdapter adapter = new OfficialQqBotApiAdapter(fixedTokenClient(), sessions);
+            adapter.invoke(context(server.getAddress().getPort()), "send_group_message", Map.of(
+                    "group_id", "group-open",
+                    "msg_type", 7,
+                    "content", "说明文字\n换行",
+                    "media", Map.of("file_type", 1, "url", "base64://aW1hZ2U=")));
+            assertTrue(sendBody.get().contains("\"msg_type\":7"));
+            assertTrue(sendBody.get().contains("\"content\":\"\\u200B\"")
+                    || sendBody.get().contains("\"content\":\"\u200B\""));
+            assertTrue(!sendBody.get().contains("base64://"));
+            assertTrue(!sendBody.get().contains("说明文字"));
+            assertTrue(!sendBody.get().contains("\\n"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
     void mapsSharedGroupBanDurationOntoOfficialMemberMute() throws Exception {
         AtomicReference<String> method = new AtomicReference<>();
         AtomicReference<String> path = new AtomicReference<>();

@@ -14,6 +14,7 @@ export interface PluginModule {
   name: string
   version?: string
   description?: string
+  icon?: string
   mainClass?: string
   jarPath?: string
   dependencies?: string[]
@@ -86,9 +87,76 @@ export interface PluginFrontendModule {
   routes: PluginFrontendRoute[]
 }
 
+export interface PluginGlobalWidget {
+  pluginCode: string
+  code: string
+  component: string
+  permission?: string
+  sort?: number
+}
+
 export interface PluginFrontendManifest {
   sdkVersion: string
   modules: PluginFrontendModule[]
+  globalWidgets?: PluginGlobalWidget[]
+}
+
+export interface PluginMessagingConnection {
+  id: string
+  name: string
+  platform?: string
+  userId?: string | null
+  protocol?: string | null
+}
+
+export interface PluginMessagingGroup {
+  id: string
+  name: string
+}
+
+export interface PluginUserCatalog {
+  id: string
+  username: string
+  nickname?: string
+  email?: string
+  avatar?: string
+  status?: string
+  deptIds?: string[]
+  deptNames?: string[]
+}
+
+export interface PluginDeptCatalog {
+  id: string
+  name: string
+  label?: string
+  parentId?: string | null
+  status?: string
+  children?: PluginDeptCatalog[]
+}
+
+export interface PluginRoleCatalog {
+  id: string
+  code?: string
+  name: string
+  deptId?: string | null
+  deptName?: string | null
+}
+
+export interface PluginAiAgentCatalog {
+  code: string
+  name: string
+  description?: string
+}
+
+export interface PluginAiModelCatalog {
+  code: string
+  name: string
+}
+
+export interface PluginAiProviderCatalog {
+  code: string
+  name: string
+  models?: PluginAiModelCatalog[]
 }
 
 export default {
@@ -101,6 +169,22 @@ export default {
   unload: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/unload`),
   remove: (code: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugins/${code}`),
   frontendManifest: () => systemClient.get<unknown, ApiResponse<PluginFrontendManifest>>('api/platform/plugins/frontend-manifest'),
+  messagingConnections: () => systemClient.get<unknown, ApiResponse<PluginMessagingConnection[]>>('api/platform/plugins/messaging/connections'),
+  messagingGroups: (connectionId: string) => systemClient.get<unknown, ApiResponse<PluginMessagingGroup[]>>('api/platform/plugins/messaging/groups', {
+    params: { connectionId },
+  }),
+  userCatalog: (params: { keyword?: string, deptId?: string, page?: number, size?: number } = {}) => systemClient.get<unknown, ApiResponse<PluginUserCatalog[]>>('api/platform/plugins/users', {
+    params,
+  }),
+  resolveUsers: (ids: string[]) => systemClient.get<unknown, ApiResponse<PluginUserCatalog[]>>('api/platform/plugins/users/resolve', {
+    params: { ids: ids.join(',') },
+  }),
+  departmentCatalog: (params: { keyword?: string, flatten?: boolean } = {}) => systemClient.get<unknown, ApiResponse<PluginDeptCatalog[]>>('api/platform/plugins/users/departments', {
+    params,
+  }),
+  roleCatalog: () => systemClient.get<unknown, ApiResponse<PluginRoleCatalog[]>>('api/platform/plugins/users/roles'),
+  aiAgentCatalog: () => systemClient.get<unknown, ApiResponse<PluginAiAgentCatalog[]>>('api/platform/plugins/ai/agents'),
+  aiProviderCatalog: () => systemClient.get<unknown, ApiResponse<PluginAiProviderCatalog[]>>('api/platform/plugins/ai/providers'),
   request: <T = unknown>(pluginCode: string, path: string, options: { method?: string, data?: unknown } = {}) => {
     return systemClient.request<unknown, ApiResponse<T>>({
       url: `api/plugins/${pluginCode}${path.startsWith('/') ? path : `/${path}`}`,

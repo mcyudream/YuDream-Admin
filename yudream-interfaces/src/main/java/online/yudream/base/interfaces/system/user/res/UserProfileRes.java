@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Builder
@@ -24,4 +26,6 @@ public class UserProfileRes {
     private Long avatarFileId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    @Builder.Default
+    private List<MessagingIdentityRes> messagingIdentities = new ArrayList<>();
 }

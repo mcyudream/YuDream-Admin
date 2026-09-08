@@ -29,6 +29,8 @@ const chartHeight = computed(() => {
 
 const containerStyle = computed<CSSProperties>(() => ({
   width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
   height: chartHeight.value,
 }))
 
@@ -40,5 +42,7 @@ useECharts(chartRef, option, computed(() => props.theme))
 <style scoped>
 .dataviz-base-chart {
   position: relative;
+  max-width: 100%;
+  min-width: 0;
 }
 </style>

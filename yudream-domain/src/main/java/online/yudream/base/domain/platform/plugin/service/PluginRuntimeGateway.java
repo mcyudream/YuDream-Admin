@@ -8,6 +8,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchReque
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
@@ -53,6 +54,11 @@ public interface PluginRuntimeGateway {
     List<PluginFrontendModuleInfo> frontendModules();
 
     List<PluginDashboardCardInfo> dashboardCards();
+
+    /** 全部已启用插件声明的全局挂件（登录态控制台布局常驻挂载）。 */
+    default List<PluginGlobalWidgetInfo> globalWidgets() {
+        return List.of();
+    }
 
     List<PluginHttpEndpointInfo> httpEndpoints();
 

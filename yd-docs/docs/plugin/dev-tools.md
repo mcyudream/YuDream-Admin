@@ -36,7 +36,7 @@
 - **CONFIG 源**：yml 的 `dev-mode.projects` 列表，面板只读；
 - **FILE 源**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，可用 `dev-mode.store-file` 覆盖路径）。这是有意选择的非数据库存储——开发者与 coding agent 都能直接读取它来定位插件源码目录。
 
-合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源项目。设置页「批量登记」可选择插件仓根目录，宿主有界扫描（深度 ≤ 3）其中的插件模块并去重写入清单。登记时宿主依次读取 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断插件 code；都读不到会报错提示先执行一次 `mvn compile`。
+合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源项目。设置页「批量登记」可选择插件仓根目录，宿主有界扫描（深度 ≤ 3）其中的插件模块并去重写入清单，新条目默认 `compile-command: mvn -q compile -DskipTests -P dev-export`。登记时宿主依次读取 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断插件 code；都读不到会报错提示先执行一次 `mvn compile`。
 
 ### 2.3 配置示例
 
@@ -161,5 +161,5 @@ vite dev 中间件把报告暴露在 `/__yudream-devtools/audit.json`（每次�
 - **悬浮按钮不出现**：确认账号有 `platform:plugin-devtools:view` 权限；按钮可能被拖到屏幕边缘收成半隐边缘条——沿左右边缘找一下，或删除 localStorage 的 `pluginDevtoolsFab` 重置位置。
 - **开发模式未按预期开启/关闭**：看「概览」页的「自动检测/配置开启」标记——未显式配置 `enabled` 时按源码/JAR 运行自动判定。
 - **面板登记的目录不生效**：看「设置」页项目行的三个状态点（源码目录存在/类产物已编译/plugin.yml 可读）；登记清单在 `devProjectStoreFile` 指向的 JSON 文件，可直接检查内容。
-- **改代码不重载**：看「概览」页最近动态的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。
+- **改代码不重载**：看「概览」页最近动态的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。面板登记留空与批量登记默认 `mvn -q compile -DskipTests -P dev-export`，热编译会刷新 `target/plugin-dev/lib`。
 - **前端改动不生效**：确认插件前端在 `vite build --watch`，且最近动态出现 FRONTEND_RELOAD。

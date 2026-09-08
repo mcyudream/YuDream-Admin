@@ -13,6 +13,8 @@ import online.yudream.base.application.system.user.query.UserPageQuery;
 import online.yudream.base.application.system.user.service.DeptManageAppService;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.application.system.user.service.UserContextAppService;
+import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
+import online.yudream.base.application.system.user.service.MessagingIdentityBindScope;
 import online.yudream.base.application.system.user.service.UserManageAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.common.service.PasswordEncoder;
@@ -27,12 +29,17 @@ import online.yudream.base.plugin.spi.system.user.PluginUserCreate;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfileUpdate;
 import online.yudream.base.plugin.spi.system.user.PluginUserRole;
+import online.yudream.base.plugin.spi.system.user.PluginMessagingIdentity;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
+import online.yudream.base.plugin.spi.system.user.PluginUserTag;
+import online.yudream.base.plugin.spi.system.user.PluginUserField;
+import online.yudream.base.domain.system.user.valobj.UserTag;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -45,6 +52,7 @@ public class PluginUserFrameworkService implements PluginUserService {
     private final UserManageAppService userManageAppService;
     private final DeptManageAppService deptManageAppService;
     private final PasswordEncoder passwordEncoder;
+    private final MessagingIdentityAppService messagingIdentityAppService;
 
     @Override
     public Optional<PluginUserProfile> authenticate(String usernameOrEmail, String password) {
@@ -112,7 +120,19 @@ public class PluginUserFrameworkService implements PluginUserService {
 
     @Override
     public Optional<PluginUserProfile> findByQq(String qq) {
-        return userRepo.findByQQ(qq).map(this::toProfile);
+        MessagingIdentityBindScope.Context context = MessagingIdentityBindScope.current();
+        if (context != null && hasText(context.identity())) {
+            return messagingIdentityAppService.findUserByEvent(
+                            connectionOf(context.connectionId()), context.scene(),
+                            hasText(qq) ? qq : context.identity(), context.groupOpenid())
+                    .map(this::toProfile);
+        }
+        if (!hasText(qq)) {
+            return Optional.empty();
+        }
+        return messagingIdentityAppService.findUserByRawIdentity(qq.trim())
+                .or(() -> userRepo.findByQQ(qq.trim()))
+                .map(this::toProfile);
     }
 
     @Override
@@ -120,16 +140,44 @@ public class PluginUserFrameworkService implements PluginUserService {
         if (userId == null || !hasText(qq)) {
             throw new BizException("用户和 QQ 不能为空");
         }
-        User user = userRepo.findById(userId).orElseThrow(() -> new BizException("用户不存在"));
-        if (user.getQq() != null && hasText(user.getQq().getValue())) {
-            throw new BizException("系统 QQ 已绑定，不能重复绑定");
+        messagingIdentityAppService.bindFromScopeOrLegacy(userId, qq);
+    }
+
+    @Override
+    public Optional<PluginUserProfile> findByMessagingIdentity(PluginMessagingIdentity identity) {
+        if (identity == null || !hasText(identity.identity())) {
+            return Optional.empty();
         }
-        String normalized = qq.trim();
-        if (userRepo.existsByQQExcludeId(normalized, userId)) {
-            throw new BizException("QQ 已被其他用户绑定");
+        MessagingIdentityBindScope.Context context = MessagingIdentityBindScope.current();
+        String scene;
+        if (hasText(identity.identityType()) && identity.identityType().contains("member")) {
+            scene = "group";
+        } else if (hasText(identity.identityType())) {
+            scene = "friend";
+        } else {
+            scene = context == null ? null : context.scene();
         }
-        user.updateProfile(user.getNickname(), user.getEmail(), user.getPhone(), online.yudream.base.domain.valobj.QQ.of(normalized), null);
-        userRepo.save(user);
+        Long connectionId = parseLong(identity.connectionId(), context == null ? null : context.connectionId());
+        String groupOpenid = hasText(identity.groupOpenid()) ? identity.groupOpenid()
+                : (context == null ? null : context.groupOpenid());
+        return messagingIdentityAppService.findUserByEvent(connectionOf(connectionId), scene, identity.identity(), groupOpenid)
+                .or(() -> messagingIdentityAppService.findUserByRawIdentity(identity.identity(), identity.appId()))
+                .map(this::toProfile);
+    }
+
+    @Override
+    public void bindMessagingIdentityOnce(Long userId, PluginMessagingIdentity identity) {
+        messagingIdentityAppService.bindSpiIdentity(userId, identity);
+    }
+
+    @Override
+    public List<PluginMessagingIdentity> listMessagingIdentities(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return messagingIdentityAppService.listByUser(userId).stream()
+                .map(messagingIdentityAppService::toPlugin)
+                .toList();
     }
 
     @Override
@@ -184,6 +232,60 @@ public class PluginUserFrameworkService implements PluginUserService {
         cmd.setPhone(update.phone());
         cmd.setQq(update.qq());
         userAppService.updateProfile(userId, cmd);
+    }
+
+    @Override
+    public List<PluginUserTag> listTags(Long userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        return userRepo.findById(userId)
+                .map(User::listTags)
+                .orElse(List.of())
+                .stream()
+                .filter(Objects::nonNull)
+                .map(tag -> new PluginUserTag(tag.namespace(), tag.code(), tag.label()))
+                .toList();
+    }
+
+    @Override
+    public void replaceTags(Long userId, String namespace, List<PluginUserTag> tags) {
+        if (userId == null) {
+            throw new BizException("用户不存在");
+        }
+        String ns = namespace == null ? "" : namespace.trim();
+        if (ns.isBlank()) {
+            throw new BizException("标签命名空间不能为空");
+        }
+        User user = userRepo.findById(userId).orElseThrow(() -> new BizException("用户不存在"));
+        List<UserTag> next = tags == null ? List.of() : tags.stream()
+                .filter(Objects::nonNull)
+                .map(tag -> new UserTag(ns, tag.code(), tag.label()))
+                .toList();
+        user.replaceNamespaceTags(ns, next);
+        userRepo.save(user);
+    }
+
+    @Override
+    public void replaceFields(Long userId, String namespace, List<PluginUserField> fields) {
+        if (userId == null) {
+            throw new BizException("用户不存在");
+        }
+        String ns = namespace == null ? "" : namespace.trim();
+        if (ns.isBlank()) {
+            throw new BizException("扩展字段命名空间不能为空");
+        }
+        User user = userRepo.findById(userId).orElseThrow(() -> new BizException("用户不存在"));
+        Map<String, String> values = new LinkedHashMap<>();
+        for (PluginUserField field : fields == null ? List.<PluginUserField>of() : fields) {
+            if (field == null) {
+                continue;
+            }
+            values.put(field.code(), field.value());
+            values.put(field.code() + "__label", field.label());
+        }
+        user.replaceNamespaceFields(ns, values);
+        userRepo.save(user);
     }
 
     private PluginUserProfile toProfile(User user) {
@@ -264,5 +366,20 @@ public class PluginUserFrameworkService implements PluginUserService {
 
     private boolean isDigits(String value) {
         return value != null && !value.isBlank() && value.chars().allMatch(Character::isDigit);
+    }
+
+    private online.yudream.base.domain.platform.milky.aggregate.MilkyConnection connectionOf(Long connectionId) {
+        return messagingIdentityAppService.findConnection(connectionId).orElse(null);
+    }
+
+    private Long parseLong(String value, Long fallback) {
+        if (!hasText(value)) {
+            return fallback;
+        }
+        try {
+            return Long.valueOf(value.trim());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 }

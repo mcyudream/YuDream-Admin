@@ -118,7 +118,7 @@ class SandboxAwarePluginUserServiceTest {
         private int bindCalls;
 
         private StubDelegate() {
-            super(null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null);
         }
 
         @Override

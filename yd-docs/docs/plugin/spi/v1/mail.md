@@ -1,6 +1,6 @@
 # 邮件 MailSpi
 
-> SPI v1（2.7.0）· 包 `online.yudream.base.plugin.spi.system.mail`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system.mail`
 
 `context.framework().mail()` 返回 `PluginMailService`，是插件发送邮件的唯一端口。宿主负责 SMTP 连接、编码与异步投递，插件只构造 `PluginMailMessage` 并调用 `send`。
 

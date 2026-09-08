@@ -8,6 +8,7 @@ import online.yudream.base.application.system.user.cmd.UserCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserDeptAssignCmd;
 import online.yudream.base.application.system.user.cmd.UserUpdateCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
+import online.yudream.base.application.system.user.dto.MessagingIdentityDTO;
 import online.yudream.base.application.system.user.dto.OptionDTO;
 import online.yudream.base.application.system.user.dto.PermissionDTO;
 import online.yudream.base.application.system.user.dto.RoleManageDTO;
@@ -25,7 +26,9 @@ import online.yudream.base.interfaces.system.user.res.DeptManageRes;
 import online.yudream.base.interfaces.system.user.res.OptionRes;
 import online.yudream.base.interfaces.system.user.res.PermissionRes;
 import online.yudream.base.interfaces.system.user.res.RoleManageRes;
+import online.yudream.base.interfaces.system.user.res.MessagingIdentityRes;
 import online.yudream.base.interfaces.system.user.res.UserManageRes;
+import online.yudream.base.interfaces.system.user.res.UserTagRes;
 
 import java.util.List;
 
@@ -152,8 +155,38 @@ public class UserManageWebAssembler {
                 .deptIds(dto.getDeptIds())
                 .deptNames(dto.getDeptNames())
                 .defaultDeptId(dto.getDefaultDeptId())
+                .tags(dto.getTags() == null ? List.of() : dto.getTags().stream()
+                        .map(tag -> UserTagRes.builder()
+                                .namespace(tag.getNamespace())
+                                .code(tag.getCode())
+                                .label(tag.getLabel())
+                                .build())
+                        .toList())
+                .fields(dto.getFields())
+                .messagingIdentities(toIdentityResList(dto.getMessagingIdentities()))
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
+                .build();
+    }
+
+    public static List<MessagingIdentityRes> toIdentityResList(List<MessagingIdentityDTO> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        return items.stream().map(UserManageWebAssembler::toIdentityRes).toList();
+    }
+
+    public static MessagingIdentityRes toIdentityRes(MessagingIdentityDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return MessagingIdentityRes.builder()
+                .protocol(dto.getProtocol())
+                .identityType(dto.getIdentityType())
+                .identity(dto.getIdentity())
+                .groupOpenid(dto.getGroupOpenid())
+                .appId(dto.getAppId())
+                .connectionId(dto.getConnectionId())
                 .build();
     }
 

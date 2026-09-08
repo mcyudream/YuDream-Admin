@@ -1,6 +1,15 @@
 import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
+export interface MessagingIdentity {
+  protocol?: string
+  identityType?: string
+  identity?: string
+  groupOpenid?: string
+  appId?: string
+  connectionId?: string
+}
+
 export interface UserProfile {
   id: string
   username: string
@@ -13,6 +22,7 @@ export interface UserProfile {
   avatarFileId?: string
   createTime?: string
   updateTime?: string
+  messagingIdentities?: MessagingIdentity[]
 }
 
 export interface UserProfilePayload {
@@ -34,6 +44,24 @@ export interface ExternalAccount {
 }
 
 export interface QqBindingCode { code: string; expiresAt: string }
+
+export interface MessagingBindingTarget {
+  connectionId: string
+  name: string
+  protocol?: string
+  botName?: string
+  appId?: string
+  bound: boolean
+}
+
+export interface MessagingBindingCode {
+  code: string
+  expiresAt: string
+  connectionId?: string
+  connectionName?: string
+  protocol?: string
+  botName?: string
+}
 
 export type PasskeyStatus = 'ACTIVE' | 'REVOKED' | 'EXPIRED'
 
@@ -97,6 +125,8 @@ export default {
   get: () => systemClient.get<unknown, ApiResponse<UserProfile>>('api/user/me/profile'),
   update: (data: UserProfilePayload) => systemClient.put<unknown, ApiResponse<UserProfile>>('api/user/me/profile', data),
   issueQqBindingCode: () => systemClient.post<unknown, ApiResponse<QqBindingCode>>('api/user/me/qq-binding-code'),
+  listMessagingBindingTargets: () => systemClient.get<unknown, ApiResponse<MessagingBindingTarget[]>>('api/user/me/messaging-binding-targets'),
+  issueMessagingBindingCode: (connectionId: string) => systemClient.post<unknown, ApiResponse<MessagingBindingCode>>('api/user/me/messaging-binding-codes', null, { params: { connectionId } }),
   uploadAvatar: (data: FormData) => systemClient.post<unknown, ApiResponse<UserProfile>>('api/user/me/avatar', data),
   externalAccounts: () => systemClient.get<unknown, ApiResponse<ExternalAccount[]>>('api/user/me/external-accounts'),
   externalBindAuthorize: (providerCode: string, type: string) => systemClient.get<unknown, ApiResponse<{ authorizationUrl: string }>>(`api/user/me/external-accounts/${providerCode}/${type}/authorize`),

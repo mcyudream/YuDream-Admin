@@ -188,29 +188,36 @@ async function install(releaseVersion: string) {
 }
 
 async function previewAndConfirmUpdate(releaseVersion: string) {
-  if (!selectedCode.value) {
+  if (!selectedCode.value || operationsPending()) {
     return
   }
+  const code = selectedCode.value
   updatingVersion.value = releaseVersion
   try {
-    const res = await apiPluginMarketplace.updatePlan(selectedCode.value, releaseVersion)
+    const res = await apiPluginMarketplace.updatePlan(code, releaseVersion)
     const plan = res.data
     if (plan.blockedReason) {
       toast.error(`无法更新：${plan.blockedReason}`)
+      updatingVersion.value = ''
       return
     }
     modal.confirm({
       title: `确认更新到 ${plan.toVersion}`,
       content: updateConfirmationContent(plan),
+      beforeClose: (action, done) => {
+        done()
+        if (action !== 'confirm') {
+          updatingVersion.value = ''
+        }
+      },
       onConfirm: async () => {
-        updatingVersion.value = releaseVersion
         try {
-          const result = await apiPluginMarketplace.update(selectedCode.value, { releaseVersion })
+          const result = await apiPluginMarketplace.update(code, { releaseVersion })
           await load()
           toast.success(result.data.requiresRestart ? '插件已更新并受控停止。重启服务后将恢复此前已启用的状态。' : '插件已更新')
         }
         catch {
-          toast.error('插件更新失败')
+          toast.error('插件更新失败，请保持当前页面并重试')
         }
         finally {
           updatingVersion.value = ''
@@ -218,7 +225,8 @@ async function previewAndConfirmUpdate(releaseVersion: string) {
       },
     })
   }
-  finally {
+  catch {
+    toast.error('获取插件更新计划失败，请稍后重试')
     updatingVersion.value = ''
   }
 }
@@ -293,8 +301,7 @@ function rollbackConfirmationContent() {
           type="button"
           @click="selectPlugin(item.code)"
         >
-          <img v-if="getDescriptor(item).icon" class="plugin-icon" :src="getDescriptor(item).icon" alt="">
-          <FaIcon v-else class="plugin-icon-fallback" name="i-ri:store-2-line" />
+          <FaIcon :name="getDescriptor(item).icon || 'i-ri:store-2-line'" class="plugin-icon" />
           <div class="plugin-card-body">
             <div class="plugin-card-title">
               <strong>{{ getDescriptor(item).displayName || getDescriptor(item).code }}</strong>
@@ -453,19 +460,21 @@ function rollbackConfirmationContent() {
 
 .plugin-icon,
 .plugin-icon-fallback {
+  display: grid;
   width: 40px;
   height: 40px;
   flex: none;
+  place-items: center;
   border-radius: 6px;
 }
 
 .plugin-icon {
   object-fit: cover;
+  overflow: hidden;
+  background: var(--color-fill-2);
 }
 
 .plugin-icon-fallback {
-  display: grid;
-  place-items: center;
   background: var(--color-fill-2);
   color: rgb(var(--primary-6));
   font-size: 20px;

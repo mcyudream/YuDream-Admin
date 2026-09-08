@@ -436,6 +436,9 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         if (reference == null || reference.isBlank()) {
             return null;
         }
+        if (reference.startsWith("i-") || reference.matches("^[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$")) {
+            return reference.trim();
+        }
         return requireStoreReference(location, baseUri, reference).toString();
     }
 

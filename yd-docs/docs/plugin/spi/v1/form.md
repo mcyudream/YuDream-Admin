@@ -1,6 +1,6 @@
 # 动态表单（Dynamic Form）
 
-> SPI v1（2.14.0）· 包 `online.yudream.base.plugin.spi.system.form`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system.form`
 
 宿主"动态表单"能力（可视化表单设计、发布、填写、结果收集）暴露给插件的只读端口：插件可搜索平台**已发布**表单构建选择器、按 code 查询表单摘要、核验指定用户是否在时间窗口内提交过指定表单。典型场景：活动插件把"参与证明"绑定到某个表单，核验参与者是否真正提交。
 

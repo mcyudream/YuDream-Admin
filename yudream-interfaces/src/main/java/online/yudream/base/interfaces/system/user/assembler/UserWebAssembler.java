@@ -18,6 +18,9 @@ import online.yudream.base.application.system.user.dto.UserLoginDTO;
 import online.yudream.base.application.system.user.dto.UserProfileDTO;
 import online.yudream.base.application.system.user.dto.UserRegisterDTO;
 import online.yudream.base.application.system.user.dto.UserRoleVO;
+import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
+import online.yudream.base.application.system.user.dto.MessagingBindingTargetDTO;
+import online.yudream.base.application.system.user.dto.MessagingIdentityDTO;
 import online.yudream.base.domain.system.monitor.dto.LoginLogDTO;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
@@ -35,6 +38,9 @@ import online.yudream.base.interfaces.system.user.res.UserDeptRes;
 import online.yudream.base.interfaces.system.user.res.UserProfileRes;
 import online.yudream.base.interfaces.system.user.res.UserRegisterRes;
 import online.yudream.base.interfaces.system.user.res.UserRoleRes;
+import online.yudream.base.interfaces.system.user.res.MessagingBindingCodeRes;
+import online.yudream.base.interfaces.system.user.res.MessagingBindingTargetRes;
+import online.yudream.base.interfaces.system.user.res.MessagingIdentityRes;
 import online.yudream.base.interfaces.system.user.res.UserRes;
 import online.yudream.base.interfaces.system.user.res.UserVerificationMethodRes;
 import online.yudream.base.interfaces.system.user.vo.PermissionListVO;
@@ -128,6 +134,63 @@ public class UserWebAssembler {
                 .avatarFileId(dto.getAvatarFileId())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
+                .messagingIdentities(toIdentityResList(dto.getMessagingIdentities()))
+                .build();
+    }
+
+    public static List<MessagingIdentityRes> toIdentityResList(List<MessagingIdentityDTO> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        return items.stream().map(UserWebAssembler::toIdentityRes).toList();
+    }
+
+    public static MessagingIdentityRes toIdentityRes(MessagingIdentityDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return MessagingIdentityRes.builder()
+                .protocol(dto.getProtocol())
+                .identityType(dto.getIdentityType())
+                .identity(dto.getIdentity())
+                .groupOpenid(dto.getGroupOpenid())
+                .appId(dto.getAppId())
+                .connectionId(dto.getConnectionId())
+                .build();
+    }
+
+    public static List<MessagingBindingTargetRes> toBindingTargetResList(List<MessagingBindingTargetDTO> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        return items.stream().map(UserWebAssembler::toBindingTargetRes).toList();
+    }
+
+    public static MessagingBindingTargetRes toBindingTargetRes(MessagingBindingTargetDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return MessagingBindingTargetRes.builder()
+                .connectionId(dto.getConnectionId())
+                .name(dto.getName())
+                .protocol(dto.getProtocol())
+                .botName(dto.getBotName())
+                .appId(dto.getAppId())
+                .bound(dto.isBound())
+                .build();
+    }
+
+    public static MessagingBindingCodeRes toBindingCodeRes(MessagingBindingCodeDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return MessagingBindingCodeRes.builder()
+                .code(dto.getCode())
+                .expiresAt(dto.getExpiresAt())
+                .connectionId(dto.getConnectionId())
+                .connectionName(dto.getConnectionName())
+                .protocol(dto.getProtocol())
+                .botName(dto.getBotName())
                 .build();
     }
 

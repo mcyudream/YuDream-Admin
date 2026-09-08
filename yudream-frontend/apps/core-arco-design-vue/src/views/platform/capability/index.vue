@@ -178,8 +178,8 @@ async function toggleCapability(item: CapabilityItem) {
 function openConfig(item: CapabilityItem) {
   selectedCode.value = item.code
   configDraft.value = { ...(item.config || {}) }
-  if (item.code === 'neo4j') {
-    configDraft.value.password = ''
+  for (const key of Object.keys(item.secretConfigured || {})) {
+    configDraft.value[key] = ''
   }
   if (item.code === 'ai' && !configDraft.value.providers) {
     configDraft.value.providers = legacyAiProvidersJson(item.config || {})
@@ -406,6 +406,14 @@ function fieldsOf(code?: string): CapabilityConfigField[] {
       { key: 'officePreviewType', label: 'Office 预览类型', placeholder: 'pdf' },
       { key: 'tokenTtlSeconds', label: '签名地址时效（秒）', placeholder: '1800', type: 'number' },
       { key: 'maxPreviewSizeMb', label: '预览大小上限（MB）', placeholder: '200', type: 'number' },
+    ],
+    'inbound-mail': [
+      { key: 'mailboxId', label: '收件箱标识', placeholder: 'default' },
+      { key: 'host', label: 'IMAP 主机', placeholder: 'imap.example.com' },
+      { key: 'port', label: '端口', placeholder: '993', type: 'number' },
+      { key: 'username', label: '用户名', placeholder: 'verify@example.com' },
+      { key: 'password', label: '密码或授权码', placeholder: '留空不修改', type: 'password' },
+      { key: 'folder', label: '文件夹', placeholder: 'INBOX' },
     ],
     form: [
       { key: 'maxUploadSizeMb', label: '上传文件大小上限（MB）', placeholder: '100', type: 'number' },
@@ -977,7 +985,7 @@ function splitModelList(value: string) {
             <div v-else-if="usesStructuredConfig" class="config-form">
               <label v-for="field in configFields" :key="field.key" class="config-field">
                 <span>{{ field.label }}</span>
-                <small v-if="selected?.code === 'neo4j' && field.key === 'password' && selected.secretConfigured?.password" class="config-field__hint">
+                <small v-if="selected?.secretConfigured?.[field.key]" class="config-field__hint">
                   已配置，留空不修改
                 </small>
                 <FaTextarea

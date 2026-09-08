@@ -6,12 +6,14 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.system.user.valobj.UserDept;
+import online.yudream.base.domain.system.user.valobj.UserTag;
 import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
 import online.yudream.base.domain.valobj.Phone;
 import online.yudream.base.domain.valobj.QQ;
 import online.yudream.base.infra.system.user.dataobj.UserDO;
 import online.yudream.base.infra.system.user.dataobj.UserDeptDO;
+import online.yudream.base.infra.system.user.dataobj.UserTagDO;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,8 @@ public class UserInfraMapper {
         userDO.setStatus(user.getStatus() == null ? UserStatus.ACTIVE : user.getStatus());
         userDO.setDepts(toDeptDOs(user.getDepts()));
         userDO.setRoleIds(toRoleIds(user.getRoles()));
+        userDO.setTags(toTagDOs(user.listTags()));
+        userDO.setFields(user.listFields());
         userDO.setVersion(user.getVersion());
         userDO.setUpdateTime(user.getUpdateTime());
         userDO.setCreateTime(user.getCreateTime());
@@ -54,10 +58,32 @@ public class UserInfraMapper {
         user.setStatus(userDO.getStatus() == null ? UserStatus.ACTIVE : userDO.getStatus());
         user.setDepts(toDomainDepts(userDO.getDepts()));
         user.setRoles(toDomainRoles(userDO.getRoleIds()));
+        user.setTags(toDomainTags(userDO.getTags()));
+        user.setFields(userDO.getFields() == null ? new java.util.LinkedHashMap<>() : new java.util.LinkedHashMap<>(userDO.getFields()));
         user.setVersion(userDO.getVersion());
         user.setCreateTime(userDO.getCreateTime());
         user.setUpdateTime(userDO.getUpdateTime());
         return user;
+    }
+
+    private static List<UserTagDO> toTagDOs(List<UserTag> tags) {
+        if (tags == null) {
+            return new ArrayList<>();
+        }
+        return tags.stream()
+                .filter(tag -> tag != null)
+                .map(tag -> new UserTagDO(tag.namespace(), tag.code(), tag.label()))
+                .toList();
+    }
+
+    private static List<UserTag> toDomainTags(List<UserTagDO> tags) {
+        if (tags == null) {
+            return new ArrayList<>();
+        }
+        return tags.stream()
+                .filter(tag -> tag != null)
+                .map(tag -> new UserTag(tag.getNamespace(), tag.getCode(), tag.getLabel()))
+                .toList();
     }
 
     private static List<UserDeptDO> toDeptDOs(List<UserDept> depts) {

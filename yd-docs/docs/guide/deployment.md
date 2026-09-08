@@ -128,7 +128,7 @@ flowchart LR
 | `PUBLIC_WIKI_CHAT_EXECUTOR_QUEUE` | 否 | 公开 Wiki 问答线程池队列容量，默认 `0`。 |
 | `MESSAGE_RENDER_BASE_URL` | 否 | 后端调用 render-server 的 URL，默认 `http://localhost:3000`；Compose 应使用 `http://render-server:3000`。 |
 | `MESSAGE_RENDER_TOKEN` | 否 | 后端渲染 token，默认空。当前 render-server 未校验 token，不应因此公开服务。 |
-| `MESSAGE_RENDER_TIMEOUT` | 否 | 后端渲染请求超时，默认 `30s`。 |
+| `MESSAGE_RENDER_TIMEOUT` | 否 | 后端渲染请求超时，默认 `45s`。 |
 | `MESSAGE_RENDER_MAX_RESPONSE_SIZE` | 否 | 后端渲染响应最大大小，默认 `16MB`。 |
 
 `PLATFORM_NEO4J_ENABLED` 只控制 Neo4j provider 是否注册。项目闸门允许后，管理员在“平台 → 能力管理 → Neo4j”保存物理 URI、用户名、密码和 database；密码不会通过 API 返回，留空更新时保留既有密码。`YUDREAM_CREDENTIAL_KEY` 是唯一的持久化加密主密钥，使用 AES-256-GCM，必须由部署 Secret 注入。图数据库页面、Wiki 和插件只使用逻辑图表：它们不保存、返回或接收连接凭据，所有写入仍按 `tableCode` 与业务空间隔离。

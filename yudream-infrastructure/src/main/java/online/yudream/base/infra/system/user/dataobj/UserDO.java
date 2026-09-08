@@ -9,7 +9,9 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -39,4 +41,8 @@ public class UserDO extends BaseDO {
     private List<UserDeptDO> depts = new ArrayList<>();
 
     private List<Long> roleIds = new ArrayList<>();
+
+    private List<UserTagDO> tags = new ArrayList<>();
+
+    private Map<String, Map<String, String>> fields = new LinkedHashMap<>();
 }

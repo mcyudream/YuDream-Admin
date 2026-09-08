@@ -105,7 +105,7 @@ Controller 必须薄：
 宿主内置认证扩展点（`online.yudream.base.plugin.spi.system.auth`）：
 
 - `RegisterInterceptor` / `LoginInterceptor`：veto 型前置拦截器，同步执行、可否决，fail-closed（实现抛异常时本次注册/登录被拒绝）。
-- `IdentityVerificationProvider`：声明一种身份核验方式（学信网、教育邮箱、CARSI、人工审核等）；站点设置 `system.auth.registration.required-verifications`（逗号分隔方式编码）声明必需方式，注册时逐一 `check(...)`，缺失或未通过即拒绝。核验交互界面由插件自身端点与前端承载，前端可通过匿名端点 `GET /api/user/register/verification-methods` 获取当前可用方式清单。
+- `IdentityVerificationProvider`：声明一种身份核验方式（学信网、教育邮箱、CARSI、人工审核等）；站点设置 `system.auth.registration.required-verifications`（逗号分隔方式编码）声明必需方式，注册时逐一 `check(...)`，缺失或未通过即拒绝。核验交互界面由插件自身端点与前端承载，前端可通过匿名端点 `GET /api/user/register/verification-methods` 获取当前可用方式清单。注册成功后，插件可通过 `PluginUserService.replaceTags(userId, namespace, tags)` 把学校、审核状态等写入系统用户标签（按命名空间隔离，人员管理只读展示）。注册成功后，插件可通过 `PluginUserService.replaceTags(userId, namespace, tags)` 把学校、审核状态等写入系统用户标签（按命名空间隔离，人员管理只读展示）。
 - `AuthEventListener`：注册成功 / 登录成功事件订阅，事务提交后派发，fail-open（监听器异常只记日志，不影响源用例）。
 
 插件图片模板必须放在插件 JAR 自身的 `templates/` 目录，并通过 `PluginContext.templateRenderer()` 渲染。运行时为每个插件绑定独立 ClassLoader，不允许插件模板落入框架 `templates/` 目录，也不允许使用 `..` 或绝对路径跨插件读取资源。模板渲染支持 Thymeleaf 变量和可选 CSS selector；selector 存在时必须使用原生元素截图。
@@ -232,6 +232,9 @@ Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图
 
 - `menuTitle` 必填，除非插件不需要菜单。
 - `menuIcon` 使用 Iconify 名称。
+- 插件根 `plugin.yml` 可声明可选 `icon`，作为插件管理、市场和未显式声明菜单/路由图标时的默认图标。
+- `icon` 支持已注册的 Iconify/FaIcon 名称（如 `i-ri:puzzle-2-line`）或插件图片资源/安全 URL；图片资源应随插件发布并使用相对路径。
+- 显式的 `menuIcon`、`icon`、`parentIcon` 优先于插件级默认 `icon`。
 - `menuSort` 控制顶级排序，越大越靠前。
 
 路由：

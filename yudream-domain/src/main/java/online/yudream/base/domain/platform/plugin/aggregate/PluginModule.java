@@ -23,6 +23,7 @@ public class PluginModule extends BaseDomain {
     private String name;
     private String pluginVersion;
     private String description;
+    private String icon;
     private String mainClass;
     private String jarPath;
     private String backupJarPath;
@@ -54,6 +55,7 @@ public class PluginModule extends BaseDomain {
                 .name(descriptor.name())
                 .pluginVersion(descriptor.version())
                 .description(descriptor.description())
+                .icon(descriptor.icon())
                 .mainClass(descriptor.mainClass())
                 .jarPath(descriptor.jarPath())
                 .dependencies(descriptor.dependencies())
@@ -66,6 +68,7 @@ public class PluginModule extends BaseDomain {
         this.name = descriptor.name();
         this.pluginVersion = descriptor.version();
         this.description = descriptor.description();
+        this.icon = descriptor.icon();
         this.mainClass = descriptor.mainClass();
         this.jarPath = descriptor.jarPath();
         this.dependencies = descriptor.dependencies();

@@ -29,7 +29,7 @@ invalid target release: 21
 **这不是代码问题，是环境问题。** 不要改 `pom.xml` 降级，而是在当前 shell 会话里显式设置 JDK 21 再执行 Maven：
 
 ```powershell
-$env:JAVA_HOME='C:/Users/SiberianHusky/.jdks/ms-21.0.10'
+$env:JAVA_HOME='C:/path/to/jdk-21'
 $env:Path="$env:JAVA_HOME/bin;$env:Path"
 mvn -pl yudream-bootstrap -am -DskipTests compile
 ```
@@ -37,7 +37,7 @@ mvn -pl yudream-bootstrap -am -DskipTests compile
 Git Bash 下等价写法：
 
 ```bash
-export JAVA_HOME='/c/Users/SiberianHusky/.jdks/ms-21.0.10'
+export JAVA_HOME='/c/path/to/jdk-21'
 export PATH="$JAVA_HOME/bin:$PATH"
 ```
 

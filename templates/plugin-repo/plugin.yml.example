@@ -4,6 +4,8 @@ displayName: Example Plugin
 main: com.example.yudream.ExamplePlugin
 version: 1.0.0
 description: A third-party YuDream plugin submission example.
+icon: i-ri:puzzle-2-line
+# icon supports an Iconify/FaIcon name or a plugin image resource/URL.
 # depend contains required plugin codes; softdepend contains optional plugin codes.
 depend: []
 softdepend: []

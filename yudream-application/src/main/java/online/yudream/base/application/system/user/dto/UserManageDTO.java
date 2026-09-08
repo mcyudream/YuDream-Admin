@@ -10,6 +10,7 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
 
 @Data
@@ -37,6 +38,12 @@ public class UserManageDTO implements Serializable {
     @Builder.Default
     private List<String> deptNames = new ArrayList<>();
     private Long defaultDeptId;
+    @Builder.Default
+    private List<UserTagDTO> tags = new ArrayList<>();
+    @Builder.Default
+    private Map<String, Map<String, String>> fields = Map.of();
+    @Builder.Default
+    private List<MessagingIdentityDTO> messagingIdentities = new ArrayList<>();
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

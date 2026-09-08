@@ -110,6 +110,15 @@ class QqSandboxAppServiceTest {
         assertEquals("1", enabled.create(createCmd()).policyConnectionId());
     }
 
+    @Test
+    void groupOptionsReturnsEmptyWhenConnectionIdInvalidOrMissing() {
+        QqSandboxAppService missing = serviceWithConnection(Optional.empty());
+        assertTrue(missing.groupOptions("not-a-number").groups().isEmpty());
+        assertTrue(missing.groupOptions("1").groups().isEmpty());
+        assertTrue(missing.groupOptions(" ").groups().isEmpty());
+        assertTrue(missing.groupOptions(null).groups().isEmpty());
+    }
+
     private QqSandboxAppService serviceWithConnection(Optional<MilkyConnection> connection) {
         QqSandboxAppService service = new QqSandboxAppService(new MemoryRepo(), null,
                 (session, message) -> CompletableFuture.completedFuture(null), null, null, null);

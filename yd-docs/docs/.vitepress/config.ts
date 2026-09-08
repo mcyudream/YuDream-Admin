@@ -56,7 +56,7 @@ const featureSidebar = [
       { text: 'CMS 内容管理', link: '/features/cms' },
       { text: '动态表单', link: '/features/dynamic-form' },
       { text: '数据可视化', link: '/features/dataviz' },
-      { text: 'Milky 即时通讯', link: '/features/milky' }
+      { text: 'QQ 消息平台（Milky / 官方）', link: '/features/milky' }
     ]
   },
   {
@@ -97,7 +97,7 @@ const spiV1Items = [
   { text: '动态表单 FormSpi', link: '/plugin/spi/v1/form' },
   { text: 'AI 能力 AiSpi', link: '/plugin/spi/v1/ai' },
   { text: '图数据库 GraphSpi', link: '/plugin/spi/v1/graph' },
-  { text: '消息与 Milky MessagingSpi', link: '/plugin/spi/v1/messaging' },
+  { text: '消息 MessagingSpi（Milky / 官方）', link: '/plugin/spi/v1/messaging' },
   { text: '命令 CommandSpi', link: '/plugin/spi/v1/command' },
   { text: '记忆 MemorySpi', link: '/plugin/spi/v1/memory' },
   { text: '注册项 RegistryItems', link: '/plugin/spi/v1/registry-items' }
@@ -152,7 +152,7 @@ const protocolSidebar = [
     text: '协议',
     items: [
       { text: '通信与渲染协议总览', link: '/protocol/' },
-      { text: 'Milky 协议详解', link: '/protocol/milky' }
+      { text: 'QQ 协议详解（Milky / 官方 OpenAPI）', link: '/protocol/milky' }
     ]
   }
 ]

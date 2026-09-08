@@ -2,12 +2,14 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
+import online.yudream.base.application.system.user.service.MessagingIdentityBindScope;
+import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.event.MilkyEventPublished;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
-import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
@@ -41,7 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class MilkyPluginEventDispatcher {
     private final JarPluginRuntimeGateway runtime;
-    private final UserRepo users;
+    private final MessagingIdentityAppService identities;
     private final RoleRepo roles;
     private final SettingRepo settings;
     private final PluginCommandService commands;
@@ -112,21 +114,31 @@ public class MilkyPluginEventDispatcher {
             PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
                     content, null, command == null ? null : command.name(), referrer, event.eventType(), data, connectionId,
                     event.selfId(), messageSeq);
-            if (command == null) {
-                runtime.publishMessagingEvent(pluginEvent);
-                return;
+            MilkyConnection connection = connectionOf(connectionId);
+            String scene = firstText(data, "message_scene");
+            String groupOpenid = officialGroupOpenid(connection, scene, channelId);
+            User user = identities.findUserByEvent(connection, scene, userId, groupOpenid).orElse(null);
+            try (MessagingIdentityBindScope ignored = MessagingIdentityBindScope.open(
+                    new MessagingIdentityBindScope.Context(
+                            connection == null ? null : connection.protocolOrDefault(),
+                            parseConnectionId(connectionId),
+                            connection == null ? null : connection.getAppId(),
+                            scene, groupOpenid, userId))) {
+                if (command == null) {
+                    runtime.publishMessagingEvent(pluginEvent);
+                    return;
+                }
+                if (isMenuAlias(command.name())) {
+                    menuImage(pluginEvent, user, command.arguments());
+                    return;
+                }
+                if (user == null && !"绑定".equals(command.name()) && (requiresBound() || commandRequiresBound(command.name()))) {
+                    replyBindHint(pluginEvent);
+                    return;
+                }
+                runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
+                        permission -> allowed(user, permission));
             }
-            User user = userId == null ? null : users.findByQQ(userId).orElse(null);
-            if (isMenuAlias(command.name())) {
-                menuImage(pluginEvent, user, command.arguments());
-                return;
-            }
-            if (user == null && !"绑定".equals(command.name()) && (requiresBound() || commandRequiresBound(command.name()))) {
-                replyBindHint(pluginEvent);
-                return;
-            }
-            runtime.publishCommand(pluginEvent, command.name(), command.arguments(), user == null ? null : user.getId(),
-                    permission -> allowed(user, permission));
         } catch (Exception error) {
             java.util.Map<String, Object> context = new java.util.LinkedHashMap<>();
             context.put("connectionId", connectionId);
@@ -201,12 +213,16 @@ public class MilkyPluginEventDispatcher {
         if (officialConnection(event.connectionId())) {
             return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
                     new PluginMessageContent(PluginMessageContent.Type.MARKDOWN,
-                            commandMenuMarkdown(nickname(user), commandList), null, event.referrer(),
+                            commandMenuMarkdown(nickname(user), commandList, filter != null), null, event.referrer(),
                             menuButtons(commandList, filter))));
         }
         StringBuilder content = new StringBuilder(filter == null ? "可用指令：" : "可用指令（" + filter + "）：");
-        commandList.forEach(command -> content
-                .append("\n/").append(command.command()).append(" - ").append(command.description()));
+        commandList.forEach(command -> {
+            content.append("\n/").append(command.command());
+            if (filter != null) {
+                content.append(" - ").append(command.description());
+            }
+        });
         return sendMenuText(event, content.toString());
     }
 
@@ -268,7 +284,7 @@ public class MilkyPluginEventDispatcher {
             var accessible = commands.listAccessible(user == null ? null : user.getId());
             String filter = effectiveMenuFilter(accessible, pluginFilter);
             var commandList = filterCommands(accessible, filter);
-            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList))
+            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList, filter != null))
                     .thenCompose(QqSandboxExecutionScope.wrap(image -> {
                         return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
                                 new PluginMessageContent(PluginMessageContent.Type.IMAGE,
@@ -292,7 +308,7 @@ public class MilkyPluginEventDispatcher {
         var commandList = filterCommands(accessible, filter);
         AtomicBoolean fallbackStarted = new AtomicBoolean();
         try {
-            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList))
+            CompletionStage<?> imageSend = renderer.html(commandMenuHtmlTemplate(nickname(user), commandList, filter != null))
                     .thenCompose(QqSandboxExecutionScope.wrap(image -> {
                         return messaging.send(new PluginMessageRequest(event.connectionId(), "qq", event.selfId(), event.channelId(),
                                 new PluginMessageContent(PluginMessageContent.Type.IMAGE,
@@ -488,7 +504,7 @@ public class MilkyPluginEventDispatcher {
         return "<html><body style='display:inline-block;margin:0;padding:10px;background:#f1f1f1;font-family:Arial,Microsoft YaHei,sans-serif;color:#182230;'><div id='command-menu-card' style='display:inline-block;width:720px;box-sizing:border-box;padding:10px;'><div style='text-align:center;margin-bottom:18px;'><span style='display:inline-block;padding:8px 16px;background:#009688;color:#fff;border-radius:5px;font-size:22px;font-weight:700;'>指令菜单</span></div><div style='margin:0 0 14px;padding:0 4px;color:#4b5563;font-size:13px;'>您好，" + escape(nickname) + "。以下是您当前有权限使用的指令：</div><div style='display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;'>" + sections + "</div><div style='margin-top:14px;font-size:11px;color:#98a2b3;text-align:right;'>" + escape(siteName()) + " · 权限菜单</div></div></body></html>";
     }
 
-    private String commandMenuHtmlTemplate(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
+    private String commandMenuHtmlTemplate(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list, boolean showDescription) {
         Map<String, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo>> groups = new java.util.LinkedHashMap<>();
         list.forEach(command -> {
             String pluginCode = command.pluginCode();
@@ -499,6 +515,7 @@ public class MilkyPluginEventDispatcher {
         context.setVariable("nickname", nickname);
         context.setVariable("groups", groups);
         context.setVariable("siteName", siteName());
+        context.setVariable("showDescription", showDescription);
         return templateEngine.process("plugin-command-menu", context);
     }
 
@@ -545,8 +562,9 @@ public class MilkyPluginEventDispatcher {
 
     /**
      * 官方 QQ 机器人指令菜单。QQ markdown 不支持表格，使用标题分组 + 列表 + 引用 + 分割线的版式。
+     * 主菜单只列指令名，二级菜单才附描述。
      */
-    private String commandMenuMarkdown(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list) {
+    private String commandMenuMarkdown(String nickname, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo> list, boolean showDescription) {
         Map<String, List<online.yudream.base.plugin.spi.system.command.PluginCommandInfo>> groups = new java.util.LinkedHashMap<>();
         list.forEach(command -> {
             String pluginCode = command.pluginCode();
@@ -559,8 +577,14 @@ public class MilkyPluginEventDispatcher {
         }
         groups.forEach((plugin, commands) -> {
             text.append("## ").append(markdown(plugin)).append("\n\n");
-            commands.forEach(command -> text.append("- `/").append(markdown(command.command())).append("` **")
-                    .append(markdown(command.name())).append("** — ").append(markdown(command.description())).append("\n"));
+            commands.forEach(command -> {
+                text.append("- `/").append(markdown(command.command())).append("` **")
+                        .append(markdown(command.name())).append("**");
+                if (showDescription) {
+                    text.append(" — ").append(markdown(command.description()));
+                }
+                text.append("\n");
+            });
             text.append("\n");
         });
         text.append("***\n\n> ").append(markdown(siteName())).append(" · 菜单按当前权限展示");
@@ -593,7 +617,7 @@ public class MilkyPluginEventDispatcher {
      * 未绑定用户使用需要绑定的指令时，给出明确提示而非静默忽略。
      */
     private void replyBindHint(PluginEvent event) {
-        sendMenuText(event, "当前 QQ 未绑定系统账号，请先完成绑定后再使用该指令。");
+        sendMenuText(event, "当前消息身份未绑定系统账号，请先完成绑定后再使用该指令。");
     }
 
     private boolean allowed(User user, String permission) {
@@ -707,6 +731,32 @@ public class MilkyPluginEventDispatcher {
         if (value != null && !String.valueOf(value).isBlank()) {
             referrer.putIfAbsent(key, String.valueOf(value));
         }
+    }
+
+    private MilkyConnection connectionOf(String connectionId) {
+        Long id = parseConnectionId(connectionId);
+        return id == null ? null : connections.findById(id).orElse(null);
+    }
+
+    private static Long parseConnectionId(String connectionId) {
+        if (connectionId == null || connectionId.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(connectionId.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    static String officialGroupOpenid(MilkyConnection connection, String scene, String channelId) {
+        if (connection == null || !connection.official()) {
+            return null;
+        }
+        if (!online.yudream.base.domain.system.user.service.MessagingIdentityClassifier.groupScene(scene)) {
+            return null;
+        }
+        return channelId;
     }
 
     static List<String> mentionsFromSegments(Object value) {

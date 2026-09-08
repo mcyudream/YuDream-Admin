@@ -211,10 +211,12 @@ public class CapabilityAppService {
 
     private Map<String, String> mergedConfig(CapabilityModule module, Map<String, String> requestedConfig) {
         Map<String, String> config = new java.util.HashMap<>(requestedConfig == null ? Map.of() : requestedConfig);
-        if ("neo4j".equals(module.getCode()) && !StringUtils.hasText(config.get("password"))) {
-            String existingPassword = module.getConfig() == null ? null : module.getConfig().get("password");
-            if (StringUtils.hasText(existingPassword)) {
-                config.put("password", existingPassword);
+        for (String secretKey : online.yudream.base.domain.platform.capability.valobj.CapabilitySecrets.keysOf(module.getCode())) {
+            if (!StringUtils.hasText(config.get(secretKey))) {
+                String existing = module.getConfig() == null ? null : module.getConfig().get(secretKey);
+                if (StringUtils.hasText(existing)) {
+                    config.put(secretKey, existing);
+                }
             }
         }
         return config;

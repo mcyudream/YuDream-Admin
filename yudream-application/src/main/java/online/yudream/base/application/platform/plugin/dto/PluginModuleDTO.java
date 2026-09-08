@@ -26,6 +26,7 @@ public class PluginModuleDTO implements Serializable {
     private String name;
     private String version;
     private String description;
+    private String icon;
     private String mainClass;
     private String jarPath;
     private PluginStatus status;

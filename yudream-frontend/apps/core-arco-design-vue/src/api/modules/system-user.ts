@@ -1,4 +1,5 @@
 import type { ApiResponse, PageResult } from './system-client'
+import type { MessagingIdentity } from './profile'
 import type { LoginData } from './user'
 import systemClient from './system-client'
 
@@ -24,8 +25,17 @@ export interface UserManageItem {
   deptIds: IdValue[]
   deptNames: string[]
   defaultDeptId?: IdValue
+  tags?: UserTagItem[]
+  fields?: Record<string, Record<string, string>>
+  messagingIdentities?: MessagingIdentity[]
   createTime?: string
   updateTime?: string
+}
+
+export interface UserTagItem {
+  namespace: string
+  code: string
+  label: string
 }
 
 export interface UserPickerRow {

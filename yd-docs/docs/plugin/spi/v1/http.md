@@ -1,6 +1,6 @@
 # HTTP 端点
 
-> SPI v1（2.7.0）· 包 `online.yudream.base.plugin.spi.http`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.http`
 
 插件 HTTP 端点由宿主运行时统一分发，挂载在 `/api/plugins/{pluginCode}/**` 下。权限校验、统一响应包装均由宿主完成。
 

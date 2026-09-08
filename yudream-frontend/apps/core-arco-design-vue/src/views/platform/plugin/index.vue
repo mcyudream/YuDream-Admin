@@ -6,6 +6,8 @@ import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 
+type PluginFilterStatus = 'all' | PluginStatus | 'update'
+
 const toast = useFaToast()
 const modal = useFaModal()
 const loading = ref(false)
@@ -15,9 +17,37 @@ const actionLoading = ref('')
 const rows = ref<PluginModule[]>([])
 const updatePlans = ref<PluginMarketplaceUpdatePlan[]>([])
 const selectedCode = ref('')
+const keyword = ref('')
+const filterStatus = ref<PluginFilterStatus>('all')
+const pagination = reactive({ page: 1, size: 12, total: 0 })
 const uploadInput = ref<HTMLInputElement>()
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
+const filterOptions: { label: string, value: PluginFilterStatus }[] = [
+  { label: '全部状态', value: 'all' },
+  { label: '可更新', value: 'update' },
+  { label: '运行中', value: 'ENABLED' },
+  { label: '已加载', value: 'LOADED' },
+  { label: '已安装', value: 'INSTALLED' },
+  { label: '已禁用', value: 'DISABLED' },
+  { label: '异常', value: 'ERROR' },
+]
+const filteredRows = computed(() => {
+  const value = keyword.value.trim().toLowerCase()
+  return rows.value.filter((item) => {
+    const matchesKeyword = !value || [item.name, item.code, item.version, item.description]
+      .some(field => field?.toLowerCase().includes(value))
+    const matchesStatus = filterStatus.value === 'all'
+      || filterStatus.value === 'update' && Boolean(updatePlanFor(item.code))
+      || item.status === filterStatus.value
+    return matchesKeyword && matchesStatus
+  })
+})
+const pagedRows = computed(() => {
+  const start = (pagination.page - 1) * pagination.size
+  return filteredRows.value.slice(start, start + pagination.size)
+})
+const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || filterStatus.value !== 'all')
 const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const loaded = rows.value.filter(item => item.loaded).length
@@ -32,11 +62,29 @@ const summary = computed(() => {
 
 onMounted(load)
 
+watch([keyword, filterStatus], () => {
+  pagination.page = 1
+})
+watch(filteredRows, clampPage, { immediate: true })
+watch(() => pagination.size, clampPage)
+
+function clampPage() {
+  pagination.total = filteredRows.value.length
+  const maxPage = Math.max(1, Math.ceil(pagination.total / pagination.size))
+  pagination.page = Math.min(Math.max(1, pagination.page), maxPage)
+}
+
+function resetFilters() {
+  keyword.value = ''
+  filterStatus.value = 'all'
+}
+
 async function load() {
   loading.value = true
   try {
     const res = await apiPlugin.list()
     rows.value = res.data
+    updatePlans.value = []
     syncSelectedCode()
   }
   finally {
@@ -58,6 +106,31 @@ async function checkUpdates() {
 
 function updatePlanFor(code: string) {
   return updatePlans.value.find(item => item.code === code)
+}
+
+const pluginIconFallbacks: Record<string, string> = {
+  'ai-chatbot': 'i-ri:robot-2-line',
+  'yudream-alipay': 'i-ri:alipay-line',
+  'authlib-injector': 'i-ri:shield-keyhole-line',
+  'mc-wiki': 'i-ri:book-open-line',
+  mcguess: 'i-ri:question-answer-line',
+  'minecraft-server': 'i-ri:server-line',
+  'project-progress': 'i-ri:task-line',
+  'qq-binding': 'i-ri:links-line',
+  'qqbot-automation': 'i-ri:chat-settings-line',
+  'yudream-student-info': 'i-ri:graduation-cap-line',
+  'yudream-wallet': 'i-ri:wallet-3-line',
+  'web-card': 'i-ri:layout-4-line',
+  'world-map': 'i-ri:map-2-line',
+  'yudream-skin': 'i-ri:t-shirt-2-line',
+}
+
+function pluginIcon(item: PluginModule) {
+  const icon = item.icon || pluginIconFallbacks[item.code] || 'i-ri:puzzle-2-line'
+  if (/^https?:\/\//.test(icon) || icon.includes(':')) {
+    return icon
+  }
+  return `/api/platform/plugins/${item.code}/assets/${icon.replace(/^\.\//, '')}`
 }
 
 function canConfirmUpdate(item: PluginModule, plan?: PluginMarketplaceUpdatePlan) {
@@ -102,7 +175,7 @@ function confirmUpdate(item = selected.value) {
         rows.value = res.data.modules
         syncSelectedCode()
         await checkUpdates()
-        toast.success(res.data.requiresRestart ? '插件已更新，请重启服务；将恢复更新前已启用的插件' : '插件已更新')
+        toast.success(res.data.requiresRestart ? '插件已更新，相关插件已尝试自动恢复；如仍有插件未恢复，请重启服务' : '插件已更新')
       }
       finally {
         actionLoading.value = ''
@@ -116,6 +189,7 @@ async function refresh() {
   try {
     const res = await apiPlugin.refresh()
     rows.value = res.data
+    updatePlans.value = []
     syncSelectedCode()
     await refreshDynamicRoutes(router)
     toast.success('插件目录已扫描')
@@ -142,6 +216,7 @@ async function uploadJar(event: Event) {
     data.append('file', file)
     const res = await apiPlugin.upload(data)
     rows.value = res.data
+    updatePlans.value = []
     syncSelectedCode()
     await refreshDynamicRoutes(router)
     toast.success('插件 JAR 已上传并扫描')
@@ -242,19 +317,26 @@ function actionText(action: string) {
 
     <FaPageMain>
       <div class="plugin-toolbar">
-        <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.click()">
-          <FaIcon name="i-ri:upload-cloud-2-line" />
-          上传 JAR
-        </FaButton>
-        <input ref="uploadInput" type="file" accept=".jar,application/java-archive" hidden @change="uploadJar">
-        <FaButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
-          <FaIcon name="i-ri:arrow-up-circle-line" />
-          检查更新
-        </FaButton>
-        <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
-          <FaIcon name="i-ri:folder-search-line" />
-          扫描目录
-        </FaButton>
+        <div class="plugin-toolbar-actions">
+          <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.click()">
+            <FaIcon name="i-ri:upload-cloud-2-line" />
+            上传 JAR
+          </FaButton>
+          <input ref="uploadInput" type="file" accept=".jar,application/java-archive" hidden @change="uploadJar">
+          <FaButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
+            <FaIcon name="i-ri:arrow-up-circle-line" />
+            检查更新
+          </FaButton>
+          <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
+            <FaIcon name="i-ri:folder-search-line" />
+            扫描目录
+          </FaButton>
+        </div>
+        <div class="plugin-filters">
+          <FaInput v-model="keyword" clearable placeholder="搜索名称、编码、版本或描述" class="plugin-search" />
+          <FaSelect v-model="filterStatus" :options="filterOptions" class="plugin-status-filter" />
+          <FaButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</FaButton>
+        </div>
       </div>
 
       <div class="summary-grid">
@@ -269,30 +351,54 @@ function actionText(action: string) {
         </div>
       </div>
 
-      <div class="plugin-layout">
-        <section class="plugin-list">
+      <div class="plugin-browser">
+        <div class="plugin-browser-header">
+          <span class="plugin-result-count">共 {{ pagination.total }} 个插件</span>
+        </div>
+        <div v-if="pagedRows.length" class="plugin-grid">
           <button
-            v-for="item in rows"
+            v-for="item in pagedRows"
             :key="item.code"
             class="plugin-item"
             :class="{ active: selected?.code === item.code }"
             type="button"
             @click="selectedCode = item.code"
           >
-            <FaIcon name="i-ri:puzzle-2-line" />
-            <span>{{ item.name }}</span>
-            <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
+            <FaIcon :name="pluginIcon(item)" class="plugin-item-icon" />
+            <div class="plugin-item-body">
+              <div class="plugin-item-title">
+                <strong>{{ item.name }}</strong>
+                <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
+              </div>
+              <span class="plugin-item-code">{{ item.code }} · {{ item.version || '未知版本' }}</span>
+              <p>{{ item.description || '暂无插件简介。' }}</p>
+            </div>
+            <FaTag v-if="updatePlanFor(item.code)" variant="default" class="update-tag">
+              可更新至 {{ updatePlanFor(item.code)?.toVersion }}
+            </FaTag>
           </button>
-          <div v-if="!rows.length && !loading" class="empty-state">
-            暂无插件。将插件 JAR 放入 plugins 目录后点击扫描目录。
-          </div>
-        </section>
+        </div>
+        <div v-else-if="!loading" class="empty-state">
+          <template v-if="rows.length">暂无符合当前筛选条件的插件。<FaButton variant="link" @click="resetFilters">重置筛选</FaButton></template>
+          <template v-else>暂无插件。将插件 JAR 放入 plugins 目录后点击扫描目录。</template>
+        </div>
+        <FaPagination
+          v-if="pagination.total > pagination.size"
+          v-model:page="pagination.page"
+          v-model:size="pagination.size"
+          :total="pagination.total"
+          class="plugin-pagination"
+        />
+      </div>
 
-        <section v-if="selected" class="plugin-detail">
+      <section v-if="selected" class="plugin-detail">
           <div class="detail-header">
-            <div>
-              <h2>{{ selected.name }}</h2>
-              <p>{{ selected.description || '-' }}</p>
+            <div class="plugin-detail-title">
+              <FaIcon :name="pluginIcon(selected)" class="plugin-detail-icon" />
+              <div>
+                <h2>{{ selected.name }}</h2>
+                <p>{{ selected.description || '-' }}</p>
+              </div>
             </div>
             <FaTag :variant="statusVariant(selected.status)">{{ statusText(selected.status) }}</FaTag>
           </div>
@@ -442,17 +548,136 @@ function actionText(action: string) {
               删除记录
             </FaButton>
           </div>
-        </section>
-      </div>
+      </section>
     </FaPageMain>
   </div>
 </template>
 
 <style scoped>
-.plugin-toolbar {
+.plugin-toolbar,
+.plugin-toolbar-actions,
+.plugin-filters,
+.plugin-browser-header,
+.plugin-item-title,
+.plugin-item-tags {
   display: flex;
   gap: 10px;
+  align-items: center;
+}
+
+.plugin-toolbar {
+  flex-wrap: wrap;
+  justify-content: space-between;
   margin-bottom: 14px;
+}
+
+.plugin-toolbar-actions,
+.plugin-filters {
+  flex-wrap: wrap;
+}
+
+.plugin-search {
+  width: min(100%, 340px);
+}
+
+.plugin-status-filter {
+  width: 140px;
+}
+
+.plugin-browser,
+.plugin-detail {
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.plugin-browser {
+  padding: 14px;
+}
+
+.plugin-browser-header {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.plugin-result-count,
+.plugin-item-code {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.plugin-item {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+  min-height: 116px;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+  text-align: left;
+}
+
+.plugin-item.active,
+.plugin-item:hover {
+  border-color: var(--color-border-3);
+  background: var(--color-fill-2);
+}
+
+.plugin-item-body {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 5px;
+}
+
+.plugin-item-title {
+  min-width: 0;
+  justify-content: space-between;
+}
+
+.plugin-item-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugin-item-body p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-3);
+  font-size: 13px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.update-tag {
+  grid-column: 2;
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plugin-pagination {
+  margin-top: 16px;
+}
+
+.plugin-detail {
+  min-width: 0;
+  margin-top: 14px;
+  padding: 16px;
 }
 
 .summary-grid {
@@ -460,14 +685,6 @@ function actionText(action: string) {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   margin-bottom: 14px;
-}
-
-.summary-item,
-.plugin-list,
-.plugin-detail {
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
-  background: var(--color-bg-2);
 }
 
 .summary-item {
@@ -506,50 +723,29 @@ function actionText(action: string) {
   font-weight: 700;
 }
 
-.plugin-layout {
-  display: grid;
-  grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
-  gap: 14px;
-  align-items: start;
+.plugin-detail-title {
+  display: flex;
+  gap: 12px;
+  min-width: 0;
+  align-items: flex-start;
 }
 
-.plugin-list {
-  display: grid;
-  gap: 8px;
-  padding: 12px;
+.plugin-item-icon,
+.plugin-detail-icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
 }
 
-.plugin-item {
-  display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  min-height: 44px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
+.plugin-detail-icon {
+  width: 36px;
+  height: 36px;
+  padding: 6px;
   border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-1);
-  text-align: left;
-}
-
-.plugin-item.active,
-.plugin-item:hover {
-  border-color: rgb(var(--primary-6));
   background: var(--color-fill-2);
 }
 
-.plugin-item span,
-.detail-grid strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
-.plugin-detail {
-  min-width: 0;
-  padding: 16px;
-}
 
 .detail-header {
   display: flex;
@@ -667,9 +863,31 @@ function actionText(action: string) {
   color: rgb(var(--danger-6));
 }
 
-@media (max-width: 900px) {
-  .plugin-layout {
+@media (max-width: 640px) {
+  .plugin-toolbar,
+  .plugin-toolbar-actions,
+  .plugin-filters,
+  .detail-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .plugin-search,
+  .plugin-status-filter {
+    width: 100%;
+  }
+
+  .plugin-grid {
     grid-template-columns: 1fr;
   }
+
+  .plugin-item {
+    min-height: 108px;
+  }
+
+  .plugin-pagination {
+    overflow-x: auto;
+  }
 }
+
 </style>

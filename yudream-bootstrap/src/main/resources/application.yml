@@ -150,6 +150,8 @@ yudream.platform.capabilities:
     enabled: ${PLATFORM_MESSAGE_RENDER_ENABLED:true}
   file-preview:
     enabled: ${PLATFORM_FILE_PREVIEW_ENABLED:true}
+  inbound-mail:
+    enabled: ${PLATFORM_INBOUND_MAIL_ENABLED:true}
 
 yudream.platform.ai.client:
   connect-timeout: ${PLATFORM_AI_CONNECT_TIMEOUT:30s}
@@ -178,7 +180,7 @@ yudream.platform.chat:
 yudream.platform.render:
   base-url: ${MESSAGE_RENDER_BASE_URL:http://localhost:3000}
   token: ${MESSAGE_RENDER_TOKEN:}
-  timeout: ${MESSAGE_RENDER_TIMEOUT:30s}
+  timeout: ${MESSAGE_RENDER_TIMEOUT:45s}
   max-response-size: ${MESSAGE_RENDER_MAX_RESPONSE_SIZE:16MB}
 
 yudream.storage.s3:

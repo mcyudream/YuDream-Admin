@@ -22,7 +22,7 @@ flowchart LR
 
 - 服务端点（`yudream-render-server/src/server.ts`）：`GET /health`、`POST /v1/render/html`、`POST /v1/render/markdown`、`POST /v1/render/url`；
 - 渲染服务返回 `{ contentType, data, width, height }`，其中 `data` 是 **Base64 字符串，仅存在于内部服务边界**；Java 网关解码后向调用方返回真实图片字节（见 `HttpMessageRenderGateway#decodeResponse`）；
-- Milky 消息通道在发送 MARKDOWN/HTML 内容时复用同一网关，把内容渲染为图片后经 Milky 上传发送（见 [Milky 协议详解](/protocol/milky)）。
+- Milky / 官方消息通道在发送 MARKDOWN/HTML 内容时复用同一网关，把内容渲染为图片后经出站适配器上传发送（见 [QQ 协议详解](/protocol/milky)）。
 
 ## 双闸门启用
 
@@ -37,7 +37,7 @@ flowchart LR
 |---|---|---|
 | `baseUrl` | `http://localhost:3000` | 渲染服务地址 |
 | `token` | 空 | 内部共享令牌（Docker 部署对应 `MESSAGE_RENDER_TOKEN`） |
-| `timeout` | `30s` | HTTP 调用超时 |
+| `timeout` | `45s` | HTTP 调用超时（需覆盖 url-html 的 30s 默认抓取） |
 | `maxResponseSize` | `16MB` | 响应体积上限 |
 
 Docker Compose 部署时在 `.env` 中设置：
@@ -74,10 +74,10 @@ Headless 安全模型是"浏览器隔离 + 网络封锁 + 私网地址拒绝"：
 
 | 参数 | 范围 / 默认 |
 |---|---|
-| `html` / `markdown` 体积 | ≤ 200 KB |
+| `html` / `markdown` 体积 | ≤ 2 MB |
 | `css` 体积 | ≤ 50 KB |
 | `width` | 320–1920（默认 900） |
-| `maxHeight` | 200–10000（默认 4000） |
+| `maxHeight` | 200–10000（默认 4000）。布局视口仍限制在 1080px，超过该高度时用 CDP `captureBeyondViewport` 或 PNG 分块拼接 |
 | `timeoutMs` | 1000–30000（默认 10000） |
 | `deviceScaleFactor` | 1–2 |
 | `format` | 仅 `png` / `jpeg` |
@@ -139,7 +139,7 @@ curl -X POST http://<host>/api/platform/render \
 
 ## 与其他能力的关系
 
-- **Milky 机器人通道**：富文本降级渲染的消费者（见 [Milky 协议详解](/protocol/milky)）；
+- **QQ 消息通道**：富文本降级渲染的消费者（见 [QQ 协议详解](/protocol/milky)）；
 - **能力框架**：作为 `MESSAGING` 类型能力参与统一的启用/禁用、健康检查与依赖级联（见 features/capability-framework.md）。
 
 ---

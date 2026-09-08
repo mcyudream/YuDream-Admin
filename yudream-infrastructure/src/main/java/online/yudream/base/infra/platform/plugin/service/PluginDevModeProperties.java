@@ -57,7 +57,8 @@ public class PluginDevModeProperties {
         private String frontendDist;
         /** 监听到 src/main/java 变化时是否自动执行编译命令 */
         private boolean autoCompile = true;
-        private String compileCommand = "mvn -q compile -DskipTests";
+        /** 开发模式热编译默认导出 runtime 依赖到 target/plugin-dev/lib，避免第三方 SDK 只在编译期可见。 */
+        private String compileCommand = "mvn -q compile -DskipTests -P dev-export";
 
         public Path classesDir() {
             return Path.of(path).toAbsolutePath().normalize().resolve("target").resolve("classes");

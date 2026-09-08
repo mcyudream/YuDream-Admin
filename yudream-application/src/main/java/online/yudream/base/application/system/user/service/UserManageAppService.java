@@ -11,6 +11,7 @@ import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.common.service.PasswordEncoder;
 import online.yudream.base.domain.system.user.aggregate.Dept;
+import online.yudream.base.domain.system.user.aggregate.MessagingIdentity;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
@@ -45,6 +46,7 @@ public class UserManageAppService {
     private final RoleRepo roleRepo;
     private final DeptRepo deptRepo;
     private final PasswordEncoder passwordEncoder;
+    private final MessagingIdentityAppService messagingIdentityAppService;
 
     @Transactional(readOnly = true)
     public PageResult<UserManageDTO> page(UserPageQuery query) {
@@ -78,6 +80,7 @@ public class UserManageAppService {
         user.replaceRoles(defaultRoleIdsIfNecessary(cmd.getRoleIds(), useDefaultDept));
         ensureRolesBelongToUserDepts(user);
         User saved = userRepo.save(user);
+        messagingIdentityAppService.syncMilkyQq(saved.getId(), cmd.getQq());
         deleteSameEmailUnverifiedUsers(saved);
         return toDTO(saved);
     }
@@ -93,6 +96,7 @@ public class UserManageAppService {
         }
         user.updateProfile(cmd.getNickname(), toEmail(cmd.getEmail()), toPhone(cmd.getPhone()), toQQ(cmd.getQq()), cmd.getEmailVerified());
         User saved = userRepo.save(user);
+        messagingIdentityAppService.syncMilkyQq(saved.getId(), cmd.getQq());
         deleteSameEmailUnverifiedUsers(saved);
         return toDTO(saved);
     }
@@ -152,6 +156,9 @@ public class UserManageAppService {
         }
         if (StringUtils.hasText(phone) && userRepo.existsByPhoneExcludeId(phone, excludeId)) {
             throw new BizException("手机号已存在");
+        }
+        if (StringUtils.hasText(qq) && !online.yudream.base.domain.system.user.service.MessagingIdentityClassifier.milkyQqNumber(qq)) {
+            throw new BizException("QQ 号格式无效");
         }
         if (StringUtils.hasText(qq) && userRepo.existsByQQExcludeId(qq, excludeId)) {
             throw new BizException("QQ已存在");
@@ -299,7 +306,10 @@ public class UserManageAppService {
                 .toList();
         Map<Long, Dept> deptMap = deptRepo.findByIds(deptIds).stream()
                 .collect(Collectors.toMap(Dept::getId, Function.identity()));
-        return users.stream().map(user -> UserAssembler.toManageDTO(user, roleMap, deptMap)).toList();
+        Map<Long, List<MessagingIdentity>> identities =
+                messagingIdentityAppService.listByUsers(users.stream().map(User::getId).toList());
+        return users.stream().map(user -> UserAssembler.toManageDTO(user, roleMap, deptMap,
+                identities.getOrDefault(user.getId(), List.of()))).toList();
     }
 
     private UserManageDTO toDTO(User user) {
@@ -308,7 +318,7 @@ public class UserManageAppService {
         List<Long> deptIds = user.getDepts().stream().map(d -> d.id().getValue()).toList();
         Map<Long, Dept> deptMap = deptRepo.findByIds(deptIds).stream()
                 .collect(Collectors.toMap(Dept::getId, Function.identity()));
-        return UserAssembler.toManageDTO(user, roleMap, deptMap);
+        return UserAssembler.toManageDTO(user, roleMap, deptMap, messagingIdentityAppService.listByUser(user.getId()));
     }
 
     private Email toEmail(String email) {

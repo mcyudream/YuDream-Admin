@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.render.model.RenderModels.RenderRequest;
 import online.yudream.base.domain.platform.render.model.RenderModels.RenderedImage;
+import online.yudream.base.domain.platform.render.model.RenderModels.RenderedPage;
 import online.yudream.base.domain.platform.render.model.RenderModels.SourceType;
 import online.yudream.base.domain.platform.render.service.MessageRenderGateway;
 import org.springframework.http.HttpHeaders;
@@ -54,6 +55,59 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
             throw new BizException("渲染服务不可用：" + exception.getMessage());
         }
         return decodeResponse(response, objectMapper);
+    }
+
+    @Override
+    public RenderedPage fetchHtml(String url) {
+        if (!StringUtils.hasText(url)) {
+            throw new BizException("渲染地址不能为空");
+        }
+        String encoded = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(url.trim().getBytes(StandardCharsets.UTF_8));
+        int timeoutMs = Math.toIntExact(Math.min(30_000L, Math.max(1_000L, timeout().minusSeconds(15).toMillis())));
+        HttpRenderResponse response;
+        try {
+            response = client().post()
+                    .uri(builder -> builder.path("/v1/render/url-html")
+                            .queryParam("urlB64", encoded)
+                            .build())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(Map.of("timeoutMs", timeoutMs))
+                    .exchangeToMono(value -> value.bodyToMono(byte[].class)
+                            .defaultIfEmpty(new byte[0])
+                            .map(body -> new HttpRenderResponse(
+                                    value.statusCode().value(),
+                                    value.headers().contentType().map(MediaType::toString).orElse(""),
+                                    body
+                            )))
+                    .block(timeout());
+        } catch (BizException exception) {
+            throw exception;
+        } catch (RuntimeException exception) {
+            throw new BizException("渲染服务不可用：" + exception.getMessage());
+        }
+        return decodePageResponse(response, objectMapper);
+    }
+
+    static RenderedPage decodePageResponse(HttpRenderResponse response, ObjectMapper objectMapper) {
+        if (response == null) throw new BizException("渲染服务未返回响应");
+        if (response.status() < 200 || response.status() >= 300) {
+            throw new BizException("渲染服务请求失败（HTTP " + response.status() + "）："
+                    + responseMessage(response.body(), objectMapper));
+        }
+        try {
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode payload = root.path("data").isObject() ? root.path("data") : root;
+            String html = firstText(payload.path("html").asText(""), root.path("html").asText(""));
+            if (!StringUtils.hasText(html)) {
+                throw new BizException("渲染服务返回成功状态但没有 HTML：" + responseMessage(response.body(), objectMapper));
+            }
+            return new RenderedPage(html, firstText(payload.path("finalUrl").asText(""), root.path("finalUrl").asText("")));
+        } catch (BizException exception) {
+            throw exception;
+        } catch (Exception ex) {
+            throw new BizException("渲染服务返回成功状态但响应无法解析：" + responseMessage(response.body(), objectMapper));
+        }
     }
 
     static RenderedImage decodeResponse(HttpRenderResponse response, ObjectMapper objectMapper) {
@@ -134,7 +188,11 @@ public class HttpMessageRenderGateway implements MessageRenderGateway {
         switch (request.sourceType()) {
             case HTML -> payload.put("html", request.content());
             case MARKDOWN -> payload.put("markdown", request.content());
-            case URL -> payload.put("url", request.content());
+            case URL -> {
+                payload.put("url", request.content());
+                payload.put("urlB64", Base64.getUrlEncoder().withoutPadding()
+                        .encodeToString(request.content().getBytes(StandardCharsets.UTF_8)));
+            }
         }
         if (request.width() != null) payload.put("width", request.width());
         if (request.maxHeight() != null) payload.put("maxHeight", request.maxHeight());

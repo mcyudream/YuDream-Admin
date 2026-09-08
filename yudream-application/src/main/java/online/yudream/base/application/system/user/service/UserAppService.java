@@ -8,6 +8,8 @@ import online.yudream.base.application.system.user.cmd.UserPasswordResetCmd;
 import online.yudream.base.application.system.user.cmd.UserPasswordResetEmailCmd;
 import online.yudream.base.application.system.user.cmd.UserProfileUpdateCmd;
 import online.yudream.base.application.system.user.cmd.UserRegisterCmd;
+import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
+import online.yudream.base.application.system.user.dto.MessagingBindingTargetDTO;
 import online.yudream.base.application.system.user.dto.UserProfileDTO;
 import online.yudream.base.application.system.user.dto.UserRegisterDTO;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
@@ -29,6 +31,7 @@ import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import online.yudream.base.domain.system.user.service.EmailVerifyTokenProvider;
 import online.yudream.base.domain.system.user.service.PasswordResetTokenProvider;
 import online.yudream.base.domain.system.user.service.UserRegisterMailSender;
+import online.yudream.base.domain.system.user.service.MessagingIdentityClassifier;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.EmailVerifyTarget;
 import online.yudream.base.domain.system.user.valobj.PasswordResetTarget;
@@ -73,6 +76,7 @@ public class UserAppService {
     private final UserRepo userRepo;
     private final SettingRepo settingRepo;
     private final PluginQqBindingService pluginQqBindingService;
+    private final MessagingIdentityAppService messagingIdentityAppService;
     private final PluginExtensionQuery pluginExtensionQuery;
     private final RoleRepo roleRepo;
     private final DeptRepo deptRepo;
@@ -105,7 +109,7 @@ public class UserAppService {
     @Transactional
     public UserRegisterDTO register(UserRegisterCmd cmd) {
         ensureRegisterAllowed(cmd);
-        ensureRequiredVerifications(cmd);
+        boolean identityVerified = ensureRequiredVerifications(cmd) || optionalVerificationPassed(cmd);
         if (userRepo.existsVerifiedByUsername(cmd.getUsername())) {
             throw new BizException("用户名已存在");
         }
@@ -124,7 +128,7 @@ public class UserAppService {
                 .nickname(cmd.getNickname())
                 .email(email)
                 .password(Password.of(cmd.getPassword(), passwordEncoder))
-                .emailVerified(false)
+                .emailVerified(identityVerified)
                 .build();
         user.joinDept(DeptID.of(rootDept.getId()), true);
         user.assignRoles(RoleID.of(userRole.getId()));
@@ -132,8 +136,10 @@ public class UserAppService {
         User saved = userRepo.save(user);
         externalLoginBindingAppService.claim(cmd.getBindingToken(), saved.getId());
 
-        String token = emailVerifyTokenProvider.generate(saved.getId(), email.getValue());
-        userRegisterMailSender.sendVerifyEmail(saved.getUsername(), email.getValue(), token);
+        if (!identityVerified) {
+            String token = emailVerifyTokenProvider.generate(saved.getId(), email.getValue());
+            userRegisterMailSender.sendVerifyEmail(saved.getUsername(), email.getValue(), token);
+        }
 
         log.info("用户注册成功: id={}, username={}, email={}, deptId={}, roleId={}",
                 saved.getId(), saved.getUsername(), email.getValue(), rootDept.getId(), userRole.getId());
@@ -239,12 +245,20 @@ public class UserAppService {
 
     @Transactional(readOnly = true)
     public PluginQqBindingCode issueQqBindingCode(Long userId) {
-        User user = userRepo.findById(userId)
+        userRepo.findById(userId)
                 .orElseThrow(() -> new BizException("用户不存在"));
-        if (user.getQq() != null && StringUtils.hasText(user.getQq().getValue())) {
-            throw new BizException("当前账号已绑定 QQ，不能重复生成绑定码");
-        }
         return pluginQqBindingService.issue(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MessagingBindingTargetDTO> listMessagingBindingTargets(Long userId) {
+        userRepo.findById(userId).orElseThrow(() -> new BizException("用户不存在"));
+        return messagingIdentityAppService.listBindingTargets(userId);
+    }
+
+    @Transactional(readOnly = true)
+    public MessagingBindingCodeDTO issueMessagingBindingCode(Long userId, String connectionId) {
+        return messagingIdentityAppService.issueBindingCode(userId, connectionId);
     }
 
     @Transactional
@@ -274,8 +288,13 @@ public class UserAppService {
         if (qq != null && userRepo.existsByQQExcludeId(qq.getValue(), userId)) {
             throw new BizException("QQ 已被使用");
         }
+        if (StringUtils.hasText(cmd.getQq()) && !MessagingIdentityClassifier.milkyQqNumber(cmd.getQq().trim())) {
+            throw new BizException("QQ 号格式无效");
+        }
         user.updateProfile(cmd.getNickname(), email, phone, qq, null);
-        return toProfileDTO(userRepo.save(user));
+        User saved = userRepo.save(user);
+        messagingIdentityAppService.syncMilkyQq(userId, qq == null ? null : qq.getValue());
+        return toProfileDTO(saved);
     }
 
     @Transactional
@@ -352,10 +371,10 @@ public class UserAppService {
         }
     }
 
-    private void ensureRequiredVerifications(UserRegisterCmd cmd) {
+    private boolean ensureRequiredVerifications(UserRegisterCmd cmd) {
         List<String> requiredCodes = requiredVerificationCodes();
         if (requiredCodes.isEmpty()) {
-            return;
+            return false;
         }
         List<IdentityVerificationProvider> providers = pluginExtensionQuery.extensions(IdentityVerificationProvider.class);
         VerificationSubject subject = new VerificationSubject(cmd.getUsername(), cmd.getEmail(), Map.of());
@@ -376,6 +395,22 @@ public class UserAppService {
                 throw new BizException(StringUtils.hasText(result.message()) ? result.message() : "未完成身份核验：" + displayName);
             }
         }
+        return true;
+    }
+
+    private boolean optionalVerificationPassed(UserRegisterCmd cmd) {
+        VerificationSubject subject = new VerificationSubject(cmd.getUsername(), cmd.getEmail(), Map.of());
+        for (IdentityVerificationProvider provider : pluginExtensionQuery.extensions(IdentityVerificationProvider.class)) {
+            try {
+                IdentityVerificationResult result = provider.check(subject);
+                if (result != null && result.verified()) {
+                    return true;
+                }
+            } catch (RuntimeException e) {
+                log.warn("可选身份核验执行异常: provider={}", provider.getClass().getName(), e);
+            }
+        }
+        return false;
     }
 
     private List<String> requiredVerificationCodes() {
@@ -540,19 +575,7 @@ public class UserAppService {
     }
 
     private UserProfileDTO toProfileDTO(User user) {
-        return UserProfileDTO.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .nickname(user.getNickname())
-                .email(user.getEmail() == null ? null : user.getEmail().getValue())
-                .phone(user.getPhone() == null ? null : user.getPhone().getValue())
-                .qq(user.getQq() == null ? null : user.getQq().getValue())
-                .emailVerified(user.isEmailVerified())
-                .avatarFileId(user.getAvatarFileId())
-                .avatar(avatarUrl(user))
-                .createTime(user.getCreateTime())
-                .updateTime(user.getUpdateTime())
-                .build();
+        return UserAssembler.toProfileDTO(user, avatarUrl(user), messagingIdentityAppService.listByUser(user.getId()));
     }
 
 }

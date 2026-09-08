@@ -25,5 +25,10 @@ describe("BrowserPool", () => {
 
     pool.release();
     expect(launch).toHaveBeenCalledTimes(2);
+    expect(launch).toHaveBeenCalledWith(expect.objectContaining({
+      channel: "chromium",
+      headless: true,
+      ignoreDefaultArgs: ["--enable-automation"]
+    }));
   });
 });

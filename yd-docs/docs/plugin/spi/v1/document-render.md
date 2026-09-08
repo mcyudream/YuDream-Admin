@@ -1,6 +1,6 @@
 # 邮件与文档渲染（Mail / Word 模板 / 图片渲染）
 
-> SPI v1（2.7.0）· 包 `online.yudream.base.plugin.spi.system.mail` / `system.document` / `system.render`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system.mail` / `system.document` / `system.render`
 
 本页覆盖宿主暴露给插件的四组"输出型"能力端口：
 
