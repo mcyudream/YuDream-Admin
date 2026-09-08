@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
@@ -28,6 +28,9 @@ const documentDetail = ref<WikiPublicDocumentDetail | null>(null)
 const documentLoading = ref(false)
 const documentError = ref('')
 const documentId = computed(() => String(route.query.doc || ''))
+const mobileNavOpen = ref(false)
+const isMobileNav = ref(false)
+let mobileQuery: MediaQueryList | undefined
 const documentGroups = computed(() => {
   const groups = new Map<string, WikiPublicDocument[]>()
   for (const doc of documents.value) {
@@ -65,11 +68,34 @@ async function load() {
   }
 }
 
+function closeMobileNav() {
+  mobileNavOpen.value = false
+}
+
+function toggleMobileNav() {
+  mobileNavOpen.value = !mobileNavOpen.value
+}
+
+function syncMobileNav() {
+  isMobileNav.value = Boolean(mobileQuery?.matches)
+  if (!isMobileNav.value) closeMobileNav()
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeMobileNav()
+}
+
+function lockBody(lock: boolean) {
+  document.body.style.overflow = lock ? 'hidden' : ''
+}
+
 function open(node: WikiNode) {
+  closeMobileNav()
   void router.push({ path: `/wiki/${encodeURIComponent(spaceSlug.value)}/${encodeURI(node.path || node.slug)}` })
 }
 
 function openDocument(doc: WikiPublicDocument) {
+  closeMobileNav()
   void router.push({ path: route.path, query: { doc: doc.id } })
 }
 
@@ -115,10 +141,18 @@ function flatten(nodes: WikiNode[]): WikiNode[] {
   return nodes.flatMap(node => [node, ...flatten(node.children || [])])
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  mobileQuery = window.matchMedia('(max-width: 760px)')
+  syncMobileNav()
+  mobileQuery.addEventListener('change', syncMobileNav)
+  window.addEventListener('keydown', onEscape)
+})
+watch(mobileNavOpen, visible => lockBody(visible))
 watch(spaceSlug, () => {
   documents.value = []
   documentDetail.value = null
+  closeMobileNav()
   load()
 })
 watch(documentId, loadDocument, { immediate: true })
@@ -137,7 +171,12 @@ watch(active, (page) => {
     ],
   })
 })
-onBeforeUnmount(clearPublicSeo)
+onBeforeUnmount(() => {
+  lockBody(false)
+  window.removeEventListener('keydown', onEscape)
+  mobileQuery?.removeEventListener('change', syncMobileNav)
+  clearPublicSeo()
+})
 </script>
 
 <template>
@@ -152,7 +191,12 @@ onBeforeUnmount(clearPublicSeo)
     </header>
 
     <div class="wiki-public-layout wiki-public-shell">
-      <aside class="wiki-public-sidebar">
+      <aside
+        id="wiki-public-sidebar"
+        class="wiki-public-sidebar"
+        :class="{ 'is-open': mobileNavOpen }"
+        :aria-hidden="isMobileNav && !mobileNavOpen"
+      >
         <div class="wiki-public-sidebar__title"><FaIcon name="i-ri:folder-3-line" /> 文档目录</div>
         <nav class="wiki-public-nav" aria-label="文档目录"><FaButton v-for="node in pages" :key="node.id" :class="{ active: !documentId && node.id === active?.id }" @click="open(node)">{{ node.title }}</FaButton></nav>
         <template v-if="documents.length">
@@ -191,6 +235,20 @@ onBeforeUnmount(clearPublicSeo)
     </div>
 
     <footer class="wiki-public-footer"><div class="wiki-public-shell wiki-public-footer__inner"><span>{{ appSettingsStore.siteName ? `${appSettingsStore.siteName} Wiki` : '公开知识库' }}</span><a href="/wiki">知识库</a></div></footer>
+    <div class="wiki-public-overlay" :class="{ 'is-open': mobileNavOpen }" aria-hidden="true" @click="closeMobileNav" />
+    <button
+      type="button"
+      class="wiki-public-fab"
+      :class="{ 'is-open': mobileNavOpen }"
+      :aria-expanded="mobileNavOpen"
+      aria-controls="wiki-public-sidebar"
+      :aria-label="mobileNavOpen ? '关闭文档目录' : '打开文档目录'"
+      @click="toggleMobileNav"
+    >
+      <span class="wiki-public-fab__line" />
+      <span class="wiki-public-fab__line" />
+      <span class="wiki-public-fab__line" />
+    </button>
   </div>
 </template>
 
@@ -252,18 +310,86 @@ onBeforeUnmount(clearPublicSeo)
 .wiki-public-footer { padding: 28px 0; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 .wiki-public-footer__inner { display: flex; justify-content: space-between; color: var(--color-text-3); font-size: 13px; }
 .wiki-public-footer a { color: var(--color-text-1); text-decoration: none; }
+.wiki-public-overlay, .wiki-public-fab { display: none; }
 @media (max-width: 760px) {
   .wiki-public-shell { width: min(100% - 28px, 1240px); }
   .wiki-public-header__inner { min-height: 56px; }
   .wiki-public-header__nav a:last-child { display: none; }
-  .wiki-public-layout { grid-template-columns: 1fr; }
-  .wiki-public-sidebar { position: static; max-height: none; overflow-y: visible; padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--color-border-2); }
-  .wiki-public-sidebar__title { display: none; }
-  .wiki-public-nav { display: flex; gap: 6px; padding-bottom: 4px; overflow-x: auto; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
-  .wiki-public-nav button { width: auto; flex: 0 0 auto; white-space: nowrap; }
-  /* 覆盖桌面端 :deep 规则（优先级更高），否则移动端每个汉字都会折行 */
-  .wiki-public-nav :deep([data-slot="button"]) { flex-shrink: 0; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
-  .wiki-public-main { padding: 30px 0 48px; }
+  .wiki-public-layout { display: block; }
+  .wiki-public-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 41;
+    width: min(288px, 82vw);
+    max-height: none;
+    align-self: auto;
+    padding: 24px 12px 88px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-right: 1px solid var(--color-border-2);
+    background: var(--color-bg-1);
+    transform: translateX(-100%);
+    transition: transform 0.28s ease, visibility 0s linear 0.28s;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .wiki-public-sidebar.is-open {
+    transform: translateX(0);
+    pointer-events: auto;
+    visibility: visible;
+    transition: transform 0.28s ease, visibility 0s linear 0s;
+    box-shadow: 8px 0 32px rgb(0 0 0 / 16%);
+  }
+  .wiki-public-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgb(0 0 0 / 45%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+  }
+  .wiki-public-overlay.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .wiki-public-fab {
+    display: flex;
+    position: fixed;
+    left: max(16px, env(safe-area-inset-left));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    z-index: 42;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border: 1px solid var(--color-border-2);
+    border-radius: 50%;
+    background: var(--color-bg-2);
+    color: var(--color-text-1);
+    box-shadow: 0 8px 24px rgb(0 0 0 / 16%);
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: background 0.2s ease, transform 0.15s ease;
+  }
+  .wiki-public-fab:active { transform: scale(0.94); }
+  .wiki-public-fab__line {
+    display: block;
+    width: 16px;
+    height: 2px;
+    border-radius: 1px;
+    background: currentcolor;
+    transition: transform 0.25s ease, opacity 0.2s ease;
+  }
+  .wiki-public-fab.is-open .wiki-public-fab__line:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .wiki-public-fab.is-open .wiki-public-fab__line:nth-child(2) { opacity: 0; }
+  .wiki-public-fab.is-open .wiki-public-fab__line:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+  .wiki-public-main { padding: 30px 0 72px; }
   .wiki-public-main > h1 { font-size: 28px; }
 }
 </style>
