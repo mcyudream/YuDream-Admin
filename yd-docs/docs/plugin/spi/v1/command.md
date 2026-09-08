@@ -1,4 +1,4 @@
-# 命令端口：PluginCommandRegistry
+# 命令端口：消息指令注册与官方面板同步
 
 插件可以向机器人/系统注册**命令**（如 `/签到`、`/wallet 查询`），由宿主统一解析、鉴权与分发。
 
@@ -187,8 +187,10 @@ sequenceDiagram
 
 - 命令字面量全局唯一性由宿主管理，重复注册会被拒绝或覆盖，建议带上插件特色前缀。
 - `allowAnonymous = true` 的命令拿到的 `ctx.userId()` 可能为 `null`，handler 内必须判空。
-- 命令回复经 [消息端口](/plugin/spi/v1/messaging) 发送；需要协议级细节参见 [Milky 协议详解](/protocol/milky)。
+- 命令回复经 [消息端口](/plugin/spi/v1/messaging) 发送；需要协议级细节参见 [QQ 协议详解](/protocol/milky)。
 - `listAccessible` 遵循权限模型，可用于在插件管理端展示"当前用户可用命令"。
+- 官方 QQ 机器人连接启用后，宿主会把系统指令与已启用插件指令自动注册到官方指令 UI：单聊底部自定义菜单（`PUT /v2/menu`）以及单聊、群聊、文字子频道、频道私信的指令面板（`/v2/panels`）。菜单按钮是 `send_message`、面板元素是 `command`。启动时先拉取远端菜单/面板到本地快照，插件全部加载后再按 remark + items 语义差异分类创建或更新；运行中插件启停/重载与本地快照对比，30s 合并写入，菜单无变动则跳过官方调用，避免面板查询 30 QPM、写入 10 QPM 被打满。官方未提供面板删除接口，非托管面板不会被改动。群聊官方事件是原生 AT/私聊事件，不是 Milky mention 段。若点击后只产生 `INTERACTION_CREATE`（没有后续 `GROUP_AT_MESSAGE_CREATE`），宿主把 `button_data` / `send_message` / 指令名当成官方定向消息（`mention_self=true`），并先 `PUT /interactions/{id}` 回执。宿主从正文剥掉 `<@bot>` 后再解析命令，命中指令时只走命令分发、不广播 `onMessage`，未命中指令的官方 AT/私聊/交互正文仍按该原生标记触发 AI。Milky 连接继续只看真实 mention 段。底部菜单一级最多 10 项、子菜单最多 5 项；面板每场景最多 20 项。命令回复走被动回复（自动附带最近 `msg_id` / `event_id`）。
+
 
 ---
 

@@ -64,7 +64,7 @@ services:
       - PLATFORM_MESSAGE_RENDER_ENABLED=${PLATFORM_MESSAGE_RENDER_ENABLED:-true}
       - MESSAGE_RENDER_BASE_URL=${MESSAGE_RENDER_BASE_URL:-http://render-server:3000}
       - MESSAGE_RENDER_TOKEN=${MESSAGE_RENDER_TOKEN:-}
-      - MESSAGE_RENDER_TIMEOUT=${MESSAGE_RENDER_TIMEOUT:-30s}
+      - MESSAGE_RENDER_TIMEOUT=${MESSAGE_RENDER_TIMEOUT:-45s}
       # 文件预览（平台能力，双闸门）：部署闸门决定「平台能力」页是否出现该能力；
       # 运行闸门为管理后台「平台能力 > 文件预览」的启用开关与 kkFileView 配置
       - PLATFORM_FILE_PREVIEW_ENABLED=${PLATFORM_FILE_PREVIEW_ENABLED:-true}
@@ -116,6 +116,7 @@ services:
       - RENDER_TOKEN=${MESSAGE_RENDER_TOKEN:-}
       - RENDER_CONCURRENCY=${RENDER_CONCURRENCY:-2}
       - RENDER_TIMEOUT_MS=${RENDER_TIMEOUT_MS:-30000}
+      - RENDER_MAX_CONCURRENT=${RENDER_CONCURRENCY:-2}
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777

@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Builder
@@ -29,4 +31,6 @@ public class UserProfileDTO implements Serializable {
     private Long avatarFileId;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
+    @Builder.Default
+    private List<MessagingIdentityDTO> messagingIdentities = new ArrayList<>();
 }

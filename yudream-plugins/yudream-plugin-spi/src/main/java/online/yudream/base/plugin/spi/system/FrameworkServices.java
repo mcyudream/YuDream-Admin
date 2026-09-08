@@ -3,6 +3,7 @@ package online.yudream.base.plugin.spi.system;
 import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateService;
 import online.yudream.base.plugin.spi.system.mail.PluginMailService;
+import online.yudream.base.plugin.spi.system.mail.PluginInboundMailService;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
 import online.yudream.base.plugin.spi.system.storage.PluginFileStore;
 import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
@@ -32,6 +33,11 @@ public interface FrameworkServices {
     PluginSecurityService security();
 
     PluginMailService mail();
+
+    default PluginInboundMailService inboundMail() {
+        return new PluginInboundMailService() {
+        };
+    }
 
     PluginWordTemplateService wordTemplates();
 

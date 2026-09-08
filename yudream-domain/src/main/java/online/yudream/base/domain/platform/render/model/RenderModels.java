@@ -26,4 +26,11 @@ public final class RenderModels {
             return content.clone();
         }
     }
+
+    public record RenderedPage(String html, String finalUrl) {
+        public RenderedPage {
+            html = html == null ? "" : html;
+            finalUrl = finalUrl == null ? "" : finalUrl;
+        }
+    }
 }

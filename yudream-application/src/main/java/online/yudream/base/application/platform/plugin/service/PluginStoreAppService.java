@@ -83,7 +83,8 @@ public class PluginStoreAppService {
     public List<PluginMarketplaceUpdatePlanDTO> updatePlans() {
         List<PluginModuleDTO> localPlugins = installedPlugins();
         return localPlugins.stream()
-                .filter(plugin -> StringUtils.hasText(plugin.getCode()))
+                // 一个损坏的本地插件记录不能拖垮整个更新检查接口。
+                .filter(plugin -> validCode(plugin == null ? null : plugin.getCode()))
                 .map(plugin -> createUpdatePlan(plugin, localPlugins, null))
                 .flatMap(java.util.Optional::stream)
                 .filter(this::isUpgrade)
@@ -138,6 +139,13 @@ public class PluginStoreAppService {
 
     @Transactional
     public PluginMarketplaceUpdateResultDTO update(String code, String targetVersion) {
+        // 更新会同时替换 JAR、写回备份元数据并刷新插件注册表，同一进程内必须串行。
+        synchronized (this) {
+            return updateSerial(code, targetVersion);
+        }
+    }
+
+    private PluginMarketplaceUpdateResultDTO updateSerial(String code, String targetVersion) {
         String normalizedCode = normalizeCode(code);
         if (!StringUtils.hasText(targetVersion)) {
             throw unavailable();
@@ -166,9 +174,15 @@ public class PluginStoreAppService {
     private java.util.Optional<PluginMarketplaceUpdatePlanDTO> createUpdatePlan(PluginModuleDTO localPlugin,
                                                                                   List<PluginModuleDTO> localPlugins,
                                                                                   String targetVersion) {
-        String normalizedCode = normalizeCode(localPlugin.getCode());
-        return pluginStoreGateway.detail(normalizedCode)
-                .flatMap(detail -> createUpdatePlan(localPlugin, localPlugins, detail, targetVersion));
+        try {
+            String normalizedCode = normalizeCode(localPlugin.getCode());
+            return pluginStoreGateway.detail(normalizedCode)
+                    .flatMap(detail -> createUpdatePlan(localPlugin, localPlugins, detail, targetVersion));
+        } catch (BizException exception) {
+            log.warn("跳过插件 {} 的市场更新计划：{}", localPlugin == null ? null : localPlugin.getCode(),
+                    exception.getMessage());
+            return java.util.Optional.empty();
+        }
     }
 
     private java.util.Optional<PluginMarketplaceUpdatePlanDTO> createUpdatePlan(PluginModuleDTO localPlugin,
@@ -465,10 +479,14 @@ public class PluginStoreAppService {
     }
 
     private String normalizeCode(String code) {
-        if (!StringUtils.hasText(code) || !code.trim().matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}")) {
+        if (!validCode(code)) {
             throw unavailable();
         }
         return code.trim();
+    }
+
+    private boolean validCode(String code) {
+        return StringUtils.hasText(code) && code.trim().matches("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
     }
 
     private void deleteQuietly(Path path) {

@@ -36,7 +36,7 @@
 | `documents(pluginCode)` | `PluginDocumentStore` | 插件私有文档存储 |
 | `files(pluginCode)` | `PluginFileStore` | 插件私有文件存储 |
 | `secrets(pluginCode)` | `PluginSecretStore` | 插件私密切钥存储 |
-| `messaging()` / `messagingRaw()` | `PluginMessagingService` / `PluginMessagingRawService` | 消息渠道（QQ 等）收发 |
+| `messaging()` / `messagingRaw()` | `PluginMessagingService` / `PluginMessagingRawService` | 消息渠道（QQ：Milky 或官方 OpenAPI）收发；连接 `protocol` 区分出站协议 |
 | `render()` | `PluginRenderService` | 通用渲染 |
 | `platformFile(fileId)` | `Optional<PluginStoredFile>` | 只读访问平台通用上传（`/api/files`）的大文件 |
 | `setting(key)` | `Optional<String>` | 读取系统设置 |
@@ -143,6 +143,6 @@ flowchart LR
 - [创建你的第一个插件](/plugin/getting-started) —— 从零到可用
 - [插件规范与检查清单](/plugin/specification) —— 工程约束
 - [后端 SPI 参考](/plugin/spi/) —— 按版本号组织的完整接口文档
-- [@yudream/plugin-sdk](/plugin/sdk/) —— 前端 SDK 全量 API
+- [@yudream/plugin-sdk](/plugin/sdk/) —— 前端 SDK 全量 API（含 `sdk.messaging` / `sdk.users` / `sdk.ai` 宿主目录）
 - [插件前端工程化](/plugin/frontend-remote) —— remoteEntry 构建与打包
 - [组件库](/components/) —— 宿主共享组件（演示 + 源码 + API）

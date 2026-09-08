@@ -31,7 +31,7 @@
 - **CONFIG**：yml `dev-mode.projects` 列表，面板只读；
 - **FILE**：调试浮窗「设置」页登记的目录，持久化在本地清单文件（默认 `plugins/dev-projects.json`，相对 `user.dir`，与插件 JAR 目录同约定，已被 `.gitignore` 的 `/plugins/` 覆盖；可用 `dev-mode.store-file` 覆盖路径）。此文件是有意选择的**非数据库存储**——coding agent 与用户都能直接读取它来定位插件源码目录。
 
-合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），开发模式开启时已登记且产物可用的项目会在宿主启动后按依赖顺序恢复启用；设置页也可直接点击启用。登记后若插件已启用会立即触发一次热切重载。设置页「批量登记」可选择插件仓根目录，宿主有界扫描（深度 ≤ 3，跳过 `node_modules`/`target`/`dist`/`src`/隐藏目录，上限 100 个候选）其中的插件模块并一次性写入清单：扫描内同 code 保留路径排序后的第一项，已在 CONFIG/FILE 登记或同路径重复的条目跳过并返回原因。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
+合并规则：同 code 时 CONFIG 优先并输出告警；面板只能增删 FILE 源，对 CONFIG 源项目的删除会被拒绝并提示去 yml 移除。清单文件带 mtime 缓存自动重载（watcher 每秒轮询天然驱动），开发模式开启时已登记且产物可用的项目会在宿主启动后按依赖顺序恢复启用；设置页也可直接点击启用。登记后若插件已启用会立即触发一次热切重载。设置页「批量登记」可选择插件仓根目录，宿主有界扫描（深度 ≤ 3，跳过 `node_modules`/`target`/`dist`/`src`/隐藏目录，上限 100 个候选）其中的插件模块并一次性写入清单：扫描内同 code 保留路径排序后的第一项，已在 CONFIG/FILE 登记或同路径重复的条目跳过并返回原因；新写入条目的 `compileCommand` 默认 `mvn -q compile -DskipTests -P dev-export`。登记时可在宿主机目录选择弹窗中从文件系统根目录逐层浏览；目录条目会标记 Maven 模块与插件模块，选中后自动回填绝对路径，并在 `code` 尚未填写时回填从 `plugin.yml` 推断出的编码。宿主依次读 `<path>/target/classes/plugin.yml`、`<path>/src/main/resources/plugin.yml` 自动推断；都读不到会报错提示先执行一次 `mvn compile`。
 
 「设置」页的「新建插件」可免去手工搭骨架：填父目录与 kebab-case 编码（可选显示名、版本、描述、depend/softdepend），宿主在 `{父目录}/yudream-plugin-{code}` 生成**独立 pom**（无 parent，SPI 依赖经本机 `~/.m2` 解析，默认版本跟随宿主根 pom 的 `yudream.plugin.spi.version`，可用 `spiVersion` 覆盖）、`plugin.yml`、含 ping 自检指令的入口类（包名 `online.yudream.base.plugin.{code去连字符}`）与 domain/application/infrastructure/interfaces 四个空分包。`register` 默认开启，生成即登记为开发模式项目，执行一次 `mvn compile` 后开发模式自动加载；目标目录已存在且非空时拒绝生成。
 
@@ -149,7 +149,7 @@ yudream:
 身份模拟（`SandboxAwarePluginUserService`，`@Primary` 装饰 SPI 实现，仅沙盒作用域激活时改写）：
 
 - 会话创建可携带 `forceUnbound`（插件侧 `findByQq` 判定为未绑定）与 `simulateRoles` 三态：`null` 走发送人真实角色（默认）、空列表为无角色、非空为角色 code 列表（未知 code 记入 `unknownRoles`）；角色选项经 `GET /qq-sandbox/presets` 下发。面板默认发送人取首个已绑定系统用户，避免默认匿名导致插件全被「未绑定」阻断。
-- 沙盒会话内 `bindQqOnce`/`create`/`updateProfile` 抛 `BizException` 禁止写系统用户数据；每次身份改写追加 `sandbox/identity.override` 时间线事件。
+- 沙盒会话内 `bindQqOnce`/`bindMessagingIdentityOnce`/`create`/`updateProfile` 抛 `BizException` 禁止写系统用户数据；每次身份改写追加 `sandbox/identity.override` 时间线事件。
 
 错误诊断可观测性：
 
@@ -210,7 +210,7 @@ vite dev 中间件把 `audit-report.json` 暴露在 `/__yudream-devtools/audit.j
 - **悬浮按钮不出现**：确认当前账号有 `platform:plugin-devtools:view` 权限；后端不可用时仅前端 DEV 模式可见降级面板。按钮可能被拖到了屏幕边缘收成半隐边缘条——沿左右边缘找一下（悬停会提亮加宽），或按 `Ctrl/Cmd+Shift+D` 直接开关浮窗，或在 localStorage 删除 `pluginDevtoolsFab` 重置位置。
 - **开发模式未按预期开启/关闭**：看「概览」页状态卡的「自动检测/配置开启」标记——未显式配置 `enabled` 时按源码/JAR 运行自动判定，显式配置优先于自动检测。
 - **面板登记的目录不生效**：看「设置」页项目行的三个状态点（源码目录存在/类产物已编译/plugin.yml 可读）；登记清单在 `devProjectStoreFile` 指向的 JSON 文件，可直接检查其内容。
-- **改代码不重载**：看「概览」页最近动态的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。
+- **改代码不重载**：看「概览」页最近动态的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。面板登记留空时默认 `mvn -q compile -DskipTests -P dev-export`，热编译会同步刷新 `target/plugin-dev/lib`；第三方 SDK 缺失（如 `AlipayApiException`）时先确认该命令带了 `-P dev-export` 并已执行过一次 `package`。
 - **前端改动不生效**：确认插件前端在 `vite build --watch`，且最近动态出现 FRONTEND_RELOAD；重挂载会重置页面状态属预期行为。
 - **追踪页查不到运行中的执行**：完成才落库，运行中的 trace 在「实时执行」区（SSE 累积）查看。
 - **审查面板 404**：先在 `yudream-frontend` 根目录执行 `pnpm audit:ui` 生成报告；该中间件仅在 vite dev 模式存在。

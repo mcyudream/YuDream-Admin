@@ -367,8 +367,8 @@ function handleResetPanel() {
           <FaInput v-model="addForm.frontendDist" placeholder="默认前端 build 输出目录" />
         </div>
         <div class="add-form__field">
-          <span class="add-form__label">编译命令（可选，留空用默认 mvn compile）</span>
-          <FaInput v-model="addForm.compileCommand" placeholder="mvn -q compile" />
+          <span class="add-form__label">编译命令（可选，留空默认 mvn -q compile -DskipTests -P dev-export）</span>
+          <FaInput v-model="addForm.compileCommand" placeholder="mvn -q compile -DskipTests -P dev-export" />
         </div>
         <div class="add-form__switch">
           <FaSwitch v-model="addForm.autoCompile" />

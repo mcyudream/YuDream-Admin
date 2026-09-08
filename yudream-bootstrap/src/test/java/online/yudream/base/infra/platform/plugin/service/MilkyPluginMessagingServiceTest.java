@@ -6,7 +6,6 @@ import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.service.MilkyApiGateway;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageContent;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessageRequest;
-import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -33,7 +32,7 @@ class MilkyPluginMessagingServiceTest {
         when(connections.findById(100L)).thenReturn(Optional.of(connection));
         when(gateway.invoke(any(), eq("send_group_message"), any())).thenReturn(Map.of("message_seq", 42));
         MilkyPluginMessagingService service = new MilkyPluginMessagingService(
-                connections, gateway, mock(PluginUserService.class), new ObjectMapper());
+                connections, gateway, null, new ObjectMapper());
 
         service.send(new PluginMessageRequest("100", "qq", "bot", "200", new PluginMessageContent(
                 PluginMessageContent.Type.TEXT,

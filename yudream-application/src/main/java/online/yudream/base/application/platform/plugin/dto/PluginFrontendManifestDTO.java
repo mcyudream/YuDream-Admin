@@ -20,8 +20,12 @@ public class PluginFrontendManifestDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @Builder.Default
-    private String sdkVersion = "1.0.0";
+    private String sdkVersion = "1.3.0";
 
     @Builder.Default
     private List<PluginFrontendModuleDTO> modules = new ArrayList<>();
+
+    /** 已启用插件声明的全局挂件；匿名访客下发时恒为空。 */
+    @Builder.Default
+    private List<PluginGlobalWidgetDTO> globalWidgets = new ArrayList<>();
 }

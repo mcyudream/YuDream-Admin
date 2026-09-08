@@ -38,6 +38,14 @@ interface RegisterData {
   emailVerified: boolean
 }
 
+export interface VerificationMethod {
+  code: string
+  displayName: string
+  description?: string
+  icon?: string
+  sort?: number
+}
+
 export interface DeptItem {
   id: IdValue
   name: string
@@ -165,6 +173,10 @@ export default {
 
   register: (data: { username: string, email: string, password: string, nickname?: string, bindingToken?: string }) => {
     return userApi.post<unknown, { status: 1, error: '', data: RegisterData }>('api/user/register', data, { skipTokenRefresh: true })
+  },
+
+  verificationMethods: () => {
+    return userApi.get<unknown, { status: 1, error: '', data: VerificationMethod[] }>('api/user/register/verification-methods', { skipTokenRefresh: true })
   },
 
   verifyEmail: (token: string) => {

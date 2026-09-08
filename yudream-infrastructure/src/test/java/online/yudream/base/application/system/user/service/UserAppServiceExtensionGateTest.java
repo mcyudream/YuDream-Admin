@@ -150,7 +150,7 @@ class UserAppServiceExtensionGateTest {
             }
         };
         SettingRepo settings = settingRepo == null ? emptySettings() : settingRepo;
-        return new UserAppService(null, settings, null, query, null, null, null, null, null, null, null, null, null);
+        return new UserAppService(null, settings, null, null, query, null, null, null, null, null, null, null, null, null);
     }
 
     private SettingRepo settingsWithRequiredVerifications(String codes) {

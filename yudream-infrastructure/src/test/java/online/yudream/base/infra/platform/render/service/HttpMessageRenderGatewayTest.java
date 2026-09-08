@@ -123,4 +123,54 @@ class HttpMessageRenderGatewayTest {
 
         assertTrue(error.getMessage().contains("selector did not match"));
     }
+
+    @Test
+    void decodesUrlHtmlResponse() {
+        String json = "{\"html\":\"<html>report</html>\",\"finalUrl\":\"https://www.chsi.com.cn/xlcx/bg.do\"}";
+        var page = HttpMessageRenderGateway.decodePageResponse(
+                new HttpMessageRenderGateway.HttpRenderResponse(200, "application/json",
+                        json.getBytes(StandardCharsets.UTF_8)), objectMapper
+        );
+        assertEquals("<html>report</html>", page.html());
+        assertEquals("https://www.chsi.com.cn/xlcx/bg.do", page.finalUrl());
+    }
+
+    @Test
+    void fetchHtmlSendsUrlSafeBase64QueryAndTimeoutBudget() {
+        String url = "https://www.chsi.com.cn/xlcx/bg.do?vcode=APEVUKH9C8SSGS5D&srcid=bgcx";
+        String expected = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(url.getBytes(StandardCharsets.UTF_8));
+        var captured = new String[1];
+        var server = HttpServer.create().port(0).route(routes -> routes.post("/v1/render/url-html",
+                (request, response) -> {
+                    captured[0] = request.uri().contains("?")
+                            ? request.uri().substring(request.uri().indexOf('?') + 1)
+                            : "";
+                    String html = "{\"html\":\"<p>ok</p>\",\"finalUrl\":\"https://example.com/\"}";
+                    if (!captured[0].contains("urlB64=" + expected)) {
+                        html = "{\"message\":\"missing urlB64\"}";
+                    }
+                    return response.header("Content-Type", "application/json").sendString(Mono.just(html));
+                })).bindNow();
+        try {
+            MessageRenderProperties properties = new MessageRenderProperties();
+            properties.setBaseUrl("http://127.0.0.1:" + server.port());
+            properties.setTimeout(java.time.Duration.ofSeconds(45));
+            HttpMessageRenderGateway gateway = new HttpMessageRenderGateway(properties, objectMapper);
+            var page = gateway.fetchHtml(url);
+            assertEquals("<p>ok</p>", page.html());
+            assertEquals("https://example.com/", page.finalUrl());
+            assertTrue(captured[0].contains("urlB64=" + expected));
+        } finally {
+            server.disposeNow();
+        }
+    }
+
+    @Test
+    void fetchHtmlRejectsBlankUrl() {
+        MessageRenderProperties properties = new MessageRenderProperties();
+        HttpMessageRenderGateway gateway = new HttpMessageRenderGateway(properties, objectMapper);
+        BizException error = assertThrows(BizException.class, () -> gateway.fetchHtml(" "));
+        assertTrue(error.getMessage().contains("不能为空"));
+    }
 }

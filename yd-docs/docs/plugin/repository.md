@@ -35,7 +35,7 @@ GitLab 只负责源码托管、CI 流水线和 CI artifacts；GitLab Package Reg
 
 ## core 仓职责
 
-core 仓（当前 `D:/code/yudream-admim` 对应的主体仓）保留：
+core 仓（YuDream Admin 主体仓）保留：
 
 | 内容 | 路径 |
 |---|---|

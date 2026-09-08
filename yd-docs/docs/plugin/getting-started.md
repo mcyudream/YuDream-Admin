@@ -9,7 +9,7 @@
 
 ## 1. 创建 Maven 模块
 
-插件只依赖 SPI：
+插件只依赖 SPI（版本以 `yudream-plugin-spi/pom.xml` 为准，当前源码 **2.24.0**；下游只用已验证发布的版本）：
 
 ```xml
 <dependency>
@@ -66,7 +66,7 @@ version: 1.0.0
 )
 @PluginFrontend(
         moduleName = "demoPlugin",
-        sdkVersion = "2.7.0",
+        sdkVersion = "1.3.0",
         menuTitle = "演示插件",
         menuIcon = "i-ri:puzzle-2-line",
         menuSort = 20,
@@ -119,7 +119,9 @@ PluginUserProfile profile = context.framework()
         .orElse(null);
 ```
 
-常用端口：`framework().users()` / `.security()` / `.mail()` / `.render()` / `.ai()`，以及 `context.files()` / `context.documents()` / `context.templateRenderer()`。完整列表见 [FrameworkServices 参考](/plugin/spi/v1/framework-services)。
+常用端口：`framework().users()` / `.security()` / `.mail()` / `.render()` / `.ai()` / `.messaging()`，以及 `context.files()` / `context.documents()` / `context.templateRenderer()`。完整列表见 [FrameworkServices 参考](/plugin/spi/v1/framework-services)。
+
+插件前端选择器不要再包一层 HTTP 去转发这些目录：消息连接/群用 `sdk.messaging`，用户/部门/角色用 `sdk.users`，Agent/供应商用 `sdk.ai`。详见 [@yudream/plugin-sdk](/plugin/sdk/)。
 
 ## 6. 插件前端
 
@@ -131,7 +133,7 @@ yudream-frontend/packages/plugin-demo/
   src/index.ts          # remote entry 导出
   src/pages/Home.vue
   src/components/
-  src/api/              # 基于 @yudream/plugin-sdk 的请求封装
+  src/api/              # 基于 @yudream/plugin-sdk 的请求封装；宿主目录用 sdk.messaging / sdk.users / sdk.ai
   src/types.ts
 ```
 

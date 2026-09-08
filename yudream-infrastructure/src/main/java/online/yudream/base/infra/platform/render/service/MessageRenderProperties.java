@@ -13,6 +13,6 @@ import java.time.Duration;
 public class MessageRenderProperties {
     private String baseUrl = "http://localhost:3000";
     private String token = "";
-    private Duration timeout = Duration.ofSeconds(30);
+    private Duration timeout = Duration.ofSeconds(45);
     private DataSize maxResponseSize = DataSize.ofMegabytes(16);
 }

@@ -1,6 +1,6 @@
 # QQ 机器人接入（Milky 与官方 OpenAPI）
 
-Milky 能力（能力码 `milky`，类型 `MESSAGING`）通过**统一出站端口**接入 QQ 机器人：一条连接可选 **Milky 协议**或**腾讯官方 QQ 机器人 OpenAPI v2**。上层发送、命令、沙盒、WebQQ 与插件消息端口共用同一套实现；协议差异只在传输适配器消化。协议层细节见 [Milky 协议详解](/protocol/milky)。
+Milky 能力（能力码 `milky`，类型 `MESSAGING`）通过**统一出站端口**接入 QQ 机器人：一条连接可选 **Milky 协议**或**腾讯官方 QQ 机器人 OpenAPI v2**。上层发送、命令、沙盒、WebQQ 与插件消息端口共用同一套实现；协议差异只在传输适配器消化。协议层细节见 [QQ 协议详解](/protocol/milky)。
 
 > 源码：`yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/milky/`、`.../milky/official/`、`yudream-application/.../platform/milky/`、`yudream-interfaces/.../platform/milky/controller/`
 
@@ -32,6 +32,12 @@ new CapabilityDescriptor("milky", "QQ 消息平台", CapabilityType.MESSAGING,
 - 每个连接对应一个协议客户端实例（`MilkyConnectionRuntime` 按 `protocol` 分流：Milky WebSocket `/event` 或官方 Gateway；`MilkyRuntimeShutdownRequested` 触发停用清理）；
 - 连接启用后才参与消息收发；存在多个启用连接时，插件发送必须显式指定 `connectionId`，否则因配置歧义被拒绝。
 - 官方连接填写 AppID / AppSecret；Webhook 回调地址为 `/api/public/qqbot/{connectionId}/webhook`（无需登录，走 Ed25519 签名校验）。官方身份是 openid，与 Milky 的 QQ 号不是同一套 ID。
+- 官方连接启用后会把管理端「系统指令」（系统菜单别名 + 已启用插件指令）自动注册到官方指令 UI：单聊底部自定义菜单（`PUT /v2/menu`），以及单聊 / 群聊 / 文字子频道 / 频道私信的全局面板（`POST|PUT /v2/panels`，`target_type=all`）。启动时先拉取远端菜单/面板到本地快照，插件全部加载后再按差异分类创建或更新；运行中插件启停/重载与本地快照对比，30s 合并写入，菜单无变动则跳过官方调用，避免面板查询 30 QPM、写入 10 QPM 被打满。官方未提供面板删除接口，非托管面板不会被改动。底部菜单最多 10 个一级按钮（超出部分收进「更多」子菜单，最多 5 项）；指令面板每场景最多 20 项。点击后会把指令文本填入输入框；群聊官方事件是原生 AT/私聊事件（`GROUP_AT_MESSAGE_CREATE` 等），不是 Milky mention 段。宿主从正文剥掉 `<@bot>` 后再解析命令，并用 `mention_self` 标记这条消息是对机器人说的；命中指令时不再转给 AI，未命中指令的官方 AT/私聊仍按该标记触发。Milky 连接继续只看真实 mention 段。
+- 官方接口不提供历史拉取。WebQQ 打开会话时走本连接事件流缓存（进程内最近 200 条），实时消息仍靠 SSE。
+- 官方发图会先上传富媒体拿到 `file_info` 再被动回复；系统菜单图的 base64 也会走这条链路，不再把 URL 当 `file_info` 直发。
+- 官方群成员列表、临时资源 URL 不是 Milky 同名接口。WebQQ 打开官方群时，成员列表无权限会回落事件缓存；图片段已有公网 URL 时不再调用 `get_resource_temp_url`。
+- 官方交互 `INTERACTION_CREATE` 必须先 `PUT /interactions/{id}` 回执，否则后续被动回复会被平台拒绝。键盘/指令面板没有 `button.id`、但带 `button_data` 或 `send_message` 时，按官方 AT 消息走 `onMessage`（`mention_self=true`），不要伪造 Milky mention 段；真正的按钮仍走 `button_click`。
+
 
 ## 沙盒聊天
 

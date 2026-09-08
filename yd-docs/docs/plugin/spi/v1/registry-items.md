@@ -74,7 +74,7 @@
 |---|---|---|
 | `entry` | `String` | remoteEntry 入口路径，约定 `META-INF/yudream-plugin/frontend/{code}/remoteEntry.js` |
 | `moduleName` | `String` | ESM 模块名（容器名称） |
-| `sdkVersion` | `String` | 依赖的 `@yudream/plugin-sdk` 版本 |
+| `sdkVersion` | `String` | 依赖的 `@yudream/plugin-sdk` 行为版本；当前宿主为 `1.3.0` |
 | `integrity` | `String` | 资源完整性校验值（可空） |
 | `menuTitle` / `menuIcon` | `String` | 模块菜单标题/图标 |
 | `menuSort` | `Integer` | 菜单排序 |

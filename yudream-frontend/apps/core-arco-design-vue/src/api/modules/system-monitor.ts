@@ -66,6 +66,126 @@ export interface LoginLog {
   createTime?: string
 }
 
+export interface HostDisk {
+  name?: string
+  mount?: string
+  type?: string
+  totalBytes?: number
+  usedBytes?: number
+  usableBytes?: number
+  usagePercent?: number
+}
+
+export interface HostNetwork {
+  name?: string
+  displayName?: string
+  ipv4?: string
+  mac?: string
+  recvBytes?: number
+  sentBytes?: number
+  recvBytesPerSec?: number
+  sentBytesPerSec?: number
+}
+
+export interface JvmMemoryPool {
+  name?: string
+  type?: string
+  usedBytes?: number
+  committedBytes?: number
+  maxBytes?: number
+  usagePercent?: number
+}
+
+export interface JvmGc {
+  name?: string
+  collectionCount?: number
+  collectionTimeMs?: number
+}
+
+export interface HostProcess {
+  pid?: number
+  name?: string
+  user?: string
+  rssBytes?: number
+  virtualBytes?: number
+  cpuPercent?: number
+  currentJvm?: boolean
+  commandLine?: string
+}
+
+export interface HostThreadHotspot {
+  threadId?: string
+  name?: string
+  state?: string
+  cpuTimeMs?: number
+  userTimeMs?: number
+  daemon?: boolean
+  stackTop?: string[]
+}
+
+export interface HostResourceSnapshot {
+  hostname?: string
+  osName?: string
+  osVersion?: string
+  architecture?: string
+  cpuName?: string
+  cpuPhysicalCount?: number
+  cpuLogicalCount?: number
+  cpuUsagePercent?: number
+  load1?: number
+  load5?: number
+  load15?: number
+  memoryTotalBytes?: number
+  memoryUsedBytes?: number
+  memoryAvailableBytes?: number
+  memoryUsagePercent?: number
+  swapTotalBytes?: number
+  swapUsedBytes?: number
+  disks: HostDisk[]
+  diskTotalBytes?: number
+  diskUsedBytes?: number
+  diskUsagePercent?: number
+  networks: HostNetwork[]
+  networkRecvBytesPerSec?: number
+  networkSentBytesPerSec?: number
+  jvmPid?: string
+  javaVersion?: string
+  jvmUptimeMs?: number
+  jvmHeapUsedBytes?: number
+  jvmHeapMaxBytes?: number
+  jvmNonHeapUsedBytes?: number
+  jvmNonHeapMaxBytes?: number
+  jvmDirectUsedBytes?: number
+  jvmDirectMaxBytes?: number
+  jvmThreadCount?: number
+  jvmDaemonThreadCount?: number
+  jvmLoadedClassCount?: number
+  memoryPools: JvmMemoryPool[]
+  garbageCollectors: JvmGc[]
+  topProcesses: HostProcess[]
+  topThreads: HostThreadHotspot[]
+  notice?: string
+  sampledAt?: string
+}
+
+export interface ResourceMetricPoint {
+  sampledAt?: string
+  cpuUsagePercent?: number
+  memoryUsedBytes?: number
+  memoryTotalBytes?: number
+  memoryUsagePercent?: number
+  swapUsedBytes?: number
+  swapTotalBytes?: number
+  diskUsedBytes?: number
+  diskTotalBytes?: number
+  diskUsagePercent?: number
+  networkRecvBytesPerSec?: number
+  networkSentBytesPerSec?: number
+  jvmHeapUsedBytes?: number
+  jvmHeapMaxBytes?: number
+  jvmNonHeapUsedBytes?: number
+}
+
 export default {
   redis: (params?: { pattern?: string; limit?: number }) => {
     return systemClient.get<unknown, ApiResponse<RedisMonitor>>('api/system/monitor/redis', { params })
@@ -87,5 +207,11 @@ export default {
   },
   clearLoginLogs: () => {
     return systemClient.delete<unknown, ApiResponse<number>>('api/system/monitor/login-logs')
+  },
+  resource: () => {
+    return systemClient.get<unknown, ApiResponse<HostResourceSnapshot>>('api/system/monitor/resource')
+  },
+  resourceHistory: (params?: { hours?: number }) => {
+    return systemClient.get<unknown, ApiResponse<ResourceMetricPoint[]>>('api/system/monitor/resource/history', { params })
   },
 }

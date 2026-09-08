@@ -21,7 +21,7 @@ YuDream Admin 把**非必需的重型能力**全部设计为"平台能力"（pla
 | `document-template` | `PLATFORM_DOCUMENT_TEMPLATE_ENABLED` | Word 模板文档生成 | [Word 文档生成](/features/word-document) |
 | `integration` | `PLATFORM_INTEGRATION_ENABLED` | HTTP 连接器 + Python 脚本运行时 | [集成运行时](/features/integration) |
 | `dataviz` | `PLATFORM_DATAVIZ_ENABLED` | 图表定义与数据服务 | [数据可视化](/features/dataviz) |
-| `milky` | `PLATFORM_MILKY_ENABLED` | Milky/QQ 机器人协议接入 | [Milky 机器人](/features/milky) |
+| `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与官方 OpenAPI v2 共用出站端口 | [QQ 机器人接入](/features/milky) |
 | `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | HTML/Markdown → 图片渲染（render-server） | [消息渲染](/features/render) |
 
 ## system vs platform 边界

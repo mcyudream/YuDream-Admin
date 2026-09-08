@@ -263,6 +263,20 @@ class PluginStoreAppServiceTest {
     }
 
     @Test
+    void skipsInvalidInstalledPluginWhenBuildingUpdatePlans() {
+        when(pluginAppService.listInstalled()).thenReturn(List.of(
+                PluginModuleDTO.builder().code("../broken").version("1.0.0").build(),
+                PluginModuleDTO.builder().code("demo").version("1.0.0").build()));
+        when(pluginStoreGateway.detail("demo")).thenReturn(Optional.of(new PluginStorePluginDetail("demo", List.of(
+                new PluginStorePluginVersion("2.0.0", descriptor("2.0.0"))))));
+
+        var result = new PluginStoreAppService(pluginStoreGateway, pluginAppService).updatePlans();
+
+        assertEquals(List.of("demo"), result.stream().map(item -> item.getCode()).toList());
+        verify(pluginStoreGateway).detail("demo");
+        verify(pluginStoreGateway, org.mockito.Mockito.never()).detail("../broken");
+    }
+    @Test
     void buildsDefaultPlansUsingHighestParsableVersionWithoutSideEffects() {
         when(pluginAppService.listInstalled()).thenReturn(List.of(
                 PluginModuleDTO.builder().code("demo").version("1.0.0").build(),

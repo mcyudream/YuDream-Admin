@@ -180,7 +180,7 @@ public PluginHttpResponse hello(PluginHttpRequest request, PluginContext context
 端点规则：
 
 - 管理接口必须声明 `plugin:{code}:manage` 权限。
-- 用户侧接口以系统用户为核心，用 `request.principal()` 取当前登录用户，再经 `FrameworkServices.users()` 查资料，**不新增平行账号体系**。
+- 用户侧接口以系统用户为核心，用 `request.principal()` 取当前登录用户，再经 `FrameworkServices.users()` 查资料，**不新增平行账号体系**。需要把插件结论展示到人员管理时，使用 `users().replaceTags(userId, pluginCode, tags)` 按命名空间写入标签，不要给用户表加平行字段。需要把插件结论展示到人员管理时，使用 `users().replaceTags(userId, pluginCode, tags)` 按命名空间写入标签，不要给用户表加平行字段。
 - 长任务日志用 SSE 或可轮询状态接口，不把大日志塞进一次性响应。
 - 文件上传、下载、预览接口必须明确权限、归属校验与内容类型。
 
@@ -217,6 +217,7 @@ packages/plugin-{code}/
 
 - 禁止把插件页面写进宿主 `apps/*/src/views`。
 - 使用宿主 SDK/client 发请求，不内置私有 axios；使用宿主组件库与后台布局风格。
+- 需要宿主目录（消息连接/群、用户/部门/角色、Agent/供应商）时走 `sdk.messaging` / `sdk.users` / `sdk.ai`，不要再包一层插件 HTTP 去转发 `framework.*()`，也不要打宿主管理接口（如 `/api/platform/milky/**`）。插件自有 CRUD、当前用户部门（`/me/departments`）等仍走 `/api/plugins/{pluginCode}/**`。
 - 生产产物必须导出 remote ESM，不依赖 workspace alias（workspace 加载只是开发便利）。
 
 生产 JAR 内前端资源路径（插件仓 CI 会强制校验 `remoteEntry.js` 存在）：

@@ -239,6 +239,10 @@
     {
       "key": "permission-code-action-vocabulary",
       "text": "权限码结构为 {domain}:{resource}:{action}（可选 {domain}:{subdomain}:{resource}:{action}），插件统一 plugin:{pluginCode}:{action}，@PermissionRegister.module 用中文模块名。末段动作词决定角色权限树的业务分组与色彩：查看=view/export/download；操作=create/edit/import/upload/use/generate/publish/connect/send/test/run/invoke/execute/enable/disable/assign-*/dataset/report/accept；管理=manage/config；危险=delete/kickout/revoke/impersonate；词表外动作归入\"其他\"。新增动作词必须同一提交同步主仓 AGENTS.md「权限码业务分类」、角色页 permissionCategoryMeta 与本条目；新权限按资源拆分 view/写/delete 独立权限码，禁止只注册 manage 再在代码内二次判断。"
+    },
+    {
+      "key": "messaging-identity-not-qq-number",
+      "text": "官方 QQ OpenAPI 不提供真实 QQ 号。账号绑定必须写入 sysMessagingIdentity：Milky 数字 QQ 镜像 User.qq；官方私聊绑 user_openid、群/频道绑 member_openid+groupOpenid。禁止把 openid 写入 User.qq。历史 User.qq 启动时按 ^\\d{5,12}$ 分类迁移。bindQqOnce 依赖当前消息分发作用域分类身份，旧插件不用改。sendDirectToBoundUser 在官方连接上只用 user_openid。绑定入口按已启用消息连接列出，前端用机器人名或连接名生成绑定码；核销仍走当前消息连接作用域。已绑 User.qq 仍可为额外官方身份签发绑定码。同一官方连接只保留一条 openid，后绑覆盖先前同连接/同 AppID 身份。"
     }
   ],
   "utilities": [
@@ -402,6 +406,10 @@
       "text": "JarPluginRuntimeGateway 的 load/enable/disable/unload 必须用 synchronized 串行化：dev-mode watcher 重载（watcher 线程）、管理端启用/禁用（HTTP 线程）与启动恢复会并发触发同一插件生命周期；containsKey/isEnabled 检查与注解注册之间的竞态会让同一 PluginContextImpl 重复注册并报『插件权限/菜单/端点重复』，失败方 catch 里的 clearRuntimeContributions 还会清掉并发成功方的贡献。修复见 68a6ebcf。"
     },
     {
+      "key": "official-qq-command-menu-snapshot",
+      "text": "官方 QQ 指令菜单/面板写入受 30 QPM 查询、10 QPM 创建修改限制。启动先 GET 远端菜单与各 scope 面板到进程内快照，插件全部加载后再按 remark+items 语义差异分类创建或更新；运行中插件启停/重载与本地快照对比，30s 合并写入，无变动则跳过官方调用。官方未提供面板删除接口，非托管面板不会被改动。菜单写入走 set_official_menu，不要再用 PUT /v2/menu 字面量。"
+    },
+    {
       "key": "official-qq-interactive-reply",
       "title": "官方 QQ 机器人交互回复（按钮 + markdown 兜底）",
       "summary": "PluginMessageContent 增加 List<Button> buttons（record Button(id,label,data,enter)，Button.command/callback 静态工厂，四参数旧构造保留兼容）。发送链路 MilkyPluginMessagingService.buildOfficialBody：官方连接无媒体一律 msg_type=2 markdown 兜底（TEXT/MARKDOWN 的 http(s) image/* 附件以 [[title]] 标记内嵌为 ![title](url)），buttons 映射 keyboard（一行 4 个、最多 5 行，enter=true→action.type=2 指令，false→1 回调，permission type=2 群成员可用），referrer 的 msg_id/event_id 透传为被动回复凭证；Milky 连接带按钮置 degraded=true。指令菜单 MilkyPluginEventDispatcher.commandMenuMarkdown 用 QQ 安全模板（标题/分组/列表/引用/***分割线，无表格）并附前 20 条指令按钮。插件侧投降/开局/互跳场景以 Button.command 接入（mcguess/wordle/pony/questionbank/wallet/project-progress/minecraft-server/qq-binding）。",
@@ -411,6 +419,10 @@
         "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/plugin/service/MilkyPluginEventDispatcher.java",
         "yudream-infrastructure/src/main/java/online/yudream/base/infra/platform/milky/official/OfficialQqBotApiAdapter.java"
       ]
+    },
+    {
+      "key": "plugin-devmode-compile-export",
+      "text": "开发模式 ClassLoader 只挂 target/classes + target/plugin-dev/lib/*.jar，不查 Maven 仓库。面板默认 compileCommand、批量登记与 DevProject 字段默认必须是 mvn -q compile -DskipTests -P dev-export，源码热编译才会刷新 runtime 依赖（如 alipay-sdk-java）。缺 profile 时第三方 SDK 只在编译期可见，启用插件会 NoClassDefFoundError（先例 AlipayApiException）。生产 shaded JAR 仍须自带这些类；首次准备或依赖变化后跑 mvn -pl <模块> -am -P dev-export package -DskipTests。"
     }
   ]
 }

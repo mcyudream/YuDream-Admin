@@ -8,13 +8,16 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.system.user.valobj.UserDept;
+import online.yudream.base.domain.system.user.valobj.UserTag;
 import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
 import online.yudream.base.domain.valobj.Phone;
 import online.yudream.base.domain.valobj.QQ;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
@@ -48,6 +51,12 @@ public class User extends BaseDomain {
     private List<UserDept> depts = new ArrayList<>();
 
     private List<RoleID> roles = new ArrayList<>();
+
+    @Builder.Default
+    private List<UserTag> tags = new ArrayList<>();
+
+    @Builder.Default
+    private Map<String, Map<String, String>> fields = new LinkedHashMap<>();
 
     public void joinDept(DeptID deptID, boolean isDefault) {
         if (depts == null) {
@@ -100,6 +109,48 @@ public class User extends BaseDomain {
 
     public void replaceRoles(List<RoleID> roleIds) {
         this.roles = roleIds == null ? new ArrayList<>() : new ArrayList<>(roleIds);
+    }
+
+    public void replaceNamespaceTags(String namespace, List<UserTag> next) {
+        if (namespace == null || namespace.isBlank()) {
+            throw new BizException("标签命名空间不能为空");
+        }
+        String ns = namespace.trim();
+        if (tags == null) {
+            tags = new ArrayList<>();
+        }
+        tags.removeIf(tag -> tag != null && ns.equals(tag.namespace()));
+        if (next == null || next.isEmpty()) {
+            return;
+        }
+        for (UserTag tag : next) {
+            if (tag == null) {
+                continue;
+            }
+            tags.add(tag.withNamespace(ns));
+        }
+    }
+
+    public List<UserTag> listTags() {
+        return tags == null ? List.of() : List.copyOf(tags);
+    }
+
+    public void replaceNamespaceFields(String namespace, Map<String, String> next) {
+        if (namespace == null || namespace.isBlank()) {
+            throw new BizException("扩展字段命名空间不能为空");
+        }
+        if (fields == null) {
+            fields = new LinkedHashMap<>();
+        }
+        fields.remove(namespace.trim());
+        if (next == null || next.isEmpty()) {
+            return;
+        }
+        fields.put(namespace.trim(), new LinkedHashMap<>(next));
+    }
+
+    public Map<String, Map<String, String>> listFields() {
+        return fields == null ? Map.of() : Map.copyOf(fields);
     }
 
     public void replaceDepts(List<UserDept> userDepts) {

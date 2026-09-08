@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingCode;
+import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
+import online.yudream.base.interfaces.system.user.res.MessagingBindingCodeRes;
+import online.yudream.base.interfaces.system.user.res.MessagingBindingTargetRes;
 
 import java.util.List;
 
@@ -39,5 +42,19 @@ public class CommandManageController {
     @PermissionRegister(code = "system:command:edit", name = "生成 QQ 绑定码", module = "系统管理", desc = "为指定用户生成一次性 QQ 绑定码")
     public Result<PluginQqBindingCode> issueQqBindingCode(@RequestParam Long userId) {
         return Result.ok(commandManageAppService.issueQqBindingCode(userId));
+    }
+
+    @GetMapping("/messaging-binding-targets")
+    @PermissionRegister(code = "system:command:view", name = "查看指令", module = "系统管理", desc = "查看已注册消息指令")
+    public Result<List<MessagingBindingTargetRes>> messagingBindingTargets(@RequestParam Long userId) {
+        return Result.ok(UserWebAssembler.toBindingTargetResList(
+                commandManageAppService.listMessagingBindingTargets(userId)));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/messaging-binding-codes")
+    @PermissionRegister(code = "system:command:edit", name = "生成 QQ 绑定码", module = "系统管理", desc = "为指定用户生成一次性 QQ 绑定码")
+    public Result<MessagingBindingCodeRes> issueMessagingBindingCode(@RequestParam Long userId, @RequestParam String connectionId) {
+        return Result.ok(UserWebAssembler.toBindingCodeRes(
+                commandManageAppService.issueMessagingBindingCode(userId, connectionId)));
     }
 }

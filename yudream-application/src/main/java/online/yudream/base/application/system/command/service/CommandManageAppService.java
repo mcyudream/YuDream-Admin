@@ -1,6 +1,9 @@
 package online.yudream.base.application.system.command.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
+import online.yudream.base.application.system.user.dto.MessagingBindingTargetDTO;
+import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandInfo;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
@@ -22,6 +25,7 @@ public class CommandManageAppService {
     private final SettingRepo settingRepo;
     private final UserRepo userRepo;
     private final PluginQqBindingService pluginQqBindingService;
+    private final MessagingIdentityAppService messagingIdentityAppService;
     private static final String REQUIRE_BOUND_QQ = "plugin.qq-binding.require-bound-qq";
     private static final String LOCK_PROFILE_QQ = "plugin.qq-binding.lock-profile-qq";
     private static final String SYSTEM_COMMAND_SOURCE = "SYSTEM";
@@ -59,11 +63,19 @@ public class CommandManageAppService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public PluginQqBindingCode issueQqBindingCode(Long userId) {
-        User user = userRepo.findById(userId).orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("用户不存在"));
-        if (user.getQq() != null && org.springframework.util.StringUtils.hasText(user.getQq().getValue())) {
-            throw new online.yudream.base.domain.common.exception.BizException("该用户已绑定 QQ，不能重复生成绑定码");
-        }
+        userRepo.findById(userId).orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("用户不存在"));
         return pluginQqBindingService.issue(userId);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<MessagingBindingTargetDTO> listMessagingBindingTargets(Long userId) {
+        userRepo.findById(userId).orElseThrow(() -> new online.yudream.base.domain.common.exception.BizException("用户不存在"));
+        return messagingIdentityAppService.listBindingTargets(userId);
+    }
+
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public MessagingBindingCodeDTO issueMessagingBindingCode(Long userId, String connectionId) {
+        return messagingIdentityAppService.issueBindingCode(userId, connectionId);
     }
 
     private boolean value(String key) { return settingRepo.findByKey(key).map(Setting::getValue).map(Boolean::parseBoolean).orElse(false); }

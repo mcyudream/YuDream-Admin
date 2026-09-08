@@ -20,6 +20,7 @@ import java.util.Map;
 @Slf4j
 public class OfficialQqBotWebhookGatewayImpl implements OfficialQqBotWebhookGateway {
     private final OfficialQqBotSessionStore sessions;
+    private final OfficialQqBotApiAdapter apiAdapter;
     private final ApplicationEventPublisher publisher;
     private final ObjectMapper mapper;
 
@@ -42,6 +43,7 @@ public class OfficialQqBotWebhookGatewayImpl implements OfficialQqBotWebhookGate
         }
         MilkyModels.Event event = OfficialQqBotEventNormalizer.normalize(payload, sessions, connection.getId());
         if (event != null) {
+            apiAdapter.ackInteractionIfNeeded(connection.toApiContext(), event);
             publisher.publishEvent(new MilkyEventPublished(connection.getId(), event));
         }
         return Map.of("op", 12);

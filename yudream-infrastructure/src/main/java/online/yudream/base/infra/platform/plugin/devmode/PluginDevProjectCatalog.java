@@ -152,6 +152,7 @@ public class PluginDevProjectCatalog {
             project.setCode(code);
             project.setPath(pathStr);
             project.setAutoCompile(true);
+            project.setCompileCommand(new PluginDevModeProperties.DevProject().getCompileCommand());
             file.put(code, project);
             registered.add(project);
         }

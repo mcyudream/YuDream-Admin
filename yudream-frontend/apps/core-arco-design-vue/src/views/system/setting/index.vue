@@ -107,7 +107,7 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
             </a-form-item>
           </div>
           <div class="mt-2 flex justify-end">
-            <FaButton :loading="saving" @click="saveSettings">
+            <FaButton v-auth="'system:setting:edit'" :loading="saving" @click="saveSettings">
               <FaIcon name="i-ri:save-3-line" />
               保存设置
             </FaButton>
@@ -161,6 +161,7 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
           </div>
         </div>
       </div>
+
     </FaPageMain>
   </div>
 </template>
@@ -197,4 +198,8 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
   max-width: 48px;
   max-height: 48px;
 }
+
+
+
+
 </style>

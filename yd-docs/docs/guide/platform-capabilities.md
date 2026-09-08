@@ -60,11 +60,11 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 | integration | `PLATFORM_INTEGRATION_ENABLED` | HTTP 集成 |
 | dataviz | `PLATFORM_DATAVIZ_ENABLED` | 数据可视化 |
 | message-render | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
-| milky | `PLATFORM_MILKY_ENABLED` | QQ 机器人接入（Milky 协议，HTTP API + WebSocket 事件流） |
+| milky | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 协议（HTTP API + WebSocket `/event`）与腾讯官方 OpenAPI v2（REST + Gateway/Webhook）共用出站端口 |
 
 \* 以上均映射到同名环境变量（见 `yudream-bootstrap/src/main/resources/application.yml` 的 `yudream.platform.capabilities.*`），compose 部署时可直接以 `PLATFORM_*_ENABLED=true/false` 控制项目闸门。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
 
-Milky 能力的连接凭据经 AES-GCM 加密落库；新写入使用 Base64 解码后恰为 32 字节的统一主密钥 `YUDREAM_CREDENTIAL_KEY` 与连接作用域 AAD。旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（Base64，长度 16/24/32 字节）仅用于解密历史密文；协议与连接管理详见 [Milky 协议](/protocol/milky)。
+Milky 能力（展示名「QQ 消息平台」）的连接凭据经 AES-GCM 加密落库；新写入使用 Base64 解码后恰为 32 字节的统一主密钥 `YUDREAM_CREDENTIAL_KEY` 与连接作用域 AAD。旧 `YUDREAM_MILKY_CREDENTIAL_KEY`（Base64，长度 16/24/32 字节）仅用于解密历史密文。一条连接可选 `protocol=milky` 或 `protocol=official`；协议与连接管理详见 [QQ 协议详解](/protocol/milky)。插件前端选择器走 SDK `sdk.messaging`，不要打管理端 `/api/platform/milky/**`。
 
 ## AI 能力要点
 

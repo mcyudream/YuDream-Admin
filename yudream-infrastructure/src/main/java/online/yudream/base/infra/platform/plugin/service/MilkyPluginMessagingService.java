@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
@@ -18,7 +19,6 @@ import online.yudream.base.plugin.spi.system.messaging.PluginMessagingConnection
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingGroup;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingRawService;
 import online.yudream.base.plugin.spi.system.messaging.PluginMessagingService;
-import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -47,7 +47,7 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     private final MilkyConnectionRepo connectionRepo;
     private final MilkyApiGateway apiGateway;
-    private final PluginUserService pluginUserService;
+    private final MessagingIdentityAppService messagingIdentities;
     private final ObjectMapper objectMapper;
     private QqSandboxSessionRepo sandboxSessions;
     private final ExecutorService executor = new ThreadPoolExecutor(2, 4, 60L, TimeUnit.SECONDS,
@@ -140,15 +140,16 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             } catch (RuntimeException exception) {
                 throw new BizException("系统用户 ID 无效");
             }
-            String qq = pluginUserService.findById(systemUserId)
-                    .map(profile -> profile.qq())
-                    .filter(value -> value != null && !value.isBlank())
-                    .orElseThrow(() -> new BizException("用户尚未绑定 QQ"));
             List<MilkyConnection> connections = connectionRepo.findEnabled();
             if (connections.size() != 1) {
-                throw new BizException("私聊需要恰好一个已启用的 Milky 连接");
+                throw new BizException("私聊需要恰好一个已启用的消息连接");
             }
-            return sendNow(connections.getFirst(), qq.trim(), "private", content);
+            MilkyConnection connection = connections.getFirst();
+            String peerId = messagingIdentities.privatePeerId(systemUserId, connection)
+                    .orElseThrow(() -> new BizException(connection.official()
+                            ? "用户尚未绑定官方私聊身份，请先在私聊中完成绑定"
+                            : "用户尚未绑定 QQ"));
+            return sendNow(connection, peerId, "private", content);
         });
     }
 
@@ -344,7 +345,9 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
         if (media != null) {
             body.put("msg_type", 7);
             body.put("media", media);
-            body.put("content", text.isBlank() ? " " : text);
+            // 官方 msg_type=7 的 content 是图片说明。可见空格、换行都会和图片同气泡，把图压小。
+            // 富媒体消息一律独占气泡，说明文字由插件另发文本消息。
+            body.put("content", OFFICIAL_MEDIA_PLACEHOLDER);
         } else {
             body.put("msg_type", 2);
             body.put("content", text.isBlank() ? " " : text);
@@ -366,6 +369,9 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             default -> null;
         };
     }
+
+    /** 官方富媒体必填但不可见的 caption，避免普通空格/换行把图片压成缩略图。 */
+    static final String OFFICIAL_MEDIA_PLACEHOLDER = "\u200B";
 
     private static int officialFileType(String contentType) {
         String value = contentType == null ? "" : contentType.toLowerCase(java.util.Locale.ROOT);

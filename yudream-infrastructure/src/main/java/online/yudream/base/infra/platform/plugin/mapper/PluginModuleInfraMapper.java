@@ -18,6 +18,7 @@ public class PluginModuleInfraMapper {
         dataObj.setName(module.getName());
         dataObj.setPluginVersion(module.getPluginVersion());
         dataObj.setDescription(module.getDescription());
+        dataObj.setIcon(module.getIcon());
         dataObj.setMainClass(module.getMainClass());
         dataObj.setJarPath(module.getJarPath());
         dataObj.setBackupJarPath(module.getBackupJarPath());
@@ -58,6 +59,7 @@ public class PluginModuleInfraMapper {
                 .name(dataObj.getName())
                 .pluginVersion(dataObj.getPluginVersion())
                 .description(dataObj.getDescription())
+                .icon(dataObj.getIcon())
                 .mainClass(dataObj.getMainClass())
                 .jarPath(dataObj.getJarPath())
                 .backupJarPath(dataObj.getBackupJarPath())

@@ -15,6 +15,7 @@ import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginPermissionInfo;
 import online.yudream.base.domain.system.security.PermissionMeta;
 import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
@@ -483,7 +484,9 @@ public class PluginAppService {
                 .filter(module -> healthy(modules.get(module.pluginCode()), module.pluginCode()))
                 .map(module -> onlyPublicRoutes ? PluginFrontendModuleInfo.onlyPublicRoutes(module) : module)
                 .toList();
-        return PluginAssembler.toManifestDTO(runtimeModules);
+        // 全局挂件需要登录态交互与权限过滤，匿名访客不下发
+        List<PluginGlobalWidgetInfo> widgets = onlyPublicRoutes ? List.of() : pluginRuntimeGateway.globalWidgets();
+        return PluginAssembler.toManifestDTO(runtimeModules, widgets);
     }
 
     @Transactional(readOnly = true)
@@ -1338,7 +1341,7 @@ public class PluginAppService {
         private PluginModuleSnapshot(PluginModule module) {
             this.value = PluginModule.builder()
                     .code(module.getCode()).name(module.getName()).pluginVersion(module.getPluginVersion())
-                    .description(module.getDescription()).mainClass(module.getMainClass()).jarPath(module.getJarPath())
+                    .description(module.getDescription()).icon(module.getIcon()).mainClass(module.getMainClass()).jarPath(module.getJarPath())
                     .backupJarPath(module.getBackupJarPath()).backupName(module.getBackupName())
                     .backupPluginVersion(module.getBackupPluginVersion()).backupDescription(module.getBackupDescription())
                     .backupMainClass(module.getBackupMainClass()).backupSha256(module.getBackupSha256())
@@ -1359,7 +1362,7 @@ public class PluginAppService {
         private void restore(PluginModule module) {
             PluginModule copy = value;
             module.setName(copy.getName()); module.setPluginVersion(copy.getPluginVersion());
-            module.setDescription(copy.getDescription()); module.setMainClass(copy.getMainClass()); module.setJarPath(copy.getJarPath());
+            module.setDescription(copy.getDescription()); module.setIcon(copy.getIcon()); module.setMainClass(copy.getMainClass()); module.setJarPath(copy.getJarPath());
             module.setBackupJarPath(copy.getBackupJarPath()); module.setBackupName(copy.getBackupName());
             module.setBackupPluginVersion(copy.getBackupPluginVersion()); module.setBackupDescription(copy.getBackupDescription());
             module.setBackupMainClass(copy.getBackupMainClass()); module.setBackupSha256(copy.getBackupSha256());

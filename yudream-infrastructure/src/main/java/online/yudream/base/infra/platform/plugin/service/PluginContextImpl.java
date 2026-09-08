@@ -19,6 +19,7 @@ import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.graph.PluginGraphService;
+import online.yudream.base.plugin.spi.widget.PluginGlobalWidget;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ public class PluginContextImpl implements PluginContext {
     private final List<PluginPermissionItem> permissions = new ArrayList<>();
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
     private final List<PluginDashboardCard> dashboardCards = new ArrayList<>();
+    private final List<PluginGlobalWidget> globalWidgets = new ArrayList<>();
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
     private final List<PluginHttpEndpointInfo> httpEndpoints = new ArrayList<>();
     private final Map<String, PluginHttpHandler> httpHandlers = new ConcurrentHashMap<>();
@@ -51,6 +53,7 @@ public class PluginContextImpl implements PluginContext {
     private final Set<String> permissionKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> capabilityKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> dashboardCardKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> globalWidgetKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendModuleKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> frontendRouteKeys = ConcurrentHashMap.newKeySet();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
@@ -160,6 +163,13 @@ public class PluginContextImpl implements PluginContext {
         String key = requireText(card.code(), "插件首页卡片编码不能为空");
         ensureUnique(dashboardCardKeys, key, "插件首页卡片重复：" + key);
         dashboardCards.add(card);
+    }
+
+    @Override
+    public void registerGlobalWidget(PluginGlobalWidget widget) {
+        String key = requireText(widget.code(), "插件全局挂件编码不能为空");
+        ensureUnique(globalWidgetKeys, key, "插件全局挂件重复：" + key);
+        globalWidgets.add(widget);
     }
 
     @Override
@@ -291,6 +301,10 @@ public class PluginContextImpl implements PluginContext {
         return List.copyOf(dashboardCards);
     }
 
+    public List<PluginGlobalWidget> globalWidgets() {
+        return List.copyOf(globalWidgets);
+    }
+
     public List<PluginHttpEndpointInfo> httpEndpoints() {
         return List.copyOf(httpEndpoints);
     }
@@ -317,6 +331,7 @@ public class PluginContextImpl implements PluginContext {
         permissions.clear();
         capabilities.clear();
         dashboardCards.clear();
+        globalWidgets.clear();
         frontendModules.clear();
         httpEndpoints.clear();
         httpHandlers.clear();
@@ -325,6 +340,7 @@ public class PluginContextImpl implements PluginContext {
         permissionKeys.clear();
         capabilityKeys.clear();
         dashboardCardKeys.clear();
+        globalWidgetKeys.clear();
         frontendModuleKeys.clear();
         frontendRouteKeys.clear();
     }

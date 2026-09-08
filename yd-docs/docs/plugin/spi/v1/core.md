@@ -1,6 +1,6 @@
 # 生命周期与 PluginContext
 
-> SPI v1 · 包 `online.yudream.base.plugin.spi.core`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.core`
 >
 > 源码：`yudream-plugins/yudream-plugin-spi/src/main/java/online/yudream/base/plugin/spi/core/`（`YuDreamPlugin.java`、`PluginContext.java`、`PluginDescriptor.java`）
 

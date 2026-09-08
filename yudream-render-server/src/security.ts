@@ -42,6 +42,34 @@ export function isPrivateAddress(address: string): boolean {
   return true;
 }
 
+export function decodeUrlB64(value: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new RenderInputError("urlB64 is invalid");
+  }
+  const normalized = value.trim().replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  let decoded: string;
+  try {
+    decoded = Buffer.from(padded, "base64").toString("utf8");
+  } catch {
+    throw new RenderInputError("urlB64 is invalid");
+  }
+  if (!decoded || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(decoded)) {
+    throw new RenderInputError("urlB64 is invalid");
+  }
+  return decoded;
+}
+
+export function resolveRequestUrl(input: { url?: string; urlB64?: string }): string {
+  if (typeof input.urlB64 === "string" && input.urlB64.trim()) {
+    return decodeUrlB64(input.urlB64);
+  }
+  if (typeof input.url === "string" && input.url.trim()) {
+    return input.url;
+  }
+  throw new RenderInputError("url or urlB64 is required");
+}
+
 export async function assertSafeExternalUrl(value: string): Promise<URL> {
   let url: URL;
   try { url = new URL(value); } catch { throw new RenderInputError("url must be absolute"); }
@@ -57,8 +85,29 @@ export async function assertSafeExternalUrl(value: string): Promise<URL> {
   return url;
 }
 
+const multiPartSecondLevel = /^(com|net|org|gov|edu|ac)\.(cn|hk|uk|au|jp|kr|tw)$/i;
+
+export function registrableSite(url: URL): string {
+  const host = url.hostname.toLowerCase();
+  const parts = host.split(".").filter(Boolean);
+  if (parts.length <= 1) return `${url.protocol}//${host}`;
+  const lastTwo = parts.slice(-2).join(".");
+  const domain = parts.length >= 3 && multiPartSecondLevel.test(lastTwo)
+    ? parts.slice(-3).join(".")
+    : lastTwo;
+  return `${url.protocol}//${domain}`;
+}
+
+export function sameRegistrableSite(left: URL, right: URL): boolean {
+  return registrableSite(left) === registrableSite(right);
+}
+
+export function isAllowedPageResource(resourceType: string): boolean {
+  return resourceType !== "media";
+}
+
 export function assertRenderOptions(input: { width?: number; maxHeight?: number; timeoutMs?: number; deviceScaleFactor?: number; css?: string; format?: string }): void {
-  const { width = 900, maxHeight = 4_000, timeoutMs = limits.defaultTimeoutMs, deviceScaleFactor = 1, css = "" } = input;
+  const { width = 900, maxHeight = limits.defaultMaxHeight, timeoutMs = limits.defaultTimeoutMs, deviceScaleFactor = 1, css = "" } = input;
   if (!Number.isInteger(width) || width < limits.minWidth || width > limits.maxWidth) throw new RenderInputError("width is outside the allowed range");
   if (!Number.isInteger(maxHeight) || maxHeight < limits.minHeight || maxHeight > limits.maxHeight) throw new RenderInputError("maxHeight is outside the allowed range");
   if (!Number.isInteger(timeoutMs) || timeoutMs < limits.minTimeoutMs || timeoutMs > limits.maxTimeoutMs) throw new RenderInputError("timeoutMs is outside the allowed range");

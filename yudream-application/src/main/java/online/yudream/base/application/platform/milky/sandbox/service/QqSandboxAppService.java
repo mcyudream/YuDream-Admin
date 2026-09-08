@@ -156,20 +156,32 @@ public class QqSandboxAppService {
      * 策略连接的真实群列表与机器人自身 ID；只在用户主动查看选项时发起远程调用，失败时 selfId 置空
      */
     public QqSandboxGroupsDTO groupOptions(String connectionId) {
-        MilkyConnection connection = enabledPolicyConnection(connectionId);
+        if (connectionId == null || connectionId.isBlank()) {
+            return new QqSandboxGroupsDTO(null, List.of());
+        }
+        MilkyConnection connection;
+        try {
+            connection = enabledPolicyConnection(connectionId);
+        } catch (BizException ignored) {
+            return new QqSandboxGroupsDTO(null, List.of());
+        }
         MilkyModels.Context context = connection.toApiContext();
-        Object data = milkyApiGateway.invoke(context, "get_group_list", Map.of());
         List<QqSandboxGroupOptionDTO> groups = new java.util.ArrayList<>();
-        Object rows = groupRows(data);
-        if (rows instanceof Iterable<?> iterable) {
-            for (Object row : iterable) {
-                if (!(row instanceof Map<?, ?> value)) continue;
-                Object id = firstKey(value, "group_id", "group_uin", "id");
-                if (id == null) continue;
-                Object name = firstKey(value, "group_name", "name", "group_remark");
-                groups.add(new QqSandboxGroupOptionDTO(String.valueOf(id),
-                        name == null ? String.valueOf(id) : String.valueOf(name)));
+        try {
+            Object data = milkyApiGateway.invoke(context, "get_group_list", Map.of());
+            Object rows = groupRows(data);
+            if (rows instanceof Iterable<?> iterable) {
+                for (Object row : iterable) {
+                    if (!(row instanceof Map<?, ?> value)) continue;
+                    Object id = firstKey(value, "group_id", "group_uin", "id");
+                    if (id == null) continue;
+                    Object name = firstKey(value, "group_name", "name", "group_remark");
+                    groups.add(new QqSandboxGroupOptionDTO(String.valueOf(id),
+                            name == null ? String.valueOf(id) : String.valueOf(name)));
+                }
             }
+        } catch (RuntimeException ignored) {
+            // 官方群列表来自事件缓存，空缓存或远端失败时保持手输，不向预设接口抛 400
         }
         return new QqSandboxGroupsDTO(fetchSelfId(context), List.copyOf(groups));
     }

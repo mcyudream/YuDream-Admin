@@ -30,7 +30,8 @@ public class PluginYamlDescriptorReader {
                 value(values, "description"),
                 required(values, "main"),
                 list(values, "depend"),
-                list(values, "softdepend")
+                list(values, "softdepend"),
+                optionalIcon(values)
         );
     }
 
@@ -45,6 +46,17 @@ public class PluginYamlDescriptorReader {
     private String value(Map<?, ?> values, String key) {
         Object value = values.get(key);
         return value == null ? "" : String.valueOf(value).trim();
+    }
+
+    private String optionalIcon(Map<?, ?> values) {
+        String icon = value(values, "icon");
+        if (!StringUtils.hasText(icon)) {
+            return null;
+        }
+        if (icon.contains("..") || icon.startsWith("/") || icon.matches("^[A-Za-z]:.*")) {
+            throw new BizException("plugin.yml 的 icon 路径无效");
+        }
+        return icon;
     }
 
     private List<String> list(Map<?, ?> values, String key) {

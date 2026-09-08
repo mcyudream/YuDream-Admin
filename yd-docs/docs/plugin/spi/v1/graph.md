@@ -1,6 +1,6 @@
 # 用途化资源图投影 GraphSpi
 
-> SPI v1（2.13.0）· 包 `online.yudream.base.plugin.spi.system.graph`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system.graph`
 
 `PluginContext.graph()` 是插件访问宿主管理资源图的唯一入口。它支持绑定状态检查、版本化投影的**原子替换**和**结构化分页读取**。插件可使用显式图表编码的兼容接口，也可使用不含 `tableCode` 的自动绑定接口；后者由宿主按运行时可信 `pluginCode` 解析唯一 ACTIVE 且已授权的逻辑图表。没有或不唯一时返回结构化失败，绝不选择第一项。所有接口均不接受插件编码或 Cypher，宿主负责能力闸门、图表状态与授权校验，以及单一 Driver 生命周期和隔离。
 

@@ -6,6 +6,7 @@ import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.plugin.spi.system.user.PluginDeptOption;
+import online.yudream.base.plugin.spi.system.user.PluginMessagingIdentity;
 import online.yudream.base.plugin.spi.system.user.PluginUserCreate;
 import online.yudream.base.plugin.spi.system.user.PluginUserDept;
 import online.yudream.base.plugin.spi.system.user.PluginUserOption;
@@ -13,6 +14,8 @@ import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 import online.yudream.base.plugin.spi.system.user.PluginUserProfileUpdate;
 import online.yudream.base.plugin.spi.system.user.PluginUserRole;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
+import online.yudream.base.plugin.spi.system.user.PluginUserTag;
+import online.yudream.base.plugin.spi.system.user.PluginUserField;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
@@ -82,6 +85,34 @@ public class SandboxAwarePluginUserService implements PluginUserService {
     }
 
     @Override
+    public Optional<PluginUserProfile> findByMessagingIdentity(PluginMessagingIdentity identity) {
+        QqSandboxSession session = QqSandboxExecutionScope.current();
+        if (session != null && session.forceUnbound()) {
+            appendIdentityOverride(session, Map.of(
+                    "type", "forceUnbound",
+                    "identity", identity == null || identity.identity() == null ? "" : identity.identity()));
+            return Optional.empty();
+        }
+        return delegate.findByMessagingIdentity(identity);
+    }
+
+    @Override
+    public void bindMessagingIdentityOnce(Long userId, PluginMessagingIdentity identity) {
+        rejectSandboxWrite("bindMessagingIdentityOnce");
+        delegate.bindMessagingIdentityOnce(userId, identity);
+    }
+
+    @Override
+    public List<PluginMessagingIdentity> listMessagingIdentities(Long userId) {
+        QqSandboxSession session = QqSandboxExecutionScope.current();
+        if (session != null && session.forceUnbound()) {
+            appendIdentityOverride(session, Map.of("type", "forceUnbound", "userId", String.valueOf(userId)));
+            return List.of();
+        }
+        return delegate.listMessagingIdentities(userId);
+    }
+
+    @Override
     public List<PluginUserOption> searchUsers(String keyword, Long deptId, int page, int size) {
         return delegate.searchUsers(keyword, deptId, page, size);
     }
@@ -124,6 +155,23 @@ public class SandboxAwarePluginUserService implements PluginUserService {
     public void updateProfile(Long userId, PluginUserProfileUpdate update) {
         rejectSandboxWrite("updateProfile");
         delegate.updateProfile(userId, update);
+    }
+
+    @Override
+    public List<PluginUserTag> listTags(Long userId) {
+        return delegate.listTags(userId);
+    }
+
+    @Override
+    public void replaceTags(Long userId, String namespace, List<PluginUserTag> tags) {
+        rejectSandboxWrite("replaceTags");
+        delegate.replaceTags(userId, namespace, tags);
+    }
+
+    @Override
+    public void replaceFields(Long userId, String namespace, List<PluginUserField> fields) {
+        rejectSandboxWrite("replaceFields");
+        delegate.replaceFields(userId, namespace, fields);
     }
 
     private void rejectSandboxWrite(String operation) {

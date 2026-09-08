@@ -108,7 +108,7 @@
               <span class="command-code" th:text="${command.command}">menu</span>
               <span class="command-name" th:text="${command.name}">菜单</span>
             </div>
-            <div class="command-description" th:text="${command.description}">查看可用指令</div>
+            <div class="command-description" th:if="${showDescription}" th:text="${command.description}">查看可用指令</div>
           </div>
         </div>
       </section>

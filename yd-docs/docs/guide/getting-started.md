@@ -331,7 +331,7 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 |---|---|---:|---|---|---|
 | `MESSAGE_RENDER_BASE_URL` | `http://localhost:3000` | 否 | backend 调用 render-server 的地址。 | 消息渲染 | 容器内使用 `http://render-server:3000`；不要使用宿主 localhost。 |
 | `MESSAGE_RENDER_TOKEN` | 空 | 否 | backend 的渲染 token 配置。 | 兼容现有部署 | 当前 render-server 不校验此 token；服务只放内网。 |
-| `MESSAGE_RENDER_TIMEOUT` | `30s` | 否 | 渲染请求超时。 | 消息渲染 | 过大可能积压请求。 |
+| `MESSAGE_RENDER_TIMEOUT` | `45s` | 否 | 渲染请求超时。 | 消息渲染 | 过大可能积压请求；url-html 默认抓取 30s。 |
 | `MESSAGE_RENDER_MAX_RESPONSE_SIZE` | `16MB` | 否 | 渲染响应最大大小。 | 消息渲染 | 防止异常响应占用内存。 |
 | `S3_ENDPOINT` | `http://localhost:9000` | 否 | S3 兼容对象存储地址。 | 文件/对象存储 | 生产使用 HTTPS 或可信内网地址。 |
 | `S3_ACCESS_KEY` | `rustfsadmin` | 否 | 对象存储访问密钥。 | 对象存储 | 示例默认值仅适合本地开发，生产必须更换并用 Secret。 |
@@ -359,7 +359,7 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 | `YUDREAM_PLATFORM_PLUGIN_DEV_MODE_PROJECTS_0_CODE` / `_PATH` | 无 | 否 | 第一个开发项目的插件 code 和源码路径；其余项目将索引改为 `1`、`2`。 | 插件开发模式 | 仅限本地开发；`path` 会触发本机编译和类加载。 |
 | `YUDREAM_PLATFORM_PLUGIN_DEV_MODE_PROJECTS_0_FRONTEND_DIST` | 空（按布局推导） | 否 | 第一个开发项目的前端产物目录。 | 插件开发模式 | 使用受控目录；复杂列表配置优先使用配置文件。 |
 | `YUDREAM_PLATFORM_PLUGIN_DEV_MODE_PROJECTS_0_AUTO_COMPILE` | `true` | 否 | 第一个开发项目是否自动执行编译。 | 插件开发模式 | 关闭可避免文件变更触发编译；编译命令只应指向可信项目。 |
-| `YUDREAM_PLATFORM_PLUGIN_DEV_MODE_PROJECTS_0_COMPILE_COMMAND` | `mvn -q compile -DskipTests` | 否 | 第一个开发项目的编译命令。 | 插件开发模式 | 具有本机命令执行权限，生产禁止开启开发模式。 |
+| `YUDREAM_PLATFORM_PLUGIN_DEV_MODE_PROJECTS_0_COMPILE_COMMAND` | `mvn -q compile -DskipTests -P dev-export` | 否 | 第一个开发项目的编译命令，默认带 `dev-export` 以刷新 `target/plugin-dev/lib`。 | 插件开发模式 | 具有本机命令执行权限，生产禁止开启开发模式。 |
 | `YUDREAM_PLATFORM_SEMANTIC_MEMORY_NEO4J_URI` | `bolt://localhost:7687` | 否 | 插件语义记忆默认 Neo4j URI。 | 使用插件语义记忆且未被能力配置覆盖时 | 容器内使用服务名，生产不要暴露数据库。 |
 | `YUDREAM_PLATFORM_SEMANTIC_MEMORY_NEO4J_USERNAME` | `neo4j` | 否 | 插件语义记忆默认 Neo4j 用户名。 | 插件语义记忆 | 生产更换默认账号。 |
 | `YUDREAM_PLATFORM_SEMANTIC_MEMORY_NEO4J_PASSWORD` | 空 | 否 | 插件语义记忆默认 Neo4j 密码。 | 插件语义记忆 | 通过 Secret 注入，不要写入配置仓库。 |

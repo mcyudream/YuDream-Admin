@@ -2,7 +2,8 @@
 import type { TableColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
 import type { OptionItem } from '@/api/modules/system-role'
-import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStatus, UserUpdatePayload } from '@/api/modules/system-user'
+import type { IdValue, UserCreatePayload, UserDeptAssign, UserManageItem, UserStatus, UserTagItem, UserUpdatePayload } from '@/api/modules/system-user'
+import type { MessagingIdentity } from '@/api/modules/profile'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
 import apiRole from '@/api/modules/system-role'
@@ -76,6 +77,9 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
   { accessorKey: 'username', header: '用户名', width: 140, fixed: 'left' },
   { accessorKey: 'nickname', header: '昵称', width: 140 },
   { accessorKey: 'email', header: '邮箱', width: 220 },
+  { id: 'identities', header: '消息身份', width: 280 },
+  { id: 'fields', header: '扩展资料', width: 240 },
+  { id: 'tags', header: '标签', width: 220 },
   { id: 'deptNames', header: '部门', width: 220 },
   { id: 'roleNames', header: '角色', width: 220 },
   { id: 'emailVerified', header: '邮箱验证', width: 100, align: 'center' },
@@ -306,8 +310,57 @@ function sameIdArray(left: IdValue[], right: IdValue[]) {
   return sortedLeft.length === sortedRight.length && sortedLeft.every((item, index) => item === sortedRight[index])
 }
 
+function personnelFields(row: UserManageItem) {
+  const result: { key: string, label: string, value: string }[] = []
+  for (const [namespace, fields] of Object.entries(row.fields || {})) {
+    for (const [code, value] of Object.entries(fields)) {
+      if (code.endsWith('__label') || !value) {
+        continue
+      }
+      result.push({
+        key: `${namespace}:${code}`,
+        label: fields[`${code}__label`] || code,
+        value,
+      })
+    }
+  }
+  return result
+}
+
 function sameId(left?: IdValue, right?: IdValue) {
   return String(left ?? '') === String(right ?? '')
+}
+
+function protocolLabel(protocol?: string) {
+  if (protocol === 'official') {
+    return '官方 QQ'
+  }
+  if (protocol === 'milky') {
+    return 'Milky'
+  }
+  return protocol || '消息协议'
+}
+
+function identityTypeLabel(type?: string) {
+  if (type === 'qq') {
+    return 'QQ 号'
+  }
+  if (type === 'user_openid') {
+    return '用户 OpenID'
+  }
+  if (type === 'member_openid') {
+    return '群成员 OpenID'
+  }
+  return type || '身份'
+}
+
+function identityKey(item: MessagingIdentity, index: string | number) {
+  return [item.protocol, item.identityType, item.identity, item.groupOpenid, item.appId, item.connectionId, String(index)].join(':')
+}
+
+function identitySummary(item: MessagingIdentity) {
+  const suffix = item.groupOpenid ? ` / 群 ${item.groupOpenid}` : ''
+  return `${protocolLabel(item.protocol)} · ${identityTypeLabel(item.identityType)}：${item.identity || ''}${suffix}`
 }
 
 function sameDeptAssigns(payload: UserDeptAssign[], row: UserManageItem) {
@@ -352,6 +405,19 @@ function normalizeDefaultDept() {
 
 function flattenDepts(items: DeptManageItem[]): DeptManageItem[] {
   return items.flatMap(item => [item, ...flattenDepts(item.children || [])])
+}
+
+function userTagVariant(tag: UserTagItem) {
+  if (tag.code === 'status') {
+    if (tag.label === '已认证') {
+      return 'default'
+    }
+    if (tag.label === '审核中') {
+      return 'outline'
+    }
+    return 'secondary'
+  }
+  return 'default'
 }
 
 async function exportUsers() {
@@ -432,6 +498,36 @@ function importUsers() {
             </div>
           </FaSearchBar>
         </template>
+        <template #cell-identities="{ row }">
+          <div v-if="row.original.qq || row.original.messagingIdentities?.length" class="flex flex-col gap-1 text-sm">
+            <div v-if="row.original.qq" class="flex gap-2">
+              <span class="shrink-0 text-secondary-foreground/60">QQ 号</span>
+              <span class="break-all">{{ row.original.qq }}</span>
+            </div>
+            <div v-for="(item, index) in row.original.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
+              <span class="shrink-0 text-secondary-foreground/60">{{ protocolLabel(item.protocol) }}</span>
+              <span class="break-all">{{ identityTypeLabel(item.identityType) }} {{ item.identity }}{{ item.groupOpenid ? ` / 群 ${item.groupOpenid}` : '' }}</span>
+            </div>
+          </div>
+          <span v-else>-</span>
+        </template>
+        <template #cell-fields="{ row }">
+          <div v-if="personnelFields(row.original).length" class="flex flex-col gap-1 text-sm">
+            <div v-for="field in personnelFields(row.original)" :key="field.key" class="flex gap-2">
+              <span class="shrink-0 text-secondary-foreground/60">{{ field.label }}</span>
+              <span class="break-all">{{ field.value }}</span>
+            </div>
+          </div>
+          <span v-else>-</span>
+        </template>
+        <template #cell-tags="{ row }">
+          <div v-if="row.original.tags?.length" class="flex flex-wrap gap-1">
+            <FaTag v-for="tag in row.original.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+              {{ tag.label }}
+            </FaTag>
+          </div>
+          <span v-else>-</span>
+        </template>
         <template #cell-deptNames="{ row }">
           <div v-if="row.original.deptIds?.length" class="flex flex-wrap gap-1">
             <FaTag v-for="(deptId, index) in row.original.deptIds" :key="deptId" :variant="sameId(deptId, row.original.defaultDeptId) ? 'default' : 'secondary'">
@@ -496,9 +592,18 @@ function importUsers() {
                   <span class="break-all">{{ row.email }}</span>
                 </div>
                 <div v-if="row.qq" class="flex gap-2">
-                  <span class="shrink-0 text-secondary-foreground/60">QQ</span>
+                  <span class="shrink-0 text-secondary-foreground/60">QQ 号</span>
                   <span>{{ row.qq }}</span>
                 </div>
+                <div v-for="(item, index) in row.messagingIdentities || []" :key="identityKey(item, index)" class="flex gap-2">
+                  <span class="shrink-0 text-secondary-foreground/60">协议</span>
+                  <span class="break-all">{{ identitySummary(item) }}</span>
+                </div>
+              </div>
+              <div v-if="row.tags?.length" class="flex flex-wrap gap-1">
+                <FaTag v-for="tag in row.tags" :key="`${tag.namespace}:${tag.code}`" :variant="userTagVariant(tag)">
+                  {{ tag.label }}
+                </FaTag>
               </div>
               <div v-if="row.deptIds?.length" class="flex flex-wrap gap-1">
                 <FaTag v-for="(deptId, index) in row.deptIds" :key="deptId" :variant="sameId(deptId, row.defaultDeptId) ? 'default' : 'secondary'">
@@ -564,8 +669,8 @@ function importUsers() {
             </a-form-item>
           </a-grid-item>
           <a-grid-item>
-            <a-form-item label="QQ">
-              <FaInput v-model="form.qq" class="w-full" />
+            <a-form-item label="QQ 号">
+              <FaInput v-model="form.qq" class="w-full" placeholder="仅 Milky 协议使用真实 QQ 号" />
             </a-form-item>
           </a-grid-item>
           <a-grid-item v-if="!editing">

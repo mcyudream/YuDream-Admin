@@ -35,6 +35,19 @@ class MilkyPluginEventDispatcherTest {
     }
 
     @Test
+    void officialGroupOpenidIsTheChannelId() {
+        online.yudream.base.domain.platform.milky.aggregate.MilkyConnection official =
+                online.yudream.base.domain.platform.milky.aggregate.MilkyConnection.create(
+                        "官方", "official", null, null, "app-1", "secret", false, null, "base64", null);
+        assertEquals("group-open", MilkyPluginEventDispatcher.officialGroupOpenid(official, "group", "group-open"));
+        assertNull(MilkyPluginEventDispatcher.officialGroupOpenid(official, "friend", "user-open"));
+        online.yudream.base.domain.platform.milky.aggregate.MilkyConnection milky =
+                online.yudream.base.domain.platform.milky.aggregate.MilkyConnection.create(
+                        "本地", "http://127.0.0.1:3010", "token", "base64", null);
+        assertNull(MilkyPluginEventDispatcher.officialGroupOpenid(milky, "group", "1064685901"));
+    }
+
+    @Test
     void acceptsBothMilkyMessageEventNames() {
         assertTrue(MilkyPluginEventDispatcher.isMessageEvent("message_receive"));
         assertTrue(MilkyPluginEventDispatcher.isMessageEvent("message"));
@@ -103,6 +116,8 @@ class MilkyPluginEventDispatcherTest {
         assertEquals(List.of("extra"), MilkyPluginEventDispatcher.parseCommand("<@123> /签到 extra").arguments());
         assertNull(MilkyPluginEventDispatcher.parseCommand("<@!bot-open> hello"));
         assertNull(MilkyPluginEventDispatcher.parseCommand("[图片] 菜单"));
+        assertNull(MilkyPluginEventDispatcher.parseCommand("@MC梦璃 你是谁"));
+        assertEquals("我的画像", MilkyPluginEventDispatcher.parseCommand("@MC梦璃 /我的画像").name());
     }
 
     @Test
@@ -126,6 +141,10 @@ class MilkyPluginEventDispatcherTest {
         assertTrue(!MilkyPluginEventDispatcher.officialDirectedAtBot(Map.of(
                 "native_type", "GROUP_MESSAGE_CREATE",
                 "mention_self", false
+        )));
+        assertTrue(MilkyPluginEventDispatcher.officialDirectedAtBot(Map.of(
+                "native_type", "GROUP_MESSAGE_CREATE",
+                "mention_self", true
         )));
         assertTrue(!MilkyPluginEventDispatcher.officialDirectedAtBot(Map.of(
                 "native_type", "INTERACTION_CREATE"

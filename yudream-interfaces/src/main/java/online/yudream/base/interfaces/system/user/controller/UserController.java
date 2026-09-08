@@ -31,6 +31,8 @@ import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
 import online.yudream.base.interfaces.system.user.res.UserProfileRes;
+import online.yudream.base.interfaces.system.user.res.MessagingBindingCodeRes;
+import online.yudream.base.interfaces.system.user.res.MessagingBindingTargetRes;
 import online.yudream.base.plugin.spi.system.user.PluginQqBindingCode;
 import online.yudream.base.interfaces.system.user.res.UserRegisterRes;
 import online.yudream.base.interfaces.system.user.res.UserRoleRes;
@@ -164,6 +166,18 @@ public class UserController {
     @PostMapping("/me/qq-binding-code")
     public Result<PluginQqBindingCode> issueQqBindingCode() {
         return Result.ok(userAppService.issueQqBindingCode(StpUtil.getLoginIdAsLong()));
+    }
+
+    @GetMapping("/me/messaging-binding-targets")
+    public Result<List<MessagingBindingTargetRes>> messagingBindingTargets() {
+        return Result.ok(UserWebAssembler.toBindingTargetResList(
+                userAppService.listMessagingBindingTargets(StpUtil.getLoginIdAsLong())));
+    }
+
+    @PostMapping("/me/messaging-binding-codes")
+    public Result<MessagingBindingCodeRes> issueMessagingBindingCode(@RequestParam String connectionId) {
+        return Result.ok(UserWebAssembler.toBindingCodeRes(
+                userAppService.issueMessagingBindingCode(StpUtil.getLoginIdAsLong(), connectionId)));
     }
 
     @PostMapping("/me/resend-verification-email")

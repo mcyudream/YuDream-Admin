@@ -1,6 +1,6 @@
 # 用户与 QQ 绑定（PluginUserService / PluginQqBindingService）
 
-> SPI v1（2.7.0）· 包 `online.yudream.base.plugin.spi.system.user`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system.user`
 >
 > 源码目录：`yudream-plugins/yudream-plugin-spi/src/main/java/online/yudream/base/plugin/spi/system/user/`
 
@@ -24,7 +24,7 @@ PluginQqBindingService qqBindings = context.framework().qqBindings();
 
 ## PluginUserService 方法详解
 
-共 12 个方法（其中 `listDepartments` 有一对重载）。以下签名逐字摘自 `PluginUserService.java`；行为说明对应宿主实现 `PluginUserFrameworkService`。
+共 15 个方法（其中 `listDepartments` 有一对重载，另有 3 个消息身份默认方法）。以下签名逐字摘自 `PluginUserService.java`；行为说明对应宿主实现 `PluginUserFrameworkService`。
 
 ### 1. authenticate — 用户名/邮箱 + 密码认证
 
@@ -110,9 +110,11 @@ Optional<PluginUserProfile> findByEmail(String email);
 Optional<PluginUserProfile> findByQq(String qq);
 ```
 
-按系统用户绑定的 QQ 号精确匹配，常用于把 QQ 消息发送者映射回系统用户；找不到返回 `Optional.empty()`。QQ 沙箱会话中若开启「强制未绑定」，本方法恒返回 `empty`（见文末）。
+按系统用户绑定的 QQ 号或当前消息协议身份精确匹配，常用于把 QQ 消息发送者映射回系统用户；找不到返回 `Optional.empty()`。QQ 沙箱会话中若开启「强制未绑定」，本方法恒返回 `empty`（见文末）。
 
-### 7. bindQqOnce — 首次绑定 QQ（一次性）
+官方 OpenAPI 事件里的 `event.userId()` 是 openid 而不是 QQ 号。宿主会按当前分发事件的协议查找身份表；Milky 仍可按数字 QQ 命中 `User.qq`。
+
+### 7. bindQqOnce — 首次绑定当前消息身份（一次性）
 
 ```java
 void bindQqOnce(Long userId, String qq);
@@ -121,7 +123,7 @@ void bindQqOnce(Long userId, String qq);
 | 参数 | 类型 | 说明 |
 |---|---|---|
 | `userId` | `Long` | 目标用户 ID |
-| `qq` | `String` | 待绑定 QQ 号，内部 `trim()` |
+| `qq` | `String` | 待绑定身份，内部 `trim()`。在指令处理线程上通常传入 `event.userId()` |
 
 **返回**：`void`，失败一律抛 `BizException`。
 
@@ -129,12 +131,30 @@ void bindQqOnce(Long userId, String qq);
 
 | 场景 | 异常文案 |
 |---|---|
-| `userId` 为 `null` 或 `qq` 空白 | `用户和 QQ 不能为空` |
+| `userId` 为 `null` 或身份空白 | `用户和 QQ 不能为空` / `用户和消息身份不能为空` |
 | 用户不存在 | `用户不存在` |
-| 该用户已绑定过 QQ | `系统 QQ 已绑定，不能重复绑定` |
-| 该 QQ 已被其他用户绑定 | `QQ 已被其他用户绑定` |
+| 该用户已绑定过同一作用域身份，且身份值不同 | `系统 QQ 已绑定，不能重复绑定` |
+| 该身份已被其他用户绑定 | `该消息身份已被其他用户绑定` / `QQ 已被其他用户绑定` |
 
-校验通过后更新用户 QQ 并保存。换绑/解绑不在 SPI 暴露面内，插件无法调用。
+宿主会看当前消息分发作用域：
+
+- **Milky**：把数字 QQ 写入 `User.qq`，并写入 `sysMessagingIdentity`（`protocol=milky`, `identityType=qq`）。
+- **官方私聊**：写入 `user_openid`，**不会**覆盖 `User.qq`。
+- **官方群**：写入 `member_openid` + `groupOpenid`，只覆盖该群；私聊仍需另绑 `user_openid`。
+
+旧插件继续 `bindQqOnce(userId, command.event().userId())` 即可，不必改编译。换绑/解绑不在 SPI 暴露面内。
+
+### 7a. findByMessagingIdentity / bindMessagingIdentityOnce / listMessagingIdentities
+
+```java
+default Optional<PluginUserProfile> findByMessagingIdentity(PluginMessagingIdentity identity);
+default void bindMessagingIdentityOnce(Long userId, PluginMessagingIdentity identity);
+default List<PluginMessagingIdentity> listMessagingIdentities(Long userId);
+```
+
+`PluginMessagingIdentity(protocol, identityType, identity, appId, groupOpenid, connectionId)`。`identityType` 为 `qq` / `user_openid` / `member_openid`。默认实现回退到 `findByQq` / `bindQqOnce`，旧测试桩不用改。
+
+启动时会把历史 `sysUser.qq` 迁到身份表：`^\d{5,12}$` 视为 Milky QQ，其余视为官方 `user_openid`（当时可能没有 AppID，查找会按身份值回落）。
 
 ### 8. searchUsers — 关键字 + 部门分页搜索
 
@@ -156,6 +176,8 @@ List<PluginUserOption> options = context.framework().users()
         .searchUsers("张", null, 1, 20);
 // options 的 id / deptIds 均为字符串形态，可直接下发前端选择器
 ```
+
+插件前端选择器应使用宿主 SDK `sdk.users.search()/resolve()/departments()/roles()`，不要再为用户/部门/角色目录单独写插件 HTTP。`roles()` 是全站角色选项；按用户查角色仍走本端口的 `listRoles(userId)`。
 
 ### 9. listDepartments(keyword) — 部门树（选项形态）
 
@@ -220,7 +242,10 @@ void updateProfile(Long userId, PluginUserProfileUpdate update);
 | 4 | `findByUsername` | `Optional<PluginUserProfile> findByUsername(String username)` | 不存在 → `empty` |
 | 5 | `findByEmail` | `Optional<PluginUserProfile> findByEmail(String email)` | 不存在 → `empty` |
 | 6 | `findByQq` | `Optional<PluginUserProfile> findByQq(String qq)` | 不存在 → `empty` |
-| 7 | `bindQqOnce` | `void bindQqOnce(Long userId, String qq)` | 校验失败 → `BizException` |
+| 7 | `bindQqOnce` | `void bindQqOnce(Long userId, String qq)` | 校验失败 → `BizException`；官方身份不写 `User.qq` |
+| 7a | `findByMessagingIdentity` | `default Optional<PluginUserProfile> findByMessagingIdentity(PluginMessagingIdentity)` | 默认回退 `findByQq` |
+| 7b | `bindMessagingIdentityOnce` | `default void bindMessagingIdentityOnce(Long, PluginMessagingIdentity)` | 默认回退 `bindQqOnce` |
+| 7c | `listMessagingIdentities` | `default List<PluginMessagingIdentity> listMessagingIdentities(Long)` | 默认只回退 `profile.qq` |
 | 8 | `searchUsers` | `List<PluginUserOption> searchUsers(String keyword, Long deptId, int page, int size)` | 仅 ACTIVE，size 钳制 [1,200] |
 | 9 | `listDepartments` | `List<PluginDeptOption> listDepartments(String keyword)` | 部门树，仅 ACTIVE |
 | 10 | `listRoles` | `List<PluginUserRole> listRoles(Long userId)` | 空列表表示无角色 |
@@ -403,7 +428,7 @@ context.framework().users().bindQqOnce(boundUserId, authorQq);
 - **`listDepartments` 有两个重载**：`String keyword` → 全量部门树；`Long userId` → 用户所属部门。传参时注意 Java 重载解析。
 - **绑定码是单节点内存态**：`PluginQqBindingFrameworkService` 用 `ConcurrentHashMap` 存码，服务重启后未使用的码全部失效，多实例部署时取码与核销必须落在同一节点。
 - **绑定码不含 QQ**：`issue` 只关联 `userId`，QQ 号由核销方（消息作者）在调用 `bindQqOnce` 时提供，避免绑定码被截获后冒绑。
-- **QQ 沙箱行为**：生产注入的 `SandboxAwarePluginUserService` 在 QQ 沙箱会话中——`create`/`bindQqOnce`/`updateProfile` 直接抛 `BizException("QQ 沙箱会话禁止写入系统用户数据：...")`；`findByQq` 可被「强制未绑定」改写为恒 `empty`；`listRoles` 可被「模拟角色」改写返回。插件代码无需区分，但沙箱调试时观察到的行为差异来自这里。
+- **QQ 沙箱行为**：生产注入的 `SandboxAwarePluginUserService` 在 QQ 沙箱会话中——`create`/`bindQqOnce`/`bindMessagingIdentityOnce`/`updateProfile` 直接抛 `BizException("QQ 沙箱会话禁止写入系统用户数据：...")`；`findByQq` / `findByMessagingIdentity` / `listMessagingIdentities` 可被「强制未绑定」改写为恒 `empty`；`listRoles` 可被「模拟角色」改写返回。插件代码无需区分，但沙箱调试时观察到的行为差异来自这里。
 - **能力获取入口**：两个端口都从 `context.framework()` 获取，插件不得注入宿主 Spring Bean；接口演进走 SPI 发版流程。
 
 ## QQ 沙箱行为详解
@@ -412,8 +437,8 @@ context.framework().users().bindQqOnce(boundUserId, authorQq);
 
 | 方法 | 沙箱会话中的行为 |
 |---|---|
-| `create` / `bindQqOnce` / `updateProfile` | 直接抛 `BizException("QQ 沙箱会话禁止写入系统用户数据：<方法名>")`，并向沙箱会话记录 `identity.override`（type=`writeBlocked`），**不会触达真实用户库** |
-| `findByQq` | 若会话开启 `forceUnbound`，恒返回 `Optional.empty()`，并记录 type=`forceUnbound` 的覆盖事件 |
+| `create` / `bindQqOnce` / `bindMessagingIdentityOnce` / `updateProfile` | 直接抛 `BizException("QQ 沙箱会话禁止写入系统用户数据：<方法名>")`，并向沙箱会话记录 `identity.override`（type=`writeBlocked`），**不会触达真实用户库** |
+| `findByQq` / `findByMessagingIdentity` / `listMessagingIdentities` | 若会话开启 `forceUnbound`，恒返回 `Optional.empty()` / 空列表，并记录 type=`forceUnbound` 的覆盖事件 |
 | `listRoles` | 若会话配置了 `simulateRoles`（角色 code 列表），返回按 code 从角色库解析出的模拟角色列表（未知 code 被忽略并记入 `unknownRoles`），不查询该用户真实角色 |
 | 其余只读方法（`authenticate`/`findById`/`findByUsername`/`findByEmail`/`searchUsers`/`listDepartments`） | 透传委托实现，不做改写 |
 

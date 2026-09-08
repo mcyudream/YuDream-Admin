@@ -40,27 +40,49 @@ public class CapabilityCredentialCipher {
     }
 
     public String encryptNeo4jPassword(String password) {
-        if (!StringUtils.hasText(password)) {
-            return password;
+        return encrypt(NEO4J_PASSWORD_AAD, password, "Neo4j 凭据加密失败");
+    }
+
+    public String decryptNeo4jPassword(String value) {
+        return decrypt(NEO4J_PASSWORD_AAD, value, "Neo4j 凭据解密失败，请配置 YUDREAM_CREDENTIAL_KEY 后重试");
+    }
+
+    /** 通用能力凭据加密：AAD 绑定 capabilityCode:configKey，防止跨能力/跨键重放。 */
+    public String encryptSecret(String capabilityCode, String configKey, String plaintext) {
+        return encrypt(aadOf(capabilityCode, configKey), plaintext, "能力凭据加密失败");
+    }
+
+    /** 通用能力凭据解密；非密文原样返回。 */
+    public String decryptSecret(String capabilityCode, String configKey, String value) {
+        return decrypt(aadOf(capabilityCode, configKey), value, "能力凭据解密失败，请配置 YUDREAM_CREDENTIAL_KEY 后重试");
+    }
+
+    private static byte[] aadOf(String capabilityCode, String configKey) {
+        return ("capability:" + capabilityCode + ":" + configKey).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String encrypt(byte[] aad, String plaintext, String failureMessage) {
+        if (!StringUtils.hasText(plaintext)) {
+            return plaintext;
         }
         try {
             byte[] iv = new byte[IV_LENGTH];
             secureRandom.nextBytes(iv);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, primaryKey(), new GCMParameterSpec(TAG_LENGTH, iv));
-            cipher.updateAAD(NEO4J_PASSWORD_AAD);
-            byte[] ciphertext = cipher.doFinal(password.getBytes(StandardCharsets.UTF_8));
+            cipher.updateAAD(aad);
+            byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
             byte[] payload = Arrays.copyOf(iv, iv.length + ciphertext.length);
             System.arraycopy(ciphertext, 0, payload, iv.length, ciphertext.length);
             return VERSION + Base64.getEncoder().encodeToString(payload);
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException("Neo4j 凭据加密失败");
+            throw new BizException(failureMessage);
         }
     }
 
-    public String decryptNeo4jPassword(String value) {
+    private String decrypt(byte[] aad, String value, String failureMessage) {
         if (!encrypted(value)) {
             return value;
         }
@@ -73,7 +95,7 @@ public class CapabilityCredentialCipher {
                 try {
                     Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
                     cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(TAG_LENGTH, payload, 0, IV_LENGTH));
-                    cipher.updateAAD(NEO4J_PASSWORD_AAD);
+                    cipher.updateAAD(aad);
                     return new String(cipher.doFinal(payload, IV_LENGTH, payload.length - IV_LENGTH), StandardCharsets.UTF_8);
                 } catch (Exception ignored) {
                     // Try the legacy key only after the unified key cannot decrypt this ciphertext.
@@ -82,7 +104,7 @@ public class CapabilityCredentialCipher {
         } catch (IllegalArgumentException ignored) {
             // Fall through to the uniform diagnostic below.
         }
-        throw new BizException("Neo4j 凭据解密失败，请配置 YUDREAM_CREDENTIAL_KEY 后重试");
+        throw new BizException(failureMessage);
     }
 
     public boolean canEncrypt() {

@@ -229,7 +229,8 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     nickname?: string
     bindingToken?: string
   }) {
-    await apiUser.register(data)
+    const res = await apiUser.register(data)
+    return res.data
   }
 
   // 加载当前部门/角色上下文

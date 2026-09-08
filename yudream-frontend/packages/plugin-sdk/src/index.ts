@@ -39,6 +39,81 @@ export interface YuDreamPluginAssetsClient {
   url: (path: string) => string
 }
 
+export interface YuDreamPluginMessagingConnection {
+  id: string
+  name: string
+  platform?: string
+  userId?: string | null
+  protocol?: string | null
+}
+
+export interface YuDreamPluginMessagingGroup {
+  id: string
+  name: string
+}
+
+export interface YuDreamPluginMessagingClient {
+  connections: () => Promise<YuDreamPluginMessagingConnection[]>
+  groups: (connectionId: string) => Promise<YuDreamPluginMessagingGroup[]>
+}
+
+export interface YuDreamPluginUserOption {
+  id: string
+  username: string
+  nickname?: string
+  email?: string
+  avatar?: string
+  status?: string
+  deptIds?: string[]
+  deptNames?: string[]
+}
+
+export interface YuDreamPluginDeptOption {
+  id: string
+  name: string
+  label?: string
+  parentId?: string | null
+  status?: string
+  children?: YuDreamPluginDeptOption[]
+}
+
+export interface YuDreamPluginRoleOption {
+  id: string
+  code?: string
+  name: string
+  deptId?: string | null
+  deptName?: string | null
+}
+
+export interface YuDreamPluginUsersClient {
+  search: (query?: { keyword?: string, deptId?: string, page?: number, size?: number }) => Promise<YuDreamPluginUserOption[]>
+  resolve: (ids: string[]) => Promise<YuDreamPluginUserOption[]>
+  departments: (query?: { keyword?: string, flatten?: boolean }) => Promise<YuDreamPluginDeptOption[]>
+  roles: () => Promise<YuDreamPluginRoleOption[]>
+}
+
+export interface YuDreamPluginAiAgentOption {
+  code: string
+  name: string
+  description?: string
+}
+
+export interface YuDreamPluginAiModelOption {
+  code: string
+  name: string
+}
+
+export interface YuDreamPluginAiProviderOption {
+  code: string
+  name: string
+  models?: YuDreamPluginAiModelOption[]
+}
+
+export interface YuDreamPluginAiClient {
+  agents: () => Promise<YuDreamPluginAiAgentOption[]>
+  providers: () => Promise<YuDreamPluginAiProviderOption[]>
+}
+
 export interface YuDreamPluginAccount {
   userId: string
   username: string
@@ -55,6 +130,9 @@ export interface YuDreamPluginSdk {
   http: YuDreamPluginHttpClient
   files: YuDreamPluginFilesClient
   assets: YuDreamPluginAssetsClient
+  messaging: YuDreamPluginMessagingClient
+  users: YuDreamPluginUsersClient
+  ai: YuDreamPluginAiClient
 }
 
 export interface YuDreamPluginPageProps {

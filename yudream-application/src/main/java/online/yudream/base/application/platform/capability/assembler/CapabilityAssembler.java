@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.capability.dto.CapabilityDTO;
 import online.yudream.base.application.platform.capability.dto.CapabilityTestDTO;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
+import online.yudream.base.domain.platform.capability.valobj.CapabilitySecrets;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
 
 import java.util.HashMap;
@@ -32,18 +33,17 @@ public class CapabilityAssembler {
 
     private static Map<String, String> publicConfig(CapabilityModule module) {
         Map<String, String> config = new HashMap<>(module.getConfig() == null ? Map.of() : module.getConfig());
-        if ("neo4j".equals(module.getCode())) {
-            config.remove("password");
-        }
+        CapabilitySecrets.keysOf(module.getCode()).forEach(config::remove);
         return config;
     }
 
     private static Map<String, Boolean> secretConfigured(CapabilityModule module) {
-        if (!"neo4j".equals(module.getCode())) {
-            return Map.of();
+        Map<String, Boolean> result = new HashMap<>();
+        for (String key : CapabilitySecrets.keysOf(module.getCode())) {
+            String value = module.getConfig() == null ? null : module.getConfig().get(key);
+            result.put(key, value != null && !value.isBlank());
         }
-        return Map.of("password", module.getConfig() != null && module.getConfig().get("password") != null
-                && !module.getConfig().get("password").isBlank());
+        return result;
     }
 
     public static CapabilityTestDTO toDTO(CapabilityTestResult result) {

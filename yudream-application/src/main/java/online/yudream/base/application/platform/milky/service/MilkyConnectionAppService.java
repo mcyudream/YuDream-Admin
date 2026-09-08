@@ -24,6 +24,7 @@ public class MilkyConnectionAppService {
     private final CapabilityAppService capabilityAppService;
     private final MilkyEventGateway eventGateway;
     private final MilkyApiGateway apiGateway;
+    private final OfficialQqBotCommandMenuAppService officialCommandMenuAppService;
 
     @Transactional
     public MilkyConnectionDTO create(MilkyConnectionCreateCmd cmd) {
@@ -57,6 +58,10 @@ public class MilkyConnectionAppService {
         connection.setEnabled(true);
         MilkyConnection saved = connectionRepo.save(connection);
         eventGateway.connect(saved.getId());
+        if (saved.official()) {
+            officialCommandMenuAppService.prefetchRemoteSnapshots();
+            officialCommandMenuAppService.requestSync();
+        }
         return MilkyConnectionAssembler.toDTO(saved);
     }
 

@@ -1,6 +1,6 @@
 # 注解声明
 
-> SPI v1（2.7.0）· 包 `online.yudream.base.plugin.spi.annotation`
+> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.annotation`
 
 优先使用注解声明静态能力（宿主扫描注册）；只有动态能力、条件注册或兼容逻辑才使用命令式 `registerXxx`。
 
@@ -45,7 +45,7 @@ TYPE。声明前端 remote 模块及路由。
 |---|---|---|---|
 | `entry` | String | `""` | ESM `remoteEntry.js` 相对路径；留空由宿主推导为 `/api/platform/plugins/{pluginCode}/assets/remoteEntry.js`（标准 JAR 布局） |
 | `moduleName` | String | 必填 | Federation 模块名 |
-| `sdkVersion` | String | `""` | 宿主注入 SDK 版本 |
+| `sdkVersion` | String | `""` | 宿主注入 SDK 行为版本。当前宿主为 `1.3.0`（与 `@yudream/plugin-sdk` npm 包版本对齐） |
 | `integrity` | String | `""` | 资源 SRI 校验值 |
 | `menuTitle` | String | `""` | 插件顶级菜单名 |
 | `menuIcon` | String | `""` | 顶级菜单图标（Iconify 名称） |

@@ -19,5 +19,7 @@ public @interface PluginSpec {
 
     String description() default "";
 
+    String icon() default "";
+
     String[] dependencies() default {};
 }

@@ -33,7 +33,39 @@ class PluginYamlDescriptorReaderTest {
     }
 
     @Test
-    void fallsBackToPluginCodeWhenDisplayNameIsMissing() {
+    void readsSystemIconAndImagePathFromPluginYaml() {
+        PluginYamlDescriptorReader reader = new PluginYamlDescriptorReader();
+
+        PluginDescriptor systemIcon = reader.read(new ByteArrayInputStream("""
+                name: system-icon
+                main: example.Plugin
+                version: 1.0.0
+                icon: i-ri:puzzle-2-line
+                """.getBytes(StandardCharsets.UTF_8)));
+        PluginDescriptor imageIcon = reader.read(new ByteArrayInputStream("""
+                name: image-icon
+                main: example.Plugin
+                version: 1.0.0
+                icon: assets/icon.png
+                """.getBytes(StandardCharsets.UTF_8)));
+
+        assertThat(systemIcon.icon()).isEqualTo("i-ri:puzzle-2-line");
+        assertThat(imageIcon.icon()).isEqualTo("assets/icon.png");
+    }
+
+    @Test
+    void rejectsUnsafePluginIconPath() {
+        org.junit.jupiter.api.Assertions.assertThrows(online.yudream.base.domain.common.exception.BizException.class,
+                () -> new PluginYamlDescriptorReader().read(new ByteArrayInputStream("""
+                        name: unsafe-icon
+                        main: example.Plugin
+                        version: 1.0.0
+                        icon: ../icon.png
+                        """.getBytes(StandardCharsets.UTF_8))));
+    }
+
+    @Test
+    void fallsBackToCodeWhenDisplayNameMissing() {
         PluginDescriptor descriptor = new PluginYamlDescriptorReader().read(new ByteArrayInputStream("""
                 name: legacy-plugin
                 main: online.yudream.plugin.legacy.LegacyPlugin

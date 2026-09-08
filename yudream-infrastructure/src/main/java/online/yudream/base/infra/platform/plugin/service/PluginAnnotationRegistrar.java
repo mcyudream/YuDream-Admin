@@ -5,6 +5,7 @@ import online.yudream.base.plugin.spi.annotation.PluginCapability;
 import online.yudream.base.plugin.spi.annotation.PluginConfigEntry;
 import online.yudream.base.plugin.spi.annotation.PluginDashboardCard;
 import online.yudream.base.plugin.spi.annotation.PluginFrontend;
+import online.yudream.base.plugin.spi.annotation.PluginGlobalWidget;
 import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginMenu;
 import online.yudream.base.plugin.spi.annotation.PluginPermission;
@@ -37,6 +38,7 @@ class PluginAnnotationRegistrar {
         registerMenus(pluginClass, context);
         registerCapabilities(pluginClass, context);
         registerDashboardCards(pluginClass, context);
+        registerGlobalWidgets(pluginClass, context);
         registerFrontend(pluginClass, context);
         registerHttpEndpoints(plugin, pluginClass, context);
         registerCommands(plugin, pluginClass, context);
@@ -144,6 +146,17 @@ class PluginAnnotationRegistrar {
                     card.minH(),
                     card.sort(),
                     card.defaultOnFirstVisit()
+            ));
+        }
+    }
+
+    private void registerGlobalWidgets(Class<?> pluginClass, PluginContextImpl context) {
+        for (PluginGlobalWidget widget : pluginClass.getAnnotationsByType(PluginGlobalWidget.class)) {
+            context.registerGlobalWidget(new online.yudream.base.plugin.spi.widget.PluginGlobalWidget(
+                    widget.code(),
+                    widget.component(),
+                    widget.permission(),
+                    widget.sort()
             ));
         }
     }

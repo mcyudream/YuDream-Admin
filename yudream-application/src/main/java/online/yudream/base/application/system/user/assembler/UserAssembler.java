@@ -1,14 +1,20 @@
 package online.yudream.base.application.system.user.assembler;
 
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
+import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
+import online.yudream.base.application.system.user.dto.MessagingBindingTargetDTO;
+import online.yudream.base.application.system.user.dto.MessagingIdentityDTO;
 import online.yudream.base.application.system.user.dto.OptionDTO;
 import online.yudream.base.application.system.user.dto.PermissionDTO;
 import online.yudream.base.application.system.user.dto.RoleManageDTO;
 import online.yudream.base.application.system.user.dto.UserDTO;
 import online.yudream.base.application.system.user.dto.UserManageDTO;
 import online.yudream.base.application.system.user.dto.UserProfileDTO;
+import online.yudream.base.application.system.user.dto.UserTagDTO;
 import online.yudream.base.application.system.user.dto.UserRegisterDTO;
+import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
 import online.yudream.base.domain.system.user.aggregate.Dept;
+import online.yudream.base.domain.system.user.aggregate.MessagingIdentity;
 import online.yudream.base.domain.system.user.aggregate.Permission;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.aggregate.User;
@@ -16,6 +22,7 @@ import online.yudream.base.domain.system.user.enumerate.PermissionStatus;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +43,10 @@ public class UserAssembler {
     }
 
     public static UserProfileDTO toProfileDTO(User user, String avatar) {
+        return toProfileDTO(user, avatar, List.of());
+    }
+
+    public static UserProfileDTO toProfileDTO(User user, String avatar, List<MessagingIdentity> identities) {
         return UserProfileDTO.builder()
                 .id(user.getId())
                 .username(user.getUsername())
@@ -48,6 +59,7 @@ public class UserAssembler {
                 .avatar(avatar)
                 .createTime(user.getCreateTime())
                 .updateTime(user.getUpdateTime())
+                .messagingIdentities(toIdentityDTOs(identities))
                 .build();
     }
 
@@ -61,6 +73,11 @@ public class UserAssembler {
     }
 
     public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap) {
+        return toManageDTO(user, roleMap, deptMap, List.of());
+    }
+
+    public static UserManageDTO toManageDTO(User user, Map<Long, Role> roleMap, Map<Long, Dept> deptMap,
+                                            List<MessagingIdentity> identities) {
         List<Long> deptIds = user.getDepts().stream().map(d -> d.id().getValue()).toList();
         return UserManageDTO.builder()
                 .id(user.getId())
@@ -76,9 +93,71 @@ public class UserAssembler {
                 .deptIds(deptIds)
                 .deptNames(deptIds.stream().map(deptMap::get).filter(d -> d != null).map(Dept::getName).toList())
                 .defaultDeptId(user.getDefaultDeptID() == null ? null : user.getDefaultDeptID().getValue())
+                .tags(user.listTags().stream()
+                        .filter(tag -> tag != null)
+                        .map(tag -> UserTagDTO.builder()
+                                .namespace(tag.namespace())
+                                .code(tag.code())
+                                .label(tag.label())
+                                .build())
+                        .toList())
+                .fields(user.listFields())
+                .messagingIdentities(toIdentityDTOs(identities))
                 .createTime(user.getCreateTime())
                 .updateTime(user.getUpdateTime())
                 .build();
+    }
+
+    public static List<MessagingIdentityDTO> toIdentityDTOs(List<MessagingIdentity> identities) {
+        if (identities == null || identities.isEmpty()) {
+            return List.of();
+        }
+        return identities.stream().map(UserAssembler::toIdentityDTO).toList();
+    }
+
+    public static MessagingIdentityDTO toIdentityDTO(MessagingIdentity identity) {
+        if (identity == null) {
+            return null;
+        }
+        return MessagingIdentityDTO.builder()
+                .protocol(identity.getProtocol() == null ? null : identity.getProtocol().code())
+                .identityType(identity.getIdentityType() == null ? null : identity.getIdentityType().code())
+                .identity(identity.getIdentity())
+                .groupOpenid(identity.getGroupOpenid())
+                .appId(identity.getAppId())
+                .connectionId(identity.getConnectionId() == null ? null : String.valueOf(identity.getConnectionId()))
+                .build();
+    }
+
+    public static MessagingBindingTargetDTO toBindingTargetDTO(MilkyConnection connection,
+                                                               String botName, boolean bound) {
+        if (connection == null || connection.getId() == null) {
+            return null;
+        }
+        return MessagingBindingTargetDTO.builder()
+                .connectionId(String.valueOf(connection.getId()))
+                .name(connection.getName())
+                .protocol(connection.protocolCode())
+                .botName(blank(botName) ? null : botName.trim())
+                .appId(blank(connection.getAppId()) ? null : connection.getAppId().trim())
+                .bound(bound)
+                .build();
+    }
+
+    public static MessagingBindingCodeDTO toBindingCodeDTO(String code, Instant expiresAt,
+                                                           MessagingBindingTargetDTO target) {
+        return MessagingBindingCodeDTO.builder()
+                .code(code)
+                .expiresAt(expiresAt)
+                .connectionId(target == null ? null : target.getConnectionId())
+                .connectionName(target == null ? null : target.getName())
+                .protocol(target == null ? null : target.getProtocol())
+                .botName(target == null ? null : target.getBotName())
+                .build();
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
     }
 
     public static RoleManageDTO toRoleManageDTO(Role role, Map<Long, Dept> deptMap) {

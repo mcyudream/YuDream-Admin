@@ -139,7 +139,10 @@ async function resolveSegment(segment: Segment): Promise<Segment> {
   if (!data.url && typeof data.temp_url === 'string') data.url = data.temp_url
   if (segment.type === 'image' || segment.type === 'file' || segment.type === 'record' || segment.type === 'video') {
     const resourceId = data.file_id || data.resource_id || data.file
-    if (resourceId) {
+    if (typeof resourceId === 'string' && (resourceId.startsWith('http://') || resourceId.startsWith('https://'))) {
+      data.url = resourceId
+    }
+    else if (resourceId && props.protocol !== 'official') {
       try {
         const result = await invoke('get_resource_temp_url', { resource_id: resourceId })
         const url = object(result).url || object(result).temp_url || object(result).data?.url || result
