@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.graph.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.enumerate.CapabilityType;
 import online.yudream.base.domain.platform.capability.service.CapabilityProvider;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
@@ -9,7 +10,9 @@ import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResul
 import online.yudream.base.infra.platform.capability.service.CapabilityCredentialCipher;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -56,14 +59,25 @@ public class Neo4jCapabilityProvider implements CapabilityProvider {
     @Override
     public void enable(Map<String, String> config) {
         enabled.set(false);
-        String password = config == null ? null : config.get("password");
-        if (credentialCipher.encrypted(password) || (password != null && !credentialCipher.canDecrypt())) {
-            credentialError = "Neo4j 凭据无法解密，请配置 YUDREAM_CREDENTIAL_KEY 后保存或启用";
-            throw new IllegalStateException(credentialError);
+        Map<String, String> runtime = config == null ? Map.of() : new HashMap<>(config);
+        String password = runtime.get("password");
+        if (credentialCipher.encrypted(password)) {
+            try {
+                runtime.put("password", credentialCipher.decryptSecret(CODE, "password", password));
+            } catch (RuntimeException ignored) {
+                failCredentialRestore();
+            }
+        } else if (StringUtils.hasText(password) && !credentialCipher.canDecrypt()) {
+            failCredentialRestore();
         }
-        graphDatabaseGateway.reconfigure(config);
         credentialError = null;
+        graphDatabaseGateway.reconfigure(runtime);
         enabled.set(true);
+    }
+
+    private void failCredentialRestore() {
+        credentialError = "Neo4j 凭据无法解密，请配置 YUDREAM_CREDENTIAL_KEY 后保存或启用";
+        throw new BizException(credentialError);
     }
 
     @Override

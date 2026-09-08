@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.graph.service;
 
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.enumerate.CapabilityStatus;
 import online.yudream.base.infra.platform.capability.service.CapabilityCredentialCipher;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class Neo4jCapabilityProviderTest {
     void reportsCredentialErrorWhenCiphertextCannotBeRestored() {
         Neo4jCapabilityProvider provider = new Neo4jCapabilityProvider(new RecordingGateway(), CIPHER);
 
-        assertThrows(IllegalStateException.class, () -> provider.enable(Map.of("password", "v1:unreadable")));
+        assertThrows(BizException.class, () -> provider.enable(Map.of("password", "v1:unreadable")));
         assertEquals(CapabilityStatus.ERROR, provider.health().status());
     }
 
@@ -43,8 +44,22 @@ class Neo4jCapabilityProviderTest {
         Neo4jCapabilityProvider provider = new Neo4jCapabilityProvider(
                 new RecordingGateway(), new CapabilityCredentialCipher(""));
 
-        assertThrows(IllegalStateException.class, () -> provider.enable(Map.of("password", "legacy-plaintext")));
+        assertThrows(BizException.class, () -> provider.enable(Map.of("password", "legacy-plaintext")));
         assertEquals(CapabilityStatus.ERROR, provider.health().status());
+    }
+
+    @Test
+    void enablesWhenHistoricalNeo4jPasswordCiphertextCanBeRestored() {
+        RecordingGateway gateway = new RecordingGateway();
+        Neo4jCapabilityProvider provider = new Neo4jCapabilityProvider(gateway, CIPHER);
+        String historical = CIPHER.encryptNeo4jPassword("private-password");
+        Map<String, String> config = Map.of(
+                "uri", "bolt://neo4j:7687", "username", "neo4j", "password", historical, "database", "neo4j");
+
+        provider.enable(config);
+
+        assertEquals("private-password", gateway.reconfigured.get().get("password"));
+        assertEquals(CapabilityStatus.ENABLED, provider.health().status());
     }
 
     @Test

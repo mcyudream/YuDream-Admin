@@ -423,6 +423,10 @@
     {
       "key": "plugin-devmode-compile-export",
       "text": "开发模式 ClassLoader 只挂 target/classes + target/plugin-dev/lib/*.jar，不查 Maven 仓库。面板默认 compileCommand、批量登记与 DevProject 字段默认必须是 mvn -q compile -DskipTests -P dev-export，源码热编译才会刷新 runtime 依赖（如 alipay-sdk-java）。缺 profile 时第三方 SDK 只在编译期可见，启用插件会 NoClassDefFoundError（先例 AlipayApiException）。生产 shaded JAR 仍须自带这些类；首次准备或依赖变化后跑 mvn -pl <模块> -am -P dev-export package -DskipTests。"
+    },
+    {
+      "key": "neo4j-credential-aad-and-bizexception",
+      "text": "Neo4j 能力密码入库现用 AAD capability:neo4j:password，但历史密文用 neo4j:password。CapabilityModuleInfraMapper 解密失败会原样保留 v1: 密文；旧 Neo4jCapabilityProvider.enable 只要看到 v1: 就抛 IllegalStateException，接口变成 500。decryptSecret 必须回退历史 AAD，enable 对仍是密文的密码再解密一次，失败抛 BizException（400）而不是 IllegalStateException。"
     }
   ]
 }
