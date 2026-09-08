@@ -42,8 +42,10 @@ function closeMobileNav() {
 }
 
 function syncMobileNavOffset() {
-  const bottom = headerBarRef.value?.getBoundingClientRect().bottom
-  document.documentElement.style.setProperty('--site-mobile-nav-top', `${Math.max(0, Math.round(bottom || 56))}px`)
+  const header = headerBarRef.value?.closest('.site-layout-header') as HTMLElement | null
+  const bottom = (header || headerBarRef.value)?.getBoundingClientRect().bottom
+  const top = Math.max(0, Math.round(bottom || 56))
+  document.documentElement.style.setProperty('--site-mobile-nav-top', `${top}px`)
 }
 
 function isInsideMobilePanel(target: EventTarget | null) {
@@ -100,7 +102,13 @@ function onMobileQueryChange() {
   if (!mobileQuery?.matches) closeMobileNav()
 }
 
-watch(mobileNavOpen, open => lockPageScroll(open))
+watch(mobileNavOpen, async (open) => {
+  lockPageScroll(open)
+  if (open) {
+    await nextTick()
+    syncMobileNavOffset()
+  }
+})
 
 onMounted(() => {
   mobileQuery = window.matchMedia('(max-width: 760px)')
@@ -172,32 +180,41 @@ onBeforeUnmount(() => {
           <span class="site-layout-header__menu-toggle-line" />
         </button>
       </div>
-      <Transition name="site-mobile">
-        <div v-show="mobileNavOpen" ref="mobilePanelRef" class="site-layout-header__mobile">
-        <nav class="site-mobile-nav" aria-label="站点导航">
-          <div v-for="item in navigationTree" :key="`m-${item.id || item.url}`" class="site-mobile-nav__group">
-            <a :href="item.url" class="site-mobile-nav__link">{{ item.label }}</a>
-            <a v-for="child in item.children || []" :key="`m-${child.id || child.url}`" :href="child.url" class="site-mobile-nav__link site-mobile-nav__link--child">{{ child.label }}</a>
-          </div>
-        </nav>
-        <div class="site-mobile-auth">
-          <template v-if="!appAccountStore.isLogin">
-            <a href="/login" class="ghost">登录</a>
-            <a href="/register" class="primary">注册</a>
-          </template>
-          <template v-else>
-            <div class="site-mobile-auth__account">
-              <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
-              <span>{{ appAccountStore.account }}</span>
-            </div>
-            <a href="/">控制台</a>
-            <a href="/profile">个人资料</a>
-            <a href="/logout" class="danger">退出登录</a>
-          </template>
-        </div>
-      </div>
-      </Transition>
     </header>
+    <Teleport to="body">
+      <Transition name="site-mobile">
+        <div
+          v-show="mobileNavOpen"
+          ref="mobilePanelRef"
+          class="site-layout-header__mobile"
+          role="dialog"
+          aria-modal="true"
+          aria-label="站点导航"
+        >
+          <nav class="site-mobile-nav" aria-label="站点导航">
+            <div v-for="item in navigationTree" :key="`m-${item.id || item.url}`" class="site-mobile-nav__group">
+              <a :href="item.url" class="site-mobile-nav__link">{{ item.label }}</a>
+              <a v-for="child in item.children || []" :key="`m-${child.id || child.url}`" :href="child.url" class="site-mobile-nav__link site-mobile-nav__link--child">{{ child.label }}</a>
+            </div>
+          </nav>
+          <div class="site-mobile-auth">
+            <template v-if="!appAccountStore.isLogin">
+              <a href="/login" class="ghost">登录</a>
+              <a href="/register" class="primary">注册</a>
+            </template>
+            <template v-else>
+              <div class="site-mobile-auth__account">
+                <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
+                <span>{{ appAccountStore.account }}</span>
+              </div>
+              <a href="/">控制台</a>
+              <a href="/profile">个人资料</a>
+              <a href="/logout" class="danger">退出登录</a>
+            </template>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <div class="site-chrome__body">
       <slot />
@@ -297,7 +314,6 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--yb-site-border);
   background: var(--yb-site-header-bg);
   backdrop-filter: blur(12px);
-  isolation: isolate;
 }
 
 .site-layout-header__bar {
@@ -555,125 +571,6 @@ onBeforeUnmount(() => {
   transform: translateY(-7px) rotate(-45deg);
 }
 
-.site-mobile-enter-active,
-.site-mobile-leave-active {
-  transition: opacity 0.22s ease, transform 0.22s ease;
-}
-
-.site-mobile-enter-from,
-.site-mobile-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.site-layout-header__mobile {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  left: 0;
-  display: none;
-  max-height: calc(100dvh - 64px);
-  padding: 10px 14px 16px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  border-bottom: 1px solid var(--yb-site-border);
-  background: var(--yb-site-surface);
-  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
-}
-
-.site-mobile-nav {
-  display: grid;
-  gap: 2px;
-}
-
-.site-mobile-nav__group {
-  display: grid;
-  gap: 2px;
-}
-
-.site-mobile-nav__group + .site-mobile-nav__group {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px solid var(--yb-site-border);
-}
-
-.site-mobile-nav__link {
-  display: flex;
-  padding: 10px 12px;
-  align-items: center;
-  border-radius: 8px;
-  color: var(--yb-site-text-2);
-  font-size: 15px;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.site-mobile-nav__link:hover {
-  background: var(--yb-site-hover);
-  color: var(--yb-site-heading);
-}
-
-.site-mobile-nav__link--child {
-  padding-left: 28px;
-  color: var(--yb-site-muted);
-  font-size: 14px;
-  font-weight: 550;
-}
-
-.site-mobile-auth {
-  display: grid;
-  gap: 6px;
-  margin-top: 10px;
-  padding-top: 12px;
-  border-top: 1px solid var(--yb-site-border);
-}
-
-.site-mobile-auth a {
-  display: flex;
-  min-height: 40px;
-  padding: 0 12px;
-  align-items: center;
-  border-radius: 8px;
-  color: var(--yb-site-text-2);
-  font-size: 14px;
-  font-weight: 650;
-  text-decoration: none;
-}
-
-.site-mobile-auth a.ghost {
-  border: 1px solid var(--yb-site-border-2);
-  background: var(--yb-site-surface);
-  justify-content: center;
-}
-
-.site-mobile-auth a.primary {
-  background: var(--yb-site-primary-btn-bg);
-  color: var(--yb-site-primary-btn-text);
-  justify-content: center;
-}
-
-.site-mobile-auth a.danger {
-  color: var(--yb-site-danger);
-}
-
-.site-mobile-auth__account {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 4px 12px 8px;
-  color: var(--yb-site-heading);
-  font-size: 14px;
-  font-weight: 750;
-}
-
-.site-mobile-auth__account img {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-}
-
 .site-layout-footer {
   position: relative;
   z-index: 1;
@@ -760,24 +657,6 @@ onBeforeUnmount(() => {
     display: inline-flex !important;
   }
 
-  .site-layout-header__mobile {
-    display: block;
-    position: fixed !important;
-    top: var(--site-mobile-nav-top, 56px) !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    z-index: 1001;
-    max-height: none !important;
-    height: auto !important;
-    overflow-x: hidden !important;
-    overflow-y: auto !important;
-    overscroll-behavior: contain;
-    touch-action: pan-y;
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-    background: var(--yb-site-surface) !important;
-  }
-
   .site-layout-footer .site-shell {
     flex-direction: column;
   }
@@ -795,6 +674,136 @@ onBeforeUnmount(() => {
 <style>
 :root {
   --site-mobile-nav-top: 56px;
+}
+
+.site-layout-header__mobile {
+  box-sizing: border-box;
+  padding: 12px 16px max(20px, env(safe-area-inset-bottom));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid var(--yb-site-border, #e5e7eb);
+  background: var(--yb-site-surface, #ffffff);
+}
+
+.site-mobile-nav {
+  display: grid;
+  gap: 2px;
+}
+
+.site-mobile-nav__group {
+  display: grid;
+  gap: 2px;
+}
+
+.site-mobile-nav__group + .site-mobile-nav__group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--yb-site-border, #e5e7eb);
+}
+
+.site-mobile-nav__link {
+  display: flex;
+  padding: 10px 12px;
+  align-items: center;
+  border-radius: 8px;
+  color: var(--yb-site-text-2, #334155);
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.site-mobile-nav__link:hover {
+  background: var(--yb-site-hover, #f1f5f9);
+  color: var(--yb-site-heading, #0f172a);
+}
+
+.site-mobile-nav__link--child {
+  padding-left: 28px;
+  color: var(--yb-site-muted, #64748b);
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.site-mobile-auth {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--yb-site-border, #e5e7eb);
+}
+
+.site-mobile-auth a {
+  display: flex;
+  min-height: 40px;
+  padding: 0 12px;
+  align-items: center;
+  border-radius: 8px;
+  color: var(--yb-site-text-2, #334155);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.site-mobile-auth a.ghost {
+  border: 1px solid var(--yb-site-border-2, #e2e8f0);
+  background: var(--yb-site-surface, #ffffff);
+  justify-content: center;
+}
+
+.site-mobile-auth a.primary {
+  background: var(--yb-site-primary-btn-bg, #111827);
+  color: var(--yb-site-primary-btn-text, #ffffff);
+  justify-content: center;
+}
+
+.site-mobile-auth a.danger {
+  color: var(--yb-site-danger, #b91c1c);
+}
+
+.site-mobile-auth__account {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 12px 8px;
+  color: var(--yb-site-heading, #0f172a);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.site-mobile-auth__account img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.site-mobile-enter-active,
+.site-mobile-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.site-mobile-enter-from,
+.site-mobile-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+@media (max-width: 760px) {
+  .site-layout-header__mobile {
+    display: block;
+    position: fixed;
+    top: var(--site-mobile-nav-top, 56px);
+    right: 0;
+    left: 0;
+    z-index: 4000;
+    width: 100%;
+    height: calc(100dvh - var(--site-mobile-nav-top, 56px));
+    max-height: calc(100dvh - var(--site-mobile-nav-top, 56px));
+    min-height: 240px;
+    touch-action: pan-y;
+  }
 }
 
 html.is-site-mobile-nav-open,
