@@ -20,6 +20,9 @@ echo "[verify-contract-packages] checking published SDK entry files"
 require_file "yudream-frontend/packages/plugin-sdk/scripts/sync-vite-shared.mjs"
 require_file "yudream-frontend/packages/plugin-sdk/vite-shared.js"
 require_file "yudream-frontend/packages/plugin-sdk/vite-shared.d.ts"
+require_file "yudream-frontend/packages/plugin-sdk/uno.config.js"
+require_file "yudream-frontend/packages/plugin-sdk/uno.config.d.ts"
+require_file "yudream-frontend/packages/plugin-sdk/src/uno-config.ts"
 
 if ! grep -q '"sync:vite-shared":[[:space:]]*"node \./scripts/sync-vite-shared.mjs"' yudream-frontend/packages/plugin-sdk/package.json; then
   fail "@yudream/plugin-sdk must generate vite-shared entry files deterministically"
@@ -37,9 +40,25 @@ if ! grep -q "'vue-router': string" yudream-frontend/packages/plugin-sdk/vite-sh
   fail "vite-shared.d.ts must expose the published alias signature"
 fi
 
+if ! grep -q '"./uno-config"' yudream-frontend/packages/plugin-sdk/package.json; then
+  fail "@yudream/plugin-sdk must export the ./uno-config subpath"
+fi
+
+if ! grep -q "yuDreamPluginUnoCss" yudream-frontend/packages/plugin-sdk/uno.config.js; then
+  fail "uno.config.js must expose the yuDreamPluginUnoCss vite plugin factory"
+fi
+
+if ! grep -q "yuDreamPluginUnoCss" yudream-frontend/packages/plugin-sdk/uno.config.d.ts; then
+  fail "uno.config.d.ts must declare the yuDreamPluginUnoCss signature"
+fi
+
+if ! grep -q '"unocss"' yudream-frontend/packages/plugin-sdk/package.json; then
+  fail "@yudream/plugin-sdk must carry unocss as a published dependency for ./uno-config"
+fi
+
 echo "[verify-contract-packages] checking npm publish registries"
-grep -q '"version":[[:space:]]*"1.3.0"' yudream-frontend/packages/plugin-sdk/package.json \
-  || fail "@yudream/plugin-sdk must use stable version 1.3.0"
+grep -q '"version":[[:space:]]*"1.4.0"' yudream-frontend/packages/plugin-sdk/package.json \
+  || fail "@yudream/plugin-sdk must use stable version 1.4.0"
 grep -q '"version":[[:space:]]*"1.2.1"' yudream-frontend/packages/components/package.json \
   || fail "@yudream/components must use stable version 1.2.1"
 if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' yudream-frontend/packages/plugin-sdk/package.json; then

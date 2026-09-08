@@ -56,6 +56,8 @@ pnpm --dir "$VERIFY_DIR" install --lockfile=false --ignore-scripts --config.stri
 
 [ -f "$VERIFY_DIR/node_modules/@yudream/plugin-sdk/vite-shared.js" ] || fail "installed @yudream/plugin-sdk is missing vite-shared.js"
 [ -f "$VERIFY_DIR/node_modules/@yudream/plugin-sdk/vite-shared.d.ts" ] || fail "installed @yudream/plugin-sdk is missing vite-shared.d.ts"
+[ -f "$VERIFY_DIR/node_modules/@yudream/plugin-sdk/uno.config.js" ] || fail "installed @yudream/plugin-sdk is missing uno.config.js"
+[ -f "$VERIFY_DIR/node_modules/@yudream/plugin-sdk/uno.config.d.ts" ] || fail "installed @yudream/plugin-sdk is missing uno.config.d.ts"
 [ -f "$VERIFY_DIR/node_modules/@yudream/components/resolver.ts" ] || fail "installed @yudream/components is missing resolver.ts"
 
 if grep -R -n -E '(workspace:|catalog:|link:|file:)' \

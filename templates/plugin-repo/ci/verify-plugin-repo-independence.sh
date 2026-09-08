@@ -109,9 +109,9 @@ fi
 
 echo "[verify-plugin-repo-independence] checking shared package public API boundaries"
 if command -v rg >/dev/null 2>&1; then
-  invalid_shared_imports=$(rg -n --no-messages '@yudream/(plugin-sdk|components)/' yudream-frontend/packages yudream-plugins -g '!**/node_modules/**' | grep -v '@yudream/plugin-sdk/vite-shared' | grep -v '@yudream/components/resolver' || true)
+  invalid_shared_imports=$(rg -n --no-messages '@yudream/(plugin-sdk|components)/' yudream-frontend/packages yudream-plugins -g '!**/node_modules/**' | grep -v '@yudream/plugin-sdk/vite-shared' | grep -v '@yudream/plugin-sdk/uno-config' | grep -v '@yudream/components/resolver' || true)
 else
-  invalid_shared_imports=$(grep -R -n '@yudream/\(plugin-sdk\|components\)/' yudream-frontend/packages yudream-plugins 2>/dev/null | grep -v '@yudream/plugin-sdk/vite-shared' | grep -v '@yudream/components/resolver' || true)
+  invalid_shared_imports=$(grep -R -n '@yudream/\(plugin-sdk\|components\)/' yudream-frontend/packages yudream-plugins 2>/dev/null | grep -v '@yudream/plugin-sdk/vite-shared' | grep -v '@yudream/plugin-sdk/uno-config' | grep -v '@yudream/components/resolver' || true)
 fi
 
 if [ -n "$invalid_shared_imports" ]; then
@@ -132,5 +132,26 @@ else
     fi
   done
 fi
+
+echo "[verify-plugin-repo-independence] checking plugin UnoCSS entry usage"
+if command -v rg >/dev/null 2>&1; then
+  total_vite_configs=$(find yudream-frontend/packages -name 'vite.config.ts' | wc -l | tr -d ' ')
+  matched_uno_configs=$(rg -l --no-messages '@yudream/plugin-sdk/uno-config' yudream-frontend/packages -g 'vite.config.ts' | wc -l | tr -d ' ')
+  if [ "$matched_uno_configs" -ne "$total_vite_configs" ]; then
+    fail "every plugin vite config must use published @yudream/plugin-sdk/uno-config helper"
+  fi
+else
+  for file in yudream-frontend/packages/plugin-*/vite.config.ts; do
+    if [ -f "$file" ] && ! grep -q '@yudream/plugin-sdk/uno-config' "$file"; then
+      fail "every plugin vite config must use published @yudream/plugin-sdk/uno-config helper"
+    fi
+  done
+fi
+
+for entry in yudream-frontend/packages/plugin-*/src/index.ts; do
+  if [ -f "$entry" ] && ! grep -q 'virtual:uno\.css' "$entry"; then
+    fail "plugin entry $entry must import virtual:uno.css so utilities are bundled"
+  fi
+done
 
 echo "[verify-plugin-repo-independence] OK"

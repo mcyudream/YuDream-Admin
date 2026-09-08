@@ -1,11 +1,13 @@
 {
   "name": "@yudream/plugin-sdk",
   "type": "module",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "files": [
     "src",
     "vite-shared.js",
-    "vite-shared.d.ts"
+    "vite-shared.d.ts",
+    "uno.config.js",
+    "uno.config.d.ts"
   ],
   "types": "./src/index.ts",
   "publishConfig": {
@@ -22,7 +24,16 @@
     "./vite-shared": {
       "types": "./vite-shared.d.ts",
       "default": "./vite-shared.js"
+    },
+    "./uno-config": {
+      "types": "./uno.config.d.ts",
+      "default": "./uno.config.js"
     }
+  },
+  "dependencies": {
+    "@iconify/json": "catalog:",
+    "unocss": "catalog:",
+    "unocss-preset-animations": "catalog:"
   },
   "peerDependencies": {
     "vue": "catalog:",
@@ -31,6 +42,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vue": "catalog:",
     "vue-router": "catalog:"
   }
