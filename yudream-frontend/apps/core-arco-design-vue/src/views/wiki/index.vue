@@ -252,5 +252,18 @@ onBeforeUnmount(clearPublicSeo)
 .wiki-public-footer { padding: 28px 0; border-top: 1px solid var(--color-border-2); background: var(--color-bg-1); }
 .wiki-public-footer__inner { display: flex; justify-content: space-between; color: var(--color-text-3); font-size: 13px; }
 .wiki-public-footer a { color: var(--color-text-1); text-decoration: none; }
-@media (max-width: 760px) { .wiki-public-shell { width: min(100% - 28px, 1240px); }.wiki-public-header__inner { min-height: 56px; }.wiki-public-header__nav a:last-child { display: none; }.wiki-public-layout { grid-template-columns: 1fr; }.wiki-public-sidebar { position: static; max-height: none; overflow-y: visible; padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--color-border-2); }.wiki-public-sidebar__title { display: none; }.wiki-public-nav { display: flex; overflow-x: auto; }.wiki-public-nav button { width: auto; flex: 0 0 auto; white-space: nowrap; }.wiki-public-main { padding: 30px 0 48px; }.wiki-public-main > h1 { font-size: 28px; } }
+@media (max-width: 760px) {
+  .wiki-public-shell { width: min(100% - 28px, 1240px); }
+  .wiki-public-header__inner { min-height: 56px; }
+  .wiki-public-header__nav a:last-child { display: none; }
+  .wiki-public-layout { grid-template-columns: 1fr; }
+  .wiki-public-sidebar { position: static; max-height: none; overflow-y: visible; padding: 12px 0; border-right: 0; border-bottom: 1px solid var(--color-border-2); }
+  .wiki-public-sidebar__title { display: none; }
+  .wiki-public-nav { display: flex; gap: 6px; padding-bottom: 4px; overflow-x: auto; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+  .wiki-public-nav button { width: auto; flex: 0 0 auto; white-space: nowrap; }
+  /* 覆盖桌面端 :deep 规则（优先级更高），否则移动端每个汉字都会折行 */
+  .wiki-public-nav :deep([data-slot="button"]) { flex-shrink: 0; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+  .wiki-public-main { padding: 30px 0 48px; }
+  .wiki-public-main > h1 { font-size: 28px; }
+}
 </style>

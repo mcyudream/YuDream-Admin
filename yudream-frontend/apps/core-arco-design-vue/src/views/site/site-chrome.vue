@@ -19,6 +19,7 @@ const appSettingsStore = useAppSettingsStore()
 const { navigationTree, footerNavigationItems } = useSiteNavigation(() => props.settings?.navigationJson)
 
 const siteLayout = computed<CmsSiteLayoutMode>(() => (props.settings?.siteLayout as CmsSiteLayoutMode) || 'HEADER_FOOTER')
+const mobileNavOpen = ref(false)
 const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
 const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
 const chromeCustomCss = computed(() => [
@@ -73,7 +74,44 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
             </div>
           </details>
         </div>
+        <button
+          type="button"
+          class="site-layout-header__menu-toggle"
+          :class="{ 'is-open': mobileNavOpen }"
+          :aria-expanded="mobileNavOpen"
+          :aria-label="mobileNavOpen ? '关闭导航菜单' : '打开导航菜单'"
+          @click="mobileNavOpen = !mobileNavOpen"
+        >
+          <span class="site-layout-header__menu-toggle-line" />
+          <span class="site-layout-header__menu-toggle-line" />
+          <span class="site-layout-header__menu-toggle-line" />
+        </button>
       </div>
+      <Transition name="site-mobile">
+        <div v-show="mobileNavOpen" class="site-layout-header__mobile">
+        <nav class="site-mobile-nav" aria-label="站点导航">
+          <div v-for="item in navigationTree" :key="`m-${item.id || item.url}`" class="site-mobile-nav__group">
+            <a :href="item.url" class="site-mobile-nav__link">{{ item.label }}</a>
+            <a v-for="child in item.children || []" :key="`m-${child.id || child.url}`" :href="child.url" class="site-mobile-nav__link site-mobile-nav__link--child">{{ child.label }}</a>
+          </div>
+        </nav>
+        <div class="site-mobile-auth">
+          <template v-if="!appAccountStore.isLogin">
+            <a href="/login" class="ghost">登录</a>
+            <a href="/register" class="primary">注册</a>
+          </template>
+          <template v-else>
+            <div class="site-mobile-auth__account">
+              <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
+              <span>{{ appAccountStore.account }}</span>
+            </div>
+            <a href="/">控制台</a>
+            <a href="/profile">个人资料</a>
+            <a href="/logout" class="danger">退出登录</a>
+          </template>
+        </div>
+      </div>
+      </Transition>
     </header>
 
     <div class="site-chrome__body">
@@ -384,6 +422,172 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
   color: var(--yb-site-danger);
 }
 
+.site-layout-header__menu-toggle {
+  display: none;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--yb-site-border-2);
+  border-radius: 7px;
+  background: var(--yb-site-surface);
+  color: var(--yb-site-text-2);
+  cursor: pointer;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.site-layout-header__menu-toggle:hover {
+  background: var(--yb-site-hover);
+  border-color: var(--yb-site-text-3);
+}
+
+.site-layout-header__menu-toggle:active {
+  transform: scale(0.92);
+}
+
+.site-layout-header__menu-toggle-line {
+  display: block;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentcolor;
+  transition: transform 0.25s ease, opacity 0.2s ease;
+}
+
+.site-layout-header__menu-toggle.is-open .site-layout-header__menu-toggle-line:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.site-layout-header__menu-toggle.is-open .site-layout-header__menu-toggle-line:nth-child(2) {
+  opacity: 0;
+}
+
+.site-layout-header__menu-toggle.is-open .site-layout-header__menu-toggle-line:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.site-mobile-enter-active,
+.site-mobile-leave-active {
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+
+.site-mobile-enter-from,
+.site-mobile-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.site-layout-header__mobile {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  left: 0;
+  display: none;
+  max-height: calc(100vh - 64px);
+  padding: 10px 14px 16px;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--yb-site-border);
+  background: var(--yb-site-header-bg);
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+.site-mobile-nav {
+  display: grid;
+  gap: 2px;
+}
+
+.site-mobile-nav__group {
+  display: grid;
+  gap: 2px;
+}
+
+.site-mobile-nav__group + .site-mobile-nav__group {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--yb-site-border);
+}
+
+.site-mobile-nav__link {
+  display: flex;
+  padding: 10px 12px;
+  align-items: center;
+  border-radius: 8px;
+  color: var(--yb-site-text-2);
+  font-size: 15px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.site-mobile-nav__link:hover {
+  background: var(--yb-site-hover);
+  color: var(--yb-site-heading);
+}
+
+.site-mobile-nav__link--child {
+  padding-left: 28px;
+  color: var(--yb-site-muted);
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.site-mobile-auth {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--yb-site-border);
+}
+
+.site-mobile-auth a {
+  display: flex;
+  min-height: 40px;
+  padding: 0 12px;
+  align-items: center;
+  border-radius: 8px;
+  color: var(--yb-site-text-2);
+  font-size: 14px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.site-mobile-auth a.ghost {
+  border: 1px solid var(--yb-site-border-2);
+  background: var(--yb-site-surface);
+  justify-content: center;
+}
+
+.site-mobile-auth a.primary {
+  background: var(--yb-site-primary-btn-bg);
+  color: var(--yb-site-primary-btn-text);
+  justify-content: center;
+}
+
+.site-mobile-auth a.danger {
+  color: var(--yb-site-danger);
+}
+
+.site-mobile-auth__account {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 12px 8px;
+  color: var(--yb-site-heading);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.site-mobile-auth__account img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .site-layout-footer {
   position: relative;
   z-index: 1;
@@ -447,17 +651,31 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
   }
 
   .site-layout-header__bar {
-    align-items: stretch;
-    flex-direction: column;
-    width: calc(100% - 28px);
-    min-height: 0;
-    padding: 12px 0;
-    gap: 10px;
+    width: calc(100% - 28px) !important;
+    min-height: 56px !important;
+    padding: 8px 0 !important;
+    gap: 12px;
+    align-items: center;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
   }
 
-  .site-layout-header__nav {
-    justify-content: flex-start;
-    flex-wrap: wrap;
+  .site-layout-header__brand {
+    font-size: 16px;
+  }
+
+  /* 历史 CMS chrome 自定义样式（Grapes 导出的 main.site-page 前缀规则）会强制导航铺开，移动端折叠必须压过它们 */
+  .site-layout-header__nav,
+  .site-layout-header__auth {
+    display: none !important;
+  }
+
+  .site-layout-header__menu-toggle {
+    display: inline-flex !important;
+  }
+
+  .site-layout-header__mobile {
+    display: block;
   }
 
   .site-layout-footer .site-shell {
