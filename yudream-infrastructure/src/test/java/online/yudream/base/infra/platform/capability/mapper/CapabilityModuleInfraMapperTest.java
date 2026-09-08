@@ -55,6 +55,16 @@ class CapabilityModuleInfraMapperTest {
     }
 
     @Test
+    void restoresHistoricalNeo4jPasswordCiphertextOnRead() {
+        var stored = CapabilityModuleInfraMapper.toDataObj(module("neo4j", Map.of("password", "x")), CIPHER);
+        stored.getConfig().put("password", CIPHER.encryptNeo4jPassword("historic-password"));
+
+        CapabilityModule restored = CapabilityModuleInfraMapper.toDomain(stored, CIPHER);
+
+        assertEquals("historic-password", restored.getConfig().get("password"));
+    }
+
+    @Test
     void leavesNonNeo4jCapabilityPasswordsUntouched() {
         CapabilityModule module = module("rabbitmq", Map.of("password", "rabbit-secret"));
 

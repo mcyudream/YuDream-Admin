@@ -58,6 +58,30 @@ class CapabilityCredentialCipherTest {
         assertThrows(RuntimeException.class, () -> cipher.encryptNeo4jPassword("neo4j-password"));
     }
 
+    @Test
+    void decryptSecretRestoresHistoricalNeo4jPasswordAad() {
+        CapabilityCredentialCipher cipher = new CapabilityCredentialCipher(CREDENTIAL_KEY);
+        String historical = cipher.encryptNeo4jPassword("historic-password");
+
+        assertEquals("historic-password", cipher.decryptSecret("neo4j", "password", historical));
+    }
+
+    @Test
+    void decryptSecretRestoresCurrentCapabilityBoundNeo4jPassword() {
+        CapabilityCredentialCipher cipher = new CapabilityCredentialCipher(CREDENTIAL_KEY);
+        String current = cipher.encryptSecret("neo4j", "password", "current-password");
+
+        assertEquals("current-password", cipher.decryptSecret("neo4j", "password", current));
+    }
+
+    @Test
+    void historicalNeo4jAadIsNotAcceptedForOtherSecrets() {
+        CapabilityCredentialCipher cipher = new CapabilityCredentialCipher(CREDENTIAL_KEY);
+        String historical = cipher.encryptNeo4jPassword("historic-password");
+
+        assertThrows(RuntimeException.class, () -> cipher.decryptSecret("inbound-mail", "password", historical));
+    }
+
     private static String key(byte value) {
         byte[] bytes = new byte[32];
         java.util.Arrays.fill(bytes, value);
