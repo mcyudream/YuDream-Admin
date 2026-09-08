@@ -17,6 +17,7 @@ import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import eventBus from '@/utils/eventBus'
 import { resetPublicPluginRoutes } from './plugin-route-runtime'
+import { shouldStopSseReconnect } from './plugin-devtools-sse'
 
 /** 抽屉页面标识，与左侧竖向导航一一对应 */
 export type PluginDevtoolsPage = 'overview' | 'plugins' | 'qq-sandbox' | 'traces' | 'logs' | 'audit' | 'settings'
@@ -38,6 +39,7 @@ export interface LiveTrace {
 const LIFECYCLE_EVENT_LIMIT = 100
 const LIVE_TRACE_LIMIT = 20
 const RECONNECT_DELAY_MS = 3_000
+const MAX_TRANSIENT_RETRIES = 8
 const ROUTE_REFRESH_DEBOUNCE_MS = 800
 const ACTIVE_PAGE_STORAGE_KEY = 'pluginDevtoolsPage'
 const DEVTOOLS_PAGES: PluginDevtoolsPage[] = ['overview', 'plugins', 'qq-sandbox', 'traces', 'logs', 'audit', 'settings']
@@ -144,9 +146,9 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     await apiDevtools.reload(code)
   }
 
-  /** 状态可用且已授权后启动双 SSE 流；布局常驻，只需启动一次 */
+  /** 开发模式已启用后启动双 SSE 流；布局常驻，只需启动一次 */
   function connect() {
-    if (started || !status.value) {
+    if (started || !status.value?.devModeEnabled) {
       return
     }
     started = true
@@ -271,21 +273,29 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     connectedFlag: Ref<boolean>,
     onPayload: (payload: any) => void,
   ) {
+    let transientFailures = 0
     while (!signal.aborted) {
       try {
         await consumeSseStream(url, signal, () => {
           connectedFlag.value = true
+          transientFailures = 0
         }, onPayload)
         connectedFlag.value = false
+        transientFailures = 0
       }
       catch (error: any) {
         connectedFlag.value = false
         if (signal.aborted || error?.name === 'AbortError') {
           return
         }
-        // 登录态失效（401/403）时继续重连只会空转刷错：停流并复位 started，
-        // 重新登录后布局重新挂载 connect() 会再次启动双流
-        if (error?.status === 401 || error?.status === 403) {
+        // 登录失效或开发模式未开启时继续重连只会空转刷错：停流并复位 started，
+        // 重新登录或开发模式恢复后布局重新挂载 connect() 会再次启动双流
+        if (shouldStopSseReconnect(error?.status)) {
+          started = false
+          return
+        }
+        transientFailures += 1
+        if (transientFailures > MAX_TRANSIENT_RETRIES) {
           started = false
           return
         }
