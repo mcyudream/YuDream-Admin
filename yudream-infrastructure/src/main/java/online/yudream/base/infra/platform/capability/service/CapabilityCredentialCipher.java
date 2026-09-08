@@ -54,14 +54,20 @@ public class CapabilityCredentialCipher {
 
     /** 通用能力凭据解密；非密文原样返回。Neo4j 密码额外兼容历史 AAD {@code neo4j:password}。 */
     public String decryptSecret(String capabilityCode, String configKey, String value) {
+        String lastError = "能力凭据解密失败，请配置 YUDREAM_CREDENTIAL_KEY 后重试";
         try {
-            return decrypt(aadOf(capabilityCode, configKey), value, "能力凭据解密失败，请配置 YUDREAM_CREDENTIAL_KEY 后重试");
-        } catch (BizException primaryFailure) {
+            return decrypt(aadOf(capabilityCode, configKey), value, lastError);
+        } catch (BizException e1) {
+            lastError = e1.getMessage();
             if ("neo4j".equals(capabilityCode) && "password".equals(configKey) && encrypted(value)) {
-                return decrypt(NEO4J_PASSWORD_AAD, value, "Neo4j 凭据解密失败，请配置 YUDREAM_CREDENTIAL_KEY 后重试");
+                try {
+                    return decrypt(NEO4J_PASSWORD_AAD, value, lastError);
+                } catch (BizException e2) {
+                    lastError = e2.getMessage();
+                }
             }
-            throw primaryFailure;
         }
+        throw new BizException(lastError);
     }
 
     private static byte[] aadOf(String capabilityCode, String configKey) {
