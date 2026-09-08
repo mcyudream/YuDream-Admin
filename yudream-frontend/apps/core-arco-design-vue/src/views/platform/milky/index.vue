@@ -35,6 +35,17 @@ async function load() {
   }
 }
 
+function onProtocolChange(value: string | number | bigint | Record<string, any> | null | undefined) {
+  if (editing.value || typeof value !== 'string' || (value !== 'milky' && value !== 'official')) {
+    return
+  }
+  Object.assign(form, emptyForm(value), { name: form.name })
+}
+
+function onSandboxChange(value?: boolean) {
+  form.baseUrl = value ? 'https://sandbox.api.bot.qq.com' : 'https://api.bot.qq.com'
+}
+
 function emptyForm(protocol: MilkyConnectionPayload['protocol'] = 'milky'): MilkyConnectionPayload {
   return {
     name: '',
@@ -200,7 +211,7 @@ onMounted(load)
               { label: 'Milky（非官方协议）', value: 'milky' },
               { label: '官方 QQ 机器人 OpenAPI', value: 'official' },
             ]"
-            @update:model-value="(value: string) => { if (!editing) Object.assign(form, emptyForm(value as MilkyConnectionPayload['protocol']), { name: form.name }) }"
+            @update:model-value="onProtocolChange"
           />
         </a-form-item>
         <template v-if="form.protocol === 'official'">
@@ -211,7 +222,7 @@ onMounted(load)
             <FaInput v-model="form.appSecret" type="password" />
           </a-form-item>
           <a-form-item label="沙箱环境">
-            <FaSwitch v-model="form.sandbox" @update:model-value="(value: boolean) => { form.baseUrl = value ? 'https://sandbox.api.bot.qq.com' : 'https://api.bot.qq.com' }" />
+            <FaSwitch v-model="form.sandbox" @update:model-value="onSandboxChange" />
           </a-form-item>
           <a-form-item label="API 地址">
             <FaInput v-model="form.baseUrl" placeholder="https://api.bot.qq.com" />
