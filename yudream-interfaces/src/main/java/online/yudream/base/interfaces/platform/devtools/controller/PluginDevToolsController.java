@@ -147,12 +147,14 @@ public class PluginDevToolsController {
     @GetMapping(value = "/events/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "订阅插件事件流", module = "开发者工具", desc = "实时接收插件生命周期与热重载事件")
     public SseEmitter lifecycleStream() {
+        devToolsAppService.requireDevMode();
         return sseBridge.connectLifecycle();
     }
 
     @GetMapping(value = "/agent-traces/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "订阅 Agent 追踪流", module = "开发者工具", desc = "实时接收 Agent 执行步骤增量与完成事件")
     public SseEmitter traceStream() {
+        devToolsAppService.requireDevMode();
         return sseBridge.connectTraces();
     }
 
@@ -170,6 +172,7 @@ public class PluginDevToolsController {
     @PermissionRegister(code = "platform:plugin-devtools:view", name = "订阅插件日志流", module = "开发者工具", desc = "实时接收指定插件的运行日志")
     public SseEmitter logStream(@PathVariable String code,
                                 @RequestParam(required = false) String level) {
+        devToolsAppService.requireDevMode();
         return logStreamBridge.connect(code, level);
     }
 }

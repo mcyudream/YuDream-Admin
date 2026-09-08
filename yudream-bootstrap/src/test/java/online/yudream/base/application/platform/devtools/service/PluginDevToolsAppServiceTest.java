@@ -77,6 +77,22 @@ class PluginDevToolsAppServiceTest {
     }
 
     @Test
+    void requireDevModeRejectsWhenRuntimeGateIsClosed() {
+        when(runtimeGateway.devModeEnabled()).thenReturn(false);
+
+        assertThatThrownBy(service::requireDevMode)
+                .isInstanceOf(BizException.class)
+                .hasMessage("插件开发模式未启用");
+    }
+
+    @Test
+    void requireDevModePassesWhenRuntimeGateIsOpen() {
+        when(runtimeGateway.devModeEnabled()).thenReturn(true);
+
+        service.requireDevMode();
+    }
+
+    @Test
     void pluginsMarkDevModeFromGatewayProjects() {
         when(runtimeGateway.devModeProjects()).thenReturn(List.of(
                 new PluginDevProjectInfo("demo", "classes", "dist", true,

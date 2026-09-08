@@ -81,6 +81,12 @@ public class PluginDevToolsAppService {
                 .build();
     }
 
+    public void requireDevMode() {
+        if (!runtimeGateway.devModeEnabled()) {
+            throw new BizException("插件开发模式未启用");
+        }
+    }
+
     public List<PluginDevPluginDTO> plugins() {
         Map<String, PluginDevProjectInfo> devProjects = runtimeGateway.devModeProjects().stream()
                 .collect(Collectors.toMap(PluginDevProjectInfo::code, Function.identity(), (left, right) -> left));

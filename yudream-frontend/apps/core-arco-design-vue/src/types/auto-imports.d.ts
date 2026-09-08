@@ -69,6 +69,7 @@ declare global {
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
+  const shouldStopSseReconnect: typeof import('../store/modules/app/plugin-devtools-sse').shouldStopSseReconnect
   const storeToRefs: typeof import('pinia').storeToRefs
   const stripBackendStructuralAuth: typeof import('../store/modules/app/route-auth').stripBackendStructuralAuth
   const toRaw: typeof import('vue').toRaw

@@ -111,7 +111,7 @@ onMounted(async () => {
     return
   }
   await store.loadStatus()
-  if (store.status) {
+  if (store.status?.devModeEnabled) {
     store.connect()
   }
 })

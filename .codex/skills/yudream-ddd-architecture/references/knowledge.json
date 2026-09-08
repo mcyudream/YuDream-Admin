@@ -272,7 +272,7 @@
     },
     {
       "key": "devtools-sse-fetch",
-      "text": "sa-token 只读 Authorization 头，EventSource 无法携带；devtools/agent SSE 一律 fetch + ReadableStream 手工解析 event:/data: 分块，断线 3s 退避重连（先例：plugin-devtools store 与 agent-debug-stream.ts）"
+      "text": "sa-token 只读 Authorization 头，EventSource 无法携带；devtools/agent SSE 一律 fetch + ReadableStream 手工解析 event:/data: 分块。生产 JAR 默认关闭开发模式：后端 SSE 端点必须 requireDevMode()，前端 connect()/onMounted 必须看 status.devModeEnabled。重连对 400/401/403/404/405 停流，网络层失败最多重试有限次（先例：plugin-devtools store 与 agent-debug-stream.ts）。"
     },
     {
       "key": "plugin-devmode-reload",
