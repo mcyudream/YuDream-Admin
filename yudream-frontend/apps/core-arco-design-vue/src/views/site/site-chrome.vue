@@ -20,6 +20,10 @@ const { navigationTree, footerNavigationItems } = useSiteNavigation(() => props.
 
 const siteLayout = computed<CmsSiteLayoutMode>(() => (props.settings?.siteLayout as CmsSiteLayoutMode) || 'HEADER_FOOTER')
 const mobileNavOpen = ref(false)
+const headerBarRef = ref<HTMLElement | null>(null)
+const mobilePanelRef = ref<HTMLElement | null>(null)
+let mobileQuery: MediaQueryList | undefined
+let touchStartY = 0
 const showFooter = computed(() => siteLayout.value === 'HEADER_FOOTER')
 const showCopyright = computed(() => siteLayout.value === 'HEADER_COPYRIGHT' || siteLayout.value === 'ADMIN')
 const chromeCustomCss = computed(() => [
@@ -32,6 +36,87 @@ const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, chromeC
 const footerTitle = computed(() => props.settings?.footerTitle || appSettingsStore.siteName || '')
 const footerDescription = computed(() => props.settings?.footerDescription || appSettingsStore.siteDescription || (appSettingsStore.siteName ? `由 ${appSettingsStore.siteName} 驱动的内容站点` : ''))
 const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${new Date().getFullYear()} ${appSettingsStore.siteName}. All rights reserved.`)
+
+function closeMobileNav() {
+  mobileNavOpen.value = false
+}
+
+function syncMobileNavOffset() {
+  const bottom = headerBarRef.value?.getBoundingClientRect().bottom
+  document.documentElement.style.setProperty('--site-mobile-nav-top', `${Math.max(0, Math.round(bottom || 56))}px`)
+}
+
+function isInsideMobilePanel(target: EventTarget | null) {
+  const panel = mobilePanelRef.value
+  return Boolean(panel && target instanceof Node && panel.contains(target))
+}
+
+function shouldBlockScroll(event: TouchEvent | WheelEvent) {
+  if (!mobileNavOpen.value) return false
+  const panel = mobilePanelRef.value
+  if (!panel || !isInsideMobilePanel(event.target)) return true
+  const atTop = panel.scrollTop <= 0
+  const atBottom = panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1
+  if (event instanceof WheelEvent) {
+    return (event.deltaY < 0 && atTop) || (event.deltaY > 0 && atBottom)
+  }
+  const currentY = event.touches[0]?.clientY ?? touchStartY
+  return (currentY > touchStartY && atTop) || (currentY < touchStartY && atBottom)
+}
+
+function onTouchStart(event: TouchEvent) {
+  touchStartY = event.touches[0]?.clientY ?? 0
+}
+
+function onLockScroll(event: TouchEvent | WheelEvent) {
+  if (shouldBlockScroll(event)) event.preventDefault()
+}
+
+function lockPageScroll(lock: boolean) {
+  const { documentElement, body } = document
+  if (lock) {
+    syncMobileNavOffset()
+    documentElement.classList.add('is-site-mobile-nav-open')
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchmove', onLockScroll, { passive: false })
+    window.addEventListener('wheel', onLockScroll, { passive: false })
+  }
+  else {
+    documentElement.classList.remove('is-site-mobile-nav-open')
+    documentElement.style.removeProperty('--site-mobile-nav-top')
+    window.removeEventListener('touchstart', onTouchStart)
+    window.removeEventListener('touchmove', onLockScroll)
+    window.removeEventListener('wheel', onLockScroll)
+    body.style.overflow = ''
+    documentElement.style.overflow = ''
+  }
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeMobileNav()
+}
+
+function onMobileQueryChange() {
+  if (!mobileQuery?.matches) closeMobileNav()
+}
+
+watch(mobileNavOpen, open => lockPageScroll(open))
+
+onMounted(() => {
+  mobileQuery = window.matchMedia('(max-width: 760px)')
+  mobileQuery.addEventListener('change', onMobileQueryChange)
+  window.addEventListener('keydown', onEscape)
+  window.addEventListener('resize', syncMobileNavOffset)
+  window.visualViewport?.addEventListener('resize', syncMobileNavOffset)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onEscape)
+  window.removeEventListener('resize', syncMobileNavOffset)
+  window.visualViewport?.removeEventListener('resize', syncMobileNavOffset)
+  mobileQuery?.removeEventListener('change', onMobileQueryChange)
+  if (mobileNavOpen.value) lockPageScroll(false)
+})
 </script>
 
 <template>
@@ -39,8 +124,8 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
     <component :is="'style'">
       {{ siteRuntimeCss }}
     </component>
-    <header v-if="!blank" data-yb-chrome="header" class="site-layout-header">
-      <div class="site-layout-header__bar">
+    <header v-if="!blank" data-yb-chrome="header" class="site-layout-header" :class="{ 'is-open': mobileNavOpen }">
+      <div ref="headerBarRef" class="site-layout-header__bar">
         <a data-yb-chrome-slot="logo" class="site-layout-header__brand" href="/site">
           <img v-if="appSettingsStore.logo" :src="appSettingsStore.logo" :alt="appSettingsStore.siteName">
           <span>{{ appSettingsStore.siteName }}</span>
@@ -88,7 +173,7 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
         </button>
       </div>
       <Transition name="site-mobile">
-        <div v-show="mobileNavOpen" class="site-layout-header__mobile">
+        <div v-show="mobileNavOpen" ref="mobilePanelRef" class="site-layout-header__mobile">
         <nav class="site-mobile-nav" aria-label="站点导航">
           <div v-for="item in navigationTree" :key="`m-${item.id || item.url}`" class="site-mobile-nav__group">
             <a :href="item.url" class="site-mobile-nav__link">{{ item.label }}</a>
@@ -487,13 +572,14 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
   right: 0;
   left: 0;
   display: none;
-  max-height: calc(100vh - 64px);
+  max-height: calc(100dvh - 64px);
   padding: 10px 14px 16px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   border-bottom: 1px solid var(--yb-site-border);
-  background: var(--yb-site-header-bg);
+  background: var(--yb-site-surface);
   box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
-  backdrop-filter: blur(12px);
 }
 
 .site-mobile-nav {
@@ -676,6 +762,20 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
 
   .site-layout-header__mobile {
     display: block;
+    position: fixed !important;
+    top: var(--site-mobile-nav-top, 56px) !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    z-index: 1001;
+    max-height: none !important;
+    height: auto !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    background: var(--yb-site-surface) !important;
   }
 
   .site-layout-footer .site-shell {
@@ -689,5 +789,17 @@ const footerCopyright = computed(() => props.settings?.footerCopyright || `© ${
   .site-shell {
     width: calc(100% - 24px);
   }
+}
+</style>
+
+<style>
+:root {
+  --site-mobile-nav-top: 56px;
+}
+
+html.is-site-mobile-nav-open,
+html.is-site-mobile-nav-open body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
 }
 </style>
