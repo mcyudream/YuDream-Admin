@@ -372,15 +372,52 @@ public final class OfficialQqBotEventNormalizer {
 
     private static MilkyModels.Event groupJoinRequest(JsonNode data, String selfId, Long connectionId) {
         String groupId = firstNonBlank(text(data, "group_openid", "group_id"), nested(data, "group", "id"));
-        String userId = firstNonBlank(text(data, "op_member_openid", "member_openid", "user_openid"), nested(data, "op_user", "id"));
+        String userId = firstNonBlank(text(data, "member_openid", "user_openid", "op_member_openid"),
+                nested(data, "member", "id"), nested(data, "op_user", "id"));
+        String requestId = firstNonBlank(text(data, "join_request_id", "id"), userId);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("group_id", groupId);
         payload.put("user_id", userId);
-        payload.put("request_id", firstNonBlank(text(data, "id"), userId));
-        payload.put("comment", text(data, "comment"));
+        payload.put("request_id", requestId);
+        payload.put("join_request_id", firstNonBlank(text(data, "join_request_id"), requestId));
+        payload.put("comment", joinComment(data));
+        payload.put("username", text(data, "username"));
         payload.put("native_type", "GROUP_JOIN_REQUEST");
         payload.put("connection_id", connectionId);
+        payload.put("native", map(data));
         return new MilkyModels.Event(now(data), selfId, "group_request", payload);
+    }
+
+    /** 官方入群申请没有顶层 comment，验证文本在 verify_info.verify_message / review_qa_list。 */
+    private static String joinComment(JsonNode data) {
+        String comment = firstNonBlank(
+                text(data, "comment", "verify_message"),
+                text(data, "verify_info.verify_message"));
+        if (!blank(comment)) {
+            return comment;
+        }
+        JsonNode qaList = data.path("verify_info").path("review_qa_list");
+        if (!qaList.isArray() || qaList.isEmpty()) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (JsonNode qa : qaList) {
+            String question = text(qa, "question");
+            String answer = text(qa, "answer");
+            if (blank(question) && blank(answer)) {
+                continue;
+            }
+            if (!builder.isEmpty()) {
+                builder.append('\n');
+            }
+            if (!blank(question)) {
+                builder.append(question).append('：');
+            }
+            if (!blank(answer)) {
+                builder.append(answer);
+            }
+        }
+        return builder.isEmpty() ? null : builder.toString();
     }
 
     private static MilkyModels.Event groupMemberChange(JsonNode data, String selfId, String eventType) {

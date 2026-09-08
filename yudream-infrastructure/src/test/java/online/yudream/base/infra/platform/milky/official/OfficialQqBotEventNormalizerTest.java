@@ -197,12 +197,55 @@ class OfficialQqBotEventNormalizerTest {
                 """), sessions, 4L);
         assertEquals("group_request", join.eventType());
         assertEquals("g1", join.data().get("group_id"));
+        assertEquals("u1", join.data().get("user_id"));
+        assertEquals("req-1", join.data().get("request_id"));
+        assertEquals("req-1", join.data().get("join_request_id"));
 
         MilkyModels.Event reject = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
                 {"op":0,"t":"GROUP_MSG_REJECT","d":{"group_openid":"g1"}}
                 """), sessions, 4L);
         assertEquals("message_reject", reject.eventType());
         assertEquals("GROUP_MSG_REJECT", reject.data().get("native_type"));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void mapsOfficialJoinRequestVerifyMessageAndJoinRequestId() throws Exception {
+        MilkyModels.Event join = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_JOIN_REQUEST","d":{
+                  "group_openid":"g-open",
+                  "join_request_id":"jr-42",
+                  "member_openid":"member-open",
+                  "username":"alice",
+                  "apply_source":"self_apply",
+                  "verify_info":{"method":"verify_message","verify_message":"allow"}
+                }}
+                """), sessions, 4L);
+        assertEquals("group_request", join.eventType());
+        assertEquals("g-open", join.data().get("group_id"));
+        assertEquals("member-open", join.data().get("user_id"));
+        assertEquals("jr-42", join.data().get("request_id"));
+        assertEquals("jr-42", join.data().get("join_request_id"));
+        assertEquals("allow", join.data().get("comment"));
+        assertEquals("alice", join.data().get("username"));
+        Map<String, Object> nativeData = (Map<String, Object>) join.data().get("native");
+        assertEquals("jr-42", nativeData.get("join_request_id"));
+    }
+
+    @Test
+    void mapsOfficialJoinRequestQaListIntoComment() throws Exception {
+        MilkyModels.Event join = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_JOIN_REQUEST","d":{
+                  "group_openid":"g-open",
+                  "join_request_id":"jr-qa",
+                  "member_openid":"member-open",
+                  "verify_info":{"method":"admin_review_qa","review_qa_list":[
+                    {"question":"物品聚合器的作用","answer":"垃圾桶"}
+                  ]}
+                }}
+                """), sessions, 4L);
+        assertEquals("物品聚合器的作用：垃圾桶", join.data().get("comment"));
+        assertEquals("jr-qa", join.data().get("request_id"));
     }
 
     @Test
