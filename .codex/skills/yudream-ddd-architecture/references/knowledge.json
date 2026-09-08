@@ -42,7 +42,7 @@
     },
     {
       "key": "plugin-remote-style-injection",
-      "text": "Frontend plugin styles used by dashboard cards and runtime pages must be injected through the plugin inline stylesheet (styles.css?inline), and install() must update an existing style tag textContent instead of returning early. Dev fallback and remote reload can keep stale style tags, so do not rely only on component scoped CSS for plugin dashboard cards."
+      "text": "Plugin frontend styles must use the declared-styles path: vite.config mounts yuDreamPluginUnoCss() from @yudream/plugin-sdk/uno-config (host-identical UnoCSS presets, reset off, host theme vars only), src/index.ts imports 'virtual:uno.css', lib cssFileName 'style', and Java @PluginFrontend(styles = {\"style.css\"}) declares the asset so the host loads it before remoteEntry and reclaims it by lease. The legacy styles.css?inline + install() <style> injection is deprecated and must not be used by new plugins."
     },
     {
       "key": "record-list-pagination",

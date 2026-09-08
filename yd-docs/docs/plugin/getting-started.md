@@ -70,6 +70,7 @@ version: 1.0.0
         menuTitle = "演示插件",
         menuIcon = "i-ri:puzzle-2-line",
         menuSort = 20,
+        styles = {"style.css"},
         routes = {
                 @PluginRoute(
                         path = "/platform/plugins/demo",
@@ -137,7 +138,7 @@ yudream-frontend/packages/plugin-demo/
   src/types.ts
 ```
 
-生产构建出 ESM `remoteEntry.js` 并打进 JAR 的 `META-INF/yudream-plugin/frontend/demo-plugin/`。宿主按 frontend manifest 动态加载并注入 SDK。详见 [插件前端工程化](/plugin/frontend-remote) 与 [@yudream/plugin-sdk](/plugin/sdk/)。
+生产构建出 ESM `remoteEntry.js` 与 `style.css`（`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`、入口 `import 'virtual:uno.css'`、lib `cssFileName: 'style'`），并打进 JAR 的 `META-INF/yudream-plugin/frontend/demo-plugin/`。宿主按 frontend manifest 动态加载并注入 SDK。详见 [插件前端工程化](/plugin/frontend-remote) 与 [@yudream/plugin-sdk](/plugin/sdk/)。
 
 ## 7. 构建与安装
 

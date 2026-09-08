@@ -26,7 +26,7 @@ yudream-frontend/packages/plugin-demo/
 export interface YuDreamPluginFrontendModule {
   routes?: Record<string, Component>       // 组件名 -> 页面组件，键对应 @PluginRoute.component
   default?: Component | YuDreamPluginFrontendModule
-  install?: () => void | Promise<void>     // 首次加载执行一次（样式注入等）
+  install?: () => void | Promise<void>     // 首次加载执行一次（初始化逻辑；样式请走声明式 style.css）
 }
 
 export function defineYuDreamPlugin(module: YuDreamPluginFrontendModule)
@@ -36,22 +36,15 @@ export function defineYuDreamPlugin(module: YuDreamPluginFrontendModule)
 
 ```ts
 import Home from './pages/Home.vue'
-import styles from './styles.css?inline'
+import 'virtual:uno.css'   // 与宿主同预设的 UnoCSS 产物，汇入 dist/style.css
+import './styles.css'      // 插件自有全局样式（可选），同样汇入 dist/style.css
 
 export default defineYuDreamPlugin({
   routes: { Home },
-  async install() {
-    // 内联样式兼容模式：始终更新已有 style 标签的 textContent
-    let tag = document.getElementById('demo-plugin-style')
-    if (!tag) {
-      tag = document.createElement('style')
-      tag.id = 'demo-plugin-style'
-      document.head.appendChild(tag)
-    }
-    tag.textContent = styles
-  },
 })
 ```
+
+样式产物 `dist/style.css` 通过后端 `@PluginFrontend(styles = {"style.css"})` 声明，宿主在导入 `remoteEntry.js` 前加载，并在页面切出后按引用计数回收，无需插件手动注入。
 
 宿主加载流程：动态 import `entry`（默认 `/api/platform/plugins/{code}/assets/remoteEntry.js`）→ 调用模块 `install()` → 按 `@PluginRoute.component` 名解析组件（先 `module.routes[name]` 再 `module[name]`）→ 以 `{ sdk, route }` props 渲染。
 
@@ -61,21 +54,29 @@ export default defineYuDreamPlugin({
 
 | 方式 | 做法 |
 |---|---|
-| 内联样式（兼容模式） | `import styles from './styles.css?inline'` + `install()` 注入 `<style>` |
+| 声明式样式（推荐） | `yuDreamPluginUnoCss()` + 入口 `import 'virtual:uno.css'`，`@PluginFrontend(styles = {"style.css"})` 声明，宿主加载/回收 |
 | 独立资源声明 | 在后端 manifest 声明 `styles: List.of("assets/plugin.css")`、`scripts: List.of("assets/bootstrap.js")`，宿主在加载 remoteEntry 前按序注入 |
 | 其他静态资源 | 图片/字体/JSON 随 JAR 放入同一前端目录，代码里用 `sdk.assets.url("assets/logo.svg")` 取地址 |
+| 内联样式（遗留兼容） | `import styles from './styles.css?inline'` + `install()` 注入 `<style>`；已被声明式取代，新插件不得使用 |
 
 Vite 产物要求：保留相对引用与 hash 文件名，保证 CSS、JS chunk、图片、字体都能从 `/assets/**` 地址加载；动态 import 的 chunk 由浏览器自动加载，无须写进 `scripts`。
 
 ## Vite 配置要点
 
 ```ts
+import { yuDreamPluginUnoCss } from '@yudream/plugin-sdk/uno-config'
 import { yuDreamPluginSharedAliases } from '@yudream/plugin-sdk/vite-shared'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), yuDreamPluginUnoCss()], // 与宿主一致的 UnoCSS 预设（关闭 reset，仅引用宿主主题变量）
   resolve: { alias: yuDreamPluginSharedAliases() }, // vue/vue-router/@yudream/components 指向宿主共享 shim
   build: {
+    lib: {
+      entry: 'src/index.ts',
+      formats: ['es'],
+      fileName: () => 'remoteEntry.js',
+      cssFileName: 'style', // 固定输出 dist/style.css，供 @PluginFrontend(styles = {"style.css"}) 声明
+    },
     // 输出 ESM remoteEntry.js + hash assets，保留相对引用
   },
 })

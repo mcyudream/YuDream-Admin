@@ -43,6 +43,7 @@
 - 插件 HTTP 端点统一挂载 `/api/plugins/{pluginCode}/**`；插件自有 Thymeleaf 模板放插件 JAR 的 `src/main/resources/templates`，经插件作用域渲染器按逻辑名渲染。
 - Java `Long`/Snowflake ID 在 JSON、插件 DTO、TS 模型、表单与 URL 参数中一律使用 `string`，禁止 `Number(id)`。
 - 生产插件前端只通过 JAR 内 ESM `remoteEntry.js` + 宿主注入 SDK 加载；前端资源打进 `META-INF/yudream-plugin/frontend/{pluginCode}`。workspace 加载仅是开发便利，禁止生产 manifest 依赖 workspace 别名。
+- 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设的 UnoCSS，关闭 reset、只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；禁止再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。
 
 ## 5. AI/Agent 与 CMS 要点
 

@@ -218,8 +218,9 @@ META-INF/yudream-plugin/frontend/{pluginCode}/assets/*
 
 插件可同时采用以下资源方式：
 
-- **内联样式（兼容模式）**：使用 `import styles from './styles.css?inline'`，并在 `install()` 中创建或更新宿主 `<style>` 的 `textContent`。宿主不会自动加载未声明的独立 CSS。
+- **声明式样式（推荐）**：插件在 `vite.config.ts` 中挂载 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主一致的 UnoCSS 预设：presetWind4 关闭 reset、shadcn 主题映射、attributify/icons/typography），并在入口 `import 'virtual:uno.css'`。Vite lib 模式用 `cssFileName: 'style'` 固定产物名，Java 侧 `@PluginFrontend(styles = {"style.css"})` 声明后由宿主在导入 `remoteEntry.js` 前加载、随页面切出按引用计数回收。插件只引用宿主注入的主题变量，不得自行重新定义 `:root` 主题变量或引入全局 reset。
 - **独立资源**：在 `PluginFrontendModule` 的 `styles` 与 `scripts` 中声明相对路径，例如 `List.of("assets/plugin.css")` 与 `List.of("assets/bootstrap.js")`。宿主在导入 `remoteEntry.js` 前按声明顺序加载 CSS 和 module script。
+- **内联样式（遗留兼容）**：`import styles from './styles.css?inline'` 并在 `install()` 中手写 `<style>` 注入的方式已被声明式 `styles` 取代，新插件不得再使用；宿主不会自动加载未声明的独立 CSS。
 - **其他静态资源**：随 JAR 放入同一前端目录；插件通过 `sdk.assets.url("assets/logo.svg")` 取得资源 URL。路径必须是相对路径，且不得包含 `..` 或反斜杠。
 
 Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图片、字体能从插件 `/assets/**` 地址加载；动态 import 的 JS chunk 无须额外写入 `scripts`。
