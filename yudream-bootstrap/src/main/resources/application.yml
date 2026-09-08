@@ -3,6 +3,10 @@ server:
   # 生产拓扑由 docker/nginx.conf 反向代理注入 X-Real-IP / X-Forwarded-For。
   # 使用容器原生 RemoteIpValve（Tomcat）解析可信内部代理，避免把反向代理地址当作客户端地址。
   forward-headers-strategy: native
+  tomcat:
+    # 与 nginx client_max_body_size 10240M 对齐；-1 表示不在 Tomcat 层二次截断表单与已拒绝请求体。
+    max-http-form-post-size: -1
+    max-swallow-size: -1
 
 spring.application:
     name: yudream-admin
@@ -45,8 +49,9 @@ spring.thymeleaf:
   cache: false
 
 spring.servlet.multipart:
-  max-file-size: 1000MB
-  max-request-size: 5000MB
+  # 与 nginx client_max_body_size 10240M 对齐，覆盖 Minecraft 地图 ZIP 等超大文件。
+  max-file-size: 10240MB
+  max-request-size: 10240MB
 
 logging:
   level:

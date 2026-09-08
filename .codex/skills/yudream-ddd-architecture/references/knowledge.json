@@ -334,6 +334,10 @@
       "text": "RustFS may reject S3 HeadBucket even when object operations can continue. Do not fail upload only because bucket head check is forbidden."
     },
     {
+      "key": "host-multipart-archive-limit",
+      "text": "Minecraft 地图 ZIP 等超大文件走宿主 /api/files/upload。spring.servlet.multipart.max-file-size 必须与 nginx client_max_body_size 对齐（现 10240MB）；Tomcat max-http-form-post-size/max-swallow-size 设 -1 避免二次截断。GlobalExceptionHandler 必须把 MaxUploadSizeExceededException/嵌套 SizeLimitExceededException 映射为 400「上传文件超过大小限制」，不能走兜底 500。通用 files.upload 与插件 XHR 大文件上传都必须 timeout:0，不能用 axios 默认 60s。"
+    },
+    {
       "key": "form-create-upload-runtime",
       "text": "form-create designer rules are persisted as JSON, so function props such as upload onSuccess/customRequest are lost. Public/runtime dynamic form rendering must re-inject upload handlers, normalize backend file URLs for previews, and provide a public form-scoped upload endpoint instead of relying on the login-only common file upload API."
     },
