@@ -147,6 +147,10 @@ public class PluginDevModeWatcher {
         try {
             ProcessBuilder builder = new ProcessBuilder(shellWrap(project.getCompileCommand()));
             builder.directory(Path.of(project.getPath()).toFile());
+            // 编译进程默认跟随宿主 JVM 的 JDK：宿主要求 JDK 21+，而系统 JAVA_HOME 可能指向旧版本，
+            // 会导致 target 21 编译失败、target/classes 只剩资源没有类，随后目录加载报主类初始化失败。
+            // 项目需要其他 JDK 时可在 compileCommand 里自行 set JAVA_HOME 覆盖。
+            pinCompileJavaHome(builder);
             builder.redirectErrorStream(true);
             Process process = builder.start();
             AtomicReference<String> output = new AtomicReference<>("");
@@ -191,6 +195,22 @@ public class PluginDevModeWatcher {
             return List.of("cmd", "/c", command);
         }
         return List.of("sh", "-c", command);
+    }
+
+    private void pinCompileJavaHome(ProcessBuilder builder) {
+        String javaHome = System.getProperty("java.home");
+        if (!StringUtils.hasText(javaHome)) {
+            return;
+        }
+        Map<String, String> env = builder.environment();
+        env.put("JAVA_HOME", javaHome);
+        String pathKey = env.keySet().stream()
+                .filter(key -> key.equalsIgnoreCase("PATH"))
+                .findFirst()
+                .orElse("PATH");
+        String path = env.getOrDefault(pathKey, "");
+        env.put(pathKey, javaHome + java.io.File.separator + "bin"
+                + (path.isEmpty() ? "" : java.io.File.pathSeparator + path));
     }
 
     private String readQuietly(InputStream inputStream) {
