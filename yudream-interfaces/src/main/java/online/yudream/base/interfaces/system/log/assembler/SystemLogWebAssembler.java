@@ -4,8 +4,10 @@ import online.yudream.base.application.system.log.cmd.DockerLogSettingsUpdateCmd
 import online.yudream.base.application.system.log.dto.DockerLogSettingsDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
+import online.yudream.base.domain.system.log.model.SystemLogModuleGroup;
 import online.yudream.base.interfaces.system.log.request.DockerLogSettingsUpdateRequest;
 import online.yudream.base.interfaces.system.log.res.DockerLogSettingsRes;
+import online.yudream.base.interfaces.system.log.res.SystemLogModuleGroupRes;
 import online.yudream.base.interfaces.system.log.res.SystemLogRes;
 
 import java.time.Instant;
@@ -49,6 +51,15 @@ public final class SystemLogWebAssembler {
         return new PageResult<>(
                 page.getRecords().stream().map(SystemLogWebAssembler::toRes).toList(),
                 page.getTotal(), page.getPage(), page.getSize());
+    }
+
+    public static List<SystemLogModuleGroupRes> toModuleGroups(List<SystemLogModuleGroup> groups) {
+        if (groups == null || groups.isEmpty()) {
+            return List.of();
+        }
+        return groups.stream()
+                .map(group -> new SystemLogModuleGroupRes(group.label(), group.modules()))
+                .toList();
     }
 
     public static DockerLogSettingsRes toRes(DockerLogSettingsDTO dto) {

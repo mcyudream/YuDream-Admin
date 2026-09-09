@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OfficialQqBotEventNormalizerTest {
@@ -279,11 +280,46 @@ class OfficialQqBotEventNormalizerTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void doesNotTreatMentioningSomeoneElseAsDirectedAtBot() throws Exception {
+        sessions.rememberSelf(9L, "bot-open", "MC梦璃");
+        MilkyModels.Event event = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_MESSAGE_CREATE","d":{
+                  "id":"msg-other","group_openid":"group-open","content":"@张三 吃饭了吗",
+                  "author":{"member_openid":"member-1"},
+                  "mentions":[{"id":"member-2"}]
+                }}
+                """), sessions, 9L);
+        List<Map<String, Object>> segments = (List<Map<String, Object>>) event.data().get("segments");
+        assertEquals("@张三 吃饭了吗", ((Map<?, ?>) segments.getFirst().get("data")).get("text"));
+        assertEquals(Boolean.FALSE, event.data().get("mention_self"));
+        assertEquals("member-2", ((Map<?, ?>) segments.stream()
+                .filter(segment -> "mention".equals(segment.get("type")))
+                .findFirst()
+                .orElseThrow()
+                .get("data")).get("user_id"));
+        assertFalse(OfficialQqBotEventNormalizer.looksLikeBotMention("@张三 吃饭了吗", "bot-open", "MC梦璃"));
+        assertFalse(OfficialQqBotEventNormalizer.looksLikeBotMention("<@member-2> 吃饭了吗", "bot-open", "MC梦璃"));
+        assertTrue(OfficialQqBotEventNormalizer.looksLikeBotMention("<@!bot-open> 你好", "bot-open", "MC梦璃"));
+        assertEquals("@张三 吃饭了吗", OfficialQqBotEventNormalizer.stripBotMentions("@张三 吃饭了吗", "bot-open", "MC梦璃"));
+    }
+
+    @Test
     void remembersBotDisplayNameFromReadyEvent() throws Exception {
         OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
                 {"op":0,"t":"READY","d":{"user":{"id":"bot-open","username":"MC梦璃"}}}
                 """), sessions, 9L);
         assertEquals("bot-open", sessions.selfId(9L));
         assertEquals("MC梦璃", sessions.selfName(9L));
+    }
+
+    @Test
+    void unknownOfficialEventsKeepNativeTypeForSystemLogs() throws Exception {
+        MilkyModels.Event event = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"FORUM_THREAD_CREATE","d":{"guild_id":"g1","thread_id":"t1"}}
+                """), sessions, 9L);
+        assertEquals("forum_thread_create", event.eventType());
+        assertEquals("FORUM_THREAD_CREATE", event.data().get("native_type"));
+        assertEquals("g1", event.data().get("guild_id"));
     }
 }

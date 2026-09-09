@@ -2,7 +2,7 @@
 
 ## 方式一：Docker Compose 部署（推荐）
 
-应用镜像发布在 `registry.yudream.online/yudream/yudreamadmin`，包括 `backend`、`frontend` 和 `render-server`。三个服务在 Compose 网络中分别以 `backend`、`frontend`、`render-server` 为 hostname；前端镜像内置 nginx，将 `/api/` 反代到 `http://backend:8080/api/`。下面两套文件都是完整模板，不依赖仓库根目录的其他 Compose 文件。
+应用镜像发布在 `registry.yudream.online/yudream/yudreamadmin`，包括 `backend`、`frontend`、`render-server` 和 `kkfileview`。服务在 Compose 网络中分别以同名 hostname 互通；前端镜像内置 nginx，将 `/api/` 反代到 `http://backend:8080/api/`，将 `/kkfileview/` 反代到 kkFileView。下面两套文件都是完整模板，不依赖仓库根目录的其他 Compose 文件。
 
 ### 模板 A：使用已有 MongoDB / Redis（无数据库容器）
 
@@ -31,6 +31,11 @@ PLATFORM_AI_ENABLED=false
 PLATFORM_AGENT_ENABLED=false
 PLATFORM_MILKY_ENABLED=false
 PLATFORM_MESSAGE_RENDER_ENABLED=true
+PLATFORM_FILE_PREVIEW_ENABLED=true
+PLATFORM_INBOUND_MAIL_ENABLED=false
+KKFILEVIEW_TAG=5.0.2
+KKFILEVIEW_PORT=8012
+KKFILEVIEW_INTERNAL_URL=http://kkfileview:8012
 ```
 
 ```yaml
@@ -59,6 +64,9 @@ services:
       PLATFORM_AGENT_ENABLED: ${PLATFORM_AGENT_ENABLED:-false}
       PLATFORM_MILKY_ENABLED: ${PLATFORM_MILKY_ENABLED:-false}
       PLATFORM_MESSAGE_RENDER_ENABLED: ${PLATFORM_MESSAGE_RENDER_ENABLED:-true}
+      PLATFORM_FILE_PREVIEW_ENABLED: ${PLATFORM_FILE_PREVIEW_ENABLED:-true}
+      PLATFORM_INBOUND_MAIL_ENABLED: ${PLATFORM_INBOUND_MAIL_ENABLED:-false}
+      FILE_PREVIEW_KKFILEVIEW_INTERNAL_URL: ${KKFILEVIEW_INTERNAL_URL:-http://kkfileview:8012}
     networks: [yudream]
 
   frontend:
@@ -85,12 +93,22 @@ services:
       retries: 6
     networks: [yudream]
 
+  kkfileview:
+    image: registry.yudream.online/yudream/yudreamadmin/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
+    restart: unless-stopped
+    ports: ["${KKFILEVIEW_PORT:-8012}:8012"]
+    environment:
+      KK_BASE_URL: ${KK_BASE_URL:-default}
+      KK_TRUST_HOST: ${KK_TRUST_HOST:-backend,localhost,127.0.0.1,host.docker.internal}
+      KK_CACHE_TYPE: ${KK_CACHE_TYPE:-jdk}
+    networks: [yudream]
+
 networks:
   yudream:
     driver: bridge
 ```
 
-A 中 `MONGO_URI`、`REDIS_HOST` 必填，分别是已有 MongoDB 的完整连接串和 Redis 的可达 hostname；其余变量均可省略并采用表中默认值。`TAG` 控制三枚应用镜像 tag；三个 `*_PORT` 是宿主端口，容器端口固定为 backend `8080`、frontend `80`、render-server `3000`。`MESSAGE_RENDER_BASE_URL` 必须使用 Compose hostname，而不是宿主机 `localhost`。`MESSAGE_RENDER_TOKEN` 是后端配置名，`RENDER_TOKEN` 是渲染容器兼容配置名，若使用 token 应保持一致；当前 render-server 源码只注册 `/health` 和渲染接口，未实现 token 校验，因此生产环境不要发布 render 端口。`SNOWFLAKE_DCI`/`SNOWFLAKE_MI` 是数据中心/机器编号，多实例必须错开。`YUDREAM_CREDENTIAL_KEY` 统一加密 Neo4j、Milky 和插件 SecretStore 的持久化凭据，必须是 Base64 编码且解码后恰为 32 字节的随机值。务必妥善备份且不要随意更换；历史密文迁移期间，三个旧专用变量仅可作为解密回退。`PLATFORM_*_ENABLED` 是平台能力的项目闸门，模板关闭未提供的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky，消息渲染默认开启。
+A 中 `MONGO_URI`、`REDIS_HOST` 必填，分别是已有 MongoDB 的完整连接串和 Redis 的可达 hostname；其余变量均可省略并采用表中默认值。`TAG` 控制 backend / frontend / render-server 镜像 tag；`KKFILEVIEW_TAG` 单独控制 kkFileView。宿主端口容器侧固定为 backend `8080`、frontend `80`、render-server `3000`、kkfileview `8012`。`MESSAGE_RENDER_BASE_URL` 必须使用 Compose hostname，而不是宿主机 `localhost`。`MESSAGE_RENDER_TOKEN` 是后端配置名，`RENDER_TOKEN` 是渲染容器兼容配置名，若使用 token 应保持一致；当前 render-server 源码只注册 `/health` 和渲染接口，未实现 token 校验，因此生产环境不要发布 render 端口。kkFileView 生产可删除宿主端口映射，浏览器走 frontend nginx 的 `/kkfileview/`。`SNOWFLAKE_DCI`/`SNOWFLAKE_MI` 是数据中心/机器编号，多实例必须错开。`YUDREAM_CREDENTIAL_KEY` 统一加密 Neo4j、Milky 和插件 SecretStore 的持久化凭据，必须是 Base64 编码且解码后恰为 32 字节的随机值。务必妥善备份且不要随意更换；历史密文迁移期间，三个旧专用变量仅可作为解密回退。`PLATFORM_*_ENABLED` 是平台能力的项目闸门，模板关闭未提供的 RabbitMQ、Neo4j、Wiki、AI、Agent、Milky、入站邮箱，消息渲染与文件预览默认开启。
 
 ### 模板 B：Compose 内置 MongoDB / Redis
 
@@ -119,6 +137,11 @@ PLATFORM_AI_ENABLED=false
 PLATFORM_AGENT_ENABLED=false
 PLATFORM_MILKY_ENABLED=false
 PLATFORM_MESSAGE_RENDER_ENABLED=true
+PLATFORM_FILE_PREVIEW_ENABLED=true
+PLATFORM_INBOUND_MAIL_ENABLED=false
+KKFILEVIEW_TAG=5.0.2
+KKFILEVIEW_PORT=8012
+KKFILEVIEW_INTERNAL_URL=http://kkfileview:8012
 ```
 
 ```yaml
@@ -172,6 +195,9 @@ services:
       PLATFORM_AGENT_ENABLED: ${PLATFORM_AGENT_ENABLED:-false}
       PLATFORM_MILKY_ENABLED: ${PLATFORM_MILKY_ENABLED:-false}
       PLATFORM_MESSAGE_RENDER_ENABLED: ${PLATFORM_MESSAGE_RENDER_ENABLED:-true}
+      PLATFORM_FILE_PREVIEW_ENABLED: ${PLATFORM_FILE_PREVIEW_ENABLED:-true}
+      PLATFORM_INBOUND_MAIL_ENABLED: ${PLATFORM_INBOUND_MAIL_ENABLED:-false}
+      FILE_PREVIEW_KKFILEVIEW_INTERNAL_URL: ${KKFILEVIEW_INTERNAL_URL:-http://kkfileview:8012}
     networks: [yudream]
 
   frontend:
@@ -196,6 +222,16 @@ services:
       retries: 6
     networks: [yudream]
 
+  kkfileview:
+    image: registry.yudream.online/yudream/yudreamadmin/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
+    restart: unless-stopped
+    ports: ["${KKFILEVIEW_PORT:-8012}:8012"]
+    environment:
+      KK_BASE_URL: ${KK_BASE_URL:-default}
+      KK_TRUST_HOST: ${KK_TRUST_HOST:-backend,localhost,127.0.0.1,host.docker.internal}
+      KK_CACHE_TYPE: ${KK_CACHE_TYPE:-jdk}
+    networks: [yudream]
+
 volumes:
   mongo-data:
   redis-data:
@@ -213,10 +249,13 @@ B 中除 `TAG`、宿主端口、雪花编号、能力开关和渲染配置外，
 
 | 变量 | 必填 | 作用 | 默认值/示例 |
 |---|---:|---|---|
-| `TAG` | 否 | 三个 YuDream 镜像的版本 tag。 | `latest` |
+| `TAG` | 否 | backend / frontend / render-server 镜像的版本 tag。 | `latest` |
 | `BACKEND_PORT` | 否 | 宿主访问 backend 的端口；容器内固定 `8080`。 | `8080` |
 | `FRONTEND_PORT` | 否 | 宿主访问 frontend nginx 的端口；容器内固定 `80`。 | `80` |
 | `RENDER_PORT` | 否 | 宿主访问 render-server 的端口；生产建议不映射。 | `3000` |
+| `KKFILEVIEW_TAG` | 否 | kkFileView 镜像 tag。 | `5.0.2` |
+| `KKFILEVIEW_PORT` | 否 | 宿主访问 kkFileView 的调试端口；生产建议不映射。 | `8012` |
+| `KKFILEVIEW_INTERNAL_URL` | 否 | 后端容器探测 kkFileView 的内网地址。 | `http://kkfileview:8012` |
 | `MONGO_URI` | A 是 | Spring Data MongoDB 完整连接串。 | A：`mongodb://mongo.example.com:27017/yudream`；B：`mongodb://mongo:27017/yudream` |
 | `REDIS_HOST` | A 是 | Redis hostname；B 固定为 Compose 服务 `redis`。 | A：`redis.example.com`；B：`redis` |
 | `REDIS_PORT` | 否 | Redis 端口。 | `6379` |
@@ -233,8 +272,10 @@ B 中除 `TAG`、宿主端口、雪花编号、能力开关和渲染配置外，
 | `PLATFORM_WIKI_ENABLED` | 否 | Wiki 项目闸门；模板未提供 Neo4j。 | `false` |
 | `PLATFORM_AI_ENABLED` | 否 | AI 项目闸门。 | `false` |
 | `PLATFORM_AGENT_ENABLED` | 否 | Agent 项目闸门。 | `false` |
-| `PLATFORM_MILKY_ENABLED` | 否 | Milky 项目闸门。 | `false` |
+| `PLATFORM_MILKY_ENABLED` | 否 | QQ 消息平台项目闸门。 | `false` |
 | `PLATFORM_MESSAGE_RENDER_ENABLED` | 否 | 消息渲染项目闸门；要使用 render-server 必须开启。 | `true` |
+| `PLATFORM_FILE_PREVIEW_ENABLED` | 否 | 文件预览项目闸门；要使用 kkFileView 必须开启。 | `true` |
+| `PLATFORM_INBOUND_MAIL_ENABLED` | 否 | 入站邮箱项目闸门；启用前需配置 IMAP。 | `false` |
 
 render-server 当前源码实际提供 `GET /health` 和 `/v1/render/*`，没有读取或校验 `RENDER_TOKEN`；文档仍同时保留两个变量名，是为了与 backend 配置和现有 Compose 兼容。它只是内网服务，生产环境应删除 `ports`，只保留 `expose`。删除 render-server 时将 `PLATFORM_MESSAGE_RENDER_ENABLED=false`，并移除 backend 的 `MESSAGE_RENDER_BASE_URL`/token 配置即可；其余服务仍按模板运行。
 
@@ -309,8 +350,10 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 | `PLATFORM_AI_ENABLED` | `true` | 否 | AI 能力项目闸门。 | AI | 还需在应用层启用并配置 provider。 |
 | `PLATFORM_AGENT_ENABLED` | `true` | 否 | Agent 能力项目闸门。 | Agent | 依赖的 AI/工具不可用时不能启用。 |
 | `PLATFORM_DATAVIZ_ENABLED` | `true` | 否 | 数据可视化能力开关。 | 数据可视化 | 按需关闭。 |
-| `PLATFORM_MILKY_ENABLED` | `true` | 否 | Milky 能力项目闸门。 | Milky | 启用并实际保存凭据时必须配置密钥。 |
+| `PLATFORM_MILKY_ENABLED` | `true` | 否 | QQ 消息平台项目闸门。 | Milky / 官方 OpenAPI | 启用并实际保存凭据时必须配置密钥。 |
 | `PLATFORM_MESSAGE_RENDER_ENABLED` | `true` | 否 | 消息渲染能力项目闸门。 | backend 调用 render-server | Compose 最小模板保持开启；不部署渲染服务时设为 `false`。 |
+| `PLATFORM_FILE_PREVIEW_ENABLED` | `true` | 否 | 文件预览项目闸门。 | kkFileView | 关闭后「平台能力」页不出现该能力；Office 等格式不可预览。 |
+| `PLATFORM_INBOUND_MAIL_ENABLED` | `true` | 否 | 入站邮箱项目闸门。 | IMAP 核验 | 启用前需配置 IMAP 主机、用户名与密码。 |
 | `PLATFORM_AI_CONNECT_TIMEOUT` | `30s` | 否 | AI provider 建连超时。 | AI | 按网络环境调整。 |
 | `PLATFORM_AI_READ_TIMEOUT` | `30m` | 否 | AI 普通读取超时。 | AI | 长超时会占用连接和线程资源。 |
 | `PLATFORM_AI_SSE_TIMEOUT` | `30m` | 否 | AI SSE 读取超时。 | AI 流式请求 | 需与反向代理超时一致。 |
@@ -341,8 +384,8 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 | `S3_PATH_STYLE_ACCESS` | `true` | 否 | 使用 path-style 访问。 | S3 兼容服务 | 按对象存储兼容性选择。 |
 | `YUDREAM_CREDENTIAL_KEY` | 空 | 保存任意受管凭据时 | Neo4j、Milky 与插件 SecretStore 共用的 AES-256-GCM 主密钥。 | Neo4j、Milky、插件 secret 存储 | 必须是 Base64 编码且解码后恰为 32 字节；缺失时应用可启动，但不能写入新凭据。使用 `openssl rand -base64 32` 生成、安全注入并妥善备份。 |
 | `PLATFORM_PLUGIN_HOST_VERSION` | `1.0.0` | 否 | 插件宿主兼容版本。 | 插件兼容性检查 | 只在确认插件契约兼容时修改。 |
-| `PLATFORM_PLUGIN_SPI_VERSION` | `2.6.0` | 否 | 插件 SPI 兼容版本。 | 插件兼容性检查 | 必须与实际宿主 SPI 契约匹配。 |
-| `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | `1.0.1` | 否 | 插件前端 SDK 兼容版本。 | 插件前端兼容性检查 | 与宿主实际 SDK 版本保持一致。 |
+| `PLATFORM_PLUGIN_SPI_VERSION` | `2.13.0` | 否 | 插件 SPI 兼容版本。 | 插件兼容性检查 | `application.yml` 默认 `2.13.0`；应与当前宿主 SPI 契约匹配（源码 `2.24.0`）。 |
+| `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | `1.0.1` | 否 | 插件前端 SDK 兼容版本。 | 插件前端兼容性检查 | `application.yml` 默认 `1.0.1`；运行时行为版本为 `1.5.0`，npm 包为 `1.5.0`。 |
 | `PLATFORM_PLUGIN_STORE_ROOT_URL` | `https://nexus.yudream.online/repository/plugin-store-releases/index.json` | 否 | 插件商店索引地址。 | 在线插件商店 | 仅信任受控 HTTPS 地址。 |
 | `PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS` | `5000` | 否 | 商店连接超时（毫秒）。 | 在线插件商店 | 网络不稳定时谨慎增大。 |
 | `PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS` | `5000` | 否 | 商店请求超时（毫秒）。 | 在线插件商店 | 避免启动或管理请求长时间阻塞。 |

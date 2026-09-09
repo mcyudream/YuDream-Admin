@@ -33,6 +33,43 @@ export interface YuDreamPluginFileUploadOptions {
 export interface YuDreamPluginFilesClient {
   uploadImage: (file: File, options?: YuDreamPluginFileUploadOptions) => Promise<YuDreamPluginFileObject>
   assetUrl: (url?: string) => string
+  /** 列表封面用的稳定缩略图地址；非 `/api/files/.../content` 原样回退。 */
+  thumbUrl: (url?: string, options?: YuDreamPluginThumbOptions) => string
+}
+
+export interface YuDreamPluginThumbOptions {
+  /** 预留最长边，当前平台出口固定 400px JPEG。 */
+  maxEdge?: number
+}
+
+/** Firefox 每域名约 6 条并发连接；列表封面必须排队，避免占满后把 API 请求挤掉。 */
+export function acquireImageSlot(maxInflight = 2): Promise<() => void> {
+  const limit = Math.max(1, maxInflight)
+  return new Promise((resolve) => {
+    const grant = () => {
+      if (imageSlotState.inflight >= limit) {
+        imageSlotState.waiters.push(grant)
+        return
+      }
+      imageSlotState.inflight += 1
+      let released = false
+      resolve(() => {
+        if (released) {
+          return
+        }
+        released = true
+        imageSlotState.inflight = Math.max(0, imageSlotState.inflight - 1)
+        const next = imageSlotState.waiters.shift()
+        next?.()
+      })
+    }
+    grant()
+  })
+}
+
+const imageSlotState = {
+  inflight: 0,
+  waiters: [] as Array<() => void>,
 }
 
 export interface YuDreamPluginAssetsClient {

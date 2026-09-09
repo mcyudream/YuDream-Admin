@@ -15,7 +15,7 @@ public enum MilkyConnectionProtocol {
     public static final String OFFICIAL_GATEWAY = "wss://api.bot.qq.com/websocket";
     public static final String OFFICIAL_SANDBOX_GATEWAY = "wss://sandbox.api.bot.qq.com/websocket";
     /** 群/C2C 事件 + 互动按钮 + 公域频道消息。 */
-    public static final int DEFAULT_OFFICIAL_INTENTS = (1 << 25) | (1 << 26) | (1 << 30);
+    public static final int DEFAULT_OFFICIAL_INTENTS = OfficialQqBotIntent.recommendedMask();
 
     private final String code;
 

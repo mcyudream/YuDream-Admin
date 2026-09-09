@@ -8,6 +8,7 @@ CMS（能力 code：`cms`）是平台可动态启用的内容定制能力，提�
 - 管理端点挂载在 `/api/platform/cms/**`，需要登录与对应权限码；公开渲染端点挂载在 `/api/public/cms/**`，无需登录，但只暴露「已发布」的内容。
 - 页面支持三种内容来源：Markdown（`markdownContent`）、可视化构建产物（`htmlContent` / `cssContent` / `jsContent` / `builderProjectJson`），可混用。
 - 首页布局是单例聚合（`homePageLayoutRepo.findCurrent()`），保存即覆盖当前布局。
+- 公开站点移动端导航为折叠菜单：挂到 `body`、铺满可视高度，打开后锁定页面滚动。插件公开页可用 `@PluginRoute(publicAccess = true, siteNav = true)` 注入站点头导航并复用站点 chrome。
 
 ```mermaid
 flowchart LR

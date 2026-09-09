@@ -3,7 +3,7 @@
 YuDream 将系统能力分为两类：
 
 - **system 基线能力**：安全与身份相关（接口加密、双 token、API Key、Passkey、OAuth），始终可用，不走动态开关。
-- **platform 动态能力**：SSE、WebSocket、MQ、Neo4j、AI/Agent、CMS 等，按需动态加载。
+- **platform 动态能力**：SSE、WebSocket、MQ、Neo4j、AI/Agent、CMS、文件预览、入站邮箱等，按需动态加载。
 
 ## 双闸门机制
 
@@ -61,6 +61,8 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 | dataviz | `PLATFORM_DATAVIZ_ENABLED` | 数据可视化 |
 | message-render | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
 | milky | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 协议（HTTP API + WebSocket `/event`）与腾讯官方 OpenAPI v2（REST + Gateway/Webhook）共用出站端口 |
+| file-preview | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览：浏览器直读优先，Office/PSD/压缩包等走 iframe |
+| inbound-mail | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 只读入站邮箱，供插件按发件域、验证码与关键词匹配入站邮件 |
 
 \* 以上均映射到同名环境变量（见 `yudream-bootstrap/src/main/resources/application.yml` 的 `yudream.platform.capabilities.*`），compose 部署时可直接以 `PLATFORM_*_ENABLED=true/false` 控制项目闸门。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
 
@@ -81,3 +83,11 @@ Milky 能力（展示名「QQ 消息平台」）的连接凭据经 AES-GCM 加�
 - Thymeleaf 模板渲染证书、活动证明等图片/PDF。
 
 安全策略严格：HTML/Markdown 渲染禁脚本与外链、URL 仅允许单次公网跳转、容器只读无特权。
+
+## 文件预览（file-preview）
+
+对接 kkFileView，由平台签发短时效公开地址并给出 `DIRECT` / `KKFILE` / `NONE` 预览决策。浏览器走 frontend nginx 的 `/kkfileview/` 同源反代，kkFileView 再回源签名端点拉文件。插件通过 `context.filePreview()` 消费，不要各自对接 kkFileView。详见 [文件预览](/features/file-preview)。
+
+## 入站邮箱（inbound-mail）
+
+以 IMAPS 只读方式连接收件箱，插件通过 `framework().inboundMail()` 按发件域、验证码与关键词匹配邮件。插件拿不到邮箱凭据或正文，只拿到核验结果。详见 [入站邮箱](/features/inbound-mail)。

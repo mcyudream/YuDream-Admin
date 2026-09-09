@@ -4,7 +4,7 @@
 
 源码升版不等于已发布到 Nexus。下游插件仓只应依赖已验证发布的版本；未跑通发布/验签流水线的版本不得用于生产插件。
 
-配套前端契约是 `@yudream/plugin-sdk`，当前源码版本 **1.3.0**（`yudream-frontend/packages/plugin-sdk/package.json`）。后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本，目前为 `1.3.0`。
+配套前端契约是 `@yudream/plugin-sdk`，当前 npm 包版本 **1.5.0**（`yudream-frontend/packages/plugin-sdk/package.json`）。后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本，目前为 `1.5.0`（运行时 `sdk.messaging` / `sdk.users` / `sdk.ai` / `sdk.files.thumbUrl`）。1.4.0 新增构建期导出 `./uno-config`，1.5.0 新增列表缩略图出口。
 
 ## 版本化文档结构
 
@@ -15,10 +15,11 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
   index.md                 ← 本页（版本清单 + 升级指引 + Agent 增量生成规范）
   v1/
     core                   生命周期与 PluginContext
-    annotations            注解声明
+    annotations            注解声明（含 GlobalWidget、siteNav）
     http                   HTTP 端点
-    frontend               前端元数据
     framework-services     框架能力端口
+    file-preview           文件预览
+    extension              扩展点 / 登录注册拦截
     graph                  平台 Neo4j 图数据库投影端口
 ```
 
@@ -28,7 +29,7 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
 
 | 版本 | 状态 | 说明 |
 |---|---|---|
-| [v1 (2.24.0)](/plugin/spi/v1/core) | 当前源码 | 全量 API 教程。相对早期 2.7 / 2.13 / 2.14 文档，已补齐 `PluginMessagingConnection.protocol`、`PluginAiService.chatStream`、宿主目录 HTTP + SDK（`sdk.messaging` / `sdk.users` / `sdk.ai`），以及官方 QQ OpenAPI 与 Milky 共用出站端口 |
+| [v1 (2.24.0)](/plugin/spi/v1/core) | 当前源码 | 全量 API 教程。相对早期文档已补齐消息 `protocol`、AI 流式、宿主目录 SDK、官方 QQ、文件预览、入站邮箱、扩展点（登录/注册拦截与身份核验）、菜单显隐与公开站 `siteNav` |
 
 ## 2.24.0 相对旧文档的增量
 
@@ -43,6 +44,11 @@ v1 教程目录继续沿用，不另开 `v2/`。下列能力已在当前源码�
 | AI 流式 | `PluginAiService.chatStream(request, onDelta)` 与 `chatStream(request, onDelta, onTool)`；默认实现退化为一次性 `chat` 后回放，宿主可覆盖为真流式 |
 | QQ 协议 | 能力码仍是 `milky`（展示名「QQ 消息平台」）。一条连接可选 Milky 或腾讯官方 OpenAPI v2，出站经 `RoutingMilkyApiGateway` 分流。官方身份是 openid；群列表来自进程内事件缓存，无历史拉取 |
 | 消息身份绑定 | `PluginUserService` 增加默认方法 `findByMessagingIdentity` / `bindMessagingIdentityOnce` / `listMessagingIdentities`，并新增 `PluginMessagingIdentity`。旧插件继续 `bindQqOnce(userId, event.userId())` 即可：宿主按当前事件协议写入身份表。Milky 数字 QQ 仍镜像到 `User.qq`；官方 openid 不再写入该字段。历史 `User.qq` 启动时迁到 `sysMessagingIdentity` |
+| 文件预览 | `FrameworkServices.filePreview()` / `PluginContext.filePreview()`，能力码 `file-preview`。插件拿签名地址与 KKFILE/DIRECT/NONE 决策，不要自行对接 kkFileView |
+| 入站邮箱 | `FrameworkServices.inboundMail()`，能力码 `inbound-mail`。IMAPS 只读核验，插件拿不到凭据或正文 |
+| 扩展点 | `registerExtension` / `extensions`；内置登录/注册拦截器与 `IdentityVerificationProvider`。disable/unload 自动回收 |
+| 菜单显隐 | `PluginContext.setMenuVisible(routePath, visible)`，按路由路径匹配侧边栏，匹配不到时静默忽略 |
+| 公开站导航 | `@PluginRoute.siteNav` 仅在 `publicAccess=true` 时生效，把页面注入 CMS 公开站头导航并使用站点 chrome |
 
 ## 升级指引
 

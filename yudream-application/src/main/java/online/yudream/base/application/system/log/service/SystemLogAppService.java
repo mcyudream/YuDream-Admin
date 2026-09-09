@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.log.dto.SystemLogStats;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
+import online.yudream.base.domain.system.log.model.SystemLogModuleGroup;
 import online.yudream.base.domain.system.log.model.SystemLogQuery;
 import online.yudream.base.domain.system.log.repo.SystemLogRepo;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,10 @@ public class SystemLogAppService {
 
     public List<String> modules() {
         return systemLogRepo.modules();
+    }
+
+    public List<SystemLogModuleGroup> moduleGroups() {
+        return systemLogRepo.moduleGroups();
     }
 
     public SystemLogStats stats() {

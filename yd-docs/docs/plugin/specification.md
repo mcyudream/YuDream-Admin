@@ -229,11 +229,11 @@ META-INF/yudream-plugin/frontend/{pluginCode}/assets/*
 
 三种资源加载方式：
 
-- **内联样式（兼容模式）**：`import styles from './styles.css?inline'`，在 `install()` 中创建或更新宿主 `<style>` 的 `textContent`。宿主不会自动加载未声明的独立 CSS。
+- **声明式 `style.css`（推荐）**：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`，入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`。插件只引用宿主主题 CSS 变量，不要重新定义 `:root` 或引入全局 reset。
 - **独立资源**：在 `PluginFrontendModule` 的 `styles` / `scripts` 字段声明相对路径（如 `List.of("assets/plugin.css")`），宿主在导入 `remoteEntry.js` 前按声明顺序加载。
 - **其他静态资源**：随 JAR 放入同一前端目录，通过 `sdk.assets.url("assets/logo.svg")` 取 URL。路径必须是相对路径，不得含 `..` 或反斜杠。
 
-Vite 产物应保留相对引用与 hash 文件名；动态 import 的 JS chunk 无须写入 `scripts`。
+不要再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。Vite 产物应保留相对引用与 hash 文件名；动态 import 的 JS chunk 无须写入 `scripts`。
 
 ## 生命周期与迁移
 

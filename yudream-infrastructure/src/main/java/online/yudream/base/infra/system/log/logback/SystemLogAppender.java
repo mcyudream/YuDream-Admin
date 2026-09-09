@@ -23,7 +23,7 @@ public class SystemLogAppender extends AppenderBase<ILoggingEvent> {
     protected void append(ILoggingEvent event) {
         try {
             SystemLogLevel level = mapLevel(event.getLevel());
-            String module = moduleResolver.resolve(event.getLoggerName());
+            String module = moduleResolver.resolve(event.getLoggerName(), event.getMDCPropertyMap());
             String traceId = mdckValue(event.getMDCPropertyMap(), "traceId");
             String throwable = throwable(event.getThrowableProxy());
             SystemLogBuffer.instance().append(event.getTimeStamp(), level, event.getLoggerName(), module,

@@ -2,7 +2,7 @@
 
 `PluginContext.registerXxx(...)` 接收的条目全部是不可变 record。本页逐个列出字段与语义；注解方式（`@PluginMenu` 等）与这些 record 一一对应，字段名相同。
 
-> 源码：`yudream-plugins/yudream-plugin-spi/src/main/java/online/yudream/base/plugin/spi/` 下 `menu/`、`permission/`、`capability/`、`dashboard/`、`frontend/` 包
+> 源码：`yudream-plugins/yudream-plugin-spi/src/main/java/online/yudream/base/plugin/spi/` 下 `menu/`、`permission/`、`capability/`、`dashboard/`、`frontend/`、`widget/` 包
 
 ---
 
@@ -74,7 +74,7 @@
 |---|---|---|
 | `entry` | `String` | remoteEntry 入口路径，约定 `META-INF/yudream-plugin/frontend/{code}/remoteEntry.js` |
 | `moduleName` | `String` | ESM 模块名（容器名称） |
-| `sdkVersion` | `String` | 依赖的 `@yudream/plugin-sdk` 行为版本；当前宿主为 `1.3.0` |
+| `sdkVersion` | `String` | 依赖的 `@yudream/plugin-sdk` 行为版本；当前宿主运行时为 `1.5.0`（npm 包 1.5.0） |
 | `integrity` | `String` | 资源完整性校验值（可空） |
 | `menuTitle` / `menuIcon` | `String` | 模块菜单标题/图标 |
 | `menuSort` | `Integer` | 菜单排序 |
@@ -97,6 +97,20 @@
 | `sort` | `Integer` | 排序 |
 | `hideInMenu` | `boolean` | 保留路由但不出现在导航（详情页等） |
 | `publicAccess` | `boolean` | **免登录公开路由**；需对应后端端点也不要求权限，宿主会将其注册为未登录可访问的顶级路由 |
+| `siteNav` | `boolean` | 注入 CMS 公开站头导航；仅 `publicAccess=true` 时生效，使用站点 chrome |
+
+## PluginGlobalWidget —— 全局挂件
+
+`context.registerGlobalWidget(widget)`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `code` | `String` | 挂件编码，插件内唯一 |
+| `component` | `String` | 远程模块 routes 映射中的组件键 |
+| `permission` | `String` | 可见所需权限；空表示登录即可见 |
+| `sort` | `int` | 排序，默认 500 |
+
+宿主登录后的控制台布局会主动加载对应前端模块并常驻渲染该组件。manifest 对匿名访客不下发挂件。
 
 ---
 
@@ -109,9 +123,10 @@
 | `@PluginCapability` | `PluginCapabilityItem` | `registerCapability` |
 | `@PluginDashboardCard` | `PluginDashboardCard` | `registerDashboardCard` |
 | `@PluginFrontend` + `@PluginRoute` | `PluginFrontendModule` + `PluginFrontendRoute` | `registerFrontend` |
+| `@PluginGlobalWidget` | `PluginGlobalWidget` | `registerGlobalWidget` |
 
 注解由宿主启动时扫描注册；编程式注册适合运行期动态构造（依赖配置、循环生成等）。
 
 ---
 
-> 源码引用：`.../plugin/spi/{menu,permission,capability,dashboard,frontend}/` 各 record；前端加载链路见 [前端生产形态](/plugin/frontend-remote)
+> 源码引用：`.../plugin/spi/{menu,permission,capability,dashboard,frontend,widget}/` 各 record；前端加载链路见 [前端生产形态](/plugin/frontend-remote)

@@ -21,7 +21,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph 模式一：成品使用
-        A1[官方镜像 backend/frontend/render-server] --> A2[docker compose 起栈]
+        A1[官方镜像 backend/frontend/render-server/kkfileview] --> A2[docker compose 起栈]
         A2 --> A3[./plugins 目录放入插件 JAR<br/>或后台插件管理上传]
     end
     subgraph 模式二：二次开发
@@ -34,13 +34,14 @@ flowchart LR
 
 ## 模式一：成品使用（Docker Compose）
 
-框架自带用户、角色、部门、菜单、权限、文件、日志、监控、设置、仪表盘等完整后台能力。仓库根目录的 `docker-compose.yml`（不含中间件，MongoDB/Redis 等需自备）使用三个官方镜像：
+框架自带用户、角色、部门、菜单、权限、文件、日志、监控、设置、仪表盘等完整后台能力。仓库根目录的 `docker-compose.yml`（不含中间件，MongoDB/Redis 等需自备）使用官方镜像：
 
 | 镜像 | 角色 | 是否必需 |
 |---|---|---|
 | `registry.yudream.online/yudream/yudreamadmin/backend:latest` | Spring Boot 后端，容器内端口 8080（宿主默认映射 `${BACKEND_PORT:-8080}`） | 必需 |
 | `registry.yudream.online/yudream/yudreamadmin/frontend:latest` | 前端静态站点，nginx 托管 `core-arco-design-vue` 构建产物并支持 history 路由，容器内端口 80（宿主默认映射 `${FRONTEND_PORT:-80}`） | 必需 |
-| `registry.yudream.online/yudream/yudreamadmin/render-server:latest` | 渲染服务（HTML/Markdown/模板 → 图片/PDF），容器内端口 3000，默认映射 `${RENDER_PORT:-3000}` | 可选，对应平台能力"消息渲染"（`PLATFORM_MESSAGE_RENDER_ENABLED`），用于消息卡片、机器人富文本降级、文档证明等场景 |
+| `registry.yudream.online/yudream/yudreamadmin/render-server:latest` | 渲染服务（HTML/Markdown/模板 → 图片/PDF），容器内端口 3000，默认映射 `${RENDER_PORT:-3000}` | 可选，对应平台能力"消息渲染"（`PLATFORM_MESSAGE_RENDER_ENABLED`） |
+| `registry.yudream.online/yudream/yudreamadmin/kkfileview:${KKFILEVIEW_TAG:-5.0.2}` | 文件预览，容器内端口 8012；浏览器经 frontend nginx `/kkfileview/` 同源反代 | 可选，对应平台能力"文件预览"（`PLATFORM_FILE_PREVIEW_ENABLED`） |
 
 镜像 tag 由环境变量控制：`CI_REGISTRY_IMAGE`（默认 `registry.yudream.online/yudream/yudreamadmin`）与 `TAG`（默认 `latest`）。
 
@@ -55,9 +56,10 @@ docker compose up -d
 关键配置项（均可用环境变量覆盖）：
 
 - backend 依赖外部 MongoDB（`MONGO_URI`）与 Redis（`REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`），compose 文件中的值为示例，需按需修改。
-- 各平台能力的项目闸门开关：`PLATFORM_CMS_ENABLED`、`PLATFORM_AI_ENABLED`、`PLATFORM_SSE_ENABLED`、`PLATFORM_MESSAGE_RENDER_ENABLED` 等，见 `docker-compose.yml` 中 `PLATFORM_*` 系列变量。
+- 各平台能力的项目闸门开关：`PLATFORM_CMS_ENABLED`、`PLATFORM_AI_ENABLED`、`PLATFORM_SSE_ENABLED`、`PLATFORM_MESSAGE_RENDER_ENABLED`、`PLATFORM_FILE_PREVIEW_ENABLED`、`PLATFORM_INBOUND_MAIL_ENABLED` 等，见 `docker-compose.yml` 中 `PLATFORM_*` 系列变量。
 - render-server 联动：backend 侧 `MESSAGE_RENDER_BASE_URL=http://render-server:3000`、`MESSAGE_RENDER_TOKEN`；render-server 侧对应 `RENDER_TOKEN`、`RENDER_CONCURRENCY`（默认 2）、`RENDER_TIMEOUT_MS`（默认 30000）。render-server 容器以 `read_only` + `cap_drop: ALL` 等加固配置运行。
-- compose 内置 watchtower 服务，每 300 秒轮询镜像更新并自动重启带 `com.centurylinklabs.watchtower.enable=true` 标签的容器（backend、frontend）。
+- kkFileView 联动：backend 侧 `FILE_PREVIEW_KKFILEVIEW_INTERNAL_URL=http://kkfileview:8012`；浏览器走 frontend nginx `/kkfileview/`，生产可删除 kkFileView 宿主端口映射。
+- compose 内置 watchtower 服务，每 300 秒轮询镜像更新并自动重启带 `com.centurylinklabs.watchtower.enable=true` 标签的容器（backend、frontend、kkfileview）。
 
 ### 用插件 JAR 扩展功能
 
@@ -146,6 +148,7 @@ pnpm --dir yudream-frontend --filter @fantastic-admin/core-arco-design-vue run t
 ## 注意事项
 
 - render-server 虽标为可选，但启用"消息渲染"平台能力（`PLATFORM_MESSAGE_RENDER_ENABLED=true`，compose 默认值）时 backend 会调用 `MESSAGE_RENDER_BASE_URL`，请确保 render-server 已部署或显式关闭该能力。
+- kkFileView 虽标为可选，但启用"文件预览"平台能力（`PLATFORM_FILE_PREVIEW_ENABLED=true`，compose 默认值）时请确保 kkfileview 服务已部署，或显式关闭该能力。
 - 插件 JAR 根必须含权威 `plugin.yml`（`name`/`main`/`version`），否则无法加载；详见 [插件规范](/plugin/specification)。
 - 插件与前端交互中，Java `Long`/Snowflake ID 在 JSON、URL、表单里一律序列化为 **string**，禁止 `Number(id)` 强转造成精度丢失。
 - 中间件（MongoDB、Redis 为必需；RabbitMQ、Neo4j 为可选）不在主 `docker-compose.yml` 内，需自备或使用 `docker-compose.platform.yml`。

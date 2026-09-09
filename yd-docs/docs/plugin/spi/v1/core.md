@@ -67,6 +67,7 @@ public record PluginDescriptor(String code, String name, String version, String 
 | `documents()` | `default PluginDocumentStore documents()` | 插件作用域文档存储，等价于 `framework().documents(pluginCode())` |
 | `files()` | `default PluginFileStore files()` | 插件作用域文件存储 |
 | `secrets()` | `default PluginSecretStore secrets()` | 插件作用域密钥存储（宿主未开启时抛 `UnsupportedOperationException`） |
+| `filePreview()` | `default PluginFilePreviewService filePreview()` | 平台文件预览，等价于 `framework().filePreview()` |
 | `templateRenderer()` | `PluginTemplateRenderService templateRenderer()` | 插件作用域 Thymeleaf 模板渲染（模板位于插件 JAR `templates/`） |
 | `semanticMemory()` | `PluginSemanticMemoryService semanticMemory()` | 语义记忆（向量索引/检索）服务 |
 
@@ -86,6 +87,9 @@ public record PluginDescriptor(String code, String name, String version, String 
 | `registerHttpHandler(method, path, handler)` | `String` / `String` / `PluginHttpHandler` | 编程式注册单个 HTTP 端点，挂载到 `/api/plugins/{pluginCode}/**` |
 | `registerHttpController(controller)` | `Object` | 扫描对象上带 `@PluginHttpEndpoint` 的方法批量注册端点 |
 | `registerAiTool(tool)` | `PluginAiTool` | 注册 AI Agent 可调用的工具 |
+| `registerGlobalWidget(widget)` | `PluginGlobalWidget` | 注册登录后控制台常驻远程挂件；匿名访客不下发 |
+| `registerExtension(type, impl[, priority])` | 扩展点接口 + 实现 | 注册扩展实现，disable/unload 自动回收。详见 [extension](/plugin/spi/v1/extension) |
+| `setMenuVisible(path, visible)` | `String` / `boolean` | 按路由路径调整本插件侧边栏可见性；匹配不到时静默忽略 |
 
 各条目 record 的字段速查见 [registry-items](/plugin/spi/v1/registry-items)；HTTP 相关见 [http](/plugin/spi/v1/http)，注解声明式写法见 [annotations](/plugin/spi/v1/annotations)。
 
@@ -97,6 +101,7 @@ public record PluginDescriptor(String code, String name, String version, String 
 | `service(code, type)` | `<T> Optional<T> service(String pluginCode, Class<T> serviceType)` | 按插件 code + 类型消费其他插件暴露的服务；目标未启用时返回空 `Optional` |
 | `services(type)` | `<T> List<T> services(Class<T> serviceType)` | 获取所有已启用插件暴露的指定类型服务列表 |
 | `dependencyAvailable(code)` | `boolean dependencyAvailable(String pluginCode)` | 判断某插件是否已加载并启用——软依赖条件注册的标准判断依据 |
+| `extensions(type)` | `<I> List<I> extensions(Class<I> extensionPoint)` | 查询某扩展点当前全部已启用实现，按优先级从小到大 |
 
 #### Provider / Consumer 示例
 

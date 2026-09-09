@@ -36,12 +36,20 @@ export interface SystemLogQuery {
   size?: number
 }
 
+export interface SystemLogModuleGroup {
+  label: string
+  modules: string[]
+}
+
 export default {
   page: (params?: SystemLogQuery) => {
     return systemClient.get<unknown, ApiResponse<PageResult<SystemLogItem>>>('api/system/logs', { params })
   },
   modules: () => {
     return systemClient.get<unknown, ApiResponse<string[]>>('api/system/logs/modules')
+  },
+  moduleGroups: () => {
+    return systemClient.get<unknown, ApiResponse<SystemLogModuleGroup[]>>('api/system/logs/module-groups')
   },
   stats: () => {
     return systemClient.get<unknown, ApiResponse<SystemLogStats>>('api/system/logs/stats')

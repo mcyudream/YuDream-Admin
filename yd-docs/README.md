@@ -20,8 +20,8 @@ docs/
   plugin/
     overview|getting-started|specification|frontend-remote
     spi/index.md              SPI 版本清单 + 升级指引 + Coding Agent 增量更新规范
-    spi/v1/                   SPI v1（当前源码 2.24.0）全量教程：core/annotations/http/frontend/framework-services
-    sdk/index.md              @yudream/plugin-sdk 全量 API
+    spi/v1/                   SPI v1（当前源码 2.24.0）全量教程：core / annotations / http / framework-services / file-preview / extension 等
+    sdk/index.md              @yudream/plugin-sdk（npm 1.5.0，运行时行为 1.5.0）
   components/                 组件库文档（element-plus 风格：演示 + 源码 + API 表）
   .vitepress/
     config.ts                 站点配置与侧边栏

@@ -2,6 +2,16 @@
 import type { TableColumn } from '@yudream/components'
 import type { MilkyConnection, MilkyConnectionPayload } from '@/api/modules/platform-milky'
 import apiMilky from '@/api/modules/platform-milky'
+import {
+  ALL_OFFICIAL_INTENTS,
+  OFFICIAL_QQ_BOT_INTENTS,
+  OFFICIAL_QQ_BOT_INTENT_GROUPS,
+  RECOMMENDED_OFFICIAL_INTENTS,
+  officialIntentSelected,
+  selectedOfficialIntentCount,
+  setOfficialIntentGroup,
+  toggleOfficialIntent,
+} from '@/api/modules/official-qqbot-intent-catalog'
 import MilkyChatWorkspace from './components/MilkyChatWorkspace.vue'
 
 const toast = useFaToast()
@@ -12,7 +22,7 @@ const editing = ref<MilkyConnection | null>(null)
 const chatConnection = ref<MilkyConnection | null>(null)
 const chatVisible = ref(false)
 const page = reactive({ page: 1, size: 20, total: 0 })
-const form = reactive<MilkyConnectionPayload>({ name: '', protocol: 'milky', baseUrl: 'http://127.0.0.1:3010', token: '', appId: '', appSecret: '', sandbox: false, commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
+const form = reactive<MilkyConnectionPayload>({ name: '', protocol: 'milky', baseUrl: 'http://127.0.0.1:3010', token: '', appId: '', appSecret: '', sandbox: false, intents: RECOMMENDED_OFFICIAL_INTENTS, commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
 
 const columns: TableColumn<MilkyConnection>[] = [
   { accessorKey: 'name', header: '连接名称', width: 180 },
@@ -46,6 +56,40 @@ function onSandboxChange(value?: boolean) {
   form.baseUrl = value ? 'https://sandbox.api.bot.qq.com' : 'https://api.bot.qq.com'
 }
 
+const officialIntentCount = computed(() => selectedOfficialIntentCount(form.intents))
+const officialIntentTotal = computed(() => OFFICIAL_QQ_BOT_INTENTS.length)
+
+function isOfficialIntentChecked(bit: number) {
+  return officialIntentSelected(form.intents, bit)
+}
+
+function groupIntentCheckedState(bits: number[]): boolean | 'indeterminate' {
+  const selected = bits.filter(bit => officialIntentSelected(form.intents, bit)).length
+  if (selected === 0) {
+    return false
+  }
+  if (selected === bits.length) {
+    return true
+  }
+  return 'indeterminate'
+}
+
+function toggleOfficialIntentBit(bit: number, checked: boolean | 'indeterminate' | null | undefined) {
+  form.intents = toggleOfficialIntent(form.intents, bit, checked === true)
+}
+
+function toggleOfficialIntentGroupBits(bits: number[], checked: boolean | 'indeterminate' | null | undefined) {
+  form.intents = setOfficialIntentGroup(form.intents, bits, checked === true ? bits : [])
+}
+
+function selectRecommendedOfficialIntents() {
+  form.intents = RECOMMENDED_OFFICIAL_INTENTS
+}
+
+function selectAllOfficialIntents() {
+  form.intents = ALL_OFFICIAL_INTENTS
+}
+
 function emptyForm(protocol: MilkyConnectionPayload['protocol'] = 'milky'): MilkyConnectionPayload {
   return {
     name: '',
@@ -55,6 +99,7 @@ function emptyForm(protocol: MilkyConnectionPayload['protocol'] = 'milky'): Milk
     appId: '',
     appSecret: '',
     sandbox: false,
+    intents: protocol === 'official' ? RECOMMENDED_OFFICIAL_INTENTS : undefined,
     commandMenuImageMode: 'base64',
     commandMenuPublicBaseUrl: '',
   }
@@ -76,6 +121,7 @@ function openEdit(connection: MilkyConnection) {
     appId: connection.appId || '',
     appSecret: '',
     sandbox: !!connection.sandbox,
+    intents: connection.intents ?? RECOMMENDED_OFFICIAL_INTENTS,
     commandMenuImageMode: connection.commandMenuImageMode || 'base64',
     commandMenuPublicBaseUrl: connection.commandMenuPublicBaseUrl || '',
   })
@@ -227,6 +273,39 @@ onMounted(load)
           <a-form-item label="API 地址">
             <FaInput v-model="form.baseUrl" placeholder="https://api.bot.qq.com" />
           </a-form-item>
+          <a-form-item label="订阅事件">
+            <div class="intent-picker">
+              <div class="intent-picker-meta">
+                <span>已选 {{ officialIntentCount }} / {{ officialIntentTotal }} 类</span>
+                <div class="intent-picker-actions">
+                  <FaButton size="sm" variant="ghost" @click="selectRecommendedOfficialIntents">推荐</FaButton>
+                  <FaButton size="sm" variant="ghost" @click="selectAllOfficialIntents">全选</FaButton>
+                </div>
+              </div>
+              <div v-for="group in OFFICIAL_QQ_BOT_INTENT_GROUPS" :key="group.label" class="intent-group">
+                <FaCheckbox
+                  :model-value="groupIntentCheckedState(group.intents.map(intent => intent.bit))"
+                  class="intent-group-title"
+                  @update:model-value="checked => toggleOfficialIntentGroupBits(group.intents.map(intent => intent.bit), checked)"
+                >
+                  {{ group.label }}
+                </FaCheckbox>
+                <div class="intent-group-items">
+                  <FaCheckbox
+                    v-for="intent in group.intents"
+                    :key="intent.code"
+                    :model-value="isOfficialIntentChecked(intent.bit)"
+                    @update:model-value="checked => toggleOfficialIntentBit(intent.bit, checked)"
+                  >
+                    <span>
+                      <span class="intent-label">{{ intent.label }}</span>
+                      <span class="intent-desc">{{ intent.description }}</span>
+                    </span>
+                  </FaCheckbox>
+                </div>
+              </div>
+            </div>
+          </a-form-item>
         </template>
         <template v-else>
           <a-form-item label="Milky HTTP 地址" required>
@@ -256,3 +335,60 @@ onMounted(load)
     </FaModal>
   </div>
 </template>
+
+<style scoped>
+.intent-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+}
+
+.intent-picker-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.intent-picker-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.intent-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.intent-group-title {
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.intent-group-items {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding-left: 22px;
+}
+
+.intent-label {
+  display: block;
+  color: var(--color-text-1);
+}
+
+.intent-desc {
+  display: block;
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+</style>

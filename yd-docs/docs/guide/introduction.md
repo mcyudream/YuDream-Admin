@@ -1,6 +1,6 @@
 # 框架概览
 
-**YuDream Admin** 是一套企业级管理后台框架：后端为 YuDream 原创实现，采用 DDD 五模块分层（JDK 21 + Spring Boot 3.5）；前端使用 [Fantastic-admin](https://fantastic-admin.hurui.me/) 构建 Vue 3 Monorepo。前端组件中，`Fa*` 为 Fantastic-admin 框架自带组件，只有 `FaResponsiveTable` 是 YuDream 原创例外；`Yd*` 为 YuDream 原创组件与 composable，不按 AI/非 AI 区分。项目同时内置一套完整的**插件体系**与 **15 项可按需加载的平台能力**。它有两种使用方式——作为**成品**直接部署、用插件扩展业务；或作为**主框架**克隆源码二次开发。
+**YuDream Admin** 是一套企业级管理后台框架：后端为 YuDream 原创实现，采用 DDD 五模块分层（JDK 21 + Spring Boot 3.5）；前端使用 [Fantastic-admin](https://fantastic-admin.hurui.me/) 构建 Vue 3 Monorepo。前端组件中，`Fa*` 为 Fantastic-admin 框架自带组件，只有 `FaResponsiveTable` 是 YuDream 原创例外；`Yd*` 为 YuDream 原创组件与 composable，不按 AI/非 AI 区分。项目同时内置一套完整的**插件体系**与 **17 项可按需加载的平台能力**。它有两种使用方式——作为**成品**直接部署、用插件扩展业务；或作为**主框架**克隆源码二次开发。
 
 ## 定位与价值
 
@@ -11,7 +11,7 @@
 
 ## 特性矩阵
 
-### 平台能力（15 项）
+### 平台能力（17 项）
 
 所有平台能力的项目闸门配置形如 `yudream.platform.capabilities.<code>.enabled`，多数同时支持环境变量覆盖：
 
@@ -30,8 +30,10 @@
 | `document-template` | `PLATFORM_DOCUMENT_TEMPLATE_ENABLED` | Word 文档模板生成（POI） |
 | `integration` | `PLATFORM_INTEGRATION_ENABLED` | HTTP 集成 |
 | `dataviz` | `PLATFORM_DATAVIZ_ENABLED` | 数据可视化 |
-| `milky` | `PLATFORM_MILKY_ENABLED` | Milky 机器人平台接入 |
+| `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与腾讯官方 OpenAPI v2 共用出站端口 |
 | `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
+| `file-preview` | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览（Office / PSD / 压缩包等） |
+| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，供插件按发件域与验证码核验 |
 
 能力间依赖（如 `wiki` 依赖 `ai` 与 `neo4j`）声明在 `CapabilityDescriptor.dependencies`，禁用一个依赖会级联禁用所有依赖方。机制详解见 [平台能力](/guide/platform-capabilities)。
 
@@ -72,14 +74,14 @@ GrapesJS 拖拽构建 + 完整发布闭环：权限菜单、管理路由、公�
 flowchart LR
     A[YuDream Admin] --> B["方式一：成品 + 插件扩展"]
     A --> C["方式二：二次开发主框架"]
-    B --> B1["docker compose 拉起<br/>backend / frontend / render-server"]
+    B --> B1["docker compose 拉起<br/>backend / frontend / render-server / kkfileview"]
     B1 --> B2["后台插件管理安装插件 JAR"]
     C --> C1["克隆源码<br/>JDK 21 + Maven / Node + pnpm"]
     C1 --> C2["修改平台能力与业务模块<br/>构建自有镜像"]
     C2 --> B2
 ```
 
-- **方式一**：不需要改任何源码。三个官方镜像（backend 必需、frontend 必需、render-server 可选）部署后，通过插件商店或自研插件扩展业务。适合"成熟后台 + 若干自定义业务"的团队。
+- **方式一**：不需要改任何源码。官方镜像（backend 必需、frontend 必需、render-server 与 kkfileview 按能力可选）部署后，通过插件商店或自研插件扩展业务。适合"成熟后台 + 若干自定义业务"的团队。
 - **方式二**：需要修改主框架本身（新增平台能力、调整系统行为、深度定制 UI）时克隆源码开发，产物仍保留完整插件体系，两种方式可随时组合切换。
 
 镜像与编排细节见 [两种使用方式](/guide/usage-modes) 与 [部署](/guide/deployment)。
@@ -121,4 +123,4 @@ flowchart LR
 
 ---
 
-> 源码引用：`pom.xml`（后端依赖与版本）、`yudream-bootstrap/src/main/resources/application.yml`（15 项平台能力开关）、`docker-compose.yml`（镜像与环境变量）、`yudream-frontend/package.json` / `yudream-frontend/pnpm-workspace.yaml`（前端版本）、`yudream-render-server/package.json`（渲染服务版本）。
+> 源码引用：`pom.xml`（后端依赖与版本）、`yudream-bootstrap/src/main/resources/application.yml`（17 项平台能力开关）、`docker-compose.yml`（镜像与环境变量）、`yudream-frontend/package.json` / `yudream-frontend/pnpm-workspace.yaml`（前端版本）、`yudream-render-server/package.json`（渲染服务版本）。

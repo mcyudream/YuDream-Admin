@@ -66,7 +66,7 @@ version: 1.0.0
 )
 @PluginFrontend(
         moduleName = "demoPlugin",
-        sdkVersion = "1.3.0",
+        sdkVersion = "1.5.0",
         menuTitle = "演示插件",
         menuIcon = "i-ri:puzzle-2-line",
         menuSort = 20,
@@ -120,7 +120,7 @@ PluginUserProfile profile = context.framework()
         .orElse(null);
 ```
 
-常用端口：`framework().users()` / `.security()` / `.mail()` / `.render()` / `.ai()` / `.messaging()`，以及 `context.files()` / `context.documents()` / `context.templateRenderer()`。完整列表见 [FrameworkServices 参考](/plugin/spi/v1/framework-services)。
+常用端口：`framework().users()` / `.security()` / `.mail()` / `.inboundMail()` / `.render()` / `.ai()` / `.messaging()` / `.filePreview()`，以及 `context.files()` / `context.documents()` / `context.templateRenderer()`。完整列表见 [FrameworkServices 参考](/plugin/spi/v1/framework-services)。
 
 插件前端选择器不要再包一层 HTTP 去转发这些目录：消息连接/群用 `sdk.messaging`，用户/部门/角色用 `sdk.users`，Agent/供应商用 `sdk.ai`。详见 [@yudream/plugin-sdk](/plugin/sdk/)。
 
