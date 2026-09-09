@@ -10,7 +10,6 @@ import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.file.assembler.FileWebAssembler;
 import online.yudream.base.interfaces.system.file.res.FileObjectRes;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +26,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/files")
@@ -68,9 +66,19 @@ public class FileController {
         return contentResponse(id, content);
     }
 
+    @GetMapping("/{id}/content/thumb")
+    public ResponseEntity<InputStreamResource> thumb(@PathVariable Long id) {
+        return contentResponse(id, fileAppService.thumbnailContent(id));
+    }
+
     @GetMapping("/public/{id}/content")
     public ResponseEntity<InputStreamResource> publicContent(@PathVariable Long id) {
         return contentResponse(id, fileAppService.publicContent(id));
+    }
+
+    @GetMapping("/public/{id}/content/thumb")
+    public ResponseEntity<InputStreamResource> publicThumb(@PathVariable Long id) {
+        return contentResponse(id, fileAppService.publicThumbnailContent(id));
     }
 
     private ResponseEntity<InputStreamResource> contentResponse(Long id, FileContentDTO content) {
@@ -79,10 +87,11 @@ public class FileController {
                 : MediaType.APPLICATION_OCTET_STREAM;
         String fileName = StringUtils.hasText(content.getOriginalName()) ? content.getOriginalName() : id.toString();
         String encodedName = URLEncoder.encode(fileName, StandardCharsets.UTF_8).replace("+", "%20");
+        // 文件 ID 对应内容不可变，长缓存避免列表封面反复打满浏览器连接。
         return ResponseEntity.ok()
                 .contentType(mediaType)
                 .contentLength(content.getContentLength() == null ? -1 : content.getContentLength())
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(10)).cachePublic())
+                .header(HttpHeaders.CACHE_CONTROL, "public, max-age=2592000, immutable")
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + encodedName)
                 .body(new InputStreamResource(content.getInputStream()));
     }

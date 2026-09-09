@@ -9,7 +9,7 @@ import { toBackendAssetUrl } from '@/utils/backend-url'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
-export const YUDREAM_PLUGIN_SDK_VERSION = '1.3.0'
+export const YUDREAM_PLUGIN_SDK_VERSION = '1.5.0'
 
 export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
   const accountStore = useAppAccountStore()
@@ -58,6 +58,9 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
         }
       },
       assetUrl: toBackendAssetUrl,
+      thumbUrl(url, _options) {
+        return toBackendAssetUrl(toFileThumbPath(url))
+      },
     },
     assets: {
       url(path: string) {
@@ -117,6 +120,18 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
       },
     },
   }
+}
+
+function toFileThumbPath(url?: string) {
+  const raw = (url || '').trim()
+  if (!raw) {
+    return ''
+  }
+  const match = raw.match(/^(.*\/api\/files\/(?:public\/)?\d+\/content)(?:\?.*)?$/i)
+  if (!match) {
+    return raw
+  }
+  return `${match[1]}/thumb`
 }
 
 declare global {

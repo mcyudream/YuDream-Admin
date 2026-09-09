@@ -102,6 +102,7 @@ flowchart TD
 - 热重载只重建本插件 ClassLoader；硬/软依赖提供者必须已启用，依赖方遇到 ABI 变化需手动重载。
 - 开发模式插件不要走市场安装/更新/回滚流程；删除插件记录不会删除源码目录。
 - Windows 下 `compile-command` 需要 `mvn` 在 PATH 中，否则填绝对路径。
+- 自动编译进程默认跟随**宿主 JVM** 的 JDK，而不是系统 `JAVA_HOME`。系统 JAVA_HOME 指向 JDK 17 时，不跟随宿主会出现 `invalid target release: 21`。修改后需重启宿主生效。
 
 ## 3. 开发者调试浮窗
 

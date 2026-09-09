@@ -54,7 +54,7 @@ flowchart TB
 
 | 通道 | 前缀 | 鉴权 | 用途 |
 |---|---|---|---|
-| 公开站点 | `/api/public/wiki` | 免登录（仅已发布空间） | 面向访客的知识库站点渲染 |
+| 公开站点 | `/api/public/wiki` | 免登录（仅已发布空间） | 面向访客的知识库站点渲染；文档页移动端为悬浮按钮 + 左侧目录抽屉 |
 | 开放 API | `/api/open/wiki` | **API Key** | 第三方系统检索知识库；由 `ApiKeyAuthenticationContext` 完成鉴权，密钥管理见 [API Key](/security/api-key) |
 
 ## RAG 问答链路

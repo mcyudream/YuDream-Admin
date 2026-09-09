@@ -39,6 +39,7 @@ flowchart TB
     end
 
     RS[render-server<br/>Fastify + Playwright 渲染服务]
+    KV[kkfileview<br/>文件预览]
 
     UI --> IF
     PluginUI -.->|宿主注入 SDK| IF
@@ -50,6 +51,7 @@ flowchart TB
     INFRA -->|实现 SPI 端口并加载| Plugins
     Plugins -.->|仅编译期依赖| SPI
     IF --> RS
+    UI -->|/kkfileview/| KV
 ```
 
 模块清单以根 `pom.xml` 的 `<modules>` 为准：`yudream-plugins/yudream-plugin-spi`、`yudream-domain`、`yudream-application`、`yudream-interfaces`、`yudream-infrastructure`、`yudream-bootstrap`。

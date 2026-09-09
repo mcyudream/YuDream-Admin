@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import apiSystemLog from '@/api/modules/system-log'
-import type { SystemLogItem } from '@/api/modules/system-log'
+import type { SystemLogItem, SystemLogModuleGroup } from '@/api/modules/system-log'
 import { saveExcelResponse } from '@/utils/excel'
 
 const MAX_ROWS = 1000
@@ -14,6 +14,8 @@ const followTail = ref(true)
 const settingsOpen = ref(false)
 const rows = ref<SystemLogItem[]>([])
 const moduleOptions = ref<string[]>([])
+const moduleGroups = ref<SystemLogModuleGroup[]>([])
+const modulePickerOpen = ref(false)
 const stats = reactive({ size: 0, droppedCount: 0, maxEntries: 10000 })
 const expanded = ref<Set<number>>(new Set())
 const logPanel = ref<HTMLElement | null>(null)
@@ -48,9 +50,27 @@ const transportOptions = [
   { label: 'Socket（Docker Engine API）', value: 'socket' },
 ]
 
-const moduleSelectOptions = computed(() => moduleOptions.value.map(name => ({ label: name, value: name })))
+const groupedModuleOptions = computed<SystemLogModuleGroup[]>(() => {
+  if (moduleGroups.value.length) {
+    return moduleGroups.value
+  }
+  if (!moduleOptions.value.length) {
+    return []
+  }
+  return [{ label: '全部', modules: moduleOptions.value }]
+})
 
 const modulesQuery = computed(() => filters.modules.join(','))
+
+const moduleFilterLabel = computed(() => {
+  if (!filters.modules.length) {
+    return '全部模块'
+  }
+  if (filters.modules.length === 1) {
+    return filters.modules[0]
+  }
+  return `已选 ${filters.modules.length} 类`
+})
 
 const toast = useFaToast()
 const modal = useFaModal()
@@ -68,10 +88,66 @@ onBeforeUnmount(() => {
 
 async function loadModules() {
   try {
-    const res = await apiSystemLog.modules()
-    moduleOptions.value = res.data || []
+    const [modulesRes, groupsRes] = await Promise.all([
+      apiSystemLog.modules(),
+      apiSystemLog.moduleGroups().catch(() => ({ data: [] as SystemLogModuleGroup[] })),
+    ])
+    moduleOptions.value = modulesRes.data || []
+    moduleGroups.value = groupsRes.data || []
   }
   catch { /* 模块列表加载失败不阻塞页面 */ }
+}
+
+function groupCheckedState(modules: string[]): boolean | 'indeterminate' {
+  if (!modules.length) {
+    return false
+  }
+  const selected = modules.filter(module => filters.modules.includes(module)).length
+  if (selected === 0) {
+    return false
+  }
+  if (selected === modules.length) {
+    return true
+  }
+  return 'indeterminate'
+}
+
+function isModuleChecked(module: string) {
+  return filters.modules.includes(module)
+}
+
+function toggleGroup(modules: string[], checked: boolean | 'indeterminate' | null | undefined) {
+  const selected = new Set(filters.modules)
+  if (checked === true) {
+    modules.forEach(module => selected.add(module))
+  }
+  else {
+    modules.forEach(module => selected.delete(module))
+  }
+  filters.modules = [...selected]
+  void applyFilters()
+}
+
+function toggleModule(module: string, checked: boolean | 'indeterminate' | null | undefined) {
+  const selected = new Set(filters.modules)
+  if (checked === true) {
+    selected.add(module)
+  }
+  else {
+    selected.delete(module)
+  }
+  filters.modules = [...selected]
+  void applyFilters()
+}
+
+function selectAllModules() {
+  filters.modules = groupedModuleOptions.value.flatMap(group => group.modules)
+  void applyFilters()
+}
+
+function clearSelectedModules() {
+  filters.modules = []
+  void applyFilters()
 }
 
 async function loadStats() {
@@ -337,7 +413,39 @@ async function saveDockerSettings() {
 
       <div class="log-toolbar">
         <FaSelect v-model="filters.level" :options="levelOptions" placeholder="日志级别" class="toolbar-level" @change="applyFilters" />
-        <FaSelect v-model="filters.modules" multiple :options="moduleSelectOptions" placeholder="模块筛选" class="toolbar-module" @change="applyFilters" />
+        <FaPopover v-model:open="modulePickerOpen" class="module-picker-popover" align="start">
+          <FaButton variant="outline" class="toolbar-module-trigger">
+            <span class="module-trigger-label">{{ moduleFilterLabel }}</span>
+            <FaIcon name="i-ri:arrow-down-s-line" />
+          </FaButton>
+          <template #panel>
+            <div class="module-picker">
+              <div class="module-picker-actions">
+                <FaButton size="sm" variant="ghost" @click="selectAllModules">全选</FaButton>
+                <FaButton size="sm" variant="ghost" @click="clearSelectedModules">清空</FaButton>
+              </div>
+              <div v-for="group in groupedModuleOptions" :key="group.label" class="module-group">
+                <FaCheckbox
+                  :model-value="groupCheckedState(group.modules)"
+                  class="module-group-title"
+                  @update:model-value="checked => toggleGroup(group.modules, checked)"
+                >
+                  {{ group.label }}
+                </FaCheckbox>
+                <div class="module-group-items">
+                  <FaCheckbox
+                    v-for="module in group.modules"
+                    :key="module"
+                    :model-value="isModuleChecked(module)"
+                    @update:model-value="checked => toggleModule(module, checked)"
+                  >
+                    {{ module }}
+                  </FaCheckbox>
+                </div>
+              </div>
+            </div>
+          </template>
+        </FaPopover>
         <FaInput v-model="filters.keyword" placeholder="关键字（消息 / logger / 异常）" clearable class="toolbar-keyword" @clear="applyFilters" />
         <FaButton variant="outline" @click="applyFilters">
           筛选
@@ -447,8 +555,57 @@ async function saveDockerSettings() {
   width: 150px;
 }
 
-.toolbar-module {
+.toolbar-module-trigger {
   width: 240px;
+  justify-content: space-between;
+}
+
+.module-trigger-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.module-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+  max-height: 360px;
+  overflow: auto;
+  padding: 4px;
+}
+
+.module-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.module-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-2);
+}
+
+.module-group:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.module-group-title {
+  color: var(--color-text-1);
+  font-weight: 600;
+}
+
+.module-group-items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  padding-left: 22px;
 }
 
 .toolbar-keyword {

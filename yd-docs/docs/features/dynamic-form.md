@@ -71,7 +71,7 @@ Excel 导出走既有支撑设施：应用层组装 `FormSubmissionExportDTO`，
 - `POST /api/public/forms/{code}/submissions` — 提交表单数据；若请求方已登录（`StpUtil.isLogin()`）自动关联 `submitterId`，否则匿名，客户端 IP 取 `X-Forwarded-For` 首段兜底 `remoteAddr`；
 - `POST /api/public/forms/{code}/files` — 表单附件上传，走 `FileAppService` 公开上传通道，返回 `FileObjectRes`。
 
-统计接口（`statistics`）在应用层限制最多扫描 5000 条提交（`STAT_SUBMISSION_LIMIT`），输出总量、今日、近 7 天以及逐字段的填写数/空白数/Top 值；导出上限为 10000 条（`EXPORT_SUBMISSION_LIMIT`）。
+统计接口（`statistics`）在应用层限制最多扫描 5000 条提交（`STAT_SUBMISSION_LIMIT`），输出总量、今日、近 7 天以及逐字段的填写数/空白数/Top 值；导出上限为 10000 条（`EXPORT_SUBMISSION_LIMIT`）。导出可打包附件为 ZIP，Excel 保留原始文件名；上传不再使用 60 秒超时，大小上限可在能力配置中调整。
 
 ## 前端实现
 

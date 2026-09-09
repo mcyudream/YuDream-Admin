@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.file.query.FileObjectPageQuery;
 import online.yudream.base.application.system.file.dto.FileContentDTO;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
+import online.yudream.base.application.system.file.support.ImageThumbnailSupport;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.file.aggregate.FileObject;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -34,6 +36,7 @@ public class FileAppService {
         String safeModule = StringUtils.hasText(module) ? module.trim() : "common";
         String objectKey = buildObjectKey(safeModule, originalName);
         objectStorage.put(objectKey, inputStream, size, contentType);
+        storeThumbnail(objectKey, originalName, contentType);
         FileObject saved = fileObjectRepo.save(FileObject.builder()
                 .bucket(objectStorage.bucket())
                 .objectKey(objectKey)
@@ -87,11 +90,18 @@ public class FileAppService {
 
     @Transactional(readOnly = true)
     public FileContentDTO publicContent(Long id) {
-        FileObject fileObject = getActiveFile(id);
-        if (!Boolean.TRUE.equals(fileObject.getPublicAccess())) {
-            throw new BizException("文件未开放公开访问");
-        }
+        FileObject fileObject = requirePublicFile(id);
         return readContent(fileObject);
+    }
+
+    @Transactional(readOnly = true)
+    public FileContentDTO thumbnailContent(Long id) {
+        return thumbnailContent(getActiveFile(id));
+    }
+
+    @Transactional(readOnly = true)
+    public FileContentDTO publicThumbnailContent(Long id) {
+        return thumbnailContent(requirePublicFile(id));
     }
 
     private FileContentDTO readContent(FileObject fileObject) {
@@ -104,10 +114,91 @@ public class FileAppService {
                 .build();
     }
 
+    private FileContentDTO thumbnailContent(FileObject fileObject) {
+        if (!ImageThumbnailSupport.rasterizable(fileObject.getOriginalName(), fileObject.getContentType())) {
+            return readContent(fileObject);
+        }
+        String thumbKey = ImageThumbnailSupport.thumbnailObjectKey(fileObject.getObjectKey());
+        try {
+            StoredObject stored = objectStorage.get(thumbKey);
+            return FileContentDTO.builder()
+                    .originalName(ImageThumbnailSupport.THUMB_FILENAME)
+                    .contentType(ImageThumbnailSupport.THUMB_CONTENT_TYPE)
+                    .contentLength(stored.contentLength())
+                    .inputStream(stored.inputStream())
+                    .build();
+        }
+        catch (BizException ignored) {
+            FileContentDTO generated = generateAndStoreThumbnail(fileObject, thumbKey);
+            return generated == null ? readContent(fileObject) : generated;
+        }
+    }
+
+    private void storeThumbnail(String objectKey, String originalName, String contentType) {
+        if (!ImageThumbnailSupport.rasterizable(originalName, contentType)) {
+            return;
+        }
+        try {
+            StoredObject stored = objectStorage.get(objectKey);
+            try (InputStream in = stored.inputStream()) {
+                byte[] jpeg = ImageThumbnailSupport.thumbnailJpeg(in);
+                if (jpeg == null || jpeg.length == 0) {
+                    return;
+                }
+                objectStorage.put(ImageThumbnailSupport.thumbnailObjectKey(objectKey),
+                        new ByteArrayInputStream(jpeg), jpeg.length, ImageThumbnailSupport.THUMB_CONTENT_TYPE);
+            }
+        }
+        catch (Exception ignored) {
+            // 首次列表请求再补生成
+        }
+    }
+
+    private FileContentDTO generateAndStoreThumbnail(FileObject fileObject, String thumbKey) {
+        StoredObject original = objectStorage.get(fileObject.getObjectKey());
+        try (InputStream in = original.inputStream()) {
+            byte[] jpeg = ImageThumbnailSupport.thumbnailJpeg(in);
+            if (jpeg == null || jpeg.length == 0) {
+                return null;
+            }
+            objectStorage.put(thumbKey, new ByteArrayInputStream(jpeg), jpeg.length, ImageThumbnailSupport.THUMB_CONTENT_TYPE);
+            return FileContentDTO.builder()
+                    .originalName(ImageThumbnailSupport.THUMB_FILENAME)
+                    .contentType(ImageThumbnailSupport.THUMB_CONTENT_TYPE)
+                    .contentLength((long) jpeg.length)
+                    .inputStream(new ByteArrayInputStream(jpeg))
+                    .build();
+        }
+        catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void deleteThumbnail(String objectKey) {
+        String thumbKey = ImageThumbnailSupport.thumbnailObjectKey(objectKey);
+        if (thumbKey == null) {
+            return;
+        }
+        try {
+            objectStorage.delete(thumbKey);
+        }
+        catch (RuntimeException ignored) {
+        }
+    }
+
+    private FileObject requirePublicFile(Long id) {
+        FileObject fileObject = getActiveFile(id);
+        if (!Boolean.TRUE.equals(fileObject.getPublicAccess())) {
+            throw new BizException("文件未开放公开访问");
+        }
+        return fileObject;
+    }
+
     @Transactional
     public void delete(Long id) {
         FileObject fileObject = getActiveFile(id);
         objectStorage.delete(fileObject.getObjectKey());
+        deleteThumbnail(fileObject.getObjectKey());
         fileObject.markDeleted();
         fileObjectRepo.save(fileObject);
     }

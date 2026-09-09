@@ -1,6 +1,7 @@
 package online.yudream.base.infra.system.log.impl;
 
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
+import online.yudream.base.domain.system.log.model.SystemLogModuleGroup;
 import online.yudream.base.domain.system.log.model.SystemLogQuery;
 import online.yudream.base.domain.system.log.repo.SystemLogRepo;
 import online.yudream.base.infra.system.log.service.LogModuleResolver;
@@ -25,9 +26,29 @@ public class SystemLogRepoImpl implements SystemLogRepo {
 
     @Override
     public List<String> modules() {
-        Set<String> modules = new LinkedHashSet<>(moduleResolver.knownModules());
+        Set<String> modules = new LinkedHashSet<>();
+        for (LogModuleResolver.ModuleGroup group : moduleResolver.knownModuleGroups()) {
+            modules.addAll(group.modules());
+        }
         modules.addAll(SystemLogBuffer.instance().observedModules());
         return new ArrayList<>(modules);
+    }
+
+    @Override
+    public List<SystemLogModuleGroup> moduleGroups() {
+        List<SystemLogModuleGroup> groups = new ArrayList<>();
+        Set<String> known = new LinkedHashSet<>();
+        for (LogModuleResolver.ModuleGroup group : moduleResolver.knownModuleGroups()) {
+            groups.add(new SystemLogModuleGroup(group.label(), group.modules()));
+            known.addAll(group.modules());
+        }
+        List<String> extra = SystemLogBuffer.instance().observedModules().stream()
+                .filter(module -> !known.contains(module))
+                .toList();
+        if (!extra.isEmpty()) {
+            groups.add(new SystemLogModuleGroup("其他", extra));
+        }
+        return groups;
     }
 
     @Override

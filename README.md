@@ -30,11 +30,12 @@ YuDream Admin 是一个后端由 YuDream 原创实现的企业级管理平台。
 | 方向 | 能力 |
 | --- | --- |
 | 系统管理 | 用户、角色、部门、菜单、权限、在线用户与安全配置 |
-| 内容与站点 | CMS、可视化页面编辑、发布流程、公开站点与 SEO 元数据 |
+| 内容与站点 | CMS、可视化页面编辑、发布流程、公开站点（含移动端折叠导航）与 SEO 元数据 |
 | 知识与智能 | 知识库检索、文档解析、AI Provider 管理、Agent 应用与可视化工作流 |
-| 集成与自动化 | HTTP、Python 运行时、消息队列、WebSocket、SSE、S3 兼容对象存储 |
+| 消息与通信 | QQ 消息平台（Milky / 官方 OpenAPI）、SSE、WebSocket、入站邮箱核验 |
+| 集成与自动化 | HTTP、Python 运行时、消息队列、S3 兼容对象存储、kkFileView 文件预览 |
 | 数据能力 | 数据可视化、图谱检索、Neo4j 与可选的 RAG 扩展 |
-| 插件生态 | JAR 热加载、动态菜单和权限、后端扩展点、前端 Remote Entry 模块 |
+| 插件生态 | JAR 热加载、动态菜单和权限、登录注册扩展点、前端 Remote Entry 模块 |
 
 ## 为什么使用它
 
@@ -78,6 +79,7 @@ yudream-bootstrap/          Spring Boot 启动模块
 yudream-frontend/           Vue 3 主前端与共享包
 yudream-plugins/            插件 SPI 与示例插件
 plugins/                    运行时加载的外部插件 JAR 目录
+yd-docs/                    在线文档站源码（VitePress）
 docs/                       平台、插件与部署文档
 ```
 
@@ -154,7 +156,7 @@ docker compose pull
 docker compose up -d
 ```
 
-默认会启动后端、前端、渲染服务与镜像更新监控。MongoDB、Redis、S3 兼容存储等依赖需要按照 `.env` 指向可访问的服务。
+默认会启动后端、前端、渲染服务、kkFileView 文件预览与镜像更新监控。MongoDB、Redis、S3 兼容存储等依赖需要按照 `.env` 指向可访问的服务。
 
 可选的 RabbitMQ 与 Neo4j 服务位于 `docker-compose.platform.yml`：
 
@@ -170,7 +172,7 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 - 后端插件依赖 `online.yudream.base:yudream-plugin-spi`。
 - 前端插件使用 `@yudream/plugin-sdk` 与 `@yudream/components`。
 - 插件 JAR 使用根目录 `plugin.yml` 描述元数据，并由运行时管理加载、启用与卸载。
-- 前端插件通过 `remoteEntry.js` 作为远程模块加载到主前端。
+- 前端插件通过 `remoteEntry.js` 作为远程模块加载到主前端；样式统一走声明式 `style.css`（`@yudream/plugin-sdk/uno-config`）。
 
 新建官方插件时，建议从 [插件仓库模板](templates/plugin-repo/README.md) 开始；完整约定见 [插件系统规范](docs/plugin-system/specification.md) 和 [插件开发教程](docs/plugin-system/tutorial.md)。官方业务插件源码位于独立仓库 [yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)。
 

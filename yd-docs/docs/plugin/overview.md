@@ -11,7 +11,9 @@
 | 插件元信息 | JAR 根 `plugin.yml` + `@PluginSpec` | code、名称、版本、描述、依赖；`plugin.yml` 是唯一权威来源 |
 | 权限 | `@PluginPermission`（可重复）或 `context.registerPermission(PluginPermissionItem)` | 用于 HTTP 端点、前端按钮与菜单的访问控制，注册进系统权限管理 |
 | HTTP 接口 | 方法注解 `@PluginHttpEndpoint` 或 `context.registerHttpController(...)` / `registerHttpHandler(...)` | 统一挂载 `/api/plugins/{pluginCode}/**`，自动接入登录态、权限校验与统一响应包装 |
-| 后台菜单 / 前端页面 | `@PluginFrontend` + `@PluginRoute` 或 `context.registerFrontend(PluginFrontendModule)` | 生产环境经 JAR 内 ESM `remoteEntry.js` 动态加载，宿主注入 SDK 与路由上下文 |
+| 后台菜单 / 前端页面 | `@PluginFrontend` + `@PluginRoute` 或 `context.registerFrontend(PluginFrontendModule)` | 生产环境经 JAR 内 ESM `remoteEntry.js` 动态加载，宿主注入 SDK 与路由上下文；公开页可用 `publicAccess` + `siteNav` 注入 CMS 站点导航 |
+| 全局挂件 | `@PluginGlobalWidget` 或 `context.registerGlobalWidget(...)` | 登录后控制台常驻远程组件（网页宠物、全局助手）；匿名访客不下发 |
+| 扩展点 | `context.registerExtension(type, impl[, priority])` | 登录/注册拦截、身份核验等可回收扩展；disable/unload 自动回收 |
 | 首页仪表盘卡片 | `@PluginDashboardCard` 或 `context.registerDashboardCard(...)` | 参与首页 DIY 卡片 |
 | 平台能力 | `@PluginCapability` / `context.registerCapability(PluginCapabilityItem)` | 声明式能力注册，受宿主双闸门（项目闸门 + 应用闸门）管控 |
 | 消息指令 / 消息交互 | `@PluginCommand` / `@PluginCommands`、`context.commands()`、`context.interactions()` | QQ 机器人等消息渠道的指令与交互处理 |
@@ -32,7 +34,10 @@
 | `ai()` | `PluginAiService` | AI 对话与 Agent 执行 |
 | `security()` | `PluginSecurityService` | 权限校验（`hasPermission` / `requirePermission`） |
 | `mail()` | `PluginMailService` | 邮件发送 |
+| `inboundMail()` | `PluginInboundMailService` | IMAPS 入站核验；插件拿不到凭据或正文 |
 | `wordTemplates()` | `PluginWordTemplateService` | Word 模板渲染 |
+| `forms()` | `PluginFormService` | 已发布动态表单查询与提交核验 |
+| `filePreview()` | `PluginFilePreviewService` | 文件预览签名地址与 KKFILE/DIRECT/NONE |
 | `documents(pluginCode)` | `PluginDocumentStore` | 插件私有文档存储 |
 | `files(pluginCode)` | `PluginFileStore` | 插件私有文件存储 |
 | `secrets(pluginCode)` | `PluginSecretStore` | 插件私密切钥存储 |

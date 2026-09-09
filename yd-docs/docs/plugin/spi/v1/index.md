@@ -17,9 +17,12 @@ online.yudream.base.plugin.spi
 │   ├── security          权限校验（PluginSecurityService / PluginPrincipal）
 │   ├── storage           文档存储 / 文件存储
 │   ├── secret            密钥存储
-│   ├── mail              邮件发送
+│   ├── mail              邮件发送 + IMAPS 入站核验
 │   ├── document          Word 文档模板渲染
 │   ├── form              动态表单（已发布表单查询与提交核验）
+│   ├── preview           文件预览（kkFileView + 签名地址）
+│   ├── extension         通用扩展点查询
+│   ├── auth              登录/注册拦截与身份核验
 │   ├── render            HTML/Markdown 渲染成图 + Thymeleaf 模板截图
 │   ├── ai                AI 对话 / Agent / 自定义工具
 │   ├── graph             图数据库（经 PluginContext.graph() 使用平台 Neo4j）
@@ -27,8 +30,8 @@ online.yudream.base.plugin.spi
 │   ├── command           命令注册
 │   └── memory            语义记忆（向量检索）
 ├── http                  插件 HTTP 端点（Request/Response/SSE）
-├── annotation            10 个声明式注解
-└── menu / permission / capability / dashboard / frontend   声明式注册 record
+├── annotation            声明式注解（含 Frontend / Route / GlobalWidget）
+└── menu / permission / capability / dashboard / frontend / widget   声明式注册 record
 ```
 
 ## 端口索引
@@ -36,7 +39,7 @@ online.yudream.base.plugin.spi
 | 文档 | 内容 | 获取方式 |
 |---|---|---|
 | [core](/plugin/spi/v1/core) | YuDreamPlugin 生命周期、PluginContext 全量方法 | 入口类参数注入 |
-| [framework-services](/plugin/spi/v1/framework-services) | FrameworkServices 门面 16 个入口 | `context.framework()` |
+| [framework-services](/plugin/spi/v1/framework-services) | FrameworkServices 门面（含 forms / filePreview / inboundMail） | `context.framework()` |
 | [graph](/plugin/spi/v1/graph) | 当前插件版本化用途化资源图投影的原子替换与分页读取 | `context.graph()` |
 | [user](/plugin/spi/v1/user) | 用户查询/创建、部门角色、QQ 绑定 | `framework().users()` 等 |
 | [security](/plugin/spi/v1/security) | 权限校验、Principal、权限码约定 | `framework().security()` |
@@ -44,12 +47,14 @@ online.yudream.base.plugin.spi
 | [mail](/plugin/spi/v1/mail) | 邮件发送（文本/HTML/抄送密送） | `framework().mail()` |
 | [document-render](/plugin/spi/v1/document-render) | Word 模板、渲染成图、Thymeleaf | `framework().wordTemplates()` 等 |
 | [form](/plugin/spi/v1/form) | 动态表单：已发布表单查询、提交核验 | `framework().forms()` |
+| [file-preview](/plugin/spi/v1/file-preview) | 文件预览：签名地址与 KKFILE/DIRECT/NONE | `context.filePreview()` |
+| [extension](/plugin/spi/v1/extension) | 扩展点注册/查询，登录注册拦截与身份核验 | `registerExtension` / `extensions` |
 | [ai](/plugin/spi/v1/ai) | AI 对话、Agent 调用、自定义 AI 工具 | `framework().ai()`、`registerAiTool` |
 | [messaging](/plugin/spi/v1/messaging) | 消息发送、事件订阅、按钮/命令回调 | `framework().messaging()`、`context.interactions()` |
 | [command](/plugin/spi/v1/command) | 命令注册与分发 | `context.commands()` |
 | [memory](/plugin/spi/v1/memory) | 语义记忆向量检索 | `context.semanticMemory()` |
 | [http](/plugin/spi/v1/http) | HTTP 端点挂载、请求响应模型、SSE | `registerHttpHandler/registerHttpController` |
-| [annotations](/plugin/spi/v1/annotations) | 10 个声明式注解详解 | 标注在插件类/方法上 |
+| [annotations](/plugin/spi/v1/annotations) | 声明式注解详解（含 GlobalWidget、siteNav） | 标注在插件类/方法上 |
 | [registry-items](/plugin/spi/v1/registry-items) | 注册条目 record 字段速查 | 作为 registerXxx 参数 |
 
 ## 统一约定

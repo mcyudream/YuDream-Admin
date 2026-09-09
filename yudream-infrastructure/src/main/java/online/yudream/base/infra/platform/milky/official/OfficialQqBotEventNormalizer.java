@@ -47,7 +47,11 @@ public final class OfficialQqBotEventNormalizer {
             case "GUILD_CREATE", "GUILD_UPDATE", "GUILD_DELETE",
                     "CHANNEL_CREATE", "CHANNEL_UPDATE", "CHANNEL_DELETE" -> notice(type, data, selfId, type.toLowerCase());
             case "READY" -> ready(data, selfId, sessions, connectionId);
-            default -> new MilkyModels.Event(now(data), selfId, type.toLowerCase(), map(data));
+            default -> {
+                Map<String, Object> eventData = new LinkedHashMap<>(map(data));
+                eventData.put("native_type", type);
+                yield new MilkyModels.Event(now(data), selfId, type.toLowerCase(), eventData);
+            }
         };
     }
 
@@ -70,7 +74,10 @@ public final class OfficialQqBotEventNormalizer {
             }
         }
         boolean mentionSelf = directedAtBot(type)
-                || looksLikeBotMention(textContent(data), sessions == null ? null : sessions.selfName(connectionId));
+                || looksLikeBotMention(
+                textContent(data),
+                selfId,
+                sessions == null ? null : sessions.selfName(connectionId));
         String selfName = sessions == null ? null : sessions.selfName(connectionId);
         List<Map<String, Object>> segments = segments(data, selfId, selfName);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -541,17 +548,23 @@ public final class OfficialQqBotEventNormalizer {
     }
 
     static boolean looksLikeBotMention(String content, String selfName) {
+        return looksLikeBotMention(content, null, selfName);
+    }
+
+    static boolean looksLikeBotMention(String content, String selfId, String selfName) {
         if (blank(content)) {
             return false;
         }
         String source = content.trim();
-        if (source.matches("(?is)^<@!?[^>]+>(?:\\s+.*)?$")) {
-            return true;
+        if (!blank(selfId)) {
+            String quoted = java.util.regex.Pattern.quote(selfId.trim());
+            if (source.matches("(?is)^<@!?" + quoted + ">(?:\\s+.*)?$")
+                    || source.matches("(?is)^@" + quoted + "(?:\\s+.*)?$")) {
+                return true;
+            }
         }
-        if (!blank(selfName) && source.matches("(?is)^@" + java.util.regex.Pattern.quote(selfName.trim()) + "(?:\\s+.*)?$")) {
-            return true;
-        }
-        return source.matches("(?is)^@\\S+(?:\\s+.*)?$");
+        return !blank(selfName)
+                && source.matches("(?is)^@" + java.util.regex.Pattern.quote(selfName.trim()) + "(?:\\s+.*)?$");
     }
 
     static String botIdFromMentions(JsonNode data) {
@@ -577,20 +590,20 @@ public final class OfficialQqBotEventNormalizer {
         if (blank(content)) {
             return content;
         }
-        String stripped = content.replaceAll("(?i)<@!?[^>]+>", " ");
-        stripped = stripped.replaceAll("(?i)\\[@?\\d+\\]", " ");
+        String stripped = content;
         if (!blank(selfId)) {
             String quoted = java.util.regex.Pattern.quote(selfId);
             stripped = stripped.replaceAll("(?i)<@!?" + quoted + ">", " ");
             stripped = stripped.replaceAll("(?i)\\[@?" + quoted + "\\]", " ");
             stripped = stripped.replaceAll("(?i)@" + quoted + "\\b", " ");
+        } else {
+            stripped = stripped.replaceFirst("(?i)^\\s*<@!?[^>]+>\\s*", " ");
         }
         if (!blank(selfName)) {
             String quotedName = java.util.regex.Pattern.quote(selfName.trim());
             stripped = stripped.replaceAll("(?i)^\\s*@" + quotedName + "(?:\\s+|$)", " ");
             stripped = stripped.replaceAll("(?i)\\s+@" + quotedName + "(?=\\s|$)", " ");
         }
-        stripped = stripped.replaceAll("(?i)^\\s*@\\S+\\s+", "");
         return stripped.replaceAll("\\s+", " ").trim();
     }
 

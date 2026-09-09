@@ -45,7 +45,7 @@ TYPE。声明前端 remote 模块及路由。
 |---|---|---|---|
 | `entry` | String | `""` | ESM `remoteEntry.js` 相对路径；留空由宿主推导为 `/api/platform/plugins/{pluginCode}/assets/remoteEntry.js`（标准 JAR 布局） |
 | `moduleName` | String | 必填 | Federation 模块名 |
-| `sdkVersion` | String | `""` | 宿主注入 SDK 行为版本。当前宿主为 `1.3.0`（与 `@yudream/plugin-sdk` npm 包版本对齐） |
+| `sdkVersion` | String | `""` | 宿主注入 SDK **行为**版本。当前宿主运行时为 `1.5.0`；npm 包 `@yudream/plugin-sdk` 为 1.5.0（含 `thumbUrl` 与构建期 `./uno-config`） |
 | `integrity` | String | `""` | 资源 SRI 校验值 |
 | `menuTitle` | String | `""` | 插件顶级菜单名 |
 | `menuIcon` | String | `""` | 顶级菜单图标（Iconify 名称） |
@@ -71,6 +71,7 @@ TYPE。声明前端 remote 模块及路由。
 | `sort` | int | 0 | 同级排序，越大越靠前 |
 | `hideInMenu` | boolean | false | 保留路由但从导航隐藏（详情页等上下文页） |
 | `publicAccess` | boolean | false | 免登录公开路由（对应 HTTP 端点也必须免权限） |
+| `siteNav` | boolean | false | 注入 CMS 公开站头导航；仅与 `publicAccess` 同时生效，页面使用站点 chrome 而非后台布局 |
 
 ```java
 routes = {
@@ -176,8 +177,21 @@ METHOD 可重复。把方法声明为消息命令处理器（聊天平台命令�
 ```java
 @PluginCommand(code = "weather", command = "/weather", name = "天气查询",
         description = "查询指定城市天气")
-public void onWeather(PluginCommandContext ctx) { ... }
+	public void onWeather(PluginCommandContext ctx) { ... }
 ```
+
+## @PluginGlobalWidget / @PluginGlobalWidgets
+
+TYPE 可重复。声明登录后控制台布局常驻的远程挂件（网页宠物、全局助手等）。manifest 对匿名访客不下发。
+
+| 属性 | 类型 | 默认 | 说明 |
+|---|---|---|---|
+| `code` | String | 必填 | 挂件编码，插件内唯一 |
+| `component` | String | 必填 | 远程模块 routes 映射中的组件键 |
+| `permission` | String | `""` | 可见所需权限；空表示登录即可见 |
+| `sort` | int | 500 | 排序 |
+
+挂件组件通过 props 接收 `sdk`。编程式注册走 `context.registerGlobalWidget(...)`。
 
 ## 注意事项
 

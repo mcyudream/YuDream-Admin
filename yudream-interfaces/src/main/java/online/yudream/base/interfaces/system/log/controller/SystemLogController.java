@@ -11,6 +11,7 @@ import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.log.assembler.SystemLogWebAssembler;
 import online.yudream.base.interfaces.system.log.request.DockerLogSettingsUpdateRequest;
 import online.yudream.base.interfaces.system.log.res.DockerLogSettingsRes;
+import online.yudream.base.interfaces.system.log.res.SystemLogModuleGroupRes;
 import online.yudream.base.interfaces.system.log.res.SystemLogRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,6 +51,12 @@ public class SystemLogController {
     @PermissionRegister(code = "system:runtime-log:view", name = "查看系统日志", module = "系统管理", desc = "查看系统运行日志")
     public Result<List<String>> modules() {
         return Result.ok(appService.modules());
+    }
+
+    @GetMapping("/module-groups")
+    @PermissionRegister(code = "system:runtime-log:view", name = "查看系统日志", module = "系统管理", desc = "查看系统运行日志")
+    public Result<List<SystemLogModuleGroupRes>> moduleGroups() {
+        return Result.ok(SystemLogWebAssembler.toModuleGroups(appService.moduleGroups()));
     }
 
     @GetMapping("/stats")

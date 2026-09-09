@@ -11,18 +11,20 @@
 - `backend:${TAG:-latest}`：Spring Boot，容器端口 `8080`。
 - `frontend:${TAG:-latest}`：nginx，容器端口 `80`，只需对外发布这个入口。
 - `render-server:${TAG:-latest}`：Fastify + Playwright，容器端口 `3000`，建议只 `expose`，不要映射宿主端口。
+- `kkfileview:${KKFILEVIEW_TAG:-5.0.2}`：文件预览，容器端口 `8012`；浏览器经 frontend nginx 的 `/kkfileview/` 同源反代，生产可删除宿主端口映射。
 - 模板 B 的基础镜像明确为 `docker.io/library/mongo:8.0` 与 `docker.io/library/redis:7.4-alpine`；模板 A 不创建数据库容器。
 
 ```mermaid
 flowchart LR
     U[用户] --> FE[frontend nginx:80]
     FE -->|http://backend:8080/api/| BE[backend:8080]
+    FE -->|/kkfileview/| KV[kkfileview:8012]
     BE -->|MONGO_URI| MG[(MongoDB)]
     BE -->|REDIS_HOST:REDIS_PORT| RD[(Redis)]
     BE -->|http://render-server:3000| RS[render-server:3000]
 ```
 
-四个应用 hostname 是 Compose 服务名：`backend`、`frontend`、`render-server`，模板 B 另有 `mongo`、`redis`。nginx 的 `/api/` 使用 `proxy_pass http://backend:8080/api/`，并透传 WebSocket 升级头；SSE/WebSocket 读写超时为 3600 秒。不要让浏览器或外层网关绕过 frontend 直连 backend。
+五个应用 hostname 是 Compose 服务名：`backend`、`frontend`、`render-server`、`kkfileview`，模板 B 另有 `mongo`、`redis`。nginx 的 `/api/` 使用 `proxy_pass http://backend:8080/api/`，并透传 WebSocket 升级头；`/kkfileview/` 同源反代到 kkFileView。SSE/WebSocket 读写超时为 3600 秒。不要让浏览器或外层网关绕过 frontend 直连 backend。
 
 ### 环境变量完整参考
 
@@ -34,7 +36,9 @@ flowchart LR
 
 | 变量 | 必填 | 作用与源码默认值 |
 |---|---:|---|
-| `TAG` | 否 | 三个应用镜像的版本 tag，默认 `latest`。 |
+| `TAG` | 否 | backend / frontend / render-server 镜像的版本 tag，默认 `latest`。 |
+| `KKFILEVIEW_TAG` | 否 | kkFileView 镜像 tag，默认 `5.0.2`。 |
+| `KKFILEVIEW_PORT` | 否 | kkFileView 宿主映射端口；容器端口固定 `8012`，默认 `8012`，生产建议删除映射。 |
 | `BACKEND_PORT` | 否 | backend 宿主映射端口；容器端口固定 `8080`，默认 `8080`。 |
 | `FRONTEND_PORT` | 否 | frontend nginx 宿主映射端口；容器端口固定 `80`，默认 `80`。生产只发布此入口。 |
 | `RENDER_PORT` | 否 | render-server 宿主映射端口；容器端口固定 `3000`，默认 `3000`，生产建议删除映射。 |
@@ -109,8 +113,10 @@ flowchart LR
 | `PLATFORM_AI_ENABLED` | 否 | AI 能力，默认 `true`。 |
 | `PLATFORM_AGENT_ENABLED` | 否 | Agent 能力，默认 `true`。 |
 | `PLATFORM_DATAVIZ_ENABLED` | 否 | 数据可视化能力，默认 `true`。 |
-| `PLATFORM_MILKY_ENABLED` | 否 | Milky 能力，默认 `true`。 |
+| `PLATFORM_MILKY_ENABLED` | 否 | QQ 消息平台能力，默认 `true`。 |
 | `PLATFORM_MESSAGE_RENDER_ENABLED` | 否 | 消息渲染能力，默认 `true`；启用需 render-server。 |
+| `PLATFORM_FILE_PREVIEW_ENABLED` | 否 | 文件预览能力，默认 `true`；启用需 kkFileView。 |
+| `PLATFORM_INBOUND_MAIL_ENABLED` | 否 | 入站邮箱能力，默认 `true`；启用需 IMAP 配置。 |
 | `YUDREAM_CREDENTIAL_KEY` | 保存任意受管凭据时 | 部署级 AES-256-GCM 主密钥，统一加密 Neo4j、Milky 与插件 SecretStore；必须为 Base64 编码且解码后恰为 32 字节。旧的三个专用变量仅用于历史密文解密，不用于新写入。 |
 
 #### AI、Wiki、Chat 与渲染
@@ -150,8 +156,8 @@ flowchart LR
 |---|---:|---|
 | `YUDREAM_CREDENTIAL_KEY` | 保存插件 SecretStore 时 | 插件 SecretStore 与 Neo4j、Milky 共用的部署级 AES-256-GCM 主密钥；必须为 Base64 编码且解码后恰为 32 字节。 |
 | `PLATFORM_PLUGIN_HOST_VERSION` | 否 | 插件兼容性矩阵中的宿主版本，默认 `1.0.0`。 |
-| `PLATFORM_PLUGIN_SPI_VERSION` | 否 | 插件兼容性矩阵中的 SPI 版本，默认 `2.6.0`。 |
-| `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | 否 | 插件兼容性矩阵中的前端 SDK 版本，默认 `1.0.1`。 |
+| `PLATFORM_PLUGIN_SPI_VERSION` | 否 | 插件兼容性矩阵中的 SPI 版本，默认 `2.13.0`；应与当前宿主 SPI 契约匹配（源码 `2.24.0`）。 |
+| `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | 否 | 插件兼容性矩阵中的前端 SDK 版本，默认 `1.0.1`；运行时行为版本为 `1.5.0`，npm 包为 `1.5.0`。 |
 | `PLATFORM_PLUGIN_STORE_ROOT_URL` | 否 | 插件商店索引 URL，默认 `https://nexus.yudream.online/repository/plugin-store-releases/index.json`。 |
 | `PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS` | 否 | 插件商店连接超时，默认 `5000` 毫秒。 |
 | `PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS` | 否 | 插件商店请求超时，默认 `5000` 毫秒。 |

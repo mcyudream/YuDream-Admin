@@ -15,8 +15,10 @@
 | `PluginContext.graph()` | `PluginGraphService` | 原子替换并按 tableCode + namespace + versionId 分页读取当前插件用途化资源图投影；请求必须提供逻辑图表编码，不接受 Cypher 或 pluginCode |
 | `security()` | `PluginSecurityService` | 权限校验 |
 | `mail()` | `PluginMailService` | 邮件发送 |
+| `inboundMail()` | `default PluginInboundMailService` | IMAPS 入站核验；宿主未提供时 `enabled()` 恒 false |
 | `wordTemplates()` | `PluginWordTemplateService` | Word 模板渲染 |
 | `forms()` | `default PluginFormService` | 动态表单：已发布表单搜索、按 code 取摘要、提交核验；宿主未提供时 `enabled()` 恒 false |
+| `filePreview()` | `default PluginFilePreviewService` | 文件预览：签名地址与 KKFILE/DIRECT/NONE；宿主未提供时预览恒为 NONE |
 | `documents(pluginCode)` | `PluginDocumentStore` | 插件作用域文档存储 |
 | `files(pluginCode)` | `PluginFileStore` | 插件作用域二进制文件存储 |
 | `secrets(pluginCode)` | `default PluginSecretStore` | 密钥存取；宿主未开启时抛 `UnsupportedOperationException` |

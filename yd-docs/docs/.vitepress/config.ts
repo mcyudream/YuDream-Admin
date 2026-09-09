@@ -65,7 +65,9 @@ const featureSidebar = [
       { text: '消息渲染', link: '/features/render' },
       { text: 'Word 文档模板', link: '/features/word-document' },
       { text: '接口文档', link: '/features/api-doc' },
-      { text: '外部系统集成', link: '/features/integration' }
+      { text: '外部系统集成', link: '/features/integration' },
+      { text: '文件预览', link: '/features/file-preview' },
+      { text: '入站邮箱', link: '/features/inbound-mail' }
     ]
   }
 ]
@@ -95,6 +97,8 @@ const spiV1Items = [
   { text: '邮件 MailSpi', link: '/plugin/spi/v1/mail' },
   { text: '文档渲染 DocumentRender', link: '/plugin/spi/v1/document-render' },
   { text: '动态表单 FormSpi', link: '/plugin/spi/v1/form' },
+  { text: '文件预览 FilePreviewSpi', link: '/plugin/spi/v1/file-preview' },
+  { text: '扩展点 ExtensionSpi', link: '/plugin/spi/v1/extension' },
   { text: 'AI 能力 AiSpi', link: '/plugin/spi/v1/ai' },
   { text: '图数据库 GraphSpi', link: '/plugin/spi/v1/graph' },
   { text: '消息 MessagingSpi（Milky / 官方）', link: '/plugin/spi/v1/messaging' },

@@ -83,7 +83,7 @@ public class PublicFilePreviewController {
         ResponseEntity.BodyBuilder builder = ResponseEntity.status(partial ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                 .contentType(mediaType)
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=60")
+                .header(HttpHeaders.CACHE_CONTROL, "private, max-age=86400")
                 .header(HttpHeaders.CONTENT_DISPOSITION,
                         "inline; filename*=UTF-8''" + URLEncoder.encode(displayName, StandardCharsets.UTF_8).replace("+", "%20"));
         if (partial) {

@@ -4,7 +4,7 @@ YuDream Admin 把**非必需的重型能力**全部设计为"平台能力"（pla
 
 与之相对，用户/角色/菜单/安全等**基线能力**属于 `system`，始终可用、不走动态开关。
 
-## 能力清单（15 项）
+## 能力清单（17 项）
 
 | 能力 code | 项目闸门环境变量 | 说明 | 文档 |
 |---|---|---|---|
@@ -23,6 +23,8 @@ YuDream Admin 把**非必需的重型能力**全部设计为"平台能力"（pla
 | `dataviz` | `PLATFORM_DATAVIZ_ENABLED` | 图表定义与数据服务 | [数据可视化](/features/dataviz) |
 | `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与官方 OpenAPI v2 共用出站端口 | [QQ 机器人接入](/features/milky) |
 | `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | HTML/Markdown → 图片渲染（render-server） | [消息渲染](/features/render) |
+| `file-preview` | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览（Office / PSD / 压缩包等） | [文件预览](/features/file-preview) |
+| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，供插件按发件域与验证码核验 | [入站邮箱](/features/inbound-mail) |
 
 ## system vs platform 边界
 
@@ -34,7 +36,7 @@ flowchart TB
         S3["文件 / 日志 / 监控 / 设置 / Excel"]
     end
     subgraph Platform["platform 动态能力（双闸门管控）"]
-        P["15 项能力 Provider<br/>按配置与持久化状态启停"]
+        P["17 项能力 Provider<br/>按配置与持久化状态启停"]
     end
     S -->|"无开关，随主框架启动"| Boot[应用启动]
     P -->|"项目闸门 + 应用闸门"| Boot

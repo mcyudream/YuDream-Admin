@@ -80,6 +80,20 @@ public void onEnable(PluginContext context) {
 - 邮件内容中的换行在纯文本模式下原样保留；HTML 模式由宿主以 UTF-8 发送。
 - 该能力依赖宿主邮件配置可用；未配置 SMTP 时调用会在后台发送阶段失败，建议仅在配置完成后触发（如用户主动操作）。
 
+## 入站核验 PluginInboundMailService
+
+`context.framework().inboundMail()` 返回入站邮箱端口（能力码 `inbound-mail`）。默认实现 `enabled()` 恒 false。插件拿不到凭据或正文。产品说明见 [入站邮箱](/features/inbound-mail)。
+
+| 方法 | 签名 | 说明 |
+|---|---|---|
+| `enabled` | `default boolean enabled()` | 能力是否已启用 |
+| `mailboxId` | `default String mailboxId()` | 当前收件箱标识 |
+| `match` | `default PluginInboundMailMatch match(PluginInboundMailQuery query)` | 只读匹配 |
+
+`PluginInboundMailQuery(mailboxId, verificationCode, allowedFromDomains, requiredKeywords, receivedAfter, expiresAt)`。
+
+`PluginInboundMailMatch(status, receivedAt, message)` 的 `status`：`MATCHED` / `PENDING` / `NOT_FOUND` / `UNAVAILABLE`。
+
 ---
 
 > 源码引用：

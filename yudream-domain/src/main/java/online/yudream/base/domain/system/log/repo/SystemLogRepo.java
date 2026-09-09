@@ -1,6 +1,7 @@
 package online.yudream.base.domain.system.log.repo;
 
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
+import online.yudream.base.domain.system.log.model.SystemLogModuleGroup;
 import online.yudream.base.domain.system.log.model.SystemLogQuery;
 
 import java.util.List;
@@ -14,6 +15,8 @@ public interface SystemLogRepo {
     List<SystemLogEntry> recent(SystemLogQuery query);
 
     List<String> modules();
+
+    List<SystemLogModuleGroup> moduleGroups();
 
     AutoCloseable subscribe(SystemLogQuery query, Consumer<SystemLogEntry> consumer);
 

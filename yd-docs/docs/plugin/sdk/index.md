@@ -2,7 +2,7 @@
 
 宿主注入给插件前端页面的 SDK。插件页面组件通过 props 接收 `{ sdk, route }`，**不要**在插件内捆绑私有 axios 实例。
 
-- npm 包版本：**1.4.0**（发布于 `nexus.yudream.online/repository/npm-public/`）；peerDependencies 仅 `vue`、`vue-router`——一切运行时能力由宿主注入。1.4.0 起新增构建期导出 `./uno-config`（依赖 `unocss` 等构建期包，仅在 Vite 构建时使用，不进入插件运行时）。
+- npm 包版本：**1.5.0**（发布于 `nexus.yudream.online/repository/npm-public/`）；peerDependencies 仅 `vue`、`vue-router`——一切运行时能力由宿主注入。1.4.0 起新增构建期导出 `./uno-config`（依赖 `unocss` 等构建期包，仅在 Vite 构建时使用，不进入插件运行时）。1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot()`。
 - 宿主启动时挂载两个全局对象：
   - `window.__YUDREAM_PLUGIN_SHARED__ = { vue, vueRouter, components }`（宿主的 Vue/VueRouter/@yudream/components 单例）；
   - `window.__YUDREAM_PLUGIN_SDK__ = { version, create(pluginCode) => YuDreamPluginSdk }`。
@@ -84,6 +84,11 @@ interface YuDreamPluginFileUploadOptions {
 interface YuDreamPluginFilesClient {
   uploadImage(file: File, options?: YuDreamPluginFileUploadOptions): Promise<YuDreamPluginFileObject>
   assetUrl(url?: string): string   // 站内文件地址 → 可访问 URL
+  thumbUrl(url?: string, options?: YuDreamPluginThumbOptions): string  // 列表封面缩略图；非 /api/files/.../content 原样回退
+}
+
+interface YuDreamPluginThumbOptions {
+  maxEdge?: number  // 预留最长边，当前平台出口固定 400px JPEG
 }
 
 interface YuDreamPluginFileObject {
@@ -107,6 +112,20 @@ interface YuDreamPluginAssetsClient {
 ```
 
 路径必须是相对路径，不得包含 `..` 或反斜杠。
+
+列表封面请用 `sdk.files.thumbUrl(file.url)`，对应宿主 `GET /api/files/{id}/content/thumb`（公开文件走 `/api/files/public/{id}/content/thumb`）。非文件内容 URL 会原样回退。Firefox 等浏览器每域名并发连接有限，封面批量加载应配合 `acquireImageSlot()` 排队：
+
+```ts
+import { acquireImageSlot } from '@yudream/plugin-sdk'
+
+const release = await acquireImageSlot(2)
+try {
+  img.src = sdk.files.thumbUrl(file.url)
+}
+finally {
+  release()
+}
+```
 
 ## messaging —— 宿主消息连接目录
 
@@ -266,5 +285,5 @@ import { yuDreamPluginUnoCss, yuDreamPluginUnoConfig } from '@yudream/plugin-sdk
 `yuDreamPluginUnoCss()` 返回配置好的 UnoCSS Vite 插件，预设与宿主完全一致（presetWind4 关闭 reset、shadcn 主题映射、attributify/icons/typography），让插件组件直接使用 `p-5`、`text-muted-foreground`、`i-ri:*` 等工具类。产物经 lib `cssFileName: 'style'` 固定为 `dist/style.css`，由 `@PluginFrontend(styles = {"style.css"})` 声明加载。插件只引用宿主注入的主题 CSS 变量，不要重新定义 `:root` 变量或引入全局 reset。`extraContent` 选项可追加扫描 glob。
 
 ::: tip 版本说明
-当前 npm 包版本 **1.4.0**（新增构建期 `./uno-config` 导出），宿主注入的运行时行为版本仍为 **1.3.0**（`sdk.messaging` / `sdk.users` / `sdk.ai`）。以 `yudream-frontend/packages/plugin-sdk/package.json` 为准；后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本。源码升版不等于已发布到 Nexus。
+当前 npm 包版本 **1.5.0**（新增 `sdk.files.thumbUrl` 与 `acquireImageSlot`；1.4.0 起含构建期 `./uno-config`），宿主注入的运行时行为版本为 **1.5.0**。以 `yudream-frontend/packages/plugin-sdk/package.json` 为准；后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本。源码升版不等于已发布到 Nexus。
 :::
