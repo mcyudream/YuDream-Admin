@@ -5,11 +5,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
+import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginThemeOverviewRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginThemeRes;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -26,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/platform/plugins")
@@ -33,6 +37,7 @@ import java.util.List;
 public class PluginController {
 
     private final PluginAppService pluginAppService;
+    private final PluginThemeAppService pluginThemeAppService;
 
     @GetMapping
     @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看插件列表与运行状态")
@@ -91,6 +96,17 @@ public class PluginController {
     public Result<PluginFrontendManifestRes> frontendManifest() {
         // 未登录访客只下发 publicAccess 路由（匿名公开页面注册用）
         return Result.ok(PluginWebAssembler.toRes(pluginAppService.frontendManifest(!StpUtil.isLogin())));
+    }
+
+    @GetMapping("/themes/active")
+    public Result<Map<String, PluginThemeRes>> activeThemes() {
+        return Result.ok(PluginWebAssembler.toActiveThemeResMap(pluginThemeAppService.activeThemes()));
+    }
+
+    @GetMapping("/themes")
+    @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看插件列表与运行状态")
+    public Result<PluginThemeOverviewRes> themes() {
+        return Result.ok(PluginWebAssembler.toThemeOverviewRes(pluginThemeAppService.overview()));
     }
 
     @GetMapping("/{code}/assets/**")

@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifes
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
+import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
@@ -72,6 +73,9 @@ class PluginMenuLifecycleTest {
     @Mock
     private RoleRepo roleRepo;
 
+    @Mock
+    private PluginThemeAppService pluginThemeAppService;
+
     private PluginModule module;
     private PluginFrontendModuleInfo frontendModule;
     private PluginAppService service;
@@ -92,7 +96,8 @@ class PluginMenuLifecycleTest {
                 pluginRuntimeGateway,
                 permissionDomainService,
                 pluginMenuProjectionService,
-                roleRepo
+                roleRepo,
+                pluginThemeAppService
         );
     }
 
@@ -321,7 +326,8 @@ class PluginMenuLifecycleTest {
                 pluginRuntimeGateway,
                 permissionDomainService,
                 projectionService,
-                roleRepo
+                roleRepo,
+                pluginThemeAppService
         );
 
         PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
@@ -631,7 +637,8 @@ class PluginMenuLifecycleTest {
                 pluginRuntimeGateway,
                 permissionDomainService,
                 projectionService,
-                roleRepo
+                roleRepo,
+                pluginThemeAppService
         );
 
         PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
@@ -678,7 +685,8 @@ class PluginMenuLifecycleTest {
                 pluginRuntimeGateway,
                 permissionDomainService,
                 projectionService,
-                roleRepo
+                roleRepo,
+                pluginThemeAppService
         );
 
         PluginFrontendManifestDTO manifest = realProjectionService.frontendManifest();
@@ -782,7 +790,8 @@ class PluginMenuLifecycleTest {
                 pluginRuntimeGateway,
                 permissionDomainService,
                 projectionService,
-                roleRepo
+                roleRepo,
+                pluginThemeAppService
         );
     }
 

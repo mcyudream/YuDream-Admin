@@ -2,6 +2,7 @@ package online.yudream.base.application.platform.plugin;
 
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
+import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
@@ -64,6 +65,9 @@ class PluginAppServiceTest {
     @Mock
     private RoleRepo roleRepo;
 
+    @Mock
+    private PluginThemeAppService pluginThemeAppService;
+
     private PluginAppService service;
 
     @BeforeEach
@@ -73,7 +77,8 @@ class PluginAppServiceTest {
                 pluginRuntimeGateway,
                 permissionDomainService,
                 pluginMenuProjectionService,
-                roleRepo
+                roleRepo,
+                pluginThemeAppService
         );
         ReflectionTestUtils.setField(service, "uploadDirectory", tempDir.toString());
     }

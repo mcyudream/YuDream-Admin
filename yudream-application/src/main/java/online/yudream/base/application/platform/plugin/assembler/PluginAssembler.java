@@ -19,6 +19,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginStorePluginJarD
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginPublisherDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSourceDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
@@ -36,6 +37,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginPublisher;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginSource;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginVersion;
+import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
 
 import java.util.List;
 
@@ -186,6 +188,19 @@ public class PluginAssembler {
                 .component(widget.component())
                 .permission(widget.permission())
                 .sort(widget.sort())
+                .build();
+    }
+
+    public static PluginThemeDTO toThemeDTO(PluginThemeInfo theme) {
+        return PluginThemeDTO.builder()
+                .pluginCode(theme.pluginCode())
+                .code(theme.code())
+                .name(theme.name())
+                .description(theme.description())
+                .scopes(theme.scopes())
+                .styles(theme.styles())
+                .preview(theme.preview())
+                .assetRevision(theme.assetRevision())
                 .build();
     }
 
