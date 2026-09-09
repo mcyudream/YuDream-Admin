@@ -1,13 +1,17 @@
 package online.yudream.base.infra.platform.milky.official;
 
 import com.sun.net.httpserver.HttpServer;
+import online.yudream.base.application.platform.preview.service.PluginPreviewFileOpener;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
+import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -280,6 +284,7 @@ class OfficialQqBotApiAdapterTest {
                     "group_id", "group-open",
                     "message", List.of(Map.of("type", "image", "data", Map.of("uri", "base64://aW1hZ2U=")))));
             assertTrue(uploadBody.get().contains("\"file_data\":\"aW1hZ2U=\""));
+            assertTrue(uploadBody.get().contains("\"file_type\":1"));
             assertTrue(uploadBody.get().contains("\"srv_send_msg\":false"));
             assertTrue(sendBody.get().contains("\"file_info\":\"uploaded-file\""));
             assertTrue(sendBody.get().contains("\"msg_type\":7"));
@@ -511,6 +516,131 @@ class OfficialQqBotApiAdapterTest {
             assertTrue(body.get().contains("\"op\":\"decline\""));
             assertTrue(body.get().contains("\"join_request_id\":\"jr-43\""));
             assertTrue(body.get().contains("\"reject_reason\":\"入群验证未通过\""));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void preUploadsOfficialVideoFromSignedPreviewUrl() throws Exception {
+        byte[] video = "official-video-bytes".getBytes(StandardCharsets.UTF_8);
+        AtomicReference<String> prepareBody = new AtomicReference<>();
+        AtomicReference<String> finishBody = new AtomicReference<>();
+        AtomicReference<String> mergeBody = new AtomicReference<>();
+        AtomicReference<String> sendBody = new AtomicReference<>();
+        AtomicReference<String> putMethod = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/presign/part-0", exchange -> {
+            putMethod.set(exchange.getRequestMethod());
+            exchange.getRequestBody().readAllBytes();
+            exchange.sendResponseHeaders(200, -1);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/upload_prepare", exchange -> {
+            prepareBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            String presign = "http://localhost:" + server.getAddress().getPort() + "/presign/part-0";
+            byte[] response = ("{\"upload_id\":\"upload-video\",\"block_size\":\"" + video.length
+                    + "\",\"parts\":[{\"index\":0,\"presigned_url\":\"" + presign
+                    + "\",\"block_size\":\"" + video.length + "\"}]}").getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/upload_part_finish", exchange -> {
+            finishBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/files", exchange -> {
+            mergeBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"file_info\":\"uploaded-video\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/messages", exchange -> {
+            sendBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"id\":\"video-1\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        try {
+            server.start();
+            OfficialQqBotSessionStore sessions = new OfficialQqBotSessionStore();
+            sessions.rememberInbound(8L, "group-open", "inbound-1", "event-1");
+            PluginPreviewFileOpener opener = token -> {
+                assertEquals("tok", token);
+                return Optional.of(new PluginStoredFile(
+                        "official/video.mp4", "video/mp4", (long) video.length, new ByteArrayInputStream(video)));
+            };
+            OfficialQqBotApiAdapter adapter = new OfficialQqBotApiAdapter(fixedTokenClient(), sessions, opener);
+            adapter.invoke(context(server.getAddress().getPort()), "send_group_message", Map.of(
+                    "group_id", "group-open",
+                    "message", List.of(Map.of("type", "video", "data", Map.of(
+                            "uri", "https://admin.example.test/api/public/preview/file/tok/video.mp4")))));
+            assertTrue(prepareBody.get().contains("\"file_type\":2"));
+            assertTrue(prepareBody.get().contains("\"file_name\":\"video.mp4\""));
+            assertTrue(prepareBody.get().contains("\"file_size\":\"" + video.length + "\""));
+            assertEquals("PUT", putMethod.get());
+            assertTrue(finishBody.get().contains("\"upload_id\":\"upload-video\""));
+            assertTrue(mergeBody.get().contains("\"upload_id\":\"upload-video\""));
+            assertTrue(mergeBody.get().contains("\"file_type\":2"));
+            assertTrue(!mergeBody.get().contains("\"url\""));
+            assertTrue(!mergeBody.get().contains("file_data"));
+            assertTrue(sendBody.get().contains("\"file_info\":\"uploaded-video\""));
+            assertTrue(sendBody.get().contains("\"msg_type\":7"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void keepsExternalVideoUrlUploadWithoutPrepare() throws Exception {
+        AtomicReference<String> uploadBody = new AtomicReference<>();
+        AtomicReference<String> prepareHit = new AtomicReference<>();
+        HttpServer server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
+        server.createContext("/v2/groups/group-open/upload_prepare", exchange -> {
+            prepareHit.set(exchange.getRequestURI().getPath());
+            byte[] response = "{}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/files", exchange -> {
+            uploadBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] response = "{\"file_info\":\"uploaded-video\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        server.createContext("/v2/groups/group-open/messages", exchange -> {
+            byte[] response = "{\"id\":\"video-1\"}".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        });
+        try {
+            server.start();
+            OfficialQqBotSessionStore sessions = new OfficialQqBotSessionStore();
+            sessions.rememberInbound(8L, "group-open", "inbound-1", "event-1");
+            OfficialQqBotApiAdapter adapter = new OfficialQqBotApiAdapter(fixedTokenClient(), sessions);
+            adapter.invoke(context(server.getAddress().getPort()), "send_group_message", Map.of(
+                    "group_id", "group-open",
+                    "message", List.of(Map.of("type", "video", "data", Map.of(
+                            "uri", "https://cdn.example.test/demo.mp4")))));
+            assertEquals(null, prepareHit.get());
+            assertTrue(uploadBody.get().contains("\"url\":\"https://cdn.example.test/demo.mp4\""));
+            assertTrue(uploadBody.get().contains("\"file_type\":2"));
         } finally {
             server.stop(0);
         }
