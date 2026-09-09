@@ -3,12 +3,15 @@ package online.yudream.base.infra.platform.milky.official;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.platform.preview.service.PluginPreviewFileOpener;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.enumerate.MilkyConnectionProtocol;
 import online.yudream.base.domain.platform.milky.model.MilkyModels.Context;
 import online.yudream.base.domain.platform.milky.model.MilkyModels.Event;
+import online.yudream.base.plugin.spi.system.storage.PluginStoredFile;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -16,19 +19,28 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.netty.http.client.HttpClient;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -36,16 +48,42 @@ import java.util.regex.Pattern;
  * 官方 OpenAPI 适配器：共享 Milky 方法名映射到 REST；未映射的路径/方法作为特异化入口透传。
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class OfficialQqBotApiAdapter {
     private static final Duration TIMEOUT = Duration.ofMinutes(2);
+    private static final Duration PRESIGN_TIMEOUT = Duration.ofMinutes(5);
+    /** 官方视频/文件硬限制 200MB；超过软限制仍按原 file_type 预上传。 */
+    static final long OFFICIAL_MEDIA_HARD_LIMIT_BYTES = 200L * 1024 * 1024;
+    static final int MD5_10M_BYTES = 10_002_432;
+    private static final long IMAGE_INLINE_LIMIT_BYTES = 2L * 1024 * 1024;
+    private static final String PUBLIC_PREVIEW_MARKER = "/api/public/preview/file/";
     /** 官方富媒体必填但不可见的 caption，避免普通空格把图片压成缩略图。 */
     static final String RICH_MEDIA_PLACEHOLDER = "\u200B";
     private static final Pattern HTTP_PREFIX = Pattern.compile("^(GET|POST|PUT|PATCH|DELETE)\\s+(.+)$", Pattern.CASE_INSENSITIVE);
     private final OfficialQqBotAccessTokenClient tokens;
     private final OfficialQqBotSessionStore sessions;
+    private final PluginPreviewFileOpener previewFiles;
     private final ObjectMapper mapper = new ObjectMapper();
+    private final java.net.http.HttpClient presignClient = java.net.http.HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(20))
+            .build();
+
+    public OfficialQqBotApiAdapter(OfficialQqBotAccessTokenClient tokens, OfficialQqBotSessionStore sessions) {
+        this(tokens, sessions, (PluginPreviewFileOpener) null);
+    }
+
+    @Autowired
+    public OfficialQqBotApiAdapter(OfficialQqBotAccessTokenClient tokens, OfficialQqBotSessionStore sessions,
+                                   ObjectProvider<PluginPreviewFileOpener> previewFiles) {
+        this(tokens, sessions, previewFiles == null ? null : previewFiles.getIfAvailable());
+    }
+
+    OfficialQqBotApiAdapter(OfficialQqBotAccessTokenClient tokens, OfficialQqBotSessionStore sessions,
+                            PluginPreviewFileOpener previewFiles) {
+        this.tokens = tokens;
+        this.sessions = sessions;
+        this.previewFiles = previewFiles;
+    }
 
     public Object invoke(Context context, String api, Object body) {
         Map<String, Object> payload = map(body);
@@ -779,7 +817,9 @@ public class OfficialQqBotApiAdapter {
         try {
             JsonNode node = mapper.readTree(response);
             if (node.has("code") && node.path("code").asInt(0) != 0) {
-                throw failure("官方机器人调用失败（code=" + node.path("code").asInt() + "）", method, path, base, null, startedAt, null);
+                String detail = node.path("message").asText("");
+                throw failure("官方机器人调用失败（code=" + node.path("code").asInt()
+                        + (detail.isBlank() ? "" : "，" + detail) + "）", method, path, base, null, startedAt, null);
             }
             return mapper.convertValue(node, Object.class);
         } catch (BizException exception) {
@@ -854,8 +894,9 @@ public class OfficialQqBotApiAdapter {
     }
 
     /**
-     * 官方富媒体必须先 POST /files 拿到 file_info，再随 msg_type=7 被动发出。
-     * URL/base64 不能直接塞进 messages.media。
+     * 官方富媒体必须先拿到 file_info，再随 msg_type=7 被动发出。
+     * 视频/语音/文件以及可读取的本地字节走 upload_prepare 分片预上传；
+     * 小图片仍可用 file_data；外部公网 URL 才让 QQ 自行下载。
      */
     private Map<String, Object> resolveUploadedMedia(Context context, boolean group, String peerId, Map<String, Object> media) {
         if (media == null || media.isEmpty()) {
@@ -867,24 +908,36 @@ public class OfficialQqBotApiAdapter {
         }
         String source = firstNonBlank(fileInfo, text(media, "url", "uri", "file", "file_data"));
         if (blank(source)) {
-            throw new BizException("官方机器人图片缺少文件内容");
+            throw new BizException("官方机器人媒体缺少文件内容");
         }
-        Map<String, Object> upload = new LinkedHashMap<>();
-        upload.put(group ? "group_id" : "user_id", peerId);
         Object fileType = media.get("file_type");
         int fileTypeValue = fileType instanceof Number number ? number.intValue() : 1;
-        upload.put("file_type", fileTypeValue);
-        upload.put("srv_send_msg", false);
-        // QQ 依 file_name 扩展名识别媒体类型，缺失时客户端可能只显示占位卡片而不展示图片
-        upload.put("file_name", mediaFileName(media, source, fileTypeValue));
-        if (base64Payload(source) != null) {
-            upload.put("file_data", base64Payload(source));
+        String fileName = mediaFileName(media, source, fileTypeValue);
+        byte[] localBytes = resolveLocalMediaBytes(source);
+        Object result;
+        if (localBytes != null) {
+            if (shouldPreUpload(fileTypeValue, localBytes.length)) {
+                result = uploadByPrepare(context, group, peerId, fileTypeValue, fileName, localBytes);
+            } else {
+                Map<String, Object> upload = new LinkedHashMap<>();
+                upload.put(group ? "group_id" : "user_id", peerId);
+                upload.put("file_type", fileTypeValue);
+                upload.put("srv_send_msg", false);
+                upload.put("file_name", fileName);
+                upload.put("file_data", Base64.getEncoder().encodeToString(localBytes));
+                result = uploadFile(context, group, upload);
+            }
         } else if (source.startsWith("http://") || source.startsWith("https://")) {
+            Map<String, Object> upload = new LinkedHashMap<>();
+            upload.put(group ? "group_id" : "user_id", peerId);
+            upload.put("file_type", fileTypeValue);
+            upload.put("srv_send_msg", false);
+            upload.put("file_name", fileName);
             upload.put("url", source);
+            result = uploadFile(context, group, upload);
         } else {
-            throw new BizException("官方机器人图片需使用公网 URL 或 base64");
+            throw new BizException("官方机器人媒体需使用本地文件、公网 URL 或 base64");
         }
-        Object result = uploadFile(context, group, upload);
         Map<String, Object> uploadedResult = map(result);
         String uploaded = firstNonBlank(text(uploadedResult, "file_info", "fileInfo"));
         if (blank(uploaded)) {
@@ -893,6 +946,202 @@ public class OfficialQqBotApiAdapter {
         log.debug("Official QQ bot media uploaded: connectionId={}, fileType={}, ttl={}",
                 context == null ? "" : context.connectionId(), fileTypeValue, text(uploadedResult, "ttl"));
         return Map.of("file_info", uploaded);
+    }
+
+    private boolean shouldPreUpload(int fileType, int length) {
+        if (fileType == 2 || fileType == 3 || fileType == 4) {
+            return true;
+        }
+        return length > IMAGE_INLINE_LIMIT_BYTES;
+    }
+
+    private byte[] resolveLocalMediaBytes(String source) {
+        String base64 = base64Payload(source);
+        if (base64 != null) {
+            try {
+                return Base64.getDecoder().decode(base64);
+            } catch (IllegalArgumentException exception) {
+                throw new BizException("官方机器人媒体 base64 无法解码");
+            }
+        }
+        String token = previewFileToken(source);
+        if (token == null) {
+            return null;
+        }
+        if (previewFiles == null) {
+            throw new BizException("官方机器人无法读取本地预览文件");
+        }
+        Optional<PluginStoredFile> file = previewFiles.openSignedFile(token);
+        if (file.isEmpty()) {
+            throw new BizException("官方机器人本地预览文件无效或已过期");
+        }
+        try (InputStream in = file.get().inputStream()) {
+            return in.readAllBytes();
+        } catch (IOException exception) {
+            throw new BizException("官方机器人读取本地预览文件失败");
+        }
+    }
+
+    static String previewFileToken(String source) {
+        if (blank(source)) {
+            return null;
+        }
+        String path = source.trim();
+        int query = path.indexOf('?');
+        if (query >= 0) {
+            path = path.substring(0, query);
+        }
+        int marker = path.indexOf(PUBLIC_PREVIEW_MARKER);
+        if (marker < 0) {
+            return null;
+        }
+        String rest = path.substring(marker + PUBLIC_PREVIEW_MARKER.length());
+        int slash = rest.indexOf('/');
+        String token = slash < 0 ? rest : rest.substring(0, slash);
+        return blank(token) ? null : token;
+    }
+
+    private Object uploadByPrepare(Context context, boolean group, String peerId, int fileType, String fileName, byte[] bytes) {
+        if (bytes.length > OFFICIAL_MEDIA_HARD_LIMIT_BYTES) {
+            throw new BizException("官方机器人文件超过 200MB 上限");
+        }
+        Map<String, Object> prepareBody = new LinkedHashMap<>();
+        prepareBody.put("file_type", fileType);
+        prepareBody.put("file_size", String.valueOf(bytes.length));
+        prepareBody.put("file_name", fileName);
+        prepareBody.put("md5", md5Hex(bytes));
+        prepareBody.put("sha1", sha1Hex(bytes));
+        prepareBody.put("md5_10m", md5Hex(bytes, 0, Math.min(bytes.length, MD5_10M_BYTES)));
+        String preparePath = group
+                ? "/v2/groups/" + peerId + "/upload_prepare"
+                : "/v2/users/" + peerId + "/upload_prepare";
+        Map<String, Object> prepared = map(request(context, HttpMethod.POST, preparePath, prepareBody));
+        String uploadId = required(text(prepared, "upload_id"), "官方机器人预上传未返回 upload_id");
+        long blockSize = parsePositiveLong(text(prepared, "block_size"), 5L * 1024 * 1024);
+        List<Map<String, Object>> parts = prepareParts(prepared.get("parts"));
+        if (parts.isEmpty()) {
+            throw new BizException("官方机器人预上传未返回分片");
+        }
+        int offset = 0;
+        for (Map<String, Object> part : parts) {
+            int remaining = bytes.length - offset;
+            if (remaining <= 0) {
+                break;
+            }
+            int size = remaining;
+            String declared = text(part, "block_size");
+            if (!blank(declared)) {
+                try {
+                    size = (int) Math.min(remaining, Long.parseLong(declared.trim()));
+                } catch (NumberFormatException ignored) {
+                    size = (int) Math.min(remaining, blockSize);
+                }
+            } else {
+                size = (int) Math.min(remaining, blockSize);
+            }
+            byte[] chunk = Arrays.copyOfRange(bytes, offset, offset + size);
+            String url = required(text(part, "presigned_url", "url"), "官方机器人预上传分片缺少 URL");
+            putPresigned(url, chunk);
+            Map<String, Object> finish = new LinkedHashMap<>();
+            finish.put("upload_id", uploadId);
+            finish.put("part_index", partIndex(part));
+            finish.put("block_size", String.valueOf(chunk.length));
+            finish.put("md5", md5Hex(chunk));
+            String finishPath = group
+                    ? "/v2/groups/" + peerId + "/upload_part_finish"
+                    : "/v2/users/" + peerId + "/upload_part_finish";
+            request(context, HttpMethod.POST, finishPath, finish);
+            offset += size;
+        }
+        if (offset != bytes.length) {
+            throw new BizException("官方机器人预上传分片未覆盖完整文件");
+        }
+        Map<String, Object> merge = new LinkedHashMap<>();
+        merge.put(group ? "group_id" : "user_id", peerId);
+        merge.put("file_type", fileType);
+        merge.put("srv_send_msg", false);
+        merge.put("file_name", fileName);
+        merge.put("upload_id", uploadId);
+        return uploadFile(context, group, merge);
+    }
+
+    private List<Map<String, Object>> prepareParts(Object raw) {
+        List<Map<String, Object>> parts = new ArrayList<>();
+        if (raw instanceof List<?> list) {
+            for (Object item : list) {
+                parts.add(map(item));
+            }
+            parts.sort(Comparator.comparingInt(this::partIndex));
+        }
+        return parts;
+    }
+
+    private int partIndex(Map<String, Object> part) {
+        Object value = part.get("index");
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value != null && !String.valueOf(value).isBlank()) {
+            try {
+                return Integer.parseInt(String.valueOf(value).trim());
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return 0;
+    }
+
+    private void putPresigned(String url, byte[] chunk) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(PRESIGN_TIMEOUT)
+                    .PUT(HttpRequest.BodyPublishers.ofByteArray(chunk))
+                    .build();
+            HttpResponse<Void> response = presignClient.send(request, HttpResponse.BodyHandlers.discarding());
+            int status = response.statusCode();
+            if (status < 200 || status >= 300) {
+                throw new BizException("官方机器人分片上传失败（HTTP " + status + "）");
+            }
+        } catch (BizException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            BizException failure = new BizException("官方机器人分片上传失败");
+            failure.initCause(exception);
+            throw failure;
+        }
+    }
+
+    private static long parsePositiveLong(String value, long fallback) {
+        if (blank(value)) {
+            return fallback;
+        }
+        try {
+            long parsed = Long.parseLong(value.trim());
+            return parsed > 0 ? parsed : fallback;
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private static String md5Hex(byte[] bytes) {
+        return digestHex("MD5", bytes, 0, bytes.length);
+    }
+
+    private static String md5Hex(byte[] bytes, int offset, int length) {
+        return digestHex("MD5", bytes, offset, length);
+    }
+
+    private static String sha1Hex(byte[] bytes) {
+        return digestHex("SHA-1", bytes, 0, bytes.length);
+    }
+
+    private static String digestHex(String algorithm, byte[] bytes, int offset, int length) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance(algorithm);
+            digest.update(bytes, offset, length);
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException(exception);
+        }
     }
 
     /** 上传文件名：优先沿用调用方命名，URL 取路径末段，base64 嗅探魔数，最后按 file_type 兜底。 */
