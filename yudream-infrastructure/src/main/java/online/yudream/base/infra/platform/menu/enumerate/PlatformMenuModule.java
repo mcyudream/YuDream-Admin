@@ -32,6 +32,15 @@ public enum PlatformMenuModule {
             parentName = "WIKI", permission = "platform:wiki:manage")
     WIKI_MANAGE,
 
+    @MenuNode(code = "platform:inbound-mail", name = "入站邮箱", type = MenuNodeType.MENU,
+            path = "/platform/inbound-mail", component = "platform/inbound-mail/index.vue",
+            icon = "i-ri:mail-download-line", sort = 77)
+    INBOUND_MAIL,
+
+    @MenuNode(code = "platform:inbound-mail:view", name = "查看入站邮件", type = MenuNodeType.BUTTON,
+            parentName = "INBOUND_MAIL", permission = "platform:inbound-mail:view")
+    INBOUND_MAIL_VIEW,
+
     @MenuNode(code = "platform:milky", name = "QQ 消息平台", type = MenuNodeType.MENU,
             path = "/platform/milky", component = "platform/milky/index.vue",
             icon = "i-ri:chat-3-line", sort = 76)

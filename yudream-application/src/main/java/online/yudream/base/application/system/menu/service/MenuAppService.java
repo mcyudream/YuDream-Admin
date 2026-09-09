@@ -51,6 +51,7 @@ public class MenuAppService {
             Map.entry("platform:form", "form"),
             Map.entry("platform:cms", "cms"),
             Map.entry("platform:agent", "agent"),
+            Map.entry("platform:inbound-mail", "inbound-mail"),
             Map.entry("platform:ai:generate", "ai"),
             Map.entry("platform:render:use", "message-render")
     );

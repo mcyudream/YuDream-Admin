@@ -62,7 +62,7 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 | message-render | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
 | milky | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 协议（HTTP API + WebSocket `/event`）与腾讯官方 OpenAPI v2（REST + Gateway/Webhook）共用出站端口 |
 | file-preview | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览：浏览器直读优先，Office/PSD/压缩包等走 iframe |
-| inbound-mail | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 只读入站邮箱，供插件按发件域、验证码与关键词匹配入站邮件 |
+| inbound-mail | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 只读入站邮箱：管理端浏览列表与详情，插件按发件域、验证码与关键词匹配 |
 
 \* 以上均映射到同名环境变量（见 `yudream-bootstrap/src/main/resources/application.yml` 的 `yudream.platform.capabilities.*`），compose 部署时可直接以 `PLATFORM_*_ENABLED=true/false` 控制项目闸门。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
 
@@ -90,4 +90,4 @@ Milky 能力（展示名「QQ 消息平台」）的连接凭据经 AES-GCM 加�
 
 ## 入站邮箱（inbound-mail）
 
-以 IMAPS 只读方式连接收件箱，插件通过 `framework().inboundMail()` 按发件域、验证码与关键词匹配邮件。插件拿不到邮箱凭据或正文，只拿到核验结果。详见 [入站邮箱](/features/inbound-mail)。
+以 IMAPS 只读方式连接收件箱。管理端可浏览邮件列表与详情；插件通过 `framework().inboundMail()` 按发件域、验证码与关键词匹配邮件。插件拿不到邮箱凭据或正文，只拿到核验结果。详见 [入站邮箱](/features/inbound-mail)。

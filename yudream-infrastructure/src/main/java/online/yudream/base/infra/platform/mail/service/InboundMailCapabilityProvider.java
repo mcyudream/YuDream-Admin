@@ -52,7 +52,7 @@ public class InboundMailCapabilityProvider implements CapabilityProvider {
                 CODE,
                 "入站邮箱",
                 CapabilityType.INTEGRATION,
-                "以 IMAPS 只读方式连接收件箱，供插件按发件域、验证码与关键词匹配入站邮件；未启用时依赖入站邮件的插件功能不可用",
+                "以 IMAPS 只读方式连接收件箱，供管理端查看邮件详情，并供插件按发件域、验证码与关键词匹配入站邮件；未启用时依赖入站邮件的插件功能不可用",
                 "i-ri:mail-download-line",
                 40,
                 Map.of(

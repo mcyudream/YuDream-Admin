@@ -5,10 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.render.cmd.MessageRenderCmd;
 import online.yudream.base.application.platform.render.dto.RenderedImageDTO;
+import online.yudream.base.application.platform.render.dto.RenderedPageDTO;
 import online.yudream.base.application.platform.render.service.MessageRenderAppService;
 import online.yudream.base.domain.platform.render.model.RenderModels.SourceType;
 import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.render.PluginRenderedImage;
+import online.yudream.base.plugin.spi.system.render.PluginRenderedPage;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -41,6 +43,26 @@ public class PluginRenderFrameworkService implements PluginRenderService {
 
     @Override
     public CompletionStage<PluginRenderedImage> url(String url) { return render(SourceType.URL, url); }
+
+    @Override
+    public CompletionStage<PluginRenderedPage> htmlFromUrl(String url) {
+        try {
+            return CompletableFuture.supplyAsync(() -> {
+                RenderedPageDTO page = messageRenderAppService.fetchHtml(url);
+                return new PluginRenderedPage(page.html(), page.finalUrl());
+            }, executor).whenComplete((result, exception) -> {
+                if (exception != null) {
+                    Throwable cause = rootCause(exception);
+                    log.error("Plugin htmlFromUrl failed: errorType={}, message={}",
+                            cause.getClass().getSimpleName(), cause.getMessage());
+                }
+            });
+        } catch (RuntimeException exception) {
+            log.error("Plugin htmlFromUrl rejected: errorType={}, message={}",
+                    exception.getClass().getSimpleName(), exception.getMessage());
+            return CompletableFuture.failedFuture(exception);
+        }
+    }
 
     private CompletionStage<PluginRenderedImage> render(SourceType sourceType, String content) {
         String selector = sourceType == SourceType.HTML && content != null && content.contains("command-menu-card")

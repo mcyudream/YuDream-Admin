@@ -47,6 +47,8 @@ public final class LogModuleResolver {
             new Rule("platform.integration", "集成调用"),
             new Rule("platform.document", "Word 模板"),
             new Rule("platform.graph", "图数据库"),
+            new Rule("platform.mail", "入站邮箱"),
+            new Rule("inbound-mail", "入站邮箱"),
             new Rule("platform.milky", "QQ 消息平台"),
             new Rule(".milky.", "QQ 消息平台"),
             new Rule("springframework", "Spring"),
@@ -112,6 +114,7 @@ public final class LogModuleResolver {
         if (module.contains("平台") || module.equals("能力管理") || module.equals("插件管理")
                 || module.equals("内容定制") || module.equals("Wiki 知识库") || module.equals("动态表单")
                 || module.equals("集成调用") || module.equals("Word 模板") || module.equals("图数据库")
+                || module.equals("入站邮箱")
                 || module.equals("AI 群聊机器人") || module.equals("QQ 群自动化") || module.equals("Codex 任务通知")) {
             return "平台";
         }

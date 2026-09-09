@@ -33,7 +33,7 @@
 | `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与腾讯官方 OpenAPI v2 共用出站端口 |
 | `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
 | `file-preview` | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览（Office / PSD / 压缩包等） |
-| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，供插件按发件域与验证码核验 |
+| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，管理端查看邮件详情，插件按发件域与验证码核验 |
 
 能力间依赖（如 `wiki` 依赖 `ai` 与 `neo4j`）声明在 `CapabilityDescriptor.dependencies`，禁用一个依赖会级联禁用所有依赖方。机制详解见 [平台能力](/guide/platform-capabilities)。
 
