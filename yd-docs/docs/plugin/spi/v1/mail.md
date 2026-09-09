@@ -90,7 +90,7 @@ public void onEnable(PluginContext context) {
 | `mailboxId` | `default String mailboxId()` | 当前收件箱标识 |
 | `match` | `default PluginInboundMailMatch match(PluginInboundMailQuery query)` | 只读匹配 |
 
-`PluginInboundMailQuery(mailboxId, verificationCode, allowedFromDomains, requiredKeywords, receivedAfter, expiresAt)`。
+`PluginInboundMailQuery(mailboxId, verificationCode, allowedFromDomains, requiredKeywords, receivedAfter, expiresAt)`。宿主从主题、正文、HTML 与 PDF 附件抽取文本后匹配验证码（忽略空白与大小写）和关键词，不把正文回传给插件。
 
 `PluginInboundMailMatch(status, receivedAt, message)` 的 `status`：`MATCHED` / `PENDING` / `NOT_FOUND` / `UNAVAILABLE`。
 

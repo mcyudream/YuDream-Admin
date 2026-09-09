@@ -24,7 +24,7 @@ YuDream Admin 把**非必需的重型能力**全部设计为"平台能力"（pla
 | `milky` | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 与官方 OpenAPI v2 共用出站端口 | [QQ 机器人接入](/features/milky) |
 | `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | HTML/Markdown → 图片渲染（render-server） | [消息渲染](/features/render) |
 | `file-preview` | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览（Office / PSD / 压缩包等） | [文件预览](/features/file-preview) |
-| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，供插件按发件域与验证码核验 | [入站邮箱](/features/inbound-mail) |
+| `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，管理端查看邮件详情，插件按发件域与验证码核验 | [入站邮箱](/features/inbound-mail) |
 
 ## system vs platform 边界
 

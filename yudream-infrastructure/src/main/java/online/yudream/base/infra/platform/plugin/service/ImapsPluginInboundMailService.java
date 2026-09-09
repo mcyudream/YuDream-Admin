@@ -1,10 +1,11 @@
 package online.yudream.base.infra.platform.plugin.service;
 
+import jakarta.mail.FetchProfile;
 import jakarta.mail.Folder;
 import jakarta.mail.Message;
 import jakarta.mail.Session;
 import jakarta.mail.Store;
-import jakarta.mail.internet.InternetAddress;
+import online.yudream.base.infra.platform.mail.InboundMailContentMatcher;
 import online.yudream.base.infra.platform.mail.service.InboundMailCapabilityProvider;
 import online.yudream.base.plugin.spi.system.mail.PluginInboundMailMatch;
 import online.yudream.base.plugin.spi.system.mail.PluginInboundMailQuery;
@@ -13,21 +14,23 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import java.util.Locale;
 import java.util.Properties;
 
 /**
  * 入站邮件匹配 SPI：只读扫描能力 Provider 配置的 IMAPS 收件箱最近若干封邮件，
- * 按实际发件域、验证码、关键词与时间窗匹配。能力与配置由「平台能力 &gt; 入站邮箱」统一托管，
+ * 按实际发件域、验证码、关键词与时间窗匹配。验证码从主题、正文、HTML 与 PDF 附件抽取，
+ * 比较时忽略空白与大小写。能力与配置由「平台能力 &gt; 入站邮箱」统一托管，
  * 本类不接触凭据落库，也不暴露邮件正文给插件。
  */
 @Service
 public class ImapsPluginInboundMailService implements PluginInboundMailService {
 
     private static final int MAX_MESSAGES = 50;
-    private static final int MAX_TEXT_CHARS = 64_000;
+    private static final int CONNECT_TIMEOUT_MS = 8000;
+    private static final int READ_TIMEOUT_MS = 20000;
 
     private final ObjectProvider<InboundMailCapabilityProvider> capabilityProvider;
+    private final InboundMailContentMatcher contentMatcher = new InboundMailContentMatcher();
 
     public ImapsPluginInboundMailService(ObjectProvider<InboundMailCapabilityProvider> capabilityProvider) {
         this.capabilityProvider = capabilityProvider;
@@ -66,8 +69,9 @@ public class ImapsPluginInboundMailService implements PluginInboundMailService {
         Properties props = new Properties();
         props.put("mail.store.protocol", "imaps");
         props.put("mail.imaps.ssl.enable", "true");
-        props.put("mail.imaps.connectiontimeout", "5000");
-        props.put("mail.imaps.timeout", "5000");
+        props.put("mail.imaps.connectiontimeout", String.valueOf(CONNECT_TIMEOUT_MS));
+        props.put("mail.imaps.timeout", String.valueOf(READ_TIMEOUT_MS));
+        props.put("mail.imaps.partialfetch", "false");
         try (Store store = Session.getInstance(props).getStore("imaps")) {
             store.connect(provider.configValue(InboundMailCapabilityProvider.CONFIG_HOST),
                     port(provider.configValue(InboundMailCapabilityProvider.CONFIG_PORT)),
@@ -78,12 +82,21 @@ public class ImapsPluginInboundMailService implements PluginInboundMailService {
                 folder.open(Folder.READ_ONLY);
                 int total = folder.getMessageCount();
                 int first = Math.max(1, total - MAX_MESSAGES + 1);
-                for (Message message : folder.getMessages(first, total)) {
-                    long receivedAt = message.getReceivedDate() == null ? 0L : message.getReceivedDate().getTime();
-                    if (receivedAt < query.receivedAfter()) {
+                Message[] messages = folder.getMessages(first, total);
+                FetchProfile profile = new FetchProfile();
+                profile.add(FetchProfile.Item.ENVELOPE);
+                profile.add(FetchProfile.Item.CONTENT_INFO);
+                folder.fetch(messages, profile);
+                for (Message message : messages) {
+                    long receivedAt = receivedAt(message);
+                    if (query.receivedAfter() > 0 && receivedAt > 0 && receivedAt < query.receivedAfter()) {
                         continue;
                     }
-                    if (!trustedSender(message, query) || !containsCodeAndKeywords(message, query)) {
+                    try {
+                        if (!contentMatcher.matches(message, query)) {
+                            continue;
+                        }
+                    } catch (Exception ignored) {
                         continue;
                     }
                     return PluginInboundMailMatch.matched(receivedAt);
@@ -101,27 +114,17 @@ public class ImapsPluginInboundMailService implements PluginInboundMailService {
         return capabilityProvider == null ? null : capabilityProvider.getIfAvailable();
     }
 
-    private boolean trustedSender(Message message, PluginInboundMailQuery query) throws Exception {
-        if (query.allowedFromDomains().isEmpty()) return false;
-        for (var address : message.getFrom() == null ? new jakarta.mail.Address[0] : message.getFrom()) {
-            String value = address instanceof InternetAddress internet ? internet.getAddress() : address.toString();
-            int at = value.lastIndexOf('@');
-            if (at < 0) continue;
-            String domain = value.substring(at + 1).toLowerCase(Locale.ROOT);
-            if (query.allowedFromDomains().stream().anyMatch(allowed -> domain.equals(allowed) || domain.endsWith("." + allowed))) {
-                return true;
+    private static long receivedAt(Message message) {
+        try {
+            if (message.getReceivedDate() != null) {
+                return message.getReceivedDate().getTime();
             }
+            if (message.getSentDate() != null) {
+                return message.getSentDate().getTime();
+            }
+        } catch (Exception ignored) {
         }
-        return false;
-    }
-
-    private boolean containsCodeAndKeywords(Message message, PluginInboundMailQuery query) throws Exception {
-        String subject = message.getSubject() == null ? "" : message.getSubject();
-        String body = String.valueOf(message.getContent());
-        String text = (subject + "\n" + body).replaceAll("\\s+", " ");
-        if (text.length() > MAX_TEXT_CHARS) text = text.substring(0, MAX_TEXT_CHARS);
-        if (!text.contains(query.verificationCode())) return false;
-        return query.requiredKeywords().stream().allMatch(text::contains);
+        return 0L;
     }
 
     private static int port(String raw) {

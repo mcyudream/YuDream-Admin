@@ -26,6 +26,8 @@ class LogModuleResolverTest {
                 "online.yudream.base.infra.platform.milky.official.OfficialQqBotEventGateway"));
         assertEquals("QQ 消息平台", resolver.resolve(
                 "online.yudream.base.infra.platform.milky.service.MilkyConnectionRuntime"));
+        assertEquals("入站邮箱", resolver.resolve(
+                "online.yudream.base.infra.platform.mail.service.ImapsInboundMailboxGateway"));
     }
 
     @Test
@@ -35,5 +37,11 @@ class LogModuleResolverTest {
         assertTrue(qq.modules().contains("QQ 群消息"));
         assertTrue(qq.modules().contains("QQ 消息平台"));
         assertTrue(resolver.knownModules().contains("QQ 互动"));
+        assertTrue(resolver.knownModuleGroups().stream()
+                .filter(group -> "平台".equals(group.label()))
+                .findFirst()
+                .orElseThrow()
+                .modules()
+                .contains("入站邮箱"));
     }
 }
