@@ -7,6 +7,7 @@ import directive from '@/utils/directive'
 import App from './App.vue'
 import formCreate from '@form-create/arco-design'
 import FcDesigner from 'form-create-designer-arco-design'
+import { bootstrapPluginThemes, watchPluginThemeScope } from './plugins/theme-runtime'
 import router from './router'
 import { applyStartupBranding, initializeStartupBranding } from './startup-branding'
 import pinia from './store'
@@ -31,8 +32,11 @@ async function bootstrap() {
     () => applyStartupBranding(document, appSettingsStore.siteName),
   )
   appSettingsStore.loadThemeSettings()
+  // 与主题设置并行拉取插件主题，挂载前注入常驻样式，避免公开站主题闪烁
+  await bootstrapPluginThemes()
 
   app.use(router)
+  watchPluginThemeScope(router)
   app.use(uiProvider)
   app.use(formCreate)
   app.use(FcDesigner)

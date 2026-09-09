@@ -101,6 +101,24 @@ export interface PluginFrontendManifest {
   globalWidgets?: PluginGlobalWidget[]
 }
 
+export type PluginThemeScope = 'SITE' | 'ADMIN'
+
+export interface PluginTheme {
+  pluginCode: string
+  code: string
+  name: string
+  description?: string
+  scopes?: PluginThemeScope[]
+  styles: string[]
+  preview?: string
+  assetRevision?: string
+}
+
+export interface PluginThemeOverview {
+  themes: PluginTheme[]
+  active: Partial<Record<PluginThemeScope, string>>
+}
+
 export interface PluginMessagingConnection {
   id: string
   name: string
@@ -169,6 +187,8 @@ export default {
   unload: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/unload`),
   remove: (code: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugins/${code}`),
   frontendManifest: () => systemClient.get<unknown, ApiResponse<PluginFrontendManifest>>('api/platform/plugins/frontend-manifest'),
+  activeThemes: () => systemClient.get<unknown, ApiResponse<Partial<Record<PluginThemeScope, PluginTheme>>>>('api/platform/plugins/themes/active'),
+  themes: () => systemClient.get<unknown, ApiResponse<PluginThemeOverview>>('api/platform/plugins/themes'),
   messagingConnections: () => systemClient.get<unknown, ApiResponse<PluginMessagingConnection[]>>('api/platform/plugins/messaging/connections'),
   messagingGroups: (connectionId: string) => systemClient.get<unknown, ApiResponse<PluginMessagingGroup[]>>('api/platform/plugins/messaging/groups', {
     params: { connectionId },

@@ -1,11 +1,47 @@
 <script setup lang="ts">
+import type { PluginThemeOverview, PluginThemeScope } from '@/api/modules/platform-plugin'
+import apiPlugin from '@/api/modules/platform-plugin'
+
 const route = useRoute()
+const router = useRouter()
 const toast = useFaToast()
 const appSettingsStore = useAppSettingsStore()
 const appMenuStore = useAppMenuStore()
 
 const saving = ref(false)
 const colorPresets = ['#18181b', '#2563eb', '#16a34a', '#dc2626', '#9333ea', '#ea580c']
+
+const pluginThemeOverview = ref<PluginThemeOverview>({ themes: [], active: {} })
+
+const scopeLabels: Record<PluginThemeScope, string> = {
+  SITE: '公开站',
+  ADMIN: '管理后台',
+}
+
+const siteThemeName = computed(() => {
+  const code = pluginThemeOverview.value.active.SITE
+  return pluginThemeOverview.value.themes.find(theme => theme.pluginCode === code)?.name || ''
+})
+
+function isThemeActive(pluginCode: string, scope: PluginThemeScope) {
+  return pluginThemeOverview.value.active[scope] === pluginCode
+}
+
+async function loadPluginThemes() {
+  try {
+    const res = await apiPlugin.themes()
+    pluginThemeOverview.value = res.data
+  }
+  catch {
+    pluginThemeOverview.value = { themes: [], active: {} }
+  }
+}
+
+function goPluginManage() {
+  router.push('/platform/plugin')
+}
+
+onMounted(loadPluginThemes)
 
 const themeRadius = computed<number[]>({
   get: () => [appSettingsStore.settings.theme.radius],
@@ -100,6 +136,48 @@ async function saveTheme() {
               &#33394;&#24369;&#27169;&#24335;
             </div>
             <FaSwitch v-model="appSettingsStore.settings.theme.colorAmblyopia" />
+          </div>
+        </section>
+
+        <section class="theme-section xl:col-span-2">
+          <div class="theme-section__title">
+            插件主题
+          </div>
+          <div class="text-sm text-muted-foreground">
+            插件可以为公开站与管理后台注册整套主题；同一范围同时只激活一个主题，在插件管理中启用目标主题插件即自动顶替。
+          </div>
+          <div v-if="siteThemeName" class="text-sm text-muted-foreground">
+            公开站主题正由插件「{{ siteThemeName }}」接管，上方的主题配置仅作用于管理后台。
+          </div>
+          <div v-if="!pluginThemeOverview.themes.length" class="text-sm text-muted-foreground">
+            当前没有已启用插件注册的主题。
+          </div>
+          <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div v-for="theme in pluginThemeOverview.themes" :key="theme.pluginCode" class="plugin-theme-card">
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 font-medium">
+                  {{ theme.name }}
+                  <FaTag v-for="scope in theme.scopes" :key="scope" variant="secondary">
+                    {{ scopeLabels[scope] }}
+                  </FaTag>
+                </div>
+                <FaTag v-if="theme.scopes?.some(scope => isThemeActive(theme.pluginCode, scope))" variant="default">
+                  当前
+                </FaTag>
+              </div>
+              <div v-if="theme.description" class="mt-1 text-sm text-muted-foreground">
+                {{ theme.description }}
+              </div>
+              <div class="mt-1 text-xs text-muted-foreground font-mono">
+                {{ theme.pluginCode }}
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end">
+            <FaButton variant="outline" size="sm" @click="goPluginManage">
+              <FaIcon name="i-ri:puzzle-line" />
+              前往插件管理
+            </FaButton>
           </div>
         </section>
 
@@ -345,5 +423,12 @@ async function saveTheme() {
 .color-swatch.active {
   border-color: oklch(var(--foreground));
   box-shadow: 0 0 0 2px oklch(var(--background)), 0 0 0 4px oklch(var(--primary));
+}
+
+.plugin-theme-card {
+  padding: 12px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
 }
 </style>
