@@ -225,6 +225,40 @@ META-INF/yudream-plugin/frontend/{pluginCode}/assets/*
 
 Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图片、字体能从插件 `/assets/**` 地址加载；动态 import 的 JS chunk 无须额外写入 `scripts`。
 
+### 9.1 主题插件（Plugin Theme）
+
+插件可以通过 `@PluginTheme` 注册整套主题，接管公开站（`/site`）或管理后台的视觉：
+
+```java
+@PluginTheme(
+    code = "pixel-dream",
+    name = "像素梦境",
+    description = "像素风公开站主题",
+    scopes = {PluginThemeScope.SITE},
+    styles = {"theme/site.css"},
+    preview = "theme/preview.png"
+)
+public class PixelThemePlugin implements YuDreamPlugin { ... }
+```
+
+契约规则：
+
+- 一个插件最多注册一个主题；`scopes` 至少声明一个范围（`SITE` 公开站 / `ADMIN` 管理后台），`styles` 至少声明一个 CSS 资产。
+- `styles`/`preview` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
+- 同一 scope 同时只激活一个主题：启用声明了主题的新插件时，宿主自动禁用同 scope 冲突的旧主题插件并接管激活位；禁用/卸载/删除主题插件即释放激活位，该 scope 回落宿主内置主题。重启恢复后宿主按持久化激活位校正。
+- 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。
+
+CSS 作用域约定：
+
+- SITE 主题只写 `.site-page` / `.site-chrome` 容器与 `--yb-site-*` 变量（背景/文本/标题/主色/边框/导航等），禁止覆写 `:root` 宿主后台变量。
+- ADMIN 主题写 `:root` / `.dark` 下的宿主主题变量（OKLCH 三通道，如 `--primary`、`--background`），禁止触碰 `.site-page` / `--yb-site-*`。
+- 主题 CSS 不得引入全局 reset，不得改动布局结构类（flex/grid 排版由宿主与插件页面自己控制）。
+
+宿主端点：
+
+- `GET /api/platform/plugins/themes/active`（匿名）：返回各 scope 当前激活主题（含样式资产相对路径与 `assetRevision`），宿主启动时在 `app.mount` 前注入常驻 `<link data-yudream-theme-scope>` 避免主题闪烁。
+- `GET /api/platform/plugins/themes`（`platform:plugin:view`）：全部已启用插件声明的主题与各 scope 激活者，供主题设置页展示。
+
 ## 10. 菜单与路由规范
 
 插件菜单由 `@PluginFrontend` 和 `@PluginRoute` 声明。
