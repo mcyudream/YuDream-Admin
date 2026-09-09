@@ -6,6 +6,7 @@ import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
+import online.yudream.base.plugin.spi.theme.PluginTheme;
 import online.yudream.base.plugin.spi.widget.PluginGlobalWidget;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
 import online.yudream.base.plugin.spi.system.storage.PluginDocumentStore;
@@ -68,6 +69,13 @@ public interface PluginContext {
      * 随插件 disable/unload 自动移除，无需手工注销。
      */
     void registerGlobalWidget(PluginGlobalWidget widget);
+
+    /**
+     * 注册界面主题：一个插件最多注册一个主题；同一 scope 同时只有一个主题插件
+     * 处于启用状态（启用新主题插件自动顶替旧的）。随插件 disable/unload 自动移除，
+     * 该 scope 回落到宿主内置主题，无需手工注销。
+     */
+    void registerTheme(PluginTheme theme);
 
     void registerFrontend(PluginFrontendModule module);
 
