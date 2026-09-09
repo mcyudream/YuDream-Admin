@@ -45,6 +45,10 @@
       "text": "Plugin frontend styles must use the declared-styles path: vite.config mounts yuDreamPluginUnoCss() from @yudream/plugin-sdk/uno-config (host-identical UnoCSS presets, reset off, host theme vars only), src/index.ts imports 'virtual:uno.css', lib cssFileName 'style', and Java @PluginFrontend(styles = {\"style.css\"}) declares the asset so the host loads it before remoteEntry and reclaims it by lease. The legacy styles.css?inline + install() <style> injection is deprecated and must not be used by new plugins."
     },
     {
+      "key": "plugin-theme-mutex",
+      "text": "插件主题经 @PluginTheme 注册（一个插件一个主题，scopes SITE/ADMIN，styles 至少一个 JAR 前端目录相对路径资产）；宿主 PluginThemeAppService 用 sys_setting(category=plugin-theme, key=pluginTheme.active.site|admin) 持久化激活位，enable 时自动顶替同 scope 冲突主题插件，disable/unload/delete 释放激活位，restoreEnabledPlugins 后 reconcile 校正。前端 main.ts 挂载前拉取 /api/platform/plugins/themes/active 注入常驻 link[data-yudream-theme-scope]，theme-runtime 按路由 meta.public 切换 site/admin link 启停。CSS 约定：SITE 只写 .site-page/.site-chrome 与 --yb-site-*，ADMIN 只写 :root/.dark 宿主 OKLCH 变量。详见 docs/plugin-system/specification.md 9.1。"
+    },
+    {
       "key": "record-list-pagination",
       "text": "Record-style lists that can grow without a small fixed bound, such as operation records, transactions, logs, audit rows, and import histories, must expose page/size in plugin HTTP APIs and show frontend pagination instead of loading a fixed 100/200 rows."
     },

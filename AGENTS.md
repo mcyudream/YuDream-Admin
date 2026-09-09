@@ -44,6 +44,7 @@
 - Java `Long`/Snowflake ID 在 JSON、插件 DTO、TS 模型、表单与 URL 参数中一律使用 `string`，禁止 `Number(id)`。
 - 生产插件前端只通过 JAR 内 ESM `remoteEntry.js` + 宿主注入 SDK 加载；前端资源打进 `META-INF/yudream-plugin/frontend/{pluginCode}`。workspace 加载仅是开发便利，禁止生产 manifest 依赖 workspace 别名。
 - 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设的 UnoCSS，关闭 reset、只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；禁止再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。
+- 插件主题经 `@PluginTheme` 注册（一个插件一个主题，`scopes` 声明 SITE/ADMIN）：同 scope 同时只激活一个，启用新主题插件自动顶替旧插件并持久化激活位（`sys_setting` category `plugin-theme`），禁用/卸载即释放回落内置主题。主题样式资产放插件 frontend 目录并经 `/api/platform/plugins/{code}/assets/**` 下发；CSS 约定 SITE 只写 `.site-page`/`.site-chrome` 与 `--yb-site-*` 变量、ADMIN 只写 `:root`/`.dark` 宿主变量，两 scope 不得互相污染。细则见 `docs/plugin-system/specification.md` 9.1。
 
 ## 5. AI/Agent 与 CMS 要点
 
