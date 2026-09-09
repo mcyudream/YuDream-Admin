@@ -3,6 +3,7 @@ import type { PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
+import { refreshPluginThemes } from '@/plugins/theme-runtime'
 import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 
@@ -233,6 +234,7 @@ async function runAction(code: string, action: 'load' | 'enable' | 'disable' | '
     replaceItem(res.data)
     if (['enable', 'disable', 'unload'].includes(action)) {
       await refreshDynamicRoutes(router)
+      await refreshPluginThemes()
     }
     toast.success(actionText(action))
   }
@@ -255,6 +257,7 @@ function confirmRemove(item = selected.value) {
         rows.value = rows.value.filter(row => row.code !== item.code)
         syncSelectedCode()
         await refreshDynamicRoutes(router)
+        await refreshPluginThemes()
         toast.success('插件记录已删除')
       }
       finally {
