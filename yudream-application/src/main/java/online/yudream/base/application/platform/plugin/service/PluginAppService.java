@@ -67,6 +67,7 @@ public class PluginAppService {
     private final PermissionDomainService permissionDomainService;
     private final PluginMenuProjectionService pluginMenuProjectionService;
     private final RoleRepo roleRepo;
+    private final PluginThemeAppService pluginThemeAppService;
 
     @Value("${yudream.platform.plugin.upload-directory:plugins}")
     private String uploadDirectory;
@@ -298,7 +299,9 @@ public class PluginAppService {
         try {
             PluginModule enabled = enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>());
             enabled.setRestoreIntentActive(true);
-            return toDTO(pluginModuleRepo.save(enabled));
+            PluginModuleDTO result = toDTO(pluginModuleRepo.save(enabled));
+            applyThemeMutex(code);
+            return result;
         } catch (Exception e) {
             String failure = rootMessage(e);
             String cleanupFailure = cleanupFailedEnable(module.getCode());
@@ -307,9 +310,29 @@ public class PluginAppService {
         }
     }
 
+    /**
+     * 主题互斥：新启用的插件若注册了主题，自动禁用与其 scope 冲突的其他主题插件，
+     * 并把该 scope 的激活位切到自身（自动顶替语义）。
+     */
+    private void applyThemeMutex(String code) {
+        if (pluginRuntimeGateway.theme(code).isEmpty()) {
+            return;
+        }
+        for (String conflict : pluginThemeAppService.themeConflicts(code)) {
+            try {
+                disable(conflict);
+                log.info("主题插件 {} 启用，自动顶替同作用域主题插件 {}", code, conflict);
+            } catch (Exception e) {
+                log.warn("自动禁用冲突主题插件 {} 失败: {}", conflict, rootMessage(e));
+            }
+        }
+        pluginThemeAppService.activate(code);
+    }
+
     @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO disable(String code) {
         PluginModule module = module(code);
+        pluginThemeAppService.clearActivation(code);
         RuntimeException runtimeFailure = null;
         try {
             pluginRuntimeGateway.disable(code);
@@ -330,6 +353,7 @@ public class PluginAppService {
     @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO unload(String code) {
         PluginModule module = module(code);
+        pluginThemeAppService.clearActivation(code);
         pluginRuntimeGateway.unload(code);
         module.markUnloaded();
         module.setRestoreIntentActive(false);
@@ -350,6 +374,7 @@ public class PluginAppService {
         if (pluginRuntimeGateway.loaded(code)) {
             pluginRuntimeGateway.unload(code);
         }
+        pluginThemeAppService.clearActivation(code);
         module.markUnloaded();
         pluginModuleRepo.save(module);
         String menuFailure = reconcileUnavailableMenus(code);
@@ -538,6 +563,7 @@ public class PluginAppService {
             }
             restoreEnabledModule(module, modules, restored, visiting);
         }
+        pluginThemeAppService.reconcileAfterRestore();
         return modules.values().stream()
                 .sorted(Comparator.comparing(PluginModule::getCode))
                 .map(this::toDTO)

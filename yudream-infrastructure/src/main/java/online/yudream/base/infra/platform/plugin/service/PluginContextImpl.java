@@ -19,6 +19,7 @@ import online.yudream.base.plugin.spi.system.render.PluginTemplateRenderService;
 import online.yudream.base.plugin.spi.system.ai.PluginAiTool;
 import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.graph.PluginGraphService;
+import online.yudream.base.plugin.spi.theme.PluginTheme;
 import online.yudream.base.plugin.spi.widget.PluginGlobalWidget;
 import org.springframework.util.StringUtils;
 
@@ -45,6 +46,7 @@ public class PluginContextImpl implements PluginContext {
     private final List<PluginCapabilityItem> capabilities = new ArrayList<>();
     private final List<PluginDashboardCard> dashboardCards = new ArrayList<>();
     private final List<PluginGlobalWidget> globalWidgets = new ArrayList<>();
+    private PluginTheme theme;
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
     private final List<PluginHttpEndpointInfo> httpEndpoints = new ArrayList<>();
     private final Map<String, PluginHttpHandler> httpHandlers = new ConcurrentHashMap<>();
@@ -170,6 +172,26 @@ public class PluginContextImpl implements PluginContext {
         String key = requireText(widget.code(), "插件全局挂件编码不能为空");
         ensureUnique(globalWidgetKeys, key, "插件全局挂件重复：" + key);
         globalWidgets.add(widget);
+    }
+
+    @Override
+    public void registerTheme(PluginTheme theme) {
+        if (this.theme != null) {
+            throw new BizException("一个插件最多注册一个主题：" + theme.code());
+        }
+        requireText(theme.code(), "插件主题编码不能为空");
+        requireText(theme.name(), "插件主题名称不能为空");
+        if (theme.scopes() == null || theme.scopes().isEmpty()) {
+            throw new BizException("插件主题至少声明一个生效范围");
+        }
+        if (theme.styles() == null || theme.styles().isEmpty()) {
+            throw new BizException("插件主题至少声明一个样式资产");
+        }
+        validateFrontendAssetPaths(theme.styles(), "插件主题样式路径非法");
+        if (StringUtils.hasText(theme.preview())) {
+            validateFrontendAssetPath(theme.preview(), "插件主题预览图路径非法");
+        }
+        this.theme = theme;
     }
 
     @Override
@@ -305,6 +327,10 @@ public class PluginContextImpl implements PluginContext {
         return List.copyOf(globalWidgets);
     }
 
+    public Optional<PluginTheme> theme() {
+        return Optional.ofNullable(theme);
+    }
+
     public List<PluginHttpEndpointInfo> httpEndpoints() {
         return List.copyOf(httpEndpoints);
     }
@@ -332,6 +358,7 @@ public class PluginContextImpl implements PluginContext {
         capabilities.clear();
         dashboardCards.clear();
         globalWidgets.clear();
+        theme = null;
         frontendModules.clear();
         httpEndpoints.clear();
         httpHandlers.clear();

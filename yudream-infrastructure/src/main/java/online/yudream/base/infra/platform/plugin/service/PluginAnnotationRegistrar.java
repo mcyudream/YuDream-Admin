@@ -10,6 +10,7 @@ import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginMenu;
 import online.yudream.base.plugin.spi.annotation.PluginPermission;
 import online.yudream.base.plugin.spi.annotation.PluginRoute;
+import online.yudream.base.plugin.spi.annotation.PluginTheme;
 import online.yudream.base.plugin.spi.annotation.PluginCommand;
 import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
@@ -39,6 +40,7 @@ class PluginAnnotationRegistrar {
         registerCapabilities(pluginClass, context);
         registerDashboardCards(pluginClass, context);
         registerGlobalWidgets(pluginClass, context);
+        registerTheme(pluginClass, context);
         registerFrontend(pluginClass, context);
         registerHttpEndpoints(plugin, pluginClass, context);
         registerCommands(plugin, pluginClass, context);
@@ -161,8 +163,22 @@ class PluginAnnotationRegistrar {
         }
     }
 
-    private void registerFrontend(Class<?> pluginClass, PluginContextImpl context) {
-        PluginFrontend frontend = pluginClass.getAnnotation(PluginFrontend.class);
+    private void registerTheme(Class<?> pluginClass, PluginContextImpl context) {
+        PluginTheme theme = pluginClass.getAnnotation(PluginTheme.class);
+        if (theme == null) {
+            return;
+        }
+        context.registerTheme(new online.yudream.base.plugin.spi.theme.PluginTheme(
+                theme.code(),
+                theme.name(),
+                theme.description(),
+                theme.scopes().length == 0 ? java.util.Set.of() : java.util.EnumSet.copyOf(List.of(theme.scopes())),
+                List.of(theme.styles()),
+                theme.preview()
+        ));
+    }
+
+    private void registerFrontend(Class<?> pluginClass, PluginContextImpl context) {        PluginFrontend frontend = pluginClass.getAnnotation(PluginFrontend.class);
         if (frontend == null) {
             return;
         }

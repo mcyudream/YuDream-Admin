@@ -19,6 +19,8 @@ import online.yudream.base.application.platform.plugin.dto.PluginStorePluginJarD
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginPublisherDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSourceDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginThemeOverviewDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMessagingConnectionDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMessagingGroupDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginAiAgentCatalogDTO;
@@ -43,6 +45,8 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginPubli
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginSourceRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginVersionRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginThemeOverviewRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginThemeRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingConnectionRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingGroupRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginAiAgentCatalogRes;
@@ -251,6 +255,32 @@ public class PluginWebAssembler {
                 .component(dto.getComponent())
                 .permission(dto.getPermission())
                 .sort(dto.getSort())
+                .build();
+    }
+
+    public static PluginThemeRes toThemeRes(PluginThemeDTO dto) {
+        return PluginThemeRes.builder()
+                .pluginCode(dto.getPluginCode())
+                .code(dto.getCode())
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .scopes(dto.getScopes())
+                .styles(dto.getStyles())
+                .preview(dto.getPreview())
+                .assetRevision(dto.getAssetRevision())
+                .build();
+    }
+
+    public static Map<String, PluginThemeRes> toActiveThemeResMap(Map<String, PluginThemeDTO> activeThemes) {
+        return activeThemes.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> toThemeRes(entry.getValue())));
+    }
+
+    public static PluginThemeOverviewRes toThemeOverviewRes(PluginThemeOverviewDTO dto) {
+        return PluginThemeOverviewRes.builder()
+                .themes(dto.getThemes() == null ? List.of() : dto.getThemes().stream()
+                        .map(PluginWebAssembler::toThemeRes).toList())
+                .active(dto.getActive() == null ? Map.of() : dto.getActive())
                 .build();
     }
 

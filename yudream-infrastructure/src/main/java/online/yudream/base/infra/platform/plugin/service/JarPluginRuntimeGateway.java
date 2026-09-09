@@ -34,6 +34,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAgentInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
+import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
 import online.yudream.base.domain.system.menu.enumerate.MenuStatus;
 import online.yudream.base.infra.platform.plugin.devmode.DevModeEnvironment;
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrowser;
@@ -55,6 +56,7 @@ import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.security.PluginPrincipal;
 import online.yudream.base.plugin.spi.system.messaging.PluginEvent;
 import online.yudream.base.plugin.spi.system.command.PluginCommandContext;
+import online.yudream.base.plugin.spi.theme.PluginTheme;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -491,6 +493,38 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                         .thenComparing(PluginGlobalWidgetInfo::pluginCode)
                         .thenComparing(PluginGlobalWidgetInfo::code))
                 .toList();
+    }
+
+    @Override
+    public List<PluginThemeInfo> themes() {
+        return holders.entrySet().stream()
+                .filter(entry -> entry.getValue().isEnabled())
+                .flatMap(entry -> entry.getValue().getContext().theme().stream()
+                        .map(theme -> toThemeInfo(entry.getKey(), theme, entry.getValue().getAssetRevision())))
+                .toList();
+    }
+
+    @Override
+    public Optional<PluginThemeInfo> theme(String code) {
+        PluginRuntimeHolder holder = holders.get(code);
+        if (holder == null || !holder.isEnabled()) {
+            return Optional.empty();
+        }
+        return holder.getContext().theme()
+                .map(theme -> toThemeInfo(code, theme, holder.getAssetRevision()));
+    }
+
+    private PluginThemeInfo toThemeInfo(String pluginCode, PluginTheme theme, String assetRevision) {
+        return new PluginThemeInfo(
+                pluginCode,
+                theme.code(),
+                theme.name(),
+                theme.description(),
+                theme.scopes().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()),
+                theme.styles(),
+                theme.preview(),
+                assetRevision
+        );
     }
 
     @Override

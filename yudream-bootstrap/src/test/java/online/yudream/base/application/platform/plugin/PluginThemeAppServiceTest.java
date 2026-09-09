@@ -1,0 +1,182 @@
+package online.yudream.base.application.platform.plugin;
+
+import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginThemeOverviewDTO;
+import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
+import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
+import online.yudream.base.domain.system.setting.aggregate.Setting;
+import online.yudream.base.domain.system.setting.repo.SettingRepo;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class PluginThemeAppServiceTest {
+
+    @Mock
+    private PluginRuntimeGateway pluginRuntimeGateway;
+
+    private InMemorySettingRepo settingRepo;
+    private PluginThemeAppService service;
+
+    @BeforeEach
+    void setUp() {
+        settingRepo = new InMemorySettingRepo();
+        service = new PluginThemeAppService(pluginRuntimeGateway, settingRepo);
+    }
+
+    @Test
+    void activateWritesDeclaredScopesAndActiveThemesResolve() {
+        stubTheme(theme("neco", Set.of("SITE", "ADMIN")));
+
+        service.activate("neco");
+
+        Map<String, PluginThemeDTO> active = service.activeThemes();
+        assertThat(active).containsOnlyKeys("SITE", "ADMIN");
+        assertThat(active.get("SITE").getPluginCode()).isEqualTo("neco");
+        assertThat(active.get("ADMIN").getName()).isEqualTo("Neco 主题");
+        assertThat(settingRepo.findByKey("pluginTheme.active.site")).hasValueSatisfying(
+                setting -> assertThat(setting.getValue()).isEqualTo("neco"));
+    }
+
+    @Test
+    void activateWithoutThemeIsNoOp() {
+        service.activate("plain-plugin");
+
+        assertThat(settingRepo.findAll()).isEmpty();
+        assertThat(service.activeThemes()).isEmpty();
+    }
+
+    @Test
+    void clearActivationOnlyClearsSlotsOwnedByPlugin() {
+        stubTheme(theme("neco", Set.of("SITE", "ADMIN")));
+        stubTheme(theme("pixel", Set.of("SITE")));
+        service.activate("neco");
+        service.activate("pixel");
+
+        service.clearActivation("pixel");
+
+        assertThat(readSlot("SITE")).isNull();
+        assertThat(readSlot("ADMIN")).isEqualTo("neco");
+    }
+
+    @Test
+    void activeThemesDropsSlotWhosePluginNoLongerServesScope() {
+        stubTheme(theme("neco", Set.of("SITE")));
+        service.activate("neco");
+        when(pluginRuntimeGateway.theme("neco")).thenReturn(Optional.empty());
+
+        assertThat(service.activeThemes()).isEmpty();
+    }
+
+    @Test
+    void reconcileClearsInvalidSlotAndBackfillsSingleCandidate() {
+        PluginThemeInfo neco = theme("neco", Set.of("SITE"));
+        stubTheme(neco);
+        writeSlot("SITE", "ghost-plugin");
+        when(pluginRuntimeGateway.themes()).thenReturn(List.of(neco));
+
+        service.reconcileAfterRestore();
+
+        assertThat(readSlot("SITE")).isEqualTo("neco");
+    }
+
+    @Test
+    void reconcileKeepsValidSlotAndLeavesMultiCandidateScopeAlone() {
+        PluginThemeInfo neco = theme("neco", Set.of("SITE"));
+        PluginThemeInfo pixel = theme("pixel", Set.of("SITE"));
+        stubTheme(neco);
+        stubTheme(pixel);
+        writeSlot("SITE", "pixel");
+        when(pluginRuntimeGateway.themes()).thenReturn(List.of(neco, pixel));
+
+        service.reconcileAfterRestore();
+
+        assertThat(readSlot("SITE")).isEqualTo("pixel");
+    }
+
+    @Test
+    void overviewListsEnabledThemesWithActiveSlots() {
+        PluginThemeInfo neco = theme("neco", Set.of("SITE"));
+        PluginThemeInfo pixel = theme("pixel", Set.of("ADMIN"));
+        stubTheme(neco);
+        stubTheme(pixel);
+        when(pluginRuntimeGateway.themes()).thenReturn(List.of(neco, pixel));
+        service.activate("pixel");
+
+        PluginThemeOverviewDTO overview = service.overview();
+
+        assertThat(overview.getThemes()).hasSize(2);
+        assertThat(overview.getActive()).containsExactlyEntriesOf(Map.of("ADMIN", "pixel"));
+    }
+
+    private PluginThemeInfo theme(String pluginCode, Set<String> scopes) {
+        return new PluginThemeInfo(pluginCode, pluginCode, "Neco 主题", "像素风主题",
+                scopes, List.of("theme/" + pluginCode + ".css"), "", "rev-1");
+    }
+
+    private void stubTheme(PluginThemeInfo theme) {
+        org.mockito.Mockito.lenient()
+                .when(pluginRuntimeGateway.theme(theme.pluginCode())).thenReturn(Optional.of(theme));
+    }
+
+    private void writeSlot(String scope, String pluginCode) {
+        settingRepo.save(Setting.builder()
+                .key("pluginTheme.active." + scope.toLowerCase())
+                .value(pluginCode)
+                .build());
+    }
+
+    private String readSlot(String scope) {
+        return settingRepo.findByKey("pluginTheme.active." + scope.toLowerCase())
+                .map(Setting::getValue)
+                .filter(value -> !value.isBlank())
+                .orElse(null);
+    }
+
+    static class InMemorySettingRepo implements SettingRepo {
+
+        private final Map<String, Setting> store = new LinkedHashMap<>();
+
+        @Override
+        public Setting save(Setting setting) {
+            store.put(setting.getKey(), setting);
+            return setting;
+        }
+
+        @Override
+        public Optional<Setting> findByKey(String key) {
+            return Optional.ofNullable(store.get(key));
+        }
+
+        @Override
+        public boolean existsByKey(String key) {
+            return store.containsKey(key);
+        }
+
+        @Override
+        public List<Setting> findByCategory(String category) {
+            return store.values().stream()
+                    .filter(setting -> category.equals(setting.getCategory()))
+                    .toList();
+        }
+
+        @Override
+        public List<Setting> findAll() {
+            return new ArrayList<>(store.values());
+        }
+    }
+}

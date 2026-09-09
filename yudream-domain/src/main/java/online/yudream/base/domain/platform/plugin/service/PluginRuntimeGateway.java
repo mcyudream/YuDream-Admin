@@ -18,6 +18,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectScanRes
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldSpec;
+import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
 
 import java.util.List;
 import java.util.Optional;
@@ -58,6 +59,16 @@ public interface PluginRuntimeGateway {
     /** 全部已启用插件声明的全局挂件（登录态控制台布局常驻挂载）。 */
     default List<PluginGlobalWidgetInfo> globalWidgets() {
         return List.of();
+    }
+
+    /** 全部已启用插件声明的界面主题（一个插件最多一个）。 */
+    default List<PluginThemeInfo> themes() {
+        return List.of();
+    }
+
+    /** 指定已启用插件声明的界面主题，未注册时为空。 */
+    default Optional<PluginThemeInfo> theme(String code) {
+        return Optional.empty();
     }
 
     List<PluginHttpEndpointInfo> httpEndpoints();
