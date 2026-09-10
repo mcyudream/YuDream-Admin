@@ -127,6 +127,7 @@ export function extractHomeContent(html: string) {
 }
 
 const chromeCssTokens = [
+  '.site-chrome',
   '.site-layout-header',
   '.site-layout-footer',
   '.site-layout-copyright',

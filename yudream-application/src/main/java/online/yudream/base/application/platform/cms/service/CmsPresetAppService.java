@@ -187,11 +187,12 @@ public class CmsPresetAppService {
                     .orElseGet(() -> HomePageLayout.defaultLayout(pluginCode));
             applyPresetToLayout(layout, preset);
             homePageLayoutRepo.save(layout);
-        } else if (previous.map(old -> old.sameContent(existingLayout.get())).orElse(false)) {
+        } else if (previous.map(old -> old.sameContent(existingLayout.get())).orElse(false)
+                || blankHomeHtml(existingLayout.get())) {
             HomePageLayout layout = existingLayout.get();
             applyPresetToLayout(layout, preset);
             homePageLayoutRepo.save(layout);
-            log.info("主题首页未被改动，已自动应用新版自带方案：plugin={}", pluginCode);
+            log.info("主题首页可自动升级（未改动或尚未使用 homeHtml），已应用新版自带方案：plugin={}", pluginCode);
         } else {
             log.info("主题首页已被管理员改动，仅更新自带方案不覆盖内容：plugin={}", pluginCode);
         }
@@ -242,6 +243,17 @@ public class CmsPresetAppService {
     private void applyPresetToLayout(HomePageLayout layout, HomePagePreset preset) {
         layout.update(preset.getTitle(), preset.getSubtitle(), preset.getCode(), preset.getHeroImageUrl(),
                 preset.getSettings(), preset.getSections(), layout.getPublished());
+    }
+
+    /**
+     * 布局尚未使用 builder 首页（homeHtml 为空）时视为可自动升级：
+     * 旧版 FEATURE 卡片回退页会被主题新大厅覆盖；管理员一旦写过 homeHtml 则不再动。
+     */
+    private static boolean blankHomeHtml(HomePageLayout layout) {
+        if (layout == null || layout.getSettings() == null) {
+            return true;
+        }
+        return !StringUtils.hasText(layout.getSettings().get("homeHtml"));
     }
 
     private void snapshotCurrentIfChanged(HomePageLayout current) {

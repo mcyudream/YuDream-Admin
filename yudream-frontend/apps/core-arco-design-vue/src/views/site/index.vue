@@ -614,6 +614,10 @@ function dateText(value?: string) {
   min-height: calc(100vh - 63px);
 }
 
+.site-page:has(.site-builder-home) .site-layout-frame {
+  min-height: 0;
+}
+
 .site-layout-content {
   flex: 1 1 auto;
   min-width: 0;
@@ -664,7 +668,8 @@ function dateText(value?: string) {
 .site-builder-home :deep(article:not([class])) {
   margin-block: 0 1.25rem;
   padding-block: 0.75rem;
-  padding-inline: 0;}
+  padding-inline: 0;
+}
 
 .site-builder-home :deep(:where(h1, h2, h3, h4, h5, h6)) {
   margin-block: 0 0.6em;
@@ -673,7 +678,8 @@ function dateText(value?: string) {
 
 .site-builder-home :deep(:where(p, ul, ol, blockquote)) {
   margin-block: 0 0.9em;
-  line-height: 1.7;}
+  line-height: 1.7;
+}
 
 .site-builder-home :deep(:where(ul, ol)) {
   padding-inline-start: 1.4em;

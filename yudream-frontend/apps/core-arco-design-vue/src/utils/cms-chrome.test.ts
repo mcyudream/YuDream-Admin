@@ -97,6 +97,17 @@ test('extracts and prioritizes chrome CSS stored inside page CSS', () => {
   assert.match(runtimeCss, /main\.site-page \.site-layout-header \{ background: #080817; \}/)
 })
 
+test('extracts overlay chrome rules that use :has() against the site chrome root', () => {
+  const pageCss = `.site-chrome:has(.neco-lobby) { position: relative; }\n.site-chrome:has(.neco-lobby) .site-layout-header { position: absolute; background: transparent; }\n.site-builder-home .neco-lobby__hero { min-height: 40rem; }`
+  const chromeOnly = extractChromeCss(pageCss)
+  const runtimeCss = chromeRuntimeCss('HEADER_FOOTER', chromeOnly)
+
+  assert.match(chromeOnly, /\.site-chrome:has\(\.neco-lobby\) \{ position: relative; \}/)
+  assert.match(chromeOnly, /\.site-chrome:has\(\.neco-lobby\) \.site-layout-header \{ position: absolute; background: transparent; \}/)
+  assert.doesNotMatch(chromeOnly, /neco-lobby__hero/)
+  assert.match(runtimeCss, /main\.site-page \.site-chrome:has\(\.neco-lobby\) \.site-layout-header/)
+})
+
 test('uses stable CMS device widths and calculates a fit zoom', () => {
   assert.deepEqual(cmsCanvasDevices(), [
     { id: 'desktop', name: '桌面', width: '1440px' },

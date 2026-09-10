@@ -314,20 +314,59 @@ class CmsPresetAppServiceTest {
     }
 
     @Test
-    void importPluginPresetKeepsAdminEditedLayoutAndOnlyUpdatesPreset() {
+    void importPluginPresetAutoAppliesWhenAdminOnlyEditedTitleWithoutHomeHtml() {
         layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
         service.importPluginPreset("neco", "Neco", "{\"title\":\"v1\",\"settings\":{\"homeCss\":\".old{}\"}}");
         HomePageLayout edited = layoutRepo.findByThemeCode("neco").orElseThrow();
         edited.setTitle("管理员改过的首页");
 
-        service.importPluginPreset("neco", "Neco", "{\"title\":\"v2\",\"settings\":{\"homeCss\":\".new{}\"}}");
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"v2\",\"settings\":{\"homeCss\":\".new{}\",\"homeHtml\":\"<div class=\\\"lobby\\\">大厅</div>\"}}");
 
         HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
-        assertThat(necoLayout.getTitle()).isEqualTo("管理员改过的首页");
-        assertThat(necoLayout.getSettings()).containsEntry("homeCss", ".old{}");
+        assertThat(necoLayout.getTitle()).isEqualTo("v2");
+        assertThat(necoLayout.getSettings())
+                .containsEntry("homeCss", ".new{}")
+                .containsEntry("homeHtml", "<div class=\"lobby\">大厅</div>");
         HomePagePreset preset = presetRepo.findByCode("plugin:neco").orElseThrow();
         assertThat(preset.getTitle()).isEqualTo("v2");
         assertThat(preset.getSettings()).containsEntry("homeCss", ".new{}");
+    }
+
+    @Test
+    void importPluginPresetAutoAppliesWhenExistingLayoutHasBlankHomeHtml() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"v1\"}");
+        HomePageLayout edited = layoutRepo.findByThemeCode("neco").orElseThrow();
+        edited.setTitle("管理员改过的首页");
+        edited.setSettings(new HashMap<>(Map.of("homeCss", ".old{}")));
+
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v2","settings":{"homeHtml":"<div class=\\"lobby\\">大厅</div>","homeCss":".new{}"}}
+                """);
+
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("v2");
+        assertThat(necoLayout.getSettings())
+                .containsEntry("homeHtml", "<div class=\"lobby\">大厅</div>")
+                .containsEntry("homeCss", ".new{}");
+    }
+
+    @Test
+    void importPluginPresetKeepsAdminHomeHtmlAndOnlyUpdatesPreset() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"v1\",\"settings\":{\"homeHtml\":\"<div>old</div>\"}}");
+        HomePageLayout edited = layoutRepo.findByThemeCode("neco").orElseThrow();
+        edited.setTitle("管理员改过的首页");
+        edited.setSettings(new HashMap<>(Map.of("homeHtml", "<div>管理员手写</div>")));
+
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"v2\",\"settings\":{\"homeHtml\":\"<div>new</div>\"}}");
+
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("管理员改过的首页");
+        assertThat(necoLayout.getSettings()).containsEntry("homeHtml", "<div>管理员手写</div>");
+        HomePagePreset preset = presetRepo.findByCode("plugin:neco").orElseThrow();
+        assertThat(preset.getTitle()).isEqualTo("v2");
+        assertThat(preset.getSettings()).containsEntry("homeHtml", "<div>new</div>");
     }
 
     @Test
