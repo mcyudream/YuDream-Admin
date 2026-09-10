@@ -43,7 +43,7 @@
 - 插件 HTTP 端点统一挂载 `/api/plugins/{pluginCode}/**`；插件自有 Thymeleaf 模板放插件 JAR 的 `src/main/resources/templates`，经插件作用域渲染器按逻辑名渲染。
 - Java `Long`/Snowflake ID 在 JSON、插件 DTO、TS 模型、表单与 URL 参数中一律使用 `string`，禁止 `Number(id)`。
 - 生产插件前端只通过 JAR 内 ESM `remoteEntry.js` + 宿主注入 SDK 加载；前端资源打进 `META-INF/yudream-plugin/frontend/{pluginCode}`。workspace 加载仅是开发便利，禁止生产 manifest 依赖 workspace 别名。
-- 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设的 UnoCSS，关闭 reset、只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；禁止再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。
+- 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设的 UnoCSS，关闭 reset、只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；禁止再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。级联隔离：SDK 1.6.0 起插件产物全部降入 `@layer yudream-plugin`，宿主层序固定 `yudream-base`（宿主 preflight）< `yudream-plugin` < 宿主未分层工具类——插件可覆写宿主 preflight 与原生元素样式，但永远不能覆盖宿主同名工具类/响应式变体；插件必须随 SDK ≥1.6.0 重建 style.css，旧未分层产物仍会顶掉宿主工具类。
 - 插件主题经 `@PluginTheme` 注册（一个插件一个主题，`scopes` 声明 SITE/ADMIN）：同 scope 同时只激活一个，启用新主题插件自动顶替旧插件并持久化激活位（`sys_setting` category `plugin-theme`），禁用/卸载即释放回落内置主题。主题样式资产放插件 frontend 目录并经 `/api/platform/plugins/{code}/assets/**` 下发；CSS 约定 SITE 只写 `.site-page`/`.site-chrome` 与 `--yb-site-*` 变量、ADMIN 只写 `:root`/`.dark` 宿主变量，两 scope 不得互相污染。细则见 `docs/plugin-system/specification.md` 9.1。
 - SITE 主题可用 `homePreset` 声明 JAR 内首页方案 JSON，激活时宿主导入为 `plugin:{pluginCode}` 方案并应用（自动快照当前定制，方案只覆盖声明的 settings 键）；后台「内容站点 → 首页方案」统一管理与一键切换。公开页换肤正途是插件适配主题：插件自带 `--xx-*` 桥接变量回退消费 `--yb-site-*`，主题按插件专属类名写样式仅作兼容层。
 
