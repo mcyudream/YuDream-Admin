@@ -20,6 +20,10 @@ import java.util.Set;
  * <p>homePreset 可声明一份首页内容定制方案 JSON（同资产目录），SITE 主题激活时
  * 宿主会自动快照当前首页定制并应用该方案；方案只覆盖其声明的字段与 settings 键，
  * 未声明的（如站点导航）保留现状。</p>
+ *
+ * <p>configSchema 可声明一份主题配置 schema JSON（同资产目录），宿主主题中心据此
+ * 渲染该主题专属的WordPress 式配置大页面；配置值按主题持久化，公开站模板经
+ * {@code theme.config.*} 消费。</p>
  */
 public record PluginTheme(
         String code,
@@ -28,6 +32,7 @@ public record PluginTheme(
         Set<PluginThemeScope> scopes,
         List<String> styles,
         String preview,
-        String homePreset
+        String homePreset,
+        String configSchema
 ) {
 }
