@@ -253,8 +253,16 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 
 - SITE 主题可声明 `homePreset` 指向 JAR 内一份首页方案 JSON（hero 标题/副标题、首页区块 sections、需要覆盖的 settings 键）；SITE scope 激活时宿主自动读取导入为方案 `plugin:{pluginCode}` 并立即应用，公开站首页整套切换。
 - 合并语义：方案只覆盖它声明的 settings 键，未声明的键（如 `navigationJson` 导航菜单）保留站点当前值；应用本身是对首页布局的整体回写，`published` 发布状态保留。
-- 应用前宿主自动把当前首页定制存为「切换前快照」方案（内容一致则去重，快照上限 10 份）；后台「内容站点 → 首页方案」可查看全部用户/插件/快照方案并一键应用或删除。换主题不会自动还原首页，需手动应用历史方案。
+- 应用前宿主自动把当前首页定制存为「切换前快照」方案（内容一致则去重，快照上限 10 份）；后台「主题中心 → 首页方案」可查看全部用户/插件/快照方案并一键应用或删除。换主题不会自动还原首页，需手动应用历史方案。
 - 内容定制能力（cms）关闭时不导入方案，仅应用主题 CSS；方案资产缺失或非法时跳过导入，不影响主题激活。
+
+主题页面集（homePreset.pages[]）：
+
+- SITE 主题的 homePreset JSON 可声明 `pages[]` 整套页面：`{slug, title, summary, coverImageUrl, template(DEFAULT/DOC/LANDING/BLANK), markdownContent, htmlContent, cssContent, jsContent, seoTitle, seoDescription}`，除 slug/title 外均可空。页面随主题启用导入为**已发布**，并标记 `sourcePluginCode={pluginCode}`。
+- slug 归属语义：slug 未被占用 → 创建发布；已被**同一插件**占用 → 覆盖更新并发布（主题升级同步内容）；被管理员或其他主题占用 → 跳过并记 warn，**永不覆盖管理员内容**。本次声明清单之外的该插件旧页面 → 转草稿（声明即同步）。
+- 停用下线语义：主题被顶替/禁用/卸载时，宿主把该主题 `sourcePluginCode` 页面全部下线转草稿（管理员内容不动）；再次启用主题时导入流程恢复发布。首页方案本身不自动回滚，由快照机制一键切回。
+- 内容注入约定：主题页面与 `settings.homeHtml` 一律用 `data-yb-*` 模板指令（`data-yb-for/if/html/markdown/limit` 等）与 `{{路径}}` 变量注入系统数据（站点信息、登录态、最新页面/Wiki 等）；**禁止声明 `navigationJson`**，导航始终由系统渲染。主题自带页面 CSS 只写布局，配色应消费主题自身变量。
+- 主题中心：后台「平台 → 主题中心」聚合展示全部 SITE 主题卡（预览图、是否含首页方案/页面集、激活态）并支持一键启用/恢复默认；CMS 页面/首页定制/导航/媒体库/首页方案管理均并入主题中心。注意：菜单为种子初始化，既有部署升级后需手工清理旧的「内容站点（platform:cms）」菜单节点。
 
 CSS 作用域约定：
 
@@ -272,6 +280,8 @@ CSS 作用域约定：
 
 - `GET /api/platform/plugins/themes/active`（匿名）：返回各 scope 当前激活主题（含样式资产相对路径与 `assetRevision`），宿主启动时在 `app.mount` 前注入常驻 `<link data-yudream-theme-scope>` 避免主题闪烁。
 - `GET /api/platform/plugins/themes`（`platform:plugin:view`）：全部已启用插件声明的主题与各 scope 激活者，供主题设置页展示。
+- `GET /api/platform/themes/overview`（`platform:theme-center:view`）：主题中心聚合视图——SITE 主题卡（预览资产、含首页方案/页面集标记、激活态）+ 首页方案列表（含 `active` 标志）；cms 能力关闭时降级为主题卡 + 空方案列表。
+- `POST /api/platform/themes/{code}/activate` / `POST /api/platform/themes/deactivate`（`platform:theme-center:use`）：启用指定 SITE 主题（互斥顶替）/ 停用当前 SITE 主题回落内置。
 
 ## 10. 菜单与路由规范
 

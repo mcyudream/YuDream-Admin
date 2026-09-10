@@ -45,7 +45,7 @@
 - 生产插件前端只通过 JAR 内 ESM `remoteEntry.js` + 宿主注入 SDK 加载；前端资源打进 `META-INF/yudream-plugin/frontend/{pluginCode}`。workspace 加载仅是开发便利，禁止生产 manifest 依赖 workspace 别名。
 - 插件前端样式统一走声明式 `style.css`：`vite.config.ts` 挂 `@yudream/plugin-sdk/uno-config` 的 `yuDreamPluginUnoCss()`（与宿主同预设的 UnoCSS，关闭 reset、只引用宿主主题变量），入口 `import 'virtual:uno.css'`，lib `cssFileName: 'style'`，Java 侧 `@PluginFrontend(styles = {"style.css"})`；禁止再用 `styles.css?inline` + `install()` 手写 `<style>` 注入。级联隔离：SDK 1.6.0 起插件产物全部降入 `@layer yudream-plugin`，宿主层序固定 `yudream-base`（宿主 preflight）< `yudream-plugin` < 宿主未分层工具类——插件可覆写宿主 preflight 与原生元素样式，但永远不能覆盖宿主同名工具类/响应式变体；插件必须随 SDK ≥1.6.0 重建 style.css，旧未分层产物仍会顶掉宿主工具类。
 - 插件主题经 `@PluginTheme` 注册（一个插件一个主题，`scopes` 声明 SITE/ADMIN）：同 scope 同时只激活一个，启用新主题插件自动顶替旧插件并持久化激活位（`sys_setting` category `plugin-theme`），禁用/卸载即释放回落内置主题。主题样式资产放插件 frontend 目录并经 `/api/platform/plugins/{code}/assets/**` 下发；CSS 约定 SITE 只写 `.site-page`/`.site-chrome` 与 `--yb-site-*` 变量、ADMIN 只写 `:root`/`.dark` 宿主变量，两 scope 不得互相污染。细则见 `docs/plugin-system/specification.md` 9.1。
-- SITE 主题可用 `homePreset` 声明 JAR 内首页方案 JSON，激活时宿主导入为 `plugin:{pluginCode}` 方案并应用（自动快照当前定制，方案只覆盖声明的 settings 键）；后台「内容站点 → 首页方案」统一管理与一键切换。公开页换肤正途是插件适配主题：插件自带 `--xx-*` 桥接变量回退消费 `--yb-site-*`，主题按插件专属类名写样式仅作兼容层。
+- SITE 主题可用 `homePreset` 声明 JAR 内首页方案 JSON，激活时宿主导入为 `plugin:{pluginCode}` 方案并应用（自动快照当前定制，方案只覆盖声明的 settings 键）；方案可再带 `pages[]` 整套页面——按 slug 归属创建/覆盖发布（标记 `sourcePluginCode`，管理员与他主题占用的 slug 跳过不覆盖），声明清单之外的该插件旧页面转草稿，主题停用/顶替/卸载时全部下线转草稿、再启用恢复发布。主题页面与 `settings.homeHtml` 一律用 `data-yb-*` 模板指令注入系统数据，禁止声明 `navigationJson`。后台「平台 → 主题中心」（独立一级菜单，已合并 CMS 页面/首页定制/导航/媒体库/首页方案）统一管理与一键切换；既有部署的种子菜单需手工清理旧「内容站点」节点。公开页换肤正途是插件适配主题：插件自带 `--xx-*` 桥接变量回退消费 `--yb-site-*`，主题按插件专属类名写样式仅作兼容层。
 
 ## 5. AI/Agent 与 CMS 要点
 
