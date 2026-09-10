@@ -42,4 +42,11 @@ public @interface PluginTheme {
      * 方案只覆盖其声明的字段与 settings 键，未声明的保留现状。
      */
     String homePreset() default "";
+
+    /**
+     * 主题配置 schema JSON 资产相对路径，可为空。
+     * 声明后宿主主题中心会为该主题渲染独立的配置大页面（WordPress 自定义器形态），
+     * 配置值按主题持久化并在公开站模板中以 {@code theme.config.*} 注入。
+     */
+    String configSchema() default "";
 }
