@@ -466,7 +466,7 @@ function confirmActivateTheme(theme: ThemeCenterTheme) {
   }
   modal.confirm({
     title: '切换整站主题',
-    content: `确认启用「${theme.name}」作为公开站主题吗？当前首页定制会自动保存为快照${theme.hasHomePreset ? '，主题自带的首页方案会随之应用' : ''}${theme.hasPageSet ? '，主题随附页面会导入并发布（停用主题时自动下线转草稿）' : ''}。`,
+    content: `确认启用「${theme.name}」作为公开站主题吗？${theme.hasHomePreset ? '首页将整套替换为该主题自带的设计（当前首页会先存为接管前备份，停用主题时自动还原，不会与其他主题内容混杂）' : '当前首页定制保持不变'}${theme.hasPageSet ? '，主题随附页面会导入并发布（停用主题时自动下线转草稿）' : ''}。`,
     onConfirm: async () => {
       themeSwitching.value = true
       try {
@@ -491,7 +491,7 @@ function confirmRestoreDefaultTheme() {
   }
   modal.confirm({
     title: '恢复默认主题',
-    content: `确认停用「${active.name}」并恢复内置默认主题吗？主题随附页面会自动下线转草稿，当前首页定制保留（可从首页方案/快照切回）。`,
+    content: `确认停用「${active.name}」并恢复内置默认主题吗？主题随附页面会自动下线转草稿，首页设计将还原到该主题接管前的状态。`,
     onConfirm: async () => {
       themeSwitching.value = true
       try {
@@ -1029,7 +1029,7 @@ function sectionTitle(type: HomeSectionType) {
         <div class="preset-toolbar">
           <div>
             <h3>整站主题</h3>
-            <p>收纳公开站可用的全部主题：内置默认主题与主题插件（主题可携带整套页面与首页方案，不只是样式覆盖）。切换时当前首页定制自动快照，可随时在「首页方案」切回。</p>
+            <p>收纳公开站可用的全部主题：内置默认主题与主题插件（主题可携带整套页面与首页设计，不只是样式覆盖）。每个主题的首页设计彼此独立：启用时整套替换，停用时自动还原到接管前的首页。</p>
           </div>
         </div>
         <div v-if="themeCards.length" class="theme-grid">

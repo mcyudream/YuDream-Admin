@@ -310,6 +310,127 @@ class CmsPresetAppServiceTest {
     }
 
     @Test
+    void switchingThemesNeverMixesHomeDesigns() {
+        layoutRepo.store(layout("站点自有首页", new HashMap<>(Map.of(
+                "navigationJson", "[{\"name\":\"wiki\"}]", "announcement", "欢迎")), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"像素首页","settings":{"homeHtml":"<div>neco</div>","homeCss":".neco{}"}}
+                """);
+
+        service.importPluginPreset("pixel", "Pixel", """
+                {"title":"另一套主题","settings":{"homeCss":".pixel{}"}}
+                """);
+
+        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
+        assertThat(current.getTitle()).isEqualTo("另一套主题");
+        assertThat(current.getTheme()).isEqualTo("plugin:pixel");
+        assertThat(current.getSettings())
+                .containsEntry("homeCss", ".pixel{}")
+                .containsEntry("navigationJson", "[{\"name\":\"wiki\"}]")
+                .containsEntry("announcement", "欢迎")
+                .doesNotContainKey("homeHtml");
+    }
+
+    @Test
+    void reimportUsesOwnPreThemeBackupAsBaseSoUpgradesLeaveNoResidue() {
+        layoutRepo.store(layout("站点自有首页", new HashMap<>(Map.of("navigationJson", "[]")), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v1","settings":{"homeHtml":"<div>old</div>"}}
+                """);
+
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v2","settings":{"homeCss":".new{}"}}
+                """);
+
+        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
+        assertThat(current.getTitle()).isEqualTo("v2");
+        assertThat(current.getSettings())
+                .containsEntry("homeCss", ".new{}")
+                .containsEntry("navigationJson", "[]")
+                .doesNotContainKey("homeHtml");
+    }
+
+    @Test
+    void restorePluginHomepageRevertsToPreThemeDesignAndDropsBackup() {
+        layoutRepo.store(layout("站点自有首页", new HashMap<>(Map.of("navigationJson", "[]")), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"像素首页","settings":{"homeHtml":"<div>neco</div>"}}
+                """);
+        assertThat(layoutRepo.findCurrent().orElseThrow().getTitle()).isEqualTo("像素首页");
+        assertThat(presetRepo.findByCode("plugin-backup:neco")).isPresent();
+
+        service.restorePluginHomepage("neco");
+
+        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
+        assertThat(current.getTitle()).isEqualTo("站点自有首页");
+        assertThat(current.getTheme()).isEqualTo("default");
+        assertThat(current.getSettings())
+                .containsEntry("navigationJson", "[]")
+                .doesNotContainKey("homeHtml");
+        assertThat(presetRepo.findByCode("plugin-backup:neco")).isEmpty();
+    }
+
+    @Test
+    void restorePluginHomepageOnlyDropsBackupWhenAdminSwitchedAway() {
+        layoutRepo.store(layout("站点自有首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"像素首页\"}");
+        presetRepo.save(HomePagePreset.builder()
+                .code("user-1").name("手工方案").source(HomePagePresetSource.USER)
+                .title("手工首页").settings(Map.of()).sections(List.of()).build());
+        service.apply("user-1");
+
+        service.restorePluginHomepage("neco");
+
+        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
+        assertThat(current.getTitle()).isEqualTo("手工首页");
+        assertThat(current.getTheme()).isEqualTo("user-1");
+        assertThat(presetRepo.findByCode("plugin-backup:neco")).isEmpty();
+    }
+
+    @Test
+    void restorePluginHomepageWithoutBackupStripsDeclaredSettingsKeys() {
+        layoutRepo.store(HomePageLayout.builder()
+                .id(1L).title("像素首页").subtitle("副标题").theme("plugin:neco")
+                .settings(new HashMap<>(Map.of("navigationJson", "[]", "homeHtml", "<div>neco</div>")))
+                .sections(new ArrayList<>()).published(true).build());
+        presetRepo.save(HomePagePreset.builder()
+                .code("plugin:neco").name("Neco").source(HomePagePresetSource.PLUGIN).pluginCode("neco")
+                .title("像素首页").settings(Map.of("homeHtml", "<div>neco</div>")).sections(List.of()).build());
+
+        service.restorePluginHomepage("neco");
+
+        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
+        assertThat(current.getTheme()).isEqualTo("default");
+        assertThat(current.getSettings())
+                .containsEntry("navigationJson", "[]")
+                .doesNotContainKey("homeHtml");
+    }
+
+    @Test
+    void listHidesThemeBackupPresets() {
+        layoutRepo.store(layout("站点自有首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"像素首页\"}");
+
+        List<HomePagePresetDTO> presets = service.list();
+
+        assertThat(presets.stream().map(HomePagePresetDTO::getCode))
+                .contains("plugin:neco")
+                .noneMatch(code -> code.startsWith("plugin-backup:"));
+    }
+
+    @Test
+    void restorePluginHomepageSkipsWhenCapabilityDisabled() {
+        layoutRepo.store(layout("站点自有首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"像素首页\"}");
+        capabilityModuleRepo.enabled = false;
+
+        service.restorePluginHomepage("neco");
+
+        assertThat(layoutRepo.findCurrent().orElseThrow().getTitle()).isEqualTo("像素首页");
+        assertThat(presetRepo.findByCode("plugin-backup:neco")).isPresent();
+    }
+
+    @Test
     void unpublishPluginPagesSkipsWhenCapabilityDisabled() {
         layoutRepo.store(layout("旧首页", Map.of(), true));
         service.importPluginPreset("neco", "Neco", """

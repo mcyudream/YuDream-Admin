@@ -46,6 +46,9 @@ public class CmsPresetAppService {
 
     private static final String CAPABILITY_CODE = "cms";
     private static final int MAX_SNAPSHOTS = 10;
+    /** 主题接管前的首页备份方案编码前缀；备份仅用于停用还原，不出现在方案列表。 */
+    private static final String PLUGIN_BACKUP_PREFIX = "plugin-backup:";
+    private static final String DEFAULT_THEME = "default";
     private static final DateTimeFormatter SNAPSHOT_NAME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final CapabilityModuleRepo capabilityModuleRepo;
@@ -60,6 +63,7 @@ public class CmsPresetAppService {
         ensureEnabled();
         String currentTheme = currentLayout().getTheme();
         return homePagePresetRepo.findAll().stream()
+                .filter(preset -> preset.getCode() == null || !preset.getCode().startsWith(PLUGIN_BACKUP_PREFIX))
                 .map(preset -> {
                     HomePagePresetDTO dto = CmsAssembler.toPresetDTO(preset);
                     dto.setActive(preset.getCode().equals(currentTheme));
@@ -103,11 +107,14 @@ public class CmsPresetAppService {
     }
 
     /**
-     * 导入插件主题自带的首页方案与页面集并应用。方案只覆盖其声明的字段与 settings 键，
-     * 未声明的（如站点导航 navigationJson）保留站点现状；同插件重复启用时按
-     * code=plugin:{pluginCode} 覆盖更新。页面集按 slug 归属管理：slug 未被占用或
-     * 属于该插件时创建/覆盖为已发布；被管理员或其他主题占用时跳过；声明清单之外的
-     * 该插件旧页面转草稿。内容定制能力关闭时不导入，返回 false。
+     * 导入插件主题自带的首页方案与页面集并应用。每个主题的首页设计彼此独立：
+     * 导入前先把布局还原到「主题接管前」的基准（上一个主题占用时取其接管前备份，
+     * 同主题重复导入取自身备份），再以基准覆盖更新 code=plugin:{pluginCode} 的方案并应用，
+     * 因此不同主题的 homeHtml/homeCss 等内容绝不混杂；方案只覆盖其声明的字段与 settings
+     * 键，未声明的（如站点导航 navigationJson）保留站点在主题之外的自有值。接管前基准
+     * 存为 plugin-backup:{pluginCode} 备份方案，供停用时整体还原。页面集按 slug 归属管理：
+     * slug 未被占用或属于该插件时创建/覆盖为已发布；被管理员或其他主题占用时跳过；
+     * 声明清单之外的该插件旧页面转草稿。内容定制能力关闭时不导入，返回 false。
      */
     @Transactional
     public boolean importPluginPreset(String pluginCode, String presetName, String presetJson) {
@@ -116,9 +123,10 @@ public class CmsPresetAppService {
             return false;
         }
         PluginHomePresetPayload payload = parsePayload(pluginCode, presetJson);
-        HomePageLayout current = currentLayout();
+        HomePageLayout base = resolveThemeBaseLayout(pluginCode);
+        upsertThemeBackup(pluginCode, presetName, base);
         Map<String, String> settings = new HashMap<>(
-                current.getSettings() == null ? Map.of() : current.getSettings());
+                base.getSettings() == null ? Map.of() : base.getSettings());
         if (payload.getSettings() != null) {
             settings.putAll(payload.getSettings());
         }
@@ -128,11 +136,11 @@ public class CmsPresetAppService {
                 .description("插件主题自带方案")
                 .source(HomePagePresetSource.PLUGIN)
                 .pluginCode(pluginCode)
-                .title(payload.getTitle() != null ? payload.getTitle() : current.getTitle())
-                .subtitle(payload.getSubtitle() != null ? payload.getSubtitle() : current.getSubtitle())
-                .heroImageUrl(payload.getHeroImageUrl() != null ? payload.getHeroImageUrl() : current.getHeroImageUrl())
+                .title(payload.getTitle() != null ? payload.getTitle() : base.getTitle())
+                .subtitle(payload.getSubtitle() != null ? payload.getSubtitle() : base.getSubtitle())
+                .heroImageUrl(payload.getHeroImageUrl() != null ? payload.getHeroImageUrl() : base.getHeroImageUrl())
                 .settings(settings)
-                .sections(payload.getSections() != null ? payload.getSections() : current.getSections())
+                .sections(payload.getSections() != null ? payload.getSections() : base.getSections())
                 .build();
         homePagePresetRepo.findByCode(preset.getCode()).ifPresent(existing -> {
             preset.setId(existing.getId());
@@ -141,6 +149,43 @@ public class CmsPresetAppService {
         applyInternal(homePagePresetRepo.save(preset));
         importPluginPages(pluginCode, payload.getPages());
         return true;
+    }
+
+    /**
+     * 主题停用/顶替/卸载时还原首页设计：当前首页仍由该主题方案占用时，整体还原为该主题
+     * 接管前备份的布局（无备份的旧数据退化为剥离该主题方案声明的 settings 键并复位 theme，
+     * 保证主题内容不残留）；备份方案随后删除。当前首页已被管理员手工切走时只清理备份。
+     */
+    @Transactional
+    public void restorePluginHomepage(String pluginCode) {
+        if (!capabilityEnabled()) {
+            log.info("内容定制能力未启用，跳过主题首页还原：{}", pluginCode);
+            return;
+        }
+        Optional<HomePagePreset> backup = homePagePresetRepo.findByCode(pluginBackupCode(pluginCode));
+        HomePageLayout current = currentLayout();
+        if (pluginPresetCode(pluginCode).equals(current.getTheme())) {
+            if (backup.isPresent()) {
+                HomePagePreset restored = backup.get();
+                current.update(restored.getTitle(), restored.getSubtitle(),
+                        StringUtils.hasText(restored.getTheme()) ? restored.getTheme() : DEFAULT_THEME,
+                        restored.getHeroImageUrl(), restored.getSettings(), restored.getSections(),
+                        current.getPublished());
+                homePageLayoutRepo.save(current);
+                log.info("主题停用，首页设计已还原到接管前状态：plugin={}", pluginCode);
+            } else {
+                Map<String, String> settings = new HashMap<>(
+                        current.getSettings() == null ? Map.of() : current.getSettings());
+                homePagePresetRepo.findByCode(pluginPresetCode(pluginCode))
+                        .map(HomePagePreset::getSettings)
+                        .ifPresent(declared -> declared.keySet().forEach(settings::remove));
+                current.update(current.getTitle(), current.getSubtitle(), DEFAULT_THEME, current.getHeroImageUrl(),
+                        settings, current.getSections(), current.getPublished());
+                homePageLayoutRepo.save(current);
+                log.info("主题停用且无接管前备份，已剥离其声明的首页设置键：plugin={}", pluginCode);
+            }
+        }
+        backup.ifPresent(ignored -> homePagePresetRepo.deleteByCode(pluginBackupCode(pluginCode)));
     }
 
     /**
@@ -206,6 +251,67 @@ public class CmsPresetAppService {
         }
     }
 
+    /**
+     * 解析主题导入的基准布局（即「主题接管前」的站点设计）：
+     * 当前首页未被任何主题占用时用当前布局；被本主题占用时用自身接管前备份（升级再导入
+     * 不残留旧版本内容）；被其他主题占用时用其接管前备份，保证新主题拿不到上一个主题的
+     * 任何内容。旧数据无备份时退化为剥离占用主题方案声明的 settings 键后的当前布局。
+     */
+    private HomePageLayout resolveThemeBaseLayout(String pluginCode) {
+        HomePageLayout current = currentLayout();
+        String appliedPlugin = appliedPluginCodeOf(current);
+        if (appliedPlugin == null) {
+            return current;
+        }
+        return homePagePresetRepo.findByCode(pluginBackupCode(appliedPlugin))
+                .map(this::backupAsLayout)
+                .orElseGet(() -> stripThemeSettings(current, appliedPlugin));
+    }
+
+    private void upsertThemeBackup(String pluginCode, String presetName, HomePageLayout base) {
+        String themeName = StringUtils.hasText(presetName) ? presetName : pluginCode;
+        HomePagePreset backup = HomePagePreset.snapshotOf(
+                pluginBackupCode(pluginCode),
+                "「" + themeName + "」接管前首页",
+                "主题停用时自动还原的首页备份",
+                HomePagePresetSource.THEME_BACKUP, pluginCode, base);
+        homePagePresetRepo.findByCode(backup.getCode()).ifPresent(existing -> {
+            backup.setId(existing.getId());
+            backup.setCreateTime(existing.getCreateTime());
+        });
+        homePagePresetRepo.save(backup);
+    }
+
+    private String appliedPluginCodeOf(HomePageLayout layout) {
+        String theme = layout.getTheme();
+        return theme != null && theme.startsWith("plugin:") ? theme.substring("plugin:".length()) : null;
+    }
+
+    private HomePageLayout backupAsLayout(HomePagePreset backup) {
+        return HomePageLayout.builder()
+                .title(backup.getTitle())
+                .subtitle(backup.getSubtitle())
+                .heroImageUrl(backup.getHeroImageUrl())
+                .settings(backup.getSettings() == null ? new HashMap<>() : new HashMap<>(backup.getSettings()))
+                .sections(backup.getSections() == null ? new java.util.ArrayList<>() : new java.util.ArrayList<>(backup.getSections()))
+                .build();
+    }
+
+    private HomePageLayout stripThemeSettings(HomePageLayout current, String appliedPlugin) {
+        Map<String, String> settings = new HashMap<>(
+                current.getSettings() == null ? Map.of() : current.getSettings());
+        homePagePresetRepo.findByCode(pluginPresetCode(appliedPlugin))
+                .map(HomePagePreset::getSettings)
+                .ifPresent(declared -> declared.keySet().forEach(settings::remove));
+        return HomePageLayout.builder()
+                .title(current.getTitle())
+                .subtitle(current.getSubtitle())
+                .heroImageUrl(current.getHeroImageUrl())
+                .settings(settings)
+                .sections(current.getSections())
+                .build();
+    }
+
     private void applyInternal(HomePagePreset preset) {
         HomePageLayout current = currentLayout();
         snapshotCurrentIfChanged(current);
@@ -258,6 +364,10 @@ public class CmsPresetAppService {
 
     private String pluginPresetCode(String pluginCode) {
         return "plugin:" + pluginCode;
+    }
+
+    private String pluginBackupCode(String pluginCode) {
+        return PLUGIN_BACKUP_PREFIX + pluginCode;
     }
 
     private boolean capabilityEnabled() {
