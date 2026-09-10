@@ -16,21 +16,21 @@ public final class CmsTemplateContextWebAssembler {
         return CmsTemplateContextRes.builder()
                 .cms(CmsTemplateContextRes.CmsTemplateCmsRes.builder()
                         .pages(CmsTemplateContextRes.CmsTemplatePagesRes.builder()
-                                .latest(dto.getCms().getPages().getLatest().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
+                                .latest(dto.getCms().getPages().getLatest().stream().map(CmsTemplateContextWebAssembler::toItemRes).toList())
                                 .build())
                         .build())
                 .knowledge(CmsTemplateContextRes.CmsTemplateKnowledgeRes.builder()
-                        .spaces(dto.getKnowledge().getSpaces().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
-                        .pages(dto.getKnowledge().getPages().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
-                        .latest(dto.getKnowledge().getLatest().stream().map(CmsTemplateContextWebAssembler::toRes).toList())
+                        .spaces(dto.getKnowledge().getSpaces().stream().map(CmsTemplateContextWebAssembler::toItemRes).toList())
+                        .pages(dto.getKnowledge().getPages().stream().map(CmsTemplateContextWebAssembler::toItemRes).toList())
+                        .latest(dto.getKnowledge().getLatest().stream().map(CmsTemplateContextWebAssembler::toItemRes).toList())
                         .featured((dto.getKnowledge().getFeatured() == null ? List.<CmsTemplateItemDTO>of() : dto.getKnowledge().getFeatured())
-                                .stream().map(CmsTemplateContextWebAssembler::toRes).toList())
+                                .stream().map(CmsTemplateContextWebAssembler::toItemRes).toList())
                         .build())
                 .blocks(dto.getBlocks())
                 .build();
     }
 
-    private static CmsTemplateItemRes toRes(CmsTemplateItemDTO item) {
+    public static CmsTemplateItemRes toItemRes(CmsTemplateItemDTO item) {
         return CmsTemplateItemRes.builder()
                 .id(item.getId())
                 .source(item.getSource())

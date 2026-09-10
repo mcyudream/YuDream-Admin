@@ -154,6 +154,8 @@ public class ThemeCenterAppService {
                 .assetRevision(theme.assetRevision())
                 .hasHomePreset(StringUtils.hasText(theme.homePreset()))
                 .hasConfigSchema(StringUtils.hasText(theme.configSchema()))
+                .hasHomeComponent(StringUtils.hasText(theme.homeComponent()))
+                .hasChromeComponent(StringUtils.hasText(theme.chromeComponent()))
                 .hasPageSet(declaresPageSet(theme))
                 .active(theme.pluginCode().equals(activeSite))
                 .enabled(true)

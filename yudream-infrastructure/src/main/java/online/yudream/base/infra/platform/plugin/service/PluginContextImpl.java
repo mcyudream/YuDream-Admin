@@ -197,6 +197,12 @@ public class PluginContextImpl implements PluginContext {
         if (StringUtils.hasText(theme.configSchema())) {
             validateFrontendAssetPath(theme.configSchema(), "插件主题配置 schema 路径非法");
         }
+        if (StringUtils.hasText(theme.homeComponent())) {
+            validateThemeComponent(theme.homeComponent(), "首页");
+        }
+        if (StringUtils.hasText(theme.chromeComponent())) {
+            validateThemeComponent(theme.chromeComponent(), "chrome");
+        }
         this.theme = theme;
     }
 
@@ -483,8 +489,15 @@ public class PluginContextImpl implements PluginContext {
         );
     }
 
-    private List<String> validateFrontendAssetPaths(List<String> paths, String message) {
-        return paths == null ? List.of() : paths.stream()
+    private void validateThemeComponent(String component, String kind) {
+        String normalized = component.trim();
+        // 远程模块 routes 导出键，形如 theme/Home：目录段小写，组件名大驼峰
+        if (!normalized.matches("[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*")) {
+            throw new BizException("插件主题" + kind + "组件名非法：" + component);
+        }
+    }
+
+    private List<String> validateFrontendAssetPaths(List<String> paths, String message) {        return paths == null ? List.of() : paths.stream()
                 .map(path -> validateFrontendAssetPath(path, message))
                 .toList();
     }

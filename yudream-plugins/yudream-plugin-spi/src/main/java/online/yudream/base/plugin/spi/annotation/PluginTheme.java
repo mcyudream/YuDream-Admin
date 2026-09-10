@@ -49,4 +49,18 @@ public @interface PluginTheme {
      * 配置值按主题持久化并在公开站模板中以 {@code theme.config.*} 注入。
      */
     String configSchema() default "";
+
+    /**
+     * 首页接管组件（远程模块 routes 导出键，如 {@code theme/Home}），可为空。
+     * 声明后 SITE 主题激活时公开站首页由该 Vue 组件渲染（原生主题页），
+     * 不再走 CMS 首页模板；未声明时首页仍由 CMS 首页定制承载。
+     */
+    String homeComponent() default "";
+
+    /**
+     * 站点 chrome 接管组件（远程模块 routes 导出键，如 {@code theme/Chrome}），可为空。
+     * 声明后 SITE 主题激活时公开站页头/页脚由该 Vue 组件渲染（导航数据由宿主注入），
+     * 不再走宿主内置 SiteChrome；未声明时仍由宿主 chrome 承载。
+     */
+    String chromeComponent() default "";
 }

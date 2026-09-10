@@ -202,6 +202,9 @@ public class PluginAssembler {
                 .preview(theme.preview())
                 .homePreset(theme.homePreset())
                 .configSchema(theme.configSchema())
+                .homeComponent(theme.homeComponent())
+                .chromeComponent(theme.chromeComponent())
+                .moduleName(theme.moduleName())
                 .assetRevision(theme.assetRevision())
                 .build();
     }

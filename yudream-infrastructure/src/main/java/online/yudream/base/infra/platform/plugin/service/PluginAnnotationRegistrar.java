@@ -176,7 +176,9 @@ class PluginAnnotationRegistrar {
                 List.of(theme.styles()),
                 theme.preview(),
                 theme.homePreset(),
-                theme.configSchema()
+                theme.configSchema(),
+                theme.homeComponent(),
+                theme.chromeComponent()
         ));
     }
 

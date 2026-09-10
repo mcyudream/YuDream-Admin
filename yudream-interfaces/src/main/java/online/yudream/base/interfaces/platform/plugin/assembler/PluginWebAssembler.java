@@ -268,6 +268,9 @@ public class PluginWebAssembler {
                 .styles(dto.getStyles())
                 .preview(dto.getPreview())
                 .configSchema(dto.getConfigSchema())
+                .homeComponent(dto.getHomeComponent())
+                .chromeComponent(dto.getChromeComponent())
+                .moduleName(dto.getModuleName())
                 .assetRevision(dto.getAssetRevision())
                 .build();
     }

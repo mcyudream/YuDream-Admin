@@ -135,7 +135,7 @@ class ThemeConfigAppServiceTest {
     @Test
     void saveRejectsThemeWithoutSchema() {
         PluginThemeInfo theme = new PluginThemeInfo("plain", "plain", "朴素主题", "",
-                Set.of("SITE"), List.of("theme.css"), "", "", "", "rev-1");
+                Set.of("SITE"), List.of("theme.css"), "", "", "", "", "", "", "rev-1");
         when(pluginRuntimeGateway.themes()).thenReturn(List.of(theme));
 
         assertThatThrownBy(() -> service.save(cmd("plain", Map.of("a", "b"))))
@@ -173,7 +173,7 @@ class ThemeConfigAppServiceTest {
 
     private PluginThemeInfo theme(String code) {
         return new PluginThemeInfo(code, code, "Neco 像素", "",
-                Set.of("SITE"), List.of("theme/neco.css"), "", "", "theme-config.json", "rev-1");
+                Set.of("SITE"), List.of("theme/neco.css"), "", "", "theme-config.json", "", "", "", "rev-1");
     }
 
     private ThemeConfigSaveCmd cmd(String themeCode, Map<String, Object> values) {

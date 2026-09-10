@@ -24,6 +24,14 @@ import java.util.Set;
  * <p>configSchema 可声明一份主题配置 schema JSON（同资产目录），宿主主题中心据此
  * 渲染该主题专属的WordPress 式配置大页面；配置值按主题持久化，公开站模板经
  * {@code theme.config.*} 消费。</p>
+ *
+ * <p>homeComponent 可声明一个首页接管组件（插件前端远程模块 routes 导出键，
+ * 如 {@code theme/Home}）；SITE 主题激活时公开站首页由该 Vue 组件原生渲染，
+ * 不再走 CMS 首页模板，主题版式页由此完全脱离 CMS。未声明时首页仍由 CMS 承载。</p>
+ *
+ * <p>chromeComponent 可声明一个站点 chrome 接管组件（如 {@code theme/Chrome}）；
+ * SITE 主题激活时公开站页头/页脚由该 Vue 组件原生渲染，导航数据由宿主注入。
+ * 未声明时仍由宿主 SiteChrome 承载。</p>
  */
 public record PluginTheme(
         String code,
@@ -33,6 +41,8 @@ public record PluginTheme(
         List<String> styles,
         String preview,
         String homePreset,
-        String configSchema
+        String configSchema,
+        String homeComponent,
+        String chromeComponent
 ) {
 }

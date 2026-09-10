@@ -33,6 +33,10 @@ public class ThemeCenterThemeCardDTO implements Serializable {
     private Boolean hasHomePreset;
     /** 是否声明主题配置 schema（有则主题中心提供配置大页面）。 */
     private Boolean hasConfigSchema;
+    /** 是否声明首页接管组件（有则公开站首页由插件 Vue 页面承载，不走 CMS 首页模板）。 */
+    private Boolean hasHomeComponent;
+    /** 是否声明站点 chrome 接管组件（有则公开站页头/页脚由插件 Vue 页面承载）。 */
+    private Boolean hasChromeComponent;
     /** 是否自带页面集（随主题启用导入、停用下线）。 */
     private Boolean hasPageSet;
     /** 是否为当前公开站激活主题。 */

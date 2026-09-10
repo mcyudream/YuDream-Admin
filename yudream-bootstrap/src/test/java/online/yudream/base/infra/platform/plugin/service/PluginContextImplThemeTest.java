@@ -90,11 +90,11 @@ class PluginContextImplThemeTest {
     @Test
     void themeRequiresScopeAndStyle() {
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(), List.of("theme/neco.css"), "", "", "")))
+                "neco", "Neco 主题", "", Set.of(), List.of("theme/neco.css"), "", "", "", "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("至少声明一个生效范围");
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of(), "", "", "")))
+                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of(), "", "", "", "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("至少声明一个样式资产");
     }
@@ -102,17 +102,50 @@ class PluginContextImplThemeTest {
     @Test
     void themeRejectsIllegalAssetPath() {
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("../escape.css"), "", "", "")))
+                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("../escape.css"), "", "", "", "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("样式路径非法");
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "/abs/preview.png", "", "")))
+                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "/abs/preview.png", "", "", "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("预览图路径非法");
     }
 
+    @Test
+    void themeValidatesHomeComponent() {
+        context.registerTheme(new PluginTheme("neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE),
+                List.of("theme/neco.css"), "", "", "", "theme/Home", ""));
+        assertThat(context.theme()).hasValueSatisfying(theme ->
+                assertThat(theme.homeComponent()).isEqualTo("theme/Home"));
+
+        // 同一上下文只允许一个主题，非法用例注册前先清场
+        context.clearRuntimeContributions();
+        assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
+                "neco2", "Neco2", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "", "", "", "Home", "")))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("首页组件名非法");
+        assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
+                "neco3", "Neco3", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "", "", "", "../theme/Home", "")))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("首页组件名非法");
+    }
+
+    @Test
+    void themeValidatesChromeComponent() {
+        context.registerTheme(new PluginTheme("neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE),
+                List.of("theme/neco.css"), "", "", "", "", "theme/Chrome"));
+        assertThat(context.theme()).hasValueSatisfying(theme ->
+                assertThat(theme.chromeComponent()).isEqualTo("theme/Chrome"));
+
+        context.clearRuntimeContributions();
+        assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
+                "neco2", "Neco2", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "", "", "", "", "Chrome")))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("chrome组件名非法");
+    }
+
     private PluginTheme theme(Set<PluginThemeScope> scopes) {
         return new PluginTheme("neco", "Neco 主题", "像素风主题", scopes,
-                List.of("theme/neco.css"), "theme/preview.png", "", "");
+                List.of("theme/neco.css"), "theme/preview.png", "", "", "", "");
     }
 }
