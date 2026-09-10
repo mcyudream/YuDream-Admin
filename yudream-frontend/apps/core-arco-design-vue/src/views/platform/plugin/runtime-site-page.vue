@@ -23,9 +23,15 @@ onMounted(async () => {
         :route="route"
       />
     </div>
+    <!-- 远程模块加载中只显示 chrome 内轻量骨架，不清空页头页脚，二次切换走模块缓存零等待 -->
+    <div v-else-if="remoteLoading" class="plugin-site-skeleton" aria-hidden="true">
+      <div class="plugin-site-skeleton__hero" />
+      <div class="plugin-site-skeleton__row" />
+      <div class="plugin-site-skeleton__row plugin-site-skeleton__row--short" />
+    </div>
     <div v-else class="plugin-site-state">
-      <h2>{{ remoteLoading ? '正在加载插件前端' : '插件前端不可用' }}</h2>
-      <p>{{ remoteLoading ? '正在获取远程入口并解析页面组件。' : remoteError }}</p>
+      <h2>插件前端不可用</h2>
+      <p>{{ remoteError }}</p>
     </div>
   </SiteChrome>
 </template>
@@ -36,6 +42,46 @@ onMounted(async () => {
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
+}
+
+.plugin-site-skeleton {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.plugin-site-skeleton__hero,
+.plugin-site-skeleton__row {
+  border-radius: 12px;
+  background: var(--yb-site-surface, rgb(148 163 184 / 12%));
+  animation: plugin-site-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.plugin-site-skeleton__hero {
+  height: 220px;
+}
+
+.plugin-site-skeleton__row {
+  height: 18px;
+}
+
+.plugin-site-skeleton__row--short {
+  width: 55%;
+}
+
+@keyframes plugin-site-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .plugin-site-state {

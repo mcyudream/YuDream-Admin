@@ -1,18 +1,44 @@
 <script setup lang="ts">
 import type { CmsPage, CmsTemplateContext, CmsTemplateContextQuery, HomePageLayout, HomeSection } from '@/api/modules/platform-cms'
 import apiCms from '@/api/modules/platform-cms'
+import { useActivePluginTheme } from '@/plugins/theme-runtime'
+import { usePluginRemoteComponentByMeta, type PluginRouteMeta } from '@/plugins/use-plugin-remote-component'
+import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { evaluateCmsTemplateCondition, parseCmsTemplateFor, renderCmsMarkdown, renderCmsVariables, resolveCmsTemplateLimit, resolveCmsTemplateRows, sanitizeCmsCss, sanitizeCmsHtml, scopeCmsCss } from '@/utils/cms-template-render'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 import SiteChrome from './site-chrome.vue'
 import { useSiteNavigation } from './site-navigation'
 
 const route = useRoute()
+const router = useRouter()
 const appAccountStore = useAppAccountStore()
 const appSettingsStore = useAppSettingsStore()
 
 const loading = ref(false)
 const home = ref<HomePageLayout | null>(null)
 const page = ref<CmsPage | null>(null)
+// 无感切换：路由变化时保留旧内容，仅在没有内容可显示时才出现整页加载态
+const hasContent = computed(() => !!(page.value || home.value))
+
+// 站内链接走 router 跳转，避免整页刷新；外部/锚点/新窗口等保持原生行为
+function navigate(event: MouseEvent, url?: string) {
+  if (!url || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    return
+  }
+  if (/^(?:https?:|mailto:|tel:|#)/i.test(url)) {
+    return
+  }
+  event.preventDefault()
+  router.push(url)
+}
+
+// CMS 渲染 HTML（v-html）里的链接没有模板事件，用容器代理拦截站内跳转
+function handleContentClick(event: MouseEvent) {
+  const anchor = (event.target as HTMLElement | null)?.closest?.('a')
+  if (anchor) {
+    navigate(event, anchor.getAttribute('href') || '')
+  }
+}
 
 // 页面模板严格决定公开站版式：
 // - DEFAULT：站点页头/页脚 + 文章头（标题/描述/封面），Markdown 正文走排版容器，整页自定义 HTML 全宽；
@@ -29,7 +55,7 @@ const articleProse = computed(() =>
 const articleFullWidth = computed(() => !articleProse.value)
 // 页面自定义 CSS 注入前剥离全局/裸元素规则并加上 .site-article 作用域：
 // 既保护站点页头页脚不被页面样式污染，也让页面自身规则压过历史遗留的全局同名类。
-const articleCss = computed(() => scopeCmsCss(sanitizeCmsCss(page.value?.cssContent), '.site-article'))
+const articleCss = computed(() => scopeCmsCss(sanitizeCmsCss(rewriteBackendAssetUrls(page.value?.cssContent)), '.site-article'))
 const publishedPages = ref<CmsPage[]>([])
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const errorMessage = ref('')
@@ -42,12 +68,37 @@ const slug = computed(() => {
   }
   return value ? String(value) : ''
 })
+
+// 激活 SITE 主题声明了 homeComponent 时，/site 首页由主题远程 Vue 组件接管；
+// meta 由 /themes/active 载荷构造，不走公开路由的 meta.plugin。
+const activeSiteTheme = useActivePluginTheme('SITE')
+const themeHomeMeta = computed<PluginRouteMeta | undefined>(() => {
+  const theme = activeSiteTheme.value
+  if (!theme?.homeComponent || !theme.moduleName) {
+    return undefined
+  }
+  return {
+    pluginCode: theme.pluginCode,
+    component: theme.homeComponent,
+    moduleName: theme.moduleName,
+    assetRevision: theme.assetRevision,
+    styles: theme.styles,
+  }
+})
+const {
+  remoteComponent: themeHomeComponent,
+  remoteLoading: themeHomeLoading,
+  remoteError: themeHomeError,
+  sdk: themeHomeSdk,
+} = usePluginRemoteComponentByMeta(themeHomeMeta)
+const themeHomeActive = computed(() => !slug.value && !!themeHomeMeta.value)
 const homeHtml = computed(() => home.value?.settings?.homeHtml || '')
 // 首页内容 CSS 只应在首页注入；页头/页脚的 chrome 自定义样式由 SiteChrome 统一注入，
 // 否则首页 CSS 里的通用类（如 .yb-ai-hero）会污染其它页面。
-const homeContentCss = computed(() => home.value?.settings?.homeCss || '')
+const homeContentCss = computed(() => rewriteBackendAssetUrls(home.value?.settings?.homeCss || ''))
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
-const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : homeJs.value)
+// 主题首页接管时不注入 CMS 首页脚本，避免与主题 Vue 页面互相干扰
+const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : themeHomeActive.value ? '' : homeJs.value)
 // 站点导航 = CMS navigationJson + 插件 siteNav 路由 + 知识库入口，与公开插件页的站点 chrome 共用同一份合并逻辑
 const { navigationItems, navigationTree } = useSiteNavigation(() => home.value?.settings?.navigationJson)
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
@@ -139,7 +190,14 @@ const renderContext = computed(() => {
   }
 })
 
+let loadSeq = 0
+
 watch(() => route.fullPath, load, { immediate: true })
+watch(themeHomeError, (message) => {
+  if (message) {
+    console.warn('[YuDream Site] 主题首页组件加载失败，回落 CMS 首页渲染：', message)
+  }
+})
 watch([
   activeCmsJs,
   homeHtml,
@@ -156,21 +214,25 @@ onBeforeUnmount(() => {
 })
 
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   errorMessage.value = ''
-  home.value = null
-  page.value = null
-  templateContext.value = emptyTemplateContext()
+  const targetSlug = slug.value
   try {
-    if (slug.value) {
-      const res = await apiCms.publicPage(slug.value)
+    if (targetSlug) {
+      const res = await apiCms.publicPage(targetSlug)
+      if (seq !== loadSeq) {
+        return
+      }
       page.value = res.data
       try {
         const homeRes = await apiCms.publicHome()
-        home.value = homeRes.data
+        if (seq === loadSeq) {
+          home.value = homeRes.data
+        }
       }
       catch {
-        home.value = null
+        // 保留旧 chrome 设置，避免导航闪烁
       }
       applyPublicSeo({
         title: res.data.seoTitle || res.data.title,
@@ -186,7 +248,11 @@ async function load() {
     }
     else {
       const res = await apiCms.publicHome()
+      if (seq !== loadSeq) {
+        return
+      }
       home.value = res.data
+      page.value = null
       applyPublicSeo({
         title: res.data.title || '站点首页',
         description: res.data.subtitle || appSettingsStore.siteDescription,
@@ -199,10 +265,20 @@ async function load() {
     await Promise.all([loadPublicPages(), loadTemplateContext()])
   }
   catch (error: any) {
-    errorMessage.value = error?.response?.data?.message || '页面暂不可访问'
+    if (seq !== loadSeq) {
+      return
+    }
+    if (page.value || home.value) {
+      console.warn('[YuDream Site] 页面加载失败，保留当前内容', error)
+    }
+    else {
+      errorMessage.value = error?.response?.data?.message || '页面暂不可访问'
+    }
   }
   finally {
-    loading.value = false
+    if (seq === loadSeq) {
+      loading.value = false
+    }
   }
 }
 
@@ -251,7 +327,7 @@ async function loadTemplateContext() {
     templateContext.value = res.data
   }
   catch {
-    templateContext.value = emptyTemplateContext()
+    // 保留旧上下文，避免块内容闪烁
   }
 }
 
@@ -320,7 +396,7 @@ function collectTermItems(items: CmsPage[], key: 'categories' | 'tags') {
 
 function sectionStyle(section: HomeSection) {
   return section.mediaUrl
-    ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.74), rgba(15, 23, 42, 0.18)), url(${section.mediaUrl})` }
+    ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.74), rgba(15, 23, 42, 0.18)), url(${toBackendAssetUrl(section.mediaUrl)})` }
     : undefined
 }
 
@@ -328,7 +404,7 @@ function renderDynamicHtml(value?: string) {
   if (!value) {
     return ''
   }
-  const sanitized = sanitizeCmsHtml(value)
+  const sanitized = sanitizeCmsHtml(rewriteBackendAssetUrls(value))
   const doc = new DOMParser().parseFromString(`<div>${sanitized}</div>`, 'text/html')
   doc.querySelectorAll('[data-yb-system-nav]').forEach(el => el.remove())
   doc.querySelectorAll('main, section').forEach((el) => {
@@ -466,7 +542,8 @@ function dateText(value?: string) {
 
 <template>
   <main class="site-page" :class="`layout-${siteLayout.toLowerCase().replace('_', '-')}`">
-    <div v-if="loading" class="site-state">
+    <div v-if="loading && hasContent" class="site-loading-bar" aria-hidden="true" />
+    <div v-if="loading && !hasContent" class="site-state">
       加载中...
     </div>
     <div v-else-if="errorMessage" class="site-state">
@@ -478,42 +555,59 @@ function dateText(value?: string) {
         <div class="site-layout-frame">
           <aside v-if="siteLayout === 'ADMIN' && !isBlankPage" class="site-admin-sidebar">
             <strong>{{ renderContext.site.name }}</strong>
-            <a href="/site">首页</a>
+            <a href="/site" @click="navigate($event, '/site')">首页</a>
             <template v-for="item in navigationTree" :key="`side-${item.id || item.url}`">
-              <a :href="item.url">{{ item.label }}</a>
-              <a v-for="child in item.children" :key="`side-child-${child.id || child.url}`" class="child" :href="child.url">{{ child.label }}</a>
+              <a :href="item.url" @click="navigate($event, item.url)">{{ item.label }}</a>
+              <a v-for="child in item.children" :key="`side-child-${child.id || child.url}`" class="child" :href="child.url" @click="navigate($event, child.url)">{{ child.label }}</a>
             </template>
           </aside>
 
           <div class="site-layout-content">
             <template v-if="!page && home">
-              <component :is="'style'" v-if="homeContentCss">
-                {{ homeContentCss }}
-              </component>
-              <div v-if="homeHtml" class="site-builder-home" v-html="renderDynamicHtml(homeHtml)" />
-              <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${home.heroImageUrl})` } : undefined">
-                <div class="site-shell">
-                  <h1>{{ home.title }}</h1>
-                  <p>{{ home.subtitle }}</p>
+              <!-- 主题声明 homeComponent：首页由主题远程 Vue 组件渲染；加载失败时回落 CMS 首页 -->
+              <template v-if="themeHomeActive && (themeHomeComponent || themeHomeLoading)">
+                <div v-if="themeHomeComponent" class="site-theme-home" :data-yudream-plugin="themeHomeMeta?.pluginCode">
+                  <component
+                    :is="themeHomeComponent"
+                    :sdk="themeHomeSdk"
+                    :route="route"
+                  />
                 </div>
-              </section>
-              <section v-if="!homeHtml" class="site-shell site-sections">
-                <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
-                  <div>
-                    <span>{{ section.type }}</span>
-                    <h2>{{ section.title }}</h2>
-                    <p>{{ section.subtitle }}</p>
-                    <a v-if="section.actionUrl" :href="section.actionUrl">{{ section.actionText || '了解更多' }}</a>
+                <div v-else class="site-theme-home-skeleton" aria-hidden="true">
+                  <div class="site-theme-home-skeleton__hero" />
+                  <div class="site-theme-home-skeleton__row" />
+                  <div class="site-theme-home-skeleton__row site-theme-home-skeleton__row--short" />
+                </div>
+              </template>
+              <template v-else>
+                <component :is="'style'" v-if="homeContentCss">
+                  {{ homeContentCss }}
+                </component>
+                <div v-if="homeHtml" class="site-builder-home" @click="handleContentClick" v-html="renderDynamicHtml(homeHtml)" />
+                <section v-if="!homeHtml" class="site-hero" :style="home.heroImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.76), rgba(15, 23, 42, 0.2)), url(${toBackendAssetUrl(home.heroImageUrl)})` } : undefined">
+                  <div class="site-shell">
+                    <h1>{{ home.title }}</h1>
+                    <p>{{ home.subtitle }}</p>
                   </div>
-                </article>
-              </section>
+                </section>
+                <section v-if="!homeHtml" class="site-shell site-sections">
+                  <article v-for="section in home.sections.filter(item => item.visible !== false)" :key="section.id || section.title" class="site-section" :class="`type-${section.type.toLowerCase()}`" :style="sectionStyle(section)">
+                    <div>
+                      <span>{{ section.type }}</span>
+                      <h2>{{ section.title }}</h2>
+                      <p>{{ section.subtitle }}</p>
+                      <a v-if="section.actionUrl" :href="section.actionUrl" @click="navigate($event, section.actionUrl)">{{ section.actionText || '了解更多' }}</a>
+                    </div>
+                  </article>
+                </section>
+              </template>
             </template>
 
             <article v-if="page" class="site-article" :class="`template-${(page.template || 'DEFAULT').toLowerCase()}`">
               <component :is="'style'" v-if="articleCss">
                 {{ articleCss }}
               </component>
-              <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${page.coverImageUrl})` } : undefined">
+              <header v-if="articleHeroVisible" class="site-article__hero" :style="page.coverImageUrl ? { backgroundImage: `linear-gradient(90deg, rgba(15, 23, 42, 0.78), rgba(15, 23, 42, 0.16)), url(${toBackendAssetUrl(page.coverImageUrl)})` } : undefined">
                 <div class="site-shell">
                   <span>{{ page.slug }}</span>
                   <h1>{{ page.title }}</h1>
@@ -535,6 +629,7 @@ function dateText(value?: string) {
               <div
                 class="site-article__body"
                 :class="[articleFullWidth ? 'site-article__body--full' : 'site-article__body--prose site-shell']"
+                @click="handleContentClick"
                 v-html="page.htmlContent ? renderDynamicHtml(page.htmlContent) : renderCmsMarkdown(page.markdownContent)"
               />
             </article>
@@ -605,6 +700,86 @@ function dateText(value?: string) {
   min-height: 100vh;
   place-items: center;
   color: var(--yb-site-muted);
+}
+
+/* 无感切换：已有内容时只在顶部显示细进度条，不清空旧视图 */
+.site-loading-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1200;
+  width: 100%;
+  height: 2px;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+}
+
+.site-loading-bar::after {
+  display: block;
+  width: 38%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--yb-site-primary);
+  content: "";
+  animation: site-loading-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes site-loading-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(280%);
+  }
+}
+
+.site-theme-home {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.site-theme-home-skeleton {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 16px;
+  width: min(1240px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.site-theme-home-skeleton__hero,
+.site-theme-home-skeleton__row {
+  border-radius: 12px;
+  background: var(--yb-site-surface, rgb(148 163 184 / 12%));
+  animation: site-theme-home-pulse 1.4s ease-in-out infinite;
+}
+
+.site-theme-home-skeleton__hero {
+  height: 320px;
+}
+
+.site-theme-home-skeleton__row {
+  height: 18px;
+}
+
+.site-theme-home-skeleton__row--short {
+  width: 55%;
+}
+
+@keyframes site-theme-home-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
 }
 
 .site-layout-frame {

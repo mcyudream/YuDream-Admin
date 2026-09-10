@@ -12,6 +12,10 @@ export interface ThemeCenterTheme {
   assetRevision?: string
   hasHomePreset?: boolean
   hasPageSet?: boolean
+  /** 主题声明了 homeComponent：公开站首页由插件 Vue 页面承载，首页设计器不再适用 */
+  hasHomeComponent?: boolean
+  /** 主题声明了 chromeComponent：公开站页头/页脚由插件 Vue 页面承载 */
+  hasChromeComponent?: boolean
   /** 主题是否声明了配置 schema（theme-config.json） */
   hasConfigSchema?: boolean
   active?: boolean

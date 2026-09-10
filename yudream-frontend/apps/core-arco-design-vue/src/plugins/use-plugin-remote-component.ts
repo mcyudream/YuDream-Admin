@@ -1,4 +1,5 @@
 import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
+import type { MaybeRefOrGetter } from 'vue'
 import type { Component } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { acquirePluginRemoteModule, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
@@ -23,13 +24,21 @@ type RemoteModule = YuDreamPluginFrontendModule & Record<string, any>
  * runtime-page（控制台内嵌）与 runtime-site-page（公开站点 chrome）共用。
  */
 export function usePluginRemoteComponent(route: RouteLocationNormalizedLoaded) {
+  return usePluginRemoteComponentByMeta(computed(() => (route.meta.plugin || {}) as PluginRouteMeta))
+}
+
+/**
+ * 按显式 meta 加载远程组件：主题首页/chrome（@PluginTheme homeComponent / chromeComponent）
+ * 这类不走路由 meta.plugin 的挂载场景由调用方用 /themes/active 载荷构造 meta。
+ */
+export function usePluginRemoteComponentByMeta(meta: MaybeRefOrGetter<PluginRouteMeta | undefined>) {
   const remoteComponent = shallowRef<Component | null>(null)
   const remoteError = ref('')
   const remoteLoading = ref(false)
   const remoteLease = shallowRef<PluginRemoteModuleLease | null>(null)
   let loadSequence = 0
 
-  const plugin = computed(() => (route.meta.plugin || {}) as PluginRouteMeta)
+  const plugin = computed(() => toValue(meta) || { pluginCode: '' })
   const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
 
   watch(plugin, () => void loadRemoteComponent(), { immediate: true })

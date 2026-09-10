@@ -1,15 +1,14 @@
 import type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
-import * as FantasticAdminComponents from '@yudream/components'
-import * as Vue from 'vue'
-import * as VueRouter from 'vue-router'
 import apiFiles from '@/api/modules/files'
 import apiPlugin from '@/api/modules/platform-plugin'
+import apiPublicTheme from '@/api/modules/public-theme'
 import { pluginFrontendAssetUrl } from '@/plugins/frontend-assets'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import { applyPublicSeo } from '@/utils/public-seo'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
-export const YUDREAM_PLUGIN_SDK_VERSION = '1.5.0'
+export const YUDREAM_PLUGIN_SDK_VERSION = '1.7.0'
 
 export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
   const accountStore = useAppAccountStore()
@@ -119,6 +118,16 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
         return res.data || []
       },
     },
+    site: {
+      async context(query = {}) {
+        const res = await apiPublicTheme.context(query)
+        return res.data
+      },
+      applySeo(input) {
+        applyPublicSeo(input)
+      },
+      assetUrl: toBackendAssetUrl,
+    },
   }
 }
 
@@ -140,20 +149,10 @@ declare global {
       version: string
       create: typeof createPluginSdk
     }
-    __YUDREAM_PLUGIN_SHARED__?: {
-      vue: typeof Vue
-      vueRouter: typeof VueRouter
-      components: typeof FantasticAdminComponents
-    }
   }
 }
 
 if (typeof window !== 'undefined') {
-  window.__YUDREAM_PLUGIN_SHARED__ = {
-    vue: Vue,
-    vueRouter: VueRouter,
-    components: FantasticAdminComponents,
-  }
   window.__YUDREAM_PLUGIN_SDK__ = {
     version: YUDREAM_PLUGIN_SDK_VERSION,
     create: createPluginSdk,

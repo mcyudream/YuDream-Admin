@@ -188,13 +188,22 @@ function setupRoutePermission(router: Router) {
 // 进度条
 function setupProgress(router: Router) {
   const { isLoading } = useNProgress()
-  router.beforeEach(() => {
+  router.beforeEach((to) => {
+    // 公开站导航由 SiteChrome/site 页的无感加载（顶部细进度条）承载，全局 NProgress 跳过
+    if (to.meta?.public) {
+      isLoading.value = false
+      return
+    }
     const appSettingsStore = useAppSettingsStore()
     if (appSettingsStore.settings.page.progress) {
       isLoading.value = true
     }
   })
-  router.afterEach(() => {
+  router.afterEach((to) => {
+    if (to.meta?.public) {
+      isLoading.value = false
+      return
+    }
     const appSettingsStore = useAppSettingsStore()
     if (appSettingsStore.settings.page.progress) {
       isLoading.value = false
