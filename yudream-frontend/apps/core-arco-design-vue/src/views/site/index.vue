@@ -123,6 +123,10 @@ const renderContext = computed(() => {
     pages: pageItems,
     cms: templateContext.value.cms,
     knowledge: templateContext.value.knowledge,
+    blocks: templateContext.value.blocks || {},
+    theme: {
+      config: page.value?.themeConfig || home.value?.themeConfig || {},
+    },
     categories: collectTermItems(publishedPages.value, 'categories'),
     tags: collectTermItems(publishedPages.value, 'tags'),
     archive: {
@@ -209,8 +213,13 @@ function templateContextQuery(): CmsTemplateContextQuery | undefined {
   }
   const doc = new DOMParser().parseFromString(`<div>${sanitizeCmsHtml(html)}</div>`, 'text/html')
   const query: CmsTemplateContextQuery = {}
+  const blockCodes = new Set<string>()
   doc.querySelectorAll('[data-yb-repeat], [data-yb-for]').forEach((element) => {
     const path = parseCmsTemplateFor(element.getAttribute('data-yb-for'))?.path || element.getAttribute('data-yb-repeat') || ''
+    const blockMatch = path.match(/^blocks\.([a-z0-9][a-z0-9-]{0,39})$/)
+    if (blockMatch) {
+      blockCodes.add(blockMatch[1])
+    }
     const limit = resolveCmsTemplateLimit(element.getAttribute('data-yb-limit'), {})
     if (limit == null) {
       return
@@ -221,7 +230,18 @@ function templateContextQuery(): CmsTemplateContextQuery | undefined {
     if (path === 'knowledge.pages') query.knowledgePagesLimit = max(query.knowledgePagesLimit)
     if (path === 'knowledge.latest') query.knowledgeLatestLimit = max(query.knowledgeLatestLimit)
     if (path === 'knowledge.featured') query.knowledgeFeaturedLimit = max(query.knowledgeFeaturedLimit)
+    if (blockMatch) {
+      query.blockLimit = max(query.blockLimit)
+    }
   })
+  doc.querySelectorAll('[data-yb-if]').forEach((element) => {
+    for (const match of String(element.getAttribute('data-yb-if') || '').matchAll(/blocks\.([a-z0-9][a-z0-9-]{0,39})/g)) {
+      blockCodes.add(match[1])
+    }
+  })
+  if (blockCodes.size) {
+    query.blocks = [...blockCodes]
+  }
   return Object.keys(query).length ? query : undefined
 }
 
@@ -239,6 +259,7 @@ function emptyTemplateContext(): CmsTemplateContext {
   return {
     cms: { pages: { latest: [] } },
     knowledge: { spaces: [], pages: [], latest: [], featured: [] },
+    blocks: {},
   }
 }
 
