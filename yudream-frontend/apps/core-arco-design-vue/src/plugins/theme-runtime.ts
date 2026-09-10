@@ -13,6 +13,12 @@ let currentRoutePublic = false
 let activeThemePlugins = new Map<string, string>()
 const themeModuleLeases = new Map<string, PluginRemoteModuleLease>()
 const pendingThemeModules = new Set<string>()
+const activeThemesSnapshot = shallowRef<Partial<Record<PluginThemeScope, PluginTheme>>>({})
+
+/** 当前激活的插件主题（按 scope），供主题首页挂载等场景读取 homeComponent/moduleName。 */
+export function useActivePluginTheme(scope: PluginThemeScope) {
+  return computed(() => activeThemesSnapshot.value[scope])
+}
 
 /**
  * 启动时拉取已激活的插件主题，并在应用挂载前注入常驻样式，避免公开站主题闪烁。
@@ -44,6 +50,7 @@ export function watchPluginThemeScope(router: Router) {
 }
 
 function applyActiveThemes(themes: Partial<Record<PluginThemeScope, PluginTheme>>) {
+  activeThemesSnapshot.value = themes
   const active = new Map<string, string>()
   for (const scope of SCOPES) {
     const theme = themes[scope]
@@ -113,7 +120,9 @@ function syncScopeVisibility() {
   for (const scope of SCOPES) {
     const enabled = scope === 'SITE' ? currentRoutePublic : !currentRoutePublic
     for (const link of themeLinks(scope)) {
-      link.disabled = !enabled
+      // 不能用 disabled 开关：加载中途置 disabled 会永久中止样式表加载，
+      // 再置回 false 也不会恢复（Chrome 行为），改用 media 开关只控制是否应用。
+      link.media = enabled ? '' : 'not all'
     }
   }
 }

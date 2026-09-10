@@ -4,6 +4,7 @@ import systemClient from './system-client'
 export interface PluginBlobResponse {
   data: Blob
   headers: Record<string, string>
+  status: number
 }
 
 export type PluginStatus = 'INSTALLED' | 'LOADED' | 'ENABLED' | 'DISABLED' | 'ERROR'
@@ -113,6 +114,12 @@ export interface PluginTheme {
   preview?: string
   /** 主题自带的首页内容定制方案资产路径，空表示不自带方案 */
   homePreset?: string
+  /** 主题声明的公开站首页远程组件（如 theme/Home），空表示首页仍走 CMS 渲染 */
+  homeComponent?: string
+  /** 主题声明的站点 chrome 远程组件（如 theme/Chrome），空表示仍走宿主 SiteChrome */
+  chromeComponent?: string
+  /** homeComponent/chromeComponent 所在的远程模块名 */
+  moduleName?: string
   assetRevision?: string
 }
 
@@ -226,9 +233,14 @@ export default {
   },
 }
 
+/**
+ * 仅当插件以 JSON 返回错误（4xx/5xx）时，把 blob 错误体解析为 Error 抛出；
+ * 2xx 的 application/json 响应是插件主动下发的 JSON 文件下载，必须原样放行。
+ * （非 2xx 时 axios 走错误拦截器，插件 message 的解析兜底在 system-client。）
+ */
 async function rejectJsonBlob(response: PluginBlobResponse) {
   const contentType = String(response.headers?.['content-type'] || '')
-  if (!contentType.includes('application/json')) {
+  if (!contentType.includes('application/json') || response.status < 400) {
     return
   }
   const text = await response.data.text()

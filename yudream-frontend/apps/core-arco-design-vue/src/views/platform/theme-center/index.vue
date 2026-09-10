@@ -74,6 +74,14 @@ function themeLabel(code?: string | null) {
   const card = themeOverview.value?.themes.find(item => (item.pluginCode || 'default') === safeCode)
   return card?.name || safeCode
 }
+const currentThemeCard = computed(() => themeOverview.value?.themes.find(item => (item.pluginCode || 'default') === currentTheme.value))
+/** 当前编辑主题声明了 homeComponent：公开站首页由插件 Vue 页面承载，首页设计器不再适用 */
+const currentThemeHasHomeComponent = computed(() => !!currentThemeCard.value?.hasHomeComponent)
+/** 当前编辑主题的 style.css 资产链接，注入 Grapes 画布实现内容页主题下所见即所得 */
+const currentThemeStyleUrls = computed(() => {
+  const card = currentThemeCard.value
+  return card?.pluginCode ? [pluginFrontendAssetUrl(card.pluginCode, 'style.css', card.assetRevision)] : []
+})
 const presetDialogVisible = ref(false)
 const presetSaving = ref(false)
 const presetForm = reactive({ name: '', description: '' })
@@ -512,7 +520,7 @@ function confirmActivateTheme(theme: ThemeCenterTheme) {
     return
   }  modal.confirm({
     title: '切换整站主题',
-    content: `确认启用「${theme.name}」作为公开站主题吗？主题是一整套独立模板：${theme.hasHomePreset ? '它自带的首页设计将应用到它自己的首页' : '它将以默认主题当前首页为起点生成自己的首页'}${theme.hasPageSet ? '，随附页面会导入到它自己的页面集并发布' : ''}。各主题内容完全独立，切换后原主题内容原样保留，互不影响。`,
+    content: `确认启用「${theme.name}」作为公开站主题吗？主题是一整套独立模板：${theme.hasHomeComponent ? '它的公开站首页由插件自带的 Vue 页面承载' : theme.hasHomePreset ? '它自带的首页设计将应用到它自己的首页' : '它将以默认主题当前首页为起点生成自己的首页'}${theme.hasChromeComponent ? '，页头页脚也由插件自管' : ''}${theme.hasPageSet ? '，随附页面会导入到它自己的页面集并发布' : ''}。各主题内容完全独立，切换后原主题内容原样保留，互不影响。`,
     onConfirm: async () => {
       themeSwitching.value = true
       try {
@@ -1380,25 +1388,32 @@ function sectionTitle(type: HomeSectionType) {
 
       <section v-else-if="activeTab === 'home'" v-loading="loading" class="home-layout">
         <main class="home-form">
-          <section class="builder-entry">
+          <section v-if="currentThemeHasHomeComponent" class="builder-entry">
             <div>
-              <span class="builder-entry__status">{{ homeBuilderContentStatus }}</span>
-              <h2>动态首页构建器</h2>
-              <p>画布会同时展示固定 Header、首页主体和固定 Footer；首页主体可自由组合内容，Header/Footer 只开放样式调整。</p>
-            </div>
-            <div class="builder-entry__actions">
-              <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
-                <FaIcon name="i-ri:layout-grid-line" />
-                打开首页构建器
-              </FaButton>
-              <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
-                <FaIcon name="i-ri:eraser-line" />
-                清空动态内容
-              </FaButton>
+              <h2>该主题首页由插件页面承载</h2>
+              <p>「{{ themeLabel(currentTheme) }}」声明了首页组件（homeComponent），公开站首页由插件自带的 Vue 页面渲染，不再使用这里的动态首页内容与兼容区块；下方的首页基础信息仍用于 SEO 与站点页头页脚。若停用该主题或切换回默认主题，这里的首页设计会原样恢复生效。</p>
             </div>
           </section>
+          <template v-else>
+            <section class="builder-entry">
+              <div>
+                <span class="builder-entry__status">{{ homeBuilderContentStatus }}</span>
+                <h2>动态首页构建器</h2>
+                <p>画布会同时展示固定 Header、首页主体和固定 Footer；首页主体可自由组合内容，Header/Footer 只开放样式调整。</p>
+              </div>
+              <div class="builder-entry__actions">
+                <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
+                  <FaIcon name="i-ri:layout-grid-line" />
+                  打开首页构建器
+                </FaButton>
+                <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
+                  <FaIcon name="i-ri:eraser-line" />
+                  清空动态内容
+                </FaButton>
+              </div>
+            </section>
 
-          <section class="legacy-sections">
+            <section class="legacy-sections">
             <div class="legacy-sections__head">
               <div>
                 <h3>兼容区块</h3>
@@ -1430,7 +1445,8 @@ function sectionTitle(type: HomeSectionType) {
                 </label>
               </div>
             </article>
-          </section>
+            </section>
+          </template>
         </main>
 
         <aside class="home-preview">
@@ -1670,6 +1686,7 @@ function sectionTitle(type: HomeSectionType) {
         :history-target-type="editorTarget"
         :history-target-id="editorTarget === 'home' ? 'home' : (selectedPageId || pageForm.slug || pageForm.title || 'draft')"
         :history-target-label="editorTarget === 'home' ? home.title : pageForm.title"
+        :theme-style-urls="currentThemeStyleUrls"
         @close="grapesEditorVisible = false"
         @save="saveGrapesEditor"
       />

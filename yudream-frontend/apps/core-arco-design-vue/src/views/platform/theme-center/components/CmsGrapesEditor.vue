@@ -77,6 +77,8 @@ const props = defineProps<{
   historyTargetType?: 'page' | 'home'
   historyTargetId?: string | null
   historyTargetLabel?: string
+  /** 画布注入的主题样式链接（当前编辑主题的 style.css），让内容页在主题下所见即所得 */
+  themeStyleUrls?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -742,7 +744,7 @@ onMounted(async () => {
       devices: cmsCanvasDevices(),
     },
     canvas: {
-      styles: [],
+      styles: props.themeStyleUrls || [],
     },
     plugins: cmsGrapesPlugins(),
     pluginsOpts: cmsGrapesPluginsOpts(),

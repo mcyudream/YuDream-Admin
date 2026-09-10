@@ -160,6 +160,45 @@ export interface YuDreamPluginAccount {
   permissions: string[]
 }
 
+export interface YuDreamPluginSiteContextQuery {
+  /** 请求的主题块编码列表；空表示不需要块数据 */
+  blocks?: string[]
+  /** 单块数据量上限 */
+  limit?: number
+  /** CMS 最新文章数量；空或 0 表示不需要 */
+  cmsLatest?: number
+}
+
+export interface YuDreamPluginSiteContext {
+  themeCode: string
+  themeConfig: Record<string, any>
+  /** 插件主题块提供者贡献的数据，键为块 code；插件未装载/不支持当前主题时缺省 */
+  blocks: Record<string, any>
+  cmsPagesLatest: Array<Record<string, any>>
+}
+
+export interface YuDreamPluginSiteSeoInput {
+  title: string
+  description?: string
+  canonicalPath?: string
+  image?: string
+  type?: 'article' | 'website'
+  siteName?: string
+  publishedAt?: string
+  updatedAt?: string
+  breadcrumbs?: Array<{ name: string, path: string }>
+}
+
+/** 公开站主题页能力：仅对 SITE 场景的公开页面有意义，匿名可用。 */
+export interface YuDreamPluginSiteClient {
+  /** 聚合当前 SITE 主题配置、插件数据块与 CMS 最新文章（匿名公开端点） */
+  context: (query?: YuDreamPluginSiteContextQuery) => Promise<YuDreamPluginSiteContext>
+  /** 写入公开页 SEO 元信息（title/description/og/canonical/结构化数据） */
+  applySeo: (input: YuDreamPluginSiteSeoInput) => void
+  /** 后端相对资产路径（/api/...）转可访问 URL（dev 走代理前缀，生产同源不变） */
+  assetUrl: (path: string) => string
+}
+
 export interface YuDreamPluginSdk {
   version: string
   pluginCode: string
@@ -170,6 +209,7 @@ export interface YuDreamPluginSdk {
   messaging: YuDreamPluginMessagingClient
   users: YuDreamPluginUsersClient
   ai: YuDreamPluginAiClient
+  site: YuDreamPluginSiteClient
 }
 
 export interface YuDreamPluginPageProps {

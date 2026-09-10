@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import type { PluginRouteMeta } from '@/plugins/use-plugin-remote-component'
 import type { CmsSiteLayoutMode } from '@/utils/cms-chrome'
+import { useActivePluginTheme } from '@/plugins/theme-runtime'
+import { usePluginRemoteComponentByMeta } from '@/plugins/use-plugin-remote-component'
+import { ensurePublicPluginRoutes } from '@/store/modules/app/plugin-route-runtime'
+import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { chromeRuntimeCss, extractChromeCss, readChromeCss } from '@/utils/cms-chrome'
 import { useSiteNavigation } from './site-navigation'
 
@@ -15,6 +20,67 @@ const props = withDefaults(defineProps<{
 
 const appAccountStore = useAppAccountStore()
 const appSettingsStore = useAppSettingsStore()
+const router = useRouter()
+
+const siteLogo = computed(() => toBackendAssetUrl(appSettingsStore.logo))
+const accountAvatar = computed(() => toBackendAssetUrl(appAccountStore.avatar))
+
+const activeSiteTheme = useActivePluginTheme('SITE')
+const themeChromeMeta = computed<PluginRouteMeta | undefined>(() => {
+  const theme = activeSiteTheme.value
+  if (!theme?.chromeComponent || !theme.moduleName) {
+    return undefined
+  }
+  return {
+    pluginCode: theme.pluginCode,
+    component: theme.chromeComponent,
+    moduleName: theme.moduleName,
+    assetRevision: theme.assetRevision,
+    styles: theme.styles,
+  }
+})
+const {
+  remoteComponent: themeChromeComponent,
+  remoteError: themeChromeError,
+  sdk: themeChromeSdk,
+} = usePluginRemoteComponentByMeta(themeChromeMeta)
+const themeChromeReady = computed(() => !!themeChromeMeta.value && !!themeChromeComponent.value && !themeChromeError.value)
+/** 主题声明了 chrome 且尚未失败：加载期间也不回落宿主浅色页头，避免白闪 */
+const themeOwnsChrome = computed(() => !!themeChromeMeta.value && !themeChromeError.value)
+const chromeProps = computed(() => ({
+  navigation: navigationTree.value,
+  footerNavigation: footerNavigationItems.value,
+  siteName: appSettingsStore.siteName || '',
+  siteLogo: siteLogo.value,
+  siteDescription: appSettingsStore.siteDescription || '',
+  isLogin: appAccountStore.isLogin,
+  account: appAccountStore.account || '',
+  avatar: accountAvatar.value,
+  blank: props.blank,
+  siteLayout: siteLayout.value,
+  footerTitle: footerTitle.value,
+  footerDescription: footerDescription.value,
+  footerCopyright: footerCopyright.value,
+}))
+
+watch(themeChromeError, (message) => {
+  if (message) {
+    console.warn('[YuDream Site] 主题 chrome 组件加载失败，回落宿主导航：', message)
+  }
+})
+
+/** 站内路径走 router 无感跳转，外部 URL 与新窗口手势保持原生 <a> 行为。 */
+function navigate(event: MouseEvent, url?: string) {
+  closeMobileNav()
+  if (!url || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    return
+  }
+  if (/^(?:https?:|mailto:|tel:|#)/i.test(url)) {
+    return
+  }
+  event.preventDefault()
+  router.push(url)
+}
 
 const { navigationTree, footerNavigationItems } = useSiteNavigation(() => props.settings?.navigationJson)
 
@@ -31,7 +97,7 @@ const chromeCustomCss = computed(() => [
   readChromeCss(props.settings ?? undefined, 'footer'),
   // 兼容 Grapes 曾把 Header/Footer 样式合并保存进 homeCss 的历史数据。
   extractChromeCss(props.settings?.homeCss || ''),
-].filter(Boolean).join('\n'))
+].map(css => rewriteBackendAssetUrls(css)).filter(Boolean).join('\n'))
 const siteRuntimeCss = computed(() => chromeRuntimeCss(siteLayout.value, chromeCustomCss.value))
 const footerTitle = computed(() => props.settings?.footerTitle || appSettingsStore.siteName || '')
 const footerDescription = computed(() => props.settings?.footerDescription || appSettingsStore.siteDescription || (appSettingsStore.siteName ? `由 ${appSettingsStore.siteName} 驱动的内容站点` : ''))
@@ -116,6 +182,8 @@ onMounted(() => {
   window.addEventListener('keydown', onEscape)
   window.addEventListener('resize', syncMobileNavOffset)
   window.visualViewport?.addEventListener('resize', syncMobileNavOffset)
+  // 进入公开区即预注册插件公开路由，导航直跳 /timeline 等路径不再经过 notFound 往返
+  void ensurePublicPluginRoutes(router)
 })
 
 onBeforeUnmount(() => {
@@ -128,42 +196,59 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="site-chrome">
+  <div class="site-chrome" :class="{ 'is-theme-chrome': themeOwnsChrome }">
+    <component
+      v-if="themeChromeReady"
+      :is="themeChromeComponent"
+      v-bind="chromeProps"
+      :sdk="themeChromeSdk"
+    >
+      <slot />
+    </component>
+    <div v-else-if="themeOwnsChrome" class="site-chrome__theme-pending">
+      <slot />
+    </div>
+    <template v-else>
     <component :is="'style'">
       {{ siteRuntimeCss }}
     </component>
-    <header v-if="!blank" data-yb-chrome="header" class="site-layout-header" :class="{ 'is-open': mobileNavOpen }">
+    <header
+      v-if="!blank"
+      data-yb-chrome="header"
+      class="site-layout-header"
+      :class="{ 'is-open': mobileNavOpen }"
+    >
       <div ref="headerBarRef" class="site-layout-header__bar">
-        <a data-yb-chrome-slot="logo" class="site-layout-header__brand" href="/site">
-          <img v-if="appSettingsStore.logo" :src="appSettingsStore.logo" :alt="appSettingsStore.siteName">
+        <a data-yb-chrome-slot="logo" class="site-layout-header__brand" href="/site" @click="navigate($event, '/site')">
+          <img v-if="siteLogo" :src="siteLogo" :alt="appSettingsStore.siteName">
           <span>{{ appSettingsStore.siteName }}</span>
         </a>
         <nav data-yb-chrome-slot="navigation" class="site-layout-header__nav">
           <div v-for="item in navigationTree" :key="item.id || item.url" class="site-nav-item" :class="{ 'has-children': item.children?.length }">
-            <a :href="item.url">
+            <a :href="item.url" @click="navigate($event, item.url)">
               {{ item.label }}
               <span v-if="item.children?.length">⌄</span>
             </a>
             <div v-if="item.children?.length" class="site-nav-dropdown">
-              <a v-for="child in item.children" :key="child.id || child.url" :href="child.url">{{ child.label }}</a>
+              <a v-for="child in item.children" :key="child.id || child.url" :href="child.url" @click="navigate($event, child.url)">{{ child.label }}</a>
             </div>
           </div>
         </nav>
         <div data-yb-chrome-slot="auth" class="site-layout-header__auth">
           <div v-if="!appAccountStore.isLogin" data-visible-when="guest">
-            <a href="/login" class="ghost">登录</a>
-            <a href="/register" class="primary">注册</a>
+            <a href="/login" class="ghost" @click="navigate($event, '/login')">登录</a>
+            <a href="/register" class="primary" @click="navigate($event, '/register')">注册</a>
           </div>
           <details v-else data-visible-when="logged-in" class="site-layout-header__account">
             <summary class="ghost site-layout-header__action">
-              <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
+              <img v-if="accountAvatar" :src="accountAvatar" :alt="appAccountStore.account">
               <span>{{ appAccountStore.account }}</span>
               <i>⌄</i>
             </summary>
             <div>
-              <a href="/">控制台</a>
-              <a href="/profile">个人资料</a>
-              <a href="/logout" class="danger">退出登录</a>
+              <a href="/" @click="navigate($event, '/')">控制台</a>
+              <a href="/profile" @click="navigate($event, '/profile')">个人资料</a>
+              <a href="/logout" class="danger" @click="navigate($event, '/logout')">退出登录</a>
             </div>
           </details>
         </div>
@@ -193,23 +278,23 @@ onBeforeUnmount(() => {
         >
           <nav class="site-mobile-nav" aria-label="站点导航">
             <div v-for="item in navigationTree" :key="`m-${item.id || item.url}`" class="site-mobile-nav__group">
-              <a :href="item.url" class="site-mobile-nav__link">{{ item.label }}</a>
-              <a v-for="child in item.children || []" :key="`m-${child.id || child.url}`" :href="child.url" class="site-mobile-nav__link site-mobile-nav__link--child">{{ child.label }}</a>
+              <a :href="item.url" class="site-mobile-nav__link" @click="navigate($event, item.url)">{{ item.label }}</a>
+              <a v-for="child in item.children || []" :key="`m-${child.id || child.url}`" :href="child.url" class="site-mobile-nav__link site-mobile-nav__link--child" @click="navigate($event, child.url)">{{ child.label }}</a>
             </div>
           </nav>
           <div class="site-mobile-auth">
             <template v-if="!appAccountStore.isLogin">
-              <a href="/login" class="ghost">登录</a>
-              <a href="/register" class="primary">注册</a>
+              <a href="/login" class="ghost" @click="navigate($event, '/login')">登录</a>
+              <a href="/register" class="primary" @click="navigate($event, '/register')">注册</a>
             </template>
             <template v-else>
               <div class="site-mobile-auth__account">
-                <img v-if="appAccountStore.avatar" :src="appAccountStore.avatar" :alt="appAccountStore.account">
+                <img v-if="accountAvatar" :src="accountAvatar" :alt="appAccountStore.account">
                 <span>{{ appAccountStore.account }}</span>
               </div>
-              <a href="/">控制台</a>
-              <a href="/profile">个人资料</a>
-              <a href="/logout" class="danger">退出登录</a>
+              <a href="/" @click="navigate($event, '/')">控制台</a>
+              <a href="/profile" @click="navigate($event, '/profile')">个人资料</a>
+              <a href="/logout" class="danger" @click="navigate($event, '/logout')">退出登录</a>
             </template>
           </div>
         </div>
@@ -228,13 +313,14 @@ onBeforeUnmount(() => {
           <small>{{ footerCopyright }}</small>
         </div>
         <nav data-yb-chrome-slot="footer-navigation">
-          <a v-for="item in footerNavigationItems" :key="`foot-${item.id || item.url}`" :href="item.url">{{ item.label }}</a>
+          <a v-for="item in footerNavigationItems" :key="`foot-${item.id || item.url}`" :href="item.url" @click="navigate($event, item.url)">{{ item.label }}</a>
         </nav>
       </div>
     </footer>
     <footer v-else-if="showCopyright && !blank" data-yb-chrome="footer" class="site-layout-copyright">
       {{ footerCopyright }}
     </footer>
+    </template>
   </div>
 </template>
 
@@ -242,6 +328,13 @@ onBeforeUnmount(() => {
 /* 与 /site 页面保持同一套站点主题变量；嵌套在 .site-page 内时取值一致，独立用于插件公开页时自带主题。 */
 /* 注意：不能包 @layer —— Tailwind preflight 的 *{margin:0;padding:0} 等非分层规则会压过所有分层规则 */
 .site-chrome {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* 浅色默认只给宿主自管 chrome；主题接管时不要赋 --yb-site-*，否则 scoped 选择器会压过主题 style.css */
+.site-chrome:not(.is-theme-chrome) {
   --yb-site-bg: #f8fafc;
   --yb-site-text: #111827;
   --yb-site-heading: #0f172a;
@@ -261,16 +354,24 @@ onBeforeUnmount(() => {
   --yb-site-hero-bg: linear-gradient(135deg, #0f766e, #1f2937);
   --yb-site-hero-text: #ffffff;
   --yb-site-danger: #b91c1c;
-
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
   background: var(--yb-site-bg);
   color: var(--yb-site-text);
 }
 
-.site-chrome.dark,
-.dark .site-chrome {
+.site-chrome.is-theme-chrome {
+  background: transparent;
+  color: inherit;
+}
+
+.site-chrome__theme-pending {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.site-chrome.dark:not(.is-theme-chrome),
+.dark .site-chrome:not(.is-theme-chrome) {
   --yb-site-bg: #0f172a;
   --yb-site-text: #e2e8f0;
   --yb-site-heading: #f8fafc;
@@ -307,20 +408,27 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
 }
 
+/* chrome 变量契约：--yb-site-header-* / --yb-site-header-bar-* 只消费不赋值，
+   主题在 style.css 里对 :root / .site-chrome 设值即可覆盖导航形态（如覆盖式 hero 导航）。 */
 .site-layout-header {
-  position: sticky;
-  top: 0;
+  position: var(--yb-site-header-position, sticky);
+  top: var(--yb-site-header-top, 0);
   z-index: 1000;
-  border-bottom: 1px solid var(--yb-site-border);
-  background: var(--yb-site-header-bg);
-  backdrop-filter: blur(12px);
+  border-bottom: var(--yb-site-header-border, 1px solid var(--yb-site-border));
+  background: var(--yb-site-header-background, var(--yb-site-header-bg));
+  backdrop-filter: var(--yb-site-header-backdrop, blur(12px));
 }
 
 .site-layout-header__bar {
   display: flex;
-  width: min(1240px, calc(100% - 40px));
-  min-height: 62px;
-  margin: 0 auto;
+  width: var(--yb-site-header-bar-width, min(1240px, calc(100% - 40px)));
+  min-height: var(--yb-site-header-bar-min-height, 62px);
+  margin: var(--yb-site-header-bar-margin, 0 auto);
+  padding: var(--yb-site-header-bar-padding, 0);
+  border: var(--yb-site-header-bar-border, none);
+  border-radius: var(--yb-site-header-bar-radius, 0);
+  background: var(--yb-site-header-bar-bg, transparent);
+  box-shadow: var(--yb-site-header-bar-shadow, none);
   gap: 22px;
   align-items: center;
 }
@@ -334,6 +442,7 @@ onBeforeUnmount(() => {
 }
 
 .site-layout-header__brand {
+  display: var(--yb-site-header-brand-display, flex);
   min-width: 0;
   gap: 10px;
   color: var(--yb-site-heading);
@@ -351,7 +460,7 @@ onBeforeUnmount(() => {
 
 .site-layout-header__nav {
   flex: 1 1 auto;
-  justify-content: flex-start;
+  justify-content: var(--yb-site-header-nav-justify, flex-start);
   gap: 4px;
   min-width: 0;
 }
@@ -628,15 +737,15 @@ onBeforeUnmount(() => {
 
 @media (max-width: 760px) {
   .site-layout-header {
-    position: sticky;
-    top: 0;
+    position: var(--yb-site-header-position, sticky);
+    top: var(--yb-site-header-top, 0);
     z-index: 1000;
   }
 
   .site-layout-header__bar {
-    width: calc(100% - 28px) !important;
-    min-height: 56px !important;
-    padding: 8px 0 !important;
+    width: var(--yb-site-header-bar-width, calc(100% - 28px)) !important;
+    min-height: var(--yb-site-header-bar-min-height, 56px) !important;
+    padding: var(--yb-site-header-bar-padding, 8px 0) !important;
     gap: 12px;
     align-items: center;
     flex-direction: row !important;
