@@ -255,6 +255,14 @@
     {
       "key": "messaging-identity-not-qq-number",
       "text": "官方 QQ OpenAPI 不提供真实 QQ 号。账号绑定必须写入 sysMessagingIdentity：Milky 数字 QQ 镜像 User.qq；官方私聊绑 user_openid、群/频道绑 member_openid+groupOpenid。禁止把 openid 写入 User.qq。历史 User.qq 启动时按 ^\\d{5,12}$ 分类迁移。bindQqOnce 依赖当前消息分发作用域分类身份，旧插件不用改。sendDirectToBoundUser 在官方连接上只用 user_openid。绑定入口按已启用消息连接列出，前端用机器人名或连接名生成绑定码；核销仍走当前消息连接作用域。已绑 User.qq 仍可为额外官方身份签发绑定码。同一官方连接只保留一条 openid，后绑覆盖先前同连接/同 AppID 身份。"
+    },
+    {
+      "key": "plugin-theme-page-set",
+      "text": "SITE 主题 homePreset JSON 可声明 pages[] 整套页面（slug/title/summary/coverImageUrl/template/markdownContent/htmlContent/cssContent/jsContent/seoTitle/seoDescription），随主题启用导入为已发布并标记 CmsPage.sourcePluginCode：slug 未被占用创建发布、同属该插件覆盖更新发布、被管理员或他主题占用跳过 warn 永不覆盖；声明清单之外的该插件旧页面转草稿；主题停用/顶替/卸载（PluginThemeAppService.clearActivation）时该插件页面全部下线转草稿，再启用恢复发布。主题页面与 settings.homeHtml 一律用 data-yb-* 模板指令注入系统数据，禁止声明 navigationJson。"
+    },
+    {
+      "key": "theme-center",
+      "text": "主题中心是独立一级菜单（platform:theme-center，/platform/theme-center，sort 60，已取代原 platform:cms 种子菜单并吸收其页面/首页定制/导航/媒体库/首页方案 tab，权限 platform:theme-center:view/:use）；后端 ThemeCenterAppService.overview/activate/deactivateSiteTheme + ThemeCenterController /api/platform/themes（cmd/res 走 ThemeCenterWebAssembler，cms 能力关闭时 overview 降级）；CmsPresetAppService.list() 计算每个方案的 active 标志。既有部署的 Mongo 种子菜单需手工删除旧 platform:cms 节点。"
     }
   ],
   "utilities": [
