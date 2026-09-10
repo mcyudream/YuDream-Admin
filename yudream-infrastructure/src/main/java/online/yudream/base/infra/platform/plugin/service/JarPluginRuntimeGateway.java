@@ -500,7 +500,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         return holders.entrySet().stream()
                 .filter(entry -> entry.getValue().isEnabled())
                 .flatMap(entry -> entry.getValue().getContext().theme().stream()
-                        .map(theme -> toThemeInfo(entry.getKey(), theme, entry.getValue().getAssetRevision())))
+                        .map(theme -> toThemeInfo(entry.getKey(), theme, entry.getValue())))
                 .toList();
     }
 
@@ -511,10 +511,14 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             return Optional.empty();
         }
         return holder.getContext().theme()
-                .map(theme -> toThemeInfo(code, theme, holder.getAssetRevision()));
+                .map(theme -> toThemeInfo(code, theme, holder));
     }
 
-    private PluginThemeInfo toThemeInfo(String pluginCode, PluginTheme theme, String assetRevision) {
+    private PluginThemeInfo toThemeInfo(String pluginCode, PluginTheme theme, PluginRuntimeHolder holder) {
+        String moduleName = holder.getContext().frontendModules().stream()
+                .findFirst()
+                .map(online.yudream.base.plugin.spi.frontend.PluginFrontendModule::moduleName)
+                .orElse("");
         return new PluginThemeInfo(
                 pluginCode,
                 theme.code(),
@@ -525,7 +529,10 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 theme.preview(),
                 theme.homePreset(),
                 theme.configSchema(),
-                assetRevision
+                theme.homeComponent(),
+                theme.chromeComponent(),
+                moduleName,
+                holder.getAssetRevision()
         );
     }
 

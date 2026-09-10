@@ -16,6 +16,10 @@ public class ThemeCenterThemeRes {
     private String assetRevision;
     private Boolean hasHomePreset;
     private Boolean hasConfigSchema;
+    /** 是否声明首页接管组件（有则公开站首页由插件 Vue 页面承载）。 */
+    private Boolean hasHomeComponent;
+    /** 是否声明站点 chrome 接管组件（有则公开站页头/页脚由插件 Vue 页面承载）。 */
+    private Boolean hasChromeComponent;
     private Boolean hasPageSet;
     private Boolean active;
     private Boolean enabled;

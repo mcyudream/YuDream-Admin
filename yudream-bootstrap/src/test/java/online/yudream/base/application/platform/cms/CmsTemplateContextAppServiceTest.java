@@ -5,6 +5,7 @@ import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
 import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
 import online.yudream.base.application.platform.cms.service.CmsTemplateContextAppService;
 import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
+import online.yudream.base.application.platform.theme.service.ThemeBlockAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
@@ -59,7 +60,7 @@ class CmsTemplateContextAppServiceTest {
     @BeforeEach
     void setUp() {
         service = new CmsTemplateContextAppService(capabilities, cmsPages, wikiSpaces, wikiNodes, wikiVersions,
-                siteThemeQueryService, pluginExtensionQuery, new ObjectMapper());
+                siteThemeQueryService, new ThemeBlockAppService(pluginExtensionQuery, new ObjectMapper()));
         lenient().when(siteThemeQueryService.activeSiteThemeCode()).thenReturn("default");
     }
 

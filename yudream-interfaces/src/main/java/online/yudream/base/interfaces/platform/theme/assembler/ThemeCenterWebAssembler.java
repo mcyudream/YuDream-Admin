@@ -32,6 +32,8 @@ public class ThemeCenterWebAssembler {
                 .assetRevision(dto.getAssetRevision())
                 .hasHomePreset(dto.getHasHomePreset())
                 .hasConfigSchema(dto.getHasConfigSchema())
+                .hasHomeComponent(dto.getHasHomeComponent())
+                .hasChromeComponent(dto.getHasChromeComponent())
                 .hasPageSet(dto.getHasPageSet())
                 .active(dto.getActive())
                 .enabled(dto.getEnabled())
