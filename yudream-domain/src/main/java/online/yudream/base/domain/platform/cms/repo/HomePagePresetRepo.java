@@ -15,6 +15,9 @@ public interface HomePagePresetRepo {
     /** 全量方案，按创建时间倒序。 */
     List<HomePagePreset> findAll();
 
+    /** 指定主题的方案，按创建时间倒序。 */
+    List<HomePagePreset> findByThemeCode(String themeCode);
+
     /** 指定来源的方案，按创建时间倒序。 */
     List<HomePagePreset> findBySource(HomePagePresetSource source);
 

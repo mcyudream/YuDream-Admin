@@ -82,37 +82,36 @@ class PluginThemeAppServiceTest {
     }
 
     @Test
-    void clearActivationUnpublishesThemePagesWhenSiteSlotReleased() {
+    void clearActivationOnlyClearsSlotsWithoutTouchingCms() {
         stubTheme(theme("neco", Set.of("SITE", "ADMIN")));
         service.activate("neco");
-
-        service.clearActivation("neco");
-
-        verify(cmsPresetAppService).unpublishPluginPages("neco");
-        verify(cmsPresetAppService).restorePluginHomepage("neco");
-    }
-
-    @Test
-    void clearActivationSkipsPageUnpublishWhenOnlyAdminSlotReleased() {
-        stubTheme(theme("pixel", Set.of("ADMIN")));
-        service.activate("pixel");
-
-        service.clearActivation("pixel");
-
-        verify(cmsPresetAppService, never()).unpublishPluginPages(org.mockito.ArgumentMatchers.anyString());
-        verify(cmsPresetAppService, never()).restorePluginHomepage(org.mockito.ArgumentMatchers.anyString());
-    }
-
-    @Test
-    void clearActivationStillClearsSlotWhenPageUnpublishFails() {
-        stubTheme(theme("neco", Set.of("SITE")));
-        service.activate("neco");
-        org.mockito.Mockito.doThrow(new RuntimeException("boom"))
-                .when(cmsPresetAppService).unpublishPluginPages("neco");
+        org.mockito.Mockito.clearInvocations(cmsPresetAppService);
 
         service.clearActivation("neco");
 
         assertThat(readSlot("SITE")).isNull();
+        assertThat(readSlot("ADMIN")).isNull();
+        org.mockito.Mockito.verifyNoMoreInteractions(cmsPresetAppService);
+    }
+
+    @Test
+    void activateSiteThemeWithoutHomePresetEnsuresThemeLayout() {
+        stubTheme(theme("neco", Set.of("SITE")));
+
+        service.activate("neco");
+
+        verify(cmsPresetAppService).ensureThemeLayout("neco");
+    }
+
+    @Test
+    void activateStillSucceedsWhenThemeLayoutInitFails() {
+        stubTheme(theme("neco", Set.of("SITE")));
+        org.mockito.Mockito.doThrow(new RuntimeException("boom"))
+                .when(cmsPresetAppService).ensureThemeLayout("neco");
+
+        service.activate("neco");
+
+        assertThat(readSlot("SITE")).isEqualTo("neco");
     }
 
     @Test
@@ -178,6 +177,7 @@ class PluginThemeAppServiceTest {
         service.activate("neco");
 
         verify(cmsPresetAppService).importPluginPreset("neco", "Neco 主题", presetJson);
+        verify(cmsPresetAppService, never()).ensureThemeLayout(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test

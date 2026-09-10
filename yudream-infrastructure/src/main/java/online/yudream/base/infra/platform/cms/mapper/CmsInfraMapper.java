@@ -94,6 +94,7 @@ public class CmsInfraMapper {
         dataObj.setTemplate(domain.getTemplate());
         dataObj.setStatus(domain.getStatus());
         dataObj.setPublishedAt(domain.getPublishedAt());
+        dataObj.setThemeCode(domain.getThemeCode());
         dataObj.setSourcePluginCode(domain.getSourcePluginCode());
         return dataObj;
     }
@@ -124,6 +125,7 @@ public class CmsInfraMapper {
                 .template(dataObj.getTemplate())
                 .status(dataObj.getStatus())
                 .publishedAt(dataObj.getPublishedAt())
+                .themeCode(dataObj.getThemeCode())
                 .sourcePluginCode(dataObj.getSourcePluginCode())
                 .build();
     }
@@ -137,6 +139,7 @@ public class CmsInfraMapper {
         dataObj.setVersion(domain.getVersion());
         dataObj.setCreateTime(domain.getCreateTime());
         dataObj.setUpdateTime(domain.getUpdateTime());
+        dataObj.setThemeCode(domain.getThemeCode());
         dataObj.setTitle(domain.getTitle());
         dataObj.setSubtitle(domain.getSubtitle());
         dataObj.setTheme(domain.getTheme());
@@ -156,6 +159,7 @@ public class CmsInfraMapper {
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())
+                .themeCode(dataObj.getThemeCode())
                 .title(dataObj.getTitle())
                 .subtitle(dataObj.getSubtitle())
                 .theme(dataObj.getTheme())
@@ -180,6 +184,7 @@ public class CmsInfraMapper {
         dataObj.setDescription(domain.getDescription());
         dataObj.setSource(domain.getSource());
         dataObj.setPluginCode(domain.getPluginCode());
+        dataObj.setThemeCode(domain.getThemeCode());
         dataObj.setTitle(domain.getTitle());
         dataObj.setSubtitle(domain.getSubtitle());
         dataObj.setTheme(domain.getTheme());
@@ -203,6 +208,7 @@ public class CmsInfraMapper {
                 .description(dataObj.getDescription())
                 .source(dataObj.getSource())
                 .pluginCode(dataObj.getPluginCode())
+                .themeCode(dataObj.getThemeCode())
                 .title(dataObj.getTitle())
                 .subtitle(dataObj.getSubtitle())
                 .theme(dataObj.getTheme())

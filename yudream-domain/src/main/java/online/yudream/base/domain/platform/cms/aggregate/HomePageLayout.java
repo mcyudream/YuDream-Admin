@@ -20,19 +20,26 @@ import java.util.Map;
 @AllArgsConstructor
 public class HomePageLayout extends BaseDomain {
 
+    /** 内置默认主题的主题编码；插件主题为其插件 code。 */
+    public static final String DEFAULT_THEME_CODE = "default";
+
+    /** 归属主题编码：每个主题各持有一套完全独立的首页布局。 */
+    private String themeCode;
     private String title;
     private String subtitle;
+    /** 该布局当前应用的方案编码（如 plugin:{code}、user-xxx），用于方案列表的「当前」标记。 */
     private String theme;
     private String heroImageUrl;
     private Map<String, String> settings;
     private List<HomeSection> sections;
     private Boolean published;
 
-    public static HomePageLayout defaultLayout() {
+    public static HomePageLayout defaultLayout(String themeCode) {
         HomePageLayout layout = new HomePageLayout();
+        layout.themeCode = themeCode == null ? DEFAULT_THEME_CODE : themeCode;
         layout.title = "YuDream";
         layout.subtitle = "自定义首页";
-        layout.theme = "default";
+        layout.theme = DEFAULT_THEME_CODE;
         layout.settings = new HashMap<>();
         layout.sections = new ArrayList<>();
         layout.published = false;

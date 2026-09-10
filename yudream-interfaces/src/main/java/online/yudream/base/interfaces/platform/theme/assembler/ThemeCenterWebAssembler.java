@@ -32,6 +32,7 @@ public class ThemeCenterWebAssembler {
         return ThemeCenterOverviewRes.builder()
                 .themes(themes)
                 .presets(CmsWebAssembler.toPresetResList(dto.getPresets()))
+                .editableThemes(dto.getEditableThemes())
                 .cmsEnabled(dto.getCmsEnabled())
                 .build();
     }

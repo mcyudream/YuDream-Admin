@@ -13,6 +13,8 @@ public class HomePagePresetRes {
     private String description;
     private String source;
     private String pluginCode;
+    /** 归属主题编码：方案按主题隔离。 */
+    private String themeCode;
     private Integer sectionCount;
     private Boolean active;
     private LocalDateTime createTime;

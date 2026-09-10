@@ -83,6 +83,7 @@ public class CmsAssembler {
                 .template(page.getTemplate())
                 .status(page.getStatus())
                 .publishedAt(page.getPublishedAt())
+                .themeCode(page.getThemeCode())
                 .sourcePluginCode(page.getSourcePluginCode())
                 .createTime(page.getCreateTime())
                 .updateTime(page.getUpdateTime())
@@ -92,6 +93,7 @@ public class CmsAssembler {
     public static HomePageLayoutDTO toDTO(HomePageLayout layout) {
         return HomePageLayoutDTO.builder()
                 .id(layout.getId())
+                .themeCode(layout.getThemeCode())
                 .title(layout.getTitle())
                 .subtitle(layout.getSubtitle())
                 .theme(layout.getTheme())
@@ -111,6 +113,7 @@ public class CmsAssembler {
                 .description(preset.getDescription())
                 .source(preset.getSource() == null ? null : preset.getSource().name())
                 .pluginCode(preset.getPluginCode())
+                .themeCode(preset.getThemeCode())
                 .sectionCount(preset.getSections() == null ? 0 : preset.getSections().size())
                 .createTime(preset.getCreateTime())
                 .updateTime(preset.getUpdateTime())

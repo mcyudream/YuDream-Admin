@@ -12,13 +12,17 @@ public interface CmsPageRepo {
 
     Optional<CmsPage> findById(Long id);
 
-    Optional<CmsPage> findBySlug(String slug);
+    /** 按归属主题 + 路径查找；slug 只在同一主题内唯一，不同主题可复用同一 slug。 */
+    Optional<CmsPage> findBySlug(String themeCode, String slug);
 
     List<CmsPage> findBySourcePluginCode(String pluginCode);
 
     void deleteById(Long id);
 
-    PageResult<CmsPage> page(String keyword, int page, int size);
+    /** 全部页面（数据迁移用）。 */
+    List<CmsPage> findAll();
 
-    PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size);
+    PageResult<CmsPage> page(String themeCode, String keyword, int page, int size);
+
+    PageResult<CmsPage> publishedPage(String themeCode, String keyword, String category, String tag, int page, int size);
 }

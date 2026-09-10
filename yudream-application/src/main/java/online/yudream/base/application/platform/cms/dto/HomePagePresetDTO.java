@@ -27,6 +27,8 @@ public class HomePagePresetDTO implements Serializable {
     /** 来源：USER / PLUGIN / SNAPSHOT。 */
     private String source;
     private String pluginCode;
+    /** 归属主题编码：方案按主题隔离。 */
+    private String themeCode;
     /** 方案内区块数量，供列表展示。 */
     private Integer sectionCount;
     /** 是否为当前首页正在使用的方案。 */

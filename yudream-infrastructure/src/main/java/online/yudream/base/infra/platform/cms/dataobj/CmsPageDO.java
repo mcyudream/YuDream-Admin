@@ -16,7 +16,8 @@ import java.util.List;
 @Document(collection = "platformCmsPage")
 public class CmsPageDO extends BaseDO {
     private String title;
-    @Indexed(unique = true)
+    /** slug 只在 (themeCode, slug) 维度唯一，唯一性由应用层校验兜底。 */
+    @Indexed
     private String slug;
     private String summary;
     private String excerpt;
@@ -33,6 +34,8 @@ public class CmsPageDO extends BaseDO {
     private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
+    @Indexed
+    private String themeCode;
     @Indexed
     private String sourcePluginCode;
 }

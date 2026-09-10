@@ -12,6 +12,8 @@ import java.util.Map;
 @Builder
 public class HomePageLayoutRes {
     private Long id;
+    /** 归属主题编码。 */
+    private String themeCode;
     private String title;
     private String subtitle;
     private String theme;

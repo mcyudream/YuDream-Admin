@@ -136,6 +136,7 @@ public class CmsWebAssembler {
                 .template(dto.getTemplate())
                 .status(dto.getStatus())
                 .publishedAt(dto.getPublishedAt())
+                .themeCode(dto.getThemeCode())
                 .sourcePluginCode(dto.getSourcePluginCode())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
@@ -145,6 +146,7 @@ public class CmsWebAssembler {
     public static HomePageLayoutRes toRes(HomePageLayoutDTO dto) {
         return HomePageLayoutRes.builder()
                 .id(dto.getId())
+                .themeCode(dto.getThemeCode())
                 .title(dto.getTitle())
                 .subtitle(dto.getSubtitle())
                 .theme(dto.getTheme())
@@ -175,6 +177,7 @@ public class CmsWebAssembler {
                 .description(dto.getDescription())
                 .source(dto.getSource())
                 .pluginCode(dto.getPluginCode())
+                .themeCode(dto.getThemeCode())
                 .sectionCount(dto.getSectionCount())
                 .active(dto.getActive())
                 .createTime(dto.getCreateTime())

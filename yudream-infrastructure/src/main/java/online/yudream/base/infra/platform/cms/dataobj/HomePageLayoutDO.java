@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import online.yudream.base.domain.platform.cms.valobj.HomeSection;
 import online.yudream.base.infra.common.baseobj.BaseDO;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
@@ -15,6 +16,8 @@ import java.util.Map;
 @Data
 @Document(collection = "platformHomePageLayout")
 public class HomePageLayoutDO extends BaseDO {
+    @Indexed
+    private String themeCode;
     private String title;
     private String subtitle;
     private String theme;

@@ -44,8 +44,8 @@ public class CmsPageRepoImpl implements CmsPageRepo {
     }
 
     @Override
-    public Optional<CmsPage> findBySlug(String slug) {
-        Query query = Query.query(Criteria.where("slug").is(slug));
+    public Optional<CmsPage> findBySlug(String themeCode, String slug) {
+        Query query = Query.query(Criteria.where("themeCode").is(themeCode).and("slug").is(slug));
         return Optional.ofNullable(CmsInfraMapper.toDomain(mongoTemplate.findOne(query, CmsPageDO.class)));
     }
 
@@ -62,14 +62,22 @@ public class CmsPageRepoImpl implements CmsPageRepo {
     }
 
     @Override
-    public PageResult<CmsPage> page(String keyword, int page, int size) {
-        Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
+    public List<CmsPage> findAll() {
+        return mongoTemplate.findAll(CmsPageDO.class).stream().map(CmsInfraMapper::toDomain).toList();
+    }
+
+    @Override
+    public PageResult<CmsPage> page(String themeCode, String keyword, int page, int size) {
+        Query query = query(keyword)
+                .addCriteria(Criteria.where("themeCode").is(themeCode))
+                .with(Sort.by(Sort.Direction.DESC, "createTime"));
         return page(query, page, size);
     }
 
     @Override
-    public PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size) {
+    public PageResult<CmsPage> publishedPage(String themeCode, String keyword, String category, String tag, int page, int size) {
         Query query = query(keyword)
+                .addCriteria(Criteria.where("themeCode").is(themeCode))
                 .addCriteria(Criteria.where("status").is(PageStatus.PUBLISHED))
                 .with(Sort.by(Sort.Direction.DESC, "publishedAt", "createTime"));
         if (StringUtils.hasText(category)) {

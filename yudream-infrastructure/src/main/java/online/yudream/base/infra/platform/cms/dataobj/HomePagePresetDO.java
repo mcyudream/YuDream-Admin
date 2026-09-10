@@ -5,6 +5,7 @@ import lombok.EqualsAndHashCode;
 import online.yudream.base.domain.platform.cms.enumerate.HomePagePresetSource;
 import online.yudream.base.domain.platform.cms.valobj.HomeSection;
 import online.yudream.base.infra.common.baseobj.BaseDO;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.util.ArrayList;
@@ -21,6 +22,8 @@ public class HomePagePresetDO extends BaseDO {
     private String description;
     private HomePagePresetSource source;
     private String pluginCode;
+    @Indexed
+    private String themeCode;
     private String title;
     private String subtitle;
     private String theme;

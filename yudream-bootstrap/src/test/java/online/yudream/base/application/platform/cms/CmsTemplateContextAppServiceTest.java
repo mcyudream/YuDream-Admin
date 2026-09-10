@@ -4,6 +4,7 @@ import online.yudream.base.application.platform.capability.service.CapabilityApp
 import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
 import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
 import online.yudream.base.application.platform.cms.service.CmsTemplateContextAppService;
+import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
@@ -29,6 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,12 +46,16 @@ class CmsTemplateContextAppServiceTest {
     private WikiNodeRepo wikiNodes;
     @Mock
     private WikiPageVersionRepo wikiVersions;
+    @Mock
+    private SiteThemeQueryService siteThemeQueryService;
 
     private CmsTemplateContextAppService service;
 
     @BeforeEach
     void setUp() {
-        service = new CmsTemplateContextAppService(capabilities, cmsPages, wikiSpaces, wikiNodes, wikiVersions);
+        service = new CmsTemplateContextAppService(capabilities, cmsPages, wikiSpaces, wikiNodes, wikiVersions,
+                siteThemeQueryService);
+        lenient().when(siteThemeQueryService.activeSiteThemeCode()).thenReturn("default");
     }
 
     @Test
@@ -62,7 +68,7 @@ class CmsTemplateContextAppServiceTest {
                 .status(PageStatus.PUBLISHED)
                 .publishedAt(LocalDateTime.now())
                 .build();
-        when(cmsPages.publishedPage(isNull(), isNull(), isNull(), anyInt(), anyInt()))
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
                 .thenReturn(new PageResult<>(List.of(published), 1, 1, 12));
         when(capabilities.enabled("wiki")).thenReturn(false);
 
@@ -75,10 +81,23 @@ class CmsTemplateContextAppServiceTest {
     }
 
     @Test
+    void queriesCmsPagesOfTheActiveSiteThemeOnly() {
+        when(siteThemeQueryService.activeSiteThemeCode()).thenReturn("neco");
+        when(cmsPages.publishedPage(eq("neco"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+                .thenReturn(PageResult.empty(1, 12));
+        when(capabilities.enabled("wiki")).thenReturn(false);
+
+        service.query();
+
+        org.mockito.Mockito.verify(cmsPages)
+                .publishedPage(eq("neco"), isNull(), isNull(), isNull(), anyInt(), anyInt());
+    }
+
+    @Test
     void passesTemplateListLimitsToTheDataLayer() {
         CmsPage first = CmsPage.builder().id(1L).title("One").slug("one").status(PageStatus.PUBLISHED).build();
         CmsPage second = CmsPage.builder().id(2L).title("Two").slug("two").status(PageStatus.PUBLISHED).build();
-        when(cmsPages.publishedPage(isNull(), isNull(), isNull(), eq(1), eq(2)))
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), eq(1), eq(2)))
                 .thenReturn(new PageResult<>(List.of(first, second), 1, 2, 2));
         when(capabilities.enabled("wiki")).thenReturn(false);
         CmsTemplateContextQuery query = new CmsTemplateContextQuery();
@@ -87,7 +106,7 @@ class CmsTemplateContextAppServiceTest {
         CmsTemplateContextDTO context = service.query(query);
 
         assertThat(context.getCms().getPages().getLatest()).hasSize(2);
-        org.mockito.Mockito.verify(cmsPages).publishedPage(isNull(), isNull(), isNull(), eq(1), eq(2));
+        org.mockito.Mockito.verify(cmsPages).publishedPage(eq("default"), isNull(), isNull(), isNull(), eq(1), eq(2));
     }
 
     @Test
@@ -100,7 +119,7 @@ class CmsTemplateContextAppServiceTest {
         WikiPageVersion published = WikiPageVersion.builder()
                 .id(30L).nodeId(20L).spaceId(10L).revision(2).title("Install")
                 .markdown("published markdown").build();
-        when(cmsPages.publishedPage(isNull(), isNull(), isNull(), anyInt(), anyInt()))
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
                 .thenReturn(PageResult.empty(1, 12));
         when(capabilities.enabled("wiki")).thenReturn(true);
         when(wikiSpaces.findAll()).thenReturn(List.of(space, privateSpace));

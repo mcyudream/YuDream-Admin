@@ -5,6 +5,7 @@ import online.yudream.base.application.platform.capability.service.CapabilityApp
 import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
 import online.yudream.base.application.platform.cms.dto.CmsTemplateItemDTO;
 import online.yudream.base.application.platform.cms.query.CmsTemplateContextQuery;
+import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
@@ -41,6 +42,7 @@ public class CmsTemplateContextAppService {
     private final WikiSpaceRepo wikiSpaces;
     private final WikiNodeRepo wikiNodes;
     private final WikiPageVersionRepo wikiVersions;
+    private final SiteThemeQueryService siteThemeQueryService;
 
     @Transactional(readOnly = true)
     public CmsTemplateContextDTO query() {
@@ -54,7 +56,7 @@ public class CmsTemplateContextAppService {
         int cmsLatestLimit = bounded(safeQuery.getCmsLatestLimit(), LATEST_LIMIT);
         List<CmsTemplateItemDTO> pages = cmsLatestLimit == 0
                 ? List.of()
-                : cmsPages.publishedPage(null, null, null, 1, cmsLatestLimit)
+                : cmsPages.publishedPage(siteThemeQueryService.activeSiteThemeCode(), null, null, null, 1, cmsLatestLimit)
                 .getRecords().stream()
                 .map(this::cmsPage)
                 .sorted(Comparator.comparing(CmsTemplateItemDTO::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))

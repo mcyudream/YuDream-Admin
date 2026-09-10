@@ -7,6 +7,7 @@ import online.yudream.base.application.platform.cms.cmd.HomePageLayoutSaveCmd;
 import online.yudream.base.application.platform.cms.dto.CmsPageDTO;
 import online.yudream.base.application.platform.cms.dto.HomePageLayoutDTO;
 import online.yudream.base.application.platform.cms.query.CmsPageQuery;
+import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -18,7 +19,13 @@ import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
 import online.yudream.base.domain.platform.cms.valobj.PageSlug;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+/**
+ * CMS 页面与首页布局编排。所有内容按主题（themeCode）完全隔离：
+ * 管理端方法接收目标主题（null=当前激活主题），公开端方法只读当前激活主题的内容，
+ * 因此切换主题即整套内容切换，互不影响。
+ */
 @Service
 @RequiredArgsConstructor
 public class CmsAppService {
@@ -28,20 +35,22 @@ public class CmsAppService {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final CmsPageRepo cmsPageRepo;
     private final HomePageLayoutRepo homePageLayoutRepo;
+    private final SiteThemeQueryService siteThemeQueryService;
 
     @Transactional(readOnly = true)
-    public PageResult<CmsPageDTO> page(CmsPageQuery query) {
+    public PageResult<CmsPageDTO> page(String themeCode, CmsPageQuery query) {
         ensureEnabled();
-        PageResult<CmsPage> page = cmsPageRepo.page(query.getKeyword(), query.getPage(), query.getSize());
+        String theme = resolveTheme(themeCode);
+        PageResult<CmsPage> page = cmsPageRepo.page(theme, query.getKeyword(), query.getPage(), query.getSize());
         return new PageResult<>(page.getRecords().stream().map(CmsAssembler::toDTO).toList(), page.getTotal(), page.getPage(), page.getSize());
     }
 
     @Transactional
-    public CmsPageDTO savePage(CmsPageSaveCmd cmd) {
+    public CmsPageDTO savePage(String themeCode, CmsPageSaveCmd cmd) {
         ensureEnabled();
-        CmsPage page = cmd.getId() == null ? createPage(cmd) : page(cmd.getId());
+        CmsPage page = cmd.getId() == null ? createPage(resolveTheme(themeCode), cmd) : page(cmd.getId());
         String normalizedSlug = normalizeSlug(cmd.getSlug());
-        ensureSlugAvailable(normalizedSlug, page.getId());
+        ensureSlugAvailable(page.getThemeCode(), normalizedSlug, page.getId());
         page.update(cmd.getTitle(), normalizedSlug, cmd.getSummary(), cmd.getExcerpt(), cmd.getCoverImageUrl(),
                 cmd.getCategories(), cmd.getTags(), cmd.getMarkdownContent(), cmd.getHtmlContent(), cmd.getCssContent(), cmd.getJsContent(), cmd.getBuilderProjectJson(), cmd.getSeoTitle(), cmd.getSeoDescription(),
                 cmd.getTemplate(), cmd.getStatus());
@@ -72,23 +81,30 @@ public class CmsAppService {
     }
 
     @Transactional(readOnly = true)
-    public HomePageLayoutDTO homeLayout() {
+    public HomePageLayoutDTO homeLayout(String themeCode) {
         ensureEnabled();
-        return CmsAssembler.toDTO(homePageLayoutRepo.findCurrent().orElseGet(HomePageLayout::defaultLayout));
+        String theme = resolveTheme(themeCode);
+        return CmsAssembler.toDTO(homePageLayoutRepo.findByThemeCode(theme)
+                .orElseGet(() -> HomePageLayout.defaultLayout(theme)));
     }
 
     @Transactional
-    public HomePageLayoutDTO saveHomeLayout(HomePageLayoutSaveCmd cmd) {
+    public HomePageLayoutDTO saveHomeLayout(String themeCode, HomePageLayoutSaveCmd cmd) {
         ensureEnabled();
-        HomePageLayout layout = homePageLayoutRepo.findCurrent().orElseGet(HomePageLayout::defaultLayout);
-        layout.update(cmd.getTitle(), cmd.getSubtitle(), cmd.getTheme(), cmd.getHeroImageUrl(), cmd.getSettings(), cmd.getSections(), cmd.getPublished());
+        String theme = resolveTheme(themeCode);
+        HomePageLayout layout = homePageLayoutRepo.findByThemeCode(theme)
+                .orElseGet(() -> HomePageLayout.defaultLayout(theme));
+        // 保留布局既有的「应用方案」标记，手工编辑不冒认方案归属
+        layout.update(cmd.getTitle(), cmd.getSubtitle(), layout.getTheme(), cmd.getHeroImageUrl(), cmd.getSettings(), cmd.getSections(), cmd.getPublished());
         return CmsAssembler.toDTO(homePageLayoutRepo.save(layout));
     }
 
     @Transactional(readOnly = true)
     public HomePageLayoutDTO publicHome() {
         ensureEnabled();
-        HomePageLayout layout = homePageLayoutRepo.findCurrent().orElseThrow(() -> new BizException("首页未配置"));
+        String theme = siteThemeQueryService.activeSiteThemeCode();
+        HomePageLayout layout = homePageLayoutRepo.findByThemeCode(theme)
+                .orElseThrow(() -> new BizException("首页未配置"));
         if (!Boolean.TRUE.equals(layout.getPublished())) {
             throw new BizException("首页未发布");
         }
@@ -98,7 +114,9 @@ public class CmsAppService {
     @Transactional(readOnly = true)
     public CmsPageDTO publicPage(String slug) {
         ensureEnabled();
-        CmsPage page = cmsPageRepo.findBySlug(normalizeSlug(slug)).orElseThrow(() -> new BizException("页面不存在"));
+        String theme = siteThemeQueryService.activeSiteThemeCode();
+        CmsPage page = cmsPageRepo.findBySlug(theme, normalizeSlug(slug))
+                .orElseThrow(() -> new BizException("页面不存在"));
         if (page.getStatus() != PageStatus.PUBLISHED) {
             throw new BizException("页面未发布");
         }
@@ -108,19 +126,20 @@ public class CmsAppService {
     @Transactional(readOnly = true)
     public PageResult<CmsPageDTO> publicPages(CmsPageQuery query) {
         ensureEnabled();
+        String theme = siteThemeQueryService.activeSiteThemeCode();
         int page = query == null ? 1 : query.getPage();
         int size = query == null ? 12 : Math.min(Math.max(query.getSize(), 1), 50);
         String keyword = query == null ? null : query.getKeyword();
         String category = query == null ? null : query.getCategory();
         String tag = query == null ? null : query.getTag();
-        PageResult<CmsPage> result = cmsPageRepo.publishedPage(keyword, category, tag, page, size);
+        PageResult<CmsPage> result = cmsPageRepo.publishedPage(theme, keyword, category, tag, page, size);
         return new PageResult<>(result.getRecords().stream().map(CmsAssembler::toDTO).toList(), result.getTotal(), result.getPage(), result.getSize());
     }
 
-    private CmsPage createPage(CmsPageSaveCmd cmd) {
+    private CmsPage createPage(String themeCode, CmsPageSaveCmd cmd) {
         String normalizedSlug = normalizeSlug(cmd.getSlug());
-        ensureSlugAvailable(normalizedSlug, null);
-        return CmsPage.create(cmd.getTitle(), normalizedSlug);
+        ensureSlugAvailable(themeCode, normalizedSlug, null);
+        return CmsPage.create(cmd.getTitle(), normalizedSlug, themeCode);
     }
 
     private CmsPage page(Long id) {
@@ -136,12 +155,16 @@ public class CmsAppService {
         }
     }
 
+    private String resolveTheme(String themeCode) {
+        return StringUtils.hasText(themeCode) ? themeCode : siteThemeQueryService.activeSiteThemeCode();
+    }
+
     private String normalizeSlug(String slug) {
         return PageSlug.of(slug).value();
     }
 
-    private void ensureSlugAvailable(String slug, Long currentPageId) {
-        cmsPageRepo.findBySlug(slug).ifPresent(existing -> {
+    private void ensureSlugAvailable(String themeCode, String slug, Long currentPageId) {
+        cmsPageRepo.findBySlug(themeCode, slug).ifPresent(existing -> {
             if (currentPageId == null || !currentPageId.equals(existing.getId())) {
                 throw new BizException("页面路径已存在");
             }
