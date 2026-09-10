@@ -12,8 +12,48 @@ export interface ThemeCenterTheme {
   assetRevision?: string
   hasHomePreset?: boolean
   hasPageSet?: boolean
+  /** 主题是否声明了配置 schema（theme-config.json） */
+  hasConfigSchema?: boolean
   active?: boolean
   enabled?: boolean
+}
+
+export interface ThemeConfigOption {
+  label: string
+  value: string
+}
+
+/** 主题配置字段：type 为 text/textarea/number/switch/select/color/image/list，list 带 itemFields 子字段 */
+export interface ThemeConfigField {
+  key: string
+  label: string
+  description?: string
+  type: string
+  placeholder?: string
+  defaultValue?: unknown
+  options?: ThemeConfigOption[]
+  /** 敏感字段：管理端读取脱敏为空串，留空保存表示不修改 */
+  secret?: boolean
+  itemFields?: ThemeConfigField[]
+}
+
+export interface ThemeConfigSection {
+  code: string
+  title: string
+  description?: string
+  fields: ThemeConfigField[]
+}
+
+export interface ThemeConfigSchema {
+  sections: ThemeConfigSection[]
+}
+
+export interface ThemeConfig {
+  themeCode: string
+  schema: ThemeConfigSchema
+  values: Record<string, any>
+  /** secret 字段是否已配置（值为脱敏后的空串时依据此标识显示"已配置"） */
+  secretConfigured?: Record<string, boolean>
 }
 
 export interface ThemeCenterOverview {
@@ -33,5 +73,11 @@ export default {
   },
   deactivate: () => {
     return systemClient.post<unknown, ApiResponse<void>>('api/platform/themes/deactivate')
+  },
+  config: (theme: string) => {
+    return systemClient.get<unknown, ApiResponse<ThemeConfig>>(`api/platform/themes/${theme}/config`)
+  },
+  saveConfig: (theme: string, values: Record<string, any>) => {
+    return systemClient.put<unknown, ApiResponse<ThemeConfig>>(`api/platform/themes/${theme}/config`, { values })
   },
 }

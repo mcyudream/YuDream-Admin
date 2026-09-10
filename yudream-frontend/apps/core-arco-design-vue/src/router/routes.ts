@@ -157,6 +157,17 @@ const systemRoutes: RouteRecordRaw[] = [
           breadcrumb: false,
         },
       },
+      {
+        // 主题配置大页面：主题中心子路由，不进菜单，由主题卡「配置」按钮进入
+        path: 'platform/theme-center/config/:theme',
+        name: 'themeCenterConfig',
+        component: () => import('@/views/platform/theme-center/config-page.vue'),
+        meta: {
+          title: '主题配置',
+          auth: 'platform:theme-center:config',
+          menu: false,
+        },
+      },
     ],
   },
 ]

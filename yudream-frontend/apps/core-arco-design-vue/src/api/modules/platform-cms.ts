@@ -51,6 +51,8 @@ export interface CmsPage {
   themeCode?: string
   /** 主题内由插件托管的来源插件编码 */
   sourcePluginCode?: string | null
+  /** 公开站载荷携带的主题公开配置（敏感字段已剔除） */
+  themeConfig?: Record<string, any>
   publishedAt?: string
   createTime?: string
   updateTime?: string
@@ -87,6 +89,8 @@ export interface HomePageLayout {
   settings?: Record<string, string>
   sections: HomeSection[]
   published: boolean
+  /** 公开站载荷携带的主题公开配置（敏感字段已剔除） */
+  themeConfig?: Record<string, any>
   createTime?: string
   updateTime?: string
 }
@@ -138,6 +142,8 @@ export interface CmsTemplateContext {
     latest: CmsTemplateItem[]
     featured: CmsTemplateItem[]
   }
+  /** 主题块提供者贡献的数据，键为块 code；块不可用时缺省 */
+  blocks?: Record<string, any>
 }
 
 export interface CmsTemplateContextQuery {
@@ -146,6 +152,10 @@ export interface CmsTemplateContextQuery {
   knowledgePagesLimit?: number
   knowledgeLatestLimit?: number
   knowledgeFeaturedLimit?: number
+  /** 模板引用到的主题块 code 列表 */
+  blocks?: string[]
+  /** 块数据条数上限 */
+  blockLimit?: number
 }
 
 export interface CmsBlock {

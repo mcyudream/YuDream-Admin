@@ -32,6 +32,7 @@ interface CmsNavigationItem {
 
 const toast = useFaToast()
 const modal = useFaModal()
+const router = useRouter()
 const appSettingsStore = useAppSettingsStore()
 const appAccountStore = useAppAccountStore()
 
@@ -502,11 +503,14 @@ function themePreviewUrl(theme: ThemeCenterTheme) {
   return pluginFrontendAssetUrl(theme.pluginCode, theme.preview, theme.assetRevision)
 }
 
+function openThemeConfig(theme: ThemeCenterTheme) {
+  router.push(`/platform/theme-center/config/${theme.code}`)
+}
+
 function confirmActivateTheme(theme: ThemeCenterTheme) {
   if (!theme.pluginCode || theme.active) {
     return
-  }
-  modal.confirm({
+  }  modal.confirm({
     title: '切换整站主题',
     content: `确认启用「${theme.name}」作为公开站主题吗？主题是一整套独立模板：${theme.hasHomePreset ? '它自带的首页设计将应用到它自己的首页' : '它将以默认主题当前首页为起点生成自己的首页'}${theme.hasPageSet ? '，随附页面会导入到它自己的页面集并发布' : ''}。各主题内容完全独立，切换后原主题内容原样保留，互不影响。`,
     onConfirm: async () => {
@@ -1113,6 +1117,13 @@ function sectionTitle(type: HomeSectionType) {
                 </FaTag>
               </div>
               <div class="preset-card__actions">
+                <FaButton
+                  v-if="theme.hasConfigSchema" v-auth="'platform:theme-center:config'"
+                  size="sm" variant="outline" @click="openThemeConfig(theme)"
+                >
+                  <FaIcon name="i-ri:settings-3-line" />
+                  配置
+                </FaButton>
                 <FaButton
                   v-if="theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" :loading="themeSwitching" @click="confirmActivateTheme(theme)"
