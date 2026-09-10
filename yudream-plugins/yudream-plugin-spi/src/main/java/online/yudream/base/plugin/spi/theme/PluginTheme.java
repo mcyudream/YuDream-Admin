@@ -16,6 +16,10 @@ import java.util.Set;
  * SITE 主题以 {@code .site-page}/{@code .site-chrome} 容器为作用域并覆写
  * {@code --yb-site-*} 变量；ADMIN 主题以 {@code :root}/{@code .dark} 为作用域
  * 覆写宿主全局变量。深浅两套配色由主题 CSS 自行通过 {@code .dark} 选择器提供。</p>
+ *
+ * <p>homePreset 可声明一份首页内容定制方案 JSON（同资产目录），SITE 主题激活时
+ * 宿主会自动快照当前首页定制并应用该方案；方案只覆盖其声明的字段与 settings 键，
+ * 未声明的（如站点导航）保留现状。</p>
  */
 public record PluginTheme(
         String code,
@@ -23,6 +27,7 @@ public record PluginTheme(
         String description,
         Set<PluginThemeScope> scopes,
         List<String> styles,
-        String preview
+        String preview,
+        String homePreset
 ) {
 }
