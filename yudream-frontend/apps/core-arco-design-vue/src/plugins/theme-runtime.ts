@@ -1,13 +1,18 @@
 import type { Router } from 'vue-router'
+import type { PluginRemoteModuleLease } from './remote-loader'
 import type { PluginTheme, PluginThemeScope } from '@/api/modules/platform-plugin'
 import apiPlugin from '@/api/modules/platform-plugin'
 import { pluginFrontendAssetUrl } from './frontend-assets'
+import { acquirePluginRemoteModuleByCode } from './remote-loader'
 
 const SCOPES: PluginThemeScope[] = ['SITE', 'ADMIN']
 const SCOPE_ATTRIBUTE = 'data-yudream-theme-scope'
 const PLUGIN_ATTRIBUTE = 'data-yudream-theme-plugin'
 
 let currentRoutePublic = false
+let activeThemePlugins = new Map<string, string>()
+const themeModuleLeases = new Map<string, PluginRemoteModuleLease>()
+const pendingThemeModules = new Set<string>()
 
 /**
  * 启动时拉取已激活的插件主题，并在应用挂载前注入常驻样式，避免公开站主题闪烁。
@@ -39,8 +44,12 @@ export function watchPluginThemeScope(router: Router) {
 }
 
 function applyActiveThemes(themes: Partial<Record<PluginThemeScope, PluginTheme>>) {
+  const active = new Map<string, string>()
   for (const scope of SCOPES) {
     const theme = themes[scope]
+    if (theme) {
+      active.set(theme.pluginCode, theme.assetRevision || '')
+    }
     const desired = theme ? theme.styles.map(path => pluginFrontendAssetUrl(theme.pluginCode, path, theme.assetRevision)) : []
     const existing = themeLinks(scope)
     const unchanged = existing.length === desired.length
@@ -63,7 +72,41 @@ function applyActiveThemes(themes: Partial<Record<PluginThemeScope, PluginTheme>
       document.head.appendChild(link)
     }
   }
+  activeThemePlugins = active
   syncScopeVisibility()
+  syncThemeRuntimeModules()
+}
+
+/**
+ * 主题插件可携带远程模块（音效、交互动效等）：主题处于激活状态时加载其
+ * remoteEntry 并调用 install，取消激活后释放触发 dispose。主题插件没有
+ * 前端模块或加载失败时静默跳过，不影响主题样式本身。
+ */
+function syncThemeRuntimeModules() {
+  for (const [code, lease] of themeModuleLeases) {
+    if (activeThemePlugins.get(code) !== undefined) {
+      continue
+    }
+    themeModuleLeases.delete(code)
+    void lease.release().catch(() => {})
+  }
+  for (const code of activeThemePlugins.keys()) {
+    if (themeModuleLeases.has(code) || pendingThemeModules.has(code)) {
+      continue
+    }
+    pendingThemeModules.add(code)
+    acquirePluginRemoteModuleByCode(code)
+      .then((lease) => {
+        if (activeThemePlugins.has(code)) {
+          themeModuleLeases.set(code, lease)
+        }
+        else {
+          void lease.release().catch(() => {})
+        }
+      })
+      .catch(() => {})
+      .finally(() => pendingThemeModules.delete(code))
+  }
 }
 
 function syncScopeVisibility() {
