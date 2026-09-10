@@ -35,4 +35,11 @@ public @interface PluginTheme {
 
     /** 预览图资产相对路径，可为空。 */
     String preview() default "";
+
+    /**
+     * 首页内容定制方案 JSON 资产相对路径，可为空。
+     * SITE 主题激活时宿主自动快照当前首页定制并应用该方案；
+     * 方案只覆盖其声明的字段与 settings 键，未声明的保留现状。
+     */
+    String homePreset() default "";
 }
