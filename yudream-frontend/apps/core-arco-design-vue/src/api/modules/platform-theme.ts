@@ -19,6 +19,8 @@ export interface ThemeCenterTheme {
 export interface ThemeCenterOverview {
   themes: ThemeCenterTheme[]
   presets: HomePagePreset[]
+  /** 可编辑内容的主题编码清单（默认主题 + 主题插件卡 + 拥有存量布局的主题） */
+  editableThemes: string[]
   cmsEnabled: boolean
 }
 

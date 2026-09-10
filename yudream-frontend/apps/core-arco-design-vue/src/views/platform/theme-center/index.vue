@@ -50,6 +50,29 @@ const mediaItems = ref<FileObject[]>([])
 const presets = ref<HomePagePreset[]>([])
 const themeOverview = ref<ThemeCenterOverview | null>(null)
 const themeSwitching = ref(false)
+/** 工作台正在编辑的主题编码；null 表示跟随当前激活的公开站主题 */
+const selectedTheme = ref<string | null>(null)
+/** 当前激活的公开站主题编码（无插件主题激活时为内置 default） */
+const activeSiteTheme = computed(() => themeOverview.value?.themes.find(item => item.active)?.pluginCode || 'default')
+const currentTheme = computed({
+  get: () => selectedTheme.value || activeSiteTheme.value,
+  set: (value: string) => {
+    selectedTheme.value = value
+  },
+})
+const editableThemeOptions = computed(() => {
+  const codes = themeOverview.value?.editableThemes?.length ? themeOverview.value.editableThemes : ['default']
+  return codes.map(code => ({
+    label: code === activeSiteTheme.value ? `${themeLabel(code)}（当前站点主题）` : themeLabel(code),
+    value: code,
+  }))
+})
+
+function themeLabel(code?: string | null) {
+  const safeCode = code || 'default'
+  const card = themeOverview.value?.themes.find(item => (item.pluginCode || 'default') === safeCode)
+  return card?.name || safeCode
+}
 const presetDialogVisible = ref(false)
 const presetSaving = ref(false)
 const presetForm = reactive({ name: '', description: '' })
@@ -303,6 +326,24 @@ watch(activeTab, async () => {
   }
 })
 
+// 切换编辑目标主题：丢弃未保存的页面编辑状态，并按目标主题重新加载当前页签数据
+watch(currentTheme, async (next, prev) => {
+  if (next === prev) {
+    return
+  }
+  pagination.page = 1
+  resetPageForm()
+  if (activeTab.value === 'pages') {
+    await loadPages()
+  }
+  else if (activeTab.value === 'presets') {
+    await loadPresets()
+  }
+  else if (activeTab.value === 'home' || activeTab.value === 'navigation') {
+    await loadHome()
+  }
+})
+
 onMounted(async () => {
   await Promise.all([loadAiModels(), loadWikiNavigation(), loadThemeOverview()])
   await loadPages()
@@ -327,6 +368,7 @@ async function loadPages() {
       page: pagination.page,
       size: pagination.size,
       keyword: search.keyword || undefined,
+      theme: currentTheme.value,
     })
     pages.value = res.data.records
     pagination.total = res.data.total
@@ -373,7 +415,7 @@ function emptyTemplateContext(): CmsTemplateContext {
 async function loadHome() {
   loading.value = true
   try {
-    const res = await apiCms.home()
+    const res = await apiCms.home(currentTheme.value)
     Object.assign(home, {
       title: res.data.title || appSettingsStore.siteName || '',
       subtitle: res.data.subtitle || '',
@@ -420,7 +462,7 @@ async function loadMedia() {
 async function loadPresets() {
   loading.value = true
   try {
-    const res = await apiCms.presets()
+    const res = await apiCms.presets(currentTheme.value)
     presets.value = res.data || []
   }
   catch (error) {
@@ -466,13 +508,14 @@ function confirmActivateTheme(theme: ThemeCenterTheme) {
   }
   modal.confirm({
     title: '切换整站主题',
-    content: `确认启用「${theme.name}」作为公开站主题吗？${theme.hasHomePreset ? '首页将整套替换为该主题自带的设计（当前首页会先存为接管前备份，停用主题时自动还原，不会与其他主题内容混杂）' : '当前首页定制保持不变'}${theme.hasPageSet ? '，主题随附页面会导入并发布（停用主题时自动下线转草稿）' : ''}。`,
+    content: `确认启用「${theme.name}」作为公开站主题吗？主题是一整套独立模板：${theme.hasHomePreset ? '它自带的首页设计将应用到它自己的首页' : '它将以默认主题当前首页为起点生成自己的首页'}${theme.hasPageSet ? '，随附页面会导入到它自己的页面集并发布' : ''}。各主题内容完全独立，切换后原主题内容原样保留，互不影响。`,
     onConfirm: async () => {
       themeSwitching.value = true
       try {
         await apiTheme.activate(theme.pluginCode!)
         toast.success(`已切换到「${theme.name}」`)
-        await Promise.all([loadThemeOverview(), loadPresets()])
+        selectedTheme.value = theme.pluginCode ?? null
+        await loadThemeOverview()
       }
       catch (error) {
         toast.error(error instanceof Error ? error.message : '主题切换失败')
@@ -491,12 +534,13 @@ function confirmRestoreDefaultTheme() {
   }
   modal.confirm({
     title: '恢复默认主题',
-    content: `确认停用「${active.name}」并恢复内置默认主题吗？主题随附页面会自动下线转草稿，首页设计将还原到该主题接管前的状态。`,
+    content: `确认停用「${active.name}」并恢复内置默认主题吗？该主题的首页设计、页面集与导航会完整保留在其主题名下，对外不再可见，再次启用即原样恢复。`,
     onConfirm: async () => {
       themeSwitching.value = true
       try {
         await apiTheme.deactivate()
         toast.success('已恢复内置默认主题')
+        selectedTheme.value = null
         await loadThemeOverview()
       }
       catch (error) {
@@ -522,7 +566,7 @@ async function savePreset() {
   }
   presetSaving.value = true
   try {
-    await apiCms.savePreset({ name: presetForm.name.trim(), description: presetForm.description.trim() || undefined })
+    await apiCms.savePreset({ name: presetForm.name.trim(), description: presetForm.description.trim() || undefined }, currentTheme.value)
     toast.success('已把当前首页定制存为方案')
     presetDialogVisible.value = false
     await loadPresets()
@@ -689,7 +733,7 @@ async function savePage() {
     // 页面模板由用户显式选择（四种模板版式差异明确），不再静默改写
     const res = selectedPageId.value
       ? await apiCms.updatePage(selectedPageId.value, payload)
-      : await apiCms.createPage(payload)
+      : await apiCms.createPage(payload, currentTheme.value)
     selectedPageId.value = res.data.id
     toast.success('页面已保存')
     await loadPages()
@@ -753,7 +797,7 @@ async function persistHome(successMessage = '首页已保存') {
       ...home,
       sections: home.sections,
       settings: home.settings || {},
-    })
+    }, currentTheme.value)
     toast.success(successMessage)
   }
   finally {
@@ -1019,6 +1063,10 @@ function sectionTitle(type: HomeSectionType) {
           <FaIcon name="i-ri:image-2-line" />
           媒体库
         </button>
+        <div class="theme-scope-picker">
+          <span class="theme-scope-picker__label">编辑主题</span>
+          <FaSelect v-model="currentTheme" :options="editableThemeOptions" />
+        </div>
         <a class="public-link" href="/site" target="_blank" rel="noopener noreferrer">
           <FaIcon name="i-ri:external-link-line" />
           访问站点
@@ -1029,7 +1077,7 @@ function sectionTitle(type: HomeSectionType) {
         <div class="preset-toolbar">
           <div>
             <h3>整站主题</h3>
-            <p>收纳公开站可用的全部主题：内置默认主题与主题插件（主题可携带整套页面与首页设计，不只是样式覆盖）。每个主题的首页设计彼此独立：启用时整套替换，停用时自动还原到接管前的首页。</p>
+            <p>收纳公开站可用的全部主题：内置默认主题与主题插件。一个主题是一整套独立模板——首页设计、页面集、导航与样式都归属该主题本身，而不是全局共享。切换主题只是把公开站整套切到另一套内容，双方互不影响；停用主题无需还原，内容保留在其名下、对外不可见，再次启用即原样恢复。顶部「编辑主题」选择器可离线预编辑任意主题的内容。</p>
           </div>
         </div>
         <div v-if="themeCards.length" class="theme-grid">
@@ -1115,6 +1163,12 @@ function sectionTitle(type: HomeSectionType) {
                 <span class="page-list-card__meta">
                   <FaTag :variant="item.status === 'PUBLISHED' ? 'default' : 'secondary'">
                     {{ item.status === 'PUBLISHED' ? '已发布' : '草稿' }}
+                  </FaTag>
+                  <FaTag variant="outline">
+                    {{ themeLabel(item.themeCode) }}
+                  </FaTag>
+                  <FaTag v-if="item.sourcePluginCode" variant="secondary">
+                    插件托管
                   </FaTag>
                   <span>{{ dateText(item.publishedAt || item.updateTime || item.createTime) || '未发布' }}</span>
                 </span>
@@ -1375,9 +1429,6 @@ function sectionTitle(type: HomeSectionType) {
               <a-form-item label="首页标题">
                 <FaInput v-model="home.title" />
               </a-form-item>
-              <a-form-item label="主题">
-                <FaInput v-model="home.theme" />
-              </a-form-item>
               <a-form-item label="站点布局">
                 <FaSelect v-model="homeLayoutMode" :options="layoutOptions" />
               </a-form-item>
@@ -1405,7 +1456,7 @@ function sectionTitle(type: HomeSectionType) {
           <div class="legacy-sections__head">
             <div>
               <h3>站点导航</h3>
-              <p>管理公开站点的导航菜单：可新增、删除、改名、调整链接、上级与排序，保存后公开站点立即生效。</p>
+              <p>管理当前编辑主题的导航菜单：可新增、删除、改名、调整链接、上级与排序。导航随主题保存与切换，当该主题是公开站当前主题时立即生效。</p>
             </div>
             <FaButton v-auth="'platform:cms:edit'" size="sm" @click="addNavigationItem()">
               <FaIcon name="i-ri:add-line" />
@@ -1529,7 +1580,7 @@ function sectionTitle(type: HomeSectionType) {
         <div class="preset-toolbar">
           <div>
             <h3>首页方案</h3>
-            <p>把首页定制（横幅、区块、导航、页脚、自定义代码）存为可命名方案，一键切换；切换前会自动快照当前定制，可随时切回。启用自带方案的站点主题时也会在这里生成对应方案。</p>
+            <p>把当前编辑主题的首页定制（横幅、区块、导航、页脚、自定义代码）存为可命名方案，一键切换；切换前会自动快照当前定制，可随时切回。方案按主题隔离，每个主题只看到自己的方案；启用自带方案的主题时，对应方案出现在该主题名下。</p>
           </div>
           <FaButton v-auth="'platform:cms:edit'" @click="openPresetDialog">
             <FaIcon name="i-ri:bookmark-3-line" />
@@ -1676,8 +1727,19 @@ function sectionTitle(type: HomeSectionType) {
   color: var(--color-text-1);
 }
 
-.public-link {
+.theme-scope-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
+}
+
+.theme-scope-picker__label {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.public-link {
   text-decoration: none;
 }
 

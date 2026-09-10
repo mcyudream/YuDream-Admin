@@ -12,6 +12,8 @@ export interface CmsPageParams {
   keyword?: string
   category?: string
   tag?: string
+  /** 目标主题编码；缺省为当前激活的公开站主题 */
+  theme?: string
 }
 
 export interface HomeSection {
@@ -45,6 +47,10 @@ export interface CmsPage {
   seoDescription?: string
   template?: PageTemplate
   status: PageStatus
+  /** 页面归属的主题编码（default 或插件 code） */
+  themeCode?: string
+  /** 主题内由插件托管的来源插件编码 */
+  sourcePluginCode?: string | null
   publishedAt?: string
   createTime?: string
   updateTime?: string
@@ -71,8 +77,11 @@ export interface CmsPagePayload {
 
 export interface HomePageLayout {
   id?: string
+  /** 布局归属的主题编码（default 或插件 code） */
+  themeCode?: string
   title?: string
   subtitle?: string
+  /** 该布局当前应用的首页方案编码 */
   theme?: string
   heroImageUrl?: string
   settings?: Record<string, string>
@@ -90,6 +99,8 @@ export interface HomePagePreset {
   description?: string
   source: HomePagePresetSource
   pluginCode?: string
+  /** 方案归属的主题编码（default 或插件 code） */
+  themeCode?: string
   sectionCount?: number
   /** 是否为当前首页布局正在使用的方案 */
   active?: boolean
@@ -193,8 +204,8 @@ export default {
   page: (params: CmsPageParams) => {
     return systemClient.get<unknown, ApiResponse<PageResult<CmsPage>>>('api/platform/cms/pages', { params })
   },
-  createPage: (data: CmsPagePayload) => {
-    return systemClient.post<unknown, ApiResponse<CmsPage>>('api/platform/cms/pages', data)
+  createPage: (data: CmsPagePayload, theme?: string) => {
+    return systemClient.post<unknown, ApiResponse<CmsPage>>('api/platform/cms/pages', data, { params: { theme } })
   },
   updatePage: (id: string, data: CmsPagePayload) => {
     return systemClient.put<unknown, ApiResponse<CmsPage>>(`api/platform/cms/pages/${id}`, data)
@@ -208,17 +219,17 @@ export default {
   unpublish: (id: string) => {
     return systemClient.post<unknown, ApiResponse<void>>(`api/platform/cms/pages/${id}/unpublish`)
   },
-  home: () => {
-    return systemClient.get<unknown, ApiResponse<HomePageLayout>>('api/platform/cms/home')
+  home: (theme?: string) => {
+    return systemClient.get<unknown, ApiResponse<HomePageLayout>>('api/platform/cms/home', { params: { theme } })
   },
-  saveHome: (data: HomePageLayout) => {
-    return systemClient.put<unknown, ApiResponse<HomePageLayout>>('api/platform/cms/home', data)
+  saveHome: (data: HomePageLayout, theme?: string) => {
+    return systemClient.put<unknown, ApiResponse<HomePageLayout>>('api/platform/cms/home', data, { params: { theme } })
   },
-  presets: () => {
-    return systemClient.get<unknown, ApiResponse<HomePagePreset[]>>('api/platform/cms/presets')
+  presets: (theme?: string) => {
+    return systemClient.get<unknown, ApiResponse<HomePagePreset[]>>('api/platform/cms/presets', { params: { theme } })
   },
-  savePreset: (data: { name: string, description?: string }) => {
-    return systemClient.post<unknown, ApiResponse<HomePagePreset>>('api/platform/cms/presets', data)
+  savePreset: (data: { name: string, description?: string }, theme?: string) => {
+    return systemClient.post<unknown, ApiResponse<HomePagePreset>>('api/platform/cms/presets', data, { params: { theme } })
   },
   applyPreset: (code: string) => {
     return systemClient.post<unknown, ApiResponse<void>>(`api/platform/cms/presets/${encodeURIComponent(code)}/apply`)
