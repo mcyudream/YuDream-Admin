@@ -263,6 +263,14 @@
     {
       "key": "theme-center",
       "text": "主题中心是独立一级菜单（platform:theme-center，/platform/theme-center，sort 60，已取代原 platform:cms 种子菜单并吸收其页面/首页定制/导航/媒体库/首页方案 tab，权限 platform:theme-center:view/:use）；后端 ThemeCenterAppService.overview/activate/deactivateSiteTheme + ThemeCenterController /api/platform/themes（cmd/res 走 ThemeCenterWebAssembler，cms 能力关闭时 overview 降级）。overview 含 editableThemes（default + 全部 SITE 主题卡 + 拥有存量布局的主题 code），工作台顶部「编辑主题」选择器默认当前激活主题、可离线预编辑任意主题；home/pages/navigation/presets 四个 tab 全部经 CmsController ?theme= 参数按所选主题读写（缺省=激活主题）。CmsPresetAppService.list(themeCode) 按主题隔离并计算 active 标志。既有部署的 Mongo 种子菜单需手工删除旧 platform:cms 节点。"
+    },
+    {
+      "key": "plugin-theme-config-schema",
+      "text": "主题配置走声明式 schema：@PluginTheme(configSchema=\"theme/theme-config.json\") 声明 JAR 内 theme-config.json（路径校验同 homePreset），格式 {sections:[{code,title,description,fields:[{key,label,description,type,placeholder,default,options,secret,itemFields}]}]}，type 支持 text/textarea/number/switch/select/color/image/list（list 用 itemFields 子字段成重复器，值成真数组供 data-yb-for 遍历；default 经 @JsonAlias 映射 defaultValue）。值按主题隔离持久化 Setting（key pluginTheme.config.{themeCode}、category plugin-theme、type JSON），ThemeConfigAppService 合并 schema 默认值与已存值；secret 字段经 CapabilityCredentialCipher 加密（AAD capability:pluginTheme.config.{theme}.{field}），管理端脱敏为空串+secretConfigured 标识、留空保存不修改，publicConfig 剔除 secret 且永不阻断渲染。端点 GET/PUT /api/platform/themes/{code}/config（platform:theme-center:config，菜单种子 BUTTON 节点 THEME_CENTER_CONFIG），配置页为隐藏路由 /platform/theme-center/config/:theme（meta.auth+menu:false），公开模板上下文根 theme.config.* 即时生效；default 主题端点返回空 schema、无配置入口。"
+    },
+    {
+      "key": "plugin-theme-block-provider",
+      "text": "插件私有数据进公开站主题模板走 SPI PluginThemeBlockProvider（code()/name()/supportedThemes() 默认空=全主题/data(PluginThemeBlockContext{themeCode,limit}) 返回 JSON 可序列化对象），onEnable 中 context.registerExtension(PluginThemeBlockProvider.class, ...) 注册、禁用自动回收（复用 PluginExtensionRegistry，零新基建）；application 经 PluginExtensionQuery 直取（UserAppService 先例，不新增 domain 端口）。模板写 {{blocks.xxx}}/data-yb-for=\"x in blocks.xxx\"/data-yb-if=\"blocks.xxx\"，前端 templateContextQuery() 扫描 blocks.{code} 路径随 GET /api/public/cms/template-context?blocks= 懒加载（不进首屏载荷；单次上限 12 块、code 正则 [a-z0-9][a-z0-9-]{0,39}），CmsTemplateContextAppService 按激活 SITE 主题过滤 supportedThemes、仅启用插件、逐块异常隔离 warn+省略，块缺失时 if 为假/for 为空优雅降级。安全约定：块数据匿名可见，提供者只暴露公开安全字段，宿主不做字段级过滤。官方实现：timeline=timeline、minecraft-server=server-list（1 分钟快照缓存）、minecraft-activity-proof=activity-square。"
     }
   ],
   "utilities": [

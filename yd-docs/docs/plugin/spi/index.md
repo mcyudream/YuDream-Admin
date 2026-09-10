@@ -1,6 +1,6 @@
 # SPI 版本说明与升级指引
 
-`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前源码版本：2.24.0**（以 `yudream-plugins/yudream-plugin-spi/pom.xml` 与根 `pom.xml` 的 `yudream.plugin.spi.version` 为准）。
+`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前源码版本：2.26.0**（以 `yudream-plugins/yudream-plugin-spi/pom.xml` 与根 `pom.xml` 的 `yudream.plugin.spi.version` 为准）。注意：2.25.0（插件主题能力）与 2.26.0（主题配置 schema + 主题块提供者）目前**仅本地 install、未发布 Nexus**，下游插件仓暂不可依赖。
 
 源码升版不等于已发布到 Nexus。下游插件仓只应依赖已验证发布的版本；未跑通发布/验签流水线的版本不得用于生产插件。
 
@@ -29,14 +29,17 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
 
 | 版本 | 状态 | 说明 |
 |---|---|---|
-| [v1 (2.24.0)](/plugin/spi/v1/core) | 当前源码 | 全量 API 教程。相对早期文档已补齐消息 `protocol`、AI 流式、宿主目录 SDK、官方 QQ、文件预览、入站邮箱、扩展点（登录/注册拦截与身份核验）、菜单显隐与公开站 `siteNav` |
+| [v1 (2.26.0)](/plugin/spi/v1/core) | 当前源码（2.25.0/2.26.0 本地未发布） | 全量 API 教程。相对早期文档已补齐消息 `protocol`、AI 流式、宿主目录 SDK、官方 QQ、文件预览、入站邮箱、扩展点（登录/注册拦截与身份核验）、菜单显隐与公开站 `siteNav`、插件主题（含 homePreset 整套模板）、主题配置 schema 与主题块提供者 |
 
-## 2.24.0 相对旧文档的增量
+## 2.26.0 相对 2.24.0 的增量
 
 v1 教程目录继续沿用，不另开 `v2/`。下列能力已在当前源码中，文档已同步：
 
 | 范围 | 变更 |
 |---|---|
+| 插件主题（2.25.0，本地未发布） | `@PluginTheme` + `PluginContext.registerTheme(...)` 注册 SITE/ADMIN 整套主题：互斥顶替与激活位持久化、`homePreset` 首页方案 + `pages[]` 整套页面按 `themeCode` 隔离导入；主题样式经 `/api/platform/plugins/{code}/assets/**` 下发 |
+| 主题配置 schema（2.26.0，本地未发布） | `@PluginTheme(configSchema="...")` 声明 JAR 内 theme-config.json，宿主渲染独立配置页 `/platform/theme-center/config/{theme}`，值按主题持久化，模板以 `theme.config.*` 消费 |
+| 主题块提供者（2.26.0，本地未发布） | `PluginThemeBlockProvider`（`code/name/supportedThemes/data(ctx)`）：插件经 `registerExtension` 向公开站模板贡献 `blocks.{code}` 数据，只暴露公开安全字段 |
 | 消息连接 | `PluginMessagingConnection` 增加 `protocol`（`milky` / `official`）。四参数构造保持源码兼容，缺省 `protocol=null`。`platform` 仍为 `qq`，不要用 `platform` 区分官 Q / Milky |
 | 消息目录 | 宿主提供登录即可读的目录 HTTP：`GET /api/platform/plugins/messaging/connections`、`/groups?connectionId=`。插件前端用 `sdk.messaging`，不要再包一层插件 HTTP，也不要打 `/api/platform/milky/**` |
 | 用户 / 部门 / 角色目录 | `GET /api/platform/plugins/users`、`/resolve`、`/departments`、`/roles`。插件前端用 `sdk.users`。`roles()` 是全站角色选项；按用户查角色仍走后端 `PluginUserService.listRoles(userId)` |
