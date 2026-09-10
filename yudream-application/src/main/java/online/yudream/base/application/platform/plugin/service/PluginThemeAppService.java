@@ -91,8 +91,9 @@ public class PluginThemeAppService {
 
     /**
      * 把插件声明的主题写入其每个 scope 的激活位（插件已启用且注册了主题时调用）。
-     * SITE 主题声明了首页方案时，顺带导入并应用（当前定制自动快照，可在内容定制
-     * 的方案列表一键切回）；方案导入失败不阻塞主题激活。
+     * SITE 主题声明了首页方案时，顺带导入并按需应用（主题无布局时克隆默认主题首页
+     * 作起点；布局未被管理员改动时自动应用新版方案）；未声明首页方案的主题激活时
+     * 克隆默认主题当前首页作为其初始首页。内容初始化失败不阻塞主题激活。
      */
     @Transactional
     public void activate(String pluginCode) {
@@ -103,13 +104,16 @@ public class PluginThemeAppService {
         for (String scope : theme.get().scopes()) {
             saveActive(scope, pluginCode);
         }
-        importHomePreset(theme.get());
+        if (theme.get().scopes().contains("SITE")) {
+            if (StringUtils.hasText(theme.get().homePreset())) {
+                importHomePreset(theme.get());
+            } else {
+                ensureThemeLayout(pluginCode);
+            }
+        }
     }
 
     private void importHomePreset(PluginThemeInfo theme) {
-        if (!theme.scopes().contains("SITE") || !StringUtils.hasText(theme.homePreset())) {
-            return;
-        }
         try {
             String presetJson = pluginRuntimeGateway.frontendAsset(theme.pluginCode(), theme.homePreset())
                     .map(asset -> new String(asset.body(), StandardCharsets.UTF_8))
@@ -120,26 +124,24 @@ public class PluginThemeAppService {
         }
     }
 
+    private void ensureThemeLayout(String pluginCode) {
+        try {
+            cmsPresetAppService.ensureThemeLayout(pluginCode);
+        } catch (Exception e) {
+            log.warn("初始化主题首页布局失败：plugin={}, reason={}", pluginCode, e.getMessage());
+        }
+    }
+
     /**
-     * 禁用/卸载/删除插件时清除其占据的激活位，该 scope 回落宿主内置主题；
-     * 失去 SITE 激活位时顺带把该主题随附页面下线转草稿、把首页设计还原到主题
-     * 接管前的备份（失败仅日志不阻塞）。
+     * 禁用/卸载/删除插件时清除其占据的激活位，该 scope 回落宿主内置主题。
+     * 主题的 CMS 内容（首页布局/页面集）天然归属主题本身，无需还原或下线：
+     * 激活位离开后其内容即对外不可见，再次激活时原样恢复。
      */
     @Transactional
     public void clearActivation(String pluginCode) {
-        boolean siteCleared = false;
         for (String scope : List.of("SITE", "ADMIN")) {
             if (pluginCode.equals(readActive(scope).orElse(null))) {
                 saveActive(scope, "");
-                siteCleared = siteCleared || "SITE".equals(scope);
-            }
-        }
-        if (siteCleared) {
-            try {
-                cmsPresetAppService.unpublishPluginPages(pluginCode);
-                cmsPresetAppService.restorePluginHomepage(pluginCode);
-            } catch (Exception e) {
-                log.warn("回收主题随附内容失败，仅清除激活位：plugin={}, reason={}", pluginCode, e.getMessage());
             }
         }
     }

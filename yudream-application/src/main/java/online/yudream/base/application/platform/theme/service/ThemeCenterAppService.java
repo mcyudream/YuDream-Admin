@@ -13,6 +13,7 @@ import online.yudream.base.application.platform.theme.dto.ThemeCenterOverviewDTO
 import online.yudream.base.application.platform.theme.dto.ThemeCenterThemeCardDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
@@ -30,10 +31,10 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 主题中心编排：聚合公开站（SITE）可切换主题（内置默认 + 插件主题），
- * 并收纳首页内容定制方案，实现主题与多套 CMS 首页的自由切换。
- * 切换主题即启用/禁用对应主题插件，互斥顶替与激活位维护复用插件生命周期逻辑；
- * 主题随附页面集随启用导入发布、随停用自动下线转草稿。
+ * 主题中心编排：聚合公开站（SITE）可切换主题（内置默认 + 插件主题）。
+ * 主题是一整套独立模板：每个主题各自持有首页布局、页面集与导航，切换主题只是
+ * 把公开站指针拨到另一套内容，双方数据互不触碰；停用主题无需还原或下线，
+ * 内容随主题隐藏、再启用即原样恢复。互斥顶替与激活位维护复用插件生命周期逻辑。
  */
 @Slf4j
 @Service
@@ -50,11 +51,13 @@ public class ThemeCenterAppService {
     private final PluginThemeAppService pluginThemeAppService;
     private final CmsPresetAppService cmsPresetAppService;
     private final CapabilityModuleRepo capabilityModuleRepo;
+    private final HomePageLayoutRepo homePageLayoutRepo;
     private final ObjectMapper objectMapper;
 
     /**
      * 主题中心总览：内置默认主题卡 + 全部声明了 SITE 作用域的主题插件卡
-     * （含已安装未启用，来源于启用时持久化的主题作用域），附首页方案列表。
+     * （含已安装未启用，来源于启用时持久化的主题作用域），附当前激活主题的首页方案
+     * 列表与可编辑主题清单（供主题选择器离线预编辑任意主题的内容）。
      */
     @Transactional(readOnly = true)
     public ThemeCenterOverviewDTO overview() {
@@ -93,17 +96,27 @@ public class ThemeCenterAppService {
             }
         }
         boolean cmsEnabled = capabilityEnabled();
-        List<HomePagePresetDTO> presets = cmsEnabled ? cmsPresetAppService.list() : List.of();
+        List<HomePagePresetDTO> presets = cmsEnabled ? cmsPresetAppService.list(null) : List.of();
+        Set<String> editableThemes = new LinkedHashSet<>();
+        editableThemes.add(BUILTIN_THEME_CODE);
+        for (ThemeCenterThemeCardDTO card : cards) {
+            if (card.getPluginCode() != null) {
+                editableThemes.add(card.getPluginCode());
+            }
+        }
+        // 拥有存量首页布局的主题（如插件已卸载但内容仍在）也可编辑
+        homePageLayoutRepo.findAll().forEach(layout -> editableThemes.add(layout.getThemeCode()));
         return ThemeCenterOverviewDTO.builder()
                 .themes(cards)
                 .presets(presets)
+                .editableThemes(List.copyOf(editableThemes))
                 .cmsEnabled(cmsEnabled)
                 .build();
     }
 
     /**
      * 切换公开站主题：启用目标主题插件（同作用域主题插件自动顶替互斥），
-     * 当前首页定制自动快照、目标主题自带方案与页面集自动导入发布。
+     * 目标主题自带方案与页面集自动导入；双方内容各自归属其主题，互不混杂。
      */
     @Transactional
     public void activateSiteTheme(String pluginCode) {
@@ -119,8 +132,8 @@ public class ThemeCenterAppService {
     }
 
     /**
-     * 恢复内置默认主题：禁用当前占据 SITE 激活位的主题插件，
-     * 其随附页面自动下线转草稿，首页定制保留（可从快照/方案切回）。
+     * 恢复内置默认主题：禁用当前占据 SITE 激活位的主题插件。
+     * 该主题的首页与页面集保留在其主题名下，对外不再可见，再次启用即原样恢复。
      */
     @Transactional
     public void deactivateSiteTheme() {

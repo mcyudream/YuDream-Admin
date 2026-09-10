@@ -12,6 +12,8 @@ import online.yudream.base.application.platform.theme.service.ThemeCenterAppServ
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.cms.aggregate.HomePageLayout;
+import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
@@ -57,16 +59,21 @@ class ThemeCenterAppServiceTest {
     @Mock
     private CapabilityModuleRepo capabilityModuleRepo;
 
+    @Mock
+    private HomePageLayoutRepo homePageLayoutRepo;
+
     private ThemeCenterAppService service;
 
     @BeforeEach
     void setUp() {
         service = new ThemeCenterAppService(pluginRuntimeGateway, pluginModuleRepo, pluginAppService,
-                pluginThemeAppService, cmsPresetAppService, capabilityModuleRepo, new ObjectMapper());
+                pluginThemeAppService, cmsPresetAppService, capabilityModuleRepo, homePageLayoutRepo,
+                new ObjectMapper());
         lenient().when(pluginRuntimeGateway.themes()).thenReturn(List.of());
         lenient().when(pluginModuleRepo.findAll()).thenReturn(List.of());
         lenient().when(pluginThemeAppService.activeThemes()).thenReturn(Map.of());
         lenient().when(capabilityModuleRepo.findByCode("cms")).thenReturn(Optional.empty());
+        lenient().when(homePageLayoutRepo.findAll()).thenReturn(List.of());
     }
 
     @Test
@@ -81,7 +88,8 @@ class ThemeCenterAppServiceTest {
         assertThat(builtin.getEnabled()).isTrue();
         assertThat(overview.getCmsEnabled()).isFalse();
         assertThat(overview.getPresets()).isEmpty();
-        verify(cmsPresetAppService, never()).list();
+        assertThat(overview.getEditableThemes()).containsExactly("default");
+        org.mockito.Mockito.verifyNoInteractions(cmsPresetAppService);
     }
 
     @Test
@@ -103,7 +111,7 @@ class ThemeCenterAppServiceTest {
         when(pluginThemeAppService.activeThemes()).thenReturn(Map.of("SITE",
                 PluginThemeDTO.builder().pluginCode("neco-pixel").build()));
         when(capabilityModuleRepo.findByCode("cms")).thenReturn(Optional.of(enabledCapability()));
-        when(cmsPresetAppService.list()).thenReturn(List.of(HomePagePresetDTO.builder().code("p1").build()));
+        when(cmsPresetAppService.list(null)).thenReturn(List.of(HomePagePresetDTO.builder().code("p1").build()));
 
         ThemeCenterOverviewDTO overview = service.overview();
 
@@ -123,6 +131,18 @@ class ThemeCenterAppServiceTest {
         assertThat(offlineCard.getPreview()).isNull();
         assertThat(overview.getCmsEnabled()).isTrue();
         assertThat(overview.getPresets()).hasSize(1);
+        assertThat(overview.getEditableThemes()).containsExactly("default", "flat-theme", "neco-pixel");
+    }
+
+    @Test
+    void overviewEditableThemesIncludesThemesOwningLayouts() {
+        when(homePageLayoutRepo.findAll()).thenReturn(List.of(
+                HomePageLayout.builder().themeCode("default").build(),
+                HomePageLayout.builder().themeCode("retired-theme").build()));
+
+        ThemeCenterOverviewDTO overview = service.overview();
+
+        assertThat(overview.getEditableThemes()).containsExactly("default", "retired-theme");
     }
 
     @Test

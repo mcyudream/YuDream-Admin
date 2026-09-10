@@ -39,13 +39,20 @@ public class CmsPage extends BaseDomain {
     private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
-    /** 页面来源插件编码；null 表示站点自有内容，主题页面随主题停用自动转草稿。 */
+    /** 归属主题编码：页面按主题隔离，仅在其归属主题激活时对外可见。 */
+    private String themeCode;
+    /** 页面来源插件编码；null 表示管理员在该主题下自建的内容（不被主题声明清单同步）。 */
     private String sourcePluginCode;
 
     public static CmsPage create(String title, String slug) {
+        return create(title, slug, HomePageLayout.DEFAULT_THEME_CODE);
+    }
+
+    public static CmsPage create(String title, String slug, String themeCode) {
         CmsPage page = new CmsPage();
         page.title = required(title, "页面标题不能为空");
         page.slug = PageSlug.of(slug).value();
+        page.themeCode = themeCode == null ? HomePageLayout.DEFAULT_THEME_CODE : themeCode;
         page.template = PageTemplate.DEFAULT;
         page.status = PageStatus.DRAFT;
         return page;

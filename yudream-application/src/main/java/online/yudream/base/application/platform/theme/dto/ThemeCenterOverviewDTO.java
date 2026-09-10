@@ -25,5 +25,7 @@ public class ThemeCenterOverviewDTO implements Serializable {
 
     private List<ThemeCenterThemeCardDTO> themes;
     private List<HomePagePresetDTO> presets;
+    /** 可在主题中心编辑内容的主题编码清单（default + 全部 SITE 插件主题 + 拥有存量布局的主题）。 */
+    private List<String> editableThemes;
     private Boolean cmsEnabled;
 }

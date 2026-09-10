@@ -29,6 +29,8 @@ public class CmsPageDTO {
     private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
+    /** 归属主题编码：页面按主题隔离，仅在其归属主题激活时对外可见。 */
+    private String themeCode;
     private String sourcePluginCode;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

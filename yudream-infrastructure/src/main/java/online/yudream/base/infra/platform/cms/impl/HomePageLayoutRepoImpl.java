@@ -8,10 +8,12 @@ import online.yudream.base.infra.platform.cms.dataobj.HomePageLayoutDO;
 import online.yudream.base.infra.platform.cms.mapper.CmsInfraMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -33,8 +35,22 @@ public class HomePageLayoutRepoImpl implements HomePageLayoutRepo {
     }
 
     @Override
-    public Optional<HomePageLayout> findCurrent() {
-        Query query = new Query().with(Sort.by(Sort.Direction.DESC, "updateTime")).limit(1);
+    public Optional<HomePageLayout> findByThemeCode(String themeCode) {
+        // 历史数据可能残留同主题多文档，取最新一条；去重由启动迁移负责
+        Query query = Query.query(Criteria.where("themeCode").is(themeCode))
+                .with(Sort.by(Sort.Direction.DESC, "updateTime")).limit(1);
         return Optional.ofNullable(CmsInfraMapper.toDomain(mongoTemplate.findOne(query, HomePageLayoutDO.class)));
+    }
+
+    @Override
+    public List<HomePageLayout> findAll() {
+        return mongoTemplate.findAll(HomePageLayoutDO.class).stream()
+                .map(CmsInfraMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        mongoTemplate.remove(Query.query(Criteria.where("id").is(id)), HomePageLayoutDO.class);
     }
 }

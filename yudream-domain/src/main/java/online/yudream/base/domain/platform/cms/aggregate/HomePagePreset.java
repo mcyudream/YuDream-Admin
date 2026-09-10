@@ -31,6 +31,8 @@ public class HomePagePreset extends BaseDomain {
     private HomePagePresetSource source;
     /** 来源插件编码，仅 PLUGIN 来源有值。 */
     private String pluginCode;
+    /** 归属主题编码：方案按主题隔离，只允许应用到其归属主题的首页布局。 */
+    private String themeCode;
 
     private String title;
     private String subtitle;
@@ -60,6 +62,7 @@ public class HomePagePreset extends BaseDomain {
                 .description(description)
                 .source(source)
                 .pluginCode(pluginCode)
+                .themeCode(layout.getThemeCode())
                 .title(layout.getTitle())
                 .subtitle(layout.getSubtitle())
                 .theme(layout.getTheme())

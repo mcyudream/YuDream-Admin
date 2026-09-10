@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.application.platform.cms.cmd.HomePagePresetSaveCmd;
 import online.yudream.base.application.platform.cms.dto.HomePagePresetDTO;
 import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
+import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -16,6 +18,8 @@ import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePagePresetRepo;
 import online.yudream.base.domain.shared.IdGenerator;
+import online.yudream.base.domain.system.setting.aggregate.Setting;
+import online.yudream.base.domain.system.setting.repo.SettingRepo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -34,10 +38,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CmsPresetAppServiceTest {
 
+    private static final String DEFAULT = HomePageLayout.DEFAULT_THEME_CODE;
+
     private InMemoryCapabilityModuleRepo capabilityModuleRepo;
     private InMemoryHomePageLayoutRepo layoutRepo;
     private InMemoryHomePagePresetRepo presetRepo;
     private InMemoryCmsPageRepo pageRepo;
+    private InMemorySettingRepo settingRepo;
     private CmsPresetAppService service;
 
     @BeforeEach
@@ -46,36 +53,40 @@ class CmsPresetAppServiceTest {
         layoutRepo = new InMemoryHomePageLayoutRepo();
         presetRepo = new InMemoryHomePagePresetRepo();
         pageRepo = new InMemoryCmsPageRepo();
+        settingRepo = new InMemorySettingRepo();
         AtomicLong sequence = new AtomicLong(1000);
         IdGenerator idGenerator = sequence::incrementAndGet;
-        service = new CmsPresetAppService(capabilityModuleRepo, layoutRepo, presetRepo, pageRepo, idGenerator, new ObjectMapper());
+        service = new CmsPresetAppService(capabilityModuleRepo, layoutRepo, presetRepo, pageRepo,
+                idGenerator, new ObjectMapper(), new SiteThemeQueryService(settingRepo));
     }
 
     @Test
-    void saveCurrentAsPresetSnapshotsCurrentLayout() {
-        layoutRepo.store(layout("原首页", Map.of("homeCss", "body{}"), true));
+    void saveCurrentAsPresetSnapshotsTargetThemeLayout() {
+        layoutRepo.store(layout(DEFAULT, "原首页", Map.of("homeCss", "body{}"), true));
 
-        HomePagePresetDTO saved = service.saveCurrentAsPreset(cmd("我的方案", "备份"));
+        HomePagePresetDTO saved = service.saveCurrentAsPreset(null, cmd("我的方案", "备份"));
 
         assertThat(saved.getCode()).startsWith("user-");
         assertThat(saved.getSource()).isEqualTo("USER");
+        assertThat(saved.getThemeCode()).isEqualTo(DEFAULT);
         HomePagePreset preset = presetRepo.findByCode(saved.getCode()).orElseThrow();
+        assertThat(preset.getThemeCode()).isEqualTo(DEFAULT);
         assertThat(preset.getTitle()).isEqualTo("原首页");
         assertThat(preset.getSettings()).containsEntry("homeCss", "body{}");
     }
 
     @Test
     void saveCurrentAsPresetRequiresName() {
-        assertThatThrownBy(() -> service.saveCurrentAsPreset(cmd(" ", null)))
+        assertThatThrownBy(() -> service.saveCurrentAsPreset(null, cmd(" ", null)))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("方案名称不能为空");
     }
 
     @Test
-    void applyAutoSnapshotsCurrentAndRewritesLayoutKeepingPublished() {
-        layoutRepo.store(layout("旧首页", Map.of("navigationJson", "[]"), true));
-        HomePagePreset preset = presetRepo.save(HomePagePreset.builder()
-                .code("user-1").name("新方案").source(HomePagePresetSource.USER)
+    void applyWritesPresetIntoItsOwnThemeLayoutAndKeepsPublished() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of("navigationJson", "[]"), true));
+        layoutRepo.store(layout("neco", "旧首页", Map.of("homeCss", "old"), true));
+        presetRepo.save(preset("user-1", "neco", HomePagePresetSource.USER)
                 .title("新首页").subtitle("副标题").heroImageUrl("hero.png")
                 .settings(Map.of("homeCss", ".pixel{}"))
                 .sections(List.of())
@@ -83,16 +94,19 @@ class CmsPresetAppServiceTest {
 
         service.apply("user-1");
 
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTitle()).isEqualTo("新首页");
-        assertThat(current.getTheme()).isEqualTo("user-1");
-        assertThat(current.getSettings()).containsEntry("homeCss", ".pixel{}");
-        assertThat(current.getPublished()).isTrue();
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("新首页");
+        assertThat(necoLayout.getTheme()).isEqualTo("user-1");
+        assertThat(necoLayout.getSettings()).containsEntry("homeCss", ".pixel{}");
+        assertThat(necoLayout.getPublished()).isTrue();
+        HomePageLayout defaultLayout = layoutRepo.findByThemeCode(DEFAULT).orElseThrow();
+        assertThat(defaultLayout.getTitle()).isEqualTo("默认首页");
+        assertThat(defaultLayout.getSettings()).containsEntry("navigationJson", "[]");
         List<HomePagePreset> snapshots = presetRepo.findBySource(HomePagePresetSource.SNAPSHOT);
         assertThat(snapshots).hasSize(1);
+        assertThat(snapshots.getFirst().getThemeCode()).isEqualTo("neco");
         assertThat(snapshots.getFirst().getTitle()).isEqualTo("旧首页");
-        assertThat(snapshots.getFirst().getSettings()).containsEntry("navigationJson", "[]");
-        assertThat(preset.getCode()).isEqualTo("user-1");
+        assertThat(snapshots.getFirst().getSettings()).containsEntry("homeCss", "old");
     }
 
     @Test
@@ -104,11 +118,9 @@ class CmsPresetAppServiceTest {
 
     @Test
     void repeatedApplyOfSameContentSkipsDuplicateSnapshot() {
-        layoutRepo.store(layout("默认", Map.of(), false));
-        presetRepo.save(HomePagePreset.builder()
-                .code("user-1").name("A").source(HomePagePresetSource.USER)
-                .title("A 首页").settings(Map.of()).sections(List.of())
-                .build());
+        layoutRepo.store(layout(DEFAULT, "默认", Map.of(), false));
+        presetRepo.save(preset("user-1", DEFAULT, HomePagePresetSource.USER)
+                .name("A").title("A 首页").settings(Map.of()).sections(List.of()).build());
 
         service.apply("user-1");
         service.apply("user-1");
@@ -118,27 +130,30 @@ class CmsPresetAppServiceTest {
     }
 
     @Test
-    void snapshotsAreCappedAtTen() {
-        layoutRepo.store(layout("默认", Map.of(), false));
-        presetRepo.save(HomePagePreset.builder()
-                .code("user-a").name("A").source(HomePagePresetSource.USER)
-                .title("A").settings(Map.of()).sections(List.of()).build());
-        presetRepo.save(HomePagePreset.builder()
-                .code("user-b").name("B").source(HomePagePresetSource.USER)
-                .title("B").settings(Map.of()).sections(List.of()).build());
+    void snapshotsAreCappedAtTenPerTheme() {
+        layoutRepo.store(layout(DEFAULT, "默认", Map.of(), false));
+        layoutRepo.store(layout("neco", "像素", Map.of(), false));
+        presetRepo.save(preset("user-a", DEFAULT, HomePagePresetSource.USER)
+                .name("A").title("A").settings(Map.of()).sections(List.of()).build());
+        presetRepo.save(preset("user-b", DEFAULT, HomePagePresetSource.USER)
+                .name("B").title("B").settings(Map.of()).sections(List.of()).build());
+        presetRepo.save(HomePagePreset.snapshotOf("snapshot-keep", "别主题快照", null,
+                HomePagePresetSource.SNAPSHOT, null, layoutRepo.findByThemeCode("neco").orElseThrow()));
 
         for (int i = 0; i < 12; i++) {
             service.apply(i % 2 == 0 ? "user-a" : "user-b");
         }
 
-        assertThat(presetRepo.findBySource(HomePagePresetSource.SNAPSHOT)).hasSize(10);
+        List<HomePagePreset> snapshots = presetRepo.findBySource(HomePagePresetSource.SNAPSHOT);
+        assertThat(snapshots.stream().filter(s -> DEFAULT.equals(s.getThemeCode()))).hasSize(10);
+        assertThat(snapshots.stream().filter(s -> "neco".equals(s.getThemeCode())))
+                .extracting(HomePagePreset::getCode).containsExactly("snapshot-keep");
     }
 
     @Test
     void deleteRemovesPresetAndFailsOnUnknown() {
-        presetRepo.save(HomePagePreset.builder()
-                .code("user-1").name("A").source(HomePagePresetSource.USER)
-                .settings(Map.of()).sections(List.of()).build());
+        presetRepo.save(preset("user-1", DEFAULT, HomePagePresetSource.USER)
+                .name("A").settings(Map.of()).sections(List.of()).build());
 
         service.delete("user-1");
 
@@ -151,19 +166,78 @@ class CmsPresetAppServiceTest {
     void capabilityDisabledRejectsUserOperationsButSkipsPluginImport() {
         capabilityModuleRepo.enabled = false;
 
-        assertThatThrownBy(() -> service.list()).isInstanceOf(BizException.class)
+        assertThatThrownBy(() -> service.list(null)).isInstanceOf(BizException.class)
                 .hasMessageContaining("内容定制能力未启用");
         assertThatThrownBy(() -> service.apply("user-1")).isInstanceOf(BizException.class);
-        assertThatThrownBy(() -> service.saveCurrentAsPreset(cmd("x", null))).isInstanceOf(BizException.class);
+        assertThatThrownBy(() -> service.saveCurrentAsPreset(null, cmd("x", null))).isInstanceOf(BizException.class);
         assertThatThrownBy(() -> service.delete("user-1")).isInstanceOf(BizException.class);
         assertThat(service.importPluginPreset("neco", "Neco", "{\"title\":\"x\"}")).isFalse();
         assertThat(presetRepo.findAll()).isEmpty();
     }
 
     @Test
-    void importPluginPresetMergesDeclaredSettingsAndKeepsNavigation() {
-        layoutRepo.store(layout("旧首页", new HashMap<>(Map.of(
-                "navigationJson", "[{\"name\":\"wiki\"}]", "homeCss", "old")), true));
+    void capabilityDisabledSkipsThemeLayoutInitialization() {
+        capabilityModuleRepo.enabled = false;
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
+
+        service.ensureThemeLayout("neco");
+
+        assertThat(layoutRepo.findByThemeCode("neco")).isEmpty();
+    }
+
+    @Test
+    void listScopesPresetsByThemeAndMarksActiveFromThatThemesLayout() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
+        layoutRepo.store(layout("neco", "像素首页", Map.of(), true));
+        presetRepo.save(preset("user-1", DEFAULT, HomePagePresetSource.USER)
+                .name("默认方案").settings(Map.of()).sections(List.of()).build());
+        presetRepo.save(preset("user-2", "neco", HomePagePresetSource.USER)
+                .name("像素方案").settings(Map.of()).sections(List.of()).build());
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        necoLayout.setTheme("user-2");
+
+        List<HomePagePresetDTO> necoPresets = service.list("neco");
+
+        assertThat(necoPresets).extracting(HomePagePresetDTO::getCode).containsExactly("user-2");
+        assertThat(necoPresets.getFirst().getActive()).isTrue();
+        assertThat(service.list(DEFAULT)).extracting(HomePagePresetDTO::getCode).containsExactly("user-1");
+        assertThat(service.list(DEFAULT).getFirst().getActive()).isFalse();
+    }
+
+    @Test
+    void listDefaultsToActiveSiteTheme() {
+        layoutRepo.store(layout("neco", "像素首页", Map.of(), true));
+        presetRepo.save(preset("user-2", "neco", HomePagePresetSource.USER)
+                .name("像素方案").settings(Map.of()).sections(List.of()).build());
+        presetRepo.save(preset("user-1", DEFAULT, HomePagePresetSource.USER)
+                .name("默认方案").settings(Map.of()).sections(List.of()).build());
+        settingRepo.setActiveSite("neco");
+
+        List<HomePagePresetDTO> presets = service.list(null);
+
+        assertThat(presets).extracting(HomePagePresetDTO::getCode).containsExactly("user-2");
+    }
+
+    @Test
+    void ensureThemeLayoutClonesDefaultThemeLayoutOnce() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of("navigationJson", "[]"), true));
+
+        service.ensureThemeLayout("pixel");
+
+        HomePageLayout clone = layoutRepo.findByThemeCode("pixel").orElseThrow();
+        assertThat(clone.getTitle()).isEqualTo("默认首页");
+        assertThat(clone.getSettings()).containsEntry("navigationJson", "[]");
+        assertThat(clone.getPublished()).isTrue();
+
+        layoutRepo.save(layout("pixel", "已被改", Map.of(), false));
+        service.ensureThemeLayout("pixel");
+        assertThat(layoutRepo.findByThemeCode("pixel").orElseThrow().getTitle()).isEqualTo("已被改");
+    }
+
+    @Test
+    void importPluginPresetCreatesThemeLayoutFromDefaultCloneAndAppliesPresetPurely() {
+        layoutRepo.store(layout(DEFAULT, "站点自有首页", new HashMap<>(Map.of(
+                "navigationJson", "[{\"name\":\"wiki\"}]", "announcement", "欢迎")), true));
 
         boolean imported = service.importPluginPreset("neco", "Neco 主题", """
                 {"title":"像素首页","subtitle":"像素风","settings":{"homeCss":".pixel{}"}}
@@ -172,19 +246,30 @@ class CmsPresetAppServiceTest {
         assertThat(imported).isTrue();
         HomePagePreset preset = presetRepo.findByCode("plugin:neco").orElseThrow();
         assertThat(preset.getSource()).isEqualTo(HomePagePresetSource.PLUGIN);
-        assertThat(preset.getSettings())
+        assertThat(preset.getThemeCode()).isEqualTo("neco");
+        assertThat(preset.getTheme()).isEqualTo("plugin:neco");
+        assertThat(preset.getSettings()).containsEntry("homeCss", ".pixel{}")
+                .doesNotContainKey("navigationJson");
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("像素首页");
+        assertThat(necoLayout.getTheme()).isEqualTo("plugin:neco");
+        assertThat(necoLayout.getPublished()).isTrue();
+        assertThat(necoLayout.getSettings())
                 .containsEntry("homeCss", ".pixel{}")
-                .containsEntry("navigationJson", "[{\"name\":\"wiki\"}]");
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTitle()).isEqualTo("像素首页");
-        assertThat(current.getTheme()).isEqualTo("plugin:neco");
-        assertThat(current.getPublished()).isTrue();
-        assertThat(presetRepo.findBySource(HomePagePresetSource.SNAPSHOT)).hasSize(1);
+                .doesNotContainKey("navigationJson")
+                .doesNotContainKey("announcement");
+        HomePageLayout defaultLayout = layoutRepo.findByThemeCode(DEFAULT).orElseThrow();
+        assertThat(defaultLayout.getTitle()).isEqualTo("站点自有首页");
+        assertThat(defaultLayout.getSettings())
+                .containsEntry("navigationJson", "[{\"name\":\"wiki\"}]")
+                .containsEntry("announcement", "欢迎")
+                .doesNotContainKey("homeCss");
+        assertThat(presetRepo.findBySource(HomePagePresetSource.SNAPSHOT)).isEmpty();
     }
 
     @Test
     void importPluginPresetUpsertsSamePluginAndPreservesIdentity() {
-        layoutRepo.store(layout("旧首页", Map.of(), false));
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), false));
         service.importPluginPreset("neco", "Neco", "{\"title\":\"v1\"}");
         HomePagePreset first = presetRepo.findByCode("plugin:neco").orElseThrow();
 
@@ -198,7 +283,7 @@ class CmsPresetAppServiceTest {
 
     @Test
     void importPluginPresetRejectsEmptyOrContentlessPayload() {
-        layoutRepo.store(layout("旧首页", Map.of(), false));
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), false));
 
         assertThatThrownBy(() -> service.importPluginPreset("neco", "Neco", " "))
                 .isInstanceOf(BizException.class);
@@ -209,26 +294,45 @@ class CmsPresetAppServiceTest {
     }
 
     @Test
-    void listMarksPresetMatchingCurrentLayoutThemeAsActive() {
-        layoutRepo.store(layout("旧首页", Map.of(), true));
-        presetRepo.save(HomePagePreset.builder()
-                .code("user-1").name("A").source(HomePagePresetSource.USER)
-                .settings(Map.of()).sections(List.of()).build());
-        presetRepo.save(HomePagePreset.builder()
-                .code("default").name("内置").source(HomePagePresetSource.USER)
-                .settings(Map.of()).sections(List.of()).build());
+    void importPluginPresetAutoAppliesUpgradeWhenLayoutMatchesPreviousPreset() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of("navigationJson", "[]"), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v1","settings":{"homeHtml":"<div>old</div>"}}
+                """);
 
-        List<HomePagePresetDTO> presets = service.list();
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v2","settings":{"homeCss":".new{}"}}
+                """);
 
-        assertThat(presets.stream().filter(p -> p.getCode().equals("default")).findFirst().orElseThrow().getActive())
-                .isTrue();
-        assertThat(presets.stream().filter(p -> p.getCode().equals("user-1")).findFirst().orElseThrow().getActive())
-                .isFalse();
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("v2");
+        assertThat(necoLayout.getTheme()).isEqualTo("plugin:neco");
+        assertThat(necoLayout.getSettings())
+                .containsEntry("homeCss", ".new{}")
+                .doesNotContainKey("homeHtml")
+                .doesNotContainKey("navigationJson");
     }
 
     @Test
-    void importPluginPresetPublishesDeclaredPagesWithSourceMark() {
-        layoutRepo.store(layout("旧首页", Map.of(), true));
+    void importPluginPresetKeepsAdminEditedLayoutAndOnlyUpdatesPreset() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"v1\",\"settings\":{\"homeCss\":\".old{}\"}}");
+        HomePageLayout edited = layoutRepo.findByThemeCode("neco").orElseThrow();
+        edited.setTitle("管理员改过的首页");
+
+        service.importPluginPreset("neco", "Neco", "{\"title\":\"v2\",\"settings\":{\"homeCss\":\".new{}\"}}");
+
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("管理员改过的首页");
+        assertThat(necoLayout.getSettings()).containsEntry("homeCss", ".old{}");
+        HomePagePreset preset = presetRepo.findByCode("plugin:neco").orElseThrow();
+        assertThat(preset.getTitle()).isEqualTo("v2");
+        assertThat(preset.getSettings()).containsEntry("homeCss", ".new{}");
+    }
+
+    @Test
+    void importPluginPresetPublishesDeclaredPagesIntoOwnThemeWithSourceMark() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
 
         service.importPluginPreset("neco", "Neco", """
                 {"title":"像素首页","pages":[
@@ -238,80 +342,59 @@ class CmsPresetAppServiceTest {
                 ]}
                 """);
 
-        CmsPage about = pageRepo.findBySlug("neco-about").orElseThrow();
+        CmsPage about = pageRepo.findBySlug("neco", "neco-about").orElseThrow();
+        assertThat(about.getThemeCode()).isEqualTo("neco");
         assertThat(about.getStatus()).isEqualTo(PageStatus.PUBLISHED);
         assertThat(about.getSourcePluginCode()).isEqualTo("neco");
         assertThat(about.getTemplate().name()).isEqualTo("LANDING");
         assertThat(about.getPublishedAt()).isNotNull();
-        assertThat(pageRepo.findBySlug("neco-join")).isPresent();
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTheme()).isEqualTo("plugin:neco");
+        assertThat(pageRepo.findBySlug("neco", "neco-join")).isPresent();
+        assertThat(pageRepo.findBySlug(DEFAULT, "neco-about")).isEmpty();
     }
 
     @Test
-    void importPluginPagesSkipsSlugOwnedBySiteOrOtherTheme() {
-        layoutRepo.store(layout("旧首页", Map.of(), true));
-        CmsPage adminPage = CmsPage.create("站点页面", "about");
-        adminPage.publish();
-        pageRepo.save(adminPage);
-        CmsPage otherThemePage = CmsPage.create("别家主题页", "shared");
-        otherThemePage.setSourcePluginCode("pixel");
-        otherThemePage.publish();
-        pageRepo.save(otherThemePage);
+    void importPluginPagesSkipsSlugOccupiedByAdminInSameThemeButAllowsCrossThemeReuse() {
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
+        CmsPage necoAdminPage = CmsPage.create("主题内管理员页", "about", "neco");
+        necoAdminPage.publish();
+        pageRepo.save(necoAdminPage);
+        CmsPage defaultAdminPage = CmsPage.create("默认主题页面", "shared", DEFAULT);
+        defaultAdminPage.publish();
+        pageRepo.save(defaultAdminPage);
 
         service.importPluginPreset("neco", "Neco", """
                 {"title":"像素首页","pages":[
                   {"slug":"about","title":"覆盖尝试"},
-                  {"slug":"shared","title":"覆盖尝试"},
-                  {"slug":"neco-own","title":"自有页"}
+                  {"slug":"shared","title":"跨主题复用"}
                 ]}
                 """);
 
-        assertThat(pageRepo.findBySlug("about").orElseThrow().getTitle()).isEqualTo("站点页面");
-        assertThat(pageRepo.findBySlug("shared").orElseThrow().getSourcePluginCode()).isEqualTo("pixel");
-        assertThat(pageRepo.findBySlug("neco-own")).isPresent();
+        assertThat(pageRepo.findBySlug("neco", "about").orElseThrow().getTitle()).isEqualTo("主题内管理员页");
+        assertThat(pageRepo.findBySlug(DEFAULT, "shared").orElseThrow().getTitle()).isEqualTo("默认主题页面");
+        CmsPage reused = pageRepo.findBySlug("neco", "shared").orElseThrow();
+        assertThat(reused.getTitle()).isEqualTo("跨主题复用");
+        assertThat(reused.getSourcePluginCode()).isEqualTo("neco");
     }
 
     @Test
     void importPluginPagesDraftsOwnedPagesDroppedFromDeclaration() {
-        layoutRepo.store(layout("旧首页", Map.of(), true));
+        layoutRepo.store(layout(DEFAULT, "默认首页", Map.of(), true));
         service.importPluginPreset("neco", "Neco", """
                 {"title":"v1","pages":[{"slug":"neco-a","title":"A"},{"slug":"neco-b","title":"B"}]}
                 """);
-        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+        assertThat(pageRepo.findBySlug("neco", "neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
 
         service.importPluginPreset("neco", "Neco", """
                 {"title":"v2","pages":[{"slug":"neco-b","title":"B"}]}
                 """);
 
-        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.DRAFT);
-        assertThat(pageRepo.findBySlug("neco-b").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
-    }
-
-    @Test
-    void unpublishPluginPagesDraftsOnlyThatThemesPagesAndRepublishOnReimport() {
-        layoutRepo.store(layout("旧首页", Map.of(), true));
-        service.importPluginPreset("neco", "Neco", """
-                {"title":"v1","pages":[{"slug":"neco-a","title":"A"}]}
-                """);
-        CmsPage adminPage = CmsPage.create("站点页面", "about");
-        adminPage.publish();
-        pageRepo.save(adminPage);
-
-        service.unpublishPluginPages("neco");
-
-        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.DRAFT);
-        assertThat(pageRepo.findBySlug("about").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
-
-        service.importPluginPreset("neco", "Neco", """
-                {"title":"v1","pages":[{"slug":"neco-a","title":"A"}]}
-                """);
-        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+        assertThat(pageRepo.findBySlug("neco", "neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.DRAFT);
+        assertThat(pageRepo.findBySlug("neco", "neco-b").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
     }
 
     @Test
     void switchingThemesNeverMixesHomeDesigns() {
-        layoutRepo.store(layout("站点自有首页", new HashMap<>(Map.of(
+        layoutRepo.store(layout(DEFAULT, "站点自有首页", new HashMap<>(Map.of(
                 "navigationJson", "[{\"name\":\"wiki\"}]", "announcement", "欢迎")), true));
         service.importPluginPreset("neco", "Neco", """
                 {"title":"像素首页","settings":{"homeHtml":"<div>neco</div>","homeCss":".neco{}"}}
@@ -321,126 +404,24 @@ class CmsPresetAppServiceTest {
                 {"title":"另一套主题","settings":{"homeCss":".pixel{}"}}
                 """);
 
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTitle()).isEqualTo("另一套主题");
-        assertThat(current.getTheme()).isEqualTo("plugin:pixel");
-        assertThat(current.getSettings())
+        HomePageLayout necoLayout = layoutRepo.findByThemeCode("neco").orElseThrow();
+        assertThat(necoLayout.getTitle()).isEqualTo("像素首页");
+        assertThat(necoLayout.getSettings())
+                .containsEntry("homeHtml", "<div>neco</div>")
+                .doesNotContainKey("navigationJson");
+        HomePageLayout pixelLayout = layoutRepo.findByThemeCode("pixel").orElseThrow();
+        assertThat(pixelLayout.getTitle()).isEqualTo("另一套主题");
+        assertThat(pixelLayout.getSettings())
                 .containsEntry("homeCss", ".pixel{}")
+                .doesNotContainKey("homeHtml")
+                .doesNotContainKey("announcement");
+        HomePageLayout defaultLayout = layoutRepo.findByThemeCode(DEFAULT).orElseThrow();
+        assertThat(defaultLayout.getTitle()).isEqualTo("站点自有首页");
+        assertThat(defaultLayout.getSettings())
                 .containsEntry("navigationJson", "[{\"name\":\"wiki\"}]")
                 .containsEntry("announcement", "欢迎")
-                .doesNotContainKey("homeHtml");
-    }
-
-    @Test
-    void reimportUsesOwnPreThemeBackupAsBaseSoUpgradesLeaveNoResidue() {
-        layoutRepo.store(layout("站点自有首页", new HashMap<>(Map.of("navigationJson", "[]")), true));
-        service.importPluginPreset("neco", "Neco", """
-                {"title":"v1","settings":{"homeHtml":"<div>old</div>"}}
-                """);
-
-        service.importPluginPreset("neco", "Neco", """
-                {"title":"v2","settings":{"homeCss":".new{}"}}
-                """);
-
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTitle()).isEqualTo("v2");
-        assertThat(current.getSettings())
-                .containsEntry("homeCss", ".new{}")
-                .containsEntry("navigationJson", "[]")
-                .doesNotContainKey("homeHtml");
-    }
-
-    @Test
-    void restorePluginHomepageRevertsToPreThemeDesignAndDropsBackup() {
-        layoutRepo.store(layout("站点自有首页", new HashMap<>(Map.of("navigationJson", "[]")), true));
-        service.importPluginPreset("neco", "Neco", """
-                {"title":"像素首页","settings":{"homeHtml":"<div>neco</div>"}}
-                """);
-        assertThat(layoutRepo.findCurrent().orElseThrow().getTitle()).isEqualTo("像素首页");
-        assertThat(presetRepo.findByCode("plugin-backup:neco")).isPresent();
-
-        service.restorePluginHomepage("neco");
-
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTitle()).isEqualTo("站点自有首页");
-        assertThat(current.getTheme()).isEqualTo("default");
-        assertThat(current.getSettings())
-                .containsEntry("navigationJson", "[]")
-                .doesNotContainKey("homeHtml");
-        assertThat(presetRepo.findByCode("plugin-backup:neco")).isEmpty();
-    }
-
-    @Test
-    void restorePluginHomepageOnlyDropsBackupWhenAdminSwitchedAway() {
-        layoutRepo.store(layout("站点自有首页", Map.of(), true));
-        service.importPluginPreset("neco", "Neco", "{\"title\":\"像素首页\"}");
-        presetRepo.save(HomePagePreset.builder()
-                .code("user-1").name("手工方案").source(HomePagePresetSource.USER)
-                .title("手工首页").settings(Map.of()).sections(List.of()).build());
-        service.apply("user-1");
-
-        service.restorePluginHomepage("neco");
-
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTitle()).isEqualTo("手工首页");
-        assertThat(current.getTheme()).isEqualTo("user-1");
-        assertThat(presetRepo.findByCode("plugin-backup:neco")).isEmpty();
-    }
-
-    @Test
-    void restorePluginHomepageWithoutBackupStripsDeclaredSettingsKeys() {
-        layoutRepo.store(HomePageLayout.builder()
-                .id(1L).title("像素首页").subtitle("副标题").theme("plugin:neco")
-                .settings(new HashMap<>(Map.of("navigationJson", "[]", "homeHtml", "<div>neco</div>")))
-                .sections(new ArrayList<>()).published(true).build());
-        presetRepo.save(HomePagePreset.builder()
-                .code("plugin:neco").name("Neco").source(HomePagePresetSource.PLUGIN).pluginCode("neco")
-                .title("像素首页").settings(Map.of("homeHtml", "<div>neco</div>")).sections(List.of()).build());
-
-        service.restorePluginHomepage("neco");
-
-        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
-        assertThat(current.getTheme()).isEqualTo("default");
-        assertThat(current.getSettings())
-                .containsEntry("navigationJson", "[]")
-                .doesNotContainKey("homeHtml");
-    }
-
-    @Test
-    void listHidesThemeBackupPresets() {
-        layoutRepo.store(layout("站点自有首页", Map.of(), true));
-        service.importPluginPreset("neco", "Neco", "{\"title\":\"像素首页\"}");
-
-        List<HomePagePresetDTO> presets = service.list();
-
-        assertThat(presets.stream().map(HomePagePresetDTO::getCode))
-                .contains("plugin:neco")
-                .noneMatch(code -> code.startsWith("plugin-backup:"));
-    }
-
-    @Test
-    void restorePluginHomepageSkipsWhenCapabilityDisabled() {
-        layoutRepo.store(layout("站点自有首页", Map.of(), true));
-        service.importPluginPreset("neco", "Neco", "{\"title\":\"像素首页\"}");
-        capabilityModuleRepo.enabled = false;
-
-        service.restorePluginHomepage("neco");
-
-        assertThat(layoutRepo.findCurrent().orElseThrow().getTitle()).isEqualTo("像素首页");
-        assertThat(presetRepo.findByCode("plugin-backup:neco")).isPresent();
-    }
-
-    @Test
-    void unpublishPluginPagesSkipsWhenCapabilityDisabled() {
-        layoutRepo.store(layout("旧首页", Map.of(), true));
-        service.importPluginPreset("neco", "Neco", """
-                {"title":"v1","pages":[{"slug":"neco-a","title":"A"}]}
-                """);
-        capabilityModuleRepo.enabled = false;
-
-        service.unpublishPluginPages("neco");
-
-        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+                .doesNotContainKey("homeHtml")
+                .doesNotContainKey("homeCss");
     }
 
     private HomePagePresetSaveCmd cmd(String name, String description) {
@@ -450,16 +431,26 @@ class CmsPresetAppServiceTest {
         return cmd;
     }
 
-    private HomePageLayout layout(String title, Map<String, String> settings, boolean published) {
+    private HomePageLayout layout(String themeCode, String title, Map<String, String> settings, boolean published) {
         return HomePageLayout.builder()
-                .id(1L)
+                .themeCode(themeCode)
                 .title(title)
                 .subtitle("副标题")
-                .theme("default")
+                .theme(DEFAULT)
                 .settings(new HashMap<>(settings))
                 .sections(new ArrayList<>())
                 .published(published)
                 .build();
+    }
+
+    private HomePagePreset.HomePagePresetBuilder<?, ?> preset(String code, String themeCode,
+                                                              HomePagePresetSource source) {
+        return HomePagePreset.builder()
+                .code(code)
+                .name(code)
+                .source(source)
+                .themeCode(themeCode)
+                .theme(DEFAULT);
     }
 
     static class InMemoryCapabilityModuleRepo implements CapabilityModuleRepo {
@@ -484,21 +475,31 @@ class CmsPresetAppServiceTest {
 
     static class InMemoryHomePageLayoutRepo implements HomePageLayoutRepo {
 
-        private HomePageLayout current;
+        private final Map<String, HomePageLayout> store = new LinkedHashMap<>();
 
         void store(HomePageLayout layout) {
-            this.current = layout;
+            store.put(layout.getThemeCode(), layout);
         }
 
         @Override
         public HomePageLayout save(HomePageLayout layout) {
-            this.current = layout;
+            store.put(layout.getThemeCode(), layout);
             return layout;
         }
 
         @Override
-        public Optional<HomePageLayout> findCurrent() {
-            return Optional.ofNullable(current);
+        public Optional<HomePageLayout> findByThemeCode(String themeCode) {
+            return Optional.ofNullable(store.get(themeCode));
+        }
+
+        @Override
+        public List<HomePageLayout> findAll() {
+            return new ArrayList<>(store.values());
+        }
+
+        @Override
+        public void deleteById(Long id) {
+            store.values().removeIf(layout -> java.util.Objects.equals(layout.getId(), id));
         }
     }
 
@@ -522,8 +523,11 @@ class CmsPresetAppServiceTest {
         }
 
         @Override
-        public Optional<CmsPage> findBySlug(String slug) {
-            return store.values().stream().filter(page -> slug.equals(page.getSlug())).findFirst();
+        public Optional<CmsPage> findBySlug(String themeCode, String slug) {
+            return store.values().stream()
+                    .filter(page -> java.util.Objects.equals(themeCode, page.getThemeCode()))
+                    .filter(page -> slug.equals(page.getSlug()))
+                    .findFirst();
         }
 
         @Override
@@ -539,12 +543,18 @@ class CmsPresetAppServiceTest {
         }
 
         @Override
-        public online.yudream.base.domain.common.PageResult<CmsPage> page(String keyword, int page, int size) {
+        public List<CmsPage> findAll() {
+            return new ArrayList<>(store.values());
+        }
+
+        @Override
+        public PageResult<CmsPage> page(String themeCode, String keyword, int page, int size) {
             throw new UnsupportedOperationException();
         }
 
         @Override
-        public online.yudream.base.domain.common.PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size) {
+        public PageResult<CmsPage> publishedPage(String themeCode, String keyword, String category, String tag,
+                                                 int page, int size) {
             throw new UnsupportedOperationException();
         }
     }
@@ -573,7 +583,14 @@ class CmsPresetAppServiceTest {
 
         @Override
         public List<HomePagePreset> findAll() {
-            return sorted(store.values().stream().toList());
+            return sorted(new ArrayList<>(store.values()));
+        }
+
+        @Override
+        public List<HomePagePreset> findByThemeCode(String themeCode) {
+            return sorted(store.values().stream()
+                    .filter(preset -> java.util.Objects.equals(themeCode, preset.getThemeCode()))
+                    .toList());
         }
 
         @Override
@@ -591,6 +608,43 @@ class CmsPresetAppServiceTest {
                     .sorted(Comparator.comparing(HomePagePreset::getCreateTime,
                             Comparator.nullsLast(Comparator.naturalOrder())).reversed())
                     .toList();
+        }
+    }
+
+    static class InMemorySettingRepo implements SettingRepo {
+
+        private final Map<String, Setting> store = new LinkedHashMap<>();
+
+        void setActiveSite(String pluginCode) {
+            save(Setting.builder().key("pluginTheme.active.site").value(pluginCode).build());
+        }
+
+        @Override
+        public Setting save(Setting setting) {
+            store.put(setting.getKey(), setting);
+            return setting;
+        }
+
+        @Override
+        public Optional<Setting> findByKey(String key) {
+            return Optional.ofNullable(store.get(key));
+        }
+
+        @Override
+        public boolean existsByKey(String key) {
+            return store.containsKey(key);
+        }
+
+        @Override
+        public List<Setting> findByCategory(String category) {
+            return store.values().stream()
+                    .filter(setting -> category.equals(setting.getCategory()))
+                    .toList();
+        }
+
+        @Override
+        public List<Setting> findAll() {
+            return new ArrayList<>(store.values());
         }
     }
 }

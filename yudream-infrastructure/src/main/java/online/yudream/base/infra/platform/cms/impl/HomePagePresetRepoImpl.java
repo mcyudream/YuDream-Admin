@@ -50,6 +50,15 @@ public class HomePagePresetRepoImpl implements HomePagePresetRepo {
     }
 
     @Override
+    public List<HomePagePreset> findByThemeCode(String themeCode) {
+        Query query = new Query(Criteria.where("themeCode").is(themeCode))
+                .with(Sort.by(Sort.Direction.DESC, "createTime"));
+        return mongoTemplate.find(query, HomePagePresetDO.class).stream()
+                .map(CmsInfraMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<HomePagePreset> findBySource(HomePagePresetSource source) {
         Query query = new Query(Criteria.where("source").is(source))
                 .with(Sort.by(Sort.Direction.DESC, "createTime"));

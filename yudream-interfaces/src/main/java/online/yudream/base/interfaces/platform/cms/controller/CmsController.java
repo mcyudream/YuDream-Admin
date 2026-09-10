@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -36,20 +37,20 @@ public class CmsController {
 
     @GetMapping("/pages")
     @PermissionRegister(code = "platform:cms:view", name = "查看内容页面", module = "平台能力", desc = "查看内容定制页面列表")
-    public Result<PageResult<CmsPageRes>> pages(CmsPageQuery query) {
-        return Result.ok(CmsWebAssembler.toPage(cmsAppService.page(query)));
+    public Result<PageResult<CmsPageRes>> pages(@RequestParam(required = false) String theme, CmsPageQuery query) {
+        return Result.ok(CmsWebAssembler.toPage(cmsAppService.page(theme, query)));
     }
 
     @PostMapping("/pages")
     @PermissionRegister(code = "platform:cms:edit", name = "新增内容页面", module = "平台能力", desc = "新增 Markdown 内容页面")
-    public Result<CmsPageRes> createPage(@Valid @RequestBody CmsPageSaveRequest request) {
-        return Result.ok(CmsWebAssembler.toRes(cmsAppService.savePage(CmsWebAssembler.toCmd(request))));
+    public Result<CmsPageRes> createPage(@RequestParam(required = false) String theme, @Valid @RequestBody CmsPageSaveRequest request) {
+        return Result.ok(CmsWebAssembler.toRes(cmsAppService.savePage(theme, CmsWebAssembler.toCmd(request))));
     }
 
     @PutMapping("/pages/{id}")
     @PermissionRegister(code = "platform:cms:edit", name = "编辑内容页面", module = "平台能力", desc = "编辑 Markdown 内容页面")
     public Result<CmsPageRes> updatePage(@PathVariable Long id, @Valid @RequestBody CmsPageSaveRequest request) {
-        return Result.ok(CmsWebAssembler.toRes(cmsAppService.savePage(CmsWebAssembler.toCmd(id, request))));
+        return Result.ok(CmsWebAssembler.toRes(cmsAppService.savePage(null, CmsWebAssembler.toCmd(id, request))));
     }
 
     @PostMapping("/pages/{id}/publish")
@@ -75,26 +76,26 @@ public class CmsController {
 
     @GetMapping("/home")
     @PermissionRegister(code = "platform:cms:view", name = "查看首页配置", module = "平台能力", desc = "查看自定义首页配置")
-    public Result<HomePageLayoutRes> home() {
-        return Result.ok(CmsWebAssembler.toRes(cmsAppService.homeLayout()));
+    public Result<HomePageLayoutRes> home(@RequestParam(required = false) String theme) {
+        return Result.ok(CmsWebAssembler.toRes(cmsAppService.homeLayout(theme)));
     }
 
     @PutMapping("/home")
     @PermissionRegister(code = "platform:cms:edit", name = "编辑首页配置", module = "平台能力", desc = "编辑自定义首页配置")
-    public Result<HomePageLayoutRes> saveHome(@RequestBody HomePageLayoutSaveRequest request) {
-        return Result.ok(CmsWebAssembler.toRes(cmsAppService.saveHomeLayout(CmsWebAssembler.toCmd(request))));
+    public Result<HomePageLayoutRes> saveHome(@RequestParam(required = false) String theme, @RequestBody HomePageLayoutSaveRequest request) {
+        return Result.ok(CmsWebAssembler.toRes(cmsAppService.saveHomeLayout(theme, CmsWebAssembler.toCmd(request))));
     }
 
     @GetMapping("/presets")
     @PermissionRegister(code = "platform:cms:view", name = "查看首页方案", module = "平台能力", desc = "查看首页内容定制方案列表")
-    public Result<List<HomePagePresetRes>> presets() {
-        return Result.ok(CmsWebAssembler.toPresetResList(cmsPresetAppService.list()));
+    public Result<List<HomePagePresetRes>> presets(@RequestParam(required = false) String theme) {
+        return Result.ok(CmsWebAssembler.toPresetResList(cmsPresetAppService.list(theme)));
     }
 
     @PostMapping("/presets")
     @PermissionRegister(code = "platform:cms:edit", name = "保存首页方案", module = "平台能力", desc = "把当前首页定制存为方案")
-    public Result<HomePagePresetRes> savePreset(@Valid @RequestBody HomePagePresetSaveRequest request) {
-        return Result.ok(CmsWebAssembler.toPresetRes(cmsPresetAppService.saveCurrentAsPreset(CmsWebAssembler.toPresetCmd(request))));
+    public Result<HomePagePresetRes> savePreset(@RequestParam(required = false) String theme, @Valid @RequestBody HomePagePresetSaveRequest request) {
+        return Result.ok(CmsWebAssembler.toPresetRes(cmsPresetAppService.saveCurrentAsPreset(theme, CmsWebAssembler.toPresetCmd(request))));
     }
 
     @PostMapping("/presets/{code}/apply")
