@@ -82,6 +82,19 @@ export interface HomePageLayout {
   updateTime?: string
 }
 
+export type HomePagePresetSource = 'USER' | 'PLUGIN' | 'SNAPSHOT'
+
+export interface HomePagePreset {
+  code: string
+  name: string
+  description?: string
+  source: HomePagePresetSource
+  pluginCode?: string
+  sectionCount?: number
+  createTime?: string
+  updateTime?: string
+}
+
 export interface CmsTemplateItem {
   id: string
   source: 'cms' | 'knowledge' | 'knowledge-space'
@@ -198,6 +211,18 @@ export default {
   },
   saveHome: (data: HomePageLayout) => {
     return systemClient.put<unknown, ApiResponse<HomePageLayout>>('api/platform/cms/home', data)
+  },
+  presets: () => {
+    return systemClient.get<unknown, ApiResponse<HomePagePreset[]>>('api/platform/cms/presets')
+  },
+  savePreset: (data: { name: string, description?: string }) => {
+    return systemClient.post<unknown, ApiResponse<HomePagePreset>>('api/platform/cms/presets', data)
+  },
+  applyPreset: (code: string) => {
+    return systemClient.post<unknown, ApiResponse<void>>(`api/platform/cms/presets/${encodeURIComponent(code)}/apply`)
+  },
+  deletePreset: (code: string) => {
+    return systemClient.delete<unknown, ApiResponse<void>>(`api/platform/cms/presets/${encodeURIComponent(code)}`)
   },
   publicHome: () => {
     return systemClient.get<unknown, ApiResponse<HomePageLayout>>('api/public/cms/home')

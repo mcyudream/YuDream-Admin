@@ -144,7 +144,7 @@ async function saveTheme() {
             插件主题
           </div>
           <div class="text-sm text-muted-foreground">
-            插件可以为公开站与管理后台注册整套主题；同一范围同时只激活一个主题，在插件管理中启用目标主题插件即自动顶替。
+            插件可以为公开站与管理后台注册整套主题；同一范围同时只激活一个主题，在插件管理中启用目标主题插件即自动顶替。公开站主题若自带首页方案，启用时会自动应用该方案，并把当前首页定制保存为快照，可在「内容站点 → 首页方案」一键切回。
           </div>
           <div v-if="siteThemeName" class="text-sm text-muted-foreground">
             公开站主题正由插件「{{ siteThemeName }}」接管，上方的主题配置仅作用于管理后台。
@@ -159,6 +159,9 @@ async function saveTheme() {
                   {{ theme.name }}
                   <FaTag v-for="scope in theme.scopes" :key="scope" variant="secondary">
                     {{ scopeLabels[scope] }}
+                  </FaTag>
+                  <FaTag v-if="theme.homePreset" variant="outline">
+                    含首页方案
                   </FaTag>
                 </div>
                 <FaTag v-if="theme.scopes?.some(scope => isThemeActive(theme.pluginCode, scope))" variant="default">
