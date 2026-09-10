@@ -91,6 +91,8 @@ export interface HomePagePreset {
   source: HomePagePresetSource
   pluginCode?: string
   sectionCount?: number
+  /** 是否为当前首页布局正在使用的方案 */
+  active?: boolean
   createTime?: string
   updateTime?: string
 }

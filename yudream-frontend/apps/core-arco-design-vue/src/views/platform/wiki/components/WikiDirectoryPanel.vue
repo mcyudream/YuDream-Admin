@@ -3,7 +3,7 @@ import { computed, inject, ref, watch } from 'vue'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { publishWikiNode, saveWikiNode, unpublishWikiNode, deleteWikiNode } from '@/api/modules/platform-wiki'
-import CmsMarkdownEditor from '../../cms/components/CmsMarkdownEditor.vue'
+import CmsMarkdownEditor from '../../theme-center/components/CmsMarkdownEditor.vue'
 import { rewriteApiFileUrls } from '@/utils/api-file-url'
 import {
   pageTypeColor,

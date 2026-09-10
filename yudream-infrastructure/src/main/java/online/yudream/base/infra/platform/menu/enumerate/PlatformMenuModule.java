@@ -236,29 +236,37 @@ public enum PlatformMenuModule {
             parentName = "FORM", permission = "platform:form:statistics:view")
     FORM_STATISTICS_VIEW,
 
-    @MenuNode(code = "platform:cms", name = "内容定制", type = MenuNodeType.MENU,
-            path = "/platform/cms", component = "platform/cms/index.vue",
-            icon = "i-ri:layout-masonry-line", sort = 60)
-    CMS,
+    @MenuNode(code = "platform:theme-center", name = "主题中心", type = MenuNodeType.MENU,
+            path = "/platform/theme-center", component = "platform/theme-center/index.vue",
+            icon = "i-ri:palette-line", sort = 60)
+    THEME_CENTER,
+
+    @MenuNode(code = "platform:theme-center:view", name = "查看主题中心", type = MenuNodeType.BUTTON,
+            parentName = "THEME_CENTER", permission = "platform:theme-center:view")
+    THEME_CENTER_VIEW,
+
+    @MenuNode(code = "platform:theme-center:use", name = "切换整站主题", type = MenuNodeType.BUTTON,
+            parentName = "THEME_CENTER", permission = "platform:theme-center:use")
+    THEME_CENTER_USE,
 
     @MenuNode(code = "platform:cms:view", name = "查看内容定制", type = MenuNodeType.BUTTON,
-            parentName = "CMS", permission = "platform:cms:view")
+            parentName = "THEME_CENTER", permission = "platform:cms:view")
     CMS_VIEW,
 
     @MenuNode(code = "platform:cms:edit", name = "编辑内容定制", type = MenuNodeType.BUTTON,
-            parentName = "CMS", permission = "platform:cms:edit")
+            parentName = "THEME_CENTER", permission = "platform:cms:edit")
     CMS_EDIT,
 
     @MenuNode(code = "platform:cms:publish", name = "发布内容页面", type = MenuNodeType.BUTTON,
-            parentName = "CMS", permission = "platform:cms:publish")
+            parentName = "THEME_CENTER", permission = "platform:cms:publish")
     CMS_PUBLISH,
 
     @MenuNode(code = "platform:cms:delete", name = "删除内容页面", type = MenuNodeType.BUTTON,
-            parentName = "CMS", permission = "platform:cms:delete")
+            parentName = "THEME_CENTER", permission = "platform:cms:delete")
     CMS_DELETE,
 
     @MenuNode(code = "platform:ai:generate", name = "AI 生成内容", type = MenuNodeType.BUTTON,
-            parentName = "CMS", permission = "platform:ai:generate")
+            parentName = "THEME_CENTER", permission = "platform:ai:generate")
     AI_GENERATE,
 
     @MenuNode(code = "platform:agent", name = "Agent 应用", type = MenuNodeType.MENU,
