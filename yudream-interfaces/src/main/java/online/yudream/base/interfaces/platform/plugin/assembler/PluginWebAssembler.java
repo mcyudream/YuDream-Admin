@@ -267,6 +267,7 @@ public class PluginWebAssembler {
                 .scopes(dto.getScopes())
                 .styles(dto.getStyles())
                 .preview(dto.getPreview())
+                .configSchema(dto.getConfigSchema())
                 .assetRevision(dto.getAssetRevision())
                 .build();
     }

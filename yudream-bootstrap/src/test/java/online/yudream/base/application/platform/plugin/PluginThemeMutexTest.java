@@ -172,7 +172,7 @@ class PluginThemeMutexTest {
 
     private PluginThemeInfo themeInfo(String pluginCode) {
         return new PluginThemeInfo(pluginCode, pluginCode, pluginCode + " 主题", "",
-                Set.of("SITE"), List.of("theme/" + pluginCode + ".css"), "", "", "rev-1");
+                Set.of("SITE"), List.of("theme/" + pluginCode + ".css"), "", "", "", "rev-1");
     }
 
     private PluginModule module(String code, PluginStatus status) throws IOException {

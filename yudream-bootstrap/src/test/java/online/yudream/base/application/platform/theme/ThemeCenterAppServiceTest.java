@@ -95,7 +95,7 @@ class ThemeCenterAppServiceTest {
     @Test
     void overviewMergesRuntimeAndOfflineThemeCards() {
         PluginThemeInfo neco = new PluginThemeInfo("neco-pixel", "neco-pixel", "Neco 像素", "像素风主题",
-                Set.of("SITE"), List.of("theme/neco.css"), "preview.png", "home-preset.json", "rev-1");
+                Set.of("SITE"), List.of("theme/neco.css"), "preview.png", "home-preset.json", "", "rev-1");
         when(pluginRuntimeGateway.themes()).thenReturn(List.of(neco));
         when(pluginRuntimeGateway.frontendAsset("neco-pixel", "home-preset.json"))
                 .thenReturn(Optional.of(new PluginFrontendAssetInfo("home-preset.json", "application/json",
@@ -148,7 +148,7 @@ class ThemeCenterAppServiceTest {
     @Test
     void overviewCoversEnabledThemeWithoutPersistedScopes() {
         PluginThemeInfo legacy = new PluginThemeInfo("legacy-theme", "legacy-theme", "旧主题", "",
-                Set.of("SITE"), List.of("theme.css"), "", "", "rev-1");
+                Set.of("SITE"), List.of("theme.css"), "", "", "", "rev-1");
         when(pluginRuntimeGateway.themes()).thenReturn(List.of(legacy));
 
         ThemeCenterOverviewDTO overview = service.overview();

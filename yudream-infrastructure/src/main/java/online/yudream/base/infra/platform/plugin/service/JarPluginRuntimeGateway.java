@@ -524,6 +524,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 theme.styles(),
                 theme.preview(),
                 theme.homePreset(),
+                theme.configSchema(),
                 assetRevision
         );
     }

@@ -26,5 +26,7 @@ public class PluginThemeRes implements Serializable {
     private Set<String> scopes;
     private List<String> styles;
     private String preview;
+    /** 主题配置 schema 资产相对路径，空表示该主题不声明配置页。 */
+    private String configSchema;
     private String assetRevision;
 }

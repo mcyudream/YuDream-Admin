@@ -16,6 +16,9 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
+import online.yudream.base.plugin.spi.system.extension.PluginExtensionQuery;
+import online.yudream.base.plugin.spi.theme.PluginThemeBlockProvider;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,13 +51,15 @@ class CmsTemplateContextAppServiceTest {
     private WikiPageVersionRepo wikiVersions;
     @Mock
     private SiteThemeQueryService siteThemeQueryService;
+    @Mock
+    private PluginExtensionQuery pluginExtensionQuery;
 
     private CmsTemplateContextAppService service;
 
     @BeforeEach
     void setUp() {
         service = new CmsTemplateContextAppService(capabilities, cmsPages, wikiSpaces, wikiNodes, wikiVersions,
-                siteThemeQueryService);
+                siteThemeQueryService, pluginExtensionQuery, new ObjectMapper());
         lenient().when(siteThemeQueryService.activeSiteThemeCode()).thenReturn("default");
     }
 
@@ -132,5 +137,115 @@ class CmsTemplateContextAppServiceTest {
         assertThat(context.getKnowledge().getPages().get(0).getContent()).isEqualTo("published markdown");
         assertThat(context.getKnowledge().getPages().get(0).getUrl()).isEqualTo("/wiki/docs/install");
         assertThat(context.getKnowledge().getSpaces()).extracting(item -> item.getSlug()).containsExactly("docs");
+    }
+    @Test
+    void resolvesRequestedThemeBlocksForTheActiveTheme() {
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+                .thenReturn(PageResult.empty(1, 12));
+        when(capabilities.enabled("wiki")).thenReturn(false);
+        PluginThemeBlockProvider provider = new PluginThemeBlockProvider() {
+            @Override
+            public String code() {
+                return "timeline";
+            }
+
+            @Override
+            public String name() {
+                return "大事记";
+            }
+
+            @Override
+            public Object data(online.yudream.base.plugin.spi.theme.PluginThemeBlockContext ctx) {
+                return List.of(java.util.Map.of("title", "一周年", "limit", ctx.limit()));
+            }
+        };
+        when(pluginExtensionQuery.extensions(PluginThemeBlockProvider.class)).thenReturn(List.of(provider));
+        CmsTemplateContextQuery query = new CmsTemplateContextQuery();
+        query.setBlocks(List.of("timeline", "server-list"));
+        query.setBlockLimit(5);
+
+        CmsTemplateContextDTO context = service.query(query);
+
+        assertThat(context.getBlocks()).containsOnlyKeys("timeline");
+        assertThat(context.getBlocks().get("timeline"))
+                .isEqualTo(List.of(java.util.Map.of("title", "一周年", "limit", 5)));
+    }
+
+    @Test
+    void skipsBlocksNotSupportingTheActiveTheme() {
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+                .thenReturn(PageResult.empty(1, 12));
+        when(capabilities.enabled("wiki")).thenReturn(false);
+        PluginThemeBlockProvider provider = new PluginThemeBlockProvider() {
+            @Override
+            public String code() {
+                return "server-list";
+            }
+
+            @Override
+            public String name() {
+                return "服务器";
+            }
+
+            @Override
+            public java.util.Set<String> supportedThemes() {
+                return java.util.Set.of("neco");
+            }
+
+            @Override
+            public Object data(online.yudream.base.plugin.spi.theme.PluginThemeBlockContext ctx) {
+                return List.of();
+            }
+        };
+        when(pluginExtensionQuery.extensions(PluginThemeBlockProvider.class)).thenReturn(List.of(provider));
+        CmsTemplateContextQuery query = new CmsTemplateContextQuery();
+        query.setBlocks(List.of("server-list"));
+
+        CmsTemplateContextDTO context = service.query(query);
+
+        assertThat(context.getBlocks()).isEmpty();
+    }
+
+    @Test
+    void isolatesFailingBlockProviders() {
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+                .thenReturn(PageResult.empty(1, 12));
+        when(capabilities.enabled("wiki")).thenReturn(false);
+        PluginThemeBlockProvider broken = new PluginThemeBlockProvider() {
+            @Override
+            public String code() {
+                return "timeline";
+            }
+
+            @Override
+            public String name() {
+                return "大事记";
+            }
+
+            @Override
+            public Object data(online.yudream.base.plugin.spi.theme.PluginThemeBlockContext ctx) {
+                throw new IllegalStateException("boom");
+            }
+        };
+        when(pluginExtensionQuery.extensions(PluginThemeBlockProvider.class)).thenReturn(List.of(broken));
+        CmsTemplateContextQuery query = new CmsTemplateContextQuery();
+        query.setBlocks(List.of("timeline"));
+
+        CmsTemplateContextDTO context = service.query(query);
+
+        assertThat(context.getBlocks()).isEmpty();
+        assertThat(context.getCms()).isNotNull();
+    }
+
+    @Test
+    void doesNotTouchBlockProvidersWhenTemplateRequestsNoBlocks() {
+        when(cmsPages.publishedPage(eq("default"), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+                .thenReturn(PageResult.empty(1, 12));
+        when(capabilities.enabled("wiki")).thenReturn(false);
+
+        CmsTemplateContextDTO context = service.query();
+
+        assertThat(context.getBlocks()).isEmpty();
+        org.mockito.Mockito.verifyNoInteractions(pluginExtensionQuery);
     }
 }

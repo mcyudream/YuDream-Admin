@@ -1,6 +1,8 @@
 package online.yudream.base.application.platform.cms.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.cms.dto.CmsTemplateContextDTO;
 import online.yudream.base.application.platform.cms.dto.CmsTemplateItemDTO;
@@ -15,6 +17,9 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiNodeType;
 import online.yudream.base.domain.platform.wiki.repo.WikiNodeRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiPageVersionRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
+import online.yudream.base.plugin.spi.system.extension.PluginExtensionQuery;
+import online.yudream.base.plugin.spi.theme.PluginThemeBlockContext;
+import online.yudream.base.plugin.spi.theme.PluginThemeBlockProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,20 +27,26 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CmsTemplateContextAppService {
 
     private static final int LATEST_LIMIT = 12;
     private static final int MAX_LIST_LIMIT = 50;
+    private static final int MAX_BLOCKS = 12;
     private static final int CONTENT_LIMIT = 20_000;
+    private static final Pattern BLOCK_CODE = Pattern.compile("[a-z0-9][a-z0-9-]{0,39}");
 
     private final CapabilityAppService capabilities;
     private final CmsPageRepo cmsPages;
@@ -43,6 +54,8 @@ public class CmsTemplateContextAppService {
     private final WikiNodeRepo wikiNodes;
     private final WikiPageVersionRepo wikiVersions;
     private final SiteThemeQueryService siteThemeQueryService;
+    private final PluginExtensionQuery pluginExtensionQuery;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public CmsTemplateContextDTO query() {
@@ -53,10 +66,11 @@ public class CmsTemplateContextAppService {
     public CmsTemplateContextDTO query(CmsTemplateContextQuery query) {
         capabilities.ensureEnabled("cms", "CMS 内容");
         CmsTemplateContextQuery safeQuery = query == null ? new CmsTemplateContextQuery() : query;
+        String theme = siteThemeQueryService.activeSiteThemeCode();
         int cmsLatestLimit = bounded(safeQuery.getCmsLatestLimit(), LATEST_LIMIT);
         List<CmsTemplateItemDTO> pages = cmsLatestLimit == 0
                 ? List.of()
-                : cmsPages.publishedPage(siteThemeQueryService.activeSiteThemeCode(), null, null, null, 1, cmsLatestLimit)
+                : cmsPages.publishedPage(theme, null, null, null, 1, cmsLatestLimit)
                 .getRecords().stream()
                 .map(this::cmsPage)
                 .sorted(Comparator.comparing(CmsTemplateItemDTO::getUpdatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -69,7 +83,48 @@ public class CmsTemplateContextAppService {
                                 .build())
                         .build())
                 .knowledge(knowledge)
+                .blocks(resolveBlocks(safeQuery, theme))
                 .build();
+    }
+
+    /**
+     * 主题块解析：仅加载模板显式请求的块，按激活 SITE 主题过滤提供者的 supportedThemes，
+     * 逐块异常隔离（失败块直接缺省，模板侧 data-yb-if 自然降级）。
+     * 扩展注册表只含已启用插件，禁用/卸载即自动回收，无需额外过滤。
+     */
+    private Map<String, Object> resolveBlocks(CmsTemplateContextQuery query, String theme) {
+        if (query.getBlocks() == null || query.getBlocks().isEmpty()) {
+            return Map.of();
+        }
+        List<PluginThemeBlockProvider> providers = pluginExtensionQuery.extensions(PluginThemeBlockProvider.class);
+        if (providers.isEmpty()) {
+            return Map.of();
+        }
+        int limit = bounded(query.getBlockLimit(), LATEST_LIMIT);
+        Map<String, Object> blocks = new LinkedHashMap<>();
+        for (String code : new LinkedHashSet<>(query.getBlocks())) {
+            if (blocks.size() >= MAX_BLOCKS) {
+                break;
+            }
+            if (code == null || !BLOCK_CODE.matcher(code).matches()) {
+                continue;
+            }
+            providers.stream()
+                    .filter(provider -> code.equals(provider.code()))
+                    .filter(provider -> provider.supportedThemes().isEmpty() || provider.supportedThemes().contains(theme))
+                    .findFirst()
+                    .ifPresent(provider -> {
+                        try {
+                            Object data = provider.data(new PluginThemeBlockContext(theme, limit));
+                            if (data != null) {
+                                blocks.put(code, objectMapper.convertValue(data, Object.class));
+                            }
+                        } catch (Exception e) {
+                            log.warn("主题块数据解析失败：block={}, reason={}", code, e.getMessage());
+                        }
+                    });
+        }
+        return blocks;
     }
 
     private CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge(CmsTemplateContextQuery query) {

@@ -21,6 +21,8 @@ public class HomePageLayoutRes {
     private Map<String, String> settings;
     private List<HomeSection> sections;
     private Boolean published;
+    /** 当前激活主题的公开配置（已剔除敏感字段），模板 theme.config 渲染根。 */
+    private java.util.Map<String, Object> themeConfig;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

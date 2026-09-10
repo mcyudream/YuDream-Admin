@@ -201,6 +201,7 @@ public class PluginAssembler {
                 .styles(theme.styles())
                 .preview(theme.preview())
                 .homePreset(theme.homePreset())
+                .configSchema(theme.configSchema())
                 .assetRevision(theme.assetRevision())
                 .build();
     }

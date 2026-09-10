@@ -28,6 +28,8 @@ public class CmsPageRes {
     private String seoDescription;
     private PageTemplate template;
     private PageStatus status;
+    /** 当前激活主题的公开配置（已剔除敏感字段），模板 theme.config 渲染根。 */
+    private java.util.Map<String, Object> themeConfig;
     private LocalDateTime publishedAt;
     /** 归属主题编码：页面按主题隔离，仅在其归属主题激活时对外可见。 */
     private String themeCode;

@@ -249,6 +249,10 @@ public enum PlatformMenuModule {
             parentName = "THEME_CENTER", permission = "platform:theme-center:use")
     THEME_CENTER_USE,
 
+    @MenuNode(code = "platform:theme-center:config", name = "配置主题", type = MenuNodeType.BUTTON,
+            parentName = "THEME_CENTER", permission = "platform:theme-center:config")
+    THEME_CENTER_CONFIG,
+
     @MenuNode(code = "platform:cms:view", name = "查看内容定制", type = MenuNodeType.BUTTON,
             parentName = "THEME_CENTER", permission = "platform:cms:view")
     CMS_VIEW,

@@ -15,6 +15,7 @@ public class ThemeCenterThemeRes {
     private String preview;
     private String assetRevision;
     private Boolean hasHomePreset;
+    private Boolean hasConfigSchema;
     private Boolean hasPageSet;
     private Boolean active;
     private Boolean enabled;

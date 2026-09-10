@@ -153,6 +153,7 @@ public class ThemeCenterAppService {
                 .preview(theme.preview())
                 .assetRevision(theme.assetRevision())
                 .hasHomePreset(StringUtils.hasText(theme.homePreset()))
+                .hasConfigSchema(StringUtils.hasText(theme.configSchema()))
                 .hasPageSet(declaresPageSet(theme))
                 .active(theme.pluginCode().equals(activeSite))
                 .enabled(true)

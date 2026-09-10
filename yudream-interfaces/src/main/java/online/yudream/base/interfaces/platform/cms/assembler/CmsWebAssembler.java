@@ -138,6 +138,7 @@ public class CmsWebAssembler {
                 .publishedAt(dto.getPublishedAt())
                 .themeCode(dto.getThemeCode())
                 .sourcePluginCode(dto.getSourcePluginCode())
+                .themeConfig(dto.getThemeConfig())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
                 .build();
@@ -154,6 +155,7 @@ public class CmsWebAssembler {
                 .settings(dto.getSettings())
                 .sections(dto.getSections())
                 .published(dto.getPublished())
+                .themeConfig(dto.getThemeConfig())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
                 .build();

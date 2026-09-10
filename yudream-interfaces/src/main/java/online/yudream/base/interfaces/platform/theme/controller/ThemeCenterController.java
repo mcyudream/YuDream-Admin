@@ -2,13 +2,18 @@ package online.yudream.base.interfaces.platform.theme.controller;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.theme.service.ThemeCenterAppService;
+import online.yudream.base.application.platform.theme.service.ThemeConfigAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.theme.assembler.ThemeCenterWebAssembler;
+import online.yudream.base.interfaces.platform.theme.request.ThemeConfigSaveRequest;
 import online.yudream.base.interfaces.platform.theme.res.ThemeCenterOverviewRes;
-import org.springframework.web.bind.annotation.PathVariable;
+import online.yudream.base.interfaces.platform.theme.res.ThemeConfigRes;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ThemeCenterController {
 
     private final ThemeCenterAppService themeCenterAppService;
+    private final ThemeConfigAppService themeConfigAppService;
 
     @GetMapping("/overview")
     @PermissionRegister(code = "platform:theme-center:view", name = "查看主题中心", module = "平台能力", desc = "查看主题中心主题与首页方案总览")
@@ -38,4 +44,18 @@ public class ThemeCenterController {
         themeCenterAppService.deactivateSiteTheme();
         return Result.ok();
     }
+
+    @GetMapping("/{code}/config")
+    @PermissionRegister(code = "platform:theme-center:config", name = "配置主题", module = "平台能力", desc = "查看主题配置 schema 与当前配置值")
+    public Result<ThemeConfigRes> config(@PathVariable String code) {
+        return Result.ok(ThemeCenterWebAssembler.toRes(themeConfigAppService.config(code)));
+    }
+
+    @PutMapping("/{code}/config")
+    @PermissionRegister(code = "platform:theme-center:config", name = "配置主题", module = "平台能力", desc = "按主题 schema 保存主题配置，公开站即时生效")
+    public Result<ThemeConfigRes> saveConfig(@PathVariable String code, @RequestBody ThemeConfigSaveRequest request) {
+        return Result.ok(ThemeCenterWebAssembler.toRes(
+                themeConfigAppService.save(ThemeCenterWebAssembler.toSaveCmd(code, request))));
+    }
 }
+
