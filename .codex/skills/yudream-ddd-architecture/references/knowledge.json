@@ -271,6 +271,14 @@
     {
       "key": "plugin-theme-block-provider",
       "text": "插件私有数据进公开站主题模板走 SPI PluginThemeBlockProvider（code()/name()/supportedThemes() 默认空=全主题/data(PluginThemeBlockContext{themeCode,limit}) 返回 JSON 可序列化对象），onEnable 中 context.registerExtension(PluginThemeBlockProvider.class, ...) 注册、禁用自动回收（复用 PluginExtensionRegistry，零新基建）；application 经 PluginExtensionQuery 直取（UserAppService 先例，不新增 domain 端口）。模板写 {{blocks.xxx}}/data-yb-for=\"x in blocks.xxx\"/data-yb-if=\"blocks.xxx\"，前端 templateContextQuery() 扫描 blocks.{code} 路径随 GET /api/public/cms/template-context?blocks= 懒加载（不进首屏载荷；单次上限 12 块、code 正则 [a-z0-9][a-z0-9-]{0,39}），CmsTemplateContextAppService 按激活 SITE 主题过滤 supportedThemes、仅启用插件、逐块异常隔离 warn+省略，块缺失时 if 为假/for 为空优雅降级。安全约定：块数据匿名可见，提供者只暴露公开安全字段，宿主不做字段级过滤。官方实现：timeline=timeline、minecraft-server=server-list（1 分钟快照缓存）、minecraft-activity-proof=activity-square。"
+    },
+    {
+      "key": "plugin-theme-vue-pages",
+      "text": "SITE 主题版式页推荐 Vue 原生承载（SPI 2.26.0 起）：@PluginTheme(homeComponent=\"theme/Home\", chromeComponent=\"theme/Chrome\") 声明远程模块 routes 键（格式 [a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*，registerTheme 注册期校验）。homeComponent 接管公开站首页；chromeComponent 接管公开站页头/页脚（导航数据由宿主注入，主题自己画导航，切页不再换 chrome）；未声明 chromeComponent 时仍由宿主 SiteChrome 承载。其余版式页用 @PluginRoute(publicAccess=true, siteNav=true) 注册公开站路由。主题页面经 sdk.site.context({blocks, limit, cmsLatest}) 消费公开主题上下文（GET /api/public/theme/context，匿名）。主题对业务插件一律 softdepend（禁止 depend），不 import 其他插件代码/组件，块缺失即回落 theme-config 静态清单。CMS 回归内容系统：/site/:slug 详情页与默认主题首页仍走 CMS 模板引擎。"
+    },
+    {
+      "key": "site-chrome-var-contract",
+      "text": "主题接管公开站导航有两条通道：①声明 chromeComponent 后由主题远程 Vue 组件完全接管页头页脚（推荐，NMO 复刻必须走这条，避免宿主 SiteChrome 在首页/内页切样式）；②未声明时仍用 chrome 变量契约：宿主 SiteChrome 只消费带兜底的 --yb-site-header-position/top/border/background/backdrop、--yb-site-header-bar-*、--yb-site-header-brand-display、--yb-site-header-nav-justify，自身永不赋值。坑：宿主自己赋的是 --yb-site-header-bg 作为 --yb-site-header-background 的兜底，主题必须写 --yb-site-header-background。旧 homeCss RAW 注入 + :has() overlay hack 已退役。"
     }
   ],
   "utilities": [
@@ -459,6 +467,10 @@
     {
       "key": "neo4j-credential-aad-and-bizexception",
       "text": "Neo4j 能力密码入库现用 AAD capability:neo4j:password，但历史密文用 neo4j:password。CapabilityModuleInfraMapper 解密失败会原样保留 v1: 密文；旧 Neo4jCapabilityProvider.enable 只要看到 v1: 就抛 IllegalStateException，接口变成 500。decryptSecret 必须回退历史 AAD，enable 对仍是密文的密码再解密一次，失败抛 BizException（400）而不是 IllegalStateException。"
+    },
+    {
+      "key": "dashboard-legacy-stack-lg-only",
+      "text": "首页卡片 isLegacyAutoStackedLayout 只允许用 lg 判定历史单列堆叠；md/sm 默认就是 x=0 竖排，用窄断点会把用户刚保存的插件卡（如 yggc.yggc-endpoints）当遗留布局丢掉，effectiveLayout 回退 defaultLayout，表现为保存成功但刷新后卡片消失。"
     }
   ]
 }

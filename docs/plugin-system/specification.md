@@ -237,7 +237,9 @@ Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图
     scopes = {PluginThemeScope.SITE},
     styles = {"theme/site.css"},
     preview = "theme/preview.png",
-    homePreset = "theme/home-preset.json",   // 可选：自带首页方案
+    homeComponent = "theme/Home",            // 可选：Vue 原生首页组件（远程模块 routes 键，推荐）
+    chromeComponent = "theme/Chrome",        // 可选：Vue 原生 chrome 组件（页头/页脚由主题自管）
+    homePreset = "theme/home-preset.json",   // 可选：CMS 首页方案（data-yb 模板体系，与 homeComponent 二选一）
     configSchema = "theme/theme-config.json" // 可选：主题配置 schema（WordPress 自定义器形态）
 )
 public class PixelThemePlugin implements YuDreamPlugin { ... }
@@ -247,8 +249,26 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 
 - 一个插件最多注册一个主题；`scopes` 至少声明一个范围（`SITE` 公开站 / `ADMIN` 管理后台），`styles` 至少声明一个 CSS 资产。
 - `styles`/`preview`/`homePreset` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
+- `homeComponent`/`chromeComponent` 必须是远程模块 `routes` 导出表中的组件键，格式 `[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*`（如 `theme/Home`、`theme/Chrome`），注册时校验；`homeComponent` 与 `homePreset` 互斥——前者由 Vue 页面接管公开站首页，后者走 CMS data-yb 模板体系，同时声明以 `homeComponent` 为准。`chromeComponent` 声明后公开站页头/页脚由该组件接管，导航数据由宿主注入；未声明时仍由宿主 SiteChrome 承载。
 - 同一 scope 同时只激活一个主题：启用声明了主题的新插件时，宿主自动禁用同 scope 冲突的旧主题插件并接管激活位；禁用/卸载/删除主题插件即释放激活位，该 scope 回落宿主内置主题。重启恢复后宿主按持久化激活位校正。
 - 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。
+
+Vue 原生主题页（homeComponent + chromeComponent，推荐路径）：
+
+- SITE 主题的版式页就是该插件 frontend 包里的普通 Vue SFC：首页经 `homeComponent` 接管 `/site`；页头/页脚经 `chromeComponent` 接管（导航数据由宿主注入，主题自己画导航，切页不再换 chrome）。其余主题页经 `@PluginRoute(publicAccess = true, siteNav = true)` 注册为公开站路由并进入站点导航（站内跳转走 router、无整页刷新）。
+- 页面数据经 SDK site client 获取（SDK ≥1.7.0）：`sdk.site.context({ blocks, limit, cmsLatest })` 拉取 `GET /api/public/theme/context`（匿名），返回 `{ themeCode, themeConfig, blocks, cmsPagesLatest }`——主题配置（secret 已剔除）、所请主题块与 CMS 最新文章一次拿齐；`sdk.site.applySeo(...)` 设置页面 SEO；`sdk.site.assetUrl(path)` 处理资产路径。拉取失败必须回落静态兜底，页面不得报错。
+- 与 CMS 的边界：默认主题与文章内容页（`/site/:slug` 新闻详情等）继续走 CMS 渲染；声明了 `homeComponent` 的主题其版式页不再是 CmsPage，主题中心首页 tab 显示「由插件页面承载」并隐藏 homeHtml 设计器。旧主题遗留的 CMS 首页布局数据保留无害（切回默认主题才用）。
+- 主题插件对其他业务插件只能是 `softdepend`（文档与加载顺序意义），**禁止 `depend`**——主题必须可独立运行；块缺失/插件未装载时回落 `theme.config` 静态清单或空态。主题不 import 任何其他插件的代码/组件，数据契约走宿主中转，代码零耦合。
+
+chrome 接管（chromeComponent，推荐）与变量契约（回落）：
+
+- 声明 `chromeComponent` 后由主题远程 Vue 组件完全接管页头页脚（NMO 复刻必须走这条，避免宿主 SiteChrome 在首页/内页切样式）。
+- 未声明时仍用 chrome 变量契约：宿主 SiteChrome 对以下变量**只消费不赋值**，主题在 style.css 里设变量即可改外观：
+  - `--yb-site-header-position` / `--yb-site-header-top` / `--yb-site-header-border` / `--yb-site-header-background` / `--yb-site-header-backdrop`（整条头部）；
+  - `--yb-site-header-bar-width` / `--yb-site-header-bar-min-height` / `--yb-site-header-bar-margin` / `--yb-site-header-bar-padding` / `--yb-site-header-bar-border` / `--yb-site-header-bar-radius` / `--yb-site-header-bar-bg` / `--yb-site-header-bar-shadow`（头部内栏，盒式导航条）；
+  - `--yb-site-header-brand-display`（品牌区显隐）、`--yb-site-header-nav-justify`（导航对齐）。
+- 注意宿主自己赋值的 `--yb-site-header-bg` 是兜底色、由宿主在未分层样式里引用——主题要改头部背景必须设契约变量 `--yb-site-header-background`，而不是 `--yb-site-header-bg`。
+- 页面级限定用 `.site-chrome:has(.your-home-class)` 设变量（如首页覆盖导航：fixed + transparent），变量继承到头部后代生效；禁止再向 CMS homeCss 写 RAW overlay 选择器 hack（已退役）。
 
 自带首页方案（homePreset）：
 
@@ -278,6 +298,7 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 - 系统能力（CMS 页面、Wiki、导航、站点设置）已在模板上下文（`cms.pages.latest`/`knowledge.*`/`navigation`/`site.*`），主题模板直接引用；**插件私有数据**通过 SPI 接口 `PluginThemeBlockProvider` 贡献：`code()`（块 code，插件内唯一）、`name()`、`supportedThemes()`（默认空=全部主题可用）、`data(PluginThemeBlockContext ctx)` 返回 JSON 可序列化对象，ctx 携带 `themeCode` 与 `limit`（模板 `data-yb-limit` 上限）。
 - 注册复用既有扩展管道：`onEnable` 中 `context.registerExtension(PluginThemeBlockProvider.class, provider)`，禁用/卸载自动回收，无需新基建。
 - 模板消费：`{{blocks.server-list}}`、`data-yb-for="server in blocks.server-list"`、`data-yb-if="blocks.activity-square"`；前端扫描模板中的 `blocks.{code}` 路径随 template-context 请求懒加载（不进入首屏载荷），单块上限 12 个；块不存在/插件未启用/单块异常时该块缺省（if 为假、for 为空），优雅降级不影响页面其余部分。
+- Vue 原生主题页消费：同一份块数据也经 `GET /api/public/theme/context?blocks=...` 匿名下发，主题页面 `sdk.site.context({ blocks: ['server-list'] })` 自取——data-yb 模板与 Vue 页面共用同一解析端口，`supportedThemes()` 过滤与单块异常隔离语义一致。
 - **公开数据安全约定**：块数据对匿名访问者可见，提供者实现必须只暴露公开安全字段（不暴露内部 ID、凭据、用户隐私）；宿主不做字段级过滤。
 
 CSS 作用域约定：
@@ -294,12 +315,13 @@ CSS 作用域约定：
 
 宿主端点：
 
-- `GET /api/platform/plugins/themes/active`（匿名）：返回各 scope 当前激活主题（含样式资产相对路径与 `assetRevision`），宿主启动时在 `app.mount` 前注入常驻 `<link data-yudream-theme-scope>` 避免主题闪烁。
+- `GET /api/platform/plugins/themes/active`（匿名）：返回各 scope 当前激活主题（含样式资产相对路径、`assetRevision`，SITE 主题附带 `homeComponent`/`moduleName` 供宿主挂载 Vue 首页），宿主启动时在 `app.mount` 前注入常驻 `<link data-yudream-theme-scope>` 避免主题闪烁。
 - `GET /api/platform/plugins/themes`（`platform:plugin:view`）：全部已启用插件声明的主题与各 scope 激活者，供主题设置页展示。
 - `GET /api/platform/themes/overview`（`platform:theme-center:view`）：主题中心聚合视图——SITE 主题卡（预览资产、含首页方案/页面集标记、激活态）+ 激活主题的首页方案列表（含 `active` 标志）+ 可编辑主题清单 `editableThemes`（默认主题 + 主题插件卡 + 拥有存量布局的主题）；cms 能力关闭时降级为主题卡 + 空方案列表。
 - `POST /api/platform/themes/{code}/activate` / `POST /api/platform/themes/deactivate`（`platform:theme-center:use`）：启用指定 SITE 主题（互斥顶替）/ 停用当前 SITE 主题回落内置。
 - `GET /api/platform/themes/{code}/config` / `PUT /api/platform/themes/{code}/config`（`platform:theme-center:config`）：主题配置 schema + 合并值读取（secret 脱敏）/ 按 schema 校验保存，公开站即时生效。
 - `GET /api/public/cms/template-context`（匿名）：模板上下文查询参数新增 `blocks`（块 code 列表）与 `blockLimit`，按激活 SITE 主题过滤 `supportedThemes()` 后逐块调用提供者，响应根新增 `blocks` 映射；公开首页/页面载荷新增 `themeConfig`（剔除 secret 的主题配置对象）。
+- `GET /api/public/theme/context`（匿名）：Vue 原生主题页的数据端点，入参 `blocks`（逗分隔块 code）、`limit`（块条数上限）、`cmsLatest`（CMS 最新文章条数），返回 `{ themeCode, themeConfig, blocks, cmsPagesLatest }`——与模板 blocks 同一解析端口与降级语义，全部匿名安全字段。
 
 ## 10. 菜单与路由规范
 
