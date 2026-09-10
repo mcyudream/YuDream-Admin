@@ -111,6 +111,8 @@ export interface PluginTheme {
   scopes?: PluginThemeScope[]
   styles: string[]
   preview?: string
+  /** 主题自带的首页内容定制方案资产路径，空表示不自带方案 */
+  homePreset?: string
   assetRevision?: string
 }
 

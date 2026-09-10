@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CmsModelSelectOption } from './config/cms-model-options'
 import type { FileObject } from '@/api/modules/files'
-import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
+import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomePagePreset, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
@@ -13,7 +13,7 @@ import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
 import { toCmsModelOptions } from './config/cms-model-options'
 
-type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media'
+type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media' | 'presets'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type EditorTarget = 'page' | 'home'
 type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
@@ -44,6 +44,10 @@ const navigationItems = ref<CmsNavigationItem[]>([])
 const wikiEnabled = ref(false)
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const mediaItems = ref<FileObject[]>([])
+const presets = ref<HomePagePreset[]>([])
+const presetDialogVisible = ref(false)
+const presetSaving = ref(false)
+const presetForm = reactive({ name: '', description: '' })
 const mediaInput = ref<HTMLInputElement>()
 const aiModelOptions = ref<CmsModelSelectOption[]>([])
 const pagination = reactive({ page: 1, size: 20, total: 0 })
@@ -283,6 +287,9 @@ watch(activeTab, async () => {
   else if (activeTab.value === 'media') {
     await loadMedia()
   }
+  else if (activeTab.value === 'presets') {
+    await loadPresets()
+  }
   else {
     await loadHome()
   }
@@ -400,6 +407,79 @@ async function loadMedia() {
   finally {
     loading.value = false
   }
+}
+
+async function loadPresets() {
+  loading.value = true
+  try {
+    const res = await apiCms.presets()
+    presets.value = res.data || []
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '方案列表加载失败')
+    presets.value = []
+  }
+  finally {
+    loading.value = false
+  }
+}
+
+function presetSourceText(source: HomePagePreset['source']) {
+  return source === 'PLUGIN' ? '插件' : source === 'SNAPSHOT' ? '快照' : '用户'
+}
+
+function presetSourceVariant(source: HomePagePreset['source']) {
+  return source === 'PLUGIN' ? 'secondary' as const : source === 'SNAPSHOT' ? 'outline' as const : 'default' as const
+}
+
+function openPresetDialog() {
+  presetForm.name = ''
+  presetForm.description = ''
+  presetDialogVisible.value = true
+}
+
+async function savePreset() {
+  if (!presetForm.name.trim()) {
+    toast.error('请输入方案名称')
+    return
+  }
+  presetSaving.value = true
+  try {
+    await apiCms.savePreset({ name: presetForm.name.trim(), description: presetForm.description.trim() || undefined })
+    toast.success('已把当前首页定制存为方案')
+    presetDialogVisible.value = false
+    await loadPresets()
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '方案保存失败')
+  }
+  finally {
+    presetSaving.value = false
+  }
+}
+
+function confirmApplyPreset(preset: HomePagePreset) {
+  modal.confirm({
+    title: '应用方案',
+    content: `确认应用「${preset.name}」吗？当前首页定制会自动保存为快照，可随时从这里一键切回。`,
+    onConfirm: async () => {
+      await apiCms.applyPreset(preset.code)
+      toast.success('方案已应用')
+      await loadPresets()
+    },
+  })
+}
+
+function confirmDeletePreset(preset: HomePagePreset) {
+  modal.confirm({
+    title: '删除方案',
+    content: `确认删除方案「${preset.name}」吗？删除后不可恢复。`,
+    onConfirm: async () => {
+      await apiCms.deletePreset(preset.code)
+      toast.success('方案已删除')
+      await loadPresets()
+    },
+  })
 }
 
 function selectPage(page: CmsPage) {
@@ -825,6 +905,10 @@ function sectionTitle(type: HomeSectionType) {
         <FaIcon :name="home.published ? 'i-ri:inbox-unarchive-line' : 'i-ri:send-plane-line'" />
         {{ home.published ? '取消发布首页' : '发布首页' }}
       </FaButton>
+      <FaButton v-else-if="activeTab === 'presets'" v-auth="'platform:cms:edit'" @click="openPresetDialog">
+        <FaIcon name="i-ri:bookmark-3-line" />
+        把当前首页存为方案
+      </FaButton>
       <FaButton v-if="activeTab === 'media'" v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
         <FaIcon name="i-ri:upload-cloud-2-line" />
         上传媒体
@@ -845,6 +929,10 @@ function sectionTitle(type: HomeSectionType) {
         <button type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
           <FaIcon name="i-ri:menu-search-line" />
           导航菜单
+        </button>
+        <button type="button" :class="{ active: activeTab === 'presets' }" @click="activeTab = 'presets'">
+          <FaIcon name="i-ri:stack-line" />
+          首页方案
         </button>
         <button type="button" :class="{ active: activeTab === 'media' }" @click="activeTab = 'media'">
           <FaIcon name="i-ri:image-2-line" />
@@ -1285,7 +1373,70 @@ function sectionTitle(type: HomeSectionType) {
           暂无媒体，点击上传添加第一张 CMS 图片。
         </div>
       </section>
+
+      <section v-else-if="activeTab === 'presets'" v-loading="loading" class="preset-workspace">
+        <div class="preset-toolbar">
+          <div>
+            <h3>首页方案</h3>
+            <p>把首页定制（横幅、区块、导航、页脚、自定义代码）存为可命名方案，一键切换；切换前会自动快照当前定制，可随时切回。启用自带方案的站点主题时也会在这里生成对应方案。</p>
+          </div>
+          <FaButton v-auth="'platform:cms:edit'" @click="openPresetDialog">
+            <FaIcon name="i-ri:bookmark-3-line" />
+            存为方案
+          </FaButton>
+        </div>
+
+        <div v-if="presets.length" class="preset-grid">
+          <article v-for="preset in presets" :key="preset.code" class="preset-card">
+            <div class="preset-card__head">
+              <strong>{{ preset.name }}</strong>
+              <FaTag :variant="presetSourceVariant(preset.source)">
+                {{ presetSourceText(preset.source) }}
+              </FaTag>
+            </div>
+            <p v-if="preset.description" class="preset-card__desc">
+              {{ preset.description }}
+            </p>
+            <div class="preset-card__meta">
+              <span v-if="preset.sectionCount != null">{{ preset.sectionCount }} 个区块</span>
+              <span>{{ dateText(preset.updateTime || preset.createTime) }}</span>
+            </div>
+            <div class="preset-card__actions">
+              <FaButton v-auth="'platform:cms:publish'" size="sm" @click="confirmApplyPreset(preset)">
+                <FaIcon name="i-ri:check-line" />
+                应用
+              </FaButton>
+              <FaButton v-auth="'platform:cms:delete'" size="sm" variant="ghost" @click="confirmDeletePreset(preset)">
+                <FaIcon name="i-ri:delete-bin-line" />
+                删除
+              </FaButton>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state">
+          暂无方案，点击右上角「把当前首页存为方案」保存当前首页定制。
+        </div>
+      </section>
     </FaPageMain>
+
+    <FaModal v-model="presetDialogVisible" title="把当前首页存为方案" class="sm:max-w-lg">
+      <div class="gap-4 grid">
+        <div>
+          <label class="preset-form-label">方案名称</label>
+          <FaInput v-model="presetForm.name" placeholder="例如：活动专题首页" maxlength="50" />
+        </div>
+        <div>
+          <label class="preset-form-label">方案描述（可选）</label>
+          <FaTextarea v-model="presetForm.description" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="记录这套首页定制的用途" maxlength="200" />
+        </div>
+        <div class="preset-form-actions">
+          <FaButton :loading="presetSaving" @click="savePreset">
+            <FaIcon name="i-ri:save-3-line" />
+            保存方案
+          </FaButton>
+        </div>
+      </div>
+    </FaModal>
 
     <div v-if="grapesEditorVisible" class="grapes-editor-shell">
       <CmsGrapesEditor
@@ -2187,6 +2338,95 @@ function sectionTitle(type: HomeSectionType) {
   padding: 24px;
   color: var(--color-text-3);
   text-align: center;
+}
+
+.preset-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.preset-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 16px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-2);
+}
+
+.preset-toolbar h3,
+.preset-toolbar p {
+  margin: 0;
+}
+
+.preset-toolbar p {
+  margin-top: 4px;
+  color: var(--color-text-3);
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.preset-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.preset-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.preset-card__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preset-card__desc {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-3);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.preset-card__meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.preset-card__actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.preset-form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--color-text-2);
+}
+
+.preset-form-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .grapes-editor-shell {
