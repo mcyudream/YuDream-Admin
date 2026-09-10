@@ -191,6 +191,9 @@ public class PluginContextImpl implements PluginContext {
         if (StringUtils.hasText(theme.preview())) {
             validateFrontendAssetPath(theme.preview(), "插件主题预览图路径非法");
         }
+        if (StringUtils.hasText(theme.homePreset())) {
+            validateFrontendAssetPath(theme.homePreset(), "插件主题首页方案路径非法");
+        }
         this.theme = theme;
     }
 

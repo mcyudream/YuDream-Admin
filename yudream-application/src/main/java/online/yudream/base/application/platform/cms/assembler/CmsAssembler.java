@@ -3,9 +3,11 @@ package online.yudream.base.application.platform.cms.assembler;
 import online.yudream.base.application.platform.cms.dto.CmsBlockDTO;
 import online.yudream.base.application.platform.cms.dto.CmsPageDTO;
 import online.yudream.base.application.platform.cms.dto.HomePageLayoutDTO;
+import online.yudream.base.application.platform.cms.dto.HomePagePresetDTO;
 import online.yudream.base.domain.platform.cms.aggregate.CmsBlock;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.aggregate.HomePageLayout;
+import online.yudream.base.domain.platform.cms.aggregate.HomePagePreset;
 
 public class CmsAssembler {
 
@@ -98,6 +100,19 @@ public class CmsAssembler {
                 .published(layout.getPublished())
                 .createTime(layout.getCreateTime())
                 .updateTime(layout.getUpdateTime())
+                .build();
+    }
+
+    public static HomePagePresetDTO toPresetDTO(HomePagePreset preset) {
+        return HomePagePresetDTO.builder()
+                .code(preset.getCode())
+                .name(preset.getName())
+                .description(preset.getDescription())
+                .source(preset.getSource() == null ? null : preset.getSource().name())
+                .pluginCode(preset.getPluginCode())
+                .sectionCount(preset.getSections() == null ? 0 : preset.getSections().size())
+                .createTime(preset.getCreateTime())
+                .updateTime(preset.getUpdateTime())
                 .build();
     }
 }

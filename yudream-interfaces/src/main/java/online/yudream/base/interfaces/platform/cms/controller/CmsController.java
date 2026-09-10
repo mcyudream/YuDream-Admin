@@ -4,14 +4,17 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.cms.query.CmsPageQuery;
 import online.yudream.base.application.platform.cms.service.CmsAppService;
+import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.cms.assembler.CmsWebAssembler;
 import online.yudream.base.interfaces.platform.cms.request.CmsPageSaveRequest;
 import online.yudream.base.interfaces.platform.cms.request.HomePageLayoutSaveRequest;
+import online.yudream.base.interfaces.platform.cms.request.HomePagePresetSaveRequest;
 import online.yudream.base.interfaces.platform.cms.res.CmsPageRes;
 import online.yudream.base.interfaces.platform.cms.res.HomePageLayoutRes;
+import online.yudream.base.interfaces.platform.cms.res.HomePagePresetRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,12 +24,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/platform/cms")
 @RequiredArgsConstructor
 public class CmsController {
 
     private final CmsAppService cmsAppService;
+    private final CmsPresetAppService cmsPresetAppService;
 
     @GetMapping("/pages")
     @PermissionRegister(code = "platform:cms:view", name = "查看内容页面", module = "平台能力", desc = "查看内容定制页面列表")
@@ -77,5 +83,31 @@ public class CmsController {
     @PermissionRegister(code = "platform:cms:edit", name = "编辑首页配置", module = "平台能力", desc = "编辑自定义首页配置")
     public Result<HomePageLayoutRes> saveHome(@RequestBody HomePageLayoutSaveRequest request) {
         return Result.ok(CmsWebAssembler.toRes(cmsAppService.saveHomeLayout(CmsWebAssembler.toCmd(request))));
+    }
+
+    @GetMapping("/presets")
+    @PermissionRegister(code = "platform:cms:view", name = "查看首页方案", module = "平台能力", desc = "查看首页内容定制方案列表")
+    public Result<List<HomePagePresetRes>> presets() {
+        return Result.ok(CmsWebAssembler.toPresetResList(cmsPresetAppService.list()));
+    }
+
+    @PostMapping("/presets")
+    @PermissionRegister(code = "platform:cms:edit", name = "保存首页方案", module = "平台能力", desc = "把当前首页定制存为方案")
+    public Result<HomePagePresetRes> savePreset(@Valid @RequestBody HomePagePresetSaveRequest request) {
+        return Result.ok(CmsWebAssembler.toPresetRes(cmsPresetAppService.saveCurrentAsPreset(CmsWebAssembler.toPresetCmd(request))));
+    }
+
+    @PostMapping("/presets/{code}/apply")
+    @PermissionRegister(code = "platform:cms:publish", name = "应用首页方案", module = "平台能力", desc = "一键应用首页方案并自动快照当前定制")
+    public Result<Void> applyPreset(@PathVariable String code) {
+        cmsPresetAppService.apply(code);
+        return Result.ok();
+    }
+
+    @DeleteMapping("/presets/{code}")
+    @PermissionRegister(code = "platform:cms:delete", name = "删除首页方案", module = "平台能力", desc = "删除首页内容定制方案")
+    public Result<Void> deletePreset(@PathVariable String code) {
+        cmsPresetAppService.delete(code);
+        return Result.ok();
     }
 }

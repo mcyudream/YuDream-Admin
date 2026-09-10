@@ -174,7 +174,8 @@ class PluginAnnotationRegistrar {
                 theme.description(),
                 theme.scopes().length == 0 ? java.util.Set.of() : java.util.EnumSet.copyOf(List.of(theme.scopes())),
                 List.of(theme.styles()),
-                theme.preview()
+                theme.preview(),
+                theme.homePreset()
         ));
     }
 

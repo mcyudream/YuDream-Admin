@@ -16,6 +16,7 @@ public record PluginThemeInfo(
         Set<String> scopes,
         List<String> styles,
         String preview,
+        String homePreset,
         String assetRevision
 ) {
 }

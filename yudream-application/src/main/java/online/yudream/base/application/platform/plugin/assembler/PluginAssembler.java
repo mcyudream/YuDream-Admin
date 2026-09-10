@@ -200,6 +200,7 @@ public class PluginAssembler {
                 .scopes(theme.scopes())
                 .styles(theme.styles())
                 .preview(theme.preview())
+                .homePreset(theme.homePreset())
                 .assetRevision(theme.assetRevision())
                 .build();
     }
