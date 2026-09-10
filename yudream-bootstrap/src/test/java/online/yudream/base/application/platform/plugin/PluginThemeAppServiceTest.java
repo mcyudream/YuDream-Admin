@@ -1,9 +1,11 @@
 package online.yudream.base.application.platform.plugin;
 
+import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeOverviewDTO;
 import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendAssetInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
 import online.yudream.base.domain.system.setting.repo.SettingRepo;
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,6 +24,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,13 +34,16 @@ class PluginThemeAppServiceTest {
     @Mock
     private PluginRuntimeGateway pluginRuntimeGateway;
 
+    @Mock
+    private CmsPresetAppService cmsPresetAppService;
+
     private InMemorySettingRepo settingRepo;
     private PluginThemeAppService service;
 
     @BeforeEach
     void setUp() {
         settingRepo = new InMemorySettingRepo();
-        service = new PluginThemeAppService(pluginRuntimeGateway, settingRepo);
+        service = new PluginThemeAppService(pluginRuntimeGateway, settingRepo, cmsPresetAppService);
     }
 
     @Test
@@ -123,9 +131,48 @@ class PluginThemeAppServiceTest {
         assertThat(overview.getActive()).containsExactlyEntriesOf(Map.of("ADMIN", "pixel"));
     }
 
+    @Test
+    void activateSiteThemeWithHomePresetImportsAndAppliesPreset() {
+        PluginThemeInfo neco = new PluginThemeInfo("neco", "neco", "Neco 主题", "像素风主题",
+                Set.of("SITE"), List.of("theme/neco.css"), "", "home-preset.json", "rev-1");
+        stubTheme(neco);
+        String presetJson = "{\"title\":\"像素首页\"}";
+        when(pluginRuntimeGateway.frontendAsset("neco", "home-preset.json"))
+                .thenReturn(Optional.of(new PluginFrontendAssetInfo("home-preset.json", "application/json",
+                        presetJson.getBytes(StandardCharsets.UTF_8))));
+
+        service.activate("neco");
+
+        verify(cmsPresetAppService).importPluginPreset("neco", "Neco 主题", presetJson);
+    }
+
+    @Test
+    void activateSiteThemeWithoutHomePresetSkipsPresetImport() {
+        stubTheme(theme("neco", Set.of("SITE")));
+
+        service.activate("neco");
+
+        verify(cmsPresetAppService, never()).importPluginPreset(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void activateStillSucceedsWhenPresetAssetMissing() {
+        PluginThemeInfo neco = new PluginThemeInfo("neco", "neco", "Neco 主题", "像素风主题",
+                Set.of("SITE"), List.of("theme/neco.css"), "", "home-preset.json", "rev-1");
+        stubTheme(neco);
+        when(pluginRuntimeGateway.frontendAsset("neco", "home-preset.json")).thenReturn(Optional.empty());
+
+        service.activate("neco");
+
+        assertThat(readSlot("SITE")).isEqualTo("neco");
+        verify(cmsPresetAppService, never()).importPluginPreset(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString());
+    }
+
     private PluginThemeInfo theme(String pluginCode, Set<String> scopes) {
         return new PluginThemeInfo(pluginCode, pluginCode, "Neco 主题", "像素风主题",
-                scopes, List.of("theme/" + pluginCode + ".css"), "", "rev-1");
+                scopes, List.of("theme/" + pluginCode + ".css"), "", "", "rev-1");
     }
 
     private void stubTheme(PluginThemeInfo theme) {

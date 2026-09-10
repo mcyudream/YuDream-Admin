@@ -3,9 +3,11 @@ package online.yudream.base.infra.platform.cms.mapper;
 import online.yudream.base.domain.platform.cms.aggregate.CmsBlock;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.aggregate.HomePageLayout;
+import online.yudream.base.domain.platform.cms.aggregate.HomePagePreset;
 import online.yudream.base.infra.platform.cms.dataobj.CmsBlockDO;
 import online.yudream.base.infra.platform.cms.dataobj.CmsPageDO;
 import online.yudream.base.infra.platform.cms.dataobj.HomePageLayoutDO;
+import online.yudream.base.infra.platform.cms.dataobj.HomePagePresetDO;
 
 public class CmsInfraMapper {
 
@@ -159,6 +161,52 @@ public class CmsInfraMapper {
                 .settings(dataObj.getSettings())
                 .sections(dataObj.getSections())
                 .published(dataObj.getPublished())
+                .build();
+    }
+
+    public static HomePagePresetDO toDataObj(HomePagePreset domain) {
+        if (domain == null) {
+            return null;
+        }
+        HomePagePresetDO dataObj = new HomePagePresetDO();
+        dataObj.setId(domain.getId());
+        dataObj.setVersion(domain.getVersion());
+        dataObj.setCreateTime(domain.getCreateTime());
+        dataObj.setUpdateTime(domain.getUpdateTime());
+        dataObj.setCode(domain.getCode());
+        dataObj.setName(domain.getName());
+        dataObj.setDescription(domain.getDescription());
+        dataObj.setSource(domain.getSource());
+        dataObj.setPluginCode(domain.getPluginCode());
+        dataObj.setTitle(domain.getTitle());
+        dataObj.setSubtitle(domain.getSubtitle());
+        dataObj.setTheme(domain.getTheme());
+        dataObj.setHeroImageUrl(domain.getHeroImageUrl());
+        dataObj.setSettings(domain.getSettings());
+        dataObj.setSections(domain.getSections());
+        return dataObj;
+    }
+
+    public static HomePagePreset toDomain(HomePagePresetDO dataObj) {
+        if (dataObj == null) {
+            return null;
+        }
+        return HomePagePreset.builder()
+                .id(dataObj.getId())
+                .version(dataObj.getVersion())
+                .createTime(dataObj.getCreateTime())
+                .updateTime(dataObj.getUpdateTime())
+                .code(dataObj.getCode())
+                .name(dataObj.getName())
+                .description(dataObj.getDescription())
+                .source(dataObj.getSource())
+                .pluginCode(dataObj.getPluginCode())
+                .title(dataObj.getTitle())
+                .subtitle(dataObj.getSubtitle())
+                .theme(dataObj.getTheme())
+                .heroImageUrl(dataObj.getHeroImageUrl())
+                .settings(dataObj.getSettings())
+                .sections(dataObj.getSections())
                 .build();
     }
 }

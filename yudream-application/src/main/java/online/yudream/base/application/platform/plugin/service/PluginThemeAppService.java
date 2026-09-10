@@ -2,9 +2,11 @@ package online.yudream.base.application.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeOverviewDTO;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginThemeInfo;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +38,7 @@ public class PluginThemeAppService {
 
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final SettingRepo settingRepo;
+    private final CmsPresetAppService cmsPresetAppService;
 
     /**
      * 公开站/后台当前激活的主题（scope -> 主题），未激活的 scope 不出现在结果中。
@@ -87,6 +91,8 @@ public class PluginThemeAppService {
 
     /**
      * 把插件声明的主题写入其每个 scope 的激活位（插件已启用且注册了主题时调用）。
+     * SITE 主题声明了首页方案时，顺带导入并应用（当前定制自动快照，可在内容定制
+     * 的方案列表一键切回）；方案导入失败不阻塞主题激活。
      */
     @Transactional
     public void activate(String pluginCode) {
@@ -96,6 +102,21 @@ public class PluginThemeAppService {
         }
         for (String scope : theme.get().scopes()) {
             saveActive(scope, pluginCode);
+        }
+        importHomePreset(theme.get());
+    }
+
+    private void importHomePreset(PluginThemeInfo theme) {
+        if (!theme.scopes().contains("SITE") || !StringUtils.hasText(theme.homePreset())) {
+            return;
+        }
+        try {
+            String presetJson = pluginRuntimeGateway.frontendAsset(theme.pluginCode(), theme.homePreset())
+                    .map(asset -> new String(asset.body(), StandardCharsets.UTF_8))
+                    .orElseThrow(() -> new BizException("主题首页方案资产不存在"));
+            cmsPresetAppService.importPluginPreset(theme.pluginCode(), theme.name(), presetJson);
+        } catch (Exception e) {
+            log.warn("导入插件主题首页方案失败，仅应用主题样式：plugin={}, reason={}", theme.pluginCode(), e.getMessage());
         }
     }
 

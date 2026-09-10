@@ -59,6 +59,9 @@ class PluginThemeMutexTest {
     private PluginRuntimeGateway pluginRuntimeGateway;
 
     @Mock
+    private online.yudream.base.application.platform.cms.service.CmsPresetAppService cmsPresetAppService;
+
+    @Mock
     private PermissionDomainService permissionDomainService;
 
     @Mock
@@ -76,7 +79,7 @@ class PluginThemeMutexTest {
     @BeforeEach
     void setUp() {
         settingRepo = new InMemorySettingRepo();
-        themeAppService = new PluginThemeAppService(pluginRuntimeGateway, settingRepo);
+        themeAppService = new PluginThemeAppService(pluginRuntimeGateway, settingRepo, cmsPresetAppService);
         service = new PluginAppService(
                 pluginModuleRepo,
                 pluginRuntimeGateway,
@@ -169,7 +172,7 @@ class PluginThemeMutexTest {
 
     private PluginThemeInfo themeInfo(String pluginCode) {
         return new PluginThemeInfo(pluginCode, pluginCode, pluginCode + " 主题", "",
-                Set.of("SITE"), List.of("theme/" + pluginCode + ".css"), "", "rev-1");
+                Set.of("SITE"), List.of("theme/" + pluginCode + ".css"), "", "", "rev-1");
     }
 
     private PluginModule module(String code, PluginStatus status) throws IOException {

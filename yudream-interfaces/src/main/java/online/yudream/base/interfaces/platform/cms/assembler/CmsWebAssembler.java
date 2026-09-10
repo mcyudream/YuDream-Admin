@@ -3,6 +3,8 @@ package online.yudream.base.interfaces.platform.cms.assembler;
 import online.yudream.base.application.platform.cms.cmd.CmsBlockSaveCmd;
 import online.yudream.base.application.platform.cms.cmd.CmsPageSaveCmd;
 import online.yudream.base.application.platform.cms.cmd.HomePageLayoutSaveCmd;
+import online.yudream.base.application.platform.cms.cmd.HomePagePresetSaveCmd;
+import online.yudream.base.application.platform.cms.dto.HomePagePresetDTO;
 import online.yudream.base.application.platform.cms.dto.CmsBlockDTO;
 import online.yudream.base.application.platform.cms.dto.CmsPageDTO;
 import online.yudream.base.application.platform.cms.dto.HomePageLayoutDTO;
@@ -10,9 +12,13 @@ import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.interfaces.platform.cms.request.CmsBlockSaveRequest;
 import online.yudream.base.interfaces.platform.cms.request.CmsPageSaveRequest;
 import online.yudream.base.interfaces.platform.cms.request.HomePageLayoutSaveRequest;
+import online.yudream.base.interfaces.platform.cms.request.HomePagePresetSaveRequest;
 import online.yudream.base.interfaces.platform.cms.res.CmsBlockRes;
 import online.yudream.base.interfaces.platform.cms.res.CmsPageRes;
 import online.yudream.base.interfaces.platform.cms.res.HomePageLayoutRes;
+import online.yudream.base.interfaces.platform.cms.res.HomePagePresetRes;
+
+import java.util.List;
 
 public class CmsWebAssembler {
 
@@ -145,6 +151,30 @@ public class CmsWebAssembler {
                 .settings(dto.getSettings())
                 .sections(dto.getSections())
                 .published(dto.getPublished())
+                .createTime(dto.getCreateTime())
+                .updateTime(dto.getUpdateTime())
+                .build();
+    }
+
+    public static HomePagePresetSaveCmd toPresetCmd(HomePagePresetSaveRequest request) {
+        HomePagePresetSaveCmd cmd = new HomePagePresetSaveCmd();
+        cmd.setName(request.getName());
+        cmd.setDescription(request.getDescription());
+        return cmd;
+    }
+
+    public static List<HomePagePresetRes> toPresetResList(List<HomePagePresetDTO> presets) {
+        return presets.stream().map(CmsWebAssembler::toPresetRes).toList();
+    }
+
+    public static HomePagePresetRes toPresetRes(HomePagePresetDTO dto) {
+        return HomePagePresetRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .description(dto.getDescription())
+                .source(dto.getSource())
+                .pluginCode(dto.getPluginCode())
+                .sectionCount(dto.getSectionCount())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
                 .build();

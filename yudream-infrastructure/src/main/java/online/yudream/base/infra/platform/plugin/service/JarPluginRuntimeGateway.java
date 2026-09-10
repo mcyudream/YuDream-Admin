@@ -523,6 +523,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 theme.scopes().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()),
                 theme.styles(),
                 theme.preview(),
+                theme.homePreset(),
                 assetRevision
         );
     }

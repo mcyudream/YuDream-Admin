@@ -31,5 +31,7 @@ public class PluginThemeDTO implements Serializable {
     /** 主题 CSS 资产相对路径，按声明顺序注入。 */
     private List<String> styles;
     private String preview;
+    /** 首页内容定制方案资产相对路径，空表示该主题不自带方案。 */
+    private String homePreset;
     private String assetRevision;
 }

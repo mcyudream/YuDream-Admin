@@ -90,11 +90,11 @@ class PluginContextImplThemeTest {
     @Test
     void themeRequiresScopeAndStyle() {
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(), List.of("theme/neco.css"), "")))
+                "neco", "Neco 主题", "", Set.of(), List.of("theme/neco.css"), "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("至少声明一个生效范围");
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of(), "")))
+                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of(), "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("至少声明一个样式资产");
     }
@@ -102,17 +102,17 @@ class PluginContextImplThemeTest {
     @Test
     void themeRejectsIllegalAssetPath() {
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("../escape.css"), "")))
+                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("../escape.css"), "", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("样式路径非法");
         assertThatThrownBy(() -> context.registerTheme(new PluginTheme(
-                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "/abs/preview.png")))
+                "neco", "Neco 主题", "", Set.of(PluginThemeScope.SITE), List.of("theme/neco.css"), "/abs/preview.png", "")))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("预览图路径非法");
     }
 
     private PluginTheme theme(Set<PluginThemeScope> scopes) {
         return new PluginTheme("neco", "Neco 主题", "像素风主题", scopes,
-                List.of("theme/neco.css"), "theme/preview.png");
+                List.of("theme/neco.css"), "theme/preview.png", "");
     }
 }
