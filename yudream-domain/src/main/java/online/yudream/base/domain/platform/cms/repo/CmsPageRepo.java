@@ -3,6 +3,7 @@ package online.yudream.base.domain.platform.cms.repo;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface CmsPageRepo {
@@ -12,6 +13,8 @@ public interface CmsPageRepo {
     Optional<CmsPage> findById(Long id);
 
     Optional<CmsPage> findBySlug(String slug);
+
+    List<CmsPage> findBySourcePluginCode(String pluginCode);
 
     void deleteById(Long id);
 

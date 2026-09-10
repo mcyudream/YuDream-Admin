@@ -25,4 +25,6 @@ public class PluginHomePresetPayload implements Serializable {
     private String heroImageUrl;
     private Map<String, String> settings;
     private List<HomeSection> sections;
+    /** 主题随附的全套页面；未声明该键时导入不动站点页面。 */
+    private List<PluginPresetPagePayload> pages;
 }

@@ -48,6 +48,8 @@ public class PluginModule extends BaseDomain {
     private LocalDateTime loadedAt;
     private LocalDateTime enabledAt;
     private Boolean menusInitialized;
+    /** 最近一次成功启用时声明的主题作用域（SITE/ADMIN），用于主题中心识别已安装但未启用的主题插件。 */
+    private List<String> themeScopes;
 
     public static PluginModule fromDescriptor(PluginDescriptorInfo descriptor) {
         return PluginModule.builder()

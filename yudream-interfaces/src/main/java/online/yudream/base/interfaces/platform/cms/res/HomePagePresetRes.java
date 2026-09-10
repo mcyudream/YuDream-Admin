@@ -14,6 +14,7 @@ public class HomePagePresetRes {
     private String source;
     private String pluginCode;
     private Integer sectionCount;
+    private Boolean active;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

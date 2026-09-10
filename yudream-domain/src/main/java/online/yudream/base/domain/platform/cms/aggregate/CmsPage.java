@@ -39,6 +39,8 @@ public class CmsPage extends BaseDomain {
     private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
+    /** 页面来源插件编码；null 表示站点自有内容，主题页面随主题停用自动转草稿。 */
+    private String sourcePluginCode;
 
     public static CmsPage create(String title, String slug) {
         CmsPage page = new CmsPage();

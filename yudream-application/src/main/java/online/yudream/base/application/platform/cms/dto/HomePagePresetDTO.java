@@ -29,6 +29,8 @@ public class HomePagePresetDTO implements Serializable {
     private String pluginCode;
     /** 方案内区块数量，供列表展示。 */
     private Integer sectionCount;
+    /** 是否为当前首页正在使用的方案。 */
+    private Boolean active;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

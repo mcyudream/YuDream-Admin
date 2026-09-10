@@ -7,9 +7,12 @@ import online.yudream.base.application.platform.cms.service.CmsPresetAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.aggregate.HomePageLayout;
 import online.yudream.base.domain.platform.cms.aggregate.HomePagePreset;
 import online.yudream.base.domain.platform.cms.enumerate.HomePagePresetSource;
+import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
+import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePagePresetRepo;
 import online.yudream.base.domain.shared.IdGenerator;
@@ -34,6 +37,7 @@ class CmsPresetAppServiceTest {
     private InMemoryCapabilityModuleRepo capabilityModuleRepo;
     private InMemoryHomePageLayoutRepo layoutRepo;
     private InMemoryHomePagePresetRepo presetRepo;
+    private InMemoryCmsPageRepo pageRepo;
     private CmsPresetAppService service;
 
     @BeforeEach
@@ -41,9 +45,10 @@ class CmsPresetAppServiceTest {
         capabilityModuleRepo = new InMemoryCapabilityModuleRepo();
         layoutRepo = new InMemoryHomePageLayoutRepo();
         presetRepo = new InMemoryHomePagePresetRepo();
+        pageRepo = new InMemoryCmsPageRepo();
         AtomicLong sequence = new AtomicLong(1000);
         IdGenerator idGenerator = sequence::incrementAndGet;
-        service = new CmsPresetAppService(capabilityModuleRepo, layoutRepo, presetRepo, idGenerator, new ObjectMapper());
+        service = new CmsPresetAppService(capabilityModuleRepo, layoutRepo, presetRepo, pageRepo, idGenerator, new ObjectMapper());
     }
 
     @Test
@@ -203,6 +208,120 @@ class CmsPresetAppServiceTest {
                 .isInstanceOf(BizException.class);
     }
 
+    @Test
+    void listMarksPresetMatchingCurrentLayoutThemeAsActive() {
+        layoutRepo.store(layout("旧首页", Map.of(), true));
+        presetRepo.save(HomePagePreset.builder()
+                .code("user-1").name("A").source(HomePagePresetSource.USER)
+                .settings(Map.of()).sections(List.of()).build());
+        presetRepo.save(HomePagePreset.builder()
+                .code("default").name("内置").source(HomePagePresetSource.USER)
+                .settings(Map.of()).sections(List.of()).build());
+
+        List<HomePagePresetDTO> presets = service.list();
+
+        assertThat(presets.stream().filter(p -> p.getCode().equals("default")).findFirst().orElseThrow().getActive())
+                .isTrue();
+        assertThat(presets.stream().filter(p -> p.getCode().equals("user-1")).findFirst().orElseThrow().getActive())
+                .isFalse();
+    }
+
+    @Test
+    void importPluginPresetPublishesDeclaredPagesWithSourceMark() {
+        layoutRepo.store(layout("旧首页", Map.of(), true));
+
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"像素首页","pages":[
+                  {"slug":"neco-about","title":"关于我们","summary":"像素风","template":"LANDING",
+                   "htmlContent":"<section data-yb-html=\\"site.name\\"></section>","cssContent":".a{}"},
+                  {"slug":"neco-join","title":"加入我们"}
+                ]}
+                """);
+
+        CmsPage about = pageRepo.findBySlug("neco-about").orElseThrow();
+        assertThat(about.getStatus()).isEqualTo(PageStatus.PUBLISHED);
+        assertThat(about.getSourcePluginCode()).isEqualTo("neco");
+        assertThat(about.getTemplate().name()).isEqualTo("LANDING");
+        assertThat(about.getPublishedAt()).isNotNull();
+        assertThat(pageRepo.findBySlug("neco-join")).isPresent();
+        HomePageLayout current = layoutRepo.findCurrent().orElseThrow();
+        assertThat(current.getTheme()).isEqualTo("plugin:neco");
+    }
+
+    @Test
+    void importPluginPagesSkipsSlugOwnedBySiteOrOtherTheme() {
+        layoutRepo.store(layout("旧首页", Map.of(), true));
+        CmsPage adminPage = CmsPage.create("站点页面", "about");
+        adminPage.publish();
+        pageRepo.save(adminPage);
+        CmsPage otherThemePage = CmsPage.create("别家主题页", "shared");
+        otherThemePage.setSourcePluginCode("pixel");
+        otherThemePage.publish();
+        pageRepo.save(otherThemePage);
+
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"像素首页","pages":[
+                  {"slug":"about","title":"覆盖尝试"},
+                  {"slug":"shared","title":"覆盖尝试"},
+                  {"slug":"neco-own","title":"自有页"}
+                ]}
+                """);
+
+        assertThat(pageRepo.findBySlug("about").orElseThrow().getTitle()).isEqualTo("站点页面");
+        assertThat(pageRepo.findBySlug("shared").orElseThrow().getSourcePluginCode()).isEqualTo("pixel");
+        assertThat(pageRepo.findBySlug("neco-own")).isPresent();
+    }
+
+    @Test
+    void importPluginPagesDraftsOwnedPagesDroppedFromDeclaration() {
+        layoutRepo.store(layout("旧首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v1","pages":[{"slug":"neco-a","title":"A"},{"slug":"neco-b","title":"B"}]}
+                """);
+        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v2","pages":[{"slug":"neco-b","title":"B"}]}
+                """);
+
+        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.DRAFT);
+        assertThat(pageRepo.findBySlug("neco-b").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+    }
+
+    @Test
+    void unpublishPluginPagesDraftsOnlyThatThemesPagesAndRepublishOnReimport() {
+        layoutRepo.store(layout("旧首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v1","pages":[{"slug":"neco-a","title":"A"}]}
+                """);
+        CmsPage adminPage = CmsPage.create("站点页面", "about");
+        adminPage.publish();
+        pageRepo.save(adminPage);
+
+        service.unpublishPluginPages("neco");
+
+        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.DRAFT);
+        assertThat(pageRepo.findBySlug("about").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v1","pages":[{"slug":"neco-a","title":"A"}]}
+                """);
+        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+    }
+
+    @Test
+    void unpublishPluginPagesSkipsWhenCapabilityDisabled() {
+        layoutRepo.store(layout("旧首页", Map.of(), true));
+        service.importPluginPreset("neco", "Neco", """
+                {"title":"v1","pages":[{"slug":"neco-a","title":"A"}]}
+                """);
+        capabilityModuleRepo.enabled = false;
+
+        service.unpublishPluginPages("neco");
+
+        assertThat(pageRepo.findBySlug("neco-a").orElseThrow().getStatus()).isEqualTo(PageStatus.PUBLISHED);
+    }
+
     private HomePagePresetSaveCmd cmd(String name, String description) {
         HomePagePresetSaveCmd cmd = new HomePagePresetSaveCmd();
         cmd.setName(name);
@@ -262,8 +381,54 @@ class CmsPresetAppServiceTest {
         }
     }
 
-    static class InMemoryHomePagePresetRepo implements HomePagePresetRepo {
+    static class InMemoryCmsPageRepo implements CmsPageRepo {
 
+        private final Map<Long, CmsPage> store = new LinkedHashMap<>();
+        private final AtomicLong idSequence = new AtomicLong(1);
+
+        @Override
+        public CmsPage save(CmsPage page) {
+            if (page.getId() == null) {
+                page.setId(idSequence.getAndIncrement());
+            }
+            store.put(page.getId(), page);
+            return page;
+        }
+
+        @Override
+        public Optional<CmsPage> findById(Long id) {
+            return Optional.ofNullable(store.get(id));
+        }
+
+        @Override
+        public Optional<CmsPage> findBySlug(String slug) {
+            return store.values().stream().filter(page -> slug.equals(page.getSlug())).findFirst();
+        }
+
+        @Override
+        public List<CmsPage> findBySourcePluginCode(String pluginCode) {
+            return store.values().stream()
+                    .filter(page -> pluginCode.equals(page.getSourcePluginCode()))
+                    .toList();
+        }
+
+        @Override
+        public void deleteById(Long id) {
+            store.remove(id);
+        }
+
+        @Override
+        public online.yudream.base.domain.common.PageResult<CmsPage> page(String keyword, int page, int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public online.yudream.base.domain.common.PageResult<CmsPage> publishedPage(String keyword, String category, String tag, int page, int size) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    static class InMemoryHomePagePresetRepo implements HomePagePresetRepo {
         private final Map<String, HomePagePreset> store = new LinkedHashMap<>();
         private final AtomicLong idSequence = new AtomicLong(1);
 

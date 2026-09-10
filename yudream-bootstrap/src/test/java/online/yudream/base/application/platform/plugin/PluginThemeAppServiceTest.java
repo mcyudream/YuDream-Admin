@@ -82,6 +82,38 @@ class PluginThemeAppServiceTest {
     }
 
     @Test
+    void clearActivationUnpublishesThemePagesWhenSiteSlotReleased() {
+        stubTheme(theme("neco", Set.of("SITE", "ADMIN")));
+        service.activate("neco");
+
+        service.clearActivation("neco");
+
+        verify(cmsPresetAppService).unpublishPluginPages("neco");
+    }
+
+    @Test
+    void clearActivationSkipsPageUnpublishWhenOnlyAdminSlotReleased() {
+        stubTheme(theme("pixel", Set.of("ADMIN")));
+        service.activate("pixel");
+
+        service.clearActivation("pixel");
+
+        verify(cmsPresetAppService, never()).unpublishPluginPages(org.mockito.ArgumentMatchers.anyString());
+    }
+
+    @Test
+    void clearActivationStillClearsSlotWhenPageUnpublishFails() {
+        stubTheme(theme("neco", Set.of("SITE")));
+        service.activate("neco");
+        org.mockito.Mockito.doThrow(new RuntimeException("boom"))
+                .when(cmsPresetAppService).unpublishPluginPages("neco");
+
+        service.clearActivation("neco");
+
+        assertThat(readSlot("SITE")).isNull();
+    }
+
+    @Test
     void activeThemesDropsSlotWhosePluginNoLongerServesScope() {
         stubTheme(theme("neco", Set.of("SITE")));
         service.activate("neco");

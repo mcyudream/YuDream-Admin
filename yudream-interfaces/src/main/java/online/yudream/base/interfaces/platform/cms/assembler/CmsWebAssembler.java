@@ -136,6 +136,7 @@ public class CmsWebAssembler {
                 .template(dto.getTemplate())
                 .status(dto.getStatus())
                 .publishedAt(dto.getPublishedAt())
+                .sourcePluginCode(dto.getSourcePluginCode())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
                 .build();
@@ -175,6 +176,7 @@ public class CmsWebAssembler {
                 .source(dto.getSource())
                 .pluginCode(dto.getPluginCode())
                 .sectionCount(dto.getSectionCount())
+                .active(dto.getActive())
                 .createTime(dto.getCreateTime())
                 .updateTime(dto.getUpdateTime())
                 .build();

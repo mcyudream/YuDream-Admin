@@ -33,4 +33,6 @@ public class CmsPageDO extends BaseDO {
     private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
+    @Indexed
+    private String sourcePluginCode;
 }

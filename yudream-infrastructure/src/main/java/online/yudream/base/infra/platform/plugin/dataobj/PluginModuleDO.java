@@ -49,4 +49,5 @@ public class PluginModuleDO extends BaseDO {
     private LocalDateTime loadedAt;
     private LocalDateTime enabledAt;
     private Boolean menusInitialized;
+    private List<String> themeScopes;
 }
