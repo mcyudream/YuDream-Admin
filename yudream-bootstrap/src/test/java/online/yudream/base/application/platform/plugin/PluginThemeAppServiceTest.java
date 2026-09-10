@@ -89,6 +89,7 @@ class PluginThemeAppServiceTest {
         service.clearActivation("neco");
 
         verify(cmsPresetAppService).unpublishPluginPages("neco");
+        verify(cmsPresetAppService).restorePluginHomepage("neco");
     }
 
     @Test
@@ -99,6 +100,7 @@ class PluginThemeAppServiceTest {
         service.clearActivation("pixel");
 
         verify(cmsPresetAppService, never()).unpublishPluginPages(org.mockito.ArgumentMatchers.anyString());
+        verify(cmsPresetAppService, never()).restorePluginHomepage(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test
