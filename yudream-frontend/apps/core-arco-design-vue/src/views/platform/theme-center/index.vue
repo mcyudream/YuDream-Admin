@@ -2,10 +2,13 @@
 import type { CmsModelSelectOption } from './config/cms-model-options'
 import type { FileObject } from '@/api/modules/files'
 import type { CmsPage, CmsPagePayload, CmsTemplateContext, HomePageLayout, HomePagePreset, HomeSection, HomeSectionType, PageStatus, PageTemplate } from '@/api/modules/platform-cms'
+import type { ThemeCenterOverview, ThemeCenterTheme } from '@/api/modules/platform-theme'
 import apiFiles from '@/api/modules/files'
 import apiAi from '@/api/modules/platform-ai'
 import apiCms from '@/api/modules/platform-cms'
+import apiTheme from '@/api/modules/platform-theme'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
+import { pluginFrontendAssetUrl } from '@/plugins/frontend-assets'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { readChromeCss } from '@/utils/cms-chrome'
 import CmsBlockLibrary from './components/CmsBlockLibrary.vue'
@@ -13,7 +16,7 @@ import CmsGrapesEditor from './components/CmsGrapesEditor.vue'
 import CmsMarkdownEditor from './components/CmsMarkdownEditor.vue'
 import { toCmsModelOptions } from './config/cms-model-options'
 
-type WorkbenchTab = 'pages' | 'home' | 'navigation' | 'media' | 'presets'
+type WorkbenchTab = 'theme' | 'pages' | 'home' | 'navigation' | 'media' | 'presets'
 type EditorMode = 'builder' | 'markdown' | 'html'
 type EditorTarget = 'page' | 'home'
 type SiteLayoutMode = 'HEADER_FOOTER' | 'HEADER_COPYRIGHT' | 'ADMIN'
@@ -32,7 +35,7 @@ const modal = useFaModal()
 const appSettingsStore = useAppSettingsStore()
 const appAccountStore = useAppAccountStore()
 
-const activeTab = ref<WorkbenchTab>('pages')
+const activeTab = ref<WorkbenchTab>('theme')
 const editorMode = ref<EditorMode>('builder')
 const loading = ref(false)
 const saving = ref(false)
@@ -45,6 +48,8 @@ const wikiEnabled = ref(false)
 const templateContext = ref<CmsTemplateContext>(emptyTemplateContext())
 const mediaItems = ref<FileObject[]>([])
 const presets = ref<HomePagePreset[]>([])
+const themeOverview = ref<ThemeCenterOverview | null>(null)
+const themeSwitching = ref(false)
 const presetDialogVisible = ref(false)
 const presetSaving = ref(false)
 const presetForm = reactive({ name: '', description: '' })
@@ -290,13 +295,16 @@ watch(activeTab, async () => {
   else if (activeTab.value === 'presets') {
     await loadPresets()
   }
+  else if (activeTab.value === 'theme') {
+    await loadThemeOverview()
+  }
   else {
     await loadHome()
   }
 })
 
 onMounted(async () => {
-  await Promise.all([loadAiModels(), loadWikiNavigation()])
+  await Promise.all([loadAiModels(), loadWikiNavigation(), loadThemeOverview()])
   await loadPages()
   await loadTemplatePreviewContext()
 })
@@ -430,6 +438,75 @@ function presetSourceText(source: HomePagePreset['source']) {
 
 function presetSourceVariant(source: HomePagePreset['source']) {
   return source === 'PLUGIN' ? 'secondary' as const : source === 'SNAPSHOT' ? 'outline' as const : 'default' as const
+}
+
+const themeCards = computed(() => themeOverview.value?.themes || [])
+
+async function loadThemeOverview() {
+  try {
+    const res = await apiTheme.overview()
+    themeOverview.value = res.data
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : '主题总览加载失败')
+    themeOverview.value = null
+  }
+}
+
+function themePreviewUrl(theme: ThemeCenterTheme) {
+  if (!theme.pluginCode || !theme.preview) {
+    return ''
+  }
+  return pluginFrontendAssetUrl(theme.pluginCode, theme.preview, theme.assetRevision)
+}
+
+function confirmActivateTheme(theme: ThemeCenterTheme) {
+  if (!theme.pluginCode || theme.active) {
+    return
+  }
+  modal.confirm({
+    title: '切换整站主题',
+    content: `确认启用「${theme.name}」作为公开站主题吗？当前首页定制会自动保存为快照${theme.hasHomePreset ? '，主题自带的首页方案会随之应用' : ''}${theme.hasPageSet ? '，主题随附页面会导入并发布（停用主题时自动下线转草稿）' : ''}。`,
+    onConfirm: async () => {
+      themeSwitching.value = true
+      try {
+        await apiTheme.activate(theme.pluginCode!)
+        toast.success(`已切换到「${theme.name}」`)
+        await Promise.all([loadThemeOverview(), loadPresets()])
+      }
+      catch (error) {
+        toast.error(error instanceof Error ? error.message : '主题切换失败')
+      }
+      finally {
+        themeSwitching.value = false
+      }
+    },
+  })
+}
+
+function confirmRestoreDefaultTheme() {
+  const active = themeCards.value.find(item => item.active && item.pluginCode)
+  if (!active) {
+    return
+  }
+  modal.confirm({
+    title: '恢复默认主题',
+    content: `确认停用「${active.name}」并恢复内置默认主题吗？主题随附页面会自动下线转草稿，当前首页定制保留（可从首页方案/快照切回）。`,
+    onConfirm: async () => {
+      themeSwitching.value = true
+      try {
+        await apiTheme.deactivate()
+        toast.success('已恢复内置默认主题')
+        await loadThemeOverview()
+      }
+      catch (error) {
+        toast.error(error instanceof Error ? error.message : '恢复默认主题失败')
+      }
+      finally {
+        themeSwitching.value = false
+      }
+    },
+  })
 }
 
 function openPresetDialog() {
@@ -888,7 +965,7 @@ function sectionTitle(type: HomeSectionType) {
 
 <template>
   <div class="cms-workbench">
-    <FaPageHeader title="内容站点" class="cms-header">
+    <FaPageHeader title="主题中心" class="cms-header">
       <FaButton v-if="activeTab === 'pages'" v-auth="'platform:cms:edit'" :loading="saving" @click="savePage">
         <FaIcon name="i-ri:save-3-line" />
         保存页面
@@ -918,6 +995,10 @@ function sectionTitle(type: HomeSectionType) {
 
     <FaPageMain>
       <div class="cms-tabs">
+        <button type="button" :class="{ active: activeTab === 'theme' }" @click="activeTab = 'theme'">
+          <FaIcon name="i-ri:palette-line" />
+          整站主题
+        </button>
         <button type="button" :class="{ active: activeTab === 'pages' }" @click="activeTab = 'pages'">
           <FaIcon name="i-ri:file-list-3-line" />
           页面库
@@ -944,7 +1025,77 @@ function sectionTitle(type: HomeSectionType) {
         </a>
       </div>
 
-      <section v-if="activeTab === 'pages'" class="cms-layout">
+      <section v-if="activeTab === 'theme'" v-loading="themeSwitching" class="theme-workspace">
+        <div class="preset-toolbar">
+          <div>
+            <h3>整站主题</h3>
+            <p>收纳公开站可用的全部主题：内置默认主题与主题插件（主题可携带整套页面与首页方案，不只是样式覆盖）。切换时当前首页定制自动快照，可随时在「首页方案」切回。</p>
+          </div>
+        </div>
+        <div v-if="themeCards.length" class="theme-grid">
+          <article v-for="theme in themeCards" :key="theme.pluginCode || theme.code" class="theme-card" :class="{ active: theme.active }">
+            <div class="theme-card__preview">
+              <img v-if="themePreviewUrl(theme)" :src="themePreviewUrl(theme)" :alt="theme.name">
+              <div v-else class="theme-card__preview-fallback">
+                <FaIcon :name="theme.pluginCode ? 'i-ri:puzzle-2-line' : 'i-ri:home-4-line'" />
+              </div>
+              <FaTag v-if="theme.active" class="theme-card__current" variant="default">
+                当前
+              </FaTag>
+            </div>
+            <div class="theme-card__body">
+              <div class="preset-card__head">
+                <strong>{{ theme.name }}</strong>
+                <FaTag v-if="theme.pluginCode && theme.enabled === false" variant="outline">
+                  未启用
+                </FaTag>
+              </div>
+              <p v-if="theme.description" class="preset-card__desc">
+                {{ theme.description }}
+              </p>
+              <div class="preset-card__meta">
+                <FaTag v-if="theme.hasHomePreset" variant="secondary">
+                  含首页方案
+                </FaTag>
+                <FaTag v-if="theme.hasPageSet" variant="secondary">
+                  含页面集
+                </FaTag>
+                <FaTag v-if="!theme.pluginCode" variant="secondary">
+                  系统内置
+                </FaTag>
+              </div>
+              <div class="preset-card__actions">
+                <FaButton
+                  v-if="theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
+                  size="sm" :loading="themeSwitching" @click="confirmActivateTheme(theme)"
+                >
+                  <FaIcon name="i-ri:check-line" />
+                  启用主题
+                </FaButton>
+                <FaButton
+                  v-if="theme.pluginCode && theme.active" v-auth="'platform:theme-center:use'"
+                  size="sm" variant="outline" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
+                >
+                  <FaIcon name="i-ri:refresh-line" />
+                  恢复默认
+                </FaButton>
+                <FaButton
+                  v-if="!theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
+                  size="sm" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
+                >
+                  <FaIcon name="i-ri:refresh-line" />
+                  恢复默认主题
+                </FaButton>
+              </div>
+            </div>
+          </article>
+        </div>
+        <div v-else class="empty-state">
+          暂无可用主题。
+        </div>
+      </section>
+
+      <section v-else-if="activeTab === 'pages'" class="cms-layout">
         <aside class="page-list">
           <div class="page-list__toolbar">
             <FaInput v-model="search.keyword" clearable placeholder="搜索标题、路径" @keydown.enter="loadPages" @clear="loadPages" />
@@ -1390,6 +1541,9 @@ function sectionTitle(type: HomeSectionType) {
           <article v-for="preset in presets" :key="preset.code" class="preset-card">
             <div class="preset-card__head">
               <strong>{{ preset.name }}</strong>
+              <FaTag v-if="preset.active" variant="default">
+                当前
+              </FaTag>
               <FaTag :variant="presetSourceVariant(preset.source)">
                 {{ presetSourceText(preset.source) }}
               </FaTag>
@@ -2427,6 +2581,73 @@ function sectionTitle(type: HomeSectionType) {
 .preset-form-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.theme-workspace {
+  display: grid;
+  gap: 16px;
+}
+
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.theme-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  background: var(--color-bg-2);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.theme-card:hover {
+  border-color: var(--color-border-3);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+
+.theme-card.active {
+  border-color: rgb(var(--primary-6));
+}
+
+.theme-card__preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--color-fill-2);
+}
+
+.theme-card__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.theme-card__preview-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: var(--color-text-3);
+}
+
+.theme-card__current {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.theme-card__body {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  align-content: start;
 }
 
 .grapes-editor-shell {

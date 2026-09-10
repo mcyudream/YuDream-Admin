@@ -11,7 +11,7 @@ import {
   updateWikiTextSource,
   uploadWikiSource,
 } from '@/api/modules/platform-wiki'
-import CmsMarkdownEditor from '../../cms/components/CmsMarkdownEditor.vue'
+import CmsMarkdownEditor from '../../theme-center/components/CmsMarkdownEditor.vue'
 import { resolveApiFileUrl, rewriteApiFileUrls } from '@/utils/api-file-url'
 import { extractionStatusLabel, ingestStatusLabel, wikiWorkbenchKey } from '../wiki-utils'
 
