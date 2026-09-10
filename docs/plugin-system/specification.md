@@ -237,7 +237,8 @@ Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图
     scopes = {PluginThemeScope.SITE},
     styles = {"theme/site.css"},
     preview = "theme/preview.png",
-    homePreset = "theme/home-preset.json"   // 可选：自带首页方案
+    homePreset = "theme/home-preset.json",   // 可选：自带首页方案
+    configSchema = "theme/theme-config.json" // 可选：主题配置 schema（WordPress 自定义器形态）
 )
 public class PixelThemePlugin implements YuDreamPlugin { ... }
 ```
@@ -265,6 +266,20 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 - 内容注入约定：主题页面与 `settings.homeHtml` 一律用 `data-yb-*` 模板指令（`data-yb-for/if/html/markdown/limit` 等）与 `{{路径}}` 变量注入系统数据（站点信息、登录态、最新页面/Wiki 等）；**禁止声明 `navigationJson`**，导航归属主题布局的 settings、始终由系统渲染。主题自带页面 CSS 只写布局，配色应消费主题自身变量。
 - 主题中心：后台「平台 → 主题中心」聚合展示全部 SITE 主题卡（预览图、是否含首页方案/页面集、激活态）并支持一键启用/恢复默认；CMS 页面/首页外观/导航/媒体库/首页方案管理均并入主题中心，工作台顶部提供「编辑主题」选择器（默认当前激活主题，可离线预编辑任意主题的内容），页面列表标记归属主题与「插件托管」。注意：菜单为种子初始化，既有部署升级后需手工清理旧的「内容站点（platform:cms）」菜单节点。
 
+主题配置（configSchema，WordPress 自定义器形态）：
+
+- SITE 主题可声明 `configSchema` 指向 JAR 内一份 `theme-config.json`（路径校验规则与 `homePreset` 相同）；声明后主题卡出现「配置」入口，进入独立配置页 `/platform/theme-center/config/{theme}`（左侧分节导航 + 右侧分节表单，宿主按 schema 渲染，主题不提供前端页面）。
+- schema 格式：`{ "sections": [{ "code", "title", "description", "fields": [...] }] }`；字段 `{ "key", "label", "description", "type", "placeholder", "default", "options", "secret", "itemFields" }`，`type` 支持 `text`/`textarea`/`number`/`switch`/`select`/`color`/`image`/`list`；`select` 用 `options: [{label, value}]`；`list` 用 `itemFields` 声明子字段形成重复器（值成为真数组，供 `data-yb-for` 遍历）；`image` 为 URL 输入，可填主题资产路径 `/api/platform/plugins/{code}/assets/...`。
+- 持久化与安全：配置值按主题隔离存入 Setting（key `pluginTheme.config.{themeCode}`、category `plugin-theme`、type JSON），读取时 schema 默认值与已存值合并；字段标记 `secret: true` 后经凭据加密存储，管理端读取脱敏为空串（另返回 `secretConfigured` 标识），留空保存表示不修改。
+- 模板消费：公开站模板上下文根新增 `theme.config`（嵌套对象，**secret 字段已剔除**），可写 `{{theme.config.heroTitle}}`、`data-yb-if="theme.config.showServers"`、`data-yb-for="item in theme.config.introItems"`；保存后公开站即时生效。内置 default 主题无配置页（端点返回空 schema）。
+
+主题块提供者（PluginThemeBlockProvider，插件联合扩展主题动态内容）：
+
+- 系统能力（CMS 页面、Wiki、导航、站点设置）已在模板上下文（`cms.pages.latest`/`knowledge.*`/`navigation`/`site.*`），主题模板直接引用；**插件私有数据**通过 SPI 接口 `PluginThemeBlockProvider` 贡献：`code()`（块 code，插件内唯一）、`name()`、`supportedThemes()`（默认空=全部主题可用）、`data(PluginThemeBlockContext ctx)` 返回 JSON 可序列化对象，ctx 携带 `themeCode` 与 `limit`（模板 `data-yb-limit` 上限）。
+- 注册复用既有扩展管道：`onEnable` 中 `context.registerExtension(PluginThemeBlockProvider.class, provider)`，禁用/卸载自动回收，无需新基建。
+- 模板消费：`{{blocks.server-list}}`、`data-yb-for="server in blocks.server-list"`、`data-yb-if="blocks.activity-square"`；前端扫描模板中的 `blocks.{code}` 路径随 template-context 请求懒加载（不进入首屏载荷），单块上限 12 个；块不存在/插件未启用/单块异常时该块缺省（if 为假、for 为空），优雅降级不影响页面其余部分。
+- **公开数据安全约定**：块数据对匿名访问者可见，提供者实现必须只暴露公开安全字段（不暴露内部 ID、凭据、用户隐私）；宿主不做字段级过滤。
+
 CSS 作用域约定：
 
 - SITE 主题只写 `.site-page` / `.site-chrome` 容器与 `--yb-site-*` 变量（背景/文本/标题/主色/边框/导航等），禁止覆写 `:root` 宿主后台变量。
@@ -283,6 +298,8 @@ CSS 作用域约定：
 - `GET /api/platform/plugins/themes`（`platform:plugin:view`）：全部已启用插件声明的主题与各 scope 激活者，供主题设置页展示。
 - `GET /api/platform/themes/overview`（`platform:theme-center:view`）：主题中心聚合视图——SITE 主题卡（预览资产、含首页方案/页面集标记、激活态）+ 激活主题的首页方案列表（含 `active` 标志）+ 可编辑主题清单 `editableThemes`（默认主题 + 主题插件卡 + 拥有存量布局的主题）；cms 能力关闭时降级为主题卡 + 空方案列表。
 - `POST /api/platform/themes/{code}/activate` / `POST /api/platform/themes/deactivate`（`platform:theme-center:use`）：启用指定 SITE 主题（互斥顶替）/ 停用当前 SITE 主题回落内置。
+- `GET /api/platform/themes/{code}/config` / `PUT /api/platform/themes/{code}/config`（`platform:theme-center:config`）：主题配置 schema + 合并值读取（secret 脱敏）/ 按 schema 校验保存，公开站即时生效。
+- `GET /api/public/cms/template-context`（匿名）：模板上下文查询参数新增 `blocks`（块 code 列表）与 `blockLimit`，按激活 SITE 主题过滤 `supportedThemes()` 后逐块调用提供者，响应根新增 `blocks` 映射；公开首页/页面载荷新增 `themeConfig`（剔除 secret 的主题配置对象）。
 
 ## 10. 菜单与路由规范
 
