@@ -167,7 +167,7 @@ class PluginThemeAppServiceTest {
     @Test
     void activateSiteThemeWithHomePresetImportsAndAppliesPreset() {
         PluginThemeInfo neco = new PluginThemeInfo("neco", "neco", "Neco 主题", "像素风主题",
-                Set.of("SITE"), List.of("theme/neco.css"), "", "home-preset.json", "rev-1");
+                Set.of("SITE"), List.of("theme/neco.css"), "", "home-preset.json", "", "rev-1");
         stubTheme(neco);
         String presetJson = "{\"title\":\"像素首页\"}";
         when(pluginRuntimeGateway.frontendAsset("neco", "home-preset.json"))
@@ -193,7 +193,7 @@ class PluginThemeAppServiceTest {
     @Test
     void activateStillSucceedsWhenPresetAssetMissing() {
         PluginThemeInfo neco = new PluginThemeInfo("neco", "neco", "Neco 主题", "像素风主题",
-                Set.of("SITE"), List.of("theme/neco.css"), "", "home-preset.json", "rev-1");
+                Set.of("SITE"), List.of("theme/neco.css"), "", "home-preset.json", "", "rev-1");
         stubTheme(neco);
         when(pluginRuntimeGateway.frontendAsset("neco", "home-preset.json")).thenReturn(Optional.empty());
 
@@ -206,7 +206,7 @@ class PluginThemeAppServiceTest {
 
     private PluginThemeInfo theme(String pluginCode, Set<String> scopes) {
         return new PluginThemeInfo(pluginCode, pluginCode, "Neco 主题", "像素风主题",
-                scopes, List.of("theme/" + pluginCode + ".css"), "", "", "rev-1");
+                scopes, List.of("theme/" + pluginCode + ".css"), "", "", "", "rev-1");
     }
 
     private void stubTheme(PluginThemeInfo theme) {

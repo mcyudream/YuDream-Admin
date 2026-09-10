@@ -31,6 +31,8 @@ public class ThemeCenterThemeCardDTO implements Serializable {
     private String assetRevision;
     /** 是否自带首页方案。 */
     private Boolean hasHomePreset;
+    /** 是否声明主题配置 schema（有则主题中心提供配置大页面）。 */
+    private Boolean hasConfigSchema;
     /** 是否自带页面集（随主题启用导入、停用下线）。 */
     private Boolean hasPageSet;
     /** 是否为当前公开站激活主题。 */

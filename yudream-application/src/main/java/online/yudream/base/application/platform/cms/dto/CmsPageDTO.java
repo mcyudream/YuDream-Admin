@@ -32,6 +32,8 @@ public class CmsPageDTO {
     /** 归属主题编码：页面按主题隔离，仅在其归属主题激活时对外可见。 */
     private String themeCode;
     private String sourcePluginCode;
+    /** 公开端按激活主题注入的主题配置（theme.config 渲染根），仅公开方法填充。 */
+    private java.util.Map<String, Object> themeConfig;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -8,6 +8,7 @@ import online.yudream.base.application.platform.cms.dto.CmsPageDTO;
 import online.yudream.base.application.platform.cms.dto.HomePageLayoutDTO;
 import online.yudream.base.application.platform.cms.query.CmsPageQuery;
 import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
+import online.yudream.base.application.platform.theme.service.ThemeConfigAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -36,6 +37,7 @@ public class CmsAppService {
     private final CmsPageRepo cmsPageRepo;
     private final HomePageLayoutRepo homePageLayoutRepo;
     private final SiteThemeQueryService siteThemeQueryService;
+    private final ThemeConfigAppService themeConfigAppService;
 
     @Transactional(readOnly = true)
     public PageResult<CmsPageDTO> page(String themeCode, CmsPageQuery query) {
@@ -108,7 +110,9 @@ public class CmsAppService {
         if (!Boolean.TRUE.equals(layout.getPublished())) {
             throw new BizException("首页未发布");
         }
-        return CmsAssembler.toDTO(layout);
+        HomePageLayoutDTO dto = CmsAssembler.toDTO(layout);
+        dto.setThemeConfig(themeConfigAppService.publicConfig(theme));
+        return dto;
     }
 
     @Transactional(readOnly = true)
@@ -120,7 +124,9 @@ public class CmsAppService {
         if (page.getStatus() != PageStatus.PUBLISHED) {
             throw new BizException("页面未发布");
         }
-        return CmsAssembler.toDTO(page);
+        CmsPageDTO dto = CmsAssembler.toDTO(page);
+        dto.setThemeConfig(themeConfigAppService.publicConfig(theme));
+        return dto;
     }
 
     @Transactional(readOnly = true)

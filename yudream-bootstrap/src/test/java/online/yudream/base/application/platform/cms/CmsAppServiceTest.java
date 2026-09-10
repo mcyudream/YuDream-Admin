@@ -6,7 +6,11 @@ import online.yudream.base.application.platform.cms.dto.CmsPageDTO;
 import online.yudream.base.application.platform.cms.dto.HomePageLayoutDTO;
 import online.yudream.base.application.platform.cms.query.CmsPageQuery;
 import online.yudream.base.application.platform.cms.service.CmsAppService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
+import online.yudream.base.application.platform.theme.service.ThemeConfigAppService;
+import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.domain.platform.theme.service.ThemeConfigSecretCipher;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
@@ -49,7 +53,10 @@ class CmsAppServiceTest {
         layoutRepo = new InMemoryHomePageLayoutRepo();
         settingRepo = new InMemorySettingRepo();
         service = new CmsAppService(capabilityModuleRepo, pageRepo, layoutRepo,
-                new SiteThemeQueryService(settingRepo));
+                new SiteThemeQueryService(settingRepo),
+                new ThemeConfigAppService(settingRepo,
+                        org.mockito.Mockito.mock(PluginRuntimeGateway.class, org.mockito.Mockito.CALLS_REAL_METHODS),
+                        new NoopCipher(), new ObjectMapper()));
     }
 
     @Test
@@ -383,6 +390,22 @@ class CmsAppServiceTest {
         @Override
         public List<Setting> findAll() {
             return new ArrayList<>(store.values());
+        }
+    }
+    private static class NoopCipher implements ThemeConfigSecretCipher {
+        @Override
+        public boolean canEncrypt() {
+            return false;
+        }
+
+        @Override
+        public boolean encrypted(String value) {
+            return false;
+        }
+
+        @Override
+        public String encrypt(String themeCode, String fieldKey, String plaintext) {
+            return plaintext;
         }
     }
 }

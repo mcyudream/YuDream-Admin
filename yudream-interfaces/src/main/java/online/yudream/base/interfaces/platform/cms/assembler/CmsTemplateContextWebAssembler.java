@@ -26,6 +26,7 @@ public final class CmsTemplateContextWebAssembler {
                         .featured((dto.getKnowledge().getFeatured() == null ? List.<CmsTemplateItemDTO>of() : dto.getKnowledge().getFeatured())
                                 .stream().map(CmsTemplateContextWebAssembler::toRes).toList())
                         .build())
+                .blocks(dto.getBlocks())
                 .build();
     }
 

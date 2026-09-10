@@ -17,6 +17,7 @@ public record PluginThemeInfo(
         List<String> styles,
         String preview,
         String homePreset,
+        String configSchema,
         String assetRevision
 ) {
 }

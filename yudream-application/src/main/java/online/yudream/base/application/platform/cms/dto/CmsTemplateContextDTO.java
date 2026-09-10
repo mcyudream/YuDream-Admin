@@ -4,12 +4,15 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
 public class CmsTemplateContextDTO {
     private CmsTemplateCmsDTO cms;
     private CmsTemplateKnowledgeDTO knowledge;
+    /** 主题块数据：块 code -> 插件提供者返回的 JSON 可序列化数据，未请求或不可用的块缺省。 */
+    private Map<String, Object> blocks;
 
     @Data
     @Builder
