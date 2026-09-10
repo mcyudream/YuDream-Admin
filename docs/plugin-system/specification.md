@@ -236,7 +236,8 @@ Vite 产物应保留相对引用和 hash 文件名，保证 CSS、JS chunk、图
     description = "像素风公开站主题",
     scopes = {PluginThemeScope.SITE},
     styles = {"theme/site.css"},
-    preview = "theme/preview.png"
+    preview = "theme/preview.png",
+    homePreset = "theme/home-preset.json"   // 可选：自带首页方案
 )
 public class PixelThemePlugin implements YuDreamPlugin { ... }
 ```
@@ -244,15 +245,28 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 契约规则：
 
 - 一个插件最多注册一个主题；`scopes` 至少声明一个范围（`SITE` 公开站 / `ADMIN` 管理后台），`styles` 至少声明一个 CSS 资产。
-- `styles`/`preview` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
+- `styles`/`preview`/`homePreset` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
 - 同一 scope 同时只激活一个主题：启用声明了主题的新插件时，宿主自动禁用同 scope 冲突的旧主题插件并接管激活位；禁用/卸载/删除主题插件即释放激活位，该 scope 回落宿主内置主题。重启恢复后宿主按持久化激活位校正。
 - 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。
+
+自带首页方案（homePreset）：
+
+- SITE 主题可声明 `homePreset` 指向 JAR 内一份首页方案 JSON（hero 标题/副标题、首页区块 sections、需要覆盖的 settings 键）；SITE scope 激活时宿主自动读取导入为方案 `plugin:{pluginCode}` 并立即应用，公开站首页整套切换。
+- 合并语义：方案只覆盖它声明的 settings 键，未声明的键（如 `navigationJson` 导航菜单）保留站点当前值；应用本身是对首页布局的整体回写，`published` 发布状态保留。
+- 应用前宿主自动把当前首页定制存为「切换前快照」方案（内容一致则去重，快照上限 10 份）；后台「内容站点 → 首页方案」可查看全部用户/插件/快照方案并一键应用或删除。换主题不会自动还原首页，需手动应用历史方案。
+- 内容定制能力（cms）关闭时不导入方案，仅应用主题 CSS；方案资产缺失或非法时跳过导入，不影响主题激活。
 
 CSS 作用域约定：
 
 - SITE 主题只写 `.site-page` / `.site-chrome` 容器与 `--yb-site-*` 变量（背景/文本/标题/主色/边框/导航等），禁止覆写 `:root` 宿主后台变量。
 - ADMIN 主题写 `:root` / `.dark` 下的宿主主题变量（OKLCH 三通道，如 `--primary`、`--background`），禁止触碰 `.site-page` / `--yb-site-*`。
 - 主题 CSS 不得引入全局 reset，不得改动布局结构类（flex/grid 排版由宿主与插件页面自己控制）。
+
+公开页换肤契约（谁适配谁）：
+
+- 正途是**插件适配主题**：插件公开页应当自带 `--xx-*` 桥接变量（如大事记页面的 `--tl-*`）并回退消费 `--yb-site-*`，主题插件只负责定义 `--yb-site-*` 变量与像素化等通用处理，页面自动跟随换肤。
+- 对使用 Arco 组件的插件公开页，主题在插件容器作用域内覆写 `--color-*` / `--primary-6` 变量属合法的变量级适配。
+- 主题按其他插件的专属类名（如 `.tl-card`、`.qb-*`）书写样式仅是面向存量插件的**兼容层**，须注释标注；插件迁移到桥接变量后应逐步移除，新增插件公开页不得再要求主题侧追加专属选择器。
 
 宿主端点：
 

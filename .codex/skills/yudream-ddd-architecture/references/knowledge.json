@@ -49,6 +49,10 @@
       "text": "插件主题经 @PluginTheme 注册（一个插件一个主题，scopes SITE/ADMIN，styles 至少一个 JAR 前端目录相对路径资产）；宿主 PluginThemeAppService 用 sys_setting(category=plugin-theme, key=pluginTheme.active.site|admin) 持久化激活位，enable 时自动顶替同 scope 冲突主题插件，disable/unload/delete 释放激活位，restoreEnabledPlugins 后 reconcile 校正。前端 main.ts 挂载前拉取 /api/platform/plugins/themes/active 注入常驻 link[data-yudream-theme-scope]，theme-runtime 按路由 meta.public 切换 site/admin link 启停。CSS 约定：SITE 只写 .site-page/.site-chrome 与 --yb-site-*，ADMIN 只写 :root/.dark 宿主 OKLCH 变量。详见 docs/plugin-system/specification.md 9.1。"
     },
     {
+      "key": "plugin-theme-home-preset",
+      "text": "SITE 主题可在 @PluginTheme 声明 homePreset（JAR 前端目录相对路径的首页方案 JSON，校验规则同 styles）：SITE scope 激活时 PluginThemeAppService 调 CmsPresetAppService.importPluginPreset 读取并导入为方案 plugin:{pluginCode} 后立即应用，cms 能力关闭或资产缺失/非法时跳过不影响激活。方案合并语义：只覆盖声明的 settings 键（未声明的 navigationJson 等保留当前值），应用是整体回写且保留 published，HomePageLayout.theme 写入方案 code。apply 前自动快照当前定制为 SNAPSHOT 方案（与最新快照内容一致则去重，上限 10 份按单调 id 判定新旧裁剪）；后台 内容站点→首页方案 统一管理 USER/PLUGIN/SNAPSHOT 方案一键切换。公开页换肤正途是插件适配主题：插件自带 --xx-* 桥接变量回退消费 --yb-site-*；主题按插件专属类名（.tl-card/.qb-* 等）写样式仅为兼容层，须注释标注并随插件迁移逐步移除。"
+    },
+    {
       "key": "record-list-pagination",
       "text": "Record-style lists that can grow without a small fixed bound, such as operation records, transactions, logs, audit rows, and import histories, must expose page/size in plugin HTTP APIs and show frontend pagination instead of loading a fixed 100/200 rows."
     },
