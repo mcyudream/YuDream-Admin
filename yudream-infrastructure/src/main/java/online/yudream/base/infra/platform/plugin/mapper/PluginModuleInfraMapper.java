@@ -43,6 +43,7 @@ public class PluginModuleInfraMapper {
         dataObj.setLoadedAt(module.getLoadedAt());
         dataObj.setEnabledAt(module.getEnabledAt());
         dataObj.setMenusInitialized(module.getMenusInitialized());
+        dataObj.setThemeScopes(module.getThemeScopes());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -84,6 +85,7 @@ public class PluginModuleInfraMapper {
                 .loadedAt(dataObj.getLoadedAt())
                 .enabledAt(dataObj.getEnabledAt())
                 .menusInitialized(dataObj.getMenusInitialized())
+                .themeScopes(dataObj.getThemeScopes())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())

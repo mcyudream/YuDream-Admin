@@ -299,6 +299,9 @@ public class PluginAppService {
         try {
             PluginModule enabled = enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>());
             enabled.setRestoreIntentActive(true);
+            enabled.setThemeScopes(pluginRuntimeGateway.theme(code)
+                    .map(theme -> theme.scopes().stream().sorted().toList())
+                    .orElse(null));
             PluginModuleDTO result = toDTO(pluginModuleRepo.save(enabled));
             applyThemeMutex(code);
             return result;

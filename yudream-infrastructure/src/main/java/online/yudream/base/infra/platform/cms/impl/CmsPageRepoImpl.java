@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -46,6 +47,12 @@ public class CmsPageRepoImpl implements CmsPageRepo {
     public Optional<CmsPage> findBySlug(String slug) {
         Query query = Query.query(Criteria.where("slug").is(slug));
         return Optional.ofNullable(CmsInfraMapper.toDomain(mongoTemplate.findOne(query, CmsPageDO.class)));
+    }
+
+    @Override
+    public List<CmsPage> findBySourcePluginCode(String pluginCode) {
+        Query query = Query.query(Criteria.where("sourcePluginCode").is(pluginCode));
+        return mongoTemplate.find(query, CmsPageDO.class).stream().map(CmsInfraMapper::toDomain).toList();
     }
 
     @Override

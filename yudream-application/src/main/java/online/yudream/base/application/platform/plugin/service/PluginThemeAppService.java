@@ -121,13 +121,23 @@ public class PluginThemeAppService {
     }
 
     /**
-     * 禁用/卸载/删除插件时清除其占据的激活位，该 scope 回落宿主内置主题。
+     * 禁用/卸载/删除插件时清除其占据的激活位，该 scope 回落宿主内置主题；
+     * 失去 SITE 激活位时顺带把该主题随附页面下线转草稿（失败仅日志不阻塞）。
      */
     @Transactional
     public void clearActivation(String pluginCode) {
+        boolean siteCleared = false;
         for (String scope : List.of("SITE", "ADMIN")) {
             if (pluginCode.equals(readActive(scope).orElse(null))) {
                 saveActive(scope, "");
+                siteCleared = siteCleared || "SITE".equals(scope);
+            }
+        }
+        if (siteCleared) {
+            try {
+                cmsPresetAppService.unpublishPluginPages(pluginCode);
+            } catch (Exception e) {
+                log.warn("下线主题随附页面失败，仅清除激活位：plugin={}, reason={}", pluginCode, e.getMessage());
             }
         }
     }

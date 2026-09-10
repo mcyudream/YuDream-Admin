@@ -94,6 +94,7 @@ public class CmsInfraMapper {
         dataObj.setTemplate(domain.getTemplate());
         dataObj.setStatus(domain.getStatus());
         dataObj.setPublishedAt(domain.getPublishedAt());
+        dataObj.setSourcePluginCode(domain.getSourcePluginCode());
         return dataObj;
     }
 
@@ -123,6 +124,7 @@ public class CmsInfraMapper {
                 .template(dataObj.getTemplate())
                 .status(dataObj.getStatus())
                 .publishedAt(dataObj.getPublishedAt())
+                .sourcePluginCode(dataObj.getSourcePluginCode())
                 .build();
     }
 

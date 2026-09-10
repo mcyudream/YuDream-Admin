@@ -7,13 +7,18 @@ import online.yudream.base.application.platform.cms.assembler.CmsAssembler;
 import online.yudream.base.application.platform.cms.cmd.HomePagePresetSaveCmd;
 import online.yudream.base.application.platform.cms.dto.HomePagePresetDTO;
 import online.yudream.base.application.platform.cms.dto.PluginHomePresetPayload;
+import online.yudream.base.application.platform.cms.dto.PluginPresetPagePayload;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.cms.aggregate.CmsPage;
 import online.yudream.base.domain.platform.cms.aggregate.HomePageLayout;
 import online.yudream.base.domain.platform.cms.aggregate.HomePagePreset;
 import online.yudream.base.domain.platform.cms.enumerate.HomePagePresetSource;
+import online.yudream.base.domain.platform.cms.enumerate.PageStatus;
+import online.yudream.base.domain.platform.cms.repo.CmsPageRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePageLayoutRepo;
 import online.yudream.base.domain.platform.cms.repo.HomePagePresetRepo;
+import online.yudream.base.domain.platform.cms.valobj.PageSlug;
 import online.yudream.base.domain.shared.IdGenerator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,8 +28,11 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * 首页内容定制方案编排：把当前首页定制存为可命名方案，一键切换。
@@ -43,13 +51,21 @@ public class CmsPresetAppService {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final HomePageLayoutRepo homePageLayoutRepo;
     private final HomePagePresetRepo homePagePresetRepo;
+    private final CmsPageRepo cmsPageRepo;
     private final IdGenerator idGenerator;
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public List<HomePagePresetDTO> list() {
         ensureEnabled();
-        return homePagePresetRepo.findAll().stream().map(CmsAssembler::toPresetDTO).toList();
+        String currentTheme = currentLayout().getTheme();
+        return homePagePresetRepo.findAll().stream()
+                .map(preset -> {
+                    HomePagePresetDTO dto = CmsAssembler.toPresetDTO(preset);
+                    dto.setActive(preset.getCode().equals(currentTheme));
+                    return dto;
+                })
+                .toList();
     }
 
     /**
@@ -87,9 +103,11 @@ public class CmsPresetAppService {
     }
 
     /**
-     * 导入插件主题自带的首页方案并应用。方案只覆盖其声明的字段与 settings 键，
+     * 导入插件主题自带的首页方案与页面集并应用。方案只覆盖其声明的字段与 settings 键，
      * 未声明的（如站点导航 navigationJson）保留站点现状；同插件重复启用时按
-     * code=plugin:{pluginCode} 覆盖更新。内容定制能力关闭时不导入，返回 false。
+     * code=plugin:{pluginCode} 覆盖更新。页面集按 slug 归属管理：slug 未被占用或
+     * 属于该插件时创建/覆盖为已发布；被管理员或其他主题占用时跳过；声明清单之外的
+     * 该插件旧页面转草稿。内容定制能力关闭时不导入，返回 false。
      */
     @Transactional
     public boolean importPluginPreset(String pluginCode, String presetName, String presetJson) {
@@ -121,7 +139,71 @@ public class CmsPresetAppService {
             preset.setCreateTime(existing.getCreateTime());
         });
         applyInternal(homePagePresetRepo.save(preset));
+        importPluginPages(pluginCode, payload.getPages());
         return true;
+    }
+
+    /**
+     * 主题停用/顶替/卸载时，把该主题随附的页面全部下线转草稿（管理员内容不动）。
+     * 再次启用主题时导入流程会把声明的页面恢复为已发布。
+     */
+    @Transactional
+    public void unpublishPluginPages(String pluginCode) {
+        if (!capabilityEnabled()) {
+            log.info("内容定制能力未启用，跳过主题页面下线：{}", pluginCode);
+            return;
+        }
+        int unpublished = 0;
+        for (CmsPage page : cmsPageRepo.findBySourcePluginCode(pluginCode)) {
+            if (page.getStatus() == PageStatus.PUBLISHED) {
+                page.unpublish();
+                cmsPageRepo.save(page);
+                unpublished++;
+            }
+        }
+        if (unpublished > 0) {
+            log.info("主题页面已下线转草稿：plugin={}, count={}", pluginCode, unpublished);
+        }
+    }
+
+    private void importPluginPages(String pluginCode, List<PluginPresetPagePayload> payloads) {
+        if (payloads == null) {
+            return;
+        }
+        Set<String> declaredSlugs = new HashSet<>();
+        for (PluginPresetPagePayload payload : payloads) {
+            if (payload == null || !StringUtils.hasText(payload.getSlug()) || !StringUtils.hasText(payload.getTitle())) {
+                log.warn("主题页面缺少 slug 或标题，跳过：plugin={}", pluginCode);
+                continue;
+            }
+            String slug;
+            try {
+                slug = PageSlug.of(payload.getSlug()).value();
+            } catch (BizException e) {
+                log.warn("主题页面路径非法，跳过：plugin={}, slug={}", pluginCode, payload.getSlug());
+                continue;
+            }
+            declaredSlugs.add(slug);
+            Optional<CmsPage> existing = cmsPageRepo.findBySlug(slug);
+            if (existing.isPresent() && !pluginCode.equals(existing.get().getSourcePluginCode())) {
+                log.warn("主题页面路径已被站点或其他主题占用，跳过导入：plugin={}, slug={}", pluginCode, slug);
+                continue;
+            }
+            CmsPage page = existing.orElseGet(() -> CmsPage.create(payload.getTitle(), slug));
+            page.update(payload.getTitle(), slug, payload.getSummary(), null, payload.getCoverImageUrl(),
+                    null, null, payload.getMarkdownContent(), payload.getHtmlContent(), payload.getCssContent(),
+                    payload.getJsContent(), null, payload.getSeoTitle(), payload.getSeoDescription(),
+                    payload.getTemplate(), PageStatus.PUBLISHED);
+            page.setSourcePluginCode(pluginCode);
+            cmsPageRepo.save(page);
+        }
+        for (CmsPage page : cmsPageRepo.findBySourcePluginCode(pluginCode)) {
+            if (!declaredSlugs.contains(page.getSlug()) && page.getStatus() == PageStatus.PUBLISHED) {
+                page.unpublish();
+                cmsPageRepo.save(page);
+                log.info("主题页面已不在声明清单内，转草稿：plugin={}, slug={}", pluginCode, page.getSlug());
+            }
+        }
     }
 
     private void applyInternal(HomePagePreset preset) {
@@ -159,7 +241,7 @@ public class CmsPresetAppService {
         try {
             PluginHomePresetPayload payload = objectMapper.readValue(presetJson, PluginHomePresetPayload.class);
             if (payload.getTitle() == null && payload.getSubtitle() == null && payload.getHeroImageUrl() == null
-                    && payload.getSettings() == null && payload.getSections() == null) {
+                    && payload.getSettings() == null && payload.getSections() == null && payload.getPages() == null) {
                 throw new BizException("插件首页方案未声明任何内容：" + pluginCode);
             }
             return payload;

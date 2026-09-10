@@ -29,6 +29,7 @@ public class CmsPageDTO {
     private PageTemplate template;
     private PageStatus status;
     private LocalDateTime publishedAt;
+    private String sourcePluginCode;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

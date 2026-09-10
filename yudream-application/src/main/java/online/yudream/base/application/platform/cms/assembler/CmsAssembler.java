@@ -83,6 +83,7 @@ public class CmsAssembler {
                 .template(page.getTemplate())
                 .status(page.getStatus())
                 .publishedAt(page.getPublishedAt())
+                .sourcePluginCode(page.getSourcePluginCode())
                 .createTime(page.getCreateTime())
                 .updateTime(page.getUpdateTime())
                 .build();
