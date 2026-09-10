@@ -42,7 +42,7 @@
     },
     {
       "key": "plugin-remote-style-injection",
-      "text": "Plugin frontend styles must use the declared-styles path: vite.config mounts yuDreamPluginUnoCss() from @yudream/plugin-sdk/uno-config (host-identical UnoCSS presets, reset off, host theme vars only), src/index.ts imports 'virtual:uno.css', lib cssFileName 'style', and Java @PluginFrontend(styles = {\"style.css\"}) declares the asset so the host loads it before remoteEntry and reclaims it by lease. The legacy styles.css?inline + install() <style> injection is deprecated and must not be used by new plugins."
+      "text": "Plugin frontend styles must use the declared-styles path: vite.config mounts yuDreamPluginUnoCss() from @yudream/plugin-sdk/uno-config (host-identical UnoCSS presets, reset off, host theme vars only), src/index.ts imports 'virtual:uno.css', lib cssFileName 'style', and Java @PluginFrontend(styles = {\"style.css\"}) declares the asset so the host loads it before remoteEntry and reclaims it by lease. The legacy styles.css?inline + install() <style> injection is deprecated and must not be used by new plugins. Cascade isolation: the SDK config emits every generated rule into `@layer yudream-plugin`, and the host pins layer order `yudream-base` (host preflights) < `yudream-plugin` < unlayered host utilities, so plugin styles may override host preflight/native-element styles but can never override host same-name utilities or responsive variants (the full-width FaModal regression caused by plugin `.max-w-full` outranking host `sm:max-w-lg`). Plugins must ship style.css built with SDK >= 1.6.0; older unlayered plugin stylesheets still win ties against host utilities and must be rebuilt."
     },
     {
       "key": "plugin-theme-mutex",
@@ -155,6 +155,10 @@
     {
       "key": "agent-capability-integration",
       "text": "Agent applications are a standalone platform capability with an explicit provider, project gate, application gate, and AI/Integration dependencies; menus and endpoints must be bound to agent rather than only ai."
+    },
+    {
+      "key": "agent-trace-logs-page",
+      "text": "Agent 执行流落库后由 AgentTraceAppService 统一查询/统计/导出/删除，日志菜单 system:agent-trace 走 /api/platform/agent-traces 与 system:monitor:agent-trace:view|export|delete，不依赖开发模式；DevTools 面板仅保留紧凑列表与 requireDevMode 的 SSE 实时流。"
     },
     {
       "key": "frontend-fa-form-label",
