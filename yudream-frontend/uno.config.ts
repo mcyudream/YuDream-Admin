@@ -17,6 +17,13 @@ import { presetAnimations } from 'unocss-preset-animations'
 const projectRoot = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  // 级联层架构：preflight（wind4 reset 的 base 层 + shadcn 的 preflights 层）降入 yudream-base，
+  // 插件 style.css 经 SDK 输出进 @layer yudream-plugin，宿主工具类保持未分层（最高优先）。
+  // 层序：yudream-base < yudream-plugin < 宿主未分层工具类——插件可覆写 reset 与原生元素样式，
+  // 但永远不能覆盖宿主同名工具类/响应式变体（如 sm:max-w-lg 被插件 max-w-full 顶掉的问题）。
+  outputToCssLayers: {
+    cssLayerName: layer => (layer === 'preflights' || layer === 'base') ? 'yudream-base' : null,
+  },
   content: {
     pipeline: {
       include: [

@@ -1,3 +1,6 @@
+/* 级联层序声明（须早于任何插件 style.css 加载）：宿主 preflight 最低，插件工具类次之，宿主工具类未分层最高 */
+@layer yudream-base, yudream-plugin;
+
 /* 页面布局 CSS 变量 */
 :root {
   color-scheme: light;
