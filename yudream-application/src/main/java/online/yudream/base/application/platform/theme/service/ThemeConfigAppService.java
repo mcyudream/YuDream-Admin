@@ -79,7 +79,7 @@ public class ThemeConfigAppService {
                             storedValue instanceof String text && StringUtils.hasText(text));
                     values.put(field.getKey(), "");
                 } else {
-                    values.put(field.getKey(), stored.getOrDefault(field.getKey(), field.getDefaultValue()));
+                    values.put(field.getKey(), mergeStored(stored, field));
                 }
             }
         }
@@ -143,7 +143,7 @@ public class ThemeConfigAppService {
                 if (isSecret(field)) {
                     continue;
                 }
-                result.put(field.getKey(), stored.getOrDefault(field.getKey(), field.getDefaultValue()));
+                result.put(field.getKey(), mergeStored(stored, field));
             }
             return result;
         } catch (Exception e) {
@@ -234,12 +234,18 @@ public class ThemeConfigAppService {
         return Boolean.TRUE.equals(field.getSecret());
     }
 
+    /** 已持久化的键（含空串）优先生效，缺键才回落 schema 默认。 */
+    private Object mergeStored(Map<String, Object> stored, ThemeConfigFieldDTO field) {
+        return stored.containsKey(field.getKey()) ? stored.get(field.getKey()) : field.getDefaultValue();
+    }
+
     private Object coerce(ThemeConfigFieldDTO field, Object value) {
         return switch (field.getType()) {
             case "number" -> coerceNumber(field, value);
             case "switch" -> coerceSwitch(value);
             case "list" -> coerceList(field, value);
             case "select" -> coerceSelect(field, value);
+            case "image" -> coerceImage(value);
             default -> value == null ? null : String.valueOf(value);
         };
     }
@@ -270,6 +276,17 @@ public class ThemeConfigAppService {
             return bool;
         }
         return Boolean.parseBoolean(String.valueOf(value));
+    }
+
+    /**
+     * 图片字段空值必须落成空串而不是删键：删键后读取会回落到 schema default，
+     * 主题自带图就删不掉。空串表示管理员明确清空。
+     */
+    private Object coerceImage(Object value) {
+        if (value == null) {
+            return "";
+        }
+        return String.valueOf(value).trim();
     }
 
     private Object coerceSelect(ThemeConfigFieldDTO field, Object value) {

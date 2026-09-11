@@ -4,13 +4,15 @@ import type { PluginTheme, PluginThemeScope } from '@/api/modules/platform-plugi
 import apiPlugin from '@/api/modules/platform-plugin'
 import { pluginFrontendAssetUrl } from './frontend-assets'
 import { acquirePluginRemoteModuleByCode } from './remote-loader'
-import { isLikelyPublicPath } from './theme-public-path'
+import { isLikelyPublicPath, isSiteThemeVisible } from './theme-public-path'
 
-export { isLikelyPublicPath } from './theme-public-path'
+export { isLikelyPublicPath, isSiteThemeVisible } from './theme-public-path'
 
 const SCOPES: PluginThemeScope[] = ['SITE', 'ADMIN']
 const SCOPE_ATTRIBUTE = 'data-yudream-theme-scope'
 const PLUGIN_ATTRIBUTE = 'data-yudream-theme-plugin'
+/** 与 index.html 启动页内联脚本共用：缓存上次 SITE 主题样式地址，公开站刷新时立刻覆盖宿主启动页。 */
+export const SITE_THEME_STYLE_CACHE_KEY = 'yudream.siteThemeStyles'
 
 let currentRoutePublic = isLikelyPublicPath()
 let activeThemePlugins = new Map<string, string>()
@@ -29,7 +31,7 @@ export function useActivePluginTheme(scope: PluginThemeScope) {
  */
 export async function bootstrapPluginThemes() {
   try {
-    currentRoutePublic = isLikelyPublicPath()
+    currentRoutePublic = isSiteThemeVisible()
     const res = await apiPlugin.activeThemes()
     applyActiveThemes(res.data || {})
     if (currentRoutePublic) {
@@ -49,7 +51,7 @@ export async function refreshPluginThemes() {
 /** 公开路由启用 site 主题并禁用 admin 主题，后台路由相反，避免两个 scope 的变量互相污染。 */
 export function watchPluginThemeScope(router: Router) {
   const sync = () => {
-    currentRoutePublic = router.currentRoute.value.meta?.public === true
+    currentRoutePublic = isSiteThemeVisible(router.currentRoute.value.meta?.public === true)
     syncScopeVisibility()
   }
   router.afterEach(sync)
@@ -66,29 +68,53 @@ function applyActiveThemes(themes: Partial<Record<PluginThemeScope, PluginTheme>
     }
     const desired = theme ? theme.styles.map(path => pluginFrontendAssetUrl(theme.pluginCode, path, theme.assetRevision)) : []
     const existing = themeLinks(scope)
-    const unchanged = existing.length === desired.length
-      && existing.every((link, index) => link.getAttribute('href') === desired[index])
+    const existingByHref = new Map(existing.map(link => [link.getAttribute('href') || '', link]))
+    const keep = new Set<HTMLLinkElement>()
+    const unchanged = desired.length > 0
+      && desired.length === existing.length
+      && desired.every(href => existingByHref.has(href))
     if (unchanged) {
       continue
     }
+    if (theme) {
+      for (const href of desired) {
+        const found = existingByHref.get(href)
+        if (found) {
+          keep.add(found)
+          continue
+        }
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = href
+        link.setAttribute(SCOPE_ATTRIBUTE, scope.toLowerCase())
+        link.setAttribute(PLUGIN_ATTRIBUTE, theme.pluginCode)
+        document.head.appendChild(link)
+        keep.add(link)
+      }
+    }
     for (const link of existing) {
-      link.remove()
-    }
-    if (!theme) {
-      continue
-    }
-    for (const path of theme.styles) {
-      const link = document.createElement('link')
-      link.rel = 'stylesheet'
-      link.href = pluginFrontendAssetUrl(theme.pluginCode, path, theme.assetRevision)
-      link.setAttribute(SCOPE_ATTRIBUTE, scope.toLowerCase())
-      link.setAttribute(PLUGIN_ATTRIBUTE, theme.pluginCode)
-      document.head.appendChild(link)
+      if (!keep.has(link)) {
+        link.remove()
+      }
     }
   }
   activeThemePlugins = active
+  persistSiteThemeStyleCache(themes)
   syncScopeVisibility()
   syncThemeRuntimeModules()
+}
+
+function persistSiteThemeStyleCache(themes: Partial<Record<PluginThemeScope, PluginTheme>>) {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+  const theme = themes.SITE
+  if (!theme?.styles?.length) {
+    localStorage.removeItem(SITE_THEME_STYLE_CACHE_KEY)
+    return
+  }
+  const hrefs = theme.styles.map(path => pluginFrontendAssetUrl(theme.pluginCode, path, theme.assetRevision))
+  localStorage.setItem(SITE_THEME_STYLE_CACHE_KEY, JSON.stringify(hrefs))
 }
 
 /**
@@ -144,9 +170,23 @@ function waitForThemeStyles(scope: PluginThemeScope, timeoutMs = 2500) {
     return Promise.resolve()
   }
   return Promise.race([
-    Promise.all(links.map(waitForStylesheet)),
+    Promise.all([...links.map(waitForStylesheet), ...links.flatMap(waitForSplashGif)]),
     new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
   ]).then(() => undefined)
+}
+
+function waitForSplashGif(link: HTMLLinkElement) {
+  const href = link.href || ''
+  if (!href.includes('style.css')) {
+    return []
+  }
+  const gif = href.replace(/style\.css(\?|$)/, 'loading.gif$1')
+  return [new Promise<void>((resolve) => {
+    const img = new Image()
+    img.onload = () => resolve()
+    img.onerror = () => resolve()
+    img.src = gif
+  })]
 }
 
 function waitForStylesheet(link: HTMLLinkElement) {

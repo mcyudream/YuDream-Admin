@@ -2,6 +2,9 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.platform.milky.service.MilkyConnectionAppService;
+import online.yudream.base.application.system.file.dto.FileObjectDTO;
+import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
 import online.yudream.base.application.system.user.service.MessagingIdentityBindScope;
 import online.yudream.base.domain.platform.milky.aggregate.MilkyConnection;
@@ -12,6 +15,8 @@ import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.platform.milky.repo.MilkyConnectionRepo;
 import online.yudream.base.domain.platform.milky.sandbox.QqSandboxSession;
+import online.yudream.base.infra.platform.milky.official.OfficialQqBotEventNormalizer;
+import online.yudream.base.infra.platform.milky.official.OfficialQqBotSessionStore;
 import online.yudream.base.application.system.file.dto.FileObjectDTO;
 import online.yudream.base.application.system.file.service.FileAppService;
 import online.yudream.base.plugin.spi.system.command.PluginCommandService;
@@ -49,6 +54,8 @@ public class MilkyPluginEventDispatcher {
     private final PluginCommandService commands;
     private final MilkyPluginMessagingService messaging;
     private final MilkyConnectionRepo connections;
+    private final MilkyConnectionAppService connectionApps;
+    private final OfficialQqBotSessionStore officialSessions;
     private final PluginRenderService renderer;
     private final FileAppService files;
     private final TemplateEngine templateEngine;
@@ -130,6 +137,10 @@ public class MilkyPluginEventDispatcher {
                 }
                 if (isMenuAlias(command.name())) {
                     menuImage(pluginEvent, user, command.arguments());
+                    return;
+                }
+                if (BIND_MENTION_COMMAND.equals(command.name())) {
+                    bindBotMention(pluginEvent, command, connection);
                     return;
                 }
                 if (user == null && !"绑定".equals(command.name()) && (requiresBound() || commandRequiresBound(command.name()))) {
@@ -658,6 +669,42 @@ public class MilkyPluginEventDispatcher {
      */
     private void replyBindHint(PluginEvent event) {
         sendMenuText(event, "当前消息身份未绑定系统账号，请先完成绑定后再使用该指令。");
+    }
+
+    /** 官方全量群消息里的机器人回填指令名：/绑定机器人 六位回填码。 */
+    static final String BIND_MENTION_COMMAND = "绑定机器人";
+
+    /**
+     * 官方全量群消息（GROUP_MESSAGE_CREATE）对每条消息推送，机器人在群内被 @ 的提及 openid
+     * 无法自动得知：管理员在连接页生成短时回填码，在目标群 @机器人 发送「/绑定机器人 码」，
+     * 用该消息内容的首个提及 id 回填连接配置并即时生效。回填码本身即授权，不要求已绑定系统账号。
+     */
+    private void bindBotMention(PluginEvent event, Parsed command, MilkyConnection connection) {
+        if (connection == null || !connection.official()) {
+            sendMenuText(event, "该指令仅支持官方 QQ 机器人连接。");
+            return;
+        }
+        if (QqSandboxExecutionScope.current() != null) {
+            sendMenuText(event, "沙箱模式不回填真实连接配置。");
+            return;
+        }
+        List<String> mentions = OfficialQqBotEventNormalizer.mentionIdsFromContent(event.content());
+        if (mentions.isEmpty()) {
+            sendMenuText(event, "请先 @ 机器人再发送：/绑定机器人 六位回填码");
+            return;
+        }
+        try {
+            connectionApps.consumeMentionBindingCode(
+                    command.arguments().isEmpty() ? "" : command.arguments().getFirst(), connection.getId());
+        } catch (RuntimeException exception) {
+            sendMenuText(event, exception.getMessage() == null ? "回填码校验失败" : exception.getMessage());
+            return;
+        }
+        String mentionOpenId = mentions.getFirst();
+        connection.bindMentionOpenId(mentionOpenId);
+        connections.save(connection);
+        officialSessions.rememberSelfAlias(connection.getId(), mentionOpenId);
+        sendMenuText(event, "已记录机器人提及身份，现在 @ 机器人即可触发对话。");
     }
 
     private boolean allowed(User user, String permission) {

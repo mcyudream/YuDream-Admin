@@ -281,8 +281,16 @@
       "text": "主题接管公开站导航有两条通道：①声明 chromeComponent 后由主题远程 Vue 组件完全接管页头页脚（推荐，NMO 复刻必须走这条，避免宿主 SiteChrome 在首页/内页切样式）；②未声明时仍用 chrome 变量契约：宿主 SiteChrome 只消费带兜底的 --yb-site-header-position/top/border/background/backdrop、--yb-site-header-bar-*、--yb-site-header-brand-display、--yb-site-header-nav-justify，自身永不赋值。坑：宿主自己赋的是 --yb-site-header-bg 作为 --yb-site-header-background 的兜底，主题必须写 --yb-site-header-background。旧 homeCss RAW 注入 + :has() overlay hack 已退役。"
     },
     {
+      "key": "site-wiki-chrome-embed",
+      "text": "公开知识库 /wiki、/wiki/search、文章页必须套 SiteChrome（默认主题也是），不得再自带「知识库 | 管理后台」独立顶栏。正文消费 --yb-site-*，MdPreview 用 preview-theme=default 并把 --md-bk-color/--md-color 设成主题变量（否则 md-editor 自带白底浅字在深色下不可读）。默认主题下宿主页面只出中性卡片（圆角+柔和阴影），像素纹理/方角/9-slice 只写在主题插件 style.css。wiki 移动端抽屉与 FAB 的 z-index 必须高于站点页头 1000 与主题导航 1024（用 1100/1110/1120），否则标题被裁切。主题中心导航 http(s) 外链可勾选 embed：公开站改写为 /embed?url=&title=，内容区 iframe 嵌入；未勾选仍新窗口打开。MC 纹理只许主题插件资产，禁止打进宿主 public/。"
+    },
+    {
+      "key": "plugin-public-page-theme-bridge",
+      "text": "插件公开页（如 mc-wiki 百科 /encyclopedia）禁止写死深色 MC 配色，必须消费宿主 --yb-site-* 桥接变量并回落浅色默认（ink=text、muted=muted、panel=surface、border=border-2、强调=primary）；主题激活时 .site-chrome/.neco-chrome 注入深色值自动换肤，顶部让位用 padding-top: var(--neco-page-top, 默认)。FaDrawer 等 portal 到 body 的浮层拿不到 .site-chrome 祖先变量：深色外观用 html:has(.neco-chrome) 前缀门控，未激活主题时完全不覆盖颜色圆角、跟随宿主外观，禁止再用 html[data-theme] 手写两套。--neco-accent-* 是 neco 主题私有变量，其他插件禁止引用。"
+    },
+    {
       "key": "plugin-theme-splash",
-      "text": "公开站启动页皮肤属于 SITE 主题，不属于宿主。vite-plugin-app-loading 在 Vue/router 之前把宿主 loading.html 注入 [data-app-loading]；theme-runtime 启动时按 URL 公开前缀（/site /login /wiki /servers /activities 等）打开 SITE 主题 link.media，再等样式表 load，主题 CSS 用自己的 GIF/字体覆盖启动页。禁止把主题 loading.gif 或像素字体放进宿主 apps/*/public/——那会在未装主题和管理后台也显示。后台路由 media=not all，SITE 覆盖不生效。插件产物在 @layer yudream-plugin，覆盖宿主未分层 loading 样式必须带 !important。"
+      "text": "公开站启动页皮肤属于 SITE 主题，不属于宿主。vite-plugin-app-loading 在 Vue/router 之前把宿主 loading.html 注入 [data-app-loading]。index.html 在公开路径（含无 token 的 /）用 localStorage yudream.siteThemeStyles 立刻挂上次 SITE CSS 并 preload loading.gif，避免等 main.ts 拉完 /themes/active 才覆盖；theme-runtime 启动后再按 URL 公开前缀打开 SITE media，等样式表和 GIF 都就绪才 loadingFadeOut。已登录的 / 仍是后台工作台，保持宿主默认动画。禁止把主题 loading.gif 或像素字体放进宿主 apps/*/public/。后台路由 media=not all。插件产物在 @layer yudream-plugin，覆盖宿主未分层 loading 样式必须带 !important。主题配置 image 字段清空必须存空串，读取不得回落到 schema default。"
     }
   ],
   "utilities": [

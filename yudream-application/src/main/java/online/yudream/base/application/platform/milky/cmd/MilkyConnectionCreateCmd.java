@@ -2,6 +2,8 @@ package online.yudream.base.application.platform.milky.cmd;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class MilkyConnectionCreateCmd {
     private String name;
@@ -12,6 +14,7 @@ public class MilkyConnectionCreateCmd {
     private String appSecret;
     private Boolean sandbox;
     private Integer intents;
+    private List<String> mentionOpenIds;
     private String commandMenuImageMode;
     private String commandMenuPublicBaseUrl;
 }

@@ -247,7 +247,7 @@ function confirmDelete(row?: MenuManageItem) {
   }
   modal.confirm({
     title: '确认信息',
-    content: `确认删除“${target.name}”吗？删除后无法恢复。`,
+    content: `确认删除“${target.name}”及其全部子菜单、按钮权限吗？删除后无法恢复。`,
     onConfirm: async () => {
       await apiMenu.remove(target.code)
       toast.success('删除成功')

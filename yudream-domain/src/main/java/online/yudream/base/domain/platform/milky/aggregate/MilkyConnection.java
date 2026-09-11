@@ -11,6 +11,8 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.enumerate.MilkyConnectionProtocol;
 import online.yudream.base.domain.platform.milky.model.MilkyModels;
 
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = true)
 @Data
 @SuperBuilder
@@ -27,6 +29,8 @@ public class MilkyConnection extends BaseDomain {
     private String appSecret;
     private boolean sandbox;
     private Integer intents;
+    /** 机器人在群内被 @ 时的提及 openid（全量群消息 GROUP_MESSAGE_CREATE 靠它与内容 <@id> 匹配判定定向；不同群可能不同，逐个登记）。 */
+    private List<String> mentionOpenIds;
     private boolean enabled;
     private String commandMenuImageMode;
     private String commandMenuPublicBaseUrl;
@@ -39,12 +43,21 @@ public class MilkyConnection extends BaseDomain {
     public static MilkyConnection create(String name, String protocol, String baseUrl, String token,
                                          String appId, String appSecret, Boolean sandbox, Integer intents,
                                          String commandMenuImageMode, String commandMenuPublicBaseUrl) {
+        return create(name, protocol, baseUrl, token, appId, appSecret, sandbox, intents,
+                commandMenuImageMode, commandMenuPublicBaseUrl, null);
+    }
+
+    public static MilkyConnection create(String name, String protocol, String baseUrl, String token,
+                                         String appId, String appSecret, Boolean sandbox, Integer intents,
+                                         String commandMenuImageMode, String commandMenuPublicBaseUrl,
+                                         List<String> mentionOpenIds) {
         MilkyConnectionProtocol kind = MilkyConnectionProtocol.from(protocol);
         MilkyConnectionBuilder<?, ?> builder = MilkyConnection.builder()
                 .name(required(name, "连接名称不能为空"))
                 .protocol(kind)
                 .sandbox(Boolean.TRUE.equals(sandbox))
                 .intents(intents)
+                .mentionOpenIds(sanitizeMentionOpenIds(mentionOpenIds))
                 .enabled(true)
                 .commandMenuImageMode(normalizeMode(commandMenuImageMode))
                 .commandMenuPublicBaseUrl(blank(commandMenuPublicBaseUrl) ? null : commandMenuPublicBaseUrl.trim());
@@ -66,12 +79,21 @@ public class MilkyConnection extends BaseDomain {
     }
 
     public void update(String name, String baseUrl, String token, String commandMenuImageMode, String commandMenuPublicBaseUrl) {
-        update(name, protocolCode(), baseUrl, token, appId, null, sandbox, intents, commandMenuImageMode, commandMenuPublicBaseUrl);
+        update(name, protocolCode(), baseUrl, token, appId, null, sandbox, intents, commandMenuImageMode, commandMenuPublicBaseUrl,
+                mentionOpenIds);
     }
 
     public void update(String name, String protocol, String baseUrl, String token,
                        String appId, String appSecret, Boolean sandbox, Integer intents,
                        String commandMenuImageMode, String commandMenuPublicBaseUrl) {
+        update(name, protocol, baseUrl, token, appId, appSecret, sandbox, intents,
+                commandMenuImageMode, commandMenuPublicBaseUrl, null);
+    }
+
+    public void update(String name, String protocol, String baseUrl, String token,
+                       String appId, String appSecret, Boolean sandbox, Integer intents,
+                       String commandMenuImageMode, String commandMenuPublicBaseUrl,
+                       List<String> mentionOpenIds) {
         this.name = required(name, "连接名称不能为空");
         MilkyConnectionProtocol kind = protocol == null || protocol.isBlank()
                 ? protocolOrDefault()
@@ -81,6 +103,9 @@ public class MilkyConnection extends BaseDomain {
         this.commandMenuPublicBaseUrl = blank(commandMenuPublicBaseUrl) ? null : commandMenuPublicBaseUrl.trim();
         if (intents != null) {
             this.intents = intents;
+        }
+        if (mentionOpenIds != null) {
+            this.mentionOpenIds = sanitizeMentionOpenIds(mentionOpenIds);
         }
         if (sandbox != null) {
             this.sandbox = sandbox;
@@ -133,6 +158,34 @@ public class MilkyConnection extends BaseDomain {
 
     public int officialIntents() {
         return intents == null ? MilkyConnectionProtocol.DEFAULT_OFFICIAL_INTENTS : intents;
+    }
+
+    public List<String> officialMentionOpenIds() {
+        return mentionOpenIds == null ? List.of() : mentionOpenIds;
+    }
+
+    /** 登记机器人被 @ 时的提及 openid（官方全量群消息按它匹配定向）；重复登记自动去重。 */
+    public void bindMentionOpenId(String mentionOpenId) {
+        if (blank(mentionOpenId)) {
+            throw new BizException("机器人提及 openid 不能为空");
+        }
+        String trimmed = mentionOpenId.trim();
+        List<String> ids = new java.util.ArrayList<>(officialMentionOpenIds());
+        if (!ids.contains(trimmed)) {
+            ids.add(trimmed);
+        }
+        this.mentionOpenIds = ids;
+    }
+
+    private static List<String> sanitizeMentionOpenIds(List<String> mentionOpenIds) {
+        if (mentionOpenIds == null) {
+            return null;
+        }
+        return mentionOpenIds.stream()
+                .filter(id -> !blank(id))
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     public boolean credentialConfigured() {

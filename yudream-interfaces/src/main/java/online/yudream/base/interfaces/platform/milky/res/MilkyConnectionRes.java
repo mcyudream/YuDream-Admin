@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -15,6 +16,7 @@ public class MilkyConnectionRes {
     private String appId;
     private boolean sandbox;
     private Integer intents;
+    private List<String> mentionOpenIds;
     private boolean enabled;
     private boolean credentialConfigured;
     private String commandMenuImageMode;

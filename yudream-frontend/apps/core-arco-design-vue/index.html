@@ -10,6 +10,105 @@
     <meta http-equiv="Cache-control" content="no-cache">
     <meta http-equiv="Cache" content="no-cache">
     <title>正在加载</title>
+    <script>
+      // 公开站启动页发生在 Vue 之前：先用缓存的 SITE CSS 立刻覆盖宿主彩虹方块，
+      // 再并行拉 /themes/active，避免等 main.ts 打包下载完才出现 MC GIF。
+      // 缓存键与 theme-runtime.ts 的 SITE_THEME_STYLE_CACHE_KEY 保持一致。
+      (function () {
+        var CACHE_KEY = 'yudream.siteThemeStyles'
+        var prefixes = ['/login', '/register', '/setup', '/verify-email', '/reset-password', '/external-login', '/pay/result', '/site', '/embed', '/forms', '/wiki', '/servers', '/activities', '/timeline']
+        function normalize(raw) {
+          return (String(raw || '/').split('?')[0] || '/').replace(/\/+$/, '') || '/'
+        }
+        function isPublic(p) {
+          return prefixes.some(function (prefix) { return p === prefix || p.indexOf(prefix + '/') === 0 })
+        }
+        var path = normalize(location.pathname)
+        var hashPath = location.hash.charAt(0) === '#' ? normalize(location.hash.slice(1)) : ''
+        var guestRoot = path === '/' && (!hashPath || hashPath === '/') && !localStorage.getItem('token')
+        if (!isPublic(path) && !isPublic(hashPath) && !guestRoot) {
+          return
+        }
+        function hideHostSquares() {
+          if (document.querySelector('[data-yudream-theme-boot="splash-gate"]')) {
+            return
+          }
+          var style = document.createElement('style')
+          style.setAttribute('data-yudream-theme-boot', 'splash-gate')
+          style.textContent = '[data-app-loading] .loading .square,[data-app-loading] .loading .square::before{visibility:hidden!important}'
+          document.head.appendChild(style)
+        }
+        function inject(hrefs, boot) {
+          if (!Array.isArray(hrefs) || !hrefs.length) {
+            return
+          }
+          hideHostSquares()
+          hrefs.forEach(function (href) {
+            if (typeof href !== 'string' || !href) {
+              return
+            }
+            if (document.querySelector('link[data-yudream-theme-scope="site"][href="' + href + '"]')) {
+              return
+            }
+            var link = document.createElement('link')
+            link.rel = 'stylesheet'
+            link.href = href
+            link.setAttribute('data-yudream-theme-scope', 'site')
+            link.setAttribute('data-yudream-theme-boot', boot)
+            document.head.appendChild(link)
+            if (/style\.css(\?|$)/.test(href)) {
+              var preload = document.createElement('link')
+              preload.rel = 'preload'
+              preload.as = 'image'
+              preload.href = href.replace(/style\.css/, 'loading.gif')
+              document.head.appendChild(preload)
+            }
+          })
+        }
+        try {
+          inject(JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'), 'cache')
+        }
+        catch (e) {}
+        var proxyUrl = '/proxy/api/platform/plugins/themes/active'
+        var directUrl = '/api/platform/plugins/themes/active'
+        function applyPayload(data, useProxy) {
+          var site = data && (data.SITE || data.site)
+          if (!site || !Array.isArray(site.styles) || !site.pluginCode) {
+            return
+          }
+          var hrefs = site.styles.map(function (path) {
+            var url = '/api/platform/plugins/' + site.pluginCode + '/assets/' + path
+            if (useProxy) {
+              url = '/proxy' + url
+            }
+            if (site.assetRevision) {
+              url += (url.indexOf('?') >= 0 ? '&' : '?') + 'v=' + encodeURIComponent(site.assetRevision)
+            }
+            return url
+          })
+          inject(hrefs, 'fetch')
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(hrefs))
+          }
+          catch (e) {}
+        }
+        function readJson(res) {
+          if (!res || !res.ok) {
+            throw new Error('theme active unavailable')
+          }
+          return res.json()
+        }
+        fetch(proxyUrl, { headers: { Accept: 'application/json' } })
+          .then(readJson)
+          .then(function (body) { applyPayload(body && body.data, true) })
+          .catch(function () {
+            return fetch(directUrl, { headers: { Accept: 'application/json' } })
+              .then(readJson)
+              .then(function (body) { applyPayload(body && body.data, false) })
+          })
+          .catch(function () {})
+      })()
+    </script>
   </head>
   <body>
     <div id="app">

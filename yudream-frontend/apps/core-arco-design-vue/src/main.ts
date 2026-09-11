@@ -28,16 +28,16 @@ app.use(pinia)
 const appSettingsStore = useAppSettingsStore(pinia)
 
 async function bootstrap() {
-  await initializeStartupBranding(
+  const branding = initializeStartupBranding(
     () => appSettingsStore.loadSiteSettings(),
     () => applyStartupBranding(document, appSettingsStore.siteName),
   )
   appSettingsStore.loadThemeSettings()
-  // 与主题设置并行拉取插件主题，挂载前注入常驻样式，避免公开站主题闪烁
-  await bootstrapPluginThemes()
+  // 与站点名并行拉取插件主题：公开站启动页要等 SITE CSS 注入后再淡出，
+  // 否则全局换页动画会一直停在宿主彩虹方块上。
+  await Promise.all([branding, bootstrapPluginThemes()])
 
   app.use(router)
-  watchPluginThemeScope(router)
   app.use(uiProvider)
   app.use(formCreate)
   app.use(FcDesigner)
@@ -50,6 +50,8 @@ async function bootstrap() {
   app.mount('#app')
   // 等主题 CSS 注入后再淡出启动页：公开站可被 SITE 主题覆盖，未装主题/后台仍是宿主默认动画。
   loadingFadeOut()
+  // 启动页还在时不要按路由关掉 SITE media，否则淡出结尾会闪回宿主彩虹方块。
+  watchPluginThemeScope(router)
 }
 
 void bootstrap()

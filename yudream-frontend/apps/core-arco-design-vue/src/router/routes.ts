@@ -95,6 +95,15 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/embed',
+    name: 'publicSiteEmbed',
+    component: () => import('@/views/site/embed.vue'),
+    meta: {
+      title: '嵌入页面',
+      public: true,
+    },
+  },
+  {
     path: '/wiki',
     name: 'publicWikiHome',
     component: () => import('@/views/wiki/home.vue'),

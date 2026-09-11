@@ -19,6 +19,7 @@ public final class MilkyConnectionAssembler {
                 .appId(source.getAppId())
                 .sandbox(source.isSandbox())
                 .intents(source.getIntents())
+                .mentionOpenIds(source.officialMentionOpenIds())
                 .enabled(source.isEnabled())
                 .credentialConfigured(source.credentialConfigured())
                 .commandMenuImageMode(source.getCommandMenuImageMode())

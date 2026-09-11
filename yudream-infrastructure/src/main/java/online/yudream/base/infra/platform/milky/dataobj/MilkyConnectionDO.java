@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import online.yudream.base.infra.common.baseobj.BaseDO;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = true)
 @Data
 @NoArgsConstructor
@@ -21,6 +23,7 @@ public class MilkyConnectionDO extends BaseDO {
     private String encryptedAppSecret;
     private boolean sandbox;
     private Integer intents;
+    private List<String> mentionOpenIds;
     private boolean enabled;
     private String commandMenuImageMode;
     private String commandMenuPublicBaseUrl;

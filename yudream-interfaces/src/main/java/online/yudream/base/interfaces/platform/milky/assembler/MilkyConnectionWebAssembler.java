@@ -51,6 +51,7 @@ public final class MilkyConnectionWebAssembler {
                 .appId(dto.getAppId())
                 .sandbox(dto.isSandbox())
                 .intents(dto.getIntents())
+                .mentionOpenIds(dto.getMentionOpenIds())
                 .enabled(dto.isEnabled())
                 .credentialConfigured(dto.isCredentialConfigured())
                 .commandMenuImageMode(dto.getCommandMenuImageMode())

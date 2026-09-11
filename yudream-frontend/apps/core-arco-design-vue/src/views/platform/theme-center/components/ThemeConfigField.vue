@@ -70,15 +70,33 @@ function updateItemField(index: number, key: string, value: any) {
   listItems.value = next
 }
 
-const imageUrls = computed({
-  get: () => typeof props.modelValue === 'string' && props.modelValue ? [toBackendAssetUrl(props.modelValue)] : [],
-  set: (urls) => {
-    const raw = urls[0] || ''
-    update(stripDisplayPrefix(raw))
-  },
+const toast = useFaToast()
+
+const imageUrls = ref<string[]>(toDisplayUrls(props.modelValue))
+
+watch(() => props.modelValue, (value) => {
+  const next = toDisplayUrls(value)
+  if (sameUrls(next, imageUrls.value)) {
+    return
+  }
+  imageUrls.value = next
 })
 
-const toast = useFaToast()
+watch(imageUrls, (urls) => {
+  const stored = stripDisplayPrefix(urls[0] || '')
+  const current = typeof props.modelValue === 'string' ? props.modelValue : ''
+  if (stored !== current) {
+    update(stored)
+  }
+}, { deep: true })
+
+function toDisplayUrls(value: unknown) {
+  return typeof value === 'string' && value ? [toBackendAssetUrl(value)] : []
+}
+
+function sameUrls(left: string[], right: string[]) {
+  return left.length === right.length && left.every((item, index) => item === right[index])
+}
 
 function stripDisplayPrefix(url: string) {
   if (url.startsWith('/proxy/api/')) {
@@ -103,7 +121,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
   if (!url) {
     throw new Error('图片上传后未返回访问地址')
   }
-  return { url }
+  return { url: toBackendAssetUrl(url) }
 }
 </script>
 
@@ -179,7 +197,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         :after-upload="response => response.url"
       />
       <p class="theme-config-field__hint">
-        点击上传图片，保存后公开站即时生效；也可继续使用主题自带资产路径。
+        点击上传或删除图片后记得保存；删除会去掉该图，不再自动填回主题自带图。
       </p>
     </template>
     <FaInput
