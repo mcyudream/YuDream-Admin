@@ -89,7 +89,10 @@ public class OfficialQqBotEventGateway {
                         .concatMap(raw -> handle(connection, raw, outbound, listener, session, resumable, heartbeatInterval, heartbeat))
                         .then())
                 .doOnError(error -> {
-                    if (expectedTransportError(error)) {
+                    if (error instanceof GatewayControlException control) {
+                        log.warn("Official QQ bot gateway control signal: connectionId={}, action={}",
+                                connectionId, control.getMessage());
+                    } else if (expectedTransportError(error)) {
                         log.warn("Official QQ bot gateway transport interrupted: connectionId={}, reason={}",
                                 connectionId, error.toString());
                     } else {
@@ -128,12 +131,12 @@ public class OfficialQqBotEventGateway {
             case OP_HEARTBEAT_ACK -> Mono.empty();
             case OP_RECONNECT -> {
                 resumable.set(true);
-                yield Mono.error(new IllegalStateException("official gateway requested reconnect"));
+                yield Mono.error(new GatewayControlException("official gateway requested reconnect"));
             }
             case OP_INVALID_SESSION -> {
                 resumable.set(false);
                 session.set(null);
-                yield Mono.error(new IllegalStateException("official gateway session invalid"));
+                yield Mono.error(new GatewayControlException("official gateway session invalid"));
             }
             case OP_DISPATCH -> {
                 dispatch(connection, payload, listener, session);
@@ -254,6 +257,21 @@ public class OfficialQqBotEventGateway {
             current = current.getCause();
         }
         return false;
+    }
+
+    /**
+     * 网关协议控制信号（服务器要求 Resume/重连或放弃会话），属预期事件而非传输故障；
+     * 错误必须向上传播以触发重连，但日志按告警降噪。
+     */
+    private static final class GatewayControlException extends IllegalStateException {
+        private GatewayControlException(String message) {
+            super(message);
+        }
+
+        @Override
+        public String toString() {
+            return getMessage();
+        }
     }
 
     private record Session(String sessionId, AtomicLong lastSequence) { }
