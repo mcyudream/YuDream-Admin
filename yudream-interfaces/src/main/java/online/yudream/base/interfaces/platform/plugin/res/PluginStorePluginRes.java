@@ -19,4 +19,6 @@ public class PluginStorePluginRes implements Serializable {
 
     private String code;
     private PluginStorePluginDescriptorRes descriptor;
+    private String sourceCode;
+    private String sourceName;
 }

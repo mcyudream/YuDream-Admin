@@ -21,4 +21,6 @@ public class PluginStorePluginVersionRes implements Serializable {
     private PluginStorePluginDescriptorRes descriptor;
     private boolean installable;
     private String installDisabledReason;
+    private String sourceCode;
+    private String sourceName;
 }

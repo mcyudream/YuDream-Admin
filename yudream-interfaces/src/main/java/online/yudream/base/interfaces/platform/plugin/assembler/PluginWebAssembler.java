@@ -92,6 +92,7 @@ public class PluginWebAssembler {
                 .enabled(dto.isEnabled())
                 .rollbackAvailable(dto.isRollbackAvailable())
                 .rollbackVersion(dto.getRollbackVersion())
+                .marketSourceCode(dto.getMarketSourceCode())
                 .build();
     }
 
@@ -148,6 +149,8 @@ public class PluginWebAssembler {
         return PluginStorePluginRes.builder()
                 .code(dto.getCode())
                 .descriptor(toStoreDescriptorRes(dto.getDescriptor()))
+                .sourceCode(dto.getSourceCode())
+                .sourceName(dto.getSourceName())
                 .build();
     }
 
@@ -164,6 +167,8 @@ public class PluginWebAssembler {
                 .descriptor(toStoreDescriptorRes(dto.getDescriptor()))
                 .installable(dto.isInstallable())
                 .installDisabledReason(dto.getInstallDisabledReason())
+                .sourceCode(dto.getSourceCode())
+                .sourceName(dto.getSourceName())
                 .build();
     }
 

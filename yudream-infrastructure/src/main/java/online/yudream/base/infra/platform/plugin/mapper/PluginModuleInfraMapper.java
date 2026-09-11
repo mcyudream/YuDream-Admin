@@ -44,6 +44,7 @@ public class PluginModuleInfraMapper {
         dataObj.setEnabledAt(module.getEnabledAt());
         dataObj.setMenusInitialized(module.getMenusInitialized());
         dataObj.setThemeScopes(module.getThemeScopes());
+        dataObj.setMarketSourceCode(module.getMarketSourceCode());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -86,6 +87,7 @@ public class PluginModuleInfraMapper {
                 .enabledAt(dataObj.getEnabledAt())
                 .menusInitialized(dataObj.getMenusInitialized())
                 .themeScopes(dataObj.getThemeScopes())
+                .marketSourceCode(dataObj.getMarketSourceCode())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())

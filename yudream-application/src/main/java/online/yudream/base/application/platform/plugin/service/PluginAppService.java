@@ -126,17 +126,44 @@ public class PluginAppService {
 
     @Transactional
     public List<PluginModuleDTO> installStoreJar(Path stagedJar, String expectedCode, String expectedVersion, String expectedMain) {
+        return installStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain, null);
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> installStoreJar(Path stagedJar, String expectedCode, String expectedVersion,
+                                                 String expectedMain, String marketSourceCode) {
         PluginDescriptorInfo descriptor = pluginRuntimeGateway.describe(stagedJar)
                 .orElseThrow(() -> new BizException("上传文件不是有效的 YuDream 插件 JAR"));
         validateStoreDescriptor(descriptor, expectedCode, expectedVersion, expectedMain);
-        return installMarketplaceJar(stagedJar, descriptor);
+        installMarketplaceJar(stagedJar, descriptor);
+        applyMarketSource(descriptor.code(), marketSourceCode);
+        return modules();
     }
 
     @Transactional
     public List<PluginModuleDTO> updateStoreJar(Path stagedJar, String expectedCode, String expectedVersion, String expectedMain) {
-        installStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain);
+        return updateStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain, null);
+    }
+
+    @Transactional
+    public List<PluginModuleDTO> updateStoreJar(Path stagedJar, String expectedCode, String expectedVersion,
+                                                String expectedMain, String marketSourceCode) {
+        installStoreJar(stagedJar, expectedCode, expectedVersion, expectedMain, marketSourceCode);
         // 市场更新会先受控停止受影响插件，替换完成后立即按依赖顺序恢复原先启用的插件。
         return restoreEnabledPlugins();
+    }
+
+    /** 安装/更新成功后记录来源市场源；空值不改动（本地上传、回滚不得清空既有来源）。 */
+    private void applyMarketSource(String code, String marketSourceCode) {
+        if (!StringUtils.hasText(marketSourceCode)) {
+            return;
+        }
+        pluginModuleRepo.findByCode(code)
+                .filter(module -> !marketSourceCode.equals(module.getMarketSourceCode()))
+                .ifPresent(module -> {
+                    module.setMarketSourceCode(marketSourceCode);
+                    pluginModuleRepo.save(module);
+                });
     }
 
     @Transactional

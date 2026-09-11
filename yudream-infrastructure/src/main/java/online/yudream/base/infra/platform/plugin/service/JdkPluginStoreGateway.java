@@ -4,15 +4,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.port.PluginStoreGateway;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogEntry;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogVersion;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginCompatibility;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDependency;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescriptor;
-import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDetail;
-import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginPublisher;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginSource;
-import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginVersion;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreSourceRef;
 import online.yudream.base.domain.platform.plugin.valobj.SemVer;
 import online.yudream.base.domain.platform.plugin.valobj.SemVerRange;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +39,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -79,69 +78,68 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
     }
 
     @Override
-    public List<PluginStorePluginInfo> list() {
-        StoreLocation location = storeLocation();
-        List<PluginStorePluginInfo> result = new ArrayList<>();
+    public PluginStoreSourceRef configuredSourceRef() {
+        return new PluginStoreSourceRef(properties.getStoreRootUrl(), null);
+    }
+
+    @Override
+    public List<PluginStoreCatalogEntry> fetchCatalog(PluginStoreSourceRef source) {
+        StoreLocation location = storeLocation(source);
+        List<PluginStoreCatalogEntry> result = new ArrayList<>();
         Set<String> codes = new HashSet<>();
-        for (JsonNode entry : rootEntries(readJson(location.rootUrl()))) {
-            PluginStorePluginInfo info = listPlugin(location, entry);
-            if (info != null && codes.add(info.getCode())) {
-                result.add(info);
+        for (JsonNode entry : rootEntries(readJson(location.rootUrl(), source))) {
+            RootPlugin plugin = parseRootPlugin(entry, false);
+            if (plugin == null || !codes.add(plugin.code())) {
+                continue;
+            }
+            try {
+                result.add(catalogEntry(location, source, plugin));
+            } catch (BizException e) {
+                // 单个坏插件不拖垮整份目录；源级错误由同步状态暴露。
             }
         }
         return result;
     }
 
-    private PluginStorePluginInfo listPlugin(StoreLocation location, JsonNode entry) {
-        try {
-            RootPlugin plugin = parseRootPlugin(entry, true);
-            URI indexUrl = requireStoreReference(location, location.rootUrl(), plugin.index());
-            List<IndexVersion> versions = indexVersions(readJson(indexUrl), plugin.code());
-            IndexVersion lastVersion = versions.getLast();
-            URI descriptorUrl = requireStoreReference(location, location.baseUrl(), lastVersion.descriptor());
-            PluginStorePluginInfo info = new PluginStorePluginInfo();
-            info.setCode(plugin.code());
-            info.setDescriptor(descriptor(readJson(descriptorUrl), location, indexUrl, plugin.code(),
-                    lastVersion.releaseVersion()));
-            return info;
-        } catch (BizException e) {
-            return null;
+    private PluginStoreCatalogEntry catalogEntry(StoreLocation location, PluginStoreSourceRef source, RootPlugin plugin) {
+        URI indexUrl = requireStoreReference(location, location.rootUrl(), plugin.index());
+        List<IndexVersion> versions = indexVersions(readJson(indexUrl, source), plugin.code());
+        IndexVersion lastVersion = versions.getLast();
+        List<PluginStoreCatalogVersion> catalogVersions = new ArrayList<>();
+        URI latestDescriptorUrl = null;
+        for (IndexVersion version : versions) {
+            URI resolved = requireStoreReference(location, location.baseUrl(), version.descriptor());
+            if (version == lastVersion) {
+                latestDescriptorUrl = resolved;
+            }
+            catalogVersions.add(new PluginStoreCatalogVersion(version.releaseVersion(), resolved.toString()));
         }
+        String descriptorJson = readText(latestDescriptorUrl, source);
+        // 同步期即按契约校验最新版 descriptor（与 index 声明的 code/version 交叉校验），坏插件在快照阶段就被跳过
+        JsonNode latestNode = parseJsonText(descriptorJson);
+        descriptor(latestNode, location, indexUrl, plugin.code(), lastVersion.releaseVersion());
+        return new PluginStoreCatalogEntry(plugin.code(), indexUrl.toString(), descriptorJson, catalogVersions);
     }
 
     @Override
-    public Optional<PluginStorePluginDetail> detail(String code) {
-        if (!StringUtils.hasText(code) || !CODE.matcher(code).matches()) {
-            throw unavailable();
-        }
-        StoreLocation location = storeLocation();
-        RootPlugin target = null;
-        Set<String> codes = new HashSet<>();
-        for (JsonNode entry : rootEntries(readJson(location.rootUrl()))) {
-            RootPlugin plugin = parseRootPlugin(entry, true);
-            if (!codes.add(plugin.code())) {
-                throw unavailable();
-            }
-            if (code.equals(plugin.code())) {
-                target = plugin;
-            }
-        }
-        if (target == null) {
-            return Optional.empty();
-        }
-        URI indexUrl = requireStoreReference(location, location.rootUrl(), target.index());
-        List<IndexVersion> indexVersions = indexVersions(readJson(indexUrl), code);
-        List<PluginStorePluginVersion> versions = new ArrayList<>();
-        for (IndexVersion version : indexVersions) {
-            URI descriptorUrl = requireStoreReference(location, location.baseUrl(), version.descriptor());
-            versions.add(new PluginStorePluginVersion(version.releaseVersion(),
-                    descriptor(readJson(descriptorUrl), location, indexUrl, code, version.releaseVersion())));
-        }
-        return Optional.of(new PluginStorePluginDetail(code, List.copyOf(versions)));
+    public PluginStorePluginDescriptor parseDescriptor(PluginStoreSourceRef source, String indexUrl, String descriptorJson) {
+        StoreLocation location = storeLocation(source);
+        URI indexUri = requireOwnedUri(location, indexUrl);
+        JsonNode node = parseJsonText(descriptorJson);
+        return descriptor(node, location, indexUri, ownCode(node), ownReleaseVersion(node));
     }
 
     @Override
-    public void downloadJar(PluginStorePluginDescriptor descriptor, Path target) {
+    public PluginStorePluginDescriptor fetchDescriptor(PluginStoreSourceRef source, String indexUrl, String descriptorUrl) {
+        StoreLocation location = storeLocation(source);
+        URI indexUri = requireOwnedUri(location, indexUrl);
+        URI descriptorUri = requireOwnedUri(location, descriptorUrl);
+        JsonNode node = readJson(descriptorUri, source);
+        return descriptor(node, location, indexUri, ownCode(node), ownReleaseVersion(node));
+    }
+
+    @Override
+    public void downloadJar(PluginStoreSourceRef source, PluginStorePluginDescriptor descriptor, Path target) {
         if (descriptor == null || descriptor.jar() == null || target == null
                 || !SHA_256.matcher(descriptor.jar().sha256() == null ? "" : descriptor.jar().sha256()).matches()) {
             throw unavailable();
@@ -152,10 +150,7 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
             if (!isValidRootUri(uri)) {
                 throw unavailable();
             }
-            HttpRequest request = HttpRequest.newBuilder(uri.normalize())
-                    .GET()
-                    .timeout(Duration.ofMillis(Math.max(1, properties.getStoreRequestTimeoutMillis())))
-                    .header("Accept", "application/java-archive, application/octet-stream")
+            HttpRequest request = requestBuilder(uri.normalize(), "application/java-archive, application/octet-stream", source)
                     .build();
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
@@ -471,13 +466,22 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         }
     }
 
-    private JsonNode readJson(URI uri) {
+    private JsonNode readJson(URI uri, PluginStoreSourceRef source) {
+        String text = readText(uri, source);
         try {
-            HttpRequest request = HttpRequest.newBuilder(uri)
-                    .GET()
-                    .timeout(Duration.ofMillis(Math.max(1, properties.getStoreRequestTimeoutMillis())))
-                    .header("Accept", "application/json")
-                    .build();
+            JsonNode json = objectMapper.readTree(text);
+            if (json == null) {
+                throw unavailable();
+            }
+            return json;
+        } catch (IOException e) {
+            throw unavailable();
+        }
+    }
+
+    private String readText(URI uri, PluginStoreSourceRef source) {
+        try {
+            HttpRequest request = requestBuilder(uri, "application/json", source).build();
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream body = response.body()) {
                 if (response.statusCode() < 200 || response.statusCode() >= 300 || !isJson(response)) {
@@ -489,11 +493,7 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
                         throw unavailable();
                     }
                 });
-                JsonNode json = objectMapper.readTree(readLimited(body, maxBytes));
-                if (json == null) {
-                    throw unavailable();
-                }
-                return json;
+                return new String(readLimited(body, maxBytes), StandardCharsets.UTF_8);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -504,6 +504,17 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
             }
             throw unavailable();
         }
+    }
+
+    private HttpRequest.Builder requestBuilder(URI uri, String accept, PluginStoreSourceRef source) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
+                .GET()
+                .timeout(Duration.ofMillis(Math.max(1, properties.getStoreRequestTimeoutMillis())))
+                .header("Accept", accept);
+        if (source != null && StringUtils.hasText(source.token())) {
+            builder.header("Authorization", "Bearer " + source.token());
+        }
+        return builder;
     }
 
     private long parseContentLength(String value) {
@@ -517,9 +528,10 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         }
     }
 
-    private StoreLocation storeLocation() {
+    private StoreLocation storeLocation(PluginStoreSourceRef source) {
         try {
-            URI root = StringUtils.hasText(properties.getStoreRootUrl()) ? new URI(properties.getStoreRootUrl()) : DEFAULT_ROOT;
+            String configured = source == null ? null : source.rootUrl();
+            URI root = StringUtils.hasText(configured) ? new URI(configured) : DEFAULT_ROOT;
             if (!isValidRootUri(root) || containsTraversal(root.getRawPath())) {
                 throw unavailable();
             }
@@ -529,6 +541,43 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
             if (e instanceof BizException bizException) {
                 throw bizException;
             }
+            throw unavailable();
+        }
+    }
+
+    /** 快照回读与按需拉取时的 URL 归属校验：必须是本源同源、位于根目录之下的 HTTPS 地址。 */
+    private URI requireOwnedUri(StoreLocation location, String value) {
+        URI uri;
+        try {
+            uri = new URI(value).normalize();
+        } catch (URISyntaxException | RuntimeException e) {
+            throw unavailable();
+        }
+        if (!isValidRootUri(uri) || !sameOrigin(location.rootUrl(), uri)
+                || !isWithinBasePath(location.baseUrl().getRawPath(), uri.getRawPath())) {
+            throw unavailable();
+        }
+        return uri;
+    }
+
+    private String ownCode(JsonNode descriptor) {
+        JsonNode plugin = descriptor.get("plugin");
+        requireObject(plugin);
+        return requireText(plugin, "code");
+    }
+
+    private String ownReleaseVersion(JsonNode descriptor) {
+        return requireSemanticVersion(descriptor, "releaseVersion");
+    }
+
+    private JsonNode parseJsonText(String descriptorJson) {
+        try {
+            JsonNode node = objectMapper.readTree(descriptorJson);
+            if (node == null) {
+                throw unavailable();
+            }
+            return node;
+        } catch (IOException e) {
             throw unavailable();
         }
     }

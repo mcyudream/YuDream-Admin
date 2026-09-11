@@ -2,10 +2,10 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogEntry;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescriptor;
-import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDetail;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
-import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreSourceRef;
 import org.junit.jupiter.api.Test;
 
 import javax.net.ssl.SSLContext;
@@ -42,6 +42,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class JdkPluginStoreGatewayTest {
 
     private static final URI ROOT = URI.create("https://store.example.test/repository/plugin-store-releases/index.json");
+    private static final String INDEX_URL = ROOT.toString();
+    private static final String DEMO_INDEX_URL = "https://store.example.test/repository/plugin-store-releases/plugins/demo/index.json";
+    private static final String DEMO_DESCRIPTOR_URL = "https://store.example.test/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json";
     private static final String SHA_256 = "A".repeat(64);
 
     @Test
@@ -63,15 +66,23 @@ class JdkPluginStoreGatewayTest {
     }
 
     @Test
+    void configuredSourceRefMirrorsProperties() {
+        assertEquals(ROOT.toString(), gateway(ROOT, new FakeHttpClient(request -> {
+            throw new AssertionError("configuredSourceRef must not request anything");
+        })).configuredSourceRef().rootUrl());
+    }
+
+    @Test
     void rejectsHttpRootConfiguredAtRuntime() {
         assertThrows(BizException.class, () -> gateway(
                 URI.create("http://store.example.test/repository/plugin-store-releases/index.json"), new FakeHttpClient(request -> {
                     throw new AssertionError("HTTP root must be rejected before requesting it");
-                })).list());
+                })).fetchCatalog(new PluginStoreSourceRef(
+                "http://store.example.test/repository/plugin-store-releases/index.json", null)));
     }
 
     @Test
-    void listSkipsInvalidRootsIndexesAndDescriptors() {
+    void fetchCatalogSkipsInvalidRootsIndexesAndDescriptors() {
         FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
             case "/repository/plugin-store-releases/index.json" -> """
                     {"schemaVersion":1,"plugins":[
@@ -101,13 +112,18 @@ class JdkPluginStoreGatewayTest {
             default -> throw new AssertionError("Unexpected request: " + request.uri());
         }));
 
-        List<PluginStorePluginInfo> plugins = gateway(ROOT, client).list();
+        List<PluginStoreCatalogEntry> entries = gateway(ROOT, client).fetchCatalog(ref());
 
-        assertEquals(List.of("good"), plugins.stream().map(PluginStorePluginInfo::getCode).toList());
-        assertEquals("2.0.0", plugins.getFirst().getDescriptor().releaseVersion());
-        assertEquals("good", plugins.getFirst().getDescriptor().code());
-        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/good/good.jar",
-                plugins.getFirst().getDescriptor().jar().url());
+        assertEquals(List.of("good"), entries.stream().map(PluginStoreCatalogEntry::code).toList());
+        PluginStoreCatalogEntry good = entries.getFirst();
+        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/good/index.json", good.indexUrl());
+        assertEquals(List.of("1.0.0", "2.0.0"), good.versions().stream().map(version -> version.releaseVersion()).toList());
+        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/good/versions/2.0.0.json",
+                good.versions().getLast().descriptorUrl());
+        PluginStorePluginDescriptor parsed = gateway(ROOT, client).parseDescriptor(ref(), good.indexUrl(), good.latestDescriptorJson());
+        assertEquals("2.0.0", parsed.releaseVersion());
+        assertEquals("good", parsed.code());
+        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/good/good.jar", parsed.jar().url());
         assertEquals(List.of(ROOT,
                 URI.create("https://store.example.test/repository/plugin-store-releases/plugins/good/index.json"),
                 URI.create("https://store.example.test/repository/plugin-store-releases/plugins/good/versions/2.0.0.json"),
@@ -118,7 +134,7 @@ class JdkPluginStoreGatewayTest {
     }
 
     @Test
-    void detailResolvesJarAndMediaFromPluginIndexWithoutFetchingJar() {
+    void fetchCatalogResolvesJarAndMediaFromPluginIndexWithoutFetchingJar() {
         FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
             case "/repository/plugin-store-releases/index.json" -> """
                     {"schemaVersion":1,"plugins":[{"code":"demo","index":"plugins/demo/index.json"}]}
@@ -131,19 +147,20 @@ class JdkPluginStoreGatewayTest {
             default -> throw new AssertionError("Unexpected request: " + request.uri());
         }));
 
-        PluginStorePluginDetail detail = gateway(ROOT, client).detail("demo").orElseThrow();
+        PluginStoreCatalogEntry entry = gateway(ROOT, client).fetchCatalog(ref()).getFirst();
+        PluginStorePluginDescriptor descriptor = gateway(ROOT, client).parseDescriptor(ref(), entry.indexUrl(), entry.latestDescriptorJson());
 
-        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/demo/jars/demo.jar", detail.versions().getFirst().descriptor().jar().url());
-        assertEquals(SHA_256.toLowerCase(), detail.versions().getFirst().descriptor().jar().sha256());
-        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/demo/images/icon.svg", detail.versions().getFirst().descriptor().icon());
+        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/demo/jars/demo.jar", descriptor.jar().url());
+        assertEquals(SHA_256.toLowerCase(), descriptor.jar().sha256());
+        assertEquals("https://store.example.test/repository/plugin-store-releases/plugins/demo/images/icon.svg", descriptor.icon());
         assertEquals(List.of("https://store.example.test/repository/plugin-store-releases/plugins/demo/images/one.png",
-                "https://store.example.test/repository/plugin-store-releases/plugins/demo/images/two.png"), detail.versions().getFirst().descriptor().screenshots());
+                "https://store.example.test/repository/plugin-store-releases/plugins/demo/images/two.png"), descriptor.screenshots());
         assertEquals(List.of(ROOT, URI.create("https://store.example.test/repository/plugin-store-releases/plugins/demo/index.json"),
                 URI.create("https://store.example.test/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json")), client.requests);
     }
 
     @Test
-    void detailKeepsAbsoluteHttpsJarUrlWithoutFetchingJar() {
+    void fetchCatalogKeepsAbsoluteHttpsJarUrlWithoutFetchingJar() {
         String jarUrl = "https://nexus.yudream.online/repository/maven-public/demo.jar";
         FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
             case "/repository/plugin-store-releases/index.json" -> """
@@ -156,15 +173,16 @@ class JdkPluginStoreGatewayTest {
             default -> throw new AssertionError("Unexpected request: " + request.uri());
         }));
 
-        PluginStorePluginDetail detail = gateway(ROOT, client).detail("demo").orElseThrow();
+        PluginStoreCatalogEntry entry = gateway(ROOT, client).fetchCatalog(ref()).getFirst();
+        PluginStorePluginDescriptor descriptor = gateway(ROOT, client).parseDescriptor(ref(), entry.indexUrl(), entry.latestDescriptorJson());
 
-        assertEquals(jarUrl, detail.versions().getFirst().descriptor().jar().url());
+        assertEquals(jarUrl, descriptor.jar().url());
         assertEquals(List.of(ROOT, URI.create("https://store.example.test/repository/plugin-store-releases/plugins/demo/index.json"),
                 URI.create("https://store.example.test/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json")), client.requests);
     }
 
     @Test
-    void detailReturnsEveryVersionInIndexOrder() {
+    void fetchDescriptorResolvesEveryVersionInIndexOrder() {
         FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
             case "/repository/plugin-store-releases/index.json" -> """
                     {"schemaVersion":1,"plugins":[{"code":"demo","index":"plugins/demo/index.json"}]}
@@ -179,52 +197,57 @@ class JdkPluginStoreGatewayTest {
             default -> throw new AssertionError("Unexpected request: " + request.uri());
         }));
 
-        PluginStorePluginDetail detail = gateway(ROOT, client).detail("demo").orElseThrow();
+        JdkPluginStoreGateway gateway = gateway(ROOT, client);
+        PluginStoreCatalogEntry entry = gateway.fetchCatalog(ref()).getFirst();
+        assertEquals(List.of("1.0.0", "2.0.0"), entry.versions().stream().map(version -> version.releaseVersion()).toList());
 
-        assertEquals(List.of("1.0.0", "2.0.0"), detail.versions().stream()
-                .map(version -> version.releaseVersion()).toList());
-        assertEquals(List.of("1.0.0", "2.0.0"), detail.versions().stream()
-                .map(version -> version.descriptor().version()).toList());
+        PluginStorePluginDescriptor first = gateway.fetchDescriptor(ref(), entry.indexUrl(), entry.versions().getFirst().descriptorUrl());
+        PluginStorePluginDescriptor second = gateway.fetchDescriptor(ref(), entry.indexUrl(), entry.versions().getLast().descriptorUrl());
+        assertEquals("1.0.0", first.version());
+        assertEquals("2.0.0", second.version());
+        assertEquals(List.of("https://store.example.test/repository/plugin-store-releases/plugins/demo/one.jar",
+                "https://store.example.test/repository/plugin-store-releases/plugins/demo/two.jar"),
+                List.of(first.jar().url(), second.jar().url()));
     }
 
     @Test
-    void detailRejectsEmptyOrDuplicateVersionsAndInvalidHash() {
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"demo","versions":[]}
-                """, null);
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"demo","versions":[
-                  {"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/1.0.0.json"},
-                  {"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/2.0.0.json"}]}
-                """, null);
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"demo","versions":[{"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/1.0.0.json"}]}
-                """, descriptor("demo", "1.0.0", "jar.jar", "not-a-hash", null, null));
+    void fetchDescriptorRejectsForeignUrlsAndInvalidDescriptors() {
+        FakeHttpClient client = new FakeHttpClient(request -> response(request, 200, "application/json",
+                descriptor("demo", "1.0.0", "jar.jar", "not-a-hash", null, null).getBytes(StandardCharsets.UTF_8)));
+        JdkPluginStoreGateway gateway = gateway(ROOT, client);
+
+        assertThrows(BizException.class, () -> gateway.fetchDescriptor(ref(),
+                "https://evil.example.test/repository/plugin-store-releases/plugins/demo/index.json", DEMO_DESCRIPTOR_URL));
+        assertThrows(BizException.class, () -> gateway.fetchDescriptor(ref(), DEMO_INDEX_URL,
+                "https://evil.example.test/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json"));
+        assertTrue(client.requests.isEmpty());
+
+        assertThrows(BizException.class, () -> gateway.fetchDescriptor(ref(), DEMO_INDEX_URL, DEMO_DESCRIPTOR_URL));
+        assertEquals(List.of(DEMO_DESCRIPTOR_URL), client.requests.stream().map(URI::toString).toList());
     }
 
     @Test
-    void detailRejectsSchemaCodeVersionAndMediaReferenceViolations() {
-        assertDetailRejected("""
-                {"schemaVersion":2,"pluginCode":"demo","versions":[{"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/1.0.0.json"}]}
-                """, null);
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"other","versions":[{"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/1.0.0.json"}]}
-                """, null);
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"demo","versions":[{"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/1.0.0.json"}]}
-                """, descriptor("demo", "2.0.0", "jar.jar", SHA_256, null, null));
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"demo","versions":[{"releaseVersion":"1.0.0","descriptor":"plugins/demo/versions/1.0.0.json"}]}
-                """, descriptor("demo", "1.0.0", "jar.jar", SHA_256, "https://evil.example/icon.svg", null));
+    void parseDescriptorRejectsInvalidDescriptorsWithoutHttp() {
+        JdkPluginStoreGateway gateway = gateway(ROOT, new FakeHttpClient(request -> {
+            throw new AssertionError("parseDescriptor must not request anything");
+        }));
+
+        assertThrows(BizException.class, () -> gateway.parseDescriptor(ref(), DEMO_INDEX_URL,
+                descriptor("demo", "1.0.0", "jar.jar", "not-a-hash", null, null)));
+        assertThrows(BizException.class, () -> gateway.parseDescriptor(ref(), DEMO_INDEX_URL,
+                descriptorWithPluginFields("\"compatibility\":{\"host\":\"^1.0.0 || ^2.0.0\",\"spi\":\"^2.6.0\",\"frontendSdk\":\"^1.0.0\"}")));
+        assertThrows(BizException.class, () -> gateway.parseDescriptor(ref(),
+                "https://evil.example.test/repository/plugin-store-releases/plugins/demo/index.json",
+                descriptor("demo", "1.0.0", "jar.jar", SHA_256, null, null)));
     }
 
     @Test
-    void detailParsesCompatibilityAndDependencies() {
+    void parseDescriptorParsesCompatibilityAndDependencies() {
         String descriptor = "{\"schemaVersion\":1,\"releaseVersion\":\"1.0.0\",\"plugin\":{\"code\":\"demo\",\"version\":\"1.0.0\",\"main\":\"example.Plugin\","
                 + "\"compatibility\":{\"host\":\">=1.0.0 <2.0.0\",\"spi\":\"^2.6.0\",\"frontendSdk\":\"~1.0.0\"},"
                 + "\"dependencies\":[{\"code\":\"base\",\"range\":\"1.2.x\",\"required\":true},{\"code\":\"optional\",\"range\":\"^9.0.0\",\"required\":false}]},"
                 + "\"jar\":{\"mavenCoordinates\":\"g:a:1.0.0\",\"url\":\"jar.jar\",\"sha256\":\"" + SHA_256 + "\"}}";
-        PluginStorePluginDescriptor result = detailForDescriptor(descriptor);
+        PluginStorePluginDescriptor result = parsedDescriptor(descriptor);
 
         assertEquals(">=1.0.0 <2.0.0", result.compatibility().host());
         assertEquals("^2.6.0", result.compatibility().spi());
@@ -235,40 +258,42 @@ class JdkPluginStoreGatewayTest {
     }
 
     @Test
-    void detailParsesCompatibilityFieldSubsets() {
-        PluginStorePluginDescriptor hostOnly = detailForDescriptor(descriptorWithPluginFields("\"compatibility\":{\"host\":\"^1.0.0\"}"));
+    void parseDescriptorParsesCompatibilityFieldSubsets() {
+        PluginStorePluginDescriptor hostOnly = parsedDescriptor(descriptorWithPluginFields("\"compatibility\":{\"host\":\"^1.0.0\"}"));
         assertEquals("^1.0.0", hostOnly.compatibility().host());
         assertNull(hostOnly.compatibility().spi());
         assertNull(hostOnly.compatibility().frontendSdk());
 
-        PluginStorePluginDescriptor empty = detailForDescriptor(descriptorWithPluginFields("\"compatibility\":{}"));
+        PluginStorePluginDescriptor empty = parsedDescriptor(descriptorWithPluginFields("\"compatibility\":{}"));
         assertNull(empty.compatibility().host());
         assertNull(empty.compatibility().spi());
         assertNull(empty.compatibility().frontendSdk());
     }
 
     @Test
-    void detailRejectsInvalidSemanticVersionsCompatibilityAndDependencies() {
-        assertDetailRejected("""
-                {"schemaVersion":1,"pluginCode":"demo","versions":[{"releaseVersion":"1.0.0-beta","descriptor":"plugins/demo/versions/1.0.0.json"}]}
-                """, null);
+    void parseDescriptorRejectsInvalidSemanticVersionsCompatibilityAndDependencies() {
+        assertThrows(BizException.class, () -> parsedDescriptor("""
+                {"schemaVersion":1,"releaseVersion":"1.0.0-beta","plugin":{"code":"demo","version":"1.0.0-beta","main":"example.Plugin"},
+                "jar":{"mavenCoordinates":"g:a:1.0.0","url":"jar.jar","sha256":"%s"}}""".formatted(SHA_256)));
         for (String invalidCompatibility : new String[]{"^1.0.0 || ^2.0.0", "[1.0.0,2.0.0)", "1.0.0-beta", ">=2.0.0 <1.0.0"}) {
-            assertDetailRejected(validIndex(), descriptorWithPluginFields("\"compatibility\":{\"host\":\"" + invalidCompatibility
-                    + "\",\"spi\":\"^2.6.0\",\"frontendSdk\":\"^1.0.0\"}"));
+            assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(
+                    "\"compatibility\":{\"host\":\"" + invalidCompatibility + "\",\"spi\":\"^2.6.0\",\"frontendSdk\":\"^1.0.0\"}")));
         }
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"compatibility\":{\"host\":\"\"}"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"compatibility\":{\"host\":true}"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"compatibility\":{\"host\":\"^1.0.0\",\"spi\":\"^2.6.0\",\"frontendSdk\":\"^1.0.0\",\"extra\":true}"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":\"true\"}]"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":true,\"extra\":true}]"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\"}]"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\">=2.0.0 <1.0.0\",\"required\":true}]"));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":true},{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":false}]"));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields("\"compatibility\":{\"host\":\"\"}")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields("\"compatibility\":{\"host\":true}")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(
+                "\"compatibility\":{\"host\":\"^1.0.0\",\"spi\":\"^2.6.0\",\"frontendSdk\":\"^1.0.0\",\"extra\":true}")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":\"true\"}]")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":true,\"extra\":true}]")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\"}]")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields("\"dependencies\":[{\"code\":\"base\",\"range\":\">=2.0.0 <1.0.0\",\"required\":true}]")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(
+                "\"dependencies\":[{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":true},{\"code\":\"base\",\"range\":\"^1.0.0\",\"required\":false}]")));
     }
 
     @Test
-    void detailParsesOptionalDisplayMetadataWithoutAffectingJarContract() {
-        PluginStorePluginDescriptor result = detailForDescriptor("""
+    void parseDescriptorParsesOptionalDisplayMetadataWithoutAffectingJarContract() {
+        PluginStorePluginDescriptor result = parsedDescriptor("""
                 {"schemaVersion":1,"releaseVersion":"1.0.0","plugin":{"code":"demo","version":"1.0.0","main":"example.Plugin",
                 "publisher":{"id":"yudream","name":"YuDream","url":"https://yudream.online","verified":true},
                 "source":{"repository":"https://github.com/yudream/demo","commit":"0123456789abcdef0123456789abcdef01234567"},
@@ -286,8 +311,8 @@ class JdkPluginStoreGatewayTest {
     }
 
     @Test
-    void detailKeepsLegacyDescriptorDisplayMetadataAbsent() {
-        PluginStorePluginDescriptor result = detailForDescriptor(descriptor("demo", "1.0.0", "jar.jar", SHA_256, null, null));
+    void parseDescriptorKeepsLegacyDescriptorDisplayMetadataAbsent() {
+        PluginStorePluginDescriptor result = parsedDescriptor(descriptor("demo", "1.0.0", "jar.jar", SHA_256, null, null));
 
         assertNull(result.publisher());
         assertNull(result.source());
@@ -296,18 +321,54 @@ class JdkPluginStoreGatewayTest {
     }
 
     @Test
-    void detailRejectsUnsafeOrMalformedDisplayMetadata() {
+    void parseDescriptorRejectsUnsafeOrMalformedDisplayMetadata() {
         String valid = "\"publisher\":{\"id\":\"publisher\",\"name\":\"Publisher\",\"url\":\"https://publisher.example\",\"verified\":false},"
                 + "\"source\":{\"repository\":\"https://github.com/example/demo\",\"commit\":\"0123456789abcdef0123456789abcdef01234567\"},"
                 + "\"license\":\"MIT\",\"releaseNotes\":\"Notes\"";
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("https://publisher.example", "http://publisher.example")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("https://publisher.example", "https://user@publisher.example")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("https://github.com/example/demo", "https://github.com/example/demo#fragment")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("0123456789abcdef0123456789abcdef01234567", "0123456789abcdef0123456789abcdef0123456G")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("\"verified\":false", "\"verified\":\"false\"")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("\"license\":\"MIT\"", "\"license\":\"MIT OR Apache-2.0\"")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("\"releaseNotes\":\"Notes\"", "\"releaseNotes\":\"line\nfeed\"")));
-        assertDetailRejected(validIndex(), descriptorWithPluginFields(valid.replace("\"verified\":false", "\"verified\":false,\"artifactUrl\":\"https://evil.example/plugin.jar\"")));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("https://publisher.example", "http://publisher.example"))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("https://publisher.example", "https://user@publisher.example"))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("https://github.com/example/demo", "https://github.com/example/demo#fragment"))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("0123456789abcdef0123456789abcdef01234567", "0123456789abcdef0123456789abcdef0123456G"))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("\"verified\":false", "\"verified\":\"false\""))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("\"license\":\"MIT\"", "\"license\":\"MIT OR Apache-2.0\""))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("\"releaseNotes\":\"Notes\"", "\"releaseNotes\":\"line\nfeed\""))));
+        assertThrows(BizException.class, () -> parsedDescriptor(descriptorWithPluginFields(valid.replace("\"verified\":false", "\"verified\":false,\"artifactUrl\":\"https://evil.example/plugin.jar\""))));
+    }
+
+    @Test
+    void fetchCatalogRejectsDescriptorVersionMismatchWithIndex() {
+        FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
+            case "/repository/plugin-store-releases/index.json" -> """
+                    {"schemaVersion":1,"plugins":[{"code":"demo","index":"plugins/demo/index.json"}]}
+                    """;
+            case "/repository/plugin-store-releases/plugins/demo/index.json" -> validIndex();
+            case "/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json" -> descriptor("demo", "2.0.0", "jar.jar", SHA_256, null, null);
+            default -> throw new AssertionError("Unexpected request: " + request.uri());
+        }));
+
+        assertTrue(gateway(ROOT, client).fetchCatalog(ref()).isEmpty());
+    }
+
+    @Test
+    void sendsBearerTokenOnlyWhenConfigured() {
+        Function<HttpRequest, HttpResponse<java.io.InputStream>> responder = request -> response(request,
+                switch (request.uri().getPath()) {
+                    case "/repository/plugin-store-releases/index.json" -> """
+                            {"schemaVersion":1,"plugins":[{"code":"demo","index":"plugins/demo/index.json"}]}
+                            """;
+                    case "/repository/plugin-store-releases/plugins/demo/index.json" -> validIndex();
+                    case "/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json" -> descriptor("demo", "1.0.0", "jar.jar", SHA_256, null, null);
+                    default -> throw new AssertionError("Unexpected request: " + request.uri());
+                });
+
+        FakeHttpClient withToken = new FakeHttpClient(responder);
+        gateway(ROOT, withToken).fetchCatalog(new PluginStoreSourceRef(ROOT.toString(), "secret-token"));
+        assertTrue(withToken.sent.stream().allMatch(request -> request.headers().firstValue("Authorization")
+                .orElse("").equals("Bearer secret-token")));
+
+        FakeHttpClient withoutToken = new FakeHttpClient(responder);
+        gateway(ROOT, withoutToken).fetchCatalog(ref());
+        assertTrue(withoutToken.sent.stream().allMatch(request -> request.headers().firstValue("Authorization").isEmpty()));
     }
 
     @Test
@@ -317,7 +378,7 @@ class JdkPluginStoreGatewayTest {
         Files.deleteIfExists(target);
         FakeHttpClient client = new FakeHttpClient(request -> response(request, 200, "application/java-archive", jar));
 
-        gateway(ROOT, client).downloadJar(storeDescriptor("https://store.example.test/repository/maven/demo.jar", sha256(jar)), target);
+        gateway(ROOT, client).downloadJar(null, storeDescriptor("https://store.example.test/repository/maven/demo.jar", sha256(jar)), target);
 
         assertEquals("plugin-jar", Files.readString(target));
         assertEquals(List.of(URI.create("https://store.example.test/repository/maven/demo.jar")), client.requests);
@@ -330,10 +391,10 @@ class JdkPluginStoreGatewayTest {
         Files.deleteIfExists(target);
         FakeHttpClient client = new FakeHttpClient(request -> response(request, 302, "application/java-archive", new byte[0]));
 
-        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(
+        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(null,
                 storeDescriptor("http://store.example.test/demo.jar", SHA_256), target));
         assertFalse(Files.exists(target));
-        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(
+        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(null,
                 storeDescriptor("https://store.example.test/demo.jar", SHA_256), target));
         assertFalse(Files.exists(target));
     }
@@ -349,42 +410,22 @@ class JdkPluginStoreGatewayTest {
         properties.setStoreMaxJarBytes(jar.length - 1);
         JdkPluginStoreGateway gateway = new JdkPluginStoreGateway(properties, client, new ObjectMapper());
 
-        assertThrows(BizException.class, () -> gateway.downloadJar(
+        assertThrows(BizException.class, () -> gateway.downloadJar(null,
                 storeDescriptor("https://store.example.test/demo.jar", sha256(jar)), target));
         assertFalse(Files.exists(target));
-        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(
+        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(null,
                 storeDescriptor("https://store.example.test/demo.jar", SHA_256), target));
         assertFalse(Files.exists(target));
     }
 
-    private void assertDetailRejected(String index, String descriptor) {
-        FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
-            case "/repository/plugin-store-releases/index.json" -> """
-                    {"schemaVersion":1,"plugins":[{"code":"demo","index":"plugins/demo/index.json"}]}
-                    """;
-            case "/repository/plugin-store-releases/plugins/demo/index.json" -> index;
-            case "/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json" -> {
-                if (descriptor == null) {
-                    throw new AssertionError("Descriptor should not be requested");
-                }
-                yield descriptor;
-            }
-            default -> throw new AssertionError("Unexpected request: " + request.uri());
-        }));
-
-        assertThrows(BizException.class, () -> gateway(ROOT, client).detail("demo"));
+    private PluginStorePluginDescriptor parsedDescriptor(String descriptor) {
+        return gateway(ROOT, new FakeHttpClient(request -> {
+            throw new AssertionError("Unexpected request: " + request.uri());
+        })).parseDescriptor(ref(), DEMO_INDEX_URL, descriptor);
     }
 
-    private PluginStorePluginDescriptor detailForDescriptor(String descriptor) {
-        FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
-            case "/repository/plugin-store-releases/index.json" -> """
-                    {"schemaVersion":1,"plugins":[{"code":"demo","index":"plugins/demo/index.json"}]}
-                    """;
-            case "/repository/plugin-store-releases/plugins/demo/index.json" -> validIndex();
-            case "/repository/plugin-store-releases/plugins/demo/versions/1.0.0.json" -> descriptor;
-            default -> throw new AssertionError("Unexpected request: " + request.uri());
-        }));
-        return gateway(ROOT, client).detail("demo").orElseThrow().versions().getFirst().descriptor();
+    private static PluginStoreSourceRef ref() {
+        return new PluginStoreSourceRef(ROOT.toString(), null);
     }
 
     private static String validIndex() {
@@ -448,6 +489,7 @@ class JdkPluginStoreGatewayTest {
 
     private static class FakeHttpClient extends HttpClient {
         private final List<URI> requests = new ArrayList<>();
+        private final List<HttpRequest> sent = new ArrayList<>();
         private final Function<HttpRequest, HttpResponse<java.io.InputStream>> responder;
 
         private FakeHttpClient(Function<HttpRequest, HttpResponse<java.io.InputStream>> responder) {
@@ -465,6 +507,7 @@ class JdkPluginStoreGatewayTest {
         @Override public Optional<Executor> executor() { return Optional.empty(); }
         @Override public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> bodyHandler) throws IOException {
             requests.add(request.uri());
+            sent.add(request);
             @SuppressWarnings("unchecked")
             HttpResponse<T> response = (HttpResponse<T>) responder.apply(request);
             return response;
