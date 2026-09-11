@@ -73,11 +73,18 @@ public final class OfficialQqBotEventNormalizer {
                 sessions.rememberSelf(connectionId, selfId);
             }
         }
-        boolean mentionSelf = directedAtBot(type)
-                || looksLikeBotMention(
-                textContent(data),
-                selfId,
-                sessions == null ? null : sessions.selfName(connectionId));
+        String rawContent = textContent(data);
+        List<String> contentMentions = mentionIdsFromContent(rawContent);
+        boolean directed = directedAtBot(type);
+        if (sessions != null && directed && !contentMentions.isEmpty()
+                && ("group".equals(scene) || "channel".equals(scene))) {
+            // @/频道消息只在被提及时推送，首个提及 id 就是机器人，记作别名供全量群消息(GROUP_MESSAGE_CREATE)匹配
+            sessions.rememberSelfAlias(connectionId, contentMentions.getFirst());
+        }
+        java.util.Set<String> selfMentionIds = sessions == null ? java.util.Set.of() : sessions.selfMentionIds(connectionId);
+        boolean mentionSelf = directed
+                || contentMentions.stream().anyMatch(selfMentionIds::contains)
+                || looksLikeBotMention(rawContent, selfId, sessions == null ? null : sessions.selfName(connectionId));
         String selfName = sessions == null ? null : sessions.selfName(connectionId);
         List<Map<String, Object>> segments = segments(data, selfId, selfName);
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -545,6 +552,22 @@ public final class OfficialQqBotEventNormalizer {
                 || "AT_MESSAGE_CREATE".equals(type)
                 || "C2C_MESSAGE_CREATE".equals(type)
                 || "DIRECT_MESSAGE_CREATE".equals(type);
+    }
+
+    /** 内容中的 <@id>/<@!id> 提及 id，按出现顺序去重；全量群消息靠它与机器人自身 id/别名匹配判定是否 @ 机器人。 */
+    public static List<String> mentionIdsFromContent(String content) {
+        if (blank(content)) {
+            return List.of();
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("<@!?([A-Za-z0-9_-]+)>").matcher(content);
+        List<String> ids = new ArrayList<>();
+        while (matcher.find()) {
+            String id = matcher.group(1);
+            if (!id.isBlank() && !ids.contains(id)) {
+                ids.add(id);
+            }
+        }
+        return ids;
     }
 
     static boolean looksLikeBotMention(String content, String selfName) {

@@ -29,6 +29,7 @@ public class OfficialQqBotSessionStore implements MessagingBotNameLookup {
     private final Map<Long, Map<String, AtomicInteger>> sequences = new ConcurrentHashMap<>();
     private final Map<Long, String> selfIds = new ConcurrentHashMap<>();
     private final Map<Long, String> selfNames = new ConcurrentHashMap<>();
+    private final Map<Long, java.util.Set<String>> selfAliases = new ConcurrentHashMap<>();
     private final Map<Long, Map<String, Deque<Map<String, Object>>>> histories = new ConcurrentHashMap<>();
 
     public void rememberSelf(Long connectionId, String selfId) {
@@ -42,6 +43,31 @@ public class OfficialQqBotSessionStore implements MessagingBotNameLookup {
         if (connectionId != null && selfName != null && !selfName.isBlank()) {
             selfNames.put(connectionId, selfName.trim());
         }
+    }
+
+    /**
+     * 记录机器人被 @ 时的提及 id：@/私聊事件天然只在被提及时推送，内容里的提及 id 就是机器人。
+     * 开通全量群消息后 GROUP_MESSAGE_CREATE 对所有消息推送，只能靠内容提及与这个别名集合判定是否 @ 机器人。
+     */
+    public void rememberSelfAlias(Long connectionId, String alias) {
+        if (connectionId == null || alias == null || alias.isBlank()) {
+            return;
+        }
+        selfAliases.computeIfAbsent(connectionId, key -> ConcurrentHashMap.newKeySet()).add(alias.trim());
+    }
+
+    /** 机器人自身 id 与历史学到的提及别名，全量群消息按这个集合判定定向。 */
+    public java.util.Set<String> selfMentionIds(Long connectionId) {
+        java.util.Set<String> ids = ConcurrentHashMap.newKeySet();
+        String selfId = selfId(connectionId);
+        if (selfId != null && !selfId.isBlank()) {
+            ids.add(selfId.trim());
+        }
+        java.util.Set<String> aliases = selfAliases.get(connectionId);
+        if (aliases != null) {
+            aliases.stream().filter(alias -> alias != null && !alias.isBlank()).map(String::trim).forEach(ids::add);
+        }
+        return ids;
     }
 
     @Override
