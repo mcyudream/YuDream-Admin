@@ -4,6 +4,8 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.milky.enumerate.MilkyConnectionProtocol;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,6 +40,17 @@ class MilkyConnectionTest {
         assertEquals(MilkyConnectionProtocol.OFFICIAL_SANDBOX_API, connection.getBaseUrl());
         assertTrue(connection.isSandbox());
         assertEquals(1, connection.officialIntents());
+    }
+
+    @Test
+    void bindMentionOpenIdTrimsAndDeduplicates() {
+        MilkyConnection connection = MilkyConnection.create("官方", "official", null, null,
+                "app-id", "app-secret", false, null, "base64", null, List.of(" OPENID-A ", "OPENID-B", "OPENID-A"));
+        assertEquals(List.of("OPENID-A", "OPENID-B"), connection.officialMentionOpenIds());
+        connection.bindMentionOpenId("openid-c");
+        connection.bindMentionOpenId("OPENID-A");
+        assertEquals(List.of("OPENID-A", "OPENID-B", "openid-c"), connection.officialMentionOpenIds());
+        assertThrows(BizException.class, () -> connection.bindMentionOpenId(" "));
     }
 
     @Test

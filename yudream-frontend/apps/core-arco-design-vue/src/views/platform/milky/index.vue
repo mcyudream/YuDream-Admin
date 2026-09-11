@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@yudream/components'
-import type { MilkyConnection, MilkyConnectionPayload } from '@/api/modules/platform-milky'
+import type { MentionBindingCode, MilkyConnection, MilkyConnectionPayload } from '@/api/modules/platform-milky'
 import apiMilky from '@/api/modules/platform-milky'
 import {
   ALL_OFFICIAL_INTENTS,
@@ -21,6 +21,9 @@ const rows = ref<MilkyConnection[]>([])
 const editing = ref<MilkyConnection | null>(null)
 const chatConnection = ref<MilkyConnection | null>(null)
 const chatVisible = ref(false)
+const mentionBindVisible = ref(false)
+const mentionBindConnection = ref<MilkyConnection | null>(null)
+const mentionCode = ref<MentionBindingCode | null>(null)
 const page = reactive({ page: 1, size: 20, total: 0 })
 const form = reactive<MilkyConnectionPayload>({ name: '', protocol: 'milky', baseUrl: 'http://127.0.0.1:3010', token: '', appId: '', appSecret: '', sandbox: false, intents: RECOMMENDED_OFFICIAL_INTENTS, commandMenuImageMode: 'base64', commandMenuPublicBaseUrl: '' })
 
@@ -164,6 +167,13 @@ function openChat(connection: MilkyConnection) {
   chatVisible.value = true
 }
 
+async function openMentionBind(connection: MilkyConnection) {
+  const result = await apiMilky.issueMentionBindingCode(connection.id)
+  mentionBindConnection.value = connection
+  mentionCode.value = result.data
+  mentionBindVisible.value = true
+}
+
 onMounted(load)
 </script>
 
@@ -195,6 +205,9 @@ onMounted(load)
             </FaButton>
             <FaButton size="sm" variant="ghost" title="测试连接" @click="test(row.original)">
               <FaIcon name="i-ri:radar-line" />
+            </FaButton>
+            <FaButton v-if="row.original.protocol === 'official'" size="sm" variant="ghost" title="回填 @ 身份" @click="openMentionBind(row.original)">
+              <FaIcon name="i-ri:at-line" />
             </FaButton>
             <FaButton size="sm" variant="ghost" :title="row.original.enabled ? '停用' : '启用'" @click="toggle(row.original)">
               <FaIcon :name="row.original.enabled ? 'i-ri:pause-circle-line' : 'i-ri:play-circle-line'" />
@@ -229,6 +242,9 @@ onMounted(load)
                 </FaButton>
                 <FaButton size="sm" variant="outline" @click="test(row)">
                   测试
+                </FaButton>
+                <FaButton v-if="row.protocol === 'official'" size="sm" variant="outline" @click="openMentionBind(row)">
+                  回填@
                 </FaButton>
                 <FaButton size="sm" variant="outline" @click="toggle(row)">
                   {{ row.enabled ? '停用' : '启用' }}
@@ -332,6 +348,23 @@ onMounted(load)
 
     <FaModal v-model="chatVisible" :title="`${chatConnection?.name || 'QQ'} WebQQ`" :show-cancel-button="false" class="sm:max-w-6xl">
       <MilkyChatWorkspace v-if="chatConnection" :connection-id="chatConnection.id" :protocol="chatConnection.protocol || 'milky'" />
+    </FaModal>
+
+    <FaModal v-model="mentionBindVisible" title="回填机器人 @ 身份" :show-cancel-button="false">
+      <div class="flex flex-col gap-3 text-sm">
+        <p>开通「接收所有消息」后，群里所有消息都以普通消息推送，机器人无法自动得知自己在群内被 @ 时的身份。按以下步骤一次性回填：</p>
+        <ol class="flex flex-col gap-1 pl-5 list-decimal">
+          <li>在目标群里 @ 机器人发送指令：<code class="font-mono">/绑定机器人 {{ mentionCode?.code }}</code></li>
+          <li>机器人回复「已记录机器人提及身份」即完成，之后 @ 机器人即可触发对话；多个群各回填一次。</li>
+        </ol>
+        <div v-if="mentionCode" class="flex flex-col gap-1 rounded-lg border border-[var(--color-border-2)] bg-[var(--color-bg-2)] p-3">
+          <span>回填码：<span class="font-mono text-base font-semibold tracking-widest">{{ mentionCode.code }}</span>（15 分钟内有效、一次性）</span>
+          <span class="text-secondary-foreground/60">连接：{{ mentionBindConnection?.name }}</span>
+        </div>
+        <div v-if="mentionBindConnection?.mentionOpenIds?.length" class="text-secondary-foreground/60">
+          已登记身份：{{ mentionBindConnection.mentionOpenIds.join('、') }}
+        </div>
+      </div>
     </FaModal>
   </div>
 </template>
