@@ -19,4 +19,7 @@ public class PluginStorePluginDTO implements Serializable {
 
     private String code;
     private PluginStorePluginDescriptorDTO descriptor;
+    /** 来源市场源；内置直连路径为 null。 */
+    private String sourceCode;
+    private String sourceName;
 }

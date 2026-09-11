@@ -173,7 +173,7 @@ class PluginStoreControllerTest {
 
     @Test
     void confirmsUpdateAndReturnsRestartRequirement() throws Exception {
-        when(pluginStoreAppService.update("demo", "2.0.0")).thenReturn(PluginMarketplaceUpdateResultDTO.builder()
+        when(pluginStoreAppService.update("demo", "2.0.0", null)).thenReturn(PluginMarketplaceUpdateResultDTO.builder()
                 .modules(List.of(PluginModuleDTO.builder().code("demo").version("2.0.0").enabled(false).build()))
                 .requiresRestart(true)
                 .build());
@@ -187,7 +187,7 @@ class PluginStoreControllerTest {
                 .andExpect(jsonPath("$.data.modules[0].enabled").value(false))
                 .andExpect(jsonPath("$.data.requiresRestart").value(true));
 
-        verify(pluginStoreAppService).update("demo", "2.0.0");
+        verify(pluginStoreAppService).update("demo", "2.0.0", null);
     }
 
     @Test
@@ -207,7 +207,7 @@ class PluginStoreControllerTest {
 
     @Test
     void installsSpecifiedVersionWithoutEnablingIt() throws Exception {
-        when(pluginStoreAppService.install("demo", "1.0.0")).thenReturn(List.of(PluginModuleDTO.builder()
+        when(pluginStoreAppService.install("demo", "1.0.0", null)).thenReturn(List.of(PluginModuleDTO.builder()
                 .code("demo")
                 .version("1.0.0")
                 .enabled(false)
@@ -221,7 +221,7 @@ class PluginStoreControllerTest {
                 .andExpect(jsonPath("$.data[0].version").value("1.0.0"))
                 .andExpect(jsonPath("$.data[0].enabled").value(false));
 
-        verify(pluginStoreAppService).install("demo", "1.0.0");
+        verify(pluginStoreAppService).install("demo", "1.0.0", null);
     }
 
     @Test

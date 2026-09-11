@@ -8,4 +8,7 @@ public class PluginMarketplaceInstallRequest {
 
     @NotBlank(message = "插件版本不能为空")
     private String releaseVersion;
+
+    /** 可选：指定从哪个市场源安装；缺省按安装来源与源优先级解析。 */
+    private String sourceCode;
 }

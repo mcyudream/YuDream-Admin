@@ -50,6 +50,8 @@ public class PluginModule extends BaseDomain {
     private Boolean menusInitialized;
     /** 最近一次成功启用时声明的主题作用域（SITE/ADMIN），用于主题中心识别已安装但未启用的主题插件。 */
     private List<String> themeScopes;
+    /** 安装来源市场源 code；本地上传或历史数据为 null，registry 同步不回写该字段。 */
+    private String marketSourceCode;
 
     public static PluginModule fromDescriptor(PluginDescriptorInfo descriptor) {
         return PluginModule.builder()

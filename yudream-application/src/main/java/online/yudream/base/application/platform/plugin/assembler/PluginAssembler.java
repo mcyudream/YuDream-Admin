@@ -66,6 +66,7 @@ public class PluginAssembler {
                 .enabled(enabled)
                 .rollbackAvailable(module.getBackupJarPath() != null)
                 .rollbackVersion(module.getBackupPluginVersion())
+                .marketSourceCode(module.getMarketSourceCode())
                 .build();
     }
 
@@ -86,6 +87,8 @@ public class PluginAssembler {
         return PluginStorePluginDTO.builder()
                 .code(plugin.getCode())
                 .descriptor(toDTO(plugin.getDescriptor()))
+                .sourceCode(plugin.getSourceCode())
+                .sourceName(plugin.getSourceName())
                 .build();
     }
 
@@ -100,6 +103,8 @@ public class PluginAssembler {
         return PluginStorePluginVersionDTO.builder()
                 .releaseVersion(version.releaseVersion())
                 .descriptor(toDTO(version.descriptor()))
+                .sourceCode(version.sourceCode())
+                .sourceName(version.sourceName())
                 .build();
     }
 

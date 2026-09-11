@@ -65,7 +65,8 @@ public class PluginMarketplaceController {
     @PermissionRegister(code = "platform:plugin:manage", name = "确认插件更新", module = "平台插件市场", desc = "确认指定版本的插件更新；请在受控停机后重启，仅恢复更新前已启用的插件")
     public Result<PluginMarketplaceUpdateResultRes> update(@PathVariable String code,
                                                              @Valid @RequestBody PluginMarketplaceUpdateRequest request) {
-        return Result.ok(PluginWebAssembler.toUpdateResultRes(pluginStoreAppService.update(code, request.getReleaseVersion())));
+        return Result.ok(PluginWebAssembler.toUpdateResultRes(pluginStoreAppService.update(code,
+                request.getReleaseVersion(), request.getSourceCode())));
     }
 
     @PostMapping("/{code}/rollback")
@@ -78,6 +79,7 @@ public class PluginMarketplaceController {
     @PermissionRegister(code = "platform:plugin:manage", name = "安装市场插件", module = "平台插件市场", desc = "安装指定版本的在线插件，不自动启用")
     public Result<List<PluginModuleRes>> install(@PathVariable String code,
                                                   @Valid @RequestBody PluginMarketplaceInstallRequest request) {
-        return Result.ok(PluginWebAssembler.toResList(pluginStoreAppService.install(code, request.getReleaseVersion())));
+        return Result.ok(PluginWebAssembler.toResList(pluginStoreAppService.install(code,
+                request.getReleaseVersion(), request.getSourceCode())));
     }
 }

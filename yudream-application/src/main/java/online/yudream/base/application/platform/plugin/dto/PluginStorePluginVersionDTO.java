@@ -21,4 +21,7 @@ public class PluginStorePluginVersionDTO implements Serializable {
     private PluginStorePluginDescriptorDTO descriptor;
     private boolean installable;
     private String installDisabledReason;
+    /** 该版本所在市场源；内置直连路径为 null。 */
+    private String sourceCode;
+    private String sourceName;
 }
