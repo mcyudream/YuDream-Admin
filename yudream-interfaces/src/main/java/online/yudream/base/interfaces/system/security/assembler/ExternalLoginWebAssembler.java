@@ -12,13 +12,13 @@ public class ExternalLoginWebAssembler {
     public static ExternalLoginProviderSaveCmd toCmd(ExternalLoginProviderSaveRequest r) {
         ExternalLoginProviderSaveCmd c = new ExternalLoginProviderSaveCmd();
         c.setCode(r.getCode()); c.setName(r.getName()); c.setAppId(r.getAppId()); c.setAppKey(r.getAppKey());
-        c.setCallbackUrl(r.getCallbackUrl()); c.setEnabled(r.isEnabled()); c.setSupportedTypes(r.getSupportedTypes());
+        c.setCallbackUrl(r.getCallbackUrl()); c.setEndpoint(r.getEndpoint()); c.setEnabled(r.isEnabled()); c.setSupportedTypes(r.getSupportedTypes());
         return c;
     }
 
     public static ExternalLoginProviderRes toRes(ExternalLoginProviderDTO d) {
         return ExternalLoginProviderRes.builder().code(d.getCode()).name(d.getName()).protocol(d.getProtocol()).appId(d.getAppId())
-                .callbackUrl(d.getCallbackUrl()).enabled(d.isEnabled()).supportedTypes(d.getSupportedTypes()).icon(d.getIcon()).pluginManaged(d.isPluginManaged()).build();
+                .callbackUrl(d.getCallbackUrl()).endpoint(d.getEndpoint()).enabled(d.isEnabled()).supportedTypes(d.getSupportedTypes()).icon(d.getIcon()).pluginManaged(d.isPluginManaged()).build();
     }
 
     public static ExternalLoginAuthorizationRes toRes(ExternalLoginAuthorizationDTO d) {

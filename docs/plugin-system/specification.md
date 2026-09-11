@@ -251,7 +251,7 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 - `styles`/`preview`/`homePreset` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
 - `homeComponent`/`chromeComponent` 必须是远程模块 `routes` 导出表中的组件键，格式 `[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*`（如 `theme/Home`、`theme/Chrome`），注册时校验；`homeComponent` 与 `homePreset` 互斥——前者由 Vue 页面接管公开站首页，后者走 CMS data-yb 模板体系，同时声明以 `homeComponent` 为准。`chromeComponent` 声明后公开站页头/页脚由该组件接管，导航数据由宿主注入（始终含首页 `/site`，CMS 已配置同 URL 则不重复）；未声明时仍由宿主 SiteChrome 承载。
 - 同一 scope 同时只激活一个主题：启用声明了主题的新插件时，宿主自动禁用同 scope 冲突的旧主题插件并接管激活位；禁用/卸载/删除主题插件即释放激活位，该 scope 回落宿主内置主题。重启恢复后宿主按持久化激活位校正。
-- 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。
+- 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。启动页（`vite-plugin-app-loading` 注入的宿主 `loading.html`）发生在 Vue Router 之前：`theme-runtime` 必须按 URL 公开路径前缀提前打开 SITE 主题 media，让已激活的 SITE 主题用自己的 style.css 覆盖 `[data-app-loading]`。主题 GIF/字体只许放在插件 frontend 资产里，禁止打进宿主 `public/`——未装主题或进入后台时必须仍是宿主默认启动页。
 
 Vue 原生主题页（homeComponent + chromeComponent，推荐路径）：
 

@@ -1,1 +1,15 @@
-package online.yudream.base.application.system.security.cmd; import lombok.Data; @Data public class ExternalLoginProviderSaveCmd {private String code;private String name;private String appId;private String appKey;private String callbackUrl;private boolean enabled;private String supportedTypes;}
+package online.yudream.base.application.system.security.cmd;
+
+import lombok.Data;
+
+@Data
+public class ExternalLoginProviderSaveCmd {
+    private String code;
+    private String name;
+    private String appId;
+    private String appKey;
+    private String callbackUrl;
+    private String endpoint;
+    private boolean enabled;
+    private String supportedTypes;
+}

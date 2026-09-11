@@ -26,6 +26,8 @@ describe('startup branding', () => {
     assert.match(indexHtml, /<title>正在加载<\/title>/)
     assert.doesNotMatch(indexHtml, /VITE_APP_TITLE|YuDream/i)
     assert.doesNotMatch(loadingHtml, /VITE_APP_TITLE|YuDream/i)
+    assert.doesNotMatch(loadingHtml, /loading\.gif|cubic-11|Minecraft-Tenv2/)
+    assert.match(loadingHtml, /class="square"/)
   })
 
   it('continues startup when public settings do not respond', async () => {

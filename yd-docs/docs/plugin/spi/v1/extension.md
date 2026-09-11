@@ -48,5 +48,5 @@ public void onEnable(PluginContext context) {
 - `providerCode` 必须全局唯一且稳定，建议使用插件 code。
 - `supportedTypes` 至少一项（如 `cas`、`oidc`）。宿主按 `code + type` 组合路由：`GET /api/external-login/{providerCode}/{type}/authorize`。
 - 回调统一走 `GET /api/external-login/callback`，接受 OIDC `code` 或 CAS `ticket`，用 `state` 反查提供方。CAS 没有独立 state 参数时，把 state 编码进 `service` URL，校验必须精确回放同一 service。
-- 登录页会合并插件提供方与后台配置的 WWOYUN 提供方；插件托管的 code 禁止在系统「第三方登录」里再保存一份。
+- 登录页和个人设置会合并所有已启用提供方（插件 + 后台配置）。Wwoyun 只是内置默认提供方，不再作为唯一硬编码入口。插件托管的 code 禁止在系统「第三方登录」里再保存一份。
 - 未绑定本站账号时走既有 `BIND_REQUIRED` 流程，插件不要自行开户。

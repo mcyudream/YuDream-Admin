@@ -4,12 +4,15 @@ import type { PluginTheme, PluginThemeScope } from '@/api/modules/platform-plugi
 import apiPlugin from '@/api/modules/platform-plugin'
 import { pluginFrontendAssetUrl } from './frontend-assets'
 import { acquirePluginRemoteModuleByCode } from './remote-loader'
+import { isLikelyPublicPath } from './theme-public-path'
+
+export { isLikelyPublicPath } from './theme-public-path'
 
 const SCOPES: PluginThemeScope[] = ['SITE', 'ADMIN']
 const SCOPE_ATTRIBUTE = 'data-yudream-theme-scope'
 const PLUGIN_ATTRIBUTE = 'data-yudream-theme-plugin'
 
-let currentRoutePublic = false
+let currentRoutePublic = isLikelyPublicPath()
 let activeThemePlugins = new Map<string, string>()
 const themeModuleLeases = new Map<string, PluginRemoteModuleLease>()
 const pendingThemeModules = new Set<string>()
@@ -26,8 +29,12 @@ export function useActivePluginTheme(scope: PluginThemeScope) {
  */
 export async function bootstrapPluginThemes() {
   try {
+    currentRoutePublic = isLikelyPublicPath()
     const res = await apiPlugin.activeThemes()
     applyActiveThemes(res.data || {})
+    if (currentRoutePublic) {
+      await waitForThemeStyles('SITE')
+    }
   }
   catch {
     // 主题加载失败时回落宿主内置主题
@@ -129,4 +136,25 @@ function syncScopeVisibility() {
 
 function themeLinks(scope: PluginThemeScope) {
   return Array.from(document.head.querySelectorAll<HTMLLinkElement>(`link[${SCOPE_ATTRIBUTE}="${scope.toLowerCase()}"]`))
+}
+
+function waitForThemeStyles(scope: PluginThemeScope, timeoutMs = 2500) {
+  const links = themeLinks(scope)
+  if (!links.length) {
+    return Promise.resolve()
+  }
+  return Promise.race([
+    Promise.all(links.map(waitForStylesheet)),
+    new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
+  ]).then(() => undefined)
+}
+
+function waitForStylesheet(link: HTMLLinkElement) {
+  if (link.sheet) {
+    return Promise.resolve()
+  }
+  return new Promise<void>((resolve) => {
+    link.addEventListener('load', () => resolve(), { once: true })
+    link.addEventListener('error', () => resolve(), { once: true })
+  })
 }

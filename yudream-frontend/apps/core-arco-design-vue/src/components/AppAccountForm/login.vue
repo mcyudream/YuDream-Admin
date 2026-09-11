@@ -40,21 +40,11 @@ const toast = useFaToast()
 const logo = computed(() => appSettingsStore.logo || new URL('@/assets/images/logo.png', import.meta.url).href)
 const loading = ref(false)
 const passkeyLoading = ref(false)
-const type = ref<string>('password')
-// 第三方登录入口与账号密码/Passkey 平铺为登录方式 tab；绑定流程下只允许账号密码，不展示第三方 tab
-const EXTERNAL_TAB_PREFIX = 'external:'
+const type = ref<'password' | 'passkey'>('password')
 const loginTabs = computed(() => [
   { label: '账号密码登录', value: 'password' },
   ...(!props.bindingToken && appFeatureStore.passkeyEnabled ? [{ label: 'Passkey 登录', value: 'passkey' }] : []),
-  ...(!props.bindingToken ? (props.externalEntries ?? []).map(entry => ({ label: entry.label, value: `${EXTERNAL_TAB_PREFIX}${entry.providerCode}:${entry.type}`, icon: entry.icon })) : []),
 ])
-const currentExternal = computed(() => {
-  if (!type.value.startsWith(EXTERNAL_TAB_PREFIX)) {
-    return undefined
-  }
-  const [providerCode, entryType] = type.value.slice(EXTERNAL_TAB_PREFIX.length).split(':')
-  return props.externalEntries?.find(entry => entry.providerCode === providerCode && entry.type === entryType)
-})
 
 onMounted(() => {
   appFeatureStore.load()
@@ -65,12 +55,6 @@ watch(() => appFeatureStore.passkeyEnabled, (enabled) => {
     type.value = 'password'
   }
 }, { immediate: true })
-
-watch(currentExternal, (entry) => {
-  if (type.value.startsWith(EXTERNAL_TAB_PREFIX) && !entry) {
-    type.value = 'password'
-  }
-})
 
 const form = useForm({
   validationSchema: toTypedSchema(z.object({
@@ -153,11 +137,11 @@ function rememberAccount(account: string, remember?: boolean) {
     </div>
     <div class="mb-4">
       <FaTabs
-        v-model="type" :list="loginTabs" class="w-full"
+        v-model="type" :list="loginTabs" class="inline-flex"
       />
     </div>
     <form @submit="onSubmit">
-      <FormField v-show="!currentExternal" v-slot="{ componentField, errors }" name="account">
+      <FormField v-slot="{ componentField, errors }" name="account">
         <FormItem class="pb-6 relative space-y-0">
           <FormControl>
             <FaInput type="text" placeholder="用户名或邮箱" class="w-full" :class="{ 'border-destructive': errors.length }" v-bind="componentField">
@@ -187,7 +171,7 @@ function rememberAccount(account: string, remember?: boolean) {
           </FormItem>
         </FormField>
       </div>
-      <div v-show="!currentExternal" class="mb-4 flex-center-between">
+      <div class="mb-4 flex-center-between">
         <div class="flex-center-start">
           <FormField v-slot="{ componentField }" type="checkbox" name="remember">
             <FormItem>
@@ -206,28 +190,47 @@ function rememberAccount(account: string, remember?: boolean) {
       <FaButton v-if="type === 'password'" :loading="loading" size="lg" class="w-full" type="submit">
         登录
       </FaButton>
-      <FaButton v-else-if="type === 'passkey'" :loading="passkeyLoading" size="lg" class="w-full" type="button" @click="loginWithPasskey">
+      <FaButton v-else :loading="passkeyLoading" size="lg" class="w-full" type="button" @click="loginWithPasskey">
         <FaIcon name="i-ri:fingerprint-line" />
         使用 Passkey 登录
       </FaButton>
-      <div v-else-if="currentExternal" class="flex-col-stretch-center gap-4">
-        <div class="flex-center size-16 border rounded-full bg-primary/5 text-primary">
-          <FaIcon :name="currentExternal.icon" class="size-8" />
-        </div>
-        <p class="text-sm text-muted-foreground text-center">
-          点击按钮跳转到「{{ currentExternal.label }}」完成认证，认证成功后自动登录；未绑定本站账号时可登录或注册后完成绑定
-        </p>
-        <FaButton size="lg" class="w-full" type="button" :loading="props.externalLoading" @click="emits('onExternalLogin', currentExternal)">
-          <FaIcon :name="currentExternal.icon" />
-          前往{{ currentExternal.label }}
-        </FaButton>
-      </div>
-      <div v-if="!currentExternal" class="text-sm mt-4 flex-center gap-2">
+      <div class="text-sm mt-4 flex-center gap-2">
         <span class="text-secondary-foreground op-50">还没有账号？</span>
         <FaButton variant="link" class="p-0 h-auto" type="button" @click="emits('onRegister', form.values.account)">
           注册新账号
         </FaButton>
       </div>
+      <div v-if="props.externalEntries?.length" class="qq-login-entry">
+        <FaButton
+          v-for="entry in props.externalEntries"
+          :key="`${entry.providerCode}:${entry.type}`"
+          variant="outline"
+          size="icon"
+          type="button"
+          :title="entry.label"
+          :aria-label="entry.label"
+          :disabled="props.externalLoading"
+          @click="emits('onExternalLogin', entry)"
+        >
+          <FaIcon :name="entry.icon" />
+        </FaButton>
+      </div>
     </form>
   </div>
 </template>
+
+<style scoped>
+.qq-login-entry {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.qq-login-entry :deep(button) {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+}
+</style>

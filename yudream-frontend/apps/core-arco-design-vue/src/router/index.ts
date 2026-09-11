@@ -1,4 +1,3 @@
-import { loadingFadeOut } from 'virtual:app-loading'
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 import settingsDefault from '@/settings'
 import setupExtensions from './extensions'
@@ -14,9 +13,5 @@ const router = createRouter({
 
 setupGuards(router)
 setupExtensions(router)
-
-router.isReady().then(() => {
-  loadingFadeOut()
-})
 
 export default router

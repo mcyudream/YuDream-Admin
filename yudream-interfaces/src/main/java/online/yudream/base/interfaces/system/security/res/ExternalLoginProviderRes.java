@@ -1,1 +1,19 @@
-package online.yudream.base.interfaces.system.security.res;import lombok.Builder;import lombok.Data;@Data @Builder public class ExternalLoginProviderRes {private String code;private String name;private String protocol;private String appId;private String callbackUrl;private boolean enabled;private String supportedTypes;private String icon;private boolean pluginManaged;}
+package online.yudream.base.interfaces.system.security.res;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class ExternalLoginProviderRes {
+    private String code;
+    private String name;
+    private String protocol;
+    private String appId;
+    private String callbackUrl;
+    private String endpoint;
+    private boolean enabled;
+    private String supportedTypes;
+    private String icon;
+    private boolean pluginManaged;
+}
