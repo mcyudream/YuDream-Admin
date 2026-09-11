@@ -173,7 +173,36 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 每个插件使用 `online.yudream.plugins:<artifactId>:<tag version>:jar` 坐标；catalog 使用 `online.yudream.plugins:plugin-catalog:<tag version>:tsv`。官方发布凭据同样只能配置为受保护、掩码变量，发布只能由受保护 `v*` tag 或手动 job 执行。
 
-## 6. 相关文档
+## 6. 插件市场源：多源订阅
+
+「插件市场源」是一个可选的平台能力（code `plugin-market-source`，能力中心「插件分发」分组），开启后插件市场从固定单源升级为**多源订阅**；关闭时市场自动回落到 `yudream.platform.plugin.store-root-url` 配置直连的内置单源，行为与历史版本完全一致，其他功能不受影响。
+
+### 6.1 双闸门
+
+- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时市场源管理端点不注册、内置源不播种。
+- 应用闸门：能力未在「平台能力」中启用时，源管理用例一律拒绝；市场页隐藏「市场源管理」菜单，多源能力不生效。
+
+### 6.2 源管理
+
+管理员在「平台 → 市场源管理」维护源列表（权限码 `platform:plugin-market-source:view/create/edit/delete/run`）：
+
+- 内置源 `default`：rootUrl 始终镜像 `yudream.platform.plugin.store-root-url` 配置，管理端只能调整令牌与启停，不可删除；
+- 新增源要求 HTTPS 根地址（`index.json` 完整地址）与 32 位内小写标识；私有源可配置 Bearer 令牌，令牌经主密钥（`YUDREAM_CREDENTIAL_KEY`）加密存储，接口只返回"是否已配置"；
+- 每个源可手动「同步」或「全部同步」：拉取根索引 → 各插件 index → 最新版 descriptor，按 `schemaVersion=1` 契约严格校验后存为本地目录快照；单源失败只标记该源异常，不影响其他源；
+- 市场列表读取快照，不产生实时外呼；详情页的历史版本 descriptor 与安装/更新时的 JAR 下载按需从对应源拉取，并校验 URL 属于该源（同源同路径）。
+
+### 6.3 多源合并与安装来源
+
+- 市场列表对各启用源的插件合并去重：同 `code` 取最高 SemVer 版本，版本相同时优先展示已安装插件的来源源，否则按源排序；
+- 详情页版本列表合并各源并标注来源；安装/更新请求可显式指定 `sourceCode`，缺省按「安装来源 → 源优先级」解析；
+- 安装/更新成功后来源 `marketSourceCode` 记录在本地插件上，后续更新检查默认跟随该来源，并在其他源存在更高版本时自动跨源升级；
+- 市场页在启用源多于一个时提供「来源」筛选，卡片与版本行标注来源名称。
+
+### 6.4 源契约
+
+市场源必须提供与官方市场一致的 `schemaVersion=1` 只读 HTTP 契约：根 `index.json` → 每插件 `index.json` → 每版本 `descriptor.json`（含 JAR 地址与 SHA-256）。相对引用按各 `index.json` 所在目录解析，且必须与源根同源同路径；JAR 下载强制校验 SHA-256 与大小上限。自托管一个市场源即等价于按该结构提供静态文件（下一期将内置自托管服务端发布与审核能力）。
+
+## 7. 相关文档
 
 - [plugin/specification.md](./specification.md)：插件结构与运行时规范
 - [plugin/dev-tools.md](./dev-tools.md)：开发模式与调试浮窗

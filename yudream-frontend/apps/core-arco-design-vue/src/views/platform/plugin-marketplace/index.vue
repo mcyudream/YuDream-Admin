@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { PluginModule } from '@/api/modules/platform-plugin'
 import type { PluginMarketplaceUpdatePlan, PluginStorePlugin, PluginStorePluginDescriptor, PluginStorePluginDetail, PluginStorePluginVersion } from '@/api/modules/platform-plugin-marketplace'
+import type { PluginMarketSource } from '@/api/modules/platform-plugin-market-source'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
+import apiPluginMarketSource from '@/api/modules/platform-plugin-market-source'
 import { compareSemVer } from './semver'
 import VersionCard from './version-card.vue'
 
@@ -12,6 +14,8 @@ type MarketplaceStatus = 'all' | 'uninstalled' | 'update' | 'installed' | 'local
 const loading = ref(false)
 const keyword = ref('')
 const status = ref<MarketplaceStatus>('all')
+const sourceFilter = ref('all')
+const sources = ref<PluginMarketSource[]>([])
 const pagination = reactive({ page: 1, size: 12, total: 0 })
 const rows = ref<PluginStorePlugin[]>([])
 const modules = ref<PluginModule[]>([])
@@ -31,20 +35,27 @@ const statusOptions: { label: string, value: MarketplaceStatus }[] = [
   { label: '本地版本较新', value: 'local-newer' },
 ]
 
+const sourceOptions = computed(() => [
+  { label: '全部来源', value: 'all' },
+  ...sources.value.filter(item => item.enabled).map(item => ({ label: item.name, value: item.code })),
+])
+const showSourceFilter = computed(() => sources.value.filter(item => item.enabled).length > 1)
+
 const filteredRows = computed(() => {
   const value = keyword.value.trim().toLowerCase()
   return rows.value.filter((item) => {
     const descriptor = getDescriptor(item)
     const matchesKeyword = !value || [item.code, descriptor.code, descriptor.displayName, descriptor.description, descriptor.version]
       .some(field => field?.toLowerCase().includes(value))
-    return matchesKeyword && (status.value === 'all' || marketplaceStatus(item) === status.value)
+    const matchesSource = sourceFilter.value === 'all' || item.sourceCode === sourceFilter.value
+    return matchesKeyword && matchesSource && (status.value === 'all' || marketplaceStatus(item) === status.value)
   })
 })
 const pagedRows = computed(() => {
   const start = (pagination.page - 1) * pagination.size
   return filteredRows.value.slice(start, start + pagination.size)
 })
-const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.value !== 'all')
+const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.value !== 'all' || sourceFilter.value !== 'all')
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
 const localModule = computed(() => modules.value.find(item => item.code === selectedCode.value))
@@ -64,7 +75,7 @@ watch(selectedCode, () => {
   showHistory.value = false
 })
 
-watch([keyword, status], () => {
+watch([keyword, status, sourceFilter], () => {
   pagination.page = 1
 })
 watch(filteredRows, clampPage, { immediate: true })
@@ -72,8 +83,20 @@ watch(() => pagination.size, clampPage)
 
 onMounted(load)
 
+async function loadSources() {
+  // 能力未启用时端点不存在（404），静默回落单源模式
+  try {
+    const res = await apiPluginMarketSource.list()
+    sources.value = res.data
+  }
+  catch {
+    sources.value = []
+  }
+}
+
 async function load() {
   loading.value = true
+  await loadSources()
   try {
     const [marketplaceRes, pluginsRes] = await Promise.all([
       apiPluginMarketplace.list(),
@@ -163,10 +186,15 @@ function clampPage() {
 function resetFilters() {
   keyword.value = ''
   status.value = 'all'
+  sourceFilter.value = 'all'
 }
 
 function operationsPending() {
   return Boolean(installingVersion.value || updatingVersion.value || rollingBackCode.value)
+}
+
+function versionByRelease(releaseVersion: string) {
+  return detail.value?.versions.find(item => item.releaseVersion === releaseVersion)
 }
 
 async function install(releaseVersion: string) {
@@ -175,7 +203,7 @@ async function install(releaseVersion: string) {
   }
   installingVersion.value = releaseVersion
   try {
-    await apiPluginMarketplace.install(selectedCode.value, { releaseVersion })
+    await apiPluginMarketplace.install(selectedCode.value, { releaseVersion, sourceCode: versionByRelease(releaseVersion)?.sourceCode })
     await load()
     toast.success('插件已安装，尚未启用。可在插件管理中启用。')
   }
@@ -212,7 +240,7 @@ async function previewAndConfirmUpdate(releaseVersion: string) {
       },
       onConfirm: async () => {
         try {
-          const result = await apiPluginMarketplace.update(code, { releaseVersion })
+          const result = await apiPluginMarketplace.update(code, { releaseVersion, sourceCode: versionByRelease(releaseVersion)?.sourceCode })
           await load()
           toast.success(result.data.requiresRestart ? '插件已更新并受控停止。重启服务后将恢复此前已启用的状态。' : '插件已更新')
         }
@@ -281,6 +309,7 @@ function rollbackConfirmationContent() {
         <div class="marketplace-filters">
           <FaInput v-model="keyword" clearable placeholder="搜索名称、编码、描述或版本" class="marketplace-search" />
           <FaSelect v-model="status" :options="statusOptions" class="marketplace-status" />
+          <FaSelect v-if="showSourceFilter" v-model="sourceFilter" :options="sourceOptions" class="marketplace-source" />
         </div>
         <div class="marketplace-toolbar-actions">
           <span class="result-count">共 {{ pagination.total }} 个结果</span>
@@ -309,6 +338,7 @@ function rollbackConfirmationContent() {
             </div>
             <div class="plugin-card-meta">
               <FaTag variant="secondary">{{ marketplaceStatusLabel(item) }}</FaTag>
+              <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
             </div>
             <p class="plugin-card-description" :title="getDescriptor(item).description || '暂无插件简介。'">
               {{ getDescriptor(item).description || '暂无插件简介。' }}
@@ -412,6 +442,10 @@ function rollbackConfirmationContent() {
 
 .marketplace-status {
   width: 140px;
+}
+
+.marketplace-source {
+  width: 150px;
 }
 
 .marketplace-toolbar-actions {

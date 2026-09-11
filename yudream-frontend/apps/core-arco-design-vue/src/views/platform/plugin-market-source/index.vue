@@ -73,11 +73,11 @@ function openForm(row?: PluginMarketSource) {
 }
 
 async function saveForm() {
-  if (!editing.value && !form.code.trim()) {
+  if (!editing.value && !form.code?.trim()) {
     toast.error('请填写市场源标识')
     return
   }
-  if (!editing.value?.builtIn && !form.rootUrl.trim()) {
+  if (!editing.value?.builtIn && !form.rootUrl?.trim()) {
     toast.error('请填写市场源地址')
     return
   }
@@ -100,14 +100,15 @@ async function saveForm() {
 }
 
 async function testForm() {
-  if (!form.rootUrl.trim()) {
+  const rootUrl = form.rootUrl?.trim()
+  if (!rootUrl) {
     toast.error('请先填写市场源地址')
     return
   }
   testing.value = true
   testMessage.value = ''
   try {
-    const res = await apiMarketSource.test({ rootUrl: form.rootUrl, token: form.token || undefined })
+    const res = await apiMarketSource.test({ rootUrl, token: form.token || undefined })
     testOk.value = res.data.ok
     testMessage.value = res.data.message || (res.data.ok ? '连接成功' : '连接失败')
   }

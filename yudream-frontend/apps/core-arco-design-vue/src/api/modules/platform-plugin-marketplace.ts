@@ -57,6 +57,9 @@ export interface PluginStorePluginDescriptor {
 export interface PluginStorePlugin {
   code: string
   descriptor: PluginStorePluginDescriptor
+  /** 来源市场源；能力未启用或内置直连时为空。 */
+  sourceCode?: string
+  sourceName?: string
   /** Legacy stores may return descriptor fields directly. */
   releaseVersion?: string
   version?: string
@@ -72,6 +75,9 @@ export interface PluginStorePluginVersion {
   installDisabledReason?: string
   compatibility?: PluginStorePluginCompatibility
   dependencies?: PluginStorePluginDependency[]
+  /** 该版本所在市场源；能力未启用或内置直连时为空。 */
+  sourceCode?: string
+  sourceName?: string
   /** Legacy responses may return descriptor fields directly. */
   code?: string
   version?: string
@@ -124,10 +130,12 @@ export interface PluginStorePluginDetail {
 
 export interface PluginMarketplaceInstallRequest {
   releaseVersion: string
+  sourceCode?: string
 }
 
 export interface PluginMarketplaceUpdateRequest {
   releaseVersion: string
+  sourceCode?: string
 }
 
 export interface PluginMarketplaceUpdateResult {
