@@ -1,5 +1,6 @@
 package online.yudream.base.interfaces.system.excel.assembler;
 
+import online.yudream.base.application.platform.agent.dto.AgentTraceSummaryDTO;
 import online.yudream.base.application.system.menu.cmd.MenuCreateCmd;
 import online.yudream.base.application.system.menu.dto.MenuManageDTO;
 import online.yudream.base.application.system.user.cmd.DeptCreateCmd;
@@ -14,6 +15,7 @@ import online.yudream.base.domain.system.monitor.dto.ApiLogDTO;
 import online.yudream.base.domain.system.monitor.dto.LoginLogDTO;
 import online.yudream.base.domain.system.monitor.dto.OnlineUserDTO;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
+import online.yudream.base.interfaces.system.excel.row.AgentTraceExcelRow;
 import online.yudream.base.interfaces.system.excel.row.ApiLogExcelRow;
 import online.yudream.base.interfaces.system.excel.row.DeptExcelRow;
 import online.yudream.base.interfaces.system.excel.row.LoginLogExcelRow;
@@ -225,6 +227,22 @@ public class SystemExcelAssembler {
         row.setIp(dto.getIp());
         row.setErrorMessage(dto.getErrorMessage());
         row.setCreateTime(format(dto.getCreateTime()));
+        return row;
+    }
+
+    public static AgentTraceExcelRow toAgentTraceRow(AgentTraceSummaryDTO dto) {
+        AgentTraceExcelRow row = new AgentTraceExcelRow();
+        row.setTraceId(dto.getTraceId());
+        row.setStatus(enumName(dto.getStatus()));
+        row.setSource(enumName(dto.getSource()));
+        row.setAgentName(dto.getAgentName());
+        row.setAgentCode(dto.getAgentCode());
+        row.setOwnerPluginCode(dto.getOwnerPluginCode());
+        row.setStepCount(dto.getStepCount());
+        row.setDurationMs(dto.getDurationMs());
+        row.setInput(dto.getInput());
+        row.setError(dto.getError());
+        row.setStartTime(format(dto.getStartTime()));
         return row;
     }
 

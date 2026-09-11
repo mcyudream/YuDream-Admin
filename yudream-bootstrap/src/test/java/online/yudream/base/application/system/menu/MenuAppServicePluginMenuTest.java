@@ -570,6 +570,29 @@ class MenuAppServicePluginMenuTest {
         verify(menuRepo).save(menu);
     }
 
+    @Test
+    void deleteRemovesMenuWithoutChildren() {
+        Menu menu = systemMenu("system:report", null, MenuNodeType.MENU);
+        when(menuRepo.findByCode(menu.getCode())).thenReturn(Optional.of(menu));
+        when(menuRepo.findAll()).thenReturn(List.of(menu));
+
+        service.delete(menu.getCode());
+
+        verify(menuDomainService).deleteMenu(menu.getCode());
+    }
+
+    @Test
+    void deleteRejectsMenuWithChildren() {
+        Menu parent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
+        Menu child = systemMenu("system:tools:audit", parent.getCode(), MenuNodeType.MENU);
+        when(menuRepo.findByCode(parent.getCode())).thenReturn(Optional.of(parent));
+        when(menuRepo.findAll()).thenReturn(List.of(parent, child));
+
+        assertThatThrownBy(() -> service.delete(parent.getCode()))
+                .isInstanceOf(BizException.class)
+                .hasMessage("菜单存在子节点，不能删除");
+    }
+
     private Menu systemMenu(String code, String parentCode, MenuNodeType type) {
         return Menu.builder()
                 .code(code)

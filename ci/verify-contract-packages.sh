@@ -57,10 +57,10 @@ if ! grep -q '"unocss"' yudream-frontend/packages/plugin-sdk/package.json; then
 fi
 
 echo "[verify-contract-packages] checking npm publish registries"
-grep -q '"version":[[:space:]]*"1.6.0"' yudream-frontend/packages/plugin-sdk/package.json \
-  || fail "@yudream/plugin-sdk must use stable version 1.6.0"
-grep -q '"version":[[:space:]]*"1.2.1"' yudream-frontend/packages/components/package.json \
-  || fail "@yudream/components must use stable version 1.2.1"
+grep -q '"version":[[:space:]]*"1.7.0"' yudream-frontend/packages/plugin-sdk/package.json \
+  || fail "@yudream/plugin-sdk must use stable version 1.7.0"
+grep -q '"version":[[:space:]]*"1.3.0"' yudream-frontend/packages/components/package.json \
+  || fail "@yudream/components must use stable version 1.3.0"
 if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' yudream-frontend/packages/plugin-sdk/package.json; then
   fail "@yudream/plugin-sdk must publish to Nexus npm-public"
 fi

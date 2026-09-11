@@ -8,10 +8,12 @@ const accountStore = useAppAccountStore()
 const message = ref('正在完成第三方登录...')
 
 onMounted(async () => {
-  const type = String(route.query.type || '')
-  const code = String(route.query.code || '')
+  // code 与 ticket（CAS）二选一；provider/type 可随回调 URL 带回，缺省时由宿主按 state 票据反查
+  const code = String(route.query.code || route.query.ticket || '')
   const state = String(route.query.state || '')
-  if (!type || !code || !state) {
+  const provider = typeof route.query.provider === 'string' && route.query.provider ? route.query.provider : undefined
+  const type = typeof route.query.type === 'string' && route.query.type ? route.query.type : undefined
+  if (!code || !state) {
     message.value = '第三方登录回调参数不完整'
     return
   }
@@ -19,7 +21,7 @@ onMounted(async () => {
   // 登录前暂存的目标路由（由登录页在跳转授权前写入），登录完成后原路返回
   const redirect = consumeExternalLoginRedirect()
   try {
-    const result = (await externalLogin.callback('wwoyun', type, { code, state })).data
+    const result = (await externalLogin.callbackByState({ code, state, provider, type })).data
     switch (result.outcome) {
       case 'LOGIN':
         await accountStore.initializeSession(result.session)

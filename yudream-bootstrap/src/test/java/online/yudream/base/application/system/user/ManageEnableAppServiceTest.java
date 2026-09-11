@@ -1,9 +1,14 @@
 package online.yudream.base.application.system.user;
 
+import online.yudream.base.application.system.user.cmd.UserPasswordChangeCmd;
 import online.yudream.base.application.system.user.service.DeptManageAppService;
+import online.yudream.base.application.system.user.service.MessagingIdentityAppService;
 import online.yudream.base.application.system.user.service.RoleManageAppService;
+import online.yudream.base.application.system.user.service.UserManageAppService;
+import online.yudream.base.domain.common.service.PasswordEncoder;
 import online.yudream.base.domain.system.user.aggregate.Dept;
 import online.yudream.base.domain.system.user.aggregate.Role;
+import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.DeptStatus;
 import online.yudream.base.domain.system.user.enumerate.RoleLevel;
 import online.yudream.base.domain.system.user.enumerate.RoleStatus;
@@ -35,6 +40,10 @@ class ManageEnableAppServiceTest {
     private PermissionRepo permissionRepo;
     @Mock
     private UserRepo userRepo;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    @Mock
+    private MessagingIdentityAppService messagingIdentityAppService;
 
     @Test
     void enableRoleOnlyChangesStatus() {
@@ -78,5 +87,24 @@ class ManageEnableAppServiceTest {
         assertThat(dept.getParentId().getValue()).isEqualTo(1L);
         assertThat(dept.getSortOrder()).isEqualTo(7);
         verify(deptRepo).save(dept);
+    }
+
+    @Test
+    void changePasswordResetsEncodedPassword() {
+        User user = User.builder()
+                .id(10L)
+                .username("alice")
+                .build();
+        when(userRepo.findById(10L)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("Passw0rd")).thenReturn("encoded-Passw0rd");
+        UserPasswordChangeCmd cmd = new UserPasswordChangeCmd();
+        cmd.setId(10L);
+        cmd.setPassword("Passw0rd");
+
+        new UserManageAppService(userRepo, roleRepo, deptRepo, passwordEncoder, messagingIdentityAppService)
+                .changePassword(cmd);
+
+        assertThat(user.getPassword().getEncodedPassword()).isEqualTo("encoded-Passw0rd");
+        verify(userRepo).save(user);
     }
 }

@@ -64,6 +64,15 @@ public class MenuDomainService {
         return saved;
     }
 
+    public void deleteMenu(String code) {
+        Menu menu = menuRepo.findByCode(code).orElse(null);
+        menuRepo.deleteByCode(code);
+        if (menu != null) {
+            permissionRepo.deleteByCode(menu.getPermissionCode());
+        }
+        log.debug("Deleted menu: code={}", code);
+    }
+
     private void upsertMenuPermission(Menu menu) {
         String permissionCode = menu.getPermissionCode();
         Permission permission = permissionRepo.findByCode(permissionCode)

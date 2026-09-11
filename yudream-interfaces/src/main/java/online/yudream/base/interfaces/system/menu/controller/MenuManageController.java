@@ -66,17 +66,24 @@ public class MenuManageController {
     }
 
     @DeleteMapping
-    @PermissionRegister(code = "system:menu:delete", name = "删除菜单", module = "系统管理", desc = "停用菜单")
-    public Result<Void> disable(@RequestParam String code) {
-        menuAppService.disable(code);
+    @PermissionRegister(code = "system:menu:delete", name = "删除菜单", module = "系统管理", desc = "删除菜单")
+    public Result<Void> delete(@RequestParam String code) {
+        menuAppService.delete(code);
         return Result.ok();
     }
 
     @Deprecated
     @DeleteMapping("/{code}")
-    @PermissionRegister(code = "system:menu:delete", name = "删除菜单", module = "系统管理", desc = "停用菜单")
-    public Result<Void> disableLegacy(@PathVariable String code) {
-        return disable(code);
+    @PermissionRegister(code = "system:menu:delete", name = "删除菜单", module = "系统管理", desc = "删除菜单")
+    public Result<Void> deleteLegacy(@PathVariable String code) {
+        return delete(code);
+    }
+
+    @PostMapping("/disable")
+    @PermissionRegister(code = "system:menu:edit", name = "停用菜单", module = "系统管理", desc = "停用菜单")
+    public Result<Void> disable(@RequestParam String code) {
+        menuAppService.disable(code);
+        return Result.ok();
     }
 
     @PostMapping("/enable")

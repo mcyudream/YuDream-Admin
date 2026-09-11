@@ -11,8 +11,16 @@ import online.yudream.base.application.platform.agent.dto.AgentModelDTO;
 import online.yudream.base.application.platform.agent.dto.AgentRunDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolCandidateDTO;
 import online.yudream.base.application.platform.agent.dto.AgentToolDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTraceDetailDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTracePageDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTraceStatsDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTraceSummaryDTO;
 import online.yudream.base.domain.common.PageResult;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolType;
+import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
+import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
+import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.interfaces.platform.agent.request.AgentApplicationSaveRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentRunRequest;
 import online.yudream.base.interfaces.platform.agent.request.AgentToolSaveRequest;
@@ -24,12 +32,23 @@ import online.yudream.base.interfaces.platform.agent.res.AgentKnowledgeSpaceRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentRunRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolCandidateRes;
 import online.yudream.base.interfaces.platform.agent.res.AgentToolRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTraceDetailRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTracePageRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTraceStatsRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTraceSummaryRes;
 import online.yudream.base.interfaces.platform.ai.res.AiToolCallRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport.SecurityPrincipal;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.List;
+import java.util.Locale;
 
 public final class AgentWebAssembler {
+    private static final DateTimeFormatter DATE_TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private AgentWebAssembler() {}
     public static AgentApplicationSaveCmd toCmd(AgentApplicationSaveRequest request) { return toCmd(null, request); }
     public static AgentApplicationSaveCmd toCmd(Long id, AgentApplicationSaveRequest request) { AgentApplicationSaveCmd cmd = new AgentApplicationSaveCmd(); cmd.setId(id); cmd.setName(request.getName()); cmd.setCode(request.getCode()); cmd.setDescription(request.getDescription()); cmd.setIcon(request.getIcon()); cmd.setSystemPrompt(request.getSystemPrompt()); cmd.setWorkflowJson(request.getWorkflowJson()); cmd.setToolCodes(request.getToolCodes()); cmd.setStatus(request.getStatus()); return cmd; }
@@ -56,4 +75,125 @@ public final class AgentWebAssembler {
     public static AgentDebugEventRes toDebugRunFinished(String runId, AgentRunDTO value) { return debugEvent("RUN_FINISHED", runId).status("COMPLETED").message("Agent 调试完成").result(toRes(value)).build(); }
     public static AgentDebugEventRes toDebugRunError(String runId, String message) { return debugEvent("RUN_ERROR", runId).status("FAILED").message(message == null ? "Agent 调试失败" : message).build(); }
     private static AgentDebugEventRes.AgentDebugEventResBuilder debugEvent(String type, String runId) { return AgentDebugEventRes.builder().type(type).threadId("agent-debug").runId(runId).timestamp(Instant.now().toEpochMilli()); }
+
+    public static AgentTraceQuery toTraceQuery(
+            String source,
+            String pluginCode,
+            String status,
+            String keyword,
+            String agentCode,
+            String startTime,
+            String endTime,
+            Integer page,
+            Integer size
+    ) {
+        return AgentTraceQuery.of(
+                parseEnum(AgentTraceSource.class, source, "来源"),
+                pluginCode,
+                parseEnum(AgentTraceStatus.class, status, "状态"),
+                keyword,
+                agentCode,
+                parseDateTime(startTime, "开始时间"),
+                parseDateTime(endTime, "结束时间"),
+                page == null ? 1 : page,
+                size == null ? 20 : size
+        );
+    }
+
+    public static AgentTracePageRes toTracePage(AgentTracePageDTO dto) {
+        List<AgentTraceSummaryRes> list = dto.getList() == null
+                ? List.of()
+                : dto.getList().stream().map(AgentWebAssembler::toTraceSummary).toList();
+        return AgentTracePageRes.builder()
+                .total(dto.getTotal())
+                .page(dto.getPage())
+                .size(dto.getSize())
+                .list(list)
+                .build();
+    }
+
+    public static AgentTraceSummaryRes toTraceSummary(AgentTraceSummaryDTO dto) {
+        return AgentTraceSummaryRes.builder()
+                .traceId(dto.getTraceId())
+                .source(dto.getSource())
+                .ownerPluginCode(dto.getOwnerPluginCode())
+                .agentId(dto.getAgentId())
+                .agentCode(dto.getAgentCode())
+                .agentName(dto.getAgentName())
+                .status(dto.getStatus())
+                .input(dto.getInput())
+                .error(dto.getError())
+                .stepCount(dto.getStepCount())
+                .durationMs(dto.getDurationMs())
+                .startTime(dto.getStartTime())
+                .build();
+    }
+
+    public static AgentTraceDetailRes toTraceDetail(AgentTraceDetailDTO dto) {
+        return AgentTraceDetailRes.builder()
+                .traceId(dto.getTraceId())
+                .source(dto.getSource())
+                .ownerPluginCode(dto.getOwnerPluginCode())
+                .agentId(dto.getAgentId())
+                .agentCode(dto.getAgentCode())
+                .agentName(dto.getAgentName())
+                .status(dto.getStatus())
+                .input(dto.getInput())
+                .finalOutput(dto.getFinalOutput())
+                .reasoning(dto.getReasoning())
+                .error(dto.getError())
+                .usage(dto.getUsage())
+                .steps(dto.getSteps())
+                .startTime(dto.getStartTime())
+                .endTime(dto.getEndTime())
+                .durationMs(dto.getDurationMs())
+                .build();
+    }
+
+    public static AgentTraceStatsRes toTraceStats(AgentTraceStatsDTO dto) {
+        return AgentTraceStatsRes.builder()
+                .total(dto.getTotal())
+                .succeeded(dto.getSucceeded())
+                .failed(dto.getFailed())
+                .running(dto.getRunning())
+                .avgDurationMs(dto.getAvgDurationMs())
+                .maxDurationMs(dto.getMaxDurationMs())
+                .promptTokens(dto.getPromptTokens())
+                .completionTokens(dto.getCompletionTokens())
+                .totalTokens(dto.getTotalTokens())
+                .sources(dto.getSources())
+                .agents(dto.getAgents())
+                .build();
+    }
+
+    private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String label) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new BizException("非法的" + label + "过滤值：" + value);
+        }
+    }
+
+    private static LocalDateTime parseDateTime(String value, String label) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        String text = value.trim().replace('T', ' ');
+        if (text.length() == 10) {
+            text = text + " 00:00:00";
+        } else if (text.length() == 16) {
+            text = text + ":00";
+        }
+        try {
+            if (text.length() > 19) {
+                return LocalDateTime.parse(text.substring(0, 19), DATE_TIME);
+            }
+            return LocalDateTime.parse(text, DATE_TIME);
+        } catch (DateTimeParseException e) {
+            throw new BizException("非法的" + label + "：" + value);
+        }
+    }
 }

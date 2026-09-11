@@ -899,6 +899,11 @@ class PluginMenuLifecycleTest {
             return menus.size();
         }
 
+        @Override
+        public void deleteByCode(String code) {
+            menus.remove(code);
+        }
+
         void removeByRegistrationKey(String registrationKey) {
             menus.values().removeIf(menu -> registrationKey.equals(menu.getPluginRegistrationKey()));
         }

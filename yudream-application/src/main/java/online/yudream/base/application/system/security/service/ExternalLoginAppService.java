@@ -13,6 +13,12 @@ import online.yudream.base.domain.system.security.repo.ExternalAccountRepo;
 import online.yudream.base.domain.system.security.repo.ExternalLoginProviderRepo;
 import online.yudream.base.domain.system.security.service.ExternalLoginGateway;
 import online.yudream.base.domain.system.security.service.ExternalLoginTicketStore;
+import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginDescriptor;
+import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginAuthorizeRequest;
+import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginExchangeRequest;
+import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginIdentity;
+import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginProvider;
+import online.yudream.base.plugin.spi.system.extension.PluginExtensionQuery;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,21 +36,41 @@ public class ExternalLoginAppService {
     private final LoginTokenAppService loginTokenAppService;
     private final ExternalLoginTicketStore ticketStore;
     private final ExternalLoginBindingAppService bindingAppService;
+    private final PluginExtensionQuery pluginExtensionQuery;
     private final SecureRandom random = new SecureRandom();
 
     @Transactional
     public ExternalLoginProviderDTO saveProvider(ExternalLoginProviderSaveCmd c) {
         String code = StringUtils.hasText(c.getCode()) ? c.getCode().trim().toLowerCase() : "wwoyun";
+        if (pluginProvider(code).isPresent()) throw new BizException("该第三方登录提供方由插件托管，请在对应插件的设置页配置");
         ExternalLoginProvider p = providerRepo.findByCode(code).orElseGet(() -> ExternalLoginProvider.builder().code(code).protocol("WWOYUN").build());
         p.update(c.getName(), c.getAppId(), c.getAppKey(), c.getCallbackUrl(), c.isEnabled(), c.getSupportedTypes());
         return toProvider(providerRepo.save(p));
     }
 
     @Transactional(readOnly = true)
-    public List<ExternalLoginProviderDTO> providers() { return providerRepo.findAll().stream().map(this::toProvider).toList(); }
+    public List<ExternalLoginProviderDTO> providers() {
+        List<ExternalLoginProviderDTO> all = new ArrayList<>(providerRepo.findAll().stream().map(this::toProvider).toList());
+        pluginExtensionQuery.extensions(PluginExternalLoginProvider.class).stream()
+                .map(this::toPluginProviderSafe).filter(Objects::nonNull)
+                .sorted(Comparator.comparingInt(ExternalLoginProviderDTO::getSort))
+                .forEach(all::add);
+        return all;
+    }
 
     @Transactional
     public ExternalLoginAuthorizationDTO authorize(String providerCode, String type, Long bindUserId) {
+        PluginExternalLoginProvider plugin = pluginProvider(providerCode).orElse(null);
+        if (plugin != null) {
+            PluginExternalLoginDescriptor d = plugin.descriptor();
+            checkPluginType(d, type);
+            if (!plugin.enabled()) throw new BizException("第三方登录提供方未启用");
+            String state = token();
+            ticketStore.saveState(state, new ExternalLoginTicketStore.State(providerCode, type, bindUserId));
+            String url = plugin.authorizationUrl(new PluginExternalLoginAuthorizeRequest(type, state));
+            if (!StringUtils.hasText(url)) throw new BizException("第三方登录提供方未返回授权地址");
+            return ExternalLoginAuthorizationDTO.builder().state(state).authorizationUrl(url).build();
+        }
         ExternalLoginProvider p = active(providerCode);
         checkType(p, type);
         String state = token();
@@ -57,8 +83,22 @@ public class ExternalLoginAppService {
         ExternalLoginTicketStore.State session = ticketStore.consumeState(state)
                 .filter(s -> s.providerCode().equals(providerCode) && s.platformType().equals(type))
                 .orElseThrow(() -> new BizException("第三方登录状态已失效或回调不匹配"));
-        ExternalLoginProvider provider = active(providerCode);
-        ExternalLoginGateway.ExternalIdentity identity = gateway.exchange(provider, type, code);
+        return finishCallback(session, state, code);
+    }
+
+    @Transactional
+    public ExternalLoginCallbackDTO callbackByState(String code, String state, String providerCode, String type) {
+        ExternalLoginTicketStore.State session = ticketStore.consumeState(state)
+                .filter(s -> (!StringUtils.hasText(providerCode) || s.providerCode().equals(providerCode))
+                        && (!StringUtils.hasText(type) || s.platformType().equals(type)))
+                .orElseThrow(() -> new BizException("第三方登录状态已失效或回调不匹配"));
+        return finishCallback(session, state, code);
+    }
+
+    private ExternalLoginCallbackDTO finishCallback(ExternalLoginTicketStore.State session, String state, String code) {
+        String providerCode = session.providerCode();
+        String type = session.platformType();
+        ExternalLoginGateway.ExternalIdentity identity = exchange(providerCode, type, code, state);
         ExternalLoginTicketStore.Binding binding = new ExternalLoginTicketStore.Binding(providerCode, type, identity.socialUid(),
                 identity.nickname(), identity.avatarUrl(), identity.gender(), identity.location());
         ExternalAccount account = accountRepo.findByProviderAndPlatformAndSocialUid(providerCode, type, identity.socialUid()).orElse(null);
@@ -74,6 +114,18 @@ public class ExternalLoginAppService {
         accountRepo.save(account);
         return ExternalLoginCallbackDTO.builder().outcome(ExternalLoginCallbackDTO.Outcome.LOGIN)
                 .session(loginSession(account.getUserId())).build();
+    }
+
+    private ExternalLoginGateway.ExternalIdentity exchange(String providerCode, String type, String code, String state) {
+        PluginExternalLoginProvider plugin = pluginProvider(providerCode).orElse(null);
+        if (plugin != null) {
+            if (!plugin.enabled()) throw new BizException("第三方登录提供方未启用");
+            PluginExternalLoginIdentity id = plugin.exchange(new PluginExternalLoginExchangeRequest(type, code, state));
+            if (id == null || !StringUtils.hasText(id.socialUid())) throw new BizException("第三方登录未返回有效账号标识");
+            return new ExternalLoginGateway.ExternalIdentity(id.socialUid(), id.nickname(), id.avatarUrl(), id.gender(), id.location());
+        }
+        ExternalLoginProvider provider = active(providerCode);
+        return gateway.exchange(provider, type, code);
     }
 
     private UserLoginDTO loginSession(Long userId) {
@@ -131,6 +183,30 @@ public class ExternalLoginAppService {
     }
     private void checkType(ExternalLoginProvider p, String type) {
         if (!StringUtils.hasText(type) || Arrays.stream(p.getSupportedTypes().split(",")).map(String::trim).noneMatch(type::equalsIgnoreCase)) throw new BizException("该平台未启用");
+    }
+    private void checkPluginType(PluginExternalLoginDescriptor d, String type) {
+        if (!StringUtils.hasText(type) || d.supportedTypes().stream().noneMatch(type::equalsIgnoreCase)) throw new BizException("该平台未启用");
+    }
+    private Optional<PluginExternalLoginProvider> pluginProvider(String code) {
+        if (!StringUtils.hasText(code)) return Optional.empty();
+        for (PluginExternalLoginProvider p : pluginExtensionQuery.extensions(PluginExternalLoginProvider.class)) {
+            try {
+                PluginExternalLoginDescriptor d = p.descriptor();
+                if (d != null && code.equals(d.providerCode())) return Optional.of(p);
+            } catch (RuntimeException ignored) { }
+        }
+        return Optional.empty();
+    }
+    private ExternalLoginProviderDTO toPluginProviderSafe(PluginExternalLoginProvider p) {
+        try {
+            PluginExternalLoginDescriptor d = p.descriptor();
+            if (d == null || !StringUtils.hasText(d.providerCode()) || d.supportedTypes().isEmpty()) return null;
+            boolean enabled;
+            try { enabled = p.enabled(); } catch (RuntimeException e) { enabled = false; }
+            return ExternalLoginProviderDTO.builder().code(d.providerCode()).name(d.displayName()).protocol("PLUGIN")
+                    .icon(d.icon()).enabled(enabled).supportedTypes(String.join(",", d.supportedTypes()))
+                    .pluginManaged(true).sort(d.sort()).build();
+        } catch (RuntimeException e) { return null; }
     }
     private String token() { byte[] b = new byte[32]; random.nextBytes(b); return Base64.getUrlEncoder().withoutPadding().encodeToString(b); }
     private ExternalLoginProviderDTO toProvider(ExternalLoginProvider p) { return ExternalLoginProviderDTO.builder().code(p.getCode()).name(p.getName()).protocol(p.getProtocol()).appId(p.getAppId()).callbackUrl(p.getCallbackUrl()).enabled(p.isEnabled()).supportedTypes(p.getSupportedTypes()).updateTime(p.getUpdateTime()).build(); }

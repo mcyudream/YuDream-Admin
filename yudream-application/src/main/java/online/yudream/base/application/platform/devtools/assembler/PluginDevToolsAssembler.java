@@ -1,12 +1,9 @@
 package online.yudream.base.application.platform.devtools.assembler;
 
-import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
-import online.yudream.base.application.platform.devtools.dto.AgentTraceSummaryDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginScaffoldDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
-import online.yudream.base.domain.platform.agent.aggregate.AgentExecutionTrace;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDevProjectInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginRuntimeAssets;
 import online.yudream.base.domain.platform.plugin.valobj.PluginScaffoldResult;
@@ -64,44 +61,6 @@ public final class PluginDevToolsAssembler {
                 .aiTools(assets.aiTools())
                 .agents(assets.agents())
                 .exposedServices(assets.exposedServices())
-                .build();
-    }
-
-    public static AgentTraceSummaryDTO toSummaryDTO(AgentExecutionTrace trace) {
-        return AgentTraceSummaryDTO.builder()
-                .traceId(trace.getTraceId())
-                .source(trace.getSource())
-                .ownerPluginCode(trace.getOwnerPluginCode())
-                .agentId(trace.getAgentId() == null ? null : String.valueOf(trace.getAgentId()))
-                .agentCode(trace.getAgentCode())
-                .agentName(trace.getAgentName())
-                .status(trace.getStatus())
-                .input(trace.getInput())
-                .error(trace.getError())
-                .stepCount(trace.getSteps() == null ? 0 : trace.getSteps().size())
-                .durationMs(trace.getDurationMs())
-                .startTime(trace.getStartTime())
-                .build();
-    }
-
-    public static AgentTraceDetailDTO toDetailDTO(AgentExecutionTrace trace) {
-        return AgentTraceDetailDTO.builder()
-                .traceId(trace.getTraceId())
-                .source(trace.getSource())
-                .ownerPluginCode(trace.getOwnerPluginCode())
-                .agentId(trace.getAgentId() == null ? null : String.valueOf(trace.getAgentId()))
-                .agentCode(trace.getAgentCode())
-                .agentName(trace.getAgentName())
-                .status(trace.getStatus())
-                .input(trace.getInput())
-                .finalOutput(trace.getFinalOutput())
-                .reasoning(trace.getReasoning())
-                .error(trace.getError())
-                .usage(trace.getUsage())
-                .steps(trace.getSteps() == null ? List.of() : trace.getSteps())
-                .startTime(trace.getStartTime())
-                .endTime(trace.getEndTime())
-                .durationMs(trace.getDurationMs())
                 .build();
     }
 }

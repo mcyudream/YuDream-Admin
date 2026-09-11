@@ -13,6 +13,7 @@ import online.yudream.base.domain.platform.agent.event.AgentTraceEvent;
 import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
+import online.yudream.base.domain.platform.agent.valobj.AgentTraceStats;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceStep;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiUsage;
@@ -193,8 +194,31 @@ class AgentExecutionTracerTest {
         }
 
         @Override
+        public List<AgentExecutionTrace> listForExport(AgentTraceQuery query, int limit) {
+            return saved.stream().limit(Math.max(limit, 0)).toList();
+        }
+
+        @Override
         public long count(AgentTraceQuery query) {
             return 0;
+        }
+
+        @Override
+        public AgentTraceStats stats(AgentTraceQuery query) {
+            return AgentTraceStats.empty();
+        }
+
+        @Override
+        public long deleteByTraceId(String traceId) {
+            boolean removed = saved.removeIf(trace -> trace.getTraceId().equals(traceId));
+            return removed ? 1 : 0;
+        }
+
+        @Override
+        public long delete(AgentTraceQuery query) {
+            int size = saved.size();
+            saved.clear();
+            return size;
         }
     }
 }

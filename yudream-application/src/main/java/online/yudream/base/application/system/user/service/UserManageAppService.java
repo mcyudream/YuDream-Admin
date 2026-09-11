@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.user.assembler.UserAssembler;
 import online.yudream.base.application.system.user.cmd.UserCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserDeptAssignCmd;
+import online.yudream.base.application.system.user.cmd.UserPasswordChangeCmd;
 import online.yudream.base.application.system.user.cmd.UserUpdateCmd;
 import online.yudream.base.application.system.user.dto.UserManageDTO;
 import online.yudream.base.application.system.user.query.UserPageQuery;
@@ -112,6 +113,13 @@ public class UserManageAppService {
     public void enable(Long id) {
         User user = getUser(id);
         user.activate();
+        userRepo.save(user);
+    }
+
+    @Transactional
+    public void changePassword(UserPasswordChangeCmd cmd) {
+        User user = getUser(cmd.getId());
+        user.resetPassword(Password.of(cmd.getPassword(), passwordEncoder));
         userRepo.save(user);
     }
 

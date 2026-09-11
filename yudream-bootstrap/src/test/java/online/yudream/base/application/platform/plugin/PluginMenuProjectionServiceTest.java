@@ -549,5 +549,10 @@ class PluginMenuProjectionServiceTest {
         public long count() {
             return menus.size();
         }
+
+        @Override
+        public void deleteByCode(String code) {
+            menus.remove(code);
+        }
     }
 }

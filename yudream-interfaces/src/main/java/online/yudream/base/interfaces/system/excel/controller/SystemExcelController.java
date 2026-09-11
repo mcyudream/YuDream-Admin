@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.system.excel.controller;
 
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.agent.service.AgentTraceAppService;
 import online.yudream.base.application.system.menu.query.MenuTreeQuery;
 import online.yudream.base.application.system.menu.service.MenuAppService;
 import online.yudream.base.application.system.monitor.service.SystemMonitorAppService;
@@ -18,6 +19,8 @@ import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.excel.assembler.SystemExcelAssembler;
 import online.yudream.base.interfaces.system.excel.res.ExcelImportResultRes;
+import online.yudream.base.interfaces.platform.agent.assembler.AgentWebAssembler;
+import online.yudream.base.interfaces.system.excel.row.AgentTraceExcelRow;
 import online.yudream.base.interfaces.system.excel.row.ApiLogExcelRow;
 import online.yudream.base.interfaces.system.excel.row.DeptExcelRow;
 import online.yudream.base.interfaces.system.excel.row.LoginLogExcelRow;
@@ -48,6 +51,7 @@ public class SystemExcelController {
     private final DeptManageAppService deptManageAppService;
     private final MenuAppService menuAppService;
     private final SystemMonitorAppService systemMonitorAppService;
+    private final AgentTraceAppService agentTraceAppService;
 
     @GetMapping("/users/export")
     @PermissionRegister(code = "system:user:export", name = "导出用户", module = "系统管理", desc = "导出用户 Excel")
@@ -159,6 +163,22 @@ public class SystemExcelController {
         PageResult<LoginLogDTO> page = systemMonitorAppService.pageLoginLogs(keyword, success, 1, EXPORT_LIMIT);
         ExcelHttpSupport.write(response, "登录日志", "登录日志", LoginLogExcelRow.class,
                 page.getRecords().stream().map(SystemExcelAssembler::toLoginLogRow).toList());
+    }
+
+    @GetMapping("/agent-traces/export")
+    @PermissionRegister(code = "system:monitor:agent-trace:export", name = "导出 Agent 执行流", module = "系统管理", desc = "导出 Agent 执行追踪 Excel")
+    public void exportAgentTraces(@RequestParam(required = false) String source,
+                                  @RequestParam(required = false) String pluginCode,
+                                  @RequestParam(required = false) String status,
+                                  @RequestParam(required = false) String keyword,
+                                  @RequestParam(required = false) String agentCode,
+                                  @RequestParam(required = false) String startTime,
+                                  @RequestParam(required = false) String endTime,
+                                  HttpServletResponse response) throws IOException {
+        ExcelHttpSupport.write(response, "Agent执行流", "执行流", AgentTraceExcelRow.class,
+                agentTraceAppService.export(AgentWebAssembler.toTraceQuery(
+                        source, pluginCode, status, keyword, agentCode, startTime, endTime, 1, EXPORT_LIMIT))
+                        .stream().map(SystemExcelAssembler::toAgentTraceRow).toList());
     }
 
     @GetMapping("/online-users/export")

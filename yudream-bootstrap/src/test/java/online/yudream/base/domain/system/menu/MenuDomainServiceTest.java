@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;
@@ -45,5 +46,21 @@ class MenuDomainServiceTest {
         assertThat(synced).isEmpty();
         verify(menuRepo, never()).save(declaration);
         verifyNoInteractions(permissionRepo);
+    }
+
+    @Test
+    void deleteMenuRemovesMenuAndItsPermission() {
+        Menu menu = Menu.builder()
+                .code("system:report")
+                .name("报表")
+                .permission("system:report:view")
+                .build();
+        when(menuRepo.findByCode(menu.getCode())).thenReturn(Optional.of(menu));
+        MenuDomainService service = new MenuDomainService(menuRepo, permissionRepo);
+
+        service.deleteMenu(menu.getCode());
+
+        verify(menuRepo).deleteByCode(menu.getCode());
+        verify(permissionRepo).deleteByCode("system:report:view");
     }
 }

@@ -58,6 +58,7 @@ const BASIC_COMPONENT_NAMES = [
 const YD_COMPONENT_NAMES = [
   'YdDatePicker',
   'YdGraphCanvas',
+  'YdIconPicker',
   'YdRangePicker',
   'YdTablePicker',
   'YdTimePicker',

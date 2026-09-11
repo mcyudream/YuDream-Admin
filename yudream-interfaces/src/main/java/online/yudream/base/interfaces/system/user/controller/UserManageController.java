@@ -17,6 +17,7 @@ import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
 import online.yudream.base.interfaces.system.user.request.UserAssignDeptsRequest;
 import online.yudream.base.interfaces.system.user.request.UserAssignRolesRequest;
 import online.yudream.base.interfaces.system.user.request.UserCreateRequest;
+import online.yudream.base.interfaces.system.user.request.UserPasswordChangeRequest;
 import online.yudream.base.interfaces.system.user.request.UserUpdateRequest;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserManageRes;
@@ -67,6 +68,13 @@ public class UserManageController {
     @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "编辑用户资料")
     public Result<Void> enable(@PathVariable Long id) {
         userManageAppService.enable(id);
+        return Result.ok();
+    }
+
+    @PutMapping("/{id}/password")
+    @PermissionRegister(code = "system:user:edit", name = "编辑用户", module = "系统管理", desc = "修改用户密码")
+    public Result<Void> changePassword(@PathVariable Long id, @Valid @RequestBody UserPasswordChangeRequest request) {
+        userManageAppService.changePassword(UserManageWebAssembler.toCmd(id, request));
         return Result.ok();
     }
 

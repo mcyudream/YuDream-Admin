@@ -284,6 +284,23 @@ public enum SystemMenuModule {
             parentName = "LOGIN_LOG", permission = "system:monitor:login-log:delete")
     LOGIN_LOG_DELETE,
 
+    @MenuNode(code = "system:agent-trace", name = "Agent 执行流", type = MenuNodeType.MENU,
+            parentName = "LOGS", path = "/system/agent-trace", component = "system/agent-trace/index.vue",
+            icon = "i-ri:flow-chart", sort = 15)
+    AGENT_TRACE,
+
+    @MenuNode(code = "system:agent-trace:view", name = "查看 Agent 执行流", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TRACE", permission = "system:monitor:agent-trace:view")
+    AGENT_TRACE_VIEW,
+
+    @MenuNode(code = "system:agent-trace:export", name = "导出 Agent 执行流", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TRACE", permission = "system:monitor:agent-trace:export")
+    AGENT_TRACE_EXPORT,
+
+    @MenuNode(code = "system:agent-trace:delete", name = "删除 Agent 执行流", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_TRACE", permission = "system:monitor:agent-trace:delete")
+    AGENT_TRACE_DELETE,
+
     @MenuNode(code = "system:runtime-log", name = "系统日志", type = MenuNodeType.MENU,
             parentName = "LOGS", path = "/system/runtime-log", component = "system/runtime-log/index.vue",
             icon = "i-ri:terminal-window-line", sort = 5)

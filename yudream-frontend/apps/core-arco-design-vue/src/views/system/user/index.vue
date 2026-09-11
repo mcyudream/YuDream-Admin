@@ -28,11 +28,16 @@ const search = reactive<{ keyword: string; roleId?: IdValue; deptId?: IdValue; e
 
 const formVisible = ref(false)
 const assignVisible = ref(false)
+const passwordVisible = ref(false)
 const assignMode = ref<'roles' | 'depts'>('roles')
 const editing = ref<UserManageItem | null>(null)
 const selectedRoleIds = ref<IdValue[]>([])
 const selectedDeptIds = ref<IdValue[]>([])
 const defaultDeptId = ref<IdValue>()
+const passwordForm = reactive({
+  password: '',
+  confirmPassword: '',
+})
 
 const form = reactive<UserCreatePayload & UserUpdatePayload>({
   username: '',
@@ -84,7 +89,7 @@ const tableColumns = computed<TableColumn<UserManageItem>[]>(() => [
   { id: 'roleNames', header: '角色', width: 220 },
   { id: 'emailVerified', header: '邮箱验证', width: 100, align: 'center' },
   { id: 'status', header: '状态', width: 90, align: 'center' },
-  { id: 'operation', header: '操作', width: 380, align: 'center', fixed: 'right' },
+  { id: 'operation', header: '操作', width: 430, align: 'center', fixed: 'right' },
 ])
 
 onMounted(async () => {
@@ -286,6 +291,30 @@ function confirmEnable(row: UserManageItem) {
       await loadUsers()
     },
   })
+}
+
+function openPassword(row: UserManageItem) {
+  editing.value = row
+  passwordForm.password = ''
+  passwordForm.confirmPassword = ''
+  passwordVisible.value = true
+}
+
+async function savePassword() {
+  if (!editing.value) {
+    return
+  }
+  if (!passwordForm.password) {
+    toast.warning('请输入新密码')
+    return
+  }
+  if (passwordForm.password !== passwordForm.confirmPassword) {
+    toast.warning('两次输入的密码不一致')
+    return
+  }
+  await apiUser.changePassword(editing.value.id, passwordForm.password)
+  toast.success('密码已修改')
+  passwordVisible.value = false
 }
 
 function onPageChange(page: number) {
@@ -554,6 +583,9 @@ function importUsers() {
             <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row.original)">
               编辑
             </FaButton>
+            <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row.original)">
+              改密
+            </FaButton>
             <FaButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row.original, 'depts')">
               部门角色
             </FaButton>
@@ -616,6 +648,9 @@ function importUsers() {
               <div class="flex flex-wrap gap-2 border-t pt-3">
                 <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openEdit(row)">
                   编辑
+                </FaButton>
+                <FaButton v-auth="'system:user:edit'" variant="outline" size="sm" @click="openPassword(row)">
+                  改密
                 </FaButton>
                 <FaButton v-if="canAssignDept || canAssignRole" variant="outline" size="sm" @click="openAssign(row, 'depts')">
                   部门角色
@@ -716,6 +751,20 @@ function importUsers() {
           <div v-else class="text-sm text-muted-foreground">
             请先选择所属部门
           </div>
+        </a-form-item>
+      </a-form>
+    </FaModal>
+
+    <FaModal v-model="passwordVisible" title="修改密码" show-cancel-button class="sm:max-w-lg" @confirm="savePassword">
+      <a-form :model="passwordForm" layout="vertical">
+        <a-form-item label="新密码" required>
+          <FaInput v-model="passwordForm.password" type="password" class="w-full" />
+        </a-form-item>
+        <a-form-item>
+          <FaPasswordStrength :password="passwordForm.password" />
+        </a-form-item>
+        <a-form-item label="确认密码" required>
+          <FaInput v-model="passwordForm.confirmPassword" type="password" class="w-full" />
         </a-form-item>
       </a-form>
     </FaModal>

@@ -79,4 +79,9 @@ public class PermissionRepoImpl implements PermissionRepo {
         Update update = new Update().set("status", PermissionStatus.DEPRECATED);
         mongoTemplate.updateMulti(query, update, PermissionDO.class);
     }
+
+    @Override
+    public void deleteByCode(String code) {
+        mongoTemplate.remove(Query.query(Criteria.where("code").is(code)), PermissionDO.class);
+    }
 }

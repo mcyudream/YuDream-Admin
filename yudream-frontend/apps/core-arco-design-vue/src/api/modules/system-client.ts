@@ -74,12 +74,26 @@ systemClient.interceptors.response.use(
     if (error.response?.status === 401) {
       return retryAfterRefresh(error.config)
     }
-    const data = error.response?.data as BackendResult<unknown> | undefined
+    let data = error.response?.data as BackendResult<unknown> | undefined
+    // blob 请求（如插件文件下载）失败时错误体也是 Blob，JSON 错误体需先解析出插件返回的 message
+    if (data instanceof Blob
+      && String(error.response?.headers?.['content-type'] || '').includes('application/json')) {
+      data = await parseJsonBlob(data)
+    }
     const message = data?.message || error.message || '网络错误'
     useFaToast().error('错误', { description: message })
     return Promise.reject(error)
   },
 )
+
+async function parseJsonBlob(blob: Blob): Promise<BackendResult<unknown> | undefined> {
+  try {
+    return JSON.parse(await blob.text()) as BackendResult<unknown>
+  }
+  catch {
+    return undefined
+  }
+}
 
 async function retryAfterRefresh(config?: InternalAxiosRequestConfig) {
   if (!config || config.skipTokenRefresh || config.tokenRetried) {

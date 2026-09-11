@@ -285,5 +285,5 @@ import { yuDreamPluginUnoCss, yuDreamPluginUnoConfig } from '@yudream/plugin-sdk
 `yuDreamPluginUnoCss()` 返回配置好的 UnoCSS Vite 插件，预设与宿主完全一致（presetWind4 关闭 reset、shadcn 主题映射、attributify/icons/typography），让插件组件直接使用 `p-5`、`text-muted-foreground`、`i-ri:*` 等工具类。产物经 lib `cssFileName: 'style'` 固定为 `dist/style.css`，由 `@PluginFrontend(styles = {"style.css"})` 声明加载。插件只引用宿主注入的主题 CSS 变量，不要重新定义 `:root` 变量或引入全局 reset。`extraContent` 选项可追加扫描 glob。
 
 ::: tip 版本说明
-当前 npm 包版本 **1.5.0**（新增 `sdk.files.thumbUrl` 与 `acquireImageSlot`；1.4.0 起含构建期 `./uno-config`），宿主注入的运行时行为版本为 **1.5.0**。以 `yudream-frontend/packages/plugin-sdk/package.json` 为准；后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本。源码升版不等于已发布到 Nexus。
+当前 npm 包版本 **1.7.0**（新增 `sdk.site` 公开主题上下文；1.6.0 产物样式降入 `@layer yudream-plugin`；1.5.0 新增 `sdk.files.thumbUrl` 与 `acquireImageSlot`；1.4.0 起含构建期 `./uno-config`），宿主注入的运行时行为版本为 **1.7.0**。以 `yudream-frontend/packages/plugin-sdk/package.json` 为准；后端 `@PluginFrontend.sdkVersion` 填写宿主实际注入的 SDK 行为版本。源码升版不等于已发布到 Nexus。
 :::

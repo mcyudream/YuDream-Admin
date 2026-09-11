@@ -22,4 +22,6 @@ public interface PermissionRepo {
      * @param codes 当前有效的权限编码集合
      */
     void deprecateAnnotationByCodesNotIn(Collection<String> codes);
+
+    void deleteByCode(String code);
 }

@@ -6,6 +6,7 @@ import online.yudream.base.application.system.user.cmd.RoleCreateCmd;
 import online.yudream.base.application.system.user.cmd.RoleUpdateCmd;
 import online.yudream.base.application.system.user.cmd.UserCreateCmd;
 import online.yudream.base.application.system.user.cmd.UserDeptAssignCmd;
+import online.yudream.base.application.system.user.cmd.UserPasswordChangeCmd;
 import online.yudream.base.application.system.user.cmd.UserUpdateCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
 import online.yudream.base.application.system.user.dto.MessagingIdentityDTO;
@@ -21,6 +22,7 @@ import online.yudream.base.interfaces.system.user.request.RoleUpdateRequest;
 import online.yudream.base.interfaces.system.user.request.UserAssignDeptsRequest;
 import online.yudream.base.interfaces.system.user.request.UserCreateRequest;
 import online.yudream.base.interfaces.system.user.request.UserDeptAssignRequest;
+import online.yudream.base.interfaces.system.user.request.UserPasswordChangeRequest;
 import online.yudream.base.interfaces.system.user.request.UserUpdateRequest;
 import online.yudream.base.interfaces.system.user.res.DeptManageRes;
 import online.yudream.base.interfaces.system.user.res.OptionRes;
@@ -60,6 +62,13 @@ public class UserManageWebAssembler {
         cmd.setPhone(request.getPhone());
         cmd.setQq(request.getQq());
         cmd.setEmailVerified(request.getEmailVerified());
+        return cmd;
+    }
+
+    public static UserPasswordChangeCmd toCmd(Long id, UserPasswordChangeRequest request) {
+        UserPasswordChangeCmd cmd = new UserPasswordChangeCmd();
+        cmd.setId(id);
+        cmd.setPassword(request.getPassword());
         return cmd;
     }
 

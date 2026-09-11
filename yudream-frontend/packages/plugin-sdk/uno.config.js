@@ -58,13 +58,18 @@ const shadcnTheme = {
 
 /**
  * 生成与宿主一致的 UnoCSS 配置（ presetWind4/attributify/icons/typography/animations、
- * flex 快捷方式与 shadcn 主题色板 ）。差异仅两处：
+ * flex 快捷方式与 shadcn 主题色板 ）。差异仅三处：
  * - 关闭全局 reset preflight（插件 DOM 与宿主同文档，宿主已提供 reset 与主题变量）；
- * - 扫描范围指向插件自身 src。
+ * - 扫描范围指向插件自身 src；
+ * - 全部产物规则降入 `@layer yudream-plugin`（宿主层序 yudream-base < yudream-plugin < 宿主未分层工具类），
+ *   插件可覆写宿主 preflight 与原生元素样式，但永远不能覆盖宿主同名工具类。
  * 图标按需从 @iconify/json 解析（随 SDK 安装，构建期本地读取，不访问网络）。
  */
 export function yuDreamPluginUnoConfig(options = {}) {
   return defineConfig({
+    outputToCssLayers: {
+      cssLayerName: () => 'yudream-plugin',
+    },
     content: {
       pipeline: {
         include: [

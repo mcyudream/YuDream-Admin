@@ -5,12 +5,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.security.service.ExternalLoginAppService;
 import online.yudream.base.application.system.security.service.ExternalLoginBindingAppService;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.assembler.ExternalLoginWebAssembler;
 import online.yudream.base.interfaces.system.security.request.ExternalLoginBindingClaimRequest;
 import online.yudream.base.interfaces.system.security.request.ExternalLoginProviderSaveRequest;
 import online.yudream.base.interfaces.system.security.res.*;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,6 +36,14 @@ public class ExternalLoginController {
     @GetMapping("/api/external-login/{providerCode}/{type}/callback")
     public Result<ExternalLoginCallbackRes> callback(@PathVariable String providerCode, @PathVariable String type, @RequestParam String code, @RequestParam String state) {
         return Result.ok(ExternalLoginWebAssembler.toRes(app.callback(providerCode, type, code, state)));
+    }
+    @GetMapping("/api/external-login/callback")
+    public Result<ExternalLoginCallbackRes> callbackByState(@RequestParam(required = false) String code, @RequestParam(required = false) String ticket,
+                                                            @RequestParam String state, @RequestParam(required = false) String provider,
+                                                            @RequestParam(required = false) String type) {
+        String credential = StringUtils.hasText(code) ? code : ticket;
+        if (!StringUtils.hasText(credential)) throw new BizException("第三方登录回调缺少票据参数");
+        return Result.ok(ExternalLoginWebAssembler.toRes(app.callbackByState(credential, state, provider, type)));
     }
     @PostMapping("/api/user/me/external-accounts/claim")
     public Result<Void> claim(@Valid @RequestBody ExternalLoginBindingClaimRequest request) {
