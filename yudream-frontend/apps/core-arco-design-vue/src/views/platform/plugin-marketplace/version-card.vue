@@ -73,6 +73,7 @@ const operationTitle = computed(() => {
       <div class="version-head-main">
         <div class="version-title">
           <h3>{{ item.releaseVersion }}</h3>
+          <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
           <FaTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</FaTag>
         </div>
         <p class="version-description">
@@ -111,6 +112,7 @@ const operationTitle = computed(() => {
     <summary class="version-summary">
       <FaIcon name="i-ri:arrow-right-s-line" class="version-caret" />
       <h3>{{ item.releaseVersion }}</h3>
+      <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
       <FaTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</FaTag>
       <span class="version-actions" @click.stop.prevent>
         <FaButton

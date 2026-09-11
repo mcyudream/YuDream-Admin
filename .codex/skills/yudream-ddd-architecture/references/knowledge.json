@@ -291,6 +291,10 @@
     {
       "key": "plugin-theme-splash",
       "text": "公开站启动页皮肤属于 SITE 主题，不属于宿主。vite-plugin-app-loading 在 Vue/router 之前把宿主 loading.html 注入 [data-app-loading]。index.html 在公开路径（含无 token 的 /）用 localStorage yudream.siteThemeStyles 立刻挂上次 SITE CSS 并 preload loading.gif，避免等 main.ts 拉完 /themes/active 才覆盖；theme-runtime 启动后再按 URL 公开前缀打开 SITE media，等样式表和 GIF 都就绪才 loadingFadeOut。已登录的 / 仍是后台工作台，保持宿主默认动画。禁止把主题 loading.gif 或像素字体放进宿主 apps/*/public/。后台路由 media=not all。插件产物在 @layer yudream-plugin，覆盖宿主未分层 loading 样式必须带 !important。主题配置 image 字段清空必须存空串，读取不得回落到 schema default。"
+    },
+    {
+      "key": "plugin-market-source",
+      "text": "插件市场源能力（plugin-market-source）：双闸门控制多源路径，关闭时 PluginStoreAppService 走配置直连单源（行为与历史一致）。PluginStoreGateway 端口按 PluginStoreSourceRef 取数：fetchCatalog 拉全量目录快照（最新版 descriptor 存原文、版本存已解析 URL）、parseDescriptor 按源内 indexUrl 离线重解析、fetchDescriptor/downloadJar 按需外呼并校验 URL 属于该源（requireOwnedUri）。快照存 Mongo（entries 内嵌 descriptor 原文 JSON），市场列表零外呼；安装/更新记录 marketSourceCode 到 platformPlugin，更新选择同版本优先安装来源、跨源取最高 SemVer。市场源 token 经 CapabilityCredentialCipher 加密（AAD capability:plugin-market-source:token:{code}）。"
     }
   ],
   "utilities": [
