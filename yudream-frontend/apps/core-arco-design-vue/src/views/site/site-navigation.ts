@@ -107,8 +107,24 @@ function loadPluginSiteNavItems(): Promise<SiteNavigationItem[]> {
   return pluginSiteNavPromise
 }
 
+function isHomeNavigationUrl(url?: string) {
+  const normalized = (url || '').trim()
+  return normalized === '/site' || normalized === '/'
+}
+
+/** 公开站导航必须含首页：CMS/插件清单经常只有内页，品牌链接不能替代导航项。 */
+function withHomeNavigationItem(items: SiteNavigationItem[]) {
+  if (items.some(item => isHomeNavigationUrl(item.url))) {
+    return items
+  }
+  return [
+    { id: 'site-home', label: '首页', url: '/site', visible: true, sort: Number.MIN_SAFE_INTEGER },
+    ...items,
+  ]
+}
+
 /**
- * 站点公开导航：CMS navigationJson + 插件 siteNav 路由 + 知识库入口的合并结果。
+ * 站点公开导航：首页 + CMS navigationJson + 插件 siteNav 路由 + 知识库入口的合并结果。
  * 供 /site 页面与公开插件页面的站点 chrome 共用。
  */
 export function useSiteNavigation(navigationJson: MaybeRefOrGetter<string | undefined>) {
@@ -122,9 +138,10 @@ export function useSiteNavigation(navigationJson: MaybeRefOrGetter<string | unde
     const items = parseNavigationItems(toValue(navigationJson)).filter(item => !isAuthNavigationUrl(item.url))
     const knownUrls = new Set(items.map(item => item.url))
     const merged = [...items, ...pluginNavItems.value.filter(item => !knownUrls.has(item.url) && !isAuthNavigationUrl(item.url))]
-    return wikiEnabled.value && !merged.some(item => item.url === '/wiki')
+    const withWiki = wikiEnabled.value && !merged.some(item => item.url === '/wiki')
       ? [...merged, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
       : merged
+    return withHomeNavigationItem(withWiki)
   })
   const navigationTree = computed(() => buildNavigationTree(navigationItems.value))
   const footerNavigationItems = computed(() => flattenNavigation(navigationTree.value))

@@ -99,7 +99,7 @@ const homeContentCss = computed(() => rewriteBackendAssetUrls(home.value?.settin
 const homeJs = computed(() => home.value?.settings?.homeJs || '')
 // 主题首页接管时不注入 CMS 首页脚本，避免与主题 Vue 页面互相干扰
 const activeCmsJs = computed(() => page.value ? page.value.jsContent || '' : themeHomeActive.value ? '' : homeJs.value)
-// 站点导航 = CMS navigationJson + 插件 siteNav 路由 + 知识库入口，与公开插件页的站点 chrome 共用同一份合并逻辑
+// 站点导航 = 首页 + CMS navigationJson + 插件 siteNav 路由 + 知识库入口，与公开插件页的站点 chrome 共用同一份合并逻辑
 const { navigationItems, navigationTree } = useSiteNavigation(() => home.value?.settings?.navigationJson)
 const siteLayout = computed<SiteLayoutMode>(() => (home.value?.settings?.siteLayout as SiteLayoutMode) || 'HEADER_FOOTER')
 const archiveFilter = computed(() => ({
