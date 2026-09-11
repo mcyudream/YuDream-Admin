@@ -12,5 +12,5 @@ import org.springframework.data.mongodb.core.mapping.Document;
 public class ExternalLoginProviderDO extends BaseDO {
     @Indexed(unique = true) private String code;
     private String name; private String protocol; private String appId; private String appKey;
-    private String callbackUrl; private boolean enabled; private String supportedTypes;
+    private String callbackUrl; private String endpoint; private boolean enabled; private String supportedTypes;
 }

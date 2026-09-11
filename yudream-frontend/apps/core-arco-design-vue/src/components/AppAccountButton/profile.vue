@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { ApiKeyCredential, ApiKeyCreatePayload, CredentialStatus, ExternalAccount, MessagingBindingCode, MessagingBindingTarget, MessagingIdentity, PasskeyCredential, PasskeyStatus, UserProfilePayload } from '@/api/modules/profile'
+import type { ExternalLoginProvider } from '@/api/modules/system-security'
 import type { PermissionItem } from '@/api/modules/system-role'
 import EditPassword from '@/components/AppAccountForm/edit-password.vue'
 import apiProfile from '@/api/modules/profile'
 import apiRole from '@/api/modules/system-role'
+import apiSecurity from '@/api/modules/system-security'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { stashExternalLoginRedirect } from '@/utils/login-redirect'
@@ -39,6 +41,24 @@ const bindingTargets = ref<MessagingBindingTarget[]>([])
 const loadingBindingTargets = ref(false)
 const externalAccounts = ref<ExternalAccount[]>([])
 const loadingExternalAccounts = ref(false)
+const bindableProviders = ref<ExternalLoginProvider[]>([])
+const externalTypeMeta: Record<string, { label: string, icon: string }> = {
+  qq: { label: 'QQ', icon: 'i-ri:qq-line' },
+  wx: { label: '微信', icon: 'i-ri:wechat-line' },
+  google: { label: 'Google', icon: 'i-ri:google-line' },
+  gitee: { label: 'Gitee', icon: 'i-ri:git-repository-line' },
+  github: { label: 'GitHub', icon: 'i-ri:github-line' },
+}
+const bindableEntries = computed(() => bindableProviders.value.flatMap((provider) => {
+  const types = (provider.supportedTypes || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean)
+  const resolvedTypes = types.length ? types : ['default']
+  return resolvedTypes.map(type => ({
+    providerCode: provider.code,
+    type,
+    label: provider.icon ? (provider.name || provider.code) : (externalTypeMeta[type]?.label || provider.name || type),
+    icon: provider.icon || externalTypeMeta[type]?.icon || 'i-ri:links-line',
+  }))
+}))
 
 const form = reactive<UserProfilePayload>({
   username: '',
@@ -66,7 +86,7 @@ const tabs = computed<{ key: ProfileTab, title: string, description: string, ico
     description: appFeatureStore.passkeyEnabled ? '密码和 Passkey 凭据' : '账号密码安全',
     icon: 'i-ri:shield-keyhole-line',
   },
-  { key: 'external', title: '第三方账号', description: '绑定 QQ、微信及代码托管账号', icon: 'i-ri:links-line' },
+  { key: 'external', title: '第三方账号', description: '绑定已启用的外部登录提供方', icon: 'i-ri:links-line' },
   ...(appFeatureStore.apiKeyEnabled ? [{ key: 'apiKey' as const, title: 'API Key', description: '用户级访问密钥', icon: 'i-ri:key-2-line' }] : []),
 ])
 
@@ -166,7 +186,9 @@ watch(active, async (tab) => {
   if (tab === 'security' && appFeatureStore.passkeyEnabled && !passkeys.value.length) {
     await loadPasskeys()
   }
-  if (tab === 'external' && !externalAccounts.value.length) await loadExternalAccounts()
+  if (tab === 'external' && !externalAccounts.value.length) {
+    await Promise.allSettled([loadExternalAccounts(), loadBindableProviders()])
+  }
 })
 
 watch(() => appFeatureStore.apiKeyEnabled, (enabled) => {
@@ -310,9 +332,17 @@ async function loadExternalAccounts() {
   finally { loadingExternalAccounts.value = false }
 }
 
-async function bindExternal(type: string) {
-  const res = await apiProfile.externalBindAuthorize('wwoyun', type)
-  // 绑定授权为整页跳转，暂存当前路由，回调完成后回到当前页
+async function loadBindableProviders() {
+  try {
+    bindableProviders.value = (await apiSecurity.publicExternalLoginProviders()).data || []
+  }
+  catch {
+    bindableProviders.value = []
+  }
+}
+
+async function bindExternal(providerCode: string, type: string) {
+  const res = await apiProfile.externalBindAuthorize(providerCode, type)
   stashExternalLoginRedirect(router.currentRoute.value.fullPath)
   window.location.assign(res.data.authorizationUrl)
 }
@@ -620,13 +650,19 @@ function dateText(value?: string) {
       </section>
 
       <section v-else-if="active === 'external'" class="profile-section">
-        <div class="section-head"><div><h2>第三方账号</h2><p>通过已配置的平台绑定账号。官方 QQ 机器人身份在个人资料的消息协议绑定中查看，不会写入 QQ 号。</p></div></div>
+        <div class="section-head"><div><h2>第三方账号</h2><p>通过已启用的外部登录提供方绑定账号。官方 QQ 机器人身份在个人资料的消息协议绑定中查看，不会写入 QQ 号。</p></div></div>
         <section class="inner-panel">
-          <div class="panel-head"><div><h3>添加绑定</h3><p>需要管理员先在系统安全中配置 Wwoyun AppId、AppKey 与回调地址。</p></div></div>
-          <div class="panel-actions"><FaButton @click="bindExternal('qq')"><FaIcon name="i-ri:qq-line" />QQ</FaButton><FaButton variant="outline" @click="bindExternal('wx')">微信</FaButton><FaButton variant="outline" @click="bindExternal('github')">GitHub</FaButton><FaButton variant="outline" @click="bindExternal('gitee')">Gitee</FaButton><FaButton variant="outline" @click="bindExternal('google')">Google</FaButton></div>
+          <div class="panel-head"><div><h3>添加绑定</h3><p>入口来自当前已启用的提供方，不再写死 Wwoyun。插件提供方在对应插件设置页启用后会出现在这里。</p></div></div>
+          <div v-if="bindableEntries.length" class="panel-actions">
+            <FaButton v-for="entry in bindableEntries" :key="`${entry.providerCode}:${entry.type}`" variant="outline" @click="bindExternal(entry.providerCode, entry.type)">
+              <FaIcon :name="entry.icon" />
+              {{ entry.label }}
+            </FaButton>
+          </div>
+          <div v-else class="empty-state">暂无已启用的第三方登录提供方</div>
         </section>
         <section class="inner-panel"><div class="panel-head"><div><h3>已绑定账号</h3></div><FaButton variant="ghost" size="sm" :loading="loadingExternalAccounts" @click="loadExternalAccounts"><FaIcon name="i-ri:refresh-line" /></FaButton></div>
-          <div class="credential-list"><div v-if="!externalAccounts.length" class="empty-state">暂无第三方账号</div><article v-for="item in externalAccounts" :key="item.id" class="credential-item"><FaAvatar :src="item.avatarUrl" :fallback="item.platformType.slice(0, 2)" class="size-10" /><div class="credential-info"><strong>{{ item.nickname || item.socialUid }}</strong><span>{{ item.platformType }} · {{ item.socialUid }}</span></div><FaButton size="sm" variant="outline" :disabled="!item.avatarUrl" @click="useExternalAvatar(item)">使用头像</FaButton><FaButton variant="destructive" size="sm" @click="revokeExternal(item)">解除</FaButton></article></div>
+          <div class="credential-list"><div v-if="!externalAccounts.length" class="empty-state">暂无第三方账号</div><article v-for="item in externalAccounts" :key="item.id" class="credential-item"><FaAvatar :src="item.avatarUrl" :fallback="item.platformType.slice(0, 2)" class="size-10" /><div class="credential-info"><strong>{{ item.nickname || item.socialUid }}</strong><span>{{ item.providerCode }} · {{ item.platformType }} · {{ item.socialUid }}</span></div><FaButton size="sm" variant="outline" :disabled="!item.avatarUrl" @click="useExternalAvatar(item)">使用头像</FaButton><FaButton variant="destructive" size="sm" @click="revokeExternal(item)">解除</FaButton></article></div>
         </section>
       </section>
 

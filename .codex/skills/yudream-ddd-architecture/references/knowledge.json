@@ -279,6 +279,10 @@
     {
       "key": "site-chrome-var-contract",
       "text": "主题接管公开站导航有两条通道：①声明 chromeComponent 后由主题远程 Vue 组件完全接管页头页脚（推荐，NMO 复刻必须走这条，避免宿主 SiteChrome 在首页/内页切样式）；②未声明时仍用 chrome 变量契约：宿主 SiteChrome 只消费带兜底的 --yb-site-header-position/top/border/background/backdrop、--yb-site-header-bar-*、--yb-site-header-brand-display、--yb-site-header-nav-justify，自身永不赋值。坑：宿主自己赋的是 --yb-site-header-bg 作为 --yb-site-header-background 的兜底，主题必须写 --yb-site-header-background。旧 homeCss RAW 注入 + :has() overlay hack 已退役。"
+    },
+    {
+      "key": "plugin-theme-splash",
+      "text": "公开站启动页皮肤属于 SITE 主题，不属于宿主。vite-plugin-app-loading 在 Vue/router 之前把宿主 loading.html 注入 [data-app-loading]；theme-runtime 启动时按 URL 公开前缀（/site /login /wiki /servers /activities 等）打开 SITE 主题 link.media，再等样式表 load，主题 CSS 用自己的 GIF/字体覆盖启动页。禁止把主题 loading.gif 或像素字体放进宿主 apps/*/public/——那会在未装主题和管理后台也显示。后台路由 media=not all，SITE 覆盖不生效。插件产物在 @layer yudream-plugin，覆盖宿主未分层 loading 样式必须带 !important。"
     }
   ],
   "utilities": [

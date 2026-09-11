@@ -7,6 +7,7 @@ import directive from '@/utils/directive'
 import App from './App.vue'
 import formCreate from '@form-create/arco-design'
 import FcDesigner from 'form-create-designer-arco-design'
+import { loadingFadeOut } from 'virtual:app-loading'
 import { bootstrapPluginThemes, watchPluginThemeScope } from './plugins/theme-runtime'
 import router from './router'
 import { applyStartupBranding, initializeStartupBranding } from './startup-branding'
@@ -47,6 +48,8 @@ async function bootstrap() {
   }
 
   app.mount('#app')
+  // 等主题 CSS 注入后再淡出启动页：公开站可被 SITE 主题覆盖，未装主题/后台仍是宿主默认动画。
+  loadingFadeOut()
 }
 
 void bootstrap()

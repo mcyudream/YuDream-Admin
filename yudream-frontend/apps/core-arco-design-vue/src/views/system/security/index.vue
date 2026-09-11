@@ -96,8 +96,21 @@ const oauthProviderForm = reactive<OAuthProviderPayload>({
   redirectUri: '',
   status: 'ACTIVE',
 })
-const externalLoginForm = reactive<ExternalLoginProviderPayload>({ code: 'wwoyun', name: 'Wwoyun 登录', appId: '', appKey: '', callbackUrl: `${window.location.origin}/external-login/callback`, enabled: false, supportedTypes: 'qq,wx,google,gitee,github' })
+const WWOYUN_DEFAULT: ExternalLoginProviderPayload = {
+  code: 'wwoyun',
+  name: 'Wwoyun 登录',
+  appId: '',
+  appKey: '',
+  callbackUrl: `${window.location.origin}/external-login/callback`,
+  endpoint: 'https://login.wwoyun.cn/connect.php',
+  enabled: false,
+  supportedTypes: 'qq,wx,google,gitee,github',
+}
+const externalLoginForm = reactive<ExternalLoginProviderPayload>({ ...WWOYUN_DEFAULT })
 const selectedExternalTypes = ref(['qq', 'wx', 'google', 'gitee', 'github'])
+const selectedHostProviderCode = ref('wwoyun')
+const pluginManagedProviders = computed(() => externalProviders.value.filter(item => item.pluginManaged))
+const hostManagedProviders = computed(() => externalProviders.value.filter(item => !item.pluginManaged))
 const externalTypeOptions = [
   { label: 'QQ', value: 'qq' },
   { label: '微信', value: 'wx' },
@@ -105,6 +118,13 @@ const externalTypeOptions = [
   { label: 'Gitee', value: 'gitee' },
   { label: 'GitHub', value: 'github' },
 ]
+const hostProviderOptions = computed(() => {
+  const options = hostManagedProviders.value.map(item => ({ label: `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`, value: item.code }))
+  if (!options.some(item => item.value === 'wwoyun')) {
+    options.unshift({ label: 'Wwoyun 登录（内置默认）', value: 'wwoyun' })
+  }
+  return options
+})
 
 const tabOptions = [
   { key: 'policy', label: '安全策略', icon: 'i-ri:shield-check-line' },
@@ -304,18 +324,50 @@ async function loadOAuth() {
   await Promise.all(tasks)
 }
 
+function applyHostProvider(provider?: ExternalLoginProvider) {
+  if (!provider) {
+    Object.assign(externalLoginForm, { ...WWOYUN_DEFAULT, appKey: '' })
+    selectedHostProviderCode.value = 'wwoyun'
+    selectedExternalTypes.value = (WWOYUN_DEFAULT.supportedTypes || '').split(',').map(item => item.trim()).filter(Boolean)
+    return
+  }
+  selectedHostProviderCode.value = provider.code
+  Object.assign(externalLoginForm, {
+    ...WWOYUN_DEFAULT,
+    ...provider,
+    appKey: '',
+    endpoint: provider.endpoint || WWOYUN_DEFAULT.endpoint,
+  })
+  selectedExternalTypes.value = (provider.supportedTypes || '').split(',').map(item => item.trim()).filter(Boolean)
+}
+
 async function loadExternalLogin() {
   externalProviders.value = (await apiSecurity.externalLoginProviders()).data
-  const provider = externalProviders.value.find(item => item.code === 'wwoyun')
-  if (provider) {
-    Object.assign(externalLoginForm, { ...provider, appKey: '' })
-    selectedExternalTypes.value = (provider.supportedTypes || '').split(',').map(item => item.trim()).filter(Boolean)
+  const current = hostManagedProviders.value.find(item => item.code === selectedHostProviderCode.value)
+    || hostManagedProviders.value.find(item => item.code === 'wwoyun')
+    || hostManagedProviders.value[0]
+  applyHostProvider(current)
+}
+
+function changeHostProvider(code: unknown) {
+  if (code === undefined || code === null || code === '') {
+    return
   }
+  const next = hostManagedProviders.value.find(item => item.code === String(code))
+  applyHostProvider(next)
 }
 
 async function saveExternalLogin() {
-  if (!externalLoginForm.appKey) { toast.error('请输入 AppKey'); return }
-  await apiSecurity.saveExternalLoginProvider({ ...externalLoginForm, supportedTypes: selectedExternalTypes.value.join(',') })
+  await apiSecurity.saveExternalLoginProvider({
+    code: externalLoginForm.code,
+    name: externalLoginForm.name,
+    appId: externalLoginForm.appId,
+    appKey: externalLoginForm.appKey,
+    callbackUrl: externalLoginForm.callbackUrl,
+    endpoint: externalLoginForm.endpoint,
+    enabled: externalLoginForm.enabled,
+    supportedTypes: selectedExternalTypes.value.join(','),
+  })
   toast.success('第三方登录配置已保存')
   await loadExternalLogin()
 }
@@ -964,8 +1016,45 @@ function normalizeDateTime(value?: string) {
 
       <section v-if="activeTab === 'external'" class="panel">
         <div class="key-toolbar"><div class="section-title"><FaIcon name="i-ri:links-line" />第三方登录</div></div>
-        <FaAlert icon="i-ri:information-line" title="Wwoyun 外置登录" description="配置后可使用 QQ、微信、Google、Gitee、GitHub 登录或在个人设置中绑定账号。回调地址需与 Wwoyun 后台登记一致。" />
-        <a-form :model="externalLoginForm" layout="vertical" class="mt-4"><div class="form-grid"><a-form-item label="提供方编码"><FaInput v-model="externalLoginForm.code" disabled /></a-form-item><a-form-item label="名称"><FaInput v-model="externalLoginForm.name" /></a-form-item><a-form-item label="AppId" required><FaInput v-model="externalLoginForm.appId" /></a-form-item><a-form-item label="AppKey" required><FaInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时请重新输入" /></a-form-item></div><a-form-item label="回调地址" required><FaInput v-model="externalLoginForm.callbackUrl" /></a-form-item><a-form-item label="启用平台"><FaSelect v-model="selectedExternalTypes" multiple :options="externalTypeOptions" class="w-full" /></a-form-item><a-form-item label="状态"><FaSwitch v-model="externalLoginForm.enabled" /></a-form-item><div class="flex justify-end"><FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin"><FaIcon name="i-ri:save-3-line" />保存配置</FaButton></div></a-form>
+        <FaAlert icon="i-ri:information-line" title="Wwoyun 是内置默认提供方" description="接口地址默认为 https://login.wwoyun.cn/connect.php，可按实际部署修改。关闭状态开关即可从登录页拿掉入口，不必清空凭据。插件托管的提供方在各自设置页配置。" />
+        <FaAlert v-if="pluginManagedProviders.length" class="mt-3" title="插件托管提供方" :description="pluginManagedProviders.map(item => `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`).join('、')" />
+        <a-form :model="externalLoginForm" layout="vertical" class="mt-4">
+          <div class="form-grid">
+            <a-form-item label="提供方">
+              <FaSelect v-model="selectedHostProviderCode" :options="hostProviderOptions" class="w-full" @update:model-value="changeHostProvider" />
+            </a-form-item>
+            <a-form-item label="提供方编码">
+              <FaInput v-model="externalLoginForm.code" disabled />
+            </a-form-item>
+            <a-form-item label="名称">
+              <FaInput v-model="externalLoginForm.name" />
+            </a-form-item>
+            <a-form-item label="AppId">
+              <FaInput v-model="externalLoginForm.appId" />
+            </a-form-item>
+            <a-form-item label="AppKey">
+              <FaInput v-model="externalLoginForm.appKey" type="password" placeholder="已保存时留空不修改" />
+            </a-form-item>
+          </div>
+          <a-form-item label="接口地址">
+            <FaInput v-model="externalLoginForm.endpoint" placeholder="https://login.wwoyun.cn/connect.php" />
+          </a-form-item>
+          <a-form-item label="回调地址" required>
+            <FaInput v-model="externalLoginForm.callbackUrl" />
+          </a-form-item>
+          <a-form-item label="启用平台">
+            <FaSelect v-model="selectedExternalTypes" multiple :options="externalTypeOptions" class="w-full" />
+          </a-form-item>
+          <a-form-item label="状态">
+            <FaSwitch v-model="externalLoginForm.enabled" />
+          </a-form-item>
+          <div class="flex justify-end">
+            <FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin">
+              <FaIcon name="i-ri:save-3-line" />
+              保存配置
+            </FaButton>
+          </div>
+        </a-form>
       </section>
 
       <section v-if="activeTab === 'passkey'" class="panel">

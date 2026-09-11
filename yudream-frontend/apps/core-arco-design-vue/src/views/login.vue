@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ExternalLoginEntry } from '@/components/AppAccountForm/login.vue'
 import { diffTwoObj } from '@fantastic-admin/settings'
 import Login from '@/components/AppAccountForm/login.vue'
 import Register from '@/components/AppAccountForm/register.vue'
@@ -29,9 +30,19 @@ const bindingToken = typeof route.query.externalLoginBindingToken === 'string' &
   ? route.query.externalLoginBindingToken
   : undefined
 const formType = ref<'binding' | 'login' | 'register' | 'resetPassword'>(bindingToken && route.query.form !== 'register' ? 'binding' : route.query.form === 'register' ? 'register' : 'login')
-const externalProviders = ref<{ code: string, supportedTypes: string }[]>([])
-const externalTypes = computed(() => [...new Set(externalProviders.value.flatMap(provider => provider.supportedTypes.split(',').map(item => item.trim().toLowerCase())))])
+const externalProviders = ref<{ code: string, name?: string, supportedTypes: string, icon?: string }[]>([])
 const externalTypeMeta: Record<string, { label: string, icon: string }> = { qq: { label: 'QQ 登录', icon: 'i-ri:qq-line' }, wx: { label: '微信登录', icon: 'i-ri:wechat-line' }, google: { label: 'Google 登录', icon: 'i-ri:google-line' }, gitee: { label: 'Gitee 登录', icon: 'i-ri:git-repository-line' }, github: { label: 'GitHub 登录', icon: 'i-ri:github-line' } }
+const externalEntries = computed<ExternalLoginEntry[]>(() => externalProviders.value.flatMap((provider) => {
+  const types = (provider.supportedTypes || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean)
+  const resolvedTypes = types.length ? types : ['default']
+  return resolvedTypes.map(type => ({
+    providerCode: provider.code,
+    type,
+    label: provider.icon ? (provider.name || provider.code) : (externalTypeMeta[type]?.label || provider.name || `${type} 登录`),
+    icon: provider.icon || externalTypeMeta[type]?.icon || 'i-ri:links-line',
+  }))
+}))
+const externalLoading = ref(false)
 
 function handleLogin() {
   const data = diffTwoObj(settingsDefault, appSettingsStore.settings)
@@ -42,11 +53,19 @@ function handleLogin() {
   })
 }
 
-async function loginWithExternal(type: string) {
-  const res = await systemClient.get<any, { data: { authorizationUrl: string } }>(`api/external-login/wwoyun/${type}/authorize`)
-  // 第三方授权为整页跳转，登录目标路由暂存 sessionStorage，回调完成后原路返回
-  stashExternalLoginRedirect(redirect.value)
-  window.location.assign(res.data.authorizationUrl)
+async function loginWithExternal(entry: ExternalLoginEntry) {
+  if (externalLoading.value) {
+    return
+  }
+  externalLoading.value = true
+  try {
+    const res = await systemClient.get<any, { data: { authorizationUrl: string } }>(`api/external-login/${entry.providerCode}/${entry.type}/authorize`)
+    stashExternalLoginRedirect(redirect.value)
+    window.location.assign(res.data.authorizationUrl)
+  }
+  catch {
+    externalLoading.value = false
+  }
 }
 
 onMounted(async () => { try { externalProviders.value = (await apiSecurity.publicExternalLoginProviders()).data } catch { externalProviders.value = [] } })
@@ -108,16 +127,14 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
           <Login
             :account
             :binding-token="bindingToken"
+            :external-entries="externalEntries"
+            :external-loading="externalLoading"
             @on-login="handleLogin"
+            @on-external-login="loginWithExternal"
             @on-register="(val) => { formType = 'register'; account = val }"
             @on-reset-password="(val) => { formType = 'resetPassword'; account = val }"
           />
         </template>
-        <div v-if="formType === 'login' && externalTypes.length" class="qq-login-entry">
-          <FaButton v-for="type in externalTypes" :key="type" variant="outline" size="icon" :title="externalTypeMeta[type]?.label || `${type} 登录`" :aria-label="externalTypeMeta[type]?.label || `${type} 登录`" @click="loginWithExternal(type)">
-            <FaIcon :name="externalTypeMeta[type]?.icon || 'i-ri:links-line'" />
-          </FaButton>
-        </div>
         <Register
           v-if="formType === 'register'"
           :account
@@ -280,25 +297,5 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
   margin: 0;
 }
 
-.qq-login-entry {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
-  position: static;
-  margin-top: 0;
-  margin-bottom: 24px;
-}
 
-.qq-login-entry :deep(button) {
-  width: 38px;
-  height: 38px;
-  border-radius: 999px;
-}
-
-@media (max-width: 767px) {
-  .qq-login-entry {
-    margin-top: 24px;
-  }
-}
 </style>
