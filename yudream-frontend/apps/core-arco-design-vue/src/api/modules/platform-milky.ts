@@ -11,12 +11,21 @@ export interface MilkyConnection {
   appId?: string
   sandbox?: boolean
   intents?: number
+  mentionOpenIds?: string[]
   enabled: boolean
   credentialConfigured: boolean
   commandMenuImageMode?: 'base64' | 'url'
   commandMenuPublicBaseUrl?: string
   createTime?: string
   updateTime?: string
+}
+
+export interface MentionBindingCode {
+  code: string
+  expiresAt: string
+  connectionId: string
+  connectionName?: string
+  protocol?: string
 }
 
 export interface MilkyConnectionPayload {
@@ -39,4 +48,5 @@ export default {
   enable: (id: string) => systemClient.post<unknown, ApiResponse<MilkyConnection>>(`api/platform/milky/connections/${id}/enable`),
   disable: (id: string) => systemClient.post<unknown, ApiResponse<MilkyConnection>>(`api/platform/milky/connections/${id}/disable`),
   test: (id: string) => systemClient.post<unknown, ApiResponse<Record<string, unknown>>>(`api/platform/milky/connections/${id}/test`),
+  issueMentionBindingCode: (id: string) => systemClient.post<unknown, ApiResponse<MentionBindingCode>>(`api/platform/milky/connections/${id}/mention-binding-code`),
 }

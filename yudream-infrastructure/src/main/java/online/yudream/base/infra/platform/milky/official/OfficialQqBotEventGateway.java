@@ -47,6 +47,8 @@ public class OfficialQqBotEventGateway {
 
     public Disposable connect(MilkyConnection connection, ReactorMilkyEventGateway.Listener listener) {
         Long connectionId = connection.getId();
+        // 连接配置里登记的机器人提及 openid 播种为别名：全量群消息(GROUP_MESSAGE_CREATE)按内容提及与别名判定是否 @ 机器人
+        connection.officialMentionOpenIds().forEach(id -> sessions.rememberSelfAlias(connectionId, id));
         AtomicReference<Session> session = new AtomicReference<>();
         AtomicBoolean resumable = new AtomicBoolean();
         return Mono.defer(() -> connectOnce(connection, listener, session, resumable))
