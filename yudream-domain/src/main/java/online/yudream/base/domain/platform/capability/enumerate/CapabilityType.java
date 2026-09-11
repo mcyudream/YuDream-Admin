@@ -8,5 +8,6 @@ public enum CapabilityType {
     DOCUMENT,
     CONTENT,
     GRAPH,
-    AI
+    AI,
+    DISTRIBUTION
 }

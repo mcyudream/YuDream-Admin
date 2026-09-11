@@ -92,6 +92,7 @@ const groups: CapabilityGroup[] = [
   { type: 'CONTENT', title: '内容定制', icon: 'i-ri:layout-masonry-line' },
   { type: 'GRAPH', title: '图数据库', icon: 'i-ri:share-circle-line' },
   { type: 'AI', title: 'AI 助手', icon: 'i-ri:sparkling-2-line' },
+  { type: 'DISTRIBUTION', title: '插件分发', icon: 'i-ri:store-2-line' },
 ]
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
