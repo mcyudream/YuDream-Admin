@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { ThemeConfigField } from '@/api/modules/platform-theme'
+import apiFiles from '@/api/modules/files'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 
 defineOptions({ name: 'ThemeConfigField' })
 
@@ -67,6 +69,42 @@ function updateItemField(index: number, key: string, value: any) {
   const next = listItems.value.map((item, i) => i === index ? { ...item, [key]: value } : item)
   listItems.value = next
 }
+
+const imageUrls = computed({
+  get: () => typeof props.modelValue === 'string' && props.modelValue ? [toBackendAssetUrl(props.modelValue)] : [],
+  set: (urls) => {
+    const raw = urls[0] || ''
+    update(stripDisplayPrefix(raw))
+  },
+})
+
+const toast = useFaToast()
+
+function stripDisplayPrefix(url: string) {
+  if (url.startsWith('/proxy/api/')) {
+    return url.slice('/proxy'.length)
+  }
+  return url
+}
+
+async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: (percent: number) => void }) {
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    throw new Error('请选择图片文件')
+  }
+  onProgress(20)
+  const data = new FormData()
+  data.append('file', file)
+  data.append('module', props.pluginCode ? `theme-${props.pluginCode}` : 'theme-config')
+  data.append('publicAccess', 'true')
+  const res = await apiFiles.upload(data)
+  onProgress(100)
+  const url = res.data.url
+  if (!url) {
+    throw new Error('图片上传后未返回访问地址')
+  }
+  return { url }
+}
 </script>
 
 <template>
@@ -132,16 +170,17 @@ function updateItemField(index: number, key: string, value: any) {
       />
     </div>
     <template v-else-if="field.type === 'image'">
-      <FaInput
-        :model-value="modelValue ?? ''"
-        :placeholder="field.placeholder || '图片 URL'"
-        class="w-full"
-        @update:model-value="update"
+      <FaImageUpload
+        v-model="imageUrls"
+        :max="1"
+        :width="160"
+        :height="96"
+        :http-request="uploadThemeImage"
+        :after-upload="response => response.url"
       />
       <p class="theme-config-field__hint">
-        可填外部图片地址，或主题资产路径 <code>/api/platform/plugins/{{ pluginCode || '{插件编码}' }}/assets/...</code>
+        点击上传图片，保存后公开站即时生效；也可继续使用主题自带资产路径。
       </p>
-      <img v-if="typeof modelValue === 'string' && modelValue" :src="modelValue" class="theme-config-field__preview" alt="">
     </template>
     <FaInput
       v-else-if="field.secret"
@@ -240,14 +279,6 @@ function updateItemField(index: number, key: string, value: any) {
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
-}
-
-.theme-config-field__preview {
-  max-width: 240px;
-  max-height: 120px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border-2);
-  object-fit: contain;
 }
 
 .theme-config-field__list {
