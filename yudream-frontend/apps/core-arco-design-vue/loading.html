@@ -1,38 +1,20 @@
+<!-- 启动页：上游 NMO loading.gif + Cubic 11 / Minecraft-Tenv2 像素字体（SIL OFL，见 public/fonts/OFL-cubic11.txt） -->
 <style>
-@keyframes dirt-shift {
-  0% { background-position: 0 0; }
-  100% { background-position: 32px 32px; }
+@font-face {
+  font-family: 'Cubic 11';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/cubic-11.woff2') format('woff2');
 }
 
-@keyframes square-to-dot-animation {
-  0%,
-  33.33% {
-    width: 10px;
-    height: 10px;
-    margin: initial;
-    border-width: 3px;
-    border-radius: 0;
-    transform: rotate(0deg);
-  }
-
-  50%,
-  83.33% {
-    width: 0;
-    height: 0;
-    margin: 5px;
-    border-width: 5px;
-    border-radius: 0;
-    transform: rotate(180deg);
-  }
-
-  100% {
-    width: 10px;
-    height: 10px;
-    margin: initial;
-    border-width: 3px;
-    border-radius: 0;
-    transform: rotate(360deg);
-  }
+@font-face {
+  font-family: 'Minecraft-Tenv2';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/Minecraft-Tenv2.woff2') format('woff2');
+  unicode-range: U+0020-007E;
 }
 
 .loading-container {
@@ -49,68 +31,28 @@
   color: #6cc349;
   user-select: none;
   background-color: #0f0e0d;
-  background-image:
-    linear-gradient(180deg, rgba(15, 14, 13, 0.55), rgba(15, 14, 13, 0.82)),
-    repeating-linear-gradient(0deg, #171615 0 16px, #1d1c1a 16px 32px),
-    repeating-linear-gradient(90deg, #171615 0 16px, #1d1c1a 16px 32px);
-  background-size: auto, 32px 32px, 32px 32px;
-  animation: dirt-shift 8s linear infinite;
   image-rendering: pixelated;
-}
-
-.loading-container *::before,
-.loading-container *::after {
-  box-sizing: content-box;
 }
 
 .loading-container .loading {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 96px;
+  height: 96px;
 }
 
-.loading-container .loading .square {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-
-.loading-container .loading .square::before {
-  width: 10px;
-  height: 10px;
-  content: "";
-  border: 3px solid #6cc349;
-  border-radius: 0;
-  box-shadow: 2px 2px 0 #000;
-  animation: square-to-dot-animation 2s linear infinite;
-}
-
-.loading-container .loading .square:nth-child(1)::before {
-  animation-delay: calc(150ms * 1);
-}
-
-.loading-container .loading .square:nth-child(2)::before {
-  animation-delay: calc(150ms * 2);
-}
-
-.loading-container .loading .square:nth-child(3)::before {
-  animation-delay: calc(150ms * 3);
-}
-
-.loading-container .loading .square:nth-child(4)::before {
-  animation-delay: calc(150ms * 4);
+.loading-container .loading img {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
 }
 
 .loading-container .name {
   position: relative;
-  margin-top: 20px;
-  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
-  font-size: 24px;
+  margin-top: 16px;
+  font-family: 'Minecraft-Tenv2', 'Cubic 11', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 22px;
   line-height: 1.5;
   color: #f7f5ee;
   text-shadow: 2px 2px 0 #000;
@@ -118,8 +60,8 @@
 
 .loading-container .tips {
   position: relative;
-  margin-top: 10px;
-  font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+  margin-top: 8px;
+  font-family: 'Cubic 11', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   font-size: 16px;
   color: rgba(247, 245, 238, 0.65);
   line-height: 1.5;
@@ -134,10 +76,7 @@
 
 <div class="loading-container">
   <div class="loading">
-    <div class="square"></div>
-    <div class="square"></div>
-    <div class="square"></div>
-    <div class="square"></div>
+    <img src="/loading.gif" alt="" width="96" height="96">
   </div>
   <div class="name"></div>
   <div class="tips">载入中</div>
