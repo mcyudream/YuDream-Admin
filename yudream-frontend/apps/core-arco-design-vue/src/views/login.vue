@@ -53,6 +53,7 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
 </script>
 
 <template>
+  <div class="login-page">
   <div class="bg-banner" />
   <div class="text-base p-1 border rounded-lg bg-background flex-center right-4 top-4 absolute z-1">
     <FaDropdown
@@ -134,6 +135,7 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
     </div>
   </div>
   <AppCopyright v-if="appSettingsStore.mode === 'mobile' || layoutAlign === 'center'" class="copyright" />
+  </div>
 </template>
 
 <style scoped>
