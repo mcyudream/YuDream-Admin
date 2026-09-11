@@ -198,8 +198,10 @@ public class MenuAppService {
     @Transactional
     public void delete(String code) {
         Menu menu = getMenu(code);
-        ensureMenuCanDelete(code);
-        menuDomainService.deleteMenu(menu.getCode());
+        List<String> codes = collectDescendantCodes(menu.getCode(), menuRepo.findAll());
+        for (int i = codes.size() - 1; i >= 0; i--) {
+            menuDomainService.deleteMenu(codes.get(i));
+        }
     }
 
     /**
@@ -427,11 +429,29 @@ public class MenuAppService {
         }
     }
 
-    private void ensureMenuCanDelete(String code) {
-        boolean hasChildren = menuRepo.findAll().stream()
-                .anyMatch(menu -> Objects.equals(code, menu.getParentCode()));
-        if (hasChildren) {
-            throw new BizException("菜单存在子节点，不能删除");
+    private List<String> collectDescendantCodes(String rootCode, List<Menu> all) {
+        Map<String, List<Menu>> childrenMap = new HashMap<>();
+        for (Menu menu : all) {
+            String parentCode = blankToNull(menu.getParentCode());
+            if (parentCode != null) {
+                childrenMap.computeIfAbsent(parentCode, key -> new ArrayList<>()).add(menu);
+            }
+        }
+        List<String> ordered = new ArrayList<>();
+        collectDescendantCodes(rootCode, childrenMap, ordered, new HashSet<>());
+        return ordered;
+    }
+
+    private void collectDescendantCodes(String code,
+                                        Map<String, List<Menu>> childrenMap,
+                                        List<String> ordered,
+                                        Set<String> visited) {
+        if (!visited.add(code)) {
+            return;
+        }
+        ordered.add(code);
+        for (Menu child : childrenMap.getOrDefault(code, List.of())) {
+            collectDescendantCodes(child.getCode(), childrenMap, ordered, visited);
         }
     }
 

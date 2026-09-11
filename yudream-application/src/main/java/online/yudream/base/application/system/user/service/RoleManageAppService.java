@@ -138,11 +138,12 @@ public class RoleManageAppService {
         if (permissions == null || permissions.isEmpty()) {
             return new ArrayList<>();
         }
-        Set<String> activeCodes = permissionRepo.findActive().stream()
+        // 插件更新/重载期间其权限记录可能短暂失效，只拒绝系统中不存在的码，已存在的失效码原样保留以免丢授权
+        Set<String> knownCodes = permissionRepo.findAll().stream()
                 .map(permission -> permission.getId().getCode())
                 .collect(Collectors.toSet());
         List<String> distinct = permissions.stream().distinct().toList();
-        if (!activeCodes.containsAll(distinct)) {
+        if (!knownCodes.containsAll(distinct)) {
             throw new BizException("权限不存在或已废弃");
         }
         return distinct.stream().map(PermissionID::of).toList();

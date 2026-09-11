@@ -105,6 +105,17 @@ const permissionTreeData = computed(() => {
     }
   }).filter(node => node.children.length > 0)
 })
+// 树当前实际渲染出的权限码集合。搜索过滤后只剩匹配项，勾选事件回传也只反映这部分状态
+const visibleCodeSet = computed(() => {
+  const codes = new Set<string>()
+  permissionTreeData.value.forEach((moduleNode) => {
+    moduleNode.children.forEach((groupNode) => {
+      groupNode.children.forEach((leaf) => codes.add(leaf.key))
+    })
+  })
+  return codes
+})
+
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
   { accessorKey: 'code', header: '编码', width: 180 },
@@ -142,7 +153,11 @@ async function loadRoles() {
       deptId: search.deptId,
       status: search.status,
     })
-    rows.value = res.data.records
+    // 权限数按现存权限计数展示（失效码不出现在树中）；row.permissions 保留原始数据，编辑回显与保存不丢
+    rows.value = res.data.records.map(row => ({
+      ...row,
+      permissionCount: row.permissions.filter(code => permissionCodeSet.value.has(code)).length,
+    }))
     pagination.total = res.data.total
   }
   finally {
@@ -179,7 +194,10 @@ function clearPermissions() {
 }
 
 function onPermissionCheck(checkedKeys: (string | number)[]) {
-  form.permissions = checkedKeys.filter((key): key is string => typeof key === 'string' && permissionCodeSet.value.has(key))
+  // 树外的勾选（被搜索过滤隐藏、或权限已失效）不在 checkedKeys 里，直接全量重算会把它们清掉
+  const keptInvisible = form.permissions.filter(code => !visibleCodeSet.value.has(code))
+  const checkedVisible = checkedKeys.filter((key): key is string => typeof key === 'string' && visibleCodeSet.value.has(key))
+  form.permissions = [...keptInvisible, ...checkedVisible]
 }
 
 function resetPermissionPanel() {
@@ -216,12 +234,11 @@ function openEdit(row: RoleManageItem) {
 }
 
 async function saveForm() {
-  if (editing.value) {
+  // 权限码原样提交：失效的插件权限（更新/重载期间）保留在角色中，插件恢复后授权自动生效
+  if (editing.value)
     await apiRole.update(editing.value.id, form)
-  }
-  else {
+  else
     await apiRole.create(form)
-  }
   toast.success(editing.value ? '编辑成功' : '新增成功')
   formVisible.value = false
   await loadRoles()
@@ -469,7 +486,7 @@ function importRoles() {
           <div class="permission-panel">
             <div class="permission-toolbar">
               <FaInput v-model="permissionKeyword" clearable placeholder="搜索权限名称 / 编码" class="min-w-[200px] flex-1" />
-              <span class="permission-count">已选 {{ form.permissions.length }} 项</span>
+              <span class="permission-count">已选 {{ form.permissions.filter(code => permissionCodeSet.has(code)).length }} 项</span>
               <FaButton size="sm" variant="outline" @click="selectAllPermissions">
                 全选
               </FaButton>

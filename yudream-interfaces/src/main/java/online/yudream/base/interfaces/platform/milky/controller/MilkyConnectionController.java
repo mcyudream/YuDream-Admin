@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.platform.milky.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.milky.service.MilkyConnectionAppService;
+import online.yudream.base.application.system.user.dto.MessagingBindingCodeDTO;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
@@ -61,5 +62,11 @@ public class MilkyConnectionController {
     @PermissionRegister(code = "platform:milky:connect", name = "测试 QQ 消息连接", module = "QQ 消息平台", desc = "测试连接")
     public Result<Object> test(@PathVariable Long id) {
         return Result.ok(appService.test(id));
+    }
+
+    @PostMapping("/{id}/mention-binding-code")
+    @PermissionRegister(code = "platform:milky:config", name = "配置 QQ 消息连接", module = "QQ 消息平台", desc = "生成机器人提及回填码")
+    public Result<MessagingBindingCodeDTO> issueMentionBindingCode(@PathVariable Long id) {
+        return Result.ok(appService.issueMentionBindingCode(id));
     }
 }

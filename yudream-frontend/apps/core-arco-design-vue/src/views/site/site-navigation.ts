@@ -8,6 +8,8 @@ export interface SiteNavigationItem {
   parentId?: string
   visible?: boolean
   sort?: number
+  /** 外链在公开站内容区 iframe 嵌入，而不是新窗口打开 */
+  embed?: boolean
   children?: SiteNavigationItem[]
 }
 
@@ -41,6 +43,10 @@ export function buildNavigationTree(items: SiteNavigationItem[]) {
       return
     }
     const parent = item.parentId ? itemMap.get(item.parentId) : undefined
+    if (item.parentId && !parent) {
+      // 父级被隐藏/删除（如登录等认证项被公开导航过滤）时，二级菜单整体隐藏，禁止平铺成一级
+      return
+    }
     if (parent) {
       parent.children = [...(parent.children || []), current]
     }
@@ -63,6 +69,23 @@ export function flattenNavigation(items: SiteNavigationItem[]) {
 export function isAuthNavigationUrl(url?: string) {
   const normalized = (url || '').trim().toLowerCase()
   return normalized === '/login' || normalized === '/register' || normalized === '/signup'
+}
+
+export function isHttpNavigationUrl(url?: string) {
+  return /^https?:\/\//i.test((url || '').trim())
+}
+
+/** 勾选了站内嵌入的 http(s) 外链改写为 /embed，chrome 按站内路由无感跳转。 */
+export function navigationHref(item: Pick<SiteNavigationItem, 'url' | 'label' | 'embed'>) {
+  const url = (item.url || '').trim()
+  if (!item.embed || !isHttpNavigationUrl(url)) {
+    return url
+  }
+  const params = new URLSearchParams({ url })
+  if (item.label) {
+    params.set('title', item.label)
+  }
+  return `/embed?${params.toString()}`
 }
 
 // 插件声明的站点导航项（@PluginRoute siteNav）：经公开 frontend-manifest 下发，
@@ -135,7 +158,9 @@ export function useSiteNavigation(navigationJson: MaybeRefOrGetter<string | unde
   loadPluginSiteNavItems().then(items => pluginNavItems.value = items)
 
   const navigationItems = computed(() => {
-    const items = parseNavigationItems(toValue(navigationJson)).filter(item => !isAuthNavigationUrl(item.url))
+    const items = parseNavigationItems(toValue(navigationJson))
+      .filter(item => !isAuthNavigationUrl(item.url))
+      .map(item => ({ ...item, url: navigationHref(item) }))
     const knownUrls = new Set(items.map(item => item.url))
     const merged = [...items, ...pluginNavItems.value.filter(item => !knownUrls.has(item.url) && !isAuthNavigationUrl(item.url))]
     const withWiki = wikiEnabled.value && !merged.some(item => item.url === '/wiki')

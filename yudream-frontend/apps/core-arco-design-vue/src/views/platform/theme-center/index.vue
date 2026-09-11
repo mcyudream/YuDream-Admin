@@ -27,6 +27,7 @@ interface CmsNavigationItem {
   parentId?: string
   visible: boolean
   sort: number
+  embed?: boolean
   children?: CmsNavigationItem[]
 }
 
@@ -1521,6 +1522,13 @@ function sectionTitle(type: HomeSectionType) {
                 </select>
               </label>
               <FaInput v-model="item.sort" type="number" placeholder="排序" />
+              <label class="cms-field">
+                <span>外链打开方式</span>
+                <span class="inline-flex items-center gap-2 text-sm">
+                  <FaSwitch v-model="item.embed" :disabled="!/^https?:\/\//i.test(item.url.trim())" />
+                  {{ /^https?:\/\//i.test(item.url.trim()) ? '在站内 iframe 嵌入' : '仅 http(s) 外链可嵌入' }}
+                </span>
+              </label>
               <label class="inline-flex items-center gap-2 text-sm">
                 <FaSwitch v-model="item.visible" />
                 显示菜单
@@ -1553,7 +1561,7 @@ function sectionTitle(type: HomeSectionType) {
           <section>
             <h3>使用说明</h3>
             <p class="cms-help-text">
-              导航菜单随首页配置一起保存（点右上角「保存首页配置」生效）；删除一级菜单时其子菜单会自动提升为一级。首页构建器中的 Header/Footer 结构、Logo、认证入口和数据绑定仍由系统固定，画布仅开放整体 CSS 定制。
+              导航菜单随首页配置一起保存（点右上角「保存首页配置」生效）；删除一级菜单时其子菜单会自动提升为一级。外链默认新窗口打开，勾选「站内 iframe 嵌入」后会在公开站内容框内打开，类似新闻页那种带导航的内嵌页。首页构建器中的 Header/Footer 结构、Logo、认证入口和数据绑定仍由系统固定，画布仅开放整体 CSS 定制。
             </p>
           </section>
         </aside>
@@ -2293,12 +2301,13 @@ function sectionTitle(type: HomeSectionType) {
 
 .cms-native-select {
   width: 100%;
-  min-height: 34px;
+  height: 36px;
   padding: 0 10px;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-1);
   color: var(--color-text-1);
+  font-size: 14px;
   outline: none;
 }
 

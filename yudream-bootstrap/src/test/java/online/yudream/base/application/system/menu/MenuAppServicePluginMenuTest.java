@@ -25,8 +25,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
@@ -582,15 +582,21 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
-    void deleteRejectsMenuWithChildren() {
-        Menu parent = systemMenu("system:tools", null, MenuNodeType.CATEGORY);
-        Menu child = systemMenu("system:tools:audit", parent.getCode(), MenuNodeType.MENU);
+    void deleteCascadesChildMenusAndButtons() {
+        Menu parent = systemMenu("platform:cms", null, MenuNodeType.MENU);
+        Menu button = systemMenu("platform:cms:view", parent.getCode(), MenuNodeType.BUTTON);
+        Menu nested = systemMenu("platform:cms:pages", parent.getCode(), MenuNodeType.MENU);
+        Menu nestedButton = systemMenu("platform:cms:pages:edit", nested.getCode(), MenuNodeType.BUTTON);
         when(menuRepo.findByCode(parent.getCode())).thenReturn(Optional.of(parent));
-        when(menuRepo.findAll()).thenReturn(List.of(parent, child));
+        when(menuRepo.findAll()).thenReturn(List.of(parent, button, nested, nestedButton));
 
-        assertThatThrownBy(() -> service.delete(parent.getCode()))
-                .isInstanceOf(BizException.class)
-                .hasMessage("菜单存在子节点，不能删除");
+        service.delete(parent.getCode());
+
+        var order = inOrder(menuDomainService);
+        order.verify(menuDomainService).deleteMenu(nestedButton.getCode());
+        order.verify(menuDomainService).deleteMenu(nested.getCode());
+        order.verify(menuDomainService).deleteMenu(button.getCode());
+        order.verify(menuDomainService).deleteMenu(parent.getCode());
     }
 
     private Menu systemMenu(String code, String parentCode, MenuNodeType type) {

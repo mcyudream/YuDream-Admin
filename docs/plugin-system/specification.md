@@ -251,7 +251,7 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 - `styles`/`preview`/`homePreset` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
 - `homeComponent`/`chromeComponent` 必须是远程模块 `routes` 导出表中的组件键，格式 `[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*`（如 `theme/Home`、`theme/Chrome`），注册时校验；`homeComponent` 与 `homePreset` 互斥——前者由 Vue 页面接管公开站首页，后者走 CMS data-yb 模板体系，同时声明以 `homeComponent` 为准。`chromeComponent` 声明后公开站页头/页脚由该组件接管，导航数据由宿主注入（始终含首页 `/site`，CMS 已配置同 URL 则不重复）；未声明时仍由宿主 SiteChrome 承载。
 - 同一 scope 同时只激活一个主题：启用声明了主题的新插件时，宿主自动禁用同 scope 冲突的旧主题插件并接管激活位；禁用/卸载/删除主题插件即释放激活位，该 scope 回落宿主内置主题。重启恢复后宿主按持久化激活位校正。
-- 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。启动页（`vite-plugin-app-loading` 注入的宿主 `loading.html`）发生在 Vue Router 之前：`theme-runtime` 必须按 URL 公开路径前缀提前打开 SITE 主题 media，让已激活的 SITE 主题用自己的 style.css 覆盖 `[data-app-loading]`。主题 GIF/字体只许放在插件 frontend 资产里，禁止打进宿主 `public/`——未装主题或进入后台时必须仍是宿主默认启动页。
+- 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。启动页（`vite-plugin-app-loading` 注入的宿主 `loading.html`）发生在 Vue Router 之前：`index.html` 在公开路径（含无 token 的 `/`）立刻注入上次缓存的 SITE 主题 CSS 并 preload `loading.gif`，`theme-runtime` 按 URL 公开路径前缀打开 SITE 主题 media，等样式表与 GIF 就绪后再淡出启动页。已登录的 `/` 仍走宿主默认动画。主题 GIF/字体只许放在插件 frontend 资产里，禁止打进宿主 `public/`——未装主题或进入后台时必须仍是宿主默认启动页。主题配置 `image` 字段清空后必须持久化为空串，读取不得回落到 schema 默认图。
 
 Vue 原生主题页（homeComponent + chromeComponent，推荐路径）：
 
@@ -262,7 +262,9 @@ Vue 原生主题页（homeComponent + chromeComponent，推荐路径）：
 
 chrome 接管（chromeComponent，推荐）与变量契约（回落）：
 
-- 声明 `chromeComponent` 后由主题远程 Vue 组件完全接管页头页脚（NMO 复刻必须走这条，避免宿主 SiteChrome 在首页/内页切样式）。
+- 声明 `chromeComponent` 后由主题远程 Vue 组件完全接管页头页脚（NMO 复刻必须走这条，避免宿主 SiteChrome 在首页/内页切样式）。公开知识库 `/wiki` 与外链嵌入页 `/embed` 也走同一套 chrome（默认主题同样），禁止再自带独立顶栏。
+- 主题中心导航项可对 http(s) 外链勾选「站内 iframe 嵌入」：公开站把该条目改写为 `/embed?url=&title=`，内容区以带框 iframe 打开（目标站点若设 X-Frame-Options 则回落「新窗口打开」）。未勾选的外链仍走原生 `<a>`。
+- 二级菜单跟随父级可见性：父级被隐藏或被过滤（如登录等认证项不进公开导航）时，其二级菜单整体隐藏，禁止把孤儿二级平铺提升为一级；主题 chrome 对隐藏项同样连子级一起隐藏。
 - 未声明时仍用 chrome 变量契约：宿主 SiteChrome 对以下变量**只消费不赋值**，主题在 style.css 里设变量即可改外观：
   - `--yb-site-header-position` / `--yb-site-header-top` / `--yb-site-header-border` / `--yb-site-header-background` / `--yb-site-header-backdrop`（整条头部）；
   - `--yb-site-header-bar-width` / `--yb-site-header-bar-min-height` / `--yb-site-header-bar-margin` / `--yb-site-header-bar-padding` / `--yb-site-header-bar-border` / `--yb-site-header-bar-radius` / `--yb-site-header-bar-bg` / `--yb-site-header-bar-shadow`（头部内栏，盒式导航条）；

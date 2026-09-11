@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchPublicWikiSpaces, searchAllPublicWiki, type WikiPublicSpace, type WikiSearchHit } from '@/api/modules/platform-wiki'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
+import WikiPublicChrome from './wiki-public-chrome.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,14 +96,8 @@ function applySearchSeo() {
 </script>
 
 <template>
+  <WikiPublicChrome>
   <main class="wiki-search-page">
-    <header class="wiki-search-page__header">
-      <div class="wiki-search-page__shell wiki-search-page__header-inner">
-        <a class="wiki-search-page__brand" href="/wiki"><FaIcon name="i-ri:book-2-line" /> 知识库</a>
-        <a class="wiki-search-page__back" href="/wiki"><FaIcon name="i-ri:arrow-left-line" /> 返回知识库</a>
-      </div>
-    </header>
-
     <section class="wiki-search-page__shell wiki-search-page__content">
       <div class="wiki-search-page__heading"><p>公开文档</p><h1>{{ searchTitle }}</h1></div>
       <form class="wiki-search-page__form" @submit.prevent="submitSearch">
@@ -124,34 +119,36 @@ function applySearchSeo() {
       </section>
     </section>
   </main>
+  </WikiPublicChrome>
 </template>
 
 <style scoped>
-.wiki-search-page { min-height: 100vh; background: var(--color-bg-1); color: var(--color-text-1); }
+.wiki-search-page {
+  min-height: 100%;
+  flex: 1 1 auto;
+  padding-top: var(--neco-page-top, 0px);
+  background: var(--yb-site-bg, var(--color-bg-1));
+  color: var(--yb-site-text, var(--color-text-1));
+}
 .wiki-search-page__shell { width: min(100% - 40px, 980px); margin: 0 auto; }
-.wiki-search-page__header { border-bottom: 1px solid var(--color-border-2); background: var(--color-bg-1); }
-.wiki-search-page__header-inner { display: flex; min-height: 62px; align-items: center; justify-content: space-between; gap: 16px; }
-.wiki-search-page__brand, .wiki-search-page__back { display: inline-flex; align-items: center; gap: 8px; color: var(--color-text-2); font-size: 14px; text-decoration: none; }
-.wiki-search-page__brand { color: var(--color-text-1); font-size: 16px; font-weight: 700; }
-.wiki-search-page__back:hover { color: var(--color-text-1); }
-.wiki-search-page__content { padding: 58px 0 80px; }
-.wiki-search-page__heading p { margin: 0 0 8px; color: var(--color-text-3); font-size: 13px; font-weight: 600; }
-.wiki-search-page__heading h1 { margin: 0; font-size: 30px; line-height: 1.35; }
+.wiki-search-page__content { padding: 48px 0 80px; }
+.wiki-search-page__heading p { margin: 0 0 8px; color: var(--yb-site-muted, var(--color-text-3)); font-size: 13px; font-weight: 600; }
+.wiki-search-page__heading h1 { margin: 0; font-size: 30px; line-height: 1.35; color: var(--yb-site-heading, var(--color-text-1)); }
 .wiki-search-page__form { display: grid; grid-template-columns: minmax(0, 1fr) 190px auto; gap: 10px; margin-top: 28px; }
-.wiki-search-page__count { margin: 26px 0 12px; color: var(--color-text-3); font-size: 13px; }
+.wiki-search-page__count { margin: 26px 0 12px; color: var(--yb-site-muted, var(--color-text-3)); font-size: 13px; }
 .wiki-search-page__results { display: grid; gap: 10px; }
-.wiki-search-result { cursor: pointer; transition: box-shadow .15s; }
-.wiki-search-result:hover { box-shadow: 0 5px 16px rgb(0 0 0 / 7%); }
+.wiki-search-result { cursor: pointer; border: 1px solid var(--yb-site-border, var(--color-border-2)); background: var(--yb-site-surface, var(--color-bg-2)); box-shadow: 0 1px 3px rgb(0 0 0 / 6%); transition: box-shadow .15s; }
+.wiki-search-result:hover { box-shadow: 0 6px 18px rgb(0 0 0 / 10%); }
 .wiki-search-result__heading { display: flex; min-width: 0; align-items: center; gap: 8px; }
 .wiki-search-result__heading strong { overflow: hidden; font-size: 16px; text-overflow: ellipsis; white-space: nowrap; }
-.wiki-search-result__heading :deep(svg) { margin-left: auto; color: var(--color-text-3); }
-.wiki-search-result__location { display: flex; min-width: 0; align-items: center; gap: 6px; margin-top: 9px; color: var(--color-text-3); font-size: 12px; }
-.wiki-search-result__location span { color: var(--color-border-2); }
-.wiki-search-result p { display: -webkit-box; overflow: hidden; margin: 9px 0 0; color: var(--color-text-2); font-size: 14px; line-height: 1.7; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.wiki-search-page__empty { display: grid; justify-items: center; gap: 8px; margin-top: 48px; padding: 54px 20px; border: 1px dashed var(--color-border-2); border-radius: 8px; color: var(--color-text-3); text-align: center; }
+.wiki-search-result__heading :deep(svg) { margin-left: auto; color: var(--yb-site-muted, var(--color-text-3)); }
+.wiki-search-result__location { display: flex; min-width: 0; align-items: center; gap: 6px; margin-top: 9px; color: var(--yb-site-muted, var(--color-text-3)); font-size: 12px; }
+.wiki-search-result__location span { color: var(--yb-site-border, var(--color-border-2)); }
+.wiki-search-result p { display: -webkit-box; overflow: hidden; margin: 9px 0 0; color: var(--yb-site-text-2, var(--color-text-2)); font-size: 14px; line-height: 1.7; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.wiki-search-page__empty { display: grid; justify-items: center; gap: 8px; margin-top: 48px; padding: 54px 20px; border: 1px dashed var(--yb-site-border, var(--color-border-2)); border-radius: 10px; background: var(--yb-site-surface, var(--color-bg-2)); color: var(--yb-site-muted, var(--color-text-3)); text-align: center; }
 .wiki-search-page__empty :deep(svg) { font-size: 34px; }
 .wiki-search-page__loading-icon { animation: wiki-search-spin 1s linear infinite; }
-.wiki-search-page__empty strong { color: var(--color-text-1); }
+.wiki-search-page__empty strong { color: var(--yb-site-heading, var(--color-text-1)); }
 .wiki-search-page__empty p { margin: 0; font-size: 13px; }
 @keyframes wiki-search-spin { to { transform: rotate(360deg); } }
 @media (max-width: 680px) { .wiki-search-page__shell { width: min(100% - 28px, 980px); }.wiki-search-page__content { padding-top: 34px; }.wiki-search-page__heading h1 { font-size: 24px; }.wiki-search-page__form { grid-template-columns: 1fr; }.wiki-search-page__form :deep(button) { width: 100%; } }

@@ -25,6 +25,7 @@ public final class MilkyInfraMapper {
         target.setEncryptedAppSecret(encryptOptional(cipher, source.getAppSecret(), source.getId()));
         target.setSandbox(source.isSandbox());
         target.setIntents(source.getIntents());
+        target.setMentionOpenIds(source.getMentionOpenIds());
         target.setEnabled(source.isEnabled());
         target.setCommandMenuImageMode(source.getCommandMenuImageMode());
         target.setCommandMenuPublicBaseUrl(source.getCommandMenuPublicBaseUrl());
@@ -48,6 +49,7 @@ public final class MilkyInfraMapper {
                 .appSecret(decryptOptional(cipher, source.getEncryptedAppSecret(), source.getId()))
                 .sandbox(source.isSandbox())
                 .intents(source.getIntents())
+                .mentionOpenIds(source.getMentionOpenIds())
                 .enabled(source.isEnabled())
                 .commandMenuImageMode(source.getCommandMenuImageMode())
                 .commandMenuPublicBaseUrl(source.getCommandMenuPublicBaseUrl())

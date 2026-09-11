@@ -41,6 +41,7 @@ class ThemeConfigAppServiceTest {
                 {"key":"newsLimit","label":"新闻数量","type":"number","default":6},
                 {"key":"accent","label":"强调色","type":"select","default":"green",
                  "options":[{"label":"绿","value":"green"},{"label":"蓝","value":"blue"}]},
+                {"key":"heroImage","label":"背景图","type":"image","default":"/api/plugins/bg.webp"},
                 {"key":"apiToken","label":"API 令牌","type":"text","secret":true}
               ]},
               {"code":"about","title":"关于","fields":[
@@ -84,6 +85,7 @@ class ThemeConfigAppServiceTest {
                 .containsEntry("heroTitle", "南京大学Minecraft协会")
                 .containsEntry("showServers", true)
                 .containsEntry("newsLimit", 6)
+                .containsEntry("heroImage", "/api/plugins/bg.webp")
                 .containsEntry("apiToken", "");
         assertThat(config.getSecretConfigured()).containsEntry("apiToken", false);
     }
@@ -130,6 +132,17 @@ class ThemeConfigAppServiceTest {
         service.save(cmd("neco", Map.of("apiToken", "")));
         assertThat(settingRepo.findByKey("pluginTheme.config.neco").orElseThrow().getValue())
                 .contains("enc:apiToken:s3cret");
+    }
+
+    @Test
+    void saveEmptyImageKeepsClearedValueInsteadOfSchemaDefault() {
+        stubTheme();
+        service.save(cmd("neco", Map.of("heroImage", "")));
+
+        assertThat(service.config("neco").getValues()).containsEntry("heroImage", "");
+        assertThat(service.publicConfig("neco")).containsEntry("heroImage", "");
+        assertThat(settingRepo.findByKey("pluginTheme.config.neco").orElseThrow().getValue())
+                .contains("\"heroImage\":\"\"");
     }
 
     @Test
