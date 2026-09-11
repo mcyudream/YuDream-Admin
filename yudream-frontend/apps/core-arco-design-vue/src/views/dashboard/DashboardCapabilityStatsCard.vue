@@ -57,6 +57,7 @@ function typeText(type: CapabilityItem['type']) {
     CONTENT: '内容',
     GRAPH: '图谱',
     AI: 'AI',
+    DISTRIBUTION: '分发',
   }
   return map[type] || type
 }
