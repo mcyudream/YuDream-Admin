@@ -12,6 +12,7 @@ const constantRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/login.vue'),
     meta: {
       title: '登录',
+      public: true,
     },
   },
   {
