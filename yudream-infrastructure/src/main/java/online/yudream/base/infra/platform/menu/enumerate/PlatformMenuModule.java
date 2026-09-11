@@ -117,6 +117,31 @@ public enum PlatformMenuModule {
             parentName = "PLUGIN_MARKETPLACE", permission = "platform:plugin-marketplace:view")
     PLUGIN_MARKETPLACE_VIEW,
 
+    @MenuNode(code = "platform:plugin-market-source", name = "市场源管理", type = MenuNodeType.MENU,
+            path = "/platform/plugin-market-source", component = "platform/plugin-market-source/index.vue",
+            icon = "i-ri:git-repository-line", sort = 93)
+    PLUGIN_MARKET_SOURCE,
+
+    @MenuNode(code = "platform:plugin-market-source:view", name = "查看市场源", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:view")
+    PLUGIN_MARKET_SOURCE_VIEW,
+
+    @MenuNode(code = "platform:plugin-market-source:create", name = "添加市场源", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:create")
+    PLUGIN_MARKET_SOURCE_CREATE,
+
+    @MenuNode(code = "platform:plugin-market-source:edit", name = "编辑市场源", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:edit")
+    PLUGIN_MARKET_SOURCE_EDIT,
+
+    @MenuNode(code = "platform:plugin-market-source:delete", name = "删除市场源", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:delete")
+    PLUGIN_MARKET_SOURCE_DELETE,
+
+    @MenuNode(code = "platform:plugin-market-source:run", name = "同步市场源", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:run")
+    PLUGIN_MARKET_SOURCE_RUN,
+
     @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
             path = "/platform/api-doc", component = "platform/api-doc/index.vue",
             icon = "i-ri:file-list-2-line", sort = 90)
