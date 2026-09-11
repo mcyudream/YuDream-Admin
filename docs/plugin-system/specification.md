@@ -249,13 +249,13 @@ public class PixelThemePlugin implements YuDreamPlugin { ... }
 
 - 一个插件最多注册一个主题；`scopes` 至少声明一个范围（`SITE` 公开站 / `ADMIN` 管理后台），`styles` 至少声明一个 CSS 资产。
 - `styles`/`preview`/`homePreset` 必须是 JAR 内 `META-INF/yudream-plugin/frontend/{pluginCode}/` 下的相对路径，不得包含 `..`、反斜杠或绝对路径；宿主经 `/api/platform/plugins/{code}/assets/**` 下发并携带 `assetRevision` 缓存指纹。
-- `homeComponent`/`chromeComponent` 必须是远程模块 `routes` 导出表中的组件键，格式 `[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*`（如 `theme/Home`、`theme/Chrome`），注册时校验；`homeComponent` 与 `homePreset` 互斥——前者由 Vue 页面接管公开站首页，后者走 CMS data-yb 模板体系，同时声明以 `homeComponent` 为准。`chromeComponent` 声明后公开站页头/页脚由该组件接管，导航数据由宿主注入；未声明时仍由宿主 SiteChrome 承载。
+- `homeComponent`/`chromeComponent` 必须是远程模块 `routes` 导出表中的组件键，格式 `[a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*`（如 `theme/Home`、`theme/Chrome`），注册时校验；`homeComponent` 与 `homePreset` 互斥——前者由 Vue 页面接管公开站首页，后者走 CMS data-yb 模板体系，同时声明以 `homeComponent` 为准。`chromeComponent` 声明后公开站页头/页脚由该组件接管，导航数据由宿主注入（始终含首页 `/site`，CMS 已配置同 URL 则不重复）；未声明时仍由宿主 SiteChrome 承载。
 - 同一 scope 同时只激活一个主题：启用声明了主题的新插件时，宿主自动禁用同 scope 冲突的旧主题插件并接管激活位；禁用/卸载/删除主题插件即释放激活位，该 scope 回落宿主内置主题。重启恢复后宿主按持久化激活位校正。
 - 主题随路由切换作用域：公开路由（`meta.public`）启用 SITE 主题、禁用 ADMIN 主题，后台路由相反，两个 scope 的 CSS 变量不得互相污染。
 
 Vue 原生主题页（homeComponent + chromeComponent，推荐路径）：
 
-- SITE 主题的版式页就是该插件 frontend 包里的普通 Vue SFC：首页经 `homeComponent` 接管 `/site`；页头/页脚经 `chromeComponent` 接管（导航数据由宿主注入，主题自己画导航，切页不再换 chrome）。其余主题页经 `@PluginRoute(publicAccess = true, siteNav = true)` 注册为公开站路由并进入站点导航（站内跳转走 router、无整页刷新）。
+- SITE 主题的版式页就是该插件 frontend 包里的普通 Vue SFC：首页经 `homeComponent` 接管 `/site`；页头/页脚经 `chromeComponent` 接管（导航数据由宿主注入且首位必须是首页 `/site`，主题自己画导航，切页不再换 chrome）。其余主题页经 `@PluginRoute(publicAccess = true, siteNav = true)` 注册为公开站路由并进入站点导航（站内跳转走 router、无整页刷新）。
 - 页面数据经 SDK site client 获取（SDK ≥1.7.0）：`sdk.site.context({ blocks, limit, cmsLatest })` 拉取 `GET /api/public/theme/context`（匿名），返回 `{ themeCode, themeConfig, blocks, cmsPagesLatest }`——主题配置（secret 已剔除）、所请主题块与 CMS 最新文章一次拿齐；`sdk.site.applySeo(...)` 设置页面 SEO；`sdk.site.assetUrl(path)` 处理资产路径。拉取失败必须回落静态兜底，页面不得报错。
 - 与 CMS 的边界：默认主题与文章内容页（`/site/:slug` 新闻详情等）继续走 CMS 渲染；声明了 `homeComponent` 的主题其版式页不再是 CmsPage，主题中心首页 tab 显示「由插件页面承载」并隐藏 homeHtml 设计器。旧主题遗留的 CMS 首页布局数据保留无害（切回默认主题才用）。
 - 主题插件对其他业务插件只能是 `softdepend`（文档与加载顺序意义），**禁止 `depend`**——主题必须可独立运行；块缺失/插件未装载时回落 `theme.config` 静态清单或空态。主题不 import 任何其他插件的代码/组件，数据契约走宿主中转，代码零耦合。
@@ -345,7 +345,7 @@ CSS 作用域约定：
 - `sort` 控制同级页面排序。
 - 多页面插件应使用 `parentTitle`、`parentPath`、`parentSort` 形成菜单目录。
 - `publicAccess` 标记匿名可访问的公开路由，公开路由随未登录 manifest 下发并注册为顶级路由。
-- `siteNav` 必须与 `publicAccess` 一起使用：页面注入 `/site` 公开站页头导航，并以站点页头/页脚布局渲染；导航项默认排在 CMS 导航之后、知识库入口之前，在 CMS 导航中配置同 URL 条目可覆盖其位置。
+- `siteNav` 必须与 `publicAccess` 一起使用：页面注入 `/site` 公开站页头导航，并以站点页头/页脚布局渲染；导航项默认排在首页之后、CMS 导航之后、知识库入口之前，在 CMS 导航中配置同 URL 条目可覆盖其位置。公开站导航始终含首页 `/site`（品牌链接不能替代导航项）。
 
 不需要展示在菜单中的页面，应由运行时或 manifest 显式标记为隐藏路由；隐藏路由仍必须有权限控制。
 

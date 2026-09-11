@@ -274,7 +274,7 @@
     },
     {
       "key": "plugin-theme-vue-pages",
-      "text": "SITE 主题版式页推荐 Vue 原生承载（SPI 2.26.0 起）：@PluginTheme(homeComponent=\"theme/Home\", chromeComponent=\"theme/Chrome\") 声明远程模块 routes 键（格式 [a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*，registerTheme 注册期校验）。homeComponent 接管公开站首页；chromeComponent 接管公开站页头/页脚（导航数据由宿主注入，主题自己画导航，切页不再换 chrome）；未声明 chromeComponent 时仍由宿主 SiteChrome 承载。其余版式页用 @PluginRoute(publicAccess=true, siteNav=true) 注册公开站路由。主题页面经 sdk.site.context({blocks, limit, cmsLatest}) 消费公开主题上下文（GET /api/public/theme/context，匿名）。主题对业务插件一律 softdepend（禁止 depend），不 import 其他插件代码/组件，块缺失即回落 theme-config 静态清单。CMS 回归内容系统：/site/:slug 详情页与默认主题首页仍走 CMS 模板引擎。"
+      "text": "SITE 主题版式页推荐 Vue 原生承载（SPI 2.26.0 起）：@PluginTheme(homeComponent=\"theme/Home\", chromeComponent=\"theme/Chrome\") 声明远程模块 routes 键（格式 [a-z0-9][a-z0-9/-]*/[A-Za-z][A-Za-z0-9]*，registerTheme 注册期校验）。homeComponent 接管公开站首页；chromeComponent 接管公开站页头/页脚（导航数据由宿主注入，主题自己画导航，切页不再换 chrome）；未声明 chromeComponent 时仍由宿主 SiteChrome 承载。其余版式页用 @PluginRoute(publicAccess=true, siteNav=true) 注册公开站路由。公开站导航合并（site-navigation.ts）必须始终含首页项 /site（CMS 已配置同 URL 则不重复），不能只靠品牌链接。主题页面经 sdk.site.context({blocks, limit, cmsLatest}) 消费公开主题上下文（GET /api/public/theme/context，匿名）。主题对业务插件一律 softdepend（禁止 depend），不 import 其他插件代码/组件，块缺失即回落 theme-config 静态清单。CMS 回归内容系统：/site/:slug 详情页与默认主题首页仍走 CMS 模板引擎。"
     },
     {
       "key": "site-chrome-var-contract",
