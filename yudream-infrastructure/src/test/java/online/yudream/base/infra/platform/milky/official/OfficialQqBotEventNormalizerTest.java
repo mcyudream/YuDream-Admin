@@ -81,6 +81,56 @@ class OfficialQqBotEventNormalizerTest {
     }
 
     @Test
+    void learnsAtMentionAliasAndMarksFullGroupMessageDirected() throws Exception {
+        sessions.rememberSelf(9L, "ready-id");
+        MilkyModels.Event at = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_AT_MESSAGE_CREATE","d":{
+                  "id":"msg-at","group_openid":"group-open","content":"<@!BOT-OPENID> 在吗",
+                  "author":{"member_openid":"member-1"}
+                }}
+                """), sessions, 9L);
+        assertEquals(Boolean.TRUE, at.data().get("mention_self"));
+        MilkyModels.Event full = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_MESSAGE_CREATE","d":{
+                  "id":"msg-full","group_openid":"group-open","content":"<@BOT-OPENID> 你是谁",
+                  "author":{"member_openid":"member-2"}
+                }}
+                """), sessions, 9L);
+        assertEquals(Boolean.TRUE, full.data().get("mention_self"));
+    }
+
+    @Test
+    void keepsFullGroupMessageUndirectedForUnknownMentionAndDoesNotLearnIt() throws Exception {
+        sessions.rememberSelf(9L, "ready-id");
+        MilkyModels.Event first = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_MESSAGE_CREATE","d":{
+                  "id":"msg-1","group_openid":"group-open","content":"<@SOMEONE-ELSE> 帮我看下",
+                  "author":{"member_openid":"member-1"}
+                }}
+                """), sessions, 9L);
+        assertEquals(Boolean.FALSE, first.data().get("mention_self"));
+        MilkyModels.Event second = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_MESSAGE_CREATE","d":{
+                  "id":"msg-2","group_openid":"group-open","content":"<@SOMEONE-ELSE> 又一条",
+                  "author":{"member_openid":"member-2"}
+                }}
+                """), sessions, 9L);
+        assertEquals(Boolean.FALSE, second.data().get("mention_self"));
+    }
+
+    @Test
+    void marksFullGroupMessageDirectedWhenMentionMatchesSelfId() throws Exception {
+        sessions.rememberSelf(9L, "bot-open");
+        MilkyModels.Event event = OfficialQqBotEventNormalizer.normalize(mapper.readTree("""
+                {"op":0,"t":"GROUP_MESSAGE_CREATE","d":{
+                  "id":"msg-full","group_openid":"group-open","content":"<@bot-open> 你是谁",
+                  "author":{"member_openid":"member-1"}
+                }}
+                """), sessions, 9L);
+        assertEquals(Boolean.TRUE, event.data().get("mention_self"));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void mapsGuildAtMessageToChannelSceneWithoutFakingMilkyMentions() throws Exception {
         sessions.rememberSelf(9L, "bot-open");
