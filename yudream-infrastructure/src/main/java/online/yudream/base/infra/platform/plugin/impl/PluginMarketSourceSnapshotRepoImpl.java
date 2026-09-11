@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -41,6 +42,13 @@ public class PluginMarketSourceSnapshotRepoImpl implements PluginMarketSourceSna
     @Override
     public Optional<PluginMarketSourceSnapshot> findBySourceId(Long sourceId) {
         return Optional.ofNullable(PluginMarketSourceSnapshotInfraMapper.toDomain(findByDataObj(sourceId)));
+    }
+
+    @Override
+    public List<PluginMarketSourceSnapshot> findAll() {
+        return mongoTemplate.findAll(PluginMarketSourceSnapshotDO.class).stream()
+                .map(PluginMarketSourceSnapshotInfraMapper::toDomain)
+                .toList();
     }
 
     @Override
