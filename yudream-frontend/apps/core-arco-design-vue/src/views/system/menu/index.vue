@@ -239,6 +239,27 @@ function confirmDisable(row?: MenuManageItem) {
   })
 }
 
+function confirmDelete(row?: MenuManageItem) {
+  const target = row || selectedMenu.value
+  if (!target) {
+    toast.warning('请先选择菜单')
+    return
+  }
+  modal.confirm({
+    title: '确认信息',
+    content: `确认删除“${target.name}”吗？删除后无法恢复。`,
+    onConfirm: async () => {
+      await apiMenu.remove(target.code)
+      toast.success('删除成功')
+      if (selectedKeys.value[0] === target.code) {
+        selectedKeys.value = []
+      }
+      await loadTree()
+      await refreshDynamicRoutes(router)
+    },
+  })
+}
+
 function confirmEnable(row?: MenuManageItem) {
   const target = row || selectedMenu.value
   if (!target) {
@@ -435,11 +456,21 @@ function importMenus() {
             </FaButton>
             <FaButton
               v-if="selectedMenu?.status === 'ACTIVE'"
-              v-auth="'system:menu:delete'"
+              v-auth="'system:menu:edit'"
               variant="ghost"
               size="sm"
               title="停用菜单"
               @click="confirmDisable()"
+            >
+              <FaIcon name="i-ri:pause-circle-line" />
+            </FaButton>
+            <FaButton
+              v-if="selectedMenu"
+              v-auth="'system:menu:delete'"
+              variant="ghost"
+              size="sm"
+              title="删除菜单"
+              @click="confirmDelete()"
             >
               <FaIcon name="i-ri:delete-bin-line" />
             </FaButton>
@@ -517,13 +548,23 @@ function importMenus() {
               </FaButton>
               <FaButton
                 v-if="selectedMenu?.status === 'ACTIVE'"
-                v-auth="'system:menu:delete'"
-                variant="destructive"
+                v-auth="'system:menu:edit'"
+                variant="outline"
                 size="sm"
                 @click="confirmDisable()"
               >
-                <FaIcon name="i-ri:delete-bin-line" />
+                <FaIcon name="i-ri:pause-circle-line" />
                 停用
+              </FaButton>
+              <FaButton
+                v-if="selectedMenu"
+                v-auth="'system:menu:delete'"
+                variant="destructive"
+                size="sm"
+                @click="confirmDelete()"
+              >
+                <FaIcon name="i-ri:delete-bin-line" />
+                删除
               </FaButton>
             </div>
           </div>
@@ -636,11 +677,20 @@ function importMenus() {
                 </FaButton>
                 <FaButton
                   v-if="row.original.status === 'ACTIVE'"
-                  v-auth="'system:menu:delete'"
+                  v-auth="'system:menu:edit'"
                   variant="ghost"
                   size="sm"
                   title="停用"
                   @click="confirmDisable(row.original)"
+                >
+                  <FaIcon name="i-ri:pause-circle-line" />
+                </FaButton>
+                <FaButton
+                  v-auth="'system:menu:delete'"
+                  variant="ghost"
+                  size="sm"
+                  title="删除"
+                  @click="confirmDelete(row.original)"
                 >
                   <FaIcon name="i-ri:delete-bin-line" />
                 </FaButton>
@@ -673,8 +723,11 @@ function importMenus() {
                     <FaButton v-if="row.status === 'DISABLED'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmEnable(row)">
                       启用
                     </FaButton>
-                    <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:menu:delete'" variant="destructive" size="sm" @click="confirmDisable(row)">
+                    <FaButton v-if="row.status === 'ACTIVE'" v-auth="'system:menu:edit'" variant="outline" size="sm" @click="confirmDisable(row)">
                       停用
+                    </FaButton>
+                    <FaButton v-auth="'system:menu:delete'" variant="destructive" size="sm" @click="confirmDelete(row)">
+                      删除
                     </FaButton>
                   </div>
                 </div>
@@ -747,7 +800,7 @@ function importMenus() {
           </a-grid-item>
           <a-grid-item v-if="form.type !== 'BUTTON'">
             <a-form-item label="图标">
-              <FaInput v-model="form.icon" placeholder="i-ri:settings-3-line" class="w-full" />
+              <YdIconPicker v-model="form.icon" class="w-full" />
             </a-form-item>
           </a-grid-item>
           <a-grid-item v-if="['MENU', 'LAYOUT', 'LINK'].includes(form.type)">

@@ -4,17 +4,14 @@ import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCm
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectBatchCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
-import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
-import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
-import online.yudream.base.application.platform.devtools.dto.AgentTraceSummaryDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTraceDetailDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTracePageDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTraceSummaryDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDisablePreviewDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginRuntimeAssetsDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginScaffoldDTO;
-import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
-import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
 import online.yudream.base.domain.system.log.model.SystemLogEntry;
@@ -22,9 +19,10 @@ import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTes
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectBatchRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginScaffoldRequest;
-import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
-import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
-import online.yudream.base.interfaces.platform.devtools.res.AgentTraceSummaryRes;
+import online.yudream.base.interfaces.platform.agent.assembler.AgentWebAssembler;
+import online.yudream.base.interfaces.platform.agent.res.AgentTraceDetailRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTracePageRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTraceSummaryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevPluginRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatusRes;
@@ -32,13 +30,11 @@ import online.yudream.base.interfaces.platform.devtools.res.PluginDisablePreview
 import online.yudream.base.interfaces.platform.devtools.res.PluginLogEntryRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginRuntimeAssetsRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginScaffoldRes;
-import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * 开发者工具接口装配器：request → cmd、查询参数解析、DTO → res。
@@ -101,11 +97,7 @@ public final class PluginDevToolsWebAssembler {
     }
 
     public static AgentTraceQuery toQuery(String source, String pluginCode, String status, Integer page, Integer size) {
-        return AgentTraceQuery.of(parseEnum(AgentTraceSource.class, source, "来源"),
-                StringUtils.hasText(pluginCode) ? pluginCode.trim() : null,
-                parseEnum(AgentTraceStatus.class, status, "状态"),
-                page == null ? 1 : page,
-                size == null ? 20 : size);
+        return AgentWebAssembler.toTraceQuery(source, pluginCode, status, null, null, null, null, page, size);
     }
 
     public static PluginDevToolsStatusRes toRes(PluginDevToolsStatusDTO dto) {
@@ -193,50 +185,15 @@ public final class PluginDevToolsWebAssembler {
     }
 
     public static AgentTracePageRes toRes(AgentTracePageDTO dto) {
-        return AgentTracePageRes.builder()
-                .total(dto.getTotal())
-                .page(dto.getPage())
-                .size(dto.getSize())
-                .list(dto.getList().stream().map(PluginDevToolsWebAssembler::toRes).toList())
-                .build();
+        return AgentWebAssembler.toTracePage(dto);
     }
 
     public static AgentTraceSummaryRes toRes(AgentTraceSummaryDTO dto) {
-        return AgentTraceSummaryRes.builder()
-                .traceId(dto.getTraceId())
-                .source(dto.getSource())
-                .ownerPluginCode(dto.getOwnerPluginCode())
-                .agentId(dto.getAgentId())
-                .agentCode(dto.getAgentCode())
-                .agentName(dto.getAgentName())
-                .status(dto.getStatus())
-                .input(dto.getInput())
-                .error(dto.getError())
-                .stepCount(dto.getStepCount())
-                .durationMs(dto.getDurationMs())
-                .startTime(dto.getStartTime())
-                .build();
+        return AgentWebAssembler.toTraceSummary(dto);
     }
 
     public static AgentTraceDetailRes toRes(AgentTraceDetailDTO dto) {
-        return AgentTraceDetailRes.builder()
-                .traceId(dto.getTraceId())
-                .source(dto.getSource())
-                .ownerPluginCode(dto.getOwnerPluginCode())
-                .agentId(dto.getAgentId())
-                .agentCode(dto.getAgentCode())
-                .agentName(dto.getAgentName())
-                .status(dto.getStatus())
-                .input(dto.getInput())
-                .finalOutput(dto.getFinalOutput())
-                .reasoning(dto.getReasoning())
-                .error(dto.getError())
-                .usage(dto.getUsage())
-                .steps(dto.getSteps())
-                .startTime(dto.getStartTime())
-                .endTime(dto.getEndTime())
-                .durationMs(dto.getDurationMs())
-                .build();
+        return AgentWebAssembler.toTraceDetail(dto);
     }
 
     public static PluginLogEntryRes toLogRes(SystemLogEntry entry) {
@@ -254,16 +211,5 @@ public final class PluginDevToolsWebAssembler {
 
     public static List<PluginLogEntryRes> toLogResList(List<SystemLogEntry> entries) {
         return entries.stream().map(PluginDevToolsWebAssembler::toLogRes).toList();
-    }
-
-    private static <E extends Enum<E>> E parseEnum(Class<E> type, String value, String label) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return Enum.valueOf(type, value.trim().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new BizException("非法的" + label + "过滤值：" + value);
-        }
     }
 }

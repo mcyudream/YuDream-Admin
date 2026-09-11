@@ -18,7 +18,7 @@ public class ExternalLoginWebAssembler {
 
     public static ExternalLoginProviderRes toRes(ExternalLoginProviderDTO d) {
         return ExternalLoginProviderRes.builder().code(d.getCode()).name(d.getName()).protocol(d.getProtocol()).appId(d.getAppId())
-                .callbackUrl(d.getCallbackUrl()).enabled(d.isEnabled()).supportedTypes(d.getSupportedTypes()).build();
+                .callbackUrl(d.getCallbackUrl()).enabled(d.isEnabled()).supportedTypes(d.getSupportedTypes()).icon(d.getIcon()).pluginManaged(d.isPluginManaged()).build();
     }
 
     public static ExternalLoginAuthorizationRes toRes(ExternalLoginAuthorizationDTO d) {

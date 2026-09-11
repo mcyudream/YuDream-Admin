@@ -1,4 +1,4 @@
-package online.yudream.base.application.platform.devtools.dto;
+package online.yudream.base.interfaces.platform.agent.res;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,18 +9,23 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceStep;
 import online.yudream.base.domain.platform.ai.valobj.AiUsage;
 
+import java.io.Serial;
+import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Agent 执行追踪详情：含完整步骤、思考过程与用量，长 ID 以字符串输出。
+ * Agent 执行追踪详情响应，长 ID 以字符串输出。
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AgentTraceDetailDTO {
+public class AgentTraceDetailRes implements Serializable {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
 
     private String traceId;
     private AgentTraceSource source;

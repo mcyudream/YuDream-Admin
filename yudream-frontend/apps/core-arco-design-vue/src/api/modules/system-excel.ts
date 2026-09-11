@@ -23,6 +23,7 @@ export default {
 
   exportApiLogs: (params?: Record<string, unknown>) => systemClient.get<unknown, ExcelBlobResponse>('api/system/excel/api-logs/export', { params, responseType: 'blob' }),
   exportLoginLogs: (params?: Record<string, unknown>) => systemClient.get<unknown, ExcelBlobResponse>('api/system/excel/login-logs/export', { params, responseType: 'blob' }),
+  exportAgentTraces: (params?: Record<string, unknown>) => systemClient.get<unknown, ExcelBlobResponse>('api/system/excel/agent-traces/export', { params, responseType: 'blob' }),
   exportOnlineUsers: (params?: Record<string, unknown>) => systemClient.get<unknown, ExcelBlobResponse>('api/system/excel/online-users/export', { params, responseType: 'blob' }),
 }
 

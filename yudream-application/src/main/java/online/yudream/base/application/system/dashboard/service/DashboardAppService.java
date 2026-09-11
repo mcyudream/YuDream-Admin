@@ -279,33 +279,26 @@ public class DashboardAppService {
     }
 
     private boolean isSingleColumnStackedLayout(DashboardLayout stored) {
-        for (String breakpoint : List.of("lg", "md", "sm")) {
-            List<DashboardGridPlacement> placements = stored.getItems().stream()
-                    .filter(DashboardLayoutItem::visible)
-                    .map(item -> item.placements().get(breakpoint))
-                    .toList();
-            if (placements.size() < 3 || placements.stream().anyMatch(placement -> placement == null || placement.x() != 0)) {
-                continue;
-            }
-            List<DashboardGridPlacement> sorted = placements.stream()
-                    .sorted(Comparator.comparingInt(DashboardGridPlacement::y))
-                    .toList();
-            int previousBottom = 0;
-            boolean stacked = true;
-            boolean hasVerticalOffset = false;
-            for (DashboardGridPlacement placement : sorted) {
-                if (placement.y() < previousBottom) {
-                    stacked = false;
-                    break;
-                }
-                hasVerticalOffset = hasVerticalOffset || placement.y() > 0;
-                previousBottom = Math.max(previousBottom, placement.y() + placement.h());
-            }
-            if (stacked && hasVerticalOffset) {
-                return true;
-            }
+        List<DashboardGridPlacement> placements = stored.getItems().stream()
+                .filter(DashboardLayoutItem::visible)
+                .map(item -> item.placements().get("lg"))
+                .toList();
+        if (placements.size() < 3 || placements.stream().anyMatch(placement -> placement == null || placement.x() != 0)) {
+            return false;
         }
-        return false;
+        List<DashboardGridPlacement> sorted = placements.stream()
+                .sorted(Comparator.comparingInt(DashboardGridPlacement::y))
+                .toList();
+        int previousBottom = 0;
+        boolean hasVerticalOffset = false;
+        for (DashboardGridPlacement placement : sorted) {
+            if (placement.y() < previousBottom) {
+                return false;
+            }
+            hasVerticalOffset = hasVerticalOffset || placement.y() > 0;
+            previousBottom = Math.max(previousBottom, placement.y() + placement.h());
+        }
+        return hasVerticalOffset;
     }
 
     private DashboardGridPlacement nextDefaultPlacement(DashboardCardDefinition card, String breakpoint, int[] heights) {

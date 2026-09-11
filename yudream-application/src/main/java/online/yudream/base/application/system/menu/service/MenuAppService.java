@@ -195,6 +195,13 @@ public class MenuAppService {
         menuRepo.save(menu);
     }
 
+    @Transactional
+    public void delete(String code) {
+        Menu menu = getMenu(code);
+        ensureMenuCanDelete(code);
+        menuDomainService.deleteMenu(menu.getCode());
+    }
+
     /**
      * 构建当前用户可见的路由树。
      *
@@ -417,6 +424,14 @@ public class MenuAppService {
                 .anyMatch(menu -> Objects.equals(code, menu.getParentCode()) && menu.getStatus() == MenuStatus.ACTIVE);
         if (hasActiveChildren) {
             throw new BizException("菜单存在启用的子节点，不能停用");
+        }
+    }
+
+    private void ensureMenuCanDelete(String code) {
+        boolean hasChildren = menuRepo.findAll().stream()
+                .anyMatch(menu -> Objects.equals(code, menu.getParentCode()));
+        if (hasChildren) {
+            throw new BizException("菜单存在子节点，不能删除");
         }
     }
 

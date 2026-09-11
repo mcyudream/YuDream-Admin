@@ -1,4 +1,4 @@
-package online.yudream.base.interfaces.platform.devtools.res;
+package online.yudream.base.interfaces.platform.agent.res;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

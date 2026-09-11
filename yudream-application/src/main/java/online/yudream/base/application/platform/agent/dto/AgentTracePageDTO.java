@@ -1,4 +1,4 @@
-package online.yudream.base.application.platform.devtools.dto;
+package online.yudream.base.application.platform.agent.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

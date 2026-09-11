@@ -93,4 +93,9 @@ public class MenuRepoImpl implements MenuRepo {
     public long count() {
         return mongoTemplate.count(new Query(), MenuDO.class);
     }
+
+    @Override
+    public void deleteByCode(String code) {
+        mongoTemplate.remove(Query.query(Criteria.where("code").is(code)), MenuDO.class);
+    }
 }

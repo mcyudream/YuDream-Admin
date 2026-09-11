@@ -1,7 +1,7 @@
 {
   "name": "@yudream/components",
   "type": "module",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "files": [
     "src",
     "resolver.ts"

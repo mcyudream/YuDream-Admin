@@ -1,14 +1,15 @@
 package online.yudream.base.application.platform.devtools.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.platform.agent.dto.AgentTraceDetailDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTracePageDTO;
+import online.yudream.base.application.platform.agent.service.AgentTraceAppService;
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.assembler.PluginDevToolsAssembler;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectBatchCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
-import online.yudream.base.application.platform.devtools.dto.AgentTraceDetailDTO;
-import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevPluginDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDisablePreviewDTO;
@@ -17,7 +18,6 @@ import online.yudream.base.application.platform.devtools.dto.PluginScaffoldDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
@@ -60,7 +60,7 @@ public class PluginDevToolsAppService {
 
     private final PluginRuntimeGateway runtimeGateway;
     private final PluginAppService pluginAppService;
-    private final AgentExecutionTraceRepo traceRepo;
+    private final AgentTraceAppService agentTraceAppService;
     private final AgentTraceProperties traceProperties;
     private final ApplicationEventPublisher eventPublisher;
     private final PluginModuleRepo pluginModuleRepo;
@@ -194,21 +194,11 @@ public class PluginDevToolsAppService {
     }
 
     public AgentTracePageDTO traces(AgentTraceQuery query) {
-        return AgentTracePageDTO.builder()
-                .total(traceRepo.count(query))
-                .page(query.page())
-                .size(query.size())
-                .list(traceRepo.query(query).stream().map(PluginDevToolsAssembler::toSummaryDTO).toList())
-                .build();
+        return agentTraceAppService.page(query);
     }
 
     public AgentTraceDetailDTO traceDetail(String traceId) {
-        if (!StringUtils.hasText(traceId)) {
-            throw new BizException("追踪 ID 不能为空");
-        }
-        return traceRepo.findByTraceId(traceId.trim())
-                .map(PluginDevToolsAssembler::toDetailDTO)
-                .orElseThrow(() -> new BizException("执行追踪不存在或已过期：" + traceId));
+        return agentTraceAppService.detail(traceId);
     }
 
     public PluginCommandTestResult commandTest(String code, PluginCommandTestCmd cmd) {

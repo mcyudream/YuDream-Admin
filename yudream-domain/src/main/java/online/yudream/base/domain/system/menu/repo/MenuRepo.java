@@ -25,4 +25,6 @@ public interface MenuRepo {
     boolean existsByCode(String code);
 
     long count();
+
+    void deleteByCode(String code);
 }

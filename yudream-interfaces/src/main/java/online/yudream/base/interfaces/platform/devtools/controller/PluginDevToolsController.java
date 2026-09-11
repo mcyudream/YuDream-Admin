@@ -13,8 +13,8 @@ import online.yudream.base.interfaces.platform.devtools.request.PluginCommandTes
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectBatchRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginDevProjectSaveRequest;
 import online.yudream.base.interfaces.platform.devtools.request.PluginScaffoldRequest;
-import online.yudream.base.interfaces.platform.devtools.res.AgentTraceDetailRes;
-import online.yudream.base.interfaces.platform.devtools.res.AgentTracePageRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTraceDetailRes;
+import online.yudream.base.interfaces.platform.agent.res.AgentTracePageRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginCommandTestRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevPluginRes;
 import online.yudream.base.interfaces.platform.devtools.res.PluginDevToolsStatusRes;

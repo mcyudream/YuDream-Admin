@@ -1,20 +1,19 @@
 package online.yudream.base.application.platform.devtools.service;
 
+import online.yudream.base.application.platform.agent.dto.AgentTracePageDTO;
+import online.yudream.base.application.platform.agent.dto.AgentTraceSummaryDTO;
+import online.yudream.base.application.platform.agent.service.AgentTraceAppService;
 import online.yudream.base.application.platform.agent.service.AgentTraceProperties;
 import online.yudream.base.application.platform.devtools.cmd.PluginCommandTestCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectBatchCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginDevProjectSaveCmd;
 import online.yudream.base.application.platform.devtools.cmd.PluginScaffoldCmd;
-import online.yudream.base.application.platform.devtools.dto.AgentTracePageDTO;
 import online.yudream.base.application.platform.devtools.dto.PluginDevToolsStatusDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.domain.common.exception.BizException;
-import online.yudream.base.domain.platform.agent.aggregate.AgentApplication;
-import online.yudream.base.domain.platform.agent.aggregate.AgentExecutionTrace;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceSource;
 import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
-import online.yudream.base.domain.platform.agent.repo.AgentExecutionTraceRepo;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevReloadTrigger;
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -45,14 +43,14 @@ class PluginDevToolsAppServiceTest {
 
     private final PluginRuntimeGateway runtimeGateway = mock(PluginRuntimeGateway.class);
     private final PluginAppService pluginAppService = mock(PluginAppService.class);
-    private final AgentExecutionTraceRepo traceRepo = mock(AgentExecutionTraceRepo.class);
+    private final AgentTraceAppService agentTraceAppService = mock(AgentTraceAppService.class);
     private final AgentTraceProperties traceProperties = new AgentTraceProperties();
     private final org.springframework.context.ApplicationEventPublisher eventPublisher =
             mock(org.springframework.context.ApplicationEventPublisher.class);
     private final PluginModuleRepo pluginModuleRepo = mock(PluginModuleRepo.class);
     private final SystemLogRepo systemLogRepo = mock(SystemLogRepo.class);
     private final PluginDevToolsAppService service = new PluginDevToolsAppService(
-            runtimeGateway, pluginAppService, traceRepo, traceProperties, eventPublisher,
+            runtimeGateway, pluginAppService, agentTraceAppService, traceProperties, eventPublisher,
             pluginModuleRepo, systemLogRepo);
 
     @Test
@@ -204,7 +202,8 @@ class PluginDevToolsAppServiceTest {
 
     @Test
     void traceDetailFailsWhenAbsent() {
-        when(traceRepo.findByTraceId("missing")).thenReturn(Optional.empty());
+        when(agentTraceAppService.detail("missing"))
+                .thenThrow(new BizException("执行追踪不存在或已过期：missing"));
 
         assertThatThrownBy(() -> service.traceDetail("missing"))
                 .isInstanceOf(BizException.class)
@@ -213,10 +212,21 @@ class PluginDevToolsAppServiceTest {
 
     @Test
     void tracesBuildsPageFromRepository() {
-        AgentExecutionTrace trace = AgentExecutionTrace.start("t1", AgentTraceSource.PLUGIN, "demo",
-                AgentApplication.builder().id(-1L).code("plugin-agent").name("插件代理").build(), "输入");
-        when(traceRepo.count(any(AgentTraceQuery.class))).thenReturn(1L);
-        when(traceRepo.query(any(AgentTraceQuery.class))).thenReturn(List.of(trace));
+        AgentTracePageDTO expected = AgentTracePageDTO.builder()
+                .total(1)
+                .page(1)
+                .size(20)
+                .list(List.of(AgentTraceSummaryDTO.builder()
+                        .traceId("t1")
+                        .source(AgentTraceSource.PLUGIN)
+                        .ownerPluginCode("demo")
+                        .agentId("-1")
+                        .agentCode("plugin-agent")
+                        .agentName("插件代理")
+                        .status(AgentTraceStatus.RUNNING)
+                        .build()))
+                .build();
+        when(agentTraceAppService.page(any(AgentTraceQuery.class))).thenReturn(expected);
 
         AgentTracePageDTO page = service.traces(AgentTraceQuery.of(AgentTraceSource.PLUGIN, "demo", null, 1, 20));
 
