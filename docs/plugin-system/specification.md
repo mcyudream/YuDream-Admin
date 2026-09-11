@@ -289,7 +289,7 @@ chrome 接管（chromeComponent，推荐）与变量契约（回落）：
 主题配置（configSchema，WordPress 自定义器形态）：
 
 - SITE 主题可声明 `configSchema` 指向 JAR 内一份 `theme-config.json`（路径校验规则与 `homePreset` 相同）；声明后主题卡出现「配置」入口，进入独立配置页 `/platform/theme-center/config/{theme}`（左侧分节导航 + 右侧分节表单，宿主按 schema 渲染，主题不提供前端页面）。
-- schema 格式：`{ "sections": [{ "code", "title", "description", "fields": [...] }] }`；字段 `{ "key", "label", "description", "type", "placeholder", "default", "options", "secret", "itemFields" }`，`type` 支持 `text`/`textarea`/`number`/`switch`/`select`/`color`/`image`/`list`；`select` 用 `options: [{label, value}]`；`list` 用 `itemFields` 声明子字段形成重复器（值成为真数组，供 `data-yb-for` 遍历）；`image` 为 URL 输入，可填主题资产路径 `/api/platform/plugins/{code}/assets/...`。
+- schema 格式：`{ "sections": [{ "code", "title", "description", "fields": [...] }] }`；字段 `{ "key", "label", "description", "type", "placeholder", "default", "options", "secret", "itemFields" }`，`type` 支持 `text`/`textarea`/`number`/`switch`/`select`/`color`/`image`/`list`；`select` 用 `options: [{label, value}]`；`list` 用 `itemFields` 声明子字段形成重复器（值成为真数组，供 `data-yb-for` 遍历）；`image` 走宿主内置上传器（`FaImageUpload` → `POST /api/files/upload`，公开文件，module=`theme-{pluginCode}`），值存站内文件 URL，也可继续使用主题自带资产路径。
 - 持久化与安全：配置值按主题隔离存入 Setting（key `pluginTheme.config.{themeCode}`、category `plugin-theme`、type JSON），读取时 schema 默认值与已存值合并；字段标记 `secret: true` 后经凭据加密存储，管理端读取脱敏为空串（另返回 `secretConfigured` 标识），留空保存表示不修改。
 - 模板消费：公开站模板上下文根新增 `theme.config`（嵌套对象，**secret 字段已剔除**），可写 `{{theme.config.heroTitle}}`、`data-yb-if="theme.config.showServers"`、`data-yb-for="item in theme.config.introItems"`；保存后公开站即时生效。内置 default 主题无配置页（端点返回空 schema）。
 
