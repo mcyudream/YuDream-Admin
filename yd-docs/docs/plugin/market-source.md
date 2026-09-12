@@ -107,7 +107,7 @@ PENDING ──通过──▶ PUBLISHED ──下架──▶ REVOKED
 
 ## 6. 协议 v2（正式源协议）
 
-基址 `/api/public/plugin-market/api/v2`。其他实例添加源时：类型选「v2 协议源」，地址填 `https://host/api/public/plugin-market`（不要带 `/api/v2`）。裸 JSON、HTTP 状态码表错（400/404），可选 `Authorization: Bearer`。仅 `PUBLISHED` 出现在目录中；能力关闭即停止服务。
+基址 `/api/public/plugin-market/api/v2`。其他实例添加源时：类型选「v2 协议源」，地址填 `https://host/api/public/plugin-market`（不要带 `/api/v2`）。直接 GET 该基址返回与 `/api/v2/manifest` 相同的清单，便于浏览器打开或健康检查；协议读写仍走 `/api/v2/*`。裸 JSON、HTTP 状态码表错（400/404），可选 `Authorization: Bearer`。仅 `PUBLISHED` 出现在目录中；能力关闭即停止服务。
 
 | 端点 | 说明 |
 | --- | --- |

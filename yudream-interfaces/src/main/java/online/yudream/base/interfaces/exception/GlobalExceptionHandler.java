@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -93,6 +94,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Void> handleAsyncRequestNotUsable(HttpServletRequest request, AsyncRequestNotUsableException e) {
         log.debug("流式请求客户端断开: method={}, path={}", request.getMethod(), request.getRequestURI());
         return null;
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResourceFound(HttpServletRequest request, NoResourceFoundException e) {
+        return failure(request, e, HttpStatus.NOT_FOUND, Result.fail(ResultCode.NOT_FOUND));
     }
 
     @ExceptionHandler(Exception.class)

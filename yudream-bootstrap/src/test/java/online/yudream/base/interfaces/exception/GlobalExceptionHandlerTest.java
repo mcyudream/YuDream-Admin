@@ -4,8 +4,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.interfaces.common.RequestFailureContext;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,6 +24,18 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).extracting("code", "message").containsExactly(1200, "业务失败");
         assertThat(RequestFailureContext.getSummary(request)).isEqualTo("BizException");
+    }
+
+    @Test
+    void mapsMissingResourceToNotFoundInsteadOfInternalError() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/public/plugin-market");
+
+        var response = handler.handleNoResourceFound(request,
+                new NoResourceFoundException(HttpMethod.GET, "/api/public/plugin-market"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody()).extracting("code", "message").containsExactly(404, "资源不存在");
+        assertThat(RequestFailureContext.getSummary(request)).isEqualTo("NoResourceFoundException");
     }
 
     @Test
