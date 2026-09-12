@@ -420,6 +420,21 @@ class PluginMarketPublicationAppServiceTest {
     }
 
     @Test
+    void pagePluginsJsonSurvivesAuthorLookupFailure() throws Exception {
+        when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED))
+                .thenReturn(List.of(publication("alpha", "1.0.0", PluginPublicationStatus.PUBLISHED)));
+        when(pluginUserCatalogAppService.resolveUsers(anyList()))
+                .thenThrow(new RuntimeException("not login"));
+
+        JsonNode page = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, null, null, null, null, null, 1, 20));
+
+        assertEquals(1, page.get("total").asInt());
+        assertEquals("alpha", page.get("items").get(0).get("code").asText());
+        assertTrue(page.get("items").get(0).get("authorName").isNull());
+    }
+
+    @Test
     void rootIndexListsDistinctPublishedCodesAndCodeIndexSortsAscending() throws Exception {
         when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(
                 publication("beta", "2.0.0", PluginPublicationStatus.PUBLISHED),
