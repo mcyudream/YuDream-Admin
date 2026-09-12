@@ -33,7 +33,8 @@ for file in \
   ci/verify-plugin-repo-independence.sh ci/verify-plugin-maven-boundary.sh \
   ci/verify-core-maven-registry.sh ci/verify-core-npm-contracts.sh \
   ci/verify-plugin-jar-assets.sh ci/verify-plugin-release-selection.sh \
-  ci/publish-plugin-jars.sh ci/verify-published-plugin-jars.sh release/plugins.txt; do
+  ci/publish-plugin-jars.sh ci/verify-published-plugin-jars.sh \
+  ci/publish-to-market.sh release/plugins.txt; do
   require_file "$file"
 done
 
@@ -61,6 +62,28 @@ require_pattern '^publish:plugin-jars:$' "plugin CI must keep publish:plugin-jar
 require_pattern 'PLUGIN_RELEASE_ONLY=1 sh ci/publish-plugin-jars.sh' "tag publishing must publish only selected jars"
 require_pattern '^verify:published-plugin-jars:$' "plugin CI must keep verify:published-plugin-jars job"
 require_pattern 'PLUGIN_RELEASE_ONLY=1 sh ci/verify-published-plugin-jars.sh' "tag verification must verify only selected jars"
+require_pattern '^publish:market:$' "plugin CI must keep publish:market job"
+require_pattern 'PLUGIN_RELEASE_ONLY=1' "tag pipelines must restrict market publish to the release list"
+require_pattern 'sh ci/publish-to-market.sh' "plugin CI market job must upload selected jars via publish-to-market.sh"
+require_pattern 'library/python:3.12-alpine' "market publish must use a python-bundled image"
+require_pattern 'mirrors.aliyun.com/alpine' "python alpine jobs must rewrite apk repositories to a China-reachable mirror"
+require_pattern 'apk add --no-cache curl unzip' "market publish must add curl and unzip"
+require_pattern 'resource_group: yudream-plugin-market' "market publication must use a serial resource_group"
+require_pattern 'job: package:plugins' "market publication must need the package artifacts"
+grep -q 'write_final_plugin_jars' ci/publish-to-market.sh \
+  || fail "market publish must select jars through plugin-jar-selection"
+grep -q 'YUDREAM_MARKET_URL' ci/publish-to-market.sh \
+  || fail "market publish must require YUDREAM_MARKET_URL"
+grep -q 'YUDREAM_MARKET_API_KEY' ci/publish-to-market.sh \
+  || fail "market publish must require YUDREAM_MARKET_API_KEY"
+grep -q 'X-API-Key' ci/publish-to-market.sh \
+  || fail "market publish must authenticate with X-API-Key"
+if grep -q 'example-plugin-\*\.jar' .gitlab-ci.yml ci/publish-to-market.sh; then
+  fail "market publish must not hard-code example-plugin-*.jar"
+fi
+if grep -Eq 'NEXUS_(USERNAME|PASSWORD)' ci/publish-to-market.sh; then
+  fail "self-hosted market publish must not use Nexus write credentials"
+fi
 
 echo "[verify-plugin-publish-pipeline] checking Nexus-only package routing"
 require_pattern 'NEXUS_MAVEN_PUBLIC_URL' "plugin CI must pull Maven artifacts through Nexus maven-public"
@@ -101,5 +124,12 @@ fi
 
 echo "[verify-plugin-publish-pipeline] checking publish rules"
 require_pattern '\$CI_COMMIT_TAG =~ /\^v/' "plugin CI publish/verify jobs must stay tag-gated"
+market_job_block=$(awk '$0 == "publish:market:" { found=1 } found { print } found && NR > 1 && $0 ~ /^[^[:space:]][^:]*:$/ && $0 != "publish:market:" { exit }' .gitlab-ci.yml)
+printf '%s\n' "$market_job_block" | grep -q 'export PLUGIN_RELEASE_ONLY=1' \
+  || fail "publish:market must publish only the release/plugins.txt selection"
+printf '%s\n' "$market_job_block" | grep -q 'CI_COMMIT_REF_PROTECTED == "true"' \
+  || fail "publish:market must require a protected tag/ref"
+printf '%s\n' "$market_job_block" | grep -q 'YUDREAM_MARKET_URL' \
+  || fail "publish:market must stay unscheduled until YUDREAM_MARKET_URL is configured"
 
 echo "[verify-plugin-publish-pipeline] OK"

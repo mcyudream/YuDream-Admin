@@ -44,6 +44,7 @@ require_file "templates/plugin-repo/release/plugins.txt"
 require_file "templates/plugin-repo/ci/verify-plugin-jar-assets.sh"
 require_file "templates/plugin-repo/ci/publish-plugin-jars.sh"
 require_file "templates/plugin-repo/ci/verify-published-plugin-jars.sh"
+require_file "templates/plugin-repo/ci/publish-to-market.sh"
 
 echo "[verify-plugin-repo-template] checking CI example hooks"
 grep -q 'sh ci/verify-core-npm-contracts.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify core npm contracts"
@@ -57,6 +58,21 @@ grep -q 'clean package -pl "\$release_modules" -am' templates/plugin-repo/.gitla
 grep -q 'PLUGIN_RELEASE_ONLY="\${CI_COMMIT_TAG:+1}" copy_final_plugin_jars "\$PWD" "\$PWD/dist/plugins"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must stage only selected tag jars"
 grep -q 'PLUGIN_RELEASE_ONLY=1 sh ci/publish-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must publish only selected tag jars"
 grep -q 'PLUGIN_RELEASE_ONLY=1 sh ci/verify-published-plugin-jars.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must verify only selected tag jars"
+	grep -q '^publish:market:$' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must keep publish:market job"
+	grep -q 'sh ci/publish-to-market.sh' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must publish selected jars to the self-hosted market"
+	grep -q 'library/python:3.12-alpine' templates/plugin-repo/.gitlab-ci.yml.example || fail "template market publish must use a python-bundled image"
+	grep -q 'mirrors.aliyun.com/alpine' templates/plugin-repo/.gitlab-ci.yml.example || fail "template python alpine jobs must rewrite apk repositories to a China-reachable mirror"
+	grep -q 'apk add --no-cache curl unzip' templates/plugin-repo/.gitlab-ci.yml.example || fail "template market publish must add curl and unzip"
+	grep -q 'resource_group: yudream-plugin-market' templates/plugin-repo/.gitlab-ci.yml.example || fail "template market publish must use a serial resource_group"
+	grep -q 'CI_COMMIT_REF_PROTECTED == "true"' templates/plugin-repo/.gitlab-ci.yml.example || fail "template market publish must require a protected tag"
+	grep -q 'write_final_plugin_jars' templates/plugin-repo/ci/publish-to-market.sh || fail "template market publish must select jars through plugin-jar-selection"
+	grep -q 'X-API-Key' templates/plugin-repo/ci/publish-to-market.sh || fail "template market publish must authenticate with X-API-Key"
+if grep -q 'example-plugin-\*\.jar' templates/plugin-repo/.gitlab-ci.yml.example templates/plugin-repo/ci/publish-to-market.sh; then
+  fail "template market publish must not hard-code example-plugin-*.jar"
+fi
+if grep -Eq 'NEXUS_(USERNAME|PASSWORD)' templates/plugin-repo/ci/publish-to-market.sh; then
+  fail "template market publish must not use Nexus write credentials"
+fi
 grep -q 'PACKAGE_MAVEN_REPO' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI package job must use a dedicated clean Maven local repository"
 grep -Eq '^[[:space:]]*-[[:space:]]+yudream-frontend/packages/plugin-\*/package\.json$' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI must restrict frontend job discovery to plugin packages"
 grep -q 'pnpm -r --filter=@yudream/plugin-\* run build' templates/plugin-repo/.gitlab-ci.yml.example || fail "template CI frontend build must explicitly filter @yudream/plugin-* packages"

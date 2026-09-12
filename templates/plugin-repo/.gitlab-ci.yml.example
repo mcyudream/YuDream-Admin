@@ -186,22 +186,27 @@ publish:plugin-jars:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v/
 
-# 可选：把构建产物同时发布到自托管 YuDream 插件市场源（插件市场源能力）。
-# 需在项目/群组 CI variables 中配置受保护、掩码变量 YUDREAM_MARKET_URL 与 YUDREAM_MARKET_API_KEY，
-# 可选 YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_CATEGORY / YUDREAM_MARKET_TAGS / YUDREAM_MARKET_METADATA；
-# 详见 yd-docs「自托管市场源」。
+# 可选：把本次选择的最终 JAR 发布到自托管 YuDream 插件市场源。
+# 在项目/群组 CI variables 中配置受保护、掩码变量 YUDREAM_MARKET_URL 与 YUDREAM_MARKET_API_KEY
+# （API Key 勾选 platform:plugin-market-source:upload）；未配置则本 job 不调度。
+# 可选 YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_CATEGORY / YUDREAM_MARKET_TAGS / YUDREAM_MARKET_METADATA。
+# 与官方仓 publish:plugin-store 一样：只跑受保护 v* tag、PLUGIN_RELEASE_ONLY=1、串行 resource_group。
 publish:market:
-  image: alpine:3.20
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/python:3.12-alpine
   stage: publish-plugin
-  dependencies:
-    - package:plugins
+  timeout: 20 minutes
+  resource_group: yudream-plugin-market
+  needs:
+    - job: package:plugins
+      artifacts: true
   before_script:
-    - apk add --no-cache curl
+    - sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.aliyun.com/alpine#g' /etc/apk/repositories
+    - apk add --no-cache curl unzip
   script:
-    - sh ci/publish-to-market.sh dist/plugins/example-plugin-*.jar
+    - export PLUGIN_RELEASE_ONLY=1
+    - sh ci/publish-to-market.sh
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v/
-      when: manual
+    - if: '$CI_COMMIT_TAG =~ /^v/ && $CI_COMMIT_REF_PROTECTED == "true" && $YUDREAM_MARKET_URL'
 
 verify:published-plugin-jars:
   image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
