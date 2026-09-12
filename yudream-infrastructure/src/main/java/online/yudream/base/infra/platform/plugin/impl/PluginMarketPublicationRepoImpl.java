@@ -8,9 +8,11 @@ import online.yudream.base.domain.shared.IdGenerator;
 import online.yudream.base.infra.platform.plugin.dataobj.PluginMarketPublicationDO;
 import online.yudream.base.infra.platform.plugin.mapper.PluginMarketPublicationInfraMapper;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -65,5 +67,19 @@ public class PluginMarketPublicationRepoImpl implements PluginMarketPublicationR
         return mongoTemplate.find(query, PluginMarketPublicationDO.class).stream()
                 .map(PluginMarketPublicationInfraMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public long incrementDownloadCount(Long id) {
+        Query query = Query.query(Criteria.where("_id").is(id));
+        Update update = new Update().inc("downloadCount", 1L);
+        PluginMarketPublicationDO updated = mongoTemplate.findAndModify(query, update,
+                FindAndModifyOptions.options().returnNew(true), PluginMarketPublicationDO.class);
+        return updated == null || updated.getDownloadCount() == null ? 0L : updated.getDownloadCount();
+    }
+
+    @Override
+    public void deleteById(Long id) {
+        mongoTemplate.remove(Query.query(Criteria.where("_id").is(id)), PluginMarketPublicationDO.class);
     }
 }

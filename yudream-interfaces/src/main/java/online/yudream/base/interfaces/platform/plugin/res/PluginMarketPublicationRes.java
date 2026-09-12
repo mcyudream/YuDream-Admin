@@ -11,6 +11,7 @@ import java.io.Serial;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @Builder
@@ -29,10 +30,15 @@ public class PluginMarketPublicationRes implements Serializable {
     private String mainClass;
     private List<String> dependencies;
     private List<String> softDependencies;
+    private String icon;
     private String releaseNotes;
     private String license;
+    private String category;
+    private List<String> tags;
+    private Map<String, String> compatibility;
     private String sha256;
     private Long sizeBytes;
+    private Long downloadCount;
     private Long publisherUserId;
     private PluginPublicationChannel channel;
     private PluginPublicationStatus status;

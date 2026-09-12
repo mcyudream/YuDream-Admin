@@ -18,4 +18,9 @@ public interface PluginMarketPublicationRepo {
 
     /** 全量发布物，按创建时间倒序。 */
     List<PluginMarketPublication> findAll();
+
+    /** 原子递增下载计数，返回递增后的值。 */
+    long incrementDownloadCount(Long id);
+
+    void deleteById(Long id);
 }

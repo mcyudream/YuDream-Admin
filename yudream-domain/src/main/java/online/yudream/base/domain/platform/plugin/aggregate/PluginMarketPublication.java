@@ -16,7 +16,8 @@ import java.util.List;
 /**
  * 自托管市场源的插件发布物。{code}@{pluginVersion} 不可覆盖；状态机 PENDING → PUBLISHED/REJECTED，
  * PUBLISHED → REVOKED（下架后 JAR 保留备查但不再对外下发）。pluginVersion 是插件语义版本，
- * 与 BaseDomain 的乐观锁 version 无关。
+ * 与 BaseDomain 的乐观锁 version 无关。category/tags 是 v3 社区元数据（plugin.yml 不携带），
+ * 供 v2 协议检索；compatibilityJson/publisherJson 保存发布时的元数据原文供编辑后重生成 descriptor。
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
@@ -32,14 +33,19 @@ public class PluginMarketPublication extends BaseDomain {
     private String mainClass;
     private List<String> dependencies;
     private List<String> softDependencies;
+    private String icon;
     private String releaseNotes;
     private String license;
-    /** 发布时生成、经契约校验的 descriptor JSON 原文（相对引用），公开端点直接下发。 */
+    private String category;
+    private List<String> tags;
+    private String compatibilityJson;
+    private String publisherJson;
     private String descriptorJson;
     /** 相对市场目录的 JAR 存储路径（{code}/{version}/plugin.jar）。 */
     private String jarPath;
     private String sha256;
     private Long sizeBytes;
+    private Long downloadCount;
     private Long publisherUserId;
     private PluginPublicationChannel channel;
     private PluginPublicationStatus status;
@@ -67,6 +73,42 @@ public class PluginMarketPublication extends BaseDomain {
         requireStatus(PluginPublicationStatus.PUBLISHED, "只有已发布的版本可以下架");
         this.status = PluginPublicationStatus.REVOKED;
         applyReview(reviewerId, note);
+    }
+
+    /** 编辑展示元数据（不改 code/version/JAR，不重置审核状态），返回是否发生了变更。 */
+    public boolean updateDisplayInfo(String displayName, String description, String releaseNotes,
+                                     String license, String category, List<String> tags,
+                                     String compatibilityJson) {
+        boolean changed = false;
+        if (displayName != null && !displayName.equals(this.displayName)) {
+            this.displayName = displayName;
+            changed = true;
+        }
+        if (description != null && !description.equals(this.description)) {
+            this.description = description;
+            changed = true;
+        }
+        if (releaseNotes != null && !releaseNotes.equals(this.releaseNotes)) {
+            this.releaseNotes = releaseNotes;
+            changed = true;
+        }
+        if (license != null && !license.equals(this.license)) {
+            this.license = license;
+            changed = true;
+        }
+        if (category != null && !category.equals(this.category)) {
+            this.category = category;
+            changed = true;
+        }
+        if (tags != null && !tags.equals(this.tags)) {
+            this.tags = tags;
+            changed = true;
+        }
+        if (compatibilityJson != null && !compatibilityJson.equals(this.compatibilityJson)) {
+            this.compatibilityJson = compatibilityJson;
+            changed = true;
+        }
+        return changed;
     }
 
     private void applyReview(Long reviewerId, String note) {

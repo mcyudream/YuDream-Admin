@@ -7,11 +7,14 @@ import online.yudream.base.application.platform.plugin.service.PluginMarketPubli
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginMarketPublicationWebAssembler;
+import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicationEditRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicationReviewRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketReviewRequiredRequest;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketPublicationRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -42,11 +45,40 @@ public class PluginMarketPublicationController {
             desc = "上传插件 JAR 到本机市场源；reviewRequired 开启时进入待审核")
     public Result<PluginMarketPublicationRes> publish(@RequestParam("file") MultipartFile file,
                                                       @RequestParam(value = "releaseNotes", required = false) String releaseNotes,
-                                                      @RequestParam(value = "metadata", required = false) String metadata) throws IOException {
+                                                      @RequestParam(value = "metadata", required = false) String metadata,
+                                                      @RequestParam(value = "category", required = false) String category,
+                                                      @RequestParam(value = "tags", required = false) String tags) throws IOException {
         boolean pipeline = SecurityPrincipalSupport.hasApiKeyAuthentication();
         return Result.ok(PluginMarketPublicationWebAssembler.toRes(pluginMarketPublicationAppService.publish(
-                file.getInputStream(), file.getSize(), releaseNotes, metadata,
+                file.getInputStream(), file.getSize(), releaseNotes, metadata, category, splitTags(tags),
                 SecurityPrincipalSupport.current().userId(), pipeline)));
+    }
+
+    @PutMapping("/{id}")
+    @PermissionRegister(code = "platform:plugin-market-source:edit", name = "编辑插件市场源", module = "平台插件市场源",
+            desc = "编辑发布物展示元数据与分类标签，重生成 descriptor，不重置审核状态")
+    public Result<PluginMarketPublicationRes> edit(@PathVariable String id,
+                                                   @Valid @RequestBody PluginMarketPublicationEditRequest request) {
+        return Result.ok(PluginMarketPublicationWebAssembler.toRes(
+                pluginMarketPublicationAppService.edit(PluginMarketPublicationWebAssembler.toEditCmd(id, request))));
+    }
+
+    @DeleteMapping("/{id}")
+    @PermissionRegister(code = "platform:plugin-market-source:delete", name = "删除插件市场源", module = "平台插件市场源",
+            desc = "硬删除发布物：移除记录与 JAR 文件，不可恢复")
+    public Result<Void> delete(@PathVariable String id) {
+        pluginMarketPublicationAppService.delete(PluginMarketPublicationWebAssembler.parseId(id));
+        return Result.ok(null);
+    }
+
+    private List<String> splitTags(String tags) {
+        if (!StringUtils.hasText(tags)) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(tags.split("[,，]"))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 
     @GetMapping

@@ -3,9 +3,12 @@ package online.yudream.base.application.platform.plugin;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
+import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationEditCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationReviewCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketPublicationDTO;
 import online.yudream.base.application.platform.plugin.service.PluginMarketPublicationAppService;
+import online.yudream.base.application.platform.plugin.service.PluginUserCatalogAppService;
+import online.yudream.base.application.system.setting.service.SettingAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -27,6 +30,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -60,6 +65,12 @@ class PluginMarketPublicationAppServiceTest {
     @Mock
     private CapabilityModuleRepo capabilityModuleRepo;
 
+    @Mock
+    private PluginUserCatalogAppService pluginUserCatalogAppService;
+
+    @Mock
+    private SettingAppService settingAppService;
+
     @TempDir
     Path tempDir;
 
@@ -68,7 +79,8 @@ class PluginMarketPublicationAppServiceTest {
     @BeforeEach
     void setUp() {
         service = new PluginMarketPublicationAppService(publicationRepo, pluginRuntimeGateway,
-                capabilityAppService, capabilityModuleRepo, new ObjectMapper());
+                capabilityAppService, capabilityModuleRepo, pluginUserCatalogAppService, settingAppService,
+                new ObjectMapper());
         ReflectionTestUtils.setField(service, "marketDirectory", tempDir.toString());
         ReflectionTestUtils.setField(service, "maxJarBytes", 1024L * 1024);
     }
@@ -82,21 +94,24 @@ class PluginMarketPublicationAppServiceTest {
 
         PluginMarketPublicationDTO result = service.publish(stream(), JAR_BYTES.length, "修复若干问题",
                 "{\"license\":\"MIT\",\"compatibility\":{\"host\":\"^1.0.0\"},\"publisher\":{\"id\":\"yudream\",\"name\":\"YuDream\",\"url\":\"https://yudream.online\",\"verified\":true}}",
-                9L, true);
+                "效率工具", List.of("Demo", "demo", "Market"), 9L, true);
 
         assertEquals("demo", result.getCode());
         assertEquals("1.0.0", result.getPluginVersion());
         assertEquals(PluginPublicationStatus.PENDING, result.getStatus());
         assertEquals(9L, result.getPublisherUserId());
 
-        JsonNode descriptor = new ObjectMapper().readTree(resultToSavedPublication().getDescriptorJson());
+        PluginMarketPublication saved = resultToSavedPublication();
+        // 标签规范化：统一小写并去重
+        assertEquals(List.of("demo", "market"), saved.getTags());
+        assertEquals("效率工具", saved.getCategory());
+        JsonNode descriptor = new ObjectMapper().readTree(saved.getDescriptorJson());
         assertEquals(1, descriptor.get("schemaVersion").asInt());
         assertEquals("1.0.0", descriptor.get("releaseVersion").asText());
         assertEquals("demo", descriptor.get("plugin").get("code").asText());
         assertEquals("MIT", descriptor.get("plugin").get("license").asText());
         assertEquals("^1.0.0", descriptor.get("plugin").get("compatibility").get("host").asText());
         assertEquals("YuDream", descriptor.get("plugin").get("publisher").get("name").asText());
-        // plugin.yml 依赖展开为无区间约束的契约依赖；jar 引用相对插件 index 目录
         assertEquals("base", descriptor.get("plugin").get("dependencies").get(0).get("code").asText());
         assertEquals("x", descriptor.get("plugin").get("dependencies").get(0).get("range").asText());
         assertTrue(descriptor.get("plugin").get("dependencies").get(0).get("required").asBoolean());
@@ -104,7 +119,6 @@ class PluginMarketPublicationAppServiceTest {
         assertFalse(descriptor.get("plugin").get("dependencies").get(1).get("required").asBoolean());
         assertEquals("versions/1.0.0/plugin.jar", descriptor.get("jar").get("url").asText());
         assertEquals(64, descriptor.get("jar").get("sha256").asText().length());
-        // JAR 已落盘到市场目录
         assertTrue(Files.isRegularFile(tempDir.resolve("demo").resolve("1.0.0").resolve("plugin.jar")));
         verify(capabilityAppService).ensureEnabled(anyString(), anyString());
     }
@@ -116,31 +130,87 @@ class PluginMarketPublicationAppServiceTest {
         when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.empty());
         when(publicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
-        PluginMarketPublicationDTO result = service.publish(stream(), JAR_BYTES.length, null, null, 9L, false);
+        PluginMarketPublicationDTO result = service.publish(stream(), JAR_BYTES.length, null, null,
+                null, null, 9L, false);
 
         assertEquals(PluginPublicationStatus.PUBLISHED, result.getStatus());
     }
 
     @Test
-    void publishRejectsDuplicateVersionWithoutSaving() {
+    void publishRejectsDuplicateVersionUnknownCategoryAndInvalidTags() {
         stubDescribe(descriptor());
         stubReviewRequired("true");
         when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.of(PluginMarketPublication.builder().build()));
 
-        assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null, 9L, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
+                null, null, 9L, false));
+        verify(publicationRepo, never()).save(any());
 
+        when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.empty());
+        assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
+                "不存在的分类", null, 9L, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
+                null, List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"), 9L, false));
         verify(publicationRepo, never()).save(any());
     }
 
     @Test
     void publishRejectsInvalidPluginVersionsAndOversize() {
         stubDescribe(new PluginDescriptorInfo("demo", "Demo", "1.0.0-beta", null, "example.Plugin", null, List.of(), List.of()));
-        assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null, 9L, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
+                null, null, 9L, false));
 
-        assertThrows(BizException.class, () -> service.publish(stream(), 0, null, null, 9L, false));
-        assertThrows(BizException.class, () -> service.publish(stream(), maxJarBytes() + 1, null, null, 9L, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), 0, null, null, null, null, 9L, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), maxJarBytes() + 1, null, null, null, null, 9L, false));
 
         verify(publicationRepo, never()).save(any());
+    }
+
+    @Test
+    void editUpdatesMetadataAndRegeneratesDescriptorWithoutResettingStatus() throws Exception {
+        PluginMarketPublication published = publication("demo", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        published.setDisplayName("旧名称");
+        published.setMainClass("example.Plugin");
+        published.setSha256("a".repeat(64));
+        published.setDescriptorJson("{\"schemaVersion\":1}");
+        when(publicationRepo.findById(1L)).thenReturn(Optional.of(published));
+        when(publicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PluginMarketPublicationEditCmd cmd = new PluginMarketPublicationEditCmd();
+        cmd.setId(1L);
+        cmd.setDisplayName("新名称");
+        cmd.setCategory("Minecraft");
+        cmd.setTags(List.of("New Tag"));
+        cmd.setCompatibility(Map.of("host", "^2.0.0"));
+
+        PluginMarketPublicationDTO result = service.edit(cmd);
+
+        assertEquals("新名称", result.getDisplayName());
+        assertEquals("Minecraft", result.getCategory());
+        assertEquals(List.of("new tag"), result.getTags());
+        assertEquals(PluginPublicationStatus.PUBLISHED, result.getStatus());
+        org.mockito.ArgumentCaptor<PluginMarketPublication> captor =
+                org.mockito.ArgumentCaptor.forClass(PluginMarketPublication.class);
+        verify(publicationRepo).save(captor.capture());
+        JsonNode descriptor = new ObjectMapper().readTree(captor.getValue().getDescriptorJson());
+        assertEquals("新名称", descriptor.get("plugin").get("displayName").asText());
+        assertEquals("^2.0.0", descriptor.get("plugin").get("compatibility").get("host").asText());
+    }
+
+    @Test
+    void deleteRemovesRowAndJarFile() throws Exception {
+        PluginMarketPublication publication = publication("demo", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        publication.setId(1L);
+        publication.setJarPath("demo/1.0.0/plugin.jar");
+        when(publicationRepo.findById(1L)).thenReturn(Optional.of(publication));
+        Path jar = tempDir.resolve("demo").resolve("1.0.0").resolve("plugin.jar");
+        Files.createDirectories(jar.getParent());
+        Files.writeString(jar, "jar");
+
+        service.delete(1L);
+
+        verify(publicationRepo).deleteById(1L);
+        assertFalse(Files.exists(jar));
     }
 
     @Test
@@ -177,12 +247,93 @@ class PluginMarketPublicationAppServiceTest {
     }
 
     @Test
+    void manifestAndFacetsAggregatePublishedCatalog() throws Exception {
+        when(settingAppService.publicSettings()).thenReturn(Map.of("siteName", "测试站"));
+        when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(
+                publication("beta", "2.0.0", PluginPublicationStatus.PUBLISHED),
+                publication("alpha", "1.0.0", PluginPublicationStatus.PUBLISHED),
+                publication("beta", "1.0.0", PluginPublicationStatus.PUBLISHED)));
+
+        JsonNode manifest = new ObjectMapper().readTree(service.manifestJson());
+        assertEquals("yudream-market-v2", manifest.get("protocol").asText());
+        assertEquals("测试站", manifest.get("name").asText());
+        assertEquals(2, manifest.get("pluginCount").asInt());
+
+        JsonNode categories = new ObjectMapper().readTree(service.categoriesJson());
+        assertTrue(categories.isArray());
+
+        JsonNode tags = new ObjectMapper().readTree(service.tagsJson(10));
+        assertTrue(tags.isArray());
+    }
+
+    @Test
+    void pagePluginsGroupsSortsFiltersAndPaginates() throws Exception {
+        PluginMarketPublication betaNew = publication("beta", "2.0.0", PluginPublicationStatus.PUBLISHED);
+        betaNew.setDownloadCount(30L);
+        betaNew.setCreateTime(LocalDateTime.of(2026, 9, 1, 0, 0));
+        betaNew.setCategory("Minecraft");
+        PluginMarketPublication betaOld = publication("beta", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        betaOld.setDownloadCount(12L);
+        PluginMarketPublication alpha = publication("alpha", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        alpha.setDownloadCount(100L);
+        alpha.setCreateTime(LocalDateTime.of(2026, 1, 1, 0, 0));
+        alpha.setCategory("AI 与对话");
+        alpha.setTags(List.of("chat"));
+        when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED))
+                .thenReturn(List.of(betaNew, betaOld, alpha));
+
+        // 默认 newest：beta（2026-09）在 alpha（2026-01）前，同 code 分组合并下载量
+        JsonNode byNewest = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, null, null, null, null, null, 1, 20));
+        assertEquals(2, byNewest.get("total").asInt());
+        assertEquals("beta", byNewest.get("items").get(0).get("code").asText());
+        assertEquals(42L, byNewest.get("items").get(0).get("downloads").asLong());
+        assertEquals("2.0.0", byNewest.get("items").get(0).get("latestVersion").asText());
+
+        // downloads 排序：alpha（100）在前
+        JsonNode byDownloads = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, null, null, null, null, "downloads", 1, 20));
+        assertEquals("alpha", byDownloads.get("items").get(0).get("code").asText());
+
+        // 分类过滤
+        JsonNode byCategory = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, "Minecraft", null, null, null, null, null, 1, 20));
+        assertEquals(1, byCategory.get("total").asInt());
+        assertEquals("beta", byCategory.get("items").get(0).get("code").asText());
+
+        // 标签过滤（大小写不敏感）
+        JsonNode byTag = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, "CHAT", null, null, null, null, 1, 20));
+        assertEquals(1, byTag.get("total").asInt());
+
+        // 作者 + 时间过滤
+        JsonNode byAuthor = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, null, 9L, null, null, null, 1, 20));
+        assertEquals(0, byAuthor.get("total").asInt());
+        JsonNode byTime = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, null, null, "2026-06-01", null, null, 1, 20));
+        assertEquals(1, byTime.get("total").asInt());
+
+        // 关键词与分页
+        JsonNode searched = new ObjectMapper().readTree(service.pagePluginsJson(
+                "ALPHA", null, null, null, null, null, null, 1, 20));
+        assertEquals(1, searched.get("total").asInt());
+        JsonNode paged = new ObjectMapper().readTree(service.pagePluginsJson(
+                null, null, null, null, null, null, null, 2, 1));
+        assertEquals(2, paged.get("total").asInt());
+        assertEquals(1, paged.get("items").size());
+
+        assertThrows(BizException.class, () -> service.pagePluginsJson(
+                null, null, null, null, null, null, "bogus", 1, 20));
+    }
+
+    @Test
     void rootIndexListsDistinctPublishedCodesAndCodeIndexSortsAscending() throws Exception {
         when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(
-                publication("beta", "2.0.0"),
-                publication("alpha", "1.0.0"),
-                publication("beta", "1.0.0"),
-                publication("beta", "1.2.0")));
+                publication("beta", "2.0.0", PluginPublicationStatus.PUBLISHED),
+                publication("alpha", "1.0.0", PluginPublicationStatus.PUBLISHED),
+                publication("beta", "1.0.0", PluginPublicationStatus.PUBLISHED),
+                publication("beta", "1.2.0", PluginPublicationStatus.PUBLISHED)));
 
         JsonNode root = new ObjectMapper().readTree(service.rootIndexJson());
         assertEquals(List.of("alpha", "beta"), textList(root.get("plugins"), "code"));
@@ -246,13 +397,17 @@ class PluginMarketPublicationAppServiceTest {
                 .build();
     }
 
-    private PluginMarketPublication publication(String code, String pluginVersion) {
+    private PluginMarketPublication publication(String code, String pluginVersion, PluginPublicationStatus status) {
         return PluginMarketPublication.builder()
                 .code(code)
                 .pluginVersion(pluginVersion)
+                .displayName(code + " 插件")
+                .mainClass("example." + code)
+                .sha256("a".repeat(64))
                 .descriptorJson("{}")
                 .jarPath(code + "/" + pluginVersion + "/plugin.jar")
-                .status(PluginPublicationStatus.PUBLISHED)
+                .publisherUserId(1L)
+                .status(status)
                 .build();
     }
 }

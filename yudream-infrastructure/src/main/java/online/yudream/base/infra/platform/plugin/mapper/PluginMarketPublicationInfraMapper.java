@@ -21,12 +21,18 @@ public class PluginMarketPublicationInfraMapper {
         dataObj.setMainClass(publication.getMainClass());
         dataObj.setDependencies(publication.getDependencies());
         dataObj.setSoftDependencies(publication.getSoftDependencies());
+        dataObj.setIcon(publication.getIcon());
         dataObj.setReleaseNotes(publication.getReleaseNotes());
         dataObj.setLicense(publication.getLicense());
+        dataObj.setCategory(publication.getCategory());
+        dataObj.setTags(publication.getTags());
+        dataObj.setCompatibilityJson(publication.getCompatibilityJson());
+        dataObj.setPublisherJson(publication.getPublisherJson());
         dataObj.setDescriptorJson(publication.getDescriptorJson());
         dataObj.setJarPath(publication.getJarPath());
         dataObj.setSha256(publication.getSha256());
         dataObj.setSizeBytes(publication.getSizeBytes());
+        dataObj.setDownloadCount(publication.getDownloadCount());
         dataObj.setPublisherUserId(publication.getPublisherUserId());
         dataObj.setChannel(publication.getChannel());
         dataObj.setStatus(publication.getStatus());
@@ -52,12 +58,18 @@ public class PluginMarketPublicationInfraMapper {
                 .mainClass(dataObj.getMainClass())
                 .dependencies(dataObj.getDependencies())
                 .softDependencies(dataObj.getSoftDependencies())
+                .icon(dataObj.getIcon())
                 .releaseNotes(dataObj.getReleaseNotes())
                 .license(dataObj.getLicense())
+                .category(dataObj.getCategory())
+                .tags(dataObj.getTags())
+                .compatibilityJson(dataObj.getCompatibilityJson())
+                .publisherJson(dataObj.getPublisherJson())
                 .descriptorJson(dataObj.getDescriptorJson())
                 .jarPath(dataObj.getJarPath())
                 .sha256(dataObj.getSha256())
                 .sizeBytes(dataObj.getSizeBytes())
+                .downloadCount(dataObj.getDownloadCount())
                 .publisherUserId(dataObj.getPublisherUserId())
                 .channel(dataObj.getChannel())
                 .status(dataObj.getStatus())
