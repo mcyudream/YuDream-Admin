@@ -29,12 +29,18 @@ public class PluginMarketPublicationDO extends BaseDO {
     private String mainClass;
     private List<String> dependencies;
     private List<String> softDependencies;
+    private String icon;
     private String releaseNotes;
     private String license;
+    private String category;
+    private List<String> tags;
+    private String compatibilityJson;
+    private String publisherJson;
     private String descriptorJson;
     private String jarPath;
     private String sha256;
     private Long sizeBytes;
+    private Long downloadCount;
     private Long publisherUserId;
     private PluginPublicationChannel channel;
     private PluginPublicationStatus status;

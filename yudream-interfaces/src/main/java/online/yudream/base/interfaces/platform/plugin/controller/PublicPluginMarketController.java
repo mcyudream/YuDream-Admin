@@ -51,7 +51,7 @@ public class PublicPluginMarketController {
 
     @GetMapping("/{code}/{pluginVersion}/plugin.jar")
     public ResponseEntity<FileSystemResource> jar(@PathVariable String code, @PathVariable String pluginVersion) {
-        return pluginMarketPublicationAppService.publishedJarFile(code, pluginVersion)
+        return pluginMarketPublicationAppService.incrementDownloadAndResolveLegacyJar(code, pluginVersion)
                 .<ResponseEntity<FileSystemResource>>map(path -> ResponseEntity.ok()
                         .cacheControl(immutableCache())
                         .contentType(MediaType.parseMediaType("application/java-archive"))
