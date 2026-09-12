@@ -21,6 +21,9 @@ import online.yudream.base.domain.platform.plugin.repo.PluginMarketPublicationRe
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginMarketCategories;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogEntry;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDependency;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreStructuredVersion;
 import online.yudream.base.domain.platform.plugin.valobj.SemVer;
 import online.yudream.base.domain.platform.plugin.valobj.SemVerRange;
 import org.springframework.beans.factory.annotation.Value;
@@ -374,6 +377,7 @@ public class PluginMarketPublicationAppService {
         for (PluginMarketPublication publication : versions) {
             ObjectNode node = versionNodes.addObject();
             node.put("version", publication.getPluginVersion());
+            node.put("main", publication.getMainClass());
             node.put("releaseNotes", publication.getReleaseNotes());
             node.put("license", publication.getLicense());
             node.put("sha256", publication.getSha256());
@@ -403,6 +407,76 @@ public class PluginMarketPublicationAppService {
     /** legacy 静态端点的下载同样计数。 */
     public Optional<Path> incrementDownloadAndResolveLegacyJar(String code, String pluginVersion) {
         return downloadPublication(code, pluginVersion);
+    }
+
+    /**
+     * 本机源目录：按 PUBLISHED 发布物进程内直读，不走 HTTP。
+     * downloadUrl 为 {@code local:{jarPath}}，安装时由应用层 Files.copy。
+     */
+    public List<PluginStoreCatalogEntry> localCatalogEntries() {
+        requirePubliclyServed();
+        Map<String, List<PluginMarketPublication>> grouped = new LinkedHashMap<>();
+        for (PluginMarketPublication publication : publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)) {
+            grouped.computeIfAbsent(publication.getCode(), key -> new ArrayList<>()).add(publication);
+        }
+        List<PluginStoreCatalogEntry> entries = new ArrayList<>();
+        for (Map.Entry<String, List<PluginMarketPublication>> entry : grouped.entrySet()) {
+            List<PluginMarketPublication> versions = entry.getValue().stream()
+                    .sorted(Comparator.comparing(item -> SemVer.parse(item.getPluginVersion())))
+                    .toList();
+            List<PluginStoreStructuredVersion> structured = new ArrayList<>();
+            for (PluginMarketPublication publication : versions) {
+                structured.add(toStructuredVersion(publication));
+            }
+            entries.add(new PluginStoreCatalogEntry(entry.getKey(), "local:" + entry.getKey(), null, List.of(), structured));
+        }
+        return entries;
+    }
+
+    /** 解析 {@code local:{jarPath}} 标记并校验路径落在市场目录内。 */
+    public Path resolveLocalJar(String localUrl) {
+        if (!StringUtils.hasText(localUrl) || !localUrl.startsWith("local:")) {
+            throw new BizException("插件商店数据不可用");
+        }
+        String jarPath = localUrl.substring("local:".length());
+        if (!StringUtils.hasText(jarPath)) {
+            throw new BizException("插件商店数据不可用");
+        }
+        Path path = marketDirectory().resolve(jarPath).normalize();
+        if (!path.startsWith(marketDirectory()) || !Files.isRegularFile(path)) {
+            throw new BizException("插件商店数据不可用");
+        }
+        return path;
+    }
+
+    private PluginStoreStructuredVersion toStructuredVersion(PluginMarketPublication publication) {
+        List<PluginStorePluginDependency> dependencies = new ArrayList<>();
+        if (publication.getDependencies() != null) {
+            for (String code : publication.getDependencies()) {
+                if (StringUtils.hasText(code)) {
+                    dependencies.add(new PluginStorePluginDependency(code.trim(), "x", true));
+                }
+            }
+        }
+        if (publication.getSoftDependencies() != null) {
+            for (String code : publication.getSoftDependencies()) {
+                if (StringUtils.hasText(code)) {
+                    dependencies.add(new PluginStorePluginDependency(code.trim(), "x", false));
+                }
+            }
+        }
+        return new PluginStoreStructuredVersion(
+                publication.getPluginVersion(),
+                "local:" + publication.getJarPath(),
+                publication.getSha256(),
+                publication.getMainClass(),
+                publication.getDisplayName(),
+                publication.getDescription(),
+                publication.getSizeBytes(),
+                publication.getCategory(),
+                publication.getTags(),
+                readStringMap(publication.getCompatibilityJson()),
+                dependencies);
     }
 
     // ---------- legacy 静态契约（schemaVersion=1，保留兼容旧消费端） ----------

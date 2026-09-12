@@ -35,6 +35,7 @@ public class PluginMarketSourceSnapshotDO extends BaseDO {
         private String indexUrl;
         private String latestDescriptorJson;
         private List<Version> versions;
+        private List<StructuredVersion> structuredVersions;
     }
 
     @Data
@@ -43,5 +44,31 @@ public class PluginMarketSourceSnapshotDO extends BaseDO {
     public static class Version {
         private String releaseVersion;
         private String descriptorUrl;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class StructuredVersion {
+        private String releaseVersion;
+        private String downloadUrl;
+        private String sha256;
+        private String main;
+        private String displayName;
+        private String description;
+        private Long sizeBytes;
+        private String category;
+        private List<String> tags;
+        private java.util.Map<String, String> compatibility;
+        private List<Dependency> dependencies;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class Dependency {
+        private String code;
+        private String range;
+        private boolean required;
     }
 }

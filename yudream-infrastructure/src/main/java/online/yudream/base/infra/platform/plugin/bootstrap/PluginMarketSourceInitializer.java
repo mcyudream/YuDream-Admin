@@ -2,17 +2,16 @@ package online.yudream.base.infra.platform.plugin.bootstrap;
 
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginMarketSource;
+import online.yudream.base.domain.platform.plugin.enumerate.MarketSourceType;
 import online.yudream.base.domain.platform.plugin.repo.PluginMarketSourceRepo;
-import online.yudream.base.infra.platform.plugin.service.PluginProperties;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 /**
- * 内置官方市场源播种。rootUrl 始终镜像 yudream.platform.plugin.store-root-url 配置，
- * 名称/令牌/启停归管理端，不覆盖；项目闸门关闭时不播种，市场走配置直连。
+ * 内置本机市场源播种。项目闸门关闭时不注册、不播种；能力开启后内置 {@code default} 源固定为 LOCAL
+ * （本机发布物进程内直读）。存量「官方插件市场」Nexus 指向在此改写为本机源，Nexus 不再作为隐式默认源。
  */
 @Component
 @RequiredArgsConstructor
@@ -20,29 +19,30 @@ import org.springframework.util.StringUtils;
 public class PluginMarketSourceInitializer implements ApplicationRunner {
 
     public static final String BUILTIN_CODE = "default";
+    public static final String BUILTIN_NAME = "本机插件市场";
 
     private final PluginMarketSourceRepo pluginMarketSourceRepo;
-    private final PluginProperties pluginProperties;
 
     @Override
     public void run(ApplicationArguments args) {
-        String rootUrl = pluginProperties.getStoreRootUrl();
-        if (!StringUtils.hasText(rootUrl)) {
-            return;
-        }
         PluginMarketSource existing = pluginMarketSourceRepo.findByCode(BUILTIN_CODE).orElse(null);
         if (existing == null) {
             pluginMarketSourceRepo.save(PluginMarketSource.builder()
                     .code(BUILTIN_CODE)
-                    .name("官方插件市场")
-                    .rootUrl(rootUrl)
+                    .name(BUILTIN_NAME)
+                    .type(MarketSourceType.LOCAL)
                     .enabled(true)
                     .builtIn(true)
                     .sortOrder(0)
                     .build());
             return;
         }
-        existing.setRootUrl(rootUrl);
+        existing.setType(MarketSourceType.LOCAL);
+        existing.setBuiltIn(true);
+        existing.setRootUrl(null);
+        if ("官方插件市场".equals(existing.getName())) {
+            existing.setName(BUILTIN_NAME);
+        }
         pluginMarketSourceRepo.save(existing);
     }
 }

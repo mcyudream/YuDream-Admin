@@ -50,8 +50,9 @@ class PluginMarketSourceControllerTest {
         when(pluginMarketSourceAppService.list()).thenReturn(List.of(PluginMarketSourceDTO.builder()
                 .id(1L)
                 .code("default")
-                .name("官方插件市场")
-                .rootUrl("https://store.example.test/index.json")
+                .name("本机插件市场")
+                .type(online.yudream.base.domain.platform.plugin.enumerate.MarketSourceType.LOCAL)
+                .rootUrl(null)
                 .tokenConfigured(true)
                 .enabled(true)
                 .builtIn(true)
@@ -65,6 +66,7 @@ class PluginMarketSourceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].id").value("1"))
                 .andExpect(jsonPath("$.data[0].code").value("default"))
+                .andExpect(jsonPath("$.data[0].type").value("LOCAL"))
                 .andExpect(jsonPath("$.data[0].tokenConfigured").value(true))
                 .andExpect(jsonPath("$.data[0].pluginCount").value(12));
     }

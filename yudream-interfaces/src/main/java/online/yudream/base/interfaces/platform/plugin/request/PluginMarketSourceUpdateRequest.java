@@ -14,6 +14,9 @@ public class PluginMarketSourceUpdateRequest {
     @Size(max = 128, message = "市场源名称过长")
     private String name;
 
+    /** STATIC_INDEX 或 V2_API；内置源忽略。 */
+    private String type;
+
     @Size(max = 2048, message = "市场源地址过长")
     private String rootUrl;
 

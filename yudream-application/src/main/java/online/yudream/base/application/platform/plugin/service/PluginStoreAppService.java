@@ -19,8 +19,10 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginCompat
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDependency;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescriptor;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginVersion;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreSourceRef;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreStructuredVersion;
 import online.yudream.base.domain.platform.plugin.valobj.SemVer;
 import online.yudream.base.domain.platform.plugin.valobj.SemVerRange;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,9 +42,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 插件市场应用服务。能力未启用时走配置直连的内置单源（与历史行为一致）；
- * 启用后读取各启用源的目录快照合并视图：列表免外呼，详情/更新按需拉取 descriptor，
- * 安装来源跟随所选源并记录到本地插件。
+ * 插件市场应用服务。能力未启用时目录为空、详情/安装/更新抛「插件市场源能力未启用」，
+ * 不再回落 Nexus；启用后读取各启用源的目录快照（LOCAL 进程内直读）合并视图。
  */
 @Service
 @Slf4j
@@ -69,6 +70,9 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public List<PluginStorePluginDTO> list() {
+        if (!pluginMarketSourceAppService.isActive()) {
+            return List.of();
+        }
         Map<String, List<VersionRef>> view = catalogView();
         Map<String, String> originSources = installedOriginSources();
         List<PluginStorePluginInfo> infos = new ArrayList<>();
@@ -98,6 +102,7 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public PluginStorePluginDetailDTO detail(String code) {
+        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         List<VersionRef> refs = catalogView().get(normalizedCode);
         if (refs == null || refs.isEmpty()) {
@@ -137,6 +142,9 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public List<PluginMarketplaceUpdateDTO> updates() {
+        if (!pluginMarketSourceAppService.isActive()) {
+            return List.of();
+        }
         List<PluginModuleDTO> localPlugins = installedPlugins();
         Map<String, List<VersionRef>> view = catalogView();
         Map<String, String> originSources = installedOriginSources();
@@ -174,6 +182,9 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public List<PluginMarketplaceUpdatePlanDTO> updatePlans() {
+        if (!pluginMarketSourceAppService.isActive()) {
+            return List.of();
+        }
         List<PluginModuleDTO> localPlugins = installedPlugins();
         Map<String, List<VersionRef>> view = catalogView();
         Map<String, String> originSources = installedOriginSources();
@@ -188,6 +199,7 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public PluginMarketplaceUpdatePlanDTO updatePlan(String code, String targetVersion) {
+        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         List<PluginModuleDTO> localPlugins = installedPlugins();
         PluginModuleDTO localPlugin = localPlugins.stream()
@@ -307,6 +319,7 @@ public class PluginStoreAppService {
     }
 
     private PluginMarketplaceUpdateResultDTO updateSerial(String code, String targetVersion, String sourceCode) {
+        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         if (!StringUtils.hasText(targetVersion)) {
             throw unavailable();
@@ -339,6 +352,7 @@ public class PluginStoreAppService {
 
     @Transactional
     public List<PluginModuleDTO> install(String code, String version, String sourceCode) {
+        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         if (!StringUtils.hasText(version)) {
             throw unavailable();
@@ -387,7 +401,16 @@ public class PluginStoreAppService {
             Path directory = Path.of(uploadDirectory).toAbsolutePath().normalize();
             Files.createDirectories(directory);
             stagedJar = Files.createTempFile(directory, ".plugin-store-", ".tmp");
-            pluginStoreGateway.downloadJar(refOf(ref.source()), descriptor, stagedJar);
+            if (ref.structured() != null && StringUtils.hasText(ref.structured().downloadUrl())
+                    && ref.structured().downloadUrl().startsWith("local:")) {
+                Path sourceJar = pluginMarketSourceAppService.resolveLocalJar(ref.structured().downloadUrl());
+                Files.copy(sourceJar, stagedJar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                if (StringUtils.hasText(descriptor.jar().sha256())) {
+                    verifySha256(stagedJar, descriptor.jar().sha256());
+                }
+            } else {
+                pluginStoreGateway.downloadJar(refOf(ref.source()), descriptor, stagedJar);
+            }
             List<PluginModuleDTO> result = update
                     ? pluginAppService.updateStoreJar(stagedJar, descriptor.code(), descriptor.version(),
                             descriptor.main(), sourceCode(ref))
@@ -404,12 +427,10 @@ public class PluginStoreAppService {
 
     // ---------- 多源目录视图 ----------
 
-    /** code -> 该插件在各启用源上的全部版本引用；能力未激活时为配置直连的内置单源。 */
+    /** code -> 该插件在各启用源上的全部版本引用；能力未激活时返回空。 */
     private Map<String, List<VersionRef>> catalogView() {
         if (!pluginMarketSourceAppService.isActive()) {
-            Map<String, List<VersionRef>> view = new LinkedHashMap<>();
-            putIntoView(view, pluginStoreGateway.fetchCatalog(pluginStoreGateway.configuredSourceRef()), null);
-            return view;
+            return Map.of();
         }
         Map<String, List<VersionRef>> view = new LinkedHashMap<>();
         for (PluginMarketSourceAppService.SourceCatalog catalog : pluginMarketSourceAppService.enabledSourceCatalogs()) {
@@ -422,8 +443,14 @@ public class PluginStoreAppService {
                              PluginMarketSource source) {
         for (PluginStoreCatalogEntry entry : entries) {
             List<VersionRef> refs = view.computeIfAbsent(entry.code(), key -> new ArrayList<>());
+            if (entry.structuredVersions() != null && !entry.structuredVersions().isEmpty()) {
+                for (PluginStoreStructuredVersion version : entry.structuredVersions()) {
+                    refs.add(new VersionRef(source, entry, version.releaseVersion(), null, version));
+                }
+                continue;
+            }
             for (PluginStoreCatalogVersion version : entry.versions()) {
-                refs.add(new VersionRef(source, entry, version.releaseVersion(), version.descriptorUrl()));
+                refs.add(new VersionRef(source, entry, version.releaseVersion(), version.descriptorUrl(), null));
             }
         }
     }
@@ -462,8 +489,11 @@ public class PluginStoreAppService {
         return code == null ? 1 : 2;
     }
 
-    /** 最新版本直接解析快照保存的 descriptor 原文（零外呼），历史版本按需从源拉取。 */
+    /** 最新版本直接解析快照保存的 descriptor 原文（零外呼），LOCAL/V2 走结构化字段；历史版本按需从源拉取。 */
     private PluginStorePluginDescriptor descriptorFor(VersionRef ref) {
+        if (ref.structured() != null) {
+            return descriptorFromStructured(ref);
+        }
         List<PluginStoreCatalogVersion> versions = ref.entry().versions();
         if (!versions.isEmpty()) {
             PluginStoreCatalogVersion latest = versions.get(versions.size() - 1);
@@ -475,10 +505,37 @@ public class PluginStoreAppService {
         return pluginStoreGateway.fetchDescriptor(refOf(ref.source()), ref.entry().indexUrl(), ref.descriptorUrl());
     }
 
+    private PluginStorePluginDescriptor descriptorFromStructured(VersionRef ref) {
+        PluginStoreStructuredVersion version = ref.structured();
+        PluginStorePluginCompatibility compatibility = null;
+        if (version.compatibility() != null && !version.compatibility().isEmpty()) {
+            compatibility = new PluginStorePluginCompatibility(
+                    version.compatibility().get("host"),
+                    version.compatibility().get("spi"),
+                    version.compatibility().get("frontendSdk"));
+        }
+        return new PluginStorePluginDescriptor(
+                version.releaseVersion(),
+                ref.entry().code(),
+                version.releaseVersion(),
+                version.main(),
+                version.displayName(),
+                version.description(),
+                null,
+                List.of(),
+                compatibility,
+                version.dependencies(),
+                new PluginStorePluginJar(
+                        "self-hosted:" + ref.entry().code() + ":" + version.releaseVersion(),
+                        version.downloadUrl(),
+                        version.sha256()));
+    }
+
     private PluginStoreSourceRef refOf(PluginMarketSource source) {
-        return source == null
-                ? pluginStoreGateway.configuredSourceRef()
-                : pluginMarketSourceAppService.sourceRef(source);
+        if (source == null) {
+            throw unavailable();
+        }
+        return pluginMarketSourceAppService.sourceRef(source);
     }
 
     private String sourceCode(VersionRef ref) {
@@ -694,8 +751,27 @@ public class PluginStoreAppService {
         }
     }
 
+    private void verifySha256(Path file, String expected) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (java.io.InputStream input = Files.newInputStream(file)) {
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            String actual = java.util.HexFormat.of().formatHex(digest.digest());
+            if (!expected.equalsIgnoreCase(actual)) {
+                throw unavailable();
+            }
+        } catch (IOException | java.security.NoSuchAlgorithmException e) {
+            throw new BizException("插件 JAR 下载失败：" + e.getMessage());
+        }
+    }
+
     private record VersionRef(PluginMarketSource source, PluginStoreCatalogEntry entry,
-                              String releaseVersion, String descriptorUrl) {
+                              String releaseVersion, String descriptorUrl, PluginStoreStructuredVersion structured) {
     }
 
     private record Installability(boolean installable, String disabledReason,

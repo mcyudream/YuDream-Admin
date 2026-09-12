@@ -21,6 +21,7 @@ public class PluginMarketSourceWebAssembler {
         PluginMarketSourceCreateCmd cmd = new PluginMarketSourceCreateCmd();
         cmd.setCode(request.getCode());
         cmd.setName(request.getName());
+        cmd.setType(request.getType());
         cmd.setRootUrl(request.getRootUrl());
         cmd.setToken(request.getToken());
         cmd.setSortOrder(request.getSortOrder());
@@ -31,6 +32,7 @@ public class PluginMarketSourceWebAssembler {
         PluginMarketSourceUpdateCmd cmd = new PluginMarketSourceUpdateCmd();
         cmd.setId(id);
         cmd.setName(request.getName());
+        cmd.setType(request.getType());
         cmd.setRootUrl(request.getRootUrl());
         cmd.setToken(request.getToken());
         cmd.setSortOrder(request.getSortOrder());
@@ -39,6 +41,7 @@ public class PluginMarketSourceWebAssembler {
 
     public static PluginMarketSourceTestCmd toTestCmd(PluginMarketSourceTestRequest request) {
         PluginMarketSourceTestCmd cmd = new PluginMarketSourceTestCmd();
+        cmd.setType(request.getType());
         cmd.setRootUrl(request.getRootUrl());
         cmd.setToken(request.getToken());
         return cmd;
@@ -49,6 +52,7 @@ public class PluginMarketSourceWebAssembler {
                 .id(dto.getId() == null ? null : dto.getId().toString())
                 .code(dto.getCode())
                 .name(dto.getName())
+                .type(dto.getType())
                 .rootUrl(dto.getRootUrl())
                 .tokenConfigured(dto.isTokenConfigured())
                 .enabled(dto.isEnabled())

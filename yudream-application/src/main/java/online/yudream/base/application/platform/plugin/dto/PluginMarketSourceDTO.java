@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import online.yudream.base.domain.platform.plugin.enumerate.MarketSourceSyncStatus;
+import online.yudream.base.domain.platform.plugin.enumerate.MarketSourceType;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -22,6 +23,7 @@ public class PluginMarketSourceDTO implements Serializable {
     private Long id;
     private String code;
     private String name;
+    private MarketSourceType type;
     private String rootUrl;
     /** 是否已配置访问令牌；令牌本身绝不出域。 */
     private boolean tokenConfigured;

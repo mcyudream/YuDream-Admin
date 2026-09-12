@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '@yudream/components'
-import type { PluginMarketPublication, PluginMarketSource, PluginMarketSourcePayload, PluginPublicationChannel, PluginPublicationStatus } from '@/api/modules/platform-plugin-market-source'
+import type { PluginMarketPublication, PluginMarketSource, PluginMarketSourcePayload, PluginPublicationChannel, PluginPublicationStatus, MarketSourceType } from '@/api/modules/platform-plugin-market-source'
 import { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 
@@ -20,13 +20,20 @@ const editing = ref<PluginMarketSource | null>(null)
 const form = reactive<PluginMarketSourcePayload>({
   code: '',
   name: '',
+  type: 'V2_API',
   rootUrl: '',
   token: '',
   sortOrder: 100,
 })
 
+const sourceTypeOptions: { label: string, value: MarketSourceType }[] = [
+  { label: 'v2 协议源', value: 'V2_API' },
+  { label: '静态索引（legacy）', value: 'STATIC_INDEX' },
+]
+
 const columns = computed<TableColumn<PluginMarketSource>[]>(() => [
   { accessorKey: 'name', header: '名称', width: 200, fixed: 'left' },
+  { id: 'type', header: '类型', width: 140 },
   { accessorKey: 'rootUrl', header: '源地址', width: 320 },
   { id: 'enabled', header: '状态', width: 90, align: 'center' },
   { id: 'sync', header: '同步', width: 170 },
@@ -37,6 +44,7 @@ const columns = computed<TableColumn<PluginMarketSource>[]>(() => [
 ])
 
 const publicIndexUrl = `${window.location.origin}/api/public/plugin-market/index.json`
+const publicV2Url = `${window.location.origin}/api/public/plugin-market`
 const publications = ref<PluginMarketPublication[]>([])
 const pubLoading = ref(false)
 const pubStatusFilter = ref<'all' | PluginPublicationStatus>('all')
@@ -110,6 +118,7 @@ function openForm(row?: PluginMarketSource) {
     ? {
         code: row.code,
         name: row.name,
+        type: row.type || (row.builtIn ? 'LOCAL' : 'STATIC_INDEX'),
         rootUrl: row.rootUrl,
         token: '',
         sortOrder: row.sortOrder ?? 100,
@@ -117,6 +126,7 @@ function openForm(row?: PluginMarketSource) {
     : {
         code: '',
         name: '',
+        type: 'V2_API',
         rootUrl: '',
         token: '',
         sortOrder: 100,
@@ -160,7 +170,7 @@ async function testForm() {
   testing.value = true
   testMessage.value = ''
   try {
-    const res = await apiMarketSource.test({ rootUrl, token: form.token || undefined })
+    const res = await apiMarketSource.test({ rootUrl, token: form.token || undefined, type: form.type === 'LOCAL' ? undefined : form.type })
     testOk.value = res.data.ok
     testMessage.value = res.data.message || (res.data.ok ? '连接成功' : '连接失败')
   }
@@ -187,6 +197,10 @@ function confirmToggle(row: PluginMarketSource) {
 }
 
 function confirmSync(row: PluginMarketSource) {
+  if (row.type === 'LOCAL' || row.builtIn) {
+    toast.success('本机源无需同步，目录实时读取本机发布物')
+    return
+  }
   modal.confirm({
     title: '确认同步',
     content: `确认拉取市场源「${row.name}」的最新目录吗？`,
@@ -327,8 +341,15 @@ async function actOnPublication(row: PluginMarketPublication, action: (api: type
 }
 
 async function copyPublicUrl() {
-  await navigator.clipboard.writeText(publicIndexUrl)
+  await navigator.clipboard.writeText(publicV2Url)
   toast.success('已复制')
+}
+
+function sourceTypeText(row: PluginMarketSource) {
+  if (row.builtIn || row.type === 'LOCAL') {
+    return '本机源'
+  }
+  return row.type === 'V2_API' ? 'v2 协议' : '静态索引'
 }
 
 function publicationStatusVariant(status: PluginPublicationStatus) {
@@ -354,7 +375,7 @@ function formatSize(bytes?: number) {
 <template>
   <FaPageHeader title="市场源管理" class="mb-0">
     <template #description>
-      管理插件市场的订阅来源：添加多个自托管或官方市场源，市场页会合并展示各源插件。内置官方源地址由系统配置管理。
+      管理插件市场的订阅来源：添加多个自托管或官方市场源，市场页会合并展示各源插件。内置源为本机发布物，无需远端地址。
     </template>
   </FaPageHeader>
   <FaPageMain>
@@ -385,12 +406,16 @@ function formatSize(bytes?: number) {
           <div class="flex items-center gap-2">
             <span class="font-medium">{{ row.original.name }}</span>
             <FaTag v-if="row.original.builtIn" variant="secondary">内置</FaTag>
+            <FaTag variant="secondary">{{ sourceTypeText(row.original) }}</FaTag>
           </div>
           <span class="text-xs text-secondary-foreground/60">{{ row.original.code }}</span>
         </div>
       </template>
+      <template #cell-type="{ row }">
+        <FaTag variant="secondary">{{ sourceTypeText(row.original) }}</FaTag>
+      </template>
       <template #cell-rootUrl="{ row }">
-        <span class="break-all text-sm">{{ row.original.rootUrl }}</span>
+        <span class="break-all text-sm">{{ row.original.builtIn || row.original.type === 'LOCAL' ? '本机发布物（进程内直读）' : row.original.rootUrl }}</span>
         <div v-if="row.original.tokenConfigured" class="text-xs text-secondary-foreground/60">
           <FaIcon name="i-ri:key-2-line" />
           已配置访问令牌
@@ -410,7 +435,7 @@ function formatSize(bytes?: number) {
       </template>
       <template #cell-operation="{ row }">
         <div class="flex justify-center gap-2">
-          <FaButton v-auth="'platform:plugin-market-source:run'" variant="outline" size="sm" @click="confirmSync(row.original)">
+          <FaButton v-if="row.original.type !== 'LOCAL' && !row.original.builtIn" v-auth="'platform:plugin-market-source:run'" variant="outline" size="sm" @click="confirmSync(row.original)">
             同步
           </FaButton>
           <FaButton v-auth="'platform:plugin-market-source:edit'" variant="outline" size="sm" @click="confirmToggle(row.original)">
@@ -441,7 +466,7 @@ function formatSize(bytes?: number) {
               </div>
               <div class="flex gap-2">
                 <span class="shrink-0 text-secondary-foreground/60">地址</span>
-                <span class="break-all">{{ row.rootUrl }}</span>
+                <span class="break-all">{{ row.builtIn || row.type === 'LOCAL' ? '本机发布物（进程内直读）' : row.rootUrl }}</span>
               </div>
               <div class="flex gap-2">
                 <span class="shrink-0 text-secondary-foreground/60">同步</span>
@@ -453,7 +478,7 @@ function formatSize(bytes?: number) {
               </div>
             </div>
             <div class="flex flex-wrap gap-2 border-t pt-3">
-              <FaButton v-auth="'platform:plugin-market-source:run'" variant="outline" size="sm" @click="confirmSync(row)">
+              <FaButton v-if="row.type !== 'LOCAL' && !row.builtIn" v-auth="'platform:plugin-market-source:run'" variant="outline" size="sm" @click="confirmSync(row)">
                 同步
               </FaButton>
               <FaButton v-auth="'platform:plugin-market-source:edit'" variant="outline" size="sm" @click="confirmToggle(row)">
@@ -475,7 +500,7 @@ function formatSize(bytes?: number) {
       <div class="min-w-0">
         <div class="text-base font-semibold">发布管理</div>
         <div class="mt-1 text-sm text-secondary-foreground/60">
-          本机作为自托管市场源对外提供插件；其他实例把下方索引地址添加为市场源即可订阅。
+          本机作为自托管市场源对外提供插件；其他实例把下方 v2 源基址添加为市场源即可订阅。
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -495,11 +520,11 @@ function formatSize(bytes?: number) {
 
     <div class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
       <FaIcon name="i-ri:link" class="shrink-0" />
-      <span class="shrink-0 text-secondary-foreground/60">对外索引地址</span>
-      <code class="min-w-0 break-all">{{ publicIndexUrl }}</code>
+      <span class="shrink-0 text-secondary-foreground/60">对外 v2 源基址</span>
+      <code class="min-w-0 break-all">{{ publicV2Url }}</code>
       <FaButton variant="link" size="sm" @click="copyPublicUrl">复制</FaButton>
       <span class="w-full text-xs text-secondary-foreground/60">
-        流水线发布：创建携带 platform:plugin-market-source:upload 权限的 API Key，向同一上传端点 POST multipart 文件即可；{code}@{version} 不可覆盖。
+        添加源时类型选「v2 协议源」，地址填该基址。legacy 静态索引仍可用：{{ publicIndexUrl }}
       </span>
     </div>
 
@@ -636,15 +661,25 @@ function formatSize(bytes?: number) {
             <FaInput v-model="form.name" placeholder="市场源显示名称" />
           </a-form-item>
         </div>
-        <a-form-item label="源地址（index.json 完整地址）">
+        <a-form-item v-if="!editing?.builtIn" label="源类型">
+          <FaSelect v-model="form.type" :options="sourceTypeOptions" :disabled="!!editing?.builtIn" />
+        </a-form-item>
+        <a-form-item v-if="editing?.builtIn" label="源类型">
+          <FaInput model-value="本机源" disabled />
+          <div class="mt-1 text-xs text-secondary-foreground/60">
+            内置源固定为本机发布物，进程内直读，无需地址与同步。
+          </div>
+        </a-form-item>
+        <a-form-item v-if="!editing?.builtIn" :label="form.type === 'V2_API' ? '源地址（v2 源基址）' : '源地址（index.json 完整地址）'">
           <div class="flex gap-2">
-            <FaInput v-model="form.rootUrl" :disabled="!!editing?.builtIn" placeholder="https://example.com/market/index.json" class="flex-1" />
+            <FaInput
+              v-model="form.rootUrl"
+              :placeholder="form.type === 'V2_API' ? 'https://example.com/api/public/plugin-market' : 'https://example.com/market/index.json'"
+              class="flex-1"
+            />
             <FaButton variant="outline" :loading="testing" @click="testForm">
               测试连接
             </FaButton>
-          </div>
-          <div v-if="editing?.builtIn" class="mt-1 text-xs text-secondary-foreground/60">
-            内置源地址由系统配置 yudream.platform.plugin.store-root-url 管理，此处不可修改。
           </div>
           <div v-if="testMessage" class="mt-1 flex items-center gap-1">
             <FaTag :variant="testOk ? 'default' : 'destructive'">{{ testOk ? '成功' : '失败' }}</FaTag>

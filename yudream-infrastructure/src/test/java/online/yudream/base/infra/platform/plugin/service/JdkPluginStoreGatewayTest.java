@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.enumerate.MarketSourceType;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogEntry;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescriptor;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
@@ -66,10 +67,44 @@ class JdkPluginStoreGatewayTest {
     }
 
     @Test
-    void configuredSourceRefMirrorsProperties() {
-        assertEquals(ROOT.toString(), gateway(ROOT, new FakeHttpClient(request -> {
-            throw new AssertionError("configuredSourceRef must not request anything");
-        })).configuredSourceRef().rootUrl());
+    void fetchV2CatalogBuildsStructuredVersionsWithoutFetchingJar() {
+        URI community = URI.create("https://community.example.test/api/public/plugin-market");
+        FakeHttpClient client = new FakeHttpClient(request -> response(request, switch (request.uri().getPath()) {
+            case "/api/public/plugin-market/api/v2/manifest" -> """
+                    {"protocol":"yudream-market-v2","name":"测试站","pluginCount":1}
+                    """;
+            case "/api/public/plugin-market/api/v2/plugins" -> """
+                    {"total":1,"page":1,"size":100,"items":[{"code":"demo","displayName":"Demo","latestVersion":"1.0.0"}]}
+                    """;
+            case "/api/public/plugin-market/api/v2/plugins/demo" -> """
+                    {"code":"demo","displayName":"Demo","description":"示例","category":"效率工具","tags":["demo"],
+                     "versions":[{"version":"1.0.0","main":"example.Plugin","sha256":"%s","sizeBytes":12,
+                     "downloadPath":"plugins/demo/versions/1.0.0/download",
+                     "dependencies":[{"code":"base","range":"x","required":true}]}]}
+                    """.formatted(SHA_256);
+            default -> throw new AssertionError("Unexpected request: " + request.uri());
+        }));
+
+        List<PluginStoreCatalogEntry> entries = gateway(community, client)
+                .fetchCatalog(new PluginStoreSourceRef(community.toString(), "secret", MarketSourceType.V2_API));
+
+        assertEquals(List.of("demo"), entries.stream().map(PluginStoreCatalogEntry::code).toList());
+        var structured = entries.getFirst().structuredVersions();
+        assertEquals(1, structured.size());
+        assertEquals("1.0.0", structured.getFirst().releaseVersion());
+        assertEquals("https://community.example.test/api/public/plugin-market/api/v2/plugins/demo/versions/1.0.0/download",
+                structured.getFirst().downloadUrl());
+        assertEquals("example.Plugin", structured.getFirst().main());
+        assertEquals(List.of("demo"), structured.getFirst().tags());
+        assertTrue(client.sent.stream().anyMatch(request -> request.headers().firstValue("Authorization")
+                .orElse("").equals("Bearer secret")));
+    }
+
+    @Test
+    void fetchCatalogRejectsLocalType() {
+        assertThrows(BizException.class, () -> gateway(ROOT, new FakeHttpClient(request -> {
+            throw new AssertionError("LOCAL must not request anything");
+        })).fetchCatalog(new PluginStoreSourceRef(null, null, MarketSourceType.LOCAL)));
     }
 
     @Test

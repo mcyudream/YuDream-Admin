@@ -18,6 +18,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescri
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginVersion;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreSourceRef;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreStructuredVersion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -27,11 +28,9 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -73,11 +72,10 @@ class PluginStoreAppServiceTest {
         return service;
     }
 
+    /** 能力开启后的单源目录（取代已删除的 Nexus 隐式回落）。 */
     private void stubLegacyCatalog(PluginStoreCatalogEntry... entries) {
-        when(pluginMarketSourceAppService.isActive()).thenReturn(false);
-        PluginStoreSourceRef configuredRef = new PluginStoreSourceRef(STORE_ROOT, null);
-        when(pluginStoreGateway.configuredSourceRef()).thenReturn(configuredRef);
-        when(pluginStoreGateway.fetchCatalog(configuredRef)).thenReturn(List.of(entries));
+        PluginMarketSource source = source("default", "本机插件市场", STORE_ROOT);
+        stubMultiSource(new PluginMarketSourceAppService.SourceCatalog(source, snapshot(source, entries)));
     }
 
     private void stubMultiSource(PluginMarketSourceAppService.SourceCatalog... catalogs) {
@@ -120,8 +118,17 @@ class PluginStoreAppServiceTest {
         var result = service().list();
 
         assertEquals(List.of("demo"), result.stream().map(item -> item.getCode()).toList());
-        assertNull(result.getFirst().getSourceCode());
-        verify(pluginStoreGateway).fetchCatalog(any());
+        assertEquals("default", result.getFirst().getSourceCode());
+        verify(pluginMarketSourceAppService).enabledSourceCatalogs();
+        verify(pluginStoreGateway, never()).fetchCatalog(any());
+    }
+
+    @Test
+    void listReturnsEmptyWhenCapabilityInactive() {
+        when(pluginMarketSourceAppService.isActive()).thenReturn(false);
+
+        assertEquals(List.of(), service().list());
+        verifyNoInteractions(pluginStoreGateway);
     }
 
     @Test
@@ -159,8 +166,8 @@ class PluginStoreAppServiceTest {
     void rejectsInvalidCodeWithoutCallingGateway() {
         assertThrows(BizException.class, () -> service().detail("../demo"));
 
+        verify(pluginMarketSourceAppService).ensureEnabled();
         verifyNoInteractions(pluginStoreGateway);
-        verifyNoInteractions(pluginMarketSourceAppService);
     }
 
     @Test
@@ -169,7 +176,8 @@ class PluginStoreAppServiceTest {
 
         assertThrows(BizException.class, () -> service().detail("demo"));
 
-        verify(pluginStoreGateway).fetchCatalog(any());
+        verify(pluginMarketSourceAppService).ensureEnabled();
+        verify(pluginStoreGateway, never()).fetchCatalog(any());
     }
 
     @Test
@@ -220,7 +228,7 @@ class PluginStoreAppServiceTest {
         service.install(" demo ", " 1.0.0 ", null);
 
         verify(pluginStoreGateway).downloadJar(any(), eq(descriptor), any());
-        verify(pluginAppService).installStoreJar(any(), eq("demo"), eq("1.0.0"), eq("example.Plugin"), isNull());
+        verify(pluginAppService).installStoreJar(any(), eq("demo"), eq("1.0.0"), eq("example.Plugin"), eq("default"));
         verifyNoMoreInteractions(pluginAppService);
     }
 
@@ -282,7 +290,7 @@ class PluginStoreAppServiceTest {
 
         verify(pluginAppService).list();
         verify(pluginStoreGateway).downloadJar(any(), eq(descriptor), any());
-        verify(pluginAppService).installStoreJar(any(), eq("demo"), eq("1.0.0"), eq("example.Plugin"), isNull());
+        verify(pluginAppService).installStoreJar(any(), eq("demo"), eq("1.0.0"), eq("example.Plugin"), eq("default"));
         verifyNoMoreInteractions(pluginAppService);
     }
 
@@ -373,7 +381,7 @@ class PluginStoreAppServiceTest {
         var result = service().updatePlans();
 
         assertEquals(List.of("demo"), result.stream().map(item -> item.getCode()).toList());
-        verify(pluginStoreGateway).fetchCatalog(any());
+        verify(pluginStoreGateway, never()).fetchCatalog(any());
     }
 
     @Test
@@ -424,10 +432,32 @@ class PluginStoreAppServiceTest {
 
         assertEquals(true, result.isRequiresRestart());
         verify(pluginStoreGateway).downloadJar(any(), eq(target), any());
-        verify(pluginAppService).updateStoreJar(any(), eq("demo"), eq("2.0.0"), eq("example.Plugin"), isNull());
+        verify(pluginAppService).updateStoreJar(any(), eq("demo"), eq("2.0.0"), eq("example.Plugin"), eq("default"));
         verify(pluginAppService, never()).enable(any());
         verify(pluginAppService, never()).disable(any());
         verify(pluginAppService, never()).unload(any());
+    }
+
+    @Test
+    void installsLocalStructuredVersionByCopyingJar() throws Exception {
+        java.nio.file.Path sourceJar = java.nio.file.Files.createTempFile("local-plugin-", ".jar");
+        java.nio.file.Files.writeString(sourceJar, "plugin-jar");
+        String sha256 = java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(sourceJar)));
+        PluginStoreStructuredVersion structured = new PluginStoreStructuredVersion(
+                "1.0.0", "local:demo/1.0.0/plugin.jar", sha256, "example.Plugin", "Demo", null,
+                10L, "效率工具", List.of("demo"), java.util.Map.of(), List.of());
+        PluginStoreCatalogEntry entry = new PluginStoreCatalogEntry("demo", "local:demo", null, List.of(), List.of(structured));
+        PluginMarketSource source = source("default", "本机插件市场", null);
+        stubMultiSource(new PluginMarketSourceAppService.SourceCatalog(source, snapshot(source, entry)));
+        when(pluginMarketSourceAppService.resolveLocalJar("local:demo/1.0.0/plugin.jar")).thenReturn(sourceJar);
+        PluginStoreAppService service = serviceWithUploadDirectory();
+
+        service.install("demo", "1.0.0", "default");
+
+        verify(pluginStoreGateway, never()).downloadJar(any(), any(), any());
+        verify(pluginAppService).installStoreJar(any(), eq("demo"), eq("1.0.0"), eq("example.Plugin"), eq("default"));
+        java.nio.file.Files.deleteIfExists(sourceJar);
     }
 
     @Test

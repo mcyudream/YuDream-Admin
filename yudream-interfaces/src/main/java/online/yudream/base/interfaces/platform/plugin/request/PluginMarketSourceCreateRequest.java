@@ -16,6 +16,9 @@ public class PluginMarketSourceCreateRequest {
     @Size(max = 128, message = "市场源名称过长")
     private String name;
 
+    /** STATIC_INDEX 或 V2_API；缺省按 STATIC_INDEX。 */
+    private String type;
+
     @NotBlank(message = "市场源地址不能为空")
     @Size(max = 2048, message = "市场源地址过长")
     private String rootUrl;
