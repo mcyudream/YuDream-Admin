@@ -184,7 +184,7 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 ### 6.2 源管理
 
-管理员在「平台 → 市场源管理」维护源列表（权限码 `platform:plugin-market-source:view/create/edit/delete/run`）。发布与审核已拆到「插件发布」（作者工作台，`upload`）和「发布审核」（`accept`），三个菜单均映射能力 `plugin-market-source`。公开 `/market` 只发现与下载，不上传：
+管理员在「平台 → 插件中心 → 市场源管理」维护源列表（权限码 `platform:plugin-market-source:view/create/edit/delete/run`）。发布与审核已拆到同分组下的「插件发布」（作者工作台，`upload`）和「发布审核」（`accept`），三个菜单均映射能力 `plugin-market-source`。公开 `/market` 只发现与下载，不上传：
 
 - 内置源 `default` 类型为 `LOCAL`（本机插件市场）：进程内直读本机 `PUBLISHED` 发布物，无需地址与同步，不可删除；
 - 新增源类型只能是 `V2_API`（正式协议，rootUrl 为 `https://host/api/public/plugin-market`）或 `STATIC_INDEX`（legacy `index.json` 完整地址）；禁止创建 `LOCAL`；
