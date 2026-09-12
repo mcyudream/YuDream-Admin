@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.plugin.impl;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginMarketPublication;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginPublicationStatus;
 import online.yudream.base.domain.platform.plugin.repo.PluginMarketPublicationRepo;
@@ -67,6 +68,29 @@ public class PluginMarketPublicationRepoImpl implements PluginMarketPublicationR
         return mongoTemplate.find(query, PluginMarketPublicationDO.class).stream()
                 .map(PluginMarketPublicationInfraMapper::toDomain)
                 .toList();
+    }
+
+    @Override
+    public PageResult<PluginMarketPublication> page(PluginPublicationStatus status, Long publisherUserId, int page, int size) {
+        Query query = new Query();
+        if (status != null) {
+            query.addCriteria(Criteria.where("status").is(status));
+        }
+        if (publisherUserId != null) {
+            query.addCriteria(Criteria.where("publisherUserId").is(publisherUserId));
+        }
+        query.with(Sort.by(Sort.Direction.DESC, "createTime"));
+        long total = mongoTemplate.count(query, PluginMarketPublicationDO.class);
+        int currentPage = Math.max(page, 1);
+        int pageSize = Math.max(size, 1);
+        query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
+        return new PageResult<>(
+                mongoTemplate.find(query, PluginMarketPublicationDO.class).stream()
+                        .map(PluginMarketPublicationInfraMapper::toDomain)
+                        .toList(),
+                total,
+                currentPage,
+                pageSize);
     }
 
     @Override

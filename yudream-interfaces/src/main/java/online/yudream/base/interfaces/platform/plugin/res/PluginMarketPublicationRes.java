@@ -39,11 +39,11 @@ public class PluginMarketPublicationRes implements Serializable {
     private String sha256;
     private Long sizeBytes;
     private Long downloadCount;
-    private Long publisherUserId;
+    private String publisherUserId;
     private PluginPublicationChannel channel;
     private PluginPublicationStatus status;
     private String reviewNote;
-    private Long reviewerUserId;
+    private String reviewerUserId;
     private LocalDateTime reviewedAt;
     private LocalDateTime createTime;
 }

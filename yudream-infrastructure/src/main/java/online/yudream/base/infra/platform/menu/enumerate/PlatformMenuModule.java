@@ -150,6 +150,20 @@ public enum PlatformMenuModule {
             parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:accept")
     PLUGIN_MARKET_SOURCE_ACCEPT,
 
+    @MenuNode(code = "platform:plugin-publish", name = "插件发布", type = MenuNodeType.MENU,
+            path = "/platform/plugin-publish", component = "platform/plugin-publish/index.vue",
+            icon = "i-ri:upload-2-line", sort = 92, permission = "platform:plugin-market-source:upload")
+    PLUGIN_PUBLISH,
+
+    @MenuNode(code = "platform:plugin-market-source:publish", name = "跳过审核直接发布", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_PUBLISH", permission = "platform:plugin-market-source:publish")
+    PLUGIN_PUBLISH_SKIP_REVIEW,
+
+    @MenuNode(code = "platform:plugin-review", name = "发布审核", type = MenuNodeType.MENU,
+            path = "/platform/plugin-review", component = "platform/plugin-review/index.vue",
+            icon = "i-ri:shield-check-line", sort = 91, permission = "platform:plugin-market-source:accept")
+    PLUGIN_REVIEW,
+
     @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
             path = "/platform/api-doc", component = "platform/api-doc/index.vue",
             icon = "i-ri:file-list-2-line", sort = 90)

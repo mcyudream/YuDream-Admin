@@ -10,7 +10,9 @@ import online.yudream.base.application.platform.plugin.assembler.PluginMarketPub
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationEditCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationReviewCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketPublicationDTO;
+import online.yudream.base.application.platform.plugin.query.PluginMarketPublicationPageQuery;
 import online.yudream.base.application.system.setting.service.SettingAppService;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
@@ -96,7 +98,7 @@ public class PluginMarketPublicationAppService {
     @Transactional
     public PluginMarketPublicationDTO publish(InputStream jarStream, long size, String releaseNotes,
                                               String metadataJson, String category, List<String> tags,
-                                              Long publisherUserId, boolean pipeline) {
+                                              Long publisherUserId, boolean pipeline, boolean skipReview) {
         capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
                 PluginMarketSourceAppService.CAPABILITY_NAME);
         if (size <= 0) {
@@ -158,7 +160,9 @@ public class PluginMarketPublicationAppService {
                         .downloadCount(0L)
                         .publisherUserId(publisherUserId)
                         .channel(pipeline ? PluginPublicationChannel.PIPELINE : PluginPublicationChannel.UI)
-                        .status(reviewRequired() ? PluginPublicationStatus.PENDING : PluginPublicationStatus.PUBLISHED)
+                        .status(skipReview || !reviewRequired()
+                                ? PluginPublicationStatus.PUBLISHED
+                                : PluginPublicationStatus.PENDING)
                         .build());
                 log.info("插件市场发布物已提交：{}@{} 通道={} 状态={}", code, pluginVersion,
                         publication.getChannel(), publication.getStatus());
@@ -175,18 +179,24 @@ public class PluginMarketPublicationAppService {
     // ---------- 管理与审核 ----------
 
     @Transactional(readOnly = true)
-    public List<PluginMarketPublicationDTO> list(String status) {
+    public PageResult<PluginMarketPublicationDTO> page(PluginMarketPublicationPageQuery query,
+                                                      Long operatorUserId, boolean canViewAll) {
         capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
                 PluginMarketSourceAppService.CAPABILITY_NAME);
-        List<PluginMarketPublication> publications = StringUtils.hasText(status)
-                ? publicationRepo.findByStatus(parseStatus(status))
-                : publicationRepo.findAll();
-        return publications.stream().map(this::toDTO).toList();
+        PluginMarketPublicationPageQuery safe = query == null ? new PluginMarketPublicationPageQuery() : query;
+        int page = Math.max(safe.getPage(), 1);
+        int size = Math.max(1, Math.min(safe.getSize() <= 0 ? 10 : safe.getSize(), MAX_PAGE_SIZE));
+        PluginPublicationStatus status = StringUtils.hasText(safe.getStatus()) ? parseStatus(safe.getStatus()) : null;
+        boolean mine = Boolean.TRUE.equals(safe.getMine()) || !canViewAll;
+        Long publisherUserId = mine ? operatorUserId : null;
+        PageResult<PluginMarketPublication> result = publicationRepo.page(status, publisherUserId, page, size);
+        return new PageResult<>(result.getRecords().stream().map(this::toDTO).toList(),
+                result.getTotal(), result.getPage(), result.getSize());
     }
 
     /** 编辑展示元数据与分类标签；不重置审核状态，重生成 descriptor。 */
     @Transactional
-    public PluginMarketPublicationDTO edit(PluginMarketPublicationEditCmd cmd) {
+    public PluginMarketPublicationDTO edit(PluginMarketPublicationEditCmd cmd, Long operatorUserId, boolean manageOthers) {
         capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
                 PluginMarketSourceAppService.CAPABILITY_NAME);
         if (cmd == null || cmd.getId() == null) {
@@ -194,6 +204,7 @@ public class PluginMarketPublicationAppService {
         }
         PluginMarketPublication publication = publicationRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("发布物不存在"));
+        assertMutable(publication, operatorUserId, manageOthers);
         String displayName = cmd.getDisplayName() == null ? null
                 : sanitizeDisplayText(cmd.getDisplayName(), MAX_DISPLAY_TEXT_LENGTH);
         String description = cmd.getDescription() == null ? null
@@ -216,32 +227,36 @@ public class PluginMarketPublicationAppService {
 
     @Transactional
     public PluginMarketPublicationDTO accept(PluginMarketPublicationReviewCmd cmd, Long reviewerId) {
-        return review(cmd, reviewerId, (publication, note) -> publication.accept(reviewerId, note));
+        return review(cmd, reviewerId, true, (publication, note) -> publication.accept(reviewerId, note));
     }
 
     @Transactional
     public PluginMarketPublicationDTO reject(PluginMarketPublicationReviewCmd cmd, Long reviewerId) {
-        return review(cmd, reviewerId, (publication, note) -> publication.reject(reviewerId, note));
+        return review(cmd, reviewerId, true, (publication, note) -> publication.reject(reviewerId, note));
     }
 
     @Transactional
-    public PluginMarketPublicationDTO unpublish(PluginMarketPublicationReviewCmd cmd, Long reviewerId) {
-        return review(cmd, reviewerId, (publication, note) -> publication.revoke(reviewerId, note));
+    public PluginMarketPublicationDTO unpublish(PluginMarketPublicationReviewCmd cmd, Long operatorUserId,
+                                               boolean manageOthers) {
+        return review(cmd, operatorUserId, manageOthers,
+                (publication, note) -> publication.revoke(operatorUserId, note));
     }
 
     /** 硬删除：移除发布记录与 JAR 文件（区别于下架的保留备查）。 */
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Long operatorUserId, boolean manageOthers) {
         capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
                 PluginMarketSourceAppService.CAPABILITY_NAME);
         PluginMarketPublication publication = publicationRepo.findById(id)
                 .orElseThrow(() -> new BizException("发布物不存在"));
+        assertMutable(publication, operatorUserId, manageOthers);
         publicationRepo.deleteById(publication.getId());
         deleteQuietly(jarFile(publication));
         log.info("插件市场发布物已删除：{}@{}", publication.getCode(), publication.getPluginVersion());
     }
 
-    private PluginMarketPublicationDTO review(PluginMarketPublicationReviewCmd cmd, Long reviewerId,
+    private PluginMarketPublicationDTO review(PluginMarketPublicationReviewCmd cmd, Long operatorUserId,
+                                              boolean manageOthers,
                                               java.util.function.BiConsumer<PluginMarketPublication, String> action) {
         capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
                 PluginMarketSourceAppService.CAPABILITY_NAME);
@@ -250,11 +265,21 @@ public class PluginMarketPublicationAppService {
         }
         PluginMarketPublication publication = publicationRepo.findById(cmd.getId())
                 .orElseThrow(() -> new BizException("发布物不存在"));
+        assertMutable(publication, operatorUserId, manageOthers);
         action.accept(publication, StringUtils.hasText(cmd.getNote()) ? cmd.getNote().trim() : null);
         PluginMarketPublication saved = publicationRepo.save(publication);
-        log.info("插件市场发布物 {}@{} 审核动作完成：{}（审核人 {}）", saved.getCode(), saved.getPluginVersion(),
-                saved.getStatus(), reviewerId);
+        log.info("插件市场发布物 {}@{} 审核动作完成：{}（操作人 {}）", saved.getCode(), saved.getPluginVersion(),
+                saved.getStatus(), operatorUserId);
         return toDTO(saved);
+    }
+
+    private void assertMutable(PluginMarketPublication publication, Long operatorUserId, boolean manageOthers) {
+        if (manageOthers) {
+            return;
+        }
+        if (operatorUserId == null || !operatorUserId.equals(publication.getPublisherUserId())) {
+            throw new BizException("只能操作自己发布的插件");
+        }
     }
 
     /** 审核开关：能力配置 reviewRequired，未配置或值非 false 时默认需要审核。 */

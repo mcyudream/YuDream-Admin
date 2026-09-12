@@ -55,6 +55,7 @@ const sortOptions: { label: string, value: PluginMarketSort }[] = [
   { label: '名称', value: 'name' },
 ]
 const categoryOptions = computed(() => PLUGIN_MARKET_CATEGORIES.map(name => ({ label: name, value: name })))
+const publicV2Url = `${window.location.origin}/api/public/plugin-market`
 const hasFilters = computed(() => Boolean(
   selectedCategories.value.length
   || selectedTags.value.length
@@ -285,6 +286,11 @@ async function submitPublish() {
     publishing.value = false
   }
 }
+
+async function copyPublicUrl() {
+  await navigator.clipboard.writeText(publicV2Url)
+  toast.success('已复制市场源地址')
+}
 </script>
 
 <template>
@@ -431,6 +437,17 @@ async function submitPublish() {
             />
           </section>
         </div>
+
+        <footer class="discover-source">
+          <div>
+            <strong>订阅此市场</strong>
+            <p>其他 YuDream 实例可将此地址添加为「v2 协议源」。</p>
+          </div>
+          <div class="discover-source__url">
+            <code>{{ publicV2Url }}</code>
+            <FaButton variant="outline" size="sm" @click="copyPublicUrl">复制</FaButton>
+          </div>
+        </footer>
       </div>
     </main>
 
@@ -737,6 +754,34 @@ async function submitPublish() {
 }
 .discover-pagination {
   margin-top: 22px;
+}
+.discover-source {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 48px;
+  padding: 18px 20px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--yb-site-surface, var(--color-bg-2)) 92%, transparent);
+}
+.discover-source p {
+  margin: 4px 0 0;
+  color: var(--yb-site-muted, var(--color-text-3));
+  font-size: 13px;
+}
+.discover-source__url {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.discover-source code {
+  max-width: min(100%, 36rem);
+  overflow-wrap: anywhere;
+  font-size: 12px;
 }
 @media (max-width: 980px) {
   .discover-grid,
