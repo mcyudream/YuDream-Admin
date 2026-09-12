@@ -200,7 +200,7 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 ### 6.4 源契约
 
-市场源必须提供与官方市场一致的 `schemaVersion=1` 只读 HTTP 契约：根 `index.json` → 每插件 `index.json` → 每版本 `descriptor.json`（含 JAR 地址与 SHA-256）。相对引用按各 `index.json` 所在目录解析，且必须与源根同源同路径；JAR 下载强制校验 SHA-256 与大小上限。自托管一个市场源即等价于按该结构提供静态文件（下一期将内置自托管服务端发布与审核能力）。
+市场源必须提供与官方市场一致的 `schemaVersion=1` 只读 HTTP 契约：根 `index.json` → 每插件 `index.json` → 每版本 `descriptor.json`（含 JAR 地址与 SHA-256）。相对引用按各 `index.json` 所在目录解析，且必须与源根同源同路径；JAR 下载强制校验 SHA-256 与大小上限。自托管一个市场源即等价于按该结构提供静态文件；YuDream 实例现已内置这一服务端（发布、审核与对外目录），见[自托管市场源](./market-source)。
 
 ## 7. 相关文档
 

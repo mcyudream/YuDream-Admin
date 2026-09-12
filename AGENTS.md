@@ -32,7 +32,8 @@
 - 平台能力运行必须过两道闸门：项目闸门（配置/`@ConditionalOnProperty` 决定是否允许加载 provider）与应用闸门（应用层每次用例前 `ensureEnabled(...)` 检查持久化状态）。项目闸门不允许的能力不得注册端点、不得启动恢复。
 - Infra provider 只是工具包装：构造与 `enable(config)` 不得建立外部连接、声明队列或启动长驻资源；连接只在两道闸门通过且真实业务/连接/健康检查动作需要时创建，disable 时关闭清理。
 - 能力间运行时依赖必须声明在 `CapabilityDescriptor.dependencies`；依赖不可用时拒绝启用，禁用依赖必须级联禁用依赖方。
-- 插件市场源（`plugin-market-source`，类型 DISTRIBUTION）遵循双闸门：项目闸门关闭时市场源管理端点不注册、不播种内置源，市场回落 `store-root-url` 配置直连单源（行为与历史一致）；开启后市场读各启用源的目录快照合并展示（列表零外呼，快照由手动/懒同步维护），安装/更新记录 `marketSourceCode` 并跟随安装来源、跨源取最高版本。市场源 token 经主密钥加密存储，源契约与官方 `schemaVersion=1` 市场一致（HTTPS-only、同源相对引用、SHA-256），契约文档在 `yd-docs/docs/plugin/marketplace.md` 第 6 节。
+- 插件市场源（`plugin-market-source`，类型 DISTRIBUTION）遵循双闸门：项目闸门关闭时市场源管理端点不注册、不播种内置源，市场回落 `store-root-url` 配置直连单源（行为与历史一致）；开启后市场读各启用源的目录快照合并展示（列表零外呼，快照由手动/懒同步维护），安装/更新记录 `marketSourceCode` 并跟随安装来源、跨源取最高版本。市场源 token 经主密钥加密存储，源契约与官方 `schemaVersion=1` 市场一致（HTTPS-only、同源相对引用、SHA-256）。
+- 自托管服务端：本机在 `/api/public/plugin-market/**` 暴露同构只读目录（仅 PUBLISHED 发布物，能力关闭即停止服务）；发布走界面/API Key 双通道（`upload` 权限，API Key 绑定用户可审计），元数据从 JAR 内 plugin.yml 自动解析，`{code}@{version}` 不可覆盖；审核开关 `reviewRequired`（能力配置键，读取处默认回落 true），状态机 PENDING→PUBLISHED/REJECTED、PUBLISHED→REVOKED；发布物 JAR 存 `market-source.directory`（必须独立于插件扫描目录）。细则见 `yd-docs/docs/plugin/market-source.md`。
 
 ## 4. 插件架构要点
 

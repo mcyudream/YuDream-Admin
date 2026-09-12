@@ -186,6 +186,7 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 - [文档站源码与维护说明](yd-docs/README.md)
 - [第三方插件市场投稿](docs/third-party-plugin-submission.md)
 - [插件市场发布边界](docs/plugin-store-release.md)
+- [自托管插件市场源](yd-docs/docs/plugin/market-source.md)
 - [平台能力说明](docs/platform/)
 - [仓库拆分与边界说明](docs/repository-split/README.md)
 - [契约发布校验](docs/plugin-system/contract-validation.md)
