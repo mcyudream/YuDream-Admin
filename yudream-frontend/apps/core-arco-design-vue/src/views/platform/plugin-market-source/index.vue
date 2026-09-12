@@ -451,16 +451,17 @@ function formatSize(bytes?: number) {
 </script>
 
 <template>
-  <FaPageHeader title="市场源管理" class="mb-0">
-    <template #description>
-      管理插件市场的订阅来源：添加多个自托管或官方市场源，市场页会合并展示各源插件。内置源为本机发布物，无需远端地址。
-    </template>
-  </FaPageHeader>
-  <FaPageMain>
-    <FaResponsiveTable
-      v-loading="loading"
-      row-key="id"
-      table-root-class="rounded-lg overflow-hidden"
+  <div>
+    <FaPageHeader title="市场源管理" class="mb-0">
+      <template #description>
+        管理插件市场的订阅来源：添加多个自托管或官方市场源，市场页会合并展示各源插件。内置源为本机发布物，无需远端地址。
+      </template>
+    </FaPageHeader>
+    <FaPageMain>
+      <a-spin :loading="loading" class="block w-full">
+        <FaResponsiveTable
+          row-key="id"
+          table-root-class="rounded-lg overflow-hidden"
       table-class="min-w-[1080px]"
       border
       stripe
@@ -573,6 +574,7 @@ function formatSize(bytes?: number) {
         </FaCard>
       </template>
     </FaResponsiveTable>
+      </a-spin>
 
     <div class="mt-10 flex flex-wrap items-center justify-between gap-3">
       <div class="min-w-0">
@@ -610,10 +612,10 @@ function formatSize(bytes?: number) {
       <FaSelect v-model="pubStatusFilter" :options="publicationFilterOptions" class="w-40" />
     </div>
 
-    <FaResponsiveTable
-      v-loading="pubLoading"
-      class="mt-2"
-      row-key="id"
+    <a-spin :loading="pubLoading" class="mt-2 block w-full">
+      <FaResponsiveTable
+        class="mt-2"
+        row-key="id"
       table-root-class="rounded-lg overflow-hidden"
       table-class="min-w-[980px]"
       border
@@ -730,6 +732,7 @@ function formatSize(bytes?: number) {
         </FaCard>
       </template>
     </FaResponsiveTable>
+    </a-spin>
 
     <FaModal
       v-model="formVisible"
@@ -834,4 +837,5 @@ function formatSize(bytes?: number) {
       </a-form>
     </FaModal>
   </FaPageMain>
+  </div>
 </template>
