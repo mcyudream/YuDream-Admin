@@ -68,7 +68,7 @@ curl --fail-with-body -X POST \
   -F 'metadata={"license":"MIT","compatibility":{"host":"^1.0.0"},"publisher":{"id":"yudream","name":"YuDream","url":"https://yudream.online","verified":true}}'
 ```
 
-3. 插件仓复用官方仓同款选择链路：模板 `ci/publish-to-market.sh` 与 `.gitlab-ci.yml.example` 的 `publish:market`。job 只在受保护 `v*` tag 且已配置 `YUDREAM_MARKET_URL` 时调度，`PLUGIN_RELEASE_ONLY=1` 发布 `release/plugins.txt` 选中的全部最终 JAR（不是 `example-plugin-*.jar`），`resource_group: yudream-plugin-market` 串行。环境变量 `YUDREAM_MARKET_URL`、`YUDREAM_MARKET_API_KEY` 必须受保护并掩码；可选 `YUDREAM_MARKET_CATEGORY`、`YUDREAM_MARKET_TAGS`、`YUDREAM_MARKET_RELEASE_NOTES`、`YUDREAM_MARKET_METADATA`。脚本会读 JAR 内 `plugin.yml` / `store.json`，并校验宿主 `Result.code == 200`。
+3. 插件仓复用官方仓同款选择链路：模板 `ci/publish-to-market.sh` 与 `.gitlab-ci.yml.example` 的 `publish:market`。job 只在受保护 `v*` tag 且已配置 `YUDREAM_MARKET_URL` 时调度，`PLUGIN_RELEASE_ONLY=1` 发布 `release/plugins.txt` 选中的全部最终 JAR（不是 `example-plugin-*.jar`），`resource_group: yudream-plugin-market` 串行。环境变量 `YUDREAM_MARKET_URL`、`YUDREAM_MARKET_API_KEY` 必须受保护并掩码；可选 `YUDREAM_MARKET_CATEGORY`、`YUDREAM_MARKET_TAGS`、`YUDREAM_MARKET_RELEASE_NOTES`、`YUDREAM_MARKET_METADATA`。脚本会读 JAR 内 `plugin.yml` / `store.json`，并校验宿主 `Result.code == 200`。后台「插件发布」页的「查看 CI 模板」弹窗给出完整 `.gitlab-ci.yml`、`publish:market` 片段、`ci/publish-to-market.sh`、`ci/lib/plugin-jar-selection.sh` 与 `release/plugins.txt`，可直接复制。
 
 `metadata` 各字段均为可选：
 
