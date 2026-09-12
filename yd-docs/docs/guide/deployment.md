@@ -158,7 +158,7 @@ flowchart LR
 | `PLATFORM_PLUGIN_HOST_VERSION` | 否 | 插件兼容性矩阵中的宿主版本，默认 `1.0.0`。 |
 | `PLATFORM_PLUGIN_SPI_VERSION` | 否 | 插件兼容性矩阵中的 SPI 版本，默认 `2.13.0`；应与当前宿主 SPI 契约匹配（源码 `2.24.0`）。 |
 | `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | 否 | 插件兼容性矩阵中的前端 SDK 版本，默认 `1.0.1`；运行时行为版本为 `1.5.0`，npm 包为 `1.5.0`。 |
-| `PLATFORM_PLUGIN_STORE_ROOT_URL` | 否 | 插件商店索引 URL，默认 `https://nexus.yudream.online/repository/plugin-store-releases/index.json`。 |
+| `PLATFORM_PLUGIN_STORE_ROOT_URL` | 否 | 遗留配置键，市场目录**不再**默认回落此 URL。可安装插件来自本机 LOCAL 与已订阅的远程源。 |
 | `PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS` | 否 | 插件商店连接超时，默认 `5000` 毫秒。 |
 | `PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS` | 否 | 插件商店请求超时，默认 `5000` 毫秒。 |
 | `PLATFORM_PLUGIN_STORE_MAX_RESPONSE_BYTES` | 否 | 插件商店响应最大字节数，默认 `1048576`。 |
@@ -226,6 +226,6 @@ SPI 与前端契约包通过 tag 流水线发布到 `nexus.yudream.online`：
 
 ## 插件发布
 
-- 插件 JAR 通过后台"插件管理"上传加载，或放入宿主 `plugins/` 目录由启动恢复。
-- 插件商店托管于 Nexus `plugin-store-releases/index.json`，索引含 host/spi/frontend-sdk 版本兼容矩阵——升级主框架前先核对兼容矩阵。
-- 第三方插件提交流程见主仓 `docs/third-party-plugin-submission.md`。
+- 插件 JAR 通过后台「插件管理」上传加载，或放入宿主 `plugins/` 目录由启动恢复。
+- 可安装目录来自已订阅的市场源（本机 LOCAL + 远程 v2 / 静态索引），不再默认回落 Nexus `plugin-store-releases`。
+- 第三方上架：投给开放站点的本机市场，或自己托管市场源。见 [插件市场与第三方上架](/plugin/marketplace) 与主仓 `docs/third-party-plugin-submission.md`。

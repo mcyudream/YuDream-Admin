@@ -70,13 +70,9 @@
 
 ## 第三方市场投稿
 
-第三方作者不使用本模板的官方发布 job，也不配置 `NEXUS_USERNAME`、`NEXUS_PASSWORD` 或其他写凭据。作者只能通过 MR 提交可审计的投稿材料；普通 MR CI 只作本地校验，绝不上传 Nexus。
+第三方作者**不要**使用本模板的 Nexus 发布 job，也不要配置 `NEXUS_USERNAME` / `NEXUS_PASSWORD`。上架走自托管市场源，两条路：
 
-1. 在受控 `submission/` 目录中复制 `plugin.yml.example`、`store.json.example`、`submission.json.example` 和 `LICENSE`。
-2. 添加构建完成的 `plugin.jar`、其 SHA-256 文件，以及 `store.json` 引用的图标、截图等资源。
-3. 使用稳定 SemVer（如 `1.0.0`），并让 `submission.json`、`plugin.yml`、`store.json` 与 JAR 内根 `plugin.yml` 的 code、version、main 完全一致。
-4. `depend` 是必需依赖，`softdepend` 是可选依赖；市场条目的 `dependencies[].required` 必须表达相同语义。
-5. 确保 JAR 不包含 `online/yudream/base/plugin/spi/**`。SPI、SDK 和组件仅作为已发布依赖使用。
-6. 提交 MR，等待许可证、版本、资源、依赖、校验和和归档安全审核。发布版本不可覆盖；修复必须增加版本号。
+1. **开放站点**：向目标站点申请 `platform:plugin-market-source:upload`，在后台「插件发布」上传 JAR；或配置受保护的 `YUDREAM_MARKET_URL` + `YUDREAM_MARKET_API_KEY`，用 `publish:market` 打受保护 `v*` tag。
+2. **自托管**：自己启用能力 `plugin-market-source`，把本机 LOCAL 当供给方，对外 v2 基址给订阅方添加为 `V2_API` 源。
 
-审核通过后，只有受信发布者才能在 protected tag 或受保护手动发布流水线中代发。写入凭据仅注入该发布 job，Raw 市场资源写入应使用串行 `resource_group`。完整格式和审核清单见 [`docs/third-party-plugin-submission.md`](../../docs/third-party-plugin-submission.md)。
+JAR 根须有 `plugin.yml`，依赖正式发布的 SPI/SDK，不得内嵌 `online/yudream/base/plugin/spi/**`。`{code}@{pluginVersion}` 不可覆盖。不要组主仓 `submission/` MR。完整步骤见主仓 [`docs/third-party-plugin-submission.md`](../../docs/third-party-plugin-submission.md) 与文档站 [插件市场与第三方上架](https://ydadocs.yudream.online/plugin/marketplace)。
