@@ -47,14 +47,28 @@ export interface PluginMarketPublication {
   description?: string
   releaseNotes?: string
   license?: string
+  category?: string
+  tags?: string[]
+  compatibility?: Record<string, string>
   sha256: string
   sizeBytes?: number
+  downloadCount?: number
   publisherUserId?: string
   channel: PluginPublicationChannel
   status: PluginPublicationStatus
   reviewNote?: string
   reviewedAt?: string
   createTime?: string
+}
+
+export interface PluginMarketPublicationEditPayload {
+  displayName?: string
+  description?: string
+  releaseNotes?: string
+  license?: string
+  category?: string
+  tags?: string[]
+  compatibility?: Record<string, string>
 }
 
 export const PLUGIN_PUBLICATION_STATUS_OPTIONS: { label: string, value: PluginPublicationStatus }[] = [
@@ -79,6 +93,8 @@ export default {
   acceptPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/accept`, { note }),
   rejectPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/reject`, { note }),
   unpublishPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/unpublish`, { note }),
+  updatePublication: (id: string, data: PluginMarketPublicationEditPayload) => systemClient.put<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}`, data),
+  deletePublication: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugin-market-source/publications/${id}`),
   reviewRequired: () => systemClient.get<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/review-required'),
   updateReviewRequired: (reviewRequired: boolean) => systemClient.put<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/review-required', { reviewRequired }),
 }

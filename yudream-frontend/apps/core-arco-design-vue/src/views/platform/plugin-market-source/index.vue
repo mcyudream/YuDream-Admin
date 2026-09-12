@@ -2,6 +2,7 @@
 import type { TableColumn } from '@yudream/components'
 import type { PluginMarketPublication, PluginMarketSource, PluginMarketSourcePayload, PluginPublicationChannel, PluginPublicationStatus, MarketSourceType } from '@/api/modules/platform-plugin-market-source'
 import { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
+import { PLUGIN_MARKET_CATEGORIES } from '@/api/modules/plugin-market-public'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 
 const modal = useFaModal()
@@ -73,8 +74,22 @@ const publicationColumns = computed<TableColumn<PluginMarketPublication>[]>(() =
   { id: 'size', header: '大小', width: 100, align: 'right' },
   { id: 'pubStatus', header: '状态', width: 100, align: 'center' },
   { accessorKey: 'createTime', header: '提交时间', width: 170 },
-  { id: 'pubOperation', header: '操作', width: 190, align: 'center', fixed: 'right' },
+  { id: 'pubOperation', header: '操作', width: 280, align: 'center', fixed: 'right' },
 ])
+
+const categoryOptions = computed(() => PLUGIN_MARKET_CATEGORIES.map(name => ({ label: name, value: name })))
+const editVisible = ref(false)
+const editSaving = ref(false)
+const editingPublication = ref<PluginMarketPublication | null>(null)
+const editForm = reactive({
+  displayName: '',
+  description: '',
+  releaseNotes: '',
+  license: '',
+  category: '',
+  tags: '',
+  compatibility: '',
+})
 
 onMounted(load)
 
@@ -326,6 +341,69 @@ function confirmUnpublish(row: PluginMarketPublication) {
     content: `确认下架 ${row.code}@${row.pluginVersion} 吗？订阅方将不再拉取到该版本，文件保留备查。`,
     onConfirm: () => actOnPublication(row, api => api.unpublishPublication(row.id), '已下架'),
   })
+}
+
+function confirmDeletePublication(row: PluginMarketPublication) {
+  modal.confirm({
+    title: '确认删除',
+    content: `确认永久删除 ${row.code}@${row.pluginVersion} 吗？发布记录与 JAR 都会移除，不可恢复。`,
+    onConfirm: () => actOnPublication(row, api => api.deletePublication(row.id), '已删除'),
+  })
+}
+
+function openEditPublication(row: PluginMarketPublication) {
+  editingPublication.value = row
+  editForm.displayName = row.displayName || ''
+  editForm.description = row.description || ''
+  editForm.releaseNotes = row.releaseNotes || ''
+  editForm.license = row.license || ''
+  editForm.category = row.category || ''
+  editForm.tags = (row.tags || []).join(', ')
+  editForm.compatibility = row.compatibility && Object.keys(row.compatibility).length
+    ? JSON.stringify(row.compatibility, null, 2)
+    : ''
+  editVisible.value = true
+}
+
+async function submitEditPublication() {
+  if (!editingPublication.value) {
+    return
+  }
+  let compatibility: Record<string, string> | undefined
+  if (editForm.compatibility.trim()) {
+    try {
+      const parsed = JSON.parse(editForm.compatibility.trim()) as unknown
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        toast.error('兼容性必须是 JSON 对象，例如 {"host":">=2.16.0"}')
+        return
+      }
+      compatibility = Object.fromEntries(
+        Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [key, String(value)]),
+      )
+    }
+    catch {
+      toast.error('兼容性必须是合法 JSON')
+      return
+    }
+  }
+  editSaving.value = true
+  try {
+    await apiMarketSource.updatePublication(editingPublication.value.id, {
+      displayName: editForm.displayName.trim(),
+      description: editForm.description.trim(),
+      releaseNotes: editForm.releaseNotes.trim(),
+      license: editForm.license.trim(),
+      category: editForm.category,
+      tags: editForm.tags.split(/[,，]/).map(item => item.trim()).filter(Boolean),
+      compatibility: compatibility ?? {},
+    })
+    editVisible.value = false
+    toast.success('发布物已更新，无需重新审核')
+    await loadPublications()
+  }
+  finally {
+    editSaving.value = false
+  }
 }
 
 async function actOnPublication(row: PluginMarketPublication, action: (api: typeof apiMarketSource) => Promise<unknown>, success: string) {
@@ -586,9 +664,12 @@ function formatSize(bytes?: number) {
           >
             下架
           </FaButton>
-          <span v-if="row.original.status === 'REJECTED' || row.original.status === 'REVOKED'" class="text-xs text-secondary-foreground/60">
-            {{ formatTime(row.original.reviewedAt) }}
-          </span>
+          <FaButton v-auth="'platform:plugin-market-source:edit'" variant="link" size="sm" :disabled="actingPublicationId === row.original.id" @click="openEditPublication(row.original)">
+            编辑
+          </FaButton>
+          <FaButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.original.id" @click="confirmDeletePublication(row.original)">
+            删除
+          </FaButton>
         </div>
       </template>
 
@@ -637,6 +718,12 @@ function formatSize(bytes?: number) {
                 @click="confirmUnpublish(row)"
               >
                 下架
+              </FaButton>
+              <FaButton v-auth="'platform:plugin-market-source:edit'" variant="link" size="sm" :disabled="actingPublicationId === row.id" @click="openEditPublication(row)">
+                编辑
+              </FaButton>
+              <FaButton v-auth="'platform:plugin-market-source:delete'" variant="destructive" size="sm" :disabled="actingPublicationId === row.id" @click="confirmDeletePublication(row)">
+                删除
               </FaButton>
             </div>
           </div>
@@ -714,6 +801,35 @@ function formatSize(bytes?: number) {
         </a-form-item>
         <a-form-item label="发布说明（可选）">
           <FaTextarea v-model="uploadNotes" :rows="4" placeholder="本版本更新内容；换行会合并为空格（对外契约单行）" />
+        </a-form-item>
+      </a-form>
+    </FaModal>
+
+    <FaModal v-model="editVisible" title="编辑发布物" show-cancel-button class="sm:max-w-xl" :confirm-loading="editSaving" @confirm="submitEditPublication">
+      <a-form :model="editForm" layout="vertical">
+        <div class="mb-2 text-xs text-secondary-foreground/60">
+          {{ editingPublication?.code }}@{{ editingPublication?.pluginVersion }} · 编辑展示信息与分类标签，不重置审核状态。
+        </div>
+        <a-form-item label="显示名称">
+          <FaInput v-model="editForm.displayName" placeholder="显示名称" />
+        </a-form-item>
+        <a-form-item label="描述">
+          <FaTextarea v-model="editForm.description" :rows="3" placeholder="插件简介" />
+        </a-form-item>
+        <a-form-item label="分类">
+          <FaSelect v-model="editForm.category" allow-clear :options="categoryOptions" placeholder="未分类" />
+        </a-form-item>
+        <a-form-item label="标签（逗号分隔）">
+          <FaInput v-model="editForm.tags" placeholder="如 chat, wiki" />
+        </a-form-item>
+        <a-form-item label="许可证">
+          <FaInput v-model="editForm.license" placeholder="如 MIT" />
+        </a-form-item>
+        <a-form-item label="发布说明">
+          <FaTextarea v-model="editForm.releaseNotes" :rows="4" placeholder="本版本更新内容" />
+        </a-form-item>
+        <a-form-item label="兼容性 JSON（可选）">
+          <FaTextarea v-model="editForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
         </a-form-item>
       </a-form>
     </FaModal>

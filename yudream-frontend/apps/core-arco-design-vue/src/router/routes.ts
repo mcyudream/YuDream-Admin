@@ -131,6 +131,24 @@ const constantRoutes: RouteRecordRaw[] = [
     },
   },
   {
+    path: '/market',
+    name: 'publicMarketHome',
+    component: () => import('@/views/market/index.vue'),
+    meta: {
+      title: '插件市场',
+      public: true,
+    },
+  },
+  {
+    path: '/market/:code',
+    name: 'publicMarketPlugin',
+    component: () => import('@/views/market/plugin.vue'),
+    meta: {
+      title: '插件详情',
+      public: true,
+    },
+  },
+  {
     path: '/:all(.*)*',
     name: 'notFound',
     component: () => import('@/views/[...all].vue'),
