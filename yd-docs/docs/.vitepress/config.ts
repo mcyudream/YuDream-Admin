@@ -13,6 +13,7 @@ const guideSidebar = [
     items: [
       { text: '框架概览', link: '/guide/introduction' },
       { text: '两种使用方式', link: '/guide/usage-modes' },
+      { text: '落地案例', link: '/guide/showcase' },
       { text: '快速启动', link: '/guide/getting-started' }
     ]
   },
@@ -277,6 +278,7 @@ export default withMermaid(
       siteTitle: 'YuDream Admin 文档',
       nav: [
         { text: '指南', link: '/guide/introduction', activeMatch: '/guide/' },
+        { text: '落地案例', link: '/guide/showcase' },
         { text: '平台能力', link: '/features/', activeMatch: '/features/' },
         { text: '安全', link: '/security/', activeMatch: '/security/' },
         { text: '插件开发', link: '/plugin/overview', activeMatch: '/plugin/' },

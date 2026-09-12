@@ -7,8 +7,9 @@ CMS（能力 code：`cms`）是平台可动态启用的内容定制能力，提�
 - 所有 CMS 应用服务入口都会先执行 `ensureEnabled()`：从 `CapabilityModuleRepo` 读取 code 为 `cms` 的能力模块，未启用时抛出 `BizException("内容定制能力未启用")`。模板上下文走 `CapabilityAppService.ensureEnabled("cms", "CMS 内容")`，语义相同。
 - 管理端点挂载在 `/api/platform/cms/**`，需要登录与对应权限码；公开渲染端点挂载在 `/api/public/cms/**`，无需登录，但只暴露「已发布」的内容。
 - 页面支持三种内容来源：Markdown（`markdownContent`）、可视化构建产物（`htmlContent` / `cssContent` / `jsContent` / `builderProjectJson`），可混用。
-- 首页布局是单例聚合（`homePageLayoutRepo.findCurrent()`），保存即覆盖当前布局。
+- 首页布局、页面与首页方案按 `themeCode`（内置 `"default"` 或插件 code）归属主题，各主题的首页设计/页面集完全独立；SITE 激活指针是 Setting 键 `pluginTheme.active.site`，切换主题只拨指针，内容随主题隐藏或恢复。
 - 公开站点移动端导航为折叠菜单：挂到 `body`、铺满可视高度，打开后锁定页面滚动。插件公开页可用 `@PluginRoute(publicAccess = true, siteNav = true)` 注入站点头导航并复用站点 chrome。
+- SITE 主题可声明 `homeComponent` / `chromeComponent` 用 Vue 远程模块接管公开站首页与页头页脚；未声明时仍由宿主 SiteChrome 承载。公开 Wiki `/wiki` 与外链嵌入页 `/embed` 走同一套 chrome。
 
 ```mermaid
 flowchart LR
@@ -42,7 +43,7 @@ flowchart LR
 |---|---|---|
 | `id` | Long | 雪花 ID，JSON 中序列化为 string |
 | `title` | String | 标题，必填（空时抛 `页面标题不能为空`） |
-| `slug` | String | 页面路径，经 `PageSlug` 规范化，全站唯一 |
+| `slug` | String | 页面路径，经 `PageSlug` 规范化，同一主题内唯一（`(themeCode, slug)`） |
 | `summary` / `excerpt` | String | 摘要 / 摘录 |
 | `coverImageUrl` | String | 封面图 URL |
 | `categories` / `tags` | List\<String\> | 分类 / 标签，去重去空白，最多 20 个 |
@@ -77,12 +78,12 @@ flowchart LR
 
 ### 首页布局 HomePageLayout
 
-单例聚合，描述自定义首页（源码：`aggregate/HomePageLayout.java`）：
+单例聚合，描述某个主题下的自定义首页（源码：`aggregate/HomePageLayout.java`）。布局按 `themeCode` 隔离，不再是全站唯一一份：
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `title` / `subtitle` | String | 主标题 / 副标题 |
-| `theme` | String | 主题标识，默认 `default` |
+| `theme` / `themeCode` | String | 主题归属，默认 `default`；布局按主题隔离 |
 | `heroImageUrl` | String | 首屏图 URL |
 | `settings` | Map\<String, String\> | 扩展设置键值对 |
 | `sections` | List\<HomeSection\> | 区块列表 |

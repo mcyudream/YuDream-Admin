@@ -4,14 +4,14 @@ layout: home
 hero:
   name: YuDream Admin
   text: 企业级 DDD 后台框架与插件生态
-  tagline: 可直接当成品部署的管理后台，也可作为主框架二次开发；17 项平台能力按需加载，插件机制无限扩展
+  tagline: 可直接当成品部署的管理后台，也可作为主框架二次开发；18 项平台能力按需加载，插件机制无限扩展
   actions:
     - theme: brand
       text: 快速开始 →
       link: /guide/getting-started
     - theme: alt
-      text: 框架概览
-      link: /guide/introduction
+      text: 落地案例
+      link: /guide/showcase
     - theme: alt
       text: 插件开发
       link: /plugin/overview
@@ -28,8 +28,8 @@ features:
     link: /guide/architecture
     linkText: 查看系统架构
   - icon: ⚡
-    title: 17 项平台能力双闸门
-    details: SSE、WebSocket、MQ、Neo4j、AI/Agent、CMS、文件预览、入站邮箱等能力按需动态加载，项目闸门 + 应用闸门双重管控，不用的能力零开销。
+    title: 18 项平台能力双闸门
+    details: SSE、WebSocket、MQ、Neo4j、AI/Agent、CMS、文件预览、入站邮箱、本机插件市场源等能力按需动态加载，项目闸门 + 应用闸门双重管控，不用的能力零开销。
     link: /guide/platform-capabilities
     linkText: 平台能力详解
   - icon: 🔌
@@ -43,11 +43,11 @@ features:
 
 | 维度 | 内容 |
 |---|---|
-| 平台能力（17 项） | api-docs、cms、wiki、form、document-template、integration、sse、websocket、rabbitmq、neo4j、ai、agent、dataviz、milky、message-render、file-preview、inbound-mail，全部受项目闸门（`yudream.platform.capabilities.<code>.enabled`）与应用闸门双重管控，支持依赖级联禁用 |
-| 插件体系 | 第三方插件仅依赖 `yudream-plugin-spi` 契约模块；JAR 内置 `plugin.yml` + 前端 `remoteEntry.js`；支持热加载/热卸载、硬依赖（`depend`）/软依赖（`softdepend`）、依赖级联与插件商店 |
+| 平台能力（18 项） | api-docs、cms、wiki、form、document-template、integration、sse、websocket、rabbitmq、neo4j、ai、agent、dataviz、milky、message-render、file-preview、inbound-mail、plugin-market-source，全部受项目闸门（`yudream.platform.capabilities.<code>.enabled`）与应用闸门双重管控，支持依赖级联禁用 |
+| 插件体系 | 第三方插件仅依赖 `yudream-plugin-spi` 契约模块；JAR 内置 `plugin.yml` + 前端 `remoteEntry.js`；支持热加载/热卸载、硬依赖（`depend`）/软依赖（`softdepend`）、依赖级联、SITE/ADMIN 主题与插件市场源 |
 | 安全体系 | Sa-Token 双 Token 会话、接口加密、API Key、Passkey（WebAuthn）、OAuth，全部属于 system 基线能力，始终可用、不走动态开关 |
 | AI / Agent | provider-first 多模型配置（`providerCode + modelCode`），Spring AI 原生 tool calling，端到端真流式 SSE 与可扩展事件信封（`ai.message` / `ai.tool` / `ai.result` / `ai.error`） |
-| CMS 可视化建站 | GrapesJS 拖拽构建，完整发布闭环：权限菜单、管理/公开路由、发布/下线、SEO、页面与模板元数据 |
+| CMS 与公开站 | GrapesJS 拖拽构建 + 完整发布闭环；SITE 主题按 `themeCode` 隔离首页、chrome 与页面集，官方插件即可拼出对外官网 |
 | 渲染服务 | 独立 render-server（Fastify 5 + Playwright Chromium），HTML / Markdown / URL → 图片，支撑消息卡片、证书证明等场景 |
 
 ## 两种使用方式
