@@ -7,8 +7,28 @@ import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 @MenuModule(code = "platform", name = "平台能力", icon = "i-ri:node-tree", sort = 2)
 public enum PlatformMenuModule {
 
+    @MenuNode(code = "platform:plugin-hub", name = "插件中心", type = MenuNodeType.LAYOUT,
+            path = "/platform/plugin-hub", component = "Layout", icon = "i-ri:puzzle-2-line", sort = 95)
+    PLUGIN_HUB,
+
+    @MenuNode(code = "platform:content-hub", name = "内容站点", type = MenuNodeType.LAYOUT,
+            path = "/platform/content-hub", component = "Layout", icon = "i-ri:layout-masonry-line", sort = 80)
+    CONTENT_HUB,
+
+    @MenuNode(code = "platform:connection-hub", name = "连接与集成", type = MenuNodeType.LAYOUT,
+            path = "/platform/connection-hub", component = "Layout", icon = "i-ri:links-line", sort = 70)
+    CONNECTION_HUB,
+
+    @MenuNode(code = "platform:app-hub", name = "智能应用", type = MenuNodeType.LAYOUT,
+            path = "/platform/app-hub", component = "Layout", icon = "i-ri:robot-2-line", sort = 60)
+    APP_HUB,
+
+    @MenuNode(code = "platform:ops-hub", name = "平台运维", type = MenuNodeType.LAYOUT,
+            path = "/platform/ops-hub", component = "Layout", icon = "i-ri:dashboard-horizontal-line", sort = 50)
+    OPS_HUB,
+
     @MenuNode(code = "platform:wiki", name = "Wiki 知识库", type = MenuNodeType.MENU,
-            path = "/platform/wiki", component = "platform/wiki/index.vue",
+            parentName = "CONTENT_HUB", path = "/platform/wiki", component = "platform/wiki/index.vue",
             icon = "i-ri:book-open-line", sort = 58)
     WIKI,
 
@@ -33,7 +53,7 @@ public enum PlatformMenuModule {
     WIKI_MANAGE,
 
     @MenuNode(code = "platform:inbound-mail", name = "入站邮箱", type = MenuNodeType.MENU,
-            path = "/platform/inbound-mail", component = "platform/inbound-mail/index.vue",
+            parentName = "CONNECTION_HUB", path = "/platform/inbound-mail", component = "platform/inbound-mail/index.vue",
             icon = "i-ri:mail-download-line", sort = 77)
     INBOUND_MAIL,
 
@@ -42,7 +62,7 @@ public enum PlatformMenuModule {
     INBOUND_MAIL_VIEW,
 
     @MenuNode(code = "platform:milky", name = "QQ 消息平台", type = MenuNodeType.MENU,
-            path = "/platform/milky", component = "platform/milky/index.vue",
+            parentName = "CONNECTION_HUB", path = "/platform/milky", component = "platform/milky/index.vue",
             icon = "i-ri:chat-3-line", sort = 76)
     MILKY,
 
@@ -71,7 +91,7 @@ public enum PlatformMenuModule {
     RENDER_USE,
 
     @MenuNode(code = "platform:capability", name = "能力管理", type = MenuNodeType.MENU,
-            path = "/platform/capability", component = "platform/capability/index.vue",
+            parentName = "OPS_HUB", path = "/platform/capability", component = "platform/capability/index.vue",
             icon = "i-ri:dashboard-horizontal-line", sort = 100)
     CAPABILITY,
 
@@ -96,7 +116,7 @@ public enum PlatformMenuModule {
     CAPABILITY_TEST,
 
     @MenuNode(code = "platform:plugin", name = "插件管理", type = MenuNodeType.MENU,
-            path = "/platform/plugin", component = "platform/plugin/index.vue",
+            parentName = "PLUGIN_HUB", path = "/platform/plugin", component = "platform/plugin/index.vue",
             icon = "i-ri:puzzle-2-line", sort = 95)
     PLUGIN,
 
@@ -109,7 +129,7 @@ public enum PlatformMenuModule {
     PLUGIN_MANAGE,
 
     @MenuNode(code = "platform:plugin-marketplace", name = "插件市场", type = MenuNodeType.MENU,
-            path = "/platform/plugin-marketplace", component = "platform/plugin-marketplace/index.vue",
+            parentName = "PLUGIN_HUB", path = "/platform/plugin-marketplace", component = "platform/plugin-marketplace/index.vue",
             icon = "i-ri:store-2-line", sort = 94)
     PLUGIN_MARKETPLACE,
 
@@ -118,7 +138,7 @@ public enum PlatformMenuModule {
     PLUGIN_MARKETPLACE_VIEW,
 
     @MenuNode(code = "platform:plugin-market-source", name = "市场源管理", type = MenuNodeType.MENU,
-            path = "/platform/plugin-market-source", component = "platform/plugin-market-source/index.vue",
+            parentName = "PLUGIN_HUB", path = "/platform/plugin-market-source", component = "platform/plugin-market-source/index.vue",
             icon = "i-ri:git-repository-line", sort = 93)
     PLUGIN_MARKET_SOURCE,
 
@@ -151,7 +171,7 @@ public enum PlatformMenuModule {
     PLUGIN_MARKET_SOURCE_ACCEPT,
 
     @MenuNode(code = "platform:plugin-publish", name = "插件发布", type = MenuNodeType.MENU,
-            path = "/platform/plugin-publish", component = "platform/plugin-publish/index.vue",
+            parentName = "PLUGIN_HUB", path = "/platform/plugin-publish", component = "platform/plugin-publish/index.vue",
             icon = "i-ri:upload-2-line", sort = 92, permission = "platform:plugin-market-source:upload")
     PLUGIN_PUBLISH,
 
@@ -160,12 +180,12 @@ public enum PlatformMenuModule {
     PLUGIN_PUBLISH_SKIP_REVIEW,
 
     @MenuNode(code = "platform:plugin-review", name = "发布审核", type = MenuNodeType.MENU,
-            path = "/platform/plugin-review", component = "platform/plugin-review/index.vue",
+            parentName = "PLUGIN_HUB", path = "/platform/plugin-review", component = "platform/plugin-review/index.vue",
             icon = "i-ri:shield-check-line", sort = 91, permission = "platform:plugin-market-source:accept")
     PLUGIN_REVIEW,
 
     @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
-            path = "/platform/api-doc", component = "platform/api-doc/index.vue",
+            parentName = "CONTENT_HUB", path = "/platform/api-doc", component = "platform/api-doc/index.vue",
             icon = "i-ri:file-list-2-line", sort = 90)
     API_DOCS,
 
@@ -178,7 +198,7 @@ public enum PlatformMenuModule {
     API_DOCS_CONFIG,
 
     @MenuNode(code = "platform:integration", name = "集成调用", type = MenuNodeType.MENU,
-            path = "/platform/integration", component = "platform/integration/index.vue",
+            parentName = "CONNECTION_HUB", path = "/platform/integration", component = "platform/integration/index.vue",
             icon = "i-ri:terminal-box-line", sort = 80)
     INTEGRATION,
 
@@ -203,7 +223,7 @@ public enum PlatformMenuModule {
     INTEGRATION_LOG_VIEW,
 
     @MenuNode(code = "platform:document", name = "Word 模板", type = MenuNodeType.MENU,
-            path = "/platform/document", component = "platform/document/index.vue",
+            parentName = "CONTENT_HUB", path = "/platform/document", component = "platform/document/index.vue",
             icon = "i-ri:file-word-2-line", sort = 70)
     DOCUMENT,
 
@@ -224,7 +244,7 @@ public enum PlatformMenuModule {
     DOCUMENT_LOG_VIEW,
 
     @MenuNode(code = "platform:graph", name = "图数据库", type = MenuNodeType.MENU,
-            path = "/platform/graph", component = "platform/graph/index.vue",
+            parentName = "CONNECTION_HUB", path = "/platform/graph", component = "platform/graph/index.vue",
             icon = "i-ri:share-circle-line", sort = 65)
     GRAPH,
 
@@ -245,12 +265,12 @@ public enum PlatformMenuModule {
     GRAPH_LOG_VIEW,
 
     @MenuNode(code = "platform:form", name = "动态表单", type = MenuNodeType.MENU,
-            path = "/platform/form", component = "platform/form/index.vue",
+            parentName = "CONTENT_HUB", path = "/platform/form", component = "platform/form/index.vue",
             icon = "i-ri:survey-line", sort = 62)
     FORM,
 
     @MenuNode(code = "platform:form:designer", name = "表单设计器", type = MenuNodeType.MENU,
-            path = "/platform/form/designer", component = "platform/form/designer.vue",
+            parentName = "CONTENT_HUB", path = "/platform/form/designer", component = "platform/form/designer.vue",
             icon = "i-ri:drag-drop-line", sort = 61, visible = false,
             permission = "platform:form:edit")
     FORM_DESIGNER,
@@ -284,7 +304,7 @@ public enum PlatformMenuModule {
     FORM_STATISTICS_VIEW,
 
     @MenuNode(code = "platform:theme-center", name = "主题中心", type = MenuNodeType.MENU,
-            path = "/platform/theme-center", component = "platform/theme-center/index.vue",
+            parentName = "CONTENT_HUB", path = "/platform/theme-center", component = "platform/theme-center/index.vue",
             icon = "i-ri:palette-line", sort = 60)
     THEME_CENTER,
 
@@ -321,17 +341,17 @@ public enum PlatformMenuModule {
     AI_GENERATE,
 
     @MenuNode(code = "platform:agent", name = "Agent 应用", type = MenuNodeType.MENU,
-            path = "/platform/agent", component = "platform/agent/index.vue",
+            parentName = "APP_HUB", path = "/platform/agent", component = "platform/agent/index.vue",
             icon = "i-ri:robot-2-line", sort = 59)
     AGENT,
 
     @MenuNode(code = "platform:agent:editor", name = "Agent 编排", type = MenuNodeType.MENU,
-            path = "/platform/agent/editor", component = "platform/agent/editor.vue",
+            parentName = "APP_HUB", path = "/platform/agent/editor", component = "platform/agent/editor.vue",
             icon = "i-ri:node-tree", sort = 58, visible = false, permission = "platform:agent:edit")
     AGENT_EDITOR,
 
     @MenuNode(code = "platform:agent:tools", name = "Agent 工具", type = MenuNodeType.MENU,
-            path = "/platform/agent/tools", component = "platform/agent/tools.vue",
+            parentName = "APP_HUB", path = "/platform/agent/tools", component = "platform/agent/tools.vue",
             icon = "i-ri:tools-line", sort = 57, permission = "platform:agent:tool:view")
     AGENT_TOOLS,
 

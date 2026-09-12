@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.menu.aggregate.Menu;
 import online.yudream.base.domain.system.menu.enumerate.MenuNodeType;
 import online.yudream.base.domain.system.menu.enumerate.SeedSyncMode;
+import online.yudream.base.domain.system.menu.repo.MenuRepo;
 import online.yudream.base.domain.system.menu.service.MenuDomainService;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
@@ -22,6 +23,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 系统菜单初始化器。
@@ -35,6 +37,7 @@ import java.util.List;
 public class SystemMenuInitializer implements ApplicationListener<ApplicationReadyEvent> {
 
     private final MenuDomainService menuDomainService;
+    private final MenuRepo menuRepo;
     private final RoleRepo roleRepo;
     private final SystemSeedProperties systemSeedProperties;
 
@@ -48,9 +51,43 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
                 online.yudream.base.infra.platform.menu.enumerate.ChatMenuModule.class);
         List<Menu> modules = MenuEnumScanner.scan(moduleClasses);
         List<Menu> syncedMenus = menuDomainService.syncMenus(modules, syncMode);
+        int rebound = rebindSeededParents(modules);
 
         bindPermissionsToSystemRoles(modules);
-        log.info("System menus initialized, modules={}, syncedMenus={}, syncMode={}", modules.size(), syncedMenus.size(), syncMode);
+        log.info("System menus initialized, modules={}, syncedMenus={}, reboundParents={}, syncMode={}",
+                modules.size(), syncedMenus.size(), rebound, syncMode);
+    }
+
+    /**
+     * MISSING_ONLY 不会改已有节点的 parentCode。功能分组调整后必须把存量叶子挂回声明的二级目录。
+     */
+    private int rebindSeededParents(List<Menu> modules) {
+        int changed = 0;
+        for (Menu module : modules) {
+            changed += rebindSeededParents(module);
+        }
+        return changed;
+    }
+
+    private int rebindSeededParents(Menu menu) {
+        if (menu.getChildren() == null || menu.getChildren().isEmpty()) {
+            return 0;
+        }
+        int changed = 0;
+        for (Menu child : menu.getChildren()) {
+            Menu existing = menuRepo.findByCode(child.getCode()).orElse(null);
+            if (existing != null && !Objects.equals(blankToNull(existing.getParentCode()), blankToNull(child.getParentCode()))) {
+                existing.setParentCode(blankToNull(child.getParentCode()));
+                menuDomainService.syncMenu(existing);
+                changed++;
+            }
+            changed += rebindSeededParents(child);
+        }
+        return changed;
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private void bindPermissionsToSystemRoles(List<Menu> modules) {

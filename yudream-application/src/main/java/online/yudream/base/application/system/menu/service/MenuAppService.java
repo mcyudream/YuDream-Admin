@@ -569,6 +569,10 @@ public class MenuAppService {
         route.put("meta", buildMeta(menu));
         route.put("_sort", menu.getSort() == null ? 0 : menu.getSort());
         List<Map<String, Object>> nested = buildChildren(menu.getCode(), childrenMap, visibleCodes, path);
+        if (nested.isEmpty() && menu.getType() == MenuNodeType.LAYOUT) {
+            path.remove(menu.getCode());
+            return null;
+        }
         if (!nested.isEmpty()) {
             route.put("children", nested);
         }

@@ -436,6 +436,49 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
+    void routeTreeNestsPlatformPagesUnderLayoutHub() {
+        Menu platform = systemMenu("platform", null, MenuNodeType.CATEGORY);
+        Menu hub = systemMenu("platform:plugin-hub", platform.getCode(), MenuNodeType.LAYOUT);
+        hub.setPath("/platform/plugin-hub");
+        hub.setComponent("Layout");
+        Menu plugin = systemMenu("platform:plugin", hub.getCode(), MenuNodeType.MENU);
+        List<Menu> menus = List.of(platform, hub, plugin);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> hubs = (List<Map<String, Object>>) group.get("children");
+            assertThat(hubs).singleElement().satisfies(hubRoute -> {
+                assertThat(hubRoute.get("name")).isEqualTo(hub.getCode());
+                assertThat(hubRoute.get("component")).isEqualTo("Layout");
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> pages = (List<Map<String, Object>>) hubRoute.get("children");
+                assertThat(pages).extracting(page -> page.get("name")).containsExactly(plugin.getCode());
+            });
+        });
+    }
+
+    @Test
+    void routeTreeOmitsEmptyLayoutGroups() {
+        Menu hub = systemMenu("platform:plugin-hub", null, MenuNodeType.LAYOUT);
+        hub.setPath("/platform/plugin-hub");
+        hub.setComponent("Layout");
+        hub.setPermission("platform:plugin-hub");
+        Menu plugin = systemMenu("platform:plugin", hub.getCode(), MenuNodeType.MENU);
+        plugin.setPermission("platform:plugin:view");
+        List<Menu> menus = List.of(hub, plugin);
+        when(menuDomainService.findActiveMenus()).thenReturn(menus);
+        when(menuRepo.findAll()).thenReturn(menus);
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("platform:plugin-hub"));
+
+        assertThat(routes).isEmpty();
+    }
+
+    @Test
     void staticRouteTreeNormalizesMissingParentChainToRoot() {
         Menu activeSystemChild = systemMenu("system:orphan", "system:missing", MenuNodeType.MENU);
         when(menuRepo.findAll()).thenReturn(List.of(activeSystemChild));
