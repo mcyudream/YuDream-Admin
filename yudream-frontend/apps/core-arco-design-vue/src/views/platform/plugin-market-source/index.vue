@@ -2,9 +2,12 @@
 import type { TableColumn } from '@yudream/components'
 import type { PluginMarketSource, PluginMarketSourcePayload, MarketSourceType } from '@/api/modules/platform-plugin-market-source'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 
 const modal = useFaModal()
 const toast = useFaToast()
+const featureStore = useAppFeatureStore()
+const localSourceEnabled = computed(() => featureStore.capabilityEnabled('plugin-market-source'))
 
 const loading = ref(false)
 const syncing = ref(false)
@@ -59,12 +62,17 @@ async function load() {
     catch {
       toast.error('加载市场源列表失败')
     }
-    try {
-      const publicRes = await apiMarketSource.publicEnabled()
-      publicEnabled.value = publicRes.data === true
+    if (!localSourceEnabled.value) {
+      publicEnabled.value = false
     }
-    catch {
-      // 拦截器已提示；保留当前开关，避免失败时回落成已开启
+    else {
+      try {
+        const publicRes = await apiMarketSource.publicEnabled()
+        publicEnabled.value = publicRes.data === true
+      }
+      catch {
+        // 拦截器已提示；保留当前开关，避免失败时回落成已开启
+      }
     }
   }
   finally {
@@ -254,11 +262,11 @@ function openPublicMarket() {
   <div>
     <FaPageHeader title="市场源管理" class="mb-0">
       <template #description>
-        管理插件市场的订阅来源：添加多个自托管或官方市场源，市场页会合并展示各源插件。内置源为本机发布物，无需远端地址。发布与审核已拆到独立菜单。
+        管理插件市场的订阅来源。远程源随时可添加；本机源、公开社区与对外 v2 协议需启用「插件市场源」能力。发布与审核已拆到独立菜单。
       </template>
     </FaPageHeader>
     <FaPageMain>
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+      <div v-if="localSourceEnabled" class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
         <div class="text-sm">
           <div class="font-medium">公开插件市场</div>
           <div class="mt-1 text-xs text-secondary-foreground/60">
@@ -275,7 +283,7 @@ function openPublicMarket() {
           />
         </div>
       </div>
-      <div class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
+      <div v-if="localSourceEnabled" class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
         <FaIcon name="i-ri:link" class="shrink-0" />
         <span class="shrink-0 text-secondary-foreground/60">对外 v2 源基址</span>
         <code class="min-w-0 break-all">{{ publicV2Url }}</code>

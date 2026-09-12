@@ -15,7 +15,7 @@ const MARKET_JOB_SNIPPET = `# 把本次选择的最终 JAR 发布到自托管 Yu
 # CI 变量（受保护并掩码）：
 #   YUDREAM_MARKET_URL      宿主根地址，例如 __MARKET_ORIGIN__
 #   YUDREAM_MARKET_API_KEY  勾选 platform:plugin-market-source:upload 的 API Key
-# 可选：YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_CATEGORY / YUDREAM_MARKET_TAGS / YUDREAM_MARKET_METADATA
+# 可选：YUDREAM_MARKET_RELEASE_NOTES（分类/标签写在各插件 store.json，不要配仓库级 CI 变量）
 # 需同时放入：
 #   ci/publish-to-market.sh
 #   ci/lib/plugin-jar-selection.sh

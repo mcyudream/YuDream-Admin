@@ -52,7 +52,6 @@ public class MenuAppService {
             Map.entry("platform:cms", "cms"),
             Map.entry("platform:agent", "agent"),
             Map.entry("platform:inbound-mail", "inbound-mail"),
-            Map.entry("platform:plugin-market-source", "plugin-market-source"),
             Map.entry("platform:plugin-publish", "plugin-market-source"),
             Map.entry("platform:plugin-review", "plugin-market-source"),
             Map.entry("platform:ai:generate", "ai"),
@@ -659,7 +658,10 @@ public class MenuAppService {
             return null;
         }
         String candidate = menuCode.substring("platform:".length()).split(":", 2)[0];
-        return StringUtils.hasText(candidate) ? candidate : null;
+        if (!StringUtils.hasText(candidate) || "plugin-market-source".equals(candidate)) {
+            return null;
+        }
+        return candidate;
     }
 
     private boolean isDescendantCode(String code, String parentCode) {

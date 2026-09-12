@@ -189,7 +189,7 @@ publish:plugin-jars:
 # 可选：把本次选择的最终 JAR 发布到自托管 YuDream 插件市场源。
 # 在项目/群组 CI variables 中配置受保护、掩码变量 YUDREAM_MARKET_URL 与 YUDREAM_MARKET_API_KEY
 # （API Key 勾选 platform:plugin-market-source:upload）；未配置则本 job 不调度。
-# 可选 YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_CATEGORY / YUDREAM_MARKET_TAGS / YUDREAM_MARKET_METADATA。
+# 可选 YUDREAM_MARKET_RELEASE_NOTES。分类/标签写在各插件 store.json，不要配仓库级 CI 变量。
 # 与官方仓 publish:plugin-store 一样：只跑受保护 v* tag、PLUGIN_RELEASE_ONLY=1、串行 resource_group。
 publish:market:
   image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/python:3.12-alpine

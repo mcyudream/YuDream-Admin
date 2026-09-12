@@ -175,17 +175,17 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 ## 6. 插件市场源：多源订阅与公开社区
 
-「插件市场源」是一个可选的平台能力（code `plugin-market-source`，能力中心「插件分发」分组）。开启后后台市场合并各启用源目录，公开站提供 `/market` 社区页；关闭时**不注册本机源、不回落 Nexus/`store-root-url`**，市场列表为空，插件管理/上传/回滚不受影响。存量部署升级后，未开启能力时市场为空是有意语义。
+「插件市场源」是一个可选的平台能力（code `plugin-market-source`，能力中心「插件分发」分组），**只提供本机源**：开启后播种 LOCAL、开放自托管发布/审核与公开 `/market`；关闭时**不播种本机源、不回落 Nexus/`store-root-url`**。远程源订阅与安装不依赖本能力——后台「插件市场」点「添加市场源」进入独立页 `/platform/plugin-marketplace/add-source`（系统路由，不进菜单）。未订阅远程源时市场列表为空，插件管理/上传/回滚不受影响。
 
 ### 6.1 双闸门
 
-- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时市场源管理端点不注册、内置源不播种、公开 v2/legacy 端点不存在。
-- 应用闸门：能力未在「平台能力」中启用时，源管理与安装/更新一律拒绝；列表返回空；公开 `/market` 跳转登录。
+- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时不播种内置源、不注册发布/公开 v2/legacy 端点；远程源订阅端点仍注册。
+- 应用闸门：能力未在「平台能力」中启用时，LOCAL 不进入目录，公开 `/market` 停止服务；远程源增删改、同步、安装仍可用。
 - 公开社区开关：能力配置键 `publicEnabled`（默认开）。关闭后公开 `/market` 与 v2/legacy 协议停止服务，后台市场订阅与发布仍可用。
 
 ### 6.2 源管理
 
-管理员在「平台 → 插件中心 → 市场源管理」维护源列表（权限码 `platform:plugin-market-source:view/create/edit/delete/run`）。发布与审核已拆到同分组下的「插件发布」（作者工作台，`upload`）和「发布审核」（`accept`），三个菜单均映射能力 `plugin-market-source`。公开 `/market` 只发现与下载，不上传：
+管理员在「平台 → 插件市场」点「添加市场源」进入独立页 `/platform/plugin-marketplace/add-source`（系统路由，不进菜单，不依赖本能力）。已订阅源在「平台 → 插件中心 → 市场源管理」维护（权限码 `platform:plugin-market-source:view/create/edit/delete/run`）。该菜单**不映射**能力。发布与审核已拆到同分组下的「插件发布」（作者工作台，`upload`）和「发布审核」（`accept`），这两个菜单映射能力 `plugin-market-source`。公开 `/market` 只发现与下载，不上传：
 
 - 内置源 `default` 类型为 `LOCAL`（本机插件市场）：进程内直读本机 `PUBLISHED` 发布物，无需地址与同步，不可删除；
 - 新增源类型只能是 `V2_API`（正式协议，rootUrl 为 `https://host/api/public/plugin-market`）或 `STATIC_INDEX`（legacy `index.json` 完整地址）；禁止创建 `LOCAL`；

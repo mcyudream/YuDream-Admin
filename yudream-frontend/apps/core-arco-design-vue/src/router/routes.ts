@@ -196,6 +196,17 @@ const systemRoutes: RouteRecordRaw[] = [
           menu: false,
         },
       },
+      {
+        // 添加远程市场源：不进菜单，不依赖「插件市场源」能力，由插件市场按钮进入
+        path: 'platform/plugin-marketplace/add-source',
+        name: 'pluginMarketplaceAddSource',
+        component: () => import('@/views/platform/plugin-marketplace/add-source.vue'),
+        meta: {
+          title: '添加市场源',
+          auth: 'platform:plugin-market-source:create',
+          menu: false,
+        },
+      },
     ],
   },
 ]

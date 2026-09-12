@@ -11,7 +11,6 @@ import online.yudream.base.interfaces.platform.plugin.request.PluginMarketSource
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketSourceUpdateRequest;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketSourceRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketSourceTestResultRes;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,13 +23,12 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 插件市场源管理。项目闸门关闭时整个控制器不注册，市场目录为空（无 Nexus 回落）；
- * 应用闸门由 PluginMarketSourceAppService.ensureEnabled 在各用例内校验。
+ * 插件市场源订阅管理。远程源增删改/同步不依赖插件市场源能力；
+ * 本机 LOCAL 源仅在能力开启时出现在列表中。无 Nexus 隐式回落。
  */
 @RestController
 @RequestMapping("/api/platform/plugin-market-sources")
 @RequiredArgsConstructor
-@ConditionalOnProperty(prefix = "yudream.platform.capabilities.plugin-market-source", name = "enabled", havingValue = "true")
 public class PluginMarketSourceController {
 
     private final PluginMarketSourceAppService pluginMarketSourceAppService;
