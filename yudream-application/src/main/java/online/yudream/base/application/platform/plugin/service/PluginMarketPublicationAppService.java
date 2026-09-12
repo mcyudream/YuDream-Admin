@@ -599,12 +599,17 @@ public class PluginMarketPublicationAppService {
             return Map.of();
         }
         Map<Long, String> names = new LinkedHashMap<>();
-        for (var user : pluginUserCatalogAppService.resolveUsers(authorIds)) {
-            try {
-                names.put(Long.valueOf(user.getId()), user.getNickname());
-            } catch (NumberFormatException ignored) {
-                // 非数字 id 不参与解析
+        try {
+            for (var user : pluginUserCatalogAppService.resolveUsers(authorIds)) {
+                try {
+                    names.put(Long.valueOf(user.getId()), user.getNickname());
+                } catch (NumberFormatException ignored) {
+                    // 非数字 id 不参与解析
+                }
             }
+        } catch (RuntimeException e) {
+            log.warn("解析插件作者显示名失败，公开目录仍返回插件列表: {}", e.toString());
+            return Map.of();
         }
         return names;
     }

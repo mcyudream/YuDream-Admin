@@ -8,6 +8,7 @@ import online.yudream.base.application.system.user.dto.OptionDTO;
 import online.yudream.base.application.system.user.service.RoleManageAppService;
 import online.yudream.base.plugin.spi.system.user.PluginDeptOption;
 import online.yudream.base.plugin.spi.system.user.PluginUserOption;
+import online.yudream.base.plugin.spi.system.user.PluginUserProfile;
 import online.yudream.base.plugin.spi.system.user.PluginUserService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -39,11 +40,10 @@ public class PluginUserCatalogAppService {
             if (!StringUtils.hasText(id)) {
                 continue;
             }
-            pluginUserService.searchUsers(id.trim(), null, 1, 1).stream()
-                    .filter(user -> id.trim().equals(user.id()))
-                    .findFirst()
-                    .map(PluginUserCatalogAppService::toUser)
-                    .ifPresent(result::add);
+            PluginUserCatalogDTO user = resolveUser(id.trim());
+            if (user != null) {
+                result.add(user);
+            }
         }
         return List.copyOf(result);
     }
@@ -66,6 +66,34 @@ public class PluginUserCatalogAppService {
         return roleManageAppService.options().stream()
                 .map(PluginUserCatalogAppService::toRole)
                 .toList();
+    }
+
+    private PluginUserCatalogDTO resolveUser(String id) {
+        Long numericId = parseId(id);
+        if (numericId != null) {
+            return pluginUserService.findById(numericId)
+                    .filter(profile -> id.equals(String.valueOf(profile.id())))
+                    .map(PluginUserCatalogAppService::toUser)
+                    .orElse(null);
+        }
+        return pluginUserService.searchUsers(id, null, 1, 1).stream()
+                .filter(user -> id.equals(user.id()))
+                .findFirst()
+                .map(PluginUserCatalogAppService::toUser)
+                .orElse(null);
+    }
+
+    private static PluginUserCatalogDTO toUser(PluginUserProfile user) {
+        return PluginUserCatalogDTO.builder()
+                .id(user.id() == null ? null : String.valueOf(user.id()))
+                .username(user.username())
+                .nickname(user.nickname())
+                .email(user.email())
+                .avatar(user.avatar())
+                .status(user.status())
+                .deptIds(List.of())
+                .deptNames(List.of())
+                .build();
     }
 
     private static PluginUserCatalogDTO toUser(PluginUserOption user) {

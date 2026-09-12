@@ -47,14 +47,17 @@ class PluginUserCatalogAppServiceTest {
     @Test
     void resolveUsersKeepsExactIdMatches() {
         PluginUserOption user = new PluginUserOption("9", "alice", "Alice", null, null, "ACTIVE", List.of(), List.of());
+        StubUserService users = new StubUserService(List.of(user), List.of());
         PluginUserCatalogAppService service = new PluginUserCatalogAppService(
-                new StubUserService(List.of(user), List.of()),
+                users,
                 new StubRoleManageAppService(List.of()));
 
-        List<PluginUserCatalogDTO> users = service.resolveUsers(List.of("9", " ", "8"));
+        List<PluginUserCatalogDTO> resolved = service.resolveUsers(List.of("9", " ", "8"));
 
-        assertEquals(1, users.size());
-        assertEquals("9", users.getFirst().getId());
+        assertEquals(1, resolved.size());
+        assertEquals("9", resolved.getFirst().getId());
+        assertEquals("Alice", resolved.getFirst().getNickname());
+        assertEquals(0, users.searchCallCount());
     }
 
     @Test
@@ -118,6 +121,10 @@ class PluginUserCatalogAppServiceTest {
         private final List<PluginDeptOption> departments;
         private final AtomicInteger searchCalls = new AtomicInteger();
 
+        int searchCallCount() {
+            return searchCalls.get();
+        }
+
         private StubUserService(List<PluginUserOption> users, List<PluginDeptOption> departments) {
             this.users = users;
             this.departments = departments;
@@ -135,7 +142,11 @@ class PluginUserCatalogAppServiceTest {
 
         @Override
         public Optional<PluginUserProfile> findById(Long userId) {
-            throw new UnsupportedOperationException();
+            return users.stream()
+                    .filter(user -> userId != null && String.valueOf(userId).equals(user.id()))
+                    .findFirst()
+                    .map(user -> new PluginUserProfile(
+                            userId, user.username(), user.nickname(), user.email(), null, null, user.avatar(), user.status()));
         }
 
         @Override

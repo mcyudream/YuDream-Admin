@@ -1,6 +1,6 @@
 package online.yudream.base.infra.system.user.context;
 
-import cn.dev33.satoken.exception.SaTokenContextException;
+import cn.dev33.satoken.exception.SaTokenException;
 import cn.dev33.satoken.stp.StpUtil;
 import online.yudream.base.domain.system.user.service.UserContextStore;
 import org.springframework.stereotype.Component;
@@ -29,8 +29,8 @@ public class SaTokenUserContextStore implements UserContextStore {
         try {
             Object value = StpUtil.getTokenSession().get(CURRENT_DEPT_KEY);
             return value == null ? null : ((Number) value).longValue();
-        } catch (SaTokenContextException ignored) {
-            // Non-HTTP work (for example, Milky events) has no Sa-Token ThreadLocal context.
+        } catch (SaTokenException ignored) {
+            // 无 HTTP 上下文（如 Milky 事件）或匿名 HTTP（公开市场）都没有可用会话。
             return null;
         }
     }
@@ -40,8 +40,8 @@ public class SaTokenUserContextStore implements UserContextStore {
         try {
             Object value = StpUtil.getTokenSession().get(CURRENT_ROLE_KEY);
             return value == null ? null : ((Number) value).longValue();
-        } catch (SaTokenContextException ignored) {
-            // Non-HTTP work (for example, Milky events) has no Sa-Token ThreadLocal context.
+        } catch (SaTokenException ignored) {
+            // 无 HTTP 上下文（如 Milky 事件）或匿名 HTTP（公开市场）都没有可用会话。
             return null;
         }
     }
