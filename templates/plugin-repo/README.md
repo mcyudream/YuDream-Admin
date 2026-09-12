@@ -53,6 +53,7 @@
 2. 在新仓 GitLab CI variables 中配置受保护、掩码的发布凭据，并保护 `v*` tag：
    - `NEXUS_USERNAME`
    - `NEXUS_PASSWORD`
+   - 可选自托管市场：`YUDREAM_MARKET_URL`、`YUDREAM_MARKET_API_KEY`（API Key 勾选 `platform:plugin-market-source:upload`）
 3. Maven 优先从阿里云公共仓库拉取通用依赖，缺失时回退 Nexus；YuDream 契约从 `maven-public` 拉取，插件 JAR 发布到 `maven-releases`
 4. 让插件仓只依赖正式发布的：
    - Maven: `online.yudream.base:yudream-plugin-spi`
