@@ -104,6 +104,6 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 - 脚本：`ci/publish-to-market.sh`，按 `release/plugins.txt` 遍历最终 JAR，从 JAR 内 `plugin.yml` / `store.json` 读取元数据；
 - 认证：`X-API-Key`，不使用 Nexus 写凭据；
 - 调度：仅受保护 `v*` tag，且已配置 `YUDREAM_MARKET_URL` 才运行；`resource_group: yudream-plugin-market` 串行化；
-- 可选覆盖：`YUDREAM_MARKET_RELEASE_NOTES`、`YUDREAM_MARKET_CATEGORY`、`YUDREAM_MARKET_TAGS`、`YUDREAM_MARKET_METADATA`。
+- 可选覆盖：`YUDREAM_MARKET_RELEASE_NOTES`。分类、标签与许可证等社区元数据放在每个插件自己的 `store.json`，不要用仓库级 CI 变量覆盖。
 
 未配置市场变量时该 job 不调度，Nexus 发布链路不受影响。

@@ -13,8 +13,8 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * 插件市场源能力：多源订阅、自托管发布与审核。项目闸门关闭时不播种本机源、管理端点不注册；
- * 应用闸门关闭时市场目录为空，无 Nexus 隐式回落；插件管理、上传与回滚不受影响。
+ * 插件市场源能力：本机 LOCAL 源、自托管发布/审核与公开社区。
+ * 远程源订阅不依赖本能力；项目闸门关闭时不播种本机源、不注册发布/公开端点；无 Nexus 隐式回落。
  */
 @Component
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.plugin-market-source", name = "enabled", havingValue = "true")
@@ -30,7 +30,7 @@ public class PluginMarketSourceCapabilityProvider implements CapabilityProvider 
                 CODE,
                 "插件市场源",
                 CapabilityType.DISTRIBUTION,
-                "自托管插件市场源：本机源进程内直读发布物，可订阅多个远端源，并向其他实例提供插件发布、审核与分发",
+                "本机插件市场源：播种 LOCAL 源、自托管发布/审核，并向其他实例提供公开社区与 v2 协议",
                 "i-ri:store-2-line",
                 48,
                 Map.of(),

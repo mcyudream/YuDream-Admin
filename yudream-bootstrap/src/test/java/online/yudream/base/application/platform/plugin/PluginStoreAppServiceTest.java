@@ -79,7 +79,6 @@ class PluginStoreAppServiceTest {
     }
 
     private void stubMultiSource(PluginMarketSourceAppService.SourceCatalog... catalogs) {
-        when(pluginMarketSourceAppService.isActive()).thenReturn(true);
         when(pluginMarketSourceAppService.enabledSourceCatalogs()).thenReturn(List.of(catalogs));
         for (PluginMarketSourceAppService.SourceCatalog catalog : catalogs) {
             // 未被解析到的源不会触发 sourceRef，按宽松桩处理
@@ -124,11 +123,18 @@ class PluginStoreAppServiceTest {
     }
 
     @Test
-    void listReturnsEmptyWhenCapabilityInactive() {
-        when(pluginMarketSourceAppService.isActive()).thenReturn(false);
+    void listStillServesRemoteCatalogWhenCapabilityInactive() {
+        PluginMarketSource remote = source("community", "社区", STORE_ROOT);
+        PluginStoreCatalogEntry entry = entry("demo", "1.0.0");
+        stubMultiSource(new PluginMarketSourceAppService.SourceCatalog(remote, snapshot(remote, entry)));
+        stubLatestParse(entry, descriptor("1.0.0"));
 
-        assertEquals(List.of(), service().list());
-        verifyNoInteractions(pluginStoreGateway);
+        var result = service().list();
+
+        assertEquals(List.of("demo"), result.stream().map(item -> item.getCode()).toList());
+        assertEquals("community", result.getFirst().getSourceCode());
+        verify(pluginMarketSourceAppService).enabledSourceCatalogs();
+        verify(pluginStoreGateway, never()).fetchCatalog(any());
     }
 
     @Test
@@ -166,7 +172,7 @@ class PluginStoreAppServiceTest {
     void rejectsInvalidCodeWithoutCallingGateway() {
         assertThrows(BizException.class, () -> service().detail("../demo"));
 
-        verify(pluginMarketSourceAppService).ensureEnabled();
+        verify(pluginMarketSourceAppService, never()).ensureEnabled();
         verifyNoInteractions(pluginStoreGateway);
     }
 
@@ -176,7 +182,7 @@ class PluginStoreAppServiceTest {
 
         assertThrows(BizException.class, () -> service().detail("demo"));
 
-        verify(pluginMarketSourceAppService).ensureEnabled();
+        verify(pluginMarketSourceAppService, never()).ensureEnabled();
         verify(pluginStoreGateway, never()).fetchCatalog(any());
     }
 

@@ -27,8 +27,9 @@ const updatingVersion = ref('')
 const rollingBackCode = ref('')
 const toast = useFaToast()
 const modal = useFaModal()
+const router = useRouter()
 const featureStore = useAppFeatureStore()
-const marketCapabilityEnabled = computed(() => featureStore.capabilityEnabled('plugin-market-source'))
+const publicMarketEnabled = computed(() => featureStore.publicPluginMarketEnabled)
 
 const statusOptions: { label: string, value: MarketplaceStatus }[] = [
   { label: '全部状态', value: 'all' },
@@ -87,7 +88,6 @@ watch(() => pagination.size, clampPage)
 onMounted(load)
 
 async function loadSources() {
-  // 能力未启用时端点不存在（404）或应用闸门关闭，静默为空
   try {
     const res = await apiPluginMarketSource.list()
     sources.value = res.data
@@ -194,6 +194,10 @@ function resetFilters() {
 
 function openPublicMarket() {
   window.open('/market', '_blank')
+}
+
+function openAddSource() {
+  router.push('/platform/plugin-marketplace/add-source')
 }
 
 function operationsPending() {
@@ -307,20 +311,11 @@ function rollbackConfirmationContent() {
   <div>
     <FaPageHeader title="插件市场" class="mb-0">
       <template #description>
-        从已订阅的市场源安装、更新插件。公开社区浏览与下载在
-        <a href="/market" target="_blank" rel="noopener">/market</a>
-        。
+        从已订阅的市场源安装、更新插件。远程源随时可添加；本机源与公开社区需启用「插件市场源」能力。
       </template>
     </FaPageHeader>
 
     <FaPageMain>
-      <FaAlert
-        v-if="!marketCapabilityEnabled"
-        class="mb-4"
-        icon="i-ri:information-line"
-        title="插件市场源能力未启用"
-        description="启用后会播种本机源并合并各市场源目录；能力关闭时市场为空，插件管理、上传与回滚不受影响。"
-      />
       <div class="marketplace-toolbar">
         <div class="marketplace-filters">
           <FaInput v-model="keyword" clearable placeholder="搜索名称、编码、描述或版本" class="marketplace-search" />
@@ -334,7 +329,11 @@ function rollbackConfirmationContent() {
             <FaIcon name="i-ri:refresh-line" />
             刷新
           </FaButton>
-          <FaButton v-if="marketCapabilityEnabled" variant="outline" @click="openPublicMarket">
+          <FaButton v-auth="'platform:plugin-market-source:create'" variant="outline" @click="openAddSource">
+            <FaIcon name="i-ri:add-line" />
+            添加市场源
+          </FaButton>
+          <FaButton v-if="publicMarketEnabled" variant="outline" @click="openPublicMarket">
             <FaIcon name="i-ri:external-link-line" />
             公开社区
           </FaButton>
@@ -368,8 +367,11 @@ function rollbackConfirmationContent() {
       </div>
       <div v-else-if="!loading" class="empty-state">
         <template v-if="rows.length">暂无符合当前搜索或筛选条件的市场插件。<FaButton variant="link" @click="resetFilters">重置筛选</FaButton></template>
-        <template v-else-if="!marketCapabilityEnabled">插件市场源能力未启用，目录为空。请先在平台能力中启用「插件市场源」。</template>
-        <template v-else>插件市场暂时没有可用插件。</template>
+        <template v-else>
+          还没有可用插件。请先
+          <FaButton v-auth="'platform:plugin-market-source:create'" variant="link" @click="openAddSource">添加远程市场源</FaButton>
+          ，或启用「插件市场源」能力以使用本机源。
+        </template>
       </div>
       <FaPagination
         v-if="pagination.total > pagination.size"

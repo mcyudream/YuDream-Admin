@@ -85,6 +85,7 @@ class PluginMarketSourceAppServiceTest {
                 .builtIn(true)
                 .build();
         when(pluginMarketSourceRepo.findAll()).thenReturn(List.of(local));
+        when(capabilityAppService.enabled("plugin-market-source")).thenReturn(true);
         PluginStoreCatalogEntry entry = new PluginStoreCatalogEntry("demo", "local:demo", null, List.of(), List.of());
         when(pluginMarketPublicationAppService.localCatalogEntries()).thenReturn(List.of(entry));
 
@@ -93,5 +94,68 @@ class PluginMarketSourceAppServiceTest {
         assertEquals("demo", catalogs.getFirst().snapshot().entries().getFirst().code());
         verify(pluginStoreGateway, never()).fetchCatalog(any());
         verify(pluginMarketSourceSnapshotRepo, never()).save(any());
+    }
+
+    @Test
+    void createRemoteDoesNotRequireCapability() {
+        PluginMarketSourceCreateCmd v2 = new PluginMarketSourceCreateCmd();
+        v2.setCode("community");
+        v2.setName("社区");
+        v2.setType("V2_API");
+        v2.setRootUrl("https://community.example.test/api/public/plugin-market");
+        when(pluginMarketSourceRepo.findByCode("community")).thenReturn(Optional.empty());
+        when(pluginMarketSourceRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var dto = service.create(v2);
+
+        assertEquals("community", dto.getCode());
+        verify(capabilityAppService, never()).ensureEnabled(any(), any());
+    }
+
+    @Test
+    void listHidesLocalSourceWhenCapabilityInactive() {
+        when(capabilityAppService.enabled("plugin-market-source")).thenReturn(false);
+        PluginMarketSource local = PluginMarketSource.builder()
+                .id(1L)
+                .code("default")
+                .name("本机插件市场")
+                .type(MarketSourceType.LOCAL)
+                .enabled(true)
+                .builtIn(true)
+                .build();
+        PluginMarketSource remote = PluginMarketSource.builder()
+                .id(2L)
+                .code("community")
+                .name("社区")
+                .type(MarketSourceType.V2_API)
+                .rootUrl("https://community.example.test/api/public/plugin-market")
+                .enabled(true)
+                .builtIn(false)
+                .build();
+        when(pluginMarketSourceRepo.findAll()).thenReturn(List.of(local, remote));
+        when(pluginMarketSourceSnapshotRepo.findAll()).thenReturn(List.of());
+
+        var result = service.list();
+
+        assertEquals(1, result.size());
+        assertEquals("community", result.getFirst().getCode());
+        verify(capabilityAppService, never()).ensureEnabled(any(), any());
+    }
+
+    @Test
+    void enabledSourceCatalogsSkipsLocalWhenCapabilityInactive() {
+        when(capabilityAppService.enabled("plugin-market-source")).thenReturn(false);
+        PluginMarketSource local = PluginMarketSource.builder()
+                .id(1L)
+                .code("default")
+                .name("本机插件市场")
+                .type(MarketSourceType.LOCAL)
+                .enabled(true)
+                .builtIn(true)
+                .build();
+        when(pluginMarketSourceRepo.findAll()).thenReturn(List.of(local));
+
+        assertEquals(0, service.enabledSourceCatalogs().size());
+        verify(pluginMarketPublicationAppService, never()).localCatalogEntries();
     }
 }

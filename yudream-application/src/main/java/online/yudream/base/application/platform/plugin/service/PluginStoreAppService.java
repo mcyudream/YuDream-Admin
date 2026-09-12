@@ -42,8 +42,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 插件市场应用服务。能力未启用时目录为空、详情/安装/更新抛「插件市场源能力未启用」，
- * 不再回落 Nexus；启用后读取各启用源的目录快照（LOCAL 进程内直读）合并视图。
+ * 插件市场应用服务。远程源订阅、目录与安装不依赖插件市场源能力；
+ * 本机 LOCAL 源仅在能力开启时进入目录。不回落 Nexus。
  */
 @Service
 @Slf4j
@@ -70,9 +70,6 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public List<PluginStorePluginDTO> list() {
-        if (!pluginMarketSourceAppService.isActive()) {
-            return List.of();
-        }
         Map<String, List<VersionRef>> view = catalogView();
         Map<String, String> originSources = installedOriginSources();
         List<PluginStorePluginInfo> infos = new ArrayList<>();
@@ -102,7 +99,6 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public PluginStorePluginDetailDTO detail(String code) {
-        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         List<VersionRef> refs = catalogView().get(normalizedCode);
         if (refs == null || refs.isEmpty()) {
@@ -142,9 +138,6 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public List<PluginMarketplaceUpdateDTO> updates() {
-        if (!pluginMarketSourceAppService.isActive()) {
-            return List.of();
-        }
         List<PluginModuleDTO> localPlugins = installedPlugins();
         Map<String, List<VersionRef>> view = catalogView();
         Map<String, String> originSources = installedOriginSources();
@@ -182,9 +175,6 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public List<PluginMarketplaceUpdatePlanDTO> updatePlans() {
-        if (!pluginMarketSourceAppService.isActive()) {
-            return List.of();
-        }
         List<PluginModuleDTO> localPlugins = installedPlugins();
         Map<String, List<VersionRef>> view = catalogView();
         Map<String, String> originSources = installedOriginSources();
@@ -199,7 +189,6 @@ public class PluginStoreAppService {
 
     @Transactional(readOnly = true)
     public PluginMarketplaceUpdatePlanDTO updatePlan(String code, String targetVersion) {
-        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         List<PluginModuleDTO> localPlugins = installedPlugins();
         PluginModuleDTO localPlugin = localPlugins.stream()
@@ -319,7 +308,6 @@ public class PluginStoreAppService {
     }
 
     private PluginMarketplaceUpdateResultDTO updateSerial(String code, String targetVersion, String sourceCode) {
-        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         if (!StringUtils.hasText(targetVersion)) {
             throw unavailable();
@@ -352,7 +340,6 @@ public class PluginStoreAppService {
 
     @Transactional
     public List<PluginModuleDTO> install(String code, String version, String sourceCode) {
-        pluginMarketSourceAppService.ensureEnabled();
         String normalizedCode = normalizeCode(code);
         if (!StringUtils.hasText(version)) {
             throw unavailable();
@@ -427,11 +414,8 @@ public class PluginStoreAppService {
 
     // ---------- 多源目录视图 ----------
 
-    /** code -> 该插件在各启用源上的全部版本引用；能力未激活时返回空。 */
+    /** code -> 该插件在各启用源上的全部版本引用；LOCAL 源仅在能力开启时出现。 */
     private Map<String, List<VersionRef>> catalogView() {
-        if (!pluginMarketSourceAppService.isActive()) {
-            return Map.of();
-        }
         Map<String, List<VersionRef>> view = new LinkedHashMap<>();
         for (PluginMarketSourceAppService.SourceCatalog catalog : pluginMarketSourceAppService.enabledSourceCatalogs()) {
             putIntoView(view, catalog.snapshot().entries(), catalog.source());

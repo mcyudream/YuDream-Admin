@@ -186,6 +186,32 @@ class MenuAppServicePluginMenuTest {
     }
 
     @Test
+    void routeTreeKeepsMarketSourceSubscribeMenuWhenCapabilityDisabled() {
+        Menu platform = systemMenu("platform", null, MenuNodeType.CATEGORY);
+        platform.setPermission(null);
+        Menu source = systemMenu("platform:plugin-market-source", platform.getCode(), MenuNodeType.MENU);
+        source.setPermission("platform:plugin-market-source:view");
+        Menu publish = systemMenu("platform:plugin-publish", platform.getCode(), MenuNodeType.MENU);
+        publish.setPermission("platform:plugin-market-source:upload");
+        CapabilityModule capability = CapabilityModule.builder()
+                .code("plugin-market-source")
+                .enabled(false)
+                .build();
+        when(menuDomainService.findActiveMenus()).thenReturn(List.of(platform, source, publish));
+        when(menuRepo.findAll()).thenReturn(List.of(platform, source, publish));
+        when(capabilityModuleRepo.findByCode("plugin-market-source")).thenReturn(Optional.of(capability));
+
+        List<Map<String, Object>> routes = service.buildRouteTree(List.of("*"));
+
+        assertThat(routes).singleElement().satisfies(group -> {
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> children = (List<Map<String, Object>>) group.get("children");
+            assertThat(children).extracting(child -> child.get("name"))
+                    .containsExactly(source.getCode());
+        });
+    }
+
+    @Test
     void routePermissionIncludesPluginStructuralAncestorsWithoutSyntheticPermissions() {
         Menu module = pluginMenu("plugin:wallet:module:walletAdmin", null, true);
         module.setType(MenuNodeType.CATEGORY);

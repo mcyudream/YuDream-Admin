@@ -1,17 +1,17 @@
 # 自托管插件市场源
 
-「插件市场源」能力（code `plugin-market-source`，能力中心「插件分发」分组）让每个 YuDream 实例同时作为**订阅方**与**供给方**：
+「插件市场源」能力（code `plugin-market-source`，能力中心「插件分发」分组）让实例作为**供给方**提供本机源：
 
-- 订阅方：在后台「插件市场」合并安装多个源中的插件（见[插件市场与第三方上架](./marketplace)第 6 节）；
-- 供给方：本机发布物构成默认市场源，对外提供 v2 协议；其他实例把本机 v2 源基址添加为 `V2_API` 源即可订阅。
+- 订阅方（不依赖本能力）：在后台「插件市场」点「添加市场源」进入独立页 `/platform/plugin-marketplace/add-source`（系统路由，不依赖本能力菜单），或到「市场源管理」维护已订阅源；安装见[插件市场与第三方上架](./marketplace)第 6 节；
+- 供给方（依赖本能力）：本机发布物构成默认 LOCAL 源，对外提供 v2 协议；其他实例把本机 v2 源基址添加为 `V2_API` 源即可订阅。
 
-能力关闭时**不注册本机源、不回落 Nexus**。后台市场列表为空，公开 `/market` 不可用；插件管理、本地上传与回滚不受影响。
+能力关闭时**不播种本机源、不回落 Nexus**。远程源仍可添加；未订阅远程源时后台市场目录为空。公开 `/market` 不可用。插件管理、本地上传与回滚不受影响。
 
 ## 1. 启用能力
 
-- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时管理端点不注册、内置源不播种、公开 v2/legacy 端点不存在。
-- 应用闸门：在「平台 → 能力管理」中启用。关闭后源行可仍存在但不生效：市场目录返回空，详情/安装/更新抛「插件市场源能力未启用」，公开端点停止服务。
-- 公开社区开关：能力配置键 `publicEnabled`（读取处默认回落 true）。关闭后 `/market` 与公开 v2/legacy 停止服务，后台发布、审核与订阅源不受影响。开关在「平台 → 插件中心 → 市场源管理」顶部。
+- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时不播种内置 LOCAL、不注册发布/审核/公开 v2/legacy 端点；远程源订阅端点仍注册。
+- 应用闸门：在「平台 → 能力管理」中启用。关闭后 LOCAL 不进入目录，公开 `/market` 停止服务；远程源增删改、同步、安装仍可用。
+- 公开社区开关：能力配置键 `publicEnabled`（读取处默认回落 true）。关闭后 `/market` 与公开 v2/legacy 停止服务，后台发布、审核与订阅源不受影响。开关在「平台 → 插件中心 → 市场源管理」顶部（能力开启时可见）。
 - 存储目录：`yudream.platform.plugin.market-source.directory`（默认 `market-source`），必须独立于插件扫描目录（`directories`），否则发布物会被当作已安装插件发现。
 
 ## 2. 源类型
@@ -33,13 +33,14 @@
 
 公开 `/market` 只做发现与下载，不承载上传。作者发布、升版与管理自己的插件一律走后台「平台 → 插件发布」。发现页对具备 `upload` 权限的登录作者只提供「管理我的插件」入口。时间筛选使用内置日期范围选择器；公开与后台列表分页始终展示（含总条数与每页条数），不因当前页未满而隐藏。页脚展示当前站点 v2 源基址 `{origin}/api/public/plugin-market`，供其他实例添加为 `V2_API` 源。
 
-后台「平台 → 插件中心」下三个页面（均映射能力 `plugin-market-source`，能力关闭则一起隐藏）：
+后台「平台 → 插件中心」：
 
-| 菜单 | 路径 | 权限 | 用途 |
-| --- | --- | --- | --- |
-| 市场源管理 | `/platform/plugin-market-source` | `view` | 订阅源增删改、启停、同步、对外基址、公开社区开关 |
-| 插件发布 | `/platform/plugin-publish` | `upload` | 我的插件、升版上传、编辑分类/标签 |
-| 发布审核 | `/platform/plugin-review` | `accept` | 待审/拒绝/下架，以及全局 `reviewRequired` 开关 |
+| 菜单 | 路径 | 权限 | 用途 | 能力映射 |
+| --- | --- | --- | --- | --- |
+| 添加市场源 | `/platform/plugin-marketplace/add-source` | `create` | 仅添加远程 `V2_API`/`STATIC_INDEX`；系统路由，不进菜单、不依赖能力 | 不映射 |
+| 市场源管理 | `/platform/plugin-market-source` | `view` | 订阅源增删改、启停、同步；能力开启时含对外基址与公开社区开关 | 不映射，始终可见 |
+| 插件发布 | `/platform/plugin-publish` | `upload` | 我的插件、升版上传、编辑分类/标签 | `plugin-market-source` |
+| 发布审核 | `/platform/plugin-review` | `accept` | 待审/拒绝/下架，以及全局 `reviewRequired` 开关 | `plugin-market-source` |
 
 存量库启动时会把已有菜单挂到「插件中心」；角色需给新菜单勾权限。
 
@@ -69,7 +70,7 @@ curl --fail-with-body -X POST \
   -F 'metadata={"license":"MIT","compatibility":{"host":"^1.0.0"},"publisher":{"id":"yudream","name":"YuDream","url":"https://yudream.online","verified":true}}'
 ```
 
-3. 插件仓复用官方仓同款选择链路：模板 `ci/publish-to-market.sh` 与 `.gitlab-ci.yml.example` 的 `publish:market`。job 只在受保护 `v*` tag 且已配置 `YUDREAM_MARKET_URL` 时调度，`PLUGIN_RELEASE_ONLY=1` 发布 `release/plugins.txt` 选中的全部最终 JAR（不是 `example-plugin-*.jar`），`resource_group: yudream-plugin-market` 串行。环境变量 `YUDREAM_MARKET_URL`、`YUDREAM_MARKET_API_KEY` 必须受保护并掩码；可选 `YUDREAM_MARKET_CATEGORY`、`YUDREAM_MARKET_TAGS`、`YUDREAM_MARKET_RELEASE_NOTES`、`YUDREAM_MARKET_METADATA`。脚本会读 JAR 内 `plugin.yml` / `store.json`，并校验宿主 `Result.code == 200`。后台「插件发布」页的「查看 CI 模板」弹窗给出完整 `.gitlab-ci.yml`、`publish:market` 片段、`ci/publish-to-market.sh`、`ci/lib/plugin-jar-selection.sh` 与 `release/plugins.txt`，可直接复制。
+3. 插件仓复用官方仓同款选择链路：模板 `ci/publish-to-market.sh` 与 `.gitlab-ci.yml.example` 的 `publish:market`。job 只在受保护 `v*` tag 且已配置 `YUDREAM_MARKET_URL` 时调度，`PLUGIN_RELEASE_ONLY=1` 发布 `release/plugins.txt` 选中的全部最终 JAR（不是 `example-plugin-*.jar`），`resource_group: yudream-plugin-market` 串行。环境变量 `YUDREAM_MARKET_URL`、`YUDREAM_MARKET_API_KEY` 必须受保护并掩码；可选 `YUDREAM_MARKET_RELEASE_NOTES`。脚本会读 JAR 内 `plugin.yml` / `store.json`，并校验宿主 `Result.code == 200`。后台「插件发布」页的「查看 CI 模板」弹窗给出完整 `.gitlab-ci.yml`、`publish:market` 片段、`ci/publish-to-market.sh`、`ci/lib/plugin-jar-selection.sh` 与 `release/plugins.txt`，可直接复制。分类、标签与许可证等社区元数据放在每个插件自己的 `store.json`（或日后 `plugin.yml`），不要用仓库级 CI 变量覆盖。
 
 `metadata` 各字段均为可选：
 

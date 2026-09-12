@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * 内置本机市场源播种。项目闸门关闭时不注册、不播种；能力开启后内置 {@code default} 源固定为 LOCAL
- * （本机发布物进程内直读）。存量「官方插件市场」Nexus 指向在此改写为本机源，Nexus 不再作为隐式默认源。
+ * （本机发布物进程内直读）。远程源订阅不依赖本初始化器。Nexus 不再作为隐式默认源。
  */
 @Component
 @RequiredArgsConstructor

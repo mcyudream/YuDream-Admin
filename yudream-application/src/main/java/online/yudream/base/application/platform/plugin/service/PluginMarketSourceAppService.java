@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 插件市场源应用服务：能力双闸门、源管理与目录快照同步。
- * 能力未启用时市场目录为空、无 Nexus 隐式回落；LOCAL 源进程内直读发布物，不建快照。
+ * 插件市场源应用服务：远程源订阅始终可用；能力双闸门只约束本机 LOCAL 源。
+ * 能力未启用时不播种、不展示 LOCAL，远程 V2_API/STATIC_INDEX 仍可增删改同步；无 Nexus 隐式回落。
  */
 @Service
 @Slf4j
@@ -52,7 +52,7 @@ public class PluginMarketSourceAppService {
     @Value("${yudream.platform.capabilities.plugin-market-source.enabled:true}")
     private boolean projectGateEnabled;
 
-    /** 多源路径是否生效：项目闸门开启且能力已在平台能力中启用。 */
+    /** 本机源 / 自托管发布 / 公开社区是否生效：项目闸门开启且能力已在平台能力中启用。远程订阅不看此开关。 */
     public boolean isActive() {
         return projectGateEnabled && capabilityAppService.enabled(CAPABILITY_CODE);
     }
@@ -65,18 +65,17 @@ public class PluginMarketSourceAppService {
 
     @Transactional(readOnly = true)
     public List<PluginMarketSourceDTO> list() {
-        ensureEnabled();
         Map<Long, Integer> counts = pluginMarketSourceSnapshotRepo.findAll().stream()
                 .collect(Collectors.toMap(PluginMarketSourceSnapshot::sourceId,
                         snapshot -> snapshot.entries().size(), (a, b) -> a));
         return pluginMarketSourceRepo.findAll().stream()
+                .filter(this::visibleInAdmin)
                 .map(source -> PluginMarketSourceAssembler.toDTO(source, pluginCount(source, counts)))
                 .toList();
     }
 
     @Transactional
     public PluginMarketSourceDTO create(PluginMarketSourceCreateCmd cmd) {
-        ensureEnabled();
         String code = cmd.getCode() == null ? "" : cmd.getCode().trim();
         if (!code.matches("[a-z0-9][a-z0-9-]{0,31}")) {
             throw new BizException("市场源标识只能是 32 位以内的小写字母、数字或连字符");
@@ -104,8 +103,8 @@ public class PluginMarketSourceAppService {
 
     @Transactional
     public PluginMarketSourceDTO update(PluginMarketSourceUpdateCmd cmd) {
-        ensureEnabled();
         PluginMarketSource source = requireById(cmd.getId());
+        ensureLocalSourceAllowed(source);
         if (!StringUtils.hasText(cmd.getName())) {
             throw new BizException("市场源名称不能为空");
         }
@@ -132,8 +131,8 @@ public class PluginMarketSourceAppService {
 
     @Transactional
     public void delete(Long id) {
-        ensureEnabled();
         PluginMarketSource source = requireById(id);
+        ensureLocalSourceAllowed(source);
         if (source.builtIn()) {
             throw new BizException("内置市场源不可删除");
         }
@@ -143,16 +142,16 @@ public class PluginMarketSourceAppService {
 
     @Transactional
     public PluginMarketSourceDTO enable(Long id) {
-        ensureEnabled();
         PluginMarketSource source = requireById(id);
+        ensureLocalSourceAllowed(source);
         source.enable();
         return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(source));
     }
 
     @Transactional
     public PluginMarketSourceDTO disable(Long id) {
-        ensureEnabled();
         PluginMarketSource source = requireById(id);
+        ensureLocalSourceAllowed(source);
         source.disable();
         return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(source));
     }
@@ -161,8 +160,8 @@ public class PluginMarketSourceAppService {
 
     @Transactional
     public PluginMarketSourceDTO sync(Long id) {
-        ensureEnabled();
         PluginMarketSource source = requireById(id);
+        ensureLocalSourceAllowed(source);
         if (source.type() == MarketSourceType.LOCAL) {
             source.markSynced();
             pluginMarketSourceRepo.save(source);
@@ -174,9 +173,8 @@ public class PluginMarketSourceAppService {
 
     @Transactional
     public List<PluginMarketSourceDTO> syncAll() {
-        ensureEnabled();
         for (PluginMarketSource source : pluginMarketSourceRepo.findAll()) {
-            if (!source.enabled()) {
+            if (!source.enabled() || !visibleInAdmin(source)) {
                 continue;
             }
             try {
@@ -195,7 +193,6 @@ public class PluginMarketSourceAppService {
 
     /** 测试尚未保存的源表单：做一次只读目录探测，不落任何状态。LOCAL 源无需探测。 */
     public PluginMarketSourceTestResultDTO test(PluginMarketSourceTestCmd cmd) {
-        ensureEnabled();
         MarketSourceType type = parseRemoteType(cmd.getType());
         validateRootUrl(cmd.getRootUrl(), type);
         try {
@@ -240,6 +237,7 @@ public class PluginMarketSourceAppService {
     public List<PluginMarketSource> enabledSources() {
         return pluginMarketSourceRepo.findAll().stream()
                 .filter(PluginMarketSource::enabled)
+                .filter(this::visibleInAdmin)
                 .toList();
     }
 
@@ -280,6 +278,16 @@ public class PluginMarketSourceAppService {
             result.add(new SourceCatalog(source, snapshot));
         }
         return result;
+    }
+
+    private boolean visibleInAdmin(PluginMarketSource source) {
+        return source.type() != MarketSourceType.LOCAL || isActive();
+    }
+
+    private void ensureLocalSourceAllowed(PluginMarketSource source) {
+        if (source.type() == MarketSourceType.LOCAL || source.builtIn()) {
+            ensureEnabled();
+        }
     }
 
     private PluginMarketSource requireById(Long id) {
