@@ -192,6 +192,10 @@ function resetFilters() {
   sourceFilter.value = 'all'
 }
 
+function openPublicMarket() {
+  window.open('/market', '_blank')
+}
+
 function operationsPending() {
   return Boolean(installingVersion.value || updatingVersion.value || rollingBackCode.value)
 }
@@ -303,7 +307,9 @@ function rollbackConfirmationContent() {
   <div>
     <FaPageHeader title="插件市场" class="mb-0">
       <template #description>
-        浏览可用插件、发布说明及兼容性信息。
+        从已订阅的市场源安装、更新插件。公开社区浏览与下载在
+        <a href="/market" target="_blank" rel="noopener">/market</a>
+        。
       </template>
     </FaPageHeader>
 
@@ -327,6 +333,10 @@ function rollbackConfirmationContent() {
           <FaButton variant="outline" :loading="loading" @click="load">
             <FaIcon name="i-ri:refresh-line" />
             刷新
+          </FaButton>
+          <FaButton v-if="marketCapabilityEnabled" variant="outline" @click="openPublicMarket">
+            <FaIcon name="i-ri:external-link-line" />
+            公开社区
           </FaButton>
         </div>
       </div>

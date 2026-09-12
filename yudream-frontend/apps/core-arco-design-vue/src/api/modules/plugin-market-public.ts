@@ -117,6 +117,27 @@ export function pluginMarketDownloadUrl(code: string, version: string) {
   return `${prefix}api/public/plugin-market/api/v2/plugins/${encodeURIComponent(code)}/versions/${encodeURIComponent(version)}/download`
 }
 
+/** 公开站导航用：能力关闭或协议不可达时不挂「插件市场」入口。 */
+export async function hasPublicPluginMarket(): Promise<boolean> {
+  const root = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY)
+    ? '/proxy/'
+    : (import.meta.env.VITE_APP_API_BASEURL || window.location.origin)
+  const prefix = String(root).endsWith('/') ? root : `${root}/`
+  try {
+    const response = await fetch(`${prefix}api/public/plugin-market/api/v2/manifest`, {
+      headers: { Accept: 'application/json', 'Accept-Language': 'zh-CN' },
+    })
+    if (!response.ok) {
+      return false
+    }
+    const result = await response.json() as { protocol?: string }
+    return result.protocol === 'yudream-market-v2'
+  }
+  catch {
+    return false
+  }
+}
+
 export default {
   manifest: () => client.get<PluginMarketManifest>(v2('/manifest')).then(res => res.data),
   categories: () => client.get<PluginMarketCategory[]>(v2('/categories')).then(res => res.data),
