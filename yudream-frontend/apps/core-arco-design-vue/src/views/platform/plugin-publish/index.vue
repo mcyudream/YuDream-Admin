@@ -317,13 +317,11 @@ const uploadHint = computed(() => {
         <div class="rounded-lg border p-3 text-sm">
           <div class="font-medium">流水线发布</div>
           <p class="mt-1 text-secondary-foreground/60">
-            用 API Key（勾选 upload）调用同一端点。模板：
-            <code>templates/plugin-repo/ci/publish-to-market.sh</code>
-            与
-            <code>.gitlab-ci.yml.example</code>
-            的
+            用 API Key（勾选 upload）调用同一端点。模板
             <code>publish:market</code>
-            job。
+            会按
+            <code>release/plugins.txt</code>
+            批量上传本次选择的 JAR，而不是单个示例文件。
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <code class="min-w-0 break-all text-xs">{{ publicV2Url }}</code>
