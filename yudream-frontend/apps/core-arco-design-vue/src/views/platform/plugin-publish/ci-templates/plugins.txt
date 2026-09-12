@@ -1,0 +1,3 @@
+# 每行一个插件模块 ID，须与 yudream-plugins/<id> 目录名、pom artifactId 一致。
+# 受保护 v* tag 的 publish:market 只会上传这里列出的最终 JAR。
+your-plugin

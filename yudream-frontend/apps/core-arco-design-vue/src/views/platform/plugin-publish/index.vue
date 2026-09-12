@@ -3,6 +3,7 @@ import type { PluginMarketPublication, PluginPublicationStatus } from '@/api/mod
 import { PLUGIN_PUBLICATION_STATUS_OPTIONS } from '@/api/modules/platform-plugin-market-source'
 import { PLUGIN_MARKET_CATEGORIES } from '@/api/modules/plugin-market-public'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
+import { buildCiTemplateFiles } from './ci-templates'
 
 interface PluginGroup {
   code: string
@@ -21,7 +22,16 @@ const pagination = reactive({ page: 1, size: 10, total: 0 })
 const statusFilter = ref<PluginPublicationStatus | ''>('')
 const reviewRequired = ref(true)
 const skipReview = computed(() => auth('platform:plugin-market-source:publish'))
-const publicV2Url = `${window.location.origin}/api/public/plugin-market`
+const marketOrigin = window.location.origin
+const publicV2Url = `${marketOrigin}/api/public/plugin-market`
+const ciTemplateVisible = ref(false)
+const ciTemplateTab = ref('market-job')
+const ciTemplateFiles = computed(() => buildCiTemplateFiles(marketOrigin))
+const ciTemplateTabList = computed(() => ciTemplateFiles.value.map(file => ({
+  label: file.label,
+  value: file.id,
+})))
+const currentCiTemplate = computed(() => ciTemplateFiles.value.find(file => file.id === ciTemplateTab.value) || ciTemplateFiles.value[0])
 
 const uploadVisible = ref(false)
 const uploading = ref(false)
@@ -262,9 +272,34 @@ async function actOnPublication(row: PluginMarketPublication, action: (api: type
   }
 }
 
+async function copyText(text: string, success: string) {
+  await navigator.clipboard.writeText(text)
+  toast.success(success)
+}
+
 async function copyPublicUrl() {
-  await navigator.clipboard.writeText(publicV2Url)
-  toast.success('已复制 v2 源基址')
+  await copyText(publicV2Url, '已复制 v2 源基址')
+}
+
+async function copyMarketOrigin() {
+  await copyText(marketOrigin, '已复制 YUDREAM_MARKET_URL')
+}
+
+function openCiTemplates() {
+  ciTemplateTab.value = 'market-job'
+  ciTemplateVisible.value = true
+}
+
+async function copyCurrentCiTemplate() {
+  const file = currentCiTemplate.value
+  await copyText(file.content, `已复制 ${file.filename}`)
+}
+
+async function copyAllCiTemplates() {
+  const bundled = ciTemplateFiles.value
+    .map(file => `# ===== ${file.filename} =====\n${file.content.replace(/\s+$/, '')}`)
+    .join('\n\n')
+  await copyText(`${bundled}\n`, '已复制全部 CI 模板文件')
 }
 
 function publicationStatusVariant(status: PluginPublicationStatus) {
@@ -317,15 +352,21 @@ const uploadHint = computed(() => {
         <div class="rounded-lg border p-3 text-sm">
           <div class="font-medium">流水线发布</div>
           <p class="mt-1 text-secondary-foreground/60">
-            用 API Key（勾选 upload）调用同一端点。模板
+            用 API Key（勾选 upload）走同一发布端点。点「查看 CI 模板」可复制完整
+            <code>.gitlab-ci.yml</code>
+            、
             <code>publish:market</code>
-            会按
+            片段、上传脚本和
             <code>release/plugins.txt</code>
-            批量上传本次选择的 JAR，而不是单个示例文件。
+            。
           </p>
           <div class="mt-2 flex flex-wrap items-center gap-2">
             <code class="min-w-0 break-all text-xs">{{ publicV2Url }}</code>
-            <FaButton variant="link" size="sm" @click="copyPublicUrl">复制基址</FaButton>
+            <FaButton variant="link" size="sm" @click="copyPublicUrl">复制 v2 基址</FaButton>
+            <FaButton variant="outline" size="sm" @click="openCiTemplates">
+              <FaIcon name="i-ri:code-s-slash-line" />
+              查看 CI 模板
+            </FaButton>
           </div>
         </div>
       </div>
@@ -477,6 +518,52 @@ const uploadHint = computed(() => {
             <FaTextarea v-model="editForm.compatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
           </a-form-item>
         </a-form>
+      </FaModal>
+
+      <FaModal
+        v-model="ciTemplateVisible"
+        title="流水线 CI 模板"
+        class="sm:max-w-5xl"
+        maximizable
+        :footer="false"
+      >
+        <div class="space-y-3 text-sm">
+          <p class="text-secondary-foreground/60">
+            把下列文件放进插件仓对应路径。CI 变量
+            <code>YUDREAM_MARKET_URL</code>
+            填宿主根地址（不要带
+            <code>/api/public/plugin-market</code>
+            ），
+            <code>YUDREAM_MARKET_API_KEY</code>
+            勾选
+            <code>platform:plugin-market-source:upload</code>
+            并设为受保护、掩码。job 只在受保护
+            <code>v*</code>
+            tag 上调度，按
+            <code>release/plugins.txt</code>
+            批量上传最终 JAR。
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <code class="min-w-0 break-all text-xs">YUDREAM_MARKET_URL={{ marketOrigin }}</code>
+            <FaButton variant="link" size="sm" @click="copyMarketOrigin">复制变量值</FaButton>
+            <FaButton variant="outline" size="sm" @click="copyCurrentCiTemplate">
+              <FaIcon name="i-ri:file-copy-line" />
+              复制当前文件
+            </FaButton>
+            <FaButton variant="outline" size="sm" @click="copyAllCiTemplates">复制全部文件</FaButton>
+          </div>
+          <FaTabs v-model="ciTemplateTab" :list="ciTemplateTabList" class="w-full" list-class="flex-wrap justify-start" content-class="mt-3">
+            <template v-for="file in ciTemplateFiles" :key="file.id" #[file.id]>
+              <div class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <code class="text-xs">{{ file.filename }}</code>
+                  <span class="text-xs text-secondary-foreground/60">{{ file.description }}</span>
+                </div>
+                <pre class="max-h-[60vh] overflow-auto rounded-lg border bg-[var(--color-fill-1)] p-3 text-xs leading-5 text-[var(--color-text-1)] whitespace-pre">{{ file.content }}</pre>
+              </div>
+            </template>
+          </FaTabs>
+        </div>
       </FaModal>
     </FaPageMain>
   </div>

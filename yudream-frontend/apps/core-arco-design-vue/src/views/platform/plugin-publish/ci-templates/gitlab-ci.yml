@@ -1,0 +1,219 @@
+default:
+  tags:
+    - shared
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+stages:
+  - validate
+  - build-frontend
+  - package-plugin
+  - publish-plugin
+  - verify-publish
+
+variables:
+  PNPM_IGNORE_PACKAGE_MANAGER_VERSION: "true"
+  NEXUS_BASE_URL: "https://nexus.yudream.online"
+  NEXUS_MAVEN_PUBLIC_URL: "https://nexus.yudream.online/repository/maven-public/"
+  NEXUS_MAVEN_RELEASES_URL: "https://nexus.yudream.online/repository/maven-releases"
+  NEXUS_NPM_PUBLIC_URL: "https://nexus.yudream.online/repository/npm-public/"
+  NPM_CONFIG_REGISTRY: "https://registry.npmjs.org/"
+  COREPACK_NPM_REGISTRY: "https://registry.npmjs.org/"
+  YUDREAM_NPM_REGISTRY: "$NEXUS_NPM_PUBLIC_URL"
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  PACKAGE_MAVEN_REPO: "$CI_PROJECT_DIR/.m2/package-repository"
+
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - yudream-frontend/.pnpm-store/
+    - .m2/repository/
+  policy: pull-push
+
+validate:repo:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - echo "standalone plugin repository initialized"
+
+validate:independence:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - sh ci/verify-plugin-repo-independence.sh
+
+validate:core-maven-registry:
+  stage: validate
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
+  script:
+    - sh ci/verify-core-maven-registry.sh
+
+validate:plugin-maven-boundary:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - sh ci/verify-plugin-maven-boundary.sh
+
+validate:core-npm-contracts:
+  stage: validate
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+  script:
+    - sh ci/verify-core-npm-contracts.sh
+
+validate:docs:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - sh ci/verify-doc-independence.sh
+
+validate:publish-pipeline:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - sh ci/verify-plugin-publish-pipeline.sh
+
+validate:release-selection:
+  stage: validate
+  image: alpine:3.20
+  script:
+    - sh ci/verify-plugin-release-selection.sh
+
+build:frontend:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/node:24.15.0-bookworm
+  stage: build-frontend
+  rules:
+    - exists:
+        - yudream-frontend/package.json
+        - yudream-frontend/packages/plugin-*/package.json
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+  script:
+    - cd yudream-frontend
+    - |
+      printf '%s\n' \
+        "registry=$NPM_CONFIG_REGISTRY" \
+        "@yudream:registry=$NEXUS_NPM_PUBLIC_URL" > .npmrc
+    - pnpm install --frozen-lockfile
+    - pnpm -r --filter=@yudream/plugin-* run build
+  artifacts:
+    paths:
+      - yudream-frontend/packages/plugin-*/dist/
+
+package:plugins:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
+  stage: package-plugin
+  script:
+    - 'echo "Using Nexus Maven registry: $NEXUS_MAVEN_PUBLIC_URL"'
+    - |
+      printf '%s\n' \
+        '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"' \
+        '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"' \
+        '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">' \
+        '    <profiles>' \
+        '        <profile>' \
+        '            <id>yudream-repositories</id>' \
+        '            <repositories>' \
+        '                <repository>' \
+        '                    <id>aliyun-public</id>' \
+        '                    <url>https://maven.aliyun.com/repository/public</url>' \
+        '                </repository>' \
+        '                <repository>' \
+        '                    <id>nexus-public</id>' \
+        '                    <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' \
+        '                </repository>' \
+        '            </repositories>' \
+        '            <pluginRepositories>' \
+        '                <pluginRepository>' \
+        '                    <id>aliyun-plugin</id>' \
+        '                    <url>https://maven.aliyun.com/repository/public</url>' \
+        '                </pluginRepository>' \
+        '                <pluginRepository>' \
+        '                    <id>nexus-plugin</id>' \
+        '                    <url>${env.NEXUS_MAVEN_PUBLIC_URL}</url>' \
+        '                </pluginRepository>' \
+        '            </pluginRepositories>' \
+        '        </profile>' \
+        '    </profiles>' \
+        '    <activeProfiles>' \
+        '        <activeProfile>yudream-repositories</activeProfile>' \
+        '    </activeProfiles>' \
+        '</settings>' > settings.xml
+    - |
+      if [ -z "$NEXUS_MAVEN_PUBLIC_URL" ]; then
+        echo "NEXUS_MAVEN_PUBLIC_URL is required"
+        exit 1
+      fi
+    - rm -rf "$PACKAGE_MAVEN_REPO"
+    - mkdir -p "$PACKAGE_MAVEN_REPO"
+    - |
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        . ./ci/lib/plugin-jar-selection.sh
+        PLUGIN_RELEASE_ONLY=1
+        export PLUGIN_RELEASE_ONLY
+        release_modules=$(selected_plugin_modules_csv "$PWD")
+        mvn -s settings.xml "-Dmaven.repo.local=$PACKAGE_MAVEN_REPO" clean package -pl "$release_modules" -am -DskipTests -B -e
+      else
+        mvn -s settings.xml "-Dmaven.repo.local=$PACKAGE_MAVEN_REPO" clean package -DskipTests -B -e
+      fi
+    - PLUGIN_RELEASE_ONLY="${CI_COMMIT_TAG:+1}" sh ci/verify-plugin-jar-assets.sh
+    - rm -rf dist/plugins
+    - mkdir -p dist/plugins
+    - |
+      . ./ci/lib/plugin-jar-selection.sh
+      PLUGIN_RELEASE_ONLY="${CI_COMMIT_TAG:+1}" copy_final_plugin_jars "$PWD" "$PWD/dist/plugins"
+    - ls -R dist/plugins
+  artifacts:
+    paths:
+      - dist/plugins/*.jar
+    expire_in: 1 week
+
+publish:plugin-jars:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
+  stage: publish-plugin
+  dependencies:
+    - package:plugins
+  script:
+    - PLUGIN_RELEASE_ONLY=1 sh ci/publish-plugin-jars.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+
+# 可选：把本次选择的最终 JAR 发布到自托管 YuDream 插件市场源。
+# 在项目/群组 CI variables 中配置受保护、掩码变量 YUDREAM_MARKET_URL 与 YUDREAM_MARKET_API_KEY
+# （API Key 勾选 platform:plugin-market-source:upload）；未配置则本 job 不调度。
+# 可选 YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_CATEGORY / YUDREAM_MARKET_TAGS / YUDREAM_MARKET_METADATA。
+# 与官方仓 publish:plugin-store 一样：只跑受保护 v* tag、PLUGIN_RELEASE_ONLY=1、串行 resource_group。
+publish:market:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/python:3.12-alpine
+  stage: publish-plugin
+  timeout: 20 minutes
+  resource_group: yudream-plugin-market
+  needs:
+    - job: package:plugins
+      artifacts: true
+  before_script:
+    - sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.aliyun.com/alpine#g' /etc/apk/repositories
+    - apk add --no-cache curl unzip
+  script:
+    - export PLUGIN_RELEASE_ONLY=1
+    - sh ci/publish-to-market.sh
+  rules:
+    - if: '$CI_COMMIT_TAG =~ /^v/ && $CI_COMMIT_REF_PROTECTED == "true" && $YUDREAM_MARKET_URL'
+
+verify:published-plugin-jars:
+  image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/maven:3.9-eclipse-temurin-21
+  stage: verify-publish
+  dependencies:
+    - package:plugins
+  script:
+    - PLUGIN_RELEASE_ONLY=1 sh ci/verify-published-plugin-jars.sh
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
