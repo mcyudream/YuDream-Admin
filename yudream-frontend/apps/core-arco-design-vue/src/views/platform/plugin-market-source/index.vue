@@ -52,15 +52,20 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    const [listRes, publicRes] = await Promise.all([
-      apiMarketSource.list(),
-      apiMarketSource.publicEnabled().catch(() => ({ data: true })),
-    ])
-    rows.value = listRes.data
-    publicEnabled.value = publicRes.data
-  }
-  catch {
-    toast.error('加载市场源列表失败')
+    try {
+      const listRes = await apiMarketSource.list()
+      rows.value = listRes.data
+    }
+    catch {
+      toast.error('加载市场源列表失败')
+    }
+    try {
+      const publicRes = await apiMarketSource.publicEnabled()
+      publicEnabled.value = publicRes.data === true
+    }
+    catch {
+      // 拦截器已提示；保留当前开关，避免失败时回落成已开启
+    }
   }
   finally {
     loading.value = false

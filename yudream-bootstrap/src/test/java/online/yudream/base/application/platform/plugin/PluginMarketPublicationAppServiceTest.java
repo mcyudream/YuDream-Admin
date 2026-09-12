@@ -328,6 +328,17 @@ class PluginMarketPublicationAppServiceTest {
     }
 
     @Test
+    void localCatalogStillServesWhenPublicMarketDisabled() {
+        PluginMarketPublication published = publication("demo", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        published.setJarPath("demo/1.0.0/plugin.jar");
+        when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(published));
+
+        var entries = service.localCatalogEntries();
+        assertEquals(1, entries.size());
+        assertEquals("demo", entries.getFirst().code());
+    }
+
+    @Test
     void manifestAndFacetsAggregatePublishedCatalog() throws Exception {
         when(settingAppService.publicSettings()).thenReturn(Map.of("siteName", "测试站"));
         when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(

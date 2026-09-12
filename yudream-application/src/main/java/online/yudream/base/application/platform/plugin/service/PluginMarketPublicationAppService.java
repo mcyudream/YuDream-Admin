@@ -442,9 +442,11 @@ public class PluginMarketPublicationAppService {
     /**
      * 本机源目录：按 PUBLISHED 发布物进程内直读，不走 HTTP。
      * downloadUrl 为 {@code local:{jarPath}}，安装时由应用层 Files.copy。
+     * 供后台源列表计数与订阅安装使用，不受公开社区开关约束。
      */
     public List<PluginStoreCatalogEntry> localCatalogEntries() {
-        requirePubliclyServed();
+        capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
+                PluginMarketSourceAppService.CAPABILITY_NAME);
         Map<String, List<PluginMarketPublication>> grouped = new LinkedHashMap<>();
         for (PluginMarketPublication publication : publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)) {
             grouped.computeIfAbsent(publication.getCode(), key -> new ArrayList<>()).add(publication);
