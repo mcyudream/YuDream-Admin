@@ -98,5 +98,7 @@ export default {
   deletePublication: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugin-market-source/publications/${id}`),
   reviewRequired: () => systemClient.get<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/review-required'),
   updateReviewRequired: (reviewRequired: boolean) => systemClient.put<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/review-required', { reviewRequired }),
+  publicEnabled: () => systemClient.get<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/public-enabled'),
+  updatePublicEnabled: (publicEnabled: boolean) => systemClient.put<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/public-enabled', { publicEnabled }),
   skipReview: () => systemClient.get<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/skip-review'),
 }

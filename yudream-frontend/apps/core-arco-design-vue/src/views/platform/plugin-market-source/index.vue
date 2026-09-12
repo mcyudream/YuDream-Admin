@@ -9,6 +9,8 @@ const toast = useFaToast()
 const loading = ref(false)
 const syncing = ref(false)
 const rows = ref<PluginMarketSource[]>([])
+const publicEnabled = ref(true)
+const publicSaving = ref(false)
 
 const formVisible = ref(false)
 const formSaving = ref(false)
@@ -50,8 +52,12 @@ onMounted(load)
 async function load() {
   loading.value = true
   try {
-    const res = await apiMarketSource.list()
-    rows.value = res.data
+    const [listRes, publicRes] = await Promise.all([
+      apiMarketSource.list(),
+      apiMarketSource.publicEnabled().catch(() => ({ data: true })),
+    ])
+    rows.value = listRes.data
+    publicEnabled.value = publicRes.data
   }
   catch {
     toast.error('加载市场源列表失败')
@@ -215,6 +221,18 @@ async function copyPublicUrl() {
   toast.success('已复制')
 }
 
+async function togglePublicEnabled(value: boolean | undefined) {
+  publicSaving.value = true
+  try {
+    const res = await apiMarketSource.updatePublicEnabled(value === true)
+    publicEnabled.value = res.data
+    toast.success(res.data ? '公开插件市场已开启' : '公开插件市场已关闭，社区页与对外协议停止服务')
+  }
+  finally {
+    publicSaving.value = false
+  }
+}
+
 function sourceTypeText(row: PluginMarketSource) {
   if (row.builtIn || row.type === 'LOCAL') {
     return '本机源'
@@ -235,12 +253,29 @@ function openPublicMarket() {
       </template>
     </FaPageHeader>
     <FaPageMain>
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+        <div class="text-sm">
+          <div class="font-medium">公开插件市场</div>
+          <div class="mt-1 text-xs text-secondary-foreground/60">
+            开启后对外提供 /market 社区页与 v2 源协议；关闭后公开入口与协议停止服务，后台发布、审核与订阅源不受影响。
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-secondary-foreground/60">{{ publicEnabled ? '已开启' : '已关闭' }}</span>
+          <FaSwitch
+            v-auth="'platform:plugin-market-source:edit'"
+            :model-value="publicEnabled"
+            :disabled="publicSaving"
+            @update:model-value="togglePublicEnabled"
+          />
+        </div>
+      </div>
       <div class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
         <FaIcon name="i-ri:link" class="shrink-0" />
         <span class="shrink-0 text-secondary-foreground/60">对外 v2 源基址</span>
         <code class="min-w-0 break-all">{{ publicV2Url }}</code>
         <FaButton variant="link" size="sm" @click="copyPublicUrl">复制</FaButton>
-        <FaButton variant="outline" size="sm" @click="openPublicMarket">
+        <FaButton variant="outline" size="sm" :disabled="!publicEnabled" @click="openPublicMarket">
           <FaIcon name="i-ri:external-link-line" />
           公开社区
         </FaButton>

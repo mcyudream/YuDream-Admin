@@ -11,6 +11,7 @@
 
 - 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时管理端点不注册、内置源不播种、公开 v2/legacy 端点不存在。
 - 应用闸门：在「平台 → 能力管理」中启用。关闭后源行可仍存在但不生效：市场目录返回空，详情/安装/更新抛「插件市场源能力未启用」，公开端点停止服务。
+- 公开社区开关：能力配置键 `publicEnabled`（读取处默认回落 true）。关闭后 `/market` 与公开 v2/legacy 停止服务，后台发布、审核与订阅源不受影响。开关在「平台 → 插件中心 → 市场源管理」顶部。
 - 存储目录：`yudream.platform.plugin.market-source.directory`（默认 `market-source`），必须独立于插件扫描目录（`directories`），否则发布物会被当作已安装插件发现。
 
 ## 2. 源类型
@@ -25,7 +26,7 @@
 
 ## 3. 公开社区页
 
-能力开启后，公开站提供 Modrinth 式发现页（SiteChrome）：
+能力开启且 `publicEnabled` 未关闭时，公开站提供 Modrinth 式发现页（SiteChrome）：
 
 - `/market`：搜索、分类/标签/作者/时间筛选、排序与分页卡片（图标、名称、版本、分类与标签、作者、下载量、更新时间）；
 - `/market/:code`：详情、版本列表、匿名下载（计数 `$inc`）。
@@ -36,7 +37,7 @@
 
 | 菜单 | 路径 | 权限 | 用途 |
 | --- | --- | --- | --- |
-| 市场源管理 | `/platform/plugin-market-source` | `view` | 订阅源增删改、启停、同步、对外基址 |
+| 市场源管理 | `/platform/plugin-market-source` | `view` | 订阅源增删改、启停、同步、对外基址、公开社区开关 |
 | 插件发布 | `/platform/plugin-publish` | `upload` | 我的插件、升版上传、编辑分类/标签 |
 | 发布审核 | `/platform/plugin-review` | `accept` | 待审/拒绝/下架，以及全局 `reviewRequired` 开关 |
 

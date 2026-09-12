@@ -181,6 +181,7 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 - 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时市场源管理端点不注册、内置源不播种、公开 v2/legacy 端点不存在。
 - 应用闸门：能力未在「平台能力」中启用时，源管理与安装/更新一律拒绝；列表返回空；公开 `/market` 跳转登录。
+- 公开社区开关：能力配置键 `publicEnabled`（默认开）。关闭后公开 `/market` 与 v2/legacy 协议停止服务，后台市场订阅与发布仍可用。
 
 ### 6.2 源管理
 

@@ -11,6 +11,7 @@ import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginMarketPublicationWebAssembler;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicationEditRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicationReviewRequest;
+import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicEnabledRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketReviewRequiredRequest;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketPublicationRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
@@ -153,6 +154,20 @@ public class PluginMarketPublicationController {
     public Result<Boolean> updateReviewRequired(@Valid @RequestBody PluginMarketReviewRequiredRequest request) {
         return Result.ok(pluginMarketPublicationAppService.updateReviewRequired(
                 Boolean.TRUE.equals(request.getReviewRequired())));
+    }
+
+    @GetMapping("/public-enabled")
+    public Result<Boolean> publicEnabled() {
+        ensureAny("无权限查看公开市场配置", PERM_VIEW, PERM_UPLOAD, PERM_ACCEPT);
+        return Result.ok(pluginMarketPublicationAppService.publicEnabled());
+    }
+
+    @PutMapping("/public-enabled")
+    @PermissionRegister(code = PERM_EDIT, name = "编辑插件市场源", module = "平台插件市场源",
+            desc = "设置是否对外开放公开插件社区与 v2 源协议；关闭后 /market 与公开端点停止服务，后台发布与订阅不受影响")
+    public Result<Boolean> updatePublicEnabled(@Valid @RequestBody PluginMarketPublicEnabledRequest request) {
+        return Result.ok(pluginMarketPublicationAppService.updatePublicEnabled(
+                Boolean.TRUE.equals(request.getPublicEnabled())));
     }
 
     private boolean canManageOthers(String sourceManagePermission) {

@@ -73,6 +73,7 @@ export interface FrontendFeature {
   passkeyEnabled: boolean
   oauthServerEnabled: boolean
   oauthClientEnabled: boolean
+  publicPluginMarketEnabled: boolean
   capabilities: Record<string, boolean>
 }
 

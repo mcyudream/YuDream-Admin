@@ -309,6 +309,25 @@ class PluginMarketPublicationAppServiceTest {
     }
 
     @Test
+    void publicEnabledFallsBackToTrueWithoutConfiguration() {
+        when(capabilityModuleRepo.findByCode(anyString())).thenReturn(Optional.empty());
+        assertTrue(service.publicEnabled());
+
+        when(capabilityModuleRepo.findByCode(anyString())).thenReturn(Optional.of(module(null)));
+        assertTrue(service.publicEnabled());
+
+        when(capabilityModuleRepo.findByCode(anyString())).thenReturn(Optional.of(module(Map.of("publicEnabled", "false"))));
+        assertFalse(service.publicEnabled());
+    }
+
+    @Test
+    void publicCatalogStopsWhenPublicMarketDisabled() {
+        when(capabilityModuleRepo.findByCode(anyString())).thenReturn(Optional.of(module(Map.of("publicEnabled", "false"))));
+        assertThrows(BizException.class, () -> service.manifestJson());
+        verify(publicationRepo, never()).findByStatus(any());
+    }
+
+    @Test
     void manifestAndFacetsAggregatePublishedCatalog() throws Exception {
         when(settingAppService.publicSettings()).thenReturn(Map.of("siteName", "测试站"));
         when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(

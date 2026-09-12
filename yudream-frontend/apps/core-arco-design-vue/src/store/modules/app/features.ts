@@ -7,6 +7,7 @@ function defaultFeatures(): FrontendFeature {
     passkeyEnabled: false,
     oauthServerEnabled: false,
     oauthClientEnabled: false,
+    publicPluginMarketEnabled: true,
     capabilities: {},
   }
 }
@@ -55,6 +56,8 @@ export const useAppFeatureStore = defineStore('appFeature', () => {
   const oauthClientEnabled = computed(() => features.value.oauthClientEnabled)
   const cmsEnabled = computed(() => capabilityEnabled('cms'))
   const formEnabled = computed(() => capabilityEnabled('form'))
+  const publicPluginMarketEnabled = computed(() =>
+    capabilityEnabled('plugin-market-source') && features.value.publicPluginMarketEnabled !== false)
 
   return {
     features,
@@ -66,6 +69,7 @@ export const useAppFeatureStore = defineStore('appFeature', () => {
     oauthClientEnabled,
     cmsEnabled,
     formEnabled,
+    publicPluginMarketEnabled,
     capabilityEnabled,
     load,
   }
