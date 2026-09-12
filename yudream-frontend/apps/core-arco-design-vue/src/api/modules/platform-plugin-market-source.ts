@@ -1,4 +1,4 @@
-import type { ApiResponse } from './system-client'
+import type { ApiResponse, PageResult } from './system-client'
 import systemClient from './system-client'
 
 export type MarketSourceSyncStatus = 'OK' | 'ERROR'
@@ -88,7 +88,8 @@ export default {
   sync: (id: string) => systemClient.post<unknown, ApiResponse<PluginMarketSource>>(`api/platform/plugin-market-sources/${id}/sync`),
   syncAll: () => systemClient.post<unknown, ApiResponse<PluginMarketSource[]>>('api/platform/plugin-market-sources/sync-all'),
   test: (data: { rootUrl: string, token?: string, type?: MarketSourceType }) => systemClient.post<unknown, ApiResponse<PluginMarketSourceTestResult>>('api/platform/plugin-market-sources/test', data),
-  publications: (status?: PluginPublicationStatus) => systemClient.get<unknown, ApiResponse<PluginMarketPublication[]>>('api/platform/plugin-market-source/publications', { params: { status } }),
+  publications: (params?: { status?: PluginPublicationStatus, mine?: boolean, page?: number, size?: number }) =>
+    systemClient.get<unknown, ApiResponse<PageResult<PluginMarketPublication>>>('api/platform/plugin-market-source/publications', { params }),
   uploadPublication: (data: FormData) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>('api/platform/plugin-market-source/publications', data, { timeout: 0 }),
   acceptPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/accept`, { note }),
   rejectPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/reject`, { note }),
@@ -97,4 +98,5 @@ export default {
   deletePublication: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugin-market-source/publications/${id}`),
   reviewRequired: () => systemClient.get<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/review-required'),
   updateReviewRequired: (reviewRequired: boolean) => systemClient.put<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/review-required', { reviewRequired }),
+  skipReview: () => systemClient.get<unknown, ApiResponse<boolean>>('api/platform/plugin-market-source/publications/skip-review'),
 }

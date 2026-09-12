@@ -3,6 +3,7 @@ package online.yudream.base.interfaces.platform.plugin.assembler;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationEditCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationReviewCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketPublicationDTO;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicationEditRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketPublicationReviewRequest;
@@ -54,11 +55,11 @@ public class PluginMarketPublicationWebAssembler {
                 .sha256(dto.getSha256())
                 .sizeBytes(dto.getSizeBytes())
                 .downloadCount(dto.getDownloadCount())
-                .publisherUserId(dto.getPublisherUserId())
+                .publisherUserId(dto.getPublisherUserId() == null ? null : dto.getPublisherUserId().toString())
                 .channel(dto.getChannel())
                 .status(dto.getStatus())
                 .reviewNote(dto.getReviewNote())
-                .reviewerUserId(dto.getReviewerUserId())
+                .reviewerUserId(dto.getReviewerUserId() == null ? null : dto.getReviewerUserId().toString())
                 .reviewedAt(dto.getReviewedAt())
                 .createTime(dto.getCreateTime())
                 .build();
@@ -66,6 +67,13 @@ public class PluginMarketPublicationWebAssembler {
 
     public static List<PluginMarketPublicationRes> toResList(List<PluginMarketPublicationDTO> items) {
         return items == null ? List.of() : items.stream().map(PluginMarketPublicationWebAssembler::toRes).toList();
+    }
+
+    public static PageResult<PluginMarketPublicationRes> toResPage(PageResult<PluginMarketPublicationDTO> page) {
+        if (page == null) {
+            return PageResult.empty(1, 10);
+        }
+        return new PageResult<>(toResList(page.getRecords()), page.getTotal(), page.getPage(), page.getSize());
     }
 
     public static Long parseId(String id) {

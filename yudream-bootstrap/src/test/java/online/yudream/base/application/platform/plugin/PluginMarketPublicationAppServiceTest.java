@@ -6,7 +6,9 @@ import online.yudream.base.application.platform.capability.service.CapabilityApp
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationEditCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketPublicationReviewCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketPublicationDTO;
+import online.yudream.base.application.platform.plugin.query.PluginMarketPublicationPageQuery;
 import online.yudream.base.application.platform.plugin.service.PluginMarketPublicationAppService;
+import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.application.platform.plugin.service.PluginUserCatalogAppService;
 import online.yudream.base.application.system.setting.service.SettingAppService;
 import online.yudream.base.domain.common.exception.BizException;
@@ -94,7 +96,7 @@ class PluginMarketPublicationAppServiceTest {
 
         PluginMarketPublicationDTO result = service.publish(stream(), JAR_BYTES.length, "修复若干问题",
                 "{\"license\":\"MIT\",\"compatibility\":{\"host\":\"^1.0.0\"},\"publisher\":{\"id\":\"yudream\",\"name\":\"YuDream\",\"url\":\"https://yudream.online\",\"verified\":true}}",
-                "效率工具", List.of("Demo", "demo", "Market"), 9L, true);
+                "效率工具", List.of("Demo", "demo", "Market"), 9L, true, false);
 
         assertEquals("demo", result.getCode());
         assertEquals("1.0.0", result.getPluginVersion());
@@ -131,7 +133,7 @@ class PluginMarketPublicationAppServiceTest {
         when(publicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         PluginMarketPublicationDTO result = service.publish(stream(), JAR_BYTES.length, null, null,
-                null, null, 9L, false);
+                null, null, 9L, false, false);
 
         assertEquals(PluginPublicationStatus.PUBLISHED, result.getStatus());
     }
@@ -143,14 +145,14 @@ class PluginMarketPublicationAppServiceTest {
         when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.of(PluginMarketPublication.builder().build()));
 
         assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
-                null, null, 9L, false));
+                null, null, 9L, false, false));
         verify(publicationRepo, never()).save(any());
 
         when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.empty());
         assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
-                "不存在的分类", null, 9L, false));
+                "不存在的分类", null, 9L, false, false));
         assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
-                null, List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"), 9L, false));
+                null, List.of("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"), 9L, false, false));
         verify(publicationRepo, never()).save(any());
     }
 
@@ -158,10 +160,10 @@ class PluginMarketPublicationAppServiceTest {
     void publishRejectsInvalidPluginVersionsAndOversize() {
         stubDescribe(new PluginDescriptorInfo("demo", "Demo", "1.0.0-beta", null, "example.Plugin", null, List.of(), List.of()));
         assertThrows(BizException.class, () -> service.publish(stream(), JAR_BYTES.length, null, null,
-                null, null, 9L, false));
+                null, null, 9L, false, false));
 
-        assertThrows(BizException.class, () -> service.publish(stream(), 0, null, null, null, null, 9L, false));
-        assertThrows(BizException.class, () -> service.publish(stream(), maxJarBytes() + 1, null, null, null, null, 9L, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), 0, null, null, null, null, 9L, false, false));
+        assertThrows(BizException.class, () -> service.publish(stream(), maxJarBytes() + 1, null, null, null, null, 9L, false, false));
 
         verify(publicationRepo, never()).save(any());
     }
@@ -183,7 +185,7 @@ class PluginMarketPublicationAppServiceTest {
         cmd.setTags(List.of("New Tag"));
         cmd.setCompatibility(Map.of("host", "^2.0.0"));
 
-        PluginMarketPublicationDTO result = service.edit(cmd);
+        PluginMarketPublicationDTO result = service.edit(cmd, 1L, false);
 
         assertEquals("新名称", result.getDisplayName());
         assertEquals("Minecraft", result.getCategory());
@@ -207,7 +209,7 @@ class PluginMarketPublicationAppServiceTest {
         Files.createDirectories(jar.getParent());
         Files.writeString(jar, "jar");
 
-        service.delete(1L);
+        service.delete(1L, 1L, false);
 
         verify(publicationRepo).deleteById(1L);
         assertFalse(Files.exists(jar));
@@ -230,8 +232,68 @@ class PluginMarketPublicationAppServiceTest {
         PluginMarketPublication published = PluginMarketPublication.builder()
                 .id(2L).code("demo").pluginVersion("2.0.0").status(PluginPublicationStatus.PUBLISHED).build();
         when(publicationRepo.findById(2L)).thenReturn(Optional.of(published));
-        var revoked = service.unpublish(reviewCmd(2L, null), 7L);
+        var revoked = service.unpublish(reviewCmd(2L, null), 7L, true);
         assertEquals(PluginPublicationStatus.REVOKED, revoked.getStatus());
+    }
+
+    @Test
+    void publishSkipsReviewWhenOperatorHasPublishPermission() {
+        stubDescribe(descriptor());
+        stubReviewRequired("true");
+        when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.empty());
+        when(publicationRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        PluginMarketPublicationDTO result = service.publish(stream(), JAR_BYTES.length, null, null,
+                null, null, 9L, false, true);
+
+        assertEquals(PluginPublicationStatus.PUBLISHED, result.getStatus());
+    }
+
+    @Test
+    void pageFiltersMineAndStatus() {
+        PluginMarketPublication mine = publication("demo", "1.0.0", PluginPublicationStatus.PENDING);
+        mine.setPublisherUserId(9L);
+        when(publicationRepo.page(PluginPublicationStatus.PENDING, 9L, 1, 10))
+                .thenReturn(new PageResult<>(List.of(mine), 1, 1, 10));
+
+        PluginMarketPublicationPageQuery query = new PluginMarketPublicationPageQuery();
+        query.setStatus("PENDING");
+        query.setMine(true);
+        query.setPage(1);
+        query.setSize(10);
+
+        PageResult<PluginMarketPublicationDTO> page = service.page(query, 9L, true);
+        assertEquals(1, page.getTotal());
+        assertEquals("demo", page.getRecords().getFirst().getCode());
+        verify(publicationRepo).page(PluginPublicationStatus.PENDING, 9L, 1, 10);
+    }
+
+    @Test
+    void pageForcesMineWhenOperatorCannotViewAll() {
+        when(publicationRepo.page(null, 9L, 1, 10))
+                .thenReturn(new PageResult<>(List.of(), 0, 1, 10));
+
+        service.page(new PluginMarketPublicationPageQuery(), 9L, false);
+
+        verify(publicationRepo).page(null, 9L, 1, 10);
+    }
+
+    @Test
+    void editAndDeleteRejectForeignPublicationsWithoutManagePermission() {
+        PluginMarketPublication ownedByOther = publication("demo", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        ownedByOther.setId(1L);
+        ownedByOther.setPublisherUserId(2L);
+        when(publicationRepo.findById(1L)).thenReturn(Optional.of(ownedByOther));
+
+        PluginMarketPublicationEditCmd cmd = new PluginMarketPublicationEditCmd();
+        cmd.setId(1L);
+        cmd.setDisplayName("新名称");
+
+        assertThrows(BizException.class, () -> service.edit(cmd, 9L, false));
+        assertThrows(BizException.class, () -> service.delete(1L, 9L, false));
+        assertThrows(BizException.class, () -> service.unpublish(reviewCmd(1L, null), 9L, false));
+        verify(publicationRepo, never()).save(any());
+        verify(publicationRepo, never()).deleteById(any());
     }
 
     @Test
