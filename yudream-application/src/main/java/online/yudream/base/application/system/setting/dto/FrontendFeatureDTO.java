@@ -22,5 +22,6 @@ public class FrontendFeatureDTO implements Serializable {
     private boolean passkeyEnabled;
     private boolean oauthServerEnabled;
     private boolean oauthClientEnabled;
+    private boolean publicPluginMarketEnabled;
     private Map<String, Boolean> capabilities;
 }

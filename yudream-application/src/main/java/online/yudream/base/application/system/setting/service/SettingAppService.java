@@ -13,6 +13,7 @@ import online.yudream.base.application.system.setting.dto.ThemeSettingDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMarketSourceConfig;
 import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.repo.ApiSecurityPolicyRepo;
 import online.yudream.base.domain.system.setting.aggregate.Setting;
@@ -87,6 +88,7 @@ public class SettingAppService {
                 .passkeyEnabled(policy.isPasskeyEnabled())
                 .oauthServerEnabled(policy.isOauthServerEnabled())
                 .oauthClientEnabled(policy.isOauthClientEnabled())
+                .publicPluginMarketEnabled(publicPluginMarketEnabled())
                 .capabilities(capabilityStatusMap())
                 .build();
     }
@@ -214,5 +216,12 @@ public class SettingAppService {
             result.put(module.getCode(), module.enabled());
         }
         return result;
+    }
+
+    private boolean publicPluginMarketEnabled() {
+        return capabilityModuleRepo.findByCode("plugin-market-source")
+                .filter(CapabilityModule::enabled)
+                .map(module -> PluginMarketSourceConfig.publicEnabled(module.getConfig()))
+                .orElse(false);
     }
 }

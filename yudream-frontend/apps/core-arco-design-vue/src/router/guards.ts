@@ -73,7 +73,7 @@ function setupRoutes(router: Router) {
         const appFeatureStore = useAppFeatureStore()
         await appFeatureStore.load()
         if ((to.name === 'publicMarketHome' || to.name === 'publicMarketPlugin')
-          && !appFeatureStore.capabilityEnabled('plugin-market-source')) {
+          && !appFeatureStore.publicPluginMarketEnabled) {
           return {
             path: appSettingsStore.settings.app.home.fullPath,
             replace: true,
@@ -141,7 +141,7 @@ function setupRoutes(router: Router) {
         }
       }
       if ((to.name === 'publicMarketHome' || to.name === 'publicMarketPlugin')
-        && !appFeatureStore.capabilityEnabled('plugin-market-source')) {
+        && !appFeatureStore.publicPluginMarketEnabled) {
         return {
           name: 'login',
           replace: true,

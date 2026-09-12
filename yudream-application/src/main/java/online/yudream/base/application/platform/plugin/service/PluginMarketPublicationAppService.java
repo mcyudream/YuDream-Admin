@@ -23,6 +23,7 @@ import online.yudream.base.domain.platform.plugin.repo.PluginMarketPublicationRe
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginMarketCategories;
+import online.yudream.base.domain.platform.plugin.valobj.PluginMarketSourceConfig;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogEntry;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDependency;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreStructuredVersion;
@@ -285,21 +286,25 @@ public class PluginMarketPublicationAppService {
     /** 审核开关：能力配置 reviewRequired，未配置或值非 false 时默认需要审核。 */
     public boolean reviewRequired() {
         return capabilityModuleRepo.findByCode(PluginMarketSourceAppService.CAPABILITY_CODE)
-                .map(this::reviewRequiredOf)
+                .map(module -> PluginMarketSourceConfig.reviewRequired(module.getConfig()))
                 .orElse(true);
     }
 
     @Transactional
     public boolean updateReviewRequired(boolean required) {
-        capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
-                PluginMarketSourceAppService.CAPABILITY_NAME);
-        CapabilityModule module = capabilityModuleRepo.findByCode(PluginMarketSourceAppService.CAPABILITY_CODE)
-                .orElseThrow(() -> new BizException("插件市场源能力未初始化，请先在平台能力中启用"));
-        Map<String, String> config = new LinkedHashMap<>(module.getConfig() == null ? Map.of() : module.getConfig());
-        config.put("reviewRequired", Boolean.toString(required));
-        module.updateConfig(config);
-        capabilityModuleRepo.save(module);
-        return required;
+        return updateCapabilityFlag(PluginMarketSourceConfig.REVIEW_REQUIRED, required);
+    }
+
+    /** 公开社区开关：能力配置 publicEnabled，未配置或值非 false 时默认开启。 */
+    public boolean publicEnabled() {
+        return capabilityModuleRepo.findByCode(PluginMarketSourceAppService.CAPABILITY_CODE)
+                .map(module -> PluginMarketSourceConfig.publicEnabled(module.getConfig()))
+                .orElse(true);
+    }
+
+    @Transactional
+    public boolean updatePublicEnabled(boolean enabled) {
+        return updateCapabilityFlag(PluginMarketSourceConfig.PUBLIC_ENABLED, enabled);
     }
 
     // ---------- v2 交互式目录（裸 JSON 协议，匿名可读） ----------
@@ -656,12 +661,21 @@ public class PluginMarketPublicationAppService {
     private void requirePubliclyServed() {
         capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
                 PluginMarketSourceAppService.CAPABILITY_NAME);
+        if (!publicEnabled()) {
+            throw new BizException("公开插件市场未开启");
+        }
     }
 
-    private boolean reviewRequiredOf(CapabilityModule module) {
-        String value = module.getConfig() == null ? null : module.getConfig().get("reviewRequired");
-        // defaultConfig 只播种空配置行：读取处运行时回落默认值（默认需要审核）
-        return !"false".equalsIgnoreCase(value);
+    private boolean updateCapabilityFlag(String key, boolean value) {
+        capabilityAppService.ensureEnabled(PluginMarketSourceAppService.CAPABILITY_CODE,
+                PluginMarketSourceAppService.CAPABILITY_NAME);
+        CapabilityModule module = capabilityModuleRepo.findByCode(PluginMarketSourceAppService.CAPABILITY_CODE)
+                .orElseThrow(() -> new BizException("插件市场源能力未初始化，请先在平台能力中启用"));
+        Map<String, String> config = new LinkedHashMap<>(module.getConfig() == null ? Map.of() : module.getConfig());
+        config.put(key, Boolean.toString(value));
+        module.updateConfig(config);
+        capabilityModuleRepo.save(module);
+        return value;
     }
 
     private Optional<PluginMarketPublication> publishedPublication(String code, String pluginVersion) {
