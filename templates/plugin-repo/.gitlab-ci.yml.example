@@ -188,7 +188,8 @@ publish:plugin-jars:
 
 # 可选：把构建产物同时发布到自托管 YuDream 插件市场源（插件市场源能力）。
 # 需在项目/群组 CI variables 中配置受保护、掩码变量 YUDREAM_MARKET_URL 与 YUDREAM_MARKET_API_KEY，
-# 可选 YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_METADATA；详见 yd-docs「自托管市场源」。
+# 可选 YUDREAM_MARKET_RELEASE_NOTES / YUDREAM_MARKET_CATEGORY / YUDREAM_MARKET_TAGS / YUDREAM_MARKET_METADATA；
+# 详见 yd-docs「自托管市场源」。
 publish:market:
   image: alpine:3.20
   stage: publish-plugin
