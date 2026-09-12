@@ -1,0 +1,21 @@
+package online.yudream.base.domain.platform.plugin.repo;
+
+import online.yudream.base.domain.platform.plugin.aggregate.PluginMarketPublication;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginPublicationStatus;
+
+import java.util.List;
+import java.util.Optional;
+
+public interface PluginMarketPublicationRepo {
+
+    PluginMarketPublication save(PluginMarketPublication publication);
+
+    Optional<PluginMarketPublication> findById(Long id);
+
+    Optional<PluginMarketPublication> findByCodeAndVersion(String code, String version);
+
+    List<PluginMarketPublication> findByStatus(PluginPublicationStatus status);
+
+    /** 全量发布物，按创建时间倒序。 */
+    List<PluginMarketPublication> findAll();
+}

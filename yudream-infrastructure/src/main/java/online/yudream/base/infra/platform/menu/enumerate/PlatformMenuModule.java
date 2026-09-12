@@ -142,6 +142,14 @@ public enum PlatformMenuModule {
             parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:run")
     PLUGIN_MARKET_SOURCE_RUN,
 
+    @MenuNode(code = "platform:plugin-market-source:upload", name = "发布插件到市场源", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:upload")
+    PLUGIN_MARKET_SOURCE_UPLOAD,
+
+    @MenuNode(code = "platform:plugin-market-source:accept", name = "审核市场发布物", type = MenuNodeType.BUTTON,
+            parentName = "PLUGIN_MARKET_SOURCE", permission = "platform:plugin-market-source:accept")
+    PLUGIN_MARKET_SOURCE_ACCEPT,
+
     @MenuNode(code = "platform:docs", name = "API 文档", type = MenuNodeType.MENU,
             path = "/platform/api-doc", component = "platform/api-doc/index.vue",
             icon = "i-ri:file-list-2-line", sort = 90)
