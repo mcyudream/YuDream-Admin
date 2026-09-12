@@ -1,63 +1,56 @@
-# 第三方插件市场投稿
+# 第三方插件投稿
 
-第三方作者只能通过 Merge Request（MR）提交投稿材料。MR 中不会运行发布操作，也不会获得或读取 Nexus 写入凭据；作者不能自行将 JAR、市场索引或资源上传到 Nexus。
+第三方作者把插件发到**某套 YuDream 实例的本机市场源**，而不是往 Nexus 交 JAR。订阅方在后台添加该实例的 v2 源后，就能发现并安装。已发布的 `{code}@{pluginVersion}` 不可覆盖，修复必须发新版本。
 
-审核通过后，受信发布者才可以在 **protected tag** 或受保护的手动发布流水线中代发。代发使用独立的受保护、掩码凭据；已发布的 `{code}@{version}` 不可覆盖，修复必须发布新的稳定版本。
+作者有两条路，选一条即可：
 
-## 投稿目录
+| 路径 | 适合谁 | 发到哪里 | 审核 |
+| --- | --- | --- | --- |
+| **开放站点投稿** | 把插件交给已开放公开市场的站点（例如高校社团官网） | 该站点的 LOCAL 源，公开 `/market` 可发现 | 由该站点管理员审核；持有跳过审核权限的人可直接上架 |
+| **自托管市场源** | 自己跑一套 YuDream，当供给方 | 本机 LOCAL 源，对外提供 v2 协议 | 本机 `reviewRequired` 开关；也可关审核或给自己跳过审核权限 |
 
-每次投稿放在受控的 `SUBMISSION_DIR`（通常是 `submission/`）中。校验器只接受该目录内部的文件和相对引用，不会跟随绝对路径、`..` 路径穿越、URL、查询参数或片段。
+两条路用同一套发布通道：后台「插件发布」上传，或 API Key / `publish:market` 流水线。不要再走主仓 MR `submission/` 目录，也不要指望受信发布者往 Nexus 代发——官方仓自己的 Nexus catalog 只服务官方插件，与第三方投稿无关。
 
-```text
-submission/
-  submission.json
-  plugin.yml
-  store.json
-  plugin.jar
-  plugin.jar.sha256
-  LICENSE
-  resources/
-    icon.svg
-    screenshot.png
-```
+操作细节（分类标签、状态机、v2 端点）见[自托管插件市场源](../yd-docs/docs/plugin/market-source.md)。文档站入口：[插件市场与第三方上架](https://ydadocs.yudream.online/plugin/marketplace)。
 
-可从 [`templates/plugin-repo/`](../templates/plugin-repo/) 复制 `plugin.yml.example`、`store.json.example`、`submission.json.example` 和 `LICENSE` 开始。将示例中的版权占位符、作者信息、插件 code、版本和入口类替换成真实值。
+## 发之前
 
-## 必填材料
+无论投给开放站点还是自己托管，JAR 都要满足运行时契约：
 
-`submission.json` 是投稿清单，声明 code、version、main、作者信息和五个文件的相对路径：`plugin.yml`、`store.json`、`plugin.jar`、SHA-256 文件和许可证。
+- 根目录有权威 `plugin.yml`（`name` / `main` / `version`）；`depend` 硬依赖、`softdepend` 软依赖。
+- 依赖正式发布的 SPI / SDK / components，JAR 内不得嵌入 `online/yudream/base/plugin/spi/**`。
+- 前端产物在 `META-INF/yudream-plugin/frontend/{pluginCode}/remoteEntry.js`。
+- `{code}@{pluginVersion}` 在目标源上尚未发布。
+- Java `Long` / Snowflake ID 在 JSON 与前端一律用 `string`。
 
-`store.json` 是市场条目，包含：
+分类、标签、许可证、兼容区间是社区元数据，界面或 `store.json` 提交即可，`plugin.yml` 不携带。完整约定见[插件开发规范](plugin-system/specification.md)。
 
-- `schemaVersion` 与稳定的 `releaseVersion`；
-- `plugin.code`、`plugin.version`、`plugin.main`、展示信息、兼容性和依赖；
-- `jar.mavenCoordinates`、相对 JAR 路径和 64 位小写十六进制 SHA-256；
-- 许可证相对路径，以及可选图标和截图资源。
+## 路径一：开放站点投稿
 
-`plugin.yml` 是 JAR 根目录运行时描述符，至少包含 `name`、`main`、`version` 和 `description`。`depend` 表示必须先启用的插件，`softdepend` 表示可选插件；市场依赖必须以 `required: true/false` 保持同一语义。
+目标站点必须已启用能力 `plugin-market-source`，且公开社区开关 `publicEnabled` 未关。访客在 `/market` 浏览；作者**不能**在公开页上传。
 
-## 一致性与安全约束
+1. 向站点管理员申请账号，以及权限 `platform:plugin-market-source:upload`（后台「插件发布」）。
+2. 登录后台 → **平台 → 插件中心 → 插件发布**，上传 JAR。元数据从 JAR 内 `plugin.yml` 解析；分类从内置清单选一项，标签最多 10 个。
+3. 默认 `reviewRequired=true` 时进入 `PENDING`，等该站点持有 `accept` 的人通过。站点若关闭审核，或作者另有 `platform:plugin-market-source:publish`，则直接 `PUBLISHED`。
+4. 上架后出现在该站 `/market` 与 v2 目录。作者只能改自己的发布物（分类/标签等），编辑不重审；硬删除会去掉记录和 JAR。
 
-投稿校验会拒绝以下情况：
+流水线投开放站点时，在自己的插件仓配置受保护变量 `YUDREAM_MARKET_URL`（该站 origin，如 `https://www.swustmc.cn`）和 `YUDREAM_MARKET_API_KEY`（勾选 `upload`）。模板 job `publish:market` 只在受保护 `v*` tag 调度。后台「插件发布」页的「查看 CI 模板」可复制完整片段。
 
-- `submission.json`、`plugin.yml` 与 `store.json` 的 code、version 或 main 不一致；
-- 非稳定 SemVer（例如 `1.0`、`v1.0.0`、`1.0.0-SNAPSHOT`、预发布版本）；
-- JAR 校验和与 `plugin.jar.sha256` 或 `store.json` 不一致；
-- 引用不存在、重复或逃出 `SUBMISSION_DIR` 的许可证、资源、清单或归档文件；
-- JAR 中缺少根 `plugin.yml`、与外部 `plugin.yml` 不一致，或包含 `online/yudream/base/plugin/spi/**` 类；
-- `depend` / `softdepend` 和市场依赖列表不一致，或 required 语义相反；
-- 使用已发布的 `{code}@{version}` 重新投稿。
+公开 `/market` 只发现与下载。其他 YuDream 实例若要安装你的插件，把该站 `{origin}/api/public/plugin-market` 加为 `V2_API` 源即可。
 
-插件必须依赖正式发布的 SPI/SDK 契约，不能将宿主 SPI 类嵌入自己的 JAR。其他插件的业务 API 也不得被消费者重复打包；详细约束见[插件开发规范](plugin-system/specification.md)。
+## 路径二：自托管市场源
 
-## 审核与发布边界
+自己部署 YuDream 后，打开项目闸门 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` 和应用闸门，本机即成为供给方：内置 LOCAL 源 `default`，对外基址 `{origin}/api/public/plugin-market`。
 
-审核人员应至少确认：
+1. 给发布账号 `upload`（以及按需 `accept` / `publish`）。
+2. 用「插件发布」或 API Key 把 JAR 发到本机 LOCAL，流程与路径一相同。
+3. 需要对外发现时打开 `publicEnabled`；只给受控实例用时关掉公开 `/market`，把 v2 基址私下交给订阅方，并可给源配 Bearer token。
+4. 订阅方在「添加市场源」填 `V2_API` + 你的基址（不要带 `/api/v2`）。远程订阅**不依赖**对方是否开启本能力。
 
-1. MR 仅包含投稿材料和必要说明，没有改写发布脚本、市场生产索引或 CI 凭据配置；
-2. 离线投稿校验通过，资源、许可证和 JAR 都在投稿目录中；
-3. code/version/main、依赖语义、兼容范围和 SHA-256 已人工复核；
-4. 许可证与作者身份、发布权限和第三方依赖许可可接受；
-5. 版本尚未发布。发布成功后版本不可变。
+能力关闭时不播种 LOCAL、不注册发布/审核/公开 v2 端点，也不回落 Nexus。插件管理、本地上传安装与回滚不受影响。
 
-普通分支和 MR 的 `validate:third-party-submission` 任务只执行离线校验，显式不声明 `NEXUS_USERNAME`、`NEXUS_PASSWORD` 或任何写入 token，也不调用 Nexus。未来的代发任务必须同时要求 protected ref、手动触发和发布者权限；Raw 资源写入以 `resource_group` 串行化，避免并发覆盖市场状态。
+## 不再使用的投稿方式
+
+主仓 `submission/` + MR + Nexus 代发已经不是第三方上架通道。`templates/plugin-repo/` 里的 `submission.json.example` 仅作历史材料模板；新投稿不要组这套目录，也不要给第三方配置 `NEXUS_USERNAME` / `NEXUS_PASSWORD`。
+
+官方业务插件仍走独立仓受保护 `v*`：可选 Nexus catalog（官方内部）和/或 `publish:market`（自托管市场源）。那是官方发布契约，不是第三方投稿。

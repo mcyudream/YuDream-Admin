@@ -140,7 +140,7 @@ pnpm --dir yudream-frontend --filter @fantastic-admin/core-arco-design-vue run t
 
 ## 升级路径与模式切换
 
-- **模式一升级**：watchtower 自动拉取新镜像重启；手动则 `docker compose pull && docker compose up -d`。插件不受影响，但升级前应核对插件商店索引（`plugin-store-releases/index.json`）中的 host/spi 兼容矩阵。
+- **模式一升级**：watchtower 自动拉取新镜像重启；手动则 `docker compose pull && docker compose up -d`。插件不受影响；升级前核对本机/远程市场源里插件声明的 host/spi 兼容区间。
 - **模式二升级**：作为主仓的下游 fork 维护，拉取上游变更后按分层规范合并冲突；业务功能若已插件化则完全不受主仓升级影响。
 - **模式一 → 模式二**：直接克隆源码改造即可，已有插件 JAR 原样可用，无需重写。
 - **模式二 → 模式一**：用自有镜像替换官方镜像（改 `CI_REGISTRY_IMAGE`），插件体系与部署方式不变。

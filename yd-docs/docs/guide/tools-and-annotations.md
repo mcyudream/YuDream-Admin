@@ -112,5 +112,5 @@ GrapesJS 拖拽建站，存储三字段：`htmlContent`（发布 HTML）、`cssC
 
 - **两级缓存**：Redis（L2）+ Caffeine（L1），`yudream.cache.*` 支持空值过期与按前缀聚合指标。
 - **雪花 ID 配置**：`snowflake.data-center-id` / `machine-id`；所有 Long/Snowflake ID 跨 JSON/前端边界一律 string。
-- **插件商店**：Nexus 托管 `plugin-store-releases/index.json`，含 host/spi/frontend-sdk 版本兼容矩阵。
+- **插件市场源**：可安装目录来自本机 LOCAL 与已订阅的远程 v2 / 静态索引，不再默认回落 Nexus `plugin-store-releases`。
 - **容器日志实时采集**：socket/CLI 双通道。

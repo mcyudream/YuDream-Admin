@@ -120,13 +120,13 @@ core 仓的 `templates/plugin-repo/` 目录是「官方业务插件独立仓」�
 - `.gitlab-ci.yml.example`、`.npmrc.example`、`settings.xml.example`、`pnpm-workspace.yaml.example`
 - `ci/` 下的校验与发布脚本：`verify-plugin-repo-independence.sh`、`verify-core-maven-registry.sh`、`verify-plugin-maven-boundary.sh`、`verify-core-npm-contracts.sh`、`verify-plugin-jar-assets.sh`、`verify-plugin-release-selection.sh`、`publish-plugin-jars.sh`、`verify-published-plugin-jars.sh`、`stage-plugin-repo-foundation.sh`、`stage-plugin-source-migration.sh`
 - `release/plugins.txt`：官方 tag 发布的显式模块清单（默认包含全部 `yudream-plugin-*` artifactId）
-- `plugin.yml.example`、`store.json.example`、`submission.json.example`、`LICENSE`（第三方投稿材料模板）
+- `plugin.yml.example`、`store.json.example`、`LICENSE`（市场元数据模板）；`submission.json.example` 仅为历史材料，第三方上架不再组 `submission/` MR
 - `docs/plugin-release.md`：完整的选择、版本与 catalog 规则
 
 初始化步骤：
 
 1. 复制模板到新仓根目录。
-2. 在新仓 GitLab CI variables 中配置受保护、掩码的发布凭据 `NEXUS_USERNAME`、`NEXUS_PASSWORD`，并保护 `v*` tag。
+2. 在新仓 GitLab CI variables 中配置受保护、掩码凭据：官方 Nexus 发布用 `NEXUS_USERNAME`、`NEXUS_PASSWORD`；自托管市场上架另配 `YUDREAM_MARKET_URL`、`YUDREAM_MARKET_API_KEY`，并保护 `v*` tag。
 3. 配置 Maven：优先阿里云公共仓库，缺失回退 Nexus；YuDream 契约从 `maven-public` 拉取，插件 JAR 发布到 `maven-releases`。
 4. 让插件仓只依赖正式发布的 `yudream-plugin-spi`（Maven）与 `@yudream/plugin-sdk`、`@yudream/components`（npm）。
 5. 前端 workspace 只保留 `packages/plugin-*`。
@@ -136,7 +136,12 @@ core 仓的 `templates/plugin-repo/` 目录是「官方业务插件独立仓」�
 
 ### 第三方市场投稿
 
-第三方作者不使用模板的官方发布 job，也不配置任何写凭据。作者在受控 `submission/` 目录中通过 MR 提交 `plugin.yml`、`store.json`、`submission.json`、`LICENSE`、构建完成的 `plugin.jar` 及其 SHA-256、图标截图等资源；普通 MR CI 只作本地校验，绝不上传 Nexus。要求各文件与 JAR 内根 `plugin.yml` 的 code、version、main 完全一致，使用稳定 SemVer，JAR 不含 `online/yudream/base/plugin/spi/**`。审核通过后由受信发布者在 protected tag 或受保护手动流水线代发。完整格式与审核清单见主仓 `docs/third-party-plugin-submission.md`。
+第三方作者不使用模板的 Nexus 发布 job，也不配置 Nexus 写凭据。上架走目标 YuDream 实例的本机市场源：
+
+- 开放站点：申请 `upload` 后在后台「插件发布」上传，或用 `publish:market` 打到该站；
+- 自托管：自己启用 `plugin-market-source`，本机 LOCAL 对外提供 v2。
+
+不要组主仓 `submission/` MR。完整步骤见 [插件市场与第三方上架](/plugin/marketplace) 与主仓 `docs/third-party-plugin-submission.md`。
 
 ## 回归校验命令
 
@@ -163,6 +168,6 @@ sh ci/verify-plugin-jar-assets.sh
 - `docs/repository-split/README.md`（拆分结论与当前事实清单）
 - `docs/plugin-system/standalone-plugin-repo-default.md`（官方业务插件默认独立仓规则）
 - `templates/plugin-repo/README.md`（模板使用说明原文）
-- `templates/plugin-repo/plugin.yml.example`（第三方投稿 `plugin.yml` 模板）
+- `templates/plugin-repo/plugin.yml.example`（插件运行时描述符模板）
 - `templates/plugin-repo/ci/verify-plugin-jar-assets.sh`（JAR 前端资源校验脚本）
-- `docs/third-party-plugin-submission.md`（第三方投稿完整规范）
+- `docs/third-party-plugin-submission.md`（第三方开放站点 / 自托管投稿）

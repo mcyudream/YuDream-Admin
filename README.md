@@ -203,7 +203,7 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 
 新建官方插件时，建议从 [插件仓库模板](templates/plugin-repo/README.md) 开始；完整约定见 [插件系统规范](docs/plugin-system/specification.md) 和 [插件开发教程](docs/plugin-system/tutorial.md)。官方业务插件源码位于独立仓库 [yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)。
 
-第三方插件作者只能通过 MR 提交投稿材料，普通 MR CI 不会获得 Nexus 写凭据，也不会发布或上传制品。审核通过后仅由受信发布者通过 protected tag 或受保护的手动流水线代发；已发布版本不可覆盖。投稿格式和审核边界见[第三方插件市场投稿指南](docs/third-party-plugin-submission.md)。
+第三方作者把插件发到开放站点的本机市场，或自己托管一套市场源（后台「插件发布」/ API Key），不要走主仓 MR 往 Nexus 代发。`{code}@{pluginVersion}` 不可覆盖。步骤见[第三方插件投稿指南](docs/third-party-plugin-submission.md) 与[自托管插件市场源](yd-docs/docs/plugin/market-source.md)。
 
 ## 文档
 
@@ -212,7 +212,7 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 - [插件系统规范](docs/plugin-system/specification.md)
 - [插件开发教程](docs/plugin-system/tutorial.md)
 - [文档站源码与维护说明](yd-docs/README.md)
-- [第三方插件市场投稿](docs/third-party-plugin-submission.md)
+- [第三方插件投稿](docs/third-party-plugin-submission.md)
 - [插件市场发布边界](docs/plugin-store-release.md)
 - [自托管插件市场源](yd-docs/docs/plugin/market-source.md)
 - [平台能力说明](docs/platform/)

@@ -157,3 +157,4 @@ mvn -pl yudream-plugins/yudream-plugin-demo -am -DskipTests package
 
 - 阅读 [SPI 参考](/plugin/spi/) 了解全部接口能力。
 - 阅读 [插件规范与检查清单](/plugin/specification) 保证工程质量。
+- 上架走目标站点的本机市场，或自己托管一套源，见 [插件市场与第三方上架](/plugin/marketplace)。

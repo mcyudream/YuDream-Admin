@@ -386,7 +386,7 @@ Spring 占位符中的 `${VAR:default}` 表示变量缺省时使用 `default`；
 | `PLATFORM_PLUGIN_HOST_VERSION` | `1.0.0` | 否 | 插件宿主兼容版本。 | 插件兼容性检查 | 只在确认插件契约兼容时修改。 |
 | `PLATFORM_PLUGIN_SPI_VERSION` | `2.13.0` | 否 | 插件 SPI 兼容版本。 | 插件兼容性检查 | `application.yml` 默认 `2.13.0`；应与当前宿主 SPI 契约匹配（源码 `2.24.0`）。 |
 | `PLATFORM_PLUGIN_FRONTEND_SDK_VERSION` | `1.0.1` | 否 | 插件前端 SDK 兼容版本。 | 插件前端兼容性检查 | `application.yml` 默认 `1.0.1`；运行时行为版本为 `1.5.0`，npm 包为 `1.5.0`。 |
-| `PLATFORM_PLUGIN_STORE_ROOT_URL` | `https://nexus.yudream.online/repository/plugin-store-releases/index.json` | 否 | 插件商店索引地址。 | 在线插件商店 | 仅信任受控 HTTPS 地址。 |
+| `PLATFORM_PLUGIN_STORE_ROOT_URL` | （遗留，默认 Nexus 静态索引） | 否 | 遗留商店索引地址，市场目录不再默认回落。 | 已订阅的市场源 | 新部署不要依赖此 URL；用「添加市场源」订阅 v2。 |
 | `PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS` | `5000` | 否 | 商店连接超时（毫秒）。 | 在线插件商店 | 网络不稳定时谨慎增大。 |
 | `PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS` | `5000` | 否 | 商店请求超时（毫秒）。 | 在线插件商店 | 避免启动或管理请求长时间阻塞。 |
 | `PLATFORM_PLUGIN_STORE_MAX_RESPONSE_BYTES` | `1048576` | 否 | 商店索引最大响应字节数。 | 在线插件商店 | 维持限制以降低内存和供应链风险。 |
