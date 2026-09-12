@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import type { PluginMarketCategory, PluginMarketQuery, PluginMarketSort, PluginMarketSummary, PluginMarketTag } from '@/api/modules/plugin-market-public'
-import { PLUGIN_MARKET_CATEGORIES } from '@/api/modules/plugin-market-public'
-import apiMarketPublic from '@/api/modules/plugin-market-public'
-import apiMarketSource from '@/api/modules/platform-plugin-market-source'
+import apiMarketPublic, { PLUGIN_MARKET_CATEGORIES } from '@/api/modules/plugin-market-public'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
@@ -35,18 +33,9 @@ const publishedAfter = ref(typeof route.query.after === 'string' ? route.query.a
 const publishedBefore = ref(typeof route.query.before === 'string' ? route.query.before : '')
 const sort = ref<PluginMarketSort>((route.query.sort as PluginMarketSort) || 'newest')
 const page = ref(Number(route.query.page) > 0 ? Number(route.query.page) : 1)
-const size = 12
-const publishVisible = ref(false)
-const publishing = ref(false)
-const publishFile = ref<File | null>(null)
-const publishNotes = ref('')
-const publishCategory = ref('')
-const publishTags = ref('')
-const publishLicense = ref('')
-const publishCompatibility = ref('')
-const fileInput = ref<HTMLInputElement | null>(null)
+const size = ref(Number(route.query.size) > 0 ? Number(route.query.size) : 12)
 
-const canPublish = computed(() => accountStore.isLogin && auth.auth('platform:plugin-market-source:upload'))
+const canManageOwnPlugins = computed(() => accountStore.isLogin && auth.auth('platform:plugin-market-source:upload'))
 const siteName = computed(() => appSettingsStore.siteName || '插件市场')
 const sortOptions: { label: string, value: PluginMarketSort }[] = [
   { label: '最新发布', value: 'newest' },
@@ -54,8 +43,19 @@ const sortOptions: { label: string, value: PluginMarketSort }[] = [
   { label: '最近更新', value: 'updated' },
   { label: '名称', value: 'name' },
 ]
-const categoryOptions = computed(() => PLUGIN_MARKET_CATEGORIES.map(name => ({ label: name, value: name })))
 const publicV2Url = `${window.location.origin}/api/public/plugin-market`
+const publishedRange = computed({
+  get: () => {
+    if (!publishedAfter.value && !publishedBefore.value) {
+      return undefined
+    }
+    return [publishedAfter.value || '', publishedBefore.value || '']
+  },
+  set: (value) => {
+    publishedAfter.value = typeof value?.[0] === 'string' ? value[0] : ''
+    publishedBefore.value = typeof value?.[1] === 'string' ? value[1] : ''
+  },
+})
 const hasFilters = computed(() => Boolean(
   selectedCategories.value.length
   || selectedTags.value.length
@@ -64,7 +64,7 @@ const hasFilters = computed(() => Boolean(
   || publishedBefore.value,
 ))
 
-watch([search, selectedCategories, selectedTags, authorId, authorName, publishedAfter, publishedBefore, sort, page], syncQuery, { deep: true })
+watch([search, selectedCategories, selectedTags, authorId, authorName, publishedAfter, publishedBefore, sort, page, size], syncQuery, { deep: true })
 
 onMounted(async () => {
   await featureStore.load()
@@ -92,6 +92,7 @@ function syncQuery() {
       before: publishedBefore.value || undefined,
       sort: sort.value === 'newest' ? undefined : sort.value,
       page: page.value > 1 ? String(page.value) : undefined,
+      size: size.value === 12 ? undefined : String(size.value),
     },
   })
 }
@@ -125,7 +126,7 @@ async function loadPlugins() {
       publishedBefore: publishedBefore.value || undefined,
       sort: sort.value,
       page: page.value,
-      size,
+      size: size.value,
     }
     const res = await apiMarketPublic.plugins(query)
     items.value = res.items
@@ -194,6 +195,20 @@ function onPageChange(value: number) {
   void loadPlugins()
 }
 
+function onSizeChange(value: number) {
+  size.value = value
+  page.value = 1
+  void loadPlugins()
+}
+
+function goAuthorWorkspace() {
+  if (!accountStore.isLogin) {
+    void router.push({ name: 'login', query: { redirect: '/platform/plugin-publish' } })
+    return
+  }
+  void router.push('/platform/plugin-publish')
+}
+
 function openPlugin(code: string) {
   void router.push({ name: 'publicMarketPlugin', params: { code } })
 }
@@ -215,76 +230,6 @@ function isImageIcon(icon?: string) {
 
 function iconUrl(icon?: string) {
   return toBackendAssetUrl(icon)
-}
-
-function onPublishFileChange(event: Event) {
-  publishFile.value = (event.target as HTMLInputElement).files?.[0] || null
-}
-
-function openPublish() {
-  if (!accountStore.isLogin) {
-    void router.push({ name: 'login', query: { redirect: '/market' } })
-    return
-  }
-  publishFile.value = null
-  publishNotes.value = ''
-  publishCategory.value = ''
-  publishTags.value = ''
-  publishLicense.value = ''
-  publishCompatibility.value = ''
-  publishVisible.value = true
-}
-
-async function submitPublish() {
-  if (!publishFile.value) {
-    toast.error('请选择插件 JAR')
-    return
-  }
-  publishing.value = true
-  try {
-    const data = new FormData()
-    data.append('file', publishFile.value)
-    if (publishNotes.value.trim()) {
-      data.append('releaseNotes', publishNotes.value.trim())
-    }
-    if (publishCategory.value) {
-      data.append('category', publishCategory.value)
-    }
-    if (publishTags.value.trim()) {
-      data.append('tags', publishTags.value.trim())
-    }
-    const metadata: Record<string, unknown> = {}
-    if (publishLicense.value.trim()) {
-      metadata.license = publishLicense.value.trim()
-    }
-    if (publishCompatibility.value.trim()) {
-      try {
-        const parsed = JSON.parse(publishCompatibility.value.trim()) as unknown
-        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-          toast.error('兼容性必须是 JSON 对象，例如 {"host":">=2.16.0"}')
-          return
-        }
-        metadata.compatibility = parsed
-      }
-      catch {
-        toast.error('兼容性必须是合法 JSON')
-        return
-      }
-    }
-    if (Object.keys(metadata).length) {
-      data.append('metadata', JSON.stringify(metadata))
-    }
-    await apiMarketSource.uploadPublication(data)
-    publishVisible.value = false
-    toast.success('发布成功，已进入本机市场源')
-    await Promise.all([loadFacets(), loadPlugins()])
-  }
-  catch {
-    // systemClient 已提示错误
-  }
-  finally {
-    publishing.value = false
-  }
 }
 
 async function copyPublicUrl() {
@@ -323,12 +268,9 @@ async function copyPublicUrl() {
           </FaInput>
           <FaSelect v-model="sort" :options="sortOptions" class="discover-sort" @update:model-value="onSortChange" />
           <FaButton html-type="submit">搜索</FaButton>
-          <FaButton v-if="canPublish" @click="openPublish">
+          <FaButton v-if="canManageOwnPlugins" variant="outline" @click="goAuthorWorkspace">
             <FaIcon name="i-ri:upload-2-line" />
-            发布插件
-          </FaButton>
-          <FaButton v-else-if="!accountStore.isLogin" variant="outline" @click="openPublish">
-            登录后发布
+            管理我的插件
           </FaButton>
         </form>
 
@@ -365,14 +307,13 @@ async function copyPublicUrl() {
             </section>
             <section>
               <h2>发布时间</h2>
-              <label class="discover-time">
-                <span>起始</span>
-                <input v-model="publishedAfter" type="date" @change="onTimeFilterChange">
-              </label>
-              <label class="discover-time">
-                <span>截止</span>
-                <input v-model="publishedBefore" type="date" @change="onTimeFilterChange">
-              </label>
+              <YdRangePicker
+                v-model="publishedRange"
+                class="discover-range"
+                :placeholder="['开始日期', '结束日期']"
+                @change="onTimeFilterChange"
+                @clear="onTimeFilterChange"
+              />
             </section>
             <section v-if="authorId">
               <h2>作者</h2>
@@ -428,12 +369,13 @@ async function copyPublicUrl() {
               </article>
             </div>
             <FaPagination
-              v-if="total > size"
               v-model:page="page"
-              :size="size"
+              v-model:size="size"
               :total="total"
+              :sizes="[12, 24, 48]"
               class="discover-pagination"
               @page-change="onPageChange"
+              @size-change="onSizeChange"
             />
           </section>
         </div>
@@ -450,36 +392,6 @@ async function copyPublicUrl() {
         </footer>
       </div>
     </main>
-
-    <FaModal v-model="publishVisible" title="发布插件" show-cancel-button class="sm:max-w-xl" :confirm-loading="publishing" @confirm="submitPublish">
-      <a-form :model="{ notes: publishNotes, category: publishCategory, tags: publishTags, license: publishLicense }" layout="vertical">
-        <a-form-item label="插件 JAR">
-          <input ref="fileInput" type="file" accept=".jar" class="hidden" @change="onPublishFileChange">
-          <div class="flex items-center gap-2">
-            <FaButton variant="outline" @click="fileInput?.click()">选择文件</FaButton>
-            <span class="min-w-0 break-all text-sm">{{ publishFile?.name || '未选择' }}</span>
-          </div>
-          <div class="mt-1 text-xs" style="color: var(--yb-site-muted, var(--color-text-3));">
-            未填写的字段以 plugin.yml 为准。
-          </div>
-        </a-form-item>
-        <a-form-item label="分类（可选）">
-          <FaSelect v-model="publishCategory" allow-clear :options="categoryOptions" placeholder="选择分类" />
-        </a-form-item>
-        <a-form-item label="标签（可选，逗号分隔）">
-          <FaInput v-model="publishTags" placeholder="如 chat, wiki" />
-        </a-form-item>
-        <a-form-item label="许可证（可选）">
-          <FaInput v-model="publishLicense" placeholder="如 MIT、Apache-2.0" />
-        </a-form-item>
-        <a-form-item label="兼容性 JSON（可选）">
-          <FaTextarea v-model="publishCompatibility" :rows="3" placeholder='{"host":">=2.16.0"}' />
-        </a-form-item>
-        <a-form-item label="发布说明（可选）">
-          <FaTextarea v-model="publishNotes" :rows="4" placeholder="本版本更新内容" />
-        </a-form-item>
-      </a-form>
-    </FaModal>
   </MarketChrome>
 </template>
 
@@ -614,23 +526,8 @@ async function copyPublicUrl() {
   background: transparent;
   font-size: 12px;
 }
-.discover-time {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: 12px;
-  color: var(--yb-site-muted, var(--color-text-3));
-}
-.discover-time input {
+.discover-range {
   width: 100%;
-  min-height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--yb-site-border, var(--color-border-2));
-  border-radius: 8px;
-  background: var(--yb-site-bg, var(--color-bg-1));
-  color: inherit;
 }
 .discover-author-chip {
   display: flex;
