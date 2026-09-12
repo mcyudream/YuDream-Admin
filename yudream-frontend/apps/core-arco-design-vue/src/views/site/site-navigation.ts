@@ -1,4 +1,5 @@
 import type { MaybeRefOrGetter } from 'vue'
+import { hasPublicPluginMarket } from '@/api/modules/plugin-market-public'
 import { hasPublicWikiSpaces } from '@/api/modules/platform-wiki'
 
 export interface SiteNavigationItem {
@@ -91,16 +92,23 @@ export function navigationHref(item: Pick<SiteNavigationItem, 'url' | 'label' | 
 // 插件声明的站点导航项（@PluginRoute siteNav）：经公开 frontend-manifest 下发，
 // 模块级 memo 让站点页与站点 chrome 共享一次请求；devtools 热重载时复位。
 let wikiEnabledPromise: Promise<boolean> | null = null
+let marketEnabledPromise: Promise<boolean> | null = null
 let pluginSiteNavPromise: Promise<SiteNavigationItem[]> | null = null
 
 export function resetSiteNavigationCache() {
   wikiEnabledPromise = null
+  marketEnabledPromise = null
   pluginSiteNavPromise = null
 }
 
 function loadWikiEnabled(): Promise<boolean> {
   wikiEnabledPromise ??= hasPublicWikiSpaces().catch(() => false)
   return wikiEnabledPromise
+}
+
+function loadMarketEnabled(): Promise<boolean> {
+  marketEnabledPromise ??= hasPublicPluginMarket().catch(() => false)
+  return marketEnabledPromise
 }
 
 function loadPluginSiteNavItems(): Promise<SiteNavigationItem[]> {
@@ -147,14 +155,16 @@ function withHomeNavigationItem(items: SiteNavigationItem[]) {
 }
 
 /**
- * 站点公开导航：首页 + CMS navigationJson + 插件 siteNav 路由 + 知识库入口的合并结果。
+ * 站点公开导航：首页 + CMS navigationJson + 插件 siteNav 路由 + 插件市场 + 知识库入口的合并结果。
  * 供 /site 页面与公开插件页面的站点 chrome 共用。
  */
 export function useSiteNavigation(navigationJson: MaybeRefOrGetter<string | undefined>) {
   const wikiEnabled = ref(false)
+  const marketEnabled = ref(false)
   const pluginNavItems = ref<SiteNavigationItem[]>([])
 
   loadWikiEnabled().then(enabled => wikiEnabled.value = enabled)
+  loadMarketEnabled().then(enabled => marketEnabled.value = enabled)
   loadPluginSiteNavItems().then(items => pluginNavItems.value = items)
 
   const navigationItems = computed(() => {
@@ -163,9 +173,12 @@ export function useSiteNavigation(navigationJson: MaybeRefOrGetter<string | unde
       .map(item => ({ ...item, url: navigationHref(item) }))
     const knownUrls = new Set(items.map(item => item.url))
     const merged = [...items, ...pluginNavItems.value.filter(item => !knownUrls.has(item.url) && !isAuthNavigationUrl(item.url))]
-    const withWiki = wikiEnabled.value && !merged.some(item => item.url === '/wiki')
-      ? [...merged, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
+    const withMarket = marketEnabled.value && !merged.some(item => item.url === '/market')
+      ? [...merged, { id: 'capability-market', label: '插件市场', url: '/market', visible: true, sort: Number.MAX_SAFE_INTEGER - 1 }]
       : merged
+    const withWiki = wikiEnabled.value && !withMarket.some(item => item.url === '/wiki')
+      ? [...withMarket, { id: 'capability-wiki', label: '知识库', url: '/wiki', visible: true, sort: Number.MAX_SAFE_INTEGER }]
+      : withMarket
     return withHomeNavigationItem(withWiki)
   })
   const navigationTree = computed(() => buildNavigationTree(navigationItems.value))

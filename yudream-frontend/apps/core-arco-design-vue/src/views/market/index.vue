@@ -4,6 +4,7 @@ import { PLUGIN_MARKET_CATEGORIES } from '@/api/modules/plugin-market-public'
 import apiMarketPublic from '@/api/modules/plugin-market-public'
 import apiMarketSource from '@/api/modules/platform-plugin-market-source'
 import { useAppFeatureStore } from '@/store/modules/app/features'
+import { toBackendAssetUrl } from '@/utils/backend-url'
 import { applyPublicSeo, clearPublicSeo } from '@/utils/public-seo'
 import MarketChrome from './market-chrome.vue'
 
@@ -18,6 +19,7 @@ const appSettingsStore = useAppSettingsStore()
 const loading = ref(false)
 const items = ref<PluginMarketSummary[]>([])
 const total = ref(0)
+const pluginCount = ref(0)
 const categories = ref<PluginMarketCategory[]>([])
 const tags = ref<PluginMarketTag[]>([])
 const search = ref(typeof route.query.q === 'string' ? route.query.q : '')
@@ -28,11 +30,12 @@ const selectedTags = ref<string[]>(typeof route.query.tags === 'string' && route
   ? route.query.tags.split(',').filter(Boolean)
   : [])
 const authorId = ref(typeof route.query.authorId === 'string' ? route.query.authorId : '')
+const authorName = ref(typeof route.query.author === 'string' ? route.query.author : '')
 const publishedAfter = ref(typeof route.query.after === 'string' ? route.query.after : '')
 const publishedBefore = ref(typeof route.query.before === 'string' ? route.query.before : '')
 const sort = ref<PluginMarketSort>((route.query.sort as PluginMarketSort) || 'newest')
 const page = ref(Number(route.query.page) > 0 ? Number(route.query.page) : 1)
-const size = 20
+const size = 12
 const publishVisible = ref(false)
 const publishing = ref(false)
 const publishFile = ref<File | null>(null)
@@ -52,8 +55,15 @@ const sortOptions: { label: string, value: PluginMarketSort }[] = [
   { label: '名称', value: 'name' },
 ]
 const categoryOptions = computed(() => PLUGIN_MARKET_CATEGORIES.map(name => ({ label: name, value: name })))
+const hasFilters = computed(() => Boolean(
+  selectedCategories.value.length
+  || selectedTags.value.length
+  || authorId.value
+  || publishedAfter.value
+  || publishedBefore.value,
+))
 
-watch([search, selectedCategories, selectedTags, authorId, publishedAfter, publishedBefore, sort, page], syncQuery, { deep: true })
+watch([search, selectedCategories, selectedTags, authorId, authorName, publishedAfter, publishedBefore, sort, page], syncQuery, { deep: true })
 
 onMounted(async () => {
   await featureStore.load()
@@ -76,6 +86,7 @@ function syncQuery() {
       categories: selectedCategories.value.length ? selectedCategories.value.join(',') : undefined,
       tags: selectedTags.value.length ? selectedTags.value.join(',') : undefined,
       authorId: authorId.value.trim() || undefined,
+      author: authorName.value.trim() || undefined,
       after: publishedAfter.value || undefined,
       before: publishedBefore.value || undefined,
       sort: sort.value === 'newest' ? undefined : sort.value,
@@ -86,12 +97,14 @@ function syncQuery() {
 
 async function loadFacets() {
   try {
-    const [categoryRes, tagRes] = await Promise.all([
+    const [categoryRes, tagRes, manifest] = await Promise.all([
       apiMarketPublic.categories(),
       apiMarketPublic.tags(30),
+      apiMarketPublic.manifest(),
     ])
     categories.value = categoryRes
     tags.value = tagRes
+    pluginCount.value = manifest.pluginCount
   }
   catch {
     categories.value = PLUGIN_MARKET_CATEGORIES.map(name => ({ code: name, name, count: 0 }))
@@ -142,11 +155,9 @@ function toggleTag(tag: string) {
   void loadPlugins()
 }
 
-function applyAuthor(id?: string) {
-  if (!id) {
-    return
-  }
-  authorId.value = id
+function applyAuthor(id?: string, name?: string) {
+  authorId.value = id || ''
+  authorName.value = name || ''
   page.value = 1
   void loadPlugins()
 }
@@ -160,6 +171,7 @@ function clearFilters() {
   selectedCategories.value = []
   selectedTags.value = []
   authorId.value = ''
+  authorName.value = ''
   publishedAfter.value = ''
   publishedBefore.value = ''
   page.value = 1
@@ -194,6 +206,14 @@ function formatDownloads(value?: number) {
     return '0'
   }
   return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(value)
+}
+
+function isImageIcon(icon?: string) {
+  return !!icon && (/^https?:\/\//i.test(icon) || icon.startsWith('/') || icon.startsWith('data:'))
+}
+
+function iconUrl(icon?: string) {
+  return toBackendAssetUrl(icon)
 }
 
 function onPublishFileChange(event: Event) {
@@ -269,14 +289,34 @@ async function submitPublish() {
 
 <template>
   <MarketChrome>
-    <main class="market-page">
-      <div class="market-page__inner">
-        <header class="market-hero">
-          <div>
-            <span>公开插件社区</span>
+    <main class="discover">
+      <div class="discover__inner">
+        <header class="discover-hero">
+          <div class="discover-hero__copy">
+            <p class="discover-kicker">公开插件社区</p>
             <h1>发现插件</h1>
-            <p>浏览当前站点发布的插件，按分类、标签与下载量筛选。</p>
+            <p>浏览当前站点发布的插件。按分类、标签、作者与时间筛选，匿名即可下载。</p>
           </div>
+          <dl class="discover-stats">
+            <div>
+              <dt>{{ pluginCount || total }}</dt>
+              <dd>已发布插件</dd>
+            </div>
+            <div>
+              <dt>{{ categories.filter(item => item.count).length }}</dt>
+              <dd>分类</dd>
+            </div>
+          </dl>
+        </header>
+
+        <form class="discover-search" @submit.prevent="onSearch">
+          <FaInput v-model="search" clearable placeholder="搜索名称、编码或描述">
+            <template #start>
+              <FaIcon name="i-ri:search-line" />
+            </template>
+          </FaInput>
+          <FaSelect v-model="sort" :options="sortOptions" class="discover-sort" @update:model-value="onSortChange" />
+          <FaButton html-type="submit">搜索</FaButton>
           <FaButton v-if="canPublish" @click="openPublish">
             <FaIcon name="i-ri:upload-2-line" />
             发布插件
@@ -284,27 +324,17 @@ async function submitPublish() {
           <FaButton v-else-if="!accountStore.isLogin" variant="outline" @click="openPublish">
             登录后发布
           </FaButton>
-        </header>
-
-        <form class="market-search" @submit.prevent="onSearch">
-          <FaInput v-model="search" clearable placeholder="搜索名称、编码或描述">
-            <template #start>
-              <FaIcon name="i-ri:search-line" />
-            </template>
-          </FaInput>
-          <FaSelect v-model="sort" :options="sortOptions" class="market-sort" @update:model-value="onSortChange" />
-          <FaButton html-type="submit">搜索</FaButton>
         </form>
 
-        <div class="market-layout">
-          <aside class="market-filters">
+        <div class="discover-layout">
+          <aside class="discover-filters">
             <section>
               <h2>分类</h2>
               <button
                 v-for="item in categories"
                 :key="item.code"
                 type="button"
-                class="market-filter"
+                class="discover-filter"
                 :class="{ 'is-active': selectedCategories.includes(item.name) }"
                 @click="toggleCategory(item.name)"
               >
@@ -314,12 +344,12 @@ async function submitPublish() {
             </section>
             <section v-if="tags.length">
               <h2>标签</h2>
-              <div class="market-tags">
+              <div class="discover-tags">
                 <button
                   v-for="item in tags"
                   :key="item.tag"
                   type="button"
-                  class="market-tag"
+                  class="discover-tag"
                   :class="{ 'is-active': selectedTags.includes(item.tag) }"
                   @click="toggleTag(item.tag)"
                 >
@@ -328,78 +358,75 @@ async function submitPublish() {
               </div>
             </section>
             <section>
-              <h2>作者</h2>
-              <FaInput v-model="authorId" clearable placeholder="作者用户 ID" @clear="onTimeFilterChange" />
-              <FaButton variant="outline" size="sm" class="mt-2" @click="onTimeFilterChange">
-                按作者筛选
-              </FaButton>
-              <div class="mt-2 text-xs" style="color: var(--yb-site-muted, var(--color-text-3));">
-                也可点击卡片上的作者名筛选。
-              </div>
-            </section>
-            <section>
               <h2>发布时间</h2>
-              <label class="market-time">
+              <label class="discover-time">
                 <span>起始</span>
                 <input v-model="publishedAfter" type="date" @change="onTimeFilterChange">
               </label>
-              <label class="market-time">
+              <label class="discover-time">
                 <span>截止</span>
                 <input v-model="publishedBefore" type="date" @change="onTimeFilterChange">
               </label>
             </section>
-            <FaButton variant="link" class="market-clear" @click="clearFilters">
+            <section v-if="authorId">
+              <h2>作者</h2>
+              <div class="discover-author-chip">
+                <span>{{ authorName || authorId }}</span>
+                <button type="button" @click="applyAuthor('', '')">清除</button>
+              </div>
+            </section>
+            <FaButton v-if="hasFilters" variant="link" class="discover-clear" @click="clearFilters">
               清除筛选
             </FaButton>
           </aside>
 
-          <section class="market-results">
-            <div class="market-results__head">
-              <span>共 {{ total }} 个插件</span>
+          <section class="discover-results">
+            <div class="discover-results__head">
+              <strong>{{ total }}</strong>
+              <span>个插件</span>
             </div>
-            <div v-if="loading" class="market-empty">加载中…</div>
-            <div v-else-if="!items.length" class="market-empty">暂无符合条件的插件。</div>
-            <div v-else class="market-grid">
-              <button
+            <div v-if="loading" class="discover-empty">加载中…</div>
+            <div v-else-if="!items.length" class="discover-empty">暂无符合条件的插件。</div>
+            <div v-else class="discover-grid">
+              <article
                 v-for="item in items"
                 :key="item.code"
-                type="button"
-                class="market-card"
+                class="discover-card"
+                role="link"
+                tabindex="0"
                 @click="openPlugin(item.code)"
+                @keydown.enter="openPlugin(item.code)"
               >
-                <div class="market-card__icon">
-                  <FaIcon :name="item.icon || 'i-ri:puzzle-line'" />
+                <div class="discover-card__icon">
+                  <img v-if="isImageIcon(item.icon)" :src="iconUrl(item.icon)" :alt="item.displayName || item.code">
+                  <FaIcon v-else :name="item.icon || 'i-ri:puzzle-2-line'" />
                 </div>
-                <div class="market-card__body">
-                  <div class="market-card__title">
-                    <strong>{{ item.displayName || item.code }}</strong>
+                <div class="discover-card__body">
+                  <div class="discover-card__title">
+                    <h3>{{ item.displayName || item.code }}</h3>
                     <span>{{ item.latestVersion }}</span>
                   </div>
                   <p>{{ item.description || '暂无简介' }}</p>
-                  <div class="market-card__meta">
-                    <FaTag v-if="item.category" variant="secondary">{{ item.category }}</FaTag>
-                    <FaTag v-for="tag in (item.tags || []).slice(0, 3)" :key="tag" variant="secondary">{{ tag }}</FaTag>
+                  <div class="discover-card__meta">
+                    <span v-if="item.category">{{ item.category }}</span>
+                    <span v-for="tag in (item.tags || []).slice(0, 3)" :key="tag">{{ tag }}</span>
                   </div>
-                  <div class="market-card__foot">
-                    <button
-                      type="button"
-                      class="market-author"
-                      @click.stop="applyAuthor(item.authorId)"
-                    >
+                  <div class="discover-card__foot">
+                    <button type="button" @click.stop="applyAuthor(item.authorId, item.authorName)">
                       {{ item.authorName || '未知作者' }}
                     </button>
                     <span>{{ formatDownloads(item.downloads) }} 下载</span>
                     <span>{{ formatTime(item.updatedAt || item.publishedAt) }}</span>
                   </div>
                 </div>
-              </button>
+              </article>
             </div>
             <FaPagination
               v-if="total > size"
               v-model:page="page"
               :size="size"
               :total="total"
-              class="market-pagination"
+              class="discover-pagination"
               @page-change="onPageChange"
             />
           </section>
@@ -440,54 +467,106 @@ async function submitPublish() {
 </template>
 
 <style scoped>
-.market-page {
+.discover {
   min-height: 100%;
   flex: 1 1 auto;
   padding-top: var(--neco-page-top, 0px);
-  background: var(--yb-site-bg, var(--color-bg-1));
+  background:
+    radial-gradient(1200px 420px at 12% -10%, color-mix(in srgb, var(--yb-site-primary, var(--color-primary-6, #3b82f6)) 14%, transparent), transparent 70%),
+    var(--yb-site-bg, var(--color-bg-1));
   color: var(--yb-site-text, var(--color-text-1));
 }
-.market-page__inner {
-  width: min(1120px, calc(100% - 40px));
+.discover__inner {
+  width: min(1180px, calc(100% - 40px));
   margin: 0 auto;
-  padding: 40px 0 72px;
+  padding: 36px 0 80px;
 }
-.market-hero {
+.discover-hero {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
 }
-.market-hero span {
-  color: var(--yb-site-muted, var(--color-text-3));
-  font-size: 13px;
-  font-weight: 700;
-}
-.market-hero h1 {
-  margin: 8px 0 6px;
-  font-size: 32px;
-}
-.market-hero p {
+.discover-kicker {
   margin: 0;
   color: var(--yb-site-muted, var(--color-text-3));
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
-.market-search {
+.discover-hero h1 {
+  margin: 8px 0 10px;
+  font-size: 42px;
+  line-height: 1.1;
+}
+.discover-hero p {
+  margin: 0;
+  max-width: 46rem;
+  color: var(--yb-site-muted, var(--color-text-3));
+  font-size: 16px;
+  line-height: 1.7;
+}
+.discover-stats {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+}
+.discover-stats div {
+  min-width: 108px;
+  padding: 12px 14px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--yb-site-surface, var(--color-bg-2)) 88%, transparent);
+}
+.discover-stats dt {
+  font-size: 24px;
+  font-weight: 800;
+}
+.discover-stats dd {
+  margin: 2px 0 0;
+  color: var(--yb-site-muted, var(--color-text-3));
+  font-size: 12px;
+}
+.discover-search {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px auto;
+  grid-template-columns: minmax(0, 1fr) 160px auto auto;
   gap: 10px;
   margin: 28px 0 32px;
 }
-.market-layout {
+.discover-layout {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 28px;
+  align-items: start;
 }
-.market-filters h2 {
+.discover-filters {
+  position: sticky;
+  top: calc(var(--neco-page-top, 0px) + 16px);
+  padding: 16px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--yb-site-surface, var(--color-bg-2)) 92%, transparent);
+}
+.discover-filters h2 {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--yb-site-muted, var(--color-text-3));
 }
-.market-filter {
+.discover-filters section + section {
+  margin-top: 22px;
+}
+.discover-filter,
+.discover-tag,
+.discover-card,
+.discover-card__foot button {
+  color: inherit;
+  cursor: pointer;
+}
+.discover-filter {
   display: flex;
   width: 100%;
   align-items: center;
@@ -496,22 +575,29 @@ async function submitPublish() {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: inherit;
-  cursor: pointer;
 }
-.market-filter.is-active,
-.market-tag.is-active {
-  background: var(--yb-site-surface, var(--color-bg-2));
+.discover-filter.is-active,
+.discover-tag.is-active {
+  background: var(--yb-site-bg, var(--color-bg-1));
 }
-.market-filter em {
+.discover-filter em {
   font-style: normal;
   color: var(--yb-site-muted, var(--color-text-3));
   font-size: 12px;
 }
-.market-filters section + section {
-  margin-top: 22px;
+.discover-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
-.market-time {
+.discover-tag {
+  padding: 4px 10px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+}
+.discover-time {
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 8px;
@@ -520,113 +606,154 @@ async function submitPublish() {
   font-size: 12px;
   color: var(--yb-site-muted, var(--color-text-3));
 }
-.market-time input {
+.discover-time input {
   width: 100%;
   min-height: 32px;
   padding: 0 8px;
   border: 1px solid var(--yb-site-border, var(--color-border-2));
   border-radius: 8px;
-  background: var(--yb-site-surface, var(--color-bg-2));
+  background: var(--yb-site-bg, var(--color-bg-1));
   color: inherit;
 }
-.market-clear {
+.discover-author-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--yb-site-bg, var(--color-bg-1));
+  font-size: 13px;
+}
+.discover-author-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--yb-site-muted, var(--color-text-3));
+  cursor: pointer;
+}
+.discover-clear {
   margin-top: 8px;
   padding-left: 0;
 }
-.market-author {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-.market-tag {
-  padding: 4px 8px;
-  border: 1px solid var(--yb-site-border, var(--color-border-2));
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 12px;
-}
-.market-results__head {
-  margin-bottom: 14px;
+.discover-results__head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 16px;
   color: var(--yb-site-muted, var(--color-text-3));
-  font-size: 13px;
 }
-.market-empty {
-  padding: 48px 0;
+.discover-results__head strong {
+  color: var(--yb-site-heading, var(--color-text-1));
+  font-size: 20px;
+}
+.discover-empty {
+  padding: 64px 0;
   color: var(--yb-site-muted, var(--color-text-3));
   text-align: center;
 }
-.market-grid {
+.discover-grid {
   display: grid;
-  gap: 12px;
-}
-.market-card {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
-  width: 100%;
-  padding: 16px;
-  border: 1px solid var(--yb-site-border, var(--color-border-2));
-  border-radius: 12px;
-  background: var(--yb-site-surface, var(--color-bg-2));
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
 }
-.market-card__icon {
+.discover-card {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  min-height: 168px;
+  padding: 18px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 16px;
+  background: var(--yb-site-surface, var(--color-bg-2));
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  text-align: left;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.discover-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgb(0 0 0 / 10%);
+}
+.discover-card__icon {
   display: flex;
-  width: 48px;
-  height: 48px;
+  width: 72px;
+  height: 72px;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  overflow: hidden;
+  border-radius: 16px;
   background: var(--yb-site-bg, var(--color-bg-1));
-  font-size: 22px;
+  font-size: 32px;
 }
-.market-card__title {
+.discover-card__icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.discover-card__title {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
 }
-.market-card__title span,
-.market-card p,
-.market-card__foot {
+.discover-card h3 {
+  margin: 0;
+  font-size: 18px;
+}
+.discover-card__title span,
+.discover-card p,
+.discover-card__foot {
   color: var(--yb-site-muted, var(--color-text-3));
 }
-.market-card p {
-  margin: 6px 0 10px;
+.discover-card p {
+  display: -webkit-box;
+  margin: 8px 0 12px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.55;
 }
-.market-card__meta {
+.discover-card__meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.market-card__foot {
+.discover-card__meta span {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--yb-site-bg, var(--color-bg-1));
+  font-size: 12px;
+}
+.discover-card__foot {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 10px;
+  margin-top: 12px;
   font-size: 12px;
 }
-.market-pagination {
-  margin-top: 20px;
+.discover-card__foot button {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
-@media (max-width: 860px) {
-  .market-layout,
-  .market-search,
-  .market-hero {
+.discover-pagination {
+  margin-top: 22px;
+}
+@media (max-width: 980px) {
+  .discover-grid,
+  .discover-layout,
+  .discover-search,
+  .discover-hero {
     display: grid;
     grid-template-columns: 1fr;
   }
-  .market-page__inner {
-    width: min(100% - 28px, 1120px);
+  .discover-filters {
+    position: static;
+  }
+  .discover-hero h1 {
+    font-size: 32px;
+  }
+  .discover__inner {
+    width: min(100% - 28px, 1180px);
   }
 }
 </style>
