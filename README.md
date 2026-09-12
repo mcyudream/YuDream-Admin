@@ -5,8 +5,9 @@
 </p>
 
 <p align="center">
-  <a href="#快速开始">快速开始</a> ·
+  <a href="#落地案例">落地案例</a> ·
   <a href="#核心能力">核心能力</a> ·
+  <a href="#快速开始">快速开始</a> ·
   <a href="#插件开发">插件开发</a> ·
   <a href="#参与贡献">参与贡献</a>
 </p>
@@ -23,19 +24,42 @@
 
 YuDream Admin 是一个后端由 YuDream 原创实现的企业级管理平台。后端基于 Java 21、Spring Boot 3 和 DDD 分层，提供用户与权限、内容管理、知识库、集成编排、可视化数据、AI Agent 等平台能力，并通过插件运行时将业务功能与平台核心解耦。
 
-前端基于 [Fantastic-admin](https://fantastic-admin.hurui.me/)，使用 Vue 3、Arco Design Vue 和 UnoCSS。项目既可以作为一套完整的后台系统使用，也可以作为团队构建独立业务插件的宿主平台。
+前端基于 [Fantastic-admin](https://fantastic-admin.hurui.me/)，使用 Vue 3、Arco Design Vue 和 UnoCSS。项目既可以作为一套完整的后台系统使用，也可以作为团队构建独立业务插件的宿主平台；打开 CMS、公开站点与官方插件后，不必二次开发就能上线面向访客的一站式官网。
+
+## 落地案例
+
+下面两所高校 Minecraft 社团官网是 **非二次开发** 的生产部署：共用同一套 YuDream Admin 宿主、SITE 主题和官方业务插件，栏目与文案在后台配置，没有分叉平台源码、也没有为单个社团写定制后端。
+
+同一主题下可以换 Hero、导航和内容区块；服务器列表、活动平台、百科、大事记、插件市场、知识库等模块按社团需要开关，形成「MC 社团一站式官网」。
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3><a href="https://www.swustmc.cn/site">西南科技大学 Minecraft 星空社</a></h3>
+      <p>公开站覆盖首页、复原工程、服务器、活动平台、百科、大事记、插件市场与知识库。首页由主题接管导航与版式，社团介绍与长期项目在 CMS 区块中维护。</p>
+      <a href="https://www.swustmc.cn/site"><img alt="西南科技大学 Minecraft 星空社公开站首页" src="docs/images/showcase-swustmc.jpg"></a>
+    </td>
+    <td width="50%" valign="top">
+      <h3><a href="https://hall.mc.taru.xj.cn/site">塔里木大学胡杨方块社</a></h3>
+      <p>同一套主题与站点能力的另一份部署。导航收敛为服务器、活动平台、百科、大事记与知识库，首页文案与配图按社团自行替换，用于招新与服务器状态公示。</p>
+      <a href="https://hall.mc.taru.xj.cn/site"><img alt="塔里木大学胡杨方块社公开站首页" src="docs/images/showcase-taru-mc.jpg"></a>
+    </td>
+  </tr>
+</table>
+
+> 这两处站点证明：把平台当产品用——启用公开站点、装上主题与业务插件、在后台填内容——就能交付完整官网。需要更深的业务差异时，再走独立插件，而不是改宿主。
 
 ## 核心能力
 
 | 方向 | 能力 |
 | --- | --- |
 | 系统管理 | 用户、角色、部门、菜单、权限、在线用户与安全配置 |
-| 内容与站点 | CMS、可视化页面编辑、发布流程、公开站点（含移动端折叠导航）与 SEO 元数据 |
+| 内容与站点 | CMS、可视化页面编辑、发布流程、公开站点（含移动端折叠导航）、SEO，以及按 `themeCode` 隔离的 SITE 主题（首页 / chrome / 页面集） |
 | 知识与智能 | 知识库检索、文档解析、AI Provider 管理、Agent 应用与可视化工作流 |
 | 消息与通信 | QQ 消息平台（Milky / 官方 OpenAPI）、SSE、WebSocket、入站邮箱核验 |
 | 集成与自动化 | HTTP、Python 运行时、消息队列、S3 兼容对象存储、kkFileView 文件预览 |
 | 数据能力 | 数据可视化、图谱检索、Neo4j 与可选的 RAG 扩展 |
-| 插件生态 | JAR 热加载、动态菜单和权限、登录注册扩展点、前端 Remote Entry 模块 |
+| 插件生态 | JAR 热加载、动态菜单和权限、登录注册扩展点、前端 Remote Entry、本机市场源与远程源订阅 |
 
 ## 为什么使用它
 
@@ -43,24 +67,25 @@ YuDream Admin 是一个后端由 YuDream 原创实现的企业级管理平台。
 - **按需启用**：平台能力可由项目配置和运行状态共同控制，未启用的能力不会强制依赖外部中间件。
 - **插件优先**：业务插件可独立开发、构建和发布；平台核心只维护稳定运行时与契约。
 - **完整的前端体验**：Vue 3 管理端支持动态路由、主题、多布局和远程插件页面。
+- **开箱即用的公开站**：CMS、SITE 主题、导航与官方插件可以拼出完整对外官网，高校 MC 社团站点即按此方式上线，无需二次开发。
 - **面向生产部署**：提供 Docker 镜像、Compose 编排与环境变量模板。
 
 ## 架构
 
 ```text
-                         ┌──────────────────────────┐
-                         │      Vue 3 管理端          │
-                         │  主应用 + 插件 Remote UI   │
-                         └────────────┬─────────────┘
-                                      │ HTTP / SSE / WebSocket
-┌─────────────────────────────────────▼─────────────────────────────────────┐
-│                             YuDream Admin Core                              │
-│  interfaces  ->  application  ->  domain  <-  infrastructure               │
-│  API、鉴权        用例编排       业务规则       Mongo、Redis、AI、S3 等      │
-├───────────────────────────────────────────────────────────────────────────┤
-│                     Plugin Runtime / yudream-plugin-spi                    │
-│          JAR 生命周期 · 菜单权限 · HTTP 扩展 · 前端 Remote 模块             │
-└───────────────────────────────────────────────────────────────────────────┘
+                    ┌────────────────────┐     ┌────────────────────┐
+                    │   Vue 3 管理端       │     │  公开站 /site        │
+                    │ 主应用 + Remote UI  │     │ SITE 主题 + CMS     │
+                    └─────────┬──────────┘     └─────────┬──────────┘
+                              │ HTTP / SSE / WebSocket    │
+┌─────────────────────────────▼───────────────────────────▼─────────────┐
+│                         YuDream Admin Core                            │
+│  interfaces  ->  application  ->  domain  <-  infrastructure          │
+│  API、鉴权        用例编排       业务规则       Mongo、Redis、AI、S3 等 │
+├───────────────────────────────────────────────────────────────────────┤
+│  18 项平台能力（双闸门）· Plugin Runtime / yudream-plugin-spi          │
+│  JAR 生命周期 · 菜单权限 · HTTP 扩展 · Remote 模块 · SITE/ADMIN 主题   │
+└───────────────────────────────────────────────────────────────────────┘
                                       │
                   ┌──────────────────┴──────────────────┐
                   │                                     │
@@ -167,12 +192,14 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 
 ## 插件开发
 
-插件通过稳定契约与平台交互，而不依赖平台内部模块：
+插件通过稳定契约与平台交互，而不依赖平台内部模块（版本以源文件为准）：
 
-- 后端插件依赖 `online.yudream.base:yudream-plugin-spi`。
-- 前端插件使用 `@yudream/plugin-sdk` 与 `@yudream/components`。
+- 后端插件依赖 `online.yudream.base:yudream-plugin-spi`（当前 `2.27.0`）。
+- 前端插件使用 `@yudream/plugin-sdk`（当前 `1.7.0`）与 `@yudream/components`（当前 `1.3.0`）。
 - 插件 JAR 使用根目录 `plugin.yml` 描述元数据，并由运行时管理加载、启用与卸载。
 - 前端插件通过 `remoteEntry.js` 作为远程模块加载到主前端；样式统一走声明式 `style.css`（`@yudream/plugin-sdk/uno-config`）。
+- SITE 主题经 `@PluginTheme` 注册：可声明 `homeComponent` / `chromeComponent`、首页方案与主题配置 schema；公开站按 `themeCode` 隔离页面与布局。
+- 本机市场源由能力 `plugin-market-source` 提供；远程 `V2_API` / `STATIC_INDEX` 订阅不依赖该能力，也不回落 Nexus。
 
 新建官方插件时，建议从 [插件仓库模板](templates/plugin-repo/README.md) 开始；完整约定见 [插件系统规范](docs/plugin-system/specification.md) 和 [插件开发教程](docs/plugin-system/tutorial.md)。官方业务插件源码位于独立仓库 [yudream-admin-plugins](https://gitlab.yudream.online/yudream/yudream-admin-plugins)。
 
@@ -181,6 +208,7 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 ## 文档
 
 - [在线文档站](https://ydadocs.yudream.online/)
+- [落地案例（MC 社团一站式官网）](https://ydadocs.yudream.online/guide/showcase)
 - [插件系统规范](docs/plugin-system/specification.md)
 - [插件开发教程](docs/plugin-system/tutorial.md)
 - [文档站源码与维护说明](yd-docs/README.md)

@@ -3,7 +3,7 @@
 YuDream 将系统能力分为两类：
 
 - **system 基线能力**：安全与身份相关（接口加密、双 token、API Key、Passkey、OAuth），始终可用，不走动态开关。
-- **platform 动态能力**：SSE、WebSocket、MQ、Neo4j、AI/Agent、CMS、文件预览、入站邮箱等，按需动态加载。
+- **platform 动态能力**：SSE、WebSocket、MQ、Neo4j、AI/Agent、CMS、文件预览、入站邮箱、本机插件市场源等，按需动态加载。
 
 ## 双闸门机制
 
@@ -63,6 +63,7 @@ Infra provider 的构造与 `enable(config)` 只允许保存本地配置或标�
 | milky | `PLATFORM_MILKY_ENABLED` | QQ 消息平台：Milky 协议（HTTP API + WebSocket `/event`）与腾讯官方 OpenAPI v2（REST + Gateway/Webhook）共用出站端口 |
 | file-preview | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览：浏览器直读优先，Office/PSD/压缩包等走 iframe |
 | inbound-mail | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 只读入站邮箱：管理端浏览列表与详情，插件按发件域、验证码与关键词匹配 |
+| plugin-market-source | `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` | 本机插件市场源（LOCAL 发布/审核/公开 v2）。远程 `V2_API`/`STATIC_INDEX` 订阅不依赖本能力，也不回落 Nexus |
 
 \* 以上均映射到同名环境变量（见 `yudream-bootstrap/src/main/resources/application.yml` 的 `yudream.platform.capabilities.*`），compose 部署时可直接以 `PLATFORM_*_ENABLED=true/false` 控制项目闸门。各能力详解见 [能力框架](/features/capability-framework) 与 features 分册。
 
@@ -91,3 +92,7 @@ Milky 能力（展示名「QQ 消息平台」）的连接凭据经 AES-GCM 加�
 ## 入站邮箱（inbound-mail）
 
 以 IMAPS 只读方式连接收件箱。管理端可浏览邮件列表与详情；插件通过 `framework().inboundMail()` 按发件域、验证码与关键词匹配邮件。插件拿不到邮箱凭据或正文，只拿到核验结果。详见 [入站邮箱](/features/inbound-mail)。
+
+## 本机插件市场源（plugin-market-source）
+
+能力只管本机 LOCAL 源：项目闸门关闭时不播种内置 LOCAL、不注册发布/审核/公开 v2 端点；应用闸门关闭时 LOCAL 不进入目录、公开 `/market` 不可用。远程源订阅与安装始终可用，不依赖本能力，也不回落 Nexus。详见 [自托管插件市场源](/plugin/market-source)。

@@ -1,6 +1,6 @@
 # 框架概览
 
-**YuDream Admin** 是一套企业级管理后台框架：后端为 YuDream 原创实现，采用 DDD 五模块分层（JDK 21 + Spring Boot 3.5）；前端使用 [Fantastic-admin](https://fantastic-admin.hurui.me/) 构建 Vue 3 Monorepo。前端组件中，`Fa*` 为 Fantastic-admin 框架自带组件，只有 `FaResponsiveTable` 是 YuDream 原创例外；`Yd*` 为 YuDream 原创组件与 composable，不按 AI/非 AI 区分。项目同时内置一套完整的**插件体系**与 **17 项可按需加载的平台能力**。它有两种使用方式——作为**成品**直接部署、用插件扩展业务；或作为**主框架**克隆源码二次开发。
+**YuDream Admin** 是一套企业级管理后台框架：后端为 YuDream 原创实现，采用 DDD 五模块分层（JDK 21 + Spring Boot 3.5）；前端使用 [Fantastic-admin](https://fantastic-admin.hurui.me/) 构建 Vue 3 Monorepo。前端组件中，`Fa*` 为 Fantastic-admin 框架自带组件，只有 `FaResponsiveTable` 是 YuDream 原创例外；`Yd*` 为 YuDream 原创组件与 composable，不按 AI/非 AI 区分。项目同时内置一套完整的**插件体系**与 **18 项可按需加载的平台能力**。它有两种使用方式——作为**成品**直接部署、用插件扩展业务；或作为**主框架**克隆源码二次开发。高校 MC 社团官网即按成品方式上线，见 [落地案例](/guide/showcase)。
 
 ## 定位与价值
 
@@ -11,7 +11,7 @@
 
 ## 特性矩阵
 
-### 平台能力（17 项）
+### 平台能力（18 项）
 
 所有平台能力的项目闸门配置形如 `yudream.platform.capabilities.<code>.enabled`，多数同时支持环境变量覆盖：
 
@@ -34,6 +34,7 @@
 | `message-render` | `PLATFORM_MESSAGE_RENDER_ENABLED` | 对接 render-server 的 HTML/Markdown → 图片渲染 |
 | `file-preview` | `PLATFORM_FILE_PREVIEW_ENABLED` | kkFileView 文件预览（Office / PSD / 压缩包等） |
 | `inbound-mail` | `PLATFORM_INBOUND_MAIL_ENABLED` | IMAPS 入站邮箱，管理端查看邮件详情，插件按发件域与验证码核验 |
+| `plugin-market-source` | `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED` | 本机插件市场源（LOCAL）。远程源订阅不依赖本能力，也不回落 Nexus |
 
 能力间依赖（如 `wiki` 依赖 `ai` 与 `neo4j`）声明在 `CapabilityDescriptor.dependencies`，禁用一个依赖会级联禁用所有依赖方。机制详解见 [平台能力](/guide/platform-capabilities)。
 
@@ -66,7 +67,7 @@
 
 ### CMS 可视化建站
 
-GrapesJS 拖拽构建 + 完整发布闭环：权限菜单、管理路由、公开路由与渲染、发布/下线、SEO、页面与模板元数据，构建产物兼容存储为 `htmlContent` / `cssContent` / `builderProjectJson`。
+GrapesJS 拖拽构建 + 完整发布闭环：权限菜单、管理路由、公开路由与渲染、发布/下线、SEO、页面与模板元数据，构建产物兼容存储为 `htmlContent` / `cssContent` / `builderProjectJson`。SITE 主题按 `themeCode` 隔离首页、chrome 与页面集；官方插件即可拼出对外官网，不必改宿主。
 
 ## 两种使用方式概览
 
@@ -117,10 +118,11 @@ flowchart LR
 
 ## 下一步
 
+- 想看成品部署长什么样？阅读 [落地案例](/guide/showcase)。
 - 想直接使用？阅读 [两种使用方式](/guide/usage-modes) 与 [快速启动](/guide/getting-started)。
 - 想了解内部设计？阅读 [系统架构](/guide/architecture)。
 - 想扩展功能？直接跳转 [插件开发](/plugin/overview)。
 
 ---
 
-> 源码引用：`pom.xml`（后端依赖与版本）、`yudream-bootstrap/src/main/resources/application.yml`（17 项平台能力开关）、`docker-compose.yml`（镜像与环境变量）、`yudream-frontend/package.json` / `yudream-frontend/pnpm-workspace.yaml`（前端版本）、`yudream-render-server/package.json`（渲染服务版本）。
+> 源码引用：`pom.xml`（后端依赖与版本）、`yudream-bootstrap/src/main/resources/application.yml`（18 项平台能力开关）、`docker-compose.yml`（镜像与环境变量）、`yudream-frontend/package.json` / `yudream-frontend/pnpm-workspace.yaml`（前端版本）、`yudream-render-server/package.json`（渲染服务版本）。

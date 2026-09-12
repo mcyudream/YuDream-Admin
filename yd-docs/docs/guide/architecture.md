@@ -14,6 +14,7 @@ flowchart TB
     subgraph Client["浏览器"]
         UI[管理后台前端<br/>Vue 3 + Arco Design Vue]
         PluginUI[插件前端页面<br/>ESM remoteEntry.js]
+        Site[公开站 /site<br/>SITE 主题 + CMS]
     end
 
     subgraph Server["后端 Spring Boot"]
@@ -43,6 +44,7 @@ flowchart TB
 
     UI --> IF
     PluginUI -.->|宿主注入 SDK| IF
+    Site --> IF
     BOOT --> IF & INFRA
     IF --> APP --> DOM
     APP --> INFRA
@@ -145,7 +147,7 @@ sequenceDiagram
 | 分类 | 能力 | 特征 |
 | --- | --- | --- |
 | `system`（基线） | 接口加密、双 token、API Key、Passkey、OAuth | 始终可用，不参与动态开关 |
-| `platform`（可插拔） | SSE、WebSocket、MQ、Neo4j、Python Runtime、HTTP 集成、文档生成、CMS、AI/Agent 等 | 可动态加载/卸载，受双闸门管控 |
+| `platform`（可插拔） | SSE、WebSocket、MQ、Neo4j、Python Runtime、HTTP 集成、文档生成、CMS、AI/Agent、本机插件市场源等 | 可动态加载/卸载，受双闸门管控 |
 
 ### 双闸门模型
 
