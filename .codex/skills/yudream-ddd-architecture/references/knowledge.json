@@ -294,7 +294,7 @@
     },
     {
       "key": "plugin-market-source",
-      "text": "插件市场源能力（plugin-market-source）：双闸门控制多源路径，关闭时 PluginStoreAppService 走配置直连单源（行为与历史一致）。PluginStoreGateway 端口按 PluginStoreSourceRef 取数：fetchCatalog 拉全量目录快照（最新版 descriptor 存原文、版本存已解析 URL）、parseDescriptor 按源内 indexUrl 离线重解析、fetchDescriptor/downloadJar 按需外呼并校验 URL 属于该源（requireOwnedUri）。快照存 Mongo（entries 内嵌 descriptor 原文 JSON），市场列表零外呼；安装/更新记录 marketSourceCode 到 platformPlugin，更新选择同版本优先安装来源、跨源取最高 SemVer。市场源 token 经 CapabilityCredentialCipher 加密（AAD capability:plugin-market-source:token:{code}）。"
+      "text": "插件市场源能力（plugin-market-source）：双闸门控制，关闭时 PluginStoreAppService 走配置直连单源。PluginStoreGateway 端口按 PluginStoreSourceRef 取数：fetchCatalog 拉全量目录快照（最新版 descriptor 存原文 JSON——PluginStorePluginDescriptor 无 setter 不可被 Mongo 直接映射，解析收敛在 parseDescriptor）、fetchDescriptor/downloadJar 按需外呼并经 requireOwnedUri 校验 URL 属于该源。安装/更新经 applyMarketSource 记录 marketSourceCode，更新选择同版本优先安装来源、跨源取最高 SemVer。二期自托管服务端：{code}@{version} 不可覆盖（DO 字段用 pluginVersion，避免与 BaseDO 乐观锁 version 撞名导致 Lombok/Mongo 映射失效）；公开契约端点 /api/public/plugin-market/** 仅下发 PUBLISHED、能力关闭即 400；descriptor 由 plugin.yml 自动生成，releaseNotes 压单行（契约禁 ISO 控制字符）、依赖展开为 range=x、仅 iconify 形态 icon 可内联下发；审核开关走能力配置键 reviewRequired 且读取处默认回落 true；发布物 JAR 存 market-source.directory，必须独立于插件扫描目录。"
     }
   ],
   "utilities": [

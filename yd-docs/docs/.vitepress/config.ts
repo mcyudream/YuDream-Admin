@@ -135,7 +135,8 @@ const pluginSidebar = [
   {
     text: '发布与生态',
     items: [
-      { text: '插件市场与上架流程', link: '/plugin/marketplace' }
+      { text: '插件市场与上架流程', link: '/plugin/marketplace' },
+      { text: '自托管市场源', link: '/plugin/market-source' }
     ]
   }
 ]
