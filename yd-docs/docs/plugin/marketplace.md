@@ -173,23 +173,24 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 每个插件使用 `online.yudream.plugins:<artifactId>:<tag version>:jar` 坐标；catalog 使用 `online.yudream.plugins:plugin-catalog:<tag version>:tsv`。官方发布凭据同样只能配置为受保护、掩码变量，发布只能由受保护 `v*` tag 或手动 job 执行。
 
-## 6. 插件市场源：多源订阅
+## 6. 插件市场源：多源订阅与公开社区
 
-「插件市场源」是一个可选的平台能力（code `plugin-market-source`，能力中心「插件分发」分组），开启后插件市场从固定单源升级为**多源订阅**；关闭时市场自动回落到 `yudream.platform.plugin.store-root-url` 配置直连的内置单源，行为与历史版本完全一致，其他功能不受影响。
+「插件市场源」是一个可选的平台能力（code `plugin-market-source`，能力中心「插件分发」分组）。开启后后台市场合并各启用源目录，公开站提供 `/market` 社区页；关闭时**不注册本机源、不回落 Nexus/`store-root-url`**，市场列表为空，插件管理/上传/回滚不受影响。存量部署升级后，未开启能力时市场为空是有意语义。
 
 ### 6.1 双闸门
 
-- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时市场源管理端点不注册、内置源不播种。
-- 应用闸门：能力未在「平台能力」中启用时，源管理用例一律拒绝；市场页隐藏「市场源管理」菜单，多源能力不生效。
+- 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时市场源管理端点不注册、内置源不播种、公开 v2/legacy 端点不存在。
+- 应用闸门：能力未在「平台能力」中启用时，源管理与安装/更新一律拒绝；列表返回空；公开 `/market` 跳转登录。
 
 ### 6.2 源管理
 
 管理员在「平台 → 市场源管理」维护源列表（权限码 `platform:plugin-market-source:view/create/edit/delete/run`）：
 
-- 内置源 `default`：rootUrl 始终镜像 `yudream.platform.plugin.store-root-url` 配置，管理端只能调整令牌与启停，不可删除；
-- 新增源要求 HTTPS 根地址（`index.json` 完整地址）与 32 位内小写标识；私有源可配置 Bearer 令牌，令牌经主密钥（`YUDREAM_CREDENTIAL_KEY`）加密存储，接口只返回"是否已配置"；
-- 每个源可手动「同步」或「全部同步」：拉取根索引 → 各插件 index → 最新版 descriptor，按 `schemaVersion=1` 契约严格校验后存为本地目录快照；单源失败只标记该源异常，不影响其他源；
-- 市场列表读取快照，不产生实时外呼；详情页的历史版本 descriptor 与安装/更新时的 JAR 下载按需从对应源拉取，并校验 URL 属于该源（同源同路径）。
+- 内置源 `default` 类型为 `LOCAL`（本机插件市场）：进程内直读本机 `PUBLISHED` 发布物，无需地址与同步，不可删除；
+- 新增源类型只能是 `V2_API`（正式协议，rootUrl 为 `https://host/api/public/plugin-market`）或 `STATIC_INDEX`（legacy `index.json` 完整地址）；禁止创建 `LOCAL`；
+- 私有源可配置 Bearer 令牌，令牌经主密钥（`YUDREAM_CREDENTIAL_KEY`）加密存储，接口只返回「是否已配置」；
+- 远程源可手动「同步」或「全部同步」：`V2_API` 分页拉 `/api/v2/plugins` 与详情构造结构化快照，`STATIC_INDEX` 仍走根索引 → 插件 index → 最新 descriptor；`LOCAL` 无需同步；单源失败只标记该源异常；
+- 后台市场列表读快照（LOCAL 为内存目录），不产生实时外呼；安装/更新按来源下载并校验 SHA-256。
 
 ### 6.3 多源合并与安装来源
 
@@ -200,7 +201,7 @@ https://nexus.yudream.online/repository/maven-releases/online/yudream/plugins/
 
 ### 6.4 源契约
 
-市场源必须提供与官方市场一致的 `schemaVersion=1` 只读 HTTP 契约：根 `index.json` → 每插件 `index.json` → 每版本 `descriptor.json`（含 JAR 地址与 SHA-256）。相对引用按各 `index.json` 所在目录解析，且必须与源根同源同路径；JAR 下载强制校验 SHA-256 与大小上限。自托管一个市场源即等价于按该结构提供静态文件；YuDream 实例现已内置这一服务端（发布、审核与对外目录），见[自托管市场源](./market-source)。
+正式源协议是 **Market Source Protocol v2**（裸 JSON REST，搜索/分页/版本/下载，含分类与标签）。静态 `schemaVersion=1` `index.json` 仅作 legacy 兼容，可作为 `STATIC_INDEX` 源手动添加（含原 Nexus 目录）。YuDream 实例内置供给端：发布、审核、编辑、删除、公开社区与 v2 目录，见[自托管市场源](./market-source)。
 
 ## 7. 相关文档
 

@@ -5,7 +5,9 @@
 #   YUDREAM_MARKET_URL            YuDream 宿主根地址（HTTPS），如 https://yudream.example.com
 #   YUDREAM_MARKET_API_KEY        具备 platform:plugin-market-source:upload 权限的 API Key（yda_ 开头）
 #   YUDREAM_MARKET_RELEASE_NOTES  可选，发布说明（单行；契约禁止控制字符）
-#   YUDREAM_MARKET_METADATA       可选，JSON：{"publisher":{"id","name","url","verified"},"license","compatibility":{"host","spi","frontendSdk"}}
+#   YUDREAM_MARKET_CATEGORY       可选，内置分类清单值（如 Minecraft、主题与皮肤）
+#   YUDREAM_MARKET_TAGS           可选，逗号分隔标签（最多 10 个，单个 ≤24 字符）
+#   YUDREAM_MARKET_METADATA       可选，JSON：{"publisher":{"id","name","url","verified"},"license","compatibility":{"host","spi","frontendSdk"},"category","tags"}
 #
 # 用法：publish-to-market.sh dist/plugins/<artifactId>-<version>.jar
 # 说明：元数据由服务端从 JAR 内 plugin.yml 自动解析；{code}@{version} 不可覆盖，
@@ -30,6 +32,12 @@ publish_args=(
 )
 if [ -n "${YUDREAM_MARKET_RELEASE_NOTES:-}" ]; then
   publish_args+=(-F "releaseNotes=$YUDREAM_MARKET_RELEASE_NOTES")
+fi
+if [ -n "${YUDREAM_MARKET_CATEGORY:-}" ]; then
+  publish_args+=(-F "category=$YUDREAM_MARKET_CATEGORY")
+fi
+if [ -n "${YUDREAM_MARKET_TAGS:-}" ]; then
+  publish_args+=(-F "tags=$YUDREAM_MARKET_TAGS")
 fi
 if [ -n "${YUDREAM_MARKET_METADATA:-}" ]; then
   publish_args+=(-F "metadata=$YUDREAM_MARKET_METADATA")
