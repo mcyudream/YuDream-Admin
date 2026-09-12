@@ -27,6 +27,15 @@ public class PublicPluginMarketController {
 
     private final PluginMarketPublicationAppService pluginMarketPublicationAppService;
 
+    /**
+     * 对外复制的 v2 源基址本身没有子路径。浏览器、健康检查或误把基址当探测 URL
+     * 时不应 404/500；返回与 {@code /api/v2/manifest} 相同的清单，消费端仍走 /api/v2。
+     */
+    @GetMapping({"", "/"})
+    public ResponseEntity<String> root() {
+        return json(pluginMarketPublicationAppService.manifestJson());
+    }
+
     @GetMapping("/index.json")
     public ResponseEntity<String> rootIndex() {
         return json(pluginMarketPublicationAppService.rootIndexJson());
