@@ -70,6 +70,15 @@ function setupRoutes(router: Router) {
       }
       // 是否已根据权限动态生成并注册路由
       if (appRouteStore.isGenerate) {
+        const appFeatureStore = useAppFeatureStore()
+        await appFeatureStore.load()
+        if ((to.name === 'publicMarketHome' || to.name === 'publicMarketPlugin')
+          && !appFeatureStore.capabilityEnabled('plugin-market-source')) {
+          return {
+            path: appSettingsStore.settings.app.home.fullPath,
+            replace: true,
+          }
+        }
         // 导航菜单如果不是 single 模式，则需要根据 path 定位主导航菜单的选中状态
         appSettingsStore.settings.menu.mode !== 'single' && appMenuStore.setActived(to.path)
         // 如果已登录状态下，进入登录页会强制跳转到主页
@@ -126,6 +135,13 @@ function setupRoutes(router: Router) {
         }
       }
       if (to.name === 'publicDynamicForm' && !appFeatureStore.formEnabled) {
+        return {
+          name: 'login',
+          replace: true,
+        }
+      }
+      if ((to.name === 'publicMarketHome' || to.name === 'publicMarketPlugin')
+        && !appFeatureStore.capabilityEnabled('plugin-market-source')) {
         return {
           name: 'login',
           replace: true,
