@@ -160,11 +160,6 @@ yudream.platform.capabilities:
   plugin-market-source:
     enabled: ${PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED:true}
 
-yudream.platform.plugin:
-  # 自托管市场源发布物存储目录；必须独立于插件扫描目录（directories），否则会被当作已安装插件发现
-  market-source:
-    directory: ${PLATFORM_PLUGIN_MARKET_SOURCE_DIRECTORY:market-source}
-
 yudream.platform.ai.client:
   connect-timeout: ${PLATFORM_AI_CONNECT_TIMEOUT:30s}
   read-timeout: ${PLATFORM_AI_READ_TIMEOUT:30m}
@@ -212,3 +207,6 @@ yudream.platform.plugin:
   store-connect-timeout-millis: ${PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS:5000}
   store-request-timeout-millis: ${PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS:5000}
   store-max-response-bytes: ${PLATFORM_PLUGIN_STORE_MAX_RESPONSE_BYTES:1048576}
+  # 自托管市场源发布物存储目录；必须独立于插件扫描目录（directories），否则发布物会被当作已安装插件发现
+  market-source:
+    directory: ${PLATFORM_PLUGIN_MARKET_SOURCE_DIRECTORY:market-source}
