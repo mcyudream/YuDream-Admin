@@ -108,9 +108,9 @@ function browseAuthor() {
               </div>
             </div>
             <div class="plugin-cta">
-              <FaButton v-if="latest" @click="download(latest.version)">
+              <button v-if="latest" type="button" class="plugin-action" @click="download(latest.version)">
                 下载 {{ latest.version }}
-              </FaButton>
+              </button>
               <p>{{ detail.downloads }} 次下载 · {{ formatTime(detail.updatedAt || detail.publishedAt) }} 更新</p>
             </div>
           </header>
@@ -143,7 +143,7 @@ function browseAuthor() {
                   <p>{{ version.releaseNotes || '无发布说明' }}</p>
                   <span>{{ formatTime(version.publishedAt) }} · {{ formatSize(version.sizeBytes) }} · {{ version.downloads }} 下载<template v-if="version.license"> · {{ version.license }}</template></span>
                 </div>
-                <FaButton variant="outline" @click="download(version.version)">下载</FaButton>
+                <button type="button" class="plugin-action plugin-action--ghost" @click="download(version.version)">下载</button>
               </article>
             </div>
           </section>
@@ -158,6 +158,16 @@ function browseAuthor() {
   min-height: 100%;
   flex: 1 1 auto;
   padding-top: var(--neco-page-top, 0px);
+  --background: var(--yb-site-bg, var(--color-bg-1));
+  --foreground: var(--yb-site-text, var(--color-text-1));
+  --card: var(--yb-site-surface, var(--color-bg-2));
+  --card-foreground: var(--yb-site-text, var(--color-text-1));
+  --muted: var(--yb-site-hover, var(--color-fill-1));
+  --muted-foreground: var(--yb-site-muted, var(--color-text-3));
+  --border: var(--yb-site-border, var(--color-border-2));
+  --input: var(--yb-site-border, var(--color-border-2));
+  --primary: var(--yb-site-primary, var(--color-primary-6, #3b82f6));
+  --primary-foreground: var(--yb-site-primary-text, #fff);
   background: var(--yb-site-bg, var(--color-bg-1));
   color: var(--yb-site-text, var(--color-text-1));
 }
@@ -230,6 +240,24 @@ function browseAuthor() {
   display: grid;
   gap: 8px;
   justify-items: end;
+}
+.plugin-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--yb-site-primary-btn-bg, var(--yb-site-primary, var(--color-primary-6, #3b82f6)));
+  border-radius: 8px;
+  background: var(--yb-site-primary-btn-bg, var(--yb-site-primary, var(--color-primary-6, #3b82f6)));
+  color: var(--yb-site-primary-btn-text, var(--yb-site-primary-text, #fff));
+  font: inherit;
+  cursor: pointer;
+}
+.plugin-action--ghost {
+  border-color: var(--yb-site-border, var(--color-border-2));
+  background: var(--yb-site-surface, var(--color-bg-2));
+  color: var(--yb-site-text, var(--color-text-1));
 }
 .plugin-cta p {
   margin: 0;

@@ -29,8 +29,8 @@ const selectedTags = ref<string[]>(typeof route.query.tags === 'string' && route
   : [])
 const authorId = ref(typeof route.query.authorId === 'string' ? route.query.authorId : '')
 const authorName = ref(typeof route.query.author === 'string' ? route.query.author : '')
-const publishedAfter = ref(typeof route.query.after === 'string' ? route.query.after : '')
-const publishedBefore = ref(typeof route.query.before === 'string' ? route.query.before : '')
+const publishedAfter = ref(typeof route.query.after === 'string' ? route.query.after.slice(0, 10) : '')
+const publishedBefore = ref(typeof route.query.before === 'string' ? route.query.before.slice(0, 10) : '')
 const sort = ref<PluginMarketSort>((route.query.sort as PluginMarketSort) || 'newest')
 const page = ref(Number(route.query.page) > 0 ? Number(route.query.page) : 1)
 const size = ref(Number(route.query.size) > 0 ? Number(route.query.size) : 12)
@@ -44,18 +44,6 @@ const sortOptions: { label: string, value: PluginMarketSort }[] = [
   { label: '名称', value: 'name' },
 ]
 const publicV2Url = `${window.location.origin}/api/public/plugin-market`
-const publishedRange = computed({
-  get: () => {
-    if (!publishedAfter.value && !publishedBefore.value) {
-      return undefined
-    }
-    return [publishedAfter.value || '', publishedBefore.value || '']
-  },
-  set: (value) => {
-    publishedAfter.value = typeof value?.[0] === 'string' ? value[0] : ''
-    publishedBefore.value = typeof value?.[1] === 'string' ? value[1] : ''
-  },
-})
 const hasFilters = computed(() => Boolean(
   selectedCategories.value.length
   || selectedTags.value.length
@@ -209,8 +197,8 @@ function goAuthorWorkspace() {
   void router.push('/platform/plugin-publish')
 }
 
-function openPlugin(code: string) {
-  void router.push({ name: 'publicMarketPlugin', params: { code } })
+function pluginLocation(code: string) {
+  return { name: 'publicMarketPlugin', params: { code } }
 }
 
 function formatTime(value?: string) {
@@ -261,17 +249,19 @@ async function copyPublicUrl() {
         </header>
 
         <form class="discover-search" @submit.prevent="onSearch">
-          <FaInput v-model="search" clearable placeholder="搜索名称、编码或描述">
-            <template #start>
-              <FaIcon name="i-ri:search-line" />
-            </template>
-          </FaInput>
-          <FaSelect v-model="sort" :options="sortOptions" class="discover-sort" @update:model-value="onSortChange" />
-          <FaButton html-type="submit">搜索</FaButton>
-          <FaButton v-if="canManageOwnPlugins" variant="outline" @click="goAuthorWorkspace">
-            <FaIcon name="i-ri:upload-2-line" />
+          <label class="discover-search__field discover-control">
+            <FaIcon name="i-ri:search-line" />
+            <input v-model="search" type="search" placeholder="搜索名称、编码或描述">
+          </label>
+          <label class="discover-sort discover-control">
+            <select v-model="sort" @change="onSortChange">
+              <option v-for="option in sortOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
+          </label>
+          <button type="submit" class="discover-action">搜索</button>
+          <button v-if="canManageOwnPlugins" type="button" class="discover-action discover-action--ghost" @click="goAuthorWorkspace">
             管理我的插件
-          </FaButton>
+          </button>
         </form>
 
         <div class="discover-layout">
@@ -307,13 +297,10 @@ async function copyPublicUrl() {
             </section>
             <section>
               <h2>发布时间</h2>
-              <YdRangePicker
-                v-model="publishedRange"
-                class="discover-range"
-                :placeholder="['开始日期', '结束日期']"
-                @change="onTimeFilterChange"
-                @clear="onTimeFilterChange"
-              />
+              <div class="discover-range">
+                <input v-model="publishedAfter" type="date" @change="onTimeFilterChange">
+                <input v-model="publishedBefore" type="date" @change="onTimeFilterChange">
+              </div>
             </section>
             <section v-if="authorId">
               <h2>作者</h2>
@@ -322,9 +309,9 @@ async function copyPublicUrl() {
                 <button type="button" @click="applyAuthor('', '')">清除</button>
               </div>
             </section>
-            <FaButton v-if="hasFilters" variant="link" class="discover-clear" @click="clearFilters">
+            <button v-if="hasFilters" type="button" class="discover-clear" @click="clearFilters">
               清除筛选
-            </FaButton>
+            </button>
           </aside>
 
           <section class="discover-results">
@@ -335,14 +322,11 @@ async function copyPublicUrl() {
             <div v-if="loading" class="discover-empty">加载中…</div>
             <div v-else-if="!items.length" class="discover-empty">暂无符合条件的插件。</div>
             <div v-else class="discover-grid">
-              <article
+              <RouterLink
                 v-for="item in items"
                 :key="item.code"
+                :to="pluginLocation(item.code)"
                 class="discover-card"
-                role="link"
-                tabindex="0"
-                @click="openPlugin(item.code)"
-                @keydown.enter="openPlugin(item.code)"
               >
                 <div class="discover-card__icon">
                   <img v-if="isImageIcon(item.icon)" :src="iconUrl(item.icon)" :alt="item.displayName || item.code">
@@ -359,24 +343,36 @@ async function copyPublicUrl() {
                     <span v-for="tag in (item.tags || []).slice(0, 3)" :key="tag">{{ tag }}</span>
                   </div>
                   <div class="discover-card__foot">
-                    <button type="button" @click.stop="applyAuthor(item.authorId, item.authorName)">
+                    <span
+                      class="discover-card__author"
+                      role="button"
+                      tabindex="0"
+                      @click.prevent.stop="applyAuthor(item.authorId, item.authorName)"
+                      @keydown.enter.prevent.stop="applyAuthor(item.authorId, item.authorName)"
+                    >
                       {{ item.authorName || '未知作者' }}
-                    </button>
+                    </span>
                     <span>{{ formatDownloads(item.downloads) }} 下载</span>
                     <span>{{ formatTime(item.updatedAt || item.publishedAt) }}</span>
                   </div>
                 </div>
-              </article>
+              </RouterLink>
             </div>
-            <FaPagination
-              v-model:page="page"
-              v-model:size="size"
-              :total="total"
-              :sizes="[12, 24, 48]"
-              class="discover-pagination"
-              @page-change="onPageChange"
-              @size-change="onSizeChange"
-            />
+            <div class="discover-pagination">
+              <span class="discover-pagination__total">共 {{ total }} 条</span>
+              <label class="discover-pagination__sizes">
+                <select :value="size" @change="onSizeChange(Number(($event.target as HTMLSelectElement).value))">
+                  <option :value="12">12 条/页</option>
+                  <option :value="24">24 条/页</option>
+                  <option :value="48">48 条/页</option>
+                </select>
+              </label>
+              <div class="discover-pagination__pager">
+                <button type="button" :disabled="page <= 1" @click="onPageChange(page - 1)">‹</button>
+                <strong>{{ page }}</strong>
+                <button type="button" :disabled="page >= Math.max(1, Math.ceil(total / size))" @click="onPageChange(page + 1)">›</button>
+              </div>
+            </div>
           </section>
         </div>
 
@@ -387,7 +383,7 @@ async function copyPublicUrl() {
           </div>
           <div class="discover-source__url">
             <code>{{ publicV2Url }}</code>
-            <FaButton variant="outline" size="sm" @click="copyPublicUrl">复制</FaButton>
+            <button type="button" class="discover-action discover-action--ghost" @click="copyPublicUrl">复制</button>
           </div>
         </footer>
       </div>
@@ -400,6 +396,21 @@ async function copyPublicUrl() {
   min-height: 100%;
   flex: 1 1 auto;
   padding-top: var(--neco-page-top, 0px);
+  --background: var(--yb-site-bg, var(--color-bg-1));
+  --foreground: var(--yb-site-text, var(--color-text-1));
+  --card: var(--yb-site-surface, var(--color-bg-2));
+  --card-foreground: var(--yb-site-text, var(--color-text-1));
+  --popover: var(--yb-site-surface, var(--color-bg-2));
+  --popover-foreground: var(--yb-site-text, var(--color-text-1));
+  --muted: var(--yb-site-hover, var(--color-fill-1));
+  --muted-foreground: var(--yb-site-muted, var(--color-text-3));
+  --border: var(--yb-site-border, var(--color-border-2));
+  --input: var(--yb-site-border, var(--color-border-2));
+  --ring: var(--yb-site-primary, var(--color-primary-6, #3b82f6));
+  --primary: var(--yb-site-primary, var(--color-primary-6, #3b82f6));
+  --primary-foreground: var(--yb-site-primary-text, #fff);
+  --accent: var(--yb-site-hover, var(--color-fill-1));
+  --accent-foreground: var(--yb-site-text, var(--color-text-1));
   background:
     radial-gradient(1200px 420px at 12% -10%, color-mix(in srgb, var(--yb-site-primary, var(--color-primary-6, #3b82f6)) 14%, transparent), transparent 70%),
     var(--yb-site-bg, var(--color-bg-1));
@@ -463,6 +474,61 @@ async function copyPublicUrl() {
   gap: 10px;
   margin: 28px 0 32px;
 }
+.discover-control {
+  min-width: 0;
+}
+.discover-search__field {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 8px;
+  background: var(--yb-site-surface, var(--color-bg-2));
+  color: var(--yb-site-text, var(--color-text-1));
+}
+.discover-search__field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+.discover-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--yb-site-primary-btn-bg, var(--yb-site-primary, var(--color-primary-6, #3b82f6)));
+  border-radius: 8px;
+  background: var(--yb-site-primary-btn-bg, var(--yb-site-primary, var(--color-primary-6, #3b82f6)));
+  color: var(--yb-site-primary-btn-text, var(--yb-site-primary-text, #fff));
+  font: inherit;
+  cursor: pointer;
+}
+.discover-action--ghost {
+  border-color: var(--yb-site-border, var(--color-border-2));
+  background: var(--yb-site-surface, var(--color-bg-2));
+  color: var(--yb-site-text, var(--color-text-1));
+}
+.discover-sort select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 8px;
+  background: var(--yb-site-surface, var(--color-bg-2));
+  color: var(--yb-site-text, var(--color-text-1));
+  font: inherit;
+}
+.discover-card {
+  text-decoration: none;
+  color: inherit;
+}
 .discover-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -491,7 +557,7 @@ async function copyPublicUrl() {
 .discover-filter,
 .discover-tag,
 .discover-card,
-.discover-card__foot button {
+.discover-card__author {
   color: inherit;
   cursor: pointer;
 }
@@ -527,7 +593,18 @@ async function copyPublicUrl() {
   font-size: 12px;
 }
 .discover-range {
+  display: grid;
+  gap: 8px;
+}
+.discover-range input {
   width: 100%;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 8px;
+  background: var(--yb-site-surface, var(--color-bg-2));
+  color: var(--yb-site-text, var(--color-text-1));
+  font: inherit;
 }
 .discover-author-chip {
   display: flex;
@@ -547,7 +624,12 @@ async function copyPublicUrl() {
 }
 .discover-clear {
   margin-top: 8px;
-  padding-left: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--yb-site-muted, var(--color-text-3));
+  font: inherit;
+  cursor: pointer;
 }
 .discover-results__head {
   display: flex;
@@ -571,6 +653,8 @@ async function copyPublicUrl() {
   gap: 14px;
 }
 .discover-card {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 16px;
@@ -644,13 +728,45 @@ async function copyPublicUrl() {
   margin-top: 12px;
   font-size: 12px;
 }
-.discover-card__foot button {
+.discover-card__author {
   padding: 0;
-  border: 0;
-  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .discover-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
   margin-top: 22px;
+  color: var(--yb-site-muted, var(--color-text-3));
+  font-size: 13px;
+}
+.discover-pagination__total {
+  margin-right: auto;
+}
+.discover-pagination__sizes select,
+.discover-pagination__pager input,
+.discover-pagination__pager button,
+.discover-pagination__pager strong {
+  min-width: 36px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--yb-site-border, var(--color-border-2));
+  border-radius: 8px;
+  background: var(--yb-site-surface, var(--color-bg-2));
+  color: var(--yb-site-text, var(--color-text-1));
+  font: inherit;
+}
+.discover-pagination__pager {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.discover-pagination__pager button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .discover-source {
   display: flex;
