@@ -17,7 +17,7 @@ const { auth } = useAppAuth()
 
 const loading = ref(false)
 const publications = ref<PluginMarketPublication[]>([])
-const pagination = reactive({ page: 1, size: 50, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 const statusFilter = ref<PluginPublicationStatus | ''>('')
 const reviewRequired = ref(true)
 const skipReview = computed(() => auth('platform:plugin-market-source:publish'))
@@ -101,6 +101,11 @@ async function load() {
 }
 
 function onPageChange() {
+  void load()
+}
+
+function onSizeChange() {
+  pagination.page = 1
   void load()
 }
 
@@ -405,14 +410,13 @@ const uploadHint = computed(() => {
       </a-spin>
 
       <FaPagination
-        v-if="pagination.total > pagination.size"
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
-        :sizes="[20, 50, 100]"
+        :sizes="[10, 20, 50]"
         class="mt-3"
         @page-change="onPageChange"
-        @size-change="onPageChange"
+        @size-change="onSizeChange"
       />
 
       <FaModal v-model="uploadVisible" title="上传插件" show-cancel-button class="sm:max-w-xl" :confirm-loading="uploading" @confirm="submitUpload">

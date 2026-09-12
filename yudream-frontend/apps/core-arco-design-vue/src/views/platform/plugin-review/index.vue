@@ -9,7 +9,7 @@ const toast = useFaToast()
 
 const loading = ref(false)
 const publications = ref<PluginMarketPublication[]>([])
-const pagination = reactive({ page: 1, size: 20, total: 0 })
+const pagination = reactive({ page: 1, size: 10, total: 0 })
 const statusFilter = ref<PluginPublicationStatus | ''>('PENDING')
 const reviewRequired = ref(true)
 const reviewSaving = ref(false)
@@ -56,6 +56,11 @@ async function load() {
 }
 
 function onPageChange() {
+  void load()
+}
+
+function onSizeChange() {
+  pagination.page = 1
   void load()
 }
 
@@ -277,14 +282,13 @@ function formatTime(value?: string) {
       </a-spin>
 
       <FaPagination
-        v-if="pagination.total > pagination.size"
         v-model:page="pagination.page"
         v-model:size="pagination.size"
         :total="pagination.total"
         :sizes="[10, 20, 50]"
         class="mt-3"
         @page-change="onPageChange"
-        @size-change="onPageChange"
+        @size-change="onSizeChange"
       />
     </FaPageMain>
   </div>
