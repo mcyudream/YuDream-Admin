@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="#在线演示">在线演示</a> ·
   <a href="#落地案例">落地案例</a> ·
   <a href="#核心能力">核心能力</a> ·
   <a href="#快速开始">快速开始</a> ·
@@ -20,11 +21,23 @@
   <img alt="pnpm" src="https://img.shields.io/badge/pnpm-11.9-F69220?style=flat-square&logo=pnpm&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white">
   <a href="https://ydadocs.yudream.online/"><img alt="文档站" src="https://img.shields.io/badge/Docs-在线文档站-2563EB?style=flat-square&logo=readthedocs&logoColor=white"></a>
+  <a href="https://ydashow.yudream.online/"><img alt="演示站" src="https://img.shields.io/badge/Demo-在线演示-0ea5e9?style=flat-square"></a>
 </p>
 
 YuDream Admin 是一个后端由 YuDream 原创实现的企业级管理平台。后端基于 Java 21、Spring Boot 3 和 DDD 分层，提供用户与权限、内容管理、知识库、集成编排、可视化数据、AI Agent 等平台能力，并通过插件运行时将业务功能与平台核心解耦。
 
 前端基于 [Fantastic-admin](https://fantastic-admin.hurui.me/)，使用 Vue 3、Arco Design Vue 和 UnoCSS。项目既可以作为一套完整的后台系统使用，也可以作为团队构建独立业务插件的宿主平台；打开 CMS、公开站点与官方插件后，不必二次开发就能上线面向访客的一站式官网。
+
+## 在线演示
+
+公开演示站：[https://ydashow.yudream.online/](https://ydashow.yudream.online/)
+
+| | |
+| --- | --- |
+| 账号 | `admin` |
+| 密码 | `admin123` |
+
+演示环境供浏览后台与公开站能力，数据可能被重置，请勿存放真实业务或密钥。
 
 ## 落地案例
 
@@ -208,6 +221,7 @@ docker compose -f docker-compose.platform.yml --profile graph up -d
 ## 文档
 
 - [在线文档站](https://ydadocs.yudream.online/)
+- [在线演示](https://ydashow.yudream.online/)（账号 `admin` / 密码 `admin123`）
 - [落地案例（MC 社团一站式官网）](https://ydadocs.yudream.online/guide/showcase)
 - [插件系统规范](docs/plugin-system/specification.md)
 - [插件开发教程](docs/plugin-system/tutorial.md)
