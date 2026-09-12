@@ -13,6 +13,7 @@ public class PluginMarketSourceAssembler {
                 .id(source.getId())
                 .code(source.getCode())
                 .name(source.getName())
+                .type(source.type())
                 .rootUrl(source.getRootUrl())
                 .tokenConfigured(source.getToken() != null && !source.getToken().isBlank())
                 .enabled(source.enabled())

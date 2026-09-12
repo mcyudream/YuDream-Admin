@@ -347,6 +347,32 @@ class PluginMarketPublicationAppServiceTest {
         assertTrue(service.codeIndexJson("missing").isEmpty());
     }
 
+    @Test
+    void localCatalogEntriesGroupPublishedVersionsAndResolveLocalJar() throws Exception {
+        PluginMarketPublication v1 = publication("demo", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        v1.setMainClass("example.Plugin");
+        v1.setJarPath("demo/1.0.0/plugin.jar");
+        PluginMarketPublication v2 = publication("demo", "2.0.0", PluginPublicationStatus.PUBLISHED);
+        v2.setMainClass("example.Plugin");
+        v2.setJarPath("demo/2.0.0/plugin.jar");
+        when(publicationRepo.findByStatus(PluginPublicationStatus.PUBLISHED)).thenReturn(List.of(v2, v1));
+
+        var entries = service.localCatalogEntries();
+        assertEquals(1, entries.size());
+        assertEquals("demo", entries.getFirst().code());
+        assertEquals(List.of("1.0.0", "2.0.0"), entries.getFirst().structuredVersions().stream()
+                .map(online.yudream.base.domain.platform.plugin.valobj.PluginStoreStructuredVersion::releaseVersion)
+                .toList());
+        assertEquals("local:demo/2.0.0/plugin.jar", entries.getFirst().structuredVersions().getLast().downloadUrl());
+
+        Path jar = tempDir.resolve("demo").resolve("1.0.0").resolve("plugin.jar");
+        Files.createDirectories(jar.getParent());
+        Files.writeString(jar, "jar");
+        assertEquals(jar, service.resolveLocalJar("local:demo/1.0.0/plugin.jar"));
+        assertThrows(BizException.class, () -> service.resolveLocalJar("local:../escape.jar"));
+        assertThrows(BizException.class, () -> service.resolveLocalJar("https://evil.example/a.jar"));
+    }
+
     private List<String> textList(JsonNode array, String field) {
         return array == null ? List.of() : java.util.stream.StreamSupport
                 .stream(array.spliterator(), false)

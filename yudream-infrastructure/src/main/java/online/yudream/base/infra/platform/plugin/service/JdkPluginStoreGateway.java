@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.plugin.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.enumerate.MarketSourceType;
 import online.yudream.base.domain.platform.plugin.port.PluginStoreGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogEntry;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreCatalogVersion;
@@ -13,6 +14,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginJar;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginPublisher;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginSource;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStoreSourceRef;
+import online.yudream.base.domain.platform.plugin.valobj.PluginStoreStructuredVersion;
 import online.yudream.base.domain.platform.plugin.valobj.SemVer;
 import online.yudream.base.domain.platform.plugin.valobj.SemVerRange;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,13 +41,13 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
 public class JdkPluginStoreGateway implements PluginStoreGateway {
 
-    private static final URI DEFAULT_ROOT = URI.create("https://nexus.yudream.online/repository/plugin-store-releases/index.json");
     private static final String STORE_UNAVAILABLE = "插件商店数据不可用";
     private static final Pattern CODE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,127}");
     private static final Pattern PUBLISHER_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]{0,63}");
@@ -78,12 +80,15 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
     }
 
     @Override
-    public PluginStoreSourceRef configuredSourceRef() {
-        return new PluginStoreSourceRef(properties.getStoreRootUrl(), null);
-    }
-
-    @Override
     public List<PluginStoreCatalogEntry> fetchCatalog(PluginStoreSourceRef source) {
+        MarketSourceType type = source == null || source.type() == null
+                ? MarketSourceType.STATIC_INDEX : source.type();
+        if (type == MarketSourceType.LOCAL) {
+            throw new BizException("本机源不经网关拉取");
+        }
+        if (type == MarketSourceType.V2_API) {
+            return fetchV2Catalog(source);
+        }
         StoreLocation location = storeLocation(source);
         List<PluginStoreCatalogEntry> result = new ArrayList<>();
         Set<String> codes = new HashSet<>();
@@ -119,6 +124,187 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         JsonNode latestNode = parseJsonText(descriptorJson);
         descriptor(latestNode, location, indexUrl, plugin.code(), lastVersion.releaseVersion());
         return new PluginStoreCatalogEntry(plugin.code(), indexUrl.toString(), descriptorJson, catalogVersions);
+    }
+
+    /**
+     * v2 协议：分页拉取 /api/v2/plugins，再逐插件拉 /api/v2/plugins/{code} 构造结构化快照。
+     * 单个坏插件跳过；根级错误（manifest 或首页失败）抛 BizException。
+     */
+    private List<PluginStoreCatalogEntry> fetchV2Catalog(PluginStoreSourceRef source) {
+        URI apiRoot = v2ApiRoot(source);
+        readJson(resolveV2(apiRoot, "manifest"), source);
+        List<PluginStoreCatalogEntry> result = new ArrayList<>();
+        Set<String> codes = new HashSet<>();
+        int page = 1;
+        int total;
+        do {
+            JsonNode listing = readJson(resolveV2(apiRoot, "plugins?page=" + page + "&size=100"), source);
+            requireObject(listing);
+            JsonNode totalNode = listing.get("total");
+            JsonNode items = listing.get("items");
+            if (totalNode == null || !totalNode.isNumber() || items == null || !items.isArray()) {
+                throw unavailable();
+            }
+            total = totalNode.intValue();
+            for (JsonNode item : items) {
+                if (item == null || !item.isObject()) {
+                    continue;
+                }
+                String code = optionalText(item, "code");
+                if (!StringUtils.hasText(code) || !CODE.matcher(code).matches() || !codes.add(code)) {
+                    continue;
+                }
+                try {
+                    result.add(v2CatalogEntry(source, apiRoot, code));
+                } catch (BizException e) {
+                    // 单个坏插件不拖垮整份目录
+                }
+            }
+            page++;
+        } while ((page - 1) * 100 < total && page <= 50);
+        return result;
+    }
+
+    private PluginStoreCatalogEntry v2CatalogEntry(PluginStoreSourceRef source, URI apiRoot, String code) {
+        JsonNode detail = readJson(resolveV2(apiRoot, "plugins/" + code), source);
+        requireObject(detail);
+        JsonNode versions = detail.get("versions");
+        if (versions == null || !versions.isArray() || versions.isEmpty()) {
+            throw unavailable();
+        }
+        List<PluginStoreStructuredVersion> structured = new ArrayList<>();
+        for (JsonNode version : versions) {
+            requireObject(version);
+            String releaseVersion = requireSemanticVersion(version, "version");
+            String sha256 = requireText(version, "sha256");
+            if (!SHA_256.matcher(sha256).matches()) {
+                throw unavailable();
+            }
+            String downloadPath = requireText(version, "downloadPath");
+            URI downloadUrl = resolveV2(apiRoot, downloadPath);
+            String main = optionalText(version, "main");
+            Long sizeBytes = version.has("sizeBytes") && version.get("sizeBytes").isNumber()
+                    ? version.get("sizeBytes").longValue() : null;
+            List<PluginStorePluginDependency> dependencies = parseV2Dependencies(version.get("dependencies"));
+            Map<String, String> compatibility = parseV2Compatibility(version.get("compatibility"));
+            structured.add(new PluginStoreStructuredVersion(
+                    releaseVersion, downloadUrl.toString(), sha256.toLowerCase(Locale.ROOT),
+                    main, optionalText(detail, "displayName"), optionalText(detail, "description"),
+                    sizeBytes, optionalText(detail, "category"), optionalTextArray(detail, "tags"),
+                    compatibility, dependencies));
+        }
+        return new PluginStoreCatalogEntry(code, apiRoot.toString() + "/plugins/" + code, null, List.of(), structured);
+    }
+
+    private List<PluginStorePluginDependency> parseV2Dependencies(JsonNode dependencies) {
+        if (dependencies == null) {
+            return List.of();
+        }
+        if (!dependencies.isArray()) {
+            throw unavailable();
+        }
+        List<PluginStorePluginDependency> result = new ArrayList<>();
+        Set<String> codes = new HashSet<>();
+        for (JsonNode dependency : dependencies) {
+            requireObject(dependency);
+            String code = requireText(dependency, "code");
+            if (!CODE.matcher(code).matches() || !codes.add(code)) {
+                throw unavailable();
+            }
+            String range = optionalText(dependency, "range");
+            if (!StringUtils.hasText(range)) {
+                range = "x";
+            } else {
+                try {
+                    SemVerRange.parse(range);
+                } catch (IllegalArgumentException e) {
+                    throw unavailable();
+                }
+            }
+            JsonNode required = dependency.get("required");
+            boolean requiredFlag = required == null || !required.isBoolean() || required.booleanValue();
+            result.add(new PluginStorePluginDependency(code, range, requiredFlag));
+        }
+        return List.copyOf(result);
+    }
+
+    private Map<String, String> parseV2Compatibility(JsonNode compatibility) {
+        if (compatibility == null || compatibility.isNull()) {
+            return Map.of();
+        }
+        requireObject(compatibility);
+        Map<String, String> result = new java.util.LinkedHashMap<>();
+        for (String key : List.of("host", "spi", "frontendSdk")) {
+            String range = optionalText(compatibility, key);
+            if (!StringUtils.hasText(range)) {
+                continue;
+            }
+            try {
+                SemVerRange.parse(range);
+            } catch (IllegalArgumentException e) {
+                throw unavailable();
+            }
+            result.put(key, range);
+        }
+        return Map.copyOf(result);
+    }
+
+    private URI v2ApiRoot(PluginStoreSourceRef source) {
+        if (source == null || !StringUtils.hasText(source.rootUrl())) {
+            throw unavailable();
+        }
+        try {
+            URI root = new URI(source.rootUrl().trim());
+            if (!isValidRootUri(root) || containsTraversal(root.getRawPath())) {
+                throw unavailable();
+            }
+            String path = root.normalize().getRawPath();
+            if (path == null) {
+                path = "";
+            }
+            if (path.endsWith("/")) {
+                path = path.substring(0, path.length() - 1);
+            }
+            if (path.endsWith("/index.json")) {
+                path = path.substring(0, path.length() - "/index.json".length());
+            }
+            if (!path.endsWith("/api/v2")) {
+                path = path + "/api/v2";
+            }
+            if (!path.endsWith("/")) {
+                path = path + "/";
+            }
+            return new URI(root.getScheme(), root.getAuthority(), path, null, null).normalize();
+        } catch (URISyntaxException e) {
+            throw unavailable();
+        }
+    }
+
+    private URI resolveV2(URI apiRoot, String relative) {
+        try {
+            if (!StringUtils.hasText(relative) || relative.startsWith("/") || relative.contains("://")) {
+                throw unavailable();
+            }
+            if (relative.contains("?")) {
+                int q = relative.indexOf('?');
+                URI resolved = apiRoot.resolve(relative.substring(0, q)).normalize();
+                if (!isValidRootUri(new URI(resolved.getScheme(), resolved.getAuthority(), resolved.getRawPath(), null, null))
+                        || !sameOrigin(apiRoot, resolved)
+                        || !isWithinBasePath(apiRoot.getRawPath(), resolved.getRawPath())) {
+                    throw unavailable();
+                }
+                return new URI(resolved.getScheme(), resolved.getAuthority(), resolved.getRawPath(),
+                        relative.substring(q + 1), null);
+            }
+            URI resolved = apiRoot.resolve(relative).normalize();
+            if (!isValidRootUri(resolved) || !sameOrigin(apiRoot, resolved)
+                    || !isWithinBasePath(apiRoot.getRawPath(), resolved.getRawPath())) {
+                throw unavailable();
+            }
+            return resolved;
+        } catch (URISyntaxException e) {
+            throw unavailable();
+        }
     }
 
     @Override
@@ -531,7 +717,10 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
     private StoreLocation storeLocation(PluginStoreSourceRef source) {
         try {
             String configured = source == null ? null : source.rootUrl();
-            URI root = StringUtils.hasText(configured) ? new URI(configured) : DEFAULT_ROOT;
+            if (!StringUtils.hasText(configured)) {
+                throw unavailable();
+            }
+            URI root = new URI(configured);
             if (!isValidRootUri(root) || containsTraversal(root.getRawPath())) {
                 throw unavailable();
             }

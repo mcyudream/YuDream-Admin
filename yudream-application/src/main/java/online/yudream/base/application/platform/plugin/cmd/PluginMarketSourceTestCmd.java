@@ -6,6 +6,8 @@ import lombok.Data;
 @Data
 public class PluginMarketSourceTestCmd {
 
+    /** STATIC_INDEX 或 V2_API。 */
+    private String type;
     private String rootUrl;
     private String token;
 }

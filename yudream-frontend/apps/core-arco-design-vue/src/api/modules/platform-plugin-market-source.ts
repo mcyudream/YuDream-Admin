@@ -2,6 +2,7 @@ import type { ApiResponse } from './system-client'
 import systemClient from './system-client'
 
 export type MarketSourceSyncStatus = 'OK' | 'ERROR'
+export type MarketSourceType = 'LOCAL' | 'STATIC_INDEX' | 'V2_API'
 
 export type PluginPublicationStatus = 'PENDING' | 'PUBLISHED' | 'REJECTED' | 'REVOKED'
 export type PluginPublicationChannel = 'UI' | 'PIPELINE'
@@ -10,6 +11,7 @@ export interface PluginMarketSource {
   id: string
   code: string
   name: string
+  type?: MarketSourceType
   rootUrl: string
   tokenConfigured: boolean
   enabled: boolean
@@ -24,6 +26,7 @@ export interface PluginMarketSource {
 export interface PluginMarketSourcePayload {
   code?: string
   name: string
+  type?: MarketSourceType
   rootUrl?: string
   /** 空白表示保留现有令牌。 */
   token?: string
@@ -70,7 +73,7 @@ export default {
   disable: (id: string) => systemClient.post<unknown, ApiResponse<PluginMarketSource>>(`api/platform/plugin-market-sources/${id}/disable`),
   sync: (id: string) => systemClient.post<unknown, ApiResponse<PluginMarketSource>>(`api/platform/plugin-market-sources/${id}/sync`),
   syncAll: () => systemClient.post<unknown, ApiResponse<PluginMarketSource[]>>('api/platform/plugin-market-sources/sync-all'),
-  test: (data: { rootUrl: string, token?: string }) => systemClient.post<unknown, ApiResponse<PluginMarketSourceTestResult>>('api/platform/plugin-market-sources/test', data),
+  test: (data: { rootUrl: string, token?: string, type?: MarketSourceType }) => systemClient.post<unknown, ApiResponse<PluginMarketSourceTestResult>>('api/platform/plugin-market-sources/test', data),
   publications: (status?: PluginPublicationStatus) => systemClient.get<unknown, ApiResponse<PluginMarketPublication[]>>('api/platform/plugin-market-source/publications', { params: { status } }),
   uploadPublication: (data: FormData) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>('api/platform/plugin-market-source/publications', data, { timeout: 0 }),
   acceptPublication: (id: string, note?: string) => systemClient.post<unknown, ApiResponse<PluginMarketPublication>>(`api/platform/plugin-market-source/publications/${id}/accept`, { note }),

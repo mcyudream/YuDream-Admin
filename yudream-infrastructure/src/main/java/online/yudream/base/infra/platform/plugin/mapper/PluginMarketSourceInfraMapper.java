@@ -16,6 +16,7 @@ public class PluginMarketSourceInfraMapper {
         dataObj.setId(source.getId());
         dataObj.setCode(source.getCode());
         dataObj.setName(source.getName());
+        dataObj.setType(source.getType());
         dataObj.setRootUrl(source.getRootUrl());
         dataObj.setToken(source.getToken());
         dataObj.setEnabled(source.getEnabled());
@@ -38,6 +39,7 @@ public class PluginMarketSourceInfraMapper {
                 .id(dataObj.getId())
                 .code(dataObj.getCode())
                 .name(dataObj.getName())
+                .type(dataObj.getType())
                 .rootUrl(dataObj.getRootUrl())
                 .token(dataObj.getToken())
                 .enabled(dataObj.getEnabled())

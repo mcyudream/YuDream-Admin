@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 /**
- * 插件市场源管理。项目闸门关闭时整个控制器不注册，市场回落内置单源；
+ * 插件市场源管理。项目闸门关闭时整个控制器不注册，市场目录为空（无 Nexus 回落）；
  * 应用闸门由 PluginMarketSourceAppService.ensureEnabled 在各用例内校验。
  */
 @RestController

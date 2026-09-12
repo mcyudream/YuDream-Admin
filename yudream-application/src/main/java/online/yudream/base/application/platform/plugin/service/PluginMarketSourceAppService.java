@@ -11,6 +11,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginMarketSourceDTO
 import online.yudream.base.application.platform.plugin.dto.PluginMarketSourceTestResultDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginMarketSource;
+import online.yudream.base.domain.platform.plugin.enumerate.MarketSourceType;
 import online.yudream.base.domain.platform.plugin.port.PluginStoreGateway;
 import online.yudream.base.domain.platform.plugin.repo.PluginMarketSourceRepo;
 import online.yudream.base.domain.platform.plugin.repo.PluginMarketSourceSnapshotRepo;
@@ -31,8 +32,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 插件市场源应用服务：能力双闸门、源管理与目录快照同步。多源路径激活时市场读取快照，
- * 未激活时市场回落配置直连的单源路径，行为与历史版本一致。
+ * 插件市场源应用服务：能力双闸门、源管理与目录快照同步。
+ * 能力未启用时市场目录为空、无 Nexus 隐式回落；LOCAL 源进程内直读发布物，不建快照。
  */
 @Service
 @Slf4j
@@ -46,6 +47,7 @@ public class PluginMarketSourceAppService {
     private final PluginMarketSourceRepo pluginMarketSourceRepo;
     private final PluginMarketSourceSnapshotRepo pluginMarketSourceSnapshotRepo;
     private final CapabilityAppService capabilityAppService;
+    private final PluginMarketPublicationAppService pluginMarketPublicationAppService;
 
     @Value("${yudream.platform.capabilities.plugin-market-source.enabled:true}")
     private boolean projectGateEnabled;
@@ -68,7 +70,7 @@ public class PluginMarketSourceAppService {
                 .collect(Collectors.toMap(PluginMarketSourceSnapshot::sourceId,
                         snapshot -> snapshot.entries().size(), (a, b) -> a));
         return pluginMarketSourceRepo.findAll().stream()
-                .map(source -> PluginMarketSourceAssembler.toDTO(source, counts.get(source.getId())))
+                .map(source -> PluginMarketSourceAssembler.toDTO(source, pluginCount(source, counts)))
                 .toList();
     }
 
@@ -85,10 +87,12 @@ public class PluginMarketSourceAppService {
         if (!StringUtils.hasText(cmd.getName())) {
             throw new BizException("市场源名称不能为空");
         }
-        validateRootUrl(cmd.getRootUrl());
+        MarketSourceType type = parseRemoteType(cmd.getType());
+        validateRootUrl(cmd.getRootUrl(), type);
         PluginMarketSource source = PluginMarketSource.builder()
                 .code(code)
                 .name(cmd.getName().trim())
+                .type(type)
                 .rootUrl(cmd.getRootUrl().trim())
                 .token(StringUtils.hasText(cmd.getToken()) ? cmd.getToken().trim() : null)
                 .enabled(true)
@@ -107,7 +111,14 @@ public class PluginMarketSourceAppService {
         }
         source.setName(cmd.getName().trim());
         if (!source.builtIn()) {
-            validateRootUrl(cmd.getRootUrl());
+            MarketSourceType type = StringUtils.hasText(cmd.getType())
+                    ? parseRemoteType(cmd.getType())
+                    : source.type();
+            if (type == MarketSourceType.LOCAL) {
+                throw new BizException("本机源类型仅限内置源");
+            }
+            validateRootUrl(cmd.getRootUrl(), type);
+            source.setType(type);
             source.setRootUrl(cmd.getRootUrl().trim());
         }
         if (StringUtils.hasText(cmd.getToken())) {
@@ -116,7 +127,7 @@ public class PluginMarketSourceAppService {
         if (cmd.getSortOrder() != null) {
             source.setSortOrder(cmd.getSortOrder());
         }
-        return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(source.getId()));
+        return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(source));
     }
 
     @Transactional
@@ -124,7 +135,7 @@ public class PluginMarketSourceAppService {
         ensureEnabled();
         PluginMarketSource source = requireById(id);
         if (source.builtIn()) {
-            throw new BizException("内置市场源不可删除，可在配置中调整其地址");
+            throw new BizException("内置市场源不可删除");
         }
         pluginMarketSourceRepo.deleteById(id);
         pluginMarketSourceSnapshotRepo.deleteBySourceId(id);
@@ -135,7 +146,7 @@ public class PluginMarketSourceAppService {
         ensureEnabled();
         PluginMarketSource source = requireById(id);
         source.enable();
-        return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(id));
+        return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(source));
     }
 
     @Transactional
@@ -143,7 +154,7 @@ public class PluginMarketSourceAppService {
         ensureEnabled();
         PluginMarketSource source = requireById(id);
         source.disable();
-        return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(id));
+        return PluginMarketSourceAssembler.toDTO(pluginMarketSourceRepo.save(source), pluginCount(source));
     }
 
     // ---------- 同步与测试 ----------
@@ -152,8 +163,13 @@ public class PluginMarketSourceAppService {
     public PluginMarketSourceDTO sync(Long id) {
         ensureEnabled();
         PluginMarketSource source = requireById(id);
+        if (source.type() == MarketSourceType.LOCAL) {
+            source.markSynced();
+            pluginMarketSourceRepo.save(source);
+            return PluginMarketSourceAssembler.toDTO(source, pluginCount(source));
+        }
         sync(source);
-        return PluginMarketSourceAssembler.toDTO(source, pluginCount(id));
+        return PluginMarketSourceAssembler.toDTO(source, pluginCount(source));
     }
 
     @Transactional
@@ -164,7 +180,12 @@ public class PluginMarketSourceAppService {
                 continue;
             }
             try {
-                sync(source);
+                if (source.type() == MarketSourceType.LOCAL) {
+                    source.markSynced();
+                    pluginMarketSourceRepo.save(source);
+                } else {
+                    sync(source);
+                }
             } catch (RuntimeException e) {
                 // 单源失败不拖垮整体同步，错误已记录在源的同步状态中。
             }
@@ -172,14 +193,16 @@ public class PluginMarketSourceAppService {
         return list();
     }
 
-    /** 测试尚未保存的源表单：做一次只读目录探测，不落任何状态。 */
+    /** 测试尚未保存的源表单：做一次只读目录探测，不落任何状态。LOCAL 源无需探测。 */
     public PluginMarketSourceTestResultDTO test(PluginMarketSourceTestCmd cmd) {
         ensureEnabled();
-        validateRootUrl(cmd.getRootUrl());
+        MarketSourceType type = parseRemoteType(cmd.getType());
+        validateRootUrl(cmd.getRootUrl(), type);
         try {
             List<PluginStoreCatalogEntry> entries = pluginStoreGateway.fetchCatalog(
                     new PluginStoreSourceRef(cmd.getRootUrl().trim(),
-                            StringUtils.hasText(cmd.getToken()) ? cmd.getToken().trim() : null));
+                            StringUtils.hasText(cmd.getToken()) ? cmd.getToken().trim() : null,
+                            type));
             return PluginMarketSourceTestResultDTO.builder()
                     .ok(true)
                     .pluginCount(entries.size())
@@ -195,6 +218,9 @@ public class PluginMarketSourceAppService {
 
     /** 同步串行化：目录拉取是长外呼，避免并发重复同步。 */
     public synchronized PluginMarketSourceSnapshot sync(PluginMarketSource source) {
+        if (source.type() == MarketSourceType.LOCAL) {
+            throw new BizException("本机源无需同步");
+        }
         List<PluginStoreCatalogEntry> entries;
         try {
             entries = pluginStoreGateway.fetchCatalog(sourceRef(source));
@@ -211,7 +237,6 @@ public class PluginMarketSourceAppService {
 
     // ---------- 目录视图支撑（PluginStoreAppService 消费） ----------
 
-    /** 多源路径是否需要项目闸门 + 应用闸门同时放行，见 isActive。 */
     public List<PluginMarketSource> enabledSources() {
         return pluginMarketSourceRepo.findAll().stream()
                 .filter(PluginMarketSource::enabled)
@@ -224,13 +249,25 @@ public class PluginMarketSourceAppService {
     }
 
     public PluginStoreSourceRef sourceRef(PluginMarketSource source) {
-        return new PluginStoreSourceRef(source.getRootUrl(), source.getToken());
+        return new PluginStoreSourceRef(source.getRootUrl(), source.getToken(), source.type());
     }
 
-    /** 启用源及其目录快照；快照缺失时内联同步，同步失败的源跳过（错误已记录在源同步状态）。 */
+    public java.nio.file.Path resolveLocalJar(String localUrl) {
+        return pluginMarketPublicationAppService.resolveLocalJar(localUrl);
+    }
+
+    /**
+     * 启用源及其目录：LOCAL 源进程内直读发布物（不建快照）；远端源读快照，缺失时内联同步，
+     * 同步失败的源跳过（错误已记录在源同步状态）。
+     */
     public List<SourceCatalog> enabledSourceCatalogs() {
         List<SourceCatalog> result = new ArrayList<>();
         for (PluginMarketSource source : enabledSources()) {
+            if (source.type() == MarketSourceType.LOCAL) {
+                result.add(new SourceCatalog(source, new PluginMarketSourceSnapshot(
+                        source.getId(), LocalDateTime.now(), pluginMarketPublicationAppService.localCatalogEntries())));
+                continue;
+            }
             PluginMarketSourceSnapshot snapshot = pluginMarketSourceSnapshotRepo.findBySourceId(source.getId()).orElse(null);
             if (snapshot == null || snapshot.entries().isEmpty()) {
                 try {
@@ -250,13 +287,41 @@ public class PluginMarketSourceAppService {
                 .orElseThrow(() -> new BizException("插件市场源不存在"));
     }
 
-    private Integer pluginCount(Long sourceId) {
-        return pluginMarketSourceSnapshotRepo.findBySourceId(sourceId)
+    private Integer pluginCount(PluginMarketSource source) {
+        if (source.type() == MarketSourceType.LOCAL) {
+            return pluginMarketPublicationAppService.localCatalogEntries().size();
+        }
+        return pluginMarketSourceSnapshotRepo.findBySourceId(source.getId())
                 .map(snapshot -> snapshot.entries().size())
                 .orElse(0);
     }
 
-    private void validateRootUrl(String rootUrl) {
+    private Integer pluginCount(PluginMarketSource source, Map<Long, Integer> snapshotCounts) {
+        if (source.type() == MarketSourceType.LOCAL) {
+            return pluginMarketPublicationAppService.localCatalogEntries().size();
+        }
+        return snapshotCounts.getOrDefault(source.getId(), 0);
+    }
+
+    private MarketSourceType parseRemoteType(String type) {
+        if (!StringUtils.hasText(type)) {
+            return MarketSourceType.STATIC_INDEX;
+        }
+        try {
+            MarketSourceType parsed = MarketSourceType.valueOf(type.trim());
+            if (parsed == MarketSourceType.LOCAL) {
+                throw new BizException("本机源类型仅限内置源，创建时请选择静态索引或 v2 协议");
+            }
+            return parsed;
+        } catch (IllegalArgumentException e) {
+            throw new BizException("未知的市场源类型：" + type);
+        }
+    }
+
+    private void validateRootUrl(String rootUrl, MarketSourceType type) {
+        if (type == MarketSourceType.LOCAL) {
+            return;
+        }
         if (!StringUtils.hasText(rootUrl)) {
             throw new BizException("市场源地址不能为空");
         }
@@ -265,7 +330,9 @@ public class PluginMarketSourceAppService {
             if (!uri.isAbsolute() || !"https".equalsIgnoreCase(uri.getScheme())
                     || !StringUtils.hasText(uri.getHost()) || uri.getRawUserInfo() != null
                     || uri.getRawQuery() != null || uri.getRawFragment() != null) {
-                throw new BizException("市场源地址必须是 HTTPS 根地址（index.json 完整地址）");
+                throw new BizException(type == MarketSourceType.V2_API
+                        ? "市场源地址必须是 HTTPS 根地址（如 https://host/api/public/plugin-market）"
+                        : "市场源地址必须是 HTTPS 根地址（index.json 完整地址）");
             }
         } catch (URISyntaxException e) {
             throw new BizException("市场源地址格式不正确");
