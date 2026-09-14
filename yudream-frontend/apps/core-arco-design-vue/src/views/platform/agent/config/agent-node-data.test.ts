@@ -23,7 +23,7 @@ test('新建节点会生成可直接序列化的完整默认配置', () => {
   assert.equal(data.knowledgeSpaceSlug, '')
   assert.equal(data.topK, 5)
   assert.equal(data.pathPrefix, '')
-  assert.equal(data.graphExpansion, false)
+  assert.equal(data.graphExpansion, true)
   assert.equal(data.documentInput, 'attachment')
   assert.equal(data.documentMode, 'text')
   assert.equal(data.citationSource, 'documents')
@@ -98,9 +98,9 @@ test('聊天模型节点使用独立的工具、结构化输出和视觉输入�
   const second = createAgentNodeData(llmTemplate)
 
   assert.equal(first.inputVariable, 'query')
-  assert.equal(first.toolMode, 'NONE')
+  assert.equal(first.toolMode, 'AUTO')
   assert.equal(first.toolConfigDeclared, true)
-  assert.deepEqual(first.toolCodes, [])
+  assert.deepEqual(first.toolCodes, ['wiki.search'])
   assert.notEqual(first.toolCodes, second.toolCodes)
   const extract = createAgentNodeData(extractTemplate)
   assert.equal(extract.outputSchema, extractOutputSchemaDefault)
@@ -130,6 +130,17 @@ test('工具声明判定兼容旧的工具列表和 ACTIVE 调用模式', () => 
   assert.equal(declaresAgentNodeToolConfig({ kind: 'llm', toolMode: 'ACTIVE' as never }), true)
   assert.equal(declaresAgentNodeToolConfig({ kind: 'llm', toolMode: 'NONE', toolCodes: [] }), false)
   assert.equal(normalizeAgentNodeData({ ...template, kind: 'llm' as const }, { toolMode: 'ACTIVE' as never }).toolMode, 'AUTO')
+})
+
+test('新建 LLM 默认工具不会覆盖显式 NONE 或历史节点', () => {
+  const llm = { ...template, kind: 'llm' as const }
+  const disabled = createAgentNodeData(llm, { toolMode: 'NONE' })
+  assert.equal(disabled.toolMode, 'NONE')
+  assert.deepEqual(disabled.toolCodes, [])
+  assert.deepEqual(normalizeAgentNodeData(llm, {}).toolCodes, [])
+  assert.equal(normalizeAgentNodeData(llm, {}).toolMode, 'NONE')
+  assert.deepEqual(createAgentNodeData(llm, { toolCodes: ['web.fetch'] }).toolCodes, ['web.fetch'])
+  assert.equal(createAgentNodeData({ ...template, kind: 'extract' }).toolMode, 'NONE')
 })
 
 test('所有聊天模型语义映射到 chat 模型，Embedding 和 Rerank 保持各自类型', () => {
