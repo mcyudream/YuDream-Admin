@@ -86,7 +86,10 @@ for file in $HOST_RUNTIME_FILES; do
 done
 
 echo "[verify-core-plugin-decoupling] checking host source tree"
-if grep -R -n 'packages/plugin-' yudream-frontend/apps/core-arco-design-vue/src >/dev/null 2>&1; then
+# plugin-publish/ci-templates holds CI template assets rendered for third-party plugin
+# repositories; their `packages/plugin-*` globs describe the consumer repo layout, not
+# host source references.
+if grep -R -n --exclude-dir=ci-templates 'packages/plugin-' yudream-frontend/apps/core-arco-design-vue/src >/dev/null 2>&1; then
   fail "core host source tree still contains local business plugin source references"
 fi
 
