@@ -41,7 +41,7 @@
 - JAR 根必须有权威 `plugin.yml`（`name`/`main`/`version`）；`name` 是唯一稳定 code，`displayName` 仅展示；`depend` 为硬依赖、`softdepend` 为可选依赖。禁止打包 `META-INF/services/...YuDreamPlugin`。
 - 插件按职责分包（domain/application/infrastructure/interfaces/migration/frontend/bootstrap）；入口类只做装配与生命周期，所有注册走 `PluginContext.registerXxx(...)`，保证 disable/unload 可完整回收。
 - 插件调用宿主能力只能走 SPI 端口；需要新能力时先发布稳定 SPI 端口/DTO，再在宿主实现适配。插件间业务 API 放 provider JAR 的稳定最小 `*.api` 包，consumer 以 `provided` 编译并通过 `context.service(...)` 调用；禁止复制 provider API。
-- 硬依赖必须先于 consumer 加载启用；软依赖缺失不阻塞 consumer，相关菜单/路由/端点必须条件注册并显式降级。provider 存在已加载的硬/软依赖方时禁止卸载。
+- 硬依赖必须先于 consumer 加载启用；软依赖缺失不阻塞 consumer，相关菜单/路由/端点必须条件注册并显式降级。provider 存在已加载的硬/软依赖方时禁止卸载。`depend`/`softdepend` 图必须无环：平台适配器不得 softdepend 已经 softdepend 自己的业务插件（`launcher-adapter` 不得声明 `minecraft-server`；服务器列表页与 YMCL scope 由 `minecraft-server` 以 `LauncherProvider` 贡献）。
 - 插件 HTTP 端点统一挂载 `/api/plugins/{pluginCode}/**`；插件自有 Thymeleaf 模板放插件 JAR 的 `src/main/resources/templates`，经插件作用域渲染器按逻辑名渲染。
 - Java `Long`/Snowflake ID 在 JSON、插件 DTO、TS 模型、表单与 URL 参数中一律使用 `string`，禁止 `Number(id)`。
 - 生产插件前端只通过 JAR 内 ESM `remoteEntry.js` + 宿主注入 SDK 加载；前端资源打进 `META-INF/yudream-plugin/frontend/{pluginCode}`。workspace 加载仅是开发便利，禁止生产 manifest 依赖 workspace 别名。

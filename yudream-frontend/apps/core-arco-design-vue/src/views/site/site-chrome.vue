@@ -6,6 +6,7 @@ import { usePluginRemoteComponentByMeta } from '@/plugins/use-plugin-remote-comp
 import { ensurePublicPluginRoutes } from '@/store/modules/app/plugin-route-runtime'
 import { rewriteBackendAssetUrls, toBackendAssetUrl } from '@/utils/backend-url'
 import { chromeRuntimeCss, extractChromeCss, readChromeCss } from '@/utils/cms-chrome'
+import Profile from '@/components/AppAccountButton/profile.vue'
 import { useSiteNavigation } from './site-navigation'
 
 // 公开站共享页头/页脚：/site 页面与声明了 siteNav 的公开插件页共用。
@@ -24,6 +25,27 @@ const router = useRouter()
 
 const siteLogo = computed(() => toBackendAssetUrl(appSettingsStore.logo))
 const accountAvatar = computed(() => toBackendAssetUrl(appAccountStore.avatar))
+
+const profileModal = useFaModal().create({
+  alignCenter: true,
+  header: false,
+  footer: false,
+  closeOnClickOverlay: false,
+  closeOnPressEscape: false,
+  class: 'profile-account-modal overflow-hidden',
+  contentClass: 'min-h-full p-0 flex',
+  content: () => h(Profile),
+})
+
+function openProfile() {
+  closeMobileNav()
+  profileModal.open()
+}
+
+function logout() {
+  closeMobileNav()
+  appAccountStore.logout(appSettingsStore.settings.app.home.fullPath)
+}
 
 const activeSiteTheme = useActivePluginTheme('SITE')
 const themeChromeMeta = computed<PluginRouteMeta | undefined>(() => {
@@ -247,8 +269,8 @@ onBeforeUnmount(() => {
             </summary>
             <div>
               <a href="/" @click="navigate($event, '/')">控制台</a>
-              <a href="/profile" @click="navigate($event, '/profile')">个人资料</a>
-              <a href="/logout" class="danger" @click="navigate($event, '/logout')">退出登录</a>
+              <button type="button" @click="openProfile">个人资料</button>
+              <button type="button" class="danger" @click="logout">退出登录</button>
             </div>
           </details>
         </div>
@@ -293,8 +315,8 @@ onBeforeUnmount(() => {
                 <span>{{ appAccountStore.account }}</span>
               </div>
               <a href="/" @click="navigate($event, '/')">控制台</a>
-              <a href="/profile" @click="navigate($event, '/profile')">个人资料</a>
-              <a href="/logout" class="danger" @click="navigate($event, '/logout')">退出登录</a>
+              <button type="button" @click="openProfile">个人资料</button>
+              <button type="button" class="danger" @click="logout">退出登录</button>
             </template>
           </div>
         </div>
