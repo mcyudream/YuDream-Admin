@@ -52,7 +52,75 @@ public class Neo4jWikiIndexGateway implements WikiIndexGateway {
     }
     @Override public void remove(WikiSpace space,Long nodeId,Long versionId){String code=table(space).getCode();try(Session s=graphGateway.openSession()){Map<String,Object>p=scope(code,space.getId(),nodeId,versionId);s.run("MATCH (c:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}) DETACH DELETE c",p);s.run("MATCH ()-[r:WIKI_RELATES {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}]->() DELETE r",p);}}
     @Override public WikiIndexSnapshot inspect(WikiSpace space,Long nodeId,Long versionId){String code=table(space).getCode();Map<String,Object>p=scope(code,space.getId(),nodeId,versionId);try(Session s=graphGateway.openSession()){var cr=s.run("MATCH (c:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}) RETURN c ORDER BY c.sequence",p);List<WikiChunk>chunks=new ArrayList<>();while(cr.hasNext()){var c=cr.next().get("c").asNode();chunks.add(new WikiChunk(space.getId(),nodeId,versionId,c.get("sequence").asInt(),c.get("title").asString(),c.get("path").asString(),c.get("content").asString()));}var rr=s.run("MATCH (source:WikiEntity {tableCode:$tableCode,spaceId:$spaceId})-[r:WIKI_RELATES {tableCode:$tableCode,spaceId:$spaceId,nodeId:$nodeId,versionId:$versionId}]->(target:WikiEntity {tableCode:$tableCode,spaceId:$spaceId}) RETURN source,r,target ORDER BY r.confidence DESC",p);List<WikiGraphRelation>relations=new ArrayList<>();while(rr.hasNext()){var row=rr.next();var a=row.get("source").asNode();var b=row.get("target").asNode();var r=row.get("r").asRelationship();relations.add(new WikiGraphRelation(a.get("key").asString(),a.get("type").asString(),r.get("relation").asString(),b.get("key").asString(),b.get("type").asString(),r.get("confidence").asDouble()));}return new WikiIndexSnapshot(chunks,relations);}}
-    @Override public List<WikiSearchHit> search(WikiSpace space,String query,int topK,String pathPrefix,boolean graphExpansion){String normalized=query==null?"":query.trim();if(normalized.isBlank())return List.of();if(space.getEmbeddingProviderCode().isBlank()||space.getEmbeddingModelCode().isBlank())throw new IllegalArgumentException("知识库未配置 Embedding 模型");String code=table(space).getCode();List<Float>vector=embeddingGateway.embed(space.getEmbeddingProviderCode(),space.getEmbeddingModelCode(),List.of(normalized)).getFirst();try(Session s=graphGateway.openSession()){int limit=Math.clamp(topK,1,30);Map<String,Object>p=new LinkedHashMap<>();p.put("index",vectorIndex(vector.size()));p.put("candidateLimit",Math.clamp(topK*4,10,100));p.put("vector",vector);p.put("tableCode",code);p.put("spaceId",space.getId());p.put("path",pathPrefix==null?"":pathPrefix);p.put("limit",limit);var rows=s.run("CALL db.index.vector.queryNodes($index,$candidateLimit,$vector) YIELD node,score WHERE node.tableCode=$tableCode AND node.spaceId=$spaceId AND node.active=true AND ($path='' OR node.path STARTS WITH $path) RETURN node,score ORDER BY score DESC LIMIT $limit",p);List<WikiSearchHit>hits=new ArrayList<>();while(rows.hasNext()){var r=rows.next();var c=r.get("node").asNode();hits.add(new WikiSearchHit(r.get("score").asDouble(),c.get("nodeId").asLong(),c.get("title").asString(),c.get("path").asString(),c.get("content").asString()));}return hits;}catch(org.neo4j.driver.exceptions.ClientException e){if(e.getMessage()!=null&&e.getMessage().contains("no such vector schema index"))throw new BizException("知识库尚未建立向量索引，请先发布或重建索引");throw e;}}
+    @Override public List<WikiSearchHit> search(WikiSpace space,String query,int topK,String pathPrefix,boolean graphExpansion){
+        String normalized=query==null?"":query.trim();
+        if(normalized.isBlank())return List.of();
+        if(space.getEmbeddingProviderCode().isBlank()||space.getEmbeddingModelCode().isBlank())throw new IllegalArgumentException("知识库未配置 Embedding 模型");
+        String code=table(space).getCode();
+        List<Float>vector=embeddingGateway.embed(space.getEmbeddingProviderCode(),space.getEmbeddingModelCode(),List.of(normalized)).getFirst();
+        try(Session s=graphGateway.openSession()){
+            int limit=Math.clamp(topK,1,30);
+            Map<String,Object>p=new LinkedHashMap<>();
+            p.put("index",vectorIndex(vector.size()));
+            p.put("candidateLimit",Math.clamp(topK*4,10,100));
+            p.put("vector",vector);
+            p.put("tableCode",code);
+            p.put("spaceId",space.getId());
+            p.put("path",pathPrefix==null?"":pathPrefix);
+            p.put("limit",limit);
+            var rows=s.run("CALL db.index.vector.queryNodes($index,$candidateLimit,$vector) YIELD node,score WHERE node.tableCode=$tableCode AND node.spaceId=$spaceId AND node.active=true AND ($path='' OR node.path STARTS WITH $path) RETURN node,score ORDER BY score DESC LIMIT $limit",p);
+            List<WikiSearchHit>hits=new ArrayList<>();
+            LinkedHashMap<Long,WikiSearchHit>byNode=new LinkedHashMap<>();
+            while(rows.hasNext()){
+                var r=rows.next();
+                var c=r.get("node").asNode();
+                WikiSearchHit hit=new WikiSearchHit(r.get("score").asDouble(),c.get("nodeId").asLong(),c.get("title").asString(),c.get("path").asString(),c.get("content").asString());
+                hits.add(hit);
+                byNode.putIfAbsent(hit.nodeId(),hit);
+            }
+            if(graphExpansion && !byNode.isEmpty()){
+                try{
+                    Map<String,Object>gp=new LinkedHashMap<>();
+                    gp.put("tableCode",code);
+                    gp.put("spaceId",space.getId());
+                    gp.put("path",pathPrefix==null?"":pathPrefix);
+                    gp.put("seedIds",new ArrayList<>(byNode.keySet()));
+                    gp.put("limit",Math.clamp(topK*2,4,40));
+                    var expanded=s.run("""
+                            MATCH (seed:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,active:true})
+                            WHERE seed.nodeId IN $seedIds
+                            MATCH (entity:WikiEntity {tableCode:$tableCode,spaceId:$spaceId})
+                            WHERE toLower(seed.content) CONTAINS entity.key OR toLower(seed.title) CONTAINS entity.key
+                            MATCH (entity)-[:WIKI_RELATES {tableCode:$tableCode,spaceId:$spaceId}]-(related:WikiEntity {tableCode:$tableCode,spaceId:$spaceId})
+                            MATCH (chunk:WikiChunk {tableCode:$tableCode,spaceId:$spaceId,active:true})
+                            WHERE chunk.nodeId <> seed.nodeId
+                              AND ($path='' OR chunk.path STARTS WITH $path)
+                              AND (toLower(chunk.content) CONTAINS related.key OR toLower(chunk.title) CONTAINS related.key)
+                            WITH chunk, max(related.confidence) AS confidence
+                            RETURN chunk, confidence
+                            ORDER BY confidence DESC
+                            LIMIT $limit
+                            """,gp);
+                    while(expanded.hasNext()){
+                        var r=expanded.next();
+                        var c=r.get("chunk").asNode();
+                        long nodeId=c.get("nodeId").asLong();
+                        if(byNode.containsKey(nodeId))continue;
+                        double score=0.55d + Math.min(0.2d, r.get("confidence").isNull()?0d:r.get("confidence").asDouble()*0.2d);
+                        WikiSearchHit hit=new WikiSearchHit(score,nodeId,c.get("title").asString(),c.get("path").asString(),c.get("content").asString());
+                        byNode.put(nodeId,hit);
+                        hits.add(hit);
+                    }
+                }catch(Exception ignored){
+                    // 图谱扩展失败时保留向量召回结果，不阻断普通检索。
+                }
+            }
+            return hits;
+        }catch(org.neo4j.driver.exceptions.ClientException e){
+            if(e.getMessage()!=null&&e.getMessage().contains("no such vector schema index"))throw new BizException("知识库尚未建立向量索引，请先发布或重建索引");
+            throw e;
+        }
+    }
     private GraphConnection table(WikiSpace space){if(space==null||space.getGraphTableCode()==null||space.getGraphTableCode().isBlank())throw new BizException("知识库必须选择逻辑图表");GraphConnection table=graphTables.findByCode(space.getGraphTableCode()).orElseThrow(()->new BizException("知识库选择的逻辑图表不存在"));if(!table.active())throw new BizException("知识库选择的逻辑图表已停用");return table;}
     private static Map<String,Object> scope(String tableCode,Long spaceId,Long nodeId,Long versionId){return Map.of("tableCode",tableCode,"spaceId",spaceId,"nodeId",nodeId,"versionId",versionId);}
     private static String vectorLabel(int dimensions){return "WikiChunkVector"+dimensions;}private static String vectorIndex(int dimensions){return "wiki_chunk_vector_"+dimensions;}private static String type(String v){return v==null||v.isBlank()?"CONCEPT":v.trim().toUpperCase().replaceAll("[^A-Z0-9_]","_");}private static List<String> chunks(String markdown,int size,int overlap){String v=markdown==null?"":markdown.trim();if(v.isEmpty())return List.of("");List<String>out=new ArrayList<>();for(int from=0;;){int end=Math.min(v.length(),from+size);out.add(v.substring(from,end));if(end==v.length())return out;from=Math.max(from+1,end-overlap);}}
