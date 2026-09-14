@@ -42,8 +42,6 @@ interface AiProviderDraft {
   defaultModel: string
   temperature: string
   extraBody: string
-  embeddingModelsText: string
-  rerankModelsText: string
   enabled: boolean
   models: AiModelDraft[]
 }
@@ -445,6 +443,25 @@ function normalizeAiProvider(raw: unknown, index = 0): AiProviderDraft {
   const defaultModel = textValue(data.defaultModel, textValue(data.model, 'gpt-4o-mini'))
   const rawModels = Array.isArray(data.models) ? data.models : [defaultModel]
   const models = rawModels.map((item, modelIndex) => normalizeAiModel(item, modelIndex)).filter(model => model.code || model.model)
+  // 旧数组可能保存模型编码或实际模型名；显式登记的 kind 优先。
+  for (const kind of ['embedding', 'rerank'] as const) {
+    const legacyModels = toTextList(data[`${kind}Models`])
+    for (const value of legacyModels) {
+      const existing = models.find(model => model.code === value || model.model === value)
+      if (existing) {
+        const registered = rawModels.find((item) => {
+          const model = objectRecord(item)
+          return item === value || model.code === existing.code || model.model === existing.model
+        })
+        if (!textValue(objectRecord(registered).kind).trim()) {
+          existing.kind = kind
+        }
+      }
+      else {
+        models.push({ ...createAiModel(value), kind })
+      }
+    }
+  }
   if (!models.length) {
     models.push(createAiModel(defaultModel))
   }
@@ -459,8 +476,6 @@ function normalizeAiProvider(raw: unknown, index = 0): AiProviderDraft {
     defaultModel: textValue(data.defaultModel, models[0]?.code || models[0]?.model || defaultModel),
     temperature: textValue(data.temperature, '0.4'),
     extraBody: extraBodyValue(data.extraBody),
-    embeddingModelsText: toTextList(data.embeddingModels).join('\n'),
-    rerankModelsText: toTextList(data.rerankModels).join('\n'),
     enabled: booleanValue(data.enabled, true),
     models,
   }
@@ -480,7 +495,7 @@ function normalizeAiModel(raw: unknown, index = 0): AiModelDraft {
     reasoningEffort: textValue(data.reasoningEffort),
     thinkingEnabled: booleanValue(data.thinkingEnabled, false),
     extraBody: extraBodyValue(data.extraBody),
-    kind: textValue(data.kind, 'chat'),
+    kind: textValue(data.kind, 'chat').trim().toLowerCase() || 'chat',
     vision: booleanValue(data.vision, false),
   }
 }
@@ -497,8 +512,6 @@ function createAiProvider(): AiProviderDraft {
     defaultModel: 'gpt-4o-mini',
     temperature: '0.4',
     extraBody: '',
-    embeddingModelsText: 'text-embedding-3-small',
-    rerankModelsText: '',
     enabled: true,
     models: [createAiModel('gpt-4o-mini', 'GPT-4o mini')],
   }
@@ -593,6 +606,13 @@ function syncAiDefaultModel() {
   }
 }
 
+function modelsByKind(provider: AiProviderDraft, kind: 'embedding' | 'rerank') {
+  return [...new Set(provider.models
+    .filter(model => model.kind === kind)
+    .map(model => model.model.trim())
+    .filter(Boolean))]
+}
+
 function serializeAiProviders() {
   return aiProviders.value.map(provider => ({
     code: provider.code.trim(),
@@ -616,8 +636,8 @@ function serializeAiProviders() {
       kind: model.kind.trim() || 'chat',
       vision: model.vision,
     })),
-    embeddingModels: splitModelList(provider.embeddingModelsText),
-    rerankModels: splitModelList(provider.rerankModelsText),
+    embeddingModels: modelsByKind(provider, 'embedding'),
+    rerankModels: modelsByKind(provider, 'rerank'),
     enabled: provider.enabled,
   }))
 }
@@ -961,17 +981,12 @@ function splitModelList(value: string) {
                     </table>
                   </div>
 
+                  <p class="config-field__hint">
+                    向量 / 嵌入与重排模型统一在上表登记并选择类型，保存时自动生成对应模型列表，无需重复填写。
+                  </p>
                   <details class="ai-advanced">
-                    <summary>高级：Embedding / Rerank / 额外请求体</summary>
+                    <summary>高级：额外请求体</summary>
                     <div class="ai-provider-form ai-advanced__body">
-                      <label class="config-field ai-span-2">
-                        <span>Embedding 模型（每行一个）</span>
-                        <FaTextarea v-model="activeProvider.embeddingModelsText" rows="2" placeholder="text-embedding-3-small" />
-                      </label>
-                      <label class="config-field ai-span-2">
-                        <span>Rerank 模型（每行一个）</span>
-                        <FaTextarea v-model="activeProvider.rerankModelsText" rows="2" placeholder="bge-reranker-v2-m3" />
-                      </label>
                       <label class="config-field ai-span-4">
                         <span>供应商额外请求体</span>
                         <FaTextarea v-model="activeProvider.extraBody" rows="2" input-class="font-mono" placeholder="{ }" />
@@ -1339,6 +1354,13 @@ function splitModelList(value: string) {
   color: var(--color-text-2);
   font-size: 12px;
   font-weight: 600;
+}
+
+.config-field__hint {
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
 }
 
 /* 内联配置编辑 */

@@ -49,13 +49,15 @@ export function agentSourceHandles(kind: AgentNodeKind) {
 
 export function createAgentNodeData(template: AgentNodeTemplate, overrides: Partial<AgentNodeData> = {}): AgentNodeData {
   const variables = variableDefaults[template.kind]
-  const toolCodes = Array.isArray(overrides.toolCodes) ? [...overrides.toolCodes] : []
+  const toolCodes = Array.isArray(overrides.toolCodes)
+    ? [...overrides.toolCodes]
+    : (template.kind === 'llm' && overrides.toolMode !== 'NONE' ? ['wiki.search'] : [])
   const classes = Array.isArray(overrides.classes) ? [...overrides.classes] : []
   return {
     ...template,
     title: template.label,
     prompt: '',
-    toolMode: 'NONE',
+    toolMode: template.kind === 'llm' ? 'AUTO' : 'NONE',
     toolConfigDeclared: isAgentToolConfigModelNode(template.kind),
     toolCode: '',
     outputSchema: template.kind === 'extract' ? extractOutputSchemaDefault : '',
@@ -73,7 +75,7 @@ export function createAgentNodeData(template: AgentNodeTemplate, overrides: Part
     knowledgeSpaceSlug: '',
     topK: 5,
     pathPrefix: '',
-    graphExpansion: false,
+    graphExpansion: template.kind === 'search' || template.kind === 'vector',
     documentInput: 'attachment',
     documentMode: 'text',
     citationSource: 'documents',
