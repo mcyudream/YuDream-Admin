@@ -428,6 +428,10 @@ export default {
   reload: (code: string) =>
     systemClient.post<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/plugins/${code}/reload`),
 
+  /** 仅重挂载插件前端远程模块，不回收 Java 运行时 */
+  reloadFrontend: (code: string) =>
+    systemClient.post<unknown, ApiResponse<unknown>>(`api/platform/plugin-devtools/plugins/${code}/frontend-reload`),
+
   devProjects: () =>
     systemClient.get<unknown, ApiResponse<PluginDevProject[]>>('api/platform/plugin-devtools/dev-projects'),
 

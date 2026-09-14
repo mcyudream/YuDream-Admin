@@ -146,6 +146,13 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     await apiDevtools.reload(code)
   }
 
+  /** 手动触发前端热重载：后端发布 FRONTEND_RELOAD；本地立即重挂载，不依赖 SSE 是否已连接 */
+  async function reloadFrontend(code: string) {
+    await apiDevtools.reloadFrontend(code)
+    eventBus.emit('plugin-devtools:remote-reload', code)
+    scheduleRouteRefresh()
+  }
+
   /** 开发模式已启用后启动双 SSE 流；布局常驻，只需启动一次 */
   function connect() {
     if (started || !status.value?.devModeEnabled) {
@@ -396,6 +403,7 @@ export const usePluginDevtoolsStore = defineStore('pluginDevtools', () => {
     batchAddDevProjects,
     removeDevProject,
     reloadDevPlugin,
+    reloadFrontend,
     scaffoldPlugin,
     connect,
     disconnect,

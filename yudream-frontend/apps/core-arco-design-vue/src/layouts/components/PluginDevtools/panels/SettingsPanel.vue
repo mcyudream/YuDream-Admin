@@ -23,6 +23,7 @@ function statusDots(project: PluginDevProject) {
 }
 
 const reloadingCode = ref('')
+const frontendReloadingCode = ref('')
 const enablingCode = ref('')
 
 async function enable(project: PluginDevProject) {
@@ -51,6 +52,20 @@ async function reload(project: PluginDevProject) {
   }
   finally {
     reloadingCode.value = ''
+  }
+}
+
+async function reloadFrontend(project: PluginDevProject) {
+  frontendReloadingCode.value = project.code
+  try {
+    await store.reloadFrontend(project.code)
+    toast.success('前端重载已触发')
+  }
+  catch {
+    // 拦截器已提示
+  }
+  finally {
+    frontendReloadingCode.value = ''
   }
 }
 
@@ -297,7 +312,12 @@ function handleResetPanel() {
             <FaIcon name="i-ri:play-line" />
           </FaButton>
         </FaTooltip>
-        <FaTooltip text="立即重载该插件" side="top">
+        <FaTooltip text="重挂载该插件前端远程模块" side="top">
+          <FaButton variant="ghost" size="icon" :loading="frontendReloadingCode === project.code" @click="reloadFrontend(project)">
+            <FaIcon name="i-ri:refresh-line" />
+          </FaButton>
+        </FaTooltip>
+        <FaTooltip text="立即 Java 重载该插件" side="top">
           <FaButton variant="ghost" size="icon" :loading="reloadingCode === project.code" @click="reload(project)">
             <FaIcon name="i-ri:restart-line" />
           </FaButton>

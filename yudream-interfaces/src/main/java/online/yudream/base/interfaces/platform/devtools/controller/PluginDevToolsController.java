@@ -81,6 +81,13 @@ public class PluginDevToolsController {
         return Result.ok(PluginWebAssembler.toRes(devToolsAppService.reload(code)));
     }
 
+    @PostMapping("/plugins/{code}/frontend-reload")
+    @PermissionRegister(code = "platform:plugin-devtools:manage", name = "重载开发插件前端", module = "开发者工具", desc = "手动触发开发模式插件的前端远程模块重挂载，不回收 Java 运行时")
+    public Result<Void> reloadFrontend(@PathVariable String code) {
+        devToolsAppService.reloadFrontend(code);
+        return Result.ok();
+    }
+
     @PostMapping("/plugins/{code}/command-test")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "模拟插件指令", module = "开发者工具", desc = "在指定插件作用域内模拟触发 QQ 指令处理器")
     public Result<PluginCommandTestRes> commandTest(@PathVariable String code,

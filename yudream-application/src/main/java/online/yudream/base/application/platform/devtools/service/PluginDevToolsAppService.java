@@ -20,7 +20,9 @@ import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
+import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
@@ -191,6 +193,22 @@ public class PluginDevToolsAppService {
     public PluginModuleDTO reload(String code) {
         requireCode(code);
         return pluginAppService.reloadDevPlugin(code.trim());
+    }
+
+    /**
+     * 手动触发前端热重载：不回收 Java 运行时，只发布 FRONTEND_RELOAD，
+     * 调试浮窗据此重挂载远程模块并刷新动态路由。
+     */
+    public void reloadFrontend(String code) {
+        String trimmed = requireCodeTrimmed(code);
+        if (!runtimeGateway.devModePlugin(trimmed)) {
+            throw new BizException("仅开发模式插件支持前端热重载：" + trimmed);
+        }
+        if (!runtimeGateway.enabled(trimmed)) {
+            throw new BizException("插件未启用，无法重载前端：" + trimmed);
+        }
+        eventPublisher.publishEvent(PluginLifecycleEvent.succeeded(
+                trimmed, PluginLifecycleAction.FRONTEND_RELOAD, null, null));
     }
 
     public AgentTracePageDTO traces(AgentTraceQuery query) {
