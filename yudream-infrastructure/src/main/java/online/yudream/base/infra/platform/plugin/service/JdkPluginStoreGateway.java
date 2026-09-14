@@ -382,7 +382,7 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
                 output.write(buffer, 0, read);
             }
         }
-        if (!expectedSha256.equalsIgnoreCase(toHex(digest.digest()))) {
+        if (total <= 0 || !expectedSha256.equalsIgnoreCase(toHex(digest.digest()))) {
             throw unavailable();
         }
     }

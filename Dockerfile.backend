@@ -3,18 +3,20 @@ FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/eclipse-temurin:
 
 WORKDIR /app
 
-# 创建插件目录，运行时可挂载宿主机 plugins/ 目录覆盖
-RUN mkdir -p /app/plugins
+# 插件扫描目录与市场源发布物目录必须分开；后者重建镜像后仍需通过挂载保留
+RUN mkdir -p /app/plugins /app/market-source
 
 # 复制主应用 JAR（CI 构建产物，spring-boot-maven-plugin 生成的可执行 fat jar）
 COPY yudream-bootstrap/target/yudream-bootstrap-*.jar /app/app.jar
 
-# 插件目录挂载点
+# 插件扫描目录与市场源发布物目录挂载点
 VOLUME /app/plugins
+VOLUME /app/market-source
 
 EXPOSE 8080
 
-# 生产环境默认使用 plugins/ 作为插件扫描目录
+# 生产环境默认使用 plugins/ 作为插件扫描目录；市场源独立存放
 ENV YUDREAM_PLATFORM_PLUGIN_DIRECTORIES=/app/plugins
+ENV PLATFORM_PLUGIN_MARKET_SOURCE_DIRECTORY=/app/market-source
 
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

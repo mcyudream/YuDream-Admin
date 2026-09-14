@@ -478,6 +478,35 @@ class PluginMarketPublicationAppServiceTest {
         assertEquals(jar, service.resolveLocalJar("local:demo/1.0.0/plugin.jar"));
         assertThrows(BizException.class, () -> service.resolveLocalJar("local:../escape.jar"));
         assertThrows(BizException.class, () -> service.resolveLocalJar("https://evil.example/a.jar"));
+        Path empty = tempDir.resolve("demo").resolve("2.0.0").resolve("plugin.jar");
+        Files.createDirectories(empty.getParent());
+        Files.write(empty, new byte[0]);
+        assertThrows(BizException.class, () -> service.resolveLocalJar("local:demo/2.0.0/plugin.jar"));
+    }
+
+    @Test
+    void downloadPublicationServesExistingJarAndSkipsMissingOrEmpty() throws Exception {
+        PluginMarketPublication published = publication("demo", "1.0.0", PluginPublicationStatus.PUBLISHED);
+        published.setId(11L);
+        published.setJarPath("demo/1.0.0/plugin.jar");
+        when(publicationRepo.findByCodeAndVersion("demo", "1.0.0")).thenReturn(Optional.of(published));
+
+        Path jar = tempDir.resolve("demo").resolve("1.0.0").resolve("plugin.jar");
+        Files.createDirectories(jar.getParent());
+        Files.writeString(jar, "jar-bytes");
+
+        Optional<Path> served = service.downloadPublication("demo", "1.0.0");
+        assertTrue(served.isPresent());
+        assertEquals(jar, served.get());
+        verify(publicationRepo).incrementDownloadCount(11L);
+
+        Files.delete(jar);
+        assertTrue(service.downloadPublication("demo", "1.0.0").isEmpty());
+        verify(publicationRepo).incrementDownloadCount(11L);
+
+        Files.write(jar, new byte[0]);
+        assertTrue(service.downloadPublication("demo", "1.0.0").isEmpty());
+        verify(publicationRepo).incrementDownloadCount(11L);
     }
 
     private List<String> textList(JsonNode array, String field) {
