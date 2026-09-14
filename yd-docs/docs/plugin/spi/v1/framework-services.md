@@ -1,6 +1,6 @@
 # 框架能力端口 FrameworkServices
 
-> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.system`
+> SPI v1 · 当前源码 2.28.0 · 包 `online.yudream.base.plugin.spi.system`
 
 `context.framework()` 返回 `FrameworkServices`，是插件访问宿主稳定能力的唯一入口。**需要新能力时先扩展 SPI 端口/DTO 再由宿主实现适配，禁止直接引用宿主 Spring Bean 或仓储实现。** 用途化资源图投影由 `context.graph()` 提供，不属于 `FrameworkServices`；运行时绑定可信插件 scope。除兼容的显式 `tableCode` 接口外，插件可调用无 `tableCode` 的自动绑定读写与完整闭合快照接口；宿主只会解析唯一 ACTIVE 且已授权的逻辑图表，没有或不唯一时受控失败。完整快照限制为 20,000 个节点、50,000 条关系和 8 MiB，超限返回 `PROJECTION_LIMIT_EXCEEDED`。`context.graph()` 禁止读取环境变量或在插件内自行创建 Neo4j `Driver`。详见 [GraphSpi](/plugin/spi/v1/graph)。
 
@@ -14,6 +14,7 @@
 | `ai()` | `PluginAiService` | AI 对话 / Agent / 工具 |
 | `PluginContext.graph()` | `PluginGraphService` | 原子替换并按 tableCode + namespace + versionId 分页读取当前插件用途化资源图投影；请求必须提供逻辑图表编码，不接受 Cypher 或 pluginCode |
 | `security()` | `PluginSecurityService` | 权限校验 |
+| `oauth()` | `default PluginOAuthService` | 宿主 OAuth 授权服务器登记：插件可幂等注册公开客户端；宿主未提供时 `enabled()` 恒 false |
 | `mail()` | `PluginMailService` | 邮件发送 |
 | `inboundMail()` | `default PluginInboundMailService` | IMAPS 入站核验；宿主未提供时 `enabled()` 恒 false |
 | `wordTemplates()` | `PluginWordTemplateService` | Word 模板渲染 |
@@ -36,6 +37,23 @@ void requirePermission(PluginPrincipal principal, String permission); // 无权�
 ```
 
 `PluginPrincipal(Long userId, List<String> permissions)`，`hasPermission(p)` 对 `"*"` 放行。
+
+## oauth
+
+`context.oauth()` / `framework.oauth()` 登记公开 OAuth 客户端（auth method `NONE`，无 secret）。启动器等 native 客户端应在 `onEnable` 调用，由宿主写入系统 OAuth 客户端表；插件不得手写内部仓储或管理 HTTP。不修改管理员的 OAuth 服务端总开关。
+
+```java
+boolean enabled();
+Optional<PluginOAuthClient> findClient(String clientId);
+Optional<PluginOAuthClient> ensurePublicClient(PluginOAuthPublicClientSpec spec);
+```
+
+| DTO | 字段 |
+|---|---|
+| `PluginOAuthPublicClientSpec` | `clientId, clientName, redirectUris, scopes` |
+| `PluginOAuthClient` | `clientId, clientName, redirectUris, scopes, active` |
+
+`ensurePublicClient` 幂等：空白 `clientId` / `clientName` / `redirectUris` 返回 empty；已存在同 `clientId` 时合并回调地址与 scope，并确保为 ACTIVE 公开客户端（authorization_code + refresh_token）。scope 缺省 `openid profile`。
 
 ## user
 

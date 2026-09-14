@@ -21,13 +21,16 @@
 ```mermaid
 sequenceDiagram
     participant UA as 第三方客户端(用户代理)
+    participant FE as 站点授权页 (/oauth/authorize)
     participant S as OAuthServerController (/api/oauth)
     participant A as OAuthServerAppService
-    UA->>S: GET /authorize?client_id&redirect_uri&state...
+    UA->>FE: 打开站点 /oauth/authorize?...
+    FE->>S: GET /authorize（已登录态 Authorization 头）
     S->>A: authorize(cmd, loginUserId)
     A->>A: 校验 client ACTIVE / redirect_uri 白名单 / grant 允许
     A->>A: 签发 ydo_code_ 授权码（5 分钟有效）
-    A-->>UA: 302 redirect_uri?code=...&state=...
+    A-->>FE: JSON redirectUrl
+    FE-->>UA: 跳转 redirect_uri?code=...&state=...
     UA->>S: POST /token (grant_type=authorization_code)
     S->>A: token(cmd)
     A->>A: client 认证 + code 有效期/归属/redirect 匹配 + 一次性消费
@@ -42,10 +45,11 @@ sequenceDiagram
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/oauth/authorize` | 需登录态；签发授权码并以 `RedirectView` 重定向回客户端 |
+| GET | `/oauth/authorize` | 站点授权页；未登录先走登录，登录后由前端带 token 调 API |
+| GET | `/api/oauth/authorize` | 需登录态（Authorization 头）；签发授权码并返回 JSON `redirectUrl` |
 | POST | `/api/oauth/token` | `application/x-www-form-urlencoded`；支持 `authorization_code` 与 `refresh_token` 两种 `grant_type` |
 
-token 响应字段（`OAuthTokenRes`）：`accessToken`、`refreshToken`、`tokenType=Bearer`、`expiresIn`、`scope`。
+token 响应字段（`OAuthTokenRes`）：`access_token`、`refresh_token`、`token_type=Bearer`、`expires_in`、`scope`。宿主会把 Java `long` 序列化成 JSON 字符串，客户端不得按纯数字解析 `expires_in`。
 
 ### 客户端注册与管理
 

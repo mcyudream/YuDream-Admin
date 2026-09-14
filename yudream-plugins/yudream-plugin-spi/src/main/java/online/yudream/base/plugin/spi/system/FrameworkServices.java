@@ -1,5 +1,6 @@
 package online.yudream.base.plugin.spi.system;
 
+import online.yudream.base.plugin.spi.system.security.PluginOAuthService;
 import online.yudream.base.plugin.spi.system.security.PluginSecurityService;
 import online.yudream.base.plugin.spi.system.document.PluginWordTemplateService;
 import online.yudream.base.plugin.spi.system.mail.PluginMailService;
@@ -31,6 +32,15 @@ public interface FrameworkServices {
     PluginAiService ai();
 
     PluginSecurityService security();
+
+    /**
+     * 宿主 OAuth 授权服务器登记端口：插件可幂等注册公开客户端。
+     * 默认实现表示宿主未提供该能力（enabled() 恒 false）。
+     */
+    default PluginOAuthService oauth() {
+        return new PluginOAuthService() {
+        };
+    }
 
     PluginMailService mail();
 

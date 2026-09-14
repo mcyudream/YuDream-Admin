@@ -1,10 +1,10 @@
 package online.yudream.base.interfaces.system.menu.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.menu.service.MenuAppService;
 import online.yudream.base.application.system.user.service.PermissionAppService;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,7 +28,7 @@ public class MenuController {
      */
     @GetMapping("/routes")
     public Result<List<Map<String, Object>>> routes() {
-        List<String> permissions = permissionAppService.getUserPermissions(StpUtil.getLoginIdAsLong());
+        List<String> permissions = permissionAppService.getUserPermissions(SecurityPrincipalSupport.currentOrOAuth().userId());
         return Result.ok(menuAppService.buildRouteTree(permissions));
     }
 }

@@ -15,6 +15,7 @@ import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.security.assembler.PasskeyWebAssembler;
 import online.yudream.base.interfaces.system.security.support.PasskeyRelyingPartySupport;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import online.yudream.base.interfaces.system.user.assembler.UserWebAssembler;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationFinishRequest;
 import online.yudream.base.interfaces.system.user.request.PasskeyAuthenticationStartRequest;
@@ -210,36 +211,44 @@ public class UserController {
 
     @GetMapping("/me/depts")
     public Result<List<UserDeptRes>> listMyDepts() {
-        return Result.ok(UserWebAssembler.toDeptResList(userContextAppService.listDepts(StpUtil.getLoginIdAsLong())));
+        return Result.ok(UserWebAssembler.toDeptResList(userContextAppService.listDepts(currentUserId())));
     }
 
     @GetMapping("/me/roles")
     public Result<List<UserRoleRes>> listMyRoles() {
-        return Result.ok(UserWebAssembler.toRoleResList(userContextAppService.listRoles(StpUtil.getLoginIdAsLong())));
+        return Result.ok(UserWebAssembler.toRoleResList(userContextAppService.listRoles(currentUserId())));
     }
 
     @GetMapping("/me/context")
     public Result<UserContextRes> getMyContext() {
-        return Result.ok(UserWebAssembler.toContextRes(userContextAppService.getContext(StpUtil.getLoginIdAsLong())));
+        return Result.ok(UserWebAssembler.toContextRes(userContextAppService.getContext(currentUserId())));
     }
 
     @PostMapping("/me/switch-dept")
     public Result<Void> switchDept(@Valid @RequestBody UserSwitchDeptRequest request) {
-        userContextAppService.switchDept(StpUtil.getLoginIdAsLong(), request.getDeptId());
+        userContextAppService.switchDept(currentUserId(), request.getDeptId());
         return Result.ok();
     }
 
     @PostMapping("/me/switch-role")
     public Result<Void> switchRole(@Valid @RequestBody UserSwitchRoleRequest request) {
-        userContextAppService.switchRole(StpUtil.getLoginIdAsLong(), request.getRoleId());
+        userContextAppService.switchRole(currentUserId(), request.getRoleId());
         return Result.ok();
     }
 
     @GetMapping("/permissions")
     public Result<PermissionListVO> permissions() {
-        Long userId = StpUtil.getLoginIdAsLong();
+        Long userId = currentUserId();
         return Result.ok(UserWebAssembler.toPermissionListVO(
                 permissionAppService.getUserPermissions(userId),
                 userAppService.isEmailVerified(userId)));
+    }
+
+    /**
+     * 浏览器会话走 Sa-Token；YMCL 等公开客户端走 OAuth Bearer。
+     * 两者都只能操作令牌所属用户自己的部门/角色，不能冒充他人。
+     */
+    private Long currentUserId() {
+        return SecurityPrincipalSupport.currentOrOAuth().userId();
     }
 }

@@ -130,6 +130,21 @@ export interface PasskeyCredential {
   updateTime?: string
 }
 
+export interface OAuthAuthorizeParams {
+  response_type: string
+  client_id: string
+  redirect_uri: string
+  scope?: string
+  state?: string
+}
+
+export interface OAuthAuthorization {
+  code: string
+  state?: string
+  redirectUri: string
+  redirectUrl: string
+}
+
 export default {
   policy: () => systemClient.get<unknown, ApiResponse<ApiSecurityPolicy>>('api/system/security/policy'),
   updatePolicy: (data: ApiSecurityPolicy) => systemClient.put<unknown, ApiResponse<ApiSecurityPolicy>>('api/system/security/policy', data),
@@ -153,4 +168,5 @@ export default {
   externalLoginProviders: () => systemClient.get<unknown, ApiResponse<ExternalLoginProvider[]>>('api/system/security/external-login/providers'),
   saveExternalLoginProvider: (data: ExternalLoginProviderPayload) => systemClient.put<unknown, ApiResponse<ExternalLoginProvider>>('api/system/security/external-login/providers', data),
   publicExternalLoginProviders: () => systemClient.get<unknown, ApiResponse<ExternalLoginProvider[]>>('api/external-login/providers'),
+  authorizeOAuth: (params: OAuthAuthorizeParams) => systemClient.get<unknown, ApiResponse<OAuthAuthorization>>('api/oauth/authorize', { params }),
 }

@@ -58,7 +58,6 @@ import online.yudream.base.interfaces.system.security.res.OAuthTokenRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyCredentialRes;
 import online.yudream.base.interfaces.system.security.res.PasskeyRegistrationOptionsRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport.SecurityPrincipal;
-import org.springframework.web.servlet.view.RedirectView;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -353,10 +352,6 @@ public class ApiSecurityWebAssembler {
                 .redirectUri(dto.getRedirectUri())
                 .redirectUrl(dto.getRedirectUrl())
                 .build();
-    }
-
-    public static RedirectView toRedirectView(OAuthAuthorizationDTO dto) {
-        return new RedirectView(dto.getRedirectUrl());
     }
 
     public static OAuthTokenRes toRes(OAuthTokenDTO dto) {

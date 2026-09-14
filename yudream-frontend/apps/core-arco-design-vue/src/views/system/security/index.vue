@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@yudream/components'
+import type { TableColumn, YdTablePickerQuery, YdTablePickerResult } from '@yudream/components'
 import type {
   ApiKeyCredential,
   ApiKeyCreatePayload,
@@ -23,6 +23,13 @@ import { clearApiEncryptionCache } from '@/utils/api-encryption'
 
 type SecurityTab = 'policy' | 'apiKey' | 'oauth' | 'external' | 'passkey'
 type OAuthPane = 'clients' | 'providers'
+
+interface OAuthScopePickerRow {
+  code: string
+  name: string
+  module: string
+  desc?: string
+}
 
 const modal = useFaModal()
 const toast = useFaToast()
@@ -178,7 +185,70 @@ const permissionSelectOptions = computed(() => Object.entries(permissionGroups.v
 
 const selectablePermissionCodes = computed(() => Object.values(permissionGroups.value).flat().map(item => item.code))
 
+const identityScopeRows: OAuthScopePickerRow[] = [
+  { code: 'openid', name: 'OpenID', module: '身份', desc: 'OpenID Connect 身份标识' },
+  { code: 'profile', name: '用户资料', module: '身份', desc: '姓名、头像等基础资料' },
+  { code: 'email', name: '邮箱', module: '身份', desc: '用户邮箱地址' },
+]
+
+const oauthScopeColumns: TableColumn<OAuthScopePickerRow>[] = [
+  { accessorKey: 'name', header: '名称', minWidth: 140 },
+  { accessorKey: 'code', header: '范围码', minWidth: 220 },
+  { accessorKey: 'module', header: '分组', minWidth: 120 },
+]
+
 const permissionNameMap = computed(() => new Map(permissions.value.map(item => [item.code, item.name])))
+
+function oauthScopePickerRows(): OAuthScopePickerRow[] {
+  const known = new Set(identityScopeRows.map(row => row.code))
+  const permissionRows = permissions.value
+    .filter(item => item.status === 'ACTIVE')
+    .map((item) => {
+      known.add(item.code)
+      return {
+        code: item.code,
+        name: item.name,
+        module: item.module || '其他',
+        desc: item.desc,
+      }
+    })
+  const extra = (oauthClientForm.scopes || [])
+    .filter(code => !known.has(code))
+    .map(code => ({
+      code,
+      name: permissionNameMap.value.get(code) || code,
+      module: '已配置',
+    }))
+  return [...identityScopeRows, ...permissionRows, ...extra]
+}
+
+function matchOAuthScopeKeyword(row: OAuthScopePickerRow, keyword: string) {
+  const query = keyword.trim().toLowerCase()
+  if (!query) {
+    return true
+  }
+  return [row.name, row.code, row.module, row.desc].some(value => (value || '').toLowerCase().includes(query))
+}
+
+async function fetchOAuthClientScopes(query: YdTablePickerQuery): Promise<YdTablePickerResult<OAuthScopePickerRow>> {
+  const filtered = oauthScopePickerRows().filter(row => matchOAuthScopeKeyword(row, query.keyword))
+  const start = Math.max(0, (query.page - 1) * query.size)
+  return {
+    list: filtered.slice(start, start + query.size),
+    total: filtered.length,
+  }
+}
+
+const oauthClientScopeInitialLabels = computed<Record<string, string>>(() => {
+  const labels: Record<string, string> = {}
+  for (const row of oauthScopePickerRows()) {
+    labels[row.code] = row.name
+  }
+  for (const code of oauthClientForm.scopes || []) {
+    labels[code] ||= permissionNameMap.value.get(code) || code
+  }
+  return labels
+})
 
 const apiKeyColumns = computed<TableColumn<ApiKeyCredential>[]>(() => [
   { accessorKey: 'name', header: '名称', width: 180, fixed: 'left' },
@@ -300,7 +370,7 @@ async function loadApiKeys() {
 }
 
 async function loadPermissions() {
-  if (!policy.apiKeyEnabled) {
+  if (!policy.apiKeyEnabled && !policy.oauthServerEnabled) {
     permissions.value = []
     return
   }
@@ -1194,8 +1264,18 @@ function normalizeDateTime(value?: string) {
         <a-form-item label="回调地址（一行一个）">
           <FaTextarea :model-value="splitTextarea(oauthClientForm.redirectUris || [])" rows="4" @update:model-value="value => updateList(oauthClientForm.redirectUris, value)" />
         </a-form-item>
-        <a-form-item label="授权范围（一行或逗号分隔）">
-          <FaTextarea :model-value="splitTextarea(oauthClientForm.scopes || [])" rows="3" @update:model-value="value => updateList(oauthClientForm.scopes, value)" />
+        <a-form-item label="授权范围">
+          <YdTablePicker
+            v-model="oauthClientForm.scopes"
+            :columns="oauthScopeColumns"
+            :fetcher="fetchOAuthClientScopes"
+            row-key="code"
+            label-key="name"
+            :initial-labels="oauthClientScopeInitialLabels"
+            title="选择授权范围"
+            placeholder="请选择客户端可申请的授权范围"
+            search-placeholder="搜索名称、范围码或分组"
+          />
         </a-form-item>
       </a-form>
     </FaModal>
