@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type {WikiNode, WikiSpace} from '@/api/modules/platform-wiki'
-import {computed, onMounted, provide, ref, shallowRef} from 'vue'
+import {computed, onMounted, provide, ref, shallowRef, watch} from 'vue'
+import {useRoute, useRouter} from 'vue-router'
 import {fetchWikiSpaces, fetchWikiTree, rebuildWikiIndex, saveWikiSpace, deleteWikiSpace} from '@/api/modules/platform-wiki'
 import WikiDirectoryPanel from './components/WikiDirectoryPanel.vue'
 import WikiGraphPanel from './components/WikiGraphPanel.vue'
@@ -15,14 +16,16 @@ import {flattenTree, wikiWorkbenchKey} from './wiki-utils'
 
 const toast = useFaToast()
 const modal = useFaModal()
+const route = useRoute()
+const router = useRouter()
+const workbenchPath = route.path
+const spacesLoaded = ref(false)
 
 const spaces = ref<WikiSpace[]>([])
 const spaceId = ref('')
 const tree = ref<WikiNode[]>([])
 const selectedNode = ref<WikiNode | null>(null)
 const loadingTree = ref(false)
-const activePanel = ref('directory')
-const spacesOpen = ref(false)
 
 const space = computed(() => spaces.value.find(item => item.id === spaceId.value) || null)
 const flatTree = computed(() => flattenTree(tree.value))
@@ -39,49 +42,82 @@ const panels = [
   {key: 'settings', label: '设置', icon: 'i-ri:settings-3-line', component: shallowRef(WikiSettingsPanel)},
 ]
 
-const activeComponent = computed(() => panels.find(item => item.key === activePanel.value)?.component.value || WikiDirectoryPanel)
+const panelGroups = [
+  {label: '内容管理', keys: ['directory', 'sources', 'ingest']},
+  {label: '探索研究', keys: ['search', 'graph', 'research']},
+  {label: '质量维护', keys: ['lint', 'review']},
+  {label: '知识库设置', keys: ['settings']},
+].map(group => ({...group, items: group.keys.map(key => panels.find(panel => panel.key === key)!)}))
+const panelOptions = panelGroups.map(group => ({
+  label: group.label,
+  options: group.items.map(item => ({label: item.label, value: item.key})),
+}))
+const spaceOptions = computed(() => spaces.value.filter(item => item.id).map(item => ({
+  label: item.name,
+  value: item.id!,
+})))
+const activePanel = computed({
+  get: () => panels.some(item => item.key === route.query.activePanel) ? route.query.activePanel as string : 'directory',
+  set: (value: string) => {
+    if (panels.some(item => item.key === value)) {
+      void router.push({query: {...route.query, activePanel: value}})
+    }
+  },
+})
+const activeItem = computed(() => panels.find(item => item.key === activePanel.value)!)
+const activeGroup = computed(() => panelGroups.find(group => group.keys.includes(activePanel.value))!)
+const activeComponent = computed(() => activeItem.value.component.value)
+const selectedSpaceId = computed({
+  get: () => spaceId.value,
+  set: (id: string) => {
+    if (spaces.value.some(item => item.id === id)) {
+      void router.push({query: {...route.query, spaceId: id}})
+    }
+  },
+})
+
+function restoreQuery() {
+  if (!spacesLoaded.value || route.path !== workbenchPath) return
+  const requestedId = route.query.spaceId
+  const nextId = spaces.value.find(item => item.id === requestedId)?.id || spaces.value[0]?.id || ''
+  if (spaceId.value !== nextId) {
+    spaceId.value = nextId
+    selectedNode.value = null
+    tree.value = []
+    void reloadTree()
+  }
+  if (route.query.spaceId !== (nextId || undefined) || route.query.activePanel !== activePanel.value) {
+    void router.replace({query: {...route.query, spaceId: nextId || undefined, activePanel: activePanel.value}})
+  }
+}
+
+watch(() => [route.path, route.query.spaceId, route.query.activePanel], restoreQuery)
 
 async function loadSpaces() {
   const res = await fetchWikiSpaces()
   spaces.value = res.data || []
-  // 当前知识库被删除后自动回落到第一个可用知识库
-  if (spaceId.value && !spaces.value.some(item => item.id === spaceId.value)) {
-    spaceId.value = ''
-    selectedNode.value = null
-  }
-  if (!spaceId.value && spaces.value.length) {
-    spaceId.value = spaces.value[0].id || ''
-  }
-  if (spaceId.value) {
-    await reloadTree()
-  }
-  else {
-    tree.value = []
-  }
+  spacesLoaded.value = true
+  const previousId = spaceId.value
+  restoreQuery()
+  if (previousId === spaceId.value) await reloadTree()
 }
 
+let treeRequest = 0
 async function reloadTree() {
-  if (!spaceId.value) {
+  const request = ++treeRequest
+  const id = spaceId.value
+  if (!id) {
     tree.value = []
+    loadingTree.value = false
     return
   }
   loadingTree.value = true
   try {
-    const res = await fetchWikiTree(spaceId.value)
-    tree.value = res.data || []
+    const res = await fetchWikiTree(id)
+    if (request === treeRequest && id === spaceId.value) tree.value = res.data || []
   } finally {
-    loadingTree.value = false
+    if (request === treeRequest) loadingTree.value = false
   }
-}
-
-async function switchSpace(id: string) {
-  if (id === spaceId.value) {
-    return
-  }
-  spaceId.value = id
-  selectedNode.value = null
-  spacesOpen.value = false
-  await reloadTree()
 }
 
 function selectNode(node: WikiNode | null) {
@@ -216,79 +252,55 @@ onMounted(loadSpaces)
       </FaButton>
     </FaPageHeader>
 
+    <div class="wiki-toolbar">
+      <label class="wiki-space-picker">
+        <span>当前知识库</span>
+        <FaSelect v-model="selectedSpaceId" :options="spaceOptions" :disabled="!spaces.length" placeholder="暂无知识库" class="w-full" />
+      </label>
+      <div class="wiki-toolbar__actions">
+        <FaButton variant="outline" @click="createVisible = true">
+          <FaIcon name="i-ri:add-line" />新建知识库
+        </FaButton>
+        <FaButton variant="ghost" :disabled="!space" :loading="!!deletingSpaceId" @click="space && removeSpace(space)">
+          <FaIcon name="i-ri:delete-bin-line" />删除知识库
+        </FaButton>
+      </div>
+      <label class="wiki-mobile-nav">
+        <span>工作台功能</span>
+        <FaSelect v-model="activePanel" :options="panelOptions" class="w-full" />
+      </label>
+    </div>
+
     <div class="wiki-shell">
-      <!-- 图标导航 -->
-      <nav class="wiki-rail" aria-label="工作台导航">
-        <FaTooltip v-for="item in panels" :key="item.key" :text="item.label" side="right">
-          <button
-              type="button"
-              class="wiki-rail__item"
-              :class="{ 'wiki-rail__item--active': activePanel === item.key }"
-              @click="activePanel = item.key"
+      <nav class="wiki-nav" aria-label="Wiki 分组导航">
+        <section v-for="group in panelGroups" :key="group.label" class="wiki-nav__group" :aria-label="group.label">
+          <h2>{{ group.label }}</h2>
+          <FaButton
+            v-for="item in group.items"
+            :key="item.key"
+            :variant="activePanel === item.key ? 'secondary' : 'ghost'"
+            class="w-full justify-start"
+            :aria-current="activePanel === item.key ? 'page' : undefined"
+            @click="openPanel(item.key)"
           >
-            <FaIcon :name="item.icon" class="wiki-rail__icon"/>
-            <span class="wiki-rail__label">{{ item.label.replace('Wiki ', '') }}</span>
-          </button>
-        </FaTooltip>
+            <FaIcon :name="item.icon" />
+            {{ item.label }}
+          </FaButton>
+        </section>
       </nav>
-
-      <!-- 知识库列表 -->
-      <div v-if="spacesOpen" class="wiki-spaces-backdrop" @click="spacesOpen = false" />
-      <aside class="wiki-spaces" :class="{ 'wiki-spaces--open': spacesOpen }">
-        <div class="wiki-spaces__head">
-          <span>知识库</span>
-          <FaTooltip text="新建知识库" side="right">
-            <button type="button" class="wiki-spaces__add" @click="createVisible = true">
-              <FaIcon name="i-ri:add-line"/>
-            </button>
-          </FaTooltip>
-          <button type="button" class="wiki-spaces__close" title="收起知识库列表" @click="spacesOpen = false">
-            <FaIcon name="i-ri:close-line" />
-          </button>
+      <main class="wiki-main" :aria-label="activeItem.label">
+        <div class="wiki-main__heading">
+          <span>{{ activeGroup.label }}</span>
+          <FaIcon name="i-ri:arrow-right-s-line" />
+          <h2>{{ activeItem.label }}</h2>
         </div>
-        <FaScrollArea class="wiki-spaces__list">
-          <button
-              v-for="item in spaces"
-              :key="item.id"
-              type="button"
-              class="wiki-space-card"
-              :class="{ 'wiki-space-card--active': item.id === spaceId }"
-              @click="switchSpace(item.id || '')"
-          >
-            <span class="wiki-space-card__icon">
-              <FaIcon name="i-ri:book-shelf-line"/>
-            </span>
-            <span class="wiki-space-card__body">
-              <strong>{{ item.name }}</strong>
-              <small>/wiki/{{ item.slug }}</small>
-            </span>
-            <FaIcon v-if="item.id === spaceId" name="i-ri:check-line" class="wiki-space-card__check"/>
-            <span
-                class="wiki-space-card__delete"
-                :class="{ 'wiki-space-card__delete--busy': deletingSpaceId === item.id }"
-                title="删除知识库"
-                @click.stop="removeSpace(item)"
-            >
-              <FaIcon name="i-ri:delete-bin-line"/>
-            </span>
-          </button>
-          <div v-if="!spaces.length" class="wiki-spaces__empty">
-            <FaIcon name="i-ri:inbox-line"/>
-            <p>暂无知识库</p>
-          </div>
-        </FaScrollArea>
-      </aside>
-
-      <!-- 主面板 -->
-      <main class="wiki-main">
-        <div class="wiki-main__spacebar">
-          <button type="button" class="wiki-main__spacebtn" @click="spacesOpen = true">
-            <FaIcon name="i-ri:book-shelf-line"/>
-            <span>{{ space ? `${space.name} · /wiki/${space.slug}` : '选择知识库' }}</span>
-            <FaIcon name="i-ri:arrow-down-s-line"/>
-          </button>
+        <div v-if="!spacesLoaded" class="wiki-empty" role="status">正在加载知识库…</div>
+        <div v-else-if="!space" class="wiki-empty">
+          <FaIcon name="i-ri:book-shelf-line" class="text-3xl" />
+          <p>暂无知识库，新建后即可管理资料与页面。</p>
+          <FaButton @click="createVisible = true">新建知识库</FaButton>
         </div>
-        <div class="wiki-main__panel">
+        <div v-else class="wiki-main__panel">
           <KeepAlive>
             <component :is="activeComponent" :key="activePanel"/>
           </KeepAlive>
@@ -330,211 +342,74 @@ onMounted(loadSpaces)
   min-height: 0;
 }
 
+.wiki-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-2);
+  background: var(--color-bg-1);
+}
+
+.wiki-space-picker,
+.wiki-mobile-nav {
+  display: grid;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.wiki-space-picker > span,
+.wiki-mobile-nav > span {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.wiki-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.wiki-mobile-nav {
+  display: none;
+}
+
 .wiki-shell {
   display: flex;
   overflow: hidden;
   flex: 1;
   min-height: 0;
-  border-top: 1px solid var(--color-border-2, var(--color-border-2));
-  background: var(--color-fill-1, var(--color-fill-1));
+  background: var(--color-fill-1);
 }
 
-/* 图标导航（固定宽度、独立纵向滚动，不随主区滚动） */
-.wiki-rail {
+.wiki-nav {
   display: flex;
-  overflow-x: hidden;
   overflow-y: auto;
   flex-direction: column;
   flex-shrink: 0;
-  gap: 4px;
-  width: 76px;
+  gap: 16px;
+  width: 220px;
   min-height: 0;
-  padding: 12px 8px;
+  padding: 16px 12px;
   border-right: 1px solid var(--color-border-2);
   background: var(--color-bg-1);
 }
 
-.wiki-rail__item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 9px 2px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--color-text-3);
-  cursor: pointer;
-  font: inherit;
-  transition: background 0.15s, color 0.15s;
-}
-
-.wiki-rail__item:hover {
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-}
-
-.wiki-rail__item--active {
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-  font-weight: 600;
-}
-
-.wiki-rail__icon {
-  font-size: 20px;
-}
-
-.wiki-rail__label {
-  font-size: 11px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-/* 知识库列（固定宽度、内部 FaScrollArea 独立滚动） */
-.wiki-spaces {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  width: 216px;
-  min-height: 0;
-  border-right: 1px solid var(--color-border-2);
-  background: var(--color-bg-1);
-}
-
-.wiki-spaces__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 14px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-3);
-}
-
-.wiki-spaces__add {
+.wiki-nav__group {
   display: grid;
-  margin-left: auto;
-  width: 24px;
-  height: 24px;
-  place-items: center;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text-3);
-  cursor: pointer;
-}
-
-.wiki-spaces__add:hover {
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-}
-
-.wiki-spaces__list {
-  flex: 1;
-  min-height: 0;
-  padding: 0 10px 12px;
-}
-
-.wiki-space-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  margin-bottom: 6px;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
-  transition: background 0.15s, border-color 0.15s;
-}
-
-.wiki-space-card:hover {
-  background: var(--color-fill-2);
-}
-
-.wiki-space-card--active {
-  border-color: var(--color-border-3);
-  background: var(--color-fill-2);
-}
-
-.wiki-space-card__icon {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  place-items: center;
-  border-radius: 9px;
-  background: var(--color-fill-2);
-  color: var(--color-text-1);
-  font-size: 17px;
-}
-
-.wiki-space-card__body {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.wiki-space-card__body strong {
-  overflow: hidden;
-  color: var(--color-text-1);
-  font-size: 13px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wiki-space-card__body small {
-  overflow: hidden;
-  color: var(--color-text-3);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.wiki-space-card__check {
-  margin-left: auto;
-  color: var(--color-text-1);
-}
-
-.wiki-space-card__delete {
-  display: none;
-  flex-shrink: 0;
-  align-items: center;
-  margin-left: auto;
-  padding: 3px;
-  border-radius: 6px;
-  color: var(--color-text-3);
-  font-size: 14px;
-}
-
-.wiki-space-card__check + .wiki-space-card__delete {
-  margin-left: 0;
-}
-
-.wiki-space-card:hover .wiki-space-card__delete,
-.wiki-space-card__delete--busy {
-  display: inline-flex;
-}
-
-.wiki-space-card__delete:hover {
-  background: var(--color-fill-3);
-  color: rgb(var(--danger-6));
-}
-
-.wiki-spaces__empty {
-  display: grid;
-  justify-items: center;
   gap: 6px;
-  padding: 28px 0;
-  color: var(--color-text-3);
-  font-size: 12px;
 }
 
-/* 主区域 */
+.wiki-nav__group h2 {
+  margin: 0 4px 2px;
+  color: var(--color-text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
 .wiki-main {
   display: flex;
   flex: 1;
@@ -544,8 +419,21 @@ onMounted(loadSpaces)
   overflow: hidden;
 }
 
-.wiki-main__spacebar {
-  display: none;
+.wiki-main__heading {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 16px 10px;
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.wiki-main__heading h2 {
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .wiki-main__panel {
@@ -554,9 +442,15 @@ onMounted(loadSpaces)
   overflow: hidden;
 }
 
-.wiki-spaces__close,
-.wiki-spaces-backdrop {
-  display: none;
+.wiki-empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+  min-height: 240px;
+  padding: 32px 16px;
+  color: var(--color-text-3);
+  text-align: center;
 }
 
 .wiki-create-form {
@@ -574,118 +468,24 @@ onMounted(loadSpaces)
   font-size: 13px;
 }
 
-/* 小屏：左侧图标导航始终保留且不压缩，仅收窄知识库列 */
-@media (max-width: 1100px) {
-  .wiki-spaces {
-    width: 176px;
-  }
-}
-
-@media (max-width: 860px) {
-  .wiki-spaces {
-    width: 148px;
+@media (max-width: 900px) {
+  .wiki-nav {
+    display: none;
   }
 
-  .wiki-space-card {
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .wiki-space-card__icon {
-    width: 28px;
-    height: 28px;
-    font-size: 14px;
-  }
-}
-
-/* 移动端：知识库列改为抽屉，主区顶部提供当前知识库切换条 */
-@media (max-width: 720px) {
-  .wiki-shell {
-    position: relative;
-  }
-
-  .wiki-rail {
-    width: 64px;
-    padding: 8px 6px;
-  }
-
-  .wiki-main__spacebar {
-    display: block;
-    flex-shrink: 0;
-    padding: 8px 10px;
-    border-bottom: 1px solid var(--color-border-2);
-    background: var(--color-bg-1);
-  }
-
-  .wiki-main__spacebtn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--color-border-2);
-    border-radius: 8px;
-    background: var(--color-bg-2);
-    color: var(--color-text-1);
-    cursor: pointer;
-    font: inherit;
-    font-size: 13px;
-  }
-
-  .wiki-main__spacebtn span {
-    overflow: hidden;
-    flex: 1;
-    text-align: left;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .wiki-spaces {
-    position: absolute;
-    z-index: 30;
-    top: 0;
-    bottom: 0;
-    left: 64px;
-    width: min(240px, calc(100vw - 140px));
-    box-shadow: 8px 0 24px rgb(15 23 42 / 0.18);
-    opacity: 0;
-    pointer-events: none;
-    transform: translateX(-16px);
-    transition: opacity 0.18s, transform 0.18s, visibility 0.18s;
-    visibility: hidden;
-  }
-
-  .wiki-spaces--open {
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-    visibility: visible;
-  }
-
-  .wiki-spaces-backdrop {
-    display: block;
-    position: absolute;
-    z-index: 25;
-    inset: 0 0 0 64px;
-    background: rgb(15 23 42 / 0.32);
-  }
-
-  .wiki-spaces__close {
+  .wiki-mobile-nav {
     display: grid;
-    margin-left: 0;
-    width: 24px;
-    height: 24px;
-    place-items: center;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--color-text-3);
-    cursor: pointer;
+    width: 100%;
   }
 
-  .wiki-spaces__close:hover {
-    background: var(--color-fill-2);
-    color: var(--color-text-1);
+  .wiki-toolbar {
+    align-items: stretch;
+  }
+
+  .wiki-space-picker,
+  .wiki-toolbar__actions {
+    width: 100%;
+    margin-left: 0;
   }
 }
 </style>

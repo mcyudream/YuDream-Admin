@@ -57,7 +57,7 @@ public class WikiPublicSearchAiTool implements AiAgentTool {
                         "query", Map.of("type", "string", "description", "检索关键词（可含多个词，系统会自动分词）"),
                         "topK", Map.of("type", "integer", "description", "返回条数，默认 8"),
                         "pathPrefix", Map.of("type", "string", "description", "路径前缀过滤（可选）"),
-                        "graphExpansion", Map.of("type", "boolean", "description", "是否启用图谱扩展，默认 false"),
+                        "graphExpansion", Map.of("type", "boolean", "description", "是否沿知识图谱扩展相关已发布页面；知识库开启图谱时可传 true"),
                         "sourceGrounded", Map.of("type", "boolean", "description", "公开场景忽略，始终为 false")
                 )
         );
