@@ -17,7 +17,9 @@ import online.yudream.base.domain.platform.agent.enumerate.AgentTraceStatus;
 import online.yudream.base.domain.platform.agent.valobj.AgentTraceQuery;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevReloadTrigger;
+import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
 import online.yudream.base.domain.platform.plugin.event.PluginDevReloadRequested;
+import online.yudream.base.domain.platform.plugin.event.PluginLifecycleEvent;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginCommandTestResult;
@@ -177,6 +179,50 @@ class PluginDevToolsAppServiceTest {
         verify(eventPublisher).publishEvent(captor.capture());
         assertThat(captor.getValue().pluginCode()).isEqualTo("demo");
         assertThat(captor.getValue().trigger()).isEqualTo(PluginDevReloadTrigger.REGISTER);
+    }
+
+    @Test
+    void reloadFrontendRequiresCode() {
+        assertThatThrownBy(() -> service.reloadFrontend("  "))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("插件编码不能为空");
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void reloadFrontendRejectsNonDevModePlugin() {
+        when(runtimeGateway.devModePlugin("store")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.reloadFrontend("store"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("仅开发模式插件支持前端热重载");
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void reloadFrontendRejectsDisabledPlugin() {
+        when(runtimeGateway.devModePlugin("demo")).thenReturn(true);
+        when(runtimeGateway.enabled("demo")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.reloadFrontend("demo"))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("插件未启用，无法重载前端");
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void reloadFrontendPublishesFrontendReloadEvent() {
+        when(runtimeGateway.devModePlugin("demo")).thenReturn(true);
+        when(runtimeGateway.enabled("demo")).thenReturn(true);
+
+        service.reloadFrontend("demo");
+
+        ArgumentCaptor<PluginLifecycleEvent> captor = ArgumentCaptor.forClass(PluginLifecycleEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().pluginCode()).isEqualTo("demo");
+        assertThat(captor.getValue().action()).isEqualTo(PluginLifecycleAction.FRONTEND_RELOAD);
+        assertThat(captor.getValue().success()).isTrue();
+        verify(pluginAppService, never()).reloadDevPlugin(any());
     }
 
     @Test

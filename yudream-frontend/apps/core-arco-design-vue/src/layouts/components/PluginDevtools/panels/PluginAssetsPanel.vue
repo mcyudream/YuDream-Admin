@@ -133,6 +133,7 @@ function statusVariant(plugin: PluginDevPlugin) {
 }
 
 const reloading = ref(false)
+const frontendReloading = ref(false)
 const enabling = ref(false)
 
 // 重载不会自动启用从未启用过的插件，LOADED 状态插件需要显式启用入口
@@ -172,6 +173,24 @@ async function reloadPlugin(code?: string) {
   }
   finally {
     reloading.value = false
+  }
+}
+
+async function reloadFrontend(code?: string) {
+  const target = code || selectedCode.value
+  if (!target) {
+    return
+  }
+  frontendReloading.value = true
+  try {
+    await devtoolsStore.reloadFrontend(target)
+    toast.success('前端重载已触发')
+  }
+  catch {
+    // 拦截器已提示
+  }
+  finally {
+    frontendReloading.value = false
   }
 }
 
@@ -412,6 +431,18 @@ async function runCommandTest() {
             启用
           </FaButton>
         </FaTooltip>
+        <FaTooltip text="重挂载该插件前端远程模块，不回收 Java 运行时" side="bottom">
+          <FaButton
+            variant="outline"
+            size="sm"
+            :disabled="!selectedPlugin.devMode || selectedPlugin.status !== 'ENABLED'"
+            :loading="frontendReloading"
+            @click="reloadFrontend()"
+          >
+            <FaIcon name="i-ri:refresh-line" />
+            前端重载
+          </FaButton>
+        </FaTooltip>
         <FaTooltip text="对开发模式插件执行 disable→unload→load→enable 重载" side="bottom">
           <FaButton
             variant="outline"
@@ -421,7 +452,7 @@ async function runCommandTest() {
             @click="reloadPlugin()"
           >
             <FaIcon name="i-ri:restart-line" />
-            重载
+            Java 重载
           </FaButton>
         </FaTooltip>
       </div>

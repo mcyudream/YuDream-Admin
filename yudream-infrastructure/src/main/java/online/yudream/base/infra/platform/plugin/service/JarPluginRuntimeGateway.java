@@ -469,7 +469,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         return holders.entrySet().stream()
                 .filter(entry -> entry.getValue().isEnabled())
                 .flatMap(entry -> entry.getValue().getContext().frontendModules().stream()
-                        .map(module -> toInfo(entry.getKey(), module, entry.getValue().getAssetRevision())))
+                        .map(module -> toInfo(entry.getKey(), module, liveAssetRevision(entry.getKey(), entry.getValue()))))
                 .toList();
     }
 
@@ -532,7 +532,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 theme.homeComponent(),
                 theme.chromeComponent(),
                 moduleName,
-                holder.getAssetRevision()
+                liveAssetRevision(pluginCode, holder)
         );
     }
 
@@ -1057,6 +1057,16 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 card.sort(),
                 card.defaultOnFirstVisit()
         );
+    }
+
+    private String liveAssetRevision(String code, PluginRuntimeHolder holder) {
+        PluginDevModeProperties.DevProject project = findDevProject(code);
+        if (project != null) {
+            Path dist = project.resolvedFrontendDist();
+            Path source = Files.isDirectory(dist) ? dist : project.classesDir();
+            return assetRevision(code, source, holder.getDescriptor());
+        }
+        return holder.getAssetRevision();
     }
 
     private String assetRevision(String code, Path pluginPath, PluginDescriptor descriptor) {

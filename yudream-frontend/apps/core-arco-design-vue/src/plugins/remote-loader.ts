@@ -31,10 +31,13 @@ const installedModules = new WeakSet<object>()
  * Loads a plugin remote with its declared assets. A cached remote is installed
  * once per live lease group; releasing the final lease invokes optional dispose.
  */
-export async function acquirePluginRemoteModule(manifest: RemoteManifest, _options: { forceReload?: boolean } = {}): Promise<PluginRemoteModuleLease> {
+export async function acquirePluginRemoteModule(manifest: RemoteManifest, options: { forceReload?: boolean } = {}): Promise<PluginRemoteModuleLease> {
   const pluginCode = normalizePluginCode(manifest.pluginCode)
   const revision = manifest.assetRevision?.trim() || ''
-  const entryUrl = resolvePluginRemoteEntry(pluginCode, manifest.entry, revision)
+  let entryUrl = resolvePluginRemoteEntry(pluginCode, manifest.entry, revision)
+  if (options.forceReload) {
+    entryUrl = appendRevision(entryUrl, `reload-${Date.now()}`)
+  }
   const key = `${pluginCode}\u0000${revision}\u0000${entryUrl}`
   let record = remoteRegistry.get(key)
   if (!record) {

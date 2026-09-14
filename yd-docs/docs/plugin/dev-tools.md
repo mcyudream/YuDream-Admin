@@ -77,7 +77,9 @@ flowchart TD
     F --> G[从 target/classes 目录重新加载]
     G --> H[恢复启用目标，再按依赖序恢复依赖方]
     B -->|前端 dist 变化| I[发布 FRONTEND_RELOAD 事件]
-    I --> J[SSE 桥到调试浮窗<br/>重挂载当前插件的远程模块]
+    I --> J[SSE 桥到调试浮窗<br/>按实时 assetRevision 重挂载远程模块]
+    M[浮窗「前端重载」按钮] --> N[POST /plugins/{code}/frontend-reload]
+    N --> I
     H --> K[刷新动态路由与公开路由 memo]
     J --> K
 ```
@@ -111,10 +113,10 @@ flowchart TD
 左侧图标导航按开发动线分页，常用页面如下：
 
 - **概览**：开发模式状态（含自动检测标记与宿主运行方式）、Agent 追踪开关、插件计数、开发项目清单文件路径，以及插件生命周期事件流（LOAD/ENABLE/DISABLE/UNLOAD/RELOAD/COMPILE/FRONTEND_RELOAD，取最新 20 条）。
-- **插件**：主从结构——先列插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献：HTTP 端点、QQ 指令、前端模块与路由、权限菜单、AI 工具、平台能力等。端点测试器与指令模拟器在详情内；开发模式插件可一键「重载」。清单工具栏可切换「依赖图」视图（depend/softdepend/被依赖四向关系），每张卡片提供「禁用预览」——列出禁用该插件的级联影响。
+- **插件**：主从结构——先列插件清单（名称、状态、开发模式徽标与来源），点入某插件后分组展示其运行时贡献：HTTP 端点、QQ 指令、前端模块与路由、权限菜单、AI 工具、平台能力等。端点测试器与指令模拟器在详情内；开发模式且已启用的插件可一键「前端重载」（只重挂载远程模块）与「Java 重载」（disable→unload→load→enable）。清单工具栏可切换「依赖图」视图（depend/softdepend/被依赖四向关系），每张卡片提供「禁用预览」——列出禁用该插件的级联影响。
 - **追踪**：Agent 执行链路实时执行区（SSE 增量累积）+ 分页历史记录；详情逐步展示输入摘要、思考过程、工具调用入出参、输出与耗时，可导出 JSON 用于缺陷上报。
 - **日志**：按插件过滤的运行日志流——REST 拉取最近清单（默认 100、上限 500 条）+ SSE 实时追加，支持暂停、清空与展开异常堆栈。
-- **设置**：开发项目管理（登记/批量登记子目录/移除/立即重载）、新建插件骨架、面板偏好重置。
+- **设置**：开发项目管理（登记/批量登记子目录/移除/前端重载/Java 重载）、新建插件骨架、面板偏好重置。
 
 可见性规则：拥有 `platform:plugin-devtools:view` 权限且后端 status 端点可用时显示；纯前端 DEV 模式（`import.meta.env.DEV`）下按钮始终可见，后端不可用时浮窗内降级提示。
 
@@ -129,7 +131,8 @@ flowchart TD
 | `GET /status` | 开发模式与追踪开关状态（含 `hostRunMode`、`devModeAuto`、`devProjectStoreFile`） |
 | `GET /plugins` | 插件清单（含 devMode 标记与 depend/softdepend 依赖列表） |
 | `GET /plugins/{code}/assets` | 单插件运行时资产快照 |
-| `POST /plugins/{code}/reload` | 手动重载（开发模式插件） |
+| `POST /plugins/{code}/reload` | 手动 Java 重载（开发模式插件：disable→unload→load→enable） |
+| `POST /plugins/{code}/frontend-reload` | 手动前端热重载（仅开发模式且已启用；发布 FRONTEND_RELOAD，不回收 Java 运行时） |
 | `GET /dev-projects` | 开发项目合并清单（CONFIG+FILE，含来源标记） |
 | `POST /dev-projects` | 登记开发目录（code 可留空自动推断；已启用插件立即热切） |
 | `POST /dev-projects/batch` | 扫描父目录下的插件模块并去重登记，返回 registered 与 skipped |
@@ -163,4 +166,4 @@ vite dev 中间件把报告暴露在 `/__yudream-devtools/audit.json`（每次�
 - **开发模式未按预期开启/关闭**：看「概览」页的「自动检测/配置开启」标记——未显式配置 `enabled` 时按源码/JAR 运行自动判定。
 - **面板登记的目录不生效**：看「设置」页项目行的三个状态点（源码目录存在/类产物已编译/plugin.yml 可读）；登记清单在 `devProjectStoreFile` 指向的 JSON 文件，可直接检查内容。
 - **改代码不重载**：看「概览」页最近动态的 COMPILE 事件——编译失败会推送错误且不重载；确认 `compile-command` 在宿主进程环境可执行（Windows 注意 PATH）。面板登记留空与批量登记默认 `mvn -q compile -DskipTests -P dev-export`，热编译会刷新 `target/plugin-dev/lib`。
-- **前端改动不生效**：确认插件前端在 `vite build --watch`，且最近动态出现 FRONTEND_RELOAD。
+- **前端改动不生效**：确认插件前端在 `vite build --watch`，且最近动态出现 FRONTEND_RELOAD；也可在「插件」详情或「设置」页点「前端重载」。重挂载会按实时 assetRevision 加唯一 import URL 打破浏览器 ESM 缓存。

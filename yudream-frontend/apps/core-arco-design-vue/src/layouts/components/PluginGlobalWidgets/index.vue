@@ -56,7 +56,7 @@ async function loadWidgets() {
       if (disposed || sequence !== loadSequence) {
         break
       }
-      const instance = await acquireWidget(widget, modules)
+      const instance = await acquireWidget(widget, modules, false)
       if (instance) {
         next.push(instance)
       }
@@ -74,14 +74,14 @@ async function loadWidgets() {
   }
 }
 
-async function acquireWidget(widget: PluginGlobalWidget, modules: PluginFrontendModule[]): Promise<WidgetInstance | null> {
+async function acquireWidget(widget: PluginGlobalWidget, modules: PluginFrontendModule[], forceReload = false): Promise<WidgetInstance | null> {
   const module = modules.find(item => item.pluginCode === widget.pluginCode)
   if (!module) {
     console.warn(`[PluginGlobalWidgets] 挂件 ${widget.pluginCode}/${widget.code} 未找到前端模块`)
     return null
   }
   try {
-    const lease = await acquirePluginRemoteModule(module)
+    const lease = await acquirePluginRemoteModule(module, { forceReload })
     const component = resolveWidgetComponent(lease.module, widget.component)
     if (!component) {
       console.warn(`[PluginGlobalWidgets] 插件 ${widget.pluginCode} 未导出挂件组件：${widget.component}`)
@@ -138,7 +138,7 @@ async function handleRemoteReload(code: string) {
     const modules = manifest.data.modules || []
     const next = [...instances.value]
     for (const target of targets) {
-      const instance = await acquireWidget(target.widget, modules)
+      const instance = await acquireWidget(target.widget, modules, true)
       const index = next.findIndex(item => item === target)
       if (instance) {
         next[index] = instance

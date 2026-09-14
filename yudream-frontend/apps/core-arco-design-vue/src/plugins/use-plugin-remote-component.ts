@@ -2,7 +2,7 @@ import type { YuDreamPluginFrontendModule } from '@yudream/plugin-sdk'
 import type { MaybeRefOrGetter } from 'vue'
 import type { Component } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
-import { acquirePluginRemoteModule, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
+import { acquirePluginRemoteModule, acquirePluginRemoteModuleByCode, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
 import { createPluginSdk } from '@/plugins/sdk'
 import eventBus from '@/utils/eventBus'
 
@@ -41,7 +41,7 @@ export function usePluginRemoteComponentByMeta(meta: MaybeRefOrGetter<PluginRout
   const plugin = computed(() => toValue(meta) || { pluginCode: '' })
   const sdk = computed(() => createPluginSdk(plugin.value.pluginCode || ''))
 
-  watch(plugin, () => void loadRemoteComponent(), { immediate: true })
+  watch(plugin, () => void loadRemoteComponent(), { immediate: true, deep: true })
 
   onMounted(() => {
     eventBus.on('plugin-devtools:remote-reload', handleRemoteReload)
@@ -55,11 +55,11 @@ export function usePluginRemoteComponentByMeta(meta: MaybeRefOrGetter<PluginRout
 
   async function handleRemoteReload(code: string) {
     if (code && code === plugin.value.pluginCode) {
-      await loadRemoteComponent()
+      await loadRemoteComponent({ forceReload: true })
     }
   }
 
-  async function loadRemoteComponent() {
+  async function loadRemoteComponent(options: { forceReload?: boolean } = {}) {
     const sequence = ++loadSequence
     remoteComponent.value = null
     remoteError.value = ''
@@ -72,7 +72,9 @@ export function usePluginRemoteComponentByMeta(meta: MaybeRefOrGetter<PluginRout
     remoteLoading.value = true
     await releaseRemoteModule()
     try {
-      const lease = await acquirePluginRemoteModule(plugin.value)
+      const lease = options.forceReload
+        ? await acquirePluginRemoteModuleByCode(plugin.value.pluginCode, { forceReload: true })
+        : await acquirePluginRemoteModule(plugin.value)
       if (sequence !== loadSequence) {
         await lease.release()
         return
@@ -119,6 +121,9 @@ export function usePluginRemoteComponentByMeta(meta: MaybeRefOrGetter<PluginRout
     }
     if (module.default && typeof module.default === 'object' && 'routes' in module.default) {
       return resolveRemoteComponent(module.default as RemoteModule)
+    }
+    if (component) {
+      return null
     }
     return (module.default as Component) || null
   }
