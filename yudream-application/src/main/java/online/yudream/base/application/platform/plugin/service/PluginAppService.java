@@ -39,6 +39,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -209,7 +210,7 @@ public class PluginAppService {
             boolean backupRestored = !switchStarted || restoreBackupFromActive(backup, backupOriginal);
             if (switchStarted && (!activeRestored || !backupRestored)) {
                 log.error("Rollback recovery incomplete for {} (activeRestored={}, backupRestored={}); retaining original staging files",
-                        module.getCode(), activeRestored, backupRestored);
+                        module.getCode(), activeRestored, backupRestored, exception);
             }
             restoreSnapshot(module, originalMetadata);
             try {
@@ -285,7 +286,8 @@ public class PluginAppService {
             boolean backupRestored = !switchStarted || restoreMarketplaceBackup(backup, actualBackup, backupOriginal, backupExisted);
             restoreMarketplaceMetadata(affected, originalMetadata);
             if (!activeRestored || !backupRestored) {
-                log.error("Marketplace update recovery incomplete for {} (activeRestored={}, backupRestored={})", existing.getCode(), activeRestored, backupRestored);
+                log.error("Marketplace update recovery incomplete for {} (activeRestored={}, backupRestored={})",
+                        existing.getCode(), activeRestored, backupRestored, exception);
             }
             throw new BizException("插件市场更新失败：" + rootMessage(exception)
                     + (!activeRestored || !backupRestored ? "；文件恢复未完成，已保留恢复副本" : ""));
@@ -738,19 +740,36 @@ public class PluginAppService {
                 }
             }
         } while (changed);
+        Map<String, Integer> depths = new HashMap<>();
         return affected.stream().map(modules::get)
-                .sorted(Comparator.<PluginModule>comparingInt(module -> reverseDependencyDepth(module, modules, affected))
+                .sorted(Comparator.<PluginModule>comparingInt(module -> reverseDependencyDepth(module, modules, affected, new HashSet<>(), depths))
                         .thenComparing(PluginModule::getCode))
                 .toList();
     }
 
-    private int reverseDependencyDepth(PluginModule module, Map<String, PluginModule> modules, Set<String> affected) {
+    /**
+     * 反向依赖深度：叶子依赖方最深，停机时先停深处。
+     * 产品规则：plugin.yml 的 depend/softdepend 图必须无环（适配器不得依赖服务器插件）。
+     * visiting + memo 只是畸形描述符的安全网，避免热重载 StackOverflowError。
+     */
+    private int reverseDependencyDepth(PluginModule module, Map<String, PluginModule> modules, Set<String> affected,
+                                       Set<String> visiting, Map<String, Integer> memo) {
+        String code = module.getCode();
+        Integer cached = memo.get(code);
+        if (cached != null) {
+            return cached;
+        }
+        if (!visiting.add(code)) {
+            return 0;
+        }
         int depth = 0;
         for (PluginModule dependent : modules.values()) {
-            if (affected.contains(dependent.getCode()) && dependsOn(dependent, module.getCode())) {
-                depth = Math.max(depth, 1 + reverseDependencyDepth(dependent, modules, affected));
+            if (affected.contains(dependent.getCode()) && dependsOn(dependent, code)) {
+                depth = Math.max(depth, 1 + reverseDependencyDepth(dependent, modules, affected, visiting, memo));
             }
         }
+        visiting.remove(code);
+        memo.put(code, depth);
         return depth;
     }
 

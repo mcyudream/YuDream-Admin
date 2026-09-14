@@ -1259,10 +1259,10 @@ public class OfficialQqBotApiAdapter {
     private BizException failure(String message, HttpMethod method, String path, URI base, Integer status, long startedAt, Throwable cause) {
         if (status != null && (status == 400 || status == 403 || status == 404)) {
             log.warn("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
-                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
         } else if (isConnectionReset(cause)) {
             log.warn("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
-                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis());
+                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
         } else {
             log.error("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
                     method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
