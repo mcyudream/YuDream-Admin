@@ -133,6 +133,10 @@
       "text": "Plugin JARs declare stable code in plugin.yml name and may declare a localized displayName for user-facing UI; displayName falls back to name and must never be used for depend/softdepend, routes, service lookup, or runtime identity. Plugin-owned APIs stay in the provider JAR; consumers use provided scope and direct context.service calls through dependency classloaders."
     },
     {
+      "key": "plugin-softdepend-acyclic",
+      "text": "plugin.yml 的 depend 与 softdepend 图必须无环。平台插件（launcher-adapter）不得 depend/softdepend 业务插件（minecraft-server）；服务器列表页、YMCL scope 等由业务插件以 LauncherProvider 扩展点贡献，适配器只聚合。宿主 reverseDependencyDepth 的 visiting+memo 只是畸形描述符安全网，不能当作允许成环。热重载按反向依赖深度停机，成环会 StackOverflowError。"
+    },
+    {
       "key": "rendered-message-template",
       "text": "Rendered message layouts such as the Milky command menu must use classpath Thymeleaf templates. Java may only assemble view data and invoke TemplateEngine; do not concatenate HTML or CSS inside dispatcher methods."
     },
@@ -294,7 +298,7 @@
     },
     {
       "key": "plugin-market-source",
-      "text": "插件市场源能力（plugin-market-source）只提供本机源：双闸门控制 LOCAL 播种、自托管发布/审核与公开 /market；关闭时不回落 Nexus/store-root-url。远程 V2_API/STATIC_INDEX 订阅与安装不依赖本能力——市场源管理端点始终注册；添加远程源走系统路由 /platform/plugin-marketplace/add-source（不进菜单、不依赖本能力）；「市场源管理」菜单不映射能力；LOCAL 源在能力关闭时从列表与目录中隐藏。默认内置源 default 为 LOCAL（本机 PUBLISHED 进程内直读，downloadUrl=local:{jarPath}，Files.copy+SHA-256，路径限制在 market-source.directory 下）。PluginStoreGateway 已删除 configuredSourceRef；fetchCatalog 按 type 分发，LOCAL 抛错由应用层直读。快照：STATIC 仍存 latestDescriptorJson（PluginStorePluginDescriptor 无 setter，解析收敛在 parseDescriptor）；LOCAL/V2 填 structuredVersions。安装/更新记录 marketSourceCode，跨源取最高 SemVer。v2 裸 JSON /api/public/plugin-market/api/v2（manifest/categories/tags/plugins/detail/download），分类清单 PluginMarketCategories，标签≤10、≤24 小写；authorId 精确、publishedAfter/Before ISO-8601。{code}@{pluginVersion} 不可覆盖（DO 字段用 pluginVersion，避免与 BaseDO 乐观锁 version 撞名）。审核开关 reviewRequired 读取处默认回落 true。公开社区开关 publicEnabled 读取处默认回落 true，关闭后 /market 与公开 v2/legacy 停止服务，后台发布/审核/订阅不受影响。持有 platform:plugin-market-source:publish 上传直接 PUBLISHED。后台「插件发布/发布审核」映射本能力；list 支持 mine/status/分页，无 accept 且无源管理 edit/delete 时作者只能动自己的记录。编辑不重审；硬删除移除记录与 JAR。公开端点仅 PUBLISHED，能力关闭即停止服务。发布物 JAR 存 market-source.directory，必须独立于插件扫描目录。"
+      "text": "插件市场源能力（plugin-market-source）只提供本机源：双闸门控制 LOCAL 播种、自托管发布/审核与公开 /market；关闭时不回落 Nexus/store-root-url。远程 V2_API/STATIC_INDEX 订阅与安装不依赖本能力——市场源管理端点始终注册；添加远程源走系统路由 /platform/plugin-marketplace/add-source（不进菜单、不依赖本能力）；「市场源管理」菜单不映射能力；LOCAL 源在能力关闭时从列表与目录中隐藏。默认内置源 default 为 LOCAL（本机 PUBLISHED 进程内直读，downloadUrl=local:{jarPath}，Files.copy+SHA-256，路径限制在 market-source.directory 下）。PluginStoreGateway 已删除 configuredSourceRef；fetchCatalog 按 type 分发，LOCAL 抛错由应用层直读。快照：STATIC 仍存 latestDescriptorJson（PluginStorePluginDescriptor 无 setter，解析收敛在 parseDescriptor）；LOCAL/V2 填 structuredVersions。安装/更新记录 marketSourceCode，跨源取最高 SemVer。v2 裸 JSON /api/public/plugin-market/api/v2（manifest/categories/tags/plugins/detail/download），分类清单 PluginMarketCategories，标签≤10、≤24 小写；authorId 精确、publishedAfter/Before ISO-8601。{code}@{pluginVersion} 不可覆盖（DO 字段用 pluginVersion，避免与 BaseDO 乐观锁 version 撞名）。审核开关 reviewRequired 读取处默认回落 true。公开社区开关 publicEnabled 读取处默认回落 true，关闭后 /market 与公开 v2/legacy 停止服务，后台发布/审核/订阅不受影响。持有 platform:plugin-market-source:publish 上传直接 PUBLISHED。后台「插件发布/发布审核」映射本能力；list 支持 mine/status/分页，无 accept 且无源管理 edit/delete 时作者只能动自己的记录。编辑不重审；硬删除移除记录与 JAR。公开端点仅 PUBLISHED，能力关闭即停止服务。发布物 JAR 存 market-source.directory，必须独立于插件扫描目录。Docker 挂载 /app/market-source；缺失或空 JAR 公开下载 404 且不计数，本机 resolveLocalJar 与消费端 downloadJar 均拒绝 0 字节。"
     }
   ],
   "utilities": [
@@ -487,6 +491,14 @@
     {
       "key": "dashboard-legacy-stack-lg-only",
       "text": "首页卡片 isLegacyAutoStackedLayout 只允许用 lg 判定历史单列堆叠；md/sm 默认就是 x=0 竖排，用窄断点会把用户刚保存的插件卡（如 yggc.yggc-endpoints）当遗留布局丢掉，effectiveLayout 回退 defaultLayout，表现为保存成功但刷新后卡片消失。"
+    },
+    {
+      "key": "plugin-frontend-reload-esm-cache",
+      "text": "FRONTEND_RELOAD 不能只发事件：开发模式 assetRevision 必须按 dist 实时计算（liveAssetRevision），浏览器 ESM import 按 URL 缓存，forceReload 要重新拉 manifest 并给 entry 追加 reload-${Date.now()}。DevTools 必须提供独立 POST /api/platform/plugin-devtools/plugins/{code}/frontend-reload（manage），与 Java reload（disable→unload→load→enable）分开；浮窗按钮成功后本地立即 emit plugin-devtools:remote-reload，不依赖 SSE 已连接。"
+    },
+    {
+      "key": "plugin-devmode-reload",
+      "text": "插件开发模式：dev-mode.enabled 三态（缺省自动检测源码/JAR 运行）+ 开发项目双来源（yml CONFIG 优先 / 面板登记 FILE 持久化到 plugins/dev-projects.json），从 target/classes + target/plugin-dev/lib 加载，watcher 三条管线=自动编译/classes 热重载/dist 前端重挂载；reloadDevPlugin 定向 describeDevPlugin 同步描述符，按 code 分段锁串行，级联停启硬/软依赖方（外层先停、依赖序恢复，依赖方失败不阻断目标），wasEnabled 含 restoreIntentActive；REGISTER 触发的源码切换在约 30s 窗口内可抑制，WATCHER 不抑制。指令模拟器 POST /api/platform/plugin-devtools/{code}/command-test 免 QQ 调试指令；面板端点 GET/POST/DELETE /api/platform/plugin-devtools/dev-projects[/{code}] 与 POST /dev-projects/batch 管理 FILE 源项目。前端热重载独立于 Java 重载：POST /plugins/{code}/frontend-reload 只发布 FRONTEND_RELOAD（须开发模式且已启用），浮窗按钮成功后本地立即 emit remote-reload。浮窗 SSE 收到 RELOAD/FRONTEND_RELOAD 成功事件后除重挂载当前插件页外，还会防抖 refreshDynamicRoutes 重建动态路由与菜单（动态路由登录后只注册一次，不重建需手动刷新才能看到新插件菜单），并重置 publicAccess 公开路由 memo。"
     }
   ]
 }
