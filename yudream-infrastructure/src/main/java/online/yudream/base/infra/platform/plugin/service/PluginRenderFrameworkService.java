@@ -54,12 +54,12 @@ public class PluginRenderFrameworkService implements PluginRenderService {
                 if (exception != null) {
                     Throwable cause = rootCause(exception);
                     log.error("Plugin htmlFromUrl failed: errorType={}, message={}",
-                            cause.getClass().getSimpleName(), cause.getMessage());
+                            cause.getClass().getSimpleName(), cause.getMessage(), exception);
                 }
             });
         } catch (RuntimeException exception) {
             log.error("Plugin htmlFromUrl rejected: errorType={}, message={}",
-                    exception.getClass().getSimpleName(), exception.getMessage());
+                    exception.getClass().getSimpleName(), exception.getMessage(), exception);
             return CompletableFuture.failedFuture(exception);
         }
     }
@@ -85,12 +85,12 @@ public class PluginRenderFrameworkService implements PluginRenderService {
                 if (exception != null) {
                     Throwable cause = rootCause(exception);
                     log.error("Plugin render operation failed: sourceType={}, errorType={}, message={}",
-                            sourceType, cause.getClass().getSimpleName(), cause.getMessage());
+                            sourceType, cause.getClass().getSimpleName(), cause.getMessage(), exception);
                 }
             });
         } catch (RuntimeException exception) {
             log.error("Plugin render operation rejected: sourceType={}, errorType={}, message={}",
-                    sourceType, exception.getClass().getSimpleName(), exception.getMessage());
+                    sourceType, exception.getClass().getSimpleName(), exception.getMessage(), exception);
             return CompletableFuture.failedFuture(exception);
         }
     }

@@ -235,12 +235,12 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
             return CompletableFuture.supplyAsync(action, executor).whenComplete((result, exception) -> {
                 if (exception != null) {
                     log.error("Milky plugin async operation failed: operation={}, connectionId={}, channelType={}, errorType={}",
-                            operation, connectionId, channelType, exception.getClass().getSimpleName());
+                            operation, connectionId, channelType, exception.getClass().getSimpleName(), exception);
                 }
             });
         } catch (RuntimeException exception) {
             log.error("Milky plugin async operation rejected: operation={}, connectionId={}, channelType={}, errorType={}",
-                    operation, connectionId, channelType, exception.getClass().getSimpleName());
+                    operation, connectionId, channelType, exception.getClass().getSimpleName(), exception);
             return CompletableFuture.failedFuture(exception);
         }
     }

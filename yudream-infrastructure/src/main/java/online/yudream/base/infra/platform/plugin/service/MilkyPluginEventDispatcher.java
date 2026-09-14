@@ -158,7 +158,7 @@ public class MilkyPluginEventDispatcher {
             QqSandboxDiagnostics.appendError("dispatch.error", null, error, context);
             log.error("Milky plugin event dispatch failed: connectionId={}, eventType={}, selfId={}, messageSeq={}, errorType={}",
                     connectionId, event == null ? null : event.eventType(), event == null ? null : event.selfId(),
-                    messageSeq, error.getClass().getSimpleName());
+                    messageSeq, error.getClass().getSimpleName(), error);
         }
     }
 

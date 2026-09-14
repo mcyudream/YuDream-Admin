@@ -283,6 +283,10 @@ class PluginAnnotationRegistrar {
             if (target instanceof RuntimeException runtimeException) {
                 throw runtimeException;
             }
+            if (target instanceof LinkageError linkageError) {
+                // 类加载失败是服务端故障（依赖未导出/快照过期），交给全局异常处理器记 500 全栈，不打成 400
+                throw linkageError;
+            }
             throw new BizException("插件 HTTP 端点执行失败 (" + target.getClass().getSimpleName() + "): " + target.getMessage());
         }
     }

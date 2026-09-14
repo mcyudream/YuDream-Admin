@@ -287,6 +287,61 @@ class PluginAppServiceTest {
     }
 
     @Test
+    void reloadDevPluginSurvivesMutualSoftDependenciesWithoutStackOverflow() throws IOException {
+        Path classes = writeJar("demo-plugin-classes", NEW_BYTES);
+        PluginModule module = module(classes, "1.0.0", "Demo plugin");
+        module.markEnabled();
+        module.setSoftDependencies(List.of("minecraft-server"));
+        PluginModule peer = PluginModule.builder()
+                .code("minecraft-server")
+                .name("Minecraft Server")
+                .pluginVersion("1.0.0")
+                .jarPath(classes.toAbsolutePath().normalize().toString())
+                .softDependencies(List.of(PLUGIN_CODE))
+                .status(PluginStatus.ENABLED)
+                .build();
+        java.util.Set<String> runtimeEnabled = new java.util.HashSet<>(java.util.Set.of(PLUGIN_CODE, "minecraft-server"));
+        java.util.Set<String> runtimeLoaded = new java.util.HashSet<>(java.util.Set.of(PLUGIN_CODE, "minecraft-server"));
+        when(pluginRuntimeGateway.describeDevPlugin(PLUGIN_CODE)).thenReturn(Optional.of(
+                descriptor("1.0.0", "Demo plugin", classes)));
+        when(pluginRuntimeGateway.enabled(anyString())).thenAnswer(invocation ->
+                runtimeEnabled.contains(invocation.getArgument(0)));
+        when(pluginRuntimeGateway.loaded(anyString())).thenAnswer(invocation ->
+                runtimeLoaded.contains(invocation.getArgument(0)));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeEnabled.remove(invocation.getArgument(0));
+            return null;
+        }).when(pluginRuntimeGateway).disable(anyString());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeLoaded.remove(invocation.getArgument(0));
+            return null;
+        }).when(pluginRuntimeGateway).unload(anyString());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeLoaded.add(((PluginModule) invocation.getArgument(0)).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).load(any());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            runtimeEnabled.add(((PluginModule) invocation.getArgument(0)).getCode());
+            return null;
+        }).when(pluginRuntimeGateway).enable(any());
+        when(pluginRuntimeGateway.permissions(anyString())).thenReturn(List.of());
+        when(pluginRuntimeGateway.frontendModules()).thenReturn(List.of());
+        when(pluginModuleRepo.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        stubRepository(module, peer);
+
+        service.reloadDevPlugin(PLUGIN_CODE);
+
+        verify(pluginRuntimeGateway).disable("minecraft-server");
+        verify(pluginRuntimeGateway).unload("minecraft-server");
+        verify(pluginRuntimeGateway).load(module);
+        verify(pluginRuntimeGateway).enable(module);
+        verify(pluginRuntimeGateway).load(peer);
+        verify(pluginRuntimeGateway).enable(peer);
+        assertThat(module.getStatus()).isEqualTo(PluginStatus.ENABLED);
+        assertThat(peer.getStatus()).isEqualTo(PluginStatus.ENABLED);
+    }
+
+    @Test
     void reloadDevPluginDoesNotEnableNeverEnabledPlugin() throws IOException {
         Path classes = writeJar("demo-plugin-classes", NEW_BYTES);
         PluginModule module = module(classes, "1.0.0", "Demo plugin");
