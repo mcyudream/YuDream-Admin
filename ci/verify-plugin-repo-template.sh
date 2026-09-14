@@ -140,10 +140,10 @@ grep -q '"releaseVersion": "1.0.0"' templates/plugin-repo/store.json.example || 
 grep -q '"sha256"' templates/plugin-repo/store.json.example || fail "submission store example must declare a JAR checksum"
 grep -q '"pluginYml": "plugin.yml"' templates/plugin-repo/submission.json.example || fail "submission manifest example must reference plugin.yml"
 grep -q '"license": "LICENSE"' templates/plugin-repo/submission.json.example || fail "submission manifest example must reference its license"
-grep -q 'MR' templates/plugin-repo/README.md || fail "template README must restrict third-party authors to merge requests"
-grep -q '普通 MR CI' templates/plugin-repo/README.md || fail "template README must state the ordinary MR credential boundary"
-grep -q 'protected tag' templates/plugin-repo/README.md || fail "template README must state the protected release boundary"
-grep -q '版本不可覆盖' templates/plugin-repo/README.md || fail "template README must state immutable versions"
+grep -q 'MR' templates/plugin-repo/README.md || fail "template README must prohibit third-party authors from the submission MR path"
+grep -q 'platform:plugin-market-source:upload' templates/plugin-repo/README.md || fail "template README must state the market-source upload permission path"
+grep -q '受保护' templates/plugin-repo/README.md || fail "template README must state the protected market publish boundary"
+grep -q '不可覆盖' templates/plugin-repo/README.md || fail "template README must state immutable versions"
 grep -q 'SPI' templates/plugin-repo/README.md || fail "template README must prohibit embedding SPI"
 
 # Submission examples describe materials only: no credentials or upload client may be added.
