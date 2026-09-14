@@ -426,12 +426,25 @@ public class PluginMarketPublicationAppService {
         return Optional.of(toJson(root));
     }
 
-    /** 解析已发布版本的 JAR 文件并递增下载计数。 */
+    /** 解析已发布版本的 JAR 文件并递增下载计数。缺失或空文件视为不存在，不计数。 */
     public Optional<Path> downloadPublication(String code, String pluginVersion) {
         requirePubliclyServed();
         Optional<PluginMarketPublication> publication = publishedPublication(code, pluginVersion);
-        publication.ifPresent(item -> publicationRepo.incrementDownloadCount(item.getId()));
-        return publication.map(this::jarFile);
+        if (publication.isEmpty()) {
+            return Optional.empty();
+        }
+        PluginMarketPublication item = publication.get();
+        if (!StringUtils.hasText(item.getJarPath())) {
+            log.warn("插件市场发布物 JAR 路径为空：{}@{}", item.getCode(), item.getPluginVersion());
+            return Optional.empty();
+        }
+        Path path = jarFile(item);
+        if (!servableJar(path)) {
+            log.warn("插件市场发布物 JAR 缺失或为空：{}@{} path={}", item.getCode(), item.getPluginVersion(), path);
+            return Optional.empty();
+        }
+        publicationRepo.incrementDownloadCount(item.getId());
+        return Optional.of(path);
     }
 
     /** legacy 静态端点的下载同样计数。 */
@@ -475,7 +488,7 @@ public class PluginMarketPublicationAppService {
             throw new BizException("插件商店数据不可用");
         }
         Path path = marketDirectory().resolve(jarPath).normalize();
-        if (!path.startsWith(marketDirectory()) || !Files.isRegularFile(path)) {
+        if (!path.startsWith(marketDirectory()) || !servableJar(path)) {
             throw new BizException("插件商店数据不可用");
         }
         return path;
@@ -700,6 +713,14 @@ public class PluginMarketPublicationAppService {
             throw new BizException("发布物文件路径非法");
         }
         return path;
+    }
+
+    private boolean servableJar(Path path) {
+        try {
+            return Files.isRegularFile(path) && Files.size(path) > 0;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     private String siteName() {

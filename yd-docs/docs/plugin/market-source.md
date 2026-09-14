@@ -12,7 +12,7 @@
 - 项目闸门：`yudream.platform.capabilities.plugin-market-source.enabled`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_ENABLED`，默认开）。关闭时不播种内置 LOCAL、不注册发布/审核/公开 v2/legacy 端点；远程源订阅端点仍注册。
 - 应用闸门：在「平台 → 能力管理」中启用。关闭后 LOCAL 不进入目录，公开 `/market` 停止服务；远程源增删改、同步、安装仍可用。
 - 公开社区开关：能力配置键 `publicEnabled`（读取处默认回落 true）。关闭后 `/market` 与公开 v2/legacy 停止服务，后台发布、审核与订阅源不受影响。开关在「平台 → 插件中心 → 市场源管理」顶部（能力开启时可见）。
-- 存储目录：`yudream.platform.plugin.market-source.directory`（默认 `market-source`），必须独立于插件扫描目录（`directories`），否则发布物会被当作已安装插件发现。
+- 存储目录：`yudream.platform.plugin.market-source.directory`（环境变量 `PLATFORM_PLUGIN_MARKET_SOURCE_DIRECTORY`，默认 `market-source`），必须独立于插件扫描目录（`directories`），否则发布物会被当作已安装插件发现。Docker 镜像默认 `/app/market-source`，compose 挂载宿主机 `./market-source`；不挂载则镜像重建后 JAR 丢失，目录元数据仍在 Mongo，下载会 404。丢失后 `{code}@{pluginVersion}` 不可覆盖，需把原文件拷回 `{directory}/{code}/{version}/plugin.jar`，或发布新版本。
 
 ## 2. 源类型
 
@@ -116,7 +116,7 @@ PENDING ──通过──▶ PUBLISHED ──下架──▶ REVOKED
 | `GET /tags?limit=30` | `[{"tag","count"}...]` 常用标签 top N |
 | `GET /plugins?search=&categories=&tags=&authorId=&publishedAfter=&publishedBefore=&sort=newest\|downloads\|updated\|name&page=&size=` | 多维检索。`categories`/`tags` 逗号分隔（任一命中 OR），`authorId` 精确，时间 ISO-8601 区间；返回 `{"total","page","size","items":[...]}`，`size`≤100 |
 | `GET /plugins/{code}` | summary + `versions`（SemVer 升序，末项为最新），每项含 `downloadPath`、`sha256`、`downloads` |
-| `GET /plugins/{code}/versions/{version}/download` | JAR 流（attachment）+ 下载计数 |
+| `GET /plugins/{code}/versions/{version}/download` | JAR 流（attachment）+ 下载计数；文件缺失或 0 字节返回 404，不计数 |
 
 列表项字段：`code`、`displayName`、`description`、`icon`、`category`、`tags`、`authorId`、`authorName`、`latestVersion`、`downloads`、`publishedAt`、`updatedAt`、`license`。长 ID 全程字符串。
 
@@ -139,5 +139,5 @@ GET /api/public/plugin-market/{code}/{version}/plugin.jar
 
 - 公开 v2/legacy 端点匿名只读；发布/审核/跳过审核分别需要 `upload`/`accept`/`publish` 权限。源管理仍用 `view/create/edit/delete/run`。API Key 与账号身份都会记录到发布物的 `publisherUserId` 与通道；
 - JAR 大小上限沿用 `yudream.platform.plugin.store-max-jar-bytes`（默认 100MB）；
-- 存储目录独立于插件扫描目录；发布物文件路径由服务端数据库记录解析，URL 参数仅用于查询匹配，不参与路径拼接；
+- 存储目录独立于插件扫描目录，生产必须持久化（compose 挂载 `./market-source`）；发布物文件路径由服务端数据库记录解析，URL 参数仅用于查询匹配，不参与路径拼接；缺失或空 JAR 对外 404，本机安装同样拒绝；
 - 市场源 token 经主密钥加密存储，接口只返回是否已配置。

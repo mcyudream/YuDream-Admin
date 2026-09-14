@@ -42,6 +42,7 @@ build/
 # Nested repository backups
 .git.bak/
 /plugins/
+/market-source/
 /.idea/jsLibraryMappings.xml
 /ci.txt
 /artifacts/

@@ -453,6 +453,17 @@ class JdkPluginStoreGatewayTest {
         assertFalse(Files.exists(target));
     }
 
+    @Test
+    void rejectsEmptyJarDownloadsWithoutLeavingTarget() throws IOException {
+        Path target = Files.createTempFile("plugin-store-", ".jar");
+        Files.deleteIfExists(target);
+        FakeHttpClient client = new FakeHttpClient(request -> response(request, 200, "application/java-archive", new byte[0]));
+
+        assertThrows(BizException.class, () -> gateway(ROOT, client).downloadJar(null,
+                storeDescriptor("https://store.example.test/demo.jar", SHA_256), target));
+        assertFalse(Files.exists(target));
+    }
+
     private PluginStorePluginDescriptor parsedDescriptor(String descriptor) {
         return gateway(ROOT, new FakeHttpClient(request -> {
             throw new AssertionError("Unexpected request: " + request.uri());

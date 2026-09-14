@@ -68,9 +68,10 @@ docker compose up -d
 ```yaml
 volumes:
   - ./plugins:/app/plugins
+  - ./market-source:/app/market-source
 ```
 
-把插件 JAR 放进 `./plugins` 后重启 backend 即可加载，也可以在后台"插件管理"页面上传安装。插件可以扩展：
+把插件 JAR 放进 `./plugins` 后重启 backend 即可加载，也可以在后台"插件管理"页面上传安装。自托管市场源的发布物存在独立目录 `./market-source`（容器内 `/app/market-source`），不要和扫描目录混用；不挂载该目录时镜像重建会丢掉已发布 JAR，公开下载会 404，且同一 `{code}@{version}` 不能覆盖，只能把文件拷回或发新版本。插件可以扩展：
 
 - 权限与菜单（随插件启停注册/回收）
 - HTTP 接口，统一挂载 `/api/plugins/{pluginCode}/**`
