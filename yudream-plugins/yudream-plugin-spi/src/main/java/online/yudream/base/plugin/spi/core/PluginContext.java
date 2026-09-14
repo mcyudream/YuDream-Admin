@@ -19,6 +19,7 @@ import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.graph.PluginGraphService;
 import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
+import online.yudream.base.plugin.spi.system.security.PluginOAuthService;
 
 import java.util.Optional;
 import java.util.List;
@@ -44,6 +45,11 @@ public interface PluginContext {
     /** 平台文件预览能力（kkFileView 统一配置 + 签名文件地址签发）。 */
     default PluginFilePreviewService filePreview() {
         return framework().filePreview();
+    }
+
+    /** 宿主 OAuth 授权服务器登记端口。 */
+    default PluginOAuthService oauth() {
+        return framework().oauth();
     }
 
     PluginGraphService graph();

@@ -59,6 +59,14 @@ const constantRoutes: RouteRecordRaw[] = [
     meta: { title: '第三方登录', public: true, constant: true },
   },
   {
+    path: '/oauth/authorize',
+    name: 'oauthAuthorize',
+    component: () => import('@/views/oauth/authorize.vue'),
+    meta: {
+      title: '启动器授权',
+    },
+  },
+  {
     path: '/pay/result',
     name: 'payResult',
     component: () => import('@/views/pay-result.vue'),

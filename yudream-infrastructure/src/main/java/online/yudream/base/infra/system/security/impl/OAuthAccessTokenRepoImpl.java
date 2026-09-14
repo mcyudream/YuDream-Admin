@@ -37,4 +37,13 @@ public class OAuthAccessTokenRepoImpl implements OAuthAccessTokenRepo {
         Query query = Query.query(Criteria.where("refreshTokenHash").is(refreshTokenHash));
         return Optional.ofNullable(OAuthSecurityInfraMapper.toDomain(mongoTemplate.findOne(query, OAuthAccessTokenDO.class)));
     }
+
+    @Override
+    public Optional<OAuthAccessToken> findByAccessTokenHash(String accessTokenHash) {
+        if (accessTokenHash == null || accessTokenHash.isBlank()) {
+            return Optional.empty();
+        }
+        Query query = Query.query(Criteria.where("accessTokenHash").is(accessTokenHash));
+        return Optional.ofNullable(OAuthSecurityInfraMapper.toDomain(mongoTemplate.findOne(query, OAuthAccessTokenDO.class)));
+    }
 }

@@ -102,7 +102,11 @@ function setupRoutes(router: Router) {
         }
         catch (error) {
           console.error('[router] failed to generate dynamic routes', error)
-          return false
+          appAccountStore.requestLogout()
+          return {
+            name: 'login',
+            replace: true,
+          }
         }
         // 动态路由生成并注册后，重新进入当前路由
         return {

@@ -5,6 +5,7 @@ import online.yudream.base.application.system.security.cmd.OAuthAuthorizeCmd;
 import online.yudream.base.application.system.security.cmd.OAuthTokenCmd;
 import online.yudream.base.application.system.security.dto.OAuthAuthorizationDTO;
 import online.yudream.base.application.system.security.dto.OAuthTokenDTO;
+import online.yudream.base.application.system.user.service.PermissionAppService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.aggregate.OAuthAccessToken;
@@ -27,8 +28,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 @Service
@@ -45,6 +48,7 @@ public class OAuthServerAppService {
     private final OAuthClientRegistrationRepo oauthClientRegistrationRepo;
     private final OAuthAuthorizationCodeRepo oauthAuthorizationCodeRepo;
     private final OAuthAccessTokenRepo oauthAccessTokenRepo;
+    private final PermissionAppService permissionAppService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Transactional
@@ -56,7 +60,8 @@ public class OAuthServerAppService {
         OAuthClientRegistration client = activeClient(cmd.getClientId());
         ensureGrantAllowed(client, OAuthGrantType.AUTHORIZATION_CODE);
         ensureRedirectAllowed(client, cmd.getRedirectUri());
-        List<String> scopes = resolveScopes(client, cmd.getScope());
+        List<String> userPermissions = resolveUserPermissions(cmd);
+        List<String> scopes = intersectGrantedScopes(resolveScopes(client, cmd.getScope()), userPermissions);
         String code = randomValue("ydo_code_", CODE_BYTES);
         OAuthAuthorizationCode authorizationCode = OAuthAuthorizationCode.issue(
                 code,
@@ -213,6 +218,34 @@ public class OAuthServerAppService {
             throw new BizException("OAuth 授权范围超出客户端允许范围");
         }
         return requested;
+    }
+
+    private List<String> resolveUserPermissions(OAuthAuthorizeCmd cmd) {
+        if (cmd.getUserId() != null) {
+            return permissionAppService.getUserPermissions(cmd.getUserId());
+        }
+        return cmd.getUserPermissions() == null ? List.of() : cmd.getUserPermissions();
+    }
+
+    /**
+     * openid / profile 始终下发；plugin:* 仅当下发用户实际拥有对应权限（含 *）。
+     */
+    private List<String> intersectGrantedScopes(List<String> requested, List<String> userPermissions) {
+        boolean superAdmin = userPermissions != null && userPermissions.contains("*");
+        LinkedHashSet<String> granted = new LinkedHashSet<>();
+        for (String scope : requested) {
+            if ("openid".equals(scope) || "profile".equals(scope) || superAdmin) {
+                granted.add(scope);
+                continue;
+            }
+            if (userPermissions != null && userPermissions.contains(scope)) {
+                granted.add(scope);
+            }
+        }
+        if (granted.isEmpty()) {
+            throw new BizException("OAuth 授权范围不能为空");
+        }
+        return new ArrayList<>(granted);
     }
 
     private String randomValue(String prefix, int bytesLength) {

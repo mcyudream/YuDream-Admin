@@ -27,6 +27,16 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsUnauthenticatedBusinessExceptionToUnauthorized() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+
+        var response = handler.handleBizException(request, new BizException(401, "未登录或登录已过期"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(response.getBody()).extracting("code", "message").containsExactly(401, "未登录或登录已过期");
+    }
+
+    @Test
     void mapsMissingResourceToNotFoundInsteadOfInternalError() {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/public/plugin-market");
 

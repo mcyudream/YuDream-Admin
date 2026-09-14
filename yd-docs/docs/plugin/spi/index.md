@@ -1,6 +1,6 @@
 # SPI 版本说明与升级指引
 
-`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前源码版本：2.27.0**（以 `yudream-plugins/yudream-plugin-spi/pom.xml` 与根 `pom.xml` 的 `yudream.plugin.spi.version` 为准）。
+`yudream-plugin-spi` 是插件唯一编译期契约模块，坐标 `online.yudream.base:yudream-plugin-spi`。**当前源码版本：2.28.0**（以 `yudream-plugins/yudream-plugin-spi/pom.xml` 与根 `pom.xml` 的 `yudream.plugin.spi.version` 为准）。
 
 源码升版不等于已发布到 Nexus。下游插件仓只应依赖已验证发布的版本；未跑通发布/验签流水线的版本不得用于生产插件。
 
@@ -29,7 +29,13 @@ SPI 接口文档按版本号组织，每个版本一个完整教程目录：
 
 | 版本 | 状态 | 说明 |
 |---|---|---|
-| [v1 (2.27.0)](/plugin/spi/v1/core) | 当前源码 | 全量 API 教程。相对早期文档已补齐消息 `protocol`、AI 流式、宿主目录 SDK、官方 QQ、文件预览、入站邮箱、扩展点（登录/注册拦截、身份核验、第三方登录提供方）、菜单显隐与公开站 `siteNav`、插件主题（含 homePreset / homeComponent / chromeComponent）、主题配置 schema 与主题块提供者 |
+| [v1 (2.28.0)](/plugin/spi/v1/core) | 当前源码 | 全量 API 教程。相对早期文档已补齐消息 `protocol`、AI 流式、宿主目录 SDK、官方 QQ、文件预览、入站邮箱、扩展点（登录/注册拦截、身份核验、第三方登录提供方）、菜单显隐与公开站 `siteNav`、插件主题（含 homePreset / homeComponent / chromeComponent）、主题配置 schema 与主题块提供者、OAuth 公开客户端登记 |
+
+## 2.28.0 相对 2.27.0 的增量
+
+| 范围 | 变更 |
+|---|---|
+| OAuth 公开客户端登记 | `FrameworkServices.oauth()` / `PluginContext.oauth()`：`PluginOAuthService.ensurePublicClient` 幂等登记 auth method NONE 的公开客户端。启动器适配器在启用时注册 `ymcl` + `sjmcl://auth/callback`，manifest 公布 `oauth.clientId` |
 
 ## 2.27.0 相对 2.24.0 的增量
 

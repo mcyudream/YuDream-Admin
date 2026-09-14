@@ -65,7 +65,9 @@ api.interceptors.request.use(
 
 // 处理错误信息的函数
 function handleError(error: any) {
-  if (error.status === 401) {
+  const status = error?.response?.status ?? error?.status
+  const code = error?.response?.data?.code ?? error?.code
+  if (status === 401 || code === 401) {
     useAppAccountStore().requestLogout()
   }
   else {

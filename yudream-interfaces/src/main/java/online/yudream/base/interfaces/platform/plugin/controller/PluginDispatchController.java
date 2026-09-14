@@ -109,7 +109,7 @@ public class PluginDispatchController {
     }
 
     private SecurityPrincipalSupport.SecurityPrincipal principal() {
-        if (SecurityPrincipalSupport.hasApiKeyAuthentication()) {
+        if (SecurityPrincipalSupport.hasApiKeyAuthentication() || SecurityPrincipalSupport.hasOAuthAuthentication()) {
             return SecurityPrincipalSupport.current();
         }
         Object loginId = StpUtil.getLoginIdDefaultNull();

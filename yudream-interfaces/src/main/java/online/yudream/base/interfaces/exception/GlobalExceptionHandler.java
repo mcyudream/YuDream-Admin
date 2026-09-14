@@ -32,7 +32,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
     public ResponseEntity<Result<Void>> handleBizException(HttpServletRequest request, BizException e) {
-        return failure(request, e, HttpStatus.BAD_REQUEST, Result.fail(e.getCode(), e.getMessage()));
+        return failure(request, e, httpStatusOf(e), Result.fail(e.getCode(), e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -106,16 +106,31 @@ public class GlobalExceptionHandler {
         return failure(request, e, HttpStatus.INTERNAL_SERVER_ERROR, Result.fail(ResultCode.INTERNAL_ERROR));
     }
 
-    private ResponseEntity<Result<Void>> failure(HttpServletRequest request, Exception e, HttpStatus status,
+    @ExceptionHandler(LinkageError.class)
+    public ResponseEntity<Result<Void>> handleLinkageError(HttpServletRequest request, LinkageError e) {
+        return failure(request, e, HttpStatus.INTERNAL_SERVER_ERROR, Result.fail(ResultCode.INTERNAL_ERROR));
+    }
+
+    private static HttpStatus httpStatusOf(BizException e) {
+        if (e.getCode() == ResultCode.UNAUTHORIZED.getCode()) {
+            return HttpStatus.UNAUTHORIZED;
+        }
+        if (e.getCode() == ResultCode.FORBIDDEN.getCode()) {
+            return HttpStatus.FORBIDDEN;
+        }
+        return HttpStatus.BAD_REQUEST;
+    }
+
+    private ResponseEntity<Result<Void>> failure(HttpServletRequest request, Throwable e, HttpStatus status,
                                                  Result<Void> result) {
         RequestFailureContext.mark(request, e);
         if (status.is5xxServerError()) {
             log.error("HTTP request failed: method={}, path={}, status={}, type={}",
-                    request.getMethod(), request.getRequestURI(), status.value(), e.getClass().getSimpleName());
+                    request.getMethod(), request.getRequestURI(), status.value(), e.getClass().getSimpleName(), e);
         }
         else {
             log.warn("HTTP request failed: method={}, path={}, status={}, type={}",
-                    request.getMethod(), request.getRequestURI(), status.value(), e.getClass().getSimpleName());
+                    request.getMethod(), request.getRequestURI(), status.value(), e.getClass().getSimpleName(), e);
         }
         // SSE 请求（Accept: text/event-stream）协商不出 JSON 错误体：异常发生在进入流式阶段之前，
         // 强写 Result 会抛 HttpMediaTypeNotAcceptableException，连带原始异常被容器以 ERROR 刷屏。

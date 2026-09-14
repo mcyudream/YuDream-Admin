@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.user.service.UserAppService;
 import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -80,6 +81,9 @@ public class EmailVerificationAccessInterceptor implements HandlerInterceptor {
     }
 
     private Long currentLoginId() {
+        if (SecurityPrincipalSupport.hasOAuthAuthentication()) {
+            return SecurityPrincipalSupport.currentOrOAuth().userId();
+        }
         try {
             Object loginId = StpUtil.getLoginIdDefaultNull();
             return loginId == null ? null : Long.valueOf(String.valueOf(loginId));
