@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import type { PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
-import type { PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
+import type { PluginDependencyStatus, PluginDependents, PluginModule, PluginStatus } from '@/api/modules/platform-plugin'
+import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceUpdatePlan } from '@/api/modules/platform-plugin-marketplace'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import { refreshPluginThemes } from '@/plugins/theme-runtime'
 import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
+import DependentsConfirmDialog from './dependents-confirm-dialog.vue'
+import EnableDependencyDialog from './enable-dependency-dialog.vue'
 
 type PluginFilterStatus = 'all' | PluginStatus | 'update'
 
@@ -22,6 +24,12 @@ const keyword = ref('')
 const filterStatus = ref<PluginFilterStatus>('all')
 const pagination = reactive({ page: 1, size: 12, total: 0 })
 const uploadInput = ref<HTMLInputElement>()
+const enableDialogOpen = ref(false)
+const enableDependencyStatus = ref<PluginDependencyStatus | null>(null)
+const enableLoading = ref(false)
+const dependentsDialogOpen = ref(false)
+const dependentsInfo = ref<PluginDependents | null>(null)
+const dependentsAction = ref<'unload' | 'delete'>('unload')
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
 const filterOptions: { label: string, value: PluginFilterStatus }[] = [
@@ -139,16 +147,19 @@ function canConfirmUpdate(item: PluginModule, plan?: PluginMarketplaceUpdatePlan
 }
 
 function confirmRollback(item = selected.value) {
-  if (!item || !item.rollbackAvailable || item.loaded || item.enabled) {
+  if (!item || !item.rollbackAvailable) {
     return
   }
+  const cascade = Boolean(item.loaded || item.enabled)
   modal.confirm({
     title: '确认回滚插件',
-    content: `确认将插件「${item.name}」回滚到 ${item.rollbackVersion || '本地备份'} 吗？目标插件及依赖方必须停止；回滚后需重启服务，且不会自动启用。`,
+    content: cascade
+      ? `确认将运行中的插件「${item.name}」回滚到 ${item.rollbackVersion || '本地备份'} 吗？将按依赖顺序级联停机（含硬/软依赖方），回滚后自动恢复原先启用的软依赖方；硬依赖方若与降级版本不兼容会标记异常。回滚不会自动启用目标插件。`
+      : `确认将插件「${item.name}」回滚到 ${item.rollbackVersion || '本地备份'} 吗？回滚后需重启服务，且不会自动启用。`,
     onConfirm: async () => {
       actionLoading.value = `${item.code}:rollback`
       try {
-        const res = await apiPluginMarketplace.rollback(item.code)
+        const res = await apiPluginMarketplace.rollback(item.code, cascade)
         rows.value = res.data.modules
         syncSelectedCode()
         await refreshDynamicRoutes(router)
@@ -228,6 +239,14 @@ async function uploadJar(event: Event) {
 }
 
 async function runAction(code: string, action: 'load' | 'enable' | 'disable' | 'unload') {
+  if (action === 'enable') {
+    await previewEnable(code)
+    return
+  }
+  if (action === 'unload') {
+    await previewUnload(code)
+    return
+  }
   actionLoading.value = `${code}:${action}`
   try {
     const res = await apiPlugin[action](code)
@@ -243,6 +262,117 @@ async function runAction(code: string, action: 'load' | 'enable' | 'disable' | '
   }
 }
 
+/** 启用前依赖预览：有依赖时弹窗（硬缺失引导安装、软依赖可选启用），无依赖直接启用。 */
+async function previewEnable(code: string) {
+  const item = rows.value.find(row => row.code === code)
+  if (!item || item.enabled) {
+    return
+  }
+  const hasDependencies = Boolean(item.dependencies?.length || item.softDependencies?.length)
+  if (!hasDependencies) {
+    await enablePlugin(code, [])
+    return
+  }
+  actionLoading.value = `${code}:enable`
+  try {
+    const res = await apiPlugin.dependencies(code)
+    enableDependencyStatus.value = res.data
+    enableDialogOpen.value = true
+  }
+  catch {
+    toast.error('获取插件依赖状态失败')
+  }
+  finally {
+    actionLoading.value = ''
+  }
+}
+
+async function confirmEnable(payload: { includeSoft: string[], installItems: PluginMarketplaceBatchInstallItem[] }) {
+  const code = enableDependencyStatus.value?.code
+  if (!code) {
+    return
+  }
+  enableLoading.value = true
+  try {
+    if (payload.installItems.length) {
+      try {
+        await apiPluginMarketplace.installBatch(payload.installItems)
+      }
+      catch {
+        toast.error('依赖下载失败，已整体回滚；插件未启用')
+        return
+      }
+    }
+    await enablePlugin(code, payload.includeSoft)
+    enableDialogOpen.value = false
+  }
+  finally {
+    enableLoading.value = false
+  }
+}
+
+async function enablePlugin(code: string, includeSoft: string[]) {
+  actionLoading.value = `${code}:enable`
+  try {
+    const res = await apiPlugin.enable(code, includeSoft)
+    replaceItem(res.data)
+    await refreshDynamicRoutes(router)
+    await refreshPluginThemes()
+    toast.success(includeSoft.length
+      ? `插件已启用，并一并启用了 ${includeSoft.length} 个软依赖`
+      : '插件已启用，动态菜单已同步')
+  }
+  catch {
+    await load()
+  }
+  finally {
+    actionLoading.value = ''
+  }
+}
+
+/** 卸载前依赖方预览：有运行中依赖方时弹窗提供级联，否则直接卸载。 */
+async function previewUnload(code: string) {
+  const item = rows.value.find(row => row.code === code)
+  if (!item || !item.loaded) {
+    return
+  }
+  actionLoading.value = `${code}:unload`
+  try {
+    const res = await apiPlugin.dependents(code)
+    const running = res.data.dependents.filter(dependent => dependent.loaded || dependent.enabled)
+    if (!running.length) {
+      await unloadPlugin(code, false)
+      return
+    }
+    dependentsInfo.value = res.data
+    dependentsAction.value = 'unload'
+    dependentsDialogOpen.value = true
+  }
+  catch {
+    toast.error('获取插件依赖方失败')
+  }
+  finally {
+    actionLoading.value = ''
+  }
+}
+
+async function unloadPlugin(code: string, cascade: boolean) {
+  actionLoading.value = `${code}:unload`
+  try {
+    const res = await apiPlugin.unload(code, cascade)
+    replaceItem(res.data)
+    await refreshDynamicRoutes(router)
+    await refreshPluginThemes()
+    toast.success(cascade ? '插件已级联卸载；软依赖方已自动降级恢复，硬依赖方保持禁用' : '插件已卸载，动态菜单已同步')
+  }
+  catch {
+    await load()
+  }
+  finally {
+    actionLoading.value = ''
+  }
+}
+
 function confirmRemove(item = selected.value) {
   if (!item) {
     return
@@ -251,20 +381,65 @@ function confirmRemove(item = selected.value) {
     title: '确认删除插件记录',
     content: `确认删除插件「${item.name}」的管理记录吗？该操作不会删除磁盘 JAR；如果 JAR 仍在插件目录中，扫描后会重新出现。`,
     onConfirm: async () => {
+      // 有运行中依赖方时改走级联确认弹窗
       actionLoading.value = `${item.code}:remove`
       try {
-        await apiPlugin.remove(item.code)
-        rows.value = rows.value.filter(row => row.code !== item.code)
-        syncSelectedCode()
-        await refreshDynamicRoutes(router)
-        await refreshPluginThemes()
-        toast.success('插件记录已删除')
+        const res = await apiPlugin.dependents(item.code)
+        const running = res.data.dependents.filter(dependent => dependent.loaded || dependent.enabled)
+        if (running.length) {
+          dependentsInfo.value = res.data
+          dependentsAction.value = 'delete'
+          dependentsDialogOpen.value = true
+          return
+        }
+        await removePluginRecord(item, false)
+      }
+      catch {
+        toast.error('获取插件依赖方失败')
       }
       finally {
         actionLoading.value = ''
       }
     },
   })
+}
+
+async function removePluginRecord(item: PluginModule, cascade: boolean) {
+  actionLoading.value = `${item.code}:remove`
+  try {
+    await apiPlugin.remove(item.code, cascade)
+    rows.value = rows.value.filter(row => row.code !== item.code)
+    syncSelectedCode()
+    await refreshDynamicRoutes(router)
+    await refreshPluginThemes()
+    toast.success(cascade ? '插件记录已级联删除；软依赖方已自动降级恢复' : '插件记录已删除')
+  }
+  finally {
+    actionLoading.value = ''
+  }
+}
+
+function openGitUrl(url?: string) {
+  if (url) {
+    window.open(url, '_blank', 'noopener')
+  }
+}
+
+/** 卸载/删除依赖方弹窗确认：级联执行并自动恢复软依赖方。 */
+async function handleDependentsConfirm(cascade: boolean) {
+  const code = dependentsInfo.value?.code
+  if (!code) {
+    return
+  }
+  dependentsDialogOpen.value = false
+  if (dependentsAction.value === 'delete') {
+    const item = rows.value.find(row => row.code === code)
+    if (item) {
+      await removePluginRecord(item, cascade)
+    }
+    return
+  }
+  await unloadPlugin(code, cascade)
 }
 
 function replaceItem(item: PluginModule) {
@@ -423,6 +598,15 @@ function actionText(action: string) {
               <span>JAR 路径</span>
               <strong>{{ selected.jarPath || '-' }}</strong>
             </div>
+            <div v-if="selected.gitUrl">
+              <span>源码仓库</span>
+              <strong>
+                <FaButton variant="link" class="detail-git-link" @click="openGitUrl(selected.gitUrl)">
+                  <FaIcon name="i-ri:github-line" />
+                  {{ selected.gitUrl }}
+                </FaButton>
+              </strong>
+            </div>
           </div>
 
           <div v-if="updatePlanFor(selected.code)" class="update-panel" :class="{ blocked: updatePlanFor(selected.code)?.blockedReason }">
@@ -477,7 +661,7 @@ function actionText(action: string) {
               <FaButton
                 v-auth="'platform:plugin:manage'"
                 variant="outline"
-                :disabled="!selected.rollbackAvailable || selected.loaded || selected.enabled || Boolean(actionLoading)"
+                :disabled="!selected.rollbackAvailable || Boolean(actionLoading)"
                 :loading="actionLoading === `${selected.code}:rollback`"
                 @click="confirmRollback(selected)"
               >
@@ -552,6 +736,20 @@ function actionText(action: string) {
             </FaButton>
           </div>
       </section>
+
+      <EnableDependencyDialog
+        v-model="enableDialogOpen"
+        :status="enableDependencyStatus"
+        :loading="enableLoading"
+        @confirm="confirmEnable"
+      />
+      <DependentsConfirmDialog
+        v-model="dependentsDialogOpen"
+        :dependents="dependentsInfo"
+        :action="dependentsAction"
+        :loading="Boolean(actionLoading)"
+        @confirm="handleDependentsConfirm"
+      />
     </FaPageMain>
   </div>
 </template>
@@ -785,6 +983,16 @@ function actionText(action: string) {
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
   background: var(--color-bg-1);
+}
+
+.detail-git-link {
+  justify-self: start;
+  max-width: 100%;
+  padding: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dependency-panel,
