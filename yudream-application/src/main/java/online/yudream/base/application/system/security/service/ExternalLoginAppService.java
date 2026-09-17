@@ -101,11 +101,27 @@ public class ExternalLoginAppService {
     private ExternalLoginCallbackDTO finishCallback(ExternalLoginTicketStore.State session, String state, String code) {
         String providerCode = session.providerCode();
         String type = session.platformType();
-        ExternalLoginGateway.ExternalIdentity identity = exchange(providerCode, type, code, state);
+        ResolvedIdentity resolved = exchange(providerCode, type, code, state);
+        ExternalLoginGateway.ExternalIdentity identity = resolved.identity();
+        Long authenticatedUserId = resolved.authenticatedUserId();
         ExternalLoginTicketStore.Binding binding = new ExternalLoginTicketStore.Binding(providerCode, type, identity.socialUid(),
                 identity.nickname(), identity.avatarUrl(), identity.gender(), identity.location());
         ExternalAccount account = accountRepo.findByProviderAndPlatformAndSocialUid(providerCode, type, identity.socialUid()).orElse(null);
+        if (authenticatedUserId != null) {
+            if (session.bindUserId() != null && !session.bindUserId().equals(authenticatedUserId)) {
+                throw new BizException("本次认证的本站账号与待绑定账号不一致");
+            }
+            if (account != null && !account.getUserId().equals(authenticatedUserId)) {
+                throw new BizException("该第三方账号已绑定其他用户");
+            }
+            bindingAppService.ensureActiveUser(authenticatedUserId);
+        }
         if (session.bindUserId() != null) return bindOutcome(session.bindUserId(), binding, account);
+        if (account == null && authenticatedUserId != null) {
+            bindingAppService.bind(binding, authenticatedUserId);
+            return ExternalLoginCallbackDTO.builder().outcome(ExternalLoginCallbackDTO.Outcome.LOGIN)
+                    .session(loginSession(authenticatedUserId)).build();
+        }
         if (account == null) {
             String bindingToken = token();
             ticketStore.saveBinding(bindingToken, binding);
@@ -119,17 +135,29 @@ public class ExternalLoginAppService {
                 .session(loginSession(account.getUserId())).build();
     }
 
-    private ExternalLoginGateway.ExternalIdentity exchange(String providerCode, String type, String code, String state) {
+    private ResolvedIdentity exchange(String providerCode, String type, String code, String state) {
         PluginExternalLoginProvider plugin = pluginProvider(providerCode).orElse(null);
         if (plugin != null) {
             if (!plugin.enabled()) throw new BizException("第三方登录提供方未启用");
             PluginExternalLoginIdentity id = plugin.exchange(new PluginExternalLoginExchangeRequest(type, code, state));
             if (id == null || !StringUtils.hasText(id.socialUid())) throw new BizException("第三方登录未返回有效账号标识");
-            return new ExternalLoginGateway.ExternalIdentity(id.socialUid(), id.nickname(), id.avatarUrl(), id.gender(), id.location());
+            return new ResolvedIdentity(new ExternalLoginGateway.ExternalIdentity(id.socialUid(), id.nickname(),
+                    id.avatarUrl(), id.gender(), id.location()), authenticatedUserId(id.authenticatedUserId()));
         }
         ExternalLoginProvider provider = active(providerCode);
-        return gateway.exchange(provider, type, code);
+        return new ResolvedIdentity(gateway.exchange(provider, type, code), null);
     }
+
+    private Long authenticatedUserId(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            long userId = Long.parseLong(value);
+            if (userId > 0) return userId;
+        } catch (NumberFormatException ignored) { }
+        throw new BizException("第三方登录返回的本站账号标识无效");
+    }
+
+    private record ResolvedIdentity(ExternalLoginGateway.ExternalIdentity identity, Long authenticatedUserId) { }
 
     private UserLoginDTO loginSession(Long userId) {
         LoginTokenDTO token = loginTokenAppService.issueForLogin(userId);

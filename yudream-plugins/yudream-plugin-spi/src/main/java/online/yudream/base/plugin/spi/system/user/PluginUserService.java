@@ -15,6 +15,14 @@ public interface PluginUserService {
 
     Optional<PluginUserProfile> findByEmail(String email);
 
+    /**
+     * 2.29.0 起按完整外部身份查询已有绑定，避免已绑定其他邮箱的用户被重复开户。
+     * 结果仅用于识别已有绑定，不能根据邮箱自动绑定到其他本站用户。
+     */
+    default Optional<PluginUserProfile> findByExternalIdentity(String providerCode, String platformType, String socialUid) {
+        throw new UnsupportedOperationException("宿主不支持查询外部账号绑定");
+    }
+
     Optional<PluginUserProfile> findByQq(String qq);
 
     void bindQqOnce(Long userId, String qq);
