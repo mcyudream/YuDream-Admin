@@ -331,7 +331,7 @@ function actionText(action: string) {
             检查更新
           </FaButton>
           <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
-            <FaIcon name="i-ri:folder-search-line" />
+            <FaIcon name="i-ri:folder-open-line" />
             扫描目录
           </FaButton>
         </div>

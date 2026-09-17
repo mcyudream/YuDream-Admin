@@ -4,6 +4,7 @@ import { useForm } from 'vee-validate'
 import * as z from 'zod'
 import { FormControl, FormField, FormItem, FormMessage } from '@/ui/shadcn/ui/form'
 import apiSetup from '@/api/modules/setup'
+import { resetSetupStatus } from '@/router/guards'
 
 const router = useRouter()
 
@@ -33,6 +34,13 @@ const form = useForm({
   },
 })
 
+const goLogin = () => {
+  localStorage.setItem('setupCompleted', 'true')
+  // 守卫内的初始化状态是缓存值，初始化完成后必须失效，否则会被弹回 setup 页
+  resetSetupStatus()
+  router.push({ name: 'login' })
+}
+
 const onSubmit = form.handleSubmit((values) => {
   loading.value = true
   apiSetup.init({
@@ -43,8 +51,13 @@ const onSubmit = form.handleSubmit((values) => {
     adminPassword: values.adminPassword,
     adminConfirmPassword: values.adminConfirmPassword,
   }).then(() => {
-    localStorage.setItem('setupCompleted', 'true')
-    router.push({ name: 'login' })
+    goLogin()
+  }).catch((error: any) => {
+    // 后端提示已初始化（如重复提交、缓存过期）时直接引导登录，不再留在初始化页
+    const message = error?.response?.data?.message || error?.message || ''
+    if (message.includes('系统已初始化')) {
+      goLogin()
+    }
   }).finally(() => {
     loading.value = false
   })

@@ -1,6 +1,7 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
+import { hintForMessage, toastApiError } from '@/utils/api-error'
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -63,9 +64,8 @@ systemClient.interceptors.response.use(
     if (result?.code === 401) {
       return retryAfterRefresh(response.config)
     }
-    const message = result?.message || '请求失败'
-    useFaToast().error('错误', { description: message })
-    return Promise.reject(new Error(message))
+    useFaToast().error('错误', { description: hintForMessage(result?.message || '请求失败') })
+    return Promise.reject(new Error(result?.message || '请求失败'))
   },
   async (error: AxiosError) => {
     if (error.response?.data) {
@@ -74,26 +74,10 @@ systemClient.interceptors.response.use(
     if (error.response?.status === 401) {
       return retryAfterRefresh(error.config)
     }
-    let data = error.response?.data as BackendResult<unknown> | undefined
-    // blob 请求（如插件文件下载）失败时错误体也是 Blob，JSON 错误体需先解析出插件返回的 message
-    if (data instanceof Blob
-      && String(error.response?.headers?.['content-type'] || '').includes('application/json')) {
-      data = await parseJsonBlob(data)
-    }
-    const message = data?.message || error.message || '网络错误'
-    useFaToast().error('错误', { description: message })
+    await toastApiError(error)
     return Promise.reject(error)
   },
 )
-
-async function parseJsonBlob(blob: Blob): Promise<BackendResult<unknown> | undefined> {
-  try {
-    return JSON.parse(await blob.text()) as BackendResult<unknown>
-  }
-  catch {
-    return undefined
-  }
-}
 
 async function retryAfterRefresh(config?: InternalAxiosRequestConfig) {
   if (!config || config.skipTokenRefresh || config.tokenRetried) {

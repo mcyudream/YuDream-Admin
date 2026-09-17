@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
+import { hintForMessage, toastApiError } from '@/utils/api-error'
 
 interface BackendResult<T> {
   code: number
@@ -48,15 +49,14 @@ setupApi.interceptors.response.use(
       } as any)
     }
     const message = result?.message || '请求失败'
-    useFaToast().error('错误', { description: message })
+    useFaToast().error('错误', { description: hintForMessage(message) })
     return Promise.reject(new Error(message))
   },
   async (error) => {
     if (error.response?.data) {
       error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
     }
-    const message = error.response?.data?.message || error.message || '网络错误'
-    useFaToast().error('错误', { description: message })
+    await toastApiError(error)
     return Promise.reject(error)
   },
 )
