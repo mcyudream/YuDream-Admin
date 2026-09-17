@@ -52,6 +52,8 @@
 - **主题配置走声明式 schema**：主题经 `@PluginTheme(configSchema="...")` 声明 JAR 内 `theme-config.json`（分节+字段：text/textarea/number/switch/select/color/image/list，字段可标 `secret` 加密存储、管理端脱敏），宿主按 schema 渲染独立配置页 `/platform/theme-center/config/{theme}`，值按主题隔离持久化 Setting（key `pluginTheme.config.{themeCode}`、category `plugin-theme`、type JSON），模板以 `theme.config.*` 消费（公开输出剔除 secret）；内置 default 主题无配置页。细则见 `docs/plugin-system/specification.md` 9.1。
 - **插件数据进主题模板走块提供者**：系统能力（CMS/Wiki/导航/站点设置）已在模板上下文直接可用；插件私有数据经 SPI `PluginThemeBlockProvider`（`code/name/supportedThemes/data(ctx)`）以 `context.registerExtension(...)` 注册，模板经 `blocks.{code}` 懒加载消费，块缺失时优雅降级；提供者只暴露公开安全字段，宿主不做字段级过滤。
 
+- 外部认证自动开户绑定使用 SPI 2.29.0 的 `PluginExternalLoginIdentity.authenticatedUserId`（字符串 ID），只能声明本次新建或已验证本站凭据的用户；禁止用邮箱匹配或浏览器提供的 ID 自动认领已有账号。宿主必须核销 state 并检查停用、绑定冲突；缺省字段保留 `BIND_REQUIRED`。开户前用 `PluginUserService.findByExternalIdentity` 检查已有绑定。详见 `docs/plugin-system/spi-2.29.0-external-login.md`。
+
 ## 5. AI/Agent 与 CMS 要点
 
 - AI 配置必须 provider-first 列表结构（`providers` 数组，每个 provider 持有 base URL、key、代理、默认模型与模型清单）；前端传 `providerCode` + `modelCode`。

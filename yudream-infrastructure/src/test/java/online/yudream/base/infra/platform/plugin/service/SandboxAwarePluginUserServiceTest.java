@@ -32,6 +32,7 @@ class SandboxAwarePluginUserServiceTest {
         SandboxAwarePluginUserService service = new SandboxAwarePluginUserService(delegate, roleRepo(List.of()));
 
         assertEquals(Optional.of(PROFILE), service.findByQq("10001"));
+        assertEquals(Optional.of(PROFILE), service.findByExternalIdentity("eduroam", "eduroam", "student@school.edu.cn"));
         assertEquals(List.of(new PluginUserRole(1L, "admin", "管理员")), service.listRoles(1L));
         assertEquals(0, delegate.bindCalls);
     }
@@ -118,7 +119,7 @@ class SandboxAwarePluginUserServiceTest {
         private int bindCalls;
 
         private StubDelegate() {
-            super(null, null, null, null, null, null, null);
+            super(null, null, null, null, null, null, null, null);
         }
 
         @Override
@@ -129,6 +130,14 @@ class SandboxAwarePluginUserServiceTest {
         @Override
         public List<PluginUserRole> listRoles(Long userId) {
             return List.of(new PluginUserRole(1L, "admin", "管理员"));
+        }
+
+        @Override
+        public Optional<PluginUserProfile> findByExternalIdentity(String providerCode, String platformType, String socialUid) {
+            assertEquals("eduroam", providerCode);
+            assertEquals("eduroam", platformType);
+            assertEquals("student@school.edu.cn", socialUid);
+            return Optional.of(PROFILE);
         }
 
         @Override

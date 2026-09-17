@@ -177,6 +177,8 @@ Assembler hard rules:
 - Frontend audit rules live in `yudream-frontend/eslint-rules/` registered as `yudream/prefer-fa-component` (template `<a-*>` + `@arco-design/web-vue` import detection against the shared `fa-component-map.mjs`; AI-scene files get the Yd* hint) and `yudream/no-brand-color-token` (Arco `--primary-N` step tokens only; the theme system's own `--primary`/`--primary-foreground` stay legal). Both are warn-level on `apps/**` and never block builds. `pnpm audit:ui` regenerates `audit-report.json` (gitignored), which the vite dev middleware serves at `/__yudream-devtools/audit.json` for the panel's audit tab; rule changes must keep that report shape (`generatedAt`/`summary`/`violations[]`) compatible.
 - Beware: `pnpm lint:eslint` runs with `--fix` at the repo root, and any `eslint.config.js` change invalidates the eslint cache, so a full run mass-rewrites unrelated files. Verify rule changes with targeted `npx eslint <paths> --no-cache` runs and only stage the files owned by the work item.
 
+- 外部登录插件自动开户后绑定使用 SPI 2.29.0 的 `PluginExternalLoginIdentity.authenticatedUserId`（字符串 ID）。只有新建用户或已证明本站凭据的用户可返回此字段；不得按邮箱匹配或浏览器参数自动认领已有账号。宿主核销 state 后必须检查停用与绑定冲突，缺省字段保持 `BIND_REQUIRED`。开户前使用 `PluginUserService.findByExternalIdentity` 排除既有绑定，避免用户更改本站邮箱后被重复开户。详见 `docs/plugin-system/spi-2.29.0-external-login.md`。
+
 ## System Seeds
 
 - System seed initialization, including menu enum seeds, must be controlled by configuration instead of hard-coded overwrite behavior.

@@ -22,6 +22,7 @@ import online.yudream.base.domain.system.user.enumerate.DeptStatus;
 import online.yudream.base.domain.system.user.aggregate.User;
 import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.UserRepo;
+import online.yudream.base.domain.system.security.repo.ExternalAccountRepo;
 import online.yudream.base.plugin.spi.system.user.PluginDeptOption;
 import online.yudream.base.plugin.spi.system.user.PluginUserDept;
 import online.yudream.base.plugin.spi.system.user.PluginUserOption;
@@ -53,6 +54,7 @@ public class PluginUserFrameworkService implements PluginUserService {
     private final DeptManageAppService deptManageAppService;
     private final PasswordEncoder passwordEncoder;
     private final MessagingIdentityAppService messagingIdentityAppService;
+    private final ExternalAccountRepo externalAccountRepo;
 
     @Override
     public Optional<PluginUserProfile> authenticate(String usernameOrEmail, String password) {
@@ -116,6 +118,17 @@ public class PluginUserFrameworkService implements PluginUserService {
     @Override
     public Optional<PluginUserProfile> findByEmail(String email) {
         return userRepo.findByEmail(email).map(this::toProfile);
+    }
+
+    @Override
+    public Optional<PluginUserProfile> findByExternalIdentity(String providerCode, String platformType, String socialUid) {
+        if (!hasText(providerCode) || !hasText(platformType) || !hasText(socialUid)) {
+            throw new BizException("外部账号标识不能为空");
+        }
+        return externalAccountRepo.findByProviderAndPlatformAndSocialUid(providerCode, platformType, socialUid)
+                .map(account -> userRepo.findById(account.getUserId())
+                        .orElseThrow(() -> new BizException("外部账号绑定的用户不存在")))
+                .map(this::toProfile);
     }
 
     @Override

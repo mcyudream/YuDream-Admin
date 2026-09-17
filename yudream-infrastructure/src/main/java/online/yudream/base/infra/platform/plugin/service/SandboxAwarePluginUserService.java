@@ -69,6 +69,11 @@ public class SandboxAwarePluginUserService implements PluginUserService {
     }
 
     @Override
+    public Optional<PluginUserProfile> findByExternalIdentity(String providerCode, String platformType, String socialUid) {
+        return delegate.findByExternalIdentity(providerCode, platformType, socialUid);
+    }
+
+    @Override
     public Optional<PluginUserProfile> findByQq(String qq) {
         QqSandboxSession session = QqSandboxExecutionScope.current();
         if (session != null && session.forceUnbound()) {
