@@ -47,6 +47,11 @@ export interface PluginStorePluginDescriptor {
   source?: PluginStorePluginSource
   license?: string
   releaseNotes?: string
+  /** 社区元数据：LOCAL/V2 源携带；静态索引源可能为空。 */
+  category?: string
+  tags?: string[]
+  /** plugin.yml 可选 git 声明的源码仓库地址。 */
+  gitUrl?: string
   /** Kept for compatibility with newer backend responses. */
   installable?: boolean
   /** Kept for compatibility with newer backend responses. */
@@ -133,6 +138,39 @@ export interface PluginMarketplaceInstallRequest {
   sourceCode?: string
 }
 
+export interface PluginMarketplaceInstallPlanEntry {
+  code: string
+  displayName?: string
+  /** true=硬依赖（必须满足才能安装目标），false=软依赖（可选安装）。 */
+  required: boolean
+  range?: string
+  installed: boolean
+  installedVersion?: string
+  versionSatisfied: boolean
+  storeAvailable: boolean
+  storeVersion?: string
+  storeSourceCode?: string
+  storeSourceName?: string
+  /** 候选市场版本自身是否可安装（兼容性与其必需依赖）。 */
+  installable: boolean
+  installDisabledReason?: string
+}
+
+export interface PluginMarketplaceInstallPlan {
+  code: string
+  releaseVersion: string
+  installable: boolean
+  installDisabledReason?: string
+  /** 依赖条目按「被依赖者在前」排序，批量安装按此顺序执行。 */
+  entries: PluginMarketplaceInstallPlanEntry[]
+}
+
+export interface PluginMarketplaceBatchInstallItem {
+  code: string
+  releaseVersion: string
+  sourceCode?: string
+}
+
 export interface PluginMarketplaceUpdateRequest {
   releaseVersion: string
   sourceCode?: string
@@ -150,6 +188,8 @@ export default {
   updatePlans: () => systemClient.get<unknown, ApiResponse<PluginMarketplaceUpdatePlan[]>>('api/platform/plugin-marketplace/update-plan'),
   updatePlan: (code: string, targetVersion?: string) => systemClient.get<unknown, ApiResponse<PluginMarketplaceUpdatePlan>>(`api/platform/plugin-marketplace/${code}/update-plan`, { params: { targetVersion } }),
   update: (code: string, data: PluginMarketplaceUpdateRequest) => systemClient.post<unknown, ApiResponse<PluginMarketplaceUpdateResult>>(`api/platform/plugin-marketplace/${code}/update`, data),
-  rollback: (code: string) => systemClient.post<unknown, ApiResponse<PluginMarketplaceUpdateResult>>(`api/platform/plugin-marketplace/${code}/rollback`),
+  rollback: (code: string, cascade = false) => systemClient.post<unknown, ApiResponse<PluginMarketplaceUpdateResult>>(`api/platform/plugin-marketplace/${code}/rollback`, undefined, { params: { cascade } }),
   install: (code: string, data: PluginMarketplaceInstallRequest) => systemClient.post<unknown, ApiResponse<PluginMarketplaceInstallResponse>>(`api/platform/plugin-marketplace/${code}/install`, data),
+  installPlan: (code: string, releaseVersion: string, sourceCode?: string) => systemClient.get<unknown, ApiResponse<PluginMarketplaceInstallPlan>>(`api/platform/plugin-marketplace/${code}/install-plan`, { params: { releaseVersion, sourceCode } }),
+  installBatch: (items: PluginMarketplaceBatchInstallItem[]) => systemClient.post<unknown, ApiResponse<PluginMarketplaceInstallResponse>>('api/platform/plugin-marketplace/install-batch', { items }),
 }

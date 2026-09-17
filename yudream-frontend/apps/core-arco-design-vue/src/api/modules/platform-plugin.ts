@@ -18,6 +18,8 @@ export interface PluginModule {
   icon?: string
   mainClass?: string
   jarPath?: string
+  /** plugin.yml 可选 git 声明的源码仓库地址。 */
+  gitUrl?: string
   dependencies?: string[]
   softDependencies?: string[]
   status: PluginStatus
@@ -28,6 +30,39 @@ export interface PluginModule {
   enabled: boolean
   rollbackAvailable?: boolean
   rollbackVersion?: string
+}
+
+export interface PluginDependencyStatusItem {
+  code: string
+  name?: string
+  required: boolean
+  installed: boolean
+  installedVersion?: string
+  loaded: boolean
+  enabled: boolean
+  storeAvailable: boolean
+  storeVersion?: string
+  storeSourceCode?: string
+  storeSourceName?: string
+}
+
+export interface PluginDependencyStatus {
+  code: string
+  dependencies: PluginDependencyStatusItem[]
+}
+
+export interface PluginDependent {
+  code: string
+  name?: string
+  /** true=硬依赖（目标不可用时无法运行），false=软依赖（可降级恢复）。 */
+  required: boolean
+  loaded: boolean
+  enabled: boolean
+}
+
+export interface PluginDependents {
+  code: string
+  dependents: PluginDependent[]
 }
 
 export interface PluginFrontendRoute {
@@ -191,10 +226,12 @@ export default {
   refresh: () => systemClient.post<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins/refresh'),
   upload: (data: FormData) => systemClient.post<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins/upload', data),
   load: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/load`),
-  enable: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/enable`),
+  enable: (code: string, includeSoftDependencies?: string[]) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/enable`, includeSoftDependencies?.length ? { includeSoftDependencies } : undefined),
   disable: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/disable`),
-  unload: (code: string) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/unload`),
-  remove: (code: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugins/${code}`),
+  unload: (code: string, cascade = false) => systemClient.post<unknown, ApiResponse<PluginModule>>(`api/platform/plugins/${code}/unload`, cascade ? { cascade: true } : undefined),
+  dependencies: (code: string) => systemClient.get<unknown, ApiResponse<PluginDependencyStatus>>(`api/platform/plugins/${code}/dependencies`),
+  dependents: (code: string) => systemClient.get<unknown, ApiResponse<PluginDependents>>(`api/platform/plugins/${code}/dependents`),
+  remove: (code: string, cascade = false) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/plugins/${code}`, { params: { cascade } }),
   frontendManifest: () => systemClient.get<unknown, ApiResponse<PluginFrontendManifest>>('api/platform/plugins/frontend-manifest'),
   activeThemes: () => systemClient.get<unknown, ApiResponse<Partial<Record<PluginThemeScope, PluginTheme>>>>('api/platform/plugins/themes/active'),
   themes: () => systemClient.get<unknown, ApiResponse<PluginThemeOverview>>('api/platform/plugins/themes'),

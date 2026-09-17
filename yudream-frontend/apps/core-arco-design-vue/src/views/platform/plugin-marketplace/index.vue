@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { PluginModule } from '@/api/modules/platform-plugin'
-import type { PluginMarketplaceUpdatePlan, PluginStorePlugin, PluginStorePluginDescriptor, PluginStorePluginDetail, PluginStorePluginVersion } from '@/api/modules/platform-plugin-marketplace'
+import type { PluginMarketplaceBatchInstallItem, PluginMarketplaceInstallPlan, PluginMarketplaceUpdatePlan, PluginStorePlugin, PluginStorePluginDescriptor, PluginStorePluginDetail, PluginStorePluginVersion } from '@/api/modules/platform-plugin-marketplace'
 import type { PluginMarketSource } from '@/api/modules/platform-plugin-market-source'
 import apiPlugin from '@/api/modules/platform-plugin'
 import apiPluginMarketplace from '@/api/modules/platform-plugin-marketplace'
 import apiPluginMarketSource from '@/api/modules/platform-plugin-market-source'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { compareSemVer } from './semver'
+import InstallDependencyDialog from './install-dependency-dialog.vue'
 import VersionCard from './version-card.vue'
 
 type MarketplaceVersion = PluginStorePluginVersion
@@ -16,6 +17,8 @@ const loading = ref(false)
 const keyword = ref('')
 const status = ref<MarketplaceStatus>('all')
 const sourceFilter = ref('all')
+const categoryFilter = ref('all')
+const tagFilter = ref<string[]>([])
 const sources = ref<PluginMarketSource[]>([])
 const pagination = reactive({ page: 1, size: 12, total: 0 })
 const rows = ref<PluginStorePlugin[]>([])
@@ -25,6 +28,9 @@ const detail = ref<PluginStorePluginDetail>()
 const installingVersion = ref('')
 const updatingVersion = ref('')
 const rollingBackCode = ref('')
+const installPlan = ref<PluginMarketplaceInstallPlan | null>(null)
+const installPlanOpen = ref(false)
+const installPlanLoading = ref(false)
 const toast = useFaToast()
 const modal = useFaModal()
 const router = useRouter()
@@ -45,6 +51,38 @@ const sourceOptions = computed(() => [
 ])
 const showSourceFilter = computed(() => sources.value.filter(item => item.enabled).length > 1)
 
+const categoryOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const item of rows.value) {
+    const category = getDescriptor(item).category?.trim()
+    if (category) {
+      counts.set(category, (counts.get(category) || 0) + 1)
+    }
+  }
+  return [
+    { label: '全部分类', value: 'all' },
+    ...[...counts.entries()]
+      .sort((left, right) => right[1] - left[1])
+      .map(([name, count]) => ({ label: `${name}（${count}）`, value: name })),
+  ]
+})
+
+const tagOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const item of rows.value) {
+    for (const tag of getDescriptor(item).tags || []) {
+      const trimmed = tag.trim()
+      if (trimmed) {
+        counts.set(trimmed, (counts.get(trimmed) || 0) + 1)
+      }
+    }
+  }
+  return [...counts.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, 24)
+    .map(([name, count]) => ({ name, count }))
+})
+
 const filteredRows = computed(() => {
   const value = keyword.value.trim().toLowerCase()
   return rows.value.filter((item) => {
@@ -52,18 +90,20 @@ const filteredRows = computed(() => {
     const matchesKeyword = !value || [item.code, descriptor.code, descriptor.displayName, descriptor.description, descriptor.version]
       .some(field => field?.toLowerCase().includes(value))
     const matchesSource = sourceFilter.value === 'all' || item.sourceCode === sourceFilter.value
-    return matchesKeyword && matchesSource && (status.value === 'all' || marketplaceStatus(item) === status.value)
+    const matchesCategory = categoryFilter.value === 'all' || descriptor.category?.trim() === categoryFilter.value
+    const matchesTags = !tagFilter.value.length || (descriptor.tags || []).some(tag => tagFilter.value.includes(tag.trim()))
+    return matchesKeyword && matchesSource && matchesCategory && matchesTags && (status.value === 'all' || marketplaceStatus(item) === status.value)
   })
 })
 const pagedRows = computed(() => {
   const start = (pagination.page - 1) * pagination.size
   return filteredRows.value.slice(start, start + pagination.size)
 })
-const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.value !== 'all' || sourceFilter.value !== 'all')
+const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.value !== 'all' || sourceFilter.value !== 'all' || categoryFilter.value !== 'all' || Boolean(tagFilter.value.length))
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
 const localModule = computed(() => modules.value.find(item => item.code === selectedCode.value))
-const canRollback = computed(() => Boolean(localModule.value?.rollbackAvailable && !localModule.value.loaded && !localModule.value.enabled))
+const canRollback = computed(() => Boolean(localModule.value?.rollbackAvailable))
 
 const sortedVersions = computed(() => {
   const versions = detail.value?.versions || []
@@ -79,7 +119,7 @@ watch(selectedCode, () => {
   showHistory.value = false
 })
 
-watch([keyword, status, sourceFilter], () => {
+watch([keyword, status, sourceFilter, categoryFilter, tagFilter], () => {
   pagination.page = 1
 })
 watch(filteredRows, clampPage, { immediate: true })
@@ -190,6 +230,18 @@ function resetFilters() {
   keyword.value = ''
   status.value = 'all'
   sourceFilter.value = 'all'
+  categoryFilter.value = 'all'
+  tagFilter.value = []
+}
+
+function toggleTag(tag: string) {
+  const index = tagFilter.value.indexOf(tag)
+  if (index >= 0) {
+    tagFilter.value.splice(index, 1)
+  }
+  else {
+    tagFilter.value.push(tag)
+  }
 }
 
 function openPublicMarket() {
@@ -198,6 +250,13 @@ function openPublicMarket() {
 
 function openAddSource() {
   router.push('/platform/plugin-marketplace/add-source')
+}
+
+function openGit(descriptor: PluginStorePluginDescriptor) {
+  const url = descriptor.gitUrl || descriptor.source?.repository
+  if (url) {
+    window.open(url, '_blank', 'noopener')
+  }
 }
 
 function operationsPending() {
@@ -212,9 +271,36 @@ async function install(releaseVersion: string) {
   if (!selectedCode.value || localModule.value) {
     return
   }
+  const sourceCode = versionByRelease(releaseVersion)?.sourceCode
+  installingVersion.value = releaseVersion
+  installPlanLoading.value = true
+  try {
+    const res = await apiPluginMarketplace.installPlan(selectedCode.value, releaseVersion, sourceCode)
+    const plan = res.data
+    const needsAction = plan.entries.some(entry => (!entry.installed || !entry.versionSatisfied))
+    if (!needsAction) {
+      await installNow(releaseVersion, sourceCode)
+      return
+    }
+    installPlan.value = plan
+    installPlanOpen.value = true
+  }
+  catch {
+    toast.error('获取安装计划失败，请稍后重试')
+  }
+  finally {
+    installPlanLoading.value = false
+    installingVersion.value = ''
+  }
+}
+
+async function installNow(releaseVersion: string, sourceCode?: string) {
+  if (!selectedCode.value) {
+    return
+  }
   installingVersion.value = releaseVersion
   try {
-    await apiPluginMarketplace.install(selectedCode.value, { releaseVersion, sourceCode: versionByRelease(releaseVersion)?.sourceCode })
+    await apiPluginMarketplace.install(selectedCode.value, { releaseVersion, sourceCode })
     await load()
     toast.success('插件已安装，尚未启用。可在插件管理中启用。')
   }
@@ -222,6 +308,33 @@ async function install(releaseVersion: string) {
     toast.error('插件安装失败')
   }
   finally {
+    installingVersion.value = ''
+  }
+}
+
+async function confirmInstallWithDependencies(items: PluginMarketplaceBatchInstallItem[]) {
+  if (!selectedCode.value || !installPlan.value) {
+    return
+  }
+  const target: PluginMarketplaceBatchInstallItem = {
+    code: selectedCode.value,
+    releaseVersion: installPlan.value.releaseVersion,
+    sourceCode: versionByRelease(installPlan.value.releaseVersion)?.sourceCode,
+  }
+  installPlanLoading.value = true
+  try {
+    await apiPluginMarketplace.installBatch([...items, target])
+    installPlanOpen.value = false
+    await load()
+    toast.success(items.length
+      ? `已安装 ${items.length} 个前置依赖与目标插件，尚未启用。可在插件管理中启用。`
+      : '插件已安装，尚未启用。可在插件管理中启用。')
+  }
+  catch {
+    toast.error('批量安装失败，所选内容已整体回滚')
+  }
+  finally {
+    installPlanLoading.value = false
     installingVersion.value = ''
   }
 }
@@ -274,13 +387,14 @@ function previewAndConfirmRollback() {
   if (!selectedCode.value || !canRollback.value) {
     return
   }
+  const cascade = Boolean(localModule.value?.loaded || localModule.value?.enabled)
   modal.confirm({
     title: '确认回滚本地备份',
-    content: rollbackConfirmationContent(),
+    content: rollbackConfirmationContent(cascade),
     onConfirm: async () => {
       rollingBackCode.value = selectedCode.value
       try {
-        const result = await apiPluginMarketplace.rollback(selectedCode.value)
+        const result = await apiPluginMarketplace.rollback(selectedCode.value, cascade)
         await load()
         toast.success(result.data.requiresRestart ? '插件已回滚，需重启服务后生效，且不会自动启用。' : '插件已回滚')
       }
@@ -302,8 +416,10 @@ function updateConfirmationContent(plan: PluginMarketplaceUpdatePlan) {
   return `将从 ${plan.fromVersion} 更新到 ${plan.toVersion}（${plan.changeType}）。${impacts}${warnings}更新会先受控停止相关插件；不会热加载或刷新动态路由。重启服务后会恢复此前已启用的状态。`
 }
 
-function rollbackConfirmationContent() {
-  return '将回滚到本地保存的已知良好备份。目标插件已停止；降级可能与数据或依赖不兼容。回滚不会热加载或刷新动态路由；重启服务后会恢复此前已启用的状态。'
+function rollbackConfirmationContent(cascade: boolean) {
+  return cascade
+    ? '目标插件正在运行，将按依赖顺序级联停机（含硬/软依赖方），回滚后自动恢复原先启用的软依赖方；硬依赖方若与降级版本不兼容会标记异常。降级可能与数据或依赖不兼容。'
+    : '将回滚到本地保存的已知良好备份。目标插件已停止；降级可能与数据或依赖不兼容。回滚不会热加载或刷新动态路由；重启服务后会恢复此前已启用的状态。'
 }
 </script>
 
@@ -320,6 +436,7 @@ function rollbackConfirmationContent() {
         <div class="marketplace-filters">
           <FaInput v-model="keyword" clearable placeholder="搜索名称、编码、描述或版本" class="marketplace-search" />
           <FaSelect v-model="status" :options="statusOptions" class="marketplace-status" />
+          <FaSelect v-model="categoryFilter" :options="categoryOptions" class="marketplace-category" />
           <FaSelect v-if="showSourceFilter" v-model="sourceFilter" :options="sourceOptions" class="marketplace-source" />
         </div>
         <div class="marketplace-toolbar-actions">
@@ -340,6 +457,19 @@ function rollbackConfirmationContent() {
         </div>
       </div>
 
+      <div v-if="tagOptions.length" class="marketplace-tags">
+        <button
+          v-for="tag in tagOptions"
+          :key="tag.name"
+          type="button"
+          class="marketplace-tag"
+          :class="{ active: tagFilter.includes(tag.name) }"
+          @click="toggleTag(tag.name)"
+        >
+          {{ tag.name }}<em>{{ tag.count }}</em>
+        </button>
+      </div>
+
       <div v-if="pagedRows.length" class="marketplace-grid">
         <button
           v-for="item in pagedRows"
@@ -358,6 +488,7 @@ function rollbackConfirmationContent() {
             <div class="plugin-card-meta">
               <FaTag variant="secondary">{{ marketplaceStatusLabel(item) }}</FaTag>
               <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
+              <FaTag v-if="getDescriptor(item).category" variant="secondary" :title="`分类：${getDescriptor(item).category}`">{{ getDescriptor(item).category }}</FaTag>
             </div>
             <p class="plugin-card-description" :title="getDescriptor(item).description || '暂无插件简介。'">
               {{ getDescriptor(item).description || '暂无插件简介。' }}
@@ -386,6 +517,19 @@ function rollbackConfirmationContent() {
           <div>
             <h2>{{ getDescriptor(selected).displayName || getDescriptor(selected).code }}</h2>
             <p>{{ getDescriptor(selected).description || '暂无插件简介。' }}</p>
+            <div class="detail-meta">
+              <FaTag v-if="getDescriptor(selected).category" variant="secondary">{{ getDescriptor(selected).category }}</FaTag>
+              <FaTag v-for="tag in (getDescriptor(selected).tags || []).slice(0, 6)" :key="tag" variant="secondary">{{ tag }}</FaTag>
+              <FaButton
+                v-if="getDescriptor(selected).gitUrl || getDescriptor(selected).source?.repository"
+                variant="link"
+                class="detail-git"
+                @click="openGit(getDescriptor(selected))"
+              >
+                <FaIcon name="i-ri:github-line" />
+                源码仓库
+              </FaButton>
+            </div>
           </div>
           <FaButton
             v-if="canRollback"
@@ -436,6 +580,13 @@ function rollbackConfirmationContent() {
           </div>
         </div>
       </section>
+
+      <InstallDependencyDialog
+        v-model="installPlanOpen"
+        :plan="installPlan"
+        :loading="installPlanLoading"
+        @confirm="confirmInstallWithDependencies"
+      />
     </FaPageMain>
   </div>
 </template>
@@ -469,6 +620,59 @@ function rollbackConfirmationContent() {
 
 .marketplace-source {
   width: 150px;
+}
+
+.marketplace-category {
+  width: 170px;
+}
+
+.marketplace-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.marketplace-tag {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 999px;
+  background: var(--color-bg-2);
+  color: var(--color-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.marketplace-tag em {
+  color: var(--color-text-3);
+  font-style: normal;
+  font-size: 11px;
+}
+
+.marketplace-tag.active {
+  border-color: rgb(var(--primary-6));
+  background: rgb(var(--primary-1));
+  color: rgb(var(--primary-6));
+}
+
+.detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.detail-meta :deep(.fa-tag) {
+  font-size: 11px;
+}
+
+.detail-git {
+  padding: 0;
+  font-size: 12px;
 }
 
 .marketplace-toolbar-actions {
