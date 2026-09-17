@@ -252,7 +252,7 @@ onMounted(loadGraphTables)
               <FaSelect v-model="form.visionModelCode" :options="visionModelOptions" placeholder="选择支持视觉的模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="i-ri:vector-pen-line" /> 向量模型（embedding）</span>
+              <span class="set-model__label"><FaIcon name="i-ri:quill-pen-line" /> 向量模型（embedding）</span>
               <FaSelect
                 :model-value="form.embeddingProviderCode"
                 :options="providerOptions"

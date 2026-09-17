@@ -795,7 +795,7 @@ function splitModelList(value: string) {
               type="button"
               @click="selectedCode = item.code"
             >
-              <FaIcon :name="item.icon || 'i-ri:plugin-line'" />
+              <FaIcon :name="item.icon || 'i-ri:puzzle-2-line'" />
               <span>{{ item.name }}</span>
               <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
             </button>
@@ -806,7 +806,7 @@ function splitModelList(value: string) {
           <div class="detail-header">
             <div class="detail-title">
               <div class="detail-icon">
-                <FaIcon :name="selected.icon || 'i-ri:plugin-line'" />
+                <FaIcon :name="selected.icon || 'i-ri:puzzle-2-line'" />
               </div>
               <div>
                 <h2>{{ selected.name }}</h2>

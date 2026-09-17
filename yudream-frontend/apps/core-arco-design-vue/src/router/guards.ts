@@ -10,6 +10,11 @@ import '@/assets/styles/nprogress.css'
 // 系统初始化状态缓存
 let setupStatus: boolean | null = null
 
+// 初始化完成后调用：失效内存缓存，让下一次导航重新读取真实状态
+export function resetSetupStatus() {
+  setupStatus = null
+}
+
 async function checkSetupStatus(): Promise<boolean> {
   // 开发环境优先读取 localStorage 缓存，减少每次刷新都请求 setup/status
   const cached = import.meta.env.DEV ? localStorage.getItem('setupCompleted') : null
@@ -22,7 +27,8 @@ async function checkSetupStatus(): Promise<boolean> {
   }
   try {
     const res = await apiSetup.status()
-    setupStatus = res.data.setupCompleted
+    // 仅在明确返回 false 时拦截；结构异常时保守视为已完成，避免用户被锁在初始化页
+    setupStatus = res.data.setupCompleted !== false
     return setupStatus
   }
   catch {

@@ -190,7 +190,7 @@ async function resendVerificationEmail() {
           <div id="fixed-content-before-area" ref="fixedContentBeforeAreaRef" class="shadow-[0_1px_0_0_oklch(var(--border)),0_-1px_0_0_oklch(var(--border))] relative z-1 empty:hidden">
             <div v-if="appAccountStore.isEmailUnverified" class="email-verification-banner">
               <div class="email-verification-banner__content">
-                <FaIcon name="i-ri:mail-warning-line" />
+                <FaIcon name="i-ri:error-warning-line" />
                 <span>当前账户未验证无法使用其他功能，或者点击重新发送验证邮件</span>
               </div>
               <FaButton size="sm" variant="outline" :loading="verificationMailSending" @click="resendVerificationEmail">

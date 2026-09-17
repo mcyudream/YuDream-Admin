@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
+import { hintForMessage, toastApiError } from '@/utils/api-error'
 // import qs from 'qs'
 
 // 请求重试配置
@@ -64,26 +65,16 @@ api.interceptors.request.use(
 )
 
 // 处理错误信息的函数
-function handleError(error: any) {
+async function handleError(error: any) {
   const status = error?.response?.status ?? error?.status
   const code = error?.response?.data?.code ?? error?.code
   if (status === 401 || code === 401) {
     useAppAccountStore().requestLogout()
   }
   else {
-    useFaToast().error('错误', {
-      description: errorMessage(error),
-    })
+    await toastApiError(error)
   }
   return Promise.reject(error)
-}
-
-function errorMessage(error: any) {
-  const data = error?.response?.data
-  if (data && typeof data === 'object') {
-    return data.message || data.msg || data.error || data.data?.message || error.message || '请求失败'
-  }
-  return error?.message || '请求失败'
 }
 
 api.interceptors.response.use(
@@ -128,7 +119,7 @@ api.interceptors.response.use(
         }
         else {
           useFaToast().error('错误', {
-            description: response.data.message || '请求失败',
+            description: hintForMessage(response.data.message || '请求失败'),
           })
           if (response.data.code === 401) {
             useAppAccountStore().requestLogout()
