@@ -36,6 +36,8 @@ public class PluginMarketPublication extends BaseDomain {
     private String icon;
     private String releaseNotes;
     private String license;
+    /** plugin.yml git 声明的源码仓库地址，发布时随 descriptor/结构化版本下发。 */
+    private String sourceUrl;
     private String category;
     private List<String> tags;
     private String compatibilityJson;

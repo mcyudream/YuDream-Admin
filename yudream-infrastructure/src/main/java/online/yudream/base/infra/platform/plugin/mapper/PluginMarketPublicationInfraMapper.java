@@ -24,6 +24,7 @@ public class PluginMarketPublicationInfraMapper {
         dataObj.setIcon(publication.getIcon());
         dataObj.setReleaseNotes(publication.getReleaseNotes());
         dataObj.setLicense(publication.getLicense());
+        dataObj.setSourceUrl(publication.getSourceUrl());
         dataObj.setCategory(publication.getCategory());
         dataObj.setTags(publication.getTags());
         dataObj.setCompatibilityJson(publication.getCompatibilityJson());
@@ -61,6 +62,7 @@ public class PluginMarketPublicationInfraMapper {
                 .icon(dataObj.getIcon())
                 .releaseNotes(dataObj.getReleaseNotes())
                 .license(dataObj.getLicense())
+                .sourceUrl(dataObj.getSourceUrl())
                 .category(dataObj.getCategory())
                 .tags(dataObj.getTags())
                 .compatibilityJson(dataObj.getCompatibilityJson())

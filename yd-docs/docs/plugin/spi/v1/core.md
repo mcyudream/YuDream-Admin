@@ -1,6 +1,6 @@
 # 生命周期与 PluginContext
 
-> SPI v1 · 当前源码 2.24.0 · 包 `online.yudream.base.plugin.spi.core`
+> SPI v1 · 当前源码 2.30.0 · 包 `online.yudream.base.plugin.spi.core`
 >
 > 源码：`yudream-plugins/yudream-plugin-spi/src/main/java/online/yudream/base/plugin/spi/core/`（`YuDreamPlugin.java`、`PluginContext.java`、`PluginDescriptor.java`）
 
@@ -39,10 +39,11 @@ flowchart LR
 
 ```java
 public record PluginDescriptor(String code, String name, String version, String description,
-        String mainClass, List<String> dependencies, List<String> softDependencies)
+        String mainClass, List<String> dependencies, List<String> softDependencies,
+        String icon, String gitUrl)
 ```
 
-紧凑构造器将 null 依赖列表归一为 `List.of()`。
+紧凑构造器将 null 依赖列表归一为 `List.of()`；`icon` / `gitUrl` 为可选展示元数据（历史 7/8 参构造器保留兼容）。
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
@@ -53,6 +54,8 @@ public record PluginDescriptor(String code, String name, String version, String 
 | `mainClass` | `String` | 入口类全限定名 |
 | `dependencies` | `List<String>` | 硬依赖插件 code 列表，必须先于本插件加载并启用 |
 | `softDependencies` | `List<String>` | 可选依赖 code 列表；缺失不阻塞加载，相关功能需条件注册降级 |
+| `icon` | `String` | 可选，`plugin.yml` 的 `icon`（Iconify 名称或安全图片路径） |
+| `gitUrl` | `String` | 可选，`plugin.yml` 的 `git`（http(s) 源码仓库地址），宿主持久化并随市场目录展示 |
 
 ## PluginContext —— 运行时门面
 

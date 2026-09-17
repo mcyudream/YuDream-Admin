@@ -46,6 +46,7 @@ import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendRoute;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
+import online.yudream.base.plugin.spi.http.PluginHttpPart;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
@@ -722,6 +723,7 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 request.headers(),
                 request.query(),
                 request.body(),
+                spiParts(request.parts()),
                 new PluginPrincipal(request.userId(), request.permissions())
         );
         PluginHttpResponse response;
@@ -740,6 +742,21 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             }
         }
         return new PluginHttpDispatchResult(response.status(), response.headers(), response.contentType(), response.body(), response.wrapped());
+    }
+
+    /** 领域 part → SPI part 的字段直映射。 */
+    private Map<String, PluginHttpPart> spiParts(Map<String, online.yudream.base.domain.platform.plugin.valobj.PluginHttpPart> parts) {
+        if (parts == null || parts.isEmpty()) {
+            return Map.of();
+        }
+        return parts.entrySet().stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        Map.Entry::getKey,
+                        entry -> {
+                            online.yudream.base.domain.platform.plugin.valobj.PluginHttpPart part = entry.getValue();
+                            return new PluginHttpPart(part.name(), part.filename(), part.contentType(), part.data());
+                        }
+                ));
     }
 
     private String messageOrDefault(Throwable throwable, String fallback) {
@@ -987,7 +1004,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 jarPath.toAbsolutePath().normalize().toString(),
                 descriptor.dependencies(),
                 descriptor.softDependencies(),
-                descriptor.icon()
+                descriptor.icon(),
+                descriptor.gitUrl()
         );
     }
 

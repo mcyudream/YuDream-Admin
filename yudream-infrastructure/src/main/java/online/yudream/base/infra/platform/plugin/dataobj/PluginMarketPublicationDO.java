@@ -32,6 +32,7 @@ public class PluginMarketPublicationDO extends BaseDO {
     private String icon;
     private String releaseNotes;
     private String license;
+    private String sourceUrl;
     private String category;
     private List<String> tags;
     private String compatibilityJson;

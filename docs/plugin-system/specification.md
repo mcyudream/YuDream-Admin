@@ -41,7 +41,7 @@
 
 插件入口类职责：
 
-- 在 JAR 根目录的 `plugin.yml` 中声明 `name`、`main`、`version` 与 `depend` / `softdepend`；可用 `displayName` 声明面向用户的显示名称。
+- 在 JAR 根目录的 `plugin.yml` 中声明 `name`、`main`、`version` 与 `depend` / `softdepend`；可用 `displayName` 声明面向用户的显示名称，可用 `git` 声明源码仓库地址（仅 http(s) URL，最长 200 字符）——发布到市场源后随 descriptor/v2 协议下发，插件管理与商店详情展示「源码仓库」链接。
 - 声明权限、前端、首页卡片、能力等静态元信息。
 - 在生命周期方法中组装插件自身服务。
 - 通过 `PluginContext` 注册 Controller、插件自有 API 服务、资源清理回调。
@@ -336,6 +336,7 @@ CSS 作用域约定：
 - 插件根 `plugin.yml` 可声明可选 `icon`，作为插件管理、市场和未显式声明菜单/路由图标时的默认图标。
 - `icon` 支持已注册的 Iconify/FaIcon 名称（如 `i-ri:puzzle-2-line`）或插件图片资源/安全 URL；图片资源应随插件发布并使用相对路径。
 - 显式的 `menuIcon`、`icon`、`parentIcon` 优先于插件级默认 `icon`。
+- 插件根 `plugin.yml` 可声明可选 `git`（http(s) 源码仓库地址）：宿主解析后持久化到插件记录，发布时写入发布物 `sourceUrl` 并随市场目录下发；仅作展示链接，不参与依赖与兼容性判断。
 - `menuSort` 控制顶级排序，越大越靠前。
 
 路由：
