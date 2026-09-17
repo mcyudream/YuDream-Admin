@@ -31,7 +31,8 @@ public class PluginYamlDescriptorReader {
                 required(values, "main"),
                 list(values, "depend"),
                 list(values, "softdepend"),
-                optionalIcon(values)
+                optionalIcon(values),
+                optionalGitUrl(values)
         );
     }
 
@@ -57,6 +58,19 @@ public class PluginYamlDescriptorReader {
             throw new BizException("plugin.yml 的 icon 路径无效");
         }
         return icon;
+    }
+
+    /** plugin.yml 可选 git 字段：源码仓库地址，仅接受 http(s) URL。 */
+    private String optionalGitUrl(Map<?, ?> values) {
+        String gitUrl = value(values, "git");
+        if (!StringUtils.hasText(gitUrl)) {
+            return null;
+        }
+        if (gitUrl.length() > 200 || !(gitUrl.startsWith("http://") || gitUrl.startsWith("https://"))
+                || gitUrl.contains("..") || gitUrl.matches(".*[\\s<>\"'].*")) {
+            throw new BizException("plugin.yml 的 git 必须是合法的 http(s) 仓库地址");
+        }
+        return gitUrl;
     }
 
     private List<String> list(Map<?, ?> values, String key) {

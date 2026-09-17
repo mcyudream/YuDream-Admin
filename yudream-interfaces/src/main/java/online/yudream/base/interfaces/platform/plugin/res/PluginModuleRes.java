@@ -29,6 +29,7 @@ public class PluginModuleRes implements Serializable {
     private String icon;
     private String mainClass;
     private String jarPath;
+    private String gitUrl;
     private PluginStatus status;
     private String errorMessage;
     private LocalDateTime loadedAt;

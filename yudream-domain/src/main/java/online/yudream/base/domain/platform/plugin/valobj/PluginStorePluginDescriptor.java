@@ -19,6 +19,9 @@ public class PluginStorePluginDescriptor {
     private final PluginStorePluginCompatibility compatibility;
     private final List<PluginStorePluginDependency> dependencies;
     private final PluginStorePluginJar jar;
+    private final String category;
+    private final List<String> tags;
+    private final String gitUrl;
 
     public PluginStorePluginDescriptor(String releaseVersion, String code, String version, String main,
                                        String displayName, String description, String icon, List<String> screenshots,
@@ -33,6 +36,16 @@ public class PluginStorePluginDescriptor {
                                        PluginStorePluginPublisher publisher, PluginStorePluginSource source, String license,
                                        String releaseNotes, PluginStorePluginCompatibility compatibility,
                                        List<PluginStorePluginDependency> dependencies, PluginStorePluginJar jar) {
+        this(releaseVersion, code, version, main, displayName, description, icon, screenshots, publisher, source,
+                license, releaseNotes, compatibility, dependencies, jar, null, List.of(), null);
+    }
+
+    public PluginStorePluginDescriptor(String releaseVersion, String code, String version, String main,
+                                       String displayName, String description, String icon, List<String> screenshots,
+                                       PluginStorePluginPublisher publisher, PluginStorePluginSource source, String license,
+                                       String releaseNotes, PluginStorePluginCompatibility compatibility,
+                                       List<PluginStorePluginDependency> dependencies, PluginStorePluginJar jar,
+                                       String category, List<String> tags, String gitUrl) {
         this.releaseVersion = releaseVersion;
         this.code = code;
         this.version = version;
@@ -48,6 +61,9 @@ public class PluginStorePluginDescriptor {
         this.compatibility = compatibility;
         this.dependencies = dependencies == null ? List.of() : List.copyOf(dependencies);
         this.jar = jar;
+        this.category = category == null || category.isBlank() ? null : category.trim();
+        this.tags = tags == null ? List.of() : List.copyOf(tags);
+        this.gitUrl = gitUrl == null || gitUrl.isBlank() ? null : gitUrl.trim();
     }
 
     public String releaseVersion() {
@@ -108,5 +124,17 @@ public class PluginStorePluginDescriptor {
 
     public PluginStorePluginJar jar() {
         return jar;
+    }
+
+    public String category() {
+        return category;
+    }
+
+    public List<String> tags() {
+        return tags;
+    }
+
+    public String gitUrl() {
+        return gitUrl;
     }
 }

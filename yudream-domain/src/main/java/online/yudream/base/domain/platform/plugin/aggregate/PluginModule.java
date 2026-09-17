@@ -26,6 +26,8 @@ public class PluginModule extends BaseDomain {
     private String icon;
     private String mainClass;
     private String jarPath;
+    /** plugin.yml 可选 git 声明的源码仓库地址，仅展示用途。 */
+    private String gitUrl;
     private String backupJarPath;
     private String backupName;
     private String backupPluginVersion;
@@ -62,6 +64,7 @@ public class PluginModule extends BaseDomain {
                 .icon(descriptor.icon())
                 .mainClass(descriptor.mainClass())
                 .jarPath(descriptor.jarPath())
+                .gitUrl(descriptor.gitUrl())
                 .dependencies(descriptor.dependencies())
                 .softDependencies(descriptor.softDependencies())
                 .status(PluginStatus.INSTALLED)
@@ -75,6 +78,7 @@ public class PluginModule extends BaseDomain {
         this.icon = descriptor.icon();
         this.mainClass = descriptor.mainClass();
         this.jarPath = descriptor.jarPath();
+        this.gitUrl = descriptor.gitUrl();
         this.dependencies = descriptor.dependencies();
         this.softDependencies = descriptor.softDependencies();
         if (this.status == null) {

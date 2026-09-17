@@ -191,7 +191,7 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
                     releaseVersion, downloadUrl.toString(), sha256.toLowerCase(Locale.ROOT),
                     main, optionalText(detail, "displayName"), optionalText(detail, "description"),
                     sizeBytes, optionalText(detail, "category"), optionalTextArray(detail, "tags"),
-                    compatibility, dependencies));
+                    compatibility, dependencies, optionalText(detail, "sourceUrl")));
         }
         return new PluginStoreCatalogEntry(code, apiRoot.toString() + "/plugins/" + code, null, List.of(), structured);
     }
@@ -488,6 +488,7 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         String releaseNotes = optionalReleaseNotes(plugin, "releaseNotes");
         PluginStorePluginCompatibility compatibility = parseCompatibility(plugin.get("compatibility"));
         List<PluginStorePluginDependency> dependencies = parseDependencies(plugin.get("dependencies"));
+        String gitUrl = optionalGitUrl(plugin.get("git"));
 
         JsonNode jar = descriptor.get("jar");
         requireObject(jar);
@@ -499,7 +500,16 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         }
         return new PluginStorePluginDescriptor(expectedVersion, expectedCode, expectedVersion, main, displayName,
                 description, icon, screenshots, publisher, source, license, releaseNotes, compatibility, dependencies,
-                new PluginStorePluginJar(mavenCoordinates, jarUrl, sha256.toLowerCase(Locale.ROOT)));
+                new PluginStorePluginJar(mavenCoordinates, jarUrl, sha256.toLowerCase(Locale.ROOT)),
+                null, List.of(), gitUrl);
+    }
+
+    /** descriptor JSON 可选 git 字段：源码仓库地址，校验同展示 URL。 */
+    private String optionalGitUrl(JsonNode git) {
+        if (git == null || git.isNull()) {
+            return null;
+        }
+        return requireDisplayUrl(git, "git");
     }
 
     private PluginStorePluginPublisher parsePublisher(JsonNode publisher) {

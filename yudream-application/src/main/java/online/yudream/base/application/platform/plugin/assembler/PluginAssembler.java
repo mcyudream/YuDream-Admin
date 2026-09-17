@@ -56,6 +56,7 @@ public class PluginAssembler {
                 .icon(module.getIcon())
                 .mainClass(module.getMainClass())
                 .jarPath(module.getJarPath())
+                .gitUrl(module.getGitUrl())
                 .dependencies(module.getDependencies())
                 .softDependencies(module.getSoftDependencies())
                 .status(module.getStatus())
@@ -125,6 +126,9 @@ public class PluginAssembler {
                 .compatibility(toDTO(descriptor.compatibility()))
                 .dependencies(descriptor.dependencies().stream().map(PluginAssembler::toDTO).toList())
                 .jar(toDTO(descriptor.jar()))
+                .category(descriptor.category())
+                .tags(descriptor.tags())
+                .gitUrl(descriptor.gitUrl())
                 .build();
     }
 

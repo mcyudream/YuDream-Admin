@@ -33,4 +33,7 @@ public class PluginStorePluginDescriptorDTO implements Serializable {
     private PluginStorePluginCompatibilityDTO compatibility;
     private List<PluginStorePluginDependencyDTO> dependencies;
     private PluginStorePluginJarDTO jar;
+    private String category;
+    private List<String> tags;
+    private String gitUrl;
 }

@@ -8,10 +8,12 @@ import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifes
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpEndpointDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginDependentsDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginModuleDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
+import online.yudream.base.domain.platform.plugin.service.PluginDependencyGraph;
 import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
@@ -174,11 +176,48 @@ public class PluginAppService {
 
     @Transactional
     public List<PluginModuleDTO> rollbackStoreJar(String code, String expectedVersion) {
+        return rollbackStoreJar(code, expectedVersion, false);
+    }
+
+    /**
+     * 级联回滚：先按卸载级联停机（含全部硬/软依赖方），回滚交换后自动恢复原先启用的依赖方；
+     * 若依赖方因降级版本不兼容恢复失败，会标记异常待人工处理。
+     */
+    @Transactional
+    public List<PluginModuleDTO> rollbackStoreJar(String code, String expectedVersion, boolean cascade) {
         if (!StringUtils.hasText(code)) {
             throw new BizException("插件代码不能为空");
         }
         PluginModule module = module(code.trim());
-        rejectRollbackWhenRunning(module);
+        if (!cascade) {
+            rejectRollbackWhenRunning(module);
+            return doRollback(module, expectedVersion);
+        }
+        CascadeContext context = stopForCascade(module.getCode());
+        try {
+            List<PluginModuleDTO> result = doRollback(context.target(), expectedVersion);
+            // 回滚不自动启用目标，清除停机时写入的恢复意图
+            pluginModuleRepo.findByCode(module.getCode()).ifPresent(rolled -> {
+                rolled.setRestoreIntentActive(false);
+                pluginModuleRepo.save(rolled);
+            });
+            restoreAfterCascade(context, "已回滚");
+            return result;
+        } catch (Exception rollbackFailure) {
+            // JAR 交换已由 doRollback 内部恢复，这里尽力把停机的依赖方拉回运行状态
+            try {
+                restoreAfterCascade(context, "回滚失败");
+            } catch (RuntimeException restoreFailure) {
+                log.warn("回滚失败后恢复依赖方异常：{}", rootMessage(restoreFailure));
+            }
+            if (rollbackFailure instanceof RuntimeException runtimeFailure) {
+                throw runtimeFailure;
+            }
+            throw new BizException(rootMessage(rollbackFailure));
+        }
+    }
+
+    private List<PluginModuleDTO> doRollback(PluginModule module, String expectedVersion) {
         Path active = activeJarPath(module);
         Path backup = backupJarPath(module);
         validateBackup(module, backup, expectedVersion);
@@ -320,13 +359,26 @@ public class PluginAppService {
 
     @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO enable(String code) {
+        return enable(code, Set.of());
+    }
+
+    /**
+     * 显式携带需一并启用的软依赖（须已安装）；硬依赖始终自动先于消费方启用。
+     */
+    @Transactional(noRollbackFor = BizException.class)
+    public PluginModuleDTO enable(String code, Set<String> includeSoftDependencies) {
+        Set<String> includeSoft = includeSoftDependencies == null ? Set.of()
+                : includeSoftDependencies.stream()
+                        .filter(StringUtils::hasText)
+                        .map(String::trim)
+                        .collect(Collectors.toSet());
         Map<String, PluginModule> modules = modulesByCode();
         PluginModule module = modules.get(code);
         if (module == null) {
             throw new BizException("插件不存在，请先刷新插件目录");
         }
         try {
-            PluginModule enabled = enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>());
+            PluginModule enabled = enableRuntimeWithDependencies(module, modules, new HashSet<>(), new HashSet<>(), includeSoft);
             enabled.setRestoreIntentActive(true);
             enabled.setThemeScopes(pluginRuntimeGateway.theme(code)
                     .map(theme -> theme.scopes().stream().sorted().toList())
@@ -384,37 +436,111 @@ public class PluginAppService {
 
     @Transactional(noRollbackFor = BizException.class)
     public PluginModuleDTO unload(String code) {
-        PluginModule module = module(code);
-        pluginThemeAppService.clearActivation(code);
-        pluginRuntimeGateway.unload(code);
-        module.markUnloaded();
-        module.setRestoreIntentActive(false);
-        PluginModule saved = pluginModuleRepo.save(module);
+        return unload(code, false);
+    }
+
+    /**
+     * 级联卸载：按「叶子依赖方先停、目标最后停」的顺序停机全部已加载依赖方后卸载目标；
+     * 仅软依赖目标的插件随后自动降级恢复（软依赖缺失不阻塞消费方），
+     * 沿硬依赖链依赖目标的插件保持禁用，待目标重新启用后再手动恢复。
+     */
+    @Transactional(noRollbackFor = BizException.class)
+    public PluginModuleDTO unload(String code, boolean cascade) {
+        if (!cascade) {
+            PluginModule module = module(code);
+            pluginThemeAppService.clearActivation(code);
+            pluginRuntimeGateway.unload(code);
+            module.markUnloaded();
+            module.setRestoreIntentActive(false);
+            PluginModule saved = pluginModuleRepo.save(module);
+            String menuFailure = reconcileUnavailableMenus(code);
+            if (menuFailure != null) {
+                throw new BizException("插件卸载失败：" + menuFailure);
+            }
+            return toDTO(saved);
+        }
+        CascadeContext context = stopForCascade(code);
+        PluginModule target = context.target();
+        target.markUnloaded();
+        target.setRestoreIntentActive(false);
+        PluginModule saved = pluginModuleRepo.save(target);
         String menuFailure = reconcileUnavailableMenus(code);
+        restoreAfterCascade(context, "已卸载");
         if (menuFailure != null) {
             throw new BizException("插件卸载失败：" + menuFailure);
         }
         return toDTO(saved);
     }
 
+    /** 直接依赖方视图：卸载/删除确认弹窗展示谁在依赖目标（区分硬/软、运行状态）。 */
+    @Transactional(readOnly = true)
+    public PluginDependentsDTO dependents(String code) {
+        String normalized = code == null ? "" : code.trim();
+        if (!StringUtils.hasText(normalized)) {
+            throw new BizException("插件代码不能为空");
+        }
+        PluginModule target = module(normalized);
+        Map<String, PluginModule> modules = modulesByCode();
+        List<PluginDependentsDTO.DependentDTO> dependents = PluginDependencyGraph.directDependentCodes(target.getCode(), modules).stream()
+                .map(dependentCode -> {
+                    PluginModule dependent = modules.get(dependentCode);
+                    return PluginDependentsDTO.DependentDTO.builder()
+                            .code(dependentCode)
+                            .name(dependent == null ? dependentCode : dependent.getName())
+                            .required(dependent != null && dependencies(dependent).contains(target.getCode()))
+                            .loaded(pluginRuntimeGateway.loaded(dependentCode))
+                            .enabled(pluginRuntimeGateway.enabled(dependentCode))
+                            .build();
+                })
+                .toList();
+        return PluginDependentsDTO.builder()
+                .code(target.getCode())
+                .dependents(dependents)
+                .build();
+    }
+
     @Transactional(noRollbackFor = BizException.class)
     public void delete(String code) {
-        PluginModule module = module(code);
-        if (pluginRuntimeGateway.enabled(code)) {
-            pluginRuntimeGateway.disable(code);
+        delete(code, false);
+    }
+
+    /**
+     * 级联删除：先按卸载级联停机依赖方，再删除目标记录与 JAR；
+     * 软依赖方降级恢复继续运行，硬依赖方保持禁用（目标已移除，无法自动恢复）。
+     */
+    @Transactional(noRollbackFor = BizException.class)
+    public void delete(String code, boolean cascade) {
+        if (!cascade) {
+            PluginModule module = module(code);
+            if (pluginRuntimeGateway.enabled(code)) {
+                pluginRuntimeGateway.disable(code);
+            }
+            if (pluginRuntimeGateway.loaded(code)) {
+                pluginRuntimeGateway.unload(code);
+            }
+            pluginThemeAppService.clearActivation(code);
+            module.markUnloaded();
+            pluginModuleRepo.save(module);
+            String menuFailure = reconcileUnavailableMenus(code);
+            if (menuFailure != null) {
+                throw new BizException(menuFailure);
+            }
+            deleteJar(module);
+            pluginModuleRepo.deleteByCode(module.getCode());
+            return;
         }
-        if (pluginRuntimeGateway.loaded(code)) {
-            pluginRuntimeGateway.unload(code);
-        }
+        CascadeContext context = stopForCascade(code);
+        PluginModule target = context.target();
         pluginThemeAppService.clearActivation(code);
-        module.markUnloaded();
-        pluginModuleRepo.save(module);
+        target.markUnloaded();
+        pluginModuleRepo.save(target);
         String menuFailure = reconcileUnavailableMenus(code);
+        deleteJar(target);
+        pluginModuleRepo.deleteByCode(target.getCode());
+        restoreAfterCascade(context, "已删除");
         if (menuFailure != null) {
             throw new BizException(menuFailure);
         }
-        deleteJar(module);
-        pluginModuleRepo.deleteByCode(module.getCode());
     }
 
     /**
@@ -618,7 +744,7 @@ public class PluginAppService {
                 if (pluginRuntimeGateway.enabled(code)) {
                     restoredModule = projectRuntimeMenus(module);
                 } else {
-                    restoredModule = enableRuntimeWithDependencies(module, modules, restored, visiting);
+                    restoredModule = enableRuntimeWithDependencies(module, modules, restored, visiting, Set.of());
                 }
                 if (!pluginRuntimeGateway.enabled(code)) {
                     throw new BizException("插件恢复后未处于启用状态");
@@ -647,7 +773,9 @@ public class PluginAppService {
         markError(module, appendCleanupFailure(failure, cleanupFailure));
     }
 
-    private PluginModule enableRuntimeWithDependencies(PluginModule module, Map<String, PluginModule> modules, Set<String> enabled, Set<String> visiting) {
+    private PluginModule enableRuntimeWithDependencies(PluginModule module, Map<String, PluginModule> modules,
+                                                       Set<String> enabled, Set<String> visiting,
+                                                       Set<String> includeSoftDependencies) {
         String code = module.getCode();
         if (enabled.contains(code)) {
             enabled.add(code);
@@ -666,8 +794,8 @@ public class PluginAppService {
             if (!jarExists(module)) {
                 throw new BizException("插件 JAR 不存在：" + module.getJarPath());
             }
-            enableDependencies(module, modules, enabled, visiting);
-            enableAvailableSoftDependencies(module, modules, enabled, visiting);
+            enableDependencies(module, modules, enabled, visiting, includeSoftDependencies);
+            enableAvailableSoftDependencies(module, modules, enabled, visiting, includeSoftDependencies);
             PluginModule saved = enableOwnRuntime(module);
             enabled.add(code);
             modules.put(code, saved);
@@ -677,7 +805,8 @@ public class PluginAppService {
         }
     }
 
-    private void enableDependencies(PluginModule module, Map<String, PluginModule> modules, Set<String> enabled, Set<String> visiting) {
+    private void enableDependencies(PluginModule module, Map<String, PluginModule> modules,
+                                    Set<String> enabled, Set<String> visiting, Set<String> includeSoftDependencies) {
         for (String dependencyCode : dependencies(module)) {
             PluginModule dependency = modules.get(dependencyCode);
             if (dependency == null) {
@@ -687,7 +816,7 @@ public class PluginAppService {
                 throw new BizException("请先启用插件依赖：" + dependency.getName());
             }
             if (!enabled.contains(dependencyCode)) {
-                enableRuntimeWithDependencies(dependency, modules, enabled, visiting);
+                enableRuntimeWithDependencies(dependency, modules, enabled, visiting, includeSoftDependencies);
             }
             if (!pluginRuntimeGateway.enabled(dependencyCode)) {
                 throw new BizException("插件依赖未启用：" + dependency.getName());
@@ -728,49 +857,84 @@ public class PluginAppService {
     }
 
     private List<PluginModule> affectedModules(PluginModule target, Map<String, PluginModule> modules) {
-        Set<String> affected = new HashSet<>();
-        affected.add(target.getCode());
-        boolean changed;
-        do {
-            changed = false;
-            for (PluginModule module : modules.values()) {
-                if ((!affected.contains(module.getCode()) && dependencies(module).stream().anyMatch(affected::contains))
-                        || (!affected.contains(module.getCode()) && softDependencies(module).stream().anyMatch(affected::contains))) {
-                    changed |= affected.add(module.getCode());
-                }
-            }
-        } while (changed);
-        Map<String, Integer> depths = new HashMap<>();
-        return affected.stream().map(modules::get)
-                .sorted(Comparator.<PluginModule>comparingInt(module -> reverseDependencyDepth(module, modules, affected, new HashSet<>(), depths))
-                        .thenComparing(PluginModule::getCode))
-                .toList();
+        return PluginDependencyGraph.affectedClosure(target.getCode(), modules);
     }
 
     /**
-     * 反向依赖深度：叶子依赖方最深，停机时先停深处。
-     * 产品规则：plugin.yml 的 depend/softdepend 图必须无环（适配器不得依赖服务器插件）。
-     * visiting + memo 只是畸形描述符的安全网，避免热重载 StackOverflowError。
+     * 级联停机上下文：目标 + 依赖方（叶子在前）+ 硬依赖链闭包（不可自动恢复）+ 停机前启用意图。
      */
-    private int reverseDependencyDepth(PluginModule module, Map<String, PluginModule> modules, Set<String> affected,
-                                       Set<String> visiting, Map<String, Integer> memo) {
-        String code = module.getCode();
-        Integer cached = memo.get(code);
-        if (cached != null) {
-            return cached;
+    private record CascadeContext(PluginModule target, List<PluginModule> dependents,
+                                  Set<String> hardLocked, Set<String> restoreIntent) {
+    }
+
+    /**
+     * 级联停机：全部（硬+软）依赖方按叶子到目标的顺序受控停止，记录恢复意图与不可恢复集合。
+     */
+    private CascadeContext stopForCascade(String code) {
+        PluginModule target = module(code);
+        Map<String, PluginModule> modules = modulesByCode();
+        List<PluginModule> affected = affectedModules(target, modules);
+        List<PluginModule> dependents = affected.stream()
+                .filter(item -> !code.equals(item.getCode()))
+                .toList();
+        Set<String> hardLocked = PluginDependencyGraph.hardDependentClosure(code, modules);
+        Set<String> restoreIntent = new HashSet<>();
+        for (PluginModule dependent : dependents) {
+            String dependentCode = dependent.getCode();
+            if (pluginRuntimeGateway.enabled(dependentCode) || dependent.enabled()
+                    || Boolean.TRUE.equals(dependent.getRestoreIntentActive())) {
+                restoreIntent.add(dependentCode);
+            }
+            pluginThemeAppService.clearActivation(dependentCode);
         }
-        if (!visiting.add(code)) {
-            return 0;
+        pluginThemeAppService.clearActivation(code);
+        stopAffectedPlugins(affected, true);
+        // 停机保存后重读目标记录，保证后续元数据操作基于最新乐观锁版本
+        return new CascadeContext(module(code), dependents, hardLocked, restoreIntent);
+    }
+
+    /**
+     * 级联停机后的恢复：硬依赖链上的插件保持禁用（目标不可用），其余原先启用的插件按
+     * 靠近目标优先的顺序重新启用；软依赖目标的一方按架构约定降级运行。
+     */
+    private void restoreAfterCascade(CascadeContext context, String targetAction) {
+        List<PluginModule> dependents = context.dependents();
+        if (dependents.isEmpty()) {
+            return;
         }
-        int depth = 0;
-        for (PluginModule dependent : modules.values()) {
-            if (affected.contains(dependent.getCode()) && dependsOn(dependent, code)) {
-                depth = Math.max(depth, 1 + reverseDependencyDepth(dependent, modules, affected, visiting, memo));
+        for (int i = dependents.size() - 1; i >= 0; i--) {
+            PluginModule dependent = dependents.get(i);
+            String dependentCode = dependent.getCode();
+            if (context.hardLocked().contains(dependentCode)) {
+                try {
+                    if (pluginRuntimeGateway.enabled(dependentCode)) {
+                        pluginRuntimeGateway.disable(dependentCode);
+                    }
+                    if (pluginRuntimeGateway.loaded(dependentCode)) {
+                        pluginRuntimeGateway.unload(dependentCode);
+                    }
+                } catch (RuntimeException cleanupError) {
+                    log.warn("级联停机后清理硬依赖方 {} 失败：{}", dependentCode, rootMessage(cleanupError));
+                }
+                PluginModule locked = pluginModuleRepo.findByCode(dependentCode).orElse(dependent);
+                locked.markDisabled();
+                locked.setRestoreIntentActive(false);
+                pluginModuleRepo.save(locked);
+                reconcileUnavailableMenus(dependentCode);
+                log.info("插件 {} 的硬依赖方 {} 因目标{}保持禁用", context.target().getCode(), dependentCode, targetAction);
+                continue;
+            }
+            if (!context.restoreIntent().contains(dependentCode)) {
+                continue;
+            }
+            try {
+                enable(dependentCode);
+                markReloaded(dependentCode);
+            } catch (RuntimeException e) {
+                log.warn("级联恢复依赖方 {} 失败，保持停机待人工处理：{}", dependentCode, rootMessage(e));
             }
         }
-        visiting.remove(code);
-        memo.put(code, depth);
-        return depth;
+        pluginThemeAppService.reconcileAfterRestore();
     }
 
     private void stopExistingPlugin(PluginModule existing) {
@@ -992,22 +1156,9 @@ public class PluginAppService {
 
     private void rejectRollbackWhenRunning(PluginModule target) {
         Map<String, PluginModule> modules = modulesByCode();
-        Set<String> affected = new HashSet<>();
-        affected.add(target.getCode());
-        boolean changed;
-        do {
-            changed = false;
-            for (PluginModule module : modules.values()) {
-                if (!affected.contains(module.getCode()) && dependencies(module).stream().anyMatch(affected::contains)
-                        || !affected.contains(module.getCode()) && softDependencies(module).stream().anyMatch(affected::contains)) {
-                    changed |= affected.add(module.getCode());
-                }
-            }
-        } while (changed);
-        for (String code : affected) {
-            PluginModule module = modules.get(code);
-            if (module != null && running(module)) {
-                throw new BizException("插件或其依赖方正在运行，需停止后完成回滚");
+        for (PluginModule module : PluginDependencyGraph.affectedClosure(target.getCode(), modules)) {
+            if (running(module)) {
+                throw new BizException("插件或其依赖方正在运行，需停止后完成回滚，或使用级联回滚");
             }
         }
     }
@@ -1018,10 +1169,6 @@ public class PluginAppService {
                 || module.getStatus() == online.yudream.base.domain.platform.plugin.enumerate.PluginStatus.ENABLED
                 || pluginRuntimeGateway.loaded(code)
                 || pluginRuntimeGateway.enabled(code);
-    }
-
-    private boolean dependsOn(PluginModule module, String code) {
-        return dependencies(module).contains(code) || softDependencies(module).contains(code);
     }
 
     private List<String> copy(List<String> values) {
@@ -1300,14 +1447,20 @@ public class PluginAppService {
     }
 
     private void enableAvailableSoftDependencies(PluginModule module, Map<String, PluginModule> modules,
-                                                 Set<String> enabled, Set<String> visiting) {
+                                                 Set<String> enabled, Set<String> visiting,
+                                                 Set<String> includeSoftDependencies) {
         for (String dependencyCode : softDependencies(module)) {
             PluginModule dependency = modules.get(dependencyCode);
-            if (dependency == null || !dependency.enabled() || enabled.contains(dependencyCode)) {
+            if (dependency == null || enabled.contains(dependencyCode)) {
+                continue;
+            }
+            // 记录态已启用（恢复语义）或用户在启用弹窗显式勾选的软依赖才随消费方启用；
+            // 未勾选的已安装软依赖保持现状，缺失的软依赖静默跳过。
+            if (!dependency.enabled() && !includeSoftDependencies.contains(dependencyCode)) {
                 continue;
             }
             try {
-                enableRuntimeWithDependencies(dependency, modules, enabled, visiting);
+                enableRuntimeWithDependencies(dependency, modules, enabled, visiting, includeSoftDependencies);
             } catch (RuntimeException e) {
                 log.warn("Optional plugin dependency {} for {} is unavailable: {}", dependencyCode, module.getCode(), rootMessage(e));
             }

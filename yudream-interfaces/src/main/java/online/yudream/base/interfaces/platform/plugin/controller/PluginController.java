@@ -5,10 +5,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
+import online.yudream.base.application.platform.plugin.service.PluginStoreAppService;
 import online.yudream.base.application.platform.plugin.service.PluginThemeAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
+import online.yudream.base.interfaces.platform.plugin.request.PluginPluginActionRequest;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDependencyStatusRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDependentsRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeOverviewRes;
@@ -38,6 +42,7 @@ public class PluginController {
 
     private final PluginAppService pluginAppService;
     private final PluginThemeAppService pluginThemeAppService;
+    private final PluginStoreAppService pluginStoreAppService;
 
     @GetMapping
     @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看插件列表与运行状态")
@@ -68,9 +73,23 @@ public class PluginController {
     }
 
     @PostMapping("/{code}/enable")
-    @PermissionRegister(code = "platform:plugin:manage", name = "启用插件", module = "平台插件", desc = "启用插件并注册运行时扩展")
-    public Result<PluginModuleRes> enable(@PathVariable String code) {
-        return Result.ok(PluginWebAssembler.toRes(pluginAppService.enable(code)));
+    @PermissionRegister(code = "platform:plugin:manage", name = "启用插件", module = "平台插件", desc = "启用插件并注册运行时扩展；硬依赖自动先启用，可在请求体勾选软依赖一并启用")
+    public Result<PluginModuleRes> enable(@PathVariable String code,
+                                          @org.springframework.web.bind.annotation.RequestBody(required = false) PluginPluginActionRequest request) {
+        return Result.ok(PluginWebAssembler.toRes(pluginAppService.enable(code,
+                PluginWebAssembler.includeSoftDependencies(request))));
+    }
+
+    @GetMapping("/{code}/dependencies")
+    @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看插件前置依赖的安装、启用与市场候选状态")
+    public Result<PluginDependencyStatusRes> dependencyStatus(@PathVariable String code) {
+        return Result.ok(PluginWebAssembler.toRes(pluginStoreAppService.dependencyStatus(code)));
+    }
+
+    @GetMapping("/{code}/dependents")
+    @PermissionRegister(code = "platform:plugin:view", name = "查看插件管理", module = "平台插件", desc = "查看直接依赖该插件的插件及运行状态")
+    public Result<PluginDependentsRes> dependents(@PathVariable String code) {
+        return Result.ok(PluginWebAssembler.toRes(pluginAppService.dependents(code)));
     }
 
     @PostMapping("/{code}/disable")
@@ -80,15 +99,17 @@ public class PluginController {
     }
 
     @PostMapping("/{code}/unload")
-    @PermissionRegister(code = "platform:plugin:manage", name = "卸载插件", module = "平台插件", desc = "卸载插件并释放 ClassLoader")
-    public Result<PluginModuleRes> unload(@PathVariable String code) {
-        return Result.ok(PluginWebAssembler.toRes(pluginAppService.unload(code)));
+    @PermissionRegister(code = "platform:plugin:manage", name = "卸载插件", module = "平台插件", desc = "卸载插件并释放 ClassLoader；cascade=true 时级联停机依赖方并在卸载后恢复软依赖方")
+    public Result<PluginModuleRes> unload(@PathVariable String code,
+                                          @org.springframework.web.bind.annotation.RequestBody(required = false) PluginPluginActionRequest request) {
+        return Result.ok(PluginWebAssembler.toRes(pluginAppService.unload(code, PluginWebAssembler.cascade(request))));
     }
 
     @DeleteMapping("/{code}")
-    @PermissionRegister(code = "platform:plugin:manage", name = "删除插件", module = "平台插件", desc = "删除插件持久化记录")
-    public Result<Void> delete(@PathVariable String code) {
-        pluginAppService.delete(code);
+    @PermissionRegister(code = "platform:plugin:manage", name = "删除插件", module = "平台插件", desc = "删除插件持久化记录；cascade=true 时级联停机依赖方并在删除后恢复软依赖方")
+    public Result<Void> delete(@PathVariable String code,
+                               @RequestParam(required = false, defaultValue = "false") boolean cascade) {
+        pluginAppService.delete(code, cascade);
         return Result.ok();
     }
 

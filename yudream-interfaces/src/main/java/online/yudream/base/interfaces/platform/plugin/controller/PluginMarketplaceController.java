@@ -6,8 +6,10 @@ import online.yudream.base.application.platform.plugin.service.PluginStoreAppSer
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
+import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceBatchInstallRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceInstallRequest;
 import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceUpdateRequest;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdatePlanRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateResultRes;
@@ -70,9 +72,10 @@ public class PluginMarketplaceController {
     }
 
     @PostMapping("/{code}/rollback")
-    @PermissionRegister(code = "platform:plugin:manage", name = "确认插件回滚", module = "平台插件市场", desc = "确认回滚到本地备份版本，回滚后需重启且不自动启用")
-    public Result<PluginMarketplaceUpdateResultRes> rollback(@PathVariable String code) {
-        return Result.ok(PluginWebAssembler.toUpdateResultRes(pluginStoreAppService.rollback(code)));
+    @PermissionRegister(code = "platform:plugin:manage", name = "确认插件回滚", module = "平台插件市场", desc = "确认回滚到本地备份版本；级联模式会按依赖顺序停机并在回滚后自动恢复")
+    public Result<PluginMarketplaceUpdateResultRes> rollback(@PathVariable String code,
+                                                             @org.springframework.web.bind.annotation.RequestParam(required = false, defaultValue = "false") boolean cascade) {
+        return Result.ok(PluginWebAssembler.toUpdateResultRes(pluginStoreAppService.rollback(code, null, cascade)));
     }
 
     @PostMapping("/{code}/install")
@@ -81,5 +84,20 @@ public class PluginMarketplaceController {
                                                   @Valid @RequestBody PluginMarketplaceInstallRequest request) {
         return Result.ok(PluginWebAssembler.toResList(pluginStoreAppService.install(code,
                 request.getReleaseVersion(), request.getSourceCode())));
+    }
+
+    @GetMapping("/{code}/install-plan")
+    @PermissionRegister(code = "platform:plugin-marketplace:view", name = "查看插件安装计划", module = "平台插件市场", desc = "预览指定版本的前置依赖与市场候选版本，不执行下载或安装")
+    public Result<PluginMarketplaceInstallPlanRes> installPlan(@PathVariable String code,
+                                                               @org.springframework.web.bind.annotation.RequestParam("releaseVersion") String releaseVersion,
+                                                               @org.springframework.web.bind.annotation.RequestParam(value = "sourceCode", required = false) String sourceCode) {
+        return Result.ok(PluginWebAssembler.toRes(pluginStoreAppService.installPlan(code, releaseVersion, sourceCode)));
+    }
+
+    @PostMapping("/install-batch")
+    @PermissionRegister(code = "platform:plugin:manage", name = "安装市场插件", module = "平台插件市场", desc = "按依赖顺序批量安装市场插件（用于安装弹窗勾选的前置依赖），任一项失败整体回滚")
+    public Result<List<PluginModuleRes>> installBatch(@Valid @RequestBody PluginMarketplaceBatchInstallRequest request) {
+        return Result.ok(PluginWebAssembler.toResList(pluginStoreAppService.installBatch(
+                PluginWebAssembler.toBatchInstallCmd(request))));
     }
 }

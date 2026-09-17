@@ -33,4 +33,7 @@ public class PluginStorePluginDescriptorRes implements Serializable {
     private PluginStorePluginCompatibilityRes compatibility;
     private List<PluginStorePluginDependencyRes> dependencies;
     private PluginStorePluginJarRes jar;
+    private String category;
+    private List<String> tags;
+    private String gitUrl;
 }

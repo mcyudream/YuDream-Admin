@@ -452,7 +452,7 @@ class PluginStoreAppServiceTest {
                 java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(sourceJar)));
         PluginStoreStructuredVersion structured = new PluginStoreStructuredVersion(
                 "1.0.0", "local:demo/1.0.0/plugin.jar", sha256, "example.Plugin", "Demo", null,
-                10L, "效率工具", List.of("demo"), java.util.Map.of(), List.of());
+                10L, "效率工具", List.of("demo"), java.util.Map.of(), List.of(), null);
         PluginStoreCatalogEntry entry = new PluginStoreCatalogEntry("demo", "local:demo", null, List.of(), List.of(structured));
         PluginMarketSource source = source("default", "本机插件市场", null);
         stubMultiSource(new PluginMarketSourceAppService.SourceCatalog(source, snapshot(source, entry)));
@@ -482,13 +482,13 @@ class PluginStoreAppServiceTest {
     void rollsBackUsingOnlyLocalBackupWithoutMarketplaceAccessOrEnabling() {
         when(pluginAppService.listInstalled()).thenReturn(List.of(
                 PluginModuleDTO.builder().code("demo").version("2.0.0").build()));
-        when(pluginAppService.rollbackStoreJar("demo")).thenReturn(List.of(
+        when(pluginAppService.rollbackStoreJar("demo", null, false)).thenReturn(List.of(
                 PluginModuleDTO.builder().code("demo").version("1.0.0").build()));
 
         var result = service().rollback("demo");
 
         assertEquals(true, result.isRequiresRestart());
-        verify(pluginAppService).rollbackStoreJar("demo");
+        verify(pluginAppService).rollbackStoreJar("demo", null, false);
         verifyNoInteractions(pluginStoreGateway);
         verifyNoInteractions(pluginMarketSourceAppService);
         verify(pluginAppService, never()).enable(any());

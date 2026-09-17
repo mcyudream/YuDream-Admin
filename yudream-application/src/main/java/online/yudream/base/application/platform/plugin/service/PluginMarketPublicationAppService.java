@@ -126,10 +126,11 @@ public class PluginMarketPublicationAppService {
             List<String> normalizedTags = normalizeTags(effectiveTags);
             Map<String, Object> compatibility = compatibilityMap(metadata);
             Map<String, Object> publisher = publisherMap(metadata);
+            String sourceUrl = descriptor.gitUrl();
             String descriptorJson = buildDescriptorJson(code, pluginVersion, descriptor.mainClass(),
                     displayName(descriptor, code), sanitizeDisplayText(descriptor.description(), MAX_DISPLAY_TEXT_LENGTH),
                     descriptor.icon(), descriptor.dependencies(), descriptor.softDependencies(),
-                    releaseNotes, license(metadata), compatibility, publisher, sha256);
+                    releaseNotes, license(metadata), sourceUrl, compatibility, publisher, sha256);
 
             Path target = directory.resolve(code).resolve(pluginVersion).resolve(JAR_FILE_NAME);
             try {
@@ -150,6 +151,7 @@ public class PluginMarketPublicationAppService {
                         .icon(descriptor.icon())
                         .releaseNotes(sanitizeReleaseNotes(releaseNotes))
                         .license(license(metadata))
+                        .sourceUrl(sourceUrl)
                         .category(normalizedCategory)
                         .tags(normalizedTags)
                         .compatibilityJson(toJsonString(compatibility))
@@ -219,7 +221,7 @@ public class PluginMarketPublicationAppService {
         String descriptorJson = buildDescriptorJson(publication.getCode(), publication.getPluginVersion(),
                 publication.getMainClass(), publication.getDisplayName(), publication.getDescription(),
                 publication.getIcon(), publication.getDependencies(), publication.getSoftDependencies(),
-                publication.getReleaseNotes(), publication.getLicense(),
+                publication.getReleaseNotes(), publication.getLicense(), publication.getSourceUrl(),
                 readMap(publication.getCompatibilityJson()), readMap(publication.getPublisherJson()),
                 publication.getSha256());
         publication.setDescriptorJson(descriptorJson);
@@ -521,7 +523,8 @@ public class PluginMarketPublicationAppService {
                 publication.getCategory(),
                 publication.getTags(),
                 readStringMap(publication.getCompatibilityJson()),
-                dependencies);
+                dependencies,
+                publication.getSourceUrl());
     }
 
     // ---------- legacy 静态契约（schemaVersion=1，保留兼容旧消费端） ----------
@@ -643,11 +646,14 @@ public class PluginMarketPublicationAppService {
         node.put("publishedAt", summary.publishedAt() == null ? null : summary.publishedAt().toString());
         node.put("updatedAt", summary.updatedAt() == null ? null : summary.updatedAt().toString());
         node.put("license", summary.license());
+        if (StringUtils.hasText(summary.sourceUrl())) {
+            node.put("sourceUrl", summary.sourceUrl());
+        }
         return node;
     }
 
     private record PluginSummary(String code, String displayName, String description, String icon,
-                                 String category, List<String> tags, String license, Long authorId,
+                                 String category, List<String> tags, String license, String sourceUrl, Long authorId,
                                  String latestVersion, long downloads, LocalDateTime publishedAt, LocalDateTime updatedAt) {
 
         static PluginSummary of(String code, List<PluginMarketPublication> versions) {
@@ -672,6 +678,7 @@ public class PluginMarketPublicationAppService {
                     StringUtils.hasText(latest.getDisplayName()) ? latest.getDisplayName() : code,
                     latest.getDescription(), latest.getIcon(), latest.getCategory(),
                     latest.getTags() == null ? List.of() : latest.getTags(), latest.getLicense(),
+                    latest.getSourceUrl(),
                     latest.getPublisherUserId(), latest.getPluginVersion(), downloads, publishedAt, updatedAt);
         }
     }
@@ -916,6 +923,7 @@ public class PluginMarketPublicationAppService {
     private String buildDescriptorJson(String code, String pluginVersion, String main, String displayName,
                                        String description, String icon, List<String> dependencies,
                                        List<String> softDependencies, String releaseNotes, String license,
+                                       String sourceUrl,
                                        Map<String, Object> compatibility, Map<String, Object> publisher,
                                        String sha256) {
         try {
@@ -945,6 +953,9 @@ public class PluginMarketPublicationAppService {
             }
             if (StringUtils.hasText(license)) {
                 plugin.put("license", license);
+            }
+            if (StringUtils.hasText(sourceUrl)) {
+                plugin.put("git", sourceUrl);
             }
             String notes = sanitizeReleaseNotes(releaseNotes);
             if (notes != null) {

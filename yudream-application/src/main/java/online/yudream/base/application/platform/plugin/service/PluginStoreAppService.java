@@ -3,6 +3,9 @@ package online.yudream.base.application.platform.plugin.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
+import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchInstallCmd;
+import online.yudream.base.application.platform.plugin.dto.PluginDependencyStatusDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceInstallPlanDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdatePlanDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginMarketplaceUpdateResultDTO;
@@ -270,27 +273,31 @@ public class PluginStoreAppService {
     @Transactional
     public PluginMarketplaceUpdateResultDTO rollback(String code) {
         String normalizedCode = normalizeCode(code);
-        return rollbackLocal(normalizedCode, null);
+        return rollbackLocal(normalizedCode, null, false);
     }
 
     @Transactional
     public PluginMarketplaceUpdateResultDTO rollback(String code, String targetVersion) {
+        return rollback(code, targetVersion, false);
+    }
+
+    /** 级联回滚：运行中也可回滚，停机/恢复由插件应用服务按依赖顺序处理。 */
+    @Transactional
+    public PluginMarketplaceUpdateResultDTO rollback(String code, String targetVersion, boolean cascade) {
         String normalizedCode = normalizeCode(code);
         if (!StringUtils.hasText(targetVersion)) {
             throw unavailable();
         }
-        return rollbackLocal(normalizedCode, targetVersion.trim());
+        return rollbackLocal(normalizedCode, targetVersion.trim(), cascade);
     }
 
-    private PluginMarketplaceUpdateResultDTO rollbackLocal(String normalizedCode, String targetVersion) {
+    private PluginMarketplaceUpdateResultDTO rollbackLocal(String normalizedCode, String targetVersion, boolean cascade) {
         boolean installed = installedPlugins().stream()
                 .anyMatch(plugin -> normalizedCode.equals(plugin.getCode()));
         if (!installed) {
             throw unavailable();
         }
-        List<PluginModuleDTO> modules = targetVersion == null
-                ? pluginAppService.rollbackStoreJar(normalizedCode)
-                : pluginAppService.rollbackStoreJar(normalizedCode, targetVersion);
+        List<PluginModuleDTO> modules = pluginAppService.rollbackStoreJar(normalizedCode, targetVersion, cascade);
         return PluginMarketplaceUpdateResultDTO.builder()
                 .modules(modules)
                 .requiresRestart(true)
@@ -372,11 +379,323 @@ public class PluginStoreAppService {
                 .orElse(null);
     }
 
+    // ---------- 安装计划与批量安装 ----------
+
+    /**
+     * 安装计划：目标版本的直接/传递前置依赖清单（被依赖者在前），每项标注
+     * 已安装/版本满足/市场候选版本与候选自身可安装性，供安装确认弹窗勾选后批量下载。
+     */
+    @Transactional(readOnly = true)
+    public PluginMarketplaceInstallPlanDTO installPlan(String code, String releaseVersion, String sourceCode) {
+        String normalizedCode = normalizeCode(code);
+        if (!StringUtils.hasText(releaseVersion)) {
+            throw unavailable();
+        }
+        Map<String, List<VersionRef>> view = catalogView();
+        List<VersionRef> refs = view.get(normalizedCode);
+        if (refs == null || refs.isEmpty()) {
+            throw unavailable();
+        }
+        VersionRef target = restrictBySource(refs, sourceCode).stream()
+                .filter(item -> releaseVersion.trim().equals(item.releaseVersion()))
+                .findFirst()
+                .orElseThrow(PluginStoreAppService::unavailable);
+        PluginStorePluginDescriptor targetDescriptor = descriptorFor(target);
+        List<PluginModuleDTO> localPlugins = installedPlugins();
+        Installability installability = evaluateInstallability(targetDescriptor, localPlugins);
+        List<PluginMarketplaceInstallPlanDTO.EntryDTO> entries = new ArrayList<>();
+        collectInstallEntries(targetDescriptor, view, installedOriginSources(), localPlugins,
+                new LinkedHashSet<>(), entries);
+        return PluginMarketplaceInstallPlanDTO.builder()
+                .code(normalizedCode)
+                .releaseVersion(target.releaseVersion())
+                .installable(installability.installable())
+                .installDisabledReason(installability.disabledReason())
+                .entries(entries)
+                .build();
+    }
+
+    /**
+     * 递归收集安装计划条目（后序：被依赖者先于消费方输出）。硬依赖未满足且市场有可安装
+     * 候选时继续下钻其硬依赖；软依赖只评估候选自身可安装性，不下钻其依赖。
+     */
+    private void collectInstallEntries(PluginStorePluginDescriptor descriptor,
+                                       Map<String, List<VersionRef>> view, Map<String, String> originSources,
+                                       List<PluginModuleDTO> localPlugins, Set<String> visiting,
+                                       List<PluginMarketplaceInstallPlanDTO.EntryDTO> entries) {
+        for (PluginStorePluginDependency dependency : descriptor.dependencies()) {
+            String dependencyCode = dependency.code();
+            if (!validCode(dependencyCode) || !visiting.add(dependencyCode)) {
+                continue;
+            }
+            try {
+                PluginMarketplaceInstallPlanDTO.EntryDTO entry = buildInstallPlanEntry(dependencyCode,
+                        dependency.required(), dependency.range(), view, originSources, localPlugins);
+                boolean satisfied = entry.isInstalled() && entry.isVersionSatisfied();
+                VersionRef candidateRef = null;
+                if (dependency.required() && !satisfied && entry.isStoreAvailable() && entry.isInstallable()
+                        && StringUtils.hasText(entry.getStoreVersion())) {
+                    candidateRef = findRef(view, dependencyCode, entry.getStoreVersion(), entry.getStoreSourceCode());
+                }
+                if (candidateRef != null) {
+                    collectInstallEntries(descriptorFor(candidateRef), view, originSources, localPlugins,
+                            visiting, entries);
+                }
+                mergeInstallPlanEntry(entries, entry);
+            } catch (BizException e) {
+                log.warn("解析安装计划依赖 {} 失败：{}", dependencyCode, e.getMessage());
+            } finally {
+                visiting.remove(dependencyCode);
+            }
+        }
+    }
+
+    /** 同一依赖出现在多条链上时合并：保留必须语义与更完整的市场候选信息。 */
+    private void mergeInstallPlanEntry(List<PluginMarketplaceInstallPlanDTO.EntryDTO> entries,
+                                       PluginMarketplaceInstallPlanDTO.EntryDTO entry) {
+        for (int i = 0; i < entries.size(); i++) {
+            PluginMarketplaceInstallPlanDTO.EntryDTO existing = entries.get(i);
+            if (!existing.getCode().equals(entry.getCode())) {
+                continue;
+            }
+            boolean required = existing.isRequired() || entry.isRequired();
+            boolean installable = existing.isInstallable() && entry.isInstallable();
+            String disabledReason = existing.getInstallDisabledReason() == null
+                    ? entry.getInstallDisabledReason() : existing.getInstallDisabledReason();
+            entries.set(i, existing.toBuilder()
+                    .required(required)
+                    .installable(installable)
+                    .installDisabledReason(disabledReason)
+                    .build());
+            return;
+        }
+        entries.add(entry);
+    }
+
+    private PluginMarketplaceInstallPlanDTO.EntryDTO buildInstallPlanEntry(String dependencyCode, boolean required,
+                                                                           String range,
+                                                                           Map<String, List<VersionRef>> view,
+                                                                           Map<String, String> originSources,
+                                                                           List<PluginModuleDTO> localPlugins) {
+        PluginModuleDTO local = localPlugins.stream()
+                .filter(plugin -> dependencyCode.equals(plugin.getCode()))
+                .findFirst()
+                .orElse(null);
+        boolean installed = local != null;
+        boolean versionSatisfied = installed && matchesQuietly(range, local.getVersion());
+        List<VersionRef> refs = view.get(dependencyCode);
+        boolean storeAvailable = refs != null && !refs.isEmpty();
+        VersionRef best = null;
+        VersionRef bestInRange = null;
+        SemVer bestVersion = null;
+        SemVer bestInRangeVersion = null;
+        if (storeAvailable) {
+            for (VersionRef ref : refs) {
+                SemVer version = parseVersion(ref.releaseVersion()).orElse(null);
+                if (version == null) {
+                    continue;
+                }
+                if (bestVersion == null || version.compareTo(bestVersion) > 0) {
+                    best = ref;
+                    bestVersion = version;
+                }
+                if (matchesQuietly(range, ref.releaseVersion())
+                        && (bestInRangeVersion == null || version.compareTo(bestInRangeVersion) > 0)) {
+                    bestInRange = ref;
+                    bestInRangeVersion = version;
+                }
+            }
+        }
+        // 范围内优先，其次市场最高版本（版本约束最终以安装时校验为准）
+        VersionRef chosen = bestInRange != null ? bestInRange : best;
+        String displayName = installed && StringUtils.hasText(local.getName()) ? local.getName() : dependencyCode;
+        boolean entryInstallable = true;
+        String disabledReason = null;
+        String storeVersion = null;
+        String storeSourceCode = null;
+        String storeSourceName = null;
+        if (chosen != null) {
+            storeVersion = chosen.releaseVersion();
+            storeSourceCode = sourceCode(chosen);
+            storeSourceName = sourceName(chosen);
+            try {
+                PluginStorePluginDescriptor candidateDescriptor = descriptorFor(chosen);
+                if (displayName.equals(dependencyCode) && StringUtils.hasText(candidateDescriptor.displayName())) {
+                    displayName = candidateDescriptor.displayName();
+                }
+                Installability candidateInstallability = evaluateInstallability(candidateDescriptor, localPlugins);
+                entryInstallable = candidateInstallability.installable();
+                disabledReason = candidateInstallability.disabledReason();
+            } catch (BizException e) {
+                entryInstallable = false;
+                disabledReason = "市场版本数据不可用";
+            }
+        } else if (storeAvailable && StringUtils.hasText(range)) {
+            entryInstallable = false;
+            disabledReason = "市场版本不满足版本要求 " + range;
+        }
+        if (required && !installed && !storeAvailable) {
+            entryInstallable = false;
+            disabledReason = "必需依赖不在任何已启用市场源中";
+        }
+        return PluginMarketplaceInstallPlanDTO.EntryDTO.builder()
+                .code(dependencyCode)
+                .displayName(displayName)
+                .required(required)
+                .range(range)
+                .installed(installed)
+                .installedVersion(installed ? local.getVersion() : null)
+                .versionSatisfied(versionSatisfied)
+                .storeAvailable(storeAvailable)
+                .storeVersion(storeVersion)
+                .storeSourceCode(storeSourceCode)
+                .storeSourceName(storeSourceName)
+                .installable(entryInstallable)
+                .installDisabledReason(disabledReason)
+                .build();
+    }
+
+    private VersionRef findRef(Map<String, List<VersionRef>> view, String code, String releaseVersion, String sourceCode) {
+        List<VersionRef> refs = view.get(code);
+        if (refs == null) {
+            return null;
+        }
+        return refs.stream()
+                .filter(ref -> releaseVersion.equals(ref.releaseVersion()))
+                .filter(ref -> !StringUtils.hasText(sourceCode) || sourceCode.equals(sourceCode(ref)))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 批量安装：按传入顺序（依赖必须排在消费方之前）逐项安装，任一项失败整体回滚。
+     * 与单插件安装/更新共用串行锁，避免并发替换 JAR 与注册表。
+     */
+    @Transactional
+    public List<PluginModuleDTO> installBatch(PluginMarketplaceBatchInstallCmd cmd) {
+        if (cmd == null || cmd.getItems() == null || cmd.getItems().isEmpty()) {
+            throw new BizException("安装清单不能为空");
+        }
+        boolean malformed = cmd.getItems().stream().anyMatch(item -> item == null
+                || !StringUtils.hasText(item.getCode()) || !StringUtils.hasText(item.getReleaseVersion()));
+        if (malformed) {
+            throw new BizException("安装清单包含缺少编码或版本的条目");
+        }
+        synchronized (this) {
+            List<PluginModuleDTO> modules = List.of();
+            for (PluginMarketplaceBatchInstallCmd.Item item : cmd.getItems()) {
+                try {
+                    modules = install(item.getCode(), item.getReleaseVersion(), item.getSourceCode());
+                } catch (BizException e) {
+                    throw new BizException("批量安装 " + item.getCode() + "@" + item.getReleaseVersion()
+                            + " 失败：" + e.getMessage() + "；本次批量安装已整体回滚");
+                }
+            }
+            return modules;
+        }
+    }
+
+    // ---------- 启用依赖状态 ----------
+
+    /**
+     * 已安装插件的前置依赖状态：硬/软依赖逐项标注安装、启用与市场候选版本，
+     * 供启用前依赖预览弹窗（硬缺失引导安装、软依赖可选启用）。
+     */
+    @Transactional(readOnly = true)
+    public PluginDependencyStatusDTO dependencyStatus(String code) {
+        String normalizedCode = normalizeCode(code);
+        List<PluginModuleDTO> localPlugins = installedPlugins();
+        PluginModuleDTO target = localPlugins.stream()
+                .filter(plugin -> normalizedCode.equals(plugin.getCode()))
+                .findFirst()
+                .orElseThrow(() -> new BizException("插件不存在：" + normalizedCode));
+        Map<String, List<VersionRef>> view = catalogView();
+        Map<String, String> originSources = installedOriginSources();
+        List<PluginDependencyStatusDTO.DependencyDTO> dependencies = new ArrayList<>();
+        for (String dependencyCode : concatDistinct(target.getDependencies(), target.getSoftDependencies())) {
+            boolean required = target.getDependencies() != null && target.getDependencies().contains(dependencyCode);
+            PluginModuleDTO local = localPlugins.stream()
+                    .filter(plugin -> dependencyCode.equals(plugin.getCode()))
+                    .findFirst()
+                    .orElse(null);
+            boolean installed = local != null;
+            VersionRef chosen = storeCandidate(view, dependencyCode, originSources.get(dependencyCode));
+            String name = installed && StringUtils.hasText(local.getName()) ? local.getName() : dependencyCode;
+            String storeVersion = null;
+            String storeSourceCode = null;
+            String storeSourceName = null;
+            if (chosen != null) {
+                storeVersion = chosen.releaseVersion();
+                storeSourceCode = sourceCode(chosen);
+                storeSourceName = sourceName(chosen);
+                if (name.equals(dependencyCode)) {
+                    try {
+                        PluginStorePluginDescriptor candidateDescriptor = descriptorFor(chosen);
+                        if (StringUtils.hasText(candidateDescriptor.displayName())) {
+                            name = candidateDescriptor.displayName();
+                        }
+                    } catch (BizException ignored) {
+                        // 展示名解析失败退回编码
+                    }
+                }
+            }
+            dependencies.add(PluginDependencyStatusDTO.DependencyDTO.builder()
+                    .code(dependencyCode)
+                    .name(name)
+                    .required(required)
+                    .installed(installed)
+                    .installedVersion(installed ? local.getVersion() : null)
+                    .loaded(installed && local.isLoaded())
+                    .enabled(installed && local.isEnabled())
+                    .storeAvailable(chosen != null)
+                    .storeVersion(storeVersion)
+                    .storeSourceCode(storeSourceCode)
+                    .storeSourceName(storeSourceName)
+                    .build());
+        }
+        return PluginDependencyStatusDTO.builder()
+                .code(normalizedCode)
+                .dependencies(dependencies)
+                .build();
+    }
+
+    private List<String> concatDistinct(List<String> dependencies, List<String> softDependencies) {
+        LinkedHashSet<String> codes = new LinkedHashSet<>();
+        if (dependencies != null) {
+            dependencies.stream().filter(StringUtils::hasText).map(String::trim).forEach(codes::add);
+        }
+        if (softDependencies != null) {
+            softDependencies.stream().filter(StringUtils::hasText).map(String::trim).forEach(codes::add);
+        }
+        return new ArrayList<>(codes);
+    }
+
+    /** 依赖的市场候选：优先安装来源源，其次全局最高版本。 */
+    private VersionRef storeCandidate(Map<String, List<VersionRef>> view, String code, String originSourceCode) {
+        List<VersionRef> refs = view.get(code);
+        if (refs == null || refs.isEmpty()) {
+            return null;
+        }
+        return selectVersion(refs, originSourceCode);
+    }
+
+    private boolean matchesQuietly(String range, String version) {
+        if (range == null) {
+            return true;
+        }
+        try {
+            return SemVerRange.parse(range).matches(SemVer.parse(version));
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
+
     private List<PluginModuleDTO> installStoreVersion(VersionRef ref, PluginStorePluginDescriptor descriptor) {
         List<PluginModuleDTO> localPlugins = descriptor.dependencies().isEmpty() ? List.of() : localPlugins();
         Installability installability = evaluateInstallability(descriptor, localPlugins);
         if (!installability.installable()) {
-            throw unavailable();
+            throw new BizException(StringUtils.hasText(installability.disabledReason())
+                    ? installability.disabledReason() : "插件商店数据不可用");
         }
         logOptionalDependencyWarnings(descriptor, installability);
         return downloadStoreVersion(ref, descriptor, false);
@@ -507,12 +826,19 @@ public class PluginStoreAppService {
                 version.description(),
                 null,
                 List.of(),
+                null,
+                null,
+                null,
+                null,
                 compatibility,
                 version.dependencies(),
                 new PluginStorePluginJar(
                         "self-hosted:" + ref.entry().code() + ":" + version.releaseVersion(),
                         version.downloadUrl(),
-                        version.sha256()));
+                        version.sha256()),
+                version.category(),
+                version.tags(),
+                version.gitUrl());
     }
 
     private PluginStoreSourceRef refOf(PluginMarketSource source) {

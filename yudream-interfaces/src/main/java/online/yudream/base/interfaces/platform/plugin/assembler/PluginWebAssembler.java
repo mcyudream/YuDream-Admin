@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.plugin.assembler;
 
 import jakarta.servlet.http.HttpServletRequest;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchInstallCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendRouteDTO;
@@ -28,11 +29,19 @@ import online.yudream.base.application.platform.plugin.dto.PluginAiProviderCatal
 import online.yudream.base.application.platform.plugin.dto.PluginDeptCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginRoleCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginUserCatalogDTO;
+import online.yudream.base.interfaces.platform.plugin.request.PluginMarketplaceBatchInstallRequest;
+import online.yudream.base.interfaces.platform.plugin.request.PluginPluginActionRequest;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDependencyStatusItemRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDependencyStatusRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDependentRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginDependentsRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendManifestRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendModuleRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginFrontendRouteRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginGlobalWidgetRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginModuleRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanEntryRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceInstallPlanRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdatePlanRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMarketplaceUpdateResultRes;
@@ -72,6 +81,37 @@ public class PluginWebAssembler {
         return items == null ? List.of() : items.stream().map(PluginWebAssembler::toRes).toList();
     }
 
+    /** 启用请求携带的软依赖集合；空请求返回空集。 */
+    public static java.util.Set<String> includeSoftDependencies(PluginPluginActionRequest request) {
+        if (request == null || request.getIncludeSoftDependencies() == null) {
+            return java.util.Set.of();
+        }
+        return new java.util.LinkedHashSet<>(request.getIncludeSoftDependencies());
+    }
+
+    /** 卸载/删除请求是否级联处理依赖方；空请求不级联。 */
+    public static boolean cascade(PluginPluginActionRequest request) {
+        return request != null && Boolean.TRUE.equals(request.getCascade());
+    }
+
+    public static PluginMarketplaceBatchInstallCmd toBatchInstallCmd(PluginMarketplaceBatchInstallRequest request) {
+        if (request == null || request.getItems() == null) {
+            return new PluginMarketplaceBatchInstallCmd();
+        }
+        java.util.List<PluginMarketplaceBatchInstallCmd.Item> items = request.getItems().stream()
+                .map(item -> {
+                    PluginMarketplaceBatchInstallCmd.Item cmd = new PluginMarketplaceBatchInstallCmd.Item();
+                    cmd.setCode(item.getCode());
+                    cmd.setReleaseVersion(item.getReleaseVersion());
+                    cmd.setSourceCode(item.getSourceCode());
+                    return cmd;
+                })
+                .toList();
+        PluginMarketplaceBatchInstallCmd cmd = new PluginMarketplaceBatchInstallCmd();
+        cmd.setItems(items);
+        return cmd;
+    }
+
     public static PluginModuleRes toRes(PluginModuleDTO dto) {
         return PluginModuleRes.builder()
                 .id(dto.getId())
@@ -82,6 +122,7 @@ public class PluginWebAssembler {
                 .icon(dto.getIcon())
                 .mainClass(dto.getMainClass())
                 .jarPath(dto.getJarPath())
+                .gitUrl(dto.getGitUrl())
                 .dependencies(dto.getDependencies())
                 .softDependencies(dto.getSoftDependencies())
                 .status(dto.getStatus())
@@ -141,6 +182,98 @@ public class PluginWebAssembler {
                 .build();
     }
 
+    public static PluginDependentsRes toRes(online.yudream.base.application.platform.plugin.dto.PluginDependentsDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginDependentsRes.builder()
+                .code(dto.getCode())
+                .dependents(dto.getDependents() == null ? List.of() : dto.getDependents().stream()
+                        .map(PluginWebAssembler::toRes)
+                        .toList())
+                .build();
+    }
+
+    public static PluginDependentRes toRes(online.yudream.base.application.platform.plugin.dto.PluginDependentsDTO.DependentDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginDependentRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .required(dto.isRequired())
+                .loaded(dto.isLoaded())
+                .enabled(dto.isEnabled())
+                .build();
+    }
+
+    public static PluginDependencyStatusRes toRes(online.yudream.base.application.platform.plugin.dto.PluginDependencyStatusDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginDependencyStatusRes.builder()
+                .code(dto.getCode())
+                .dependencies(dto.getDependencies() == null ? List.of() : dto.getDependencies().stream()
+                        .map(PluginWebAssembler::toRes)
+                        .toList())
+                .build();
+    }
+
+    public static PluginDependencyStatusItemRes toRes(online.yudream.base.application.platform.plugin.dto.PluginDependencyStatusDTO.DependencyDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginDependencyStatusItemRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .required(dto.isRequired())
+                .installed(dto.isInstalled())
+                .installedVersion(dto.getInstalledVersion())
+                .loaded(dto.isLoaded())
+                .enabled(dto.isEnabled())
+                .storeAvailable(dto.isStoreAvailable())
+                .storeVersion(dto.getStoreVersion())
+                .storeSourceCode(dto.getStoreSourceCode())
+                .storeSourceName(dto.getStoreSourceName())
+                .build();
+    }
+
+    public static PluginMarketplaceInstallPlanRes toRes(online.yudream.base.application.platform.plugin.dto.PluginMarketplaceInstallPlanDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginMarketplaceInstallPlanRes.builder()
+                .code(dto.getCode())
+                .releaseVersion(dto.getReleaseVersion())
+                .installable(dto.isInstallable())
+                .installDisabledReason(dto.getInstallDisabledReason())
+                .entries(dto.getEntries() == null ? List.of() : dto.getEntries().stream()
+                        .map(PluginWebAssembler::toRes)
+                        .toList())
+                .build();
+    }
+
+    public static PluginMarketplaceInstallPlanEntryRes toRes(online.yudream.base.application.platform.plugin.dto.PluginMarketplaceInstallPlanDTO.EntryDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        return PluginMarketplaceInstallPlanEntryRes.builder()
+                .code(dto.getCode())
+                .displayName(dto.getDisplayName())
+                .required(dto.isRequired())
+                .range(dto.getRange())
+                .installed(dto.isInstalled())
+                .installedVersion(dto.getInstalledVersion())
+                .versionSatisfied(dto.isVersionSatisfied())
+                .storeAvailable(dto.isStoreAvailable())
+                .storeVersion(dto.getStoreVersion())
+                .storeSourceCode(dto.getStoreSourceCode())
+                .storeSourceName(dto.getStoreSourceName())
+                .installable(dto.isInstallable())
+                .installDisabledReason(dto.getInstallDisabledReason())
+                .build();
+    }
+
     public static List<PluginStorePluginRes> toStoreResList(List<PluginStorePluginDTO> items) {
         return items == null ? List.of() : items.stream().map(PluginWebAssembler::toStoreRes).toList();
     }
@@ -190,6 +323,9 @@ public class PluginWebAssembler {
                 .dependencies(dto.getDependencies() == null ? List.of() : dto.getDependencies().stream()
                         .map(PluginWebAssembler::toStoreDependencyRes).toList())
                 .jar(toStoreJarRes(dto.getJar()))
+                .category(dto.getCategory())
+                .tags(dto.getTags())
+                .gitUrl(dto.getGitUrl())
                 .build();
     }
 
