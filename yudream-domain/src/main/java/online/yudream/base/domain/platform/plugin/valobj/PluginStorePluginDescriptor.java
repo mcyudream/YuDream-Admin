@@ -22,6 +22,8 @@ public class PluginStorePluginDescriptor {
     private final String category;
     private final List<String> tags;
     private final String gitUrl;
+    private final String publishedAt;
+    private final String updatedAt;
 
     public PluginStorePluginDescriptor(String releaseVersion, String code, String version, String main,
                                        String displayName, String description, String icon, List<String> screenshots,
@@ -37,7 +39,7 @@ public class PluginStorePluginDescriptor {
                                        String releaseNotes, PluginStorePluginCompatibility compatibility,
                                        List<PluginStorePluginDependency> dependencies, PluginStorePluginJar jar) {
         this(releaseVersion, code, version, main, displayName, description, icon, screenshots, publisher, source,
-                license, releaseNotes, compatibility, dependencies, jar, null, List.of(), null);
+                license, releaseNotes, compatibility, dependencies, jar, null, List.of(), null, null, null);
     }
 
     public PluginStorePluginDescriptor(String releaseVersion, String code, String version, String main,
@@ -45,7 +47,8 @@ public class PluginStorePluginDescriptor {
                                        PluginStorePluginPublisher publisher, PluginStorePluginSource source, String license,
                                        String releaseNotes, PluginStorePluginCompatibility compatibility,
                                        List<PluginStorePluginDependency> dependencies, PluginStorePluginJar jar,
-                                       String category, List<String> tags, String gitUrl) {
+                                       String category, List<String> tags, String gitUrl,
+                                       String publishedAt, String updatedAt) {
         this.releaseVersion = releaseVersion;
         this.code = code;
         this.version = version;
@@ -64,6 +67,8 @@ public class PluginStorePluginDescriptor {
         this.category = category == null || category.isBlank() ? null : category.trim();
         this.tags = tags == null ? List.of() : List.copyOf(tags);
         this.gitUrl = gitUrl == null || gitUrl.isBlank() ? null : gitUrl.trim();
+        this.publishedAt = publishedAt == null || publishedAt.isBlank() ? null : publishedAt.trim();
+        this.updatedAt = updatedAt == null || updatedAt.isBlank() ? null : updatedAt.trim();
     }
 
     public String releaseVersion() {
@@ -136,5 +141,13 @@ public class PluginStorePluginDescriptor {
 
     public String gitUrl() {
         return gitUrl;
+    }
+
+    public String publishedAt() {
+        return publishedAt;
+    }
+
+    public String updatedAt() {
+        return updatedAt;
     }
 }

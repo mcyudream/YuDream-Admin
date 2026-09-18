@@ -62,6 +62,8 @@ public class PluginMarketSourceSnapshotDO extends BaseDO {
         private java.util.Map<String, String> compatibility;
         private List<Dependency> dependencies;
         private String gitUrl;
+        private String publishedAt;
+        private String updatedAt;
     }
 
     @Data

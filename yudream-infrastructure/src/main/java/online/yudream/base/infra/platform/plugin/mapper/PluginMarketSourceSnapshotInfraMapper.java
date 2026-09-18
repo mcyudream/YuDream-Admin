@@ -41,7 +41,7 @@ public class PluginMarketSourceSnapshotInfraMapper {
                         version.displayName(), version.description(), version.sizeBytes(), version.category(),
                         version.tags() == null ? List.of() : new ArrayList<>(version.tags()),
                         version.compatibility() == null ? java.util.Map.of() : new java.util.LinkedHashMap<>(version.compatibility()),
-                        dependencies, version.gitUrl()));
+                        dependencies, version.gitUrl(), version.publishedAt(), version.updatedAt()));
             }
             entries.add(new PluginMarketSourceSnapshotDO.Entry(entry.code(), entry.indexUrl(),
                     entry.latestDescriptorJson(), versions, structured));
@@ -77,7 +77,8 @@ public class PluginMarketSourceSnapshotInfraMapper {
                                 version.getReleaseVersion(), version.getDownloadUrl(), version.getSha256(),
                                 version.getMain(), version.getDisplayName(), version.getDescription(),
                                 version.getSizeBytes(), version.getCategory(), version.getTags(),
-                                version.getCompatibility(), dependencies, version.getGitUrl()));
+                                version.getCompatibility(), dependencies, version.getGitUrl(),
+                                version.getPublishedAt(), version.getUpdatedAt()));
                     }
                 }
                 entries.add(new PluginStoreCatalogEntry(entry.getCode(), entry.getIndexUrl(),

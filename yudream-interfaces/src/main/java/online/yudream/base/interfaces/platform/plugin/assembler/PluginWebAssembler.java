@@ -326,6 +326,8 @@ public class PluginWebAssembler {
                 .category(dto.getCategory())
                 .tags(dto.getTags())
                 .gitUrl(dto.getGitUrl())
+                .publishedAt(dto.getPublishedAt())
+                .updatedAt(dto.getUpdatedAt())
                 .build();
     }
 

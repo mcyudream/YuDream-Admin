@@ -838,7 +838,9 @@ public class PluginStoreAppService {
                         version.sha256()),
                 version.category(),
                 version.tags(),
-                version.gitUrl());
+                version.gitUrl(),
+                version.publishedAt(),
+                version.updatedAt());
     }
 
     private PluginStoreSourceRef refOf(PluginMarketSource source) {

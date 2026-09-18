@@ -452,7 +452,7 @@ class PluginStoreAppServiceTest {
                 java.security.MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(sourceJar)));
         PluginStoreStructuredVersion structured = new PluginStoreStructuredVersion(
                 "1.0.0", "local:demo/1.0.0/plugin.jar", sha256, "example.Plugin", "Demo", null,
-                10L, "效率工具", List.of("demo"), java.util.Map.of(), List.of(), null);
+                10L, "效率工具", List.of("demo"), java.util.Map.of(), List.of(), null, null, null);
         PluginStoreCatalogEntry entry = new PluginStoreCatalogEntry("demo", "local:demo", null, List.of(), List.of(structured));
         PluginMarketSource source = source("default", "本机插件市场", null);
         stubMultiSource(new PluginMarketSourceAppService.SourceCatalog(source, snapshot(source, entry)));

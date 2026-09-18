@@ -191,7 +191,8 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
                     releaseVersion, downloadUrl.toString(), sha256.toLowerCase(Locale.ROOT),
                     main, optionalText(detail, "displayName"), optionalText(detail, "description"),
                     sizeBytes, optionalText(detail, "category"), optionalTextArray(detail, "tags"),
-                    compatibility, dependencies, optionalText(detail, "sourceUrl")));
+                    compatibility, dependencies, optionalText(detail, "sourceUrl"),
+                    optionalText(detail, "publishedAt"), optionalText(detail, "updatedAt")));
         }
         return new PluginStoreCatalogEntry(code, apiRoot.toString() + "/plugins/" + code, null, List.of(), structured);
     }
@@ -501,7 +502,7 @@ public class JdkPluginStoreGateway implements PluginStoreGateway {
         return new PluginStorePluginDescriptor(expectedVersion, expectedCode, expectedVersion, main, displayName,
                 description, icon, screenshots, publisher, source, license, releaseNotes, compatibility, dependencies,
                 new PluginStorePluginJar(mavenCoordinates, jarUrl, sha256.toLowerCase(Locale.ROOT)),
-                null, List.of(), gitUrl);
+                null, List.of(), gitUrl, null, null);
     }
 
     /** descriptor JSON 可选 git 字段：源码仓库地址，校验同展示 URL。 */

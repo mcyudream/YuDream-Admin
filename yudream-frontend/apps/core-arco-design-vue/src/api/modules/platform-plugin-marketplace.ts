@@ -52,6 +52,10 @@ export interface PluginStorePluginDescriptor {
   tags?: string[]
   /** plugin.yml 可选 git 声明的源码仓库地址。 */
   gitUrl?: string
+  /** 发布时间（ISO 文本）；静态索引源可能为空。 */
+  publishedAt?: string
+  /** 最近发布/更新时间（ISO 文本）。 */
+  updatedAt?: string
   /** Kept for compatibility with newer backend responses. */
   installable?: boolean
   /** Kept for compatibility with newer backend responses. */
