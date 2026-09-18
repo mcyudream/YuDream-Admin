@@ -52,6 +52,8 @@ public class SettingAppService {
     private static final String KEY_COPYRIGHT_COMPANY = "copyrightCompany";
     private static final String KEY_COPYRIGHT_WEBSITE = "copyrightWebsite";
     private static final String KEY_COPYRIGHT_DATES = "copyrightDates";
+    /** 登录页默认选中的登录方式：password / passkey / external:{providerCode}:{type}；空表示账号密码 */
+    private static final String KEY_LOGIN_DEFAULT_METHOD = "loginDefaultMethod";
     private static final String KEY_THEME_CONFIG = "appSettings";
 
     @Transactional(readOnly = true)
@@ -103,6 +105,7 @@ public class SettingAppService {
         save(KEY_COPYRIGHT_COMPANY, cmd.getCopyrightCompany(), "版权公司");
         save(KEY_COPYRIGHT_WEBSITE, cmd.getCopyrightWebsite(), "版权网站");
         save(KEY_COPYRIGHT_DATES, cmd.getCopyrightDates(), "版权年份");
+        save(KEY_LOGIN_DEFAULT_METHOD, normalizeLoginDefaultMethod(cmd.getLoginDefaultMethod()), "默认登录方式");
         return siteSettings();
     }
 
@@ -204,7 +207,26 @@ public class SettingAppService {
                 .copyrightCompany(settings.get(KEY_COPYRIGHT_COMPANY))
                 .copyrightWebsite(settings.get(KEY_COPYRIGHT_WEBSITE))
                 .copyrightDates(settings.get(KEY_COPYRIGHT_DATES))
+                .loginDefaultMethod(settings.getOrDefault(KEY_LOGIN_DEFAULT_METHOD, ""))
                 .build();
+    }
+
+    /**
+     * 只接受内置登录方式与插件入口 token（external:{providerCode}:{type}），
+     * 其它值一律回落空字符串（= 账号密码），避免脏配置让登录页选中一个不存在的登录方式。
+     */
+    private String normalizeLoginDefaultMethod(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        String method = value.trim();
+        if ("password".equals(method) || "passkey".equals(method)) {
+            return method;
+        }
+        if (method.startsWith("external:") && method.length() > "external:".length()) {
+            return method;
+        }
+        return "";
     }
 
     private Map<String, Boolean> capabilityStatusMap() {

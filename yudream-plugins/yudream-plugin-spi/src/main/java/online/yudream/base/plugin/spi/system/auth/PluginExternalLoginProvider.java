@@ -22,6 +22,20 @@ public interface PluginExternalLoginProvider {
     PluginExternalLoginDescriptor descriptor();
 
     /**
+     * 该提供方在登录页的呈现方式，缺省 {@link PluginExternalLoginPresentation#ICON}。
+     *
+     * <p>返回 {@link PluginExternalLoginPresentation#TAB} 时，宿主把 descriptor() 的每个
+     * supportedType 渲染成与「账号密码登录 / Passkey 登录」并列的登录方式 Tab，标签取
+     * displayName、图标取 icon；未声明该方法的既有插件继续渲染成图标按钮，行为不变。</p>
+     *
+     * <p>与 descriptor() 一样会被宿主高频调用，实现必须快速返回，不得在其中做网络 IO；
+     * 抛异常时宿主按缺省值 ICON 处理。</p>
+     */
+    default PluginExternalLoginPresentation presentation() {
+        return PluginExternalLoginPresentation.ICON;
+    }
+
+    /**
      * 当前是否可用（配置完整且已启用）。不可用的提供方不会出现在登录页，
      * 其授权与回调请求也会被宿主拒绝。
      */
