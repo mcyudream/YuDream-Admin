@@ -104,6 +104,17 @@ app:
   base-url: ${APP_BASE_URL:http://localhost:8080}
   web-url: ${APP_WEB_URL:${APP_BASE_URL:http://localhost:9000}}
 
+# 公开页 SEO head 注入与 sitemap（可选，默认关闭）。
+# enabled=true 时 nginx 将页面类 SPA 路由（无物理文件的请求）兜底转发到 /api/public/seo/view，
+# 后端读取 index-html-path 指向的前端 index.html，按路由注入 title/description/og/canonical/robots；
+# 公开内容（/site /wiki /market 等）取真实数据，后台路径注入 noindex；/api/public/sitemap.xml 输出站点地图。
+# site-url 用作 canonical/sitemap 基址，默认取 app.web-url；后端不可用时 nginx 自动回落静态壳。
+yudream.seo:
+  enabled: ${YUDREAM_SEO_ENABLED:false}
+  index-html-path: ${YUDREAM_SEO_INDEX_HTML_PATH:}
+  site-url: ${YUDREAM_SEO_SITE_URL:${app.web-url:}}
+  public-prefixes: ${YUDREAM_SEO_PUBLIC_PREFIXES:/site,/wiki,/market,/servers,/activities,/timeline,/forms,/embed}
+
 # Web 请求日志配置
 yudream.web.log:
   enabled: ${WEB_LOG_ENABLED:true}

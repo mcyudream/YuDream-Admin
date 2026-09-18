@@ -19,6 +19,10 @@ services:
       - SERVER_PORT=8080
       - APP_BASE_URL=${APP_BASE_URL:-http://localhost:8080}
       - APP_WEB_URL=${APP_WEB_URL:-http://localhost}
+      # 公开页 SEO head 注入与 sitemap（/api/public/seo/view、/api/public/sitemap.xml）；
+      # index.html 由后端镜像内置（/app/public/index.html），nginx 将页面类请求兜底转发到后端注入
+      - YUDREAM_SEO_ENABLED=${YUDREAM_SEO_ENABLED:-true}
+      - YUDREAM_SEO_INDEX_HTML_PATH=${YUDREAM_SEO_INDEX_HTML_PATH:-/app/public/index.html}
       - WEB_LOG_ENABLED=${WEB_LOG_ENABLED:-true}
       - WEB_LOG_PREFIX=${WEB_LOG_PREFIX:-YuDreamAdmin}
       - SNOWFLAKE_DCI=${SNOWFLAKE_DCI:-1}
