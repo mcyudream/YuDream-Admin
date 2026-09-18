@@ -9,6 +9,9 @@ RUN mkdir -p /app/plugins /app/market-source
 # 复制主应用 JAR（CI 构建产物，spring-boot-maven-plugin 生成的可执行 fat jar）
 COPY yudream-bootstrap/target/yudream-bootstrap-*.jar /app/app.jar
 
+# 前端静态壳 index.html：yudream.seo.enabled=true 时供 /api/public/seo/view 做 head 注入
+COPY yudream-frontend/apps/core-arco-design-vue/dist/index.html /app/public/index.html
+
 # 插件扫描目录与市场源发布物目录挂载点
 VOLUME /app/plugins
 VOLUME /app/market-source

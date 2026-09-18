@@ -207,6 +207,19 @@ docker compose -f docker-compose.yml -f docker-compose.platform.yml --profile mq
 
 外层 Nginx/Traefik 只转发到 frontend:80，并透传 `Upgrade`、`Connection`，放宽 SSE 读超时；frontend 内置配置已经完成 API 代理、Vue Router history 回退、静态资源缓存和 10240M 上传上限。
 
+### 公开页 SEO（head 注入与 sitemap，默认关闭）
+
+SPA 静态壳对所有路由返回同一份「正在加载」页面，不执行 JS 的抓取方（百度、微信/QQ 链接预览）拿不到真实标题与摘要。`YUDREAM_SEO_ENABLED=true` 时后端启用公开端点 `GET /api/public/seo/view`：读取前端构建的 `index.html`，按路由注入真实 `title`/`description`/og/canonical/robots（公开内容 `/site`、`/wiki`、`/market` 等取 CMS/知识库/插件市场真实数据，后台路径注入 `noindex`），并对外提供 `GET /api/public/sitemap.xml`。frontend 镜像的 nginx 会把首页与页面类请求（无物理文件的 SPA 路由）兜底转发到该端点；后端未启用或不可用时自动回落静态壳，行为与未接入前一致。
+
+| 环境变量 | 默认 | 说明 |
+|---|---|---|
+| `YUDREAM_SEO_ENABLED` | `false`（Compose 模板默认 `true`） | 是否注册 SEO 端点 |
+| `YUDREAM_SEO_INDEX_HTML_PATH` | 空（镜像内为 `/app/public/index.html`） | 前端 index.html 路径；由 backend 镜像内置，源码部署时指向前端 dist |
+| `YUDREAM_SEO_SITE_URL` | 取 `APP_WEB_URL` | canonical/sitemap 基址，建议填浏览器可达地址（如 `https://www.example.com`） |
+| `YUDREAM_SEO_PUBLIC_PREFIXES` | `/site,/wiki,/market,/servers,/activities,/timeline,/forms,/embed` | 视为公开内容的路由前缀，其余路径注入 noindex |
+
+使用要点：`APP_WEB_URL`（或 `YUDREAM_SEO_SITE_URL`）必须是浏览器实际可达的对外地址；`robots.txt` 由前端静态产物提供，已屏蔽 `/platform`、`/api` 等路径；把 `<站点地址>/api/public/sitemap.xml` 提交到百度资源平台 / Google Search Console 即可加速收录。若使用自建外层 Nginx 直接托管静态产物（不经 frontend 镜像），需要自行把页面类请求兜底转发到 `/api/public/seo/view`，可参考 `docker/nginx.conf` 的 `@seo`/`@static` 写法。
+
 ## 自建镜像（二次开发）
 
 CI 使用 `maven:3.9-temurin-21` 与 `node:24.15` 构建；`CI_REGISTRY_IMAGE` 默认指向上述 registry。二次开发团队可将 `CI_REGISTRY_IMAGE` 指向自有 registry 构建发布。
