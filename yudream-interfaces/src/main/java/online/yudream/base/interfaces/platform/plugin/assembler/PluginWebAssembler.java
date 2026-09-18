@@ -1,6 +1,8 @@
 package online.yudream.base.interfaces.platform.plugin.assembler;
 
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Part;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchInstallCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
@@ -56,6 +58,8 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginStorePluginVersionRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeOverviewRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginThemeRes;
+import online.yudream.base.domain.common.exception.BizException;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpPart;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingConnectionRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingGroupRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginAiAgentCatalogRes;
@@ -66,8 +70,11 @@ import online.yudream.base.interfaces.platform.plugin.res.PluginRoleCatalogRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginUserCatalogRes;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -111,6 +118,7 @@ public class PluginWebAssembler {
         cmd.setItems(items);
         return cmd;
     }
+
 
     public static PluginModuleRes toRes(PluginModuleDTO dto) {
         return PluginModuleRes.builder()
@@ -500,16 +508,50 @@ public class PluginWebAssembler {
             HttpServletRequest request,
             SecurityPrincipalSupport.SecurityPrincipal principal
     ) {
+        return toDispatchCmd(pluginCode, pluginPath, body, request, principal, Map.of());
+    }
+
+    public static PluginHttpDispatchCmd toDispatchCmd(
+            String pluginCode,
+            String pluginPath,
+            String body,
+            HttpServletRequest request,
+            SecurityPrincipalSupport.SecurityPrincipal principal,
+            Map<String, PluginHttpPart> parts
+    ) {
         PluginHttpDispatchCmd cmd = new PluginHttpDispatchCmd();
         cmd.setPluginCode(pluginCode);
         cmd.setMethod(request.getMethod());
         cmd.setPath(pluginPath);
         cmd.setBody(body);
+        cmd.setParts(parts);
         cmd.setHeaders(headers(request));
         cmd.setQuery(query(request));
         cmd.setUserId(principal.userId());
         cmd.setPermissions(principal.permissions());
         return cmd;
+    }
+
+    /** 从 servlet multipart 请求收集 parts；非 multipart 请求返回空 Map。 */
+    public static Map<String, PluginHttpPart> httpParts(HttpServletRequest request) {
+        try {
+            Collection<Part> servletParts = request.getParts();
+            if (servletParts == null || servletParts.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, PluginHttpPart> parts = new LinkedHashMap<>();
+            for (Part part : servletParts) {
+                parts.put(part.getName(), new PluginHttpPart(
+                        part.getName(),
+                        part.getSubmittedFileName(),
+                        part.getContentType(),
+                        part.getInputStream().readAllBytes()
+                ));
+            }
+            return parts;
+        } catch (IOException | ServletException e) {
+            throw new BizException("解析 multipart 请求失败：" + e.getMessage());
+        }
     }
 
     public static List<PluginMessagingConnectionRes> toMessagingConnectionResList(List<PluginMessagingConnectionDTO> items) {

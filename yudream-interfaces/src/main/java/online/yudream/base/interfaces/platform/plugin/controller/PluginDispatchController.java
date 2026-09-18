@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -40,6 +41,25 @@ public class PluginDispatchController {
         PluginHttpDispatchDTO result = pluginAppService.dispatch(
                 PluginWebAssembler.toDispatchCmd(code, pluginPath(code, request), body, request, principal)
         );
+        return respond(result);
+    }
+
+    /** multipart/form-data 请求：parts 从 servlet 解析后透传给插件。 */
+    @RequestMapping(value = {"/api/plugins/{code}", "/api/plugins/{code}/**"},
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Object> dispatchMultipart(
+            @PathVariable String code,
+            HttpServletRequest request
+    ) {
+        SecurityPrincipalSupport.SecurityPrincipal principal = principal();
+        PluginHttpDispatchDTO result = pluginAppService.dispatch(
+                PluginWebAssembler.toDispatchCmd(code, pluginPath(code, request), null, request, principal,
+                        PluginWebAssembler.httpParts(request))
+        );
+        return respond(result);
+    }
+
+    private ResponseEntity<Object> respond(PluginHttpDispatchDTO result) {
         HttpHeaders headers = new HttpHeaders();
         result.getHeaders().forEach(headers::add);
         headers.setContentType(MediaType.parseMediaType(result.getContentType()));
@@ -57,35 +77,77 @@ public class PluginDispatchController {
     }
 
     private SseEmitter toEmitter(PluginSseStream stream) {
+        // 长连接场景（插件 SSE 事件流）需要足够长的超时；到期时正常 complete，
+        // 避免 Spring 再抛 AsyncRequestTimeoutException 被全局异常处理器记成 ERROR。
         SseEmitter emitter = new SseEmitter(30 * 60 * 1000L);
         PluginSseStream.Subscriber subscriber = new PluginSseStream.Subscriber() {
             @Override
             public void send(String event, Object data) {
                 try {
-                    emitter.send(SseEmitter.event().name(event).data(data));
+                    SseEmitter.SseEventBuilder builder = SseEmitter.event();
+                    if (event != null && !event.isBlank()) {
+                        builder.name(event);
+                    }
+                    String eventId = extractEventId(data);
+                    if (eventId != null) {
+                        builder.id(eventId);
+                    }
+                    builder.data(data);
+                    emitter.send(builder);
                 } catch (Exception e) {
                     stream.unsubscribe(this);
-                    emitter.completeWithError(e);
+                    try {
+                        emitter.complete();
+                    } catch (Exception ignored) {
+                        // emitter 可能已完成
+                    }
                 }
             }
 
             @Override
             public void complete() {
                 stream.unsubscribe(this);
-                emitter.complete();
+                try {
+                    emitter.complete();
+                } catch (Exception ignored) {
+                    // already completed
+                }
             }
 
             @Override
             public void error(Throwable throwable) {
                 stream.unsubscribe(this);
-                emitter.completeWithError(throwable);
+                try {
+                    emitter.complete();
+                } catch (Exception ignored) {
+                    // already completed
+                }
             }
         };
         emitter.onCompletion(() -> stream.unsubscribe(subscriber));
-        emitter.onTimeout(() -> stream.unsubscribe(subscriber));
+        emitter.onTimeout(() -> {
+            stream.unsubscribe(subscriber);
+            try {
+                emitter.complete();
+            } catch (Exception ignored) {
+                // already completed
+            }
+        });
         emitter.onError(ignored -> stream.unsubscribe(subscriber));
         stream.subscribe(subscriber);
         return emitter;
+    }
+
+    /** 从事件信封提取 SSE id 字段，供客户端 Last-Event-ID 续传。 */
+    @SuppressWarnings("unchecked")
+    private static String extractEventId(Object data) {
+        if (data instanceof Map<?, ?> map) {
+            Object id = map.get("id");
+            if (id != null) {
+                return String.valueOf(id);
+            }
+        }
+        return null;
     }
 
     private String pluginPath(String code, HttpServletRequest request) {
