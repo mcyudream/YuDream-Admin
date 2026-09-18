@@ -216,9 +216,7 @@ export const cancelWikiIngestTask = (id: string) => systemClient.post<unknown, A
 export const retryWikiIngestTask = (id: string) => systemClient.post<unknown, ApiResponse<void>>(`api/platform/wiki/ingest-tasks/${id}/retry`)
 export const deleteWikiIngestTask = (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/wiki/ingest-tasks/${id}`)
 export const clearWikiIngestTasks = (spaceId: string) => systemClient.delete<unknown, ApiResponse<number>>(`api/platform/wiki/spaces/${spaceId}/ingest-tasks`)
-export const wikiIngestEventsEndpoint = (spaceId: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? `/proxy/api/platform/wiki/spaces/${spaceId}/ingest-events`
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/ingest-events`
+export const wikiIngestEventsEndpoint = (spaceId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/ingest-events`
 
 // Lint / 审核 / 深度研究 / 图谱 / 迁移
 export const lintWiki = (spaceId: string) => systemClient.post<unknown, ApiResponse<WikiLintReport>>(`api/platform/wiki/spaces/${spaceId}/lint`)
@@ -237,32 +235,22 @@ export const rebuildWikiIndex = (spaceId: string) => systemClient.post<unknown, 
 // 智能问答（LLM 经 wiki.search 工具检索）
 export const chatWiki = (spaceId: string, data: { question: string; history?: WikiChatTurn[] }) => systemClient.post<unknown, ApiResponse<WikiChatResult>>(`api/platform/wiki/spaces/${spaceId}/chat`, data)
 // 流式问答端点（自定义 SSE：delta / tool / citations / done / error）
-export const wikiChatStreamEndpoint = (spaceId: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? `/proxy/api/platform/wiki/spaces/${spaceId}/chat/stream`
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/chat/stream`
+export const wikiChatStreamEndpoint = (spaceId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/chat/stream`
 
 // 流式问答端点（AG-UI 协议）
-export const wikiChatAguiEndpoint = (spaceId: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? `/proxy/api/platform/wiki/spaces/${spaceId}/chat/agui`
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/chat/agui`
+export const wikiChatAguiEndpoint = (spaceId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/spaces/${spaceId}/chat/agui`
 
 // SSE 端点
-export const wikiPublicationEventsEndpoint = (nodeId: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? `/proxy/api/platform/wiki/nodes/${nodeId}/publication-events`
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/nodes/${nodeId}/publication-events`
+export const wikiPublicationEventsEndpoint = (nodeId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/wiki/nodes/${nodeId}/publication-events`
 
 // 公开端
 export const fetchPublicWikiTree = (slug: string) => systemClient.get<unknown, ApiResponse<WikiNode[]>>(`api/public/wiki/${slug}/tree`)
 export const fetchPublicWikiSpaces = () => systemClient.get<unknown, ApiResponse<WikiPublicSpace[]>>('api/public/wiki/spaces')
 
 // 公开站点浮窗助手的 AG-UI 流式问答端点（无需登录）
-export const wikiPublicChatAguiEndpoint = (slug: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? `/proxy/api/public/wiki/${encodeURIComponent(slug)}/chat/agui`
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/public/wiki/${encodeURIComponent(slug)}/chat/agui`
+export const wikiPublicChatAguiEndpoint = (slug: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/public/wiki/${encodeURIComponent(slug)}/chat/agui`
 export async function hasPublicWikiSpaces(): Promise<boolean> {
-  const baseUrl = import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-    ? '/proxy/'
-    : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/`
+  const baseUrl = `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/`
   try {
     const response = await fetch(`${baseUrl}api/public/wiki/spaces`, { headers: { 'Accept-Language': 'zh-CN' } })
     if (!response.ok) return false

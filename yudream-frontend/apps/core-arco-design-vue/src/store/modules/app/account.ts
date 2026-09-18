@@ -1,6 +1,7 @@
 import type { DeptItem, IdValue, LoginData, RoleItem } from '@/api/modules/user'
 import apiApp from '@/api/modules/app'
 import apiUser from '@/api/modules/user'
+import { refreshTokenOnce } from '@/api/token-refresh'
 import router from '@/router'
 import { refreshDynamicRoutes } from '@/router/dynamic'
 import { toBackendAssetUrl } from '@/utils/backend-url'
@@ -114,7 +115,42 @@ export const useAppAccountStore = defineStore('appAccount', () => {
       localStorage.setItem('refreshToken', res.data.refreshToken)
       refreshToken.value = res.data.refreshToken
     }
+    scheduleProactiveRefresh(res.data.expiresIn)
     return res.data.token
+  }
+
+  // 访问令牌到期前主动刷新，避免被动 401 窗口
+  const TOKEN_REFRESH_AHEAD_MS = 60 * 1000
+  let proactiveRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearProactiveRefresh() {
+    if (proactiveRefreshTimer) {
+      clearTimeout(proactiveRefreshTimer)
+      proactiveRefreshTimer = null
+    }
+  }
+
+  function armProactiveRefresh(expiresAt: number) {
+    clearProactiveRefresh()
+    const delay = Math.max(expiresAt - Date.now() - TOKEN_REFRESH_AHEAD_MS, 5000)
+    proactiveRefreshTimer = setTimeout(() => {
+      proactiveRefreshTimer = null
+      // 失败不强制登出，由被动 401 刷新路径兜底
+      refreshTokenOnce().catch((error) => {
+        console.warn('[account] 主动刷新令牌失败', error)
+      })
+    }, delay)
+  }
+
+  function scheduleProactiveRefresh(expiresIn?: number) {
+    if (!expiresIn || expiresIn <= 0 || !refreshToken.value) {
+      clearProactiveRefresh()
+      localStorage.removeItem('tokenExpiresAt')
+      return
+    }
+    const expiresAt = Date.now() + expiresIn * 1000
+    localStorage.setItem('tokenExpiresAt', String(expiresAt))
+    armProactiveRefresh(expiresAt)
   }
 
   function applyLoginData(user: LoginData) {
@@ -142,6 +178,7 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     setEmailVerified(user.emailVerified ?? true)
     setCurrentDept(null)
     setCurrentRole(null)
+    scheduleProactiveRefresh(user.expiresIn)
   }
 
   function getCurrentSession(): AccountSession {
@@ -283,8 +320,10 @@ export const useAppAccountStore = defineStore('appAccount', () => {
 
   // 手动登出
   function logout(redirect = router.currentRoute.value.fullPath) {
+    clearProactiveRefresh()
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('tokenExpiresAt')
     clearImpersonatorSession()
     token.value = ''
     refreshToken.value = ''
@@ -298,8 +337,10 @@ export const useAppAccountStore = defineStore('appAccount', () => {
 
   // 请求登出
   function requestLogout() {
+    clearProactiveRefresh()
     localStorage.removeItem('token')
     localStorage.removeItem('refreshToken')
+    localStorage.removeItem('tokenExpiresAt')
     clearImpersonatorSession()
     token.value = ''
     refreshToken.value = ''
@@ -319,6 +360,8 @@ export const useAppAccountStore = defineStore('appAccount', () => {
 
   // 登出后清除状态
   function logoutCleanStatus() {
+    clearProactiveRefresh()
+    localStorage.removeItem('tokenExpiresAt')
     localStorage.removeItem('account')
     localStorage.removeItem('userId')
     localStorage.removeItem('avatar')
@@ -383,6 +426,12 @@ export const useAppAccountStore = defineStore('appAccount', () => {
   function setEmailVerified(value: boolean) {
     emailVerified.value = value
     localStorage.setItem('emailVerified', String(value))
+  }
+
+  // 页面重载后按持久化的过期时间恢复主动刷新
+  const storedTokenExpiresAt = Number(localStorage.getItem('tokenExpiresAt') ?? 0)
+  if (refreshToken.value && storedTokenExpiresAt > 0) {
+    armProactiveRefresh(storedTokenExpiresAt)
   }
 
   return {

@@ -28,4 +28,12 @@ public interface PluginOAuthService {
     default Optional<PluginOAuthClient> ensurePublicClient(PluginOAuthPublicClientSpec spec) {
         return Optional.empty();
     }
+
+    /**
+     * 停用已登记客户端（插件停用/卸载时调用）：仅将状态置为停用，保留登记
+     * 配置（回调地址、scope 等），插件重新启用后经 {@link #ensurePublicClient}
+     * 恢复。宿主未提供该能力时保持空实现。
+     */
+    default void disableClient(String clientId) {
+    }
 }

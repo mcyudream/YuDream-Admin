@@ -90,9 +90,6 @@ async function openOpenApi() {
 
 function backendEndpoint(path: string) {
   const normalized = path.startsWith('/') ? path : `/${path}`
-  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) {
-    return `/proxy${normalized}`
-  }
   const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
   return `${base.replace(/\/$/, '')}${normalized}`
 }

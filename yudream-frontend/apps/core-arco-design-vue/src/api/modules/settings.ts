@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
+import { retryAfterRefresh } from '../token-refresh'
 
 interface BackendResult<T> {
   code: number
@@ -9,7 +10,7 @@ interface BackendResult<T> {
 }
 
 const settingsApi = axios.create({
-  baseURL: (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL,
+  baseURL: import.meta.env.VITE_APP_API_BASEURL,
   timeout: 1000 * 60,
 })
 
@@ -24,6 +25,9 @@ settingsApi.interceptors.response.use(
         data: result.data,
       } as any)
     }
+    if (result?.code === 401) {
+      return retryAfterRefresh(settingsApi, response.config)
+    }
     const message = result?.message || '请求失败'
     useFaToast().error('错误', { description: message })
     return Promise.reject(new Error(message))
@@ -31,6 +35,9 @@ settingsApi.interceptors.response.use(
   async (error) => {
     if (error.response?.data) {
       error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
+    }
+    if (error.response?.status === 401) {
+      return retryAfterRefresh(settingsApi, error.config)
     }
     const message = error.response?.data?.message || error.message || '网络错误'
     useFaToast().error('错误', { description: message })
@@ -44,6 +51,10 @@ settingsApi.interceptors.request.use(async (request) => {
   if (token) {
     request.headers.Authorization = token
   }
+  if (request.apiPlainData === undefined) {
+    request.apiPlainData = request.data
+  }
+  request.data = request.apiPlainData
   const encrypted = await prepareApiEncryption(request.url, request.data)
   if (encrypted) {
     Object.assign(request.headers, encrypted.headers)

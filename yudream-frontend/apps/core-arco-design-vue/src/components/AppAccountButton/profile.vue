@@ -542,7 +542,6 @@ function dateText(value?: string) {
             <h2>个人资料</h2>
             <p>维护你的基础资料、头像和联系方式。</p>
           </div>
-          <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
         </div>
 
         <a-form :model="form" layout="vertical" class="form-grid">
@@ -773,6 +772,9 @@ function dateText(value?: string) {
         </section>
       </section>
 
+      <footer v-if="active === 'profile'" class="profile-footer">
+        <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
+      </footer>
     </main>
   </div>
 </template>
@@ -878,15 +880,36 @@ function dateText(value?: string) {
 
 .profile-main {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   overflow: auto;
-  padding: 22px;
+  padding: 22px 22px 0;
 }
 
 .profile-section,
 .security-layout {
   display: grid;
   gap: 16px;
+}
+
+.profile-section {
+  flex: 1 0 auto;
+  padding-bottom: 22px;
+}
+
+.profile-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  justify-content: flex-end;
+  margin: 0 -22px;
+  padding: 12px 22px;
+  border-top: 1px solid var(--color-border-2);
+  background: var(--color-bg-1);
 }
 
 .loading {
@@ -1144,8 +1167,12 @@ function dateText(value?: string) {
   }
 
   .profile-main {
-    padding: 16px;
-    padding-bottom: 80px;
+    padding: 16px 16px 0;
+  }
+
+  .profile-footer {
+    margin: 0 -16px;
+    padding: 12px 16px;
   }
 
   .panel-head > :deep(.fa-input) {

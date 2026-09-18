@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
 import { hintForMessage, toastApiError } from '@/utils/api-error'
+import { retryAfterRefresh } from './token-refresh'
 // import qs from 'qs'
 
 // 请求重试配置
@@ -19,7 +20,7 @@ declare module 'axios' {
 }
 
 const api = axios.create({
-  baseURL: (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL,
+  baseURL: import.meta.env.VITE_APP_API_BASEURL,
   timeout: 1000 * 60,
   responseType: 'json',
 })
@@ -68,6 +69,11 @@ api.interceptors.request.use(
 async function handleError(error: any) {
   const status = error?.response?.status ?? error?.status
   const code = error?.response?.data?.code ?? error?.code
+  const config = error?.config
+  // 真实后端的 401 先尝试刷新令牌并重放原请求；fake 请求无会话，直接登出
+  if ((status === 401 || code === 401) && config && !config.fake) {
+    return retryAfterRefresh(api, config)
+  }
   if (status === 401 || code === 401) {
     useAppAccountStore().requestLogout()
   }
@@ -118,12 +124,12 @@ api.interceptors.response.use(
           })
         }
         else {
+          if (response.data.code === 401) {
+            return retryAfterRefresh(api, response.config)
+          }
           useFaToast().error('错误', {
             description: hintForMessage(response.data.message || '请求失败'),
           })
-          if (response.data.code === 401) {
-            useAppAccountStore().requestLogout()
-          }
           return Promise.reject(response.data)
         }
       }

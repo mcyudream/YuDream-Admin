@@ -340,7 +340,7 @@ async function actNotification(item: any, accept: boolean) {
 
 function connectEvents() {
   const token = localStorage.getItem('token')
-  const base = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL
+  const base = import.meta.env.VITE_APP_API_BASEURL
   eventAbort = new AbortController()
   void fetch(`${base}api/platform/milky/connections/${props.connectionId}/chat/events`, { headers: token ? { Authorization: token } : {}, signal: eventAbort.signal }).then(async response => {
     if (!response.ok || !response.body) return
