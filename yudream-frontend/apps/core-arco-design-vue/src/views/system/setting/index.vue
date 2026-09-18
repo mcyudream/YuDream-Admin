@@ -1,16 +1,27 @@
 <script setup lang="ts">
 import type { SiteSetting } from '@/api/modules/settings'
 import apiSettings from '@/api/modules/settings'
+import apiSecurity from '@/api/modules/system-security'
+import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
 
 const toast = useFaToast()
 const appSettingsStore = useAppSettingsStore()
+const appFeatureStore = useAppFeatureStore()
 
 const loading = ref(false)
 const saving = ref(false)
 const logoInput = ref<HTMLInputElement>()
 const faviconInput = ref<HTMLInputElement>()
 const loginBannerInput = ref<HTMLInputElement>()
+/** 可作为默认登录方式的插件登录入口（只列已启用且以登录 Tab 呈现的） */
+const externalLoginOptions = ref<{ label: string, value: string }[]>([])
+/** 默认登录方式下拉项：内置两种 + 可用的插件登录入口 */
+const loginMethodOptions = computed(() => [
+  { label: '账号密码登录', value: 'password' },
+  ...(appFeatureStore.passkeyEnabled ? [{ label: 'Passkey 登录', value: 'passkey' }] : []),
+  ...externalLoginOptions.value,
+])
 
 const form = reactive<SiteSetting>({
   siteName: '',
@@ -21,9 +32,30 @@ const form = reactive<SiteSetting>({
   copyrightCompany: '',
   copyrightWebsite: '',
   copyrightDates: '',
+  loginDefaultMethod: 'password',
 })
 
-onMounted(loadSettings)
+onMounted(() => {
+  loadSettings()
+  appFeatureStore.load()
+  loadExternalLoginOptions()
+})
+
+async function loadExternalLoginOptions() {
+  try {
+    const providers = (await apiSecurity.externalLoginProviders()).data
+    externalLoginOptions.value = providers
+      .filter(provider => provider.enabled && provider.presentation === 'TAB')
+      .flatMap(provider => (provider.supportedTypes || '')
+        .split(',')
+        .map(item => item.trim().toLowerCase())
+        .filter(Boolean)
+        .map(type => ({ label: `${provider.name || provider.code}（${type}）`, value: `external:${provider.code}:${type}` })))
+  }
+  catch {
+    externalLoginOptions.value = []
+  }
+}
 
 async function loadSettings() {
   loading.value = true
@@ -59,6 +91,7 @@ function assignForm(data: SiteSetting) {
     copyrightCompany: data.copyrightCompany || '',
     copyrightWebsite: data.copyrightWebsite || '',
     copyrightDates: data.copyrightDates || '',
+    loginDefaultMethod: data.loginDefaultMethod || 'password',
   })
 }
 
@@ -104,6 +137,14 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
             </a-form-item>
             <a-form-item label="版权年份">
               <FaInput v-model="form.copyrightDates" placeholder="2026" class="w-full" />
+            </a-form-item>
+            <a-form-item label="默认登录方式" class="md:col-span-2">
+              <FaSelect v-model="form.loginDefaultMethod" :options="loginMethodOptions" class="w-full" />
+              <template #extra>
+                <span class="text-xs text-muted-foreground">
+                  打开登录页时默认选中的登录方式。第三方登录入口需已启用且以登录 Tab 呈现（插件声明 TAB），否则不出现在此列表。
+                </span>
+              </template>
             </a-form-item>
           </div>
           <div class="mt-2 flex justify-end">

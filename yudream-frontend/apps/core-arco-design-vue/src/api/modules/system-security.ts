@@ -115,7 +115,7 @@ export interface OAuthProviderPayload {
   status: OAuthRegistrationStatus
 }
 
-export interface ExternalLoginProvider { code: string, name: string, protocol: string, appId: string, callbackUrl: string, endpoint?: string, enabled: boolean, supportedTypes: string, icon?: string, pluginManaged?: boolean }
+export interface ExternalLoginProvider { code: string, name: string, protocol: string, appId: string, callbackUrl: string, endpoint?: string, enabled: boolean, supportedTypes: string, icon?: string, pluginManaged?: boolean, presentation?: string, sort?: number }
 export interface ExternalLoginProviderPayload { code: string, name?: string, appId?: string, appKey?: string, callbackUrl: string, endpoint?: string, enabled: boolean, supportedTypes?: string }
 
 export interface PasskeyCredential {
