@@ -20,6 +20,7 @@ public class SettingWebAssembler {
         cmd.setCopyrightCompany(request.getCopyrightCompany());
         cmd.setCopyrightWebsite(request.getCopyrightWebsite());
         cmd.setCopyrightDates(request.getCopyrightDates());
+        cmd.setLoginDefaultMethod(request.getLoginDefaultMethod());
         return cmd;
     }
 
@@ -39,6 +40,7 @@ public class SettingWebAssembler {
                 .copyrightCompany(dto.getCopyrightCompany())
                 .copyrightWebsite(dto.getCopyrightWebsite())
                 .copyrightDates(dto.getCopyrightDates())
+                .loginDefaultMethod(dto.getLoginDefaultMethod())
                 .build();
     }
 

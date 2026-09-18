@@ -17,6 +17,7 @@ import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginDescriptor;
 import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginAuthorizeRequest;
 import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginExchangeRequest;
 import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginIdentity;
+import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginPresentation;
 import online.yudream.base.plugin.spi.system.auth.PluginExternalLoginProvider;
 import online.yudream.base.plugin.spi.system.extension.PluginExtensionQuery;
 import org.springframework.stereotype.Service;
@@ -262,8 +263,18 @@ public class ExternalLoginAppService {
             try { enabled = p.enabled(); } catch (RuntimeException e) { enabled = false; }
             return ExternalLoginProviderDTO.builder().code(d.providerCode()).name(d.displayName()).protocol("PLUGIN")
                     .icon(d.icon()).enabled(enabled).supportedTypes(String.join(",", d.supportedTypes()))
-                    .pluginManaged(true).sort(d.sort()).build();
+                    .pluginManaged(true).presentation(presentationOf(p)).sort(d.sort()).build();
         } catch (RuntimeException e) { return null; }
+    }
+
+    /** 插件声明的登录页呈现方式；未声明或实现异常时回落图标按钮，旧插件行为不变。 */
+    private String presentationOf(PluginExternalLoginProvider p) {
+        try {
+            PluginExternalLoginPresentation presentation = p.presentation();
+            return presentation == null ? PluginExternalLoginPresentation.ICON.name() : presentation.name();
+        } catch (RuntimeException e) {
+            return PluginExternalLoginPresentation.ICON.name();
+        }
     }
     private String token() { byte[] b = new byte[32]; random.nextBytes(b); return Base64.getUrlEncoder().withoutPadding().encodeToString(b); }
     private ExternalLoginProviderDTO toProvider(ExternalLoginProvider p) {
