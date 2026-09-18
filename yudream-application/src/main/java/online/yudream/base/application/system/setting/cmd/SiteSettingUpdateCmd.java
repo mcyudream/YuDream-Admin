@@ -16,4 +16,5 @@ public class SiteSettingUpdateCmd implements Serializable {
     private String copyrightCompany;
     private String copyrightWebsite;
     private String copyrightDates;
+    private String loginDefaultMethod;
 }

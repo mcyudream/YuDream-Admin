@@ -25,4 +25,6 @@ public class SiteSettingDTO implements Serializable {
     private String copyrightCompany;
     private String copyrightWebsite;
     private String copyrightDates;
+    /** 登录页默认选中的登录方式；空表示账号密码。取值：password / passkey / external:{providerCode}:{type} */
+    private String loginDefaultMethod;
 }

@@ -73,6 +73,8 @@ export interface SiteSetting {
   copyrightCompany?: string
   copyrightWebsite?: string
   copyrightDates?: string
+  /** 登录页默认选中的登录方式：password / passkey / external:{providerCode}:{type}；空=账号密码 */
+  loginDefaultMethod?: string
 }
 
 export interface ThemeSetting {
