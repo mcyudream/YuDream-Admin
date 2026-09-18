@@ -317,6 +317,7 @@ public class PluginAssembler {
                 cmd.getHeaders(),
                 cmd.getQuery(),
                 cmd.getBody(),
+                cmd.getParts(),
                 cmd.getUserId(),
                 cmd.getPermissions()
         );

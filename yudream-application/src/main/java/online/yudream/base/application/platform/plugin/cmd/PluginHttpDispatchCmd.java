@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.plugin.cmd;
 
 import lombok.Data;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpPart;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -19,6 +20,7 @@ public class PluginHttpDispatchCmd implements Serializable {
     private Map<String, List<String>> headers;
     private Map<String, List<String>> query;
     private String body;
+    private Map<String, PluginHttpPart> parts;
     private Long userId;
     private List<String> permissions;
 }
