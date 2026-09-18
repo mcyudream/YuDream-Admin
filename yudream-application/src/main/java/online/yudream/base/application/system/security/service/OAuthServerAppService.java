@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -202,9 +203,70 @@ public class OAuthServerAppService {
     }
 
     private void ensureRedirectAllowed(OAuthClientRegistration client, String redirectUri) {
-        if (!StringUtils.hasText(redirectUri) || client.getRedirectUris() == null || !client.getRedirectUris().contains(redirectUri)) {
+        if (!StringUtils.hasText(redirectUri)) {
             throw new BizException("OAuth 回调地址不在客户端白名单内");
         }
+        List<String> registered = client.getRedirectUris();
+        if (registered != null && registered.contains(redirectUri)) {
+            return;
+        }
+        if (matchesLoopbackRegistration(registered, redirectUri)) {
+            return;
+        }
+        throw new BizException("OAuth 回调地址不在客户端白名单内");
+    }
+
+    /**
+     * RFC 8252 §7.3：本机回环回调（启动器等原生应用）的端口是动态的，无法
+     * 事先静态登记。登记条目若为不带端口的回环地址（如
+     * {@code http://127.0.0.1/auth/callback}），则放行同 scheme/host/path 的
+     * 任意端口回调；显式登记了端口的条目仍走上面的精确匹配。
+     */
+    private boolean matchesLoopbackRegistration(List<String> registered, String redirectUri) {
+        URI incoming = parseRedirect(redirectUri);
+        if (incoming == null || !isLoopbackHost(incoming.getHost())) {
+            return false;
+        }
+        if (registered == null) {
+            return false;
+        }
+        for (String entry : registered) {
+            URI candidate = parseRedirect(entry);
+            if (candidate == null
+                    || candidate.getPort() != -1
+                    || !isLoopbackHost(candidate.getHost())
+                    || !candidate.getScheme().equalsIgnoreCase(incoming.getScheme())
+                    || !candidate.getRawPath().equals(incoming.getRawPath())) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private URI parseRedirect(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(value.trim());
+            if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
+                return null;
+            }
+            return uri;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private boolean isLoopbackHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        return "127.0.0.1".equals(host)
+                || "localhost".equalsIgnoreCase(host)
+                || "[::1]".equals(host)
+                || "::1".equals(host);
     }
 
     private List<String> resolveScopes(OAuthClientRegistration client, String scope) {

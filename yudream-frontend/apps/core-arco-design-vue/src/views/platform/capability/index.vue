@@ -323,18 +323,11 @@ function connectionCount() {
 }
 
 function httpEndpoint(path: string) {
-  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) {
-    return `/proxy${path}`
-  }
   const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
   return `${base.replace(/\/$/, '')}${path}`
 }
 
 function wsEndpoint(path: string) {
-  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) {
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    return `${protocol}://${window.location.host}/proxy${path}`
-  }
   const base = new URL(import.meta.env.VITE_APP_API_BASEURL || window.location.origin)
   const protocol = base.protocol === 'https:' ? 'wss' : 'ws'
   return `${protocol}://${base.host}${path}`

@@ -87,6 +87,20 @@ public class PluginOAuthFrameworkService implements PluginOAuthService {
         return Optional.of(toClient(oauthClientRegistrationRepo.save(registration)));
     }
 
+    /** 仅停用登记（插件停用/卸载场景），保留回调地址与 scope 配置。 */
+    @Override
+    public void disableClient(String clientId) {
+        if (!StringUtils.hasText(clientId)) {
+            return;
+        }
+        oauthClientRegistrationRepo.findByClientId(clientId.trim())
+                .filter(registration -> registration.getStatus() == OAuthRegistrationStatus.ACTIVE)
+                .ifPresent(registration -> {
+                    registration.disable();
+                    oauthClientRegistrationRepo.save(registration);
+                });
+    }
+
     private PluginOAuthClient toClient(OAuthClientRegistration registration) {
         return new PluginOAuthClient(
                 registration.getClientId(),

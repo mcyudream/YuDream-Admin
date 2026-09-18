@@ -28,7 +28,7 @@ interface EncryptedPayload {
   data?: string
 }
 
-const backendBaseURL = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL
+const backendBaseURL = import.meta.env.VITE_APP_API_BASEURL
 let statusCache: { enabled: boolean, algorithm?: string } | null = null
 let publicKeyCache: { enabled: boolean, publicKey?: CryptoKey } | null = null
 

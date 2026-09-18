@@ -196,9 +196,7 @@ export interface CmsBlockPayload {
 }
 
 export async function fetchPublicCmsChrome(): Promise<HomePageLayout | null> {
-  const baseUrl = import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-    ? '/proxy/'
-    : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/`
+  const baseUrl = `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/`
   try {
     const response = await fetch(`${baseUrl}api/public/cms/home`, { headers: { 'Accept-Language': 'zh-CN' } })
     if (!response.ok) return null

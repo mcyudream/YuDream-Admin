@@ -192,7 +192,7 @@ async function loadHistory() {
 function connectStream() {
   abortController?.abort()
   const token = localStorage.getItem('token')
-  const base = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL
+  const base = import.meta.env.VITE_APP_API_BASEURL
   const params = new URLSearchParams()
   if (filters.level) params.set('level', filters.level)
   if (modulesQuery.value) params.set('modules', modulesQuery.value)

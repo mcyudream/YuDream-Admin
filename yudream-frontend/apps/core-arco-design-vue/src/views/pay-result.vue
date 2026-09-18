@@ -27,7 +27,7 @@ interface AlipayOrder {
 const route = useRoute()
 const router = useRouter()
 const resultClient = axios.create({
-  baseURL: (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL,
+  baseURL: import.meta.env.VITE_APP_API_BASEURL,
   timeout: 1000 * 20,
 })
 

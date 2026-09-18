@@ -1,6 +1,7 @@
-import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import type { AxiosError } from 'axios'
 import axios from 'axios'
 import { decryptApiResponse, prepareApiEncryption } from '@/utils/api-encryption'
+import { retryAfterRefresh } from '../token-refresh'
 
 interface BackendResult<T> {
   code: number
@@ -66,11 +67,9 @@ export interface ContextData {
 }
 
 const userApi = axios.create({
-  baseURL: (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) ? '/proxy/' : import.meta.env.VITE_APP_API_BASEURL,
+  baseURL: import.meta.env.VITE_APP_API_BASEURL,
   timeout: 1000 * 60,
 })
-
-let refreshingToken: Promise<string> | null = null
 
 userApi.interceptors.request.use(async (request) => {
   request.headers['Accept-Language'] = 'zh-CN'
@@ -103,7 +102,7 @@ userApi.interceptors.response.use(
       } as any)
     }
     if (result?.code === 401) {
-      return retryAfterRefresh(response.config)
+      return retryAfterRefresh(userApi, response.config)
     }
     const message = result?.message || '请求失败'
     useFaToast().error('错误', { description: message })
@@ -114,7 +113,7 @@ userApi.interceptors.response.use(
       error.response.data = await decryptApiResponse(error.response.data, error.config?.apiEncryptionKey)
     }
     if (error.response?.status === 401) {
-      return retryAfterRefresh(error.config)
+      return retryAfterRefresh(userApi, error.config)
     }
     const data = error.response?.data as BackendResult<unknown> | undefined
     const message = data?.message || error.message || '网络错误'
@@ -122,33 +121,6 @@ userApi.interceptors.response.use(
     return Promise.reject(error)
   },
 )
-
-async function retryAfterRefresh(config?: InternalAxiosRequestConfig) {
-  if (!config || config.skipTokenRefresh || config.tokenRetried) {
-    useAppAccountStore().requestLogout()
-    return Promise.reject(new Error('登录已过期'))
-  }
-  config.tokenRetried = true
-  try {
-    await refreshTokenOnce()
-    config.data = config.apiPlainData
-    config.apiEncryptionKey = undefined
-    return userApi(config)
-  }
-  catch (error) {
-    useAppAccountStore().requestLogout()
-    return Promise.reject(error)
-  }
-}
-
-async function refreshTokenOnce() {
-  if (!refreshingToken) {
-    refreshingToken = useAppAccountStore().refreshAccessToken().finally(() => {
-      refreshingToken = null
-    })
-  }
-  return refreshingToken
-}
 
 export default {
   login: (data: { account: string, password: string, bindingToken?: string }) => {

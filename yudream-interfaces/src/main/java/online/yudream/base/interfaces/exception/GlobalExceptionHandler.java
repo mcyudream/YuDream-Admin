@@ -20,6 +20,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -94,6 +95,28 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Void> handleAsyncRequestNotUsable(HttpServletRequest request, AsyncRequestNotUsableException e) {
         log.debug("流式请求客户端断开: method={}, path={}", request.getMethod(), request.getRequestURI());
         return null;
+    }
+
+    /**
+     * SSE 长连接超时是正常生命周期事件（连接到期、客户端重连），不是业务故障。
+     * 插件事件流（如 ymcl-adapter /v1/events）由客户端带 Last-Event-ID 重连续传。
+     */
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    public ResponseEntity<?> handleAsyncRequestTimeout(HttpServletRequest request, AsyncRequestTimeoutException e) {
+        if (isSseRequest(request)) {
+            log.debug("SSE 请求超时结束: method={}, path={}", request.getMethod(), request.getRequestURI());
+            return null;
+        }
+        return failure(request, e, HttpStatus.INTERNAL_SERVER_ERROR, Result.fail(ResultCode.INTERNAL_ERROR));
+    }
+
+    private static boolean isSseRequest(HttpServletRequest request) {
+        String accept = request.getHeader(HttpHeaders.ACCEPT);
+        if (accept != null && accept.toLowerCase().contains(MediaType.TEXT_EVENT_STREAM_VALUE)) {
+            return true;
+        }
+        String uri = request.getRequestURI();
+        return uri != null && (uri.endsWith("/events") || uri.contains("/events/"));
     }
 
     @ExceptionHandler(NoResourceFoundException.class)

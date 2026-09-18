@@ -1,8 +1,6 @@
 import axios from 'axios'
 
-const baseURL = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY)
-  ? '/proxy/'
-  : import.meta.env.VITE_APP_API_BASEURL
+const baseURL = import.meta.env.VITE_APP_API_BASEURL
 
 /** v2 协议裸 JSON 客户端：不走 systemClient 的 Result 包裹与接口加密。 */
 const client = axios.create({
@@ -110,18 +108,14 @@ function v2(path: string) {
 }
 
 export function pluginMarketDownloadUrl(code: string, version: string) {
-  const root = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY)
-    ? '/proxy/'
-    : (import.meta.env.VITE_APP_API_BASEURL || '/')
+  const root = import.meta.env.VITE_APP_API_BASEURL || '/'
   const prefix = String(root).endsWith('/') ? root : `${root}/`
   return `${prefix}api/public/plugin-market/api/v2/plugins/${encodeURIComponent(code)}/versions/${encodeURIComponent(version)}/download`
 }
 
 /** 公开站导航用：能力关闭或协议不可达时不挂「插件市场」入口。 */
 export async function hasPublicPluginMarket(): Promise<boolean> {
-  const root = (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY)
-    ? '/proxy/'
-    : (import.meta.env.VITE_APP_API_BASEURL || window.location.origin)
+  const root = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
   const prefix = String(root).endsWith('/') ? root : `${root}/`
   try {
     const response = await fetch(`${prefix}api/public/plugin-market/api/v2/manifest`, {

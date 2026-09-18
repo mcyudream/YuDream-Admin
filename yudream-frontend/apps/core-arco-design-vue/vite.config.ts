@@ -17,6 +17,9 @@ export default defineConfig(({ mode, command }) => {
       scssResources.push(`@use "/src/assets/styles/resources/${dirname}" as *;`)
     }
   })
+  // dev 下前端与启动器等外部客户端统一走站点同源 /api，由下面的代理转发；
+  // 代理目标用独立变量（dev 后端地址），前端 axios 的 VITE_APP_API_BASEURL 恒为同源 '/'。
+  const devApiTarget = env.VITE_DEV_API_TARGET || 'http://localhost:8080'
   return {
     // 开发服务器选项 https://cn.vitejs.dev/config/server-options
     server: {
@@ -24,27 +27,28 @@ export default defineConfig(({ mode, command }) => {
       host: true,
       port: 9000,
       proxy: {
+        // 与生产 nginx 的 ^~ /api/ 反代保持同语义（保留 /api 前缀）：
+        // 生产与开发的后端代理统一为 /api，前端同源调用，启动器等
+        // 外部客户端也以站点同源地址访问后端。
+        // xfwd 透传 X-Forwarded-Proto/Host，插件据此重构出的自报 origin
+        // 是站点地址而不是 dev 后端的 8080。
+        '/api': {
+          target: devApiTarget,
+          changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
+          ws: true,
+          xfwd: true,
+        },
         '/v3/api-docs': {
-          target: env.VITE_APP_API_BASEURL,
+          target: devApiTarget,
           changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
         },
         '/swagger-ui': {
-          target: env.VITE_APP_API_BASEURL,
+          target: devApiTarget,
           changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
         },
         '/swagger-ui.html': {
-          target: env.VITE_APP_API_BASEURL,
+          target: devApiTarget,
           changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
-        },
-        '/proxy': {
-          target: env.VITE_APP_API_BASEURL,
-          changeOrigin: command === 'serve' && env.VITE_ENABLE_PROXY,
-          ws: true,
-          headers: {
-            // Preserve the public prefix after the proxy rewrites it away.
-            'X-Forwarded-Prefix': '/proxy',
-          },
-          rewrite: path => path.replace(/\/proxy/, ''),
         },
       },
     },

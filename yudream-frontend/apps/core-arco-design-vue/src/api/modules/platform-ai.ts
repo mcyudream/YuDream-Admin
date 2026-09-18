@@ -100,9 +100,6 @@ export default {
 }
 
 function streamEndpoint(path: string) {
-  if (import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY) {
-    return `/proxy${path}`
-  }
   const base = import.meta.env.VITE_APP_API_BASEURL || window.location.origin
   return `${base.replace(/\/$/, '')}${path}`
 }

@@ -27,6 +27,10 @@ interface ImportMetaEnv {
    */
   readonly VITE_APP_TITLE: string
   /**
+   * dev 后端代理目标（vite /api 专用；前端 axios 恒走同源 /）
+   */
+  readonly VITE_DEV_API_TARGET: string
+  /**
    * 启用代理
    * Enable proxy
    */

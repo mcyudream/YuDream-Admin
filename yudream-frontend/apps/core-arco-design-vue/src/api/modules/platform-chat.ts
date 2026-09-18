@@ -121,21 +121,15 @@ export const fetchMyChatQuota = () => systemClient.get<unknown, ApiResponse<Chat
 export const fetchChatQuotaConfig = () => systemClient.get<unknown, ApiResponse<{ dailyTokenLimit: number }>>('api/platform/chat/quota/config')
 export const updateChatQuotaConfig = (dailyTokenLimit: number) => systemClient.put<unknown, ApiResponse<{ dailyTokenLimit: number }>>('api/platform/chat/quota/config', { dailyTokenLimit })
 
-export const chatStreamEndpoint = (sessionId: string) => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? `/proxy/api/platform/chat/sessions/${sessionId}/stream`
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/chat/sessions/${sessionId}/stream`
+export const chatStreamEndpoint = (sessionId: string) => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/chat/sessions/${sessionId}/stream`
 
-export const chatStreamOnceEndpoint = () => import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-  ? '/proxy/api/platform/chat/stream-once'
-  : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/chat/stream-once`
+export const chatStreamOnceEndpoint = () => `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/api/platform/chat/stream-once`
 
 export async function uploadChatAttachment(file: File): Promise<ChatAttachment> {
   const form = new FormData()
   form.append('file', file)
   const token = localStorage.getItem('token')
-  const baseUrl = import.meta.env.DEV && import.meta.env.VITE_ENABLE_PROXY
-    ? '/proxy/'
-    : `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/`
+  const baseUrl = `${(import.meta.env.VITE_APP_API_BASEURL || window.location.origin).replace(/\/$/, '')}/`
   const response = await fetch(`${baseUrl}api/platform/chat/attachments`, {
     method: 'POST',
     headers: token ? { Authorization: token } : {},
