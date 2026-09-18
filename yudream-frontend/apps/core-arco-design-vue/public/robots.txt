@@ -1,0 +1,17 @@
+# YuDream Admin 前端 robots 声明。
+# 静态壳（index.html）对所有路由返回同一份中性内容（标题"正在加载"），
+# 管理后台与认证/基础设施路径没有收录价值，统一禁止抓取；
+# 公开内容路径（/site /wiki /servers /activities /timeline /forms 等）保持默认允许。
+User-agent: *
+Disallow: /platform
+Disallow: /api
+Disallow: /proxy
+Disallow: /kkfileview
+Disallow: /login
+Disallow: /register
+Disallow: /setup
+Disallow: /verify-email
+Disallow: /reset-password
+Disallow: /external-login
+Disallow: /pay
+Disallow: /embed
