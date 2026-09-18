@@ -179,6 +179,8 @@ Assembler hard rules:
 
 - 外部登录插件自动开户后绑定使用 SPI 2.29.0 的 `PluginExternalLoginIdentity.authenticatedUserId`（字符串 ID）。只有新建用户或已证明本站凭据的用户可返回此字段；不得按邮箱匹配或浏览器参数自动认领已有账号。宿主核销 state 后必须检查停用与绑定冲突，缺省字段保持 `BIND_REQUIRED`。开户前使用 `PluginUserService.findByExternalIdentity` 排除既有绑定，避免用户更改本站邮箱后被重复开户。详见 `docs/plugin-system/spi-2.29.0-external-login.md`。
 
+- 插件第三方登录入口的呈现与排序使用 SPI 2.32.0（2.30.0 已由 `PluginDescriptor.gitUrl` 占用、2.31.0 已由插件 HTTP 上传契约 `PluginHttpPart` / `PluginHttpRequest.parts` 占用）：`PluginExternalLoginProvider.presentation()`（default 方法，`ICON` 缺省 / `TAB` 登录方式 Tab，宿主对未实现、返回 null 或抛异常一律回落 `ICON`）声明呈现方式；`descriptor().sort()` 同时对 Tab 与图标入口排序，内置 Tab 基线是账号密码 100、Passkey 200，因此 `sort < 100` 的插件入口排在账号密码之前。首选登录方式是站点级配置，存 `site` 分类通用 Setting 键 `loginDefaultMethod`（取值 `password` / `passkey` / `external:{providerCode}:{type}`，写入时非法值归一化为空串），随 `/api/settings/public` 匿名下发；登录页默认选中它，入口未启用、已下线或非 Tab 型时静默回落账号密码，第三方账号绑定流程（`externalLoginBindingToken`）忽略该配置。宿主登录页的账号输入框与「记住账号」行必须常驻（`v-show` 隐藏，不能用 `v-if`）：字段随 Tab 卸载会让浏览器自动填充与 vee-validate 注册失效，表现为「切回账号密码登录点按钮没反应」。详见 `docs/plugin-system/spi-2.32.0-login-tab.md`。
+
 ## System Seeds
 
 - System seed initialization, including menu enum seeds, must be controlled by configuration instead of hard-coded overwrite behavior.
