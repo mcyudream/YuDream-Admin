@@ -129,6 +129,8 @@ public class PluginAssembler {
                 .category(descriptor.category())
                 .tags(descriptor.tags())
                 .gitUrl(descriptor.gitUrl())
+                .publishedAt(descriptor.publishedAt())
+                .updatedAt(descriptor.updatedAt())
                 .build();
     }
 

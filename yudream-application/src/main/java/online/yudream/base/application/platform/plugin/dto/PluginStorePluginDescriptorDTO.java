@@ -36,4 +36,6 @@ public class PluginStorePluginDescriptorDTO implements Serializable {
     private String category;
     private List<String> tags;
     private String gitUrl;
+    private String publishedAt;
+    private String updatedAt;
 }

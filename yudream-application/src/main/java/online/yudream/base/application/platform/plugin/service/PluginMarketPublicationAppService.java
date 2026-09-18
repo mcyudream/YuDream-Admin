@@ -524,7 +524,9 @@ public class PluginMarketPublicationAppService {
                 publication.getTags(),
                 readStringMap(publication.getCompatibilityJson()),
                 dependencies,
-                publication.getSourceUrl());
+                publication.getSourceUrl(),
+                publication.getCreateTime() == null ? null : publication.getCreateTime().toString(),
+                publication.getCreateTime() == null ? null : publication.getCreateTime().toString());
     }
 
     // ---------- legacy 静态契约（schemaVersion=1，保留兼容旧消费端） ----------

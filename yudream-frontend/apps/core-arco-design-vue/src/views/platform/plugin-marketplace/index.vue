@@ -19,6 +19,8 @@ const status = ref<MarketplaceStatus>('all')
 const sourceFilter = ref('all')
 const categoryFilter = ref('all')
 const tagFilter = ref<string[]>([])
+const publishedAfter = ref('')
+const publishedBefore = ref('')
 const sources = ref<PluginMarketSource[]>([])
 const pagination = reactive({ page: 1, size: 12, total: 0 })
 const rows = ref<PluginStorePlugin[]>([])
@@ -92,14 +94,28 @@ const filteredRows = computed(() => {
     const matchesSource = sourceFilter.value === 'all' || item.sourceCode === sourceFilter.value
     const matchesCategory = categoryFilter.value === 'all' || descriptor.category?.trim() === categoryFilter.value
     const matchesTags = !tagFilter.value.length || (descriptor.tags || []).some(tag => tagFilter.value.includes(tag.trim()))
-    return matchesKeyword && matchesSource && matchesCategory && matchesTags && (status.value === 'all' || marketplaceStatus(item) === status.value)
+    const matchesTime = matchesTimeRange(descriptor)
+    return matchesKeyword && matchesSource && matchesCategory && matchesTags && matchesTime && (status.value === 'all' || marketplaceStatus(item) === status.value)
   })
 })
 const pagedRows = computed(() => {
   const start = (pagination.page - 1) * pagination.size
   return filteredRows.value.slice(start, start + pagination.size)
 })
-const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.value !== 'all' || sourceFilter.value !== 'all' || categoryFilter.value !== 'all' || Boolean(tagFilter.value.length))
+const hasActiveFilters = computed(() => Boolean(keyword.value.trim()) || status.value !== 'all' || sourceFilter.value !== 'all' || categoryFilter.value !== 'all' || Boolean(tagFilter.value.length) || Boolean(publishedAfter.value) || Boolean(publishedBefore.value))
+
+/** 按 descriptor 的发布/更新时间做日期区间过滤（无时间的插件在有界筛选时隐藏）。 */
+function matchesTimeRange(descriptor: PluginStorePluginDescriptor) {
+  const time = descriptor.updatedAt || descriptor.publishedAt || ''
+  const day = time.slice(0, 10)
+  if (publishedAfter.value && (!day || day < publishedAfter.value)) {
+    return false
+  }
+  if (publishedBefore.value && (!day || day > publishedBefore.value)) {
+    return false
+  }
+  return true
+}
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value))
 const localModule = computed(() => modules.value.find(item => item.code === selectedCode.value))
@@ -119,7 +135,7 @@ watch(selectedCode, () => {
   showHistory.value = false
 })
 
-watch([keyword, status, sourceFilter, categoryFilter, tagFilter], () => {
+watch([keyword, status, sourceFilter, categoryFilter, tagFilter, publishedAfter, publishedBefore], () => {
   pagination.page = 1
 })
 watch(filteredRows, clampPage, { immediate: true })
@@ -232,6 +248,8 @@ function resetFilters() {
   sourceFilter.value = 'all'
   categoryFilter.value = 'all'
   tagFilter.value = []
+  publishedAfter.value = ''
+  publishedBefore.value = ''
 }
 
 function toggleTag(tag: string) {
@@ -438,6 +456,12 @@ function rollbackConfirmationContent(cascade: boolean) {
           <FaSelect v-model="status" :options="statusOptions" class="marketplace-status" />
           <FaSelect v-model="categoryFilter" :options="categoryOptions" class="marketplace-category" />
           <FaSelect v-if="showSourceFilter" v-model="sourceFilter" :options="sourceOptions" class="marketplace-source" />
+          <div class="marketplace-time">
+            <span class="marketplace-time__label">发布时间</span>
+            <FaInput v-model="publishedAfter" type="date" class="marketplace-time__input" />
+            <span class="marketplace-time__dash">–</span>
+            <FaInput v-model="publishedBefore" type="date" class="marketplace-time__input" />
+          </div>
         </div>
         <div class="marketplace-toolbar-actions">
           <span class="result-count">共 {{ pagination.total }} 个结果</span>
@@ -626,6 +650,26 @@ function rollbackConfirmationContent(cascade: boolean) {
   width: 170px;
 }
 
+.marketplace-time {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.marketplace-time__label {
+  color: var(--color-text-3);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.marketplace-time__input {
+  width: 132px;
+}
+
+.marketplace-time__dash {
+  color: var(--color-text-3);
+}
+
 .marketplace-tags {
   display: flex;
   flex-wrap: wrap;
@@ -667,7 +711,11 @@ function rollbackConfirmationContent(cascade: boolean) {
 }
 
 .detail-meta :deep(.fa-tag) {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .detail-git {
@@ -747,12 +795,17 @@ function rollbackConfirmationContent(cascade: boolean) {
 
 .plugin-card-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
 }
 
 .plugin-card-meta :deep(.fa-tag) {
+  max-width: 100%;
+  overflow: hidden;
   font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .plugin-card-title,
@@ -864,6 +917,10 @@ function rollbackConfirmationContent(cascade: boolean) {
   .marketplace-search,
   .marketplace-status {
     width: 100%;
+  }
+
+  .marketplace-time {
+    flex-wrap: wrap;
   }
 
   .result-count {

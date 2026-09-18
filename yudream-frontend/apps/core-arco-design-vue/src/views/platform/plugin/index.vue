@@ -425,6 +425,32 @@ function openGitUrl(url?: string) {
   }
 }
 
+/** 一键打开插件注册的后台页面（取第一个可见、非公开访问且带组件的路由）。 */
+async function openPluginPage(code: string) {
+  actionLoading.value = `${code}:open`
+  try {
+    const res = await apiPlugin.frontendManifest()
+    const mod = res.data.modules.find(item => item.pluginCode === code)
+    const routes = (mod?.routes || []).filter(route =>
+      !route.hideInMenu
+      && !route.publicAccess
+      && route.status !== 'DISABLED'
+      && Boolean(route.path))
+    const target = routes.find(route => route.component) || routes[0]
+    if (!target) {
+      toast.error('该插件未启用或没有注册后台页面')
+      return
+    }
+    await router.push(target.path)
+  }
+  catch {
+    toast.error('获取插件页面失败')
+  }
+  finally {
+    actionLoading.value = ''
+  }
+}
+
 /** 卸载/删除依赖方弹窗确认：级联执行并自动恢复软依赖方。 */
 async function handleDependentsConfirm(cascade: boolean) {
   const code = dependentsInfo.value?.code
@@ -590,14 +616,6 @@ function actionText(action: string) {
               <span>版本</span>
               <strong>{{ selected.version || '-' }}</strong>
             </div>
-            <div>
-              <span>主类</span>
-              <strong>{{ selected.mainClass || '-' }}</strong>
-            </div>
-            <div>
-              <span>JAR 路径</span>
-              <strong>{{ selected.jarPath || '-' }}</strong>
-            </div>
             <div v-if="selected.gitUrl">
               <span>源码仓库</span>
               <strong>
@@ -686,6 +704,14 @@ function actionText(action: string) {
           </div>
 
           <div class="detail-actions">
+            <FaButton
+              variant="outline"
+              :loading="actionLoading === `${selected.code}:open`"
+              @click="openPluginPage(selected.code)"
+            >
+              <FaIcon name="i-ri:external-link-line" />
+              打开插件页面
+            </FaButton>
             <FaButton
               v-auth="'platform:plugin:manage'"
               variant="outline"
