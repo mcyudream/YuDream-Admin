@@ -17,6 +17,8 @@ export const useAppSettingsStore = defineStore(
     const logo = ref('')
     const favicon = ref('')
     const loginBanner = ref('')
+    // 登录页默认登录方式：password / passkey / external:{providerCode}:{type}；空=账号密码
+    const loginDefaultMethod = ref('')
 
     function normalizeHexColor(value?: string) {
       if (!value) {
@@ -116,6 +118,7 @@ export const useAppSettingsStore = defineStore(
         logo.value = toBackendAssetUrl(data.logo)
         favicon.value = toBackendAssetUrl(data.favicon)
         loginBanner.value = toBackendAssetUrl(data.loginBanner)
+        loginDefaultMethod.value = data.loginDefaultMethod || ''
         if (data.copyrightCompany || data.copyrightWebsite || data.copyrightDates) {
           settings.value.app.copyright.company = data.copyrightCompany || settings.value.app.copyright.company
           settings.value.app.copyright.website = data.copyrightWebsite || settings.value.app.copyright.website
@@ -314,6 +317,7 @@ export const useAppSettingsStore = defineStore(
       logo,
       favicon,
       loginBanner,
+      loginDefaultMethod,
       loadSiteSettings,
       loadThemeSettings,
       saveThemeSettings,

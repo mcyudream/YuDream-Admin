@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ExternalLoginEntry } from '@/components/AppAccountForm/login.vue'
+import type { ExternalLoginEntry, ExternalLoginPresentation } from '@/components/AppAccountForm/login.vue'
 import { diffTwoObj } from '@fantastic-admin/settings'
 import Login from '@/components/AppAccountForm/login.vue'
 import Register from '@/components/AppAccountForm/register.vue'
@@ -30,16 +30,20 @@ const bindingToken = typeof route.query.externalLoginBindingToken === 'string' &
   ? route.query.externalLoginBindingToken
   : undefined
 const formType = ref<'binding' | 'login' | 'register' | 'resetPassword'>(bindingToken && route.query.form !== 'register' ? 'binding' : route.query.form === 'register' ? 'register' : 'login')
-const externalProviders = ref<{ code: string, name?: string, supportedTypes: string, icon?: string }[]>([])
+const externalProviders = ref<{ code: string, name?: string, supportedTypes: string, icon?: string, presentation?: string, sort?: number }[]>([])
 const externalTypeMeta: Record<string, { label: string, icon: string }> = { qq: { label: 'QQ 登录', icon: 'i-ri:qq-line' }, wx: { label: '微信登录', icon: 'i-ri:wechat-line' }, google: { label: 'Google 登录', icon: 'i-ri:google-line' }, gitee: { label: 'Gitee 登录', icon: 'i-ri:git-repository-line' }, github: { label: 'GitHub 登录', icon: 'i-ri:github-line' } }
 const externalEntries = computed<ExternalLoginEntry[]>(() => externalProviders.value.flatMap((provider) => {
   const types = (provider.supportedTypes || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean)
   const resolvedTypes = types.length ? types : ['default']
+  // 插件可声明以登录 Tab 呈现（SPI PluginExternalLoginPresentation.TAB）；宿主托管提供方只有图标按钮
+  const presentation: ExternalLoginPresentation = provider.presentation === 'TAB' ? 'TAB' : 'ICON'
   return resolvedTypes.map(type => ({
     providerCode: provider.code,
     type,
     label: provider.icon ? (provider.name || provider.code) : (externalTypeMeta[type]?.label || provider.name || `${type} 登录`),
     icon: provider.icon || externalTypeMeta[type]?.icon || 'i-ri:links-line',
+    presentation,
+    sort: provider.sort ?? 0,
   }))
 }))
 const externalLoading = ref(false)
@@ -129,6 +133,7 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
             :binding-token="bindingToken"
             :external-entries="externalEntries"
             :external-loading="externalLoading"
+            :preferred-method="bindingToken ? '' : appSettingsStore.loginDefaultMethod"
             @on-login="handleLogin"
             @on-external-login="loginWithExternal"
             @on-register="(val) => { formType = 'register'; account = val }"
