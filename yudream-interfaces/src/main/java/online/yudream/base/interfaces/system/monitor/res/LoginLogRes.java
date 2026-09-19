@@ -15,6 +15,5 @@ public class LoginLogRes {
     private String message;
     private String ip;
     private String userAgent;
-    private String token;
     private LocalDateTime createTime;
 }

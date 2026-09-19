@@ -16,5 +16,4 @@ public class LoginLogDO extends BaseDO {
     private String message;
     private String ip;
     private String userAgent;
-    private String token;
 }

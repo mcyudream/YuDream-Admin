@@ -170,7 +170,6 @@ public class MonitorWebAssembler {
                 .message(dto.getMessage())
                 .ip(dto.getIp())
                 .userAgent(dto.getUserAgent())
-                .token(dto.getToken())
                 .createTime(dto.getCreateTime())
                 .build();
     }

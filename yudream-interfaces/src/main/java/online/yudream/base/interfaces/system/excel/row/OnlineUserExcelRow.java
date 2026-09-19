@@ -19,6 +19,4 @@ public class OnlineUserExcelRow {
     private Long timeout;
     @ExcelProperty("活跃有效期")
     private Long activeTimeout;
-    @ExcelProperty("Token")
-    private String token;
 }
