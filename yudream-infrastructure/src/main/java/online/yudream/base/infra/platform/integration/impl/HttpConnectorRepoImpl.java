@@ -52,7 +52,7 @@ public class HttpConnectorRepoImpl implements HttpConnectorRepo {
         Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
         long total = mongoTemplate.count(query, HttpConnectorDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         return new PageResult<>(
                 mongoTemplate.find(query, HttpConnectorDO.class).stream().map(IntegrationInfraMapper::toDomain).toList(),

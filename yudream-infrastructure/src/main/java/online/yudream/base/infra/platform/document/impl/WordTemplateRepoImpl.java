@@ -52,7 +52,7 @@ public class WordTemplateRepoImpl implements WordTemplateRepo {
         Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
         long total = mongoTemplate.count(query, WordTemplateDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         return new PageResult<>(
                 mongoTemplate.find(query, WordTemplateDO.class).stream().map(WordDocumentInfraMapper::toDomain).toList(),

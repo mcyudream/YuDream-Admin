@@ -81,7 +81,7 @@ public class CmsBlockRepoImpl implements CmsBlockRepo {
     private PageResult<CmsBlock> page(Query query, int page, int size) {
         long total = mongoTemplate.count(query, CmsBlockDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         return new PageResult<>(
                 mongoTemplate.find(query, CmsBlockDO.class).stream().map(CmsInfraMapper::toDomain).toList(),

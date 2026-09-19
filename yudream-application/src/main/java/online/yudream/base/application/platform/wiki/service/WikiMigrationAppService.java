@@ -98,10 +98,13 @@ public class WikiMigrationAppService {
             WikiSpace saved = spaceRepo.save(space);
 
             Map<String, JsonNode> nodesById = archiveNodes(root.path("nodes"));
+            if (nodesById.size() > MAX_IMPORT_NODES) {
+                throw new BizException("导入归档节点数超过上限：" + MAX_IMPORT_NODES);
+            }
             Map<String, Long> importedIds = new HashMap<>();
             Set<String> visiting = new HashSet<>();
             for (String nodeId : nodesById.keySet()) {
-                importNode(nodeId, nodesById, importedIds, visiting, saved.getId());
+                importNode(nodeId, nodesById, importedIds, visiting, saved.getId(), 0);
             }
             root.path("sources").forEach(source -> {
                 WikiSource wikiSource = WikiSource.file(saved.getId(), source.path("folderPath").asText("/"),
@@ -120,6 +123,10 @@ public class WikiMigrationAppService {
         }
         catch (BizException exception) {
             throw exception;
+        }
+        catch (StackOverflowError error) {
+            // 畸形归档（超深父链）以业务异常拒绝，不作为进程级错误逃逸
+            throw new BizException("导入归档的节点层级过深");
         }
         catch (Exception exception) {
             throw new BizException("导入失败：" + exception.getMessage());
@@ -149,11 +156,18 @@ public class WikiMigrationAppService {
         return result;
     }
 
+    /** 归档导入节点数与父链深度上限：畸形归档以业务异常拒绝，而非栈溢出。 */
+    private static final int MAX_IMPORT_NODES = 5000;
+    private static final int MAX_PARENT_CHAIN_DEPTH = 200;
+
     private Long importNode(String oldId, Map<String, JsonNode> nodesById, Map<String, Long> importedIds,
-                            Set<String> visiting, Long spaceId) {
+                            Set<String> visiting, Long spaceId, int depth) {
         Long imported = importedIds.get(oldId);
         if (imported != null) {
             return imported;
+        }
+        if (depth > MAX_PARENT_CHAIN_DEPTH) {
+            throw new BizException("导入归档的节点层级过深（>" + MAX_PARENT_CHAIN_DEPTH + "）");
         }
         JsonNode node = nodesById.get(oldId);
         if (node == null) {
@@ -165,7 +179,7 @@ public class WikiMigrationAppService {
         String parentId = node.path("parentId").asText("").trim();
         Long newParentId = parentId.isBlank() || "0".equals(parentId)
                 ? null
-                : importNode(parentId, nodesById, importedIds, visiting, spaceId);
+                : importNode(parentId, nodesById, importedIds, visiting, spaceId, depth + 1);
         WikiNode parent = newParentId == null ? null : nodeRepo.findById(newParentId)
                 .orElseThrow(() -> new BizException("导入父节点不存在"));
         String title = node.path("title").asText("未命名页面");

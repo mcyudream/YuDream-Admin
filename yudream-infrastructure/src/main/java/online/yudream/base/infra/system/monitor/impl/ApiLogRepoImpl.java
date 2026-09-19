@@ -38,7 +38,7 @@ public class ApiLogRepoImpl implements ApiLogRepo {
         Query query = buildQuery(keyword, success);
         long total = mongoTemplate.count(query, ApiLogDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.with(Sort.by(Sort.Direction.DESC, "createTime"))
                 .skip((long) (currentPage - 1) * pageSize)
                 .limit(pageSize);
