@@ -141,11 +141,18 @@ public class PluginDevModeWatcher {
         }
     }
 
+    /**
+     * 编译命令为服务端固定值：不再执行操作者自定义的 compileCommand——
+     * 该值曾经 sh -c / cmd /c 展开构成命令注入；如需调整构建参数应升级宿主。
+     */
+    private static final String FIXED_COMPILE_COMMAND =
+            new PluginDevModeProperties.DevProject().getCompileCommand();
+
     private void compile(PluginDevModeProperties.DevProject project, WatchState state) {
         state.compiling = true;
         long startNanos = System.nanoTime();
         try {
-            ProcessBuilder builder = new ProcessBuilder(shellWrap(project.getCompileCommand()));
+            ProcessBuilder builder = new ProcessBuilder(shellWrap(FIXED_COMPILE_COMMAND));
             builder.directory(Path.of(project.getPath()).toFile());
             // 编译进程默认跟随宿主 JVM 的 JDK：宿主要求 JDK 21+，而系统 JAVA_HOME 可能指向旧版本，
             // 会导致 target 21 编译失败、target/classes 只剩资源没有类，随后目录加载报主类初始化失败。

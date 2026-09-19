@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.plugin.service;
 
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
 import online.yudream.base.domain.system.security.enumerate.OAuthClientAuthMethod;
@@ -16,6 +17,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PluginOAuthFrameworkServiceTest {
@@ -42,7 +44,7 @@ class PluginOAuthFrameworkServiceTest {
     }
 
     @Test
-    void mergesRedirectsAndReactivatesExistingClient() {
+    void rejectsHijackingConfidentialClient() {
         Fixture fixture = new Fixture();
         OAuthClientRegistration existing = OAuthClientRegistration.create("ymcl", "旧名称", null);
         existing.update(
@@ -57,21 +59,39 @@ class PluginOAuthFrameworkServiceTest {
         );
         fixture.clients.save(existing);
 
-        var result = fixture.service.ensurePublicClient(new PluginOAuthPublicClientSpec(
+        // 机密客户端不得被插件降级为公共客户端（历史行为曾允许，构成客户端劫持）
+        assertThrows(BizException.class, () -> fixture.service.ensurePublicClient(new PluginOAuthPublicClientSpec(
                 "ymcl",
                 "YMCL",
                 List.of("sjmcl://auth/callback"),
                 List.of("openid", "profile")
-        ));
-
-        assertTrue(result.isPresent());
+        )));
         OAuthClientRegistration stored = fixture.clients.findByClientId("ymcl").orElseThrow();
-        assertEquals("YMCL", stored.getClientName());
+        assertEquals(OAuthClientAuthMethod.CLIENT_SECRET_BASIC, stored.getAuthMethod());
+    }
+
+    @Test
+    void rejectsCrossOwnerUpdateAndKeepsAuthMethod() {
+        Fixture fixture = new Fixture();
+
+        // 属主插件登记
+        assertTrue(fixture.service.ensurePublicClient(new PluginOAuthPublicClientSpec(
+                "pub-a", "A", List.of("a://callback"), List.of("openid")
+        ), "plugin-a").isPresent());
+
+        // 其他插件不能修改
+        assertThrows(BizException.class, () -> fixture.service.ensurePublicClient(new PluginOAuthPublicClientSpec(
+                "pub-a", "B", List.of("b://callback"), List.of("openid")
+        ), "plugin-b"));
+
+        // 属主可幂等重复登记（重新启用场景），认证方式保持 NONE
+        assertTrue(fixture.service.ensurePublicClient(new PluginOAuthPublicClientSpec(
+                "pub-a", "A", List.of("a://callback2"), List.of("openid")
+        ), "plugin-a").isPresent());
+        OAuthClientRegistration stored = fixture.clients.findByClientId("pub-a").orElseThrow();
         assertEquals(OAuthClientAuthMethod.NONE, stored.getAuthMethod());
-        assertEquals(OAuthRegistrationStatus.ACTIVE, stored.getStatus());
-        assertEquals(List.of("https://legacy.example/callback", "sjmcl://auth/callback"), stored.getRedirectUris());
-        assertEquals(List.of("openid", "profile"), stored.getScopes());
-        assertEquals(3600, stored.getAccessTokenTtlSeconds());
+        assertEquals("plugin-a", stored.getOwnerPluginCode());
+        assertEquals(List.of("a://callback", "a://callback2"), stored.getRedirectUris());
     }
 
     @Test

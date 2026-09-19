@@ -107,6 +107,7 @@ public class OAuthSecurityInfraMapper {
         dataObj.setClientId(registration.getClientId());
         dataObj.setClientName(registration.getClientName());
         dataObj.setClientSecretHash(registration.getClientSecretHash());
+        dataObj.setOwnerPluginCode(registration.getOwnerPluginCode());
         dataObj.setAuthMethod(registration.getAuthMethod());
         dataObj.setGrantTypes(registration.getGrantTypes());
         dataObj.setRedirectUris(registration.getRedirectUris());
@@ -129,6 +130,7 @@ public class OAuthSecurityInfraMapper {
                 .clientId(dataObj.getClientId())
                 .clientName(dataObj.getClientName())
                 .clientSecretHash(dataObj.getClientSecretHash())
+                .ownerPluginCode(dataObj.getOwnerPluginCode())
                 .authMethod(dataObj.getAuthMethod())
                 .grantTypes(dataObj.getGrantTypes())
                 .redirectUris(dataObj.getRedirectUris())

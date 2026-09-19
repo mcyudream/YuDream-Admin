@@ -105,6 +105,7 @@ public class PluginDevToolsController {
     @GetMapping("/dev-projects/browse")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "浏览宿主机目录", module = "开发者工具", desc = "登记开发项目时浏览宿主机目录，仅列子目录与插件模块标记，不读取文件内容")
     public Result<PluginDevDirectoryBrowseInfo> browseDevDirectories(@RequestParam(required = false) String path) {
+        devToolsAppService.requireDevMode();
         return Result.ok(devToolsAppService.browseDevDirectories(path));
     }
 
@@ -123,6 +124,8 @@ public class PluginDevToolsController {
     @PostMapping("/scaffold")
     @PermissionRegister(code = "platform:plugin-devtools:manage", name = "新建插件骨架", module = "开发者工具", desc = "在宿主机生成插件 Maven 模块骨架，可选同时登记为开发模式项目")
     public Result<PluginScaffoldRes> scaffold(@Valid @RequestBody PluginScaffoldRequest request) {
+        // 骨架生成会写宿主机文件，与 SSE 等端点同样受开发模式门禁约束
+        devToolsAppService.requireDevMode();
         return Result.ok(PluginDevToolsWebAssembler.toRes(
                 devToolsAppService.scaffold(PluginDevToolsWebAssembler.toCmd(request))));
     }

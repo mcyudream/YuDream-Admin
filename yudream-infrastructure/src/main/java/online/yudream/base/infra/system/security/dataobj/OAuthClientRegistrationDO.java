@@ -25,6 +25,8 @@ public class OAuthClientRegistrationDO extends BaseDO {
     private String clientId;
     private String clientName;
     private String clientSecretHash;
+    /** 插件登记属主（pluginCode），与聚合字段对应。 */
+    private String ownerPluginCode;
     private OAuthClientAuthMethod authMethod;
     private List<OAuthGrantType> grantTypes = new ArrayList<>();
     private List<String> redirectUris = new ArrayList<>();

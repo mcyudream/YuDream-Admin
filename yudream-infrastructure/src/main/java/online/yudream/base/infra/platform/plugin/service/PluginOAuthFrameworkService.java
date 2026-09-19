@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.security.aggregate.ApiSecurityPolicy;
 import online.yudream.base.domain.system.security.aggregate.OAuthClientRegistration;
 import online.yudream.base.domain.system.security.enumerate.OAuthClientAuthMethod;
@@ -51,6 +52,15 @@ public class PluginOAuthFrameworkService implements PluginOAuthService {
 
     @Override
     public Optional<PluginOAuthClient> ensurePublicClient(PluginOAuthPublicClientSpec spec) {
+        return ensurePublicClient(spec, null);
+    }
+
+    /**
+     * 插件维度的公开客户端登记：绑定属主，且绝不修改既有登记的认证方式——
+     * 插件传入任意 clientId 即可把机密客户端降级为公共客户端（无需密钥），
+     * 这里对非 NONE 的既有登记直接拒绝；已登记属主的其他插件也不能跨属主修改。
+     */
+    public Optional<PluginOAuthClient> ensurePublicClient(PluginOAuthPublicClientSpec spec, String pluginCode) {
         if (spec == null || !StringUtils.hasText(spec.clientId()) || !StringUtils.hasText(spec.clientName())) {
             return Optional.empty();
         }
@@ -66,6 +76,7 @@ public class PluginOAuthFrameworkService implements PluginOAuthService {
         }
         OAuthClientRegistration registration = oauthClientRegistrationRepo.findByClientId(clientId)
                 .orElseGet(() -> OAuthClientRegistration.create(clientId, clientName, null));
+        assertPluginMayManage(registration, clientId, pluginCode);
         List<String> mergedRedirects = merge(registration.getRedirectUris(), redirectUris);
         List<String> mergedScopes = merge(registration.getScopes(), scopes);
         long accessTtl = registration.getAccessTokenTtlSeconds() > 0
@@ -87,14 +98,45 @@ public class PluginOAuthFrameworkService implements PluginOAuthService {
         return Optional.of(toClient(oauthClientRegistrationRepo.save(registration)));
     }
 
+    private void assertPluginMayManage(OAuthClientRegistration registration, String clientId, String pluginCode) {
+        if (registration.getId() == null) {
+            // 全新登记：直接绑定属主
+            registration.setOwnerPluginCode(pluginCode);
+            return;
+        }
+        if (registration.getAuthMethod() != null && registration.getAuthMethod() != OAuthClientAuthMethod.NONE) {
+            throw new BizException("OAuth 客户端 " + clientId + " 已存在且非公共客户端，插件不能修改");
+        }
+        if (!StringUtils.hasText(pluginCode)) {
+            // 无属主上下文（历史调用路径）：不允许修改任何既有登记
+            throw new BizException("OAuth 客户端 " + clientId + " 已存在，插件不能修改");
+        }
+        if (StringUtils.hasText(registration.getOwnerPluginCode())
+                && !registration.getOwnerPluginCode().equals(pluginCode)) {
+            throw new BizException("OAuth 客户端 " + clientId + " 由其他插件登记，不能修改");
+        }
+        registration.setOwnerPluginCode(pluginCode);
+    }
+
     /** 仅停用登记（插件停用/卸载场景），保留回调地址与 scope 配置。 */
     @Override
     public void disableClient(String clientId) {
+        disableClient(null, clientId);
+    }
+
+    public void disableClient(String pluginCode, String clientId) {
         if (!StringUtils.hasText(clientId)) {
             return;
         }
         oauthClientRegistrationRepo.findByClientId(clientId.trim())
                 .filter(registration -> registration.getStatus() == OAuthRegistrationStatus.ACTIVE)
+                .filter(registration -> {
+                    if (!StringUtils.hasText(pluginCode)) {
+                        return true;
+                    }
+                    return !StringUtils.hasText(registration.getOwnerPluginCode())
+                            || registration.getOwnerPluginCode().equals(pluginCode);
+                })
                 .ifPresent(registration -> {
                     registration.disable();
                     oauthClientRegistrationRepo.save(registration);
