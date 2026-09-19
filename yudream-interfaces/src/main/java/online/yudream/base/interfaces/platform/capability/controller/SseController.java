@@ -1,5 +1,6 @@
 package online.yudream.base.interfaces.platform.capability.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.interfaces.platform.capability.service.SseCapabilityProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,6 +19,9 @@ public class SseController {
 
     @GetMapping("/connect")
     public SseEmitter connect() {
+        // SSE 端点必须登录：浏览器 EventSource 无法携带 Authorization 头，
+        // 前端已改为 fetch 流式读取并附带令牌。
+        StpUtil.checkLogin();
         return sseCapabilityProvider.connect();
     }
 }

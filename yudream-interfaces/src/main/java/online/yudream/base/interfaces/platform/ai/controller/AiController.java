@@ -43,6 +43,7 @@ public class AiController {
 
     private final AiAppService aiAppService;
     private final AgentAppService agentAppService;
+    private final online.yudream.base.interfaces.platform.ai.service.AguiWsTicketService aguiWsTicketService;
 
     @Value("${yudream.platform.ai.client.sse-timeout:30m}")
     private Duration sseTimeout;
@@ -51,6 +52,17 @@ public class AiController {
      * CMS 构建器等 AI 场景的 Agent 列表。与 Agent 管理台的 platform:agent:view 分离：
      * 只要能用 AI 生成页面（platform:ai:generate）就能看到可切换的 Agent，否则面板会静默丢失选择器。
      */
+    /**
+     * 签发 AG-UI WebSocket 握手票据：浏览器 WebSocket 无法携带 Authorization 头，
+     * 用一次性短时效票据替代在查询参数中暴露长效会话令牌。
+     */
+    @PostMapping("/ws-ticket")
+    @PermissionRegister(code = "platform:ai:generate", name = "AI 生成页面", module = "平台能力", desc = "签发 AG-UI WebSocket 握手票据")
+    public Result<java.util.Map<String, Object>> wsTicket() {
+        String ticket = aguiWsTicketService.issue(cn.dev33.satoken.stp.StpUtil.getTokenValue());
+        return Result.ok(java.util.Map.of("ticket", ticket, "expiresIn", 60));
+    }
+
     @GetMapping("/agents/available")
     @PermissionRegister(code = "platform:ai:generate", name = "AI 生成页面", module = "平台能力", desc = "使用 AI 为 CMS 生成页面草稿")
     public Result<List<AgentApplicationRes>> availableAgents() {
@@ -115,8 +127,12 @@ public class AiController {
                 send(emitter, AiWebAssembler.toAguiRunFinished(traceId, result));
                 emitter.complete();
             } catch (Exception e) {
-                log.debug("AI SSE stream failed, traceId={}", traceId, e);
-                send(emitter, AiWebAssembler.toAguiRunError(traceId, e.getMessage()));
+                log.warn("AI SSE stream failed, traceId={}", traceId, e);
+                // 业务异常文案可直接返回；内部异常只回固定文案 + traceId，堆栈仅留服务端日志
+                String message = e instanceof online.yudream.base.domain.common.exception.BizException biz
+                        ? biz.getMessage()
+                        : "生成失败，请稍后重试（traceId=" + traceId + "）";
+                send(emitter, AiWebAssembler.toAguiRunError(traceId, message));
                 emitter.complete();
             } finally {
                 running.set(false);

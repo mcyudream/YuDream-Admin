@@ -22,6 +22,8 @@ public class SseCapabilityProvider implements CapabilityProvider {
 
     public static final String CODE = "sse";
     private static final long DEFAULT_TIMEOUT = 300_000L;
+    /** 并发连接硬上限：防止匿名/异常客户端连接洪泛拖垮堆内存。 */
+    private static final int MAX_CONNECTIONS = 500;
 
     private final AtomicBoolean enabled = new AtomicBoolean(false);
     private final Map<String, SseEmitter> emitters = new ConcurrentHashMap<>();
@@ -73,6 +75,9 @@ public class SseCapabilityProvider implements CapabilityProvider {
     public SseEmitter connect() {
         if (!enabled.get()) {
             throw new BizException("SSE 能力未启用，请先在平台能力中启用");
+        }
+        if (emitters.size() >= MAX_CONNECTIONS) {
+            throw new BizException("SSE 连接数已达上限，请稍后重试");
         }
         String id = UUID.randomUUID().toString();
         SseEmitter emitter = new SseEmitter(timeout());

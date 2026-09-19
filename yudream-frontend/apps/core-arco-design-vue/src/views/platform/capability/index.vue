@@ -65,7 +65,6 @@ const activeProviderIndex = ref(0)
 const testMessage = ref('平台能力测试消息')
 const sseStatus = ref('未连接')
 const wsStatus = ref('未连接')
-let eventSource: EventSource | null = null
 let websocket: WebSocket | null = null
 
 const aiProviderTypeOptions: { label: string, value: AiProviderType }[] = [
@@ -273,24 +272,69 @@ async function testCapability(item: CapabilityItem) {
   }
 }
 
-function connectSse() {
+/** SSE 端点已要求登录：EventSource 无法携带 Authorization 头，改用 fetch 流式读取 */
+async function connectSse() {
   closeSse()
-  eventSource = new EventSource(httpEndpoint('/api/platform/sse/connect'))
   sseStatus.value = '连接中'
-  eventSource.addEventListener('connected', event => sseStatus.value = `已连接：${(event as MessageEvent).data}`)
-  eventSource.addEventListener('capability-test', event => toast.info('SSE 消息', { description: (event as MessageEvent).data }))
-  eventSource.onerror = () => sseStatus.value = '连接异常'
+  const controller = new AbortController()
+  sseAbort = controller
+  try {
+    const response = await fetch(httpEndpoint('/api/platform/sse/connect'), {
+      headers: { Authorization: localStorage.getItem('token') || '', Accept: 'text/event-stream' },
+      signal: controller.signal,
+    })
+    if (!response.ok || !response.body) {
+      sseStatus.value = `连接失败（HTTP ${response.status}）`
+      return
+    }
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let eventName = 'message'
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) {
+        break
+      }
+      const rawLines = decoder.decode(value, { stream: true }).split('\n')
+      for (const rawLine of rawLines) {
+        const line = rawLine.replace(/\r$/, '')
+        if (line.startsWith('event:')) {
+          eventName = line.slice(6).trim()
+        }
+        else if (line.startsWith('data:')) {
+          const data = line.slice(5).trim()
+          if (eventName === 'connected') {
+            sseStatus.value = `已连接：${data}`
+          }
+          else if (eventName === 'capability-test') {
+            toast.info('SSE 消息', { description: data })
+          }
+          eventName = 'message'
+        }
+      }
+    }
+    sseStatus.value = '未连接'
+  }
+  catch {
+    if (!controller.signal.aborted) {
+      sseStatus.value = '连接异常'
+    }
+  }
 }
 
+let sseAbort: AbortController | null = null
+
 function closeSse() {
-  eventSource?.close()
-  eventSource = null
+  sseAbort?.abort()
+  sseAbort = null
   sseStatus.value = '未连接'
 }
 
 function connectWs() {
   closeWs()
-  websocket = new WebSocket(wsEndpoint('/api/platform/ws'))
+  // WS 端点握手已要求登录：浏览器无法携带 Authorization 头，经查询参数传入令牌
+  const token = localStorage.getItem('token') || ''
+  websocket = new WebSocket(`${wsEndpoint('/api/platform/ws')}?token=${encodeURIComponent(token)}`)
   wsStatus.value = '连接中'
   websocket.onopen = () => wsStatus.value = '已连接'
   websocket.onmessage = event => toast.info('WebSocket 消息', { description: event.data })

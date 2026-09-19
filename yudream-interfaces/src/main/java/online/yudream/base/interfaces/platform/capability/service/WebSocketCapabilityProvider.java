@@ -22,6 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class WebSocketCapabilityProvider extends TextWebSocketHandler implements CapabilityProvider {
 
     public static final String CODE = "websocket";
+    /** 并发会话硬上限，防止连接洪泛。 */
+    private static final int MAX_SESSIONS = 500;
 
     private final AtomicBoolean enabled = new AtomicBoolean(false);
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
@@ -77,6 +79,10 @@ public class WebSocketCapabilityProvider extends TextWebSocketHandler implements
     public void afterConnectionEstablished(WebSocketSession session) throws Exception {
         if (!enabled.get()) {
             session.close(CloseStatus.POLICY_VIOLATION.withReason("WebSocket 能力未启用"));
+            return;
+        }
+        if (sessions.size() >= MAX_SESSIONS) {
+            session.close(CloseStatus.POLICY_VIOLATION.withReason("WebSocket 会话数已达上限"));
             return;
         }
         sessions.put(session.getId(), session);

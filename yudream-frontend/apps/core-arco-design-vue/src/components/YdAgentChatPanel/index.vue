@@ -17,6 +17,7 @@ import {
   YdChatSessionList,
   YdWelcome,
 } from '@yudream/components'
+import apiAi from '@/api/modules/platform-ai'
 import type { YdAgentChatSession, YdAgentChatSessionMeta, YdAgentChatSessionStore } from './types'
 import { resolveApiFileUrl } from '@/utils/api-file-url'
 
@@ -106,7 +107,18 @@ const { messages, streaming, send, stop } = useYdChatStream({
     : { question, history, attachments: currentAttachments },
   onTool: tool => emits('tool', tool),
   onToolCallRequest: props.onToolCallRequest,
-  getWebSocketToken: () => localStorage.getItem('token') || undefined,
+  getWebSocketToken: async () => {
+    if (props.protocol !== 'agui') {
+      return localStorage.getItem('token') || undefined
+    }
+    // AG-UI 端点改用一次性握手票据，避免长效会话令牌出现在 URL 中
+    try {
+      const res = await apiAi.issueAguiWsTicket()
+      return res.data?.ticket
+    } catch {
+      return localStorage.getItem('token') || undefined
+    }
+  },
   onDone: message => emits('done', message),
   onError: (message, error) => emits('error', message, error),
 })
