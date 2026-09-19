@@ -56,6 +56,87 @@ public class FileAppService {
         return toDTO(getActiveFile(id));
     }
 
+    /** 调用方维度读取：非公开文件仅属主或持管理权限者可见。 */
+
+    @Transactional(readOnly = true)
+    public FileObjectDTO get(Long id, Long callerId, boolean privileged) {
+        FileObject fileObject = getActiveFile(id);
+        assertCanRead(fileObject, callerId, privileged);
+        return toDTO(fileObject);
+    }
+
+    /** 调用方维度分页：privileged 时不过滤属主（管理视图），否则仅本人与公开文件。 */
+    @Transactional(readOnly = true)
+    public PageResult<FileObjectDTO> page(FileObjectPageQuery query, Long callerId, boolean privileged) {
+        if (privileged) {
+            return page(query);
+        }
+        int page = query == null ? 1 : query.getPage();
+        int size = query == null ? 20 : query.getSize();
+        String keyword = query == null ? null : query.getKeyword();
+        String module = query == null ? null : query.getModule();
+        Boolean publicAccess = query == null ? null : query.getPublicAccess();
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(size, 1), 200);
+        return new PageResult<>(
+                fileObjectRepo.page(keyword, module, publicAccess, callerId, true, safePage, safeSize)
+                        .stream().map(this::toDTO).toList(),
+                fileObjectRepo.count(keyword, module, publicAccess, callerId, true),
+                safePage,
+                safeSize
+        );
+    }
+
+    /** 调用方维度内容读取。 */
+    @Transactional(readOnly = true)
+    public FileContentDTO content(Long id, Long callerId, boolean privileged) {
+        FileObject fileObject = getActiveFile(id);
+        assertCanRead(fileObject, callerId, privileged);
+        return readContent(fileObject);
+    }
+
+    /** 调用方维度缩略图读取。 */
+    @Transactional(readOnly = true)
+    public FileContentDTO thumbnailContent(Long id, Long callerId, boolean privileged) {
+        FileObject fileObject = getActiveFile(id);
+        assertCanRead(fileObject, callerId, privileged);
+        return thumbnailContent(fileObject);
+    }
+
+    /** 调用方维度删除：属主或持管理权限者；否则拒绝。 */
+    @Transactional
+    public void delete(Long id, Long callerId, boolean privileged) {
+        FileObject fileObject = getActiveFile(id);
+        assertCanManage(fileObject, callerId, privileged);
+        objectStorage.delete(fileObject.getObjectKey());
+        deleteThumbnail(fileObject.getObjectKey());
+        fileObject.markDeleted();
+        fileObjectRepo.save(fileObject);
+    }
+
+    /** 非公开文件仅属主或持管理权限者可读；公开文件对所有调用方开放。 */
+    private void assertCanRead(FileObject fileObject, Long callerId, boolean privileged) {
+        if (privileged || isOwner(fileObject, callerId)) {
+            return;
+        }
+        if (Boolean.TRUE.equals(fileObject.getPublicAccess())) {
+            return;
+        }
+        throw new BizException("无权访问该文件");
+    }
+
+    /** 删除等管理动作要求属主身份或管理权限。 */
+    private void assertCanManage(FileObject fileObject, Long callerId, boolean privileged) {
+        if (privileged || isOwner(fileObject, callerId)) {
+            return;
+        }
+        throw new BizException("无权操作该文件");
+    }
+
+    private boolean isOwner(FileObject fileObject, Long callerId) {
+        return callerId != null && callerId.equals(fileObject.getUploaderId());
+    }
+
     @Transactional(readOnly = true)
     public FileObjectDTO tryGet(Long id) {
         if (id == null) {
@@ -194,6 +275,7 @@ public class FileAppService {
         return fileObject;
     }
 
+    /** 内部用例删除（服务端编排路径），HTTP 入口必须走 delete(id, callerId, privileged)。 */
     @Transactional
     public void delete(Long id) {
         FileObject fileObject = getActiveFile(id);

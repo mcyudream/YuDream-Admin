@@ -14,4 +14,13 @@ public interface FileObjectRepo {
     List<FileObject> page(String keyword, String module, Boolean publicAccess, int page, int size);
 
     long count(String keyword, String module, Boolean publicAccess);
+
+    /**
+     * 按属主过滤的分页查询：uploaderId 非空时仅返回该用户上传的文件；
+     * includePublic 为 true 时并集公开文件（publicAccess=true）。
+     */
+    List<FileObject> page(String keyword, String module, Boolean publicAccess, Long uploaderId,
+                          boolean includePublic, int page, int size);
+
+    long count(String keyword, String module, Boolean publicAccess, Long uploaderId, boolean includePublic);
 }
