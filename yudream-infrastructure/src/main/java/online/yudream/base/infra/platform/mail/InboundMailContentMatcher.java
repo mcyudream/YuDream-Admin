@@ -34,23 +34,92 @@ public final class InboundMailContentMatcher {
         return trustedSender(message, query) && containsCodeAndKeywords(message, query);
     }
 
+    /**
+     * 可信发件人判定（防伪造）：
+     * <ol>
+     *   <li>身份只取 From 头声明的域，并要求命中允许列表；</li>
+     *   <li>要求接收 MTA 的 Authentication-Results 存在且结果可信
+     *       （dmarc=pass，或 spf=pass 与 dkim=pass 同时成立），缺失即拒绝（fail closed）；</li>
+     *   <li>要求信封发件人（Return-Path / X-Envelope-From）域与 From 域对齐。</li>
+     * </ol>
+     * 不再对 Reply-To/Sender 等可伪造头做 OR 匹配。
+     */
     boolean trustedSender(Message message, PluginInboundMailQuery query) throws Exception {
         if (query == null || query.allowedFromDomains().isEmpty()) {
             return false;
         }
-        for (String value : senderAddresses(message)) {
-            int at = value.lastIndexOf('@');
-            if (at < 0) {
-                continue;
-            }
-            String domain = value.substring(at + 1).toLowerCase(Locale.ROOT);
-            if (query.allowedFromDomains().stream().anyMatch(allowed ->
-                    allowed != null && (domain.equals(allowed.toLowerCase(Locale.ROOT))
-                            || domain.endsWith("." + allowed.toLowerCase(Locale.ROOT))))) {
-                return true;
-            }
+        String fromDomain = domainOf(firstAddress(headerAddresses(message, Message::getFrom)));
+        if (fromDomain == null || !isAllowedDomain(fromDomain, query)) {
+            return false;
         }
-        return false;
+        if (!hasServerAuthenticationPass(message, fromDomain)) {
+            return false;
+        }
+        String envelopeDomain = domainOf(firstAddress(headerValues(message, "Return-Path")));
+        if (envelopeDomain == null) {
+            envelopeDomain = domainOf(firstAddress(headerValues(message, "X-Envelope-From")));
+        }
+        return envelopeDomain != null && envelopeDomain.equals(fromDomain);
+    }
+
+    private static String firstAddress(Address[] addresses) {
+        if (addresses == null || addresses.length == 0) {
+            return null;
+        }
+        return addresses[0] instanceof InternetAddress internet ? internet.getAddress() : addresses[0].toString();
+    }
+
+    private static String firstAddress(String[] headers) {
+        if (headers == null || headers.length == 0 || headers[0] == null || headers[0].isBlank()) {
+            return null;
+        }
+        try {
+            InternetAddress[] parsed = InternetAddress.parseHeader(headers[0], false);
+            if (parsed.length > 0) {
+                return parsed[0].getAddress();
+            }
+        } catch (Exception ignored) {
+            // 回落原样解析
+        }
+        String value = headers[0].trim();
+        if (value.startsWith("<") && value.endsWith(">") && value.length() > 2) {
+            value = value.substring(1, value.length() - 1).trim();
+        }
+        return value;
+    }
+
+    private static String domainOf(String mailbox) {
+        if (mailbox == null) {
+            return null;
+        }
+        int at = mailbox.lastIndexOf('@');
+        return at < 0 ? null : mailbox.substring(at + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isAllowedDomain(String domain, PluginInboundMailQuery query) {
+        return query.allowedFromDomains().stream().anyMatch(allowed ->
+                allowed != null && (domain.equals(allowed.toLowerCase(Locale.ROOT))
+                        || domain.endsWith("." + allowed.toLowerCase(Locale.ROOT))));
+    }
+
+    /**
+     * 校验接收 MTA 写入的 Authentication-Results：dmarc=pass，
+     * 或 spf=pass 与 dkim=pass 同时存在。无任何 A-R 头视为不可信。
+     */
+    private static boolean hasServerAuthenticationPass(Message message, String claimedDomain) {
+        String[] results = headerValues(message, "Authentication-Results");
+        if (results == null || results.length == 0) {
+            return false;
+        }
+        String combined = String.join(";", results).toLowerCase(Locale.ROOT);
+        if (!combined.contains(claimedDomain)) {
+            // A-R 未覆盖声明的域，判定不可信
+            return false;
+        }
+        boolean dmarcPass = combined.contains("dmarc=pass");
+        boolean spfPass = combined.contains("spf=pass");
+        boolean dkimPass = combined.contains("dkim=pass");
+        return dmarcPass || (spfPass && dkimPass);
     }
 
     public static Set<String> senderAddresses(Message message) {
