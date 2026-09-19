@@ -152,7 +152,7 @@ public class UserRepoImpl implements UserRepo {
         Query query = buildPageQuery(keyword, deptId, roleId, emailVerified, status);
         long total = mongoTemplate.count(query, UserDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         List<User> records = mongoTemplate.find(query, UserDO.class).stream()
                 .map(UserInfraMapper::toDomain)

@@ -52,7 +52,7 @@ public class ApiKeyCredentialRepoImpl implements ApiKeyCredentialRepo {
         Query query = buildPageQuery(keyword, creatorUserId)
                 .with(Sort.by(Sort.Direction.DESC, "createTime"));
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         return mongoTemplate.find(query, ApiKeyCredentialDO.class).stream()
                 .map(ApiKeyCredentialInfraMapper::toDomain)
