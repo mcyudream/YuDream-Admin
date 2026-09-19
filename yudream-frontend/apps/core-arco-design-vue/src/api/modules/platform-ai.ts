@@ -76,6 +76,10 @@ export default {
   generateCmsPageAguiWsEndpoint: () => {
     return streamEndpoint('/api/platform/ai/cms/pages/generate/ws')
   },
+  /** 签发 AG-UI WebSocket 一次性握手票据（60 秒有效，避免长效令牌进 URL） */
+  issueAguiWsTicket: () => {
+    return systemClient.post<unknown, ApiResponse<{ ticket: string, expiresIn: number }>>('api/platform/ai/ws-ticket')
+  },
   generateCmsPageStreamRequest: async (data: CmsPageGeneratePayload): Promise<RequestInit> => {
     const headers: Record<string, string> = {
       'Accept-Language': 'zh-CN',

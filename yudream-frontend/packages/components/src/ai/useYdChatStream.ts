@@ -136,8 +136,8 @@ export interface UseYdChatStreamOptions {
   buildBody?: (question: string, history: YdChatHistoryTurn[], attachments?: YdChatAttachment[]) => Record<string, unknown>
   /** WebSocket 请求帧（不传时复用 buildBody，最终缺省为 { question, history }） */
   buildMessage?: (question: string, history: YdChatHistoryTurn[], attachments?: YdChatAttachment[]) => unknown
-  /** WebSocket 鉴权 token（用于拼接 ?token= 或写入首帧） */
-  getWebSocketToken?: () => string | undefined
+  /** WebSocket 鉴权 token（用于拼接 ?token= 或写入首帧）；支持异步签发（如一次性握手票据） */
+  getWebSocketToken?: () => string | undefined | Promise<string | undefined>
   /** 携带历史的最大轮数（默认 10） */
   historyLimit?: number
   /** 自定义历史消息序列化；默认会附加工具分页上下文 */
@@ -438,7 +438,8 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
 
   function readWebSocket(answer: YdChatMessage, question: string, history: YdChatHistoryTurn[], attachments?: YdChatAttachment[]): Promise<void> {
     return new Promise<void>((resolve, reject) => {
-      const endpoint = toWebSocketUrl(resolveEndpoint(), options.getWebSocketToken?.())
+      void (async () => {
+      const endpoint = toWebSocketUrl(resolveEndpoint(), await options.getWebSocketToken?.())
       let settled = false
       let terminalReceived = false
       let currentSocket: WebSocket
@@ -520,6 +521,9 @@ export function useYdChatStream(options: UseYdChatStreamOptions) {
         }
         finish()
       }
+      })().catch((error) => {
+        reject(error)
+      })
     })
   }
 

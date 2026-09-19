@@ -42,6 +42,7 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
 
     private final AiAppService aiAppService;
     private final ObjectMapper objectMapper;
+    private final online.yudream.base.interfaces.platform.ai.service.AguiWsTicketService aguiWsTicketService;
 
     @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) {
@@ -57,10 +58,12 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
         String traceId = UUID.randomUUID().toString();
         try {
             SecurityPrincipal principal = SecurityPrincipalSupport.fromToken(token(session));
+            // 权限门禁对所有模式生效：agent 与直连生成都消耗模型配额，
+            // 与 SSE 端点 platform:ai:generate 的要求保持一致，防止 WS 通道垂直越权。
+            ensureAgentPermission(principal);
             CmsPageGenerateRequest request = objectMapper.readValue(message.getPayload(), CmsPageGenerateRequest.class);
             CmsPageGenerateCmd command = AiWebAssembler.toCmd(request, principal);
             if (isAgentMode(request)) {
-                ensureAgentPermission(principal);
                 runAgent(session, command, traceId);
                 return;
             }
@@ -241,7 +244,13 @@ public class AguiWebSocketHandler extends TextWebSocketHandler {
         if (uri == null) {
             return null;
         }
-        return UriComponentsBuilder.fromUri(uri).build().getQueryParams().getFirst("token");
+        var params = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
+        // 优先核销一次性握手票据，避免长效令牌进入 URL；兼容直传令牌的旧客户端。
+        String ticketToken = aguiWsTicketService.consume(params.getFirst("ticket"));
+        if (ticketToken != null) {
+            return ticketToken;
+        }
+        return params.getFirst("token");
     }
 
     private void close(WebSocketSession session) {
