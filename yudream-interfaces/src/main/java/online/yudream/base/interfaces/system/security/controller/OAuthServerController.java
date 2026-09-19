@@ -54,6 +54,11 @@ public class OAuthServerController {
      */
     @PostMapping("/satoken/exchange")
     public Result<Map<String, Object>> exchangeSatoken() {
+        // 仅限 OAuth access-token 主体：API Key 的 scope 是所有者权限的子集，
+        // 允许其换取完整 RBAC 会话等于绕开 PermissionScope，构成权限提升。
+        if (SecurityPrincipalSupport.hasApiKeyAuthentication() && !SecurityPrincipalSupport.hasOAuthAuthentication()) {
+            throw new online.yudream.base.domain.common.exception.BizException("API Key 不能换取登录会话，请使用 OAuth 授权码流程");
+        }
         SecurityPrincipalSupport.SecurityPrincipal principal = SecurityPrincipalSupport.current();
         LoginTokenDTO token = loginTokenAppService.issueForLogin(principal.userId());
         Map<String, Object> payload = new LinkedHashMap<>();

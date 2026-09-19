@@ -39,4 +39,9 @@ public class SetupCmd {
      * 确认密码。
      */
     private String adminConfirmPassword;
+
+    /**
+     * 初始化令牌（可选）：部署侧配置 YUDREAM_SETUP_TOKEN 时必须携带匹配值。
+     */
+    private String setupToken;
 }

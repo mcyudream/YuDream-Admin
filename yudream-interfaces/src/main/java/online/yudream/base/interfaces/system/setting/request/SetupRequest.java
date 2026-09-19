@@ -32,4 +32,7 @@ public class SetupRequest {
 
     @NotBlank(message = "确认密码不能为空")
     private String adminConfirmPassword;
+
+    /** 部署侧配置 YUDREAM_SETUP_TOKEN 时必填且需匹配；未配置时忽略。 */
+    private String setupToken;
 }

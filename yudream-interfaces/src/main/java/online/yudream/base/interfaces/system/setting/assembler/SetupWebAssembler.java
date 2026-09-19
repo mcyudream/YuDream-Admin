@@ -21,6 +21,7 @@ public class SetupWebAssembler {
                 .adminEmail(request.getAdminEmail())
                 .adminPassword(request.getAdminPassword())
                 .adminConfirmPassword(request.getAdminConfirmPassword())
+                .setupToken(request.getSetupToken())
                 .build();
     }
 
