@@ -31,14 +31,16 @@ public class DeptManageController {
     private final DeptManageAppService deptManageAppService;
 
     @GetMapping
+    @PermissionRegister(code = "system:dept:view", name = "查看部门", module = "系统管理", desc = "查看部门树")
     public Result<List<DeptManageRes>> tree(DeptTreeQuery query) {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:dept:view");
         return Result.ok(UserManageWebAssembler.toDeptResList(deptManageAppService.tree(query)));
     }
 
     @GetMapping("/options")
+    @PermissionRegister(code = "system:dept:view", name = "查看部门", module = "系统管理", desc = "查看部门选项")
     public Result<List<OptionRes>> options() {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:dept:view");
         return Result.ok(UserManageWebAssembler.toOptionResList(deptManageAppService.options()));
     }
 
