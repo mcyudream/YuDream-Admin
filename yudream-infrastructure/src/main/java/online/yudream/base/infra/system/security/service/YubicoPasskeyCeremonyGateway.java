@@ -37,9 +37,14 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +53,34 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
 
     private final UserRepo userRepo;
     private final PasskeyCredentialRepo passkeyCredentialRepo;
+
+    /**
+     * 服务端 challenge 绑定：start 阶段签发的 challenge 必须在服务端登记，
+     * finish 阶段按 challenge 一次性核销；客户端自带的 requestJson 仅作为载体，
+     * challenge 未登记、已过期或已使用即拒绝，断言无法重放。
+     */
+    private static final Duration CEREMONY_TTL = Duration.ofMinutes(5);
+    private static final int MAX_PENDING_CHALLENGES = 4096;
+    private final Map<String, Instant> pendingChallenges = new ConcurrentHashMap<>();
+
+    private void rememberChallenge(ByteArray challenge) {
+        if (pendingChallenges.size() >= MAX_PENDING_CHALLENGES) {
+            Instant now = Instant.now();
+            pendingChallenges.entrySet().removeIf(entry -> entry.getValue().isBefore(now));
+        }
+        pendingChallenges.put(challengeKey(challenge), Instant.now().plus(CEREMONY_TTL));
+    }
+
+    private void consumeChallenge(ByteArray challenge) {
+        Instant expireAt = pendingChallenges.remove(challengeKey(challenge));
+        if (expireAt == null || expireAt.isBefore(Instant.now())) {
+            throw new BizException("Passkey 校验请求无效或已过期，请重新发起");
+        }
+    }
+
+    private String challengeKey(ByteArray challenge) {
+        return Base64.getEncoder().encodeToString(challenge.getBytes());
+    }
 
     @Override
     public PasskeyRegistrationOptions startRegistration(
@@ -65,6 +98,7 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
                             .id(userHandle(userId))
                             .build())
                     .build());
+            rememberChallenge(request.getChallenge());
             return new PasskeyRegistrationOptions(request.toJson(), request.toCredentialsCreateJson());
         }
         catch (JsonProcessingException e) {
@@ -76,6 +110,7 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
     public PasskeyRegistrationResult finishRegistration(PasskeyRelyingPartyContext relyingParty, String requestJson, String responseJson) {
         try {
             PublicKeyCredentialCreationOptions request = PublicKeyCredentialCreationOptions.fromJson(requestJson);
+            consumeChallenge(request.getChallenge());
             RegistrationResult result = relyingParty(relyingParty).finishRegistration(FinishRegistrationOptions.builder()
                     .request(request)
                     .response(PublicKeyCredential.parseRegistrationResponseJson(responseJson))
@@ -103,6 +138,7 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
             AssertionRequest request = relyingParty(relyingParty).startAssertion(StartAssertionOptions.builder()
                     .username(username)
                     .build());
+            rememberChallenge(request.getPublicKeyCredentialRequestOptions().getChallenge());
             return new PasskeyAuthenticationOptions(request.toJson(), request.toCredentialsGetJson());
         }
         catch (JsonProcessingException e) {
@@ -114,6 +150,7 @@ public class YubicoPasskeyCeremonyGateway implements PasskeyCeremonyGateway {
     public PasskeyAuthenticationResult finishAuthentication(PasskeyRelyingPartyContext relyingParty, String requestJson, String responseJson) {
         try {
             AssertionRequest request = AssertionRequest.fromJson(requestJson);
+            consumeChallenge(request.getPublicKeyCredentialRequestOptions().getChallenge());
             AssertionResult result = relyingParty(relyingParty).finishAssertion(FinishAssertionOptions.builder()
                     .request(request)
                     .response(PublicKeyCredential.parseAssertionResponseJson(responseJson))

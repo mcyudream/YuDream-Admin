@@ -35,6 +35,11 @@ public class AesGcmMilkyCredentialCipher implements MilkyCredentialCipher {
         }
     }
 
+    /**
+     * 解密仅接受当前密钥 + 连接维度 AAD 绑定（新写入的密文格式）；
+     * 兼容分支只保留「旧独立密钥」的历史数据回退，解密成功后调用方必须以
+     * 当前密钥重新加密（save 时自动完成）。不再回退空 AAD，防止跨连接的密文互换。
+     */
     @Override
     public String decrypt(String cipherText, Long connectionId) {
         Exception scopedFailure;
@@ -43,18 +48,11 @@ public class AesGcmMilkyCredentialCipher implements MilkyCredentialCipher {
         } catch (Exception exception) {
             scopedFailure = exception;
         }
-        Exception unifiedLegacyFailure;
-        try {
-            return decrypt(cipherText, requiredKey(credentialKey), null);
-        } catch (Exception exception) {
-            exception.addSuppressed(scopedFailure);
-            unifiedLegacyFailure = exception;
-        }
         try {
             return decrypt(cipherText, legacyKey(), null);
         } catch (Exception exception) {
-            exception.addSuppressed(unifiedLegacyFailure);
-            throw new IllegalStateException("Milky 凭证解密失败", exception);
+            exception.addSuppressed(scopedFailure);
+            throw new IllegalStateException("Milky 凭证解密失败，请在连接配置中重新保存机器人凭据", exception);
         }
     }
 
@@ -102,12 +100,12 @@ public class AesGcmMilkyCredentialCipher implements MilkyCredentialCipher {
         }
         try {
             byte[] key = Base64.getDecoder().decode(legacyMilkyCredentialKey);
-            if (key.length != 16 && key.length != 24 && key.length != 32) {
+            if (key.length != 32) {
                 throw new IllegalArgumentException("invalid legacy key length");
             }
             return new SecretKeySpec(key, "AES");
         } catch (IllegalArgumentException exception) {
-            throw new IllegalStateException("YUDREAM_MILKY_CREDENTIAL_KEY 必须是 Base64 编码的 16、24 或 32 字节 AES 密钥", exception);
+            throw new IllegalStateException("YUDREAM_MILKY_CREDENTIAL_KEY 必须是 Base64 编码的 32 字节 AES 密钥", exception);
         }
     }
 

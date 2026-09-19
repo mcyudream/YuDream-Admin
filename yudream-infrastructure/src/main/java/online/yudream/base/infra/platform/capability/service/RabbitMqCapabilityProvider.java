@@ -25,8 +25,6 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
     public static final String CODE = "rabbitmq";
     private static final String DEFAULT_HOST = "localhost";
     private static final String DEFAULT_PORT = "35672";
-    private static final String DEFAULT_USERNAME = "guest";
-    private static final String DEFAULT_PASSWORD = "guest";
     private static final String DEFAULT_VIRTUAL_HOST = "/";
     private static final String DEFAULT_EXCHANGE = "yudream.capability";
     private static final String DEFAULT_QUEUE = "yudream.capability.test";
@@ -50,8 +48,6 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
                 Map.of(
                         "host", DEFAULT_HOST,
                         "port", DEFAULT_PORT,
-                        "username", DEFAULT_USERNAME,
-                        "password", DEFAULT_PASSWORD,
                         "virtualHost", DEFAULT_VIRTUAL_HOST,
                         "exchange", DEFAULT_EXCHANGE,
                         "queue", DEFAULT_QUEUE,
@@ -114,6 +110,10 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
         if (rabbitTemplate != null) {
             return rabbitTemplate;
         }
+        // 不提供默认凭据：必须显式配置，防止 guest/guest 默认生效。
+        if (!org.springframework.util.StringUtils.hasText(username()) || !org.springframework.util.StringUtils.hasText(password())) {
+            throw new online.yudream.base.domain.common.exception.BizException("请先在能力配置中填写 RabbitMQ 用户名与密码");
+        }
         CachingConnectionFactory factory = new CachingConnectionFactory(host(), port());
         factory.setUsername(username());
         factory.setPassword(password());
@@ -156,11 +156,11 @@ public class RabbitMqCapabilityProvider implements CapabilityProvider {
     }
 
     private String username() {
-        return config.getOrDefault("username", DEFAULT_USERNAME);
+        return config.getOrDefault("username", "");
     }
 
     private String password() {
-        return config.getOrDefault("password", DEFAULT_PASSWORD);
+        return config.getOrDefault("password", "");
     }
 
     private String virtualHost() {

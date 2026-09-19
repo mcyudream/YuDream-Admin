@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.capability.mapper;
 
+import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.valobj.CapabilitySecrets;
 import online.yudream.base.infra.platform.capability.dataobj.CapabilityModuleDO;
@@ -57,9 +58,14 @@ public class CapabilityModuleInfraMapper {
         Map<String, String> config = new HashMap<>(module.getConfig() == null ? Map.of() : module.getConfig());
         for (String secretKey : CapabilitySecrets.keysOf(module.getCode())) {
             String value = config.get(secretKey);
-            if (StringUtils.hasText(value) && !credentialCipher.encrypted(value) && credentialCipher.canEncrypt()) {
-                config.put(secretKey, credentialCipher.encryptSecret(module.getCode(), secretKey, value));
+            if (!StringUtils.hasText(value) || credentialCipher.encrypted(value)) {
+                continue;
             }
+            // 失效关闭：未配置主密钥时拒绝落库新的明文凭据，与主题机密/插件 SecretStore 行为一致。
+            if (!credentialCipher.canEncrypt()) {
+                throw new BizException("未配置凭据加密密钥（YUDREAM_CREDENTIAL_KEY），无法保存能力凭据，请先在部署配置中设置主密钥");
+            }
+            config.put(secretKey, credentialCipher.encryptSecret(module.getCode(), secretKey, value));
         }
         return config;
     }

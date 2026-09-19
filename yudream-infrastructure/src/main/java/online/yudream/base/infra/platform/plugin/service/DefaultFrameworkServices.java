@@ -253,10 +253,11 @@ public class DefaultFrameworkServices implements FrameworkServices {
         if (!StringUtils.hasText(key)) {
             return Optional.empty();
         }
+        // 仅提供平台设置仓库中的值：Environment 回退会允许插件读取任意宿主属性
+        // （包括 YUDREAM_CREDENTIAL_KEY 等机密），因此已移除。
         return settingRepo.findByKey(key)
                 .map(Setting::getValue)
-                .filter(StringUtils::hasText)
-                .or(() -> Optional.ofNullable(environment.getProperty(key)).filter(StringUtils::hasText));
+                .filter(StringUtils::hasText);
     }
 
     private PluginRenderedDocument renderWordTemplate(byte[] templateContent, Map<String, Object> data) {
