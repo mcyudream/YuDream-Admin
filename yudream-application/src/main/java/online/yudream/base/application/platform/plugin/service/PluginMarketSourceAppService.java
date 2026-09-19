@@ -2,6 +2,8 @@ package online.yudream.base.application.platform.plugin.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
+import online.yudream.base.application.common.net.OutboundUrlGuard;
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.plugin.assembler.PluginMarketSourceAssembler;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketSourceCreateCmd;
@@ -48,6 +50,7 @@ public class PluginMarketSourceAppService {
     private final PluginMarketSourceSnapshotRepo pluginMarketSourceSnapshotRepo;
     private final CapabilityAppService capabilityAppService;
     private final PluginMarketPublicationAppService pluginMarketPublicationAppService;
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
 
     @Value("${yudream.platform.capabilities.plugin-market-source.enabled:true}")
     private boolean projectGateEnabled;
@@ -247,6 +250,11 @@ public class PluginMarketSourceAppService {
     }
 
     public PluginStoreSourceRef sourceRef(PluginMarketSource source) {
+        if (source.type() != MarketSourceType.LOCAL && source.getRootUrl() != null) {
+            // 存量数据同样在每次外呼前校验，防止历史未校验地址绕过。
+            OutboundUrlGuard.validate(source.getRootUrl(), "市场源",
+                    outboundNetworkPolicy == null || outboundNetworkPolicy.allowPrivateNetwork());
+        }
         return new PluginStoreSourceRef(source.getRootUrl(), source.getToken(), source.type());
     }
 
@@ -345,6 +353,8 @@ public class PluginMarketSourceAppService {
         } catch (URISyntaxException e) {
             throw new BizException("市场源地址格式不正确");
         }
+        // 结构校验通过后再校验解析主机，默认拒绝内网/保留地址（自托管集成可显式放开）。
+        OutboundUrlGuard.validate(rootUrl, "市场源", outboundNetworkPolicy == null || outboundNetworkPolicy.allowPrivateNetwork());
     }
 
     public record SourceCatalog(PluginMarketSource source, PluginMarketSourceSnapshot snapshot) {

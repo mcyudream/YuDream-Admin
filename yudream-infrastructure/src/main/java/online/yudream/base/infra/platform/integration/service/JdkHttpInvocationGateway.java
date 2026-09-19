@@ -1,5 +1,7 @@
 package online.yudream.base.infra.platform.integration.service;
 
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
+import online.yudream.base.application.common.net.OutboundUrlGuard;
 import online.yudream.base.domain.platform.integration.aggregate.HttpConnector;
 import online.yudream.base.domain.platform.integration.enumerate.ExecutionStatus;
 import online.yudream.base.domain.platform.integration.enumerate.HttpMethodType;
@@ -20,15 +22,26 @@ import java.util.stream.Collectors;
 @Service
 public class JdkHttpInvocationGateway implements HttpInvocationGateway {
 
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
+
+    public JdkHttpInvocationGateway(OutboundNetworkPolicy outboundNetworkPolicy) {
+        this.outboundNetworkPolicy = outboundNetworkPolicy;
+    }
+
     @Override
     public HttpInvocationResult invoke(HttpConnector connector, Map<String, String> headers, Map<String, String> queryParams, String body) {
         long start = System.currentTimeMillis();
         int attempts = Math.max(connector.getRetryTimes(), 0) + 1;
         Exception lastError = null;
+        // 连接器 URL 每次外呼前校验协议与解析主机；自托管部署可经
+        // yudream.security.outbound.allow-private-network 放开内网目标。
+        boolean allowPrivate = outboundNetworkPolicy != null && outboundNetworkPolicy.allowPrivateNetwork();
         for (int i = 0; i < attempts; i++) {
             try {
+                URI uri = OutboundUrlGuard.validate(
+                        urlWithQuery(connector.getUrl(), queryParams), "HTTP 连接器", allowPrivate);
                 HttpRequest.Builder builder = HttpRequest.newBuilder()
-                        .uri(URI.create(urlWithQuery(connector.getUrl(), queryParams)))
+                        .uri(uri)
                         .timeout(Duration.ofMillis(connector.getTimeoutMillis()));
                 headers.forEach(builder::header);
                 builder.method(connector.getMethod().name(), bodyPublisher(connector.getMethod(), body));

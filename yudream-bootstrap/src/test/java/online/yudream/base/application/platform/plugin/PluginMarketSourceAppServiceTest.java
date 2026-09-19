@@ -47,7 +47,7 @@ class PluginMarketSourceAppServiceTest {
     @BeforeEach
     void setUp() {
         service = new PluginMarketSourceAppService(pluginStoreGateway, pluginMarketSourceRepo,
-                pluginMarketSourceSnapshotRepo, capabilityAppService, pluginMarketPublicationAppService);
+                pluginMarketSourceSnapshotRepo, capabilityAppService, pluginMarketPublicationAppService, null);
         ReflectionTestUtils.setField(service, "projectGateEnabled", true);
     }
 
