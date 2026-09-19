@@ -134,14 +134,14 @@ public class WikiSourceAppService {
     }
 
     @Transactional
-    public WikiSourceDTO createText(Long spaceId, String folderPath, String title, String content) {
+    public WikiSourceDTO createText(Long spaceId, String folderPath, String title, String content, Long callerId) {
         enabled();
         WikiSpace space = space(spaceId);
         if (!StringUtils.hasText(content)) {
             throw new BizException("资料内容不能为空");
         }
         // 在线 Markdown 编辑的资料同样摄取其中引用的远程图片：下载入库、可生成 caption、重写为站内地址
-        MarkdownImageIngest ingest = ingestMarkdownImages(space, content);
+        MarkdownImageIngest ingest = ingestMarkdownImages(space, content, callerId);
         WikiSource source = WikiSource.text(spaceId, folderPath, title, ingest.markdown(), sha256(ingest.markdown()));
         source.markExtracted(ingest.markdown(), ingest.images());
         WikiSource saved = sourceRepo.save(source);
@@ -150,13 +150,13 @@ public class WikiSourceAppService {
     }
 
     @Transactional
-    public WikiSourceDTO updateText(Long sourceId, String title, String content) {
+    public WikiSourceDTO updateText(Long sourceId, String title, String content, Long callerId) {
         enabled();
         WikiSource source = sourceRepo.findById(sourceId).orElseThrow(() -> new BizException("资料不存在"));
         if (!StringUtils.hasText(content)) {
             throw new BizException("资料内容不能为空");
         }
-        MarkdownImageIngest ingest = ingestMarkdownImages(space(source.getSpaceId()), content);
+        MarkdownImageIngest ingest = ingestMarkdownImages(space(source.getSpaceId()), content, callerId);
         source.updateText(title, ingest.markdown(), sha256(ingest.markdown()));
         source.markExtracted(ingest.markdown(), ingest.images());
         WikiSource saved = sourceRepo.save(source);
@@ -181,7 +181,7 @@ public class WikiSourceAppService {
     }
 
     @Transactional
-    public WikiSourceDTO captionImages(Long sourceId) {
+    public WikiSourceDTO captionImages(Long sourceId, Long callerId) {
         enabled();
         WikiSource source = sourceRepo.findById(sourceId).orElseThrow(() -> new BizException("资料不存在"));
         WikiSpace space = space(source.getSpaceId());
@@ -194,15 +194,16 @@ public class WikiSourceAppService {
                 images.add(image);
                 continue;
             }
-            images.add(caption(space, image));
+            images.add(caption(space, image, callerId));
         }
         source.setImages(images);
         return WikiKnowledgeAssembler.source(sourceRepo.save(source));
     }
 
-    private WikiSourceImage caption(WikiSpace space, WikiSourceImage image) {
+    private WikiSourceImage caption(WikiSpace space, WikiSourceImage image, Long callerId) {
         try {
-            FileContentDTO content = fileAppService.content(image.fileObjectId());
+            // 仅允许公开文件或调用方本人文件进入视觉模型，防止站内 id 枚举读取私有文件。
+            FileContentDTO content = fileAppService.content(image.fileObjectId(), callerId, false);
             byte[] bytes;
             try (InputStream inputStream = content.getInputStream()) {
                 bytes = inputStream.readAllBytes();
@@ -225,7 +226,7 @@ public class WikiSourceAppService {
     /**
      * 摄取在线 Markdown 中引用的远程图片：下载入库（图片重写为站内地址），并按知识库视觉配置生成 caption。
      */
-    private MarkdownImageIngest ingestMarkdownImages(WikiSpace space, String markdown) {
+    private MarkdownImageIngest ingestMarkdownImages(WikiSpace space, String markdown, Long callerId) {
         if (!StringUtils.hasText(markdown)) {
             return new MarkdownImageIngest(markdown, List.of());
         }
@@ -246,7 +247,7 @@ public class WikiSourceAppService {
                 // 站内文件引用：无需下载，登记为资料图片并规范化地址（去掉 dev 代理前缀）
                 Long fileObjectId = Long.valueOf(internalId);
                 if (seenInternalIds.add(fileObjectId)) {
-                    images.add(captionStored(fileObjectId, images.size(), space, aiConfig, captionEnabled));
+                    images.add(captionStored(fileObjectId, images.size(), space, aiConfig, captionEnabled, callerId));
                 }
                 if (imageUrl.startsWith("/proxy/") && !replacements.containsKey(imageUrl)) {
                     replacements.put(imageUrl, imageUrl.substring("/proxy".length()));
@@ -276,9 +277,10 @@ public class WikiSourceAppService {
 
     /** 站内已存储图片：登记为资料图片，配置了视觉模型时读取字节生成 caption。 */
     private WikiSourceImage captionStored(Long fileObjectId, int sequence, WikiSpace space,
-                                          Map<String, String> aiConfig, boolean captionEnabled) {
+                                          Map<String, String> aiConfig, boolean captionEnabled, Long callerId) {
         try {
-            FileContentDTO content = fileAppService.content(fileObjectId);
+            // 仅允许公开文件或调用方本人文件进入视觉模型，防止站内 id 枚举读取私有文件。
+            FileContentDTO content = fileAppService.content(fileObjectId, callerId, false);
             String contentType = StringUtils.hasText(content.getContentType()) ? content.getContentType() : "image/png";
             if (!captionEnabled) {
                 closeQuietly(content);

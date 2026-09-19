@@ -124,6 +124,17 @@ class FileAppServiceTest {
         public long count(String keyword, String module, Boolean publicAccess) {
             return 0;
         }
+
+        @Override
+        public List<FileObject> page(String keyword, String module, Boolean publicAccess, Long uploaderId,
+                                     boolean includePublic, int page, int size) {
+            return List.of();
+        }
+
+        @Override
+        public long count(String keyword, String module, Boolean publicAccess, Long uploaderId, boolean includePublic) {
+            return 0;
+        }
     }
 
     private static final class InMemoryStorage implements ObjectStorage {

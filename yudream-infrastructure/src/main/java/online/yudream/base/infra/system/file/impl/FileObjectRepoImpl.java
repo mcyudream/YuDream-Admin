@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class FileObjectRepoImpl implements FileObjectRepo {
 
+    private static final int MAX_PAGE_SIZE = 200;
+
     private final MongoTemplate mongoTemplate;
     private final IdGenerator idGenerator;
 
@@ -48,7 +50,7 @@ public class FileObjectRepoImpl implements FileObjectRepo {
         Query query = buildPageQuery(keyword, module, publicAccess)
                 .with(Sort.by(Sort.Direction.DESC, "createTime"));
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         return mongoTemplate.find(query, FileObjectDO.class).stream()
                 .map(FileObjectInfraMapper::toDomain)
@@ -60,12 +62,41 @@ public class FileObjectRepoImpl implements FileObjectRepo {
         return mongoTemplate.count(buildPageQuery(keyword, module, publicAccess), FileObjectDO.class);
     }
 
+    @Override
+    public List<FileObject> page(String keyword, String module, Boolean publicAccess, Long uploaderId,
+                                 boolean includePublic, int page, int size) {
+        Query query = buildPageQuery(keyword, module, publicAccess, uploaderId, includePublic)
+                .with(Sort.by(Sort.Direction.DESC, "createTime"));
+        int currentPage = Math.max(page, 1);
+        int pageSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
+        query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
+        return mongoTemplate.find(query, FileObjectDO.class).stream()
+                .map(FileObjectInfraMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public long count(String keyword, String module, Boolean publicAccess, Long uploaderId, boolean includePublic) {
+        return mongoTemplate.count(buildPageQuery(keyword, module, publicAccess, uploaderId, includePublic), FileObjectDO.class);
+    }
+
     private Query buildPageQuery(String keyword, String module, Boolean publicAccess) {
+        return buildPageQuery(keyword, module, publicAccess, null, false);
+    }
+
+    private Query buildPageQuery(String keyword, String module, Boolean publicAccess, Long uploaderId, boolean includePublic) {
         List<Criteria> criteriaList = new ArrayList<>();
         criteriaList.add(new Criteria().orOperator(
                 Criteria.where("deleted").is(false),
                 Criteria.where("deleted").exists(false)
         ));
+        if (uploaderId != null) {
+            criteriaList.add(includePublic
+                    ? new Criteria().orOperator(
+                            Criteria.where("uploaderId").is(uploaderId),
+                            Criteria.where("publicAccess").is(true))
+                    : Criteria.where("uploaderId").is(uploaderId));
+        }
         if (StringUtils.hasText(module)) {
             criteriaList.add(Criteria.where("module").is(module.trim()));
         }

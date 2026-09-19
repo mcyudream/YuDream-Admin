@@ -1,6 +1,7 @@
 package online.yudream.base.interfaces.platform.wiki.controller;
 
 import jakarta.validation.Valid;
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.wiki.service.WikiSourceAppService;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
@@ -56,7 +57,8 @@ public class WikiSourceController {
     public Result<WikiSourceRes> createText(@PathVariable Long spaceId,
                                             @Valid @RequestBody WikiTextSourceRequest request) {
         return Result.ok(WikiKnowledgeWebAssembler.toRes(
-                service.createText(spaceId, request.getFolderPath(), request.getTitle(), request.getContent())));
+                service.createText(spaceId, request.getFolderPath(), request.getTitle(), request.getContent(),
+                        StpUtil.getLoginIdAsLong())));
     }
 
     @PutMapping("/sources/{id}/text")
@@ -64,7 +66,7 @@ public class WikiSourceController {
     public Result<WikiSourceRes> updateText(@PathVariable Long id,
                                             @Valid @RequestBody WikiTextSourceRequest request) {
         return Result.ok(WikiKnowledgeWebAssembler.toRes(
-                service.updateText(id, request.getTitle(), request.getContent())));
+                service.updateText(id, request.getTitle(), request.getContent(), StpUtil.getLoginIdAsLong())));
     }
 
     @GetMapping("/spaces/{spaceId}/sources")
@@ -83,6 +85,6 @@ public class WikiSourceController {
     @PostMapping("/sources/{id}/caption-images")
     @PermissionRegister(code = "platform:wiki:edit", name = "重新生成图片描述", module = "平台能力", desc = "为资料中未成功生成 caption 的图片重新调用视觉模型")
     public Result<WikiSourceRes> captionImages(@PathVariable Long id) {
-        return Result.ok(WikiKnowledgeWebAssembler.toRes(service.captionImages(id)));
+        return Result.ok(WikiKnowledgeWebAssembler.toRes(service.captionImages(id, StpUtil.getLoginIdAsLong())));
     }
 }
