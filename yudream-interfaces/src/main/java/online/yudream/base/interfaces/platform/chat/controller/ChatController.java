@@ -2,6 +2,7 @@ package online.yudream.base.interfaces.platform.chat.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.chat.dto.ChatAttachmentDTO;
 import online.yudream.base.application.platform.chat.service.ChatAttachmentAppService;
 import online.yudream.base.application.platform.chat.service.ChatQuotaAppService;
@@ -40,6 +41,7 @@ import java.util.List;
 @RequestMapping("/api/platform/chat")
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.ai", name = "enabled", havingValue = "true")
+@Slf4j
 public class ChatController {
 
     private final ChatSessionAppService sessionService;
@@ -112,8 +114,9 @@ public class ChatController {
             throw error;
         }
         catch (Exception error) {
-            throw new online.yudream.base.domain.common.exception.BizException(
-                    "附件上传失败：" + (error.getMessage() == null ? "未知错误" : error.getMessage()));
+            // 内部异常细节仅写服务端日志，客户端只收固定文案
+            log.error("AI 附件上传失败", error);
+            throw new online.yudream.base.domain.common.exception.BizException("附件上传失败，请稍后重试");
         }
         return Result.ok(ChatWebAssembler.attachment(dto));
     }
