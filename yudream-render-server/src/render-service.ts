@@ -1,9 +1,10 @@
+import { lookup } from "dns/promises";
 import { PNG } from "pngjs";
 import MarkdownIt from "markdown-it";
 import type { Browser, BrowserContext, Page } from "playwright";
 import { BrowserPool } from "./browser-pool.js";
 import { limits } from "./config.js";
-import { assertRenderOptions, assertSafeExternalUrl, assertTextLimit, RenderInputError, resolveRequestUrl, sameRegistrableSite, validateMarkup } from "./security.js";
+import { assertRenderOptions, assertSafeExternalUrl, assertTextLimit, isPrivateAddress, RenderInputError, resolveRequestUrl, sameRegistrableSite, validateMarkup } from "./security.js";
 
 // Kept alongside themes/default.css for deployments that mount or replace the stylesheet.
 const defaultCss = `:root{color-scheme:light}*{box-sizing:border-box}html,body{margin:0;padding:0}body{width:fit-content;min-width:100%;padding:32px;color:#1f2937;background:#fff;font-family:"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",Arial,sans-serif;font-size:16px;line-height:1.65;overflow-wrap:anywhere}pre,code{font-family:"Noto Sans Mono CJK SC","Cascadia Mono",Consolas,monospace}pre{padding:16px;overflow:auto;color:#e5e7eb;background:#111827;border-radius:4px}code{padding:1px 4px;background:#f3f4f6;border-radius:3px}pre code{padding:0;color:inherit;background:transparent}table{width:100%;border-collapse:collapse}th,td{padding:8px 12px;border:1px solid #d1d5db;text-align:left}blockquote{margin-left:0;padding-left:16px;color:#4b5563;border-left:4px solid #9ca3af}img,video{max-width:100%;height:auto}`;
@@ -139,8 +140,36 @@ export class RenderService {
     const budget = timeoutMs ?? limits.defaultFetchedHtmlTimeoutMs;
     const started = Date.now();
     const remaining = () => Math.max(1_000, budget - (Date.now() - started));
-    // Do not install page.route here. Aliyun WAF treats request interception as
-    // a failed challenge even when every request is continued.
+    // Block private-network subresources by default. RENDER_EGRESS_INTERCEPTION=off
+    // restores unconditional pass-through for deployments behind WAFs that treat
+    // interception as a failed challenge.
+    if (process.env.RENDER_EGRESS_INTERCEPTION !== "off") {
+      await page.route("**/*", async (route) => {
+        const request = route.request();
+        if (request.isNavigationRequest() && request.url() === url.toString()) {
+          await route.continue();
+          return;
+        }
+        try {
+          const target = new URL(request.url());
+          if (target.protocol !== "http:" && target.protocol !== "https:") {
+            await route.abort();
+            return;
+          }
+          const addresses = await lookup(target.hostname, { all: true, verbatim: true });
+          if (addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address))) {
+            await route.abort();
+            return;
+          }
+        } catch {
+          await route.abort();
+          return;
+        }
+        await route.continue();
+      });
+    }
+    // Do not install page.route here when interception is off. Aliyun WAF treats
+    // request interception as a failed challenge even when every request is continued.
     const response = await page.goto(url.toString(), { waitUntil: "commit", timeout: budget });
     await this.waitForSettledDocument(page, remaining());
     let finalUrl: URL;

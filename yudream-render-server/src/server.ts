@@ -21,6 +21,20 @@ export function buildServer(pool = new BrowserPool()): FastifyInstance {
   const service = new RenderService(pool);
   void app.register(sensible);
 
+  // RENDER_TOKEN 配置后，/v1/render/* 一律要求 Bearer 令牌（网关侧从同一环境变量读取）。
+  const renderToken = process.env.RENDER_TOKEN;
+  if (renderToken) {
+    app.addHook("onRequest", async (request, reply) => {
+      if (request.url.startsWith("/health")) return;
+      const header = request.headers.authorization ?? "";
+      if (header !== `Bearer ${renderToken}`) {
+        await reply.code(401).send({ message: "unauthorized" });
+      }
+    });
+  } else {
+    app.log.warn("RENDER_TOKEN is not set: render endpoints are unauthenticated");
+  }
+
   app.setErrorHandler((error, request, reply) => {
     const message = error instanceof Error ? error.message : "render failed";
     const name = error instanceof Error ? error.name : "";

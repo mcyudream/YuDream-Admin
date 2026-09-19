@@ -79,16 +79,28 @@ class InboundMailContentMatcherTest {
     }
 
     @Test
-    void matchesWhenFromHeaderMissingButSenderDomainTrusted() throws Exception {
-        MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
-        message.setSubject("教育部学籍在线验证报告（郭金龙）");
-        message.setRecipient(Message.RecipientType.TO, new InternetAddress("yudream@yudream.online"));
-        message.setHeader("Sender", "noreply@mail.chsi.com.cn");
-        message.setHeader("Return-Path", "<bounce@chsi.com.cn>");
+    void rejectsWhenAuthenticationResultsMissing() throws Exception {
+        // 可信发件人判定 fail closed：接收方未提供 Authentication-Results 一律拒绝
+        MimeMessage message = baseMessageWithoutAuthenticationResults();
         message.setText("请查收教育部学籍在线验证报告，在线验证码 " + CODE, "UTF-8");
         message.saveChanges();
 
-        assertTrue(matcher.matches(message, query(CODE)));
+        assertFalse(matcher.matches(message, query(CODE)));
+    }
+
+    @Test
+    void rejectsSpoofedEnvelopeSenderMismatch() throws Exception {
+        // From 声明可信域，但信封发件人（Return-Path）域不一致 → 拒绝
+        MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
+        message.setFrom(new InternetAddress("noreply@chsi.com.cn"));
+        message.setSubject("学信网报告邮件");
+        message.setRecipient(Message.RecipientType.TO, new InternetAddress("inbox@example.com"));
+        message.setHeader("Return-Path", "<bounce@evil.example>");
+        message.setHeader("Authentication-Results", "mx.example.com; dmarc=pass header.from=chsi.com.cn");
+        message.setText("验证码 " + CODE, "UTF-8");
+        message.saveChanges();
+
+        assertFalse(matcher.matches(message, query(CODE)));
     }
 
     @Test
@@ -130,6 +142,14 @@ class InboundMailContentMatcherTest {
     }
 
     private static MimeMessage baseMessage() throws Exception {
+        MimeMessage message = baseMessageWithoutAuthenticationResults();
+        // 接收 MTA 写入的服务端认证结果与信封对齐
+        message.setHeader("Return-Path", "<bounce@chsi.com.cn>");
+        message.setHeader("Authentication-Results", "mx.example.com; dmarc=pass header.from=chsi.com.cn");
+        return message;
+    }
+
+    private static MimeMessage baseMessageWithoutAuthenticationResults() throws Exception {
         MimeMessage message = new MimeMessage(Session.getInstance(new Properties()));
         message.setFrom(new InternetAddress("noreply@chsi.com.cn"));
         message.setSubject("学信网报告邮件");
