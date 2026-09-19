@@ -50,7 +50,7 @@ public class ChartDefinitionRepoImpl implements ChartDefinitionRepo {
     @Override
     public PageResult<ChartDefinition> page(String keyword, int page, int size) {
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "createTime"));
         long total = mongoTemplate.count(query, ChartDefinitionDO.class);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);

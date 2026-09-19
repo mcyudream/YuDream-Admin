@@ -43,8 +43,14 @@ final class DockerSocketLogReader {
      * 解析多路复用流：每个帧为 [1 字节流类型][3 字节填充][4 字节大端长度][负载]，按行回调。
      * 帧边界与行边界无关，需跨帧累积到换行符才输出一行。
      */
+    /** 单行缓冲上限：超限先输出截断行，防止容器输出无换行流导致堆内存耗尽。 */
+    private static final int MAX_LINE_BYTES = 16 * 1024;
+    /** 单帧长度上限：Docker 守护进程帧有界，异常大帧视为流损坏并中止。 */
+    private static final int MAX_FRAME_BYTES = 4 * 1024 * 1024;
+
     static void drainMultiplexed(InputStream in, Consumer<String> onLine) throws IOException {
         ByteArrayOutputStream lineBuffer = new ByteArrayOutputStream();
+        boolean lineTruncated = false;
         while (true) {
             byte[] header = in.readNBytes(8);
             if (header.length < 8) {
@@ -55,15 +61,27 @@ final class DockerSocketLogReader {
             if (size <= 0) {
                 continue;
             }
+            if (size > MAX_FRAME_BYTES) {
+                throw new IOException("Docker log frame too large: " + size);
+            }
             byte[] payload = in.readNBytes(size);
             for (byte value : payload) {
                 if (value == '\n') {
                     String line = lineBuffer.toString(StandardCharsets.UTF_8);
                     lineBuffer.reset();
+                    if (lineTruncated) {
+                        line = line + "…[truncated]";
+                        lineTruncated = false;
+                    }
                     if (!line.isBlank()) {
                         onLine.accept(line);
                     }
                 } else {
+                    if (lineBuffer.size() >= MAX_LINE_BYTES) {
+                        // 超出部分丢弃仅保留截断标记，行边界到达后恢复
+                        lineTruncated = true;
+                        continue;
+                    }
                     lineBuffer.write(value);
                 }
             }

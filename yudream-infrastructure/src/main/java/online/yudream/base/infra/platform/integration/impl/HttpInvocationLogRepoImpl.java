@@ -40,7 +40,7 @@ public class HttpInvocationLogRepoImpl implements HttpInvocationLogRepo {
         Query query = query(keyword).with(Sort.by(Sort.Direction.DESC, "invokedAt"));
         long total = mongoTemplate.count(query, HttpInvocationLogDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.skip((long) (currentPage - 1) * pageSize).limit(pageSize);
         return new PageResult<>(
                 mongoTemplate.find(query, HttpInvocationLogDO.class).stream().map(IntegrationInfraMapper::toDomain).toList(),
