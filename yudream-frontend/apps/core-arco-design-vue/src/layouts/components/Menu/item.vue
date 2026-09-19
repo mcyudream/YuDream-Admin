@@ -2,6 +2,7 @@
 import type { SubMenuItemProps } from './types'
 import { cn } from '@/utils'
 import { rootMenuInjectionKey } from './types'
+import { safeExternalLink } from '@/utils/menu-link'
 
 defineOptions({
   name: 'SubMenuItem',
@@ -54,8 +55,9 @@ defineExpose({
         <Component
           :is="subMenu ? 'div' : 'a'" v-bind="{
             ...(!subMenu && {
-              href: item.meta?.link ? item.meta.link : href,
+              href: item.meta?.link ? safeExternalLink(item.meta.link) : href,
               target: item.meta?.link ? '_blank' : '_self',
+              rel: item.meta?.link ? 'noopener noreferrer' : undefined,
               class: 'no-underline',
             }),
           }" :class="cn('group menu-item-container relative h-full w-full min-w-0 flex items-center justify-between gap-1 rounded-lg', {

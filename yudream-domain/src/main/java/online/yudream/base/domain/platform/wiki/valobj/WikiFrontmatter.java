@@ -71,7 +71,8 @@ public record WikiFrontmatter(
             String line = rawLine.strip();
             if (line.startsWith("- ") || line.equals("-")) {
                 if (currentList != null) {
-                    addToList(currentList, sources, related, tags, line.startsWith("- ") ? line.substring(2).trim() : "");
+                    addToList(currentList, sources, related, tags,
+                            unquote(line.startsWith("- ") ? line.substring(2).trim() : ""));
                 }
                 continue;
             }
@@ -81,7 +82,7 @@ public record WikiFrontmatter(
                 continue;
             }
             String key = line.substring(0, colon).trim().toLowerCase(Locale.ROOT);
-            String value = line.substring(colon + 1).trim();
+            String value = unquote(line.substring(colon + 1).trim());
             if (value.isEmpty()) {
                 currentList = key;
             }
@@ -102,23 +103,23 @@ public record WikiFrontmatter(
         StringBuilder builder = new StringBuilder();
         builder.append("---\n");
         if (!title.isBlank()) {
-            builder.append("title: ").append(title).append('\n');
+            builder.append("title: ").append(yamlScalar(title)).append('\n');
         }
         builder.append("type: ").append(typeKey()).append('\n');
         if (!summary.isBlank()) {
-            builder.append("summary: ").append(summary).append('\n');
+            builder.append("summary: ").append(yamlScalar(summary)).append('\n');
         }
         if (!sources.isEmpty()) {
             builder.append("sources:\n");
-            sources.forEach(item -> builder.append("  - ").append(item).append('\n'));
+            sources.forEach(item -> builder.append("  - ").append(yamlScalar(item)).append('\n'));
         }
         if (!related.isEmpty()) {
             builder.append("related:\n");
-            related.forEach(item -> builder.append("  - ").append(item).append('\n'));
+            related.forEach(item -> builder.append("  - ").append(yamlScalar(item)).append('\n'));
         }
         if (!tags.isEmpty()) {
             builder.append("tags:\n");
-            tags.forEach(item -> builder.append("  - ").append(item).append('\n'));
+            tags.forEach(item -> builder.append("  - ").append(yamlScalar(item)).append('\n'));
         }
         builder.append("---\n");
         if (!body.isBlank()) {
@@ -130,8 +131,27 @@ public record WikiFrontmatter(
         return builder.toString();
     }
 
+    /**
+     * frontmatter 标量值转义：以 JSON 风格双引号字符串输出并转义反斜杠/引号，
+     * 拒绝换行与 "---" 文档分隔符，防止用户可控字段伪造 frontmatter 指令。
+     */
+    private static String yamlScalar(String value) {
+        if (value.indexOf('\n') >= 0 || value.indexOf('\r') >= 0 || value.stripTrailing().equals("---")) {
+            throw new online.yudream.base.domain.common.exception.BizException("内容包含不允许的换行或分隔符");
+        }
+        return '"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
+    }
+
     public String bodyOnly() {
         return body;
+    }
+
+    /** 去除成对双引号并反转义（与 {@link #yamlScalar} 输出格式对应）；无引号原样返回。 */
+    private static String unquote(String value) {
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            return value.substring(1, value.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
+        }
+        return value;
     }
 
     private String typeKey() {

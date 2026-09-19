@@ -15,15 +15,37 @@ export interface CmsBlockDefinition {
   attributes?: Record<string, string>
 }
 
+/** 属性转义：GrapesJS 会把 media 以 innerHTML 注入，值里的引号/尖括号必须转义 */
+function escapeAttr(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+/** 预览图地址仅接受 http(s)/同源相对路径，阻断 javascript: 一类伪协议 */
+function safePreviewUrl(value?: string): string | undefined {
+  if (!value) {
+    return undefined
+  }
+  if (/^https?:\/\//i.test(value) || value.startsWith('/')) {
+    return value
+  }
+  return undefined
+}
+
 export function toBlockDefinition(block: CmsBlock): CmsBlockDefinition {
   const kind: CmsBlockKind = block.kind === 'PRESET' ? 'preset' : 'atomic'
+  const preview = safePreviewUrl(block.previewImageUrl)
   return {
     id: block.code,
     label: block.name,
     category: block.category || (block.kind === 'PRESET' ? '预制' : '自定义'),
     kind,
-    media: block.previewImageUrl
-      ? `<img src="${block.previewImageUrl}" style="width:100%;height:auto;object-fit:cover;border-radius:6px;" />`
+    media: preview
+      ? `<img src="${escapeAttr(preview)}" style="width:100%;height:auto;object-fit:cover;border-radius:6px;" />`
       : genericBlockPreview(),
     content: block.htmlContent || '',
     css: block.cssContent,
