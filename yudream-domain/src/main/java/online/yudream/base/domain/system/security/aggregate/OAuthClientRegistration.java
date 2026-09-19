@@ -24,6 +24,8 @@ public class OAuthClientRegistration extends BaseDomain {
     private String clientId;
     private String clientName;
     private String clientSecretHash;
+    /** 插件登记的属主（pluginCode）；管理端创建的登记为空。 */
+    private String ownerPluginCode;
     private OAuthClientAuthMethod authMethod;
     private List<OAuthGrantType> grantTypes;
     private List<String> redirectUris;

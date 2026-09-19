@@ -37,10 +37,7 @@ public class PluginScaffoldGenerator {
     private static final List<String> PACKAGE_DIRS = List.of("domain", "application", "infrastructure", "interfaces");
 
     public PluginScaffoldResult generate(PluginScaffoldSpec spec) {
-        Path parent = Path.of(spec.parentDir()).toAbsolutePath().normalize();
-        if (!Files.isDirectory(parent)) {
-            throw new BizException("目标父目录不存在：" + parent);
-        }
+        Path parent = resolveSafeParent(spec.parentDir());
         Path target = parent.resolve(spec.moduleDirName());
         if (Files.exists(target) && !isEmptyDirectory(target)) {
             throw new BizException("目标目录已存在且非空：" + target);
@@ -115,6 +112,31 @@ public class PluginScaffoldGenerator {
     }
 
     /** Java 注解与 YAML 双引号标量共用的转义：反斜杠/双引号转义，换行收敛为空格。 */
+    /**
+     * 骨架父目录校验：必须为绝对路径，拒绝 `..` 上跳与符号链接占位，
+     * 防止把生成物写到宿主任意位置（dev-mode 本身即面向本机开发环境）。
+     */
+    private Path resolveSafeParent(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new BizException("目标父目录不能为空");
+        }
+        if (raw.contains("..")) {
+            throw new BizException("目标父目录不允许包含 .. 路径段");
+        }
+        Path candidate = Path.of(raw.trim());
+        if (!candidate.isAbsolute()) {
+            throw new BizException("目标父目录必须是绝对路径");
+        }
+        Path parent = candidate.normalize();
+        if (!Files.isDirectory(parent)) {
+            throw new BizException("目标父目录不存在：" + parent);
+        }
+        if (Files.isSymbolicLink(parent)) {
+            throw new BizException("目标父目录不允许是符号链接");
+        }
+        return parent;
+    }
+
     private String escapeQuoted(String value) {
         return value.replace("\\", "\\\\").replace("\"", "\\\"").replace('\r', ' ').replace('\n', ' ');
     }
