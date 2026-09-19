@@ -28,6 +28,7 @@ public class AgentKnowledgeOperationsService implements AgentKnowledgeOperations
 
     @Override
     public List<WikiSearchHit> search(String spaceSlug, String query, int topK, String pathPrefix, boolean graphExpansion) {
+        capabilities.ensureEnabled("wiki", "Wiki 知识库");
         return searches.searchForAdmin(spaceSlug, query, topK, pathPrefix, graphExpansion).stream()
                 .map(hit -> new WikiSearchHit(hit.getScore(), parseId(hit.getNodeId()), hit.getTitle(), hit.getPath(), hit.getContent()))
                 .toList();

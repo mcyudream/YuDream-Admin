@@ -23,6 +23,7 @@ import online.yudream.base.domain.platform.wiki.repo.WikiSourceRepo;
 import online.yudream.base.domain.platform.wiki.repo.WikiSpaceRepo;
 import online.yudream.base.domain.platform.wiki.service.WikiIndexGateway;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
@@ -75,7 +76,10 @@ public class WikiAppService {
         space.applyKnowledgeConfig(command.getPurpose(), command.getSchemaContent(), command.getLanguage());
         space.applyModelRouting(command.getChatProviderCode(), command.getChatModelCode(), command.getIngestProviderCode(),
                 command.getIngestModelCode(), command.getVisionProviderCode(), command.getVisionModelCode());
-        space.applyWebSearch(command.getWebSearchProviderCode(), command.getWebSearchApiKey(),
+        // API Key 不回显：提交为空白时保留既有值，与前端「留空则不修改」语义一致。
+        String webSearchApiKey = StringUtils.hasText(command.getWebSearchApiKey())
+                ? command.getWebSearchApiKey() : space.getWebSearchApiKey();
+        space.applyWebSearch(command.getWebSearchProviderCode(), webSearchApiKey,
                 command.getWebSearchInstanceUrl(), command.getWebSearchEngine());
         space.applyRuntime(command.getContextWindowTokens(), command.isSourceGroundedDefault());
         space.applyWatch(command.isWatchEnabled(), command.getWatchFolderPath());

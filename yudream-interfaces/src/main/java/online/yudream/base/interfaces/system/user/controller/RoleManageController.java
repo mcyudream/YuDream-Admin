@@ -34,20 +34,23 @@ public class RoleManageController {
     private final RoleManageAppService roleManageAppService;
 
     @GetMapping
+    @PermissionRegister(code = "system:role:view", name = "查看角色", module = "系统管理", desc = "查看角色列表")
     public Result<PageResult<RoleManageRes>> page(RolePageQuery query) {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:role:view");
         return Result.ok(UserManageWebAssembler.toRolePage(roleManageAppService.page(query)));
     }
 
     @GetMapping("/options")
+    @PermissionRegister(code = "system:role:view", name = "查看角色", module = "系统管理", desc = "查看角色选项")
     public Result<List<OptionRes>> options() {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:role:view");
         return Result.ok(UserManageWebAssembler.toOptionResList(roleManageAppService.options()));
     }
 
     @GetMapping("/permissions")
+    @PermissionRegister(code = "system:role:view", name = "查看角色", module = "系统管理", desc = "查看权限目录")
     public Result<List<PermissionRes>> permissions() {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:role:view");
         return Result.ok(UserManageWebAssembler.toPermissionResList(roleManageAppService.permissions()));
     }
 

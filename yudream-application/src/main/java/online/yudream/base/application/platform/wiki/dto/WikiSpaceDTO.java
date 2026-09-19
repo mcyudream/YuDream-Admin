@@ -35,7 +35,8 @@ public class WikiSpaceDTO {
     private String visionProviderCode;
     private String visionModelCode;
     private String webSearchProviderCode;
-    private String webSearchApiKey;
+    /** 是否已配置 Web 搜索 API Key；明文 Key 不出服务。 */
+    private boolean webSearchApiKeyConfigured;
     private String webSearchInstanceUrl;
     private String webSearchEngine;
     private int contextWindowTokens;

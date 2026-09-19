@@ -34,14 +34,16 @@ public class MenuManageController {
     private final MenuAppService menuAppService;
 
     @GetMapping
+    @PermissionRegister(code = "system:menu:view", name = "查看菜单", module = "系统管理", desc = "查看菜单管理树")
     public Result<List<MenuManageRes>> tree(MenuTreeQuery query) {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:menu:view");
         return Result.ok(MenuWebAssembler.toResList(menuAppService.tree(query)));
     }
 
     @GetMapping("/candidates")
+    @PermissionRegister(code = "system:menu:view", name = "查看菜单", module = "系统管理", desc = "查看菜单候选列表")
     public Result<PageResult<MenuCandidateRes>> candidates(MenuCandidatePageQuery query) {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:menu:view");
         return Result.ok(MenuWebAssembler.toCandidatePage(menuAppService.pageCandidates(query)));
     }
 

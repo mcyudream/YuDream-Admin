@@ -40,8 +40,9 @@ public class UserManageController {
     private final LoginTokenAppService loginTokenAppService;
 
     @GetMapping
+    @PermissionRegister(code = "system:user:view", name = "查看用户", module = "系统管理", desc = "查看用户列表")
     public Result<PageResult<UserManageRes>> page(UserPageQuery query) {
-        StpUtil.checkLogin();
+        StpUtil.checkPermission("system:user:view");
         return Result.ok(UserManageWebAssembler.toUserPage(userManageAppService.page(query)));
     }
 

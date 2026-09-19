@@ -9,6 +9,8 @@ import online.yudream.base.domain.platform.wiki.enumerate.WikiIndexStatus;
 import online.yudream.base.domain.platform.wiki.enumerate.WikiPageType;
 import online.yudream.base.domain.platform.wiki.valobj.WikiFrontmatter;
 
+import org.springframework.util.StringUtils;
+
 import java.util.List;
 
 public final class WikiAssembler {
@@ -45,7 +47,7 @@ public final class WikiAssembler {
                 .visionProviderCode(s.getVisionProviderCode())
                 .visionModelCode(s.getVisionModelCode())
                 .webSearchProviderCode(s.getWebSearchProviderCode())
-                .webSearchApiKey(s.getWebSearchApiKey())
+                .webSearchApiKeyConfigured(StringUtils.hasText(s.getWebSearchApiKey()))
                 .webSearchInstanceUrl(s.getWebSearchInstanceUrl())
                 .webSearchEngine(s.getWebSearchEngine())
                 .contextWindowTokens(s.getContextWindowTokens())
