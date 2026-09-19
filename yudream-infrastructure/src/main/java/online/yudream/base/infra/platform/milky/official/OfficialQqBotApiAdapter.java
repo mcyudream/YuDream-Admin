@@ -264,19 +264,19 @@ public class OfficialQqBotApiAdapter {
         if (!cached.isEmpty()) {
             return Map.of("members", cached, "cached", true);
         }
-        StringBuilder path = new StringBuilder("/v2/groups/").append(groupId).append("/members");
+        StringBuilder path = new StringBuilder("/v2/groups/").append(encodeQuery(groupId)).append("/members");
         String start = text(payload, "start_index", "start");
         String limit = text(payload, "limit");
         if (!blank(start) || !blank(limit)) {
             path.append('?');
             if (!blank(start)) {
-                path.append("start_index=").append(start);
+                path.append("start_index=").append(encodeQuery(start));
             }
             if (!blank(limit)) {
                 if (!blank(start)) {
                     path.append('&');
                 }
-                path.append("limit=").append(limit);
+                path.append("limit=").append(encodeQuery(limit));
             }
         }
         try {
@@ -1241,6 +1241,10 @@ public class OfficialQqBotApiAdapter {
         return List.of();
     }
 
+    /** 官方 API 基础地址白名单：官方协议只允许请求 QQ 官方机器人域名，防止 baseUrl 覆盖导致携带令牌的 SSRF。 */
+    private static final java.util.Set<String> OFFICIAL_ALLOWED_HOSTS =
+            java.util.Set.of("api.bot.qq.com", "sandbox.api.bot.qq.com");
+
     private URI base(Context context) {
         String value = context == null || blank(context.baseUrl())
                 ? (context != null && context.sandbox()
@@ -1249,23 +1253,28 @@ public class OfficialQqBotApiAdapter {
                 : context.baseUrl();
         try {
             URI uri = URI.create(value);
-            if (("http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme())) && uri.getHost() != null) {
+            boolean trusted = "https".equalsIgnoreCase(uri.getScheme())
+                    && uri.getHost() != null
+                    && OFFICIAL_ALLOWED_HOSTS.contains(uri.getHost().toLowerCase(java.util.Locale.ROOT));
+            if (trusted) {
                 return uri;
             }
         } catch (IllegalArgumentException ignored) { }
-        throw new BizException("官方机器人地址必须是有效的 HTTP 地址");
+        throw new BizException("官方机器人地址必须是官方 API 地址（https://api.bot.qq.com 或沙箱地址）");
     }
 
     private BizException failure(String message, HttpMethod method, String path, URI base, Integer status, long startedAt, Throwable cause) {
+        // path 含 payload 派生值，写日志前去除控制字符，防止日志注入
+        String safePath = path == null ? null : path.replaceAll("[\\p{Cntrl}]", "_");
         if (status != null && (status == 400 || status == 403 || status == 404)) {
             log.warn("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
-                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
+                    method, safePath, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
         } else if (isConnectionReset(cause)) {
             log.warn("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
-                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
+                    method, safePath, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
         } else {
             log.error("Official QQ bot request failed: method={}, path={}, host={}, status={}, elapsedMs={}",
-                    method, path, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
+                    method, safePath, base.getHost(), status, Duration.ofNanos(System.nanoTime() - startedAt).toMillis(), cause);
         }
         BizException exception = new BizException(message);
         if (cause != null) {

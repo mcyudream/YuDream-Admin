@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.wiki.service;
 
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.wiki.service.WikiWebPageFetcher;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebPage;
@@ -20,35 +21,34 @@ import java.util.regex.Pattern;
 public class HttpWikiWebPageFetcher implements WikiWebPageFetcher {
 
     private static final int MAX_CONTENT_LENGTH = 100_000;
+    private static final int MAX_REDIRECT_HOPS = 5;
     private static final Pattern TITLE = Pattern.compile("(?is)<title[^>]*>(.*?)</title>");
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
+
+    public HttpWikiWebPageFetcher(OutboundNetworkPolicy outboundNetworkPolicy) {
+        this.outboundNetworkPolicy = outboundNetworkPolicy;
+    }
 
     @Override
     public WikiWebPage fetch(String url) {
         if (url == null || url.isBlank()) {
             throw new BizException("网页地址不能为空");
         }
-        String normalized = url.trim();
-        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
-            throw new BizException("仅支持 http/https 网页地址");
-        }
+        URI target = outboundNetworkPolicy.validate(url, "网页", false);
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(normalized))
-                    .timeout(Duration.ofSeconds(20))
-                    .header("User-Agent", "Mozilla/5.0 (compatible; YudreamWikiBot/1.0)")
-                    .GET()
-                    .build();
-            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = sendFollowingRedirects(target);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new BizException("网页抓取失败：HTTP " + response.statusCode());
             }
             String html = response.body();
             String title = extractTitle(html);
             String content = stripHtml(html);
-            return new WikiWebPage(title == null ? normalized : title, limit(content), "text/html");
+            return new WikiWebPage(title == null ? url.trim() : title, limit(content), "text/html");
         }
         catch (BizException exception) {
             throw exception;
@@ -56,6 +56,31 @@ public class HttpWikiWebPageFetcher implements WikiWebPageFetcher {
         catch (Exception exception) {
             throw new BizException("网页抓取失败：" + readableMessage(exception));
         }
+    }
+
+    /** 手动跟随重定向，每一跳都重新执行出站目标校验。 */
+    private HttpResponse<String> sendFollowingRedirects(URI initial) throws Exception {
+        URI current = initial;
+        for (int hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder(current)
+                    .timeout(Duration.ofSeconds(20))
+                    .header("User-Agent", "Mozilla/5.0 (compatible; YudreamWikiBot/1.0)")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if (status >= 300 && status < 400 && hop < MAX_REDIRECT_HOPS) {
+                current = outboundNetworkPolicy.validateRedirect(current,
+                        response.headers().firstValue("Location").orElse(null), "网页");
+                continue;
+            }
+            return response;
+        }
+        throw new BizException("网页重定向次数过多");
+    }
+
+    private boolean allowPrivate() {
+        return outboundNetworkPolicy.allowPrivateNetwork();
     }
 
     private String extractTitle(String html) {

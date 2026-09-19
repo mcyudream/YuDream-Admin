@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.wiki.service;
 
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.wiki.service.WikiRemoteImageFetcher;
 import online.yudream.base.domain.platform.wiki.valobj.WikiRemoteImage;
@@ -20,6 +21,7 @@ import java.util.Map;
 public class HttpWikiRemoteImageFetcher implements WikiRemoteImageFetcher {
 
     private static final long MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+    private static final int MAX_REDIRECT_HOPS = 5;
     private static final Map<String, String> EXTENSION_CONTENT_TYPES = Map.of(
             ".png", "image/png",
             ".jpg", "image/jpeg",
@@ -32,26 +34,23 @@ public class HttpWikiRemoteImageFetcher implements WikiRemoteImageFetcher {
     );
     private static final HttpClient CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
+
+    public HttpWikiRemoteImageFetcher(OutboundNetworkPolicy outboundNetworkPolicy) {
+        this.outboundNetworkPolicy = outboundNetworkPolicy;
+    }
 
     @Override
     public WikiRemoteImage fetch(String url) {
         if (url == null || url.isBlank()) {
             throw new BizException("图片地址不能为空");
         }
-        String normalized = url.trim();
-        if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
-            throw new BizException("仅支持 http/https 图片地址");
-        }
+        URI target = outboundNetworkPolicy.validate(url, "图片", false);
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(normalized))
-                    .timeout(Duration.ofSeconds(20))
-                    .header("User-Agent", "Mozilla/5.0 (compatible; YudreamWikiBot/1.0)")
-                    .GET()
-                    .build();
-            HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers
-                    .ofByteArray());
+            HttpResponse<byte[]> response = sendFollowingRedirects(target);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new BizException("图片下载失败：HTTP " + response.statusCode());
             }
@@ -65,7 +64,7 @@ public class HttpWikiRemoteImageFetcher implements WikiRemoteImageFetcher {
             String contentType = response.headers().firstValue("Content-Type")
                     .map(value -> value.split(";")[0].trim().toLowerCase(Locale.ROOT))
                     .orElse("");
-            String fileName = fileName(normalized);
+            String fileName = fileName(target);
             if (!contentType.startsWith("image/")) {
                 contentType = EXTENSION_CONTENT_TYPES.getOrDefault(extension(fileName), "");
             }
@@ -83,8 +82,29 @@ public class HttpWikiRemoteImageFetcher implements WikiRemoteImageFetcher {
         }
     }
 
-    private String fileName(String url) {
-        String path = URI.create(url).getPath();
+    /** 手动跟随重定向，每一跳都重新执行出站目标校验。 */
+    private HttpResponse<byte[]> sendFollowingRedirects(URI initial) throws Exception {
+        URI current = initial;
+        for (int hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder(current)
+                    .timeout(Duration.ofSeconds(20))
+                    .header("User-Agent", "Mozilla/5.0 (compatible; YudreamWikiBot/1.0)")
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            int status = response.statusCode();
+            if (status >= 300 && status < 400 && hop < MAX_REDIRECT_HOPS) {
+                current = outboundNetworkPolicy.validateRedirect(current,
+                        response.headers().firstValue("Location").orElse(null), "图片");
+                continue;
+            }
+            return response;
+        }
+        throw new BizException("图片重定向次数过多");
+    }
+
+    private String fileName(URI url) {
+        String path = url.getPath();
         String name = path == null || path.isBlank() ? "" : path.substring(path.lastIndexOf('/') + 1);
         return name.isBlank() ? "image.png" : name;
     }

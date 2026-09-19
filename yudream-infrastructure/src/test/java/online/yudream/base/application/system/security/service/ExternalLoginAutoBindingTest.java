@@ -74,7 +74,7 @@ class ExternalLoginAutoBindingTest {
             public <I> List<I> extensions(Class<I> type) { return List.of(type.cast(provider)); }
         };
         app = new ExternalLoginAppService(null, accounts, null, userApp, tokens, tickets,
-                new ExternalLoginBindingAppService(tickets, accounts, userRepo), extensions);
+                new ExternalLoginBindingAppService(tickets, accounts, userRepo), extensions, null);
         authorize(null);
     }
 

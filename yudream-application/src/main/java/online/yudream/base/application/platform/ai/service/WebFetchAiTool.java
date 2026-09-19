@@ -1,11 +1,14 @@
 package online.yudream.base.application.platform.ai.service;
 
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
+import online.yudream.base.application.common.net.OutboundUrlGuard;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.enumerate.AgentToolRisk;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolCall;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolDescriptor;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -26,22 +29,30 @@ public class WebFetchAiTool implements AiAgentTool {
     public static final String PERMISSION_CODE = "platform:ai:tool:web-fetch";
 
     private static final int MAX_BODY_LENGTH = 6_000;
+    private static final int MAX_REDIRECT_HOPS = 5;
     private static final Pattern SCRIPT_STYLE = Pattern.compile("(?is)<(script|style)[^>]*>.*?</\\1>");
     private static final Pattern TAG = Pattern.compile("(?is)<[^>]+>");
     private static final Pattern TITLE = Pattern.compile("(?is)<title[^>]*>(.*?)</title>");
     private static final Pattern DESCRIPTION = Pattern.compile("(?is)<meta\\s+[^>]*(name|property)=[\"'](?:description|og:description)[\"'][^>]*content=[\"'](.*?)[\"'][^>]*>");
 
     private final HttpClient httpClient;
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
 
-    public WebFetchAiTool() {
+    @Autowired
+    public WebFetchAiTool(OutboundNetworkPolicy outboundNetworkPolicy) {
         this(HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build());
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build(), outboundNetworkPolicy);
     }
 
     public WebFetchAiTool(HttpClient httpClient) {
+        this(httpClient, new OutboundNetworkPolicy(false));
+    }
+
+    public WebFetchAiTool(HttpClient httpClient, OutboundNetworkPolicy outboundNetworkPolicy) {
         this.httpClient = httpClient;
+        this.outboundNetworkPolicy = outboundNetworkPolicy;
     }
 
     @Override
@@ -71,24 +82,10 @@ public class WebFetchAiTool implements AiAgentTool {
         if (!StringUtils.hasText(url)) {
             throw new BizException("web.fetch 缺少 url 参数");
         }
-        URI uri;
+        boolean allowPrivate = outboundNetworkPolicy != null && outboundNetworkPolicy.allowPrivateNetwork();
+        URI uri = OutboundUrlGuard.validate(url, "web.fetch", allowPrivate);
         try {
-            uri = URI.create(url);
-        } catch (IllegalArgumentException e) {
-            throw new BizException("web.fetch 地址无效：" + url);
-        }
-        if (!"http".equalsIgnoreCase(uri.getScheme()) && !"https".equalsIgnoreCase(uri.getScheme())) {
-            throw new BizException("web.fetch 仅支持 http/https 地址");
-        }
-        HttpRequest request = HttpRequest.newBuilder(uri)
-                .timeout(Duration.ofSeconds(20))
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 YuDream-AI-WebFetch/1.0")
-                .header("Accept", "text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.2")
-                .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
-                .GET()
-                .build();
-        try {
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = sendFollowingRedirects(uri, allowPrivate);
             String contentType = response.headers().firstValue("Content-Type").orElse("");
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 throw new BizException("web.fetch 请求失败：HTTP " + response.statusCode() + responseDetail(response.body()));
@@ -119,6 +116,29 @@ public class WebFetchAiTool implements AiAgentTool {
             Thread.currentThread().interrupt();
             throw new BizException("web.fetch 抓取被中断");
         }
+    }
+
+    /** 手动跟随重定向，每一跳都重新执行出站目标校验。 */
+    private HttpResponse<String> sendFollowingRedirects(URI initial, boolean allowPrivate) throws IOException, InterruptedException {
+        URI current = initial;
+        for (int hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder(current)
+                    .timeout(Duration.ofSeconds(20))
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36 YuDream-AI-WebFetch/1.0")
+                    .header("Accept", "text/html,application/xhtml+xml,application/json,text/plain;q=0.9,*/*;q=0.2")
+                    .header("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if (status >= 300 && status < 400 && hop < MAX_REDIRECT_HOPS) {
+                current = OutboundUrlGuard.validateRedirect(current,
+                        response.headers().firstValue("Location").orElse(null), "web.fetch", allowPrivate);
+                continue;
+            }
+            return response;
+        }
+        throw new BizException("web.fetch 重定向次数过多");
     }
 
     private String extract(Pattern pattern, String html) {

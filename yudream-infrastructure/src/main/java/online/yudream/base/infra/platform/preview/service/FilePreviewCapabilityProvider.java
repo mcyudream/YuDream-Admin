@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.preview.service;
 
+import online.yudream.base.application.common.net.OutboundUrlGuard;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.capability.enumerate.CapabilityType;
 import online.yudream.base.domain.platform.capability.service.CapabilityProvider;
@@ -140,11 +141,15 @@ public class FilePreviewCapabilityProvider implements CapabilityProvider {
         return merged;
     }
 
-    private static ProbeResult probe(String target) {
+    private ProbeResult probe(String target) {
         long started = System.currentTimeMillis();
         try {
-            HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-            HttpRequest request = HttpRequest.newBuilder(URI.create(target))
+            // 预览服务通常部署在内网（容器内网地址/本机反代），此处仅做结构校验（协议、主机、无凭据），
+            // 不拒绝内网地址；异常细节只写服务端日志，不回显给调用方。
+            URI uri = OutboundUrlGuard.validate(target, "预览服务", true);
+            HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NEVER).build();
+            HttpRequest request = HttpRequest.newBuilder(uri)
                     .timeout(Duration.ofSeconds(5))
                     .GET()
                     .build();
@@ -156,7 +161,7 @@ public class FilePreviewCapabilityProvider implements CapabilityProvider {
             return new ProbeResult(false, "服务返回 HTTP " + response.statusCode(), latency);
         }
         catch (Exception e) {
-            return new ProbeResult(false, "连接失败：" + e.getMessage(), System.currentTimeMillis() - started);
+            return new ProbeResult(false, "连接失败，请检查服务地址与网络可达性", System.currentTimeMillis() - started);
         }
     }
 

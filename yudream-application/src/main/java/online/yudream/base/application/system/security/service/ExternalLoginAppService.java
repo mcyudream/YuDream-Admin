@@ -1,6 +1,8 @@
 package online.yudream.base.application.system.security.service;
 
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
+import online.yudream.base.application.common.net.OutboundUrlGuard;
 import online.yudream.base.application.system.security.cmd.ExternalLoginProviderSaveCmd;
 import online.yudream.base.application.system.security.dto.*;
 import online.yudream.base.application.system.user.dto.UserLoginDTO;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.net.URI;
 import java.security.SecureRandom;
 import java.util.*;
 
@@ -38,6 +41,7 @@ public class ExternalLoginAppService {
     private final ExternalLoginTicketStore ticketStore;
     private final ExternalLoginBindingAppService bindingAppService;
     private final PluginExtensionQuery pluginExtensionQuery;
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
     private final SecureRandom random = new SecureRandom();
 
     @Transactional
@@ -197,14 +201,48 @@ public class ExternalLoginAppService {
     public void useAvatar(Long uid, Long id) {
         ExternalAccount a = accountRepo.findByIdAndUserId(id, uid).orElseThrow(() -> new BizException("第三方账号不存在"));
         if (!StringUtils.hasText(a.getAvatarUrl())) throw new BizException("该第三方账号没有可用头像");
+        boolean allowPrivate = outboundNetworkPolicy != null && outboundNetworkPolicy.allowPrivateNetwork();
         try {
-            java.net.URLConnection c = new java.net.URI(a.getAvatarUrl()).toURL().openConnection();
-            c.setConnectTimeout(10000); c.setReadTimeout(15000);
-            String type = c.getContentType(); long size = c.getContentLengthLong();
-            if (!StringUtils.hasText(type) || !type.toLowerCase().startsWith("image/")) throw new BizException("第三方头像不是图片");
-            if (size > 10 * 1024 * 1024) throw new BizException("第三方头像文件过大");
-            try (java.io.InputStream in = c.getInputStream()) { userAppService.updateAvatar(uid, in, "external-avatar", type, Math.max(size, 0)); }
+            URI target = OutboundUrlGuard.validate(a.getAvatarUrl(), "第三方头像", allowPrivate);
+            java.net.HttpURLConnection c = openAvatarConnection(target);
+            int status = c.getResponseCode();
+            for (int hop = 0; status >= 300 && status < 400 && hop < 5; hop++) {
+                URI next = OutboundUrlGuard.validateRedirect(target, c.getHeaderField("Location"), "第三方头像", allowPrivate);
+                target = next;
+                c = openAvatarConnection(next);
+                status = c.getResponseCode();
+            }
+            if (status < 200 || status >= 300) throw new BizException("下载第三方头像失败");
+            String type = c.getContentType();
+            if (!StringUtils.hasText(type) || !type.toLowerCase(Locale.ROOT).startsWith("image/")) throw new BizException("第三方头像不是图片");
+            byte[] body = readLimited(c.getInputStream(), 10 * 1024 * 1024);
+            userAppService.updateAvatar(uid, new java.io.ByteArrayInputStream(body), "external-avatar", type, body.length);
         } catch (BizException e) { throw e; } catch (Exception e) { throw new BizException("下载第三方头像失败"); }
+    }
+
+    private java.net.HttpURLConnection openAvatarConnection(URI target) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) target.toURL().openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(15000);
+        c.setInstanceFollowRedirects(false);
+        return c;
+    }
+
+    /** 流式读取并以硬上限截断，避免依赖不可靠的 Content-Length。 */
+    private byte[] readLimited(java.io.InputStream in, int maxBytes) throws Exception {
+        try (in) {
+            byte[] buffer = new byte[8192];
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            int read;
+            int total = 0;
+            while ((read = in.read(buffer)) != -1) {
+                total += read;
+                if (total > maxBytes) throw new BizException("第三方头像文件过大");
+                out.write(buffer, 0, read);
+            }
+            if (total == 0) throw new BizException("第三方头像内容为空");
+            return out.toByteArray();
+        }
     }
 
     private ExternalLoginProvider active(String code) {

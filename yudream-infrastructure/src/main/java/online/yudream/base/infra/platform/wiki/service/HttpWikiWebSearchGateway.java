@@ -1,5 +1,6 @@
 package online.yudream.base.infra.platform.wiki.service;
 
+import online.yudream.base.application.common.net.OutboundNetworkPolicy;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.wiki.service.WikiWebSearchGateway;
 import online.yudream.base.domain.platform.wiki.valobj.WikiWebSearchConfig;
@@ -8,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,10 +31,17 @@ public class HttpWikiWebSearchGateway implements WikiWebSearchGateway {
 
     private static final int DEFAULT_LIMIT = 5;
     private static final int PAGE_CONTENT_LIMIT = 12_000;
+    private static final int MAX_REDIRECT_HOPS = 5;
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .build();
+
+    private final OutboundNetworkPolicy outboundNetworkPolicy;
+
+    public HttpWikiWebSearchGateway(OutboundNetworkPolicy outboundNetworkPolicy) {
+        this.outboundNetworkPolicy = outboundNetworkPolicy;
+    }
 
     @Override
     public List<WikiWebSearchResult> search(WikiWebSearchConfig config, String query, int limit) {
@@ -130,10 +139,19 @@ public class HttpWikiWebSearchGateway implements WikiWebSearchGateway {
         if (base.endsWith("/")) {
             base = base.substring(0, base.length() - 1);
         }
+        // SearXNG 常自托管于内网：管理端配置的实例地址按部署级出站策略校验。
+        URI instance = outboundNetworkPolicy.validate(base + "/search", "SearXNG 实例",
+                outboundNetworkPolicy.allowPrivateNetwork());
+        String categories = StringUtils.hasText(config.category()) ? config.category() : "general";
+        URI requestUri = UriComponentsBuilder.fromUri(instance)
+                .queryParam("q", query)
+                .queryParam("format", "json")
+                .queryParam("categories", categories)
+                .encode()
+                .build()
+                .toUri();
         Map<String, Object> response = RestClient.create().get()
-                .uri(base + "/search?q={q}&format=json&categories={categories}",
-                        query,
-                        StringUtils.hasText(config.category()) ? config.category() : "general")
+                .uri(requestUri)
                 .retrieve().body(Map.class);
         List<WikiWebSearchResult> results = new ArrayList<>();
         Object data = response == null ? null : response.get("results");
@@ -164,12 +182,8 @@ public class HttpWikiWebSearchGateway implements WikiWebSearchGateway {
             return fallback == null ? "" : fallback;
         }
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(url))
-                    .timeout(Duration.ofSeconds(15))
-                    .header("User-Agent", "Mozilla/5.0 (compatible; YudreamWikiBot/1.0)")
-                    .GET()
-                    .build();
-            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            URI target = outboundNetworkPolicy.validate(url, "搜索结果", false);
+            HttpResponse<String> response = sendFollowingRedirects(target);
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 return fallback == null ? "" : fallback;
             }
@@ -178,10 +192,32 @@ public class HttpWikiWebSearchGateway implements WikiWebSearchGateway {
                 return fallback == null ? "" : fallback;
             }
             return text.length() > PAGE_CONTENT_LIMIT ? text.substring(0, PAGE_CONTENT_LIMIT) : text;
-        }
-        catch (Exception ignored) {
+        } catch (BizException ignored) {
+            return fallback == null ? "" : fallback;
+        } catch (Exception ignored) {
             return fallback == null ? "" : fallback;
         }
+    }
+
+    /** 手动跟随重定向，每一跳都重新执行出站目标校验。 */
+    private HttpResponse<String> sendFollowingRedirects(URI initial) throws Exception {
+        URI current = initial;
+        for (int hop = 0; hop <= MAX_REDIRECT_HOPS; hop++) {
+            HttpRequest request = HttpRequest.newBuilder(current)
+                    .timeout(Duration.ofSeconds(15))
+                    .header("User-Agent", "Mozilla/5.0 (compatible; YudreamWikiBot/1.0)")
+                    .GET()
+                    .build();
+            HttpResponse<String> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofString());
+            int status = response.statusCode();
+            if (status >= 300 && status < 400 && hop < MAX_REDIRECT_HOPS) {
+                current = outboundNetworkPolicy.validateRedirect(current,
+                        response.headers().firstValue("Location").orElse(null), "搜索结果");
+                continue;
+            }
+            return response;
+        }
+        return null;
     }
 
     private String stripHtml(String html) {
