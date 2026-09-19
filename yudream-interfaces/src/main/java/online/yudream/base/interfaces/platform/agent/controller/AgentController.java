@@ -46,7 +46,16 @@ import java.util.concurrent.CompletableFuture;
 @RequestMapping("/api/platform/agents")
 @ConditionalOnProperty(prefix = "yudream.platform.capabilities.agent", name = "enabled", havingValue = "true")
 public class AgentController {
-    private final AgentAppService agentAppService;
+        private final online.yudream.base.application.platform.agent.workflow.AgentWorkflowValidator agentWorkflowValidator;
+    private final online.yudream.base.interfaces.platform.agent.support.AgentCodeNodeGate agentCodeNodeGate;
+
+    /** 工作流包含 Python 代码节点时要求专门的代码节点权限（编辑级权限不足以执行任意代码）。 */
+    private void ensureCodeNodePermission(String workflowJson) {
+        if (workflowJson != null && agentWorkflowValidator.containsCodeNode(workflowJson)) {
+            agentCodeNodeGate.ensureMayManageCodeNode();
+        }
+    }
+private final AgentAppService agentAppService;
 
     @Value("${yudream.platform.ai.client.sse-timeout:30m}")
     private Duration sseTimeout;
@@ -74,10 +83,16 @@ public class AgentController {
     public Result<AgentCatalogRes> catalog() { return Result.ok(AgentWebAssembler.toRes(agentAppService.catalog())); }
     @PostMapping
     @PermissionRegister(code = "platform:agent:edit", name = "新建 Agent 应用", module = "平台能力", desc = "新建 Agent 应用")
-    public Result<AgentApplicationRes> create(@Valid @RequestBody AgentApplicationSaveRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.save(AgentWebAssembler.toCmd(request)))); }
+    public Result<AgentApplicationRes> create(@Valid @RequestBody AgentApplicationSaveRequest request) {
+        ensureCodeNodePermission(request.getWorkflowJson());
+        return Result.ok(AgentWebAssembler.toRes(agentAppService.save(AgentWebAssembler.toCmd(request))));
+    }
     @PutMapping("/{id}")
     @PermissionRegister(code = "platform:agent:edit", name = "编辑 Agent 应用", module = "平台能力", desc = "编辑 Agent 编排")
-    public Result<AgentApplicationRes> update(@PathVariable Long id, @Valid @RequestBody AgentApplicationSaveRequest request) { return Result.ok(AgentWebAssembler.toRes(agentAppService.save(AgentWebAssembler.toCmd(id, request)))); }
+    public Result<AgentApplicationRes> update(@PathVariable Long id, @Valid @RequestBody AgentApplicationSaveRequest request) {
+        ensureCodeNodePermission(request.getWorkflowJson());
+        return Result.ok(AgentWebAssembler.toRes(agentAppService.save(AgentWebAssembler.toCmd(id, request))));
+    }
     @PostMapping("/{id}/publish")
     @PermissionRegister(code = "platform:agent:publish", name = "发布 Agent 应用", module = "平台能力", desc = "发布 Agent 应用")
     public Result<Void> publish(@PathVariable Long id) { agentAppService.publish(id); return Result.ok(); }

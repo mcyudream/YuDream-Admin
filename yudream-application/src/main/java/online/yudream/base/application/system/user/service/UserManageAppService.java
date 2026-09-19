@@ -148,7 +148,35 @@ public class UserManageAppService {
         if (user.getStatus() == UserStatus.DISABLED) {
             throw new BizException("用户已停用");
         }
+        assertImpersonationLevelCap(operatorId, user);
         return user;
+    }
+
+    /**
+     * 伪装权限上限：操作者的最高角色权重必须高于目标用户的最高角色权重。
+     * 否则 ADMIN 可通过伪装 SUPER_ADMIN 拿到超管级登录令牌，构成权限提升。
+     */
+    private void assertImpersonationLevelCap(Long operatorId, User target) {
+        if (operatorId == null) {
+            throw new BizException("无法识别操作者身份");
+        }
+        User operator = getUser(operatorId);
+        int operatorMax = maxRoleLevel(operator);
+        int targetMax = maxRoleLevel(target);
+        if (targetMax >= operatorMax) {
+            throw new BizException("不能伪装同级或更高权限的用户");
+        }
+    }
+
+    private int maxRoleLevel(User user) {
+        if (user.getRoles() == null || user.getRoles().isEmpty()) {
+            return 0;
+        }
+        List<Role> roles = roleRepo.findByIds(user.getRoles().stream().map(RoleID::getValue).distinct().toList());
+        return roles.stream()
+                .mapToInt(role -> role.getLevel() == null ? 0 : role.getLevel().getWeight())
+                .max()
+                .orElse(0);
     }
 
     private User getUser(Long id) {

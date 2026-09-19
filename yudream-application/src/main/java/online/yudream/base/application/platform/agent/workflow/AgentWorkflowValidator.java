@@ -30,6 +30,16 @@ public final class AgentWorkflowValidator {
         this.parser = new AgentWorkflowGraphParser(objectMapper);
     }
 
+    /** 工作流是否包含 Python 代码节点（供接口层做作者权限门禁判断）。 */
+    public boolean containsCodeNode(String workflowJson) {
+        try {
+            AgentWorkflowGraph graph = parser.parse(workflowJson);
+            return graph.topologicalOrder().stream().anyMatch(node -> "code".equals(node.kind()));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public void validate(String workflowJson, Catalog catalog) {
         AgentWorkflowGraph graph = parser.parse(workflowJson);
         Catalog available = catalog == null ? Catalog.empty() : catalog;

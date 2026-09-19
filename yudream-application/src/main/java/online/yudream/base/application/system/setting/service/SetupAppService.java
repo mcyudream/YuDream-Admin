@@ -21,6 +21,7 @@ import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import online.yudream.base.domain.valobj.Email;
 import online.yudream.base.domain.valobj.Password;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -42,6 +43,13 @@ public class SetupAppService {
     private final RoleRepo roleRepo;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * 部署级初始化令牌（可选）：设置 YUDREAM_SETUP_TOKEN 后，初始化请求必须携带
+     * 匹配值，未携带/不匹配一律拒绝，防止初始化窗口期被匿名创建超级管理员。
+     */
+    @Value("${YUDREAM_SETUP_TOKEN:}")
+    private String setupTokenExpected;
+
     @Transactional(readOnly = true)
     public SetupStatusDTO isSetupRequired() {
         boolean completed = settingRepo.existsByKey(SETUP_COMPLETED_KEY);
@@ -49,9 +57,19 @@ public class SetupAppService {
     }
 
     @Transactional
-    public User initialize(SetupCmd cmd) {
+    public synchronized User initialize(SetupCmd cmd) {
         if (settingRepo.existsByKey(SETUP_COMPLETED_KEY)) {
             throw new BizException("系统已初始化，请勿重复操作");
+        }
+        // synchronized + 完成标记双检：防止并发请求同时进入超管创建流程
+        if (settingRepo.existsByKey(SETUP_COMPLETED_KEY)) {
+            throw new BizException("系统已初始化，请勿重复操作");
+        }
+        if (StringUtils.hasText(setupTokenExpected)) {
+            if (!StringUtils.hasText(cmd.getSetupToken()) || !setupTokenExpected.equals(cmd.getSetupToken())) {
+                log.warn("初始化请求令牌校验失败，已拒绝");
+                throw new BizException("初始化令牌缺失或不匹配");
+            }
         }
         validate(cmd);
 
