@@ -143,10 +143,10 @@ public class WikiChatExecution {
                     taskFinished.set(true);
                     finishThinking(emitter, traceId, agui, thinkingStarted, terminate);
                     if (agui) {
-                        sendAgui(emitter, WikiAguiWebAssembler.runError(traceId, exception.getMessage()), terminate);
+                        sendAgui(emitter, WikiAguiWebAssembler.runError(traceId, safeMessage(exception, traceId)), terminate);
                     } else {
                         sendLegacy(emitter, "error", Map.of(
-                                "type", "error", "message", errorMessage(exception)), terminate);
+                                "type", "error", "message", safeMessage(exception, traceId)), terminate);
                     }
                     emitter.complete();
                 } else {
@@ -225,10 +225,16 @@ public class WikiChatExecution {
         }
     }
 
-    private String errorMessage(Exception exception) {
-        return exception.getMessage() == null || exception.getMessage().isBlank()
-                ? "问答失败，请稍后重试"
-                : exception.getMessage();
+    /**
+     * 面向客户端的错误文案收敛：业务异常（BizException）文案经过审核可直接返回；
+     * 其余内部异常只回固定文案 + traceId，完整堆栈仅写服务端日志。
+     */
+    private String safeMessage(Exception exception, String traceId) {
+        if (exception instanceof online.yudream.base.domain.common.exception.BizException bizException
+                && exception.getMessage() != null && !exception.getMessage().isBlank()) {
+            return bizException.getMessage();
+        }
+        return "问答失败，请稍后重试（traceId=" + traceId + "）";
     }
 
     private static final class SseTransportException extends RuntimeException {

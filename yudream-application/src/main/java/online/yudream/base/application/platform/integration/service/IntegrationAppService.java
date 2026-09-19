@@ -100,9 +100,9 @@ public class IntegrationAppService {
                 .url(connector.getUrl())
                 .method(connector.getMethod())
                 .requestHeaders(redact(headers))
-                .requestBody(body)
+                .requestBody(redactBody(body))
                 .responseStatus(result.statusCode())
-                .responseBody(result.body())
+                .responseBody(redactBody(result.body()))
                 .durationMillis(result.durationMillis())
                 .status(result.status())
                 .errorMessage(result.errorMessage())
@@ -243,6 +243,72 @@ public class IntegrationAppService {
         }
         values.forEach((key, value) -> result.put(key, shouldRedact(key) ? "******" : value));
         return result;
+    }
+
+    /**
+     * 请求/响应正文落库前做键感知脱敏：JSON/表单值中键名命中 shouldRedact
+     * 拒绝列表（token/secret/key/password/authorization 及其变体）的整值替换为 ******，
+     * 与请求头脱敏共用同一判定谓词。
+     */
+    private String redactBody(String body) {
+        if (body == null || body.isBlank()) {
+            return body;
+        }
+        String trimmed = body.stripLeading();
+        if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode root =
+                        new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+                if (root.isObject()) {
+                    return redactObject((com.fasterxml.jackson.databind.node.ObjectNode) root).toString();
+                }
+                return body;
+            } catch (Exception parseFailure) {
+                // 非 JSON 正文不做结构化脱敏，仅截断保存
+                return limitBody(body);
+            }
+        }
+        return maskFormOrQuery(body);
+    }
+
+    private com.fasterxml.jackson.databind.JsonNode redactObject(com.fasterxml.jackson.databind.node.ObjectNode node) {
+        var fields = node.fieldNames();
+        while (fields.hasNext()) {
+            String field = fields.next();
+            if (shouldRedact(field)) {
+                node.put(field, "******");
+            } else {
+                com.fasterxml.jackson.databind.JsonNode child = node.get(field);
+                if (child != null && child.isObject()) {
+                    redactObject((com.fasterxml.jackson.databind.node.ObjectNode) child);
+                }
+            }
+        }
+        return node;
+    }
+
+    private String maskFormOrQuery(String body) {
+        if (body.indexOf('=') < 0) {
+            return limitBody(body);
+        }
+        StringBuilder out = new StringBuilder(body.length());
+        for (String pair : body.split("&", -1)) {
+            if (!out.isEmpty()) {
+                out.append('&');
+            }
+            int split = pair.indexOf('=');
+            if (split > 0 && shouldRedact(pair.substring(0, split))) {
+                out.append(pair, 0, split + 1).append("******");
+            } else {
+                out.append(pair);
+            }
+        }
+        return out.toString();
+    }
+
+    private String limitBody(String body) {
+        int limit = 4000;
+        return body.length() <= limit ? body : body.substring(0, limit);
     }
 
     private boolean shouldRedact(String key) {
