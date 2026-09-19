@@ -63,9 +63,28 @@ public class UserController {
     private final LoginTokenAppService loginTokenAppService;
     private final OAuthPasskeyAppService oauthPasskeyAppService;
     private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
+    private final online.yudream.base.interfaces.common.support.AuthRateLimiter authRateLimiter;
+
+    /** 匿名可触达认证端点的限流参数（按 IP / 按账号双维度）。 */
+    private static final java.time.Duration RATE_WINDOW = java.time.Duration.ofMinutes(1);
+    private static final int LOGIN_IP_LIMIT = 20;
+    private static final int LOGIN_ACCOUNT_LIMIT = 8;
+    private static final int REGISTER_IP_LIMIT = 5;
+    private static final int RESET_EMAIL_LIMIT = 3;
+
+    private void limitAuth(String bucket, String key) {
+        authRateLimiter.check(bucket, key, switch (bucket) {
+            case "login-ip" -> LOGIN_IP_LIMIT;
+            case "login-account" -> LOGIN_ACCOUNT_LIMIT;
+            case "register-ip" -> REGISTER_IP_LIMIT;
+            case "reset-email" -> RESET_EMAIL_LIMIT;
+            default -> LOGIN_IP_LIMIT;
+        }, RATE_WINDOW);
+    }
 
     @PostMapping("/register")
-    public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request) {
+    public Result<UserRegisterRes> register(@Valid @RequestBody UserRegisterRequest request, HttpServletRequest httpRequest) {
+        limitAuth("register-ip", clientIp(httpRequest));
         return Result.ok(UserWebAssembler.toRegisterRes(userAppService.register(UserWebAssembler.toRegisterCmd(request))));
     }
 
@@ -75,7 +94,8 @@ public class UserController {
     }
 
     @PostMapping("/password-reset/email")
-    public Result<Void> sendPasswordResetEmail(@Valid @RequestBody UserPasswordResetEmailRequest request) {
+    public Result<Void> sendPasswordResetEmail(@Valid @RequestBody UserPasswordResetEmailRequest request, HttpServletRequest httpRequest) {
+        limitAuth("reset-email", clientIp(httpRequest));
         userAppService.sendPasswordResetEmail(UserWebAssembler.toCmd(request));
         return Result.ok();
     }
@@ -88,15 +108,17 @@ public class UserController {
 
     @PostMapping("/login")
     public Result<UserLoginRes> login(@Valid @RequestBody UserLoginRequest request, HttpServletRequest httpRequest) {
+        limitAuth("login-ip", clientIp(httpRequest));
+        limitAuth("login-account", request.getUsername());
         try {
             User user = userAppService.login(UserWebAssembler.toLoginCmd(request), request.getBindingToken());
             LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
             UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
-            recordLoginLog(request, httpRequest, user, true, "success", res.getToken());
+            recordLoginLog(request, httpRequest, user, true, "success");
             return Result.ok(res);
         }
         catch (RuntimeException e) {
-            recordLoginLog(request, httpRequest, null, false, e.getMessage(), null);
+            recordLoginLog(request, httpRequest, null, false, e.getMessage());
             throw e;
         }
     }
@@ -122,11 +144,11 @@ public class UserController {
                     PasskeyWebAssembler.toAuthenticationFinishCmd(request, PasskeyRelyingPartySupport.from(httpRequest, siteName())));
             LoginTokenDTO token = loginTokenAppService.issueForLogin(user.getId());
             UserLoginRes res = UserWebAssembler.toLoginRes(user, token, userAppService.avatarUrl(user));
-            recordLoginLog(request.getUsername(), httpRequest, user, true, "passkey success", res.getToken());
+            recordLoginLog(request.getUsername(), httpRequest, user, true, "passkey success");
             return Result.ok(res);
         }
         catch (RuntimeException e) {
-            recordLoginLog(request.getUsername(), httpRequest, null, false, e.getMessage(), null);
+            recordLoginLog(request.getUsername(), httpRequest, null, false, e.getMessage());
             throw e;
         }
     }
@@ -140,23 +162,43 @@ public class UserController {
         }
     }
 
-    private void recordLoginLog(UserLoginRequest request, HttpServletRequest httpRequest, User user, boolean success, String message, String token) {
+    // 登录审计不记录令牌：原始会话令牌属于持有者凭据，落库即泄露面。
+    private void recordLoginLog(UserLoginRequest request, HttpServletRequest httpRequest, User user, boolean success, String message) {
         systemMonitorAppService.recordLoginLog(UserWebAssembler.toLoginLogDTO(
-                request, user, success, message, clientIp(httpRequest), httpRequest.getHeader("User-Agent"), token));
+                request, user, success, message, clientIp(httpRequest), httpRequest.getHeader("User-Agent")));
     }
 
-    private void recordLoginLog(String username, HttpServletRequest httpRequest, User user, boolean success, String message, String token) {
+    private void recordLoginLog(String username, HttpServletRequest httpRequest, User user, boolean success, String message) {
         systemMonitorAppService.recordLoginLog(UserWebAssembler.toLoginLogDTO(
-                username, user, success, message, clientIp(httpRequest), httpRequest.getHeader("User-Agent"), token));
+                username, user, success, message, clientIp(httpRequest), httpRequest.getHeader("User-Agent")));
     }
 
     private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(forwarded)) {
-            return forwarded.split(",")[0].trim();
+        // 转发头仅在反向代理后可信：逐段校验为合法 IP 字面量，非法值一律回退直连地址。
+        for (String candidate : new String[]{request.getHeader("X-Forwarded-For"), request.getHeader("X-Real-IP")}) {
+            if (!StringUtils.hasText(candidate)) {
+                continue;
+            }
+            for (String part : candidate.split(",")) {
+                String ip = part.trim();
+                if (isValidIpLiteral(ip)) {
+                    return ip;
+                }
+            }
         }
-        String realIp = request.getHeader("X-Real-IP");
-        return StringUtils.hasText(realIp) ? realIp : request.getRemoteAddr();
+        return request.getRemoteAddr();
+    }
+
+    private boolean isValidIpLiteral(String value) {
+        if (!StringUtils.hasText(value)) {
+            return false;
+        }
+        try {
+            java.net.InetAddress address = java.net.InetAddress.getByName(value);
+            return value.indexOf(':') >= 0 || address.getHostAddress().replace("/", "").equals(value);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @GetMapping("/me/profile")
