@@ -116,17 +116,33 @@ public class ApiPayloadEncryptionFilter extends OncePerRequestFilter {
                 && StringUtils.hasText(request.getHeader(ENCRYPTED_KEY_HEADER));
     }
 
+    /** 失效关闭：携带请求体的方法必须同时提供 IV 与密文，缺一即拒绝，防止明文绕过加密策略。 */
+    private boolean hasRequestBody(HttpServletRequest request) {
+        long length = request.getContentLengthLong();
+        if (length > 0) {
+            return true;
+        }
+        if (length == 0) {
+            return false;
+        }
+        String transferEncoding = request.getHeader("Transfer-Encoding");
+        return transferEncoding != null && transferEncoding.toLowerCase().contains("chunked");
+    }
+
     private HttpServletRequest decryptRequestIfNeeded(HttpServletRequest request, byte[] sessionKey) throws IOException {
         if (!BODY_METHODS.contains(request.getMethod().toUpperCase())) {
             return request;
         }
+        if (!hasRequestBody(request)) {
+            return request;
+        }
         String iv = request.getHeader(ENCRYPTED_IV_HEADER);
         if (!StringUtils.hasText(iv)) {
-            return request;
+            throw new BizException("接口加密已开启，请求体必须携带加密 IV");
         }
         ApiEncryptedPayloadRequest payload = objectMapper.readValue(request.getInputStream(), ApiEncryptedPayloadRequest.class);
         if (!StringUtils.hasText(payload.getData())) {
-            return request;
+            throw new BizException("接口加密已开启，请求体必须为加密载荷");
         }
         String plainBody = apiEncryptionAppService.decrypt(sessionKey, iv, payload.getData());
         return new ApiEncryptedRequestWrapper(request, plainBody);
