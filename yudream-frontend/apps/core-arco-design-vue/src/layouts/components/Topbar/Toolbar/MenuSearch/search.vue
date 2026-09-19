@@ -5,6 +5,7 @@ import { useHotkeyBindings } from '@/hotkeys/useHotkeys'
 import Breadcrumb from '@/layouts/components/Breadcrumb/index.vue'
 import BreadcrumbItem from '@/layouts/components/Breadcrumb/item.vue'
 import { resolveRoutePath } from '@/utils'
+import { safeExternalLink } from '@/utils/menu-link'
 
 defineOptions({
   name: 'ToolbarMenuSearchModal',
@@ -172,7 +173,10 @@ function handleScroll() {
 
 function pageJump(path: listTypes['path'], link: listTypes['link']) {
   if (link) {
-    window.open(link, '_blank')
+    const target = safeExternalLink(link)
+    if (target) {
+      window.open(target, '_blank', 'noopener,noreferrer')
+    }
   }
   else {
     router.push(path)

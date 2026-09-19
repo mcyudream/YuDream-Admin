@@ -145,7 +145,7 @@ public class MenuAppService {
                 .icon(cmd.getIcon())
                 .path(resolvePath(cmd.getType(), cmd.getCode(), cmd.getPath()))
                 .component(resolveComponent(cmd.getType(), cmd.getComponent()))
-                .link(cmd.getLink())
+                .link(sanitizeLink(cmd.getLink()))
                 .sort(cmd.getSort() == null ? 0 : cmd.getSort())
                 .visible(cmd.getVisible() == null || cmd.getVisible())
                 .permission(cmd.getPermission())
@@ -168,7 +168,7 @@ public class MenuAppService {
                 cmd.getIcon(),
                 resolvePath(cmd.getType(), cmd.getCode(), cmd.getPath()),
                 resolveComponent(cmd.getType(), cmd.getComponent()),
-                cmd.getLink(),
+                sanitizeLink(cmd.getLink()),
                 cmd.getSort(),
                 cmd.getVisible() == null || cmd.getVisible(),
                 cmd.getPermission()
@@ -509,6 +509,29 @@ public class MenuAppService {
                 .pluginModuleName(menu.getPluginModuleName())
                 .runtimeAvailable(menu.getRuntimeAvailable())
                 .build();
+    }
+
+    /**
+     * 菜单外链 scheme 白名单：仅 http/https。菜单 link 会在前端绑定到
+     * href/window.open，javascript:/data:/vbscript: 一类值构成存储型 XSS。
+     */
+    private String sanitizeLink(String link) {
+        if (!StringUtils.hasText(link)) {
+            return null;
+        }
+        String trimmed = link.trim();
+        String lower = trimmed.toLowerCase(java.util.Locale.ROOT);
+        if (lower.startsWith("http://") || lower.startsWith("https://")) {
+            try {
+                java.net.URI uri = java.net.URI.create(trimmed);
+                if (uri.getHost() != null) {
+                    return trimmed;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // 落入下方拒绝
+            }
+        }
+        throw new BizException("菜单外链仅支持 http/https 地址");
     }
 
     private String blankToNull(String value) {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useClipboard } from '@vueuse/core'
+import { safeExternalLink } from '@/utils/menu-link'
 
 defineOptions({
   name: 'LinkView',
@@ -12,7 +13,10 @@ watch(copied, (val) => {
 })
 
 function open() {
-  window.open(route.meta.link, '_blank')
+  const target = safeExternalLink(route.meta.link)
+  if (target) {
+    window.open(target, '_blank', 'noopener,noreferrer')
+  }
 }
 </script>
 

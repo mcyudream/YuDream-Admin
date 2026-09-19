@@ -58,6 +58,7 @@ public class MenuDomainService {
     }
 
     public Menu syncMenu(Menu menu) {
+        assertSafeLink(menu.getLink());
         Menu saved = menuRepo.save(menu);
         log.debug("Synced menu: code={}, name={}", saved.getCode(), saved.getName());
         upsertMenuPermission(saved);
@@ -71,6 +72,27 @@ public class MenuDomainService {
             permissionRepo.deleteByCode(menu.getPermissionCode());
         }
         log.debug("Deleted menu: code={}", code);
+    }
+
+    /**
+     * 菜单外链 scheme 白名单（http/https）：link 会在控制台绑定到 href/window.open，
+     * javascript:/data: 等值构成存储型 XSS；插件清单与 HTTP 管理两条写入路径统一在此校验。
+     */
+    private void assertSafeLink(String link) {
+        if (link == null || link.isBlank()) {
+            return;
+        }
+        String lower = link.trim().toLowerCase(java.util.Locale.ROOT);
+        if ((lower.startsWith("http://") || lower.startsWith("https://"))) {
+            try {
+                if (java.net.URI.create(link.trim()).getHost() != null) {
+                    return;
+                }
+            } catch (IllegalArgumentException ignored) {
+                // 落入拒绝
+            }
+        }
+        throw new online.yudream.base.domain.common.exception.BizException("菜单外链仅支持 http/https 地址");
     }
 
     private void upsertMenuPermission(Menu menu) {

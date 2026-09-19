@@ -430,7 +430,11 @@ public class MilkyPluginMessagingService implements PluginMessagingService, Plug
 
     private static String markdownImage(PluginMessageContent.Attachment attachment) {
         String title = attachment.title() == null || attachment.title().isBlank() ? "图片" : attachment.title().trim();
-        return "![" + title + "](" + attachment.url() + ")";
+        String url = attachment.url() == null ? "" : attachment.url().trim();
+        // 标题转义 Markdown 元字符、URL 拒绝含空白/括号/换行，防止注入图片文本或断链
+        String safeTitle = title.replaceAll("[\\[\\]\\()!\\\\]", "-").replaceAll("\\s+", " ");
+        String safeUrl = url.matches("[^\\s()<>]+") ? url : "";
+        return "![" + safeTitle + "](" + safeUrl + ")";
     }
 
     /** SPI 按钮 → 官方 keyboard：指令按钮 action.type=2，回调按钮 action.type=1；每排最多 2 个、最多 5 行。 */
