@@ -278,11 +278,12 @@ public class UserWebAssembler {
                 .build();
     }
 
-    public static LoginLogDTO toLoginLogDTO(UserLoginRequest request, User user, boolean success, String message, String ip, String userAgent, String token) {
-        return toLoginLogDTO(request.getUsername(), user, success, message, ip, userAgent, token);
+    public static LoginLogDTO toLoginLogDTO(UserLoginRequest request, User user, boolean success, String message, String ip, String userAgent) {
+        return toLoginLogDTO(request.getUsername(), user, success, message, ip, userAgent);
     }
 
-    public static LoginLogDTO toLoginLogDTO(String username, User user, boolean success, String message, String ip, String userAgent, String token) {
+    /** 登录审计不落令牌：审计需要追踪会话时以服务端不可逆会话标识替代。 */
+    public static LoginLogDTO toLoginLogDTO(String username, User user, boolean success, String message, String ip, String userAgent) {
         return LoginLogDTO.builder()
                 .username(username)
                 .userId(user == null ? null : user.getId())
@@ -290,7 +291,6 @@ public class UserWebAssembler {
                 .message(message)
                 .ip(ip)
                 .userAgent(userAgent)
-                .token(token)
                 .build();
     }
 

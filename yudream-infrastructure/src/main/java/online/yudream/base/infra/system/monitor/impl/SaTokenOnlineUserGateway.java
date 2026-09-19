@@ -14,6 +14,9 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -30,12 +33,7 @@ public class SaTokenOnlineUserGateway implements OnlineUserGateway {
     public List<OnlineUserDTO> list(String keyword, int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 200));
         String match = StringUtils.hasText(keyword) ? keyword.trim() : "";
-        Set<String> tokens = new LinkedHashSet<>(StpUtil.searchTokenValue("", 0, safeLimit, false));
-        String currentToken = StpUtil.getTokenValue();
-        if (StringUtils.hasText(currentToken)) {
-            tokens.add(currentToken);
-        }
-        tokens.addAll(recentLoginTokens(safeLimit));
+        Set<String> tokens = candidateTokens();
         return tokens.stream()
                 .map(this::toOnlineUser)
                 .filter(Objects::nonNull)
@@ -43,11 +41,39 @@ public class SaTokenOnlineUserGateway implements OnlineUserGateway {
                 .toList();
     }
 
-    @Override
-    public void kickout(String token) {
-        if (StringUtils.hasText(token)) {
-            StpUtil.kickoutByTokenValue(token);
+    /** 会话句柄：令牌的不可逆摘要，供展示与踢出定位，本身不具备认证价值。 */
+    static String sessionId(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest).substring(0, 32);
+        } catch (Exception e) {
+            throw new IllegalStateException("无法计算会话标识", e);
         }
+    }
+
+    @Override
+    public void kickout(String handle) {
+        if (!StringUtils.hasText(handle)) {
+            return;
+        }
+        // 句柄不可逆，踢出前在服务端把句柄解析回真实令牌；兼容直接传入原始令牌的调用。
+        for (String candidate : candidateTokens()) {
+            if (sessionId(candidate).equals(handle)) {
+                StpUtil.kickoutByTokenValue(candidate);
+                return;
+            }
+        }
+        StpUtil.kickoutByTokenValue(handle);
+    }
+
+    private Set<String> candidateTokens() {
+        Set<String> tokens = new LinkedHashSet<>(StpUtil.searchTokenValue("", 0, 200, false));
+        String currentToken = StpUtil.getTokenValue();
+        if (StringUtils.hasText(currentToken)) {
+            tokens.add(currentToken);
+        }
+        return tokens;
     }
 
     private OnlineUserDTO toOnlineUser(String token) {
@@ -66,7 +92,8 @@ public class SaTokenOnlineUserGateway implements OnlineUserGateway {
             Long userId = Long.valueOf(String.valueOf(loginId));
             User user = userRepo.findById(userId).orElse(null);
             return OnlineUserDTO.builder()
-                    .token(token)
+                    // 对外仅暴露不可逆会话句柄，原始令牌不出网关。
+                    .token(sessionId(token))
                     .userId(userId)
                     .username(user == null ? null : user.getUsername())
                     .nickname(user == null ? null : user.getNickname())
@@ -79,15 +106,6 @@ public class SaTokenOnlineUserGateway implements OnlineUserGateway {
         catch (Exception e) {
             return null;
         }
-    }
-
-    private List<String> recentLoginTokens(int limit) {
-        Query query = Query.query(Criteria.where("success").is(true).and("token").ne(null));
-        query.with(Sort.by(Sort.Direction.DESC, "createTime")).limit(limit);
-        return mongoTemplate.find(query, LoginLogDO.class).stream()
-                .map(LoginLogDO::getToken)
-                .filter(StringUtils::hasText)
-                .toList();
     }
 
     private boolean matches(OnlineUserDTO item, String keyword) {

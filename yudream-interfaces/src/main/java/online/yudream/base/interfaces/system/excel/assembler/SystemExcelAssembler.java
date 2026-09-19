@@ -267,7 +267,6 @@ public class SystemExcelAssembler {
         row.setDevice(dto.getDevice());
         row.setTimeout(dto.getTimeout());
         row.setActiveTimeout(dto.getActiveTimeout());
-        row.setToken(dto.getToken());
         return row;
     }
 

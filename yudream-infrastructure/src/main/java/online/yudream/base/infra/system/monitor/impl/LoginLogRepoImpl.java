@@ -38,7 +38,7 @@ public class LoginLogRepoImpl implements LoginLogRepo {
         Query query = buildQuery(keyword, success);
         long total = mongoTemplate.count(query, LoginLogDO.class);
         int currentPage = Math.max(page, 1);
-        int pageSize = Math.max(size, 1);
+        int pageSize = Math.min(Math.max(size, 1), 200);
         query.with(Sort.by(Sort.Direction.DESC, "createTime"))
                 .skip((long) (currentPage - 1) * pageSize)
                 .limit(pageSize);
@@ -77,7 +77,6 @@ public class LoginLogRepoImpl implements LoginLogRepo {
         data.setMessage(dto.getMessage());
         data.setIp(dto.getIp());
         data.setUserAgent(dto.getUserAgent());
-        data.setToken(dto.getToken());
         return data;
     }
 
@@ -90,7 +89,6 @@ public class LoginLogRepoImpl implements LoginLogRepo {
                 .message(data.getMessage())
                 .ip(data.getIp())
                 .userAgent(data.getUserAgent())
-                .token(data.getToken())
                 .createTime(data.getCreateTime())
                 .build();
     }
