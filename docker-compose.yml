@@ -1,4 +1,5 @@
-# YuDream Admin 生产部署编排（不含中间件）
+# YuDream Admin 生产部署编排（基础服务：backend/render/frontend/kkfileview/watchtower）
+# MongoDB/Redis 等中间件请叠加全套编排：docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d
 # 用法：
 #   docker compose pull
 #   docker compose up -d
@@ -102,6 +103,9 @@ services:
       - ./plugins:/app/plugins
       # 市场源发布物必须独立于扫描目录；不挂载则镜像重建后 JAR 丢失，下载会 404
       - ./market-source:/app/market-source
+      # 安装向导生成的引导配置（config/yudream-bootstrap.properties，含数据库连接与部署密钥）
+      # 必须以卷持久化，否则容器重建后回到安装向导
+      - ./config:/app/config
       # 启用 docker 容器日志采集时，取消下一行注释，将宿主 docker 只读 socket 挂入容器
       # - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:

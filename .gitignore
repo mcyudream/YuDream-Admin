@@ -38,6 +38,7 @@ build/
 ### Mac OS ###
 .DS_Store
 /.env
+/config/
 
 # Nested repository backups
 .git.bak/
