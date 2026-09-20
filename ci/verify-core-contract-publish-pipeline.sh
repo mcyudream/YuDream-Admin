@@ -67,6 +67,7 @@ grep -q 'remoteRepositories=nexus-public' ci/verify-plugin-spi-registry.sh \
 echo "[verify-core-contract-publish-pipeline] checking Nexus npm publish/verify jobs"
 require_pattern '^publish:npm-plugin-sdk:$' "core CI must publish @yudream/plugin-sdk to Nexus"
 require_pattern '^publish:npm-components:$' "core CI must publish @yudream/components to Nexus"
+require_pattern '^publish:npm-dataviz:$' "core CI must publish @yudream/dataviz to Nexus"
 require_pattern '^verify:npm-contracts:$' "core CI must verify Nexus npm contracts"
 require_pattern 'VERIFY_NPM_REGISTRY="\$NEXUS_NPM_PUBLIC_URL" sh ci/verify-published-npm-contracts.sh' "core CI must re-install npm contracts from Nexus npm-public"
 require_pattern 'pnpm publish --no-git-checks --registry "\$NEXUS_NPM_PUBLIC_URL"' "core CI must publish npm contracts to Nexus npm-public"
@@ -75,7 +76,7 @@ require_pattern 'NEXUS_PASSWORD' "core CI must use the shared Nexus password"
 
 echo "[verify-core-contract-publish-pipeline] checking publish rules"
 require_pattern '\$CI_COMMIT_TAG =~ /\[pv\]/' "contract publish/verify jobs must use p/v tag rules"
-require_pattern '\$CI_COMMIT_TAG =~ /\[dv\]/' "build and Docker jobs must use d/v tag rules"
+require_pattern '\$CI_COMMIT_TAG =~ /\^(v\|d)/' "build and Docker jobs must use anchored v*/d* tag rules"
 
 if grep -Eq 'packages/(maven|npm)|publish:npmjs-|verify:(gitlab-npm|npmjs)|GITLAB_NPM_PUBLISH_ENABLED|NPMJS_PUBLISH_ENABLED|NPM_TOKEN' .gitlab-ci.yml; then
   fail "core CI must not publish contracts to GitLab Package Registry or npmjs"

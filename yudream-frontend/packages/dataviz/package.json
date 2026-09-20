@@ -1,7 +1,18 @@
 {
   "name": "@yudream/dataviz",
   "type": "module",
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "files": [
+    "src"
+  ],
+  "types": "./src/index.ts",
+  "publishConfig": {
+    "registry": "https://nexus.yudream.online/repository/npm-public/"
+  },
+  "scripts": {
+    "build": "vue-tsc -p tsconfig.json --noEmit",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit --pretty false"
+  },
   "exports": {
     ".": "./src/index.ts"
   },
@@ -14,6 +25,9 @@
     "echarts": "catalog:"
   },
   "devDependencies": {
-    "@types/d3": "catalog:"
+    "@types/d3": "catalog:",
+    "typescript": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:"
   }
 }

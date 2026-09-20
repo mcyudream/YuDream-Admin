@@ -69,4 +69,17 @@ if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/np
   fail "@yudream/components must publish to Nexus npm-public"
 fi
 
+echo "[verify-contract-packages] checking @yudream/dataviz"
+grep -q '"version":[[:space:]]*"0.1.0"' yudream-frontend/packages/dataviz/package.json \
+  || fail "@yudream/dataviz must use stable version 0.1.0"
+grep -q '"./src/index.ts"' yudream-frontend/packages/dataviz/package.json \
+  || fail "@yudream/dataviz must export the published src entry"
+if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' yudream-frontend/packages/dataviz/package.json; then
+  fail "@yudream/dataviz must publish to Nexus npm-public"
+fi
+grep -q '"echarts"' yudream-frontend/packages/dataviz/package.json \
+  || fail "@yudream/dataviz must carry echarts as a published dependency"
+grep -q '"d3"' yudream-frontend/packages/dataviz/package.json \
+  || fail "@yudream/dataviz must carry d3 as a published dependency"
+
 echo "[verify-contract-packages] OK"

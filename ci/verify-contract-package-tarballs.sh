@@ -27,11 +27,16 @@ pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/plugi
 echo "[verify-contract-package-tarballs] packing @yudream/components"
 pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/components pack --pack-destination "$PACK_DIR" >/dev/null
 
+echo "[verify-contract-package-tarballs] packing @yudream/dataviz"
+pnpm --config.engine-strict=false --dir yudream-frontend --filter @yudream/dataviz pack --pack-destination "$PACK_DIR" >/dev/null
+
 PLUGIN_SDK_TGZ=$(find "$PACK_DIR" -maxdepth 1 -type f -name 'yudream-plugin-sdk-*.tgz' | head -n 1)
 COMPONENTS_TGZ=$(find "$PACK_DIR" -maxdepth 1 -type f -name 'yudream-components-*.tgz' | head -n 1)
+DATAVIZ_TGZ=$(find "$PACK_DIR" -maxdepth 1 -type f -name 'yudream-dataviz-*.tgz' | head -n 1)
 
 [ -n "$PLUGIN_SDK_TGZ" ] || fail "missing plugin-sdk packed tarball"
 [ -n "$COMPONENTS_TGZ" ] || fail "missing components packed tarball"
+[ -n "$DATAVIZ_TGZ" ] || fail "missing dataviz packed tarball"
 
 extract_tgz() {
   archive_path=$1
@@ -73,5 +78,12 @@ tar -tf "$COMPONENTS_TGZ" | grep -q '^package/src/index\.ts$' || fail "component
 extract_tgz "$COMPONENTS_TGZ" "$EXTRACT_DIR/components"
 grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' "$EXTRACT_DIR/components/package/package.json" || fail "components tarball package.json must publish to Nexus npm-public"
 assert_no_publish_local_refs "@yudream/components" "$EXTRACT_DIR/components"
+
+echo "[verify-contract-package-tarballs] checking dataviz tarball contents"
+tar -tf "$DATAVIZ_TGZ" | grep -q '^package/src/index\.ts$' || fail "dataviz tarball must contain src/index.ts"
+tar -tf "$DATAVIZ_TGZ" | grep -q '^package/src/composables/useECharts\.ts$' || fail "dataviz tarball must contain src/composables/useECharts.ts"
+extract_tgz "$DATAVIZ_TGZ" "$EXTRACT_DIR/dataviz"
+grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/npm-public/"' "$EXTRACT_DIR/dataviz/package/package.json" || fail "dataviz tarball package.json must publish to Nexus npm-public"
+assert_no_publish_local_refs "@yudream/dataviz" "$EXTRACT_DIR/dataviz"
 
 echo "[verify-contract-package-tarballs] OK"
