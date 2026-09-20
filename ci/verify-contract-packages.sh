@@ -70,8 +70,8 @@ if ! grep -q '"registry":[[:space:]]*"https://nexus.yudream.online/repository/np
 fi
 
 echo "[verify-contract-packages] checking @yudream/dataviz"
-grep -q '"version":[[:space:]]*"0.1.1"' yudream-frontend/packages/dataviz/package.json \
-  || fail "@yudream/dataviz must use stable version 0.1.1"
+grep -q '"version":[[:space:]]*"0.1.2"' yudream-frontend/packages/dataviz/package.json \
+  || fail "@yudream/dataviz must use stable version 0.1.2"
 grep -q '"./src/index.ts"' yudream-frontend/packages/dataviz/package.json \
   || fail "@yudream/dataviz must export the published src entry"
 grep -q '"./echarts"' yudream-frontend/packages/dataviz/package.json \

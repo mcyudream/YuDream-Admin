@@ -6,8 +6,8 @@
 import type { CSSProperties } from 'vue'
 import { computed, ref } from 'vue'
 import type { ChartDataset, ChartTheme } from '../types'
-import { useECharts } from '../composables'
-import { buildEChartsOption } from '../utils'
+import { useECharts } from '../composables/useECharts'
+import { buildEChartsOption } from '../utils/echarts-option-builder'
 
 const props = withDefaults(defineProps<{
   dataset: ChartDataset
