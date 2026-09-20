@@ -112,7 +112,7 @@ build:backend:
       - yudream-plugins/yudream-plugin-spi/target/*.jar
     expire_in: 1 week
   rules:
-    - if: $CI_COMMIT_TAG =~ /[dv]/
+    - if: $CI_COMMIT_TAG =~ /^(v|d)/
 
 build:frontend-main:
   stage: build-frontend-main
@@ -133,13 +133,14 @@ build:frontend-main:
       - yudream-frontend/apps/core-arco-design-vue/dist/
     expire_in: 1 week
   rules:
-    - if: $CI_COMMIT_TAG =~ /[dv]/
+    - if: $CI_COMMIT_TAG =~ /^(v|d)/
 
 # 契约包发布 tag 约定：
-#   v* / 裸 p*（如 p2.15.0）发布并验签全部契约包（SPI + plugin-sdk + components）；
+#   v* / 裸 p*（如 p2.15.0）发布并验签全部契约包（SPI + plugin-sdk + components + dataviz）；
 #   pspi-* 只发布/验签 yudream-plugin-spi（Maven）；
 #   psdk-* 只发布/验签 @yudream/plugin-sdk；
-#   pcomp-* 只发布/验签 @yudream/components。
+#   pcomp-* 只发布/验签 @yudream/components；
+#   pdviz-* 只发布/验签 @yudream/dataviz。
 # 各作业用「排除其他分包 tag 后回落到 [pv]」的 rules 实现该拆分。
 publish:maven-plugin-spi:
   stage: publish-packages
@@ -148,7 +149,7 @@ publish:maven-plugin-spi:
     - echo "Deploy yudream-plugin-spi to Nexus"
     - mvn -s ci/maven-settings-nexus.xml -f yudream-plugins/yudream-plugin-spi/pom.xml -DskipTests deploy -B -ntp -e
   rules:
-    - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
+    - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
@@ -158,7 +159,7 @@ verify:maven-plugin-spi:
   script:
     - sh ci/verify-plugin-spi-registry.sh
   rules:
-    - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
+    - if: $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
@@ -183,6 +184,9 @@ verify:npm-contracts:
     - if: $CI_COMMIT_TAG =~ /^pcomp/
       variables:
         VERIFY_NPM_PACKAGES: "@yudream/components"
+    - if: $CI_COMMIT_TAG =~ /^pdviz/
+      variables:
+        VERIFY_NPM_PACKAGES: "@yudream/dataviz"
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
 publish:npm-plugin-sdk:
@@ -208,7 +212,7 @@ publish:npm-plugin-sdk:
     - cd packages/plugin-sdk
     - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^pcomp/
+    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
@@ -235,7 +239,34 @@ publish:npm-components:
     - cd packages/components
     - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/
+    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pdviz/
+      when: never
+    - if: $CI_COMMIT_TAG =~ /[pv]/
+
+publish:npm-dataviz:
+  stage: publish-packages
+  image: *node_image
+  before_script:
+    - npm config set registry "$NPM_CONFIG_REGISTRY"
+    - corepack enable && corepack prepare pnpm@11.9.0 --activate
+    - pnpm config set registry "$NPM_CONFIG_REGISTRY"
+    - node -v
+    - pnpm -v
+  script:
+    - cd "$FRONTEND_DIR"
+    - pnpm install --frozen-lockfile
+    - pnpm --filter @yudream/dataviz run build
+    - |
+      REGISTRY_HOST=$(echo "$NEXUS_NPM_PUBLIC_URL" | sed -E 's#^https?://##' | sed 's#/$##')
+      printf '%s\n' \
+        "@yudream:registry=$NEXUS_NPM_PUBLIC_URL" \
+        "//$REGISTRY_HOST/:username=$NEXUS_USERNAME" \
+        "//$REGISTRY_HOST/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')" \
+        'always-auth=true' > .npmrc
+    - cd packages/dataviz
+    - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
       when: never
     - if: $CI_COMMIT_TAG =~ /[pv]/
 
@@ -257,7 +288,7 @@ collect:artifacts:
       - dist/
     expire_in: 1 week
   rules:
-    - if: $CI_COMMIT_TAG =~ /[dv]/
+    - if: $CI_COMMIT_TAG =~ /^(v|d)/
 
 build-and-push-images:
   stage: build-images
@@ -295,7 +326,7 @@ build-and-push-images:
           ;;
       esac
   rules:
-    - if: $CI_COMMIT_TAG =~ /[dv]/
+    - if: $CI_COMMIT_TAG =~ /^(v|d)/
 
 # 文档站仅在名称包含 w/W 的 Git tag 上构建并通过 FTP/FTPS 发布。
 deploy:docs-ftp:

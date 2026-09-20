@@ -894,13 +894,19 @@ importers:
       echarts:
         specifier: 'catalog:'
         version: 5.5.0
-      vue:
-        specifier: 'catalog:'
-        version: 3.5.38(typescript@6.0.3)
     devDependencies:
       '@types/d3':
         specifier: 'catalog:'
         version: 7.4.3
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.38(typescript@6.0.3)
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.4(typescript@6.0.3)
 
   packages/iconify-tools:
     dependencies:
@@ -3653,6 +3659,7 @@ packages:
   '@xmldom/xmldom@0.9.10':
     resolution: {integrity: sha512-A9gOqLdi6cV4ibazAjcQufGj0B1y/vDqYrcuP6d/6x8P27gRS8643Dj9o1dEKtB6O7fwxb2FgBmJS2mX7gpvdw==}
     engines: {node: '>=14.6'}
+    deprecated: this version has critical issues, please update to the latest version
 
   '@zumer/snapdom@2.12.8':
     resolution: {integrity: sha512-dLX6ZMNjLveasn9yhcruOOfd8GBZBDp59F7iJoLlGf7BnGp0vfVsjxIZDIjN2UTZJN1KoJR/BXsxEnAyY7LuXA==}

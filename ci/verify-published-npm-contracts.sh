@@ -13,9 +13,9 @@ if ! command -v pnpm >/dev/null 2>&1; then
   fail "pnpm is required"
 fi
 
-# 分包发布 tag（psdk-*/pcomp-*）经 CI rules 注入 VERIFY_NPM_PACKAGES 限定验签范围；
+# 分包发布 tag（psdk-*/pcomp-*/pdviz-*）经 CI rules 注入 VERIFY_NPM_PACKAGES 限定验签范围；
 # 默认验签全部 npm 契约包。
-VERIFY_PACKAGES="${VERIFY_NPM_PACKAGES:-@yudream/plugin-sdk @yudream/components}"
+VERIFY_PACKAGES="${VERIFY_NPM_PACKAGES:-@yudream/plugin-sdk @yudream/components @yudream/dataviz}"
 
 DEPS_JSON=""
 PKG_SUMMARY=""
@@ -23,6 +23,7 @@ for pkg in $VERIFY_PACKAGES; do
   case "$pkg" in
     "@yudream/plugin-sdk") PKG_DIR="plugin-sdk" ;;
     "@yudream/components") PKG_DIR="components" ;;
+    "@yudream/dataviz") PKG_DIR="dataviz" ;;
     *) fail "unsupported package in VERIFY_NPM_PACKAGES: $pkg" ;;
   esac
   PKG_VERSION=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "yudream-frontend/packages/$PKG_DIR/package.json" | head -n 1)
