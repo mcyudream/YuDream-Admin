@@ -1,0 +1,2 @@
+org.springframework.boot.env.EnvironmentPostProcessor=\
+  online.yudream.base.bootstrap.installer.BootstrapPropertiesEnvironmentPostProcessor
