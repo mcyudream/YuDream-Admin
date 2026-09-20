@@ -1,6 +1,7 @@
 import type { Router } from 'vue-router'
 import { useNProgress } from '@vueuse/integrations/useNProgress'
 import { warnKeepAliveComponentNameMissing } from 'virtual:fantastic-admin/turbo-console'
+import apiInstaller from '@/api/modules/installer'
 import apiSetup from '@/api/modules/setup'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { ensurePublicPluginRoutes } from '@/store/modules/app/plugin-route-runtime'
@@ -9,6 +10,9 @@ import '@/assets/styles/nprogress.css'
 
 // 系统初始化状态缓存
 let setupStatus: boolean | null = null
+// 安装器模式探测缓存：确认非安装器模式（404）后本次会话不再重复探测；
+// 探测出错时不置位，下次导航重试
+let installerModeAbsent = false
 
 // 初始化完成后调用：失效内存缓存，让下一次导航重新读取真实状态
 export function resetSetupStatus() {
@@ -16,6 +20,21 @@ export function resetSetupStatus() {
 }
 
 async function checkSetupStatus(): Promise<boolean> {
+  // 全新部署的安装向导优先：/api/installer/status 存在即视为未完成初始化，
+  // 该接口在正常模式不存在（404），因此对存量部署只是每次会话多一次无害探测
+  if (!installerModeAbsent) {
+    try {
+      const installer = await apiInstaller.detectStatus()
+      if (installer) {
+        setupStatus = false
+        return false
+      }
+      installerModeAbsent = true
+    }
+    catch {
+      // 探测失败按非安装器模式继续走原逻辑
+    }
+  }
   // 开发环境优先读取 localStorage 缓存，减少每次刷新都请求 setup/status
   const cached = import.meta.env.DEV ? localStorage.getItem('setupCompleted') : null
   if (cached !== null) {

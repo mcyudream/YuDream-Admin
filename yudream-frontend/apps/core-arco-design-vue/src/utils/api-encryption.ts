@@ -85,19 +85,26 @@ async function loadEncryptionStatus() {
   if (statusCache) {
     return statusCache
   }
-  const res = await axios.get<EncryptionStatusResult>('api/system/security/encryption/status', {
-    baseURL: backendBaseURL,
-    headers: { 'Accept-Language': 'zh-CN' },
-  })
-  const data = res.data.data
-  statusCache = {
-    enabled: Boolean(data?.enabled),
-    algorithm: data?.algorithm,
+  try {
+    const res = await axios.get<EncryptionStatusResult>('api/system/security/encryption/status', {
+      baseURL: backendBaseURL,
+      headers: { 'Accept-Language': 'zh-CN' },
+    })
+    const data = res.data.data
+    statusCache = {
+      enabled: Boolean(data?.enabled),
+      algorithm: data?.algorithm,
+    }
+    if (!statusCache.enabled) {
+      publicKeyCache = { enabled: false }
+    }
+    return statusCache
   }
-  if (!statusCache.enabled) {
-    publicKeyCache = { enabled: false }
+  catch {
+    // 状态端点不可达（安装器模式、后端重启窗口）时按未启用处理直发明文，
+    // 且不缓存失败结果，后端恢复加密后下次请求重新探测
+    return { enabled: false }
   }
-  return statusCache
 }
 
 async function loadPublicKey() {
