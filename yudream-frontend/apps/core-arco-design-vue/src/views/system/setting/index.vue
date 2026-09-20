@@ -4,6 +4,7 @@ import apiSettings from '@/api/modules/settings'
 import apiSecurity from '@/api/modules/system-security'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+import IntegrationSettings from './IntegrationSettings.vue'
 
 const toast = useFaToast()
 const appSettingsStore = useAppSettingsStore()
@@ -203,6 +204,7 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
         </div>
       </div>
 
+      <IntegrationSettings />
     </FaPageMain>
   </div>
 </template>
