@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.file.service.ObjectStorage;
 import online.yudream.base.domain.system.file.valobj.StoredObject;
-import online.yudream.base.infra.system.file.config.S3StorageProperties;
+import online.yudream.base.infra.system.integration.StorageClientProvider;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -26,20 +26,21 @@ import java.io.InputStream;
 @Slf4j
 public class S3ObjectStorage implements ObjectStorage {
 
-    private final S3Client s3Client;
-    private final S3StorageProperties properties;
+    private final StorageClientProvider storage;
 
     @Override
     public String bucket() {
-        return properties.getBucket();
+        return storage.config().bucket();
     }
 
     @Override
     public String put(String objectKey, InputStream inputStream, long contentLength, String contentType) {
-        ensureBucket();
+        String bucket = storage.config().bucket();
+        S3Client s3Client = storage.client();
+        ensureBucket(s3Client, bucket);
         try {
             PutObjectRequest request = PutObjectRequest.builder()
-                    .bucket(properties.getBucket())
+                    .bucket(bucket)
                     .key(objectKey)
                     .contentType(contentType)
                     .contentLength(contentLength)
@@ -54,9 +55,10 @@ public class S3ObjectStorage implements ObjectStorage {
 
     @Override
     public StoredObject get(String objectKey) {
+        String bucket = storage.config().bucket();
         try {
-            ResponseInputStream<GetObjectResponse> stream = s3Client.getObject(GetObjectRequest.builder()
-                    .bucket(properties.getBucket())
+            ResponseInputStream<GetObjectResponse> stream = storage.client().getObject(GetObjectRequest.builder()
+                    .bucket(bucket)
                     .key(objectKey)
                     .build());
             GetObjectResponse response = stream.response();
@@ -72,28 +74,29 @@ public class S3ObjectStorage implements ObjectStorage {
 
     @Override
     public void delete(String objectKey) {
+        String bucket = storage.config().bucket();
         try {
-            s3Client.deleteObject(builder -> builder.bucket(properties.getBucket()).key(objectKey));
+            storage.client().deleteObject(builder -> builder.bucket(bucket).key(objectKey));
         }
         catch (S3Exception e) {
             throw new BizException("文件删除失败：" + e.awsErrorDetails().errorMessage());
         }
     }
 
-    private void ensureBucket() {
+    private void ensureBucket(S3Client s3Client, String bucket) {
         try {
-            s3Client.headBucket(HeadBucketRequest.builder().bucket(properties.getBucket()).build());
+            s3Client.headBucket(HeadBucketRequest.builder().bucket(bucket).build());
         }
         catch (NoSuchBucketException e) {
-            s3Client.createBucket(CreateBucketRequest.builder().bucket(properties.getBucket()).build());
+            s3Client.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
         }
         catch (S3Exception e) {
             if (e.statusCode() == 404) {
-                s3Client.createBucket(CreateBucketRequest.builder().bucket(properties.getBucket()).build());
+                s3Client.createBucket(CreateBucketRequest.builder().bucket(bucket).build());
                 return;
             }
             if (e.statusCode() == 403) {
-                log.warn("S3 bucket head check forbidden, continue with object operation. bucket={}", properties.getBucket());
+                log.warn("S3 bucket head check forbidden, continue with object operation. bucket={}", bucket);
                 return;
             }
             throw new BizException("对象存储 Bucket 检查失败：" + e.awsErrorDetails().errorMessage());

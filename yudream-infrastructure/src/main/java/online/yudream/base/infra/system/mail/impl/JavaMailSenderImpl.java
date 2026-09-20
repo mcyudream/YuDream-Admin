@@ -8,9 +8,8 @@ import online.yudream.base.domain.system.mail.aggregate.MailMessage;
 import online.yudream.base.domain.system.mail.repo.MailSender;
 import online.yudream.base.domain.system.mail.repo.MailTemplateEngine;
 import online.yudream.base.domain.system.mail.valobj.MailAttachment;
-import online.yudream.base.infra.config.prop.MailProperties;
+import online.yudream.base.infra.system.integration.MailSenderProvider;
 import org.springframework.mail.MailSendException;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 
@@ -21,18 +20,17 @@ import java.io.ByteArrayInputStream;
 @RequiredArgsConstructor
 public class JavaMailSenderImpl implements MailSender {
 
-    private final JavaMailSender javaMailSender;
+    private final MailSenderProvider mailSenderProvider;
     private final MailTemplateEngine templateEngine;
-    private final MailProperties mailProperties;
 
     @Override
     public void send(MailMessage message) {
         try {
-            MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+            MimeMessage mimeMessage = mailSenderProvider.sender().createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
             // 发件人
-            String from = message.getFrom() != null ? message.getFrom() : mailProperties.getFrom();
+            String from = message.getFrom() != null ? message.getFrom() : mailSenderProvider.from();
             helper.setFrom(from);
 
             // 收件人
@@ -74,7 +72,7 @@ public class JavaMailSenderImpl implements MailSender {
                 }
             }
 
-            javaMailSender.send(mimeMessage);
+            mailSenderProvider.sender().send(mimeMessage);
             log.info("邮件发送成功: to={}, subject={}", message.getTo(), message.getSubject());
 
         } catch (MessagingException e) {

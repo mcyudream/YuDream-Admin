@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import online.yudream.base.domain.system.mail.aggregate.MailMessage;
 import online.yudream.base.domain.system.mail.repo.MailSender;
 import online.yudream.base.domain.system.user.service.UserRegisterMailSender;
-import org.springframework.beans.factory.annotation.Value;
+import online.yudream.base.infra.system.integration.SystemIntegrationSettings;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,9 +18,7 @@ import java.util.Map;
 public class UserRegisterMailService implements UserRegisterMailSender {
 
     private final MailSender mailSender;
-
-    @Value("${app.web-url:${app.base-url:http://localhost:9000}}")
-    private String webUrl;
+    private final SystemIntegrationSettings integrationSettings;
 
     /**
      * 发送邮箱验证邮件。
@@ -30,7 +28,7 @@ public class UserRegisterMailService implements UserRegisterMailSender {
      * @param token    验证 token
      */
     public void sendVerifyEmail(String username, String email, String token) {
-        String verifyUrl = webUrl + "/verify-email?token=" + token;
+        String verifyUrl = integrationSettings.effectiveWebUrl() + "/verify-email?token=" + token;
         MailMessage message = MailMessage.builder()
                 .to(List.of(email))
                 .subject("邮箱验证")
@@ -45,7 +43,7 @@ public class UserRegisterMailService implements UserRegisterMailSender {
 
     @Override
     public void sendPasswordResetEmail(String username, String email, String token) {
-        String resetUrl = webUrl + "/reset-password?token=" + token;
+        String resetUrl = integrationSettings.effectiveWebUrl() + "/reset-password?token=" + token;
         MailMessage message = MailMessage.builder()
                 .to(List.of(email))
                 .subject("重置密码")
