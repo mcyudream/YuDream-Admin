@@ -21,8 +21,8 @@ fi
 export CI_REGISTRY_IMAGE="${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}"
 export TAG="${TAG:-latest}"
 
-# 创建插件目录（用于单独挂载更新插件 JAR）
-mkdir -p plugins
+# 创建插件目录（单独挂载更新插件 JAR）与引导配置目录（安装向导落盘 config/yudream-bootstrap.properties）
+mkdir -p plugins config market-source
 
 cmd="${1:-up}"
 

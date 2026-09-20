@@ -1,4 +1,53 @@
 services:
+  # 全套编排时 backend 额外注入中间件发现提示与启动依赖；
+  # 引导向导会探测这些地址并自动预填，向导落盘的 config/yudream-bootstrap.properties 优先级最高。
+  backend:
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - YUDREAM_DISCOVERY_MONGO_HOST=mongo
+      - YUDREAM_DISCOVERY_MONGO_PORT=27017
+      - YUDREAM_DISCOVERY_REDIS_HOST=redis
+      - YUDREAM_DISCOVERY_REDIS_PORT=6379
+
+  mongo:
+    image: docker.io/library/mongo:7.0
+    container_name: yudream-mongo
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    # 仅 docker 内网监听，不映射宿主机端口；需外部访问时自行追加 ports
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - yudream
+
+  redis:
+    image: docker.io/library/redis:7.2-alpine
+    container_name: yudream-redis
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks:
+      - yudream
+
   rabbitmq:
     image: docker.io/rabbitmq:4.3.2-management-alpine
     container_name: yudream-rabbitmq
@@ -28,5 +77,7 @@ services:
       - neo4j-data:/data
 
 volumes:
+  mongo-data:
+  redis-data:
   rabbitmq-data:
   neo4j-data:

@@ -114,3 +114,10 @@
 - 新权限码末段动作词是否落入第 11 节词表，并拆分了查看/写/删除级别？
 - 插件 JAR 的 `plugin.yml`、前端 remote 产物是否完整？软依赖路径是否条件注册？
 - 是否完成目标构建/测试与定向扫描，中文文案无乱码，并同步了受影响的 skill/文档？
+
+## 13. 安装向导与引导配置
+
+- 新部署无数据库配置时自动进入安装器切片（`InstallerApplication`，只扫 installer 包并排除 Mongo/Redis/邮件/SaToken DAO 自动配置）；引导配置落 `config/yudream-bootstrap.properties`（卷挂载持久化，`YUDREAM_BOOTSTRAP_CONFIG` 可覆盖），经 EnvironmentPostProcessor 以最高优先级属性源装载，压过环境变量；env 仅作存量部署兜底。
+- 运行期业务配置（邮件、对象存储、站点地址等）归管理后台系统配置；`.env` 只保留部署拓扑（镜像/端口/能力闸门）。三层职责不得互相写穿。
+- 全套编排 `docker compose -f docker-compose.yml -f docker-compose.platform.yml up -d` 内置 MongoDB/Redis 并向 backend 注入 `YUDREAM_DISCOVERY_*` 发现提示，安装向导据此自动发现并预填中间件连接。
+- 细则见 `.codex/skills/yudream-ddd-architecture/SKILL.md`「Setup Installer and Bootstrap Configuration」。
