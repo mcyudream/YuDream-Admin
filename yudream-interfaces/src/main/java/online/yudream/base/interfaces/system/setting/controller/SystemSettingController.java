@@ -3,12 +3,20 @@ package online.yudream.base.interfaces.system.setting.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import online.yudream.base.application.system.setting.dto.IntegrationConfigDTO;
+import online.yudream.base.application.system.setting.service.IntegrationConfigAppService;
 import online.yudream.base.application.system.setting.service.SettingAppService;
+import online.yudream.base.domain.system.integration.valobj.IntegrationProbeResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.system.setting.assembler.IntegrationConfigWebAssembler;
 import online.yudream.base.interfaces.system.setting.assembler.SettingWebAssembler;
+import online.yudream.base.interfaces.system.setting.request.IntegrationConfigSaveRequest;
+import online.yudream.base.interfaces.system.setting.request.MailTestRequest;
 import online.yudream.base.interfaces.system.setting.request.SiteSettingUpdateRequest;
+import online.yudream.base.interfaces.system.setting.request.StorageTestRequest;
 import online.yudream.base.interfaces.system.setting.request.ThemeSettingUpdateRequest;
+import online.yudream.base.interfaces.system.setting.res.IntegrationConfigRes;
 import online.yudream.base.interfaces.system.setting.res.SiteSettingRes;
 import online.yudream.base.interfaces.system.setting.res.ThemeSettingRes;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,6 +36,33 @@ import java.io.IOException;
 public class SystemSettingController {
 
     private final SettingAppService settingAppService;
+    private final IntegrationConfigAppService integrationConfigAppService;
+
+    @GetMapping("/integrations")
+    @PermissionRegister(code = "system:setting:view", name = "查看系统设置", module = "系统管理", desc = "查看邮件与对象存储集成配置")
+    public Result<IntegrationConfigRes> integrations() {
+        return Result.ok(IntegrationConfigWebAssembler.toRes(integrationConfigAppService.get()));
+    }
+
+    @PutMapping("/integrations")
+    @PermissionRegister(code = "system:setting:edit", name = "编辑系统设置", module = "系统管理", desc = "编辑邮件与对象存储集成配置")
+    public Result<IntegrationConfigRes> updateIntegrations(@RequestBody IntegrationConfigSaveRequest request) {
+        IntegrationConfigDTO dto = integrationConfigAppService.update(
+                IntegrationConfigWebAssembler.toCmd(request));
+        return Result.ok(IntegrationConfigWebAssembler.toRes(dto));
+    }
+
+    @PostMapping("/integrations/test-mail")
+    @PermissionRegister(code = "system:setting:edit", name = "编辑系统设置", module = "系统管理", desc = "测试候选邮件配置")
+    public Result<IntegrationProbeResult> testMail(@RequestBody MailTestRequest request) {
+        return Result.ok(integrationConfigAppService.testMail(IntegrationConfigWebAssembler.toCmd(request)));
+    }
+
+    @PostMapping("/integrations/test-storage")
+    @PermissionRegister(code = "system:setting:edit", name = "编辑系统设置", module = "系统管理", desc = "测试候选对象存储配置")
+    public Result<IntegrationProbeResult> testStorage(@RequestBody StorageTestRequest request) {
+        return Result.ok(integrationConfigAppService.testStorage(IntegrationConfigWebAssembler.toCmd(request)));
+    }
 
     @GetMapping("/site")
     @PermissionRegister(code = "system:setting:view", name = "查看系统设置", module = "系统管理", desc = "查看站点系统设置")
