@@ -12,7 +12,7 @@ const router = useRouter()
 
 // ==================== 安装向导（安装器模式） ====================
 
-type WizardStep = 'middleware' | 'applying' | 'restarting' | 'admin'
+type WizardStep = 'middleware' | 'applying' | 'restarting' | 'integrations' | 'admin'
 
 const wizardStep = ref<WizardStep>('admin')
 const installerStatus = ref<InstallerStatusData | null>(null)
@@ -30,6 +30,16 @@ const mongoProbeState = ref<{ loading: boolean, ok: boolean, text: string } | nu
 const redisProbeState = ref<{ loading: boolean, ok: boolean, text: string } | null>(null)
 const applyError = ref('')
 const restartTimedOut = ref(false)
+
+// 可选集成配置（重启进入正常模式后，落库到系统配置）
+const setupMail = reactive({ host: '', port: 465, username: '', password: '', from: '', ssl: true, starttls: false })
+const setupMailTestTo = ref('')
+const setupMailResult = ref<{ ok: boolean, message: string } | null>(null)
+const testingSetupMail = ref(false)
+const setupStorage = reactive({ endpoint: '', accessKey: '', secretKey: '', bucket: 'yudream-admin', region: 'us-east-1', pathStyle: true })
+const setupStorageResult = ref<{ ok: boolean, message: string } | null>(null)
+const testingSetupStorage = ref(false)
+const savingIntegrations = ref(false)
 
 const mongoReady = computed(() => mongoProbeState.value?.ok === true)
 const redisReady = computed(() => redisProbeState.value?.ok === true)
@@ -50,6 +60,14 @@ onMounted(async () => {
       localStorage.removeItem('setupCompleted')
       resetSetupStatus()
       void runDiscover()
+      return
+    }
+    // 非安装器模式（如环境变量预置了数据库）：未完成初始化的全新部署同样先进入可选集成配置
+    const res = await apiSetup.status()
+    if (res.data.setupCompleted === false) {
+      localStorage.removeItem('setupCompleted')
+      resetSetupStatus()
+      wizardStep.value = 'integrations'
     }
   }
   catch {
@@ -186,7 +204,7 @@ async function pollAfterRestart() {
       if (res.data.setupCompleted === false) {
         localStorage.removeItem('setupCompleted')
         resetSetupStatus()
-        wizardStep.value = 'admin'
+        wizardStep.value = 'integrations'
         return
       }
       // 已完成初始化（异常路径）直接引导登录
@@ -203,17 +221,122 @@ async function pollAfterRestart() {
 const wizardSteps = computed(() => [
   { key: 'env', label: '部署环境' },
   { key: 'middleware', label: '中间件' },
+  { key: 'integrations', label: '集成配置' },
   { key: 'admin', label: '站点与管理员' },
 ])
 const wizardActiveIndex = computed(() => {
-  if (wizardStep.value === 'middleware' || wizardStep.value === 'applying') {
+  if (wizardStep.value === 'middleware' || wizardStep.value === 'applying' || wizardStep.value === 'restarting') {
     return 1
   }
-  if (wizardStep.value === 'restarting') {
-    return 1
+  if (wizardStep.value === 'integrations') {
+    return 2
   }
-  return 2
+  return 3
 })
+
+async function testSetupMail() {
+  if (!setupMail.host) {
+    toastSetup('请先填写 SMTP 主机')
+    return
+  }
+  if (!setupMailTestTo.value) {
+    toastSetup('请填写测试收件地址')
+    return
+  }
+  testingSetupMail.value = true
+  setupMailResult.value = null
+  try {
+    const res = await apiSetup.testMail({
+      host: setupMail.host,
+      port: setupMail.port,
+      username: setupMail.username,
+      password: setupMail.password || undefined,
+      from: setupMail.from,
+      ssl: setupMail.ssl,
+      starttls: setupMail.starttls,
+      to: setupMailTestTo.value,
+    })
+    setupMailResult.value = { ok: res.data.ok, message: res.data.message }
+  }
+  catch {
+    setupMailResult.value = { ok: false, message: '测试失败，请检查配置' }
+  }
+  finally {
+    testingSetupMail.value = false
+  }
+}
+
+async function testSetupStorage() {
+  if (!setupStorage.endpoint) {
+    toastSetup('请先填写对象存储 Endpoint')
+    return
+  }
+  testingSetupStorage.value = true
+  setupStorageResult.value = null
+  try {
+    const res = await apiSetup.testStorage({
+      endpoint: setupStorage.endpoint,
+      accessKey: setupStorage.accessKey,
+      secretKey: setupStorage.secretKey || undefined,
+      bucket: setupStorage.bucket,
+      region: setupStorage.region,
+      pathStyle: setupStorage.pathStyle,
+      autoCreate: true,
+    })
+    setupStorageResult.value = { ok: res.data.ok, message: res.data.message }
+  }
+  catch {
+    setupStorageResult.value = { ok: false, message: '测试失败，请检查配置' }
+  }
+  finally {
+    testingSetupStorage.value = false
+  }
+}
+
+async function finishIntegrations() {
+  // 两项都未填写视为跳过，直接进入管理员步骤
+  if (!setupMail.host && !setupStorage.endpoint) {
+    wizardStep.value = 'admin'
+    return
+  }
+  savingIntegrations.value = true
+  try {
+    await apiSetup.saveIntegrations({
+      mail: setupMail.host
+        ? {
+            host: setupMail.host,
+            port: setupMail.port,
+            username: setupMail.username,
+            password: setupMail.password || undefined,
+            from: setupMail.from,
+            ssl: setupMail.ssl,
+            starttls: setupMail.starttls,
+          }
+        : null,
+      storage: setupStorage.endpoint
+        ? {
+            endpoint: setupStorage.endpoint,
+            accessKey: setupStorage.accessKey,
+            secretKey: setupStorage.secretKey || undefined,
+            bucket: setupStorage.bucket,
+            region: setupStorage.region,
+            pathStyle: setupStorage.pathStyle,
+          }
+        : null,
+    })
+    wizardStep.value = 'admin'
+  }
+  catch {
+    // 错误已由拦截器 toast，停留当前步骤
+  }
+  finally {
+    savingIntegrations.value = false
+  }
+}
+
+function toastSetup(description: string) {
+  useFaToast().error('请补全配置', { description })
+}
 
 // ==================== 站点与管理员（原有初始化表单） ====================
 
@@ -287,7 +410,7 @@ const onSubmit = form.handleSubmit((values) => {
             {{ wizardStep === 'admin' ? '系统初始化 🚀' : '安装向导 🚀' }}
           </h3>
           <p class="text-sm text-muted-foreground lg:text-base">
-            {{ wizardStep === 'admin' ? '配置站点信息并创建超级管理员账号' : '检测到全新部署，先配置数据库与 Redis' }}
+            {{ wizardStep === 'admin' ? '配置站点信息并创建超级管理员账号' : wizardStep === 'integrations' ? '可选：配置邮件与对象存储，可稍后在系统设置中修改' : '检测到全新部署，先配置数据库与 Redis' }}
           </p>
         </div>
 
@@ -405,6 +528,86 @@ const onSubmit = form.handleSubmit((values) => {
               重新检查
             </FaButton>
           </template>
+        </div>
+
+        <!-- 步骤三：可选集成配置（邮件/对象存储） -->
+        <div v-else-if="wizardStep === 'integrations'" class="w-full space-y-4">
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <div class="text-sm font-medium">SMTP 主机<span class="text-muted-foreground">（选填）</span></div>
+              <FaInput v-model="setupMail.host" type="text" placeholder="smtp.example.com" class="w-full">
+                <template #start>
+                  <FaIcon name="i-lucide:mail" />
+                </template>
+              </FaInput>
+            </div>
+            <div class="space-y-1">
+              <div class="text-sm font-medium">端口</div>
+              <FaInput v-model="setupMail.port" type="number" class="w-full" />
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <div class="text-sm font-medium">邮箱账号</div>
+              <FaInput v-model="setupMail.username" type="text" placeholder="发件邮箱账号" class="w-full" />
+            </div>
+            <div class="space-y-1">
+              <div class="text-sm font-medium">密码/授权码</div>
+              <FaInput v-model="setupMail.password" type="password" placeholder="SMTP 授权码" class="w-full" />
+            </div>
+          </div>
+          <div class="flex items-end gap-2">
+            <div class="flex-1 space-y-1">
+              <div class="text-sm font-medium">测试收件地址</div>
+              <FaInput v-model="setupMailTestTo" type="text" placeholder="接收测试邮件" class="w-full" />
+            </div>
+            <FaButton variant="outline" :loading="testingSetupMail" @click="testSetupMail">
+              测试邮件
+            </FaButton>
+          </div>
+          <p v-if="setupMailResult" class="text-xs" :class="setupMailResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
+            {{ setupMailResult.message }}
+          </p>
+
+          <div class="space-y-1">
+            <div class="text-sm font-medium">对象存储 Endpoint<span class="text-muted-foreground">（选填，S3 兼容）</span></div>
+            <FaInput v-model="setupStorage.endpoint" type="text" placeholder="http://localhost:9000" class="w-full">
+              <template #start>
+                <FaIcon name="i-lucide:hard-drive" />
+              </template>
+            </FaInput>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <div class="text-sm font-medium">AccessKey</div>
+              <FaInput v-model="setupStorage.accessKey" type="text" placeholder="对象存储 AccessKey" class="w-full" />
+            </div>
+            <div class="space-y-1">
+              <div class="text-sm font-medium">SecretKey</div>
+              <FaInput v-model="setupStorage.secretKey" type="password" placeholder="对象存储 SecretKey" class="w-full" />
+            </div>
+          </div>
+          <div class="flex items-end gap-2">
+            <div class="flex-1 space-y-1">
+              <div class="text-sm font-medium">Bucket</div>
+              <FaInput v-model="setupStorage.bucket" type="text" class="w-full" />
+            </div>
+            <FaButton variant="outline" :loading="testingSetupStorage" @click="testSetupStorage">
+              测试连接
+            </FaButton>
+          </div>
+          <p v-if="setupStorageResult" class="text-xs" :class="setupStorageResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
+            {{ setupStorageResult.message }}
+          </p>
+
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <FaButton variant="outline" :disabled="savingIntegrations" @click="wizardStep = 'admin'">
+              稍后再配置
+            </FaButton>
+            <FaButton :loading="savingIntegrations" @click="finishIntegrations">
+              保存并继续
+            </FaButton>
+          </div>
         </div>
 
         <!-- 步骤二：站点与管理员（原有表单，正常模式直接进入） -->

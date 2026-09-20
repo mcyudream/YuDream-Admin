@@ -303,6 +303,10 @@
     {
       "key": "installer-slice-autoconfig",
       "text": "Installer slice (InstallerApplication) must exclude Mongo/Redis/Mail auto configurations AND cn.dev33.satoken.dao.SaTokenDaoForRedisTemplate, which unconditionally requires the Redis StringRedisTemplate bean."
+    },
+    {
+      "key": "integration-config-precedence",
+      "text": "Runtime integration config (mail/S3/site-url) resolves DB sys_setting first and falls back to env/yml; secrets encrypt via CapabilityCredentialCipher AAD system.integration.{category}; dynamic providers rebuild clients by config hash so admin edits apply without restart; never return secrets - expose passwordSet/secretKeySet flags only."
     }
   ],
   "utilities": [
@@ -507,6 +511,10 @@
     {
       "key": "installer-bootstrap-placeholder",
       "text": "EnvironmentPostProcessor property lookups must read raw values from property sources: environment.getProperty(spring.data.mongodb.uri) throws PlaceholderResolutionException when application.yml holds an unresolved ${MONGO_URI} placeholder - exactly the fresh-install case the installer boots in."
+    },
+    {
+      "key": "env-getproperty-placeholder",
+      "text": "Any environment.getProperty(key) lookup whose application.yml value is an unresolved placeholder (e.g. spring.mail.username=${MAIL_USERNAME} without default) throws PlaceholderResolutionException - resolveRequiredPlaceholders is strict. Guard every such lookup (installer resolver AND runtime services); safer default in yml does not help nested placeholders."
     }
   ]
 }

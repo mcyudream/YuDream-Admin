@@ -61,11 +61,46 @@ setupApi.interceptors.response.use(
   },
 )
 
+export interface SetupIntegrationSaveData {
+  mail?: {
+    host: string
+    port?: number
+    username?: string
+    password?: string
+    from?: string
+    ssl?: boolean
+    starttls?: boolean
+  } | null
+  storage?: {
+    endpoint: string
+    accessKey?: string
+    secretKey?: string
+    bucket?: string
+    region?: string
+    pathStyle?: boolean
+  } | null
+  setupToken?: string
+}
+
+export interface SetupProbeData {
+  ok: boolean
+  message: string
+}
+
 export default {
   status: () => {
     return setupApi.get<unknown, { status: 1; error: ''; data: SetupStatusData }>('api/setup/status')
   },
   init: (data: SetupData) => {
     return setupApi.post<unknown, { status: 1; error: ''; data: null }>('api/setup/init', data)
+  },
+  saveIntegrations: (data: SetupIntegrationSaveData) => {
+    return setupApi.put<unknown, { status: 1; error: ''; data: unknown }>('api/setup/integrations', data)
+  },
+  testMail: (data: SetupIntegrationSaveData['mail'] & { to: string, setupToken?: string }) => {
+    return setupApi.post<unknown, { status: 1; error: ''; data: SetupProbeData }>('api/setup/integrations/test-mail', data)
+  },
+  testStorage: (data: { endpoint: string, accessKey?: string, secretKey?: string, bucket?: string, region?: string, pathStyle?: boolean, autoCreate?: boolean, setupToken?: string }) => {
+    return setupApi.post<unknown, { status: 1; error: ''; data: SetupProbeData }>('api/setup/integrations/test-storage', data)
   },
 }

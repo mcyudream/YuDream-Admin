@@ -90,6 +90,57 @@ export interface FrontendFeature {
   capabilities: Record<string, boolean>
 }
 
+export interface IntegrationMailSetting {
+  host: string
+  port: number
+  username: string
+  from: string
+  ssl: boolean
+  starttls: boolean
+  passwordSet: boolean
+  source: 'custom' | 'environment'
+}
+
+export interface IntegrationStorageSetting {
+  endpoint: string
+  accessKey: string
+  bucket: string
+  region: string
+  pathStyle: boolean
+  secretKeySet: boolean
+  source: 'custom' | 'environment'
+}
+
+export interface IntegrationConfigSetting {
+  mail: IntegrationMailSetting
+  storage: IntegrationStorageSetting
+}
+
+export interface IntegrationConfigSavePayload {
+  mail?: {
+    host: string
+    port?: number
+    username?: string
+    password?: string
+    from?: string
+    ssl?: boolean
+    starttls?: boolean
+  } | null
+  storage?: {
+    endpoint: string
+    accessKey?: string
+    secretKey?: string
+    bucket?: string
+    region?: string
+    pathStyle?: boolean
+  } | null
+}
+
+export interface IntegrationProbeOutcome {
+  ok: boolean
+  message: string
+}
+
 export default {
   publicSettings: () => {
     return settingsApi.get<unknown, { status: 1; error: ''; data: SiteSetting }>('api/settings/public')
@@ -120,5 +171,17 @@ export default {
   },
   updateTheme: (data: ThemeSetting) => {
     return settingsApi.put<unknown, { status: 1; error: ''; data: ThemeSetting }>('api/system/settings/theme', data)
+  },
+  integrations: () => {
+    return settingsApi.get<unknown, { status: 1; error: ''; data: IntegrationConfigSetting }>('api/system/settings/integrations')
+  },
+  updateIntegrations: (data: IntegrationConfigSavePayload) => {
+    return settingsApi.put<unknown, { status: 1; error: ''; data: IntegrationConfigSetting }>('api/system/settings/integrations', data)
+  },
+  testMail: (data: { host: string, port?: number, username?: string, password?: string, from?: string, ssl?: boolean, starttls?: boolean, to: string }) => {
+    return settingsApi.post<unknown, { status: 1; error: ''; data: IntegrationProbeOutcome }>('api/system/settings/integrations/test-mail', data)
+  },
+  testStorage: (data: { endpoint: string, accessKey?: string, secretKey?: string, bucket?: string, region?: string, pathStyle?: boolean, autoCreate?: boolean }) => {
+    return settingsApi.post<unknown, { status: 1; error: ''; data: IntegrationProbeOutcome }>('api/system/settings/integrations/test-storage', data)
   },
 }
