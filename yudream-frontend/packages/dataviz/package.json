@@ -1,7 +1,7 @@
 {
   "name": "@yudream/dataviz",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "files": [
     "src"
   ],
@@ -14,7 +14,8 @@
     "typecheck": "vue-tsc -p tsconfig.json --noEmit --pretty false"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./echarts": "./src/echarts.ts"
   },
   "peerDependencies": {
     "@vueuse/core": "catalog:",
