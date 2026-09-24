@@ -4,7 +4,7 @@
 #   docker compose pull
 #   docker compose up -d
 #
-# watchtower 会自动检测 GitLab 容器仓库镜像更新并重启对应服务。
+# watchtower 会自动检测 Harbor 镜像仓库的镜像更新并重启对应服务。
 
 services:
   backend:

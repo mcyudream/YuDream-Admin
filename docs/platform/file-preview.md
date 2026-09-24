@@ -63,7 +63,7 @@ backend 容器    http://backend:8080/api/public/preview/file/{token}/{filename}
 首选直接同步官方镜像（脚本内置国内镜像站优先、Docker Hub 兜底）：
 
 ```bash
-docker login registry.yudream.online   # GitLab 容器仓库，凭据不进仓库
+docker login registry.yudream.online   # Harbor 镜像仓库，凭据不进仓库
 sh docker/kkfileview/push.sh           # 默认 5.0.2
 sh docker/kkfileview/push.sh 5.0.2     # 显式指定版本
 ```

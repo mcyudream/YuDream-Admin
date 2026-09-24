@@ -6,7 +6,7 @@
 #   sh docker/kkfileview/push.sh [版本]        # 默认 5.0.2，拉取官方镜像转推（首选）
 #   MODE=build sh docker/kkfileview/push.sh    # 备选：用本目录 Dockerfile 从源码构建
 #
-# 前置条件：先 docker login registry.yudream.online（GitLab 容器仓库）。
+# 前置条件：先 docker login registry.yudream.online（Harbor 镜像仓库，用 robot 账号）。
 # 凭据只进本机 docker 配置，禁止写入仓库、脚本或文档。
 set -euo pipefail
 
