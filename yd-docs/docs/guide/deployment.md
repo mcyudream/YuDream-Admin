@@ -13,6 +13,7 @@
 - `render-server:${TAG:-latest}`：Fastify + Playwright，容器端口 `3000`，建议只 `expose`，不要映射宿主端口。
 - `kkfileview:${KKFILEVIEW_TAG:-5.0.2}`（在 Harbor 的 `library` 项目）：文件预览，容器端口 `8012`；浏览器经 frontend nginx 的 `/kkfileview/` 同源反代，生产可删除宿主端口映射。
 - 模板 B 的基础镜像明确为 `docker.io/library/mongo:8.0` 与 `docker.io/library/redis:7.4-alpine`；模板 A 不创建数据库容器。
+- `yda` 与 `library` 两个 Harbor 项目默认公开，拉取免登录；若改成私有（需 `docker login` 才能拉），按下面「环境变量完整参考」的 `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASSWORD` 填写，`deploy.sh` 会自动登录；watchtower 另需挂载宿主 `~/.docker/config.json`（见 `docker-compose.yml` 内注释）。
 
 ```mermaid
 flowchart LR
@@ -38,6 +39,8 @@ flowchart LR
 |---|---:|---|
 | `TAG` | 否 | backend / frontend / render-server 镜像的版本 tag，默认 `latest`。 |
 | `KKFILEVIEW_TAG` | 否 | kkFileView 镜像 tag，默认 `5.0.2`。 |
+| `CI_REGISTRY_IMAGE` | 否 | 应用镜像仓库前缀，默认 `registry.yudream.online/yda`；指向自有 registry 时整体替换即可。 |
+| `DOCKER_REGISTRY_USER` / `DOCKER_REGISTRY_PASSWORD` | 否 | Harbor 项目改成私有时填写的拉取凭据（默认公开、留空即匿名）；`deploy.sh` 检测到两者就自动 `docker login`。robot 账号名含 `$`，写在 `.env` 里要加单引号。 |
 | `KKFILEVIEW_PORT` | 否 | kkFileView 宿主映射端口；容器端口固定 `8012`，默认 `8012`，生产建议删除映射。 |
 | `BACKEND_PORT` | 否 | backend 宿主映射端口；容器端口固定 `8080`，默认 `8080`。 |
 | `FRONTEND_PORT` | 否 | frontend nginx 宿主映射端口；容器端口固定 `80`，默认 `80`。生产只发布此入口。 |

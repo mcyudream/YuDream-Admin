@@ -192,6 +192,9 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Harbor 项目改为私有时：先在宿主 docker login，再取消下一行注释并重建 watchtower，
+      # 否则 watchtower 读不到宿主凭据、拉取私有镜像会失败。
+      # - ${HOME}/.docker/config.json:/config.json:ro
     environment:
       # 每 300 秒（5 分钟）检查一次更新
       - WATCHTOWER_POLL_INTERVAL=300
