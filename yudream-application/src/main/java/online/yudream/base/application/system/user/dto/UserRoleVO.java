@@ -23,5 +23,8 @@ public class UserRoleVO implements Serializable {
 
     private String code;
 
+    /** 角色所属部门，角色按部门归属。 */
+    private Long deptId;
+
     private boolean current;
 }

@@ -204,4 +204,49 @@ public class User extends BaseDomain {
                 }
         ).toList();
     }
+
+    /**
+     * 当前会话部门：会话选择优先，未选择时回落默认部门。
+     */
+    public DeptID resolveContextDeptID(Long selectedDeptId) {
+        return selectedDeptId == null ? getDefaultDeptID() : DeptID.of(selectedDeptId);
+    }
+
+    /**
+     * 当前会话角色：角色隶属于部门，先定部门再定角色。
+     * <p>
+     * 会话已选角色必须落在当前部门内，否则取该部门内用户拥有的第一个角色；
+     * 部门内没有可用角色时保留用户已拥有的角色，避免存量数据切换部门后权限整体失效。
+     */
+    public RoleID resolveContextRole(DeptID deptID, Long selectedRoleId, List<Role> ownedRoles) {
+        List<RoleID> roleIds = roles == null ? List.of() : roles;
+        if (roleIds.isEmpty()) {
+            return null;
+        }
+        List<RoleID> inDept = deptID == null ? List.of() : getRoleInDept(deptID, roleId -> roleDept(roleId, ownedRoles));
+        RoleID selectedInDept = matchRole(inDept, selectedRoleId);
+        if (selectedInDept != null) {
+            return selectedInDept;
+        }
+        if (!inDept.isEmpty()) {
+            return inDept.getFirst();
+        }
+        RoleID owned = matchRole(roleIds, selectedRoleId);
+        return owned == null ? roleIds.getFirst() : owned;
+    }
+
+    private static RoleID matchRole(List<RoleID> candidates, Long roleId) {
+        if (roleId == null) {
+            return null;
+        }
+        return candidates.stream().filter(candidate -> candidate.getValue().equals(roleId)).findFirst().orElse(null);
+    }
+
+    private static DeptID roleDept(RoleID roleId, List<Role> ownedRoles) {
+        return ownedRoles.stream()
+                .filter(role -> role.getId().equals(roleId.getValue()))
+                .map(Role::getDeptId)
+                .findFirst()
+                .orElse(null);
+    }
 }

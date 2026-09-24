@@ -395,7 +395,7 @@
   "pitfalls": [
     {
       "key": "role-bound-to-dept",
-      "text": "User role assignment is department-scoped. Frontend and backend must avoid assigning roles outside the user's selected departments."
+      "text": "User role assignment is department-scoped. Frontend and backend must avoid assigning roles outside the user's selected departments. Runtime context follows the same rule (UserContextAppService): switch the department first, then only the roles that department owns are selectable (GET /api/user/me/roles returns current-department roles only, switch-role rejects roles outside it), switching department moves the session role to that department's first available role, and PermissionAppService/SaTokenPermissionProvider resolve the effective role department-first with a fallback to an owned role so legacy data never loses every permission."
     },
     {
       "key": "id-value-object-equality",

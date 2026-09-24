@@ -223,6 +223,7 @@ public class UserWebAssembler {
                 .id(dto.getId())
                 .name(dto.getName())
                 .code(dto.getCode())
+                .deptId(dto.getDeptId())
                 .current(dto.isCurrent())
                 .build();
     }
