@@ -398,6 +398,10 @@
       "text": "User role assignment is department-scoped. Frontend and backend must avoid assigning roles outside the user's selected departments."
     },
     {
+      "key": "id-value-object-equality",
+      "text": "DeptID/RoleID/UserID/PermissionID are value objects and must compare by value. They originally lacked equals/hashCode, so belongsToDept, getRoleInDept, joinDept and assignRoles silently never matched (department switches failed with 未加入该部门). Compare through these objects, not with ==, and keep equals/hashCode in place."
+    },
+    {
       "key": "s3-rustfs-bucket-head",
       "text": "RustFS may reject S3 HeadBucket even when object operations can continue. Do not fail upload only because bucket head check is forbidden."
     },

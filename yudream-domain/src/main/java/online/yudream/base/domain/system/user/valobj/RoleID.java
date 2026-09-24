@@ -1,12 +1,14 @@
 package online.yudream.base.domain.system.user.valobj;
 
 import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import online.yudream.base.domain.system.user.aggregate.Role;
 import online.yudream.base.domain.system.user.enumerate.SystemRoleType;
 
 @AllArgsConstructor
 @Getter
+@EqualsAndHashCode
 public class RoleID {
     private final Long value;
 
