@@ -298,16 +298,25 @@ export const useAppAccountStore = defineStore('appAccount', () => {
     }
   }
 
-  // 切换部门
+  // 切换部门：角色随部门收敛，生效角色变化时同步刷新权限与动态路由
   async function switchDept(deptId: IdValue) {
+    const previousRoleId = currentRole.value?.id
     await apiUser.switchDept(deptId)
     await loadContext()
+    if (!sameId(previousRoleId, currentRole.value?.id)) {
+      await reloadPermissions()
+    }
   }
 
   // 切换角色
   async function switchRole(roleId: IdValue) {
     await apiUser.switchRole(roleId)
     await loadContext()
+    await reloadPermissions()
+  }
+
+  // 生效角色变化后重建动态路由并回到首页
+  async function reloadPermissions() {
     await refreshDynamicRoutes(router)
     appTabbarStore.clean()
     appKeepAliveStore.clean()
@@ -316,6 +325,10 @@ export const useAppAccountStore = defineStore('appAccount', () => {
       path: appSettingsStore.settings.app.home.fullPath,
       force: true,
     })
+  }
+
+  function sameId(left?: IdValue | null, right?: IdValue | null) {
+    return String(left ?? '') === String(right ?? '')
   }
 
   // 手动登出

@@ -58,6 +58,8 @@ export interface RoleItem {
   id: IdValue
   name: string
   code: string
+  /** 角色所属部门：角色按部门归属，切换角色只能选当前部门的角色。 */
+  deptId: IdValue | null
   current: boolean
 }
 
