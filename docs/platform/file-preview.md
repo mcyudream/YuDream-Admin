@@ -60,13 +60,15 @@ backend 容器    http://backend:8080/api/public/preview/file/{token}/{filename}
 
 本镜像属转推的第三方镜像，发布在 Harbor 的 `library` 项目：`registry.yudream.online/library/kkfileview:<version>`（backend/frontend 等应用镜像在 `yda` 项目）。
 
-首选直接同步官方镜像（脚本内置国内镜像站优先、Docker Hub 兜底）：
+首选直接同步官方镜像（脚本内置国内镜像站优先、Docker Hub 兜底；本地已有同版本镜像时直接复用，不再联网拉取）：
 
 ```bash
 docker login registry.yudream.online   # Harbor 镜像仓库，凭据不进仓库
 sh docker/kkfileview/push.sh           # 默认 5.0.2
 sh docker/kkfileview/push.sh 5.0.2     # 显式指定版本
 ```
+
+上游 tag 可能已从镜像源下线（例如 `keking/kkfileview:5.0.2` 在镜像站与 Docker Hub 都已取不到），此时脚本按「本地镜像 → 镜像站 → Docker Hub」的顺序取材；三者都没有就走下面的源码自构建。
 
 官方镜像不可用（架构、网络、需定制字体/配置）时，用本仓 Dockerfile 从源码构建：
 
