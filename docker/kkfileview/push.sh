@@ -4,7 +4,7 @@
 #   registry.yudream.online/library/kkfileview:<version>
 #
 # 用法：
-#   sh docker/kkfileview/push.sh [版本]        # 默认 5.0.2，拉取官方镜像转推（首选）
+#   sh docker/kkfileview/push.sh [版本]        # 默认 5.0.2，转推官方镜像（本地已有同版本镜像则直接复用）
 #   MODE=build sh docker/kkfileview/push.sh    # 备选：用本目录 Dockerfile 从源码构建
 #
 # 前置条件：先 docker login registry.yudream.online（Harbor 镜像仓库，用 robot 账号）。
@@ -23,13 +23,27 @@ if [ "$MODE" = "build" ]; then
 else
   SOURCE_MIRROR="swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/keking/kkfileview:${VERSION}"
   SOURCE_OFFICIAL="keking/kkfileview:${VERSION}"
-  # 国内网络优先走 ddn-k8s 镜像站，失败后回退 Docker Hub 官方地址
-  if docker pull "$SOURCE_MIRROR"; then
-    SOURCE="$SOURCE_MIRROR"
+  # 上游 tag 可能已下线（镜像站与 Docker Hub 都取不到，例如 5.0.2）：本地已有同版本镜像就直接转推，
+  # 只有本地也没有时才联网拉取。
+  LOCAL_SOURCE=""
+  for candidate in "$TARGET" "$SOURCE_MIRROR" "$SOURCE_OFFICIAL"; do
+    if docker image inspect "$candidate" >/dev/null 2>&1; then
+      LOCAL_SOURCE="$candidate"
+      break
+    fi
+  done
+  if [ -n "$LOCAL_SOURCE" ]; then
+    echo "==> 复用本地已有镜像 $LOCAL_SOURCE"
+    SOURCE="$LOCAL_SOURCE"
   else
-    echo "==> 镜像站拉取失败，回退 Docker Hub"
-    docker pull "$SOURCE_OFFICIAL"
-    SOURCE="$SOURCE_OFFICIAL"
+    # 国内网络优先走 ddn-k8s 镜像站，失败后回退 Docker Hub 官方地址
+    if docker pull "$SOURCE_MIRROR"; then
+      SOURCE="$SOURCE_MIRROR"
+    else
+      echo "==> 镜像站拉取失败，回退 Docker Hub"
+      docker pull "$SOURCE_OFFICIAL"
+      SOURCE="$SOURCE_OFFICIAL"
+    fi
   fi
   docker tag "$SOURCE" "$TARGET"
 fi
