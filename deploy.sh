@@ -18,7 +18,7 @@ if [ -f .env ]; then
 fi
 
 # 默认使用 Harbor 镜像仓库，可在 .env 中覆盖
-export CI_REGISTRY_IMAGE="${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}"
+export CI_REGISTRY_IMAGE="${CI_REGISTRY_IMAGE:-registry.yudream.online/yda}"
 export TAG="${TAG:-latest}"
 
 # 创建插件目录（单独挂载更新插件 JAR）与引导配置目录（安装向导落盘 config/yudream-bootstrap.properties）

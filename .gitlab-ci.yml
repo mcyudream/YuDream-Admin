@@ -296,7 +296,7 @@ build-and-push-images:
   # 串行化镜像构建推送，避免多条 tag 流水线在共享 docker daemon 上争抢 latest 可变标签
   resource_group: yudreamadmin-images
   variables:
-    CI_REGISTRY_IMAGE: "registry.yudream.online/yudream/yudreamadmin"
+    CI_REGISTRY_IMAGE: "registry.yudream.online/yda"
     BACKEND_IMAGE: "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA"
     FRONTEND_IMAGE: "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHORT_SHA"
     BACKEND_IMAGE_LATEST: "$CI_REGISTRY_IMAGE/backend:latest"
@@ -306,6 +306,7 @@ build-and-push-images:
     - build:frontend-main
   before_script:
     # Harbor（registry.yudream.online）推送必须认证：robot 账号只经项目级 CI 变量注入，禁止写入仓库
+    # 应用镜像落 Harbor 的 yda 项目；转推的第三方镜像（如 kkfileview）走 library，见 docker/kkfileview/push.sh
     - |
       REGISTRY_SERVER="${DOCKER_REGISTRY:-$(printf '%s' "$CI_REGISTRY_IMAGE" | cut -d/ -f1)}"
       if [ -z "${DOCKER_REGISTRY_USER:-}" ] || [ -z "${DOCKER_REGISTRY_PASSWORD:-}" ]; then

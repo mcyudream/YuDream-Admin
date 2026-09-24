@@ -58,7 +58,7 @@ backend 容器    http://backend:8080/api/public/preview/file/{token}/{filename}
 
 ## kkFileView 镜像
 
-镜像发布到与 backend/frontend 相同的命名空间：`registry.yudream.online/yudream/yudreamadmin/kkfileview:<version>`。
+本镜像属转推的第三方镜像，发布在 Harbor 的 `library` 项目：`registry.yudream.online/library/kkfileview:<version>`（backend/frontend 等应用镜像在 `yda` 项目）。
 
 首选直接同步官方镜像（脚本内置国内镜像站优先、Docker Hub 兜底）：
 
