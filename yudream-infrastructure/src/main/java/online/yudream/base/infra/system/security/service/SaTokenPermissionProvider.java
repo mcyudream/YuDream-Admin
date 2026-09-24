@@ -10,6 +10,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.service.UserContextStore;
+import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import org.springframework.stereotype.Component;
@@ -70,10 +71,12 @@ public class SaTokenPermissionProvider implements StpInterface {
         if (roles == null || roles.isEmpty()) {
             return null;
         }
-        Long currentRoleId = userContextStore.getCurrentRoleId(userId);
-        RoleID selectedRoleId = currentRoleId == null
-                ? roles.getFirst()
-                : roles.stream().filter(roleId -> roleId.getValue().equals(currentRoleId)).findFirst().orElse(null);
-        return selectedRoleId == null ? null : roleRepo.findById(selectedRoleId.getValue()).orElse(null);
+        List<Role> ownedRoles = roleRepo.findByIds(roles.stream().map(RoleID::getValue).distinct().toList());
+        DeptID deptId = user.resolveContextDeptID(userContextStore.getCurrentDeptId(userId));
+        RoleID roleId = user.resolveContextRole(deptId, userContextStore.getCurrentRoleId(userId), ownedRoles);
+        if (roleId == null) {
+            return null;
+        }
+        return ownedRoles.stream().filter(role -> role.getId().equals(roleId.getValue())).findFirst().orElse(null);
     }
 }

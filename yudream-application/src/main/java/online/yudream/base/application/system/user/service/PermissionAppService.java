@@ -10,6 +10,7 @@ import online.yudream.base.domain.system.user.enumerate.UserStatus;
 import online.yudream.base.domain.system.user.repo.RoleRepo;
 import online.yudream.base.domain.system.user.repo.UserRepo;
 import online.yudream.base.domain.system.user.service.UserContextStore;
+import online.yudream.base.domain.system.user.valobj.DeptID;
 import online.yudream.base.domain.system.user.valobj.PermissionID;
 import online.yudream.base.domain.system.user.valobj.RoleID;
 import org.springframework.stereotype.Service;
@@ -60,15 +61,21 @@ public class PermissionAppService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 会话生效角色：角色隶属于部门，按「当前部门 → 已拥有角色」顺序解析，
+     * 与切换部门/角色（{@link UserContextAppService}）保持同一套口径。
+     */
     private Role currentRole(User user, Long userId) {
         List<RoleID> roles = user.getRoles();
         if (roles == null || roles.isEmpty()) {
             return null;
         }
-        Long currentRoleId = userContextStore.getCurrentRoleId(userId);
-        RoleID selectedRoleId = currentRoleId == null
-                ? roles.getFirst()
-                : roles.stream().filter(roleId -> roleId.getValue().equals(currentRoleId)).findFirst().orElse(null);
-        return selectedRoleId == null ? null : roleRepo.findById(selectedRoleId.getValue()).orElse(null);
+        List<Role> ownedRoles = roleRepo.findByIds(roles.stream().map(RoleID::getValue).distinct().toList());
+        DeptID deptId = user.resolveContextDeptID(userContextStore.getCurrentDeptId(userId));
+        RoleID roleId = user.resolveContextRole(deptId, userContextStore.getCurrentRoleId(userId), ownedRoles);
+        if (roleId == null) {
+            return null;
+        }
+        return ownedRoles.stream().filter(role -> role.getId().equals(roleId.getValue())).findFirst().orElse(null);
     }
 }
