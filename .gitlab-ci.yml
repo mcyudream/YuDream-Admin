@@ -305,6 +305,14 @@ build-and-push-images:
     - build:backend
     - build:frontend-main
   before_script:
+    # Harbor（registry.yudream.online）推送必须认证：robot 账号只经项目级 CI 变量注入，禁止写入仓库
+    - |
+      REGISTRY_SERVER="${DOCKER_REGISTRY:-$(printf '%s' "$CI_REGISTRY_IMAGE" | cut -d/ -f1)}"
+      if [ -z "${DOCKER_REGISTRY_USER:-}" ] || [ -z "${DOCKER_REGISTRY_PASSWORD:-}" ]; then
+        echo "缺少 GitLab CI/CD 变量 DOCKER_REGISTRY_USER / DOCKER_REGISTRY_PASSWORD（Harbor robot 账号）"
+        exit 1
+      fi
+      printf '%s' "$DOCKER_REGISTRY_PASSWORD" | docker login "$REGISTRY_SERVER" -u "$DOCKER_REGISTRY_USER" --password-stdin
     - docker info
   script:
     # 先构建并推送提交 SHA 标签

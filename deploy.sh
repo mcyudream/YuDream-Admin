@@ -17,7 +17,7 @@ if [ -f .env ]; then
   set +a
 fi
 
-# 默认使用 GitLab 容器仓库，可在 .env 中覆盖
+# 默认使用 Harbor 镜像仓库，可在 .env 中覆盖
 export CI_REGISTRY_IMAGE="${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}"
 export TAG="${TAG:-latest}"
 
