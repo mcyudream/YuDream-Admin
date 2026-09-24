@@ -138,15 +138,8 @@ public class RoleManageAppService {
         if (permissions == null || permissions.isEmpty()) {
             return new ArrayList<>();
         }
-        // 插件更新/重载期间其权限记录可能短暂失效，只拒绝系统中不存在的码，已存在的失效码原样保留以免丢授权
-        Set<String> knownCodes = permissionRepo.findAll().stream()
-                .map(permission -> permission.getId().getCode())
-                .collect(Collectors.toSet());
-        List<String> distinct = permissions.stream().distinct().toList();
-        if (!knownCodes.containsAll(distinct)) {
-            throw new BizException("权限不存在或已废弃");
-        }
-        return distinct.stream().map(PermissionID::of).toList();
+        // 权限码原样入库：失效/未注册的码不阻断保存也不丢弃，仅在展示层隐藏，权限恢复后授权自动生效
+        return permissions.stream().distinct().map(PermissionID::of).toList();
     }
 
     private List<RoleManageDTO> toDTOs(List<Role> roles) {
