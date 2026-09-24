@@ -307,6 +307,10 @@
     {
       "key": "integration-config-precedence",
       "text": "Runtime integration config (mail/S3/site-url) resolves DB sys_setting first and falls back to env/yml; secrets encrypt via CapabilityCredentialCipher AAD system.integration.{category}; dynamic providers rebuild clients by config hash so admin edits apply without restart; never return secrets - expose passwordSet/secretKeySet flags only."
+    },
+    {
+      "key": "role-permission-codes-passthrough",
+      "text": "角色保存/分配权限不校验权限码是否存在于注册表：失效或未注册的码原样入库不阻断保存（不抛「权限不存在或已废弃」），仅展示层隐藏（权限树/权限数只按现存码），插件恢复或权限重现后授权自动生效；前端勾选时保留树外不可见码，提交原样透传。"
     }
   ],
   "utilities": [
