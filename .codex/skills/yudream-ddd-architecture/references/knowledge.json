@@ -390,6 +390,10 @@
         "yudream-interfaces/src/main/java/online/yudream/base/interfaces/platform/devtools/controller/PluginDevToolsController.java",
         "yudream-frontend/apps/core-arco-design-vue/src/layouts/components/PluginDevtools/panels/SettingsPanel.vue"
       ]
+    },
+    {
+      "key": "about-build-version-injection",
+      "text": "关于系统页版本来源：框架/SPI 版本经 Maven 资源过滤注入（bootstrap about.properties、SPI spi-build.properties），运行时走 domain 端口 + infra classpath 读取（不经 Environment，避免 IDE 未过滤时占位符穿透）；最新版本探测走 domain LatestVersionGateway 端口 + infra NexusLatestVersionGateway（maven-metadata.xml / npm dist-tags，TTL 缓存），出站基址由应用层过 OutboundUrlGuard"
     }
   ],
   "pitfalls": [

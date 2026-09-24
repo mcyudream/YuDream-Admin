@@ -7,6 +7,18 @@ import { parseLoadedEnv } from 'vite-plugin-env-parse'
 import pkg from './package.json'
 import createVitePlugins from './vite/plugins'
 
+// workspace 依赖在 __SYSTEM_INFO__ 里只会显示 "workspace:*"，
+// 「关于系统」页需要的真实版本号改为构建期直接从各包 package.json 读取注入。
+function readWorkspacePackageVersion(packageDir: string): string {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../packages', packageDir, 'package.json'), 'utf-8'))
+    return manifest.version ?? '0.0.0'
+  }
+  catch {
+    return '0.0.0'
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode, command }) => {
   const env = parseLoadedEnv(loadEnv(mode, process.cwd()))
@@ -64,6 +76,11 @@ export default defineConfig(({ mode, command }) => {
           devDependencies: pkg.devDependencies,
         },
         lastBuildTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      }),
+      __YUDREAM_PACKAGE_VERSIONS__: JSON.stringify({
+        'plugin-sdk': readWorkspacePackageVersion('plugin-sdk'),
+        'components': readWorkspacePackageVersion('components'),
+        'dataviz': readWorkspacePackageVersion('dataviz'),
       }),
     },
     plugins: createVitePlugins(mode, command === 'build'),

@@ -12,6 +12,13 @@ declare const __SYSTEM_INFO__: {
   lastBuildTime: string
 }
 
+/** 构建期注入的共享契约包真实版本（workspace 依赖在 __SYSTEM_INFO__ 中只会是 workspace:*） */
+declare const __YUDREAM_PACKAGE_VERSIONS__: {
+  'plugin-sdk': string
+  'components': string
+  'dataviz': string
+}
+
 declare module 'virtual:fantastic-admin/turbo-console' {
   export function warnKeepAliveComponentNameMissing(filePath: string): void
 }

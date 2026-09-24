@@ -6,7 +6,7 @@
 
     <groupId>online.yudream.base</groupId>
     <artifactId>yudream-plugin-spi</artifactId>
-    <version>2.32.0</version>
+    <version>2.33.0</version>
     <packaging>jar</packaging>
 
     <name>YuDream Plugin SPI</name>
@@ -17,6 +17,8 @@
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.parameters>true</maven.compiler.parameters>
+        <!-- 必须声明在模块自身：IDE 运行时的资源过滤按模块 pom 解析属性，不继承父 pom（Maven 打包与 IDE 运行才会一致） -->
+        <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
     </properties>
 
     <distributionManagement>
@@ -31,6 +33,13 @@
     </distributionManagement>
 
     <build>
+        <resources>
+            <!-- 供宿主「关于系统」页在运行时读取当前 SPI 版本/构建时间（classpath:spi-build.properties） -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
