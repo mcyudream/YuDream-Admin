@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# 把 kkFileView 镜像发布到平台私有仓库，与 backend/frontend 同一命名空间：
-#   registry.yudream.online/yudream/yudreamadmin/kkfileview:<version>
+# 把 kkFileView 镜像发布到平台私有仓库：本镜像属转推的第三方镜像，落 Harbor 的 library 项目，
+# 与应用镜像（Harbor 的 yda 项目里的 backend/frontend）分开：
+#   registry.yudream.online/library/kkfileview:<version>
 #
 # 用法：
 #   sh docker/kkfileview/push.sh [版本]        # 默认 5.0.2，拉取官方镜像转推（首选）
@@ -11,7 +12,7 @@
 set -euo pipefail
 
 VERSION="${1:-5.0.2}"
-REGISTRY="${REGISTRY:-registry.yudream.online/yudream/yudreamadmin}"
+REGISTRY="${REGISTRY:-registry.yudream.online/library}"
 TARGET="${REGISTRY}/kkfileview:${VERSION}"
 MODE="${MODE:-retag}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

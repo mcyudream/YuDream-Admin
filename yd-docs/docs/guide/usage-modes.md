@@ -38,12 +38,12 @@ flowchart LR
 
 | 镜像 | 角色 | 是否必需 |
 |---|---|---|
-| `registry.yudream.online/yudream/yudreamadmin/backend:latest` | Spring Boot 后端，容器内端口 8080（宿主默认映射 `${BACKEND_PORT:-8080}`） | 必需 |
-| `registry.yudream.online/yudream/yudreamadmin/frontend:latest` | 前端静态站点，nginx 托管 `core-arco-design-vue` 构建产物并支持 history 路由，容器内端口 80（宿主默认映射 `${FRONTEND_PORT:-80}`） | 必需 |
-| `registry.yudream.online/yudream/yudreamadmin/render-server:latest` | 渲染服务（HTML/Markdown/模板 → 图片/PDF），容器内端口 3000，默认映射 `${RENDER_PORT:-3000}` | 可选，对应平台能力"消息渲染"（`PLATFORM_MESSAGE_RENDER_ENABLED`） |
-| `registry.yudream.online/yudream/yudreamadmin/kkfileview:${KKFILEVIEW_TAG:-5.0.2}` | 文件预览，容器内端口 8012；浏览器经 frontend nginx `/kkfileview/` 同源反代 | 可选，对应平台能力"文件预览"（`PLATFORM_FILE_PREVIEW_ENABLED`） |
+| `registry.yudream.online/yda/backend:latest` | Spring Boot 后端，容器内端口 8080（宿主默认映射 `${BACKEND_PORT:-8080}`） | 必需 |
+| `registry.yudream.online/yda/frontend:latest` | 前端静态站点，nginx 托管 `core-arco-design-vue` 构建产物并支持 history 路由，容器内端口 80（宿主默认映射 `${FRONTEND_PORT:-80}`） | 必需 |
+| `registry.yudream.online/yda/render-server:latest` | 渲染服务（HTML/Markdown/模板 → 图片/PDF），容器内端口 3000，默认映射 `${RENDER_PORT:-3000}` | 可选，对应平台能力"消息渲染"（`PLATFORM_MESSAGE_RENDER_ENABLED`） |
+| `registry.yudream.online/library/kkfileview:${KKFILEVIEW_TAG:-5.0.2}` | 文件预览，容器内端口 8012；浏览器经 frontend nginx `/kkfileview/` 同源反代 | 可选，对应平台能力"文件预览"（`PLATFORM_FILE_PREVIEW_ENABLED`） |
 
-镜像 tag 由环境变量控制：`CI_REGISTRY_IMAGE`（默认 `registry.yudream.online/yudream/yudreamadmin`）与 `TAG`（默认 `latest`）。
+镜像 tag 由环境变量控制：`CI_REGISTRY_IMAGE`（默认 `registry.yudream.online/yda`）与 `TAG`（默认 `latest`）。
 
 ### 快速起栈
 

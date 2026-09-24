@@ -8,7 +8,7 @@
 
 services:
   backend:
-    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/backend:${TAG:-latest}
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yda}/backend:${TAG:-latest}
     container_name: yudream-backend
     restart: unless-stopped
     labels:
@@ -114,7 +114,7 @@ services:
   render-server:
     build:
       context: ./yudream-render-server
-    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/render-server:${TAG:-latest}
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yda}/render-server:${TAG:-latest}
     container_name: yudream-render-server
     restart: unless-stopped
     expose:
@@ -144,7 +144,7 @@ services:
       - yudream
 
   frontend:
-    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/frontend:${TAG:-latest}
+    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yda}/frontend:${TAG:-latest}
     container_name: yudream-frontend
     restart: unless-stopped
     labels:
@@ -156,7 +156,7 @@ services:
 
   # kkFileView 在线文件预览（平台能力，管理入口：系统配置 > 文件预览）
   kkfileview:
-    image: ${CI_REGISTRY_IMAGE:-registry.yudream.online/yudream/yudreamadmin}/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
+    image: registry.yudream.online/library/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
     container_name: yudream-kkfileview
     restart: unless-stopped
     labels:

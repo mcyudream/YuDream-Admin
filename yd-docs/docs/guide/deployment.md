@@ -6,12 +6,12 @@
 
 ### 拓扑与镜像
 
-应用镜像仓库是 `registry.yudream.online/yudream/yudreamadmin`：
+应用镜像仓库是 `registry.yudream.online/yda`（Harbor 的 `yda` 项目）：
 
 - `backend:${TAG:-latest}`：Spring Boot，容器端口 `8080`。
 - `frontend:${TAG:-latest}`：nginx，容器端口 `80`，只需对外发布这个入口。
 - `render-server:${TAG:-latest}`：Fastify + Playwright，容器端口 `3000`，建议只 `expose`，不要映射宿主端口。
-- `kkfileview:${KKFILEVIEW_TAG:-5.0.2}`：文件预览，容器端口 `8012`；浏览器经 frontend nginx 的 `/kkfileview/` 同源反代，生产可删除宿主端口映射。
+- `kkfileview:${KKFILEVIEW_TAG:-5.0.2}`（在 Harbor 的 `library` 项目）：文件预览，容器端口 `8012`；浏览器经 frontend nginx 的 `/kkfileview/` 同源反代，生产可删除宿主端口映射。
 - 模板 B 的基础镜像明确为 `docker.io/library/mongo:8.0` 与 `docker.io/library/redis:7.4-alpine`；模板 A 不创建数据库容器。
 
 ```mermaid

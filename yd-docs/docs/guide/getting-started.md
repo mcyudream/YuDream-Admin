@@ -2,7 +2,7 @@
 
 ## 方式一：Docker Compose 部署（推荐）
 
-应用镜像发布在 `registry.yudream.online/yudream/yudreamadmin`，包括 `backend`、`frontend`、`render-server` 和 `kkfileview`。服务在 Compose 网络中分别以同名 hostname 互通；前端镜像内置 nginx，将 `/api/` 反代到 `http://backend:8080/api/`，将 `/kkfileview/` 反代到 kkFileView。下面两套文件都是完整模板，不依赖仓库根目录的其他 Compose 文件。
+应用镜像发布在 `registry.yudream.online/yda`，包括 `backend`、`frontend`、`render-server`；转推的 `kkfileview` 在 `registry.yudream.online/library`。服务在 Compose 网络中分别以同名 hostname 互通；前端镜像内置 nginx，将 `/api/` 反代到 `http://backend:8080/api/`，将 `/kkfileview/` 反代到 kkFileView。下面两套文件都是完整模板，不依赖仓库根目录的其他 Compose 文件。
 
 ### 模板 A：使用已有 MongoDB / Redis（无数据库容器）
 
@@ -41,7 +41,7 @@ KKFILEVIEW_INTERNAL_URL=http://kkfileview:8012
 ```yaml
 services:
   backend:
-    image: registry.yudream.online/yudream/yudreamadmin/backend:${TAG:-latest}
+    image: registry.yudream.online/yda/backend:${TAG:-latest}
     restart: unless-stopped
     ports:
       - "${BACKEND_PORT:-8080}:8080"
@@ -70,14 +70,14 @@ services:
     networks: [yudream]
 
   frontend:
-    image: registry.yudream.online/yudream/yudreamadmin/frontend:${TAG:-latest}
+    image: registry.yudream.online/yda/frontend:${TAG:-latest}
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-80}:80"
     networks: [yudream]
 
   render-server:
-    image: registry.yudream.online/yudream/yudreamadmin/render-server:${TAG:-latest}
+    image: registry.yudream.online/yda/render-server:${TAG:-latest}
     restart: unless-stopped
     expose: ["3000"]
     ports:
@@ -94,7 +94,7 @@ services:
     networks: [yudream]
 
   kkfileview:
-    image: registry.yudream.online/yudream/yudreamadmin/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
+    image: registry.yudream.online/library/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
     restart: unless-stopped
     ports: ["${KKFILEVIEW_PORT:-8012}:8012"]
     environment:
@@ -170,7 +170,7 @@ services:
     networks: [yudream]
 
   backend:
-    image: registry.yudream.online/yudream/yudreamadmin/backend:${TAG:-latest}
+    image: registry.yudream.online/yda/backend:${TAG:-latest}
     restart: unless-stopped
     ports: ["${BACKEND_PORT:-8080}:8080"]
     depends_on:
@@ -201,13 +201,13 @@ services:
     networks: [yudream]
 
   frontend:
-    image: registry.yudream.online/yudream/yudreamadmin/frontend:${TAG:-latest}
+    image: registry.yudream.online/yda/frontend:${TAG:-latest}
     restart: unless-stopped
     ports: ["${FRONTEND_PORT:-80}:80"]
     networks: [yudream]
 
   render-server:
-    image: registry.yudream.online/yudream/yudreamadmin/render-server:${TAG:-latest}
+    image: registry.yudream.online/yda/render-server:${TAG:-latest}
     restart: unless-stopped
     expose: ["3000"]
     ports: ["${RENDER_PORT:-3000}:3000"]
@@ -223,7 +223,7 @@ services:
     networks: [yudream]
 
   kkfileview:
-    image: registry.yudream.online/yudream/yudreamadmin/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
+    image: registry.yudream.online/library/kkfileview:${KKFILEVIEW_TAG:-5.0.2}
     restart: unless-stopped
     ports: ["${KKFILEVIEW_PORT:-8012}:8012"]
     environment:

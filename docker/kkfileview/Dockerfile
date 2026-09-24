@@ -3,7 +3,7 @@
 # 仅在官方镜像不可用（架构不匹配、网络受限、需定制字体或默认配置）时，
 # 用本文件从源码构建：
 #   docker build --build-arg KKFILEVIEW_VERSION=5.0.2 \
-#     -t registry.yudream.online/yudream/yudreamadmin/kkfileview:5.0.2 docker/kkfileview
+#     -t registry.yudream.online/library/kkfileview:5.0.2 docker/kkfileview
 
 ARG KKFILEVIEW_VERSION=5.0.2
 
