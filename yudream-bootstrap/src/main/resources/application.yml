@@ -52,6 +52,9 @@ spring.servlet.multipart:
   # 与 nginx client_max_body_size 10240M 对齐，覆盖 Minecraft 地图 ZIP 等超大文件。
   max-file-size: 10240MB
   max-request-size: 10240MB
+  # 惰性解析：DispatcherServlet 只在首次 getParts()/getParameterMap() 时才 spool multipart 体，
+  # 插件流式端点的鉴权与 Content-Length 前置限长因此先于容器整体消费请求体执行。
+  resolve-lazily: true
 
 logging:
   level:
@@ -123,6 +126,15 @@ yudream.web.log:
 yudream.system.seed:
   menu:
     sync-mode: ${SYSTEM_SEED_MENU_SYNC_MODE:MISSING_ONLY}
+
+# 关于系统页：契约包最新版本探测（只读出站查询 Nexus，带缓存与降级；enabled=false 时只展示当前版本）
+yudream.system.about:
+  version-check:
+    enabled: ${ABOUT_VERSION_CHECK_ENABLED:true}
+    nexus-base-url: ${ABOUT_VERSION_CHECK_NEXUS_URL:https://nexus.yudream.online}
+    connect-timeout-millis: ${ABOUT_VERSION_CHECK_CONNECT_TIMEOUT:3000}
+    request-timeout-millis: ${ABOUT_VERSION_CHECK_REQUEST_TIMEOUT:8000}
+    cache-ttl-seconds: ${ABOUT_VERSION_CHECK_CACHE_TTL:600}
 
 # 系统日志：docker 容器日志实时采集（可选）
 # transport: auto=有 unix socket 走 Docker API，否则走 docker CLI；cli=强制 CLI；socket=强制 Docker API
@@ -214,6 +226,12 @@ yudream.platform.plugin:
     host: ${PLATFORM_PLUGIN_HOST_VERSION:1.0.0}
     spi: ${PLATFORM_PLUGIN_SPI_VERSION:2.13.0}
     frontend-sdk: ${PLATFORM_PLUGIN_FRONTEND_SDK_VERSION:1.0.1}
+  # 插件开发模式热编译为服务端固定命令（防面板命令注入），不执行面板登记的 compileCommand。
+  # 固定命令使用宿主进程的默认 Maven 环境；本地插件源码仓需要私服镜像或专用本地仓库时，
+  # 由部署者经 compile-args 追加 Maven 参数（部署配置，非面板操作者输入），例如：
+  #   -s <插件仓>/settings.xml -Dmaven.repo.local=<本地仓库目录>
+  dev-mode:
+    compile-args: ${PLATFORM_PLUGIN_DEV_COMPILE_ARGS:}
   store-root-url: ${PLATFORM_PLUGIN_STORE_ROOT_URL:https://nexus.yudream.online/repository/plugin-store-releases/index.json}
   store-connect-timeout-millis: ${PLATFORM_PLUGIN_STORE_CONNECT_TIMEOUT_MILLIS:5000}
   store-request-timeout-millis: ${PLATFORM_PLUGIN_STORE_REQUEST_TIMEOUT_MILLIS:5000}

@@ -107,6 +107,15 @@ public enum SystemMenuModule {
             icon = "i-ri:tools-line", sort = 30)
     SETTING,
 
+    @MenuNode(code = "system:about", name = "关于系统", type = MenuNodeType.MENU,
+            parentName = "CONFIG", path = "/system/about", component = "system/about/index.vue",
+            icon = "i-ri:information-line", sort = 40)
+    ABOUT,
+
+    @MenuNode(code = "system:about:view", name = "查看关于系统", type = MenuNodeType.BUTTON,
+            parentName = "ABOUT", permission = "system:about:view")
+    ABOUT_VIEW,
+
     @MenuNode(code = "system:setting:view", name = "查看系统设置", type = MenuNodeType.BUTTON,
             parentName = "SETTING", permission = "system:setting:view")
     SETTING_VIEW,

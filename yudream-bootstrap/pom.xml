@@ -15,6 +15,8 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- 必须声明在模块自身：IDE 运行时的资源过滤按模块 pom 解析属性，不继承父 pom（Maven 打包与 IDE 运行才会一致） -->
+        <maven.build.timestamp.format>yyyy-MM-dd'T'HH:mm:ss'Z'</maven.build.timestamp.format>
     </properties>
 
     <dependencies>
@@ -58,6 +60,23 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>about.properties</exclude>
+                </excludes>
+            </resource>
+            <!-- 框架版本构建期注入：宿主「关于系统」页运行时读取（classpath:about.properties） -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>about.properties</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
