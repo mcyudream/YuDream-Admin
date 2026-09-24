@@ -25,4 +25,9 @@ public class PermissionID {
         return Objects.equals(code, ((PermissionID) o).code);
     }
 
+    @Override
+    public int hashCode() {
+        return Objects.hash(code);
+    }
+
 }
