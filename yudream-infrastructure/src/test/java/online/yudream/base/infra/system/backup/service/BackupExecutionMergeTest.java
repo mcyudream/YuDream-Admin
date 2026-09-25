@@ -46,7 +46,7 @@ class BackupExecutionMergeTest {
         RecordingScopeSource scopes = new RecordingScopeSource();
         BackupExecutionService service = new BackupExecutionService(
                 null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
-                null, null, null, () -> "fedcba9876543210", null);
+                null, null, null, () -> "fedcba9876543210", new online.yudream.base.application.system.backup.support.BackupDirectorySupport("target/test-backup"));
 
         BackupJob job = job(archive, BackupConflictStrategy.LOCAL_WINS);
         BackupJobResult result = service.run(job, (phase, message, percent) -> { });
@@ -69,7 +69,7 @@ class BackupExecutionMergeTest {
         RecordingScopeSource scopes = new RecordingScopeSource();
         BackupExecutionService service = new BackupExecutionService(
                 null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
-                null, null, null, () -> "fedcba9876543210", null);
+                null, null, null, () -> "fedcba9876543210", new online.yudream.base.application.system.backup.support.BackupDirectorySupport("target/test-backup"));
 
         BackupJob job = job(archive, BackupConflictStrategy.ARCHIVE_WINS);
         BackupJobResult result = service.run(job, (phase, message, percent) -> { });
@@ -90,7 +90,7 @@ class BackupExecutionMergeTest {
         RecordingScopeSource scopes = new RecordingScopeSource(false);
         BackupExecutionService service = new BackupExecutionService(
                 null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
-                null, null, null, () -> "fedcba9876543210", null);
+                null, null, null, () -> "fedcba9876543210", new online.yudream.base.application.system.backup.support.BackupDirectorySupport("target/test-backup"));
 
         BackupJob job = job(archive, BackupConflictStrategy.LOCAL_WINS);
         BackupJobResult result = service.run(job, (phase, message, percent) -> { });

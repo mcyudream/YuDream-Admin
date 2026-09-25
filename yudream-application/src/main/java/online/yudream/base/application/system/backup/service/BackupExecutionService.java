@@ -258,6 +258,9 @@ public class BackupExecutionService implements BackupJobRunner {
             mergePluginScopes(reader, manifest, strategy, counters, warnings, progress);
         } catch (IOException e) {
             throw new BizException("读取备份归档失败：" + e.getMessage());
+        } finally {
+            // 导入完成后清理暂存归档（上传落盘与异地下载共用），失败也不留孤儿临时文件
+            directories.deleteQuietly(archiveFile);
         }
         progress.update("finalize", "合并完成", 100);
         return new BackupJobResult(null, null, null, counters.toStats(), List.copyOf(warnings));
@@ -393,9 +396,12 @@ public class BackupExecutionService implements BackupJobRunner {
             progress.update("download", "正在从异地下载归档…", 3);
             remoteFactory.create(target).fetch(job.getArchiveName(), temp);
             return importArchive(temp, progress, job.getStrategy());
-        } finally {
-            directories.deleteQuietly(temp);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("从异地恢复失败：" + e.getMessage());
         }
+        // temp 由 importArchive 统一清理
     }
 
     // ---------------------------------------------------------------- 公共
