@@ -116,6 +116,43 @@ public enum SystemMenuModule {
             parentName = "ABOUT", permission = "system:about:view")
     ABOUT_VIEW,
 
+    @MenuNode(code = "system:backup", name = "数据备份", type = MenuNodeType.MENU,
+            parentName = "CONFIG", path = "/system/backup", component = "system/backup/index.vue",
+            icon = "i-ri:database-2-line", sort = 35)
+    BACKUP,
+
+    @MenuNode(code = "system:backup:view", name = "查看备份中心", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:view")
+    BACKUP_VIEW,
+
+    @MenuNode(code = "system:backup:export", name = "创建全量导出", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:export")
+    BACKUP_EXPORT,
+
+    @MenuNode(code = "system:backup:download", name = "下载备份归档", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:download")
+    BACKUP_DOWNLOAD,
+
+    @MenuNode(code = "system:backup:import", name = "合并导入备份", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:import")
+    BACKUP_IMPORT,
+
+    @MenuNode(code = "system:backup:run", name = "执行异地备份", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:run")
+    BACKUP_RUN,
+
+    @MenuNode(code = "system:backup:test", name = "测试异地连接", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:test")
+    BACKUP_TEST,
+
+    @MenuNode(code = "system:backup:config", name = "配置异地备份", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:config")
+    BACKUP_CONFIG,
+
+    @MenuNode(code = "system:backup:delete", name = "删除备份任务", type = MenuNodeType.BUTTON,
+            parentName = "BACKUP", permission = "system:backup:delete")
+    BACKUP_DELETE,
+
     @MenuNode(code = "system:setting:view", name = "查看系统设置", type = MenuNodeType.BUTTON,
             parentName = "SETTING", permission = "system:setting:view")
     SETTING_VIEW,
