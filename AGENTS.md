@@ -38,6 +38,7 @@
 ## 4. 插件架构要点
 
 - `yudream-plugin-spi` 是插件唯一可依赖的宿主模块；插件代码禁止依赖 domain/application/infrastructure/interfaces/bootstrap。
+- 数据备份是 `system/backup` 四层的基线能力（无双闸门）：全量导出/合并导入用 YDBA 归档（ZIP：manifest.json + `mongo/*.ndjson` EJSON EXTENDED + 对象存储索引 + 插件范围文件），合并导入是无损并集、同标识冲突开始前一次询问策略（本地为准只补缺 / 备份为准覆盖）；异地备份目标支持 FTP/FTPS/WebDAV（密码主密钥加密，AAD `system-backup:target:{code}`），本地归档目录默认 `config/backup`；计划 cron 为 Spring 6 位表达式，监听 `BackupPlansChangedEvent` 重排；插件经 SPI `system.backup` 扩展点 `context.registerExtension(PluginBackupProvider.class, impl)` 贡装备份范围（scopeCode 归属插件码，恢复缺失提供方时跳过并告警）。细则见 `docs/system/backup.md` 与 skill `rules.system-backup-capability`。
 - JAR 根必须有权威 `plugin.yml`（`name`/`main`/`version`）；`name` 是唯一稳定 code，`displayName` 仅展示；可选 `git` 声明 http(s) 源码仓库地址（宿主持久化并随市场目录下发展示链接）；`depend` 为硬依赖、`softdepend` 为可选依赖。禁止打包 `META-INF/services/...YuDreamPlugin`。
 - 插件按职责分包（domain/application/infrastructure/interfaces/migration/frontend/bootstrap）；入口类只做装配与生命周期，所有注册走 `PluginContext.registerXxx(...)`，保证 disable/unload 可完整回收。
 - 插件调用宿主能力只能走 SPI 端口；需要新能力时先发布稳定 SPI 端口/DTO，再在宿主实现适配。插件间业务 API 放 provider JAR 的稳定最小 `*.api` 包，consumer 以 `provided` 编译并通过 `context.service(...)` 调用；禁止复制 provider API。
