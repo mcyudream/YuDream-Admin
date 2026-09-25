@@ -132,6 +132,23 @@ public class CapabilityCredentialCipher {
         return StringUtils.hasText(value) && value.startsWith(VERSION);
     }
 
+    /**
+     * 主密钥指纹（SHA-256 前 16 个十六进制字符）。用于备份归档清单标记密钥来源，
+     * 合并导入时与当前主密钥比对，不一致则提示存量密文可能无法解密。未配置主密钥返回空串。
+     */
+    public String fingerprint() {
+        SecretKey key = primaryKeyOrNull();
+        if (key == null) {
+            return "";
+        }
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256").digest(key.getEncoded());
+            return java.util.HexFormat.of().formatHex(hash, 0, 8);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
     private SecretKey primaryKey() {
         SecretKey key = primaryKeyOrNull();
         if (key == null) {

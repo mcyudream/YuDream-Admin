@@ -39,6 +39,7 @@
         <yubico.webauthn.version>2.9.0</yubico.webauthn.version>
         <spring-ai.version>1.1.8</spring-ai.version>
         <oshi.version>6.8.3</oshi.version>
+        <commons-net.version>3.11.1</commons-net.version>
     </properties>
 
     <dependencyManagement>
@@ -111,6 +112,11 @@
                 <groupId>software.amazon.awssdk</groupId>
                 <artifactId>s3</artifactId>
                 <version>${aws.sdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>commons-net</groupId>
+                <artifactId>commons-net</artifactId>
+                <version>${commons-net.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.alibaba</groupId>

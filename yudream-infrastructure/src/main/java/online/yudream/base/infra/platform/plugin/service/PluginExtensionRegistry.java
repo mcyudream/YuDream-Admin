@@ -32,15 +32,26 @@ public class PluginExtensionRegistry implements PluginExtensionQuery {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
     public <I> List<I> extensions(Class<I> extensionPoint) {
+        return registrations(extensionPoint).stream().map(ExtensionRegistration::extension).toList();
+    }
+
+    /** 携带注册来源插件码的扩展查询：宿主基础设施在需要追溯贡献方（如备份范围归属插件）时使用。 */
+    public <I> List<ExtensionRegistration<I>> registrations(Class<I> extensionPoint) {
         List<Registration> values = registrations.get(extensionPoint);
         if (values == null || values.isEmpty()) {
             return List.of();
         }
         List<Registration> sorted = new ArrayList<>(values);
         sorted.sort(Comparator.comparingInt(Registration::priority).thenComparingLong(Registration::sequence));
-        return (List<I>) sorted.stream().map(Registration::extension).toList();
+        return sorted.stream()
+                .map(registration -> new ExtensionRegistration<I>(
+                        registration.pluginCode(), registration.priority(), registration.sequence(),
+                        (I) registration.extension()))
+                .toList();
+    }
+
+    public record ExtensionRegistration<I>(String pluginCode, int priority, long sequence, I extension) {
     }
 
     private record Registration(String pluginCode, int priority, long sequence, Object extension) {
