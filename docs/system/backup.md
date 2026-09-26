@@ -32,7 +32,8 @@ plugins.index.json          # [{pluginCode, scopeCode, path, size, sha256}]
 ```java
 context.registerExtension(PluginBackupProvider.class, new MyBackupProvider(...));
 // scopeCode / displayName / description / defaultSchedule（cron 建议）
-// export(BackupSink sink)      —— 只允许 putFile/putText 写相对路径文件
+// ExportReport export(BackupSink sink) —— 只允许 putFile/putText 写相对路径文件；
+//   返回的 warnings 会拼进备份任务消息（用于记录局部跳过原因，如某节点离线）
 // restore(BackupSource source, PluginBackupConflictStrategy strategy)
 ```
 
@@ -58,5 +59,5 @@ context.registerExtension(PluginBackupProvider.class, new MyBackupProvider(...))
 
 ## 已知边界
 
-- mcpanel 插件注册 `panel-data` 范围（元数据集合 + 节点注册密钥，含敏感凭据需妥善保管归档）；节点上的实例世界数据由 mcpanel-node 持有，待节点协议提供归档流式下载后按同一扩展点追加 `server-data` 范围。
+- mcpanel 插件注册两个备份范围：`panel-data`（元数据集合 + 节点注册密钥，含敏感凭据需妥善保管归档）与 `server-data`（实例世界数据：逐实例在节点侧 `backup.create` 整包后经分块通道 `backup.download.chunk` 拉取归档；恢复时 `backup.upload.*` 回灌节点、停机后 `backup.restore` 覆盖，并清理回灌副本）。`server-data` 需 mcpanel-node ≥ 0.7.0（caps 广播分块备份通道），旧节点/离线节点自动跳过并把原因拼进任务消息；`LOCAL_WINS` 只恢复数据目录为空的实例，`ARCHIVE_WINS` 停机后无条件覆盖。
 - Mongo 索引、GridFS（本系统未使用）不在迁移范围；跨主密钥导入的加密凭据需重新配置。
