@@ -11,6 +11,7 @@ import type {
   RemoteTargetType,
 } from '@/api/modules/system-backup'
 import apiBackup from '@/api/modules/system-backup'
+import { saveExcelResponse } from '@/utils/excel'
 
 const modal = useFaModal()
 const toast = useFaToast()
@@ -326,14 +327,9 @@ function confirmRemoveJob(row: BackupJob) {
 }
 
 async function downloadArchive(row: BackupJob) {
+  // blob 响应经拦截器包装为 { data: Blob, headers }，复用既有的保存工具（解析 UTF-8 文件名头）
   const res = await apiBackup.downloadArchive(row.id)
-  const blob = res as unknown as Blob
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = row.archiveName || `backup-${row.id}.zip`
-  link.click()
-  URL.revokeObjectURL(url)
+  saveExcelResponse(res, row.archiveName || `backup-${row.id}.zip`)
 }
 
 // ---------------------------------------------------------------- 异地目标
