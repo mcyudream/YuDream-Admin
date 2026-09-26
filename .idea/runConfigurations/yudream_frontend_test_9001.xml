@@ -1,0 +1,13 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="yudream-frontend-test : 9001 → 8081" type="js.build_tools.npm">
+    <package-json value="$PROJECT_DIR$/yudream-frontend/apps/core-arco-design-vue/package.json" />
+    <command value="run" />
+    <scripts>
+      <script value="dev:test" />
+    </scripts>
+    <node-interpreter value="project" />
+    <envs>
+      <env name="VITE_DEV_API_TARGET" value="http://localhost:8081" />
+    </envs>
+  </configuration>
+</component>
