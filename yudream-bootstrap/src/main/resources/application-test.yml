@@ -1,0 +1,48 @@
+# ===== 测试实例 profile（IDEA 共享运行配置「yudream-test」专用）=====
+# 目的：与开发实例同机并存、数据完全隔离，用于测试现有功能（如备份中心、插件等）。
+# 用法：IDEA 运行配置「yudream-test : 8081 隔离库」一键启动；
+#   命令行等价：--spring.profiles.active=test 且 YUDREAM_BOOTSTRAP_CONFIG=yudream-bootstrap-test.properties
+# 隔离矩阵：
+#   Mongo 库   yudream-test        （yudream-bootstrap-test.properties，引导文件优先级最高）
+#   Redis DB   1                   （会话/缓存与开发实例隔离，互不掉登录）
+#   S3 桶      yudream-test        （对象存储/插件资产/备份对象互不可见）
+#   归档目录   config/backup-test  （备份中心本机归档互不可见）
+#   端口       8081                （与开发 8080 并存）
+#   雪花 ID    machine-id=2        （避免两库各自生成的 ID 撞号，跨库合并导入时误判为同一条数据）
+#   插件热重载 关闭                （避免与开发实例的 dev-mode watcher 互相触发 reload）
+#   邮件       指向 localhost      （测试实例不发真实邮件，发送会连接失败而非外发）
+# 注意：OS 环境变量优先级高于 yml——运行配置里不要带 MONGO_URI/S3_BUCKET 等环境变量，
+#       只保留 YUDREAM_BOOTSTRAP_CONFIG（共享运行配置已内置）。
+server:
+  port: 8081
+
+spring.data:
+  mongodb:
+    # 引导文件 yudream-bootstrap-test.properties 优先级高于此处；此值兜底防止占位符未解析
+    uri: ${MONGO_TEST_URI:mongodb://localhost:27017/yudream-test}
+  redis:
+    database: ${REDIS_TEST_DB:1}
+
+spring.mail:
+  host: localhost
+
+yudream.storage.s3:
+  endpoint: ${S3_TEST_ENDPOINT:http://localhost:9000}
+  access-key: ${S3_TEST_ACCESS_KEY:rustfsadmin}
+  secret-key: ${S3_TEST_SECRET_KEY:rustfsadmin}
+  bucket: ${S3_TEST_BUCKET:yudream-test}
+  region: ${S3_REGION:us-east-1}
+  path-style-access: ${S3_PATH_STYLE_ACCESS:true}
+
+yudream.platform.plugin.dev-mode:
+  enabled: false
+
+yudream.system.backup:
+  directory: config/backup-test
+
+snowflake:
+  data-center-id: 1
+  machine-id: 2
+
+app:
+  base-url: ${APP_TEST_BASE_URL:http://localhost:8081}
