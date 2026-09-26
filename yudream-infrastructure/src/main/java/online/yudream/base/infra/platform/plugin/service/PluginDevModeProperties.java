@@ -30,6 +30,12 @@ public class PluginDevModeProperties {
     private long pollIntervalMs = 1_000;
     private long debounceMs = 800;
     private long compileTimeoutSeconds = 180;
+    /**
+     * 热编译附加 Maven 参数，属于部署者配置（application.yml/环境变量），而非面板操作者输入：
+     * 宿主进程的默认 Maven 环境可能缺少插件源码仓所需的私服镜像与专用本地仓库，
+     * 通过该参数追加 -s <settings>、-Dmaven.repo.local=<dir> 等，保证热编译与仓库自身构建一致。
+     */
+    private String compileArgs = "";
 
     public boolean effectiveEnabled(DevModeEnvironment environment) {
         return enabled != null ? enabled : environment.runningFromSource();
@@ -57,8 +63,13 @@ public class PluginDevModeProperties {
         private String frontendDist;
         /** 监听到 src/main/java 变化时是否自动执行编译命令 */
         private boolean autoCompile = true;
-        /** 开发模式热编译默认导出 runtime 依赖到 target/plugin-dev/lib，避免第三方 SDK 只在编译期可见。 */
-        private String compileCommand = "mvn -q compile -DskipTests -P dev-export";
+        /**
+         * 开发模式热编译固定命令（服务端固定值，不执行面板登记的操作者命令，防命令注入）。
+         * 必须到达 process-classes 阶段：dev-export 的 copy-dependencies 绑定在该阶段，
+         * 负责 runtime 依赖导出到 target/plugin-dev/lib，避免第三方 SDK 只在编译期可见。
+         * 该字段不再被执行，仅为 dev-projects.json 兼容保留反序列化字段。
+         */
+        private String compileCommand = "mvn -q process-classes -DskipTests -P dev-export";
 
         public Path classesDir() {
             return Path.of(path).toAbsolutePath().normalize().resolve("target").resolve("classes");
