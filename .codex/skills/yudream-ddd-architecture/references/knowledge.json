@@ -531,6 +531,10 @@
     {
       "key": "env-getproperty-placeholder",
       "text": "Any environment.getProperty(key) lookup whose application.yml value is an unresolved placeholder (e.g. spring.mail.username=${MAIL_USERNAME} without default) throws PlaceholderResolutionException - resolveRequiredPlaceholders is strict. Guard every such lookup (installer resolver AND runtime services); safer default in yml does not help nested placeholders."
+    },
+    {
+      "key": "merge-import-id-variants",
+      "text": "合并导入的存在性判定（MongoBackupRestoreStore.idVariants）必须为规范化 id 生成多类型变体探测：种子数据大量使用负数雪花 Long（如 sysRole 的 -1740829301），带负号会让 Character.isDigit 判定失败，漏掉 Long 变体 → 同一文档被误判「本地缺失」→ InsertOne 撞 _id 唯一键（E11000）。变体=去符号判 19 位内数字则加 Long.parseLong（含符号）、24 位字母数字加 ObjectId、恒加原字符串；另注意全局 Jackson long 出网是字符串，前端算术前必须 Number()。"
     }
   ]
 }
