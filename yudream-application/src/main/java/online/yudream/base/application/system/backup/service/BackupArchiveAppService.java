@@ -24,6 +24,7 @@ import online.yudream.base.domain.system.backup.valobj.BackupBusinessKeys;
 import online.yudream.base.domain.system.backup.service.BackupRestoreStore;
 import online.yudream.base.domain.system.backup.service.CredentialFingerprint;
 import online.yudream.base.domain.system.backup.service.PluginBackupScopeSource;
+import online.yudream.base.domain.system.backup.service.RemoteBackupStorage;
 import online.yudream.base.domain.system.backup.valobj.ArchiveFileEntry;
 import online.yudream.base.domain.system.backup.valobj.BackupManifest;
 import online.yudream.base.domain.system.backup.valobj.BackupScopeRef;
@@ -73,11 +74,22 @@ public class BackupArchiveAppService {
         return scopes;
     }
 
-    /** 创建全量导出任务并排队。 */
-    public BackupJobDTO createExportJob(List<String> scopeTags) {
+    /** 创建备份任务并排队：targetCode 为空=本机导出，否则立即推送异地（无需计划）。 */
+    public BackupJobDTO createExportJob(List<String> scopeTags, String targetCode) {
         List<String> tags = normalizeScopeTags(scopeTags);
-        BackupJob job = BackupJob.create(BackupJobType.EXPORT, BackupJobTrigger.MANUAL, tags,
-                null, null, null, null);
+        BackupJob job;
+        if (StringUtils.hasText(targetCode)) {
+            RemoteTarget target = remoteTargetRepo.findByCode(targetCode)
+                    .orElseThrow(() -> new BizException("异地目标不存在：" + targetCode));
+            if (!target.isEnabled()) {
+                throw new BizException("异地目标已停用：" + targetCode);
+            }
+            job = BackupJob.create(BackupJobType.REMOTE_BACKUP, BackupJobTrigger.MANUAL, tags,
+                    null, null, target.getCode(), target.getName());
+        } else {
+            job = BackupJob.create(BackupJobType.EXPORT, BackupJobTrigger.MANUAL, tags,
+                    null, null, null, null);
+        }
         return toDTO(jobRepo.save(job));
     }
 

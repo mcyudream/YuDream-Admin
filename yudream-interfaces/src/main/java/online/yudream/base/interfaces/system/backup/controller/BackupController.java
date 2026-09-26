@@ -72,9 +72,9 @@ public class BackupController {
     }
 
     @PostMapping("/export")
-    @PermissionRegister(code = "system:backup:export", name = "创建全量导出", module = MODULE, desc = "创建系统/插件范围的全量备份归档任务")
+    @PermissionRegister(code = "system:backup:export", name = "创建全量导出", module = MODULE, desc = "创建系统/插件范围的全量备份任务，可选立即推送异地")
     public Result<BackupJobRes> export(@RequestBody BackupExportRequest request) {
-        BackupJobDTO job = archiveService.createExportJob(request.getScopeTags());
+        BackupJobDTO job = archiveService.createExportJob(request.getScopeTags(), request.getTargetCode());
         return Result.ok(BackupWebAssembler.toRes(job));
     }
 

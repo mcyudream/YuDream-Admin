@@ -28,6 +28,7 @@ const activeTab = ref('export')
 
 const scopes = ref<BackupScope[]>([])
 const exportScopes = ref<(string | number)[]>(['system'])
+const exportTargetCode = ref('')
 const exporting = ref(false)
 
 const scopeCheckOptions = computed(() => scopes.value.map(scope => ({
@@ -156,6 +157,14 @@ const planScopeModel = computed({
   },
 })
 
+const exportTargetOptions = computed(() => [
+  { label: '仅本机导出（归档留在服务器）', value: '' },
+  ...targets.value.filter(target => target.enabled).map(target => ({
+    label: `立即推送到 ${target.name}（${target.code}）`,
+    value: target.code,
+  })),
+])
+
 const targetOptions = computed(() => targets.value.filter(target => target.enabled).map(target => ({
   label: `${target.name}（${target.code}）`,
   value: target.code,
@@ -234,14 +243,19 @@ function confirmExport() {
     .filter(scope => exportScopes.value.includes(scope.tag))
     .map(scope => scope.displayName)
     .join('、')
+  const pushTarget = targets.value.find(target => target.code === exportTargetCode.value)
+  const targetText = pushTarget ? `，完成后立即推送到异地「${pushTarget.name}」` : '，归档留在服务器可供下载'
   modal.confirm({
-    title: '确认全量导出',
-    content: `将对范围「${names}」执行全量导出，生成可下载的备份归档。视数据量可能耗时较长，任务在后台执行。`,
+    title: '确认立即执行备份',
+    content: `将对范围「${names}」执行全量备份${targetText}。视数据量可能耗时较长，任务在后台执行。`,
     onConfirm: async () => {
       exporting.value = true
       try {
-        await apiBackup.export(exportScopes.value.map(String))
-        toast.success('导出任务已创建')
+        await apiBackup.export({
+          scopeTags: exportScopes.value.map(String),
+          targetCode: exportTargetCode.value || undefined,
+        })
+        toast.success('备份任务已创建')
         activeTab.value = 'jobs'
         await loadJobs()
       }
@@ -712,11 +726,20 @@ function formatArchiveTime(millis?: number) {
                 将所选范围打包为 ZIP 归档（Mongo 集合 EJSON + 对象存储 + 插件数据），可在本页下载或用于迁移导入。
               </div>
               <FaCheckboxGroup v-model="exportScopes" :options="scopeCheckOptions" class="mt-3" />
-              <div class="mt-4">
-                <FaButton v-auth="'system:backup:export'" :loading="exporting" :disabled="hasActiveJob()" @click="confirmExport">
-                  <FaIcon name="i-ri:download-cloud-2-line" />
-                  开始导出
-                </FaButton>
+              <div class="mt-4 flex flex-col gap-3">
+                <div>
+                  <div class="mb-1 text-xs font-medium text-secondary-foreground/70">执行方式</div>
+                  <FaSelect v-model="exportTargetCode" :options="exportTargetOptions" class="max-w-sm" />
+                  <div class="mt-1 text-xs text-secondary-foreground/60">
+                    选异地目标即「立即执行备份」：归档生成后当场推送，无需计划。
+                  </div>
+                </div>
+                <div>
+                  <FaButton v-auth="'system:backup:export'" :loading="exporting" :disabled="hasActiveJob()" @click="confirmExport">
+                    <FaIcon name="i-ri:save-3-line" />
+                    立即执行备份
+                  </FaButton>
+                </div>
               </div>
             </div>
             <div class="rounded-lg border p-4">

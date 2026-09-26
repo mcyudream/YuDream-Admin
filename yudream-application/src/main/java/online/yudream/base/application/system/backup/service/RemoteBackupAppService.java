@@ -96,14 +96,41 @@ public class RemoteBackupAppService {
         remoteFactory.create(requireTarget(id)).test();
     }
 
-    /** 远端归档清单（按修改时间倒序）。 */
+    /** 远端归档清单：递归浏览 yda-backup 分类目录与根目录旧档（按修改时间倒序，name 为相对路径）。 */
     public List<RemoteEntry> remoteArchives(Long targetId) {
         RemoteTarget target = requireTarget(targetId);
-        List<RemoteEntry> entries = new ArrayList<>(remoteFactory.create(target).list(archivePrefix()));
+        RemoteBackupStorage storage = remoteFactory.create(target);
+        List<RemoteEntry> entries = new ArrayList<>();
+        walkRemoteArchives(storage, "", 0, entries);
         entries.sort((a, b) -> Long.compare(
                 b.modifiedAtMillis() == null ? 0 : b.modifiedAtMillis(),
                 a.modifiedAtMillis() == null ? 0 : a.modifiedAtMillis()));
         return entries;
+    }
+
+    private void walkRemoteArchives(RemoteBackupStorage storage, String dir, int depth,
+                                    List<RemoteEntry> out) {
+        List<RemoteEntry> files;
+        List<String> dirs;
+        try {
+            files = storage.list(dir);
+            dirs = storage.listDirs(dir);
+        } catch (BizException e) {
+            if (depth == 0) {
+                throw e;
+            }
+            return;
+        }
+        for (RemoteEntry file : files) {
+            String path = dir.isBlank() ? file.name() : dir + "/" + file.name();
+            out.add(new RemoteEntry(path, file.size(), file.modifiedAtMillis()));
+        }
+        if (depth >= 3) {
+            return;
+        }
+        for (String sub : dirs) {
+            walkRemoteArchives(storage, dir.isBlank() ? sub : dir + "/" + sub, depth + 1, out);
+        }
     }
 
     /** 从远端归档创建恢复任务。 */
