@@ -226,15 +226,15 @@ async function save() {
             />
           </a-form-item>
         </div>
-        <div class="flex items-end gap-2">
-          <a-form-item label="测试收件地址" class="flex-1">
-            <FaInput v-model="mailTestTo" class="w-full" placeholder="接收测试邮件的地址" />
-          </a-form-item>
-          <FaButton variant="outline" :loading="testingMail" @click="testMail">
-            <FaIcon name="i-ri:send-plane-line" />
-            发送测试邮件
-          </FaButton>
-        </div>
+        <a-form-item label="测试收件地址">
+          <div class="flex w-full items-center gap-2">
+            <FaInput v-model="mailTestTo" class="min-w-0 flex-1" placeholder="接收测试邮件的地址" />
+            <FaButton variant="outline" :loading="testingMail" @click="testMail">
+              <FaIcon name="i-ri:send-plane-line" />
+              发送测试邮件
+            </FaButton>
+          </div>
+        </a-form-item>
         <p v-if="mailTestResult" class="text-xs" :class="mailTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
           {{ mailTestResult.message }}
         </p>
@@ -266,15 +266,15 @@ async function save() {
             <FaInput v-model="storage.region" class="w-full" placeholder="us-east-1" />
           </a-form-item>
         </div>
-        <div class="flex items-center justify-between">
-          <a-form-item label="Path-Style 访问">
+        <a-form-item label="Path-Style 访问">
+          <div class="flex w-full items-center justify-between gap-2">
             <FaSwitch v-model="storage.pathStyle" />
-          </a-form-item>
-          <FaButton variant="outline" :loading="testingStorage" @click="testStorage">
-            <FaIcon name="i-ri:plug-line" />
-            测试连接
-          </FaButton>
-        </div>
+            <FaButton variant="outline" :loading="testingStorage" @click="testStorage">
+              <FaIcon name="i-ri:plug-line" />
+              测试连接
+            </FaButton>
+          </div>
+        </a-form-item>
         <p v-if="storageTestResult" class="text-xs" :class="storageTestResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'">
           {{ storageTestResult.message }}
         </p>
