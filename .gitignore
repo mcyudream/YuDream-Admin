@@ -53,3 +53,17 @@ npm-publish-dist/
 # Standalone headless render service
 /yudream-render-server/node_modules/
 /yudream-render-server/dist/
+
+# ZCode 本地记忆汇总（由记忆目录生成，不属于产品代码）
+/ZCODE-MEMORY-DIGEST.md
+
+# 本地运行产物：端到端冒烟日志/载荷、JVM 崩溃日志、临时中间件数据、插件回滚暂存
+.e2e-*
+**/.e2e-*
+hs_err_pid*.log
+**/hs_err_pid*.log
+.tmp-mongo/
+.plugin-rollback/
+.zcode/
+.idea/dataSources.xml
+yd-docs/.dev-server.log
