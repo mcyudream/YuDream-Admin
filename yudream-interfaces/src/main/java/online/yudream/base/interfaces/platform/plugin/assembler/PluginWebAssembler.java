@@ -4,6 +4,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.Part;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginHttpStreamingDispatchCmd;
 import online.yudream.base.application.platform.plugin.cmd.PluginMarketplaceBatchInstallCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendModuleDTO;
@@ -28,6 +29,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginMessagingConnec
 import online.yudream.base.application.platform.plugin.dto.PluginMessagingGroupDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginAiAgentCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginAiProviderCatalogDTO;
+import online.yudream.base.application.platform.plugin.dto.PluginBackupTargetCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginDeptCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginRoleCatalogDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginUserCatalogDTO;
@@ -62,6 +64,7 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpPart;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingConnectionRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginMessagingGroupRes;
+import online.yudream.base.interfaces.platform.plugin.res.PluginBackupTargetCatalogRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginAiAgentCatalogRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginAiModelCatalogRes;
 import online.yudream.base.interfaces.platform.plugin.res.PluginAiProviderCatalogRes;
@@ -532,6 +535,31 @@ public class PluginWebAssembler {
         return cmd;
     }
 
+    /**
+     * 流式分发 cmd 组装：query/body/parts 以惰性 Supplier 携带，
+     * 由运行时网关在鉴权与 Content-Length 前置限长通过后才物化，
+     * 确保鉴权先于任何请求体消费。multipart 路径无独立 body。
+     */
+    public static PluginHttpStreamingDispatchCmd toStreamingDispatchCmd(
+            String pluginCode,
+            String pluginPath,
+            HttpServletRequest request,
+            SecurityPrincipalSupport.SecurityPrincipal principal,
+            boolean multipart
+    ) {
+        PluginHttpStreamingDispatchCmd cmd = new PluginHttpStreamingDispatchCmd();
+        cmd.setPluginCode(pluginCode);
+        cmd.setMethod(request.getMethod());
+        cmd.setPath(pluginPath);
+        cmd.setHeaders(headers(request));
+        cmd.setQuerySupplier(() -> query(request));
+        cmd.setBodySupplier(multipart ? () -> null : () -> PluginStreamingHttpWebSupport.streamingBody(request));
+        cmd.setPartsSupplier(() -> PluginStreamingHttpWebSupport.streamingParts(request));
+        cmd.setUserId(principal.userId());
+        cmd.setPermissions(principal.permissions());
+        return cmd;
+    }
+
     /** 从 servlet multipart 请求收集 parts；非 multipart 请求返回空 Map。 */
     public static Map<String, PluginHttpPart> httpParts(HttpServletRequest request) {
         try {
@@ -576,6 +604,18 @@ public class PluginWebAssembler {
         return PluginMessagingGroupRes.builder()
                 .id(dto.getId())
                 .name(dto.getName())
+                .build();
+    }
+
+    public static List<PluginBackupTargetCatalogRes> toBackupTargetCatalogResList(List<PluginBackupTargetCatalogDTO> items) {
+        return items == null ? List.of() : items.stream().map(PluginWebAssembler::toBackupTargetCatalogRes).toList();
+    }
+
+    public static PluginBackupTargetCatalogRes toBackupTargetCatalogRes(PluginBackupTargetCatalogDTO dto) {
+        return PluginBackupTargetCatalogRes.builder()
+                .code(dto.getCode())
+                .name(dto.getName())
+                .type(dto.getType())
                 .build();
     }
 
@@ -666,12 +706,14 @@ public class PluginWebAssembler {
         return path.isBlank() ? "" : path;
     }
 
-    private static Map<String, List<String>> headers(HttpServletRequest request) {
+    /** 请求头集合（保持宿主既有大小写与多值语义），供缓冲与流式分发共用。 */
+    public static Map<String, List<String>> headers(HttpServletRequest request) {
         return Collections.list(request.getHeaderNames()).stream()
                 .collect(Collectors.toMap(name -> name, name -> Collections.list(request.getHeaders(name)), (a, b) -> a));
     }
 
-    private static Map<String, List<String>> query(HttpServletRequest request) {
+    /** 请求参数集合。注意：urlencoded/multipart 内容类型会触发容器解析，由调用方把握时机。 */
+    public static Map<String, List<String>> query(HttpServletRequest request) {
         return request.getParameterMap().entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> Arrays.asList(entry.getValue()), (a, b) -> a));
     }

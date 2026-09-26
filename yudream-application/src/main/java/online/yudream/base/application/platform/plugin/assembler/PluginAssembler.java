@@ -1,6 +1,7 @@
 package online.yudream.base.application.platform.plugin.assembler;
 
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginHttpStreamingDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginGlobalWidgetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
@@ -28,6 +29,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendRouteInfo
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpStreamingDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginCompatibility;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDependency;
 import online.yudream.base.domain.platform.plugin.valobj.PluginStorePluginDescriptor;
@@ -320,6 +322,20 @@ public class PluginAssembler {
                 cmd.getParts(),
                 cmd.getUserId(),
                 cmd.getPermissions()
+        );
+    }
+
+    public static PluginHttpStreamingDispatchRequest toStreamingRequest(PluginHttpStreamingDispatchCmd cmd) {
+        return new PluginHttpStreamingDispatchRequest(
+                cmd.getPluginCode(),
+                cmd.getMethod(),
+                cmd.getPath(),
+                cmd.getHeaders(),
+                cmd.getUserId(),
+                cmd.getPermissions(),
+                cmd.getQuerySupplier(),
+                cmd.getBodySupplier(),
+                cmd.getPartsSupplier()
         );
     }
 

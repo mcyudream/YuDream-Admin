@@ -104,6 +104,12 @@ public class DefaultFrameworkServices implements FrameworkServices {
             public java.util.Optional<online.yudream.base.plugin.spi.system.backup.PluginBackupJobStatus> status(String jobId) {
                 return backupArchiveAppService.pluginJobStatus(pluginCode, jobId);
             }
+
+            @Override
+            public java.util.List<online.yudream.base.plugin.spi.system.backup.PluginBackupJobSummary> listScopeJobs(
+                    String scopeCode, int limit) {
+                return backupArchiveAppService.pluginScopeJobs(pluginCode, scopeCode, limit);
+            }
         };
     }
 

@@ -1,22 +1,25 @@
 package online.yudream.base.interfaces.platform.plugin.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import io.swagger.v3.oas.annotations.Hidden;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
 import online.yudream.base.application.platform.plugin.service.PluginAppService;
 import online.yudream.base.application.system.user.service.PermissionAppService;
 import online.yudream.base.interfaces.common.Result;
+import online.yudream.base.interfaces.platform.plugin.assembler.PluginStreamingHttpWebSupport;
 import online.yudream.base.interfaces.platform.plugin.assembler.PluginWebAssembler;
 import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
+import online.yudream.base.plugin.spi.http.PluginHttpResponseBody;
 import online.yudream.base.plugin.spi.http.PluginSseStream;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,32 +33,71 @@ public class PluginDispatchController {
 
     private final PluginAppService pluginAppService;
     private final PermissionAppService permissionAppService;
+    private final ObjectMapper objectMapper;
 
     @RequestMapping({"/api/plugins/{code}", "/api/plugins/{code}/**"})
     public ResponseEntity<Object> dispatch(
             @PathVariable String code,
-            @RequestBody(required = false) String body,
-            HttpServletRequest request
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
         SecurityPrincipalSupport.SecurityPrincipal principal = principal();
+        String path = pluginPath(code, request);
+        if (pluginAppService.hasStreamingHttpHandler(code, request.getMethod(), path)) {
+            return respondStreaming(code, path, request, response, principal, false);
+        }
+        // 缓冲路径：读取语义与原 @RequestBody String 完全一致（含空 body 为 null 与字符集规则）
+        String body = PluginStreamingHttpWebSupport.readBufferedBodyAsString(request);
         PluginHttpDispatchDTO result = pluginAppService.dispatch(
-                PluginWebAssembler.toDispatchCmd(code, pluginPath(code, request), body, request, principal)
+                PluginWebAssembler.toDispatchCmd(code, path, body, request, principal)
         );
         return respond(result);
     }
 
-    /** multipart/form-data 请求：parts 从 servlet 解析后透传给插件。 */
+    /** multipart/form-data 请求：parts 从 servlet 解析后透传给插件；流式端点惰性透传。 */
     @RequestMapping(value = {"/api/plugins/{code}", "/api/plugins/{code}/**"},
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Object> dispatchMultipart(
             @PathVariable String code,
-            HttpServletRequest request
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
         SecurityPrincipalSupport.SecurityPrincipal principal = principal();
+        String path = pluginPath(code, request);
+        if (pluginAppService.hasStreamingHttpHandler(code, request.getMethod(), path)) {
+            return respondStreaming(code, path, request, response, principal, true);
+        }
         PluginHttpDispatchDTO result = pluginAppService.dispatch(
-                PluginWebAssembler.toDispatchCmd(code, pluginPath(code, request), null, request, principal,
+                PluginWebAssembler.toDispatchCmd(code, path, null, request, principal,
                         PluginWebAssembler.httpParts(request))
         );
+        return respond(result);
+    }
+
+    /**
+     * 流式分发：query/body/parts 以惰性 Supplier 传入，运行时网关在鉴权与 Content-Length
+     * 前置限长通过后才物化，确保鉴权先于任何请求体消费。
+     */
+    private ResponseEntity<Object> respondStreaming(String code,
+                                                    String path,
+                                                    HttpServletRequest request,
+                                                    HttpServletResponse response,
+                                                    SecurityPrincipalSupport.SecurityPrincipal principal,
+                                                    boolean multipart) {
+        PluginHttpDispatchDTO result = pluginAppService.dispatchStreaming(
+                PluginWebAssembler.toStreamingDispatchCmd(code, path, request, principal, multipart));
+        return respond(result, response);
+    }
+
+    private ResponseEntity<Object> respond(PluginHttpDispatchDTO result, HttpServletResponse response) {
+        if (isSse(result)) {
+            return respond(result);
+        }
+        if (result.getBody() instanceof PluginHttpResponseBody streamBody) {
+            // 真流式：直写原生 Servlet 输出（绕开响应缓存包装），写完返回 null（响应已处理）
+            PluginStreamingHttpWebSupport.writeStreamingBody(response, result, streamBody, objectMapper);
+            return null;
+        }
         return respond(result);
     }
 

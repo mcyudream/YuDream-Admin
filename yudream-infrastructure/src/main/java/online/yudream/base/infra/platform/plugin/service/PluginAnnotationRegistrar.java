@@ -7,6 +7,7 @@ import online.yudream.base.plugin.spi.annotation.PluginDashboardCard;
 import online.yudream.base.plugin.spi.annotation.PluginFrontend;
 import online.yudream.base.plugin.spi.annotation.PluginGlobalWidget;
 import online.yudream.base.plugin.spi.annotation.PluginHttpEndpoint;
+import online.yudream.base.plugin.spi.annotation.PluginStreamingHttpEndpoint;
 import online.yudream.base.plugin.spi.annotation.PluginMenu;
 import online.yudream.base.plugin.spi.annotation.PluginPermission;
 import online.yudream.base.plugin.spi.annotation.PluginRoute;
@@ -19,6 +20,7 @@ import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendRoute;
 import online.yudream.base.plugin.spi.http.PluginHttpRequest;
 import online.yudream.base.plugin.spi.http.PluginHttpResponse;
+import online.yudream.base.plugin.spi.http.PluginStreamingHttpRequest;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import org.springframework.util.StringUtils;
@@ -43,6 +45,7 @@ class PluginAnnotationRegistrar {
         registerTheme(pluginClass, context);
         registerFrontend(pluginClass, context);
         registerHttpEndpoints(plugin, pluginClass, context);
+        registerStreamingHttpEndpoints(plugin, pluginClass, context);
         registerCommands(plugin, pluginClass, context);
     }
 
@@ -239,6 +242,87 @@ class PluginAnnotationRegistrar {
             }
             current = current.getSuperclass();
         }
+    }
+
+    /**
+     * 注册流式 HTTP 端点：permission 不在处理器内校验，而是随注册保存，
+     * 由运行时网关在任何请求体消费之前执行鉴权（流式路径鉴权必须先于 body 读取）。
+     */
+    void registerStreamingHttpEndpoints(Object target, Class<?> targetClass, PluginContextImpl context) {
+        Class<?> current = targetClass;
+        while (current != null && current != Object.class) {
+            for (Method method : current.getDeclaredMethods()) {
+                PluginStreamingHttpEndpoint endpoint = method.getAnnotation(PluginStreamingHttpEndpoint.class);
+                if (endpoint == null) {
+                    continue;
+                }
+                validateStreamingEndpointMethod(method);
+                method.setAccessible(true);
+                context.registerStreamingHttpHandler(endpoint.method(), endpoint.path(),
+                        endpoint.permission(), endpoint.wrapResult(),
+                        request -> invokeStreamingEndpoint(target, method, request, context, endpoint.wrapResult()));
+            }
+            current = current.getSuperclass();
+        }
+    }
+
+    private void validateStreamingEndpointMethod(Method method) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        if (parameterTypes.length > 2) {
+            throw new BizException("插件流式 HTTP 端点方法最多只能声明 PluginStreamingHttpRequest 和 PluginContext：" + method.getName());
+        }
+        boolean requestSeen = false;
+        boolean contextSeen = false;
+        for (Class<?> parameterType : parameterTypes) {
+            if (PluginStreamingHttpRequest.class.equals(parameterType)) {
+                if (requestSeen) {
+                    throw new BizException("插件流式 HTTP 端点方法重复声明 PluginStreamingHttpRequest：" + method.getName());
+                }
+                requestSeen = true;
+            } else if (PluginContext.class.equals(parameterType)) {
+                if (contextSeen) {
+                    throw new BizException("插件流式 HTTP 端点方法重复声明 PluginContext：" + method.getName());
+                }
+                contextSeen = true;
+            } else {
+                throw new BizException("插件流式 HTTP 端点方法参数只支持 PluginStreamingHttpRequest 和 PluginContext：" + method.getName());
+            }
+        }
+        if (Void.TYPE.equals(method.getReturnType())) {
+            throw new BizException("插件流式 HTTP 端点方法必须返回 PluginHttpResponse 或响应对象：" + method.getName());
+        }
+    }
+
+    private PluginHttpResponse invokeStreamingEndpoint(Object targetInstance, Method method, PluginStreamingHttpRequest request, PluginContext context, boolean wrapResult) {
+        try {
+            Object target = Modifier.isStatic(method.getModifiers()) ? null : targetInstance;
+            Object result = method.invoke(target, streamingEndpointArgs(method, request, context));
+            if (result instanceof PluginHttpResponse response) {
+                return wrapResult ? response : response.withWrapped(false);
+            }
+            return PluginHttpResponse.ok(result == null ? Map.of() : result).withWrapped(wrapResult);
+        } catch (IllegalAccessException e) {
+            throw new BizException("插件流式 HTTP 端点不可访问：" + method.getName());
+        } catch (InvocationTargetException e) {
+            Throwable target = e.getTargetException();
+            if (target instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (target instanceof LinkageError linkageError) {
+                // 类加载失败是服务端故障（依赖未导出/快照过期），交给全局异常处理器记 500 全栈，不打成 400
+                throw linkageError;
+            }
+            throw new BizException("插件流式 HTTP 端点执行失败 (" + target.getClass().getSimpleName() + "): " + target.getMessage());
+        }
+    }
+
+    private Object[] streamingEndpointArgs(Method method, PluginStreamingHttpRequest request, PluginContext context) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        Object[] args = new Object[parameterTypes.length];
+        for (int i = 0; i < parameterTypes.length; i++) {
+            args[i] = PluginStreamingHttpRequest.class.equals(parameterTypes[i]) ? request : context;
+        }
+        return args;
     }
 
     private void validateEndpointMethod(Method method) {

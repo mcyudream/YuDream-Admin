@@ -104,6 +104,10 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     private final PluginScaffoldGenerator scaffoldGenerator;
     private final DevModeEnvironment devModeEnvironment;
     private final ConcurrentMap<String, PluginRuntimeHolder> holders = new ConcurrentHashMap<>();
+
+    /** 插件当前启用代的流式分发注册表：enable 发放新代，disable/unload latch 旧代（流式桥接消费）。 */
+    private final ConcurrentMap<String, PluginStreamingHttpBridge.PluginActiveDispatches> streamingRegistries =
+            new ConcurrentHashMap<>();
     private final PluginAnnotationRegistrar annotationRegistrar = new PluginAnnotationRegistrar();
 
     @Override
@@ -364,6 +368,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             annotationRegistrar.register(holder.getPlugin(), holder.getContext());
             registerDeclaredAgents(holder);
             holder.getPlugin().onEnable(holder.getContext());
+            // 重新启用：发放新一代流式分发注册表（旧代已随 disable latch 终止）
+            streamingRegistries.put(module.getCode(), streamingHttpBridge.newRegistry());
             holder.setEnabled(true);
             log.info("Plugin enabled: code={}", module.getCode());
             pluginLogger(module).info("插件已启用");
@@ -386,6 +392,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         ensureNoEnabledHardDependents(code);
         long startNanos = System.nanoTime();
         try {
+            // 主动取消该插件进行中的流式分发（关闭请求体/part 流与在途响应体唤醒挂起读取），而非等待其自然结束
+            streamingHttpBridge.cancel(streamingRegistries.remove(code));
             holder.getPlugin().onDisable(holder.getContext());
             holder.getContext().clearRuntimeContributions();
             holder.setEnabled(false);
@@ -408,6 +416,8 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         long startNanos = System.nanoTime();
         String version = holder.getDescriptor() == null ? null : holder.getDescriptor().version();
         try {
+            // 卸载同样先主动取消进行中的流式分发，关闭 ClassLoader 前不再有插件代码在消费请求体/响应体
+            streamingHttpBridge.cancel(streamingRegistries.remove(code));
             if (holder.isEnabled()) {
                 holder.getPlugin().onDisable(holder.getContext());
             }
@@ -742,6 +752,71 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             }
         }
         return new PluginHttpDispatchResult(response.status(), response.headers(), response.contentType(), response.body(), response.wrapped());
+    }
+
+    /**
+     * 解析插件 WebSocket 注册（宿主 WS 桥接握手与连接阶段使用）。
+     * 插件不存在或未启用时返回 empty，由桥接层决定拒绝方式。
+     */
+    public Optional<PluginWsEndpointResolution> resolveWsEndpoint(String code, String path) {
+        if (!StringUtils.hasText(code) || !StringUtils.hasText(path)) {
+            return Optional.empty();
+        }
+        PluginRuntimeHolder holder = holders.get(code.trim());
+        if (holder == null || !holder.isEnabled()) {
+            return Optional.empty();
+        }
+        return holder.getContext().findWsHandler(path)
+                .map(registration -> new PluginWsEndpointResolution(holder.getContext().pluginCode(), registration));
+    }
+
+    /** 插件 WebSocket 端点解析结果（宿主 WS 桥接消费）。 */
+    public record PluginWsEndpointResolution(String pluginCode, PluginContextImpl.WsHandlerRegistration registration) {
+    }
+
+    private final PluginStreamingHttpBridge streamingHttpBridge = new PluginStreamingHttpBridge();
+
+    @Override
+    public boolean hasStreamingHttpHandler(String pluginCode, String method, String path) {
+        PluginRuntimeHolder holder = holders.get(pluginCode == null ? "" : pluginCode.trim());
+        return holder != null && holder.isEnabled() && holder.getContext().hasStreamingHttpHandler(method, path);
+    }
+
+    @Override
+    public PluginHttpDispatchResult dispatchStreaming(online.yudream.base.domain.platform.plugin.valobj.PluginHttpStreamingDispatchRequest request) {
+        PluginRuntimeHolder holder = holder(request.pluginCode());
+        if (!holder.isEnabled()) {
+            throw new BizException("插件未启用");
+        }
+        PluginContextImpl.StreamingHttpRegistration registration = holder.getContext()
+                .findStreamingHttpHandler(request.method(), request.path())
+                .orElseThrow(() -> new BizException("插件接口不存在"));
+        PluginStreamingHttpBridge.PluginActiveDispatches registry = streamingRegistries.get(request.pluginCode());
+        if (registry == null) {
+            throw new BizException("插件未启用");
+        }
+        PluginPrincipal principal = new PluginPrincipal(request.userId(), request.permissions());
+        // 流式路径鉴权必须先于任何请求体消费：由桥接在物化 query/body/parts 之前执行
+        Runnable permissionCheck = () -> {
+            if (StringUtils.hasText(registration.permission())) {
+                frameworkServices.security().requirePermission(principal, registration.permission());
+            }
+        };
+        pluginLogger(request.pluginCode(), holder).info("开始处理流式 HTTP 请求：{} {}", request.method(), request.path());
+        PluginHttpDispatchResult result = streamingHttpBridge.dispatch(
+                registry,
+                registration,
+                request.method(),
+                request.path(),
+                request.headers(),
+                principal,
+                pluginProperties.getHttpStreamingMaxBodyBytes(),
+                permissionCheck,
+                request
+        );
+        pluginLogger(request.pluginCode(), holder).info("流式 HTTP 请求处理完成：{} {}，状态={}",
+                request.method(), request.path(), result.status());
+        return result;
     }
 
     /** 领域 part → SPI part 的字段直映射。 */

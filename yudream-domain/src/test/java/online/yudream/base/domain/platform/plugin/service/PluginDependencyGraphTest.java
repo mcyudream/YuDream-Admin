@@ -59,6 +59,60 @@ class PluginDependencyGraphTest {
                 PluginDependencyGraph.directDependentCodes("provider", modules));
     }
 
+    @Test
+    void restoreOrderPutsSoftDependencyProviderBeforeConsumer() {
+        Map<String, PluginModule> modules = new LinkedHashMap<>();
+        // 复现 mcpanel/minecraft-server：字母序消费方在前，软依赖必须反超
+        modules.put("mcpanel", module("mcpanel", List.of(), List.of("minecraft-server")));
+        modules.put("minecraft-server", module("minecraft-server"));
+
+        assertEquals(List.of("minecraft-server", "mcpanel"),
+                PluginDependencyGraph.restoreOrder(modules).stream().map(PluginModule::getCode).toList());
+    }
+
+    @Test
+    void restoreOrderRespectsTransitiveChainsAndAlphabeticalTieBreak() {
+        Map<String, PluginModule> modules = new LinkedHashMap<>();
+        modules.put("wallet", module("wallet"));
+        modules.put("panel", module("panel", List.of(), List.of("minecraft-server", "wallet")));
+        modules.put("minecraft-server", module("minecraft-server", List.of(), List.of("skin")));
+        modules.put("skin", module("skin"));
+        modules.put("standalone-b", module("standalone-b"));
+        modules.put("standalone-a", module("standalone-a"));
+
+        List<String> order = PluginDependencyGraph.restoreOrder(modules).stream()
+                .map(PluginModule::getCode)
+                .toList();
+        // 提供方最先（深度大者在前），无依赖关系的插件按字母序殿后
+        assertEquals(List.of("skin", "minecraft-server", "wallet", "panel", "standalone-a", "standalone-b"), order);
+    }
+
+    @Test
+    void restoreOrderBreaksCyclesWithoutDroppingModules() {
+        Map<String, PluginModule> modules = new LinkedHashMap<>();
+        modules.put("b", module("b", List.of(), List.of("a")));
+        modules.put("a", module("a", List.of(), List.of("b")));
+        modules.put("c", module("c"));
+
+        List<String> order = PluginDependencyGraph.restoreOrder(modules).stream()
+                .map(PluginModule::getCode)
+                .toList();
+
+        // 环内相对顺序受 visiting 兜底影响不保证：只要求不丢模块、环成员在前、无环的 c 殿后
+        assertEquals(3, order.size());
+        assertEquals(java.util.Set.of("a", "b"), new java.util.HashSet<>(order.subList(0, 2)));
+        assertEquals("c", order.get(2));
+    }
+
+    @Test
+    void restoreOrderIgnoresUnknownDependencyCodes() {
+        Map<String, PluginModule> modules = new LinkedHashMap<>();
+        modules.put("consumer", module("consumer", List.of("ghost"), List.of("missing-provider")));
+
+        assertEquals(List.of("consumer"),
+                PluginDependencyGraph.restoreOrder(modules).stream().map(PluginModule::getCode).toList());
+    }
+
     private PluginModule module(String code) {
         return module(code, List.of(), List.of());
     }
