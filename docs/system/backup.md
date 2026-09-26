@@ -6,6 +6,7 @@
 
 - **全量导出**：把系统数据（Mongo 全部业务集合 + 对象存储全部文件）与插件贡献的范围打包为 YDBA 归档（ZIP），本机留存并可在页面下载。
 - **合并导入**：上传/下载归档后先分析（各集合缺失/冲突计数、插件范围可用性、主密钥指纹比对），管理员选择「以哪边为准」后一次性合并。语义是**无损并集**：任一端独有的数据始终保留，同标识冲突按策略裁决；永不删除任何一侧数据。
+- **分片导入（超大归档）**：前端按 8MB 分片顺序上传（`import/upload/begin → chunk → finish`，服务端按偏移追加落盘并增量计算 SHA-256，finish 校验总大小与摘要），合并完成后复用同一分析/合并导入链路（`import/analyze/staged`、`import/staged`）；会话 2 小时无活动自动清理，失败可用 `import/upload/abort` 作废。
 - **异地备份**：目标支持 FTP / FTPS（commons-net）与 WebDAV（JDK HttpClient 实现 PROPFIND/MKCOL/PUT/GET/DELETE）；计划按 Spring 6 位 cron 到点把所选范围归档推送到目标，并按保留份数清理旧档（按 `yudream-backup-` 前缀匹配删除）。
 - **异地恢复**：从目标选择远端归档，下载后走同一合并导入流程。
 
