@@ -209,8 +209,16 @@ publish:npm-plugin-sdk:
         "//$REGISTRY_HOST/:username=$NEXUS_USERNAME" \
         "//$REGISTRY_HOST/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')" \
         'always-auth=true' > .npmrc
-    - cd packages/plugin-sdk
-    - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+    - |
+      cd packages/plugin-sdk
+      # 幂等发布：版本已在目标仓库时跳过（重打标签重跑验签的场景），其余错误照常失败；
+      # 发布结果仍由 verify:npm-contracts 从仓库回读校验
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      if npm view "@yudream/plugin-sdk@$PKG_VERSION" version --registry "$NEXUS_NPM_PUBLIC_URL" >/dev/null 2>&1; then
+        echo "@yudream/plugin-sdk@$PKG_VERSION 已存在于 $NEXUS_NPM_PUBLIC_URL，跳过发布"
+      else
+        pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+      fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^pcomp/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
@@ -236,8 +244,15 @@ publish:npm-components:
         "//$REGISTRY_HOST/:username=$NEXUS_USERNAME" \
         "//$REGISTRY_HOST/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')" \
         'always-auth=true' > .npmrc
-    - cd packages/components
-    - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+    - |
+      cd packages/components
+      # 幂等发布：版本已在目标仓库时跳过（重打标签重跑验签的场景），其余错误照常失败
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      if npm view "@yudream/components@$PKG_VERSION" version --registry "$NEXUS_NPM_PUBLIC_URL" >/dev/null 2>&1; then
+        echo "@yudream/components@$PKG_VERSION 已存在于 $NEXUS_NPM_PUBLIC_URL，跳过发布"
+      else
+        pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+      fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pdviz/
       when: never
@@ -263,8 +278,15 @@ publish:npm-dataviz:
         "//$REGISTRY_HOST/:username=$NEXUS_USERNAME" \
         "//$REGISTRY_HOST/:_password=$(printf '%s' "$NEXUS_PASSWORD" | base64 | tr -d '\n')" \
         'always-auth=true' > .npmrc
-    - cd packages/dataviz
-    - pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+    - |
+      cd packages/dataviz
+      # 幂等发布：版本已在目标仓库时跳过（重打标签重跑验签的场景），其余错误照常失败
+      PKG_VERSION=$(node -p "require('./package.json').version")
+      if npm view "@yudream/dataviz@$PKG_VERSION" version --registry "$NEXUS_NPM_PUBLIC_URL" >/dev/null 2>&1; then
+        echo "@yudream/dataviz@$PKG_VERSION 已存在于 $NEXUS_NPM_PUBLIC_URL，跳过发布"
+      else
+        pnpm publish --no-git-checks --registry "$NEXUS_NPM_PUBLIC_URL"
+      fi
   rules:
     - if: $CI_COMMIT_TAG =~ /^pspi/ || $CI_COMMIT_TAG =~ /^psdk/ || $CI_COMMIT_TAG =~ /^pcomp/
       when: never
