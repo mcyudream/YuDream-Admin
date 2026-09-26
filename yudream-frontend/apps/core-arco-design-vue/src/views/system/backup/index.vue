@@ -5,11 +5,9 @@ import type {
   BackupConflictStrategy,
   BackupJob,
   BackupPlan,
-  BackupPlanPayload,
   BackupScope,
   RemoteArchive,
   RemoteTarget,
-  RemoteTargetPayload,
   RemoteTargetType,
 } from '@/api/modules/system-backup'
 import apiBackup from '@/api/modules/system-backup'
@@ -17,13 +15,25 @@ import apiBackup from '@/api/modules/system-backup'
 const modal = useFaModal()
 const toast = useFaToast()
 
+const tabList = [
+  { label: '导出与导入', value: 'export', icon: 'i-ri:download-cloud-2-line' },
+  { label: '任务记录', value: 'jobs', icon: 'i-ri:history-line' },
+  { label: '异地目标', value: 'targets', icon: 'i-ri:cloud-line' },
+  { label: '备份计划', value: 'plans', icon: 'i-ri:timer-line' },
+]
 const activeTab = ref('export')
 
 // ---------------------------------------------------------------- 范围与导出
 
 const scopes = ref<BackupScope[]>([])
-const exportScopes = ref<string[]>(['system'])
+const exportScopes = ref<(string | number)[]>(['system'])
 const exporting = ref(false)
+
+const scopeCheckOptions = computed(() => scopes.value.map(scope => ({
+  label: scope.displayName,
+  value: scope.tag,
+  description: scope.description || '',
+})))
 
 // ---------------------------------------------------------------- 合并导入
 
@@ -31,9 +41,21 @@ const importInputRef = ref<HTMLInputElement>()
 const importing = ref(false)
 const importSubmitting = ref(false)
 const importModalVisible = ref(false)
-const importStrategy = ref<BackupConflictStrategy>('LOCAL_WINS')
+const importStrategy = ref('LOCAL_WINS')
 const analysis = ref<BackupAnalysis | null>(null)
 const selectedImportFile = ref<File | null>(null)
+
+const strategyOptions = [
+  { label: '以本地数据为准', value: 'LOCAL_WINS', description: '只插入本地缺失的数据，不覆盖任何现有数据' },
+  { label: '以备份数据为准', value: 'ARCHIVE_WINS', description: '备份中存在的同标识数据覆盖本地，本地独有数据保留' },
+]
+
+const analysisColumns = [
+  { accessorKey: 'name', header: '集合' },
+  { accessorKey: 'archiveCount', header: '归档数据', align: 'right' as const },
+  { accessorKey: 'missingCount', header: '本地缺失', align: 'right' as const },
+  { accessorKey: 'conflictCount', header: '重复冲突', align: 'right' as const },
+]
 
 // ---------------------------------------------------------------- 任务
 
@@ -49,12 +71,12 @@ const targetFormVisible = ref(false)
 const targetFormSaving = ref(false)
 const targetTesting = ref(false)
 const editingTarget = ref<RemoteTarget | null>(null)
-const targetForm = reactive<RemoteTargetPayload>({
+const targetForm = reactive({
   code: '',
   name: '',
-  type: 'WEBDAV',
+  type: 'WEBDAV' as RemoteTargetType,
   host: '',
-  port: undefined,
+  port: 443,
   username: '',
   password: '',
   basePath: '/',
@@ -72,7 +94,7 @@ const archivesVisible = ref(false)
 const archivesLoading = ref(false)
 const archivesTarget = ref<RemoteTarget | null>(null)
 const archives = ref<RemoteArchive[]>([])
-const restoreStrategy = ref<BackupConflictStrategy>('LOCAL_WINS')
+const restoreStrategy = ref('LOCAL_WINS')
 
 // ---------------------------------------------------------------- 备份计划
 
@@ -81,11 +103,11 @@ const plansLoading = ref(false)
 const planFormVisible = ref(false)
 const planFormSaving = ref(false)
 const editingPlan = ref<BackupPlan | null>(null)
-const planForm = reactive<BackupPlanPayload>({
+const planForm = reactive({
   code: '',
   name: '',
   cron: '0 0 3 * * *',
-  scopeTags: ['system'],
+  scopeTags: ['system'] as string[],
   targetCode: '',
   retentionCount: 10,
 })
@@ -122,6 +144,18 @@ const planColumns = computed<TableColumn<BackupPlan>[]>(() => [
   { accessorKey: 'lastRunAt', header: '上次执行', width: 170 },
   { id: 'operation', header: '操作', width: 240, align: 'center', fixed: 'right' },
 ])
+
+const planScopeModel = computed({
+  get: () => planForm.scopeTags as (string | number)[],
+  set: (value) => {
+    planForm.scopeTags = value.map(String)
+  },
+})
+
+const targetOptions = computed(() => targets.value.filter(target => target.enabled).map(target => ({
+  label: `${target.name}（${target.code}）`,
+  value: target.code,
+})))
 
 onMounted(() => {
   loadScopes()
@@ -202,7 +236,7 @@ function confirmExport() {
     onConfirm: async () => {
       exporting.value = true
       try {
-        await apiBackup.export(exportScopes.value)
+        await apiBackup.export(exportScopes.value.map(String))
         toast.success('导出任务已创建')
         activeTab.value = 'jobs'
         await loadJobs()
@@ -251,17 +285,17 @@ function submitImport() {
   const conflictTotal
     = analysis.value.collections.reduce((sum, item) => sum + item.conflictCount, 0)
       + analysis.value.objects.conflictCount
-  importSubmitting.value = true
-  try {
-    modal.confirm({
-      title: '确认合并导入',
-      content: `已选择「${localWins ? '以本地数据为准' : '以备份数据为准'}」。`
-        + `重复数据 ${conflictTotal} 条将${localWins ? '保留本地、只补缺失部分' : '以备份覆盖本地'}；`
-        + `任一端独有的数据始终保留，不会删除。确认开始合并导入吗？`,
-      onConfirm: async () => {
-        const form = new FormData()
-        form.append('file', file)
-        form.append('strategy', importStrategy.value)
+  modal.confirm({
+    title: '确认合并导入',
+    content: `已选择「${localWins ? '以本地数据为准' : '以备份数据为准'}」。`
+      + `重复数据 ${conflictTotal} 条将${localWins ? '保留本地、只补缺失部分' : '以备份覆盖本地'}；`
+      + `任一端独有的数据始终保留，不会删除。确认开始合并导入吗？`,
+    onConfirm: async () => {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('strategy', importStrategy.value)
+      importSubmitting.value = true
+      try {
         const res = await apiBackup.import(form)
         toast.success(`合并导入任务已创建（#${res.data.id}）`)
         importModalVisible.value = false
@@ -269,12 +303,12 @@ function submitImport() {
         selectedImportFile.value = null
         activeTab.value = 'jobs'
         await loadJobs()
-      },
-    })
-  }
-  finally {
-    importSubmitting.value = false
-  }
+      }
+      finally {
+        importSubmitting.value = false
+      }
+    },
+  })
 }
 
 // ---------------------------------------------------------------- 任务操作
@@ -315,6 +349,10 @@ async function loadTargets() {
   }
 }
 
+function defaultPortFor(type: RemoteTargetType) {
+  return type === 'WEBDAV' ? 443 : 21
+}
+
 function openTargetForm(row?: RemoteTarget) {
   editingTarget.value = row || null
   Object.assign(targetForm, row
@@ -323,7 +361,7 @@ function openTargetForm(row?: RemoteTarget) {
         name: row.name,
         type: row.type,
         host: row.host,
-        port: row.port,
+        port: row.port ?? defaultPortFor(row.type),
         username: row.username,
         password: '',
         basePath: row.basePath || '/',
@@ -334,7 +372,7 @@ function openTargetForm(row?: RemoteTarget) {
         name: '',
         type: 'WEBDAV',
         host: '',
-        port: undefined,
+        port: 443,
         username: '',
         password: '',
         basePath: '/',
@@ -342,6 +380,10 @@ function openTargetForm(row?: RemoteTarget) {
       })
   targetFormVisible.value = true
 }
+
+watch(() => targetForm.type, (type) => {
+  targetForm.port = defaultPortFor(type)
+})
 
 async function saveTargetForm() {
   if (!editingTarget.value && !targetForm.code?.trim()) {
@@ -430,7 +472,7 @@ function confirmRestore(row: RemoteArchive) {
     title: '确认从异地恢复',
     content: `将从「${target.name}」下载归档 ${row.name} 并合并导入，策略为「${localWins ? '以本地数据为准' : '以备份数据为准'}」。确认开始吗？`,
     onConfirm: async () => {
-      await apiBackup.restoreFromTarget(target.id, { archiveName: row.name, strategy: restoreStrategy.value })
+      await apiBackup.restoreFromTarget(target.id, { archiveName: row.name, strategy: restoreStrategy.value as BackupConflictStrategy })
       toast.success('恢复任务已创建')
       archivesVisible.value = false
       activeTab.value = 'jobs'
@@ -638,11 +680,6 @@ function formatArchiveTime(millis?: number) {
   }
   return new Date(millis).toLocaleString('zh-CN', { hour12: false })
 }
-
-const targetOptions = computed(() => targets.value.filter(target => target.enabled).map(target => ({
-  label: `${target.name}（${target.code}）`,
-  value: target.code,
-})))
 </script>
 
 <template>
@@ -653,8 +690,8 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
       </template>
     </FaPageHeader>
     <FaPageMain>
-      <a-tabs v-model:active-key="activeTab">
-        <a-tab-pane key="export" title="导出与导入">
+      <FaTabs v-model="activeTab" :list="tabList">
+        <template #export>
           <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <div class="rounded-lg border p-4">
               <div class="text-base font-medium">
@@ -663,14 +700,7 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
               <div class="mt-1 text-xs text-secondary-foreground/60">
                 将所选范围打包为 ZIP 归档（Mongo 集合 EJSON + 对象存储 + 插件数据），可在本页下载或用于迁移导入。
               </div>
-              <div class="mt-3 flex flex-col gap-2">
-                <a-checkbox-group v-model:value="exportScopes" class="flex flex-col gap-2">
-                  <a-checkbox v-for="scope in scopes" :key="scope.tag" :value="scope.tag">
-                    <span class="font-medium">{{ scope.displayName }}</span>
-                    <span v-if="scope.description" class="ml-2 text-xs text-secondary-foreground/60">{{ scope.description }}</span>
-                  </a-checkbox>
-                </a-checkbox-group>
-              </div>
+              <FaCheckboxGroup v-model="exportScopes" :options="scopeCheckOptions" class="mt-3" />
               <div class="mt-4">
                 <FaButton v-auth="'system:backup:export'" :loading="exporting" :disabled="hasActiveJob()" @click="confirmExport">
                   <FaIcon name="i-ri:download-cloud-2-line" />
@@ -692,288 +722,287 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
                   选择备份归档并分析
                 </FaButton>
               </div>
-              <div class="mt-4 rounded-lg bg-secondary/40 p-3 text-xs text-secondary-foreground/70">
-                提示：跨主机导入时，若源站主密钥（YUDREAM_CREDENTIAL_KEY）不同，归档中加密存储的凭据需导入后重新配置。
-              </div>
+              <FaAlert
+                class="mt-4"
+                icon="i-ri:information-line"
+                title="跨主机导入提示"
+                description="若源站主密钥（YUDREAM_CREDENTIAL_KEY）不同，归档中加密存储的凭据需导入后重新配置。"
+              />
             </div>
           </div>
-        </a-tab-pane>
+        </template>
 
-        <a-tab-pane key="jobs" title="任务记录">
-          <a-spin :loading="jobsLoading" class="block w-full">
-            <FaResponsiveTable
-              row-key="id"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[1180px]"
-              border
-              stripe
-              :columns="jobColumns"
-              :data="jobs"
-            >
-              <template #toolbar>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-xs text-secondary-foreground/60">每 3 秒自动刷新执行中任务</span>
-                  <FaButton variant="outline" size="sm" @click="loadJobs()">
-                    <FaIcon name="i-ri:refresh-line" />
-                    刷新
-                  </FaButton>
-                </div>
-              </template>
-              <template #cell-type="{ row }">
-                <FaTag variant="secondary">{{ jobTypeText(row.original) }}</FaTag>
-              </template>
-              <template #cell-scopeTags="{ row }">
-                <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
-              </template>
-              <template #cell-status="{ row }">
-                <div class="flex flex-col gap-1">
-                  <FaTag :variant="jobStatusVariant(row.original)">{{ jobStatusText(row.original) }}</FaTag>
-                  <a-progress
-                    v-if="row.original.status === 'RUNNING' || row.original.status === 'QUEUED'"
-                    :percent="row.original.percent || 0"
-                    size="small"
-                    :show-text="false"
-                  />
-                  <span v-if="row.original.message" class="max-w-[240px] break-all text-xs text-secondary-foreground/60" :title="row.original.message">
-                    {{ row.original.message }}
-                  </span>
-                </div>
-              </template>
-              <template #cell-archiveSize="{ row }">
-                {{ formatSize(row.original.archiveSize) }}
-              </template>
-              <template #cell-targetName="{ row }">
-                {{ row.original.targetName || '—' }}
-              </template>
-              <template #cell-counts="{ row }">
-                <span class="text-xs">{{ jobCountsText(row.original) }}</span>
-              </template>
-              <template #cell-operation="{ row }">
-                <div class="flex justify-center gap-2">
-                  <FaButton
-                    v-if="row.original.type === 'EXPORT' && row.original.status === 'SUCCEEDED'"
-                    v-auth="'system:backup:download'"
-                    variant="outline"
-                    size="sm"
-                    @click="downloadArchive(row.original)"
-                  >
-                    下载归档
-                  </FaButton>
-                  <FaButton
-                    v-if="row.original.status === 'SUCCEEDED' || row.original.status === 'FAILED'"
-                    v-auth="'system:backup:delete'"
-                    variant="destructive"
-                    size="sm"
-                    @click="confirmRemoveJob(row.original)"
-                  >
-                    删除
-                  </FaButton>
-                </div>
-              </template>
-              <template #card="{ row }">
-                <FaCard class="w-full">
-                  <div class="flex flex-col gap-2 text-sm">
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium">#{{ row.id }} {{ jobTypeText(row) }}</span>
-                      <FaTag :variant="jobStatusVariant(row)">{{ jobStatusText(row) }}</FaTag>
-                    </div>
-                    <div class="text-xs text-secondary-foreground/60">
-                      {{ formatTime(row.createTime) }} · {{ scopeText(row.scopeTags) }} · {{ formatSize(row.archiveSize) }}
-                    </div>
-                    <div v-if="row.message" class="break-all text-xs text-secondary-foreground/60">
-                      {{ row.message }}
-                    </div>
-                    <div class="flex gap-2 border-t pt-2">
-                      <FaButton
-                        v-if="row.type === 'EXPORT' && row.status === 'SUCCEEDED'"
-                        v-auth="'system:backup:download'"
-                        variant="outline"
-                        size="sm"
-                        @click="downloadArchive(row)"
-                      >
-                        下载归档
-                      </FaButton>
-                      <FaButton
-                        v-if="row.status === 'SUCCEEDED' || row.status === 'FAILED'"
-                        v-auth="'system:backup:delete'"
-                        variant="destructive"
-                        size="sm"
-                        @click="confirmRemoveJob(row)"
-                      >
-                        删除
-                      </FaButton>
-                    </div>
+        <template #jobs>
+          <FaProgress v-if="jobsLoading" :model-value="100" class="mb-2" />
+          <FaResponsiveTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1180px]"
+            border
+            stripe
+            :columns="jobColumns"
+            :data="jobs"
+          >
+            <template #toolbar>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-xs text-secondary-foreground/60">每 3 秒自动刷新执行中任务</span>
+                <FaButton variant="outline" size="sm" :loading="jobsLoading" @click="loadJobs()">
+                  <FaIcon name="i-ri:refresh-line" />
+                  刷新
+                </FaButton>
+              </div>
+            </template>
+            <template #cell-type="{ row }">
+              <FaTag variant="secondary">{{ jobTypeText(row.original) }}</FaTag>
+            </template>
+            <template #cell-scopeTags="{ row }">
+              <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
+            </template>
+            <template #cell-status="{ row }">
+              <div class="flex flex-col gap-1">
+                <FaTag :variant="jobStatusVariant(row.original)">{{ jobStatusText(row.original) }}</FaTag>
+                <FaProgress
+                  v-if="row.original.status === 'RUNNING' || row.original.status === 'QUEUED'"
+                  :model-value="row.original.percent || 0"
+                  class="h-1"
+                />
+                <span v-if="row.original.message" class="max-w-[240px] break-all text-xs text-secondary-foreground/60" :title="row.original.message">
+                  {{ row.original.message }}
+                </span>
+              </div>
+            </template>
+            <template #cell-archiveSize="{ row }">
+              {{ formatSize(row.original.archiveSize) }}
+            </template>
+            <template #cell-targetName="{ row }">
+              {{ row.original.targetName || '—' }}
+            </template>
+            <template #cell-counts="{ row }">
+              <span class="text-xs">{{ jobCountsText(row.original) }}</span>
+            </template>
+            <template #cell-operation="{ row }">
+              <div class="flex justify-center gap-2">
+                <FaButton
+                  v-if="row.original.type === 'EXPORT' && row.original.status === 'SUCCEEDED'"
+                  v-auth="'system:backup:download'"
+                  variant="outline"
+                  size="sm"
+                  @click="downloadArchive(row.original)"
+                >
+                  下载归档
+                </FaButton>
+                <FaButton
+                  v-if="row.original.status === 'SUCCEEDED' || row.original.status === 'FAILED'"
+                  v-auth="'system:backup:delete'"
+                  variant="destructive"
+                  size="sm"
+                  @click="confirmRemoveJob(row.original)"
+                >
+                  删除
+                </FaButton>
+              </div>
+            </template>
+            <template #card="{ row }">
+              <FaCard class="w-full">
+                <div class="flex flex-col gap-2 text-sm">
+                  <div class="flex items-center justify-between">
+                    <span class="font-medium">#{{ row.id }} {{ jobTypeText(row) }}</span>
+                    <FaTag :variant="jobStatusVariant(row)">{{ jobStatusText(row) }}</FaTag>
                   </div>
-                </FaCard>
-              </template>
-            </FaResponsiveTable>
-          </a-spin>
-        </a-tab-pane>
-
-        <a-tab-pane key="targets" title="异地目标">
-          <a-spin :loading="targetsLoading" class="block w-full">
-            <FaResponsiveTable
-              row-key="id"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[1080px]"
-              border
-              stripe
-              :columns="targetColumns"
-              :data="targets"
-            >
-              <template #toolbar>
-                <div class="flex justify-end">
-                  <FaButton v-auth="'system:backup:config'" @click="openTargetForm()">
-                    <FaIcon name="i-ri:add-line" />
-                    添加目标
-                  </FaButton>
+                  <div class="text-xs text-secondary-foreground/60">
+                    {{ formatTime(row.createTime) }} · {{ scopeText(row.scopeTags) }} · {{ formatSize(row.archiveSize) }}
+                  </div>
+                  <div v-if="row.message" class="break-all text-xs text-secondary-foreground/60">
+                    {{ row.message }}
+                  </div>
+                  <div class="flex gap-2 border-t pt-2">
+                    <FaButton
+                      v-if="row.type === 'EXPORT' && row.status === 'SUCCEEDED'"
+                      v-auth="'system:backup:download'"
+                      variant="outline"
+                      size="sm"
+                      @click="downloadArchive(row)"
+                    >
+                      下载归档
+                    </FaButton>
+                    <FaButton
+                      v-if="row.status === 'SUCCEEDED' || row.status === 'FAILED'"
+                      v-auth="'system:backup:delete'"
+                      variant="destructive"
+                      size="sm"
+                      @click="confirmRemoveJob(row)"
+                    >
+                      删除
+                    </FaButton>
+                  </div>
                 </div>
-              </template>
-              <template #cell-type="{ row }">
-                <FaTag variant="secondary">{{ row.original.type }}</FaTag>
-              </template>
-              <template #cell-endpoint="{ row }">
-                <span class="break-all text-sm">{{ targetEndpoint(row.original) }}</span>
-              </template>
-              <template #cell-enabled="{ row }">
-                <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
-                  {{ row.original.enabled ? '启用' : '停用' }}
+              </FaCard>
+            </template>
+          </FaResponsiveTable>
+        </template>
+
+        <template #targets>
+          <FaProgress v-if="targetsLoading" :model-value="100" class="mb-2" />
+          <FaResponsiveTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1080px]"
+            border
+            stripe
+            :columns="targetColumns"
+            :data="targets"
+          >
+            <template #toolbar>
+              <div class="flex justify-end">
+                <FaButton v-auth="'system:backup:config'" @click="openTargetForm()">
+                  <FaIcon name="i-ri:add-line" />
+                  添加目标
+                </FaButton>
+              </div>
+            </template>
+            <template #cell-type="{ row }">
+              <FaTag variant="secondary">{{ row.original.type }}</FaTag>
+            </template>
+            <template #cell-endpoint="{ row }">
+              <span class="break-all text-sm">{{ targetEndpoint(row.original) }}</span>
+            </template>
+            <template #cell-enabled="{ row }">
+              <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
+                {{ row.original.enabled ? '启用' : '停用' }}
+              </FaTag>
+            </template>
+            <template #cell-operation="{ row }">
+              <div class="flex flex-wrap justify-center gap-2">
+                <FaButton v-auth="'system:backup:test'" variant="outline" size="sm" :loading="targetTesting" @click="testTarget(row.original)">
+                  测试
+                </FaButton>
+                <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="openArchives(row.original)">
+                  远端归档
+                </FaButton>
+                <FaButton v-auth="'system:backup:config'" variant="outline" size="sm" @click="confirmToggleTarget(row.original)">
+                  {{ row.original.enabled ? '停用' : '启用' }}
+                </FaButton>
+                <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openTargetForm(row.original)">
+                  编辑
+                </FaButton>
+                <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemoveTarget(row.original)">
+                  删除
+                </FaButton>
+              </div>
+            </template>
+            <template #card="{ row }">
+              <FaCard class="w-full">
+                <div class="flex flex-col gap-2 text-sm">
+                  <div class="flex items-center justify-between">
+                    <span class="font-medium">{{ row.name }}</span>
+                    <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                      {{ row.enabled ? '启用' : '停用' }}
+                    </FaTag>
+                  </div>
+                  <div class="text-xs break-all text-secondary-foreground/60">
+                    {{ row.type }} · {{ targetEndpoint(row) }} · {{ row.username || '匿名' }}
+                  </div>
+                  <div class="flex flex-wrap gap-2 border-t pt-2">
+                    <FaButton v-auth="'system:backup:test'" variant="outline" size="sm" @click="testTarget(row)">
+                      测试
+                    </FaButton>
+                    <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="openArchives(row)">
+                      远端归档
+                    </FaButton>
+                    <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openTargetForm(row)">
+                      编辑
+                    </FaButton>
+                    <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemoveTarget(row)">
+                      删除
+                    </FaButton>
+                  </div>
+                </div>
+              </FaCard>
+            </template>
+          </FaResponsiveTable>
+        </template>
+
+        <template #plans>
+          <FaProgress v-if="plansLoading" :model-value="100" class="mb-2" />
+          <FaResponsiveTable
+            row-key="id"
+            table-root-class="rounded-lg overflow-hidden"
+            table-class="min-w-[1180px]"
+            border
+            stripe
+            :columns="planColumns"
+            :data="plans"
+          >
+            <template #toolbar>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="text-xs text-secondary-foreground/60">cron 为 6 位 Spring 表达式（秒 分 时 日 月 周），如每天 3 点：0 0 3 * * *</span>
+                <FaButton v-auth="'system:backup:config'" :disabled="targets.length === 0" @click="openPlanForm()">
+                  <FaIcon name="i-ri:add-line" />
+                  添加计划
+                </FaButton>
+              </div>
+            </template>
+            <template #cell-scopeTags="{ row }">
+              <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
+            </template>
+            <template #cell-enabled="{ row }">
+              <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
+                {{ row.original.enabled ? '启用' : '停用' }}
+              </FaTag>
+            </template>
+            <template #cell-lastRunAt="{ row }">
+              <div class="flex flex-col gap-1">
+                <span class="text-sm">{{ formatTime(row.original.lastRunAt) }}</span>
+                <FaTag v-if="row.original.lastStatus" :variant="row.original.lastStatus === 'SUCCEEDED' ? 'default' : 'destructive'">
+                  {{ row.original.lastStatus === 'SUCCEEDED' ? '成功' : row.original.lastStatus === 'FAILED' ? '失败' : '执行中' }}
                 </FaTag>
-              </template>
-              <template #cell-operation="{ row }">
-                <div class="flex flex-wrap justify-center gap-2">
-                  <FaButton v-auth="'system:backup:test'" variant="outline" size="sm" :loading="targetTesting" @click="testTarget(row.original)">
-                    测试
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="openArchives(row.original)">
-                    远端归档
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:config'" variant="outline" size="sm" @click="confirmToggleTarget(row.original)">
-                    {{ row.original.enabled ? '停用' : '启用' }}
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openTargetForm(row.original)">
-                    编辑
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemoveTarget(row.original)">
-                    删除
-                  </FaButton>
-                </div>
-              </template>
-              <template #card="{ row }">
-                <FaCard class="w-full">
-                  <div class="flex flex-col gap-2 text-sm">
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium">{{ row.name }}</span>
-                      <FaTag :variant="row.enabled ? 'default' : 'secondary'">
-                        {{ row.enabled ? '启用' : '停用' }}
-                      </FaTag>
-                    </div>
-                    <div class="text-xs break-all text-secondary-foreground/60">
-                      {{ row.type }} · {{ targetEndpoint(row) }} · {{ row.username || '匿名' }}
-                    </div>
-                    <div class="flex flex-wrap gap-2 border-t pt-2">
-                      <FaButton v-auth="'system:backup:test'" variant="outline" size="sm" @click="testTarget(row)">
-                        测试
-                      </FaButton>
-                      <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="openArchives(row)">
-                        远端归档
-                      </FaButton>
-                      <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openTargetForm(row)">
-                        编辑
-                      </FaButton>
-                      <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemoveTarget(row)">
-                        删除
-                      </FaButton>
-                    </div>
+              </div>
+            </template>
+            <template #cell-operation="{ row }">
+              <div class="flex flex-wrap justify-center gap-2">
+                <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRunPlan(row.original)">
+                  立即执行
+                </FaButton>
+                <FaButton v-auth="'system:backup:config'" variant="outline" size="sm" @click="confirmTogglePlan(row.original)">
+                  {{ row.original.enabled ? '停用' : '启用' }}
+                </FaButton>
+                <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openPlanForm(row.original)">
+                  编辑
+                </FaButton>
+                <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemovePlan(row.original)">
+                  删除
+                </FaButton>
+              </div>
+            </template>
+            <template #card="{ row }">
+              <FaCard class="w-full">
+                <div class="flex flex-col gap-2 text-sm">
+                  <div class="flex items-center justify-between">
+                    <span class="font-medium">{{ row.name }}</span>
+                    <FaTag :variant="row.enabled ? 'default' : 'secondary'">
+                      {{ row.enabled ? '启用' : '停用' }}
+                    </FaTag>
                   </div>
-                </FaCard>
-              </template>
-            </FaResponsiveTable>
-          </a-spin>
-        </a-tab-pane>
-
-        <a-tab-pane key="plans" title="备份计划">
-          <a-spin :loading="plansLoading" class="block w-full">
-            <FaResponsiveTable
-              row-key="id"
-              table-root-class="rounded-lg overflow-hidden"
-              table-class="min-w-[1180px]"
-              border
-              stripe
-              :columns="planColumns"
-              :data="plans"
-            >
-              <template #toolbar>
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <span class="text-xs text-secondary-foreground/60">cron 为 6 位 Spring 表达式（秒 分 时 日 月 周），如每天 3 点：0 0 3 * * *</span>
-                  <FaButton v-auth="'system:backup:config'" :disabled="targets.length === 0" @click="openPlanForm()">
-                    <FaIcon name="i-ri:add-line" />
-                    添加计划
-                  </FaButton>
-                </div>
-              </template>
-              <template #cell-scopeTags="{ row }">
-                <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
-              </template>
-              <template #cell-enabled="{ row }">
-                <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
-                  {{ row.original.enabled ? '启用' : '停用' }}
-                </FaTag>
-              </template>
-              <template #cell-lastRunAt="{ row }">
-                <div class="flex flex-col gap-1">
-                  <span class="text-sm">{{ formatTime(row.original.lastRunAt) }}</span>
-                  <FaTag v-if="row.original.lastStatus" :variant="row.original.lastStatus === 'SUCCEEDED' ? 'default' : 'destructive'">
-                    {{ row.original.lastStatus === 'SUCCEEDED' ? '成功' : row.original.lastStatus === 'FAILED' ? '失败' : '执行中' }}
-                  </FaTag>
-                </div>
-              </template>
-              <template #cell-operation="{ row }">
-                <div class="flex flex-wrap justify-center gap-2">
-                  <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRunPlan(row.original)">
-                    立即执行
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:config'" variant="outline" size="sm" @click="confirmTogglePlan(row.original)">
-                    {{ row.original.enabled ? '停用' : '启用' }}
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openPlanForm(row.original)">
-                    编辑
-                  </FaButton>
-                  <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemovePlan(row.original)">
-                    删除
-                  </FaButton>
-                </div>
-              </template>
-              <template #card="{ row }">
-                <FaCard class="w-full">
-                  <div class="flex flex-col gap-2 text-sm">
-                    <div class="flex items-center justify-between">
-                      <span class="font-medium">{{ row.name }}</span>
-                      <FaTag :variant="row.enabled ? 'default' : 'secondary'">
-                        {{ row.enabled ? '启用' : '停用' }}
-                      </FaTag>
-                    </div>
-                    <div class="text-xs text-secondary-foreground/60">
-                      {{ row.cron }} · {{ scopeText(row.scopeTags) }} · {{ row.targetName }}
-                    </div>
-                    <div class="flex flex-wrap gap-2 border-t pt-2">
-                      <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRunPlan(row)">
-                        立即执行
-                      </FaButton>
-                      <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openPlanForm(row)">
-                        编辑
-                      </FaButton>
-                      <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemovePlan(row)">
-                        删除
-                      </FaButton>
-                    </div>
+                  <div class="text-xs text-secondary-foreground/60">
+                    {{ row.cron }} · {{ scopeText(row.scopeTags) }} · {{ row.targetName }}
                   </div>
-                </FaCard>
-              </template>
-            </FaResponsiveTable>
-          </a-spin>
-        </a-tab-pane>
-      </a-tabs>
+                  <div class="flex flex-wrap gap-2 border-t pt-2">
+                    <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRunPlan(row)">
+                      立即执行
+                    </FaButton>
+                    <FaButton v-auth="'system:backup:config'" variant="link" size="sm" @click="openPlanForm(row)">
+                      编辑
+                    </FaButton>
+                    <FaButton v-auth="'system:backup:delete'" variant="destructive" size="sm" @click="confirmRemovePlan(row)">
+                      删除
+                    </FaButton>
+                  </div>
+                </div>
+              </FaCard>
+            </template>
+          </FaResponsiveTable>
+        </template>
+      </FaTabs>
 
       <FaModal
         v-model="importModalVisible"
@@ -985,67 +1014,30 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
         @confirm="submitImport"
       >
         <template v-if="analysis">
-          <div class="mb-3 flex flex-wrap gap-2 text-xs text-secondary-foreground/70">
+          <div class="mb-3 flex flex-wrap items-center gap-2 text-xs text-secondary-foreground/70">
             <FaTag :variant="analysis.masterKeyMatch ? 'default' : 'destructive'">
               {{ analysis.masterKeyMatch ? '主密钥一致' : '主密钥不一致，加密凭据可能需重新配置' }}
             </FaTag>
             <span v-if="analysis.createdAt">备份时间：{{ formatTime(analysis.createdAt) }}</span>
             <span v-if="analysis.hostVersion">宿主版本：{{ analysis.hostVersion }}</span>
           </div>
-          <a-alert v-if="analysis.warnings.length" type="warning" class="mb-3">
-            <div v-for="warning in analysis.warnings" :key="warning">
-              {{ warning }}
-            </div>
-          </a-alert>
-          <div class="max-h-[320px] overflow-auto rounded-lg border">
-            <table class="w-full text-sm">
-              <thead class="bg-secondary/40 text-xs text-secondary-foreground/70">
-                <tr>
-                  <th class="px-3 py-2 text-left">
-                    集合
-                  </th>
-                  <th class="px-3 py-2 text-right">
-                    归档数据
-                  </th>
-                  <th class="px-3 py-2 text-right">
-                    本地缺失
-                  </th>
-                  <th class="px-3 py-2 text-right">
-                    重复冲突
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in analysis.collections" :key="item.name" class="border-t">
-                  <td class="px-3 py-2">
-                    {{ item.name }}
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    {{ item.archiveCount }}
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    {{ item.missingCount }}
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    {{ item.conflictCount }}
-                  </td>
-                </tr>
-                <tr class="border-t bg-secondary/20">
-                  <td class="px-3 py-2 font-medium">
-                    对象存储文件
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    {{ analysis.objects.archiveCount }}
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    {{ analysis.objects.missingCount }}
-                  </td>
-                  <td class="px-3 py-2 text-right">
-                    {{ analysis.objects.conflictCount }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <FaAlert
+            v-if="analysis.warnings.length"
+            icon="i-ri:alert-line"
+            title="导入前请注意"
+            :description="analysis.warnings.join('；')"
+            class="mb-3"
+          />
+          <FaResponsiveTable
+            row-key="name"
+            table-root-class="rounded-lg overflow-hidden"
+            border
+            :columns="analysisColumns"
+            :data="analysis.collections"
+          />
+          <div class="mt-2 flex flex-wrap items-center gap-2 text-xs text-secondary-foreground/70">
+            <FaTag variant="secondary">对象存储文件</FaTag>
+            <span>归档 {{ analysis.objects.archiveCount }} · 本地缺失 {{ analysis.objects.missingCount }} · 重复冲突 {{ analysis.objects.conflictCount }} · 共 {{ formatSize(analysis.objects.totalBytes) }}</span>
           </div>
           <div v-if="analysis.pluginScopes.length" class="mt-3 flex flex-wrap gap-2">
             <FaTag
@@ -1056,17 +1048,8 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
               {{ scope.pluginCode }}/{{ scope.scopeCode }} · {{ scope.fileCount }} 文件 · {{ scope.available ? '可恢复' : '插件未安装，将跳过' }}
             </FaTag>
           </div>
-          <a-divider />
-          <a-radio-group v-model:value="importStrategy" class="flex flex-col gap-2">
-            <a-radio value="LOCAL_WINS">
-              <span class="font-medium">以本地数据为准</span>
-              <span class="ml-2 text-xs text-secondary-foreground/60">只插入本地缺失的数据，不覆盖任何现有数据</span>
-            </a-radio>
-            <a-radio value="ARCHIVE_WINS">
-              <span class="font-medium">以备份数据为准</span>
-              <span class="ml-2 text-xs text-secondary-foreground/60">备份中存在的同标识数据覆盖本地，本地独有数据保留</span>
-            </a-radio>
-          </a-radio-group>
+          <FaDivider class="my-3" />
+          <FaRadioGroup v-model="importStrategy" :options="strategyOptions" />
         </template>
       </FaModal>
 
@@ -1093,7 +1076,7 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
               <FaInput v-model="targetForm.host" placeholder="如 192.168.1.10 或 nas.example.com" />
             </a-form-item>
             <a-form-item label="端口">
-              <a-input-number v-model:value="targetForm.port" class="w-full" :min="1" :max="65535" placeholder="留空按协议默认（WebDAV 443 / FTP 21）" />
+              <FaNumberField v-model="targetForm.port" class="w-full" :min="1" :max="65535" />
             </a-form-item>
             <a-form-item label="账号">
               <FaInput v-model="targetForm.username" placeholder="可留空" />
@@ -1111,9 +1094,11 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
               多数防火墙/NAT 环境需保持开启。
             </div>
           </a-form-item>
-          <div class="rounded-lg bg-secondary/40 p-3 text-xs text-secondary-foreground/70">
-            密码经主密钥加密存储；WebDAV 建议使用 HTTPS（非 80 端口默认按 HTTPS 访问）。归档将写入基础路径下，文件名前缀 yudream-backup-。
-          </div>
+          <FaAlert
+            icon="i-ri:key-2-line"
+            title="凭据与安全"
+            description="密码经主密钥加密存储；WebDAV 建议使用 HTTPS（非 80 端口默认按 HTTPS 访问）。归档将写入基础路径下，文件名前缀 yudream-backup-。"
+          />
         </a-form>
       </FaModal>
 
@@ -1124,41 +1109,33 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
         :show-cancel-button="false"
         confirm-button-text="关闭"
       >
-        <div class="mb-3 flex items-center gap-3 text-sm">
+        <div class="mb-3 flex flex-wrap items-center gap-3 text-sm">
           <span class="shrink-0 text-secondary-foreground/60">恢复策略</span>
-          <a-radio-group v-model:value="restoreStrategy">
-            <a-radio value="LOCAL_WINS">
-              本地为准
-            </a-radio>
-            <a-radio value="ARCHIVE_WINS">
-              备份为准
-            </a-radio>
-          </a-radio-group>
+          <FaRadioGroup v-model="restoreStrategy" :options="strategyOptions" />
         </div>
-        <a-spin :loading="archivesLoading" class="block w-full">
-          <div v-if="archives.length === 0" class="py-6 text-center text-sm text-secondary-foreground/60">
-            远端暂无备份归档
-          </div>
-          <div v-else class="flex flex-col gap-2">
-            <div
-              v-for="archive in archives"
-              :key="archive.name"
-              class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
-            >
-              <div class="min-w-0">
-                <div class="break-all text-sm font-medium">
-                  {{ archive.name }}
-                </div>
-                <div class="text-xs text-secondary-foreground/60">
-                  {{ formatSize(archive.size) }} · {{ formatArchiveTime(archive.modifiedAtMillis) }}
-                </div>
+        <FaProgress v-if="archivesLoading" :model-value="100" class="mb-2" />
+        <div v-if="archives.length === 0 && !archivesLoading" class="py-6 text-center text-sm text-secondary-foreground/60">
+          远端暂无备份归档
+        </div>
+        <div v-else class="flex flex-col gap-2">
+          <div
+            v-for="archive in archives"
+            :key="archive.name"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
+          >
+            <div class="min-w-0">
+              <div class="break-all text-sm font-medium">
+                {{ archive.name }}
               </div>
-              <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRestore(archive)">
-                恢复
-              </FaButton>
+              <div class="text-xs text-secondary-foreground/60">
+                {{ formatSize(archive.size) }} · {{ formatArchiveTime(archive.modifiedAtMillis) }}
+              </div>
             </div>
+            <FaButton v-auth="'system:backup:run'" variant="outline" size="sm" @click="confirmRestore(archive)">
+              恢复
+            </FaButton>
           </div>
-        </a-spin>
+        </div>
       </FaModal>
 
       <FaModal
@@ -1184,20 +1161,17 @@ const targetOptions = computed(() => targets.value.filter(target => target.enabl
               <FaSelect v-model="planForm.targetCode" :options="targetOptions" placeholder="选择目标" />
             </a-form-item>
             <a-form-item label="保留份数">
-              <a-input-number v-model:value="planForm.retentionCount" class="w-full" :min="1" :max="100" />
+              <FaNumberField v-model="planForm.retentionCount" class="w-full" :min="1" :max="100" />
             </a-form-item>
           </div>
           <a-form-item label="备份范围">
-            <a-checkbox-group v-model:value="planForm.scopeTags" class="flex flex-col gap-2">
-              <a-checkbox v-for="scope in scopes" :key="scope.tag" :value="scope.tag">
-                {{ scope.displayName }}
-                <span v-if="scope.defaultSchedule" class="ml-1 text-xs text-secondary-foreground/60">插件建议：{{ scope.defaultSchedule }}</span>
-              </a-checkbox>
-            </a-checkbox-group>
+            <FaCheckboxGroup v-model="planScopeModel" :options="scopeCheckOptions" />
           </a-form-item>
-          <div class="rounded-lg bg-secondary/40 p-3 text-xs text-secondary-foreground/60">
-            到点后按所选范围生成全量归档并推送到异地目标，自动清理超出保留份数的旧备份（按前缀匹配）。
-          </div>
+          <FaAlert
+            icon="i-ri:information-line"
+            title="调度说明"
+            description="到点后按所选范围生成全量归档并推送到异地目标，自动清理超出保留份数的旧备份（按前缀匹配）。"
+          />
         </a-form>
       </FaModal>
     </FaPageMain>
