@@ -4,11 +4,14 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DockerSocketLogReaderTest {
 
@@ -34,6 +37,30 @@ class DockerSocketLogReaderTest {
         assertEquals(2, in.read());
         assertEquals(3, in.read());
         assertEquals(4, in.read());
+    }
+
+    @Test
+    void logRequestUsesHttp10SoDockerSkipsChunkedEncoding() {
+        String request = DockerSocketLogReader.logRequest("swustmc-frontend", 200);
+        assertTrue(request.startsWith("GET /v1.41/containers/swustmc-frontend/logs?follow=true&stdout=true&stderr=true&tail=200&timestamps=true"),
+                request);
+        assertTrue(request.endsWith(" HTTP/1.0\r\nHost: docker\r\nConnection: close\r\n\r\n"), request);
+    }
+
+    @Test
+    void rejectsErrorStatusInsteadOfParsingBodyAsFrames() {
+        byte[] response = "HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\n\r\n{\"message\":\"No such container\"}"
+                .getBytes(StandardCharsets.UTF_8);
+        IOException error = assertThrows(IOException.class,
+                () -> DockerSocketLogReader.skipHttpHeaders(new ByteArrayInputStream(response)));
+        assertTrue(error.getMessage().contains("404"), error.getMessage());
+    }
+
+    @Test
+    void rejectsNonHttpPayload() {
+        byte[] response = "docker daemon gone\r\n\r\n".getBytes(StandardCharsets.UTF_8);
+        assertThrows(IOException.class,
+                () -> DockerSocketLogReader.skipHttpHeaders(new ByteArrayInputStream(response)));
     }
 
     private static byte[] frame(byte streamType, String payload) {
