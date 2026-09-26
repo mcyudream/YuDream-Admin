@@ -1,9 +1,14 @@
-# ===== 测试实例 profile（IDEA 共享运行配置「yudream-test」专用）=====
-# 目的：与开发实例同机并存、数据完全隔离，用于测试现有功能（如备份中心、插件等）。
-# 用法：IDEA 运行配置「yudream-test : 8081 隔离库」一键启动；
-#   命令行等价：--spring.profiles.active=test 且 YUDREAM_BOOTSTRAP_CONFIG=yudream-bootstrap-test.properties
+# ===== 测试实例 profile（IDEA 共享运行配置「yudream-test」系列专用）=====
+# 目的：与开发实例同机并存、数据完全隔离，用于测试现有功能（如备份中心、插件、安装向导等）。
+# 两种启动姿势（引导文件 = config/yudream-bootstrap-test.properties，机器本地、不进 git）：
+#   1) 首次/想走安装向导：运行「yudream-test-setup : 8081 安装向导」——
+#      文件不存在 → 进入安装向导，Mongo URI 填 mongodb://localhost:27017/yudream-test，
+#      应用后进程自动退出，再运行「yudream-test : 8081 隔离库」即可正常启动；
+#   2) 跳过向导直达：手工创建上面的引导文件（内容两行：
+#      spring.data.mongodb.uri=mongodb://localhost:27017/yudream-test
+#      存在即视为已配置，直接运行隔离库配置；想重走向导删掉它即可）。
 # 隔离矩阵：
-#   Mongo 库   yudream-test        （yudream-bootstrap-test.properties，引导文件优先级最高）
+#   Mongo 库   yudream-test        （config/yudream-bootstrap-test.properties，引导文件优先级最高）
 #   Redis DB   1                   （会话/缓存与开发实例隔离，互不掉登录）
 #   S3 桶      yudream-test        （对象存储/插件资产/备份对象互不可见）
 #   归档目录   config/backup-test  （备份中心本机归档互不可见）
@@ -18,7 +23,7 @@ server:
 
 spring.data:
   mongodb:
-    # 引导文件 yudream-bootstrap-test.properties 优先级高于此处；此值兜底防止占位符未解析
+    # 引导文件 config/yudream-bootstrap-test.properties 优先级高于此处；此值兜底防止占位符未解析
     uri: ${MONGO_TEST_URI:mongodb://localhost:27017/yudream-test}
   redis:
     database: ${REDIS_TEST_DB:1}
