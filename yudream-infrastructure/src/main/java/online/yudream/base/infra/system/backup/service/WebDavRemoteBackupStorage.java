@@ -70,8 +70,12 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
                 // IP 直连自签证书场景：握手前清空 SNI 匹配器（IP 不是合法 SNI 名，避免 SNI 解析异常），
                 // 并信任所有证书——两者合起来才构成确定性的「跳过 TLS 校验」。
                 base = base.secure(spec -> spec.sslContext(sslContext)
-                        .handlerConfigurator(handler -> handler.engine()
-                                .setSNIMatchers(java.util.Collections.<javax.net.ssl.SNIServerName>emptyList())));
+                        .handlerConfigurator(handler -> {
+                            // 清空 SNI server names：IP 直连自签证书场景握手不携带 SNI
+                            javax.net.ssl.SSLParameters parameters = handler.engine().getSSLParameters();
+                            parameters.setServerNames(java.util.Collections.emptyList());
+                            handler.engine().setSSLParameters(parameters);
+                        }));
             } catch (Exception e) {
                 throw new BizException("初始化 TLS 上下文失败：" + e.getMessage());
             }
