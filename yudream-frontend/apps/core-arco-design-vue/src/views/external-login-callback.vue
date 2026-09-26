@@ -18,6 +18,24 @@ onMounted(async () => {
     return
   }
 
+  // ymcl 启动器联动：state 若由启动器发起（适配器 flow 持有），把浏览器原样
+  // 转交适配器 landing 完成启动器侧登录。未命中、适配器未安装/未启用或请求
+  // 出错时，走下方原网页流程，不影响站点自身的第三方登录。
+  try {
+    const owner = await fetch(
+      `/api/plugins/ymcl-adapter/v1/auth/external/flow-owner?state=${encodeURIComponent(state)}`,
+      { headers: { Accept: 'application/json' } },
+    )
+    if (owner.ok) {
+      const data = await owner.json()
+      if (data?.owned) {
+        window.location.replace(`/api/plugins/ymcl-adapter/v1/auth/external/landing${window.location.search}`)
+        return
+      }
+    }
+  }
+  catch { /* 适配器不可用：按原网页流程处理 */ }
+
   // 登录前暂存的目标路由（由登录页在跳转授权前写入），登录完成后原路返回
   const redirect = consumeExternalLoginRedirect()
   try {
