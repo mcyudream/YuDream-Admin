@@ -217,7 +217,8 @@ class BackupExecutionMergeTest {
         }
 
         @Override
-        public List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink) {
+        public List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink,
+                                        java.util.Map<String, String> options) {
             throw new UnsupportedOperationException();
         }
 

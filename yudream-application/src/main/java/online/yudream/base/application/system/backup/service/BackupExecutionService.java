@@ -45,6 +45,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -99,7 +100,8 @@ public class BackupExecutionService implements BackupJobRunner {
         boolean success = false;
         try {
             List<String> exportWarnings = new ArrayList<>();
-            BackupJobStats stats = writeArchive(localFile, scopes, progress, exportWarnings);
+            BackupJobStats stats = writeArchive(localFile, scopes, progress, exportWarnings,
+                    job.getScopeOptions());
             long size = Files.size(localFile);
             if (target != null) {
                 progress.update("upload", "正在推送到异地：" + target.getName(), 99);
@@ -122,7 +124,7 @@ public class BackupExecutionService implements BackupJobRunner {
     }
 
     private BackupJobStats writeArchive(Path localFile, List<BackupScopeRef> scopes, BackupJobProgress progress,
-                                        List<String> warnings)
+                                        List<String> warnings, Map<String, String> jobScopeOptions)
             throws IOException {
         long documents = 0;
         long objects = 0;
@@ -167,6 +169,7 @@ public class BackupExecutionService implements BackupJobRunner {
             List<BackupScopeRef> pluginScopes = scopes.stream()
                     .filter(scope -> scope.type() == BackupScopeType.PLUGIN).toList();
             long[] pluginHolder = {0};
+            Map<String, String> scopeOptions = jobScopeOptions;
             for (BackupScopeRef scope : pluginScopes) {
                 scopeIndex++;
                 int percent = 75 + scopeIndex * 20 / Math.max(1, pluginScopes.size());
@@ -181,7 +184,7 @@ public class BackupExecutionService implements BackupJobRunner {
                         throw new BizException("写入插件备份文件失败：" + path);
                     }
                     pluginHolder[0]++;
-                }));
+                }, scopeOptions));
                 writer.closePluginScope();
             }
             pluginFiles = pluginHolder[0];

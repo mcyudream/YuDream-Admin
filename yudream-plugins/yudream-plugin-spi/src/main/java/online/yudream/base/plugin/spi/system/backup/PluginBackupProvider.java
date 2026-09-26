@@ -32,11 +32,13 @@ public interface PluginBackupProvider {
     /**
      * 将本范围全部数据写入宿主提供的 {@link BackupSink}。
      * 只允许通过 sink 写文件，禁止感知归档格式与远端存储细节。
+     * {@code options} 为宿主触发任务时携带的参数（如插件单实例备份的 {@code instanceId}），
+     * 系统级全量导出时为空；提供者应把无法识别的选项当作全量处理。
      * 局部跳过（如某节点离线、某数据源不可用）不应抛异常中断整个备份，
      * 而是记录到返回的 {@link ExportReport#warnings()}，宿主会随任务消息透出；
      * 只有整体无法继续时才抛异常（fail-fast，宿主丢弃本次归档）。
      */
-    ExportReport export(BackupSink sink) throws Exception;
+    ExportReport export(BackupSink sink, BackupExportOptions options) throws Exception;
 
     /**
      * 按合并策略恢复此前由本范围导出的文件。source 只包含本范围的文件；

@@ -4,6 +4,7 @@ import online.yudream.base.domain.system.backup.enumerate.BackupConflictStrategy
 import online.yudream.base.domain.system.backup.service.PluginBackupScopeSource;
 import online.yudream.base.domain.system.backup.valobj.ArchiveFileEntry;
 import online.yudream.base.infra.platform.plugin.service.PluginExtensionRegistry;
+import online.yudream.base.plugin.spi.system.backup.BackupExportOptions;
 import online.yudream.base.plugin.spi.system.backup.BackupSink;
 import online.yudream.base.plugin.spi.system.backup.BackupSource;
 import online.yudream.base.plugin.spi.system.backup.PluginBackupConflictStrategy;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -45,9 +47,10 @@ public class PluginBackupScopeRegistry implements PluginBackupScopeSource {
     }
 
     @Override
-    public List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink) {
+    public List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink, Map<String, String> options) {
         try {
-            PluginBackupProvider.ExportReport report = provider(handle).export(validatingSink(sink));
+            PluginBackupProvider.ExportReport report = provider(handle).export(validatingSink(sink),
+                    new BackupExportOptions(options == null ? Map.of() : Map.copyOf(options)));
             return report == null || report.warnings() == null
                     ? List.of()
                     : List.copyOf(report.warnings());

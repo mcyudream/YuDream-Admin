@@ -5,6 +5,7 @@ import online.yudream.base.domain.system.backup.valobj.ArchiveFileEntry;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -18,8 +19,8 @@ public interface PluginBackupScopeSource {
 
     Optional<PluginScopeHandle> find(String pluginCode, String scopeCode);
 
-    /** 调用插件导出其范围数据；返回需要随任务消息透出的告警列表。 */
-    List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink);
+    /** 调用插件导出其范围数据（options 为任务触发方携带的参数，如单实例过滤）；返回告警列表。 */
+    List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink, Map<String, String> options);
 
     /** 调用插件按策略恢复其范围数据。 */
     void restoreScope(PluginScopeHandle handle, PluginBackupFileSource files, BackupConflictStrategy strategy);

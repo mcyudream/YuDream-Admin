@@ -14,6 +14,7 @@ import online.yudream.base.domain.system.backup.valobj.BackupJobStats;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 备份任务：全量导出、异地推送、合并导入、异地恢复共用一张任务表，
@@ -35,6 +36,8 @@ public class BackupJob extends BaseDomain {
     private String targetCode;
     private String targetName;
     private BackupConflictStrategy strategy;
+    /** 插件范围触发时的导出选项（原样传给提供者，如单实例过滤）。 */
+    private Map<String, String> scopeOptions;
     private String archiveName;
     private String archivePath;
     private Long archiveSize;

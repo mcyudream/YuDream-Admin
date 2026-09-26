@@ -18,6 +18,7 @@ import online.yudream.base.plugin.spi.system.render.PluginRenderService;
 import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.form.PluginFormService;
 import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
+import online.yudream.base.plugin.spi.system.backup.PluginBackupOperations;
 
 import java.util.Optional;
 
@@ -63,6 +64,14 @@ public interface FrameworkServices {
     PluginDocumentStore documents(String pluginCode);
 
     PluginFileStore files(String pluginCode);
+
+    /**
+     * 备份触发端口：插件以自己的身份发起范围备份（含异地目标）并查询任务状态。
+     * 默认实现表示宿主无备份能力（SPI 过旧），调用方应按软依赖降级。
+     */
+    default PluginBackupOperations backups(String pluginCode) {
+        throw new UnsupportedOperationException("宿主无备份触发能力（SPI 过旧）");
+    }
 
     default PluginSecretStore secrets(String pluginCode) {
         return new PluginSecretStore() {

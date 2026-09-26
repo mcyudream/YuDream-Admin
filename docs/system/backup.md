@@ -35,10 +35,25 @@ plugins.index.json          # [{pluginCode, scopeCode, path, size, sha256}]
 ```java
 context.registerExtension(PluginBackupProvider.class, new MyBackupProvider(...));
 // scopeCode / displayName / description / defaultSchedule（cron 建议）
-// ExportReport export(BackupSink sink) —— 只允许 putFile/putText 写相对路径文件；
+// ExportReport export(BackupSink sink, BackupExportOptions options) —— 只允许 putFile/putText
+//   写相对路径文件；options 为触发方携带的参数（如插件单实例备份的 instanceId，空=全量）；
 //   返回的 warnings 会拼进备份任务消息（用于记录局部跳过原因，如某节点离线）
 // restore(BackupSource source, PluginBackupConflictStrategy strategy)
 ```
+
+**插件主动触发**（实例计划任务、面板按钮等场景）：经 `context.framework().backups(pluginCode)`
+获取 `PluginBackupOperations`（默认实现抛不支持，宿主 SPI 过旧时按软依赖降级）：
+
+```java
+String jobId = framework.backups("mcpanel").startScopeBackup(
+        new PluginScopeBackupRequest("server-data", "nas-webdav", Map.of("instanceId", id)));
+Optional<PluginBackupJobStatus> status = framework.backups("mcpanel").status(jobId);
+```
+
+- 只能触发**本插件**注册的 scopeCode；targetCode 空=本机导出，否则推送到该异地目标；
+  options 原样传给提供者 export。
+- mcpanel 实例计划任务已接入：计划动作选「异地备份」并填宿主目标编码（存 payload 字段），
+  到点自动把该实例世界数据推送到对应目标；计划上的「立即执行」即手动触发一次。
 
 - 宿主经 `PluginExtensionRegistry.registrations(Class)` 按插件码聚合；插件禁用/卸载后其范围自动从备份中心消失（归档里已有数据在导入时跳过并计入告警）。
 - 归档内插件范围由对应 provider 自行解释（文件格式由插件自定义）；宿主统一校验相对路径（禁止穿越/反斜杠/控制字符）。
