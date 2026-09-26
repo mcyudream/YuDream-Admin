@@ -66,7 +66,7 @@ public class MenuAppService {
     public List<MenuManageDTO> tree(MenuTreeQuery query) {
         List<Menu> allMenus = menuRepo.findAll();
         Map<String, Menu> allMenuMap = allMenus.stream()
-                .collect(Collectors.toMap(Menu::getCode, menu -> menu));
+                .collect(Collectors.toMap(Menu::getCode, menu -> menu, (left, right) -> left));
         Set<String> selectedCodes = selectManageMenuCodes(allMenus, allMenuMap, query);
         List<MenuManageDTO> nodes = allMenus.stream()
                 .filter(menu -> selectedCodes.contains(menu.getCode()))
@@ -215,8 +215,9 @@ public class MenuAppService {
     public List<Map<String, Object>> buildRouteTree(Collection<String> userPermissions) {
         Set<String> permissionSet = userPermissions == null ? Collections.emptySet() : new HashSet<>(userPermissions);
         List<Menu> activeMenus = menuDomainService.findActiveMenus();
+        // 同 code 冗余（历史导入残留）保留先加载的一条，路由树构建不因重复键中断
         Map<String, Menu> activeMenuMap = activeMenus.stream()
-                .collect(Collectors.toMap(Menu::getCode, menu -> menu));
+                .collect(Collectors.toMap(Menu::getCode, menu -> menu, (left, right) -> left));
         Map<String, Menu> allMenuMap = new HashMap<>(activeMenuMap);
         List<Menu> persistedMenus = menuRepo.findAll();
         if (persistedMenus != null) {
@@ -458,7 +459,8 @@ public class MenuAppService {
     }
 
     private List<MenuManageDTO> buildManageTree(List<MenuManageDTO> nodes) {
-        Map<String, MenuManageDTO> nodeMap = nodes.stream().collect(Collectors.toMap(MenuManageDTO::getCode, m -> m));
+        Map<String, MenuManageDTO> nodeMap = nodes.stream()
+                .collect(Collectors.toMap(MenuManageDTO::getCode, m -> m, (left, right) -> left));
         List<MenuManageDTO> roots = new ArrayList<>();
         for (MenuManageDTO node : nodes) {
             String displayParentCode = node.getDisplayParentCode();
