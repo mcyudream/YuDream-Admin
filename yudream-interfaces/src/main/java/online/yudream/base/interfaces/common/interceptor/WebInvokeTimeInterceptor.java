@@ -21,8 +21,7 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
 
     private static final String START_TIME_ATTR = "WEB_LOG_START_TIME";
     private static final int MAX_BODY_LENGTH = 2000;
-    private static final String SENSITIVE_VALUE_PATTERN = "(?i)(\\b(?:token|authorization|cookie|password|secret|message|content|html|prompt)\\b\\s*(?:=|:)\\s*)([^&\\s,]+)";
-    private static final String SENSITIVE_JSON_PATTERN = "(?i)(\"(?:token|authorization|cookie|password|secret|message|content|html|prompt)\"\\s*:\\s*\")(?:[^\"]*)(\")";
+    private static final java.util.regex.Pattern CONTROL_CHARS = java.util.regex.Pattern.compile("\\p{Cntrl}");
 
     private final WebLogProperties properties;
     private final SystemMonitorAppService systemMonitorAppService;
@@ -35,7 +34,7 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         request.setAttribute(START_TIME_ATTR, System.currentTimeMillis());
 
         String p = prefix();
-        String url = request.getMethod() + " " + request.getRequestURI();
+        String url = sanitize(request.getMethod() + " " + request.getRequestURI());
         String params = formatParams(request);
         log.info("{} > start request\n{}   URL   : {}\n{}   params: {}", p, p, url, p, params);
         return true;
@@ -50,7 +49,7 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         long cost = start == null ? 0 : System.currentTimeMillis() - start;
 
         String p = prefix();
-        String url = request.getMethod() + " " + request.getRequestURI();
+        String url = sanitize(request.getMethod() + " " + request.getRequestURI());
         String params = formatParams(request);
         String body = formatBody(request);
         log.info("{} < end request\n{}   URL   : {}\n{}   params: {}\n{}   body  : {}\n{}   cost  : {}ms",
@@ -95,17 +94,17 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         String errorSummary = handledFailure != null ? handledFailure : ex == null ? null : ex.getClass().getSimpleName();
         try {
             systemMonitorAppService.recordApiLog(ApiLogDTO.builder()
-                    .method(request.getMethod())
-                    .path(request.getRequestURI())
-                    .query(maskSensitive(request.getQueryString()))
+                    .method(sanitize(request.getMethod()))
+                    .path(sanitize(request.getRequestURI()))
+                    .query(maskSensitive(sanitize(request.getQueryString())))
                     .requestBody(limit(body))
                     .status(response.getStatus())
                     .costMs(cost)
                     .success(handledFailure == null && ex == null && response.getStatus() < 400)
                     .loginId(currentLoginId())
-                    .ip(clientIp(request))
-                    .userAgent(request.getHeader("User-Agent"))
-                    .errorMessage(errorSummary)
+                    .ip(sanitize(clientIp(request)))
+                    .userAgent(sanitize(request.getHeader("User-Agent")))
+                    .errorMessage(errorSummary == null ? null : sanitize(errorSummary))
                     .build());
         }
         catch (Exception auditException) {
@@ -148,11 +147,34 @@ public class WebInvokeTimeInterceptor implements HandlerInterceptor {
         return value.substring(0, MAX_BODY_LENGTH);
     }
 
+    /** 脱敏收敛到 SensitiveValueMasker 单点：凭据键 fail closed，内容键保持既有范围。 */
     private String maskSensitive(String value) {
-        if (!StringUtils.hasText(value)) {
+        return SensitiveValueMasker.mask(value);
+    }
+
+    /**
+     * 日志注入防护：请求行/URI/UA 等客户端可控值写入日志或审计前，
+     * 将 CR/LF 及其他控制字符替换为可见转义，防止伪造日志边界。
+     */
+    static String sanitize(String value) {
+        if (value == null || !CONTROL_CHARS.matcher(value).find()) {
             return value;
         }
-        return value.replaceAll(SENSITIVE_JSON_PATTERN, "$1******$2")
-                .replaceAll(SENSITIVE_VALUE_PATTERN, "$1******");
+        StringBuilder out = new StringBuilder(value.length() + 16);
+        for (char c : value.toCharArray()) {
+            switch (c) {
+                case '\r' -> out.append("\\r");
+                case '\n' -> out.append("\\n");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20 || c == 0x7f) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
     }
 }
