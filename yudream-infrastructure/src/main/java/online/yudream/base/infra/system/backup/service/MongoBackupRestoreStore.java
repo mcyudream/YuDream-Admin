@@ -143,16 +143,21 @@ public class MongoBackupRestoreStore implements BackupRestoreStore {
     }
 
     /** 同一规范化 id 的本地存在性需按可能的原生类型探测（雪花 Long / 字符串 / ObjectId）。 */
-    private static List<Object> idVariants(String id) {
+    static List<Object> idVariants(String id) {
         List<Object> variants = new ArrayList<>(3);
-        if (id != null && id.length() == 24 && id.chars().allMatch(c -> Character.isLetterOrDigit(c))) {
+        if (id == null || id.isEmpty()) {
+            return variants;
+        }
+        // 负数雪花 ID（种子数据常见，如 -1740829301）：去掉符号位后再判数值形态
+        String unsigned = id.startsWith("-") ? id.substring(1) : id;
+        if (unsigned.length() == 24 && unsigned.chars().allMatch(Character::isLetterOrDigit)) {
             try {
-                variants.add(new ObjectId(id));
+                variants.add(new ObjectId(unsigned));
             } catch (IllegalArgumentException ignored) {
                 // 非 ObjectId 十六进制串按字符串处理
             }
         }
-        if (id != null && id.chars().allMatch(Character::isDigit) && id.length() <= 19) {
+        if (!unsigned.isEmpty() && unsigned.length() <= 19 && unsigned.chars().allMatch(Character::isDigit)) {
             try {
                 variants.add(Long.parseLong(id));
             } catch (NumberFormatException ignored) {
