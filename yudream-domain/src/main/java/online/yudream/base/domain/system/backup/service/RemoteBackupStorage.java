@@ -17,11 +17,14 @@ public interface RemoteBackupStorage {
     /** 探测连接与凭据；失败抛出业务异常。 */
     void test();
 
-    /** 上传文件（覆盖同名）。 */
+    /** 上传文件（覆盖同名）。path 为相对 basePath 的完整路径，可含子目录。 */
     void put(String path, InputStream in, long size);
 
-    /** 列出前缀下的文件（不含子目录递归）。 */
-    List<RemoteEntry> list(String prefix);
+    /** 列出目录下的文件（非递归；name 为文件名）。 */
+    List<RemoteEntry> list(String dir);
+
+    /** 列出目录下的直接子目录名。 */
+    List<String> listDirs(String dir);
 
     /** 下载远端文件到本地目标文件（覆盖）。 */
     void fetch(String path, Path destination);

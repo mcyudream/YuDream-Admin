@@ -73,19 +73,19 @@ public class FtpRemoteBackupStorage implements RemoteBackupStorage {
     }
 
     @Override
-    public List<RemoteEntry> list(String prefix) {
+    public List<RemoteEntry> list(String dir) {
         FTPClient client = connect();
         try {
-            FTPFile[] files = client.listFiles(target.getBasePath());
+            if (!client.changeWorkingDirectory(dirPathOf(dir))) {
+                throw new BizException("远端目录不存在或不可进入：" + dirPathOf(dir));
+            }
+            FTPFile[] files = client.listFiles();
             if (files == null) {
-                throw new BizException("远端目录不可读：" + target.getBasePath());
+                throw new BizException("远端目录不可读：" + dirPathOf(dir));
             }
             List<RemoteEntry> entries = new ArrayList<>();
             for (FTPFile file : files) {
                 if (file.isDirectory()) {
-                    continue;
-                }
-                if (prefix != null && !prefix.isBlank() && !file.getName().startsWith(prefix)) {
                     continue;
                 }
                 entries.add(new RemoteEntry(file.getName(), file.getSize(),
@@ -93,11 +93,47 @@ public class FtpRemoteBackupStorage implements RemoteBackupStorage {
                                 file.getTimestamp().getTimeInMillis()));
             }
             return entries;
+        } catch (BizException e) {
+            throw e;
         } catch (IOException e) {
             throw new BizException("FTP 列表失败：" + e.getMessage());
         } finally {
             disconnectQuietly(client);
         }
+    }
+
+    @Override
+    public List<String> listDirs(String dir) {
+        FTPClient client = connect();
+        try {
+            if (!client.changeWorkingDirectory(dirPathOf(dir))) {
+                throw new BizException("远端目录不存在或不可进入：" + dirPathOf(dir));
+            }
+            FTPFile[] files = client.listFiles();
+            List<String> dirs = new ArrayList<>();
+            if (files != null) {
+                for (FTPFile file : files) {
+                    if (file.isDirectory() && !".".equals(file.getName()) && !"..".equals(file.getName())) {
+                        dirs.add(file.getName());
+                    }
+                }
+            }
+            return dirs;
+        } catch (BizException e) {
+            throw e;
+        } catch (IOException e) {
+            throw new BizException("FTP 列目录失败：" + e.getMessage());
+        } finally {
+            disconnectQuietly(client);
+        }
+    }
+
+    /** 目录参数转远端绝对路径（空串 = 基础路径）。 */
+    private String dirPathOf(String dir) {
+        if (dir == null || dir.isBlank()) {
+            return target.getBasePath();
+        }
+        return remotePath(dir.startsWith("/") ? dir : "/" + dir);
     }
 
     @Override

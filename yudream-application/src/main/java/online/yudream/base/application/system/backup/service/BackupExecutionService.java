@@ -107,9 +107,13 @@ public class BackupExecutionService implements BackupJobRunner {
                     job.getScopeOptions());
             long size = Files.size(localFile);
             if (target != null) {
+                // 异地归档统一归类：yda-backup/{消费方}[/{子路径}]——系统=sys-backup，插件={插件}-backup[/{instanceId}]
+                String consumer = consumerDir(scopes, job.getScopeOptions());
+                String remoteKey = "yda-backup/" + consumer + "/" + archiveName;
                 progress.update("upload", "正在推送到异地：" + target.getName(), 99);
-                remoteFactory.create(target).put(archiveName, Files.newInputStream(localFile), size);
-                prune(target, archivePrefix(job.getPlanCode()), retentionOf(job.getPlanCode()));
+                RemoteBackupStorage storage = remoteFactory.create(target);
+                storage.put(remoteKey, Files.newInputStream(localFile), size);
+                pruneDir(storage, "yda-backup/" + consumer, retentionOf(job.getPlanCode()));
                 success = true;
                 progress.update("done", "已推送到异地", 100);
                 return new BackupJobResult(archiveName, null, size, stats, List.copyOf(exportWarnings));
@@ -213,22 +217,37 @@ public class BackupExecutionService implements BackupJobRunner {
         }
     }
 
-    private void prune(RemoteTarget target, String prefix, int retention) {
+    /** 归档远端归档目录：单一插件范围按 {插件}-backup（带 instanceId 选项再分层），其余归 sys-backup。 */
+    static String consumerDir(List<BackupScopeRef> scopes, Map<String, String> options) {
+        List<BackupScopeRef> pluginScopes = scopes.stream()
+                .filter(scope -> scope.type() == BackupScopeType.PLUGIN).toList();
+        boolean hasSystem = scopes.stream().anyMatch(scope -> scope.type() == BackupScopeType.SYSTEM);
+        if (!hasSystem && pluginScopes.size() == 1) {
+            BackupScopeRef scope = pluginScopes.get(0);
+            String instanceId = options == null ? null : options.get("instanceId");
+            return instanceId == null || instanceId.isBlank()
+                    ? scope.pluginCode() + "-backup"
+                    : scope.pluginCode() + "-backup/" + instanceId;
+        }
+        return "sys-backup";
+    }
+
+    /** 目录内按保留份数清理旧归档（按修改时间倒序保留）。 */
+    private void pruneDir(RemoteBackupStorage storage, String dir, int retention) {
         if (retention < 1) {
             return;
         }
-        RemoteBackupStorage storage = remoteFactory.create(target);
-        List<RemoteEntry> entries = new ArrayList<>(storage.list(prefix));
+        List<RemoteEntry> entries = new ArrayList<>(storage.list(dir));
         entries.sort((a, b) -> Long.compare(
                 b.modifiedAtMillis() == null ? 0 : b.modifiedAtMillis(),
                 a.modifiedAtMillis() == null ? 0 : a.modifiedAtMillis()));
         for (int i = retention; i < entries.size(); i++) {
             String name = entries.get(i).name();
             try {
-                storage.delete(name);
-                log.info("异地备份超过保留份数，已删除：{}/{}", target.getCode(), name);
+                storage.delete(dir + "/" + name);
+                log.info("异地备份超过保留份数，已删除：{}/{}", dir, name);
             } catch (BizException e) {
-                log.warn("清理异地旧备份失败：{}/{}（{}）", target.getCode(), name, e.getMessage());
+                log.warn("清理异地旧备份失败：{}/{}（{}）", dir, name, e.getMessage());
             }
         }
     }

@@ -119,7 +119,8 @@ export interface RemoteArchive {
 
 export default {
   scopes: () => systemClient.get<unknown, ApiResponse<BackupScope[]>>('api/system/backup/scopes'),
-  export: (scopeTags: string[]) => systemClient.post<unknown, ApiResponse<BackupJob>>('api/system/backup/export', { scopeTags }),
+  export: (data: { scopeTags: string[], targetCode?: string }) =>
+    systemClient.post<unknown, ApiResponse<BackupJob>>('api/system/backup/export', data),
   analyzeImport: (data: FormData) => systemClient.post<unknown, ApiResponse<BackupAnalysis>>('api/system/backup/import/analyze', data, { timeout: 0 }),
   import: (data: FormData) => systemClient.post<unknown, ApiResponse<BackupJob>>('api/system/backup/import', data, { timeout: 0 }),
   // 分片导入（超大归档）：顺序分片上传，服务端合并落盘后复用分析/导入

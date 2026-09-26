@@ -4,11 +4,17 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.backup.aggregate.RemoteTarget;
 import online.yudream.base.domain.system.backup.service.RemoteBackupStorage;
 import online.yudream.base.domain.system.backup.valobj.RemoteEntry;
-import org.springframework.http.HttpStatusCode;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.InputSource;
+import io.netty.handler.codec.http.HttpMethod;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import reactor.core.publisher.Mono;
+import reactor.netty.ByteBufFlux;
+import reactor.netty.Connection;
+import reactor.netty.http.client.HttpClient;
+import reactor.netty.http.client.HttpClientResponse;
+import reactor.util.function.Tuple2;
+import reactor.util.function.Tuples;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -16,13 +22,14 @@ import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.net.URI;
 import java.net.URLDecoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,10 +38,14 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 /**
- * WebDAV 异地备份存储（JDK HttpClient，PROPFIND/MKCOL/PUT/GET/DELETE）。
- * 连接为短生命周期：每次操作独立请求，不持长驻资源。
+ * WebDAV 异地备份存储（reactor-netty HttpClient，PROPFIND/MKCOL/PUT/GET/DELETE）。
+ * 目标开启「跳过 TLS 证书校验」时使用 InsecureTrustManagerFactory——netty 传输层
+ * 不做主机名校验，可确定性地支持自签名证书与 IP 直连；关闭时走默认信任链。
+ * 连接为短生命周期语义：每次操作独立请求，不持长驻资源。
  */
 public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
 
@@ -45,17 +56,30 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
 
     WebDavRemoteBackupStorage(RemoteTarget target) {
         this.target = target;
-        HttpClient.Builder builder = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(TIMEOUT_MILLIS))
-                .followRedirects(HttpClient.Redirect.NORMAL);
+        HttpClient base = HttpClient.create()
+                .followRedirect(true)
+                .responseTimeout(Duration.ofMillis(TIMEOUT_MILLIS));
         if (target.isInsecureTls()) {
-            // 内网自签名/IP 直连：信任所有证书并关闭端点身份校验（仅当目标显式开启）
-            builder.sslContext(trustAllContext());
-            SSLParameters parameters = new SSLParameters();
-            parameters.setEndpointIdentificationAlgorithm("");
-            builder.sslParameters(parameters);
+            try {
+                SslContext sslContext = SslContextBuilder.forClient()
+                        .trustManager(InsecureTrustManagerFactory.INSTANCE)
+                        .build();
+                base = base.secure(spec -> spec.sslContext(sslContext));
+            } catch (Exception e) {
+                throw new BizException("初始化 TLS 上下文失败：" + e.getMessage());
+            }
         }
-        this.http = builder.build();
+        this.http = base;
+    }
+
+    /** 构建带认证与 Depth 头的单次请求客户端。 */
+    private HttpClient client(String depth) {
+        return http.headers(headers -> {
+            applyAuth(headers::set);
+            if (depth != null) {
+                headers.set("Depth", depth);
+            }
+        });
     }
 
     private static SSLContext trustAllContext() {
@@ -84,21 +108,15 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
 
     @Override
     public void test() {
-        try {
-            HttpResponse<byte[]> response = propfind(baseDirUrl(), "0");
-            if (response.statusCode() == 401 || response.statusCode() == 403) {
-                throw new BizException("WebDAV 认证失败，请检查账号与密码");
-            }
-            if (response.statusCode() == 404) {
-                throw new BizException("WebDAV 远端目录不存在：" + target.getBasePath());
-            }
-            if (response.statusCode() != 207 && response.statusCode() != 200) {
-                throw new BizException("WebDAV 探测失败，远端返回 " + response.statusCode());
-            }
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new BizException("WebDAV 连接失败：" + e.getMessage());
+        int code = exchange("PROPFIND", baseDirUrl(), propfindBody(), "0");
+        if (code == 401 || code == 403) {
+            throw new BizException("WebDAV 认证失败，请检查账号与密码");
+        }
+        if (code == 404) {
+            throw new BizException("WebDAV 远端目录不存在：" + target.getBasePath());
+        }
+        if (code != 207 && code != 200) {
+            throw new BizException("WebDAV 探测失败，远端返回 " + code);
         }
     }
 
@@ -106,13 +124,29 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
     public void put(String path, InputStream in, long size) {
         try {
             ensureRemoteDirs(path);
-            HttpRequest request = builder(fileUrl(path), "PUT")
-                    .header("Content-Type", "application/octet-stream")
-                    .header("Content-Length", String.valueOf(size))
-                    .PUT(HttpRequest.BodyPublishers.ofInputStream(() -> in))
-                    .build();
-            HttpResponse<byte[]> response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            requireSuccess(response, "上传备份");
+            Integer code = client(null)
+                    .headers(headers -> headers.set("Content-Type", "application/octet-stream"))
+                    .request(HttpMethod.PUT)
+                    .uri(fileUrl(path))
+                    .send(reactor.core.publisher.Flux.generate(
+                            () -> in,
+                            (input, sink) -> {
+                                byte[] buffer = new byte[64 * 1024];
+                                try {
+                                    int read = input.read(buffer);
+                                    if (read < 0) {
+                                        sink.complete();
+                                    } else {
+                                        sink.next(io.netty.buffer.Unpooled.wrappedBuffer(buffer, 0, read));
+                                    }
+                                } catch (java.io.IOException e) {
+                                    sink.error(e);
+                                }
+                                return input;
+                            }))
+                    .responseSingle((response, byteBufFlux) -> Mono.just(response.status().code()))
+                    .block(Duration.ofMillis(TIMEOUT_MILLIS));
+            requireSuccess(code == null ? 0 : code, "上传备份");
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
@@ -121,46 +155,118 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
     }
 
     @Override
-    public List<RemoteEntry> list(String prefix) {
+    public List<RemoteEntry> list(String dir) {
+        return propfindDir(dir).files();
+    }
+
+    @Override
+    public List<String> listDirs(String dir) {
+        return propfindDir(dir).dirs();
+    }
+
+    private PropfindResult propfindDir(String dir) {
+        String dirPath = normalizeDir(target.getBasePath() + "/"
+                + (dir == null || dir.isBlank() ? "" : dir.startsWith("/") ? dir.substring(1) : dir));
+        Tuple2<Integer, String> result;
         try {
-            String dirPath = normalizeDir(target.getBasePath());
-            HttpResponse<byte[]> response = propfind(baseDirUrl(), "1");
-            requireSuccess(response, "列出备份");
-            return parseListing(new String(response.body(), StandardCharsets.UTF_8), dirPath, prefix);
+            result = client("1")
+                    .request(HttpMethod.valueOf("PROPFIND"))
+                    .uri(dirUrl(dir))
+                    .send(ByteBufFlux.fromString(Mono.just(propfindBody())))
+                    .responseSingle((response, byteBufMono) -> byteBufMono.asString(StandardCharsets.UTF_8)
+                            .defaultIfEmpty("")
+                            .map(body -> Tuples.of(response.status().code(), body)))
+                    .block(Duration.ofMillis(TIMEOUT_MILLIS));
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
             throw new BizException("WebDAV 列表失败：" + e.getMessage());
         }
+        if (result == null) {
+            throw new BizException("远端无响应");
+        }
+        int code = result.getT1();
+        String xml = result.getT2();
+        if (code == 401 || code == 403) {
+            throw new BizException("WebDAV 认证失败，请检查账号与密码");
+        }
+        if (code == 404) {
+            return new PropfindResult(List.of(), List.of());
+        }
+        if (code != 207 && code != 200) {
+            throw new BizException("WebDAV 列表失败，远端返回 " + code);
+        }
+        return parseListing(xml, dirPath);
+    }
+
+    private record PropfindResult(List<RemoteEntry> files, List<String> dirs) {
+    }
+
+    private String propfindBody() {
+        return "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+                + "<D:propfind xmlns:D=\"DAV:\"><D:prop><D:displayname/><D:getcontentlength/>"
+                + "<D:getlastmodified/><D:resourcetype/></D:prop></D:propfind>";
     }
 
     @Override
     public void fetch(String path, Path destination) {
+        Tuple2<HttpClientResponse, Connection> result;
         try {
-            HttpRequest request = builder(fileUrl(path), "GET").GET().build();
-            HttpResponse<InputStream> response = http.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            if (response.statusCode() == 404) {
+            result = client(null)
+                    .request(io.netty.handler.codec.http.HttpMethod.GET)
+                    .uri(fileUrl(path))
+                    .responseConnection((response, connection) -> Mono.just(Tuples.of(response, connection)))
+                    .blockLast(Duration.ofMillis(TIMEOUT_MILLIS));
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("WebDAV 下载失败：" + e.getMessage());
+        }
+        if (result == null) {
+            throw new BizException("远端无响应");
+        }
+        HttpClientResponse response = result.getT1();
+        Connection connection = result.getT2();
+        try {
+            if (response.status().code() == 404) {
                 throw new BizException("远端备份文件不存在：" + path);
             }
-            requireSuccess(response.statusCode(), "下载备份");
-            try (InputStream body = response.body()) {
-                Files.copy(body, destination, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            requireSuccess(response.status().code(), "下载备份");
+            // 分块流式落盘，避免大归档整档进内存
+            try (java.io.OutputStream out = Files.newOutputStream(destination,
+                    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+                    java.nio.file.StandardOpenOption.WRITE)) {
+                connection.inbound().receive().asInputStream()
+                        .toStream(8)
+                        .forEach(chunk -> {
+                            try {
+                                chunk.transferTo(out);
+                            } catch (java.io.IOException e) {
+                                throw new java.io.UncheckedIOException(e);
+                            }
+                        });
+                out.flush();
             }
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
             throw new BizException("WebDAV 下载失败：" + e.getMessage());
+        } finally {
+            connection.dispose();
         }
     }
 
     @Override
     public void delete(String path) {
         try {
-            HttpRequest request = builder(fileUrl(path), "DELETE").build();
-            HttpResponse<byte[]> response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            int code = response.statusCode();
-            if (code != 404 && (code < 200 || code >= 300)) {
-                throw new BizException("WebDAV 删除失败，远端返回 " + code);
+            Integer code = client(null)
+                    .request(HttpMethod.DELETE)
+                    .uri(fileUrl(path))
+                    .responseSingle((response, byteBufFlux) -> Mono.just(response.status().code()))
+                    .block(Duration.ofMillis(TIMEOUT_MILLIS));
+            int value = code == null ? 0 : code;
+            if (value != 404 && (value < 200 || value >= 300)) {
+                throw new BizException("WebDAV 删除失败，远端返回 " + value);
             }
         } catch (BizException e) {
             throw e;
@@ -169,117 +275,32 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         }
     }
 
-    private HttpRequest.Builder builder(String url, String method) {
-        HttpRequest.Builder builder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofMillis(TIMEOUT_MILLIS))
-                .header("User-Agent", "YuDreamAdmin-Backup")
-                .method(method, method.equals("GET") || method.equals("DELETE")
-                        ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.noBody());
+    // ---------------------------------------------------------------- 请求封装
+
+    private int exchange(String method, String url, String body, String depth) {
+        try {
+            Integer code = client(depth)
+                    .request(HttpMethod.valueOf(method))
+                    .uri(url)
+                    .send(ByteBufFlux.fromString(Mono.just(body)))
+                    .responseSingle((response, byteBufFlux) -> Mono.just(response.status().code()))
+                    .block(Duration.ofMillis(TIMEOUT_MILLIS));
+            return code == null ? 0 : code;
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("WebDAV 连接失败：" + e.getMessage());
+        }
+    }
+
+    private void applyAuth(BiConsumer<String, String> headers) {
         if (target.getUsername() != null && !target.getUsername().isBlank()) {
             String token = Base64.getEncoder().encodeToString(
                     (target.getUsername() + ":" + (target.getPassword() == null ? "" : target.getPassword()))
                             .getBytes(StandardCharsets.UTF_8));
-            builder.header("Authorization", "Basic " + token);
+            headers.accept("Authorization", "Basic " + token);
         }
-        return builder;
-    }
-
-    private HttpResponse<byte[]> propfind(String url, String depth) throws Exception {
-        HttpRequest request = builder(url, "PROPFIND")
-                .header("Depth", depth)
-                .header("Content-Type", "application/xml")
-                .method("PROPFIND", HttpRequest.BodyPublishers.ofString(
-                        "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
-                                + "<D:propfind xmlns:D=\"DAV:\"><D:prop><D:displayname/><D:getcontentlength/>"
-                                + "<D:getlastmodified/><D:resourcetype/></D:prop></D:propfind>",
-                        StandardCharsets.UTF_8))
-                .build();
-        return http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-    }
-
-    private List<RemoteEntry> parseListing(String xml, String dirPath, String prefix) {
-        try {
-            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
-            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-            factory.setXIncludeAware(false);
-            factory.setExpandEntityReferences(false);
-            Element root = factory.newDocumentBuilder()
-                    .parse(new InputSource(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))))
-                    .getDocumentElement();
-            List<RemoteEntry> entries = new ArrayList<>();
-            NodeList responses = root.getElementsByTagNameNS("*", "response");
-            for (int i = 0; i < responses.getLength(); i++) {
-                Element response = (Element) responses.item(i);
-                String href = textOfFirstChild(response, "href");
-                if (href == null) {
-                    continue;
-                }
-                String decodedPath = decodedPath(href);
-                if (decodedPath.endsWith("/")) {
-                    continue;
-                }
-                String parent = decodedPath.substring(0, decodedPath.lastIndexOf('/') + 1);
-                if (!parent.equals(dirPath)) {
-                    continue;
-                }
-                String name = decodedPath.substring(decodedPath.lastIndexOf('/') + 1);
-                if (prefix != null && !prefix.isBlank() && !name.startsWith(prefix)) {
-                    continue;
-                }
-                long size = 0;
-                String length = textOfFirstChild(response, "getcontentlength");
-                if (length != null) {
-                    try {
-                        size = Long.parseLong(length.trim());
-                    } catch (NumberFormatException ignored) {
-                        // 个别服务器不返回 content-length
-                    }
-                }
-                Long modified = null;
-                String lastModified = textOfFirstChild(response, "getlastmodified");
-                if (lastModified != null) {
-                    try {
-                        modified = ZonedDateTime.parse(lastModified,
-                                java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli();
-                    } catch (Exception ignored) {
-                        // 时间格式异常时保持空
-                    }
-                }
-                entries.add(new RemoteEntry(name, size, modified));
-            }
-            return entries;
-        } catch (Exception e) {
-            throw new BizException("解析 WebDAV 响应失败：" + e.getMessage());
-        }
-    }
-
-    private void ensureRemoteDirs(String path) throws Exception {
-        String dirPath = normalizeDir(target.getBasePath() + "/"
-                + (path.contains("/") ? path.substring(0, path.lastIndexOf('/')) : ""));
-        String[] segments = dirPath.split("/");
-        StringBuilder current = new StringBuilder();
-        for (String segment : segments) {
-            if (segment.isBlank()) {
-                continue;
-            }
-            current.append('/').append(segment);
-            HttpRequest request = builder(schemeHost() + encodePath(current.toString()), "MKCOL").build();
-            HttpResponse<byte[]> response = http.send(request, HttpResponse.BodyHandlers.ofByteArray());
-            int code = response.statusCode();
-            if (code != 201 && code != 405 && code != 301) {
-                if (code == 401 || code == 403) {
-                    throw new BizException("WebDAV 认证失败，无法创建目录：" + current);
-                }
-                // 其他错误（如父级已存在判断分歧）留给后续 PUT 校验
-            }
-        }
-    }
-
-    private void requireSuccess(HttpResponse<byte[]> response, String action) {
-        requireSuccess(response.statusCode(), action);
+        headers.accept("User-Agent", "YuDreamAdmin-Backup");
     }
 
     private void requireSuccess(int code, String action) {
@@ -290,6 +311,25 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
             throw new BizException(action + "失败，远端返回 " + code);
         }
     }
+
+    private void ensureRemoteDirs(String path) throws Exception {
+        String dirPath = normalizeDir(target.getBasePath() + "/"
+                + (path.contains("/") ? path.substring(0, path.lastIndexOf('/')) : ""));
+        StringBuilder current = new StringBuilder();
+        for (String segment : dirPath.split("/")) {
+            if (segment.isBlank()) {
+                continue;
+            }
+            current.append('/').append(segment);
+            int code = exchange("MKCOL", schemeHost() + encodePath(current + "/"), null, null);
+            if (code == 401 || code == 403) {
+                throw new BizException("WebDAV 认证失败，无法创建目录：" + current);
+            }
+            // 405/301 等视为已存在，留给后续 PUT 校验
+        }
+    }
+
+    // ---------------------------------------------------------------- URL 与解析
 
     private String schemeHost() {
         return target.webDavScheme() + "://" + target.getHost() + ":" + target.getPort();
@@ -310,6 +350,12 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         return schemeHost() + encodePath(normalizeDir(target.getBasePath()));
     }
 
+    private String dirUrl(String dir) {
+        String normalized = normalizeDir(target.getBasePath() + "/"
+                + (dir == null || dir.isBlank() ? "" : dir.startsWith("/") ? dir.substring(1) : dir));
+        return schemeHost() + encodePath(normalized);
+    }
+
     private String fileUrl(String path) {
         String normalized = normalizeDir(target.getBasePath())
                 + (path.startsWith("/") ? path.substring(1) : path);
@@ -322,7 +368,7 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
             if (!builder.isEmpty()) {
                 builder.append('/');
             }
-            builder.append(java.net.URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20"));
+            builder.append(URLEncoder.encode(segment, StandardCharsets.UTF_8).replace("+", "%20"));
         }
         return builder.toString();
     }
@@ -345,5 +391,74 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         Node child = children.item(0);
         String text = child.getTextContent();
         return text == null || text.isBlank() ? null : text.trim();
+    }
+
+    private PropfindResult parseListing(String xml, String dirPath) {
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+            Element root = factory.newDocumentBuilder()
+                    .parse(new InputSource(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8))))
+                    .getDocumentElement();
+            List<RemoteEntry> files = new ArrayList<>();
+            List<String> dirs = new ArrayList<>();
+            NodeList responses = root.getElementsByTagNameNS("*", "response");
+            for (int i = 0; i < responses.getLength(); i++) {
+                Element response = (Element) responses.item(i);
+                String href = textOfFirstChild(response, "href");
+                if (href == null) {
+                    continue;
+                }
+                String decodedPath = decodedPath(href);
+                boolean isCollection = response.getElementsByTagNameNS("*", "collection").getLength() > 0
+                        || decodedPath.endsWith("/");
+                String trimmed = decodedPath.endsWith("/")
+                        ? decodedPath.substring(0, decodedPath.length() - 1)
+                        : decodedPath;
+                String name = trimmed.substring(trimmed.lastIndexOf('/') + 1);
+                if (name.isBlank()) {
+                    continue;
+                }
+                if (isCollection) {
+                    if (!decodedPath.equals(dirPath) && !dirs.contains(name)) {
+                        dirs.add(name);
+                    }
+                    continue;
+                }
+                String parent = decodedPath.substring(0, decodedPath.lastIndexOf('/') + 1);
+                if (!parent.equals(dirPath)) {
+                    continue;
+                }
+                long size = 0;
+                String length = textOfFirstChild(response, "getcontentlength");
+                if (length != null) {
+                    try {
+                        size = Long.parseLong(length.trim());
+                    } catch (NumberFormatException ignored) {
+                        // 个别服务器不返回 content-length
+                    }
+                }
+                Long modified = null;
+                String lastModified = textOfFirstChild(response, "getlastmodified");
+                if (lastModified != null) {
+                    try {
+                        modified = ZonedDateTime.parse(lastModified,
+                                java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli();
+                    } catch (Exception ignored) {
+                        // 时间格式异常时保持空
+                    }
+                }
+                files.add(new RemoteEntry(name, size, modified));
+            }
+            return new PropfindResult(files, dirs);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new BizException("解析 WebDAV 响应失败：" + e.getMessage());
+        }
     }
 }
