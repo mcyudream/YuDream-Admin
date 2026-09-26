@@ -33,6 +33,7 @@ public class SystemDataInitializer implements ApplicationListener<ApplicationRea
 
     private final DeptRepo deptRepo;
     private final RoleRepo roleRepo;
+    private final online.yudream.base.application.system.user.service.DeptManageAppService deptManageAppService;
 
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
@@ -46,6 +47,12 @@ public class SystemDataInitializer implements ApplicationListener<ApplicationRea
         initRole(SystemRoleType.ADMIN, systemAdminDept);
         initRole(SystemRoleType.USER, rootDept);
         initRole(SystemRoleType.GUEST, rootDept);
+
+        // 导入合并/历史原因可能残留「同父同级同名」的冗余部门（如两侧各自创建的默认部门），启动时自愈清理
+        int removedDepts = deptManageAppService.dedupeByParentAndName();
+        if (removedDepts > 0) {
+            log.info("System data initialized with {} duplicate dept(s) removed", removedDepts);
+        }
 
         log.info("System data initialized. systemDeptId={}, systemAdminDeptId={}, rootDeptId={}",
                 systemDept.getId(), systemAdminDept.getId(), rootDept.getId());

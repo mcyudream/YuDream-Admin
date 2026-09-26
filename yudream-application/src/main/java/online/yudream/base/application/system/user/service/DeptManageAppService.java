@@ -1,6 +1,7 @@
 package online.yudream.base.application.system.user.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.system.user.cmd.DeptCreateCmd;
 import online.yudream.base.application.system.user.cmd.DeptUpdateCmd;
 import online.yudream.base.application.system.user.dto.DeptManageDTO;
@@ -24,12 +25,59 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DeptManageAppService {
 
     private final DeptRepo deptRepo;
     private final UserRepo userRepo;
+
+    /**
+     * 按「同父同级同名」自愈清理重复部门（导入合并产生的冗余；新建部门时同父同名本就被禁止）。
+     * 保守策略：保留用户挂靠最多的一个；冗余副本仅在「无用户挂靠且无子部门」时删除，
+     * 否则保留并在日志中提示。返回清理数量。
+     */
+    public int dedupeByParentAndName() {
+        List<Dept> all = deptRepo.findAll();
+        Map<String, List<Dept>> groups = new LinkedHashMap<>();
+        for (Dept dept : all) {
+            String parentKey = dept.getParentId() == null ? "root" : String.valueOf(dept.getParentId().getValue());
+            groups.computeIfAbsent(parentKey + "|" + dept.getName(), ignored -> new ArrayList<>()).add(dept);
+        }
+        int removed = 0;
+        for (List<Dept> group : groups.values()) {
+            if (group.size() < 2) {
+                continue;
+            }
+            Dept keeper = group.get(0);
+            long keeperUsers = -1;
+            for (Dept candidate : group) {
+                long users = userRepo.countByDeptId(candidate.getId());
+                if (users > keeperUsers) {
+                    keeper = candidate;
+                    keeperUsers = users;
+                }
+            }
+            for (Dept candidate : group) {
+                if (candidate.getId().equals(keeper.getId())) {
+                    continue;
+                }
+                long users = userRepo.countByDeptId(candidate.getId());
+                if (users > 0 || !deptRepo.findChildren(candidate.getId()).isEmpty()) {
+                    log.warn("跳过清理重复部门「{}」（id={}）：仍有用户挂靠或子部门，请人工处理",
+                            candidate.getName(), candidate.getId());
+                    continue;
+                }
+                deptRepo.deleteById(candidate.getId());
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            log.info("重复部门清理完成，共删除 {} 个冗余部门", removed);
+        }
+        return removed;
+    }
 
     @Transactional(readOnly = true)
     public List<DeptManageDTO> tree(DeptTreeQuery query) {
