@@ -283,9 +283,10 @@ function submitImport() {
     return
   }
   const localWins = importStrategy.value === 'LOCAL_WINS'
+  // 后端全局 Jackson 把 long 序列化为字符串（防精度丢失），参与算术前必须 Number()
   const conflictTotal
-    = analysis.value.collections.reduce((sum, item) => sum + item.conflictCount, 0)
-      + analysis.value.objects.conflictCount
+    = analysis.value.collections.reduce((sum, item) => sum + Number(item.conflictCount), 0)
+      + Number(analysis.value.objects.conflictCount)
   modal.confirm({
     title: '确认合并导入',
     content: `已选择「${localWins ? '以本地数据为准' : '以备份数据为准'}」。`
@@ -500,7 +501,7 @@ function openPlanForm(row?: BackupPlan) {
         cron: row.cron,
         scopeTags: [...row.scopeTags],
         targetCode: row.targetCode,
-        retentionCount: row.retentionCount,
+        retentionCount: Number(row.retentionCount ?? 10),
       }
     : {
         code: '',
@@ -650,20 +651,22 @@ function scopeText(tag?: string[]) {
   }).join('、')
 }
 
-function formatSize(size?: number) {
-  if (size === undefined || size === null) {
+function formatSize(size?: number | string) {
+  // long 出网为字符串，先转数值再比较/格式化
+  const value = Number(size)
+  if (!Number.isFinite(value)) {
     return '—'
   }
-  if (size < 1024) {
-    return `${size} B`
+  if (value < 1024) {
+    return `${value} B`
   }
-  if (size < 1024 * 1024) {
-    return `${(size / 1024).toFixed(1)} KB`
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`
   }
-  if (size < 1024 * 1024 * 1024) {
-    return `${(size / 1024 / 1024).toFixed(1)} MB`
+  if (value < 1024 * 1024 * 1024) {
+    return `${(value / 1024 / 1024).toFixed(1)} MB`
   }
-  return `${(size / 1024 / 1024 / 1024).toFixed(2)} GB`
+  return `${(value / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 
 function formatTime(value?: string) {
