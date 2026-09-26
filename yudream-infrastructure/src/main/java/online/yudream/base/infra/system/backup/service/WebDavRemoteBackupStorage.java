@@ -67,7 +67,10 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
                 SslContext sslContext = SslContextBuilder.forClient()
                         .trustManager(InsecureTrustManagerFactory.INSTANCE)
                         .build();
-                base = base.secure(spec -> spec.sslContext(sslContext));
+                // IP 直连自签证书场景：握手前清空 SNI 匹配器（IP 不是合法 SNI 名，避免 SNI 解析异常），
+                // 并信任所有证书——两者合起来才构成确定性的「跳过 TLS 校验」。
+                base = base.secure(spec -> spec.sslContext(sslContext)
+                        .handlerConfigurator(handler -> handler.engine().setSNIMatchers(List.of())));
             } catch (Exception e) {
                 throw new BizException("初始化 TLS 上下文失败：" + e.getMessage());
             }
@@ -162,7 +165,7 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException("WebDAV 上传失败：" + e.getMessage());
+            throw new BizException("WebDAV 上传失败：" + describe(e));
         }
     }
 
@@ -201,7 +204,7 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException("WebDAV 列表失败：" + e.getMessage());
+            throw new BizException("WebDAV 列表失败：" + describe(e));
         }
         if (result == null) {
             throw new BizException("远端无响应");
@@ -246,7 +249,7 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException("WebDAV 下载失败：" + e.getMessage());
+            throw new BizException("WebDAV 下载失败：" + describe(e));
         }
         if (result == null) {
             throw new BizException("远端无响应");
@@ -276,7 +279,7 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException("WebDAV 下载失败：" + e.getMessage());
+            throw new BizException("WebDAV 下载失败：" + describe(e));
         } finally {
             connection.dispose();
         }
@@ -315,7 +318,7 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         } catch (BizException e) {
             throw e;
         } catch (Exception e) {
-            throw new BizException("WebDAV 连接失败：" + e.getMessage());
+            throw new BizException("WebDAV 连接失败：" + describe(e));
         }
     }
 
@@ -426,6 +429,13 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         }
         String compact = body.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
         return compact.length() <= 120 ? compact : compact.substring(0, 120);
+    }
+
+    /** 异常消息带类名：TLS/网络各层异常文本相近，类名便于定位问题层。 */
+    private static String describe(Exception e) {
+        String message = e.getMessage();
+        String text = message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
+        return e.getClass().getSimpleName() + ": " + text;
     }
 
     private PropfindResult parseListing(String xml, String dirPath) {

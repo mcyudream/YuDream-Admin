@@ -63,8 +63,12 @@ const analysisColumns = [
 
 // ---------------------------------------------------------------- 任务
 
+// ---------------------------------------------------------------- 任务
+
 const jobs = ref<BackupJob[]>([])
 const jobsLoading = ref(false)
+const detailJob = ref<BackupJob | null>(null)
+const detailVisible = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | undefined
 
 // ---------------------------------------------------------------- 异地目标
@@ -821,28 +825,31 @@ function formatArchiveTime(millis?: number) {
             <template #cell-counts="{ row }">
               <span class="text-xs">{{ jobCountsText(row.original) }}</span>
             </template>
-            <template #cell-operation="{ row }">
-              <div class="flex justify-center gap-2">
-                <FaButton
-                  v-if="row.original.type === 'EXPORT' && row.original.status === 'SUCCEEDED'"
-                  v-auth="'system:backup:download'"
-                  variant="outline"
-                  size="sm"
-                  @click="downloadArchive(row.original)"
-                >
-                  下载归档
-                </FaButton>
-                <FaButton
-                  v-if="row.original.status === 'SUCCEEDED' || row.original.status === 'FAILED'"
-                  v-auth="'system:backup:delete'"
-                  variant="destructive"
-                  size="sm"
-                  @click="confirmRemoveJob(row.original)"
-                >
-                  删除
-                </FaButton>
-              </div>
-            </template>
+              <template #cell-operation="{ row }">
+                <div class="flex justify-center gap-2">
+                  <FaButton variant="outline" size="sm" @click="detailJob = row.original; detailVisible = true">
+                    详情
+                  </FaButton>
+                  <FaButton
+                    v-if="row.original.type === 'EXPORT' && row.original.status === 'SUCCEEDED'"
+                    v-auth="'system:backup:download'"
+                    variant="outline"
+                    size="sm"
+                    @click="downloadArchive(row.original)"
+                  >
+                    下载归档
+                  </FaButton>
+                  <FaButton
+                    v-if="row.original.status === 'SUCCEEDED' || row.original.status === 'FAILED'"
+                    v-auth="'system:backup:delete'"
+                    variant="destructive"
+                    size="sm"
+                    @click="confirmRemoveJob(row.original)"
+                  >
+                    删除
+                  </FaButton>
+                </div>
+              </template>
             <template #card="{ row }">
               <FaCard class="w-full">
                 <div class="flex flex-col gap-2 text-sm">
@@ -857,6 +864,9 @@ function formatArchiveTime(millis?: number) {
                     {{ row.message }}
                   </div>
                   <div class="flex gap-2 border-t pt-2">
+                    <FaButton variant="outline" size="sm" @click="detailJob = row; detailVisible = true">
+                      详情
+                    </FaButton>
                     <FaButton
                       v-if="row.type === 'EXPORT' && row.status === 'SUCCEEDED'"
                       v-auth="'system:backup:download'"
@@ -1090,6 +1100,50 @@ function formatArchiveTime(millis?: number) {
           </div>
           <FaDivider class="my-3" />
           <FaRadioGroup v-model="importStrategy" :options="strategyOptions" />
+        </template>
+      </FaModal>
+
+      <FaModal
+        v-model="detailVisible"
+        :title="`任务详情 #${detailJob?.id || ''}`"
+        class="sm:max-w-2xl"
+        :show-cancel-button="false"
+        confirm-button-text="关闭"
+      >
+        <template v-if="detailJob">
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <FaTag :variant="jobStatusVariant(detailJob)">{{ jobStatusText(detailJob) }}</FaTag>
+            <FaTag variant="secondary">{{ jobTypeText(detailJob) }}</FaTag>
+            <FaTag v-if="detailJob.trigger === 'SCHEDULED'" variant="secondary">计划触发</FaTag>
+            <span class="text-xs text-secondary-foreground/60">创建于 {{ formatTime(detailJob.createTime) }}</span>
+          </div>
+          <div class="grid grid-cols-1 gap-x-4 gap-y-2 text-sm md:grid-cols-2">
+            <div>
+              <span class="text-secondary-foreground/60">备份范围：</span>{{ scopeText(detailJob.scopeTags) }}
+            </div>
+            <div>
+              <span class="text-secondary-foreground/60">异地目标：</span>{{ detailJob.targetName || '—' }}
+            </div>
+            <div>
+              <span class="text-secondary-foreground/60">归档名：</span>{{ detailJob.archiveName || '—' }}
+            </div>
+            <div>
+              <span class="text-secondary-foreground/60">归档大小：</span>{{ formatSize(detailJob.archiveSize) }}
+            </div>
+            <div>
+              <span class="text-secondary-foreground/60">开始时间：</span>{{ formatTime(detailJob.startedAt) }}
+            </div>
+            <div>
+              <span class="text-secondary-foreground/60">结束时间：</span>{{ formatTime(detailJob.finishedAt) }}
+            </div>
+          </div>
+          <FaDivider class="my-3" />
+          <div class="text-xs font-medium text-secondary-foreground/70">执行统计</div>
+          <div class="mt-1 text-sm">
+            {{ jobCountsText(detailJob) }}
+          </div>
+          <div class="mt-3 text-xs font-medium text-secondary-foreground/70">信息 / 错误详情</div>
+          <pre class="mt-1 max-h-[260px] overflow-auto break-all whitespace-pre-wrap rounded-lg bg-secondary/40 p-3 text-xs leading-5">{{ detailJob.message || '无' }}</pre>
         </template>
       </FaModal>
 
