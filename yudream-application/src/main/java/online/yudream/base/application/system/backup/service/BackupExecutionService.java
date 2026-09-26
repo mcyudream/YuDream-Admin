@@ -3,6 +3,7 @@ package online.yudream.base.application.system.backup.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.system.backup.support.BackupDirectorySupport;
+import online.yudream.base.application.system.backup.support.BackupEjson;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.backup.aggregate.BackupJob;
 import online.yudream.base.domain.system.backup.aggregate.BackupPlan;
@@ -27,6 +28,7 @@ import online.yudream.base.domain.system.backup.valobj.BackupJobStats;
 import online.yudream.base.domain.system.backup.valobj.BackupManifest;
 import online.yudream.base.domain.system.backup.valobj.BackupManifestHeader;
 import online.yudream.base.domain.system.backup.valobj.BackupScopeRef;
+import online.yudream.base.domain.system.backup.valobj.BackupBusinessKeys;
 import online.yudream.base.domain.system.backup.valobj.RemoteEntry;
 import online.yudream.base.domain.system.backup.valobj.SnapshotDocument;
 import online.yudream.base.domain.system.file.valobj.StoredObject;
@@ -43,6 +45,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -293,21 +296,51 @@ public class BackupExecutionService implements BackupJobRunner {
 
     private void flushBatch(String collection, List<SnapshotDocument> batch,
                             BackupConflictStrategy strategy, Counters counters) {
+        String keyField = BackupBusinessKeys.fieldOf(collection);
+        // 业务键判重：权限/菜单/角色等集合在目标库可能存在同业务键、不同 _id 的记录（种子重建），
+        // 仅按 _id 比对会误判缺失并造成同键双文档。
+        Set<String> bizLookup = Set.of();
+        Map<String, String> collectedBizValues = new LinkedHashMap<>();
+        if (keyField != null) {
+            for (SnapshotDocument document : batch) {
+                String value = BackupEjson.fieldValue(document.ejson(), keyField);
+                if (value != null) {
+                    collectedBizValues.putIfAbsent(document.id(), value);
+                }
+            }
+        }
+        final Map<String, String> bizValueById = collectedBizValues;
+        if (!bizValueById.isEmpty()) {
+            bizLookup = restoreStore.existingBusinessKeyValues(
+                    collection, keyField, bizValueById.values());
+        }
+        final Set<String> existingBizKeys = bizLookup;
         Set<String> ids = new LinkedHashSet<>();
         batch.forEach(document -> ids.add(document.id()));
         Set<String> existing = restoreStore.existingDocumentIds(collection, ids);
-        long conflicts = batch.stream().filter(document -> existing.contains(document.id())).count();
+        List<SnapshotDocument> conflicts = batch.stream()
+                .filter(document -> existing.contains(document.id())
+                        || isBusinessKeyExisting(bizValueById.get(document.id()), existingBizKeys))
+                .toList();
         if (strategy == BackupConflictStrategy.ARCHIVE_WINS) {
+            if (keyField != null && !existingBizKeys.isEmpty()) {
+                // 覆盖语义：先清掉同业务键的旧文档（_id 不同），归档版本随后写入
+                restoreStore.purgeByBusinessKeys(collection, keyField, existingBizKeys);
+            }
             restoreStore.writeDocuments(collection, batch, true);
-            counters.inserted += batch.size() - conflicts;
+            counters.inserted += batch.size() - conflicts.size();
         } else {
             List<SnapshotDocument> missing = batch.stream()
-                    .filter(document -> !existing.contains(document.id())).toList();
+                    .filter(document -> !conflicts.contains(document)).toList();
             restoreStore.writeDocuments(collection, missing, false);
             counters.inserted += missing.size();
         }
-        counters.conflicts += conflicts;
+        counters.conflicts += conflicts.size();
         counters.documents += batch.size();
+    }
+
+    private static boolean isBusinessKeyExisting(String bizValue, Set<String> existingBizKeys) {
+        return bizValue != null && existingBizKeys.contains(bizValue);
     }
 
     private void mergeObjects(BackupArchiveReader reader, BackupConflictStrategy strategy,

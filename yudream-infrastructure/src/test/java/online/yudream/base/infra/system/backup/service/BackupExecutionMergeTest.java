@@ -1,14 +1,17 @@
 package online.yudream.base.infra.system.backup.service;
 
 import online.yudream.base.application.system.backup.service.BackupExecutionService;
+import online.yudream.base.application.system.backup.support.BackupDirectorySupport;
 import online.yudream.base.domain.system.backup.aggregate.BackupJob;
 import online.yudream.base.domain.system.backup.enumerate.BackupConflictStrategy;
+import online.yudream.base.domain.system.backup.enumerate.BackupJobTrigger;
 import online.yudream.base.domain.system.backup.enumerate.BackupJobType;
 import online.yudream.base.domain.system.backup.service.BackupRestoreStore;
 import online.yudream.base.domain.system.backup.service.CredentialFingerprint;
 import online.yudream.base.domain.system.backup.service.PluginBackupScopeSource;
 import online.yudream.base.domain.system.backup.valobj.ArchiveFileEntry;
 import online.yudream.base.domain.system.backup.valobj.BackupJobResult;
+import online.yudream.base.domain.system.backup.valobj.BackupManifestHeader;
 import online.yudream.base.domain.system.backup.valobj.BackupScopeRef;
 import online.yudream.base.domain.system.backup.valobj.SnapshotDocument;
 import org.junit.jupiter.api.Test;
@@ -32,7 +35,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * 合并导入策略编排测试：本地为准只补缺，备份为准覆盖同名，插件范围按策略回调恢复。
+ * 合并导入策略编排测试：本地为准只补缺，备份为准覆盖同名，
+ * 业务键（如权限 code）重复即使 _id 不同也按冲突处理，插件范围按策略回调恢复。
  */
 class BackupExecutionMergeTest {
 
@@ -44,12 +48,10 @@ class BackupExecutionMergeTest {
         Path archive = buildArchive();
         MemoryRestoreStore store = localStore();
         RecordingScopeSource scopes = new RecordingScopeSource();
-        BackupExecutionService service = new BackupExecutionService(
-                null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
-                null, null, null, () -> "fedcba9876543210", new online.yudream.base.application.system.backup.support.BackupDirectorySupport("target/test-backup"));
+        BackupExecutionService service = service(store, scopes);
 
-        BackupJob job = job(archive, BackupConflictStrategy.LOCAL_WINS);
-        BackupJobResult result = service.run(job, (phase, message, percent) -> { });
+        BackupJobResult result = service.run(job(archive, BackupConflictStrategy.LOCAL_WINS),
+                (phase, message, percent) -> { });
 
         assertEquals(2, result.stats().insertedCount());
         assertEquals(2, result.stats().conflictCount());
@@ -67,12 +69,10 @@ class BackupExecutionMergeTest {
         Path archive = buildArchive();
         MemoryRestoreStore store = localStore();
         RecordingScopeSource scopes = new RecordingScopeSource();
-        BackupExecutionService service = new BackupExecutionService(
-                null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
-                null, null, null, () -> "fedcba9876543210", new online.yudream.base.application.system.backup.support.BackupDirectorySupport("target/test-backup"));
+        BackupExecutionService service = service(store, scopes);
 
-        BackupJob job = job(archive, BackupConflictStrategy.ARCHIVE_WINS);
-        BackupJobResult result = service.run(job, (phase, message, percent) -> { });
+        BackupJobResult result = service.run(job(archive, BackupConflictStrategy.ARCHIVE_WINS),
+                (phase, message, percent) -> { });
 
         assertEquals(3, result.stats().insertedCount());
         assertEquals(2, result.stats().conflictCount());
@@ -88,12 +88,10 @@ class BackupExecutionMergeTest {
         Path archive = buildArchive();
         MemoryRestoreStore store = localStore();
         RecordingScopeSource scopes = new RecordingScopeSource(false);
-        BackupExecutionService service = new BackupExecutionService(
-                null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
-                null, null, null, () -> "fedcba9876543210", new online.yudream.base.application.system.backup.support.BackupDirectorySupport("target/test-backup"));
+        BackupExecutionService service = service(store, scopes);
 
-        BackupJob job = job(archive, BackupConflictStrategy.LOCAL_WINS);
-        BackupJobResult result = service.run(job, (phase, message, percent) -> { });
+        BackupJobResult result = service.run(job(archive, BackupConflictStrategy.LOCAL_WINS),
+                (phase, message, percent) -> { });
 
         assertEquals(2, result.stats().skippedCount());
         assertEquals(1, result.warnings().size());
@@ -101,10 +99,60 @@ class BackupExecutionMergeTest {
         assertEquals(0, scopes.restoreCalls.get());
     }
 
+    @Test
+    void businessKeyDuplicateSkippedUnderLocalWins() throws Exception {
+        Path archive = buildSingleDocArchive("sysPermission",
+                "{\"_id\":\"p1\",\"code\":\"perm-common\",\"v\":\"new\"}");
+        MemoryRestoreStore store = new MemoryRestoreStore();
+        store.collections.put("sysPermission", new HashMap<>(Map.of(
+                "local-1", "{\"_id\":\"local-1\",\"code\":\"perm-common\"}")));
+        store.businessKeyValues.put("sysPermission", new HashSet<>(List.of("perm-common")));
+        RecordingScopeSource scopes = new RecordingScopeSource();
+        BackupExecutionService service = service(store, scopes);
+
+        BackupJobResult result = service.run(job(archive, BackupConflictStrategy.LOCAL_WINS),
+                (phase, message, percent) -> { });
+
+        assertEquals(0, result.stats().insertedCount());
+        assertEquals(1, result.stats().conflictCount());
+        assertEquals(1, store.collections.get("sysPermission").size());
+        assertTrue(store.collections.get("sysPermission").containsKey("local-1"));
+        assertTrue(store.purgedBusinessKeys.isEmpty());
+    }
+
+    @Test
+    void businessKeyDuplicatePurgedUnderArchiveWins() throws Exception {
+        Path archive = buildSingleDocArchive("sysPermission",
+                "{\"_id\":\"p1\",\"code\":\"perm-common\",\"v\":\"new\"}");
+        MemoryRestoreStore store = new MemoryRestoreStore();
+        store.collections.put("sysPermission", new HashMap<>(Map.of(
+                "local-1", "{\"_id\":\"local-1\",\"code\":\"perm-common\"}")));
+        store.businessKeyValues.put("sysPermission", new HashSet<>(List.of("perm-common")));
+        RecordingScopeSource scopes = new RecordingScopeSource();
+        BackupExecutionService service = service(store, scopes);
+
+        BackupJobResult result = service.run(job(archive, BackupConflictStrategy.ARCHIVE_WINS),
+                (phase, message, percent) -> { });
+
+        // 覆盖语义：p1 属业务键冲突（计入重复），purge 后以归档版本写入
+        assertEquals(0, result.stats().insertedCount());
+        assertEquals(1, result.stats().conflictCount());
+        assertTrue(store.purgedBusinessKeys.contains("perm-common"));
+        assertEquals(1, store.collections.get("sysPermission").size());
+        assertTrue(store.collections.get("sysPermission").containsKey("p1"));
+    }
+
     // ---------------------------------------------------------------- 桩与夹具
 
+    private BackupExecutionService service(MemoryRestoreStore store, RecordingScopeSource scopes) {
+        return new BackupExecutionService(
+                null, null, store, scopes, null, new ZipBackupArchiveReader.Factory(),
+                null, null, null, () -> "fedcba9876543210",
+                new BackupDirectorySupport("target/test-chunk-upload"));
+    }
+
     private BackupJob job(Path archive, BackupConflictStrategy strategy) {
-        BackupJob job = BackupJob.create(BackupJobType.IMPORT, online.yudream.base.domain.system.backup.enumerate.BackupJobTrigger.MANUAL,
+        BackupJob job = BackupJob.create(BackupJobType.IMPORT, BackupJobTrigger.MANUAL,
                 List.of(), strategy, null, null, null);
         job.setArchivePath(archive.toString());
         return job;
@@ -122,7 +170,19 @@ class BackupExecutionMergeTest {
             writer.openPluginScope(BackupScopeRef.plugin("mcpanel", "server-data", "服务器数据"));
             writer.writePluginFile("data.txt", new ByteArrayInputStream("d".getBytes(StandardCharsets.UTF_8)), 1);
             writer.closePluginScope();
-            writer.finish(new online.yudream.base.domain.system.backup.valobj.BackupManifestHeader(
+            writer.finish(new BackupManifestHeader(
+                    "test", "fedcba9876543210", List.of(BackupScopeRef.system()), List.of()));
+        }
+        return archive;
+    }
+
+    private Path buildSingleDocArchive(String collection, String docJson) throws Exception {
+        Path archive = tempDir.resolve("merge-" + System.nanoTime() + ".zip");
+        try (ZipBackupArchiveWriter writer = new ZipBackupArchiveWriter(Files.newOutputStream(archive))) {
+            writer.openCollection(collection);
+            writer.writeCollectionDocument(docJson);
+            writer.closeCollection();
+            writer.finish(new BackupManifestHeader(
                     "test", "fedcba9876543210", List.of(BackupScopeRef.system()), List.of()));
         }
         return archive;
@@ -140,8 +200,10 @@ class BackupExecutionMergeTest {
     /** 内存还原存储：记录写入语义供断言。 */
     private static final class MemoryRestoreStore implements BackupRestoreStore {
         private final Map<String, Map<String, String>> collections = new HashMap<>();
+        private final Map<String, Set<String>> businessKeyValues = new HashMap<>();
         private final Set<String> objectKeys = new HashSet<>();
         private final List<String> writtenObjects = new ArrayList<>();
+        private final List<String> purgedBusinessKeys = new ArrayList<>();
 
         @Override
         public Set<String> existingDocumentIds(String collection, Set<String> candidateIds) {
@@ -165,6 +227,28 @@ class BackupExecutionMergeTest {
                     target.putIfAbsent(document.id(), document.ejson());
                 }
             }
+        }
+
+        @Override
+        public Set<String> existingBusinessKeyValues(String collection, String keyField,
+                                                     Collection<String> keyValues) {
+            Set<String> existing = businessKeyValues.getOrDefault(collection, Set.of());
+            Set<String> result = new HashSet<>();
+            for (String value : keyValues) {
+                if (existing.contains(value)) {
+                    result.add(value);
+                }
+            }
+            return result;
+        }
+
+        @Override
+        public long purgeByBusinessKeys(String collection, String keyField, Collection<String> keyValues) {
+            purgedBusinessKeys.addAll(keyValues);
+            businessKeyValues.computeIfAbsent(collection, ignored -> new HashSet<>()).removeAll(keyValues);
+            Map<String, String> target = collections.getOrDefault(collection, new HashMap<>());
+            target.values().removeIf(ejson -> keyValues.stream().anyMatch(ejson::contains));
+            return keyValues.size();
         }
 
         @Override
