@@ -184,6 +184,12 @@ public class ZipBackupArchiveReader implements BackupArchiveReader {
         root.withArray("pluginScopes").forEach(node -> pluginScopes.add(new BackupManifest.ManifestPluginScope(
                 textOrNull(node.get("pluginCode")), textOrNull(node.get("scopeCode")),
                 node.path("fileCount").asInt(0), node.path("bytes").asLong(0))));
+        List<String> excludedCollections = new ArrayList<>();
+        root.withArray("excludedCollections").forEach(node -> {
+            if (node.isTextual()) {
+                excludedCollections.add(node.asText());
+            }
+        });
         return new BackupManifest(
                 textOrNull(root.get("format")),
                 root.path("schemaVersion").asInt(0),
@@ -194,7 +200,8 @@ public class ZipBackupArchiveReader implements BackupArchiveReader {
                 List.copyOf(collections),
                 root.path("objectCount").asLong(0),
                 root.path("objectBytes").asLong(0),
-                List.copyOf(pluginScopes));
+                List.copyOf(pluginScopes),
+                List.copyOf(excludedCollections));
     }
 
     private void parseObjectIndex(JsonNode root) {

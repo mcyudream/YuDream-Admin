@@ -20,7 +20,10 @@ plugins/{pluginCode}/{scopeCode}/{path}   # 插件备份范围贡献的文件
 plugins.index.json          # [{pluginCode, scopeCode, path, size, sha256}]
 ```
 
-- 集合快照排除 `system.*`、视图与备份自身集合（`sysBackupJob`/`sysBackupTarget`/`sysBackupPlan`）；**只迁移数据不迁移索引**（Spring Data 注解索引会在写入时自动重建）。
+- 集合排除分两层：
+  - **硬排除**（不可配置）：Mongo 内部命名空间 `system.*`、视图、备份自身三表（`sysBackupJob`/`sysBackupTarget`/`sysBackupPlan`——恢复会复活旧任务/覆盖新目标，自引用污染）。
+  - **默认排除**（可整组覆盖）：高频日志与遥测 `sysApiLog`、`sysLoginLog`、`sysResourceMetric`、`platformAgentExecutionTrace`、`platformRuntimeExecutionLog`、`platformHttpInvocationLog`、`platformGraphQueryLog`；运行时队列与缓存 `platformWikiIngestTask`、`platformPluginMarketSourceSnapshot`；短时效凭据 `oauthAuthorizationCode`、`oauthAccessToken`、`sysRefreshTokenCredential`（备份不携带活体令牌，恢复后用户需重新登录）。
+  - 其余全部集合（含 `sysUser/sysRole/sysMenu/sysDept/sysSetting/sysPermission/sysFileObject` 与安全凭据等核心 sys 表）**全部进备份**；**只迁移数据不迁移索引**（Spring Data 注解索引会在写入时自动重建）。
 - 合并写入按 500 条一批比对 `_id`（雪花 Long / ObjectId / 字符串按原生类型变体探测）后 `bulkWrite`（LOCAL_WINS 只插缺失；ARCHIVE_WINS upsert 覆盖）。
 - 归档清单记录主密钥指纹（`CapabilityCredentialCipher.fingerprint()`），与当前主密钥不一致时在分析与导入时告警：存量加密凭据（邮箱/对象存储/异地目标密码等）可能无法解密，需导入后重新配置。
 
@@ -51,6 +54,7 @@ context.registerExtension(PluginBackupProvider.class, new MyBackupProvider(...))
 | 键 | 默认 | 说明 |
 | --- | --- | --- |
 | `yudream.system.backup.directory` | `config/backup` | 本机归档与临时文件目录（gitignored、Docker 卷 `./config` 天然持久化） |
+| `yudream.system.backup.exclude-collections` | （见上文默认排除清单） | 集合排除规则，逗号分隔，支持「前缀*」通配（如 `plugin_mcpanel__mcpanel_metrics*`）；**设置后整组替换默认清单**，硬排除不受影响；最终生效清单写入归档 `manifest.json` 的 `excludedCollections` |
 | `YUDREAM_CREDENTIAL_KEY` | — | 异地目标密码等加密主密钥；跨主机恢复需一致，否则凭据需重配 |
 
 ## 权限码

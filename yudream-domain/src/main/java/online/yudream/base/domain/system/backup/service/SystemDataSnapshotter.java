@@ -14,6 +14,9 @@ public interface SystemDataSnapshotter {
     /** 全部可导出集合及估算文档数。 */
     List<CollectionSummary> collections();
 
+    /** 最终生效的排除清单（含系统内部与备份自身集合），写入归档清单供审计。 */
+    List<String> excludedCollections();
+
     /** 流式遍历集合内全部文档；consumer 不负责资源生命周期。 */
     void streamCollection(String name, Consumer<SnapshotDocument> consumer);
 

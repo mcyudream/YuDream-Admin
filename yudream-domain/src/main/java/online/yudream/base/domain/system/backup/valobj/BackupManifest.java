@@ -18,7 +18,8 @@ public record BackupManifest(
         List<ManifestCollection> collections,
         long objectCount,
         long objectBytes,
-        List<ManifestPluginScope> pluginScopes
+        List<ManifestPluginScope> pluginScopes,
+        List<String> excludedCollections
 ) {
 
     public static final String FORMAT = "yudream-backup";

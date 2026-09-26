@@ -123,7 +123,7 @@ class BackupExecutionMergeTest {
             writer.writePluginFile("data.txt", new ByteArrayInputStream("d".getBytes(StandardCharsets.UTF_8)), 1);
             writer.closePluginScope();
             writer.finish(new online.yudream.base.domain.system.backup.valobj.BackupManifestHeader(
-                    "test", "fedcba9876543210", List.of(BackupScopeRef.system())));
+                    "test", "fedcba9876543210", List.of(BackupScopeRef.system()), List.of()));
         }
         return archive;
     }
