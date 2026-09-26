@@ -13,6 +13,7 @@ public record RemoteTargetDTO(
         String username,
         String basePath,
         boolean passiveMode,
+        boolean insecureTls,
         boolean enabled,
         boolean passwordSet,
         LocalDateTime createTime

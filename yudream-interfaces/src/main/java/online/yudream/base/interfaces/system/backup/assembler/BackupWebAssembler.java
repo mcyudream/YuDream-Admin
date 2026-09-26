@@ -32,7 +32,8 @@ public final class BackupWebAssembler {
     public static RemoteTargetCmd toCmd(RemoteTargetRequest request) {
         return new RemoteTargetCmd(request.getCode(), request.getName(), parseType(request.getType()),
                 request.getHost(), request.getPort(), request.getUsername(), request.getPassword(),
-                request.getBasePath(), Boolean.TRUE.equals(request.getPassiveMode()));
+                request.getBasePath(), Boolean.TRUE.equals(request.getPassiveMode()),
+                Boolean.TRUE.equals(request.getInsecureTls()));
     }
 
     public static BackupPlanCmd toCmd(online.yudream.base.interfaces.system.backup.request.BackupPlanRequest request) {
@@ -124,6 +125,7 @@ public final class BackupWebAssembler {
                 .username(dto.username())
                 .basePath(dto.basePath())
                 .passiveMode(dto.passiveMode())
+                .insecureTls(dto.insecureTls())
                 .enabled(dto.enabled())
                 .passwordSet(dto.passwordSet())
                 .createTime(dto.createTime())

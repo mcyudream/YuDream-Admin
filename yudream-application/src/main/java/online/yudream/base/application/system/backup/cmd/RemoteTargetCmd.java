@@ -12,6 +12,7 @@ public record RemoteTargetCmd(
         String username,
         String password,
         String basePath,
-        boolean passiveMode
+        boolean passiveMode,
+        Boolean insecureTls
 ) {
 }

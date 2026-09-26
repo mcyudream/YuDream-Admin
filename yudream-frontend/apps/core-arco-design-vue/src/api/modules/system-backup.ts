@@ -56,6 +56,7 @@ export interface RemoteTarget {
   username?: string
   basePath?: string
   passiveMode?: boolean
+  insecureTls?: boolean
   enabled: boolean
   passwordSet: boolean
   createTime?: string
@@ -72,6 +73,7 @@ export interface RemoteTargetPayload {
   password?: string
   basePath?: string
   passiveMode?: boolean
+  insecureTls?: boolean
 }
 
 export interface BackupPlan {

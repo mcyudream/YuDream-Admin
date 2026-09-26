@@ -137,6 +137,10 @@ public class FtpRemoteBackupStorage implements RemoteBackupStorage {
 
     private FTPClient connect() {
         FTPClient client = target.getType() == RemoteTargetType.FTPS ? new FTPSClient() : new FTPClient();
+        if (client instanceof FTPSClient ftps && target.isInsecureTls()) {
+            // 自签名/内网 IP 直连：信任所有服务端证书（仅当目标显式开启）
+            ftps.setTrustManager(org.apache.commons.net.util.TrustManagerUtils.getAcceptAllTrustManager());
+        }
         client.setControlEncoding("UTF-8");
         client.setConnectTimeout(TIMEOUT_MILLIS);
         client.setDefaultTimeout(TIMEOUT_MILLIS);
