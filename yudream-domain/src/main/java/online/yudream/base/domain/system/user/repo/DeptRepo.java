@@ -28,4 +28,6 @@ public interface DeptRepo {
     boolean existsByNameAndParentExcludeId(String name, Long parentId, Long excludeId);
 
     long countActiveChildren(Long parentId);
+
+    void deleteById(Long id);
 }

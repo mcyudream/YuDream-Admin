@@ -131,4 +131,9 @@ public class DeptRepoImpl implements DeptRepo {
         Query query = Query.query(Criteria.where("parentId").is(parentId).and("status").is(DeptStatus.ACTIVE));
         return mongoTemplate.count(query, DeptDO.class);
     }
+
+    @Override
+    public void deleteById(Long id) {
+        mongoTemplate.remove(Query.query(Criteria.where("id").is(id)), DeptDO.class);
+    }
 }
