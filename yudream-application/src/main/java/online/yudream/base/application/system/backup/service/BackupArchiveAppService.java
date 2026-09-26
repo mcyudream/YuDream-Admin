@@ -7,6 +7,7 @@ import online.yudream.base.application.system.backup.dto.BackupAnalysisDTO;
 import online.yudream.base.application.system.backup.dto.BackupArchiveDownloadDTO;
 import online.yudream.base.application.system.backup.dto.BackupJobDTO;
 import online.yudream.base.application.system.backup.dto.BackupScopeDTO;
+import online.yudream.base.application.system.backup.support.BackupChunkUploadManager;
 import online.yudream.base.application.system.backup.support.BackupDirectorySupport;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.backup.aggregate.BackupJob;
@@ -26,6 +27,7 @@ import online.yudream.base.domain.system.backup.valobj.BackupManifest;
 import online.yudream.base.domain.system.backup.valobj.BackupScopeRef;
 import online.yudream.base.domain.system.backup.valobj.SnapshotDocument;
 import online.yudream.base.plugin.spi.system.backup.PluginBackupJobStatus;
+import online.yudream.base.plugin.spi.system.backup.PluginBackupJobSummary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -59,6 +61,7 @@ public class BackupArchiveAppService {
     private final PluginBackupScopeSource scopeSource;
     private final CredentialFingerprint fingerprint;
     private final BackupDirectorySupport directories;
+    private final BackupChunkUploadManager chunkUploads;
 
     /** 备份范围清单：系统范围 + 当前可用的插件范围。 */
     public List<BackupScopeDTO> scopes() {
@@ -116,6 +119,30 @@ public class BackupArchiveAppService {
                         job.getPercent(),
                         job.getMessage(),
                         job.getArchiveName()));
+    }
+
+    /** 插件按范围查询自己最近的任务摘要（本机导出 + 异地推送），按创建时间倒序。 */
+    public List<PluginBackupJobSummary> pluginScopeJobs(String pluginCode, String scopeCode, int limit) {
+        int capped = Math.max(1, Math.min(limit, 200));
+        String tagPrefix = "plugin:" + pluginCode + "/" + scopeCode;
+        // 近期记录里可能混有其他范围/系统任务，多取一批再过滤截断
+        List<BackupJob> recent = jobRepo.findRecent(Math.min(capped * 5 + 20, 500));
+        return recent.stream()
+                .filter(job -> job.getScopeTags() != null && job.getScopeTags().stream()
+                        .anyMatch(tag -> tag.startsWith(tagPrefix)))
+                .limit(capped)
+                .map(job -> new PluginBackupJobSummary(
+                        String.valueOf(job.getId()),
+                        job.getStatus() == null ? "" : job.getStatus().name(),
+                        job.getPercent(),
+                        job.getMessage(),
+                        job.getArchiveName(),
+                        job.getTargetCode() == null ? "" : job.getTargetCode(),
+                        job.getTargetName() == null ? "" : job.getTargetName(),
+                        job.getCreateTime() == null ? 0L
+                                : java.sql.Timestamp.valueOf(job.getCreateTime()).getTime(),
+                        job.getScopeOptions() == null ? Map.of() : Map.copyOf(job.getScopeOptions())))
+                .toList();
     }
 
     /** 同步分析归档：按集合统计缺失/冲突数量，供管理员在执行合并前确认策略。 */
@@ -198,6 +225,58 @@ public class BackupArchiveAppService {
         job.setArchivePath(temp.toString());
         job.setArchiveSize(size);
         return toDTO(jobRepo.save(job));
+    }
+
+    // ---------------------------------------------------------------- 分片上传
+
+    /** 开启分片上传会话，返回 uploadId。 */
+    public String beginChunkUpload(String name, long size) {
+        return chunkUploads.begin(name, size);
+    }
+
+    /** 追加分片（偏移必须顺序），返回新的已接收长度。 */
+    public long writeChunk(String uploadId, long offset, InputStream data) {
+        return chunkUploads.write(uploadId, offset, data);
+    }
+
+    /** 结束分片上传：校验大小与摘要，标记为已暂存。 */
+    public void finishChunkUpload(String uploadId, long size, String sha256) {
+        chunkUploads.finish(uploadId, size, sha256);
+    }
+
+    public void abortChunkUpload(String uploadId) {
+        chunkUploads.abort(uploadId);
+    }
+
+    /** 分析已暂存归档（分析完即清理暂存文件）。 */
+    public BackupAnalysisDTO analyzeStaged(String uploadId) {
+        Path staged = chunkUploads.stagedFile(uploadId);
+        try {
+            return analyze(staged);
+        } finally {
+            chunkUploads.consume(uploadId);
+            directories.deleteQuietly(staged);
+        }
+    }
+
+    /** 用已暂存归档创建合并导入任务（暂存文件所有权移交任务，执行完成后清理）。 */
+    public BackupJobDTO createImportJobFromStaged(String uploadId, BackupConflictStrategy strategy) {
+        if (strategy == null) {
+            throw new BizException("请先选择合并策略（以哪边为准）");
+        }
+        Path staged = chunkUploads.stagedFile(uploadId);
+        chunkUploads.consume(uploadId);
+        try {
+            BackupJob job = BackupJob.create(BackupJobType.IMPORT, BackupJobTrigger.MANUAL,
+                    List.of(), strategy, null, null, null);
+            job.setArchiveName("staged-" + stamp() + ".zip");
+            job.setArchivePath(staged.toString());
+            job.setArchiveSize(Files.size(staged));
+            return toDTO(jobRepo.save(job));
+        } catch (IOException e) {
+            directories.deleteQuietly(staged);
+            throw new BizException("读取暂存归档失败：" + e.getMessage());
+        }
     }
 
     public List<BackupJobDTO> jobs(int limit) {

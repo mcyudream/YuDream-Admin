@@ -120,6 +120,25 @@ export default {
   export: (scopeTags: string[]) => systemClient.post<unknown, ApiResponse<BackupJob>>('api/system/backup/export', { scopeTags }),
   analyzeImport: (data: FormData) => systemClient.post<unknown, ApiResponse<BackupAnalysis>>('api/system/backup/import/analyze', data, { timeout: 0 }),
   import: (data: FormData) => systemClient.post<unknown, ApiResponse<BackupJob>>('api/system/backup/import', data, { timeout: 0 }),
+  // 分片导入（超大归档）：顺序分片上传，服务端合并落盘后复用分析/导入
+  beginChunkUpload: (data: { name: string, size: number }) =>
+    systemClient.post<unknown, ApiResponse<string>>('api/system/backup/import/upload/begin', data),
+  uploadChunk: (uploadId: string, offset: number, blob: Blob) =>
+    systemClient.post<unknown, ApiResponse<number>>(
+      `api/system/backup/import/upload/chunk?uploadId=${encodeURIComponent(uploadId)}&offset=${offset}`,
+      blob,
+      { headers: { 'Content-Type': 'application/octet-stream' }, timeout: 0 },
+    ),
+  finishChunkUpload: (data: { uploadId: string, size: number }) =>
+    systemClient.post<unknown, ApiResponse<void>>('api/system/backup/import/upload/finish', data, { timeout: 0 }),
+  abortChunkUpload: (uploadId: string) =>
+    systemClient.post<unknown, ApiResponse<void>>('api/system/backup/import/upload/abort', { uploadId }),
+  analyzeStaged: (uploadId: string) =>
+    systemClient.post<unknown, ApiResponse<BackupAnalysis>>(
+      `api/system/backup/import/analyze/staged?uploadId=${encodeURIComponent(uploadId)}`, null, { timeout: 0 },
+    ),
+  importStaged: (uploadId: string, strategy: BackupConflictStrategy) =>
+    systemClient.post<unknown, ApiResponse<BackupJob>>('api/system/backup/import/staged', { uploadId, strategy }, { timeout: 0 }),
   jobs: (limit = 50) => systemClient.get<unknown, ApiResponse<BackupJob[]>>('api/system/backup/jobs', { params: { limit } }),
   removeJob: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/system/backup/jobs/${id}`),
   downloadArchive: (id: string) => systemClient.get<unknown, ExcelBlobResponse>(`api/system/backup/jobs/${id}/archive`, { responseType: 'blob' }),

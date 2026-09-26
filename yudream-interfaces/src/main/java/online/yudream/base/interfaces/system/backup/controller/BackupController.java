@@ -11,14 +11,19 @@ import online.yudream.base.application.system.backup.dto.BackupScopeDTO;
 import online.yudream.base.application.system.backup.dto.RemoteTargetDTO;
 import online.yudream.base.application.system.backup.service.BackupArchiveAppService;
 import online.yudream.base.application.system.backup.service.RemoteBackupAppService;
+import online.yudream.base.application.system.backup.support.BackupChunkUploadManager;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.backup.enumerate.BackupConflictStrategy;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.backup.assembler.BackupWebAssembler;
 import online.yudream.base.interfaces.system.backup.request.BackupExportRequest;
+import online.yudream.base.interfaces.system.backup.request.BackupImportStagedRequest;
 import online.yudream.base.interfaces.system.backup.request.BackupPlanRequest;
 import online.yudream.base.interfaces.system.backup.request.BackupRestoreRequest;
+import online.yudream.base.interfaces.system.backup.request.BackupUploadAbortRequest;
+import online.yudream.base.interfaces.system.backup.request.BackupUploadBeginRequest;
+import online.yudream.base.interfaces.system.backup.request.BackupUploadFinishRequest;
 import online.yudream.base.interfaces.system.backup.request.RemoteTargetRequest;
 import online.yudream.base.interfaces.system.backup.res.BackupAnalysisRes;
 import online.yudream.base.interfaces.system.backup.res.BackupJobRes;
@@ -86,6 +91,59 @@ public class BackupController {
         } catch (Exception e) {
             throw new BizException("读取上传归档失败：" + e.getMessage());
         }
+    }
+
+    // ---------------------------------------------------------------- 分片导入（超大归档）
+
+    @PostMapping("/import/upload/begin")
+    @PermissionRegister(code = "system:backup:import", name = "分析备份归档", module = MODULE, desc = "开启分片上传会话")
+    public Result<String> beginUpload(@RequestBody BackupUploadBeginRequest request) {
+        if (request.getSize() == null || request.getSize() < 0) {
+            throw new BizException("归档大小无效");
+        }
+        return Result.ok(archiveService.beginChunkUpload(request.getName(), request.getSize()));
+    }
+
+    @PostMapping("/import/upload/chunk")
+    @PermissionRegister(code = "system:backup:import", name = "分析备份归档", module = MODULE, desc = "追加分片（偏移顺序）")
+    public Result<Long> uploadChunk(@RequestParam("uploadId") String uploadId,
+                                    @RequestParam("offset") long offset,
+                                    jakarta.servlet.http.HttpServletRequest request) throws java.io.IOException {
+        if (request.getContentLengthLong() > BackupChunkUploadManager.MAX_CHUNK_BYTES) {
+            throw new BizException("单分片超过大小限制（16MB）");
+        }
+        return Result.ok(archiveService.writeChunk(uploadId, offset, request.getInputStream()));
+    }
+
+    @PostMapping("/import/upload/finish")
+    @PermissionRegister(code = "system:backup:import", name = "分析备份归档", module = MODULE, desc = "结束分片上传并校验完整性")
+    public Result<Void> finishUpload(@RequestBody BackupUploadFinishRequest request) {
+        if (request.getUploadId() == null || request.getSize() == null || request.getSize() < 0) {
+            throw new BizException("分片上传参数无效");
+        }
+        archiveService.finishChunkUpload(request.getUploadId(), request.getSize(), request.getSha256());
+        return Result.ok();
+    }
+
+    @PostMapping("/import/upload/abort")
+    @PermissionRegister(code = "system:backup:import", name = "分析备份归档", module = MODULE, desc = "中止分片上传并清理暂存")
+    public Result<Void> abortUpload(@RequestBody BackupUploadAbortRequest request) {
+        archiveService.abortChunkUpload(request.getUploadId());
+        return Result.ok();
+    }
+
+    @PostMapping("/import/analyze/staged")
+    @PermissionRegister(code = "system:backup:import", name = "分析备份归档", module = MODULE, desc = "分析已暂存的分片归档")
+    public Result<BackupAnalysisRes> analyzeStaged(@RequestParam("uploadId") String uploadId) {
+        return Result.ok(BackupWebAssembler.toRes(archiveService.analyzeStaged(uploadId)));
+    }
+
+    @PostMapping("/import/staged")
+    @PermissionRegister(code = "system:backup:import", name = "合并导入备份", module = MODULE, desc = "用已暂存的分片归档按策略合并导入")
+    public Result<BackupJobRes> importStaged(@RequestBody BackupImportStagedRequest request) {
+        BackupConflictStrategy resolved = BackupWebAssembler.parseStrategy(request.getStrategy());
+        BackupJobDTO job = archiveService.createImportJobFromStaged(request.getUploadId(), resolved);
+        return Result.ok(BackupWebAssembler.toRes(job));
     }
 
     @PostMapping("/import")
