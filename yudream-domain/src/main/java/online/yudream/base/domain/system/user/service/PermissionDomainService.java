@@ -37,11 +37,31 @@ public class PermissionDomainService {
         }
 
         List<Permission> existingPermissions = permissionRepo.findAll();
-        Map<String, Permission> existingMap = existingPermissions.stream()
-                .collect(Collectors.toMap(
-                        p -> p.getId().getCode(),
-                        p -> p
-                ));
+        // 同 code 多条（导入合并/并发注册等历史原因产生）保留先加载的一条并自愈清理，
+        // 否则 toMap 无 merge 函数会让整个应用启动失败。
+        Map<String, Permission> existingMap = new java.util.LinkedHashMap<>();
+        List<Permission> duplicatePermissions = new java.util.ArrayList<>();
+        for (Permission permission : existingPermissions) {
+            String code = permission.getId().getCode();
+            Permission kept = existingMap.putIfAbsent(code, permission);
+            if (kept != null) {
+                duplicatePermissions.add(permission);
+            }
+        }
+        if (!duplicatePermissions.isEmpty()) {
+            log.warn("权限同步发现 {} 条重复权限码记录，自动清理冗余（保留首条）", duplicatePermissions.size());
+            java.util.Set<String> healedCodes = new java.util.LinkedHashSet<>();
+            for (Permission duplicate : duplicatePermissions) {
+                String code = duplicate.getId().getCode();
+                if (healedCodes.add(code)) {
+                    permissionRepo.deleteByCode(code);
+                    Permission kept = existingMap.get(code);
+                    if (kept != null) {
+                        permissionRepo.save(kept);
+                    }
+                }
+            }
+        }
 
         int created = 0;
         int updated = 0;
