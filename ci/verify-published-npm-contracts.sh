@@ -60,8 +60,11 @@ cat > "$VERIFY_DIR/package.json" <<EOF
 EOF
 
 REGISTRY_HOST=$(printf '%s' "$TARGET_REGISTRY" | sed -E 's#^https?://##' | sed 's#/$##')
+# 非 @yudream 依赖（vue / vue-router / unocss / @iconify/json 等）走与其它作业一致的镜像源：
+# 直连 registry.npmjs.org 在自建 runner 上会随机超时，表现为验签作业反复重试后失败
+DEFAULT_REGISTRY="${NPM_CONFIG_REGISTRY:-https://registry.npmmirror.com}"
 cat > "$VERIFY_DIR/.npmrc" <<EOF
-registry=https://registry.npmjs.org/
+registry=${DEFAULT_REGISTRY}
 @yudream:registry=${TARGET_REGISTRY}
 strict-peer-dependencies=false
 //${REGISTRY_HOST}/:username=${NEXUS_USERNAME}
