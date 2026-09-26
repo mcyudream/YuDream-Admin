@@ -98,7 +98,8 @@ public class BackupExecutionService implements BackupJobRunner {
         Path localFile = target == null ? directories.newArchiveFile(archiveName) : directories.newTempFile("push-");
         boolean success = false;
         try {
-            BackupJobStats stats = writeArchive(localFile, scopes, progress);
+            List<String> exportWarnings = new ArrayList<>();
+            BackupJobStats stats = writeArchive(localFile, scopes, progress, exportWarnings);
             long size = Files.size(localFile);
             if (target != null) {
                 progress.update("upload", "正在推送到异地：" + target.getName(), 99);
@@ -106,10 +107,11 @@ public class BackupExecutionService implements BackupJobRunner {
                 prune(target, archivePrefix(job.getPlanCode()), retentionOf(job.getPlanCode()));
                 success = true;
                 progress.update("done", "已推送到异地", 100);
-                return BackupJobResult.archive(archiveName, null, size, stats);
+                return new BackupJobResult(archiveName, null, size, stats, List.copyOf(exportWarnings));
             }
             success = true;
-            return BackupJobResult.archive(archiveName, localFile.toAbsolutePath().toString(), size, stats);
+            return new BackupJobResult(archiveName, localFile.toAbsolutePath().toString(), size, stats,
+                    List.copyOf(exportWarnings));
         } catch (IOException e) {
             throw new BizException("备份归档写入失败：" + e.getMessage());
         } finally {
@@ -119,7 +121,8 @@ public class BackupExecutionService implements BackupJobRunner {
         }
     }
 
-    private BackupJobStats writeArchive(Path localFile, List<BackupScopeRef> scopes, BackupJobProgress progress)
+    private BackupJobStats writeArchive(Path localFile, List<BackupScopeRef> scopes, BackupJobProgress progress,
+                                        List<String> warnings)
             throws IOException {
         long documents = 0;
         long objects = 0;
@@ -171,14 +174,14 @@ public class BackupExecutionService implements BackupJobRunner {
                 PluginBackupScopeSource.PluginScopeHandle handle = scopeSource.find(scope.pluginCode(), scope.scopeCode())
                         .orElseThrow(() -> new BizException("插件备份范围当前不可用：" + scope.tag()));
                 writer.openPluginScope(scope);
-                scopeSource.exportScope(handle, (path, size, in) -> {
+                warnings.addAll(scopeSource.exportScope(handle, (path, size, in) -> {
                     try {
                         writer.writePluginFile(path, in, size);
                     } catch (IOException e) {
                         throw new BizException("写入插件备份文件失败：" + path);
                     }
                     pluginHolder[0]++;
-                });
+                }));
                 writer.closePluginScope();
             }
             pluginFiles = pluginHolder[0];

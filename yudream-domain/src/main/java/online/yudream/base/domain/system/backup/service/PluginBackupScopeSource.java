@@ -18,8 +18,8 @@ public interface PluginBackupScopeSource {
 
     Optional<PluginScopeHandle> find(String pluginCode, String scopeCode);
 
-    /** 调用插件导出其范围数据。 */
-    void exportScope(PluginScopeHandle handle, PluginScopeSink sink);
+    /** 调用插件导出其范围数据；返回需要随任务消息透出的告警列表。 */
+    List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink);
 
     /** 调用插件按策略恢复其范围数据。 */
     void restoreScope(PluginScopeHandle handle, PluginBackupFileSource files, BackupConflictStrategy strategy);

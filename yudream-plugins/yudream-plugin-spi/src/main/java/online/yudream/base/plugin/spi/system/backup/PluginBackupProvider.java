@@ -32,12 +32,24 @@ public interface PluginBackupProvider {
     /**
      * 将本范围全部数据写入宿主提供的 {@link BackupSink}。
      * 只允许通过 sink 写文件，禁止感知归档格式与远端存储细节。
+     * 局部跳过（如某节点离线、某数据源不可用）不应抛异常中断整个备份，
+     * 而是记录到返回的 {@link ExportReport#warnings()}，宿主会随任务消息透出；
+     * 只有整体无法继续时才抛异常（fail-fast，宿主丢弃本次归档）。
      */
-    void export(BackupSink sink) throws Exception;
+    ExportReport export(BackupSink sink) throws Exception;
 
     /**
      * 按合并策略恢复此前由本范围导出的文件。source 只包含本范围的文件；
      * 策略语义与宿主系统数据一致：{@code LOCAL_WINS} 只补缺，{@code ARCHIVE_WINS} 覆盖同名。
+     * 恢复是尽力而为：单条目失败建议跳过并留待整体异常上报，不要静默吞掉。
      */
     void restore(BackupSource source, PluginBackupConflictStrategy strategy) throws Exception;
+
+    /** 导出结果报告：warnings 会拼进备份任务消息展示给管理员。 */
+    record ExportReport(java.util.List<String> warnings) {
+
+        public static ExportReport none() {
+            return new ExportReport(java.util.List.of());
+        }
+    }
 }

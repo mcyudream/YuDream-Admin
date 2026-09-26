@@ -45,9 +45,12 @@ public class PluginBackupScopeRegistry implements PluginBackupScopeSource {
     }
 
     @Override
-    public void exportScope(PluginScopeHandle handle, PluginScopeSink sink) {
+    public List<String> exportScope(PluginScopeHandle handle, PluginScopeSink sink) {
         try {
-            provider(handle).export(validatingSink(sink));
+            PluginBackupProvider.ExportReport report = provider(handle).export(validatingSink(sink));
+            return report == null || report.warnings() == null
+                    ? List.of()
+                    : List.copyOf(report.warnings());
         } catch (online.yudream.base.domain.common.exception.BizException e) {
             throw e;
         } catch (Exception e) {
