@@ -1,6 +1,7 @@
 package online.yudream.base.infra.system.backup.service;
 
 import online.yudream.base.domain.common.exception.BizException;
+import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.domain.system.backup.aggregate.RemoteTarget;
 import online.yudream.base.domain.system.backup.service.RemoteBackupStorage;
 import online.yudream.base.domain.system.backup.valobj.RemoteEntry;
@@ -47,12 +48,14 @@ import java.util.function.Consumer;
  * 不做主机名校验，可确定性地支持自签名证书与 IP 直连；关闭时走默认信任链。
  * 连接为短生命周期语义：每次操作独立请求，不持长驻资源。
  */
+@Slf4j
 public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
-
     private static final int TIMEOUT_MILLIS = 60_000;
 
     private final RemoteTarget target;
     private final HttpClient http;
+    /** 服务端不支持 PROPFIND（405/501，如 Nginx dav 模块）时降级：列表返回空、上传/下载仍可用。 */
+    private volatile boolean listDisabled;
 
     WebDavRemoteBackupStorage(RemoteTarget target) {
         this.target = target;
@@ -115,8 +118,17 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         if (code == 404) {
             throw new BizException("WebDAV 远端目录不存在：" + target.getBasePath());
         }
+        if (code == 405 || code == 501) {
+            // 服务端不实现 PROPFIND（如 Nginx dav 模块/极简 WebDAV）：降级为仅上传/下载，
+            // 远端列表与保留份数清理不可用；备份推送不受影响。
+            listDisabled = true;
+            log.warn("WebDAV 目标 {} 不支持 PROPFIND（{}），已降级：可上传/下载，远端列表与自动清理不可用",
+                    target.getCode(), code);
+            return;
+        }
         if (code != 207 && code != 200) {
-            throw new BizException("WebDAV 探测失败，远端返回 " + code);
+            throw new BizException("WebDAV 探测失败，远端返回 " + code
+                    + "——该地址可能未启用 WebDAV（如指向了普通网站或 S3 端点），请确认服务端与基础路径");
         }
     }
 
@@ -156,15 +168,24 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
 
     @Override
     public List<RemoteEntry> list(String dir) {
+        if (listDisabled) {
+            return List.of();
+        }
         return propfindDir(dir).files();
     }
 
     @Override
     public List<String> listDirs(String dir) {
+        if (listDisabled) {
+            return List.of();
+        }
         return propfindDir(dir).dirs();
     }
 
     private PropfindResult propfindDir(String dir) {
+        if (listDisabled) {
+            return new PropfindResult(List.of(), List.of());
+        }
         String dirPath = normalizeDir(target.getBasePath() + "/"
                 + (dir == null || dir.isBlank() ? "" : dir.startsWith("/") ? dir.substring(1) : dir));
         Tuple2<Integer, String> result;
@@ -193,8 +214,13 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         if (code == 404) {
             return new PropfindResult(List.of(), List.of());
         }
+        if (code == 405 || code == 501) {
+            listDisabled = true;
+            log.warn("WebDAV 目标 {} 返回 {}（不支持目录列举），已降级", target.getCode(), code);
+            return new PropfindResult(List.of(), List.of());
+        }
         if (code != 207 && code != 200) {
-            throw new BizException("WebDAV 列表失败，远端返回 " + code);
+            throw new BizException("WebDAV 列表失败，远端返回 " + code + "，响应片段：" + snippet(xml));
         }
         return parseListing(xml, dirPath);
     }
@@ -391,6 +417,15 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
         Node child = children.item(0);
         String text = child.getTextContent();
         return text == null || text.isBlank() ? null : text.trim();
+    }
+
+    /** 响应体摘要（去标签截 120 字），用于失败信息定位。 */
+    private static String snippet(String body) {
+        if (body == null || body.isBlank()) {
+            return "";
+        }
+        String compact = body.replaceAll("<[^>]+>", " ").replaceAll("\\s+", " ").trim();
+        return compact.length() <= 120 ? compact : compact.substring(0, 120);
     }
 
     private PropfindResult parseListing(String xml, String dirPath) {
