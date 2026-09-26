@@ -50,10 +50,11 @@ class ZipBackupArchiveRoundTripTest {
             writer.writePluginFile("notes.txt", new ByteArrayInputStream("hello".getBytes(StandardCharsets.UTF_8)), 5);
             writer.closePluginScope();
             manifest = writer.finish(new BackupManifestHeader("1.0.0-test", "0123456789abcdef",
-                    List.of(BackupScopeRef.system(), pluginScope)));
+                    List.of(BackupScopeRef.system(), pluginScope), List.of("sysApiLog", "system.*")));
         }
 
         assertEquals(BackupManifest.FORMAT, manifest.format());
+        assertEquals(List.of("sysApiLog", "system.*"), manifest.excludedCollections());
         assertEquals(2, manifest.collections().size());
         assertEquals(1, manifest.objectCount());
         assertEquals(20, manifest.objectBytes());

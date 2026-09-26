@@ -164,6 +164,8 @@ public class ZipBackupArchiveWriter implements BackupArchiveWriter {
         manifestJson.put("objectCount", objectCount);
         manifestJson.put("objectBytes", objectBytes);
         manifestJson.put("pluginScopes", pluginScopes);
+        manifestJson.put("excludedCollections", header.excludedCollections() == null
+                ? List.of() : header.excludedCollections());
         writeJson("manifest.json", manifestJson);
         finished = true;
         zip.finish();
@@ -171,7 +173,8 @@ public class ZipBackupArchiveWriter implements BackupArchiveWriter {
         return new BackupManifest(BackupManifest.FORMAT, BackupManifest.SCHEMA_VERSION,
                 (String) manifestJson.get("createdAt"), header.hostVersion(), header.masterKeyFingerprint(),
                 manifestScopes(header),
-                List.copyOf(collections), objectCount, objectBytes, List.copyOf(pluginScopes));
+                List.copyOf(collections), objectCount, objectBytes, List.copyOf(pluginScopes),
+                header.excludedCollections() == null ? List.of() : List.copyOf(header.excludedCollections()));
     }
 
     private List<BackupManifest.ManifestScope> manifestScopes(BackupManifestHeader header) {

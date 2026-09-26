@@ -6,6 +6,7 @@ import java.util.List;
 public record BackupManifestHeader(
         String hostVersion,
         String masterKeyFingerprint,
-        List<BackupScopeRef> scopes
+        List<BackupScopeRef> scopes,
+        List<String> excludedCollections
 ) {
 }

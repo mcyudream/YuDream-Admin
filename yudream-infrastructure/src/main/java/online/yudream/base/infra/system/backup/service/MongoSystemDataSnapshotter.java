@@ -6,6 +6,7 @@ import org.bson.Document;
 import org.bson.json.JsonMode;
 import org.bson.json.JsonWriterSettings;
 import org.bson.types.ObjectId;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.stereotype.Service;
 
@@ -17,18 +18,21 @@ import java.util.function.Consumer;
 
 /**
  * Mongo 全量快照：枚举主库业务集合并流式导出 EJSON EXTENDED 文档（类型无损）。
- * 排除系统内部集合与备份自身集合，避免快照包含备份元数据。
+ * 排除策略见 {@link SnapshotExclusions}：系统内部集合与备份自身集合硬排除，
+ * 日志/遥测/短时效令牌类默认排除且可经 {@code yudream.system.backup.exclude-collections}
+ * 整组覆盖（支持「前缀*」通配）。
  */
 @Service
 public class MongoSystemDataSnapshotter implements SystemDataSnapshotter {
 
-    private static final Set<String> EXCLUDED_COLLECTIONS = Set.of(
-            "sysBackupJob", "sysBackupTarget", "sysBackupPlan");
-
     private final MongoTemplate mongo;
+    private final SnapshotExclusions exclusions;
 
-    public MongoSystemDataSnapshotter(MongoTemplate mongo) {
+    public MongoSystemDataSnapshotter(
+            MongoTemplate mongo,
+            @Value("${yudream.system.backup.exclude-collections:}") String excludeCollections) {
         this.mongo = mongo;
+        this.exclusions = new SnapshotExclusions(excludeCollections);
     }
 
     @Override
@@ -41,7 +45,7 @@ public class MongoSystemDataSnapshotter implements SystemDataSnapshotter {
         });
         List<CollectionSummary> summaries = new ArrayList<>();
         for (String name : mongo.getCollectionNames()) {
-            if (name.startsWith("system.") || EXCLUDED_COLLECTIONS.contains(name) || views.contains(name)) {
+            if (views.contains(name) || exclusions.excluded(name)) {
                 continue;
             }
             try {
@@ -51,6 +55,11 @@ public class MongoSystemDataSnapshotter implements SystemDataSnapshotter {
             }
         }
         return summaries;
+    }
+
+    @Override
+    public List<String> excludedCollections() {
+        return exclusions.describe();
     }
 
     @Override

@@ -186,7 +186,8 @@ public class BackupExecutionService implements BackupJobRunner {
             }
             pluginFiles = pluginHolder[0];
             progress.update("finalize", "正在生成归档清单…", 98);
-            writer.finish(new BackupManifestHeader(hostVersion, fingerprint.fingerprint(), scopes));
+            writer.finish(new BackupManifestHeader(hostVersion, fingerprint.fingerprint(), scopes,
+                    dataSnapshotter.excludedCollections()));
         }
         return new BackupJobStats(collectionCount, documents, objects, pluginFiles, 0, 0, 0);
     }
