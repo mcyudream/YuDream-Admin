@@ -151,6 +151,19 @@ export interface YuDreamPluginAiClient {
   providers: () => Promise<YuDreamPluginAiProviderOption[]>
 }
 
+export interface YuDreamPluginBackupTargetOption {
+  /** 目标编码（稳定标识，触发异地备份时传给插件后端） */
+  code: string
+  name: string
+  /** FTP / FTPS / WEBDAV */
+  type?: string
+}
+
+export interface YuDreamPluginBackupClient {
+  /** 启用中的异地备份目标目录（宿主「数据备份中心」配置）；旧宿主无此能力时返回空数组 */
+  targets: () => Promise<YuDreamPluginBackupTargetOption[]>
+}
+
 export interface YuDreamPluginAccount {
   userId: string
   username: string
@@ -209,6 +222,8 @@ export interface YuDreamPluginSdk {
   messaging: YuDreamPluginMessagingClient
   users: YuDreamPluginUsersClient
   ai: YuDreamPluginAiClient
+  /** 1.8.0 起提供；旧宿主注入的 sdk 无此属性，插件需可选链降级 */
+  backup?: YuDreamPluginBackupClient
   site: YuDreamPluginSiteClient
 }
 

@@ -49,6 +49,24 @@ public final class PluginDependencyGraph {
     }
 
     /**
+     * 全量恢复顺序：提供方最先、依赖方最后（硬+软边都参与深度计算），同层按 code 字母序决胜。
+     *
+     * <p>启动恢复与整体重载必须用它而不是字母序：插件 ClassLoader 的软依赖查找链在消费方
+     * 创建时一次性捕获，字母序会让消费方（如 mcpanel）先于提供方（如 minecraft-server）
+     * 加载，运行期引用提供方 API 类会直接 NoClassDefFoundError。畸形描述符成环时由
+     * visiting 兜底为同层，交由单插件恢复的重试/降级处理。
+     */
+    public static List<PluginModule> restoreOrder(Map<String, PluginModule> modulesByCode) {
+        Set<String> all = new HashSet<>(modulesByCode.keySet());
+        Map<String, Integer> depths = new HashMap<>();
+        return modulesByCode.values().stream()
+                .sorted(Comparator.<PluginModule>comparingInt(module ->
+                                reverseDependencyDepth(module, modulesByCode, all, new HashSet<>(), depths)).reversed()
+                        .thenComparing(PluginModule::getCode))
+                .toList();
+    }
+
+    /**
      * 仅沿硬依赖边回溯的依赖方闭包（不含目标自身）：这些插件离开目标无法运行，
      * 级联停机后不能自动恢复，只能保持禁用；闭包之外的软依赖方可降级恢复。
      */

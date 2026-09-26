@@ -8,7 +8,7 @@ import { applyPublicSeo } from '@/utils/public-seo'
 
 export type { YuDreamPluginSdk } from '@yudream/plugin-sdk'
 
-export const YUDREAM_PLUGIN_SDK_VERSION = '1.7.0'
+export const YUDREAM_PLUGIN_SDK_VERSION = '1.8.0'
 
 export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
   const accountStore = useAppAccountStore()
@@ -115,6 +115,12 @@ export function createPluginSdk(pluginCode: string): YuDreamPluginSdk {
       },
       async providers() {
         const res = await apiPlugin.aiProviderCatalog()
+        return res.data || []
+      },
+    },
+    backup: {
+      async targets() {
+        const res = await apiPlugin.backupTargetCatalog()
         return res.data || []
       },
     },

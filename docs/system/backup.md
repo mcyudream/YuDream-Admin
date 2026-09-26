@@ -49,12 +49,20 @@ context.registerExtension(PluginBackupProvider.class, new MyBackupProvider(...))
 String jobId = framework.backups("mcpanel").startScopeBackup(
         new PluginScopeBackupRequest("server-data", "nas-webdav", Map.of("instanceId", id)));
 Optional<PluginBackupJobStatus> status = framework.backups("mcpanel").status(jobId);
+List<PluginBackupJobSummary> jobs = framework.backups("mcpanel").listScopeJobs("server-data", 50);
 ```
 
 - 只能触发**本插件**注册的 scopeCode；targetCode 空=本机导出，否则推送到该异地目标；
   options 原样传给提供者 export。
-- mcpanel 实例计划任务已接入：计划动作选「异地备份」并填宿主目标编码（存 payload 字段），
-  到点自动把该实例世界数据推送到对应目标；计划上的「立即执行」即手动触发一次。
+- `listScopeJobs`（default 方法，旧宿主返回空列表）按范围返回本插件最近任务摘要
+  （含 targetCode/targetName、createdAt、options），供插件界面合并展示「本机导出 / 异地推送」任务。
+- 插件前端的目标选择走宿主目录端点 `GET /api/platform/plugins/backup/targets`
+  （权限 `system:backup:view`，仅返回启用中目标的 code/name/type，不含凭据）；
+  SDK 1.8.0 起注入 `sdk.backup.targets()`，插件用它渲染统一异地目标下拉，旧宿主回落手输编码。
+- mcpanel 实例计划任务已接入：动作 `offsite-backup`（payload=宿主目标编码）与 `local-backup`
+  （本机导出，payload 空）到点自动触发；实例页手动备份可选本地（节点磁盘，就地恢复）或异地，
+  列表合并节点本机档与备份中心任务（带本地/异地标识）；按实例保留策略（keepCount/keepDays）
+  随节点 backup.create 下发，打包后自动清理超额/过期旧档（节点 ≥0.7.0 `backup.prune`）。
 
 - 宿主经 `PluginExtensionRegistry.registrations(Class)` 按插件码聚合；插件禁用/卸载后其范围自动从备份中心消失（归档里已有数据在导入时跳过并计入告警）。
 - 归档内插件范围由对应 provider 自行解释（文件格式由插件自定义）；宿主统一校验相对路径（禁止穿越/反斜杠/控制字符）。

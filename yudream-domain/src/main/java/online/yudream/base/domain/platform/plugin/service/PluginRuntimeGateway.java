@@ -6,6 +6,7 @@ import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpDispatchResult;
+import online.yudream.base.domain.platform.plugin.valobj.PluginHttpStreamingDispatchRequest;
 import online.yudream.base.domain.platform.plugin.valobj.PluginHttpEndpointInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDashboardCardInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
@@ -78,6 +79,21 @@ public interface PluginRuntimeGateway {
     Optional<PluginFrontendAssetInfo> frontendAsset(String code, String assetPath);
 
     PluginHttpDispatchResult dispatch(PluginHttpDispatchRequest request);
+
+    /**
+     * 插件是否在 (method, path) 上注册了流式 HTTP 端点。false 时分发方走缓冲式路径。
+     */
+    default boolean hasStreamingHttpHandler(String pluginCode, String method, String path) {
+        return false;
+    }
+
+    /**
+     * 真流式分发：请求体与响应不整体缓冲。宿主实现保证先完成鉴权与前置限长，
+     * 再物化 query/body/parts。当前运行时网关不支持流式时抛出业务异常。
+     */
+    default PluginHttpDispatchResult dispatchStreaming(PluginHttpStreamingDispatchRequest request) {
+        throw new UnsupportedOperationException("当前运行时网关不支持插件流式 HTTP 分发");
+    }
 
     /** 单个插件运行时贡献资产快照，供开发者工具面板聚合展示。 */
     PluginRuntimeAssets runtimeAssets(String code);

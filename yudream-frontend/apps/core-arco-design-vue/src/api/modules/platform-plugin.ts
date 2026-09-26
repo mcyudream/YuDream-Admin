@@ -221,6 +221,12 @@ export interface PluginAiProviderCatalog {
   models?: PluginAiModelCatalog[]
 }
 
+export interface PluginBackupTargetCatalog {
+  code: string
+  name: string
+  type: string
+}
+
 export default {
   list: () => systemClient.get<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins'),
   refresh: () => systemClient.post<unknown, ApiResponse<PluginModule[]>>('api/platform/plugins/refresh'),
@@ -251,6 +257,7 @@ export default {
   roleCatalog: () => systemClient.get<unknown, ApiResponse<PluginRoleCatalog[]>>('api/platform/plugins/users/roles'),
   aiAgentCatalog: () => systemClient.get<unknown, ApiResponse<PluginAiAgentCatalog[]>>('api/platform/plugins/ai/agents'),
   aiProviderCatalog: () => systemClient.get<unknown, ApiResponse<PluginAiProviderCatalog[]>>('api/platform/plugins/ai/providers'),
+  backupTargetCatalog: () => systemClient.get<unknown, ApiResponse<PluginBackupTargetCatalog[]>>('api/platform/plugins/backup/targets'),
   request: <T = unknown>(pluginCode: string, path: string, options: { method?: string, data?: unknown } = {}) => {
     return systemClient.request<unknown, ApiResponse<T>>({
       url: `api/plugins/${pluginCode}${path.startsWith('/') ? path : `/${path}`}`,

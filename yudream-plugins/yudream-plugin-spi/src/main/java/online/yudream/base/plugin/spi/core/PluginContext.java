@@ -4,6 +4,7 @@ import online.yudream.base.plugin.spi.capability.PluginCapabilityItem;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
+import online.yudream.base.plugin.spi.http.PluginStreamingHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.theme.PluginTheme;
@@ -20,6 +21,7 @@ import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.graph.PluginGraphService;
 import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
 import online.yudream.base.plugin.spi.system.security.PluginOAuthService;
+import online.yudream.base.plugin.spi.ws.PluginWsHandler;
 
 import java.util.Optional;
 import java.util.List;
@@ -87,7 +89,42 @@ public interface PluginContext {
 
     void registerHttpHandler(String method, String path, PluginHttpHandler handler);
 
+    /**
+     * 注册流式 HTTP 端点（SPI 2.33.0 起）：请求体与响应支持真流式（宿主不整体缓冲），
+     * 见 {@link PluginStreamingHttpHandler}。同一路径与缓冲端点并存时流式优先；
+     * 注册随插件 disable/unload 自动移除，无需手工注销。
+     *
+     * <p>为保持既有第三方 {@code PluginContext} 实现类的二进制兼容，本方法以 default
+     * 形式声明；仅宿主实现覆写。在未实现该契约的宿主上调用将抛出
+     * {@link UnsupportedOperationException}。</p>
+     */
+    default void registerStreamingHttpHandler(String method, String path, PluginStreamingHttpHandler handler) {
+        throw new UnsupportedOperationException(
+                "当前宿主未实现插件流式 HTTP 契约（需要 SPI >= 2.33.0 的宿主支持）：registerStreamingHttpHandler");
+    }
+
     void registerHttpController(Object controller);
+
+    /**
+     * 注册插件 WebSocket 端点（SPI 2.33.0 起），最终挂载到
+     * {@code /api/platform/plugin-ws/{pluginCode}{path}}。permission 非空时宿主在握手阶段
+     * 校验当前主体权限（语义与 {@code @PluginHttpEndpoint#permission} 一致）；为空表示
+     * 由插件自行基于 {@code handshake.principal()} 判断（允许匿名时不要注册权限）。
+     * 注册随插件 disable/unload/reload 自动移除，宿主同时强制关闭该插件的全部会话。
+     *
+     * <p>为保持既有第三方 {@code PluginContext} 实现类的二进制兼容，本方法以 default
+     * 形式声明；仅宿主实现覆写。在未实现该契约的宿主上调用将抛出
+     * {@link UnsupportedOperationException}。
+     */
+    default void registerWebSocketHandler(String path, String permission, PluginWsHandler handler) {
+        throw new UnsupportedOperationException(
+                "当前宿主未实现插件 WebSocket 契约（需要 SPI >= 2.33.0 的宿主支持）：registerWebSocketHandler");
+    }
+
+    /** 以无宿主权限门槛方式注册插件 WebSocket 端点（鉴权交由插件自行处理）。 */
+    default void registerWebSocketHandler(String path, PluginWsHandler handler) {
+        registerWebSocketHandler(path, "", handler);
+    }
 
     void registerAiTool(PluginAiTool tool);
 

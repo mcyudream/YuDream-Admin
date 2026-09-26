@@ -1,5 +1,6 @@
 package online.yudream.base.plugin.spi.system.backup;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -19,4 +20,15 @@ public interface PluginBackupOperations {
 
     /** 查询本插件触发的任务状态；任务不存在或不属于本插件时返回空。 */
     Optional<PluginBackupJobStatus> status(String jobId);
+
+    /**
+     * 按备份范围查询本插件最近的任务摘要（含本机导出与异地推送，按创建时间倒序）。
+     * 宿主 SPI 无此能力（旧版本）时返回空列表。
+     *
+     * @param scopeCode 插件自己注册的范围编码，如 {@code server-data}
+     * @param limit     返回条数上限（1-200，越界按边界处理）
+     */
+    default List<PluginBackupJobSummary> listScopeJobs(String scopeCode, int limit) {
+        return List.of();
+    }
 }

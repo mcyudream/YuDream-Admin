@@ -10,6 +10,7 @@ import online.yudream.base.plugin.spi.core.PluginContext;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
 import online.yudream.base.plugin.spi.http.PluginHttpHandler;
+import online.yudream.base.plugin.spi.http.PluginStreamingHttpHandler;
 import online.yudream.base.plugin.spi.menu.PluginMenuItem;
 import online.yudream.base.plugin.spi.permission.PluginPermissionItem;
 import online.yudream.base.plugin.spi.system.FrameworkServices;
@@ -21,6 +22,7 @@ import online.yudream.base.plugin.spi.system.memory.PluginSemanticMemoryService;
 import online.yudream.base.plugin.spi.system.graph.PluginGraphService;
 import online.yudream.base.plugin.spi.theme.PluginTheme;
 import online.yudream.base.plugin.spi.widget.PluginGlobalWidget;
+import online.yudream.base.plugin.spi.ws.PluginWsHandler;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -50,6 +52,8 @@ public class PluginContextImpl implements PluginContext {
     private final List<PluginFrontendModule> frontendModules = new ArrayList<>();
     private final List<PluginHttpEndpointInfo> httpEndpoints = new ArrayList<>();
     private final Map<String, PluginHttpHandler> httpHandlers = new ConcurrentHashMap<>();
+    private final Map<String, StreamingHttpRegistration> streamingHttpHandlers = new ConcurrentHashMap<>();
+    private final Map<String, WsHandlerRegistration> wsHandlers = new ConcurrentHashMap<>();
     private final List<AutoCloseable> disposables = new ArrayList<>();
     private final Set<String> menuKeys = ConcurrentHashMap.newKeySet();
     private final Set<String> permissionKeys = ConcurrentHashMap.newKeySet();
@@ -99,6 +103,38 @@ public class PluginContextImpl implements PluginContext {
     @Override
     public String pluginCode() {
         return pluginCode;
+    }
+
+    /** 覆写默认实现：OAuth 登记端口绑定当前插件 code，宿主据此做属主校验与降级防护。 */
+    @Override
+    public online.yudream.base.plugin.spi.system.security.PluginOAuthService oauth() {
+        online.yudream.base.plugin.spi.system.security.PluginOAuthService delegate = framework().oauth();
+        if (!(delegate instanceof online.yudream.base.infra.platform.plugin.service.PluginOAuthFrameworkService frameworkService)) {
+            return delegate;
+        }
+        String owner = pluginCode;
+        return new online.yudream.base.plugin.spi.system.security.PluginOAuthService() {
+            @Override
+            public boolean enabled() {
+                return delegate.enabled();
+            }
+
+            @Override
+            public java.util.Optional<online.yudream.base.plugin.spi.system.security.PluginOAuthClient> findClient(String clientId) {
+                return delegate.findClient(clientId);
+            }
+
+            @Override
+            public java.util.Optional<online.yudream.base.plugin.spi.system.security.PluginOAuthClient> ensurePublicClient(
+                    online.yudream.base.plugin.spi.system.security.PluginOAuthPublicClientSpec spec) {
+                return frameworkService.ensurePublicClient(spec, owner);
+            }
+
+            @Override
+            public void disableClient(String clientId) {
+                frameworkService.disableClient(owner, clientId);
+            }
+        };
     }
 
     @Override
@@ -229,7 +265,87 @@ public class PluginContextImpl implements PluginContext {
         if (httpHandlers.putIfAbsent(key, handler) != null) {
             throw new BizException("插件 HTTP 端点重复：" + key);
         }
+        if (streamingHttpHandlers.containsKey(key)) {
+            httpHandlers.remove(key);
+            throw new BizException("插件 HTTP 端点重复（已注册为流式端点）：" + key);
+        }
         httpEndpoints.add(new PluginHttpEndpointInfo(pluginCode, method, path, permission, wrapResult));
+    }
+
+    @Override
+    public void registerStreamingHttpHandler(String method, String path, PluginStreamingHttpHandler handler) {
+        registerStreamingHttpHandler(method, path, "", true, handler);
+    }
+
+    /** 宿主内部注册流式端点：permission/wrapResult 随注册保存，分发时由网关先做鉴权再做限长。 */
+    public void registerStreamingHttpHandler(String method, String path, String permission, boolean wrapResult, PluginStreamingHttpHandler handler) {
+        if (handler == null) {
+            throw new BizException("插件流式 HTTP 处理器不能为空");
+        }
+        String key = httpKey(method, path);
+        if (streamingHttpHandlers.putIfAbsent(key, new StreamingHttpRegistration(handler,
+                permission == null ? "" : permission.trim(), wrapResult)) != null) {
+            throw new BizException("插件流式 HTTP 端点重复：" + key);
+        }
+        if (httpHandlers.containsKey(key)) {
+            streamingHttpHandlers.remove(key);
+            throw new BizException("插件 HTTP 端点重复（已注册为缓冲端点）：" + key);
+        }
+        httpEndpoints.add(new PluginHttpEndpointInfo(pluginCode, method, path, permission, wrapResult));
+    }
+
+    /** 按插件内相对路径解析流式端点注册：先精确匹配（method、通配 *），再按路由模式（**、{var}）匹配。 */
+    public Optional<StreamingHttpRegistration> findStreamingHttpHandler(String method, String path) {
+        String normalizedMethod = StringUtils.hasText(method) ? method.trim().toUpperCase(Locale.ROOT) : "*";
+        String normalizedPath = normalizePath(path);
+        StreamingHttpRegistration registration = streamingHttpHandlers.get(httpKey(normalizedMethod, normalizedPath));
+        if (registration == null) {
+            registration = streamingHttpHandlers.get(httpKey("*", normalizedPath));
+        }
+        if (registration != null) {
+            return Optional.of(registration);
+        }
+        return streamingHttpHandlers.entrySet().stream()
+                .filter(entry -> routeMatches(entry.getKey(), normalizedMethod, normalizedPath))
+                .map(Map.Entry::getValue)
+                .findFirst();
+    }
+
+    public boolean hasStreamingHttpHandler(String method, String path) {
+        return findStreamingHttpHandler(method, path).isPresent();
+    }
+
+    /** 插件流式 HTTP 注册项（宿主网关消费）：permission 先于任何请求体消费执行鉴权。 */
+    public record StreamingHttpRegistration(PluginStreamingHttpHandler handler, String permission, boolean wrapResult) {
+    }
+
+    @Override
+    public void registerWebSocketHandler(String path, String permission, PluginWsHandler handler) {
+        if (handler == null) {
+            throw new BizException("插件 WebSocket 处理器不能为空");
+        }
+        String key = normalizePath(requireText(path, "插件 WebSocket 路径不能为空"));
+        String safePermission = permission == null ? "" : permission.trim();
+        WsHandlerRegistration registration = new WsHandlerRegistration(key, safePermission, handler);
+        if (wsHandlers.putIfAbsent(key, registration) != null) {
+            throw new BizException("插件 WebSocket 端点重复：" + key);
+        }
+    }
+
+    /** 按插件内相对路径解析 WebSocket 注册：先精确匹配，再按路由模式（*、**、{var}）匹配。 */
+    public Optional<WsHandlerRegistration> findWsHandler(String path) {
+        String normalizedPath = normalizePath(path);
+        WsHandlerRegistration exact = wsHandlers.get(normalizedPath);
+        if (exact != null) {
+            return Optional.of(exact);
+        }
+        return wsHandlers.values().stream()
+                .filter(registration -> pathMatches(registration.path(), normalizedPath))
+                .findFirst();
+    }
+
+    /** 插件 WebSocket 注册项（宿主桥接消费）。 */
+    public record WsHandlerRegistration(String path, String permission, PluginWsHandler handler) {
     }
 
     @Override
@@ -374,6 +490,8 @@ public class PluginContextImpl implements PluginContext {
         frontendModules.clear();
         httpEndpoints.clear();
         httpHandlers.clear();
+        streamingHttpHandlers.clear();
+        wsHandlers.clear();
         pluginServiceRegistry.clear(pluginCode);
         menuKeys.clear();
         permissionKeys.clear();

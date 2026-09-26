@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.assembler.PluginAssembler;
 import online.yudream.base.application.platform.plugin.cmd.PluginHttpDispatchCmd;
+import online.yudream.base.application.platform.plugin.cmd.PluginHttpStreamingDispatchCmd;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendManifestDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginFrontendAssetDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginHttpDispatchDTO;
@@ -704,13 +705,29 @@ public class PluginAppService {
         return PluginAssembler.toDTO(pluginRuntimeGateway.dispatch(PluginAssembler.toRequest(cmd)));
     }
 
+    /** 插件是否在 (method, path) 上注册了流式 HTTP 端点；分发方据此选择流式/缓冲路径。 */
+    @Transactional(readOnly = true)
+    public boolean hasStreamingHttpHandler(String pluginCode, String method, String path) {
+        return pluginRuntimeGateway.hasStreamingHttpHandler(pluginCode, method, path);
+    }
+
+    /** 真流式分发：鉴权与前置限长由运行时网关在物化 query/body/parts 之前完成。 */
+    @Transactional(readOnly = true)
+    public PluginHttpDispatchDTO dispatchStreaming(PluginHttpStreamingDispatchCmd cmd) {
+        if (!pluginRuntimeGateway.enabled(cmd.getPluginCode())) {
+            throw new BizException("插件未启用");
+        }
+        return PluginAssembler.toDTO(pluginRuntimeGateway.dispatchStreaming(PluginAssembler.toStreamingRequest(cmd)));
+    }
+
     @Transactional
     public List<PluginModuleDTO> restoreEnabledPlugins() {
         syncPluginRegistry();
         Map<String, PluginModule> modules = modulesByCode();
         Set<String> restored = new HashSet<>();
         Set<String> visiting = new HashSet<>();
-        for (PluginModule module : modules.values().stream().sorted(Comparator.comparing(PluginModule::getCode)).toList()) {
+        // 依赖感知顺序：提供方先于消费方加载，软依赖 ClassLoader 一次性捕获才拿得到提供方
+        for (PluginModule module : PluginDependencyGraph.restoreOrder(modules)) {
             if (!restoreCandidate(module)) {
                 disableZombieRuntime(module.getCode());
                 String menuFailure = reconcileUnavailableMenus(module.getCode());
@@ -766,6 +783,13 @@ public class PluginAppService {
                         break;
                     }
                 }
+            } catch (Throwable e) {
+                // 插件 enable 期的 NoClassDefFoundError 等 LinkageError 不是 Exception 子类，
+                // 必须同样收敛为 markError；否则单个坏插件（如缺软依赖 API 类）会炸掉整机启动。
+                lastFailure = new BizException("插件启用失败：" + rootMessage(e));
+                log.warn("Failed to restore plugin {} on attempt {}/{} (linkage): {}", code, attempt,
+                        MARKETPLACE_RESTORE_ATTEMPTS, rootMessage(e), e);
+                break;
             }
         }
         String failure = rootMessage(lastFailure == null ? new BizException("插件恢复失败") : lastFailure);
@@ -1030,9 +1054,13 @@ public class PluginAppService {
             return backup;
         }
         if (Files.isRegularFile(backup)) {
-            backup = backup.getParent().resolve(module.getCode() + "-" +
-                    (StringUtils.hasText(module.getPluginVersion()) ? module.getPluginVersion() : "unknown") +
-                    "-" + activeHash + ".jar").toAbsolutePath().normalize();
+            // code/version 来自 plugin.yml，必须先净化再拼路径，否则 "1.0.0/../.." 一类版本会逃出回滚目录
+            backup = backup.getParent().resolve(backupJarName(module.getCode(),
+                    StringUtils.hasText(module.getPluginVersion()) ? module.getPluginVersion() : "unknown",
+                    activeHash)).toAbsolutePath().normalize();
+            if (!backup.startsWith(backupDirectory())) {
+                throw new BizException("非法插件备份路径");
+            }
         }
         Path staged = stageJar(active, backup.getParent(), ".plugin-rollback-backup-");
         try {
@@ -1198,6 +1226,11 @@ public class PluginAppService {
         return backupDirectory()
                 .resolve((module.getCode() + "-" + version + ".jar").replaceAll("[^A-Za-z0-9._-]", "-"))
                 .toAbsolutePath().normalize();
+    }
+
+    /** 备份文件名与 controlledBackupPath 同规则净化，并保证解析后仍位于回滚目录内。 */
+    private String backupJarName(String code, String version, String hashSuffix) {
+        return (code + "-" + version + "-" + hashSuffix + ".jar").replaceAll("[^A-Za-z0-9._-]", "-");
     }
 
     private Path backupDirectory() {
