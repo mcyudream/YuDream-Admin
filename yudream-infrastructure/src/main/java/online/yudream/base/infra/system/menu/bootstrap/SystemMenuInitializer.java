@@ -54,8 +54,10 @@ public class SystemMenuInitializer implements ApplicationListener<ApplicationRea
         int rebound = rebindSeededParents(modules);
 
         bindPermissionsToSystemRoles(modules);
-        log.info("System menus initialized, modules={}, syncedMenus={}, reboundParents={}, syncMode={}",
-                modules.size(), syncedMenus.size(), rebound, syncMode);
+        // 导入合并/历史原因可能产生同 code 菜单冗余，启动时自愈清理（保留首条）
+        int deduped = menuDomainService.dedupeByCode();
+        log.info("System menus initialized, modules={}, syncedMenus={}, reboundParents={}, deduped={}, syncMode={}",
+                modules.size(), syncedMenus.size(), rebound, deduped, syncMode);
     }
 
     /**

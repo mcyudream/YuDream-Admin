@@ -14,8 +14,11 @@ import online.yudream.base.domain.system.user.repo.PermissionRepo;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -128,10 +131,44 @@ public class MenuDomainService {
     }
 
     /**
-     * 按 code 构建菜单索引。
+     * 按 code 自愈清理重复菜单（导入合并/历史原因产生同 code 多条时保留首条，删除冗余后重建首条）。
+     * 子节点按 parentCode 挂接，删除冗余副本不影响树结构。
+     *
+     * @return 清理的冗余菜单数量
+     */
+    public int dedupeByCode() {
+        List<Menu> all = menuRepo.findAll();
+        Map<String, Menu> keptByCode = new LinkedHashMap<>();
+        List<Menu> duplicates = new ArrayList<>();
+        for (Menu menu : all) {
+            Menu kept = keptByCode.putIfAbsent(menu.getCode(), menu);
+            if (kept != null) {
+                duplicates.add(menu);
+            }
+        }
+        if (duplicates.isEmpty()) {
+            return 0;
+        }
+        Set<String> healedCodes = new LinkedHashSet<>();
+        for (Menu duplicate : duplicates) {
+            if (healedCodes.add(duplicate.getCode())) {
+                menuRepo.deleteByCode(duplicate.getCode());
+                Menu kept = keptByCode.get(duplicate.getCode());
+                if (kept != null) {
+                    menuRepo.save(kept);
+                }
+            }
+        }
+        log.warn("Menu sync detected {} duplicate menu docs, cleaned redundant copies for codes: {}",
+                duplicates.size(), healedCodes);
+        return duplicates.size();
+    }
+
+    /**
+     * 按 code 构建菜单索引（重复 code 保留先加载的一条）。
      */
     public Map<String, Menu> findAllMap() {
         return findActiveMenus().stream()
-                .collect(Collectors.toMap(Menu::getCode, m -> m));
+                .collect(Collectors.toMap(Menu::getCode, m -> m, (first, second) -> first));
     }
 }
