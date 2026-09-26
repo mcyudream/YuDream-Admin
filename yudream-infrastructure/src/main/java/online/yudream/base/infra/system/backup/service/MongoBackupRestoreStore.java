@@ -103,6 +103,46 @@ public class MongoBackupRestoreStore implements BackupRestoreStore {
     }
 
     @Override
+    public Set<String> existingBusinessKeyValues(String collection, String keyField, Collection<String> keyValues) {
+        if (keyValues.isEmpty()) {
+            return Set.of();
+        }
+        Set<String> existing = new HashSet<>();
+        List<String> values = new ArrayList<>(keyValues);
+        for (int from = 0; from < values.size(); from += KEY_PROBE_BATCH) {
+            List<String> batch = values.subList(from, Math.min(from + KEY_PROBE_BATCH, values.size()));
+            try (var cursor = mongo.getCollection(collection)
+                    .find(new Document(keyField, new Document("$in", batch)))
+                    .projection(new Document(keyField, 1))
+                    .iterator()) {
+                while (cursor.hasNext()) {
+                    Object value = cursor.next().get(keyField);
+                    if (value != null) {
+                        existing.add(String.valueOf(value));
+                    }
+                }
+            } catch (Exception e) {
+                throw new BizException("比对业务键失败：" + collection);
+            }
+        }
+        return existing;
+    }
+
+    @Override
+    public long purgeByBusinessKeys(String collection, String keyField, Collection<String> keyValues) {
+        if (keyValues.isEmpty()) {
+            return 0;
+        }
+        try {
+            var result = mongo.getCollection(collection).deleteMany(
+                    new Document(keyField, new Document("$in", new ArrayList<>(keyValues))));
+            return result.getDeletedCount();
+        } catch (Exception e) {
+            throw new BizException("清理同业务键旧数据失败（集合 " + collection + "）：" + rootMessage(e));
+        }
+    }
+
+    @Override
     public Set<String> existingObjectKeys(Collection<String> keys) {
         Set<String> existing = existingObjectKeys();
         Set<String> result = new HashSet<>();

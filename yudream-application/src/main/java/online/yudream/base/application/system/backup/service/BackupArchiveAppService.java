@@ -9,6 +9,7 @@ import online.yudream.base.application.system.backup.dto.BackupJobDTO;
 import online.yudream.base.application.system.backup.dto.BackupScopeDTO;
 import online.yudream.base.application.system.backup.support.BackupChunkUploadManager;
 import online.yudream.base.application.system.backup.support.BackupDirectorySupport;
+import online.yudream.base.application.system.backup.support.BackupEjson;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.backup.aggregate.BackupJob;
 import online.yudream.base.domain.system.backup.aggregate.RemoteTarget;
@@ -19,6 +20,7 @@ import online.yudream.base.domain.system.backup.enumerate.BackupJobType;
 import online.yudream.base.domain.system.backup.repo.BackupJobRepo;
 import online.yudream.base.domain.system.backup.repo.RemoteTargetRepo;
 import online.yudream.base.domain.system.backup.service.BackupArchiveReader;
+import online.yudream.base.domain.system.backup.valobj.BackupBusinessKeys;
 import online.yudream.base.domain.system.backup.service.BackupRestoreStore;
 import online.yudream.base.domain.system.backup.service.CredentialFingerprint;
 import online.yudream.base.domain.system.backup.service.PluginBackupScopeSource;
@@ -165,11 +167,30 @@ public class BackupArchiveAppService {
             manifest.ensureSupported();
             List<BackupAnalysisDTO.CollectionAnalysis> collections = new ArrayList<>();
             for (BackupManifest.ManifestCollection collection : manifest.collections()) {
+                List<SnapshotDocument> documents = new ArrayList<>();
+                reader.streamCollection(collection.name(), documents::add);
                 Set<String> ids = new HashSet<>();
-                reader.streamCollection(collection.name(),
-                        document -> ids.add(document.id()));
+                documents.forEach(document -> ids.add(document.id()));
                 Set<String> existing = restoreStore.existingDocumentIds(collection.name(), ids);
-                long conflict = existing.size();
+                String keyField = BackupBusinessKeys.fieldOf(collection.name());
+                Set<String> existingBizKeys = Set.of();
+                if (keyField != null) {
+                    List<String> bizValues = documents.stream()
+                            .map(document -> BackupEjson.fieldValue(document.ejson(), keyField))
+                            .filter(java.util.Objects::nonNull)
+                            .distinct()
+                            .toList();
+                    if (!bizValues.isEmpty()) {
+                        existingBizKeys = restoreStore.existingBusinessKeyValues(
+                                collection.name(), keyField, bizValues);
+                    }
+                }
+                Set<String> conflictBiz = existingBizKeys;
+                long conflict = documents.stream()
+                        .filter(document -> existing.contains(document.id())
+                                || (keyField != null
+                                        && conflictBiz.contains(BackupEjson.fieldValue(document.ejson(), keyField))))
+                        .count();
                 collections.add(new BackupAnalysisDTO.CollectionAnalysis(
                         collection.name(), collection.count(), collection.count() - conflict, conflict));
             }
