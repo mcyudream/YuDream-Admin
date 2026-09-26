@@ -104,6 +104,7 @@ public final class BackupInfraMapper {
         dataObj.setPassword(encryptPassword(target, cipher));
         dataObj.setBasePath(target.getBasePath());
         dataObj.setPassiveMode(target.isPassiveMode());
+        dataObj.setInsecureTls(target.isInsecureTls());
         dataObj.setEnabled(target.isEnabled());
         return dataObj;
     }
@@ -126,6 +127,7 @@ public final class BackupInfraMapper {
         target.setPassword(decryptPassword(dataObj, cipher));
         target.setBasePath(dataObj.getBasePath());
         target.setPassiveMode(dataObj.isPassiveMode());
+        target.setInsecureTls(dataObj.isInsecureTls());
         target.setEnabled(dataObj.isEnabled());
         return target;
     }

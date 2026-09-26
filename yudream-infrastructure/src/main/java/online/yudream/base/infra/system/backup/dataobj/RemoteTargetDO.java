@@ -22,5 +22,7 @@ public class RemoteTargetDO extends BaseDO {
     private String password;
     private String basePath;
     private boolean passiveMode;
+    /** 跳过 TLS 证书校验（自签名/内网 IP 直连）。 */
+    private boolean insecureTls;
     private boolean enabled;
 }

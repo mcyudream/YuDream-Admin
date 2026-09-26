@@ -34,10 +34,13 @@ public class RemoteTarget extends BaseDomain {
     private String basePath;
     /** FTP 是否使用被动模式（默认 true）。 */
     private boolean passiveMode;
+    /** 跳过 TLS 证书校验（自签名/内网 IP 直连场景）；仅建议可信内网使用。 */
+    private boolean insecureTls;
     private boolean enabled;
 
     public static RemoteTarget create(String code, String name, RemoteTargetType type, String host, Integer port,
-                                      String username, String password, String basePath, boolean passiveMode) {
+                                      String username, String password, String basePath, boolean passiveMode,
+                                      boolean insecureTls) {
         RemoteTarget target = RemoteTarget.builder()
                 .code(code)
                 .name(name)
@@ -48,6 +51,7 @@ public class RemoteTarget extends BaseDomain {
                 .password(password)
                 .basePath(basePath)
                 .passiveMode(passiveMode)
+                .insecureTls(insecureTls)
                 .enabled(true)
                 .build();
         target.ensureValid();
@@ -55,7 +59,8 @@ public class RemoteTarget extends BaseDomain {
     }
 
     public void update(String name, RemoteTargetType type, String host, Integer port,
-                       String username, String password, String basePath, boolean passiveMode) {
+                       String username, String password, String basePath, boolean passiveMode,
+                       boolean insecureTls) {
         this.name = name;
         this.type = type;
         this.host = host;
@@ -66,6 +71,7 @@ public class RemoteTarget extends BaseDomain {
         }
         this.basePath = basePath;
         this.passiveMode = passiveMode;
+        this.insecureTls = insecureTls;
         ensureValid();
     }
 

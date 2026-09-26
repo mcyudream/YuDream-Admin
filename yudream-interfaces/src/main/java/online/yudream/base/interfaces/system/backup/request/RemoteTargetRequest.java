@@ -16,4 +16,6 @@ public class RemoteTargetRequest {
     private String password;
     private String basePath;
     private Boolean passiveMode;
+    /** 跳过 TLS 证书校验（自签名/内网 IP 直连场景）。 */
+    private Boolean insecureTls;
 }

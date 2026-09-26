@@ -18,6 +18,7 @@ public class RemoteTargetRes {
     private String username;
     private String basePath;
     private Boolean passiveMode;
+    private Boolean insecureTls;
     private Boolean enabled;
     private Boolean passwordSet;
     private LocalDateTime createTime;

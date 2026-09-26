@@ -85,6 +85,7 @@ public final class BackupAppAssembler {
                 target.getUsername(),
                 target.getBasePath(),
                 target.isPassiveMode(),
+                target.isInsecureTls(),
                 target.isEnabled(),
                 StringUtils.hasText(target.getPassword()),
                 target.getCreateTime());

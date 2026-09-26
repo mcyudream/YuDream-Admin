@@ -84,6 +84,7 @@ const targetForm = reactive({
   password: '',
   basePath: '/',
   passiveMode: true,
+  insecureTls: false,
 })
 
 const targetTypes: { label: string, value: RemoteTargetType }[] = [
@@ -372,6 +373,7 @@ function openTargetForm(row?: RemoteTarget) {
         password: '',
         basePath: row.basePath || '/',
         passiveMode: row.passiveMode !== false,
+        insecureTls: row.insecureTls === true,
       }
     : {
         code: '',
@@ -383,6 +385,7 @@ function openTargetForm(row?: RemoteTarget) {
         password: '',
         basePath: '/',
         passiveMode: true,
+        insecureTls: false,
       })
   targetFormVisible.value = true
 }
@@ -1102,6 +1105,12 @@ function formatArchiveTime(millis?: number) {
               <FaInput v-model="targetForm.basePath" placeholder="/dav/backup，须以 / 开头" />
             </a-form-item>
           </div>
+          <a-form-item v-if="targetForm.type !== 'FTP'" label="跳过 TLS 证书校验">
+            <FaSwitch v-model="targetForm.insecureTls" />
+            <div class="mt-1 text-xs text-secondary-foreground/60">
+              自签名证书或用 IP 直连 HTTPS/FTPS 时开启；存在中间人风险，仅建议可信内网使用。
+            </div>
+          </a-form-item>
           <a-form-item v-if="targetForm.type !== 'WEBDAV'" label="FTP 被动模式">
             <FaSwitch v-model="targetForm.passiveMode" />
             <div class="mt-1 text-xs text-secondary-foreground/60">

@@ -58,14 +58,16 @@ public class RemoteBackupAppService {
             throw new BizException("目标编码已存在：" + cmd.code());
         }
         RemoteTarget target = RemoteTarget.create(cmd.code(), cmd.name(), requireType(cmd.type()),
-                cmd.host(), cmd.port(), cmd.username(), cmd.password(), cmd.basePath(), cmd.passiveMode());
+                cmd.host(), cmd.port(), cmd.username(), cmd.password(), cmd.basePath(), cmd.passiveMode(),
+                Boolean.TRUE.equals(cmd.insecureTls()));
         return BackupAppAssembler.toTargetDTO(targetRepo.save(target));
     }
 
     public RemoteTargetDTO updateTarget(Long id, RemoteTargetCmd cmd) {
         RemoteTarget target = targetRepo.findById(id).orElseThrow(() -> new BizException("异地目标不存在"));
         target.update(cmd.name(), requireType(cmd.type()), cmd.host(), cmd.port(),
-                cmd.username(), cmd.password(), cmd.basePath(), cmd.passiveMode());
+                cmd.username(), cmd.password(), cmd.basePath(), cmd.passiveMode(),
+                Boolean.TRUE.equals(cmd.insecureTls()));
         return BackupAppAssembler.toTargetDTO(targetRepo.save(target));
     }
 

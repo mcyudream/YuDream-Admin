@@ -12,6 +12,10 @@ import org.xml.sax.InputSource;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URI;
@@ -37,13 +41,45 @@ public class WebDavRemoteBackupStorage implements RemoteBackupStorage {
     private static final int TIMEOUT_MILLIS = 60_000;
 
     private final RemoteTarget target;
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofMillis(TIMEOUT_MILLIS))
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
+    private final HttpClient http;
 
     WebDavRemoteBackupStorage(RemoteTarget target) {
         this.target = target;
+        HttpClient.Builder builder = HttpClient.newBuilder()
+                .connectTimeout(Duration.ofMillis(TIMEOUT_MILLIS))
+                .followRedirects(HttpClient.Redirect.NORMAL);
+        if (target.isInsecureTls()) {
+            // 内网自签名/IP 直连：信任所有证书并关闭端点身份校验（仅当目标显式开启）
+            builder.sslContext(trustAllContext());
+            SSLParameters parameters = new SSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("");
+            builder.sslParameters(parameters);
+        }
+        this.http = builder.build();
+    }
+
+    private static SSLContext trustAllContext() {
+        TrustManager[] trustAll = new TrustManager[]{new X509TrustManager() {
+            @Override
+            public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+            }
+
+            @Override
+            public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType) {
+            }
+
+            @Override
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return new java.security.cert.X509Certificate[0];
+            }
+        }};
+        try {
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, trustAll, new java.security.SecureRandom());
+            return context;
+        } catch (Exception e) {
+            throw new BizException("初始化 TLS 上下文失败：" + e.getMessage());
+        }
     }
 
     @Override
