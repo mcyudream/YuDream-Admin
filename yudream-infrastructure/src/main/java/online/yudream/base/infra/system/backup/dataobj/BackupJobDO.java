@@ -12,6 +12,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -28,6 +29,8 @@ public class BackupJobDO extends BaseDO {
     private String targetCode;
     private String targetName;
     private BackupConflictStrategy strategy;
+    /** 插件范围触发时的导出选项。 */
+    private Map<String, String> scopeOptions;
     private String archiveName;
     private String archivePath;
     private Long archiveSize;

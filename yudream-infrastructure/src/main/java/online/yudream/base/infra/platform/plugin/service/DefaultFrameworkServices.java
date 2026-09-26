@@ -85,9 +85,27 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final SettingRepo settingRepo;
     private final Environment environment;
+    private final online.yudream.base.application.system.backup.service.BackupArchiveAppService backupArchiveAppService;
     private final ConcurrentMap<String, PluginDocumentStore> documentStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginFileStore> fileStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginSecretStore> secretStores = new ConcurrentHashMap<>();
+
+    @Override
+    public online.yudream.base.plugin.spi.system.backup.PluginBackupOperations backups(String pluginCode) {
+        return new online.yudream.base.plugin.spi.system.backup.PluginBackupOperations() {
+            @Override
+            public String startScopeBackup(
+                    online.yudream.base.plugin.spi.system.backup.PluginScopeBackupRequest request) {
+                return backupArchiveAppService.startPluginScopeBackup(pluginCode,
+                        request.scopeCode(), request.targetCode(), request.options());
+            }
+
+            @Override
+            public java.util.Optional<online.yudream.base.plugin.spi.system.backup.PluginBackupJobStatus> status(String jobId) {
+                return backupArchiveAppService.pluginJobStatus(pluginCode, jobId);
+            }
+        };
+    }
 
     @Override
     public PluginUserService users() {

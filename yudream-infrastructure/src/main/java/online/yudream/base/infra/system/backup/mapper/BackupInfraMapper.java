@@ -34,6 +34,7 @@ public final class BackupInfraMapper {
         dataObj.setTargetCode(job.getTargetCode());
         dataObj.setTargetName(job.getTargetName());
         dataObj.setStrategy(job.getStrategy());
+        dataObj.setScopeOptions(job.getScopeOptions());
         dataObj.setArchiveName(job.getArchiveName());
         dataObj.setArchivePath(job.getArchivePath());
         dataObj.setArchiveSize(job.getArchiveSize());
@@ -69,6 +70,7 @@ public final class BackupInfraMapper {
         job.setTargetCode(dataObj.getTargetCode());
         job.setTargetName(dataObj.getTargetName());
         job.setStrategy(dataObj.getStrategy());
+        job.setScopeOptions(dataObj.getScopeOptions());
         job.setArchiveName(dataObj.getArchiveName());
         job.setArchivePath(dataObj.getArchivePath());
         job.setArchiveSize(dataObj.getArchiveSize());

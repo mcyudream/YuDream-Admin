@@ -10,11 +10,13 @@ import online.yudream.base.application.system.backup.dto.BackupScopeDTO;
 import online.yudream.base.application.system.backup.support.BackupDirectorySupport;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.system.backup.aggregate.BackupJob;
+import online.yudream.base.domain.system.backup.aggregate.RemoteTarget;
 import online.yudream.base.domain.system.backup.enumerate.BackupConflictStrategy;
 import online.yudream.base.domain.system.backup.enumerate.BackupJobStatus;
 import online.yudream.base.domain.system.backup.enumerate.BackupJobTrigger;
 import online.yudream.base.domain.system.backup.enumerate.BackupJobType;
 import online.yudream.base.domain.system.backup.repo.BackupJobRepo;
+import online.yudream.base.domain.system.backup.repo.RemoteTargetRepo;
 import online.yudream.base.domain.system.backup.service.BackupArchiveReader;
 import online.yudream.base.domain.system.backup.service.BackupRestoreStore;
 import online.yudream.base.domain.system.backup.service.CredentialFingerprint;
@@ -23,6 +25,7 @@ import online.yudream.base.domain.system.backup.valobj.ArchiveFileEntry;
 import online.yudream.base.domain.system.backup.valobj.BackupManifest;
 import online.yudream.base.domain.system.backup.valobj.BackupScopeRef;
 import online.yudream.base.domain.system.backup.valobj.SnapshotDocument;
+import online.yudream.base.plugin.spi.system.backup.PluginBackupJobStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -35,6 +38,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -48,6 +53,7 @@ public class BackupArchiveAppService {
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     private final BackupJobRepo jobRepo;
+    private final RemoteTargetRepo remoteTargetRepo;
     private final BackupArchiveReader.Factory readerFactory;
     private final BackupRestoreStore restoreStore;
     private final PluginBackupScopeSource scopeSource;
@@ -68,6 +74,48 @@ public class BackupArchiveAppService {
         BackupJob job = BackupJob.create(BackupJobType.EXPORT, BackupJobTrigger.MANUAL, tags,
                 null, null, null, null);
         return toDTO(jobRepo.save(job));
+    }
+
+    /** 插件以自己身份触发一次范围备份（targetCode 空=本机导出，否则推送异地）。返回任务 id。 */
+    public String startPluginScopeBackup(String pluginCode, String scopeCode, String targetCode,
+                                         Map<String, String> options) {
+        PluginBackupScopeSource.PluginScopeHandle handle = scopeSource.find(pluginCode, scopeCode)
+                .orElseThrow(() -> new BizException("该插件未提供备份范围：" + scopeCode));
+        String tag = BackupScopeRef.plugin(pluginCode, scopeCode, handle.displayName()).tag();
+        BackupJob job;
+        if (StringUtils.hasText(targetCode)) {
+            RemoteTarget target = remoteTargetRepo.findByCode(targetCode)
+                    .orElseThrow(() -> new BizException("异地目标不存在：" + targetCode));
+            if (!target.isEnabled()) {
+                throw new BizException("异地目标已停用：" + targetCode);
+            }
+            job = BackupJob.create(BackupJobType.REMOTE_BACKUP, BackupJobTrigger.MANUAL,
+                    List.of(tag), null, null, target.getCode(), target.getName());
+        } else {
+            job = BackupJob.create(BackupJobType.EXPORT, BackupJobTrigger.MANUAL,
+                    List.of(tag), null, null, null, null);
+        }
+        job.setScopeOptions(options == null ? Map.of() : Map.copyOf(options));
+        return String.valueOf(jobRepo.save(job).getId());
+    }
+
+    /** 插件查询自己触发的任务状态；任务不存在或不属于该插件时返回空。 */
+    public Optional<PluginBackupJobStatus> pluginJobStatus(String pluginCode, String jobId) {
+        long id;
+        try {
+            id = Long.parseLong(jobId);
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+        return jobRepo.findById(id)
+                .filter(job -> job.getScopeTags() != null && job.getScopeTags().stream()
+                        .anyMatch(tag -> tag.startsWith("plugin:" + pluginCode + "/")))
+                .map(job -> new PluginBackupJobStatus(
+                        String.valueOf(job.getId()),
+                        job.getStatus() == null ? "" : job.getStatus().name(),
+                        job.getPercent(),
+                        job.getMessage(),
+                        job.getArchiveName()));
     }
 
     /** 同步分析归档：按集合统计缺失/冲突数量，供管理员在执行合并前确认策略。 */
