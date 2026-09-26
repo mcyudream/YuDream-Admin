@@ -43,7 +43,7 @@ class PluginDevProjectCatalogTest {
         assertEquals(1, first.registered().size());
         assertEquals("alpha", first.registered().getFirst().getCode());
         assertEquals(pluginA.toAbsolutePath().normalize().toString(), first.registered().getFirst().getPath());
-        assertEquals("mvn -q compile -DskipTests -P dev-export", first.registered().getFirst().getCompileCommand());
+        assertEquals("mvn -q process-classes -DskipTests -P dev-export", first.registered().getFirst().getCompileCommand());
         assertTrue(first.skipped().stream().anyMatch(item ->
                 "alpha".equals(item.code()) && "编码冲突".equals(item.reason())));
         assertTrue(first.skipped().stream().anyMatch(item ->
@@ -70,7 +70,7 @@ class PluginDevProjectCatalogTest {
         PluginDevProjectCatalog.CatalogBatchResult result = catalog.addFromDirectory(plugin);
         assertEquals(1, result.registered().size());
         assertEquals("solo", result.registered().getFirst().getCode());
-        assertEquals("mvn -q compile -DskipTests -P dev-export", result.registered().getFirst().getCompileCommand());
+        assertEquals("mvn -q process-classes -DskipTests -P dev-export", result.registered().getFirst().getCompileCommand());
         assertTrue(result.skipped().isEmpty());
     }
 
@@ -86,7 +86,7 @@ class PluginDevProjectCatalogTest {
         project.setPath(plugin.toString());
         PluginDevModeProperties.DevProject saved = catalog.add(project);
         assertEquals("solo", saved.getCode());
-        assertEquals("mvn -q compile -DskipTests -P dev-export", saved.getCompileCommand());
+        assertEquals("mvn -q process-classes -DskipTests -P dev-export", saved.getCompileCommand());
     }
 
     private Path writePlugin(Path root, String code) throws IOException {
