@@ -1,11 +1,10 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="yudream-test : 8081 隔离库" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+  <configuration default="false" name="yudream-test-setup : 8081 安装向导（首次）" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
     <option name="ACTIVE_PROFILES" value="test" />
     <envs>
       <env name="YUDREAM_BOOTSTRAP_CONFIG" value="config/yudream-bootstrap-test.properties" />
     </envs>
     <module name="yudream-bootstrap" />
-    <option name="SHORTEN_COMMAND_LINE" value="ARGS_FILE" />
     <option name="SPRING_BOOT_MAIN_CLASS" value="online.yudream.base.bootstrap.YuDreamApplication" />
     <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
     <method v="2">
