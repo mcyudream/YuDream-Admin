@@ -40,11 +40,13 @@ const scopeCheckOptions = computed(() => scopes.value.map(scope => ({
 
 const importInputRef = ref<HTMLInputElement>()
 const importing = ref(false)
-const importSubmitting = ref(false)
 const importModalVisible = ref(false)
 const importStrategy = ref('LOCAL_WINS')
 const analysis = ref<BackupAnalysis | null>(null)
-const selectedImportFile = ref<File | null>(null)
+const stagedUploadId = ref('')
+const importingProgress = ref<number | null>(null)
+/** 分片大小 8MB：兼顾请求数与单请求内存/失败重传代价。 */
+const CHUNK_SIZE = 8 * 1024 * 1024
 
 const strategyOptions = [
   { label: '以本地数据为准', value: 'LOCAL_WINS', description: '只插入本地缺失的数据，不覆盖任何现有数据' },
@@ -263,23 +265,39 @@ async function onImportFile(event: Event) {
     return
   }
   importing.value = true
+  importingProgress.value = 0
+  let uploadId = ''
   try {
-    const form = new FormData()
-    form.append('file', file)
-    const res = await apiBackup.analyzeImport(form)
+    // 分片顺序上传：服务端按偏移追加落盘并增量算摘要，规避超大档单请求超时/内存问题
+    uploadId = (await apiBackup.beginChunkUpload({ name: file.name, size: file.size })).data
+    stagedUploadId.value = uploadId
+    let offset = 0
+    while (offset < file.size) {
+      const chunk = file.slice(offset, Math.min(offset + CHUNK_SIZE, file.size))
+      offset = Number((await apiBackup.uploadChunk(uploadId, offset, chunk)).data ?? offset)
+      importingProgress.value = Math.round((offset / file.size) * 100)
+    }
+    await apiBackup.finishChunkUpload({ uploadId, size: file.size })
+    const res = await apiBackup.analyzeStaged(uploadId)
     analysis.value = res.data
-    selectedImportFile.value = file
     importStrategy.value = 'LOCAL_WINS'
     importModalVisible.value = true
   }
+  catch {
+    if (uploadId) {
+      void apiBackup.abortChunkUpload(uploadId).catch(() => {})
+    }
+    stagedUploadId.value = ''
+  }
   finally {
     importing.value = false
+    importingProgress.value = null
   }
 }
 
 function submitImport() {
-  const file = selectedImportFile.value
-  if (!file || !analysis.value) {
+  const uploadId = stagedUploadId.value
+  if (!uploadId || !analysis.value) {
     return
   }
   const localWins = importStrategy.value === 'LOCAL_WINS'
@@ -293,22 +311,13 @@ function submitImport() {
       + `重复数据 ${conflictTotal} 条将${localWins ? '保留本地、只补缺失部分' : '以备份覆盖本地'}；`
       + `任一端独有的数据始终保留，不会删除。确认开始合并导入吗？`,
     onConfirm: async () => {
-      const form = new FormData()
-      form.append('file', file)
-      form.append('strategy', importStrategy.value)
-      importSubmitting.value = true
-      try {
-        const res = await apiBackup.import(form)
-        toast.success(`合并导入任务已创建（#${res.data.id}）`)
-        importModalVisible.value = false
-        analysis.value = null
-        selectedImportFile.value = null
-        activeTab.value = 'jobs'
-        await loadJobs()
-      }
-      finally {
-        importSubmitting.value = false
-      }
+      importModalVisible.value = false
+      const res = await apiBackup.importStaged(uploadId, importStrategy.value as BackupConflictStrategy)
+      toast.success(`合并导入任务已创建（#${res.data.id}）`)
+      analysis.value = null
+      stagedUploadId.value = ''
+      activeTab.value = 'jobs'
+      await loadJobs()
     },
   })
 }
@@ -720,6 +729,12 @@ function formatArchiveTime(millis?: number) {
                   <FaIcon name="i-ri:upload-cloud-2-line" />
                   选择备份归档并分析
                 </FaButton>
+                <template v-if="importing">
+                  <FaProgress :model-value="importingProgress ?? 0" class="mt-3" />
+                  <div class="mt-1 text-xs text-secondary-foreground/60">
+                    分片上传中 {{ importingProgress ?? 0 }}%（8MB/片，服务端合并后分析）
+                  </div>
+                </template>
               </div>
               <FaAlert
                 class="mt-4"
@@ -758,14 +773,15 @@ function formatArchiveTime(millis?: number) {
               <span class="text-sm">{{ scopeText(row.original.scopeTags) }}</span>
             </template>
             <template #cell-status="{ row }">
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col items-start gap-1">
                 <FaTag :variant="jobStatusVariant(row.original)">{{ jobStatusText(row.original) }}</FaTag>
                 <FaProgress
                   v-if="row.original.status === 'RUNNING' || row.original.status === 'QUEUED'"
                   :model-value="row.original.percent || 0"
-                  class="h-1"
+                  class="h-1 self-stretch"
                 />
-                <span v-if="row.original.message" class="max-w-[240px] break-all text-xs text-secondary-foreground/60" :title="row.original.message">
+                <!-- td 自带 whitespace-nowrap，提示必须显式截断，否则会横穿右侧列 -->
+                <span v-if="row.original.message" class="max-w-[154px] truncate text-xs text-secondary-foreground/60" :title="row.original.message">
                   {{ row.original.message }}
                 </span>
               </div>
@@ -950,7 +966,7 @@ function formatArchiveTime(millis?: number) {
               </FaTag>
             </template>
             <template #cell-lastRunAt="{ row }">
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col items-start gap-1">
                 <span class="text-sm">{{ formatTime(row.original.lastRunAt) }}</span>
                 <FaTag v-if="row.original.lastStatus" :variant="row.original.lastStatus === 'SUCCEEDED' ? 'default' : 'destructive'">
                   {{ row.original.lastStatus === 'SUCCEEDED' ? '成功' : row.original.lastStatus === 'FAILED' ? '失败' : '执行中' }}
@@ -1008,7 +1024,6 @@ function formatArchiveTime(millis?: number) {
         title="合并导入分析"
         show-cancel-button
         class="sm:max-w-3xl"
-        :confirm-loading="importSubmitting"
         confirm-button-text="开始导入"
         @confirm="submitImport"
       >
