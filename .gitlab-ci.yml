@@ -307,6 +307,8 @@ build-and-push-images:
   before_script:
     # Harbor（registry.yudream.online）推送必须认证：robot 账号只经项目级 CI 变量注入，禁止写入仓库
     # 应用镜像落 Harbor 的 yda 项目；转推的第三方镜像（如 kkfileview）走 library，见 docker/kkfileview/push.sh
+    # 注意：DOCKER_REGISTRY_USER 的形如 robot$push，变量必须以 raw（不展开变量引用）方式创建——
+    # 否则 GitLab 会把 $push 当变量引用展开成空值，登录用户变成 robot 并报 unauthorized
     - |
       REGISTRY_SERVER="${DOCKER_REGISTRY:-$(printf '%s' "$CI_REGISTRY_IMAGE" | cut -d/ -f1)}"
       if [ -z "${DOCKER_REGISTRY_USER:-}" ] || [ -z "${DOCKER_REGISTRY_PASSWORD:-}" ]; then
