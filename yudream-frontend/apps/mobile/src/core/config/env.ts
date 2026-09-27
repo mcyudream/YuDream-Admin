@@ -6,7 +6,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const KEY_SERVER_URL = 'env.serverUrl';
 
-export const DEFAULT_SERVER_URL = 'http://10.0.2.2:8080';
+// adb reverse tcp:8080 已把模拟器 localhost 映射到宿主机（run-android 亦会自动转发 8081），
+// 比 10.0.2.2 更确定（MuMu/标准模拟器通吃）；真机调试在设置页改成局域网地址。
+export const DEFAULT_SERVER_URL = 'http://127.0.0.1:8080';
 
 /** App 宿主自身版本，随 package.json 同步维护；manifest 协商的 minHostVersion 依据。 */
 export const HOST_VERSION = '0.1.0';

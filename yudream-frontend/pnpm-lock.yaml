@@ -834,6 +834,12 @@ importers:
       '@react-native/babel-preset':
         specifier: 0.76.6
         version: 0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))
+      '@react-native/codegen':
+        specifier: 0.76.6
+        version: 0.76.6(@babel/preset-env@7.29.7(@babel/core@7.29.7))
+      '@react-native/gradle-plugin':
+        specifier: 0.76.6
+        version: 0.76.6
       '@react-native/metro-config':
         specifier: 0.76.6
         version: 0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))

@@ -6,7 +6,7 @@ pluginManagement {
     if (rnGradlePlugin == null) {
         throw new GradleException("找不到 @react-native/gradle-plugin，请先在 yudream-frontend 下执行 pnpm install")
     }
-    includeBuild(rnGradlePlugin)
+    includeBuild(rnGradlePlugin.absolutePath)
     repositories {
         google()
         mavenCentral()
@@ -18,3 +18,11 @@ plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'YuDream'
 include ':app'
+
+// 与官方模板同构的双重 includeBuild：复合构建按 group:name 做依赖替换，
+// buildscript 中无版本的 react-native-gradle-plugin / AGP / KGP 因此命中本地
+// @react-native/gradle-plugin 工程（AGP/KGP 版本由该工程 catalog 钉定）。
+def rnGradlePluginDir = ['../node_modules', '../../node_modules', '../../../node_modules']
+    .collect { file("$it/@react-native/gradle-plugin") }
+    .find { it.exists() }
+includeBuild(rnGradlePluginDir)

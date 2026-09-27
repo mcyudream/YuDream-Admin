@@ -29,6 +29,8 @@
     "@module-federation/enhanced": "0.8.9",
     "@react-native-community/cli": "15.0.1",
     "@react-native-community/cli-platform-android": "15.0.1",
+    "@react-native/codegen": "0.76.6",
+    "@react-native/gradle-plugin": "0.76.6",
     "@react-native/babel-preset": "0.76.6",
     "@react-native/metro-config": "0.76.6",
     "@react-native/typescript-config": "0.76.6",
