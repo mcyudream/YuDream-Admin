@@ -3,6 +3,7 @@ import type { CSSProperties, HTMLAttributes } from 'vue'
 </script>
 
 <script setup lang="ts" generic="TItem extends DescriptionItem = DescriptionItem">
+import { useMediaQuery } from '@vueuse/core'
 import { computed } from 'vue'
 import { cn } from '#utils'
 
@@ -29,6 +30,10 @@ export interface DescriptionsProps<
 > {
   items?: TItem[]
   column?: number
+  /** 移动端（视口宽度小于等于 mobileBreakpoint）时的列数，默认降为 1 列避免拥挤 */
+  mobileColumn?: number
+  /** 移动端断点，默认与 FaResponsiveTable 一致 */
+  mobileBreakpoint?: string
   direction?: DescriptionDirection
   border?: boolean
   labelWidth?: string | number
@@ -74,6 +79,8 @@ defineOptions({
 
 const props = withDefaults(defineProps<DescriptionsProps<TItem>>(), {
   column: 3,
+  mobileColumn: 1,
+  mobileBreakpoint: '(max-width: 768px)',
   direction: 'horizontal',
   border: false,
   size: 'default',
@@ -88,7 +95,10 @@ const cellSizeClasses: Record<DescriptionSize, string> = {
   lg: 'px-5 py-4 text-base',
 }
 
-const normalizedColumn = computed(() => normalizeColumn(props.column))
+const isMobile = useMediaQuery(() => props.mobileBreakpoint || '(max-width: 768px)')
+
+const normalizedColumn = computed(() =>
+  normalizeColumn(isMobile.value ? props.mobileColumn : props.column))
 
 const rows = computed(() => createRows(props.items ?? [], normalizedColumn.value))
 
