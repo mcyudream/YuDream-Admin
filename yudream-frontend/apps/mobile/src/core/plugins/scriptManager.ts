@@ -6,12 +6,13 @@
 import { Script, ScriptManager } from '@callstack/repack/client';
 import { getActiveDomain } from '@/core/domains/store';
 import { resolveLocalUrl } from './bundleCache';
-import { getPlugin } from './registry';
+import { getPlugin, getPlugins } from './registry';
 
 function findPluginByScript(scriptId: string, caller?: string) {
-  // MF2 下 scriptId 通常为 remote 名（= 插件 code）；caller 兜底
-  // 处理 remoteEntry 二次拉取自身 chunk 的场景。
-  return getPlugin(scriptId) ?? (caller ? getPlugin(caller) : undefined);
+  // remote 名已规范化（连字符转下划线），需要双向反查。
+  const byId = (id: string) =>
+    getPlugin(id) ?? getPlugins().find((p) => p.code.replace(/\W/g, '_') === id);
+  return byId(scriptId) ?? (caller ? byId(caller) : undefined);
 }
 
 export function installScriptManager(): void {
