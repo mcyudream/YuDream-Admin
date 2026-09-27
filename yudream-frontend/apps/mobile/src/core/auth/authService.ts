@@ -29,6 +29,8 @@ export interface MeInfo {
   username: string;
   nickname: string;
   avatar: string | null;
+  /** 管理员（决定「域管理」入口可见性） */
+  admin?: boolean;
 }
 
 export async function login(username: string, password: string): Promise<LoginResult> {
@@ -56,6 +58,8 @@ export async function login(username: string, password: string): Promise<LoginRe
     avatar: envelope.data.avatar ?? null,
   };
   await updateDomainAccount(domain.id, account);
+  // 登录后立即取 /me 补齐管理员标志（login 响应不含角色信息）
+  void fetchMe().catch(() => undefined);
   return envelope.data;
 }
 
@@ -90,6 +94,7 @@ export async function fetchMe(): Promise<MeInfo | null> {
       username: me.username,
       nickname: me.nickname || me.username,
       avatar: me.avatar ?? null,
+      admin: me.admin ?? false,
     });
     return me;
   } catch {

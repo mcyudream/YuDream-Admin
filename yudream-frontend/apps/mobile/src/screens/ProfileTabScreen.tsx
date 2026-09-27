@@ -93,9 +93,25 @@ export function ProfileTabScreen({ navigation }: Props) {
               size={52}
             />
             <View style={{ flex: 1, gap: 2 }}>
-              <YdText style={{ fontWeight: t.typography.weightMedium }}>
-                {active?.account?.nickname ?? '未登录'}
-              </YdText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <YdText style={{ fontWeight: t.typography.weightMedium }}>
+                  {active?.account?.nickname ?? '未登录'}
+                </YdText>
+                {active?.account?.admin ? (
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 1,
+                      borderRadius: 999,
+                      backgroundColor: t.colors.fillHover,
+                    }}
+                  >
+                    <YdText variant="caption" style={{ color: t.colors.accent }}>
+                      管理员
+                    </YdText>
+                  </View>
+                ) : null}
+              </View>
               <YdText variant="caption" numberOfLines={1}>
                 {active ? hostOf(active.serverUrl) : ''}
               </YdText>
@@ -115,7 +131,19 @@ export function ProfileTabScreen({ navigation }: Props) {
           ) : null}
         </YdCard>
 
-        {/* 域管理 */}
+        {/* 域管理（管理员）：统一管理站点域与应用注册内容 */}
+        {active?.account?.admin ? (
+          <YdCard>
+            <YdListItem
+              title="域管理"
+              subtitle="站点域与应用展示、排序统一管理"
+              onPress={() => navigation.navigate('DomainManage')}
+              trailing={<Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />}
+            />
+          </YdCard>
+        ) : null}
+
+        {/* 域列表 */}
         <YdCard>
           <View style={{ gap: t.spacing.sm }}>
             <YdText style={{ fontWeight: t.typography.weightMedium }}>我的站点域</YdText>

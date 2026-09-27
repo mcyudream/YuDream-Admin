@@ -5,7 +5,7 @@
 import { installScriptManager } from '@/core/plugins/scriptManager';
 import { syncPlugins, warmupFromCache } from '@/core/plugins/pluginLoader';
 import { loadCachedThemeOverride, fetchThemeOverride } from '@/core/theme/themeLoader';
-import { isAuthenticated } from '@/core/auth/authService';
+import { fetchMe, isAuthenticated } from '@/core/auth/authService';
 import { getActiveDomain, loadDomains, updateDomainBranding } from '@/core/domains/store';
 import { discoverDomain } from '@/core/domains/discover';
 
@@ -45,6 +45,12 @@ export async function bootstrap(): Promise<BootstrapResult> {
     .catch(() => undefined);
 
   const authenticated = await isAuthenticated();
+  // 已登录的启动同样后台同步（否则重启后永远停留在旧快照，新装的插件不出现）
+  if (authenticated) {
+    startBackgroundSync();
+    // 刷新账户摘要（管理员标志可能变化）
+    void fetchMe().catch(() => undefined);
+  }
   return { hasDomain: true, authenticated, themeOverride };
 }
 

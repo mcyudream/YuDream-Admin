@@ -52,7 +52,7 @@ export async function restoreCachedManifest(domainId: string): Promise<boolean> 
     return false;
   }
   try {
-    current = (JSON.parse(raw) as MobileManifest).plugins;
+    current = (JSON.parse(raw) as MobileManifest).plugins ?? [];
     emit();
     return true;
   } catch {

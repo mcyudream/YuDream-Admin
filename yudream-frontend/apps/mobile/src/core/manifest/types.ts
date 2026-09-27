@@ -6,6 +6,17 @@
 
 export type MobilePlatform = 'android' | 'ios';
 
+/** 应用向主页注册的卡片（plugin.yml mobile.home.cards，后端透传）。 */
+export interface MobileHomeCard {
+  id: string;
+  title: string;
+  description: string;
+  /** Ionicons 图标名 */
+  icon: string;
+  /** 应用内路由，打开应用时透传给插件模块 */
+  route: string;
+}
+
 export interface ManifestPluginEntry {
   code: string;
   version: string;
@@ -16,6 +27,23 @@ export interface ManifestPluginEntry {
   minHostVersion: string;
   platforms: MobilePlatform[];
   requiredNativeCapabilities: string[];
+  /** 移动端展示名（mobile.name，缺省回落 code） */
+  name?: string;
+  description?: string;
+  /** Ionicons 图标名（mobile.icon） */
+  icon?: string;
+  /** 应用注册的主页卡片 */
+  homeCards?: MobileHomeCard[];
+}
+
+/** 应用展示名：mobile.name 优先，回落 code。 */
+export function appDisplayName(entry: ManifestPluginEntry): string {
+  return entry.name?.trim() || entry.code;
+}
+
+/** 应用首个卡片路由：无声明时 undefined，宿主用默认路由打开。 */
+export function appHomeRoute(entry: ManifestPluginEntry): string | undefined {
+  return entry.homeCards?.[0]?.route;
 }
 
 export interface MobileManifest {
