@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, RefreshControl, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -251,6 +251,64 @@ export function HomeTabScreen({ navigation }: Props) {
             </View>
             {/* 轮播图 */}
             <BannerCarousel banners={banners} onPress={openBanner} />
+            {/* 轻量应用入口条：常用应用 + 全部 */}
+            {visibleApps.length > 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {visibleApps.slice(0, 4).map((app) => (
+                  <Pressable
+                    key={app.code}
+                    onPress={() =>
+                      navigation.navigate('PluginHost', {
+                        code: app.code,
+                        title: appDisplayName(app),
+                        route: app.homeCards?.[0]?.route,
+                      })
+                    }
+                    android_ripple={{ color: t.colors.fillHover, radius: 40 }}
+                    style={{ alignItems: 'center', marginRight: t.spacing.md, paddingHorizontal: t.spacing.xs }}
+                  >
+                    <View
+                      style={{
+                        width: 46,
+                        height: 46,
+                        borderRadius: 14,
+                        backgroundColor: t.colors.bgSurface,
+                        borderWidth: 1,
+                        borderColor: t.colors.borderSubtle,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Icon name={app.icon ?? 'cube-outline'} size={24} color={t.colors.accent} />
+                    </View>
+                    <YdText variant="caption" numberOfLines={1} style={{ marginTop: 4, maxWidth: 64 }}>
+                      {appDisplayName(app)}
+                    </YdText>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => navigation.navigate('应用')}
+                  android_ripple={{ color: t.colors.fillHover, radius: 40 }}
+                  style={{ alignItems: 'center', paddingHorizontal: t.spacing.xs }}
+                >
+                  <View
+                    style={{
+                      width: 46,
+                      height: 46,
+                      borderRadius: 14,
+                      backgroundColor: t.colors.fillHover,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon name="grid-outline" size={22} color={t.colors.textSecondary} />
+                  </View>
+                  <YdText variant="caption" style={{ marginTop: 4 }}>
+                    全部
+                  </YdText>
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         }
         renderItem={({ item }) => {
