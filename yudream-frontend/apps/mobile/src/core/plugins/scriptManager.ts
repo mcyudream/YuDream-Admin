@@ -16,11 +16,17 @@ function findPluginByScript(scriptId: string, caller?: string) {
 
 export function installScriptManager(): void {
   ScriptManager.shared.addResolver(async (scriptId, caller) => {
-    const plugin = findPluginByScript(scriptId, caller);
     const domain = getActiveDomain();
+    const plugin = findPluginByScript(scriptId, caller) ?? (caller ? findPluginByScript(caller) : undefined);
     if (!plugin || !domain) {
       // 非插件脚本（如 dev server 的宿主 bundle 附属块）交给默认解析。
       return undefined;
+    }
+    // MF shared 异步 chunk：scriptId 为 chunk 文件名（如 845），caller 为 remote 名。
+    // v1 缓存目录只存 remoteEntry 本体，chunk 回源源站同目录。
+    if (scriptId !== plugin.code && /^[\w.-]+?(\.js)?$/.test(scriptId)) {
+      const base = plugin.remoteEntryUrl.replace(/[^/]*$/, '');
+      return { url: Script.getRemoteURL(`${base}${scriptId}.js`), cache: false };
     }
     const local = await resolveLocalUrl(domain.id, plugin.code);
     if (local) {

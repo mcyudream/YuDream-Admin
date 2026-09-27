@@ -16,7 +16,7 @@ export interface PluginThemeTokens {
   colors: Record<string, string>;
   spacing: Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number>;
   radii: Record<'sm' | 'md' | 'lg' | 'full', number>;
-  typography: Record<string, unknown>;
+  typography: Record<string, number>;
 }
 
 export type PluginPlatform = 'android' | 'ios';
