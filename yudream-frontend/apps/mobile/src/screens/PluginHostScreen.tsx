@@ -6,6 +6,7 @@ import { YdButton, YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { loadPluginModule } from '@/core/plugins/pluginLoader';
 import { rollback } from '@/core/plugins/bundleCache';
+import { getActiveDomain } from '@/core/domains/store';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PluginHost'>;
@@ -62,7 +63,12 @@ export function PluginHostScreen({ route }: Props) {
           <YdButton
             title="回滚到上一版本并重试"
             variant="secondary"
-            onPress={() => void rollback(code).then(() => setRetryToken((n) => n + 1))}
+            onPress={() => {
+              const domain = getActiveDomain();
+              void (domain ? rollback(domain.id, code) : Promise.resolve(false)).then(() =>
+                setRetryToken((n) => n + 1),
+              );
+            }}
           />
           <YdButton title="重试" variant="ghost" onPress={() => setRetryToken((n) => n + 1)} />
         </View>

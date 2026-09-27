@@ -43,9 +43,22 @@ export interface DeeplinkBridge {
   canOpen(url: string): Promise<boolean>;
 }
 
+export type ScanSource = 'camera' | 'image';
+
+export interface ScannerBridge {
+  /**
+   * 扫描二维码并返回文本；取消返回 null。
+   * v1：相机扫描待接入（需原生相机能力），实现方返回 null 时 UI 引导手动输入/粘贴。
+   */
+  scan(source?: ScanSource): Promise<string | null>;
+  /** 能力是否真正可用（决定 UI 是否展示扫码入口）。 */
+  available(): Promise<boolean>;
+}
+
 export interface NativeBridges {
   secureStorage: SecureStorageBridge;
   sse: SseBridge;
   download: DownloadBridge;
   deeplink: DeeplinkBridge;
+  scanner: ScannerBridge;
 }

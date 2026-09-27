@@ -1,11 +1,11 @@
 /**
- * 插件注册表：当前生效的 manifest + 加载状态。
- * manifest 拉取失败时用 AsyncStorage 里的上次成功快照（离线启动的核心）。
+ * 插件注册表：当前激活域生效的 manifest + 加载状态。
+ * manifest 按域缓存（AsyncStorage 键含域 id），切域/离线启动用快照。
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { ManifestPluginEntry, MobileManifest } from '@/core/manifest/types';
 
-const KEY_CACHED_MANIFEST = 'manifest.cached';
+const cacheKey = (domainId: string) => `manifest.cached.${domainId}`;
 
 type Listener = (plugins: ManifestPluginEntry[]) => void;
 
@@ -34,16 +34,21 @@ export function getPlugin(code: string): ManifestPluginEntry | undefined {
 export function setManifest(manifest: MobileManifest): void {
   current = manifest.plugins;
   emit();
-  void AsyncStorage.setItem(
-    KEY_CACHED_MANIFEST,
+}
+
+export async function cacheManifest(domainId: string, manifest: MobileManifest): Promise<void> {
+  await AsyncStorage.setItem(
+    cacheKey(domainId),
     JSON.stringify({ ...manifest, fetchedAt: new Date().toISOString() }),
   );
 }
 
-/** 启动早期调用：先用快照填充，保证离线/弱网时 UI 立即可渲染。 */
-export async function restoreCachedManifest(): Promise<boolean> {
-  const raw = await AsyncStorage.getItem(KEY_CACHED_MANIFEST);
+/** 切域/启动早期调用：先用该域快照填充，保证离线/弱网时 UI 立即可渲染。 */
+export async function restoreCachedManifest(domainId: string): Promise<boolean> {
+  const raw = await AsyncStorage.getItem(cacheKey(domainId));
   if (!raw) {
+    current = [];
+    emit();
     return false;
   }
   try {
@@ -51,7 +56,9 @@ export async function restoreCachedManifest(): Promise<boolean> {
     emit();
     return true;
   } catch {
-    await AsyncStorage.removeItem(KEY_CACHED_MANIFEST);
+    await AsyncStorage.removeItem(cacheKey(domainId));
+    current = [];
+    emit();
     return false;
   }
 }

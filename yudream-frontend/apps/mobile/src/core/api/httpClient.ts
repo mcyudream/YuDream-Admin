@@ -1,10 +1,11 @@
 /**
- * HTTP 客户端：对齐 web 侧双 token 语义——
- * 401 先刷新再重试一次；刷新失败统一登出。未登录/失效必须按 401 处理，
+ * HTTP 客户端：始终作用于"激活域"。对齐 web 侧双 token 语义——
+ * 401 先刷新再重试一次；刷新失败统一登出该域。未登录/失效必须按 401 处理，
  * 不得降级成业务错误（否则动态内容失败后会呈现空白页）。
  */
-import { getServerUrl } from '@/core/config/env';
+import { getActiveDomain } from '@/core/domains/store';
 import { clearTokens, loadTokens, saveTokens } from '@/core/auth/tokenStore';
+import type { ResultEnvelope } from './envelope';
 
 export class ApiError extends Error {
   constructor(
@@ -21,12 +22,6 @@ export class ApiError extends Error {
   }
 }
 
-interface ResultEnvelope<T> {
-  code: number;
-  message: string;
-  data: T;
-}
-
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
@@ -40,11 +35,15 @@ let refreshInFlight: Promise<boolean> | null = null;
 async function tryRefresh(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
-      const tokens = await loadTokens();
+      const domain = getActiveDomain();
+      if (!domain) {
+        return false;
+      }
+      const tokens = await loadTokens(domain.id);
       if (!tokens) {
         return false;
       }
-      const res = await fetch(`${getServerUrl()}/api/user/token/refresh`, {
+      const res = await fetch(`${domain.serverUrl}/api/user/token/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: tokens.refreshToken }),
@@ -59,7 +58,7 @@ async function tryRefresh(): Promise<boolean> {
       if (envelope.code !== 200) {
         return false;
       }
-      await saveTokens({
+      await saveTokens(domain.id, {
         accessToken: envelope.data.token,
         refreshToken: envelope.data.refreshToken,
       });
@@ -72,7 +71,11 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const tokens = await loadTokens();
+  const domain = getActiveDomain();
+  if (!domain) {
+    throw new ApiError('尚未接入任何站点域', 0, 0);
+  }
+  const tokens = await loadTokens(domain.id);
   const headers: Record<string, string> = {
     Accept: 'application/json',
     ...options.headers,
@@ -84,7 +87,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     headers.Authorization = `Bearer ${tokens.accessToken}`;
   }
 
-  const res = await fetch(`${getServerUrl()}${path}`, {
+  const res = await fetch(`${domain.serverUrl}${path}`, {
     method: options.method ?? 'GET',
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -94,7 +97,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     if (await tryRefresh()) {
       return request<T>(path, { ...options, retried: true });
     }
-    await clearTokens();
+    await clearTokens(domain.id);
     throw new ApiError('登录状态已失效，请重新登录', 401, 401);
   }
 

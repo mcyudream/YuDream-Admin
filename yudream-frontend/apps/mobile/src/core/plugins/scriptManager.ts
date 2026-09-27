@@ -1,9 +1,10 @@
 /**
  * Re.Pack ScriptManager 接管：
- * 插件 remoteEntry 一律优先解析沙盒缓存（离线可用）；无缓存回源站。
+ * 插件 remoteEntry 一律优先解析激活域的沙盒缓存（离线可用）；无缓存回源站。
  * 解析失败会在 pluginLoader 层触发回滚重试。
  */
 import { Script, ScriptManager } from '@callstack/repack/client';
+import { getActiveDomain } from '@/core/domains/store';
 import { resolveLocalUrl } from './bundleCache';
 import { getPlugin } from './registry';
 
@@ -16,11 +17,12 @@ function findPluginByScript(scriptId: string, caller?: string) {
 export function installScriptManager(): void {
   ScriptManager.shared.addResolver(async (scriptId, caller) => {
     const plugin = findPluginByScript(scriptId, caller);
-    if (!plugin) {
+    const domain = getActiveDomain();
+    if (!plugin || !domain) {
       // 非插件脚本（如 dev server 的宿主 bundle 附属块）交给默认解析。
       return undefined;
     }
-    const local = await resolveLocalUrl(plugin.code);
+    const local = await resolveLocalUrl(domain.id, plugin.code);
     if (local) {
       return { url: local, cache: false };
     }

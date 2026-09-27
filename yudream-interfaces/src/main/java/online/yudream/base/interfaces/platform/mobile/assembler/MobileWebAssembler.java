@@ -5,6 +5,7 @@ import online.yudream.base.application.platform.mobile.cmd.MobileDeviceUnregiste
 import online.yudream.base.application.platform.mobile.dto.MobileDeviceDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileManifestEntryDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileManifestDTO;
+import online.yudream.base.application.platform.mobile.dto.MobileSiteInfoDTO;
 import online.yudream.base.application.platform.mobile.query.MobileManifestQuery;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
@@ -13,6 +14,7 @@ import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceUnregi
 import online.yudream.base.interfaces.platform.mobile.res.MobileDeviceRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestEntryRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestRes;
+import online.yudream.base.interfaces.platform.mobile.res.MobileSiteInfoRes;
 import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
@@ -72,6 +74,16 @@ public class MobileWebAssembler {
                 .hostVersion(dto.getHostVersion())
                 .registeredAt(dto.getRegisteredAt())
                 .lastSeenAt(dto.getLastSeenAt())
+                .build();
+    }
+
+    public static MobileSiteInfoRes toSiteInfoRes(MobileSiteInfoDTO dto) {
+        return MobileSiteInfoRes.builder()
+                .siteName(dto.getSiteName())
+                .logo(dto.getLogo())
+                .favicon(dto.getFavicon())
+                .version(dto.getVersion())
+                .mobileEnabled(dto.isMobileEnabled())
                 .build();
     }
 

@@ -4,9 +4,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import type { RootStackParamList } from './types';
 import { SplashScreen } from '@/screens/SplashScreen';
+import { WelcomeScreen } from '@/screens/WelcomeScreen';
+import { DomainAddScreen } from '@/screens/DomainAddScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
-import { HomeScreen } from '@/screens/HomeScreen';
-import { SettingsScreen } from '@/screens/SettingsScreen';
+import { MainTabs } from '@/screens/MainTabs';
 import { PluginHostScreen } from '@/screens/PluginHostScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -30,9 +31,18 @@ export function RootNavigator() {
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator initialRouteName="Splash">
         <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="Welcome"
+          component={WelcomeScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="DomainAdd"
+          component={DomainAddScreen}
+          options={{ headerShown: false, presentation: 'modal' }}
+        />
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false, title: '首页' }} />
-        <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: '设置' }} />
+        <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
         <Stack.Screen
           name="PluginHost"
           component={PluginHostScreen}
