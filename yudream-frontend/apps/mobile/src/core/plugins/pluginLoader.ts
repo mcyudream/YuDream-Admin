@@ -29,9 +29,14 @@ export function initFederation(): void {
   federationReady = true;
 }
 
+/** MF 容器名必须是合法 JS 标识符：code 中的连字符等转下划线（yudream-skin -> yudream_skin）。 */
+export function remoteNameOf(code: string): string {
+  return code.replace(/\W/g, '_');
+}
+
 function toRemotes(plugins: ManifestPluginEntry[]) {
   return plugins.map((p) => ({
-    name: p.code,
+    name: remoteNameOf(p.code),
     // 指向 manifest 给的远端地址；ScriptManager resolver 会优先改投本地缓存。
     entry: p.remoteEntryUrl,
   }));
@@ -99,7 +104,7 @@ export async function loadPluginModule(
   initFederation();
   const domain = getActiveDomain();
   try {
-    const mod = await loadRemote<MobilePluginModule>(`${code}/module`);
+    const mod = await loadRemote<MobilePluginModule>(`${remoteNameOf(code)}/module`);
     if (!mod?.default) {
       throw new Error('插件未导出默认组件');
     }
@@ -110,7 +115,7 @@ export async function loadPluginModule(
       throw first;
     }
     console.warn(`[plugins] ${code} 加载失败，已回滚到上一可用版本`, first);
-    const mod = await loadRemote<MobilePluginModule>(`${code}/module`);
+    const mod = await loadRemote<MobilePluginModule>(`${remoteNameOf(code)}/module`);
     if (!mod?.default) {
       throw first;
     }
