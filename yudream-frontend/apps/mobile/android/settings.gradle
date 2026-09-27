@@ -1,0 +1,20 @@
+pluginManagement {
+    // 单仓/平铺两种 node_modules 布局都找得到 gradle 插件（pnpm 提升后在本仓根）。
+    def rnGradlePlugin = ['../node_modules', '../../node_modules', '../../../node_modules']
+        .collect { file("$it/@react-native/gradle-plugin") }
+        .find { it.exists() }
+    if (rnGradlePlugin == null) {
+        throw new GradleException("找不到 @react-native/gradle-plugin，请先在 yudream-frontend 下执行 pnpm install")
+    }
+    includeBuild(rnGradlePlugin)
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins { id("com.facebook.react.settings") }
+extensions.configure(com.facebook.react.ReactSettingsExtension) { ex -> ex.autolinkLibrariesFromCommand() }
+rootProject.name = 'YuDream'
+include ':app'

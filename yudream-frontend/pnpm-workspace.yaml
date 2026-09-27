@@ -15,6 +15,7 @@ packages:
   - packages/dataviz
   - packages/iconify-tools
   - packages/plugin-sdk
+  - packages/plugin-sdk-mobile
   - packages/settings
   - packages/themes
   - packages/types
