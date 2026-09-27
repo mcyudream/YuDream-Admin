@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import online.yudream.base.application.platform.plugin.service.PluginMenuProjectionService;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
+import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginLifecycleAction;
@@ -41,6 +43,7 @@ import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrows
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
+import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
 import online.yudream.base.plugin.spi.frontend.PluginFrontendModule;
@@ -685,34 +688,74 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
             throw new BizException("插件未启用");
         }
         String path = normalizeAssetPath(assetPath);
+        // 约定 mobile/ 前缀映射插件 JAR 内 frontend-mobile 根，供移动 App 下载移动产物
+        if (path.startsWith("mobile/")) {
+            String mobilePath = path.substring("mobile/".length());
+            if (mobilePath.isBlank()) {
+                throw new BizException("插件前端资源路径非法");
+            }
+            return readFrontendAsset(holder, code, path,
+                    "META-INF/yudream-plugin/frontend-mobile/" + code + "/", mobilePath, "mobile");
+        }
+        return readFrontendAsset(holder, code, path,
+                "META-INF/yudream-plugin/frontend/" + code + "/", path, null);
+    }
+
+    private Optional<PluginFrontendAssetInfo> readFrontendAsset(PluginRuntimeHolder holder, String code,
+                                                                String displayPath, String resourceRoot, String resourcePath,
+                                                                String devDistSubDir) {
         // 开发模式优先从源码仓 dist 目录取前端产物，vite build --watch 的更新即时生效
-        Optional<PluginFrontendAssetInfo> devAsset = devFrontendAsset(code, path);
+        Optional<PluginFrontendAssetInfo> devAsset = devFrontendAsset(code, displayPath, resourcePath, devDistSubDir);
         if (devAsset.isPresent()) {
             return devAsset;
         }
-        String resourcePath = "META-INF/yudream-plugin/frontend/" + code + "/" + path;
-        try (InputStream inputStream = holder.getClassLoader().getResourceAsStream(resourcePath)) {
+        String fullResourcePath = resourceRoot + resourcePath;
+        try (InputStream inputStream = holder.getClassLoader().getResourceAsStream(fullResourcePath)) {
             if (inputStream == null) {
                 return Optional.empty();
             }
-            return Optional.of(frontendAssetInfo(path, inputStream.readAllBytes()));
+            return Optional.of(frontendAssetInfo(displayPath, inputStream.readAllBytes()));
         } catch (IOException e) {
             throw new BizException("插件前端资源读取失败：" + e.getMessage());
         }
     }
 
-    private Optional<PluginFrontendAssetInfo> devFrontendAsset(String code, String path) {
+    @Override
+    public Optional<String> mobileAssetSha256(String code, String assetPath) {
+        PluginRuntimeHolder holder = holder(code);
+        if (!holder.isEnabled()) {
+            return Optional.empty();
+        }
+        String path = normalizeAssetPath(assetPath);
+        String resourcePath = "META-INF/yudream-plugin/frontend-mobile/" + code + "/" + path;
+        try (InputStream inputStream = holder.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                return Optional.empty();
+            }
+            byte[] body = inputStream.readAllBytes();
+            return Optional.of(java.util.HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(body)));
+        } catch (IOException e) {
+            throw new BizException("插件移动产物读取失败：" + e.getMessage());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 不可用", exception);
+        }
+    }
+
+    private Optional<PluginFrontendAssetInfo> devFrontendAsset(String code, String displayPath,
+                                                               String resourcePath, String distSubDir) {
         PluginDevModeProperties.DevProject project = findDevProject(code);
         if (project == null) {
             return Optional.empty();
         }
+        // 移动产物在 dist 下约定放 mobile/ 子目录，与桌面前端产物互不干扰
         Path dist = project.resolvedFrontendDist();
-        Path file = dist.resolve(path).normalize();
+        Path file = dist.resolve(distSubDir == null ? resourcePath : distSubDir + "/" + resourcePath).normalize();
         if (!file.startsWith(dist) || !Files.isRegularFile(file)) {
             return Optional.empty();
         }
         try {
-            return Optional.of(frontendAssetInfo(path, Files.readAllBytes(file)));
+            return Optional.of(frontendAssetInfo(displayPath, Files.readAllBytes(file)));
         } catch (IOException e) {
             throw new BizException("插件前端资源读取失败：" + e.getMessage());
         }
@@ -1080,8 +1123,19 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
                 descriptor.dependencies(),
                 descriptor.softDependencies(),
                 descriptor.icon(),
-                descriptor.gitUrl()
+                descriptor.gitUrl(),
+                toMobileSupport(descriptor.mobileSupport())
         );
+    }
+
+    private MobilePluginSupport toMobileSupport(PluginMobileSupport mobileSupport) {
+        if (mobileSupport == null) {
+            return MobilePluginSupport.undeclared();
+        }
+        List<MobilePlatform> platforms = mobileSupport.platforms().stream()
+                .map(MobilePluginSupport::requireLegalPlatformToken)
+                .toList();
+        return MobilePluginSupport.declared(platforms, mobileSupport.minHostVersion(), mobileSupport.requiredNativeCapabilities());
     }
 
     private PluginPermissionInfo toInfo(PluginPermissionItem item) {

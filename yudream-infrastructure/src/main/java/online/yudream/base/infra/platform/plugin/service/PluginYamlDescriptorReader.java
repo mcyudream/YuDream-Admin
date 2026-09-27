@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
+import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import org.springframework.util.StringUtils;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -32,7 +33,8 @@ public class PluginYamlDescriptorReader {
                 list(values, "depend"),
                 list(values, "softdepend"),
                 optionalIcon(values),
-                optionalGitUrl(values)
+                optionalGitUrl(values),
+                optionalMobileSupport(values)
         );
     }
 
@@ -71,6 +73,35 @@ public class PluginYamlDescriptorReader {
             throw new BizException("plugin.yml 的 git 必须是合法的 http(s) 仓库地址");
         }
         return gitUrl;
+    }
+
+    /**
+     * plugin.yml 可选 mobile 块：platforms（缺省 android+ios）、minHostVersion（缺省 1.0.0）、
+     * requiredNativeCapabilities（缺省空）。注册期校验合法性：platforms 只允许 android/ios。
+     */
+    private PluginMobileSupport optionalMobileSupport(Map<?, ?> values) {
+        Object mobile = values.get("mobile");
+        if (mobile == null) {
+            return null;
+        }
+        if (!(mobile instanceof Map<?, ?> mobileValues)) {
+            throw new BizException("plugin.yml 的 mobile 必须是 YAML 对象");
+        }
+        List<String> platforms = list(mobileValues, "platforms");
+        for (String platform : platforms) {
+            if (!"android".equalsIgnoreCase(platform) && !"ios".equalsIgnoreCase(platform)) {
+                throw new BizException("plugin.yml 的 mobile.platforms 仅支持 android/ios：" + platform);
+            }
+        }
+        String minHostVersion = value(mobileValues, "minHostVersion");
+        if (StringUtils.hasText(minHostVersion) && !minHostVersion.matches("[0-9]+(\\.[0-9]+){0,3}(-[0-9A-Za-z.-]+)?")) {
+            throw new BizException("plugin.yml 的 mobile.minHostVersion 必须是语义化版本：" + minHostVersion);
+        }
+        return new PluginMobileSupport(
+                platforms,
+                minHostVersion,
+                list(mobileValues, "requiredNativeCapabilities")
+        );
     }
 
     private List<String> list(Map<?, ?> values, String key) {

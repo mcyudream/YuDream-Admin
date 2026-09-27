@@ -52,4 +52,10 @@ public class PluginModuleDO extends BaseDO {
     private Boolean menusInitialized;
     private List<String> themeScopes;
     private String marketSourceCode;
+    /** plugin.yml mobile 块：android/ios 小写 token 列表；未声明移动支持时为 null。 */
+    private List<String> mobilePlatforms;
+    /** plugin.yml mobile 块：宿主最低版本；未声明时为 null。 */
+    private String mobileMinHostVersion;
+    /** plugin.yml mobile 块：要求的原生能力；未声明时为 null。 */
+    private List<String> mobileRequiredNativeCapabilities;
 }
