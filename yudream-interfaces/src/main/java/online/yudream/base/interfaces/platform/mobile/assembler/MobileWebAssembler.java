@@ -12,6 +12,8 @@ import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceRegisterRequest;
 import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceUnregisterRequest;
 import online.yudream.base.interfaces.platform.mobile.res.MobileDeviceRes;
+import online.yudream.base.application.platform.mobile.dto.MobileHomeCardDTO;
+import online.yudream.base.interfaces.platform.mobile.res.MobileHomeCardRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestEntryRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileSiteInfoRes;
@@ -102,9 +104,28 @@ public class MobileWebAssembler {
                 .remoteEntryUrl(entry.getRemoteEntryUrl())
                 .minHostVersion(entry.getMinHostVersion())
                 .styleUrl(entry.getStyleUrl())
+                .name(entry.getName())
+                .description(entry.getDescription())
+                .icon(entry.getIcon())
+                .homeCards(toHomeCardRes(entry.getHomeCards()))
                 .platforms(entry.getPlatforms())
                 .requiredNativeCapabilities(entry.getRequiredNativeCapabilities())
                 .build();
+    }
+
+    private static List<MobileHomeCardRes> toHomeCardRes(List<MobileHomeCardDTO> cards) {
+        if (cards == null || cards.isEmpty()) {
+            return List.of();
+        }
+        return cards.stream()
+                .map(card -> MobileHomeCardRes.builder()
+                        .id(card.getId())
+                        .title(card.getTitle())
+                        .description(card.getDescription())
+                        .icon(card.getIcon())
+                        .route(card.getRoute())
+                        .build())
+                .toList();
     }
 
     /** capabilitySet 逗号分隔可空；空集表示不要求任何原生能力。 */

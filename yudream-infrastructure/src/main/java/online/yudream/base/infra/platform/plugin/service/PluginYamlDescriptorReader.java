@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
+import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import org.springframework.util.StringUtils;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -9,8 +10,11 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class PluginYamlDescriptorReader {
 
@@ -77,7 +81,8 @@ public class PluginYamlDescriptorReader {
 
     /**
      * plugin.yml 可选 mobile 块：platforms（缺省 android+ios）、minHostVersion（缺省 1.0.0）、
-     * requiredNativeCapabilities（缺省空）。注册期校验合法性：platforms 只允许 android/ios。
+     * requiredNativeCapabilities（缺省空）；name/description/icon 为移动端展示声明（可选），
+     * home.cards 为移动端主页卡片声明（可选，≤10 项）。注册期校验合法性：platforms 只允许 android/ios。
      */
     private PluginMobileSupport optionalMobileSupport(Map<?, ?> values) {
         Object mobile = values.get("mobile");
@@ -97,11 +102,102 @@ public class PluginYamlDescriptorReader {
         if (StringUtils.hasText(minHostVersion) && !minHostVersion.matches("[0-9]+(\\.[0-9]+){0,3}(-[0-9A-Za-z.-]+)?")) {
             throw new BizException("plugin.yml 的 mobile.minHostVersion 必须是语义化版本：" + minHostVersion);
         }
+        String name = optionalDisplayValue(mobileValues, "name", 64);
+        String description = optionalDisplayValue(mobileValues, "description", 256);
+        String icon = optionalDisplayValue(mobileValues, "icon", 64);
+        List<PluginMobileHomeCard> homeCards = optionalHomeCards(mobileValues);
         return new PluginMobileSupport(
                 platforms,
                 minHostVersion,
-                list(mobileValues, "requiredNativeCapabilities")
+                list(mobileValues, "requiredNativeCapabilities"),
+                name,
+                description,
+                icon,
+                homeCards
         );
+    }
+
+    /** mobile 块可选展示字段（name/description/icon）：空白视为缺省，超长拒绝。 */
+    private String optionalDisplayValue(Map<?, ?> values, String key, int maxLength) {
+        String value = value(values, key);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        if (value.length() > maxLength) {
+            throw new BizException("plugin.yml 的 mobile." + key + " 长度不能超过 " + maxLength);
+        }
+        return value;
+    }
+
+    /** mobile.home.cards 主页卡片声明：整体可选，声明后逐项校验必填字段与约束。 */
+    private List<PluginMobileHomeCard> optionalHomeCards(Map<?, ?> mobileValues) {
+        Object home = mobileValues.get("home");
+        if (home == null) {
+            return List.of();
+        }
+        if (!(home instanceof Map<?, ?> homeValues)) {
+            throw new BizException("plugin.yml 的 mobile.home 必须是 YAML 对象");
+        }
+        Object cards = homeValues.get("cards");
+        if (cards == null) {
+            return List.of();
+        }
+        if (!(cards instanceof List<?> cardList)) {
+            throw new BizException("plugin.yml 的 mobile.home.cards 必须是列表");
+        }
+        if (cardList.size() > 10) {
+            throw new BizException("plugin.yml 的 mobile.home.cards 数量不能超过 10");
+        }
+        List<PluginMobileHomeCard> parsed = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+        for (int index = 0; index < cardList.size(); index++) {
+            Object item = cardList.get(index);
+            String prefix = "plugin.yml 的 mobile.home.cards[" + index + "]";
+            if (!(item instanceof Map<?, ?> cardValues)) {
+                throw new BizException(prefix + " 必须是 YAML 对象");
+            }
+            String id = requiredCardValue(cardValues, prefix, "id");
+            if (!id.matches("[a-z0-9][a-z0-9-]{0,63}")) {
+                throw new BizException(prefix + ".id 必须匹配 [a-z0-9-]：" + id);
+            }
+            if (!seenIds.add(id)) {
+                throw new BizException(prefix + ".id 重复：" + id);
+            }
+            String title = requiredCardValue(cardValues, prefix, "title");
+            if (title.length() > 32) {
+                throw new BizException(prefix + ".title 长度不能超过 32");
+            }
+            String description = optionalCardValue(cardValues, prefix, "description", 128);
+            String icon = optionalCardValue(cardValues, prefix, "icon", 64);
+            String route = requiredCardValue(cardValues, prefix, "route");
+            if (route.length() > 128) {
+                throw new BizException(prefix + ".route 长度不能超过 128");
+            }
+            if (!route.startsWith("/")) {
+                throw new BizException(prefix + ".route 必须以 / 开头：" + route);
+            }
+            parsed.add(new PluginMobileHomeCard(id, title, description, icon, route));
+        }
+        return List.copyOf(parsed);
+    }
+
+    private String requiredCardValue(Map<?, ?> cardValues, String prefix, String key) {
+        String value = value(cardValues, key);
+        if (!StringUtils.hasText(value)) {
+            throw new BizException(prefix + "." + key + " 不能为空");
+        }
+        return value;
+    }
+
+    private String optionalCardValue(Map<?, ?> cardValues, String prefix, String key, int maxLength) {
+        String value = value(cardValues, key);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        if (value.length() > maxLength) {
+            throw new BizException(prefix + "." + key + " 长度不能超过 " + maxLength);
+        }
+        return value;
     }
 
     private List<String> list(Map<?, ?> values, String key) {

@@ -25,4 +25,6 @@ public class UserMeRes implements Serializable {
     private String username;
     private String nickname;
     private String avatar;
+    /** 是否管理员：判定口径见 UserAppService#hasAdminRole（super_admin/admin 系统角色）。 */
+    private boolean admin;
 }

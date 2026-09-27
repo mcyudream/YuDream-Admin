@@ -29,10 +29,19 @@ public class MobileManifestEntryDTO implements Serializable {
     private String remoteEntryUrl;
     private String minHostVersion;
     private String styleUrl;
+    /** 移动端展示名（plugin.yml mobile.name，未声明时为 null）。 */
+    private String name;
+    /** 移动端描述（plugin.yml mobile.description，未声明时为 null）。 */
+    private String description;
+    /** 移动端图标（Ionicons 名，未声明时为 null）。 */
+    private String icon;
 
     @Builder.Default
     private List<String> platforms = new ArrayList<>();
 
     @Builder.Default
     private List<String> requiredNativeCapabilities = new ArrayList<>();
+
+    @Builder.Default
+    private List<MobileHomeCardDTO> homeCards = new ArrayList<>();
 }

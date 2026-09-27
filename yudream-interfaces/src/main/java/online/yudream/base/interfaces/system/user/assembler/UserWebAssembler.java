@@ -128,6 +128,7 @@ public class UserWebAssembler {
                 .username(dto.getUsername())
                 .nickname(dto.getNickname())
                 .avatar(dto.getAvatar())
+                .admin(dto.isAdmin())
                 .build();
     }
 

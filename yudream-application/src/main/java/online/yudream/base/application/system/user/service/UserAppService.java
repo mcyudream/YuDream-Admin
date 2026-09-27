@@ -575,7 +575,28 @@ public class UserAppService {
     }
 
     private UserProfileDTO toProfileDTO(User user) {
-        return UserAssembler.toProfileDTO(user, avatarUrl(user), messagingIdentityAppService.listByUser(user.getId()));
+        UserProfileDTO dto = UserAssembler.toProfileDTO(user, avatarUrl(user),
+                messagingIdentityAppService.listByUser(user.getId()));
+        dto.setAdmin(hasAdminRole(user));
+        return dto;
+    }
+
+    /**
+     * admin 判定口径：当前用户绑定角色集合中存在系统角色类型为
+     * super_admin（超级管理员）或 admin（管理员）的角色即视为管理员；
+     * 与 PluginAppService 管理端角色口径（SUPER_ADMIN/ADMIN）一致。
+     */
+    private boolean hasAdminRole(User user) {
+        List<RoleID> roleIds = user.getRoles();
+        if (roleIds == null || roleIds.isEmpty()) {
+            return false;
+        }
+        List<Long> ids = roleIds.stream().map(RoleID::getValue).filter(Objects::nonNull).distinct().toList();
+        if (ids.isEmpty()) {
+            return false;
+        }
+        return roleRepo.findByIds(ids).stream().anyMatch(role ->
+                role.getSystemType() == SystemRoleType.SUPER_ADMIN || role.getSystemType() == SystemRoleType.ADMIN);
     }
 
 }

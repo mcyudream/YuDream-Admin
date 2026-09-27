@@ -1,6 +1,7 @@
 package online.yudream.base.infra.platform.plugin.mapper;
 
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.infra.platform.plugin.dataobj.PluginModuleDO;
 
@@ -52,6 +53,10 @@ public class PluginModuleInfraMapper {
         dataObj.setMobilePlatforms(toPlatformTokens(module.getMobilePlatforms()));
         dataObj.setMobileMinHostVersion(module.getMobileMinHostVersion());
         dataObj.setMobileRequiredNativeCapabilities(module.getMobileRequiredNativeCapabilities());
+        dataObj.setMobileName(module.getMobileName());
+        dataObj.setMobileDescription(module.getMobileDescription());
+        dataObj.setMobileIcon(module.getMobileIcon());
+        dataObj.setMobileHomeCards(toHomeCardDOs(module.getMobileHomeCards()));
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -99,6 +104,10 @@ public class PluginModuleInfraMapper {
                 .mobilePlatforms(toPlatforms(dataObj.getMobilePlatforms()))
                 .mobileMinHostVersion(dataObj.getMobileMinHostVersion())
                 .mobileRequiredNativeCapabilities(dataObj.getMobileRequiredNativeCapabilities())
+                .mobileName(dataObj.getMobileName())
+                .mobileDescription(dataObj.getMobileDescription())
+                .mobileIcon(dataObj.getMobileIcon())
+                .mobileHomeCards(toHomeCards(dataObj.getMobileHomeCards()))
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())
@@ -119,6 +128,28 @@ public class PluginModuleInfraMapper {
         return tokens.stream()
                 .filter(token -> token != null && !token.isBlank())
                 .map(MobilePlatform::fromToken)
+                .toList();
+    }
+
+    private static List<PluginModuleDO.MobileHomeCardDO> toHomeCardDOs(List<MobileHomeCard> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new PluginModuleDO.MobileHomeCardDO(
+                        card.id(), card.title(), card.description(), card.icon(), card.route()))
+                .toList();
+    }
+
+    private static List<MobileHomeCard> toHomeCards(List<PluginModuleDO.MobileHomeCardDO> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new MobileHomeCard(
+                        card.getId(), card.getTitle(), card.getDescription(), card.getIcon(), card.getRoute()))
                 .toList();
     }
 }

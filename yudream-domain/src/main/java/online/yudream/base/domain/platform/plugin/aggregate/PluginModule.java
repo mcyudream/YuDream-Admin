@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
@@ -62,6 +63,14 @@ public class PluginModule extends BaseDomain {
     private String mobileMinHostVersion;
     /** plugin.yml mobile 块持久化：要求的原生能力（未声明时为 null）。 */
     private List<String> mobileRequiredNativeCapabilities;
+    /** plugin.yml mobile 块持久化：移动端展示名（未声明时为 null）。 */
+    private String mobileName;
+    /** plugin.yml mobile 块持久化：移动端描述（未声明时为 null）。 */
+    private String mobileDescription;
+    /** plugin.yml mobile 块持久化：移动端图标（Ionicons 名，未声明时为 null）。 */
+    private String mobileIcon;
+    /** plugin.yml mobile 块持久化：移动端主页卡片声明（未声明时为 null）。 */
+    private List<MobileHomeCard> mobileHomeCards;
 
     public static PluginModule fromDescriptor(PluginDescriptorInfo descriptor) {
         MobilePluginSupport mobile = descriptor.mobileSupport();
@@ -79,6 +88,10 @@ public class PluginModule extends BaseDomain {
                 .mobilePlatforms(mobile.declared() ? mobile.platforms() : null)
                 .mobileMinHostVersion(mobile.declared() ? mobile.minHostVersion() : null)
                 .mobileRequiredNativeCapabilities(mobile.declared() ? mobile.requiredNativeCapabilities() : null)
+                .mobileName(mobile.declared() ? emptyToNull(mobile.name()) : null)
+                .mobileDescription(mobile.declared() ? emptyToNull(mobile.description()) : null)
+                .mobileIcon(mobile.declared() ? emptyToNull(mobile.icon()) : null)
+                .mobileHomeCards(mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null)
                 .status(PluginStatus.INSTALLED)
                 .build();
     }
@@ -97,6 +110,10 @@ public class PluginModule extends BaseDomain {
         this.mobilePlatforms = mobile.declared() ? mobile.platforms() : null;
         this.mobileMinHostVersion = mobile.declared() ? mobile.minHostVersion() : null;
         this.mobileRequiredNativeCapabilities = mobile.declared() ? mobile.requiredNativeCapabilities() : null;
+        this.mobileName = mobile.declared() ? emptyToNull(mobile.name()) : null;
+        this.mobileDescription = mobile.declared() ? emptyToNull(mobile.description()) : null;
+        this.mobileIcon = mobile.declared() ? emptyToNull(mobile.icon()) : null;
+        this.mobileHomeCards = mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null;
         if (this.status == null) {
             this.status = PluginStatus.INSTALLED;
         }
@@ -107,7 +124,13 @@ public class PluginModule extends BaseDomain {
         if (mobilePlatforms == null || mobilePlatforms.isEmpty()) {
             return MobilePluginSupport.undeclared();
         }
-        return MobilePluginSupport.declared(mobilePlatforms, mobileMinHostVersion, mobileRequiredNativeCapabilities);
+        return MobilePluginSupport.declared(mobilePlatforms, mobileMinHostVersion, mobileRequiredNativeCapabilities,
+                mobileName, mobileDescription, mobileIcon, mobileHomeCards);
+    }
+
+    /** 空串归一为 null，与未声明字段保持同一持久化形态。 */
+    private static String emptyToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     public void markLoaded() {

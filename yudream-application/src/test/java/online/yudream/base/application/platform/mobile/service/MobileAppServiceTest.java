@@ -12,6 +12,7 @@ import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.domain.platform.mobile.aggregate.MobileDevice;
 import online.yudream.base.domain.platform.mobile.repo.MobileDeviceRepo;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
@@ -101,6 +102,42 @@ class MobileAppServiceTest {
         // 显式关闭同理
         harness.capabilityModules.put(CAPABILITY_CODE, capabilityModule("false"));
         assertTrue(harness.service.manifest(query("ios", "9.9.9", "")).getEntries().isEmpty());
+    }
+
+    @Test
+    void manifestTransmitsDisplayAndHomeCardDeclarations() {
+        MobileTestHarness harness = MobileTestHarness.create(true, iosEnabled("true"));
+        harness.plugin("forum", PluginStatus.ENABLED, List.of("android", "ios"), "2.0.0", List.of(),
+                "论坛", "社区讨论", "chatbubbles-outline",
+                List.of(new MobileHomeCard("latest-posts", "最新帖子", "社区最新动态", "flame-outline", "/posts/latest"),
+                        new MobileHomeCard("hot-posts", "热门帖子", "", "", "/posts/hot")));
+
+        MobileManifestDTO manifest = harness.service.manifest(query("android", "2.0.0", ""));
+        var entry = manifest.getEntries().stream()
+                .filter(item -> item.getCode().equals("forum")).findFirst().orElseThrow();
+        assertEquals("论坛", entry.getName());
+        assertEquals("社区讨论", entry.getDescription());
+        assertEquals("chatbubbles-outline", entry.getIcon());
+        assertEquals(2, entry.getHomeCards().size());
+        var firstCard = entry.getHomeCards().get(0);
+        assertEquals("latest-posts", firstCard.getId());
+        assertEquals("最新帖子", firstCard.getTitle());
+        assertEquals("社区最新动态", firstCard.getDescription());
+        assertEquals("flame-outline", firstCard.getIcon());
+        assertEquals("/posts/latest", firstCard.getRoute());
+        // 空描述/图标按未声明处理，下发 null
+        assertNull(entry.getHomeCards().get(1).getDescription());
+        assertNull(entry.getHomeCards().get(1).getIcon());
+        assertEquals("/posts/hot", entry.getHomeCards().get(1).getRoute());
+
+        // 未声明展示与主页卡片的插件：字段保持 null/空列表，过滤不受影响
+        harness.plugin("plain", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of());
+        var plain = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+                .filter(item -> item.getCode().equals("plain")).findFirst().orElseThrow();
+        assertNull(plain.getName());
+        assertNull(plain.getDescription());
+        assertNull(plain.getIcon());
+        assertTrue(plain.getHomeCards().isEmpty());
     }
 
     @Test
@@ -204,6 +241,12 @@ class MobileAppServiceTest {
 
         void plugin(String code, PluginStatus status, List<String> platforms, String minHostVersion,
                     List<String> capabilities) {
+            plugin(code, status, platforms, minHostVersion, capabilities, null, null, null, null);
+        }
+
+        void plugin(String code, PluginStatus status, List<String> platforms, String minHostVersion,
+                    List<String> capabilities, String displayName, String description, String icon,
+                    List<MobileHomeCard> homeCards) {
             PluginModule.PluginModuleBuilder builder = PluginModule.builder()
                     .id(idSequence.incrementAndGet())
                     .code(code)
@@ -212,7 +255,11 @@ class MobileAppServiceTest {
             if (platforms != null) {
                 builder.mobilePlatforms(platforms.stream().map(MobilePlatform::fromToken).toList())
                         .mobileMinHostVersion(minHostVersion)
-                        .mobileRequiredNativeCapabilities(capabilities);
+                        .mobileRequiredNativeCapabilities(capabilities)
+                        .mobileName(displayName)
+                        .mobileDescription(description)
+                        .mobileIcon(icon)
+                        .mobileHomeCards(homeCards);
             }
             pluginModules.put(code, builder.build());
         }

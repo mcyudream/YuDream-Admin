@@ -1,11 +1,15 @@
 package online.yudream.base.application.platform.mobile.assembler;
 
 import online.yudream.base.application.platform.mobile.dto.MobileDeviceDTO;
+import online.yudream.base.application.platform.mobile.dto.MobileHomeCardDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileManifestEntryDTO;
 import online.yudream.base.domain.platform.mobile.aggregate.MobileDevice;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
+import org.springframework.util.StringUtils;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -48,8 +52,32 @@ public class MobileAssembler {
                 .minHostVersion(support.minHostVersion())
                 .platforms(support.platformTokens())
                 .requiredNativeCapabilities(support.normalizedCapabilityTokens())
+                .name(blankToNull(support.name()))
+                .description(blankToNull(support.description()))
+                .icon(blankToNull(support.icon()))
+                .homeCards(toHomeCardDTOs(support.homeCards()))
                 .styleUrl(styleUrl)
                 .build();
+    }
+
+    public static List<MobileHomeCardDTO> toHomeCardDTOs(List<MobileHomeCard> cards) {
+        if (cards == null || cards.isEmpty()) {
+            return List.of();
+        }
+        return cards.stream()
+                .map(card -> MobileHomeCardDTO.builder()
+                        .id(card.id())
+                        .title(card.title())
+                        .description(blankToNull(card.description()))
+                        .icon(blankToNull(card.icon()))
+                        .route(card.route())
+                        .build())
+                .toList();
+    }
+
+    /** 空串按未声明处理，清单下发保持 JSON 字段缺省。 */
+    private static String blankToNull(String value) {
+        return StringUtils.hasText(value) ? value : null;
     }
 
     /** 移动产物下载地址：复用既有插件资产下发通道，约定 mobile/ 前缀映射 frontend-mobile 根。 */

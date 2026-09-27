@@ -30,6 +30,15 @@ public class MobileManifestEntryRes implements Serializable {
     private String minHostVersion;
     private String styleUrl;
 
+    /** 移动端展示名（mobile.name，可空则客户端回落 code） */
+    private String name;
+    private String description;
+    /** Ionicons 图标名 */
+    private String icon;
+    /** 应用向主页注册的卡片 */
+    @Builder.Default
+    private List<MobileHomeCardRes> homeCards = new ArrayList<>();
+
     @Builder.Default
     private List<String> platforms = new ArrayList<>();
 

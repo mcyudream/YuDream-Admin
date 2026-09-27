@@ -10,26 +10,34 @@ import java.util.Set;
 /**
  * 插件对移动 App 的支持声明（plugin.yml mobile 块的领域镜像）。
  * <p>
- * 承载 manifest 过滤的三个判定：平台匹配、原生能力子集、宿主版本下限。
+ * 承载 manifest 过滤的三个判定：平台匹配、原生能力子集、宿主版本下限；
+ * name/description/icon/homeCards 为移动端展示与主页卡片声明，仅透传不参与过滤。
  * {@link #declared()} 为 false 表示插件整个 mobile 块缺省，不进入移动清单。
  */
 public record MobilePluginSupport(
         boolean declared,
         List<MobilePlatform> platforms,
         String minHostVersion,
-        List<String> requiredNativeCapabilities
+        List<String> requiredNativeCapabilities,
+        String name,
+        String description,
+        String icon,
+        List<MobileHomeCard> homeCards
 ) {
 
     public static final String DEFAULT_MIN_HOST_VERSION = "1.0.0";
 
     /** plugin.yml 未声明 mobile 块时的空声明。 */
     public static MobilePluginSupport undeclared() {
-        return new MobilePluginSupport(false, List.of(), DEFAULT_MIN_HOST_VERSION, List.of());
+        return new MobilePluginSupport(false, List.of(), DEFAULT_MIN_HOST_VERSION, List.of(),
+                null, null, null, List.of());
     }
 
     /** 声明了 mobile 块但未填字段时按约定回落默认值。 */
     public static MobilePluginSupport declared(List<MobilePlatform> platforms, String minHostVersion,
-                                               List<String> requiredNativeCapabilities) {
+                                               List<String> requiredNativeCapabilities,
+                                               String name, String description, String icon,
+                                               List<MobileHomeCard> homeCards) {
         List<MobilePlatform> safePlatforms = platforms == null || platforms.isEmpty()
                 ? List.of(MobilePlatform.ANDROID, MobilePlatform.IOS)
                 : List.copyOf(platforms);
@@ -39,12 +47,20 @@ public record MobilePluginSupport(
         List<String> safeCapabilities = requiredNativeCapabilities == null
                 ? List.of()
                 : requiredNativeCapabilities.stream().filter(item -> item != null && !item.isBlank()).toList();
-        return new MobilePluginSupport(true, safePlatforms, safeMinHostVersion, safeCapabilities);
+        String safeName = name == null ? "" : name.trim();
+        String safeDescription = description == null ? "" : description.trim();
+        String safeIcon = icon == null ? "" : icon.trim();
+        List<MobileHomeCard> safeHomeCards = homeCards == null
+                ? List.of()
+                : homeCards.stream().filter(item -> item != null).toList();
+        return new MobilePluginSupport(true, safePlatforms, safeMinHostVersion, safeCapabilities,
+                safeName, safeDescription, safeIcon, safeHomeCards);
     }
 
     public MobilePluginSupport {
         platforms = platforms == null ? List.of() : List.copyOf(platforms);
         requiredNativeCapabilities = requiredNativeCapabilities == null ? List.of() : List.copyOf(requiredNativeCapabilities);
+        homeCards = homeCards == null ? List.of() : List.copyOf(homeCards);
     }
 
     /** 注册期校验：platforms 只允许 android/ios，其余值在插件加载时即失败。 */
