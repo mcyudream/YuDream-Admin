@@ -1,7 +1,7 @@
 <script setup lang="ts" generic="TData extends RowData = RowData">
 import type { RowData } from '@tanstack/vue-table'
 import { useMediaQuery } from '@vueuse/core'
-import { computed, useSlots } from 'vue'
+import { computed, useAttrs, useSlots } from 'vue'
 import FaCard from '../card/index.vue'
 import type { TableColumn, TableProps } from '../table/index.vue'
 
@@ -38,6 +38,19 @@ const props = withDefaults(defineProps<TableProps<TData> & {
 
 const slots = useSlots()
 const isMobile = useMediaQuery(() => props.mobileBreakpoint || '(max-width: 768px)')
+
+// 本组件不声明 emits，父组件传入的事件监听（onSelectionChange 等）会落入 attrs；
+// 默认透传只会挂到根 div 上永远收不到，需显式转发给 FaTable。
+const attrs = useAttrs()
+const tableListeners = computed(() => {
+  const result: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(attrs)) {
+    if (key.startsWith('on')) {
+      result[key] = value
+    }
+  }
+  return result
+})
 
 /** 转发给桌面 FaTable 的插槽（排除移动端专用的 card 插槽） */
 const tableSlots = computed(() => {
@@ -99,6 +112,11 @@ function rowValue(row: TData, column: TableColumn<TData, any>): unknown {
   return undefined
 }
 
+/** 默认卡片值为空时显示占位符，避免留白难以辨识 */
+function displayValue(value: unknown): string {
+  return value === null || value === undefined || value === '' ? '—' : String(value)
+}
+
 function columnKey(column: TableColumn<TData, any>): string {
   if ('accessorKey' in column && column.accessorKey) {
     return String(column.accessorKey)
@@ -112,7 +130,7 @@ function columnKey(column: TableColumn<TData, any>): string {
 
 <template>
   <div>
-    <FaTable v-if="!isMobile" v-bind="tableProps">
+    <FaTable v-if="!isMobile" v-bind="{ ...tableProps, ...tableListeners }">
       <template v-for="(_, name) in tableSlots" :key="name" #[name]="scope">
         <slot :name="name" v-bind="scope || {}" />
       </template>
@@ -137,7 +155,7 @@ function columnKey(column: TableColumn<TData, any>): string {
             <div class="flex flex-col gap-2">
               <div v-for="column in cardColumns" :key="columnKey(column)" class="flex items-start justify-between gap-3 text-sm">
                 <span class="shrink-0 text-secondary-foreground/60">{{ columnLabel(column) }}</span>
-                <span class="break-all text-right font-medium">{{ rowValue(row.node, column) }}</span>
+                <span class="break-all text-right font-medium">{{ displayValue(rowValue(row.node, column)) }}</span>
               </div>
             </div>
           </FaCard>

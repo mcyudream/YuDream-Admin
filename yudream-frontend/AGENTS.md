@@ -64,6 +64,7 @@ pnpm lint         # 运行全量 lint（tsc + eslint + stylelint）
 - 框架内建组件在 `packages/components/` 子包中，优先使用内建组件而非第三方组件或自定义实现；页面控件优先使用 `Fa*`，AI/对话等领域能力优先使用 `Yd*`。
 - 主题、主色和深浅模式由后台主题配置与组件体系统一控制。业务页面不得自行声明品牌色、固定色板或手写主色强调态；只使用中性语义变量和组件内建状态样式。
 - 在任何情况下都请勿直接修改内建组件，确定修改前需要和用户进行确认
+- 移动端适配约定：断点统一 768px（UnoCSS `max-md:` 变体 / `useMediaQuery('(max-width: 768px)')`，与 FaResponsiveTable 一致）；FaPageMain 在手机端已全出血（无左右外边距/圆角，p-3），页面不得再自加移动端外边距；列表一律用 FaResponsiveTable + `#card` 槽（参考 views/system/user/index.vue），禁止裸 FaTable，也不要手写 media query 双端渲染
 - Mock 数据使用 `vite-plugin-fake-server`，文件放在 `apps/<app>/src/api/modules/` 对应模块旁
 - 代码提交前会自动运行 lint-staged，确保代码符合规范
 - Node.js 版本要求以根目录下 `package.json` 中定义的为准
