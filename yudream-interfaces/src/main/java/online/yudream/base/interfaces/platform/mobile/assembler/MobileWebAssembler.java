@@ -84,6 +84,8 @@ public class MobileWebAssembler {
                 .favicon(dto.getFavicon())
                 .version(dto.getVersion())
                 .mobileEnabled(dto.isMobileEnabled())
+                .loginHeroImage(dto.getLoginHeroImage())
+                .loginHeroBackground(dto.getLoginHeroBackground())
                 .build();
     }
 

@@ -12,6 +12,16 @@ export interface DomainAccount {
   avatar: string | null;
 }
 
+/** 域品牌信息：来自站点设置（logo/favicon）与 mobile-app 能力配置（登录页定制）。 */
+export interface DomainBranding {
+  /** 站点 logo（站点设置；相对路径或完整 URL） */
+  logo?: string;
+  /** 登录页 hero 背景图（能力配置） */
+  loginHeroImage?: string;
+  /** 登录页 hero 底色（能力配置，CSS 颜色值） */
+  loginHeroBackground?: string;
+}
+
 export interface Domain {
   id: string;
   /** 站点名（发现接口取回；发现失败时用主机名兜底），可在管理页改名 */
@@ -24,6 +34,8 @@ export interface Domain {
   mobileEnabled: boolean;
   /** 最近一次登录的账户摘要（显示用；凭据在安全存储） */
   account: DomainAccount | null;
+  /** 站点品牌信息（发现时与启动期后台刷新回填） */
+  branding: DomainBranding;
 }
 
 const KEY_LIST = 'domains.list';
@@ -95,6 +107,7 @@ export interface AddDomainInput {
   serverUrl: string;
   name: string;
   mobileEnabled: boolean;
+  branding?: DomainBranding;
 }
 
 /** 幂等添加：同 serverUrl 视为同一个域，仅更新元数据。 */
@@ -103,6 +116,7 @@ export async function addDomain(input: AddDomainInput): Promise<Domain> {
   if (existing) {
     existing.name = input.name || existing.name;
     existing.mobileEnabled = input.mobileEnabled;
+    existing.branding = { ...existing.branding, ...input.branding };
     await persist();
     emit();
     return existing;
@@ -115,6 +129,7 @@ export async function addDomain(input: AddDomainInput): Promise<Domain> {
     lastActiveAt: Date.now(),
     mobileEnabled: input.mobileEnabled,
     account: null,
+    branding: input.branding ?? {},
   };
   domains = [...domains, domain];
   await persist();
@@ -167,6 +182,17 @@ export async function renameDomain(id: string, name: string): Promise<void> {
     return;
   }
   domain.name = name.trim();
+  await persist();
+  emit();
+}
+
+/** 启动期后台刷新品牌信息（站点 logo/登录页定制可能被管理员更新）。 */
+export async function updateDomainBranding(id: string, branding: DomainBranding): Promise<void> {
+  const domain = domains.find((d) => d.id === id);
+  if (!domain) {
+    return;
+  }
+  domain.branding = { ...domain.branding, ...branding };
   await persist();
   emit();
 }

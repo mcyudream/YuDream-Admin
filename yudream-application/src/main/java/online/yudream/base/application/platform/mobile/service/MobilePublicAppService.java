@@ -27,12 +27,15 @@ public class MobilePublicAppService {
     @Transactional(readOnly = true)
     public MobileSiteInfoDTO siteInfo() {
         var site = settingAppService.siteSettings();
+        var branding = loginBranding();
         return MobileSiteInfoDTO.builder()
                 .siteName(site.getSiteName())
                 .logo(site.getLogo())
                 .favicon(site.getFavicon())
                 .version(aboutBuildInfoGateway.read().map(info -> info.version() == null ? "" : info.version()).orElse(""))
                 .mobileEnabled(mobileEnabled())
+                .loginHeroImage(branding.getLoginHeroImage())
+                .loginHeroBackground(branding.getLoginHeroBackground())
                 .build();
     }
 
@@ -40,5 +43,16 @@ public class MobilePublicAppService {
         return capabilityModuleRepo.findByCode(MobileCapabilityConfig.CAPABILITY_CODE)
                 .filter(CapabilityModule::enabled)
                 .isPresent();
+    }
+
+    /** 登录页品牌定制：仅能力启用时读取配置；能力关闭/键缺失一律空串（App 回退内置样式）。 */
+    private MobileSiteInfoDTO loginBranding() {
+        return capabilityModuleRepo.findByCode(MobileCapabilityConfig.CAPABILITY_CODE)
+                .filter(CapabilityModule::enabled)
+                .map(module -> MobileSiteInfoDTO.builder()
+                        .loginHeroImage(MobileCapabilityConfig.textConfig(module.getConfig(), MobileCapabilityConfig.KEY_LOGIN_HERO_IMAGE))
+                        .loginHeroBackground(MobileCapabilityConfig.textConfig(module.getConfig(), MobileCapabilityConfig.KEY_LOGIN_HERO_BACKGROUND))
+                        .build())
+                .orElseGet(() -> MobileSiteInfoDTO.builder().build());
     }
 }

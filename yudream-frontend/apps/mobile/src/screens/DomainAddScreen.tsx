@@ -25,6 +25,7 @@ export function DomainAddScreen({ navigation }: Props) {
     serverUrl: string;
     name: string;
     mobileEnabled: boolean;
+    branding: { logo?: string; loginHeroImage?: string; loginHeroBackground?: string };
   } | null>(null);
 
   const tryScan = async () => {
@@ -69,6 +70,14 @@ export function DomainAddScreen({ navigation }: Props) {
         serverUrl,
         name: outcome.kind === 'ok' ? outcome.info.siteName : serverUrl.replace(/^https?:\/\//, ''),
         mobileEnabled: outcome.kind === 'ok' ? outcome.info.mobileEnabled : false,
+        branding:
+          outcome.kind === 'ok'
+            ? {
+                logo: outcome.info.logo,
+                loginHeroImage: outcome.info.loginHeroImage,
+                loginHeroBackground: outcome.info.loginHeroBackground,
+              }
+            : {},
       });
     } finally {
       setChecking(false);
