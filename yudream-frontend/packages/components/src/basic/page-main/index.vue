@@ -38,17 +38,17 @@ function handleCollaspe() {
 
 <template>
   <div
-    :class="cn('m-4 flex flex-col overflow-hidden rounded-lg border transition-[background-color,border-color]', {
+    :class="cn('m-4 flex flex-col overflow-hidden rounded-lg border transition-[background-color,border-color] max-md:mx-0 max-md:my-2 max-md:rounded-none max-md:border-x-0', {
       'overflow-hidden': collaspe,
     }, props.class)"
   >
-    <div v-if="!!slots.title || title" :class="cn('px-4 py-4 my--2 bg-muted text-muted-foreground rounded-t-lg text-sm', props.titleClass)">
+    <div v-if="!!slots.title || title" :class="cn('px-4 py-4 my--2 bg-muted text-muted-foreground rounded-t-lg text-sm max-md:px-3 max-md:py-3', props.titleClass)">
       <slot name="title">
         {{ title }}
       </slot>
     </div>
     <div
-      :class="cn('group/pagemain relative h-[calc-size(auto,size)] bg-card p-4 rounded-lg transition-height after:(pointer-events-none absolute bottom-0 left-0 z-1 h-12 max-h-full w-full from-transparent to-[oklch(var(--card))] bg-gradient-to-b opacity-0 transition-opacity content-empty)', {
+      :class="cn('group/pagemain relative h-[calc-size(auto,size)] bg-card p-4 rounded-lg transition-height after:(pointer-events-none absolute bottom-0 left-0 z-1 h-12 max-h-full w-full from-transparent to-[oklch(var(--card))] bg-gradient-to-b opacity-0 transition-opacity content-empty) max-md:p-3 max-md:rounded-none', {
         'border-t': !!slots.title || title,
         'overflow-hidden': collaspe,
         'after:(opacity-100)': isCollaspe,

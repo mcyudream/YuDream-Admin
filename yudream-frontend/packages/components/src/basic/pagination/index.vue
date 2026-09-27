@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useMediaQuery } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import Input from '../input/index.vue'
 import Select from '../select/index.vue'
@@ -46,6 +47,7 @@ const size = defineModel<number>('size', { required: true })
 
 const jumpPage = ref<number | string>(page.value)
 const totalPages = computed(() => Math.ceil(props.total / size.value))
+const isMobile = useMediaQuery('(max-width: 768px)')
 
 // Parse layout string to determine order and visibility
 const layoutConfig = computed(() => {
@@ -63,6 +65,12 @@ const layoutConfig = computed(() => {
       config[item] = { show: true, order: index + 1 }
     }
   })
+
+  // 移动端隐藏 sizes 与 jumper，避免横向溢出；total 与 pager 保留
+  if (isMobile.value) {
+    config.sizes.show = false
+    config.jumper.show = false
+  }
 
   return config
 })
@@ -104,7 +112,7 @@ function handleJump() {
 </script>
 
 <template>
-  <Pagination v-slot="{ page: currentPage }" :total="props.total" :sibling-count="1" show-edges :page="page" class="gap-2 sm:gap-4 items-center" :items-per-page="size" @update:page="(val) => page = val">
+  <Pagination v-slot="{ page: currentPage }" :total="props.total" :sibling-count="1" show-edges :page="page" class="flex-wrap gap-2 sm:gap-4 items-center" :items-per-page="size" @update:page="(val) => page = val">
     <PaginationContent v-if="layoutConfig.pager.show" v-slot="{ items }" class="flex-center gap-1" :style="{ order: layoutConfig.pager.order }">
       <PaginationFirst size="icon-sm" class="size-8 rtl:rotate-180" />
       <PaginationPrevious size="icon-sm" class="size-8 rtl:rotate-180" />
