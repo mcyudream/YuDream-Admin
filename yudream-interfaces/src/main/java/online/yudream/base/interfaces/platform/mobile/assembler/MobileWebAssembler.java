@@ -13,7 +13,9 @@ import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceRegist
 import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceUnregisterRequest;
 import online.yudream.base.interfaces.platform.mobile.res.MobileDeviceRes;
 import online.yudream.base.application.platform.mobile.dto.MobileHomeCardDTO;
+import online.yudream.base.application.platform.mobile.dto.MobileHomeFeedDTO;
 import online.yudream.base.interfaces.platform.mobile.res.MobileHomeCardRes;
+import online.yudream.base.interfaces.platform.mobile.res.MobileHomeFeedRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestEntryRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileSiteInfoRes;
@@ -109,8 +111,20 @@ public class MobileWebAssembler {
                 .description(entry.getDescription())
                 .icon(entry.getIcon())
                 .homeCards(toHomeCardRes(entry.getHomeCards()))
+                .homeFeed(toHomeFeedRes(entry.getHomeFeed()))
                 .platforms(entry.getPlatforms())
                 .requiredNativeCapabilities(entry.getRequiredNativeCapabilities())
+                .build();
+    }
+
+    /** 首页信息流内容源声明透传：DTO 未声明时 res 保持 null。 */
+    private static MobileHomeFeedRes toHomeFeedRes(MobileHomeFeedDTO feed) {
+        if (feed == null) {
+            return null;
+        }
+        return MobileHomeFeedRes.builder()
+                .endpoint(feed.getEndpoint())
+                .title(feed.getTitle())
                 .build();
     }
 

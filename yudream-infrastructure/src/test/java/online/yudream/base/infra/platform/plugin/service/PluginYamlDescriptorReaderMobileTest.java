@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.plugin.service;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
+import online.yudream.base.plugin.spi.core.PluginMobileHomeFeed;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import org.junit.jupiter.api.Test;
 
@@ -47,6 +48,7 @@ class PluginYamlDescriptorReaderMobileTest {
         assertNull(mobile.description());
         assertNull(mobile.icon());
         assertTrue(mobile.homeCards().isEmpty());
+        assertNull(mobile.homeFeed());
     }
 
     @Test
@@ -64,7 +66,7 @@ class PluginYamlDescriptorReaderMobileTest {
                     - push
                 """);
         assertEquals(new PluginMobileSupport(List.of("ios"), "2.3.0", List.of("biometric", "push"),
-                        null, null, null, null),
+                        null, null, null, null, null),
                 descriptor.mobileSupport());
     }
 
@@ -119,6 +121,63 @@ class PluginYamlDescriptorReaderMobileTest {
         assertEquals("社区讨论", mobile.description());
         assertEquals("chatbubbles-outline", mobile.icon());
         assertTrue(mobile.homeCards().isEmpty());
+        assertNull(mobile.homeFeed());
+    }
+
+    @Test
+    void mobileHomeFeedParsesAlongsideCards() {
+        PluginDescriptor descriptor = read("""
+                name: demo
+                main: com.example.DemoPlugin
+                version: 1.0.0
+                mobile:
+                  home:
+                    feed:
+                      endpoint: /public/mobile-feed
+                      title: 论坛动态
+                    cards:
+                      - id: latest-posts
+                        title: 最新帖子
+                        route: /posts/latest
+                """);
+        PluginMobileSupport mobile = descriptor.mobileSupport();
+        // feed 与 cards 可共存，feed 至多一个
+        assertEquals(new PluginMobileHomeFeed("/public/mobile-feed", "论坛动态"), mobile.homeFeed());
+        assertEquals(1, mobile.homeCards().size());
+        // title 可选，缺省保持 null
+        PluginDescriptor untitled = read("""
+                name: demo
+                main: com.example.DemoPlugin
+                version: 1.0.0
+                mobile:
+                  home:
+                    feed:
+                      endpoint: /public/mobile-feed
+                """);
+        assertEquals(new PluginMobileHomeFeed("/public/mobile-feed", null), untitled.mobileSupport().homeFeed());
+    }
+
+    @Test
+    void mobileHomeFeedRejectsIllegalShapes() {
+        // feed 不是对象（标量/列表）
+        assertThrows(BizException.class, () -> read(yamlWithMobile("home:\n    feed: mobile-feed")));
+        assertThrows(BizException.class, () -> read(yamlWithMobile("home:\n    feed: [/a, /b]")));
+        // endpoint 缺失
+        assertThrows(BizException.class, () -> read(yamlWithMobile("home:\n    feed:\n      title: 论坛动态")));
+        // endpoint 不以 / 开头
+        BizException badEndpoint = assertThrows(BizException.class,
+                () -> read(yamlWithMobile("home:\n    feed:\n      endpoint: public/mobile-feed")));
+        assertTrue(badEndpoint.getMessage().contains("feed.endpoint 必须以 / 开头"));
+        // endpoint 超长（129 字符）
+        assertThrows(BizException.class, () -> read(yamlWithMobile(
+                "home:\n    feed:\n      endpoint: /" + "p".repeat(128))));
+        // endpoint 含空白字符
+        BizException blank = assertThrows(BizException.class,
+                () -> read(yamlWithMobile("home:\n    feed:\n      endpoint: /public/mobile feed")));
+        assertTrue(blank.getMessage().contains("feed.endpoint 不能包含空白字符"));
+        // title 超长（33 字符）
+        assertThrows(BizException.class, () -> read(yamlWithMobile(
+                "home:\n    feed:\n      endpoint: /public/mobile-feed\n      title: " + "标".repeat(33))));
     }
 
     @Test

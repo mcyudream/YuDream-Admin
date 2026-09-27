@@ -57,6 +57,8 @@ public class PluginModuleInfraMapper {
         dataObj.setMobileDescription(module.getMobileDescription());
         dataObj.setMobileIcon(module.getMobileIcon());
         dataObj.setMobileHomeCards(toHomeCardDOs(module.getMobileHomeCards()));
+        dataObj.setMobileFeedEndpoint(module.getMobileFeedEndpoint());
+        dataObj.setMobileFeedTitle(module.getMobileFeedTitle());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -108,6 +110,8 @@ public class PluginModuleInfraMapper {
                 .mobileDescription(dataObj.getMobileDescription())
                 .mobileIcon(dataObj.getMobileIcon())
                 .mobileHomeCards(toHomeCards(dataObj.getMobileHomeCards()))
+                .mobileFeedEndpoint(dataObj.getMobileFeedEndpoint())
+                .mobileFeedTitle(dataObj.getMobileFeedTitle())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())
