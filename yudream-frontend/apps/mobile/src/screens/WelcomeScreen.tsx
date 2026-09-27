@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { resolveAssetUrl } from '@/core/domains/assetUrl';
 import { FlatList, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdButton, YdCard, YdMark, YdScreen, YdText } from '@/components';
+import { YdButton, YdCard, YdDomainAvatar, YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import {
   getActiveDomain,
@@ -71,7 +72,7 @@ export function WelcomeScreen({ navigation }: Props) {
             return (
               <YdCard onPress={() => void pick(item)}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-                  <YdMark name={item.name} size={46} />
+                  <YdDomainAvatar name={item.name} logoUrl={resolveAssetUrl(item.serverUrl, item.branding?.logo)} size={46} />
                   <View style={{ flex: 1, gap: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <YdText style={{ fontWeight: t.typography.weightMedium }} numberOfLines={1}>

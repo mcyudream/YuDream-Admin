@@ -262,6 +262,9 @@ catalogs:
     qs:
       specifier: ^6.15.2
       version: 6.15.2
+    react-native-paper:
+      specifier: ^5.15.3
+      version: 5.15.3
     reka-ui:
       specifier: ^2.9.10
       version: 2.9.10
@@ -567,7 +570,7 @@ importers:
         version: 14.3.0(vue@3.5.38(typescript@6.0.3))
       '@vueuse/integrations':
         specifier: 'catalog:'
-        version: 14.3.0(async-validator@4.2.5)(axios@1.17.0(debug@4.4.3))(change-case@5.4.4)(nprogress@0.2.0)(sortablejs@1.15.7)(vue@3.5.38(typescript@6.0.3))
+        version: 14.3.0(async-validator@4.2.5)(axios@1.17.0)(change-case@5.4.4)(nprogress@0.2.0)(sortablejs@1.15.7)(vue@3.5.38(typescript@6.0.3))
       '@yudream/components':
         specifier: workspace:*
         version: link:../../packages/components
@@ -582,7 +585,7 @@ importers:
         version: 2.12.8
       axios:
         specifier: 'catalog:'
-        version: 1.17.0(debug@4.4.3)
+        version: 1.17.0
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -818,6 +821,9 @@ importers:
       react-native-keychain:
         specifier: ^10.0.0
         version: 10.0.0
+      react-native-paper:
+        specifier: 'catalog:'
+        version: 5.15.3(react-native-safe-area-context@5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       react-native-safe-area-context:
         specifier: 5.1.0
         version: 5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
@@ -896,7 +902,7 @@ importers:
         version: 14.3.0(vue@3.5.38(typescript@6.0.3))
       axios:
         specifier: 'catalog:'
-        version: 1.17.0(debug@4.4.3)
+        version: 1.17.0
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -1902,6 +1908,11 @@ packages:
 
   '@cacheable/utils@2.4.1':
     resolution: {integrity: sha512-eiFgzCbIneyMlLOmNG4g9xzF7Hv3Mga4LjxjcSC/ues6VYq2+gUbQI8JqNuw/ZM8tJIeIaBGpswAsqV2V7ApgA==}
+
+  '@callstack/react-theme-provider@3.0.9':
+    resolution: {integrity: sha512-tTQ0uDSCL0ypeMa8T/E9wAZRGKWj8kXP7+6RYgPTfOPs9N07C9xM8P02GJ3feETap4Ux5S69D9nteq9mEj86NA==}
+    peerDependencies:
+      react: '>=16.3.0'
 
   '@callstack/repack-dev-server@5.3.0':
     resolution: {integrity: sha512-WW5onAddhO12wM59VCCpLQYn7NIPZc2HvM+mmcTvJsi8k3ggeW61pYsOnnX6GMNWmy/2Wu4AiecouQa4+zGuwA==}
@@ -5656,6 +5667,10 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
+  deepmerge@3.3.0:
+    resolution: {integrity: sha512-GRQOafGHwMHpjPx9iCvTgpu9NojZ49q794EEL94JVEw6VaeA8XTUyBKvAkOOjBX9oJNiV6G3P+T+tihFjo2TqA==}
+    engines: {node: '>=0.10.0'}
+
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
@@ -6566,6 +6581,9 @@ packages:
 
   hermes-parser@0.36.1:
     resolution: {integrity: sha512-GApNk4zLHi2UWoWZZkx7LNCOSzLSc5lB55pZ/PhK7ycFeg7u5LcF88p/WbpIi1XUDtE0MpHE3uRR3u3KB7TjSQ==}
+
+  hoist-non-react-statics@3.3.2:
+    resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
 
   homedir-polyfill@1.0.3:
     resolution: {integrity: sha512-eSmmWE5bZTK2Nou4g0AI3zZ9rswp7GRKoKXS1BLUkvPviOqs4YTN1djQIqrXy9k5gEtdLPy86JjRwsNM9tnDcA==}
@@ -8269,6 +8287,13 @@ packages:
   react-native-keychain@10.0.0:
     resolution: {integrity: sha512-YzPKSAnSzGEJ12IK6CctNLU79T1W15WDrElRQ+1/FsOazGX9ucFPTQwgYe8Dy8jiSEDJKM4wkVa3g4lD2Z+Pnw==}
     engines: {node: '>=16'}
+
+  react-native-paper@5.15.3:
+    resolution: {integrity: sha512-GEyNTmWElIZgnYw09AjjCNupRYzCmP79uAAyGSyCEUZz7KBz1wtJcC0wVUkozR1Rn3PK/td/9LlR6+F1hzmYvA==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
+      react-native-safe-area-context: '*'
 
   react-native-safe-area-context@5.1.0:
     resolution: {integrity: sha512-Y4vyJX+0HPJUQNVeIJTj2/UOjbSJcB09OEwirAWDrOZ67Lz5p43AmjxSy8nnZft1rMzoh3rcPuonB6jJyHTfCw==}
@@ -10902,6 +10927,12 @@ snapshots:
       hashery: 1.5.1
       keyv: 5.6.0
 
+  '@callstack/react-theme-provider@3.0.9(react@18.3.1)':
+    dependencies:
+      deepmerge: 3.3.0
+      hoist-non-react-statics: 3.3.2
+      react: 18.3.1
+
   '@callstack/repack-dev-server@5.3.0':
     dependencies:
       '@babel/code-frame': 7.29.7
@@ -12124,7 +12155,7 @@ snapshots:
       '@module-federation/third-party-dts-extractor': 0.8.9
       adm-zip: 0.5.18
       ansi-colors: 4.1.3
-      axios: 1.17.0(debug@4.4.3)
+      axios: 1.17.0
       chalk: 3.0.0
       fs-extra: 9.1.0
       isomorphic-ws: 5.0.0(ws@8.18.0)
@@ -13917,14 +13948,14 @@ snapshots:
       '@vueuse/shared': 14.3.0(vue@3.5.38(typescript@6.0.3))
       vue: 3.5.38(typescript@6.0.3)
 
-  '@vueuse/integrations@14.3.0(async-validator@4.2.5)(axios@1.17.0(debug@4.4.3))(change-case@5.4.4)(nprogress@0.2.0)(sortablejs@1.15.7)(vue@3.5.38(typescript@6.0.3))':
+  '@vueuse/integrations@14.3.0(async-validator@4.2.5)(axios@1.17.0)(change-case@5.4.4)(nprogress@0.2.0)(sortablejs@1.15.7)(vue@3.5.38(typescript@6.0.3))':
     dependencies:
       '@vueuse/core': 14.3.0(vue@3.5.38(typescript@6.0.3))
       '@vueuse/shared': 14.3.0(vue@3.5.38(typescript@6.0.3))
       vue: 3.5.38(typescript@6.0.3)
     optionalDependencies:
       async-validator: 4.2.5
-      axios: 1.17.0(debug@4.4.3)
+      axios: 1.17.0
       change-case: 5.4.4
       nprogress: 0.2.0
       sortablejs: 1.15.7
@@ -14217,7 +14248,7 @@ snapshots:
       '@fastify/error': 4.2.0
       fastq: 1.20.1
 
-  axios@1.17.0(debug@4.4.3):
+  axios@1.17.0:
     dependencies:
       follow-redirects: 1.16.0(debug@4.4.3)
       form-data: 4.0.6
@@ -15058,6 +15089,8 @@ snapshots:
   deep-equal@1.0.1: {}
 
   deep-is@0.1.4: {}
+
+  deepmerge@3.3.0: {}
 
   deepmerge@4.3.1: {}
 
@@ -16101,6 +16134,10 @@ snapshots:
   hermes-parser@0.36.1:
     dependencies:
       hermes-estree: 0.36.1
+
+  hoist-non-react-statics@3.3.2:
+    dependencies:
+      react-is: 16.13.1
 
   homedir-polyfill@1.0.3:
     dependencies:
@@ -18112,6 +18149,15 @@ snapshots:
       utf8: 3.0.0
 
   react-native-keychain@10.0.0: {}
+
+  react-native-paper@5.15.3(react-native-safe-area-context@5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
+    dependencies:
+      '@callstack/react-theme-provider': 3.0.9(react@18.3.1)
+      color: 3.2.1
+      react: 18.3.1
+      react-native: 0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1)
+      react-native-safe-area-context: 5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
+      use-latest-callback: 0.2.6(react@18.3.1)
 
   react-native-safe-area-context@5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
     dependencies:

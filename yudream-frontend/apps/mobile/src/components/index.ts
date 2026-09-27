@@ -1,5 +1,6 @@
 export { YdButton } from './YdButton';
 export { YdCard } from './YdCard';
+export { YdDomainAvatar } from './YdDomainAvatar';
 export { YdField } from './YdField';
 export { YdListItem } from './YdListItem';
 export { YdMark } from './YdMark';

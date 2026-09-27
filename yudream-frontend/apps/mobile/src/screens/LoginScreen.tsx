@@ -5,11 +5,10 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  TextInput,
   View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { YdButton, YdText } from '@/components';
+import { YdButton, YdDomainAvatar, YdField, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { login } from '@/core/auth/authService';
 import { getActiveDomain, hostOf } from '@/core/domains/store';
@@ -29,7 +28,6 @@ export function LoginScreen({ navigation }: Props) {
   const domain = getActiveDomain();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -56,13 +54,6 @@ export function LoginScreen({ navigation }: Props) {
       setLoading(false);
     }
   };
-
-  const underline = (focused: boolean) => ({
-    borderBottomWidth: 1.5,
-    borderBottomColor: focused ? t.colors.accent : t.colors.borderSubtle,
-  });
-
-  const fieldText = { color: t.colors.textPrimary, fontSize: t.typography.sizeMd, paddingVertical: 12 };
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bgPage }}>
@@ -119,25 +110,7 @@ export function LoginScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('Welcome')}
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 }}
         >
-          <View
-            style={{
-              width: 96,
-              height: 96,
-              borderRadius: 48,
-              backgroundColor: t.colors.bgSurface,
-              alignItems: 'center',
-              justifyContent: 'center',
-              overflow: 'hidden',
-            }}
-          >
-            {logoUrl ? (
-              <Image source={{ uri: logoUrl }} style={{ width: 96, height: 96 }} resizeMode="cover" />
-            ) : (
-              <YdText style={{ color: t.colors.accent, fontSize: 42, fontWeight: t.typography.weightBold }}>
-                {heroLetter}
-              </YdText>
-            )}
-          </View>
+          <YdDomainAvatar name={domain?.name ?? 'YuDream'} logoUrl={logoUrl} size={96} />
           <YdText
             numberOfLines={1}
             style={{
@@ -174,43 +147,26 @@ export function LoginScreen({ navigation }: Props) {
           keyboardShouldPersistTaps="handled"
         >
           <View style={{ gap: t.spacing.lg }}>
-            <View style={underline(username.length > 0)}>
-              <TextInput
-                value={username}
-                onChangeText={(text) => {
-                  setUsername(text);
-                  setError(null);
-                }}
-                placeholder="用户名 / 邮箱"
-                placeholderTextColor={t.colors.textTertiary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={fieldText}
-              />
-            </View>
-            <View style={{ ...underline(password.length > 0), flexDirection: 'row', alignItems: 'center' }}>
-              <TextInput
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  setError(null);
-                }}
-                placeholder="密码"
-                placeholderTextColor={t.colors.textTertiary}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                onSubmitEditing={submit}
-                style={[fieldText, { flex: 1 }]}
-              />
-              <Pressable
-                onPress={() => setShowPassword((v) => !v)}
-                hitSlop={8}
-                accessibilityLabel={showPassword ? '隐藏密码' : '显示密码'}
-              >
-                <YdText variant="caption">{showPassword ? '隐藏' : '显示'}</YdText>
-              </Pressable>
-            </View>
+            <YdField
+              label="用户名"
+              value={username}
+              onChangeText={(text) => {
+                setUsername(text);
+                setError(null);
+              }}
+              placeholder="用户名 / 邮箱"
+            />
+            <YdField
+              label="密码"
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                setError(null);
+              }}
+              placeholder="密码"
+              secure
+              onSubmitEditing={submit}
+            />
 
             {error ? (
               <YdText variant="secondary" style={{ color: t.colors.danger }}>

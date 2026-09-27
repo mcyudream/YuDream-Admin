@@ -1,10 +1,10 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import { List as PaperList } from 'react-native-paper';
 import { useTheme } from '@/core/theme/ThemeProvider';
-import { YdText } from './YdText';
 
 /**
- * 列表行：标题 + 副标题 + 右侧槽位；最小触控 44pt。
+ * 列表行（react-native-paper List.Item 封装）：标题 + 副标题 + 右侧槽位。
  */
 export function YdListItem({
   title,
@@ -19,31 +19,15 @@ export function YdListItem({
 }) {
   const t = useTheme();
   return (
-    <Pressable
-      accessibilityRole={onPress ? 'button' : undefined}
+    <PaperList.Item
+      title={title}
+      description={subtitle}
       onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => [
-        styles.row,
-        {
-          minHeight: 44,
-          paddingVertical: t.spacing.sm,
-          borderBottomColor: t.colors.borderSubtle,
-        },
-        pressed && { backgroundColor: t.colors.fillHover },
-      ]}
-    >
-      <View style={styles.texts}>
-        <YdText>{title}</YdText>
-        {subtitle ? <YdText variant="secondary">{subtitle}</YdText> : null}
-      </View>
-      {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
-    </Pressable>
+      titleStyle={{ color: t.colors.textPrimary, fontSize: t.typography.sizeMd }}
+      descriptionStyle={{ color: t.colors.textTertiary, fontSize: t.typography.sizeSm }}
+      descriptionNumberOfLines={1}
+      right={trailing ? () => <View style={{ flexDirection: 'row', alignItems: 'center' }}>{trailing}</View> : undefined}
+      style={{ paddingHorizontal: 0, minHeight: 48, borderBottomWidth: 1, borderBottomColor: t.colors.borderSubtle }}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth },
-  texts: { flex: 1, gap: 2 },
-  trailing: { marginLeft: 12 },
-});
