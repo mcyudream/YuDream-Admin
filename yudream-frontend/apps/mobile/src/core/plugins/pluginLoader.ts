@@ -8,10 +8,10 @@
  */
 import { init, loadRemote, registerRemotes } from '@module-federation/runtime';
 import type { ComponentType } from 'react';
-import type { MobilePluginModule } from '@yudream/plugin-sdk-mobile';
 import { fetchManifest } from '@/core/manifest/manifestClient';
 import type { ManifestPluginEntry } from '@/core/manifest/types';
 import { getActiveDomain } from '@/core/domains/store';
+import { resolveAssetUrl } from '@/core/domains/assetUrl';
 import { cacheManifest, restoreCachedManifest } from './registry';
 import { getInstalled, install, pruneToManifest, rollback } from './bundleCache';
 import {
@@ -34,11 +34,30 @@ export function remoteNameOf(code: string): string {
   return code.replace(/\W/g, '_');
 }
 
+/**
+ * 正在 loadRemote 的应用 code。remote 内部异步 chunk 以纯数字 chunkId 走
+ * ScriptManager（无任何插件标识），resolver 依赖此作用域归属回源。
+ * 宿主一次只加载一个应用模块（PluginHostScreen 串行），并行预加载会误归属。
+ */
+let loadingPluginCode: string | null = null;
+
+export function beginPluginChunkScope(code: string): void {
+  loadingPluginCode = code;
+}
+
+export function endPluginChunkScope(): void {
+  loadingPluginCode = null;
+}
+
+export function getLoadingPluginCode(): string | null {
+  return loadingPluginCode;
+}
+
 function toRemotes(plugins: ManifestPluginEntry[]) {
   return plugins.map((p) => ({
     name: remoteNameOf(p.code),
     // 指向 manifest 给的远端地址；ScriptManager resolver 会优先改投本地缓存。
-    entry: p.remoteEntryUrl,
+    entry: resolveAssetUrl(getActiveDomain()?.serverUrl ?? '', p.remoteEntryUrl),
   }));
 }
 
@@ -87,10 +106,18 @@ export async function syncPlugins(): Promise<SyncResult> {
       result.updated.push(entry.code);
     } catch (e) {
       result.failed[entry.code] = e instanceof Error ? e.message : String(e);
+      console.warn(`[plugins] ${entry.code} 安装失败`, e);
     }
   }
   await pruneToManifest(domain.id, manifest.plugins.map((p) => p.code));
   await reregisterRemotes();
+  if (result.updated.length) {
+    console.log('[plugins] 已更新', result.updated.join(', '));
+  }
+  const failedKeys = Object.keys(result.failed);
+  if (failedKeys.length) {
+    console.warn('[plugins] 同步失败', result.failed);
+  }
   return result;
 }
 
@@ -103,22 +130,42 @@ export async function loadPluginModule(
 ): Promise<ComponentType<Record<string, unknown>>> {
   initFederation();
   const domain = getActiveDomain();
+  beginPluginChunkScope(code);
   try {
-    const mod = await loadRemote<MobilePluginModule>(`${remoteNameOf(code)}/module`);
-    if (!mod?.default) {
-      throw new Error('插件未导出默认组件');
+    const mod = await loadRemote<unknown>(`${remoteNameOf(code)}/module`);
+    // 兼容两种导出形态：default 直接是组件；或 SDK 约定的 { default: 组件 } 包装。
+    const exports = mod as { default?: unknown } | null;
+    const primary = exports?.default;
+    const component =
+      typeof primary === 'function'
+        ? primary
+        : typeof (primary as { default?: unknown })?.default === 'function'
+          ? (primary as { default: unknown }).default
+          : undefined;
+    if (!component) {
+      throw new Error('应用未导出默认组件');
     }
-    return mod.default;
+    return component as ComponentType<Record<string, unknown>>;
   } catch (first) {
     const rolledBack = domain ? await rollback(domain.id, code) : false;
     if (!rolledBack) {
       throw first;
     }
     console.warn(`[plugins] ${code} 加载失败，已回滚到上一可用版本`, first);
-    const mod = await loadRemote<MobilePluginModule>(`${remoteNameOf(code)}/module`);
-    if (!mod?.default) {
+    const mod = await loadRemote<unknown>(`${remoteNameOf(code)}/module`);
+    const exports = mod as { default?: unknown } | null;
+    const primary = exports?.default;
+    const component =
+      typeof primary === 'function'
+        ? primary
+        : typeof (primary as { default?: unknown })?.default === 'function'
+          ? (primary as { default: unknown }).default
+          : undefined;
+    if (!component) {
       throw first;
     }
-    return mod.default;
+    return component as ComponentType<Record<string, unknown>>;
+  } finally {
+    endPluginChunkScope();
   }
 }

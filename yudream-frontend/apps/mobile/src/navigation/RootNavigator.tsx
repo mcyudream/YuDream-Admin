@@ -9,6 +9,7 @@ import { DomainAddScreen } from '@/screens/DomainAddScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { MainTabs } from '@/screens/MainTabs';
 import { PluginHostScreen } from '@/screens/PluginHostScreen';
+import { DomainManageScreen } from '@/screens/DomainManageScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -47,6 +48,11 @@ export function RootNavigator() {
           name="PluginHost"
           component={PluginHostScreen}
           options={({ route }) => ({ title: route.params.title })}
+        />
+        <Stack.Screen
+          name="DomainManage"
+          component={DomainManageScreen}
+          options={{ title: '域管理' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

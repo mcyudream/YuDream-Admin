@@ -180,7 +180,7 @@ export function LoginScreen({ navigation }: Props) {
               variant="caption"
               style={{ textAlign: 'center', color: t.colors.textTertiary }}
             >
-              登录即同步该域的插件与内容
+              登录即同步该域的应用与内容
             </YdText>
           </View>
         </ScrollView>

@@ -83,8 +83,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
+  // sa-token 的 token-name 即 Authorization 且原样取值：不能加 Bearer 前缀
   if (tokens) {
-    headers.Authorization = `Bearer ${tokens.accessToken}`;
+    headers.Authorization = tokens.accessToken;
   }
 
   const res = await fetch(`${domain.serverUrl}${path}`, {

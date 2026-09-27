@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
+import type { PluginMobileSdk } from '@yudream/plugin-sdk-mobile';
 import { YdButton, YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { loadPluginModule } from '@/core/plugins/pluginLoader';
+import { buildAppSdk } from '@/core/plugins/appSdk';
 import { rollback } from '@/core/plugins/bundleCache';
 import { getActiveDomain } from '@/core/domains/store';
 import type { RootStackParamList } from '@/navigation/types';
@@ -13,30 +15,43 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PluginHost'>;
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ready'; Component: ComponentType<Record<string, unknown>> }
+  | { kind: 'ready'; Component: AppModuleComponent }
   | { kind: 'error'; message: string };
 
+/** 宿主传给应用模块的入参：sdk 注入 + route（应用内路由，主页卡片声明）。 */
+export interface AppModuleProps {
+  sdk: PluginMobileSdk;
+  route?: string;
+}
+
+type AppModuleComponent = ComponentType<AppModuleProps>;
+
 /**
- * 插件容器：经 MF 运行时加载远程模块并渲染其默认导出。
+ * 应用容器：经 MF 运行时加载远程模块并渲染其默认导出。
  * 失败路径已含 last-known-good 回滚（pluginLoader 内）；
  * 仍失败则给出手动回滚入口。
  */
 export function PluginHostScreen({ route }: Props) {
   const t = useTheme();
-  const { code } = route.params;
+  const { code, route: appRoute } = route.params;
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [retryToken, setRetryToken] = useState(0);
+  const sdk = useMemo(() => buildAppSdk(code, t), [code, t]);
 
   useEffect(() => {
     let cancelled = false;
     setState({ kind: 'loading' });
     loadPluginModule(code)
-      .then((Component) => !cancelled && setState({ kind: 'ready', Component }))
+      .then(
+        (Component) =>
+          !cancelled &&
+          setState({ kind: 'ready', Component: Component as unknown as AppModuleComponent }),
+      )
       .catch((e) =>
         !cancelled &&
         setState({
           kind: 'error',
-          message: e instanceof Error ? e.message : '插件加载失败',
+          message: e instanceof Error ? e.message : '应用加载失败',
         }),
       );
     return () => {
@@ -49,7 +64,7 @@ export function PluginHostScreen({ route }: Props) {
       <YdScreen>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: t.spacing.md }}>
           <ActivityIndicator color={t.colors.accent} />
-          <YdText variant="secondary">正在加载插件…</YdText>
+          <YdText variant="secondary">正在加载应用…</YdText>
         </View>
       </YdScreen>
     );
@@ -79,7 +94,7 @@ export function PluginHostScreen({ route }: Props) {
   const { Component } = state;
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bgPage }}>
-      <Component />
+      <Component sdk={sdk} route={appRoute} />
     </View>
   );
 }

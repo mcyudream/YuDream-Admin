@@ -142,6 +142,7 @@ catalog:
   grapesjs-navbar: 1.0.2
   grapesjs-custom-code: 1.0.2
   grapesjs-style-bg: 2.0.2
+  react-native-paper: ^5.15.3
 catalogs:
   arco-design-vue:
     '@arco-design/web-vue': ^2.58.0

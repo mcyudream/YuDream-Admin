@@ -9,7 +9,7 @@ import type { MainTabParamList } from '@/navigation/types';
 
 const Tabs = createBottomTabNavigator<MainTabParamList>();
 
-/** 主界面：底部导航（首页 / 插件 / 我的）。 */
+/** 主界面：底部导航（首页 / 应用 / 我的）。 */
 export function MainTabs() {
   const t = useTheme();
 
@@ -27,7 +27,7 @@ export function MainTabs() {
           const name =
             route.name === '首页'
               ? 'home-outline'
-              : route.name === '插件'
+              : route.name === '应用'
                 ? 'grid-outline'
                 : 'person-outline';
           return <Icon name={name} size={size} color={color} />;
@@ -35,7 +35,7 @@ export function MainTabs() {
       })}
     >
       <Tabs.Screen name="首页" component={HomeTabScreen} />
-      <Tabs.Screen name="插件" component={PluginsTabScreen} />
+      <Tabs.Screen name="应用" component={PluginsTabScreen} />
       <Tabs.Screen name="我的" component={ProfileTabScreen} />
     </Tabs.Navigator>
   );

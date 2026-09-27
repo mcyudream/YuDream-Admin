@@ -10,7 +10,7 @@ import { onPluginsChanged, getPlugins } from '@/core/plugins/registry';
 import { syncPlugins } from '@/core/plugins/pluginLoader';
 import { getInstalled } from '@/core/plugins/bundleCache';
 import { getActiveDomain } from '@/core/domains/store';
-import type { ManifestPluginEntry } from '@/core/manifest/types';
+import { appDisplayName, type ManifestPluginEntry } from '@/core/manifest/types';
 import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Props = CompositeScreenProps<
@@ -19,7 +19,7 @@ type Props = CompositeScreenProps<
 >;
 
 /**
- * 插件页：当前域的全部插件，下拉刷新检查更新（需登录态）。
+ * 应用页：当前域的全部应用，下拉刷新检查更新（需登录态）。
  */
 export function PluginsTabScreen({ navigation }: Props) {
   const t = useTheme();
@@ -57,7 +57,7 @@ export function PluginsTabScreen({ navigation }: Props) {
       setLastSync(new Date().toLocaleTimeString());
       await refreshLocal();
     } catch (e) {
-      console.warn('[plugins] 同步失败', e);
+      console.warn('[apps] 同步失败', e);
     } finally {
       setRefreshing(false);
     }
@@ -74,7 +74,7 @@ export function PluginsTabScreen({ navigation }: Props) {
         }
         ListHeaderComponent={
           <View style={{ gap: 4, paddingHorizontal: 4 }}>
-            <YdText variant="title">插件</YdText>
+            <YdText variant="title">应用</YdText>
             <YdText variant="caption">
               {lastSync ? `上次检查更新 ${lastSync} · 下拉刷新` : '下拉检查更新'}
             </YdText>
@@ -85,7 +85,13 @@ export function PluginsTabScreen({ navigation }: Props) {
           const pendingUpdate = local && local !== item.version;
           return (
             <YdCard
-              onPress={() => navigation.navigate('PluginHost', { code: item.code, title: item.code })}
+              onPress={() =>
+                navigation.navigate('PluginHost', {
+                  code: item.code,
+                  title: appDisplayName(item),
+                  route: item.homeCards?.[0]?.route,
+                })
+              }
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
                 <View
@@ -98,13 +104,18 @@ export function PluginsTabScreen({ navigation }: Props) {
                     justifyContent: 'center',
                   }}
                 >
-                  <Icon name="extension-outline" size={20} color={t.colors.accent} />
+                  <Icon name={item.icon ?? 'cube-outline'} size={20} color={t.colors.accent} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <YdText style={{ fontWeight: t.typography.weightMedium }} numberOfLines={1}>
-                    {item.code}
+                    {appDisplayName(item)}
                   </YdText>
-                  <YdText variant="caption">
+                  {item.description ? (
+                    <YdText variant="caption" numberOfLines={1}>
+                      {item.description}
+                    </YdText>
+                  ) : null}
+                  <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
                     {local ? `本地 v${local}` : '未下载'} · 最新 v{item.version}
                   </YdText>
                 </View>
@@ -120,7 +131,7 @@ export function PluginsTabScreen({ navigation }: Props) {
         }}
         ListEmptyComponent={
           <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.xl }}>
-            暂无可用插件
+            暂无可用应用
           </YdText>
         }
       />

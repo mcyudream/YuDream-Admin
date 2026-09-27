@@ -15,6 +15,8 @@ import RNFS from 'react-native-fs';
 import CryptoJS from 'crypto-js';
 import { bridges } from '@/bridges';
 import type { ManifestPluginEntry } from '@/core/manifest/types';
+import { getDomains } from '@/core/domains/store';
+import { resolveAssetUrl } from '@/core/domains/assetUrl';
 
 const rootOf = (domainId: string) => `${RNFS.DocumentDirectoryPath}/plugins/${domainId}`;
 
@@ -100,7 +102,13 @@ export async function install(domainId: string, entry: ManifestPluginEntry): Pro
     await RNFS.unlink(tmp);
   }
 
-  await bridges.download.download(entry.remoteEntryUrl, tmp).promise;
+  // manifest 的 remoteEntryUrl 是站内相对路径，须经激活域 origin 拼接。
+  const domain = getDomains().find((d) => d.id === domainId);
+  const sourceUrl = resolveAssetUrl(domain?.serverUrl ?? '', entry.remoteEntryUrl);
+  if (!/^https?:\/\//i.test(sourceUrl)) {
+    throw new Error(`插件 ${entry.code} 下载地址无效（缺域 origin）`);
+  }
+  await bridges.download.download(sourceUrl, tmp).promise;
   const actual = await sha256OfFile(tmp);
   if (actual.toLowerCase() !== entry.remoteEntrySha256.toLowerCase()) {
     await RNFS.unlink(tmp);

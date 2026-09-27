@@ -10,6 +10,8 @@ export interface DomainAccount {
   username: string;
   nickname: string;
   avatar: string | null;
+  /** 管理员（/api/user/me 提供；决定「域管理」入口） */
+  admin?: boolean;
 }
 
 /** 域品牌信息：来自站点设置（logo/favicon）与 mobile-app 能力配置（登录页定制）。 */
