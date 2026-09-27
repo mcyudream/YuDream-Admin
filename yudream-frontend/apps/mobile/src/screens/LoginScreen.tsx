@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { YdButton, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { login } from '@/core/auth/authService';
 import { getActiveDomain, hostOf } from '@/core/domains/store';
+import { resolveAssetUrl } from '@/core/domains/assetUrl';
 import { startBackgroundSync } from '@/app/bootstrap';
 import type { RootStackParamList } from '@/navigation/types';
 
@@ -12,8 +21,8 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 /**
  * 域登录（设计稿风格）：
- * 上半为品牌 hero 区——装饰弧线 + 居中域标识 + 域名大字（点击换域）；
- * 下半白底承载账号表单与胶囊主按钮。
+ * 上半为品牌 hero 区——优先使用能力配置的登录页背景图与底色，
+ * 回退主题 accent + 装饰弧线；居中为站点 logo（回退域标识字母）与域名大字。
  */
 export function LoginScreen({ navigation }: Props) {
   const t = useTheme();
@@ -23,6 +32,12 @@ export function LoginScreen({ navigation }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const branding = domain?.branding ?? {};
+  const heroImage = resolveAssetUrl(domain?.serverUrl ?? '', branding.loginHeroImage);
+  const logoUrl = resolveAssetUrl(domain?.serverUrl ?? '', branding.logo);
+  const heroBackground = branding.loginHeroBackground || t.colors.accent;
+  const heroLetter = (domain?.name ?? 'Y').trim()[0]?.toUpperCase() ?? 'Y';
 
   const submit = async () => {
     if (!username || !password) {
@@ -51,35 +66,51 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bgPage }}>
-      {/* 品牌 hero 区 */}
-      <View style={{ height: '44%', backgroundColor: t.colors.accent, overflow: 'hidden' }}>
-        {/* 装饰弧线（纯 View，无 SVG 依赖） */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: -140,
-            left: -60,
-            width: 300,
-            height: 220,
-            borderRadius: 160,
-            borderWidth: 26,
-            borderColor: 'rgba(255,255,255,0.22)',
-          }}
-        />
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: -40,
-            right: -80,
-            width: 260,
-            height: 260,
-            borderRadius: 130,
-            borderWidth: 20,
-            borderColor: 'rgba(255,255,255,0.14)',
-          }}
-        />
+      {/* 品牌 hero 区：能力配置背景图 > 能力配置底色 > 主题 accent + 弧线 */}
+      <View style={{ height: '44%', backgroundColor: heroBackground, overflow: 'hidden' }}>
+        {heroImage ? (
+          <Image
+            source={{ uri: heroImage }}
+            style={{ position: 'absolute', width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
+        ) : (
+          <>
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: -140,
+                left: -60,
+                width: 300,
+                height: 220,
+                borderRadius: 160,
+                borderWidth: 26,
+                borderColor: 'rgba(255,255,255,0.22)',
+              }}
+            />
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: -40,
+                right: -80,
+                width: 260,
+                height: 260,
+                borderRadius: 130,
+                borderWidth: 20,
+                borderColor: 'rgba(255,255,255,0.14)',
+              }}
+            />
+          </>
+        )}
+        {/* 背景图上压轻微暗化，保证域名文字可读 */}
+        {heroImage ? (
+          <View
+            pointerEvents="none"
+            style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.18)' }}
+          />
+        ) : null}
 
         {/* 居中域标识 + 域名（点击换域） */}
         <Pressable
@@ -96,17 +127,16 @@ export function LoginScreen({ navigation }: Props) {
               backgroundColor: t.colors.bgSurface,
               alignItems: 'center',
               justifyContent: 'center',
+              overflow: 'hidden',
             }}
           >
-            <YdText
-              style={{
-                color: t.colors.accent,
-                fontSize: 42,
-                fontWeight: t.typography.weightBold,
-              }}
-            >
-              {(domain?.name ?? 'Y').trim()[0]?.toUpperCase() ?? 'Y'}
-            </YdText>
+            {logoUrl ? (
+              <Image source={{ uri: logoUrl }} style={{ width: 96, height: 96 }} resizeMode="cover" />
+            ) : (
+              <YdText style={{ color: t.colors.accent, fontSize: 42, fontWeight: t.typography.weightBold }}>
+                {heroLetter}
+              </YdText>
+            )}
           </View>
           <YdText
             numberOfLines={1}
@@ -139,9 +169,11 @@ export function LoginScreen({ navigation }: Props) {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={{ flexGrow: 1, paddingHorizontal: t.spacing.xl, paddingTop: t.spacing.xl }} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, paddingHorizontal: t.spacing.xl, paddingTop: t.spacing.xl }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={{ gap: t.spacing.lg }}>
-            {/* 用户名：底线式输入 */}
             <View style={underline(username.length > 0)}>
               <TextInput
                 value={username}
@@ -156,7 +188,6 @@ export function LoginScreen({ navigation }: Props) {
                 style={fieldText}
               />
             </View>
-            {/* 密码：底线式输入 + 可见切换 */}
             <View style={{ ...underline(password.length > 0), flexDirection: 'row', alignItems: 'center' }}>
               <TextInput
                 value={password}

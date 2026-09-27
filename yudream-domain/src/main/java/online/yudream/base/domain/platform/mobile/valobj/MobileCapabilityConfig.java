@@ -15,6 +15,12 @@ public final class MobileCapabilityConfig {
 
     public static final String KEY_IOS_ENABLED = "iosEnabled";
 
+    /** 登录页 hero 背景图（站点资产路径或完整 URL），空表示未定制。 */
+    public static final String KEY_LOGIN_HERO_IMAGE = "loginHeroImage";
+
+    /** 登录页 hero 底色（CSS 颜色值），空表示未定制（App 用主题 accent）。 */
+    public static final String KEY_LOGIN_HERO_BACKGROUND = "loginHeroBackground";
+
     private MobileCapabilityConfig() {
     }
 
@@ -24,5 +30,14 @@ public final class MobileCapabilityConfig {
             return false;
         }
         return "true".equalsIgnoreCase(config.get(KEY_IOS_ENABLED));
+    }
+
+    /** 文本型品牌配置：键缺失/空串/纯空白一律回落空串（App 回退内置样式）。 */
+    public static String textConfig(Map<String, String> config, String key) {
+        if (config == null) {
+            return "";
+        }
+        String value = config.get(key);
+        return value == null ? "" : value.strip();
     }
 }

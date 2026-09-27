@@ -6,7 +6,8 @@ import { installScriptManager } from '@/core/plugins/scriptManager';
 import { syncPlugins, warmupFromCache } from '@/core/plugins/pluginLoader';
 import { loadCachedThemeOverride, fetchThemeOverride } from '@/core/theme/themeLoader';
 import { isAuthenticated } from '@/core/auth/authService';
-import { getActiveDomain, loadDomains } from '@/core/domains/store';
+import { getActiveDomain, loadDomains, updateDomainBranding } from '@/core/domains/store';
+import { discoverDomain } from '@/core/domains/discover';
 
 export interface BootstrapResult {
   /** 是否已有接入的域 */
@@ -29,8 +30,19 @@ export async function bootstrap(): Promise<BootstrapResult> {
   const themeOverride = await loadCachedThemeOverride(domain.id);
   await warmupFromCache();
 
-  // 后台刷新主题（匿名）；插件同步需要登录态，登录成功后由首页触发。
+  // 后台刷新主题（匿名）与站点品牌信息（logo/登录页定制可能被管理员更新）。
   void fetchThemeOverride(domain.id, domain.serverUrl).catch(() => undefined);
+  void discoverDomain(domain.serverUrl)
+    .then((outcome) => {
+      if (outcome.kind === 'ok') {
+        void updateDomainBranding(domain.id, {
+          logo: outcome.info.logo,
+          loginHeroImage: outcome.info.loginHeroImage,
+          loginHeroBackground: outcome.info.loginHeroBackground,
+        });
+      }
+    })
+    .catch(() => undefined);
 
   const authenticated = await isAuthenticated();
   return { hasDomain: true, authenticated, themeOverride };

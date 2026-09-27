@@ -31,4 +31,11 @@ public class MobileSiteInfoDTO implements Serializable {
 
     /** mobile-app 能力应用闸门状态：未启用为 false。 */
     private boolean mobileEnabled;
+
+    /** 登录页 hero 背景图（能力配置，空=未定制）。 */
+    private String loginHeroImage;
+
+    /** 登录页 hero 底色（能力配置，空=未定制）。 */
+    private String loginHeroBackground;
+
 }

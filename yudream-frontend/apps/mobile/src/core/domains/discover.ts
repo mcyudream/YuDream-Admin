@@ -11,6 +11,10 @@ export interface SiteInfo {
   favicon: string;
   version: string;
   mobileEnabled: boolean;
+  /** mobile-app 能力配置：登录页 hero 背景图（空=未定制） */
+  loginHeroImage: string;
+  /** mobile-app 能力配置：登录页 hero 底色（空=未定制） */
+  loginHeroBackground: string;
 }
 
 interface SiteInfoRes {
@@ -19,6 +23,8 @@ interface SiteInfoRes {
   favicon?: string;
   version?: string;
   mobileEnabled?: boolean;
+  loginHeroImage?: string;
+  loginHeroBackground?: string;
 }
 
 export type DiscoverOutcome =
@@ -46,6 +52,8 @@ export async function discoverDomain(rawUrl: string): Promise<DiscoverOutcome> {
             favicon: body.data.favicon ?? '',
             version: body.data.version ?? '',
             mobileEnabled: body.data.mobileEnabled === true,
+            loginHeroImage: body.data.loginHeroImage ?? '',
+            loginHeroBackground: body.data.loginHeroBackground ?? '',
           },
         };
       }
