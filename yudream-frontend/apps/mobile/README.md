@@ -41,9 +41,26 @@ keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey \
   -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android
 ```
 
-默认服务器地址 `http://10.0.2.2:8080`（模拟器回环），真机/生产在 App 内「设置」修改。
-Gradle 版本随 RN 0.76 模板（AGP 8.6.x / Gradle 8.10.2 / NDK 27.1 / Kotlin 2.0.21）；
-如与本地 react-native 实际版本不符，同步 `android/build.gradle` 与 `gradle-wrapper.properties`。
+默认服务器地址 `http://127.0.0.1:8080`（配合 `adb reverse tcp:8080` 转发到宿主机后端，
+`run-android` 会自动转发 8081）；真机调试在 App 内「设置」改成局域网/正式地址。
+
+### Windows 构建环境（已按此配置并验证）
+
+- JDK 21、Android SDK（platforms;android-35、build-tools;35.0.0、**NDK 26.1.10909125**、cmake;3.22.1），
+  `android/local.properties` 写 `sdk.dir`。
+- **长路径**：CMake/ninja 构建路径在本 monorepo 深度下必超 260，需两步：
+  1. `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled = 1`（管理员一次性）；
+  2. SDK 自带 ninja 无 longPathAware 清单，把 `Sdk/cmake/3.22.1/bin/ninja.exe`
+     换为 ninja ≥1.12（longPathAware；原版备份为 ninja.exe.bak）。
+  不要用 junction/subst 绕短路径：pnpm 相对软链会在跨重解析点回溯 `..` 时断裂。
+- Gradle 8.10.2 wrapper 已在 `android/` 生成（`gradle wrapper --gradle-version 8.10.2`）。
+- `android/build.gradle` 的版本组（AGP 8.6.0 / Kotlin 1.9.24 / target 34）对齐
+  `@react-native/gradle-plugin@0.76.6` 的 catalog；`react-native-screens` 钉 4.5.0
+  （4.28+ 的 codegen 输出与本版 RN 不兼容）。
+- `react-native.config.js` 接管 Re.Pack 命令并解析 monorepo reactNativePath。
+
+模拟器（MuMu 12）：`adb connect 127.0.0.1:16384`、`adb reverse tcp:8081 tcp:8081`、
+`adb reverse tcp:8080 tcp:8080`。构建安装：`gradlew.bat app:installDebug`。
 
 ## iOS 预留
 
