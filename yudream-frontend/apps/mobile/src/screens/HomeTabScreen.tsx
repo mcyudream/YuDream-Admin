@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FlatList, RefreshControl, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { BannerCarousel, YdScreen, YdText } from '@/components';
+import { BannerCarousel, FeedItem, YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import {
   getActiveDomain,
@@ -17,8 +17,9 @@ import { onPluginsChanged, getPlugins } from '@/core/plugins/registry';
 import {
   appDisplayName,
   type ManifestPluginEntry,
-  type MobileHomeCard,
+  type MobileFeedItem,
 } from '@/core/manifest/types';
+import { fetchAppFeed } from '@/core/manifest/homeFeed';
 import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Props = CompositeScreenProps<
@@ -26,16 +27,24 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-/** 首页内容流条目：某应用注册的一张卡片。 */
-interface HomeFeedItem {
-  app: ManifestPluginEntry;
-  card: MobileHomeCard;
+type FeedEntry =
+  | { kind: 'content'; key: string; app: ManifestPluginEntry; item: MobileFeedItem }
+  | { kind: 'card'; key: string; app: ManifestPluginEntry; card: MobileFeedCard };
+
+type MobileFeedCard = NonNullable<ManifestPluginEntry['homeCards']>[number];
+
+interface FeedSourceState {
+  items: MobileFeedItem[];
+  page: number;
+  hasMore: boolean;
 }
 
+const PAGE_SIZE = 20;
+
 /**
- * 首页 = 轮播图 + 应用注册的内容条目流，仅内容。
- * 应用排布与展示切换收在「域管理」（管理员定默认：服务端应用启用与顺序；
- * 用户覆盖：本地隐藏/排序）；头部仅保留一个轻量应用入口。
+ * 首页 = 轮播图 + 应用注册的内容源信息流（真实内容条目，仅内容）。
+ * 下拉刷新重置回第一页；触底自动为仍有余量的应用加载下一页。
+ * 无内容源的应用其主页卡片作为快捷入口排在列表末尾。
  */
 export function HomeTabScreen({ navigation }: Props) {
   const t = useTheme();
@@ -46,17 +55,17 @@ export function HomeTabScreen({ navigation }: Props) {
   );
   const [prefsVersion, setPrefsVersion] = useState(0);
 
+  const [sources, setSources] = useState<Record<string, FeedSourceState>>({});
+  const [cardEntries, setCardEntries] = useState<FeedEntry[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sourcesRef = useRef<Record<string, FeedSourceState>>({});
+  const feedAppsRef = useRef<ManifestPluginEntry[]>([]);
+
   useEffect(() => onPluginsChanged(setPlugins), []);
   useEffect(() => setAccount(getActiveDomain()?.account ?? null), []);
   useEffect(() => subscribeAppPrefs(() => setPrefsVersion((v) => v + 1)), []);
-  // 域变化时重载偏好（切域）
-  useEffect(() => {
-    const d = getActiveDomain();
-    if (d) {
-      void loadAppPrefs(d.id);
-    }
-    setAccount(d?.account ?? null);
-  }, [domain?.id]);
+  useEffect(() => setAccount(getActiveDomain()?.account ?? null), [domain?.id]);
 
   const visibleApps = useMemo(() => {
     void prefsVersion;
@@ -72,21 +81,53 @@ export function HomeTabScreen({ navigation }: Props) {
       .filter((p): p is ManifestPluginEntry => Boolean(p));
   }, [plugins, domain?.id, prefsVersion]);
 
-  const feed = useMemo<HomeFeedItem[]>(
-    () =>
-      visibleApps.flatMap((app) =>
-        (app.homeCards ?? []).map((card) => ({ app, card })),
-      ),
+  const feedApps = useMemo(
+    () => visibleApps.filter((a) => a.homeFeed?.endpoint),
+    [visibleApps],
+  );
+  const cardOnlyApps = useMemo(
+    () => visibleApps.filter((a) => !a.homeFeed?.endpoint && (a.homeCards?.length ?? 0) > 0),
     [visibleApps],
   );
 
-  const banners = domain?.branding?.homeBanners ?? [];
+  const reloadAll = useCallback(async () => {
+    const apps = feedAppsRef.current;
+    const results = await Promise.allSettled(apps.map((app) => fetchAppFeed(app, 1)));
+    const next: Record<string, FeedSourceState> = {};
+    apps.forEach((app, i) => {
+      const result = results[i];
+      next[app.code] =
+        result && result.status === 'fulfilled'
+          ? { items: result.value.items, page: 1, hasMore: result.value.hasMore }
+          : { items: [], page: 1, hasMore: false };
+    });
+    sourcesRef.current = next;
+    setSources(next);
+  }, []);
+
+  // 内容源应用集合变化（切域/装新应用/偏好调整）→ 重置回第一页
+  const feedKey = feedApps.map((a) => a.code).join(',');
+  useEffect(() => {
+    feedAppsRef.current = feedApps;
+    void reloadAll();
+  }, [feedKey, reloadAll]);
+
+  // 无内容源的应用：主页卡片作为快捷条目
+  useEffect(() => {
+    const entries: FeedEntry[] = cardOnlyApps.flatMap((app) =>
+      (app.homeCards ?? []).map(
+        (card): FeedEntry => ({ kind: 'card', key: `${app.code}:${card.id}`, app, card }),
+      ),
+    );
+    setCardEntries(entries);
+  }, [cardOnlyApps]);
+
+  const banners: DomainBanner[] = domain?.branding?.homeBanners ?? [];
 
   const openBanner = (banner: DomainBanner) => {
     if (!banner.route) {
       return;
     }
-    // 路由归属：优先命中注册了该路由的应用
     const hit = visibleApps.find((app) =>
       (app.homeCards ?? []).some((c) => c.route === banner.route),
     );
@@ -98,6 +139,63 @@ export function HomeTabScreen({ navigation }: Props) {
       });
     }
   };
+
+  const openContent = (app: ManifestPluginEntry, route: string) =>
+    navigation.navigate('PluginHost', { code: app.code, title: appDisplayName(app), route });
+
+  const merged: FeedEntry[] = [
+    ...feedApps.flatMap((app) =>
+      (sources[app.code]?.items ?? []).map(
+        (item): FeedEntry => ({ kind: 'content', key: `${app.code}:${item.id}`, app, item }),
+      ),
+    ),
+    ...cardEntries,
+  ];
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reloadAll();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reloadAll]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore) {
+      return;
+    }
+    const current = sourcesRef.current;
+    const pending = feedAppsRef.current.filter((a) => current[a.code]?.hasMore);
+    if (pending.length === 0) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const results = await Promise.allSettled(
+        pending.map((app) => fetchAppFeed(app, (current[app.code]?.page ?? 1) + 1)),
+      );
+      const next: Record<string, FeedSourceState> = { ...sourcesRef.current };
+      pending.forEach((app, i) => {
+        const result = results[i];
+        const prev: FeedSourceState =
+          current[app.code] ?? { items: [], page: 1, hasMore: false };
+        if (result && result.status === 'fulfilled') {
+          const known = new Set(prev.items.map((existing) => existing.id));
+          const fresh = result.value.items.filter((incoming) => !known.has(incoming.id));
+          next[app.code] = {
+            items: [...prev.items, ...fresh],
+            page: prev.page + 1,
+            hasMore: result.value.hasMore,
+          };
+        }
+      });
+      sourcesRef.current = next;
+      setSources(next);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore]);
 
   if (!domain) {
     return (
@@ -114,120 +212,85 @@ export function HomeTabScreen({ navigation }: Props) {
 
   return (
     <YdScreen>
-      <ScrollView contentContainerStyle={{ gap: t.spacing.lg, paddingBottom: t.spacing.xl }}>
-        {/* 顶栏：站点身份 + 轻量应用入口 */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md, paddingTop: t.spacing.md }}>
-          <View style={{ flex: 1 }}>
-            <YdText variant="title" numberOfLines={1}>
-              {greeting}
-              {account ? `，${account.nickname}` : ''}
-            </YdText>
-            <YdText variant="caption" numberOfLines={1}>
-              {domain.name} · {hostOf(domain.serverUrl)}
-            </YdText>
-          </View>
-          <Icon
-            name="apps-outline"
-            size={22}
-            color={t.colors.textSecondary}
-            onPress={() => navigation.navigate('应用')}
-            hitSlop={10}
-          />
-          <Icon
-            name="swap-horizontal"
-            size={22}
-            color={t.colors.textSecondary}
-            onPress={() => navigation.navigate('Welcome')}
-            hitSlop={10}
-          />
-        </View>
-
-        {/* 轮播图 */}
-        <BannerCarousel banners={banners} onPress={openBanner} />
-
-        {/* 内容条目流：仅内容 */}
-        {feed.length > 0 ? (
-          <View>
-            {feed.map(({ app, card }, i) => (
-              <View key={`${app.code}:${card.id}`}>
-                <FeedItemRow
-                  icon={card.icon}
-                  title={card.title}
-                  description={card.description}
-                  source={appDisplayName(app)}
-                  onPress={() =>
-                    navigation.navigate('PluginHost', {
-                      code: app.code,
-                      title: appDisplayName(app),
-                      route: card.route,
-                    })
-                  }
-                />
-                {i < feed.length - 1 ? (
-                  <View style={{ height: 1, backgroundColor: t.colors.borderSubtle, marginHorizontal: 4 }} />
-                ) : null}
+      <FlatList
+        data={merged}
+        keyExtractor={(entry) => `${entry.kind}:${entry.key}`}
+        contentContainerStyle={{ paddingBottom: t.spacing.xl }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.colors.accent} />
+        }
+        onEndReachedThreshold={0.3}
+        onEndReached={() => void loadMore()}
+        ListHeaderComponent={
+          <View style={{ gap: t.spacing.lg, paddingTop: t.spacing.md, paddingBottom: t.spacing.sm }}>
+            {/* 顶栏：站点身份 + 轻量应用入口 */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <YdText variant="title" numberOfLines={1}>
+                  {greeting}
+                  {account ? `，${account.nickname}` : ''}
+                </YdText>
+                <YdText variant="caption" numberOfLines={1}>
+                  {domain.name} · {hostOf(domain.serverUrl)}
+                </YdText>
               </View>
-            ))}
+              <Icon
+                name="apps-outline"
+                size={22}
+                color={t.colors.textSecondary}
+                onPress={() => navigation.navigate('应用')}
+                hitSlop={10}
+              />
+              <Icon
+                name="swap-horizontal"
+                size={22}
+                color={t.colors.textSecondary}
+                onPress={() => navigation.navigate('Welcome')}
+                hitSlop={10}
+              />
+            </View>
+            {/* 轮播图 */}
+            <BannerCarousel banners={banners} onPress={openBanner} />
           </View>
-        ) : (
-          <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.lg }}>
-            暂无内容，安装的应用会在这里展示动态
-          </YdText>
-        )}
-      </ScrollView>
-    </YdScreen>
-  );
-}
-
-interface FeedItemRowProps {
-  icon: string;
-  title: string;
-  description: string;
-  source: string;
-  onPress: () => void;
-}
-
-function FeedItemRow({ icon, title, description, source, onPress }: FeedItemRowProps) {
-  const t = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      android_ripple={{ color: t.colors.fillHover }}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: t.spacing.md,
-        paddingVertical: t.spacing.md,
-        paddingHorizontal: 4,
-        backgroundColor: pressed ? t.colors.fillHover : 'transparent',
-      })}
-    >
-      <View
-        style={{
-          width: 46,
-          height: 46,
-          borderRadius: 12,
-          backgroundColor: t.colors.fillHover,
-          alignItems: 'center',
-          justifyContent: 'center',
+        }
+        renderItem={({ item }) => {
+          if (item.kind === 'content') {
+            return (
+              <FeedItem
+                item={item.item}
+                onPress={() => openContent(item.app, item.item.route)}
+              />
+            );
+          }
+          return (
+            <View style={{ paddingHorizontal: t.spacing.lg, paddingVertical: t.spacing.md }}>
+              <YdText numberOfLines={1} style={{ fontWeight: t.typography.weightMedium }}>
+                {item.card.title}
+              </YdText>
+              {item.card.description ? (
+                <YdText variant="caption" numberOfLines={1}>
+                  {item.card.description}
+                </YdText>
+              ) : null}
+            </View>
+          );
         }}
-      >
-        <Icon name={icon} size={24} color={t.colors.accent} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <YdText numberOfLines={1} style={{ fontSize: 16, fontWeight: t.typography.weightMedium }}>
-          {title}
-        </YdText>
-        {description ? (
-          <YdText variant="secondary" numberOfLines={2}>
-            {description}
+        ItemSeparatorComponent={() => (
+          <View style={{ height: 1, backgroundColor: t.colors.borderSubtle }} />
+        )}
+        ListEmptyComponent={
+          <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.xl }}>
+            暂无内容，下拉刷新试试
           </YdText>
-        ) : null}
-        <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
-          {source}
-        </YdText>
-      </View>
-      <Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />
-    </Pressable>
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <YdText variant="caption" style={{ textAlign: 'center', paddingVertical: t.spacing.md }}>
+              正在加载更多…
+            </YdText>
+          ) : null
+        }
+      />
+    </YdScreen>
   );
 }

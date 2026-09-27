@@ -24,6 +24,7 @@ interface ManifestRes {
       icon?: string;
       route?: string;
     }> | null;
+    homeFeed?: { endpoint?: string; title?: string } | null;
   }>;
 }
 
@@ -63,6 +64,9 @@ export async function fetchManifest(): Promise<MobileManifest> {
           icon: c.icon ?? 'cube-outline',
           route: c.route ?? '',
         })),
+      homeFeed: entry.homeFeed?.endpoint
+        ? { endpoint: entry.homeFeed.endpoint, title: entry.homeFeed.title ?? undefined }
+        : undefined,
     })),
   };
 }

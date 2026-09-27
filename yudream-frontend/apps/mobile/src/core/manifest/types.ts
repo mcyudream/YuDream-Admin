@@ -17,6 +17,35 @@ export interface MobileHomeCard {
   route: string;
 }
 
+/** 应用向首页注册的内容源端点（plugin.yml mobile.home.feed）。 */
+export interface MobileHomeFeed {
+  /** 插件 API 根下的相对端点，如 /public/mobile-feed */
+  endpoint: string;
+  /** 可选分节标题 */
+  title?: string;
+}
+
+/** 内容源返回的标准条目：一条真实内容（帖子等），由宿主统一渲染。 */
+export interface MobileFeedItem {
+  id: string;
+  /** 应用内路由，点击条目打开 */
+  route: string;
+  title: string;
+  summary: string;
+  /** 缩略图（宿主最多展示 3 张） */
+  images: string[];
+  /** 实际图片总数（多于展示数时显示「共 N 张」） */
+  imageCount?: number;
+  author: { name: string; avatar: string };
+  /** 分类/标签名 */
+  tagName?: string;
+  commentCount?: number;
+  likeCount?: number;
+  viewCount?: number;
+  /** epoch 毫秒 */
+  createTime?: number;
+}
+
 export interface ManifestPluginEntry {
   code: string;
   version: string;
@@ -34,6 +63,8 @@ export interface ManifestPluginEntry {
   icon?: string;
   /** 应用注册的主页卡片 */
   homeCards?: MobileHomeCard[];
+  /** 应用注册的首页内容源（真实内容条目） */
+  homeFeed?: MobileHomeFeed;
 }
 
 /** 应用展示名：mobile.name 优先，回落 code。 */
