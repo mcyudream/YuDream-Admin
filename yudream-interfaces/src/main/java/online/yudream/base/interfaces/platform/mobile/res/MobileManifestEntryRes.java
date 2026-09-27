@@ -39,6 +39,9 @@ public class MobileManifestEntryRes implements Serializable {
     @Builder.Default
     private List<MobileHomeCardRes> homeCards = new ArrayList<>();
 
+    /** 移动端首页信息流内容源端点声明（未声明时为 null） */
+    private MobileHomeFeedRes homeFeed;
+
     @Builder.Default
     private List<String> platforms = new ArrayList<>();
 

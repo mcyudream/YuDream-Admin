@@ -3,6 +3,7 @@ package online.yudream.base.infra.platform.plugin.service;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
+import online.yudream.base.plugin.spi.core.PluginMobileHomeFeed;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import org.springframework.util.StringUtils;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -82,7 +83,8 @@ public class PluginYamlDescriptorReader {
     /**
      * plugin.yml 可选 mobile 块：platforms（缺省 android+ios）、minHostVersion（缺省 1.0.0）、
      * requiredNativeCapabilities（缺省空）；name/description/icon 为移动端展示声明（可选），
-     * home.cards 为移动端主页卡片声明（可选，≤10 项）。注册期校验合法性：platforms 只允许 android/ios。
+     * home.cards 为移动端主页卡片声明（可选，≤10 项），home.feed 为移动端首页信息流
+     * 内容源端点声明（可选，至多一个）。注册期校验合法性：platforms 只允许 android/ios。
      */
     private PluginMobileSupport optionalMobileSupport(Map<?, ?> values) {
         Object mobile = values.get("mobile");
@@ -106,6 +108,7 @@ public class PluginYamlDescriptorReader {
         String description = optionalDisplayValue(mobileValues, "description", 256);
         String icon = optionalDisplayValue(mobileValues, "icon", 64);
         List<PluginMobileHomeCard> homeCards = optionalHomeCards(mobileValues);
+        PluginMobileHomeFeed homeFeed = optionalHomeFeed(mobileValues);
         return new PluginMobileSupport(
                 platforms,
                 minHostVersion,
@@ -113,7 +116,8 @@ public class PluginYamlDescriptorReader {
                 name,
                 description,
                 icon,
-                homeCards
+                homeCards,
+                homeFeed
         );
     }
 
@@ -156,20 +160,20 @@ public class PluginYamlDescriptorReader {
             if (!(item instanceof Map<?, ?> cardValues)) {
                 throw new BizException(prefix + " 必须是 YAML 对象");
             }
-            String id = requiredCardValue(cardValues, prefix, "id");
+            String id = requiredFieldValue(cardValues, prefix, "id");
             if (!id.matches("[a-z0-9][a-z0-9-]{0,63}")) {
                 throw new BizException(prefix + ".id 必须匹配 [a-z0-9-]：" + id);
             }
             if (!seenIds.add(id)) {
                 throw new BizException(prefix + ".id 重复：" + id);
             }
-            String title = requiredCardValue(cardValues, prefix, "title");
+            String title = requiredFieldValue(cardValues, prefix, "title");
             if (title.length() > 32) {
                 throw new BizException(prefix + ".title 长度不能超过 32");
             }
-            String description = optionalCardValue(cardValues, prefix, "description", 128);
-            String icon = optionalCardValue(cardValues, prefix, "icon", 64);
-            String route = requiredCardValue(cardValues, prefix, "route");
+            String description = optionalFieldValue(cardValues, prefix, "description", 128);
+            String icon = optionalFieldValue(cardValues, prefix, "icon", 64);
+            String route = requiredFieldValue(cardValues, prefix, "route");
             if (route.length() > 128) {
                 throw new BizException(prefix + ".route 长度不能超过 128");
             }
@@ -181,7 +185,41 @@ public class PluginYamlDescriptorReader {
         return List.copyOf(parsed);
     }
 
-    private String requiredCardValue(Map<?, ?> cardValues, String prefix, String key) {
+    /**
+     * mobile.home.feed 首页信息流内容源端点声明：整体可选，至多一个；与 home.cards 可共存。
+     * endpoint 必填、以 / 开头、≤128 字符且不含空白；title 可选 ≤32 字符。
+     */
+    private PluginMobileHomeFeed optionalHomeFeed(Map<?, ?> mobileValues) {
+        Object home = mobileValues.get("home");
+        if (home == null) {
+            return null;
+        }
+        if (!(home instanceof Map<?, ?> homeValues)) {
+            throw new BizException("plugin.yml 的 mobile.home 必须是 YAML 对象");
+        }
+        Object feed = homeValues.get("feed");
+        if (feed == null) {
+            return null;
+        }
+        if (!(feed instanceof Map<?, ?> feedValues)) {
+            throw new BizException("plugin.yml 的 mobile.home.feed 必须是 YAML 对象");
+        }
+        String prefix = "plugin.yml 的 mobile.home.feed";
+        String endpoint = requiredFieldValue(feedValues, prefix, "endpoint");
+        if (!endpoint.startsWith("/")) {
+            throw new BizException(prefix + ".endpoint 必须以 / 开头：" + endpoint);
+        }
+        if (endpoint.length() > 128) {
+            throw new BizException(prefix + ".endpoint 长度不能超过 128");
+        }
+        if (endpoint.matches(".*\\s.*")) {
+            throw new BizException(prefix + ".endpoint 不能包含空白字符：" + endpoint);
+        }
+        String title = optionalFieldValue(feedValues, prefix, "title", 32);
+        return new PluginMobileHomeFeed(endpoint, title);
+    }
+
+    private String requiredFieldValue(Map<?, ?> cardValues, String prefix, String key) {
         String value = value(cardValues, key);
         if (!StringUtils.hasText(value)) {
             throw new BizException(prefix + "." + key + " 不能为空");
@@ -189,7 +227,7 @@ public class PluginYamlDescriptorReader {
         return value;
     }
 
-    private String optionalCardValue(Map<?, ?> cardValues, String prefix, String key, int maxLength) {
+    private String optionalFieldValue(Map<?, ?> cardValues, String prefix, String key, int maxLength) {
         String value = value(cardValues, key);
         if (!StringUtils.hasText(value)) {
             return null;

@@ -66,6 +66,10 @@ public class PluginModuleDO extends BaseDO {
     private String mobileIcon;
     /** plugin.yml mobile 块：移动端主页卡片声明；未声明时为 null。 */
     private List<MobileHomeCardDO> mobileHomeCards;
+    /** plugin.yml mobile 块：移动端首页信息流内容源端点；未声明时为 null。 */
+    private String mobileFeedEndpoint;
+    /** plugin.yml mobile 块：信息流分节标题；未声明时为 null。 */
+    private String mobileFeedTitle;
 
     /** mobile.home.cards[] 的持久化形态。 */
     @Data

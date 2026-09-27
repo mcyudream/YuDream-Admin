@@ -7,6 +7,7 @@ import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeFeed;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
@@ -45,6 +46,7 @@ import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog
 import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
+import online.yudream.base.plugin.spi.core.PluginMobileHomeFeed;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
@@ -1140,8 +1142,15 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         List<MobileHomeCard> homeCards = mobileSupport.homeCards().stream()
                 .map(this::toMobileHomeCard)
                 .toList();
+        MobileHomeFeed homeFeed = mobileSupport.homeFeed() == null
+                ? null
+                : toMobileHomeFeed(mobileSupport.homeFeed());
         return MobilePluginSupport.declared(platforms, mobileSupport.minHostVersion(), mobileSupport.requiredNativeCapabilities(),
-                mobileSupport.name(), mobileSupport.description(), mobileSupport.icon(), homeCards);
+                mobileSupport.name(), mobileSupport.description(), mobileSupport.icon(), homeCards, homeFeed);
+    }
+
+    private MobileHomeFeed toMobileHomeFeed(PluginMobileHomeFeed feed) {
+        return new MobileHomeFeed(feed.endpoint(), feed.title());
     }
 
     private MobileHomeCard toMobileHomeCard(PluginMobileHomeCard card) {

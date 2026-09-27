@@ -13,6 +13,7 @@ import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.domain.platform.mobile.aggregate.MobileDevice;
 import online.yudream.base.domain.platform.mobile.repo.MobileDeviceRepo;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeFeed;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.repo.PluginModuleRepo;
@@ -141,6 +142,34 @@ class MobileAppServiceTest {
     }
 
     @Test
+    void manifestTransmitsHomeFeedDeclaration() {
+        MobileTestHarness harness = MobileTestHarness.create(true, iosEnabled("true"));
+        harness.plugin("forum", PluginStatus.ENABLED, List.of("android", "ios"), "2.0.0", List.of(),
+                "论坛", null, null, List.of(), new MobileHomeFeed("/public/mobile-feed", "论坛动态"));
+        // 标题空白按未声明处理，下发 null
+        harness.plugin("wiki", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of(),
+                null, null, null, List.of(), new MobileHomeFeed("/public/mobile-feed", " "));
+
+        var forum = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+                .filter(item -> item.getCode().equals("forum")).findFirst().orElseThrow();
+        assertNotNull(forum.getHomeFeed());
+        assertEquals("/public/mobile-feed", forum.getHomeFeed().getEndpoint());
+        assertEquals("论坛动态", forum.getHomeFeed().getTitle());
+
+        var wiki = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+                .filter(item -> item.getCode().equals("wiki")).findFirst().orElseThrow();
+        assertNotNull(wiki.getHomeFeed());
+        assertEquals("/public/mobile-feed", wiki.getHomeFeed().getEndpoint());
+        assertNull(wiki.getHomeFeed().getTitle());
+
+        // 未声明 feed 的插件：homeFeed 保持 null，过滤不受影响
+        harness.plugin("plain", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of());
+        var plain = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+                .filter(item -> item.getCode().equals("plain")).findFirst().orElseThrow();
+        assertNull(plain.getHomeFeed());
+    }
+
+    @Test
     void manifestRejectsWhenCapabilityGateClosed() {
         MobileTestHarness harness = MobileTestHarness.create(false, iosEnabled("true"));
         BizException exception = assertThrows(BizException.class,
@@ -241,12 +270,19 @@ class MobileAppServiceTest {
 
         void plugin(String code, PluginStatus status, List<String> platforms, String minHostVersion,
                     List<String> capabilities) {
-            plugin(code, status, platforms, minHostVersion, capabilities, null, null, null, null);
+            plugin(code, status, platforms, minHostVersion, capabilities, null, null, null, null, null);
         }
 
         void plugin(String code, PluginStatus status, List<String> platforms, String minHostVersion,
                     List<String> capabilities, String displayName, String description, String icon,
                     List<MobileHomeCard> homeCards) {
+            plugin(code, status, platforms, minHostVersion, capabilities, displayName, description, icon,
+                    homeCards, null);
+        }
+
+        void plugin(String code, PluginStatus status, List<String> platforms, String minHostVersion,
+                    List<String> capabilities, String displayName, String description, String icon,
+                    List<MobileHomeCard> homeCards, MobileHomeFeed homeFeed) {
             PluginModule.PluginModuleBuilder builder = PluginModule.builder()
                     .id(idSequence.incrementAndGet())
                     .code(code)
@@ -259,7 +295,9 @@ class MobileAppServiceTest {
                         .mobileName(displayName)
                         .mobileDescription(description)
                         .mobileIcon(icon)
-                        .mobileHomeCards(homeCards);
+                        .mobileHomeCards(homeCards)
+                        .mobileFeedEndpoint(homeFeed == null ? null : homeFeed.endpoint())
+                        .mobileFeedTitle(homeFeed == null ? null : homeFeed.title());
             }
             pluginModules.put(code, builder.build());
         }
