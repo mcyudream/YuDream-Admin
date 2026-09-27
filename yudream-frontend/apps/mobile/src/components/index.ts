@@ -1,4 +1,5 @@
 export { BannerCarousel } from './BannerCarousel';
+export { FeedItem } from './FeedItem';
 export { YdButton } from './YdButton';
 export { YdCard } from './YdCard';
 export { YdDomainAvatar } from './YdDomainAvatar';
