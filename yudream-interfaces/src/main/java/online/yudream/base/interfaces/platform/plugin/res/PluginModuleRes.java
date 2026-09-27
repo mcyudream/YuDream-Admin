@@ -46,4 +46,9 @@ public class PluginModuleRes implements Serializable {
     private boolean rollbackAvailable;
     private String rollbackVersion;
     private String marketSourceCode;
+
+    /** plugin.yml mobile 块（android/ios token），未声明移动支持时为 null。 */
+    private List<String> mobilePlatforms;
+    private String mobileMinHostVersion;
+    private List<String> mobileRequiredNativeCapabilities;
 }

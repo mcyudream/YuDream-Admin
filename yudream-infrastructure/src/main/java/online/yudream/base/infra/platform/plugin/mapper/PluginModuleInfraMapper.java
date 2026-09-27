@@ -1,7 +1,10 @@
 package online.yudream.base.infra.platform.plugin.mapper;
 
+import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.infra.platform.plugin.dataobj.PluginModuleDO;
+
+import java.util.List;
 
 public class PluginModuleInfraMapper {
 
@@ -46,6 +49,9 @@ public class PluginModuleInfraMapper {
         dataObj.setMenusInitialized(module.getMenusInitialized());
         dataObj.setThemeScopes(module.getThemeScopes());
         dataObj.setMarketSourceCode(module.getMarketSourceCode());
+        dataObj.setMobilePlatforms(toPlatformTokens(module.getMobilePlatforms()));
+        dataObj.setMobileMinHostVersion(module.getMobileMinHostVersion());
+        dataObj.setMobileRequiredNativeCapabilities(module.getMobileRequiredNativeCapabilities());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -90,9 +96,29 @@ public class PluginModuleInfraMapper {
                 .menusInitialized(dataObj.getMenusInitialized())
                 .themeScopes(dataObj.getThemeScopes())
                 .marketSourceCode(dataObj.getMarketSourceCode())
+                .mobilePlatforms(toPlatforms(dataObj.getMobilePlatforms()))
+                .mobileMinHostVersion(dataObj.getMobileMinHostVersion())
+                .mobileRequiredNativeCapabilities(dataObj.getMobileRequiredNativeCapabilities())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())
                 .build();
+    }
+
+    private static List<String> toPlatformTokens(List<MobilePlatform> platforms) {
+        if (platforms == null) {
+            return null;
+        }
+        return platforms.stream().map(MobilePlatform::token).toList();
+    }
+
+    private static List<MobilePlatform> toPlatforms(List<String> tokens) {
+        if (tokens == null) {
+            return null;
+        }
+        return tokens.stream()
+                .filter(token -> token != null && !token.isBlank())
+                .map(MobilePlatform::fromToken)
+                .toList();
     }
 }

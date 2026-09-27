@@ -21,6 +21,7 @@ import online.yudream.base.application.platform.plugin.dto.PluginStorePluginPubl
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginSourceDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginStorePluginVersionDTO;
 import online.yudream.base.application.platform.plugin.dto.PluginThemeDTO;
+import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.valobj.PluginFrontendModuleInfo;
 import online.yudream.base.domain.platform.plugin.valobj.PluginGlobalWidgetInfo;
@@ -70,7 +71,17 @@ public class PluginAssembler {
                 .rollbackAvailable(module.getBackupJarPath() != null)
                 .rollbackVersion(module.getBackupPluginVersion())
                 .marketSourceCode(module.getMarketSourceCode())
+                .mobilePlatforms(mobileTokens(module))
+                .mobileMinHostVersion(module.getMobileMinHostVersion())
+                .mobileRequiredNativeCapabilities(module.getMobileRequiredNativeCapabilities())
                 .build();
+    }
+
+    private static List<String> mobileTokens(PluginModule module) {
+        if (module.getMobilePlatforms() == null) {
+            return null;
+        }
+        return module.getMobilePlatforms().stream().map(MobilePlatform::token).toList();
     }
 
     public static PluginMarketplaceUpdateDTO toDTO(PluginMarketplaceUpdateDTO update) {

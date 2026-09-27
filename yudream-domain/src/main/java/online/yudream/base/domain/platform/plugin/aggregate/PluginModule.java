@@ -6,6 +6,8 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
+import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginStatus;
 import online.yudream.base.domain.platform.plugin.valobj.PluginDescriptorInfo;
 
@@ -54,8 +56,15 @@ public class PluginModule extends BaseDomain {
     private List<String> themeScopes;
     /** 安装来源市场源 code；本地上传或历史数据为 null，registry 同步不回写该字段。 */
     private String marketSourceCode;
+    /** plugin.yml mobile 块持久化：支持平台（未声明移动支持时为 null）。 */
+    private List<MobilePlatform> mobilePlatforms;
+    /** plugin.yml mobile 块持久化：宿主最低版本（未声明时为 null）。 */
+    private String mobileMinHostVersion;
+    /** plugin.yml mobile 块持久化：要求的原生能力（未声明时为 null）。 */
+    private List<String> mobileRequiredNativeCapabilities;
 
     public static PluginModule fromDescriptor(PluginDescriptorInfo descriptor) {
+        MobilePluginSupport mobile = descriptor.mobileSupport();
         return PluginModule.builder()
                 .code(descriptor.code())
                 .name(descriptor.name())
@@ -67,11 +76,15 @@ public class PluginModule extends BaseDomain {
                 .gitUrl(descriptor.gitUrl())
                 .dependencies(descriptor.dependencies())
                 .softDependencies(descriptor.softDependencies())
+                .mobilePlatforms(mobile.declared() ? mobile.platforms() : null)
+                .mobileMinHostVersion(mobile.declared() ? mobile.minHostVersion() : null)
+                .mobileRequiredNativeCapabilities(mobile.declared() ? mobile.requiredNativeCapabilities() : null)
                 .status(PluginStatus.INSTALLED)
                 .build();
     }
 
     public void refreshDescriptor(PluginDescriptorInfo descriptor) {
+        MobilePluginSupport mobile = descriptor.mobileSupport();
         this.name = descriptor.name();
         this.pluginVersion = descriptor.version();
         this.description = descriptor.description();
@@ -81,9 +94,20 @@ public class PluginModule extends BaseDomain {
         this.gitUrl = descriptor.gitUrl();
         this.dependencies = descriptor.dependencies();
         this.softDependencies = descriptor.softDependencies();
+        this.mobilePlatforms = mobile.declared() ? mobile.platforms() : null;
+        this.mobileMinHostVersion = mobile.declared() ? mobile.minHostVersion() : null;
+        this.mobileRequiredNativeCapabilities = mobile.declared() ? mobile.requiredNativeCapabilities() : null;
         if (this.status == null) {
             this.status = PluginStatus.INSTALLED;
         }
+    }
+
+    /** 持久化字段重建移动支持声明；从未声明 mobile 时返回 undeclared。 */
+    public MobilePluginSupport mobileSupport() {
+        if (mobilePlatforms == null || mobilePlatforms.isEmpty()) {
+            return MobilePluginSupport.undeclared();
+        }
+        return MobilePluginSupport.declared(mobilePlatforms, mobileMinHostVersion, mobileRequiredNativeCapabilities);
     }
 
     public void markLoaded() {
