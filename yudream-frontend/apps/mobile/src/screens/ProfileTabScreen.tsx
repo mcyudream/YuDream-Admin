@@ -4,9 +4,10 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdButton, YdCard, YdListItem, YdMark, YdScreen, YdText } from '@/components';
+import { YdButton, YdCard, YdDomainAvatar, YdListItem, YdScreen, YdText } from '@/components';
 import { useTheme, useThemeController, type ThemeMode } from '@/core/theme/ThemeProvider';
 import { HOST_VERSION } from '@/core/config/env';
+import { resolveAssetUrl } from '@/core/domains/assetUrl';
 import {
   getActiveDomain,
   getDomains,
@@ -86,7 +87,11 @@ export function ProfileTabScreen({ navigation }: Props) {
         {/* 账户卡 */}
         <YdCard>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-            <YdMark name={active?.account?.nickname ?? active?.name ?? 'Y'} size={52} />
+            <YdDomainAvatar
+              name={active?.account?.nickname ?? active?.name ?? 'Y'}
+              logoUrl={resolveAssetUrl(active?.serverUrl ?? '', active?.branding?.logo)}
+              size={52}
+            />
             <View style={{ flex: 1, gap: 2 }}>
               <YdText style={{ fontWeight: t.typography.weightMedium }}>
                 {active?.account?.nickname ?? '未登录'}
