@@ -58,4 +58,24 @@ public class PluginModuleDO extends BaseDO {
     private String mobileMinHostVersion;
     /** plugin.yml mobile 块：要求的原生能力；未声明时为 null。 */
     private List<String> mobileRequiredNativeCapabilities;
+    /** plugin.yml mobile 块：移动端展示名；未声明时为 null。 */
+    private String mobileName;
+    /** plugin.yml mobile 块：移动端描述；未声明时为 null。 */
+    private String mobileDescription;
+    /** plugin.yml mobile 块：移动端图标（Ionicons 名）；未声明时为 null。 */
+    private String mobileIcon;
+    /** plugin.yml mobile 块：移动端主页卡片声明；未声明时为 null。 */
+    private List<MobileHomeCardDO> mobileHomeCards;
+
+    /** mobile.home.cards[] 的持久化形态。 */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MobileHomeCardDO {
+        private String id;
+        private String title;
+        private String description;
+        private String icon;
+        private String route;
+    }
 }

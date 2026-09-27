@@ -6,6 +6,7 @@ import online.yudream.base.application.platform.plugin.service.PluginMenuProject
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.domain.platform.plugin.enumerate.PluginDevProjectSource;
@@ -43,6 +44,7 @@ import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrows
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
+import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
 import online.yudream.base.plugin.spi.core.YuDreamPlugin;
 import online.yudream.base.plugin.spi.dashboard.PluginDashboardCard;
@@ -1135,7 +1137,15 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         List<MobilePlatform> platforms = mobileSupport.platforms().stream()
                 .map(MobilePluginSupport::requireLegalPlatformToken)
                 .toList();
-        return MobilePluginSupport.declared(platforms, mobileSupport.minHostVersion(), mobileSupport.requiredNativeCapabilities());
+        List<MobileHomeCard> homeCards = mobileSupport.homeCards().stream()
+                .map(this::toMobileHomeCard)
+                .toList();
+        return MobilePluginSupport.declared(platforms, mobileSupport.minHostVersion(), mobileSupport.requiredNativeCapabilities(),
+                mobileSupport.name(), mobileSupport.description(), mobileSupport.icon(), homeCards);
+    }
+
+    private MobileHomeCard toMobileHomeCard(PluginMobileHomeCard card) {
+        return new MobileHomeCard(card.id(), card.title(), card.description(), card.icon(), card.route());
     }
 
     private PluginPermissionInfo toInfo(PluginPermissionItem item) {
