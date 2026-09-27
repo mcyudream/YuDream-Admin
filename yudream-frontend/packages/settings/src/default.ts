@@ -52,6 +52,7 @@ const settingsDefault: RequiredDeep<SettingsOptions> = {
       enable: true,
       hotkeys: true,
     },
+    notifications: true,
     fullscreen: false,
     colorScheme: false,
   },

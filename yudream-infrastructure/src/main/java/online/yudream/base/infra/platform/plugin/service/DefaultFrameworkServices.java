@@ -53,6 +53,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.LinkedHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -85,6 +86,7 @@ public class DefaultFrameworkServices implements FrameworkServices {
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final SettingRepo settingRepo;
     private final Environment environment;
+    private final online.yudream.base.application.system.notification.NotificationAppService notificationAppService;
     private final online.yudream.base.application.system.backup.service.BackupArchiveAppService backupArchiveAppService;
     private final ConcurrentMap<String, PluginDocumentStore> documentStores = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, PluginFileStore> fileStores = new ConcurrentHashMap<>();
@@ -273,6 +275,48 @@ public class DefaultFrameworkServices implements FrameworkServices {
     }
 
     @Override
+    public online.yudream.base.plugin.spi.system.notification.PluginNotificationCenter notifications() {
+        return new online.yudream.base.plugin.spi.system.notification.PluginNotificationCenter() {
+            @Override
+            public String send(String sourcePlugin, long userId, String type, String title, String body, String link) {
+                return notificationAppService.send(sourcePlugin, userId, type, title, body, link);
+            }
+
+            @Override
+            public int unreadCount(long userId) {
+                return notificationAppService.unreadCount(userId);
+            }
+
+            @Override
+            public java.util.List<Map<String, Object>> list(long userId, int page, int size) {
+                var pageResult = notificationAppService.page(userId, page, size);
+                return pageResult.getRecords().stream().map(n -> {
+                    Map<String, Object> view = new LinkedHashMap<>();
+                    view.put("id", String.valueOf(n.getId()));
+                    view.put("sourcePlugin", n.getSourcePlugin());
+                    view.put("type", n.getType());
+                    view.put("title", n.getTitle());
+                    view.put("body", n.getBody());
+                    view.put("link", n.getLink());
+                    view.put("read", n.isRead());
+                    view.put("createdAt", n.getCreatedAt() == null ? 0L : n.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+                    view.put("readAt", n.getReadAt() == null ? 0L : n.getReadAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli());
+                    return view;
+                }).toList();
+            }
+
+            @Override
+            public void markRead(long userId, String id) {
+                notificationAppService.markRead(userId, Long.valueOf(id));
+            }
+
+            @Override
+            public void markAllRead(long userId) {
+                notificationAppService.markAllRead(userId);
+            }
+        };
+    }
+
     public Optional<String> setting(String key) {
         if (!StringUtils.hasText(key)) {
             return Optional.empty();

@@ -19,7 +19,10 @@ import online.yudream.base.plugin.spi.system.secret.PluginSecretStore;
 import online.yudream.base.plugin.spi.system.form.PluginFormService;
 import online.yudream.base.plugin.spi.system.preview.PluginFilePreviewService;
 import online.yudream.base.plugin.spi.system.backup.PluginBackupOperations;
+import online.yudream.base.plugin.spi.system.notification.PluginNotificationCenter;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface FrameworkServices {
@@ -106,5 +109,20 @@ public interface FrameworkServices {
     }
 
     Optional<String> setting(String key);
+
+    /**
+     * 官方站内通知中心端口：插件推送面向用户的消息（宿主前端铃铛未读红点
+     * + SSE 实时推送统一呈现）。默认实现表示宿主未提供该能力（SPI 过旧），
+     * 调用方应按软依赖降级（send 抛 UnsupportedOperationException、其余空实现）。
+     */
+    default PluginNotificationCenter notifications() {
+        return new PluginNotificationCenter() {
+            @Override public String send(String sourcePlugin, long userId, String type, String title, String body, String link) { throw new UnsupportedOperationException("宿主无站内通知中心能力（SPI 过旧）"); }
+            @Override public int unreadCount(long userId) { return 0; }
+            @Override public List<Map<String, Object>> list(long userId, int page, int size) { return List.of(); }
+            @Override public void markRead(long userId, String id) { }
+            @Override public void markAllRead(long userId) { }
+        };
+    }
 
 }
