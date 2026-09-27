@@ -16,6 +16,7 @@ import type {
   SseBridge,
   SseHandlers,
   SseSubscription,
+  ScannerBridge,
 } from './types';
 
 const secureStorage: SecureStorageBridge = {
@@ -83,4 +84,14 @@ const deeplink: DeeplinkBridge = {
   },
 };
 
-export const bridges: NativeBridges = { secureStorage, sse, download, deeplink };
+// v1 相机扫描未接入（模拟器亦无摄像头）；接口占位，UI 按 available() 引导手动输入/粘贴。
+const scanner: ScannerBridge = {
+  async scan() {
+    return null;
+  },
+  async available() {
+    return false;
+  },
+};
+
+export const bridges: NativeBridges = { secureStorage, sse, download, deeplink, scanner };

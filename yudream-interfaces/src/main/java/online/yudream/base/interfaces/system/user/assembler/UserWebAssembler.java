@@ -35,6 +35,7 @@ import online.yudream.base.interfaces.system.user.res.PasskeyAuthenticationOptio
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
+import online.yudream.base.interfaces.system.user.res.UserMeRes;
 import online.yudream.base.interfaces.system.user.res.UserProfileRes;
 import online.yudream.base.interfaces.system.user.res.UserRegisterRes;
 import online.yudream.base.interfaces.system.user.res.UserRoleRes;
@@ -118,6 +119,15 @@ public class UserWebAssembler {
                 .qq(userDTO.getQq())
                 .phone(userDTO.getPhone())
                 .createTime(userDTO.getCreateTime())
+                .build();
+    }
+
+    public static UserMeRes toMeRes(UserProfileDTO dto) {
+        return UserMeRes.builder()
+                .id(dto.getId() == null ? null : String.valueOf(dto.getId()))
+                .username(dto.getUsername())
+                .nickname(dto.getNickname())
+                .avatar(dto.getAvatar())
                 .build();
     }
 
