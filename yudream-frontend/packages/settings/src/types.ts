@@ -261,6 +261,11 @@ export interface ToolbarSettings {
    */
   fullscreen?: boolean
   /**
+   * 消息中心（未读红点铃铛 + SSE 实时推送）
+   * @default true
+   */
+  notifications?: boolean
+  /**
    * 颜色主题
    * @description 控制是否启用颜色主题切换功能
    * @default false

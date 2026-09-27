@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ToolbarSettings } from '@fantastic-admin/settings'
 import { pascalCase } from 'scule'
+import NotificationBell from './NotificationBell/index.vue'
 
 defineOptions({
   name: 'ToolbarTools',
@@ -36,4 +37,5 @@ function checkVisible(item: boolean | { enable: boolean }) {
   <template v-for="item in tools" :key="item">
     <Component :is="modules[`./${pascalCase(item)}/index.vue`]" v-if="checkVisible(appSettingsStore.settings.toolbar[item])" />
   </template>
+  <NotificationBell v-if="props.mode === 'right-side'" />
 </template>
