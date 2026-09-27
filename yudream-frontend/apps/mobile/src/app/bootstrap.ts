@@ -39,6 +39,7 @@ export async function bootstrap(): Promise<BootstrapResult> {
           logo: outcome.info.logo,
           loginHeroImage: outcome.info.loginHeroImage,
           loginHeroBackground: outcome.info.loginHeroBackground,
+          homeBanners: outcome.info.homeBanners,
         });
       }
     })
