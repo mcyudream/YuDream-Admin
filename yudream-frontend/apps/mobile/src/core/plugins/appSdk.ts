@@ -6,6 +6,7 @@ import { Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { PluginMobileSdk } from '@yudream/plugin-sdk-mobile';
 import { request } from '@/core/api/httpClient';
+import { getActiveDomain } from '@/core/domains/store';
 import { PLATFORM, HOST_VERSION } from '@/core/config/env';
 import type { ThemeTokens } from '@/core/theme/tokens';
 
@@ -15,6 +16,7 @@ export function buildAppSdk(appCode: string, theme: ThemeTokens): PluginMobileSd
     theme: theme as unknown as PluginMobileSdk['theme'],
     platform: PLATFORM,
     hostVersion: HOST_VERSION,
+    baseUrl: getActiveDomain()?.serverUrl ?? '',
     api: {
       request: <T,>(path: string, options?: { method?: string; body?: unknown }) =>
         request<T>(path, {

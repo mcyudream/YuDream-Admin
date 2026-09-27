@@ -27,6 +27,8 @@ export interface PluginMobileSdk {
   readonly platform: PluginPlatform;
   /** 宿主版本，供插件做 minHostVersion 运行期自查。 */
   readonly hostVersion: string;
+  /** 激活域 origin；站内相对资产路径（头像/图片）用它拼接。 */
+  readonly baseUrl: string;
   api: {
     /** 已携带鉴权与 401 刷新重试的站内请求。 */
     request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T>;

@@ -4,7 +4,8 @@ import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdCard, YdScreen, YdText } from '@/components';
+import { Pressable } from 'react-native';
+import { YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { onPluginsChanged, getPlugins } from '@/core/plugins/registry';
 import { syncPlugins } from '@/core/plugins/pluginLoader';
@@ -19,7 +20,7 @@ type Props = CompositeScreenProps<
 >;
 
 /**
- * 应用页：当前域的全部应用，下拉刷新检查更新（需登录态）。
+ * 应用页：当前域全部应用，双列卡片；下拉刷新检查更新（需登录态）。
  */
 export function PluginsTabScreen({ navigation }: Props) {
   const t = useTheme();
@@ -68,15 +69,19 @@ export function PluginsTabScreen({ navigation }: Props) {
       <FlatList
         data={plugins}
         keyExtractor={(item) => item.code}
+        numColumns={2}
+        columnWrapperStyle={{ gap: t.spacing.md, paddingHorizontal: t.spacing.lg }}
         contentContainerStyle={{ gap: t.spacing.md, paddingVertical: t.spacing.md }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.colors.accent} />
         }
         ListHeaderComponent={
-          <View style={{ gap: 4, paddingHorizontal: 4 }}>
+          <View style={{ gap: 4, paddingHorizontal: t.spacing.lg }}>
             <YdText variant="title">应用</YdText>
             <YdText variant="caption">
-              {lastSync ? `上次检查更新 ${lastSync} · 下拉刷新` : '下拉检查更新'}
+              {lastSync
+                ? `上次检查更新 ${lastSync} · 下拉刷新`
+                : `${plugins.length} 个应用 · 下拉检查更新`}
             </YdText>
           </View>
         }
@@ -84,7 +89,7 @@ export function PluginsTabScreen({ navigation }: Props) {
           const local = localVersions[item.code];
           const pendingUpdate = local && local !== item.version;
           return (
-            <YdCard
+            <Pressable
               onPress={() =>
                 navigation.navigate('PluginHost', {
                   code: item.code,
@@ -92,41 +97,43 @@ export function PluginsTabScreen({ navigation }: Props) {
                   route: item.homeCards?.[0]?.route,
                 })
               }
+              android_ripple={{ color: t.colors.fillHover }}
+              style={{
+                flex: 1,
+                borderRadius: t.radii.lg,
+                borderWidth: 1,
+                borderColor: t.colors.borderSubtle,
+                backgroundColor: t.colors.bgSurface,
+                padding: t.spacing.md,
+                gap: 10,
+              }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-                <View
-                  style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 12,
-                    backgroundColor: t.colors.fillHover,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Icon name={item.icon ?? 'cube-outline'} size={20} color={t.colors.accent} />
-                </View>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <YdText style={{ fontWeight: t.typography.weightMedium }} numberOfLines={1}>
-                    {appDisplayName(item)}
-                  </YdText>
-                  {item.description ? (
-                    <YdText variant="caption" numberOfLines={1}>
-                      {item.description}
-                    </YdText>
-                  ) : null}
-                  <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
-                    {local ? `本地 v${local}` : '未下载'} · 最新 v{item.version}
-                  </YdText>
-                </View>
-                {pendingUpdate ? (
-                  <YdText variant="caption" style={{ color: t.colors.accent }}>
-                    可更新
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 13,
+                  backgroundColor: t.colors.fillHover,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name={item.icon ?? 'cube-outline'} size={22} color={t.colors.accent} />
+              </View>
+              <View style={{ gap: 3, minHeight: 54 }}>
+                <YdText numberOfLines={1} style={{ fontWeight: t.typography.weightMedium }}>
+                  {appDisplayName(item)}
+                </YdText>
+                {item.description ? (
+                  <YdText variant="caption" numberOfLines={2}>
+                    {item.description}
                   </YdText>
                 ) : null}
-                <Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />
               </View>
-            </YdCard>
+              <YdText variant="caption" style={{ color: pendingUpdate ? t.colors.accent : t.colors.textTertiary }}>
+                {pendingUpdate ? '可更新' : local ? `已安装 v${local}` : `v${item.version}`}
+              </YdText>
+            </Pressable>
           );
         }}
         ListEmptyComponent={
