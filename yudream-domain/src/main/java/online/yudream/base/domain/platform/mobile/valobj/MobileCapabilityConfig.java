@@ -21,6 +21,9 @@ public final class MobileCapabilityConfig {
     /** 登录页 hero 底色（CSS 颜色值），空表示未定制（App 用主题 accent）。 */
     public static final String KEY_LOGIN_HERO_BACKGROUND = "loginHeroBackground";
 
+    /** 首页轮播图（JSON 数组 [{imageUrl,title,route}]），空表示未定制。 */
+    public static final String KEY_HOME_BANNERS = "homeBanners";
+
     private MobileCapabilityConfig() {
     }
 

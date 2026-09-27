@@ -88,6 +88,7 @@ public class MobileWebAssembler {
                 .mobileEnabled(dto.isMobileEnabled())
                 .loginHeroImage(dto.getLoginHeroImage())
                 .loginHeroBackground(dto.getLoginHeroBackground())
+                .homeBanners(dto.getHomeBanners())
                 .build();
     }
 

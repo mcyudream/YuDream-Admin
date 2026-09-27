@@ -5,6 +5,12 @@
 import { ResultEnvelope } from '@/core/api/envelope';
 import { hostOf } from '@/core/domains/store';
 
+export interface SiteBanner {
+  imageUrl: string;
+  title: string;
+  route: string;
+}
+
 export interface SiteInfo {
   siteName: string;
   logo: string;
@@ -15,6 +21,8 @@ export interface SiteInfo {
   loginHeroImage: string;
   /** mobile-app 能力配置：登录页 hero 底色（空=未定制） */
   loginHeroBackground: string;
+  /** mobile-app 能力配置：首页轮播图（空=未配置） */
+  homeBanners: SiteBanner[];
 }
 
 interface SiteInfoRes {
@@ -25,6 +33,7 @@ interface SiteInfoRes {
   mobileEnabled?: boolean;
   loginHeroImage?: string;
   loginHeroBackground?: string;
+  homeBanners?: Array<{ imageUrl?: string; title?: string; route?: string } | string> | null;
 }
 
 export type DiscoverOutcome =
@@ -44,6 +53,13 @@ export async function discoverDomain(rawUrl: string): Promise<DiscoverOutcome> {
     if (res.ok) {
       const body = (await res.json()) as ResultEnvelope<SiteInfoRes>;
       if (body.code === 200 && body.data) {
+        const banners = (body.data.homeBanners ?? [])
+          .map((b) =>
+            typeof b === 'string'
+              ? { imageUrl: b, title: '', route: '' }
+              : { imageUrl: b.imageUrl ?? '', title: b.title ?? '', route: b.route ?? '' },
+          )
+          .filter((b) => /^https?:\/\/|^\//.test(b.imageUrl));
         return {
           kind: 'ok',
           info: {
@@ -54,6 +70,7 @@ export async function discoverDomain(rawUrl: string): Promise<DiscoverOutcome> {
             mobileEnabled: body.data.mobileEnabled === true,
             loginHeroImage: body.data.loginHeroImage ?? '',
             loginHeroBackground: body.data.loginHeroBackground ?? '',
+            homeBanners: banners,
           },
         };
       }

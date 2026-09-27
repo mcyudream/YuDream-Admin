@@ -14,7 +14,14 @@ export interface DomainAccount {
   admin?: boolean;
 }
 
-/** 域品牌信息：来自站点设置（logo/favicon）与 mobile-app 能力配置（登录页定制）。 */
+/** 首页轮播图条目（mobile-app 能力配置 homeBanners）。 */
+export interface DomainBanner {
+  imageUrl: string;
+  title: string;
+  route: string;
+}
+
+/** 域品牌信息：来自站点设置（logo/favicon）与 mobile-app 能力配置（登录页/首页定制）。 */
 export interface DomainBranding {
   /** 站点 logo（站点设置；相对路径或完整 URL） */
   logo?: string;
@@ -22,6 +29,8 @@ export interface DomainBranding {
   loginHeroImage?: string;
   /** 登录页 hero 底色（能力配置，CSS 颜色值） */
   loginHeroBackground?: string;
+  /** 首页轮播图（能力配置） */
+  homeBanners?: DomainBanner[];
 }
 
 export interface Domain {

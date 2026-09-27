@@ -1,3 +1,4 @@
+export { BannerCarousel } from './BannerCarousel';
 export { YdButton } from './YdButton';
 export { YdCard } from './YdCard';
 export { YdDomainAvatar } from './YdDomainAvatar';

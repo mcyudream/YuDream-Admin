@@ -1,12 +1,17 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdCard, YdMark, YdScreen, YdText } from '@/components';
+import { BannerCarousel, YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
-import { getActiveDomain, hostOf, type DomainAccount } from '@/core/domains/store';
+import {
+  getActiveDomain,
+  hostOf,
+  type DomainAccount,
+  type DomainBanner,
+} from '@/core/domains/store';
 import { applyAppPrefs, getAppPrefs, loadAppPrefs, subscribeAppPrefs } from '@/core/domains/appPrefs';
 import { onPluginsChanged, getPlugins } from '@/core/plugins/registry';
 import {
@@ -21,15 +26,16 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-/** 主页信息流条目：某应用注册的一张卡片。 */
+/** 首页内容流条目：某应用注册的一张卡片。 */
 interface HomeFeedItem {
   app: ManifestPluginEntry;
   card: MobileHomeCard;
 }
 
 /**
- * 首页（域内容）：应用注册的主页卡片信息流 + 我的应用网格。
- * 应用经 plugin.yml mobile.home.cards 向主页注册内容；顺序/可见性由域管理维护。
+ * 首页 = 轮播图 + 应用注册的内容条目流，仅内容。
+ * 应用排布与展示切换收在「域管理」（管理员定默认：服务端应用启用与顺序；
+ * 用户覆盖：本地隐藏/排序）；头部仅保留一个轻量应用入口。
  */
 export function HomeTabScreen({ navigation }: Props) {
   const t = useTheme();
@@ -74,6 +80,25 @@ export function HomeTabScreen({ navigation }: Props) {
     [visibleApps],
   );
 
+  const banners = domain?.branding?.homeBanners ?? [];
+
+  const openBanner = (banner: DomainBanner) => {
+    if (!banner.route) {
+      return;
+    }
+    // 路由归属：优先命中注册了该路由的应用
+    const hit = visibleApps.find((app) =>
+      (app.homeCards ?? []).some((c) => c.route === banner.route),
+    );
+    if (hit) {
+      navigation.navigate('PluginHost', {
+        code: hit.code,
+        title: appDisplayName(hit),
+        route: banner.route,
+      });
+    }
+  };
+
   if (!domain) {
     return (
       <YdScreen>
@@ -87,122 +112,122 @@ export function HomeTabScreen({ navigation }: Props) {
   const hour = new Date().getHours();
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
 
-  const openApp = (app: ManifestPluginEntry, route?: string) =>
-    navigation.navigate('PluginHost', {
-      code: app.code,
-      title: appDisplayName(app),
-      route,
-    });
-
   return (
     <YdScreen>
       <ScrollView contentContainerStyle={{ gap: t.spacing.lg, paddingBottom: t.spacing.xl }}>
-        {/* 域头：标识 + 问候 */}
-        <View style={{ gap: t.spacing.md, paddingTop: t.spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-            <YdMark name={domain.name} size={52} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <YdText variant="title" numberOfLines={1}>
-                {greeting}
-                {account ? `，${account.nickname}` : ''}
-              </YdText>
-              <YdText variant="caption" numberOfLines={1}>
-                {domain.name} · {hostOf(domain.serverUrl)}
-              </YdText>
-            </View>
-            <Icon
-              name="swap-horizontal"
-              size={22}
-              color={t.colors.textSecondary}
-              onPress={() => navigation.navigate('Welcome')}
-              hitSlop={10}
-            />
-          </View>
-          {!domain.mobileEnabled ? (
-            <YdText variant="caption" style={{ color: t.colors.warning }}>
-              该站点未启用移动能力，仅提供基础功能
+        {/* 顶栏：站点身份 + 轻量应用入口 */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md, paddingTop: t.spacing.md }}>
+          <View style={{ flex: 1 }}>
+            <YdText variant="title" numberOfLines={1}>
+              {greeting}
+              {account ? `，${account.nickname}` : ''}
             </YdText>
-          ) : null}
+            <YdText variant="caption" numberOfLines={1}>
+              {domain.name} · {hostOf(domain.serverUrl)}
+            </YdText>
+          </View>
+          <Icon
+            name="apps-outline"
+            size={22}
+            color={t.colors.textSecondary}
+            onPress={() => navigation.navigate('应用')}
+            hitSlop={10}
+          />
+          <Icon
+            name="swap-horizontal"
+            size={22}
+            color={t.colors.textSecondary}
+            onPress={() => navigation.navigate('Welcome')}
+            hitSlop={10}
+          />
         </View>
 
-        {/* 主页内容：应用注册的卡片信息流 */}
+        {/* 轮播图 */}
+        <BannerCarousel banners={banners} onPress={openBanner} />
+
+        {/* 内容条目流：仅内容 */}
         {feed.length > 0 ? (
-          <View style={{ gap: t.spacing.md }}>
-            <YdText variant="secondary" style={{ fontWeight: t.typography.weightMedium }}>
-              主页内容
-            </YdText>
-            {feed.map(({ app, card }) => (
-              <YdCard key={`${app.code}:${card.id}`} onPress={() => openApp(app, card.route)}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-                  <View
-                    style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 12,
-                      backgroundColor: t.colors.fillHover,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Icon name={card.icon} size={22} color={t.colors.accent} />
-                  </View>
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <YdText style={{ fontWeight: t.typography.weightMedium }} numberOfLines={1}>
-                      {card.title}
-                    </YdText>
-                    {card.description ? (
-                      <YdText variant="caption" numberOfLines={2}>
-                        {card.description}
-                      </YdText>
-                    ) : null}
-                    <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
-                      来自 {appDisplayName(app)}
-                    </YdText>
-                  </View>
-                  <Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />
-                </View>
-              </YdCard>
+          <View>
+            {feed.map(({ app, card }, i) => (
+              <View key={`${app.code}:${card.id}`}>
+                <FeedItemRow
+                  icon={card.icon}
+                  title={card.title}
+                  description={card.description}
+                  source={appDisplayName(app)}
+                  onPress={() =>
+                    navigation.navigate('PluginHost', {
+                      code: app.code,
+                      title: appDisplayName(app),
+                      route: card.route,
+                    })
+                  }
+                />
+                {i < feed.length - 1 ? (
+                  <View style={{ height: 1, backgroundColor: t.colors.borderSubtle, marginHorizontal: 4 }} />
+                ) : null}
+              </View>
             ))}
           </View>
-        ) : null}
-
-        {/* 我的应用：图标网格 */}
-        <View style={{ gap: t.spacing.md }}>
-          <YdText variant="secondary" style={{ fontWeight: t.typography.weightMedium }}>
-            我的应用
+        ) : (
+          <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.lg }}>
+            暂无内容，安装的应用会在这里展示动态
           </YdText>
-          {visibleApps.length > 0 ? (
-            <YdCard>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {visibleApps.map((app) => (
-                  <View
-                    key={app.code}
-                    style={{ width: '25%', alignItems: 'center', paddingVertical: t.spacing.md }}
-                  >
-                    <Icon
-                      name={app.icon ?? 'cube-outline'}
-                      size={30}
-                      color={t.colors.accent}
-                      onPress={() => openApp(app, app.homeCards?.[0]?.route)}
-                    />
-                    <YdText
-                      variant="caption"
-                      numberOfLines={1}
-                      style={{ marginTop: 6, maxWidth: '88%', textAlign: 'center' }}
-                    >
-                      {appDisplayName(app)}
-                    </YdText>
-                  </View>
-                ))}
-              </View>
-            </YdCard>
-          ) : (
-            <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.sm }}>
-              暂无可用应用，联网后将自动同步
-            </YdText>
-          )}
-        </View>
+        )}
       </ScrollView>
     </YdScreen>
+  );
+}
+
+interface FeedItemRowProps {
+  icon: string;
+  title: string;
+  description: string;
+  source: string;
+  onPress: () => void;
+}
+
+function FeedItemRow({ icon, title, description, source, onPress }: FeedItemRowProps) {
+  const t = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      android_ripple={{ color: t.colors.fillHover }}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: t.spacing.md,
+        paddingVertical: t.spacing.md,
+        paddingHorizontal: 4,
+        backgroundColor: pressed ? t.colors.fillHover : 'transparent',
+      })}
+    >
+      <View
+        style={{
+          width: 46,
+          height: 46,
+          borderRadius: 12,
+          backgroundColor: t.colors.fillHover,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon name={icon} size={24} color={t.colors.accent} />
+      </View>
+      <View style={{ flex: 1, gap: 2 }}>
+        <YdText numberOfLines={1} style={{ fontSize: 16, fontWeight: t.typography.weightMedium }}>
+          {title}
+        </YdText>
+        {description ? (
+          <YdText variant="secondary" numberOfLines={2}>
+            {description}
+          </YdText>
+        ) : null}
+        <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
+          {source}
+        </YdText>
+      </View>
+      <Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />
+    </Pressable>
   );
 }
