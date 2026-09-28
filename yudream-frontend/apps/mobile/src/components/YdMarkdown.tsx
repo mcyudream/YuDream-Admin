@@ -74,7 +74,7 @@ function buildStyles(tokens: PluginThemeTokens | null): Record<string, Record<st
     thead: { backgroundColor: fillHover },
     th: { color: textSecondary, fontWeight: '600', padding: spacing.sm, borderColor: borderSubtle },
     td: { color: textPrimary, padding: spacing.sm, borderColor: borderSubtle },
-    image: { borderRadius: 8, marginVertical: spacing.sm },
+    image: { width: '100%', height: 210, resizeMode: 'contain', backgroundColor: bgSurface, borderRadius: 8, marginVertical: spacing.sm },
     paragraph: { marginTop: 0, marginBottom: spacing.sm },
     quote: {},
   };
