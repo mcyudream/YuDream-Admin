@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -18,6 +18,7 @@ import {
 import { clearAllTokens } from '@/core/auth/tokenStore';
 import { removeAllForDomain } from '@/core/plugins/bundleCache';
 import { clearThemeOverride } from '@/core/theme/themeLoader';
+import { resolveAssetUrl } from '@/core/domains/assetUrl';
 import { logout } from '@/core/auth/authService';
 import { onPluginsChanged, getPlugins } from '@/core/plugins/registry';
 import { getInstalled } from '@/core/plugins/bundleCache';
@@ -151,8 +152,10 @@ export function ProfileTabScreen({ navigation }: Props) {
   const pendingCount = Object.values(updates).filter(Boolean).length;
   const quickApps = plugins.slice(0, 5);
 
-  const headerBg =
-    active?.branding?.themeColor || active?.branding?.loginHeroBackground || t.colors.accent;
+  // hero 跟随宿主主题色（accent/onAccent 随深浅模式成对反色）；站点品牌绿不侵入移动端
+  const headerBg = t.colors.accent;
+  const logoUrl = resolveAssetUrl(active?.serverUrl ?? '', active?.branding?.logo);
+  const avatarUrl = account?.avatar ? resolveAssetUrl(active?.serverUrl ?? '', account.avatar) : '';
 
   return (
     <YdScreen padded={false}>
@@ -206,9 +209,10 @@ export function ProfileTabScreen({ navigation }: Props) {
                 justifyContent: 'center',
               }}
             >
-              {account?.avatar ? (
-                // 图片头像由 YdDomainAvatar 的 Image 逻辑等价处理；这里保持纯剪影通用性
-                <Icon name="person" size={34} color="#ffffff" />
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={{ width: 54, height: 54 }} resizeMode="cover" />
+              ) : logoUrl ? (
+                <Image source={{ uri: logoUrl }} style={{ width: 54, height: 54 }} resizeMode="cover" />
               ) : (
                 <Icon name="person" size={34} color="#ffffff" />
               )}
