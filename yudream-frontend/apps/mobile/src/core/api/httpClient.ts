@@ -80,7 +80,9 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     Accept: 'application/json',
     ...options.headers,
   };
-  if (options.body !== undefined) {
+  // FormData（文件上传）原样透传：交给 fetch 自动生成 multipart 边界，禁手设 JSON 头
+  const isForm = typeof FormData !== 'undefined' && options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) {
     headers['Content-Type'] = 'application/json';
   }
   // sa-token 的 token-name 即 Authorization 且原样取值：不能加 Bearer 前缀
@@ -91,7 +93,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const res = await fetch(`${domain.serverUrl}${path}`, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : isForm ? (options.body as globalThis.FormData) : JSON.stringify(options.body),
   });
 
   if (res.status === 401 && !options.retried) {
