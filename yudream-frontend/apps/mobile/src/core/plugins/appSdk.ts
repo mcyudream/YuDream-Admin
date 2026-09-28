@@ -10,13 +10,27 @@ import { getActiveDomain } from '@/core/domains/store';
 import { PLATFORM, HOST_VERSION } from '@/core/config/env';
 import type { ThemeTokens } from '@/core/theme/tokens';
 
-export function buildAppSdk(appCode: string, theme: ThemeTokens): PluginMobileSdk {
+export interface SdkNavigationController {
+  setTitle: (title: string) => void;
+  setHidden: (hidden: boolean) => void;
+}
+
+export function buildAppSdk(
+  appCode: string,
+  theme: ThemeTokens,
+  navigation?: SdkNavigationController,
+): PluginMobileSdk {
   const ns = `app.${appCode}.`;
   return {
     theme: theme as unknown as PluginMobileSdk['theme'],
     platform: PLATFORM,
     hostVersion: HOST_VERSION,
     baseUrl: getActiveDomain()?.serverUrl ?? '',
+    navigation: navigation ?? {
+      // 缺省空实现：旧宿主能力位向前兼容（插件侧可选链消费）
+      setTitle: () => undefined,
+      setHidden: () => undefined,
+    },
     api: {
       request: <T,>(path: string, options?: { method?: string; body?: unknown }) =>
         request<T>(path, {

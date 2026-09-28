@@ -29,6 +29,13 @@ export interface PluginMobileSdk {
   readonly hostVersion: string;
   /** 激活域 origin；站内相对资产路径（头像/图片）用它拼接。 */
   readonly baseUrl: string;
+  /** 宿主顶部导航栏能力位：插件可改标题/显隐，也可完全自绘头部（v1 提供的最小面）。 */
+  navigation: {
+    /** 设置导航栏标题（插件内路由切换时同步调用）。 */
+    setTitle(title: string): void;
+    /** 显示/隐藏导航栏；隐藏时插件自绘头部并自行处理返回。 */
+    setHidden(hidden: boolean): void;
+  };
   api: {
     /** 已携带鉴权与 401 刷新重试的站内请求。 */
     request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T>;
