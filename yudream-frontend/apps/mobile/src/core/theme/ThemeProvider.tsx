@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useColorScheme } from 'react-native';
 import {
   Provider as PaperProvider,
@@ -6,6 +6,7 @@ import {
   MD3LightTheme,
   type MD3Theme,
 } from 'react-native-paper';
+import { setMarkdownTheme } from '@/components/YdMarkdown';
 import { darkTheme, lightTheme, mergeTokens, type ThemeTokens } from './tokens';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -65,6 +66,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const tokens = value.tokens;
   const paperTheme = useMemo(() => toPaperTheme(tokens), [tokens]);
+  // 统一 Markdown 渲染：宿主把当前主题 token 注入 sdk 单例，插件零配置共用
+  // 统一 Markdown 渲染：宿主把当前主题 token 注入渲染器（插件用同源副本保持一致）
+  useEffect(() => setMarkdownTheme(tokens), [tokens]);
 
   return (
     <ThemeContext.Provider value={value}>
