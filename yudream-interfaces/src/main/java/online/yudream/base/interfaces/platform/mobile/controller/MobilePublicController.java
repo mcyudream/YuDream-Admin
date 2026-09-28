@@ -6,6 +6,7 @@ import online.yudream.base.application.platform.mobile.service.MobilePublicAppSe
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.platform.mobile.assembler.MobileWebAssembler;
 import online.yudream.base.interfaces.platform.mobile.res.MobileSiteInfoRes;
+import online.yudream.base.interfaces.platform.mobile.res.MobileThemeActiveRes;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,5 +29,11 @@ public class MobilePublicController {
     public Result<MobileSiteInfoRes> siteInfo() {
         MobileSiteInfoDTO info = mobilePublicAppService.siteInfo();
         return Result.ok(MobileWebAssembler.toSiteInfoRes(info));
+    }
+
+    /** 激活站点主题与域主题色（匿名：登录前也要按站点主题渲染）。 */
+    @GetMapping("/theme/active")
+    public Result<MobileThemeActiveRes> themeActive() {
+        return Result.ok(MobileWebAssembler.toThemeActiveRes(mobilePublicAppService.themeActive()));
     }
 }

@@ -6,7 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.mobile.dto.MobileBannerDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileSiteInfoDTO;
+import online.yudream.base.application.platform.mobile.dto.MobileThemeActiveDTO;
 import online.yudream.base.application.system.setting.service.SettingAppService;
+import online.yudream.base.domain.platform.plugin.service.PluginRuntimeGateway;
+import online.yudream.base.application.platform.theme.service.SiteThemeQueryService;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.mobile.valobj.MobileCapabilityConfig;
@@ -31,6 +34,8 @@ public class MobilePublicAppService {
     private final AboutBuildInfoGateway aboutBuildInfoGateway;
     private final CapabilityModuleRepo capabilityModuleRepo;
     private final ObjectMapper objectMapper;
+    private final SiteThemeQueryService siteThemeQueryService;
+    private final PluginRuntimeGateway pluginRuntimeGateway;
 
     @Transactional(readOnly = true)
     public MobileSiteInfoDTO siteInfo() {
@@ -79,5 +84,33 @@ public class MobilePublicAppService {
         } catch (JsonProcessingException e) {
             return List.of();
         }
+    }
+
+    /**
+     * 激活站点主题的主色（移动端域主题色）：读取激活主题前端 style.css 的
+     * --yb-site-primary；内置 default 主题/解析失败/非 hex 一律 null（App 回退主题色）。
+     */
+    @Transactional(readOnly = true)
+    public MobileThemeActiveDTO themeActive() {
+        String themeCode = siteThemeQueryService.activeSiteThemeCode();
+        if (themeCode == null || themeCode.isBlank() || "default".equals(themeCode)) {
+            return new MobileThemeActiveDTO("default", null);
+        }
+        String css = pluginRuntimeGateway.siteThemeCss(themeCode).orElse(null);
+        return new MobileThemeActiveDTO(themeCode, primaryFromCss(css));
+    }
+
+    private static String primaryFromCss(String css) {
+        if (css == null || css.isBlank()) {
+            return null;
+        }
+        var matcher = java.util.regex.Pattern
+                .compile("--yb-site-primary" + "\s*:" + "\s*([^;]+)")
+                .matcher(css);
+        if (!matcher.find()) {
+            return null;
+        }
+        String value = matcher.group(1).trim();
+        return value.matches("#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?") ? value : null;
     }
 }

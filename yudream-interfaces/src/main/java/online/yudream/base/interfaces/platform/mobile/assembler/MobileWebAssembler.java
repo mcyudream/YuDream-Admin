@@ -6,6 +6,7 @@ import online.yudream.base.application.platform.mobile.dto.MobileDeviceDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileManifestEntryDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileManifestDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileSiteInfoDTO;
+import online.yudream.base.application.platform.mobile.dto.MobileThemeActiveDTO;
 import online.yudream.base.application.platform.mobile.query.MobileManifestQuery;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
@@ -19,6 +20,7 @@ import online.yudream.base.interfaces.platform.mobile.res.MobileHomeFeedRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestEntryRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileSiteInfoRes;
+import online.yudream.base.interfaces.platform.mobile.res.MobileThemeActiveRes;
 import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
@@ -65,6 +67,10 @@ public class MobileWebAssembler {
                 .platform(dto.getPlatform())
                 .entries(dto.getEntries().stream().map(MobileWebAssembler::toEntryRes).toList())
                 .build();
+    }
+
+    public static MobileThemeActiveRes toThemeActiveRes(MobileThemeActiveDTO dto) {
+        return new MobileThemeActiveRes(dto.themeCode(), dto.primaryColor());
     }
 
     public static MobileDeviceRes toRes(MobileDeviceDTO dto) {

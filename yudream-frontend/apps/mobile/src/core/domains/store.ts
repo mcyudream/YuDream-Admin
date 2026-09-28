@@ -31,6 +31,8 @@ export interface DomainBranding {
   loginHeroBackground?: string;
   /** 首页轮播图（能力配置） */
   homeBanners?: DomainBanner[];
+  /** 域主题色（激活站点主题主色，null=回退内置 accent） */
+  themeColor?: string | null;
 }
 
 export interface Domain {

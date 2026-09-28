@@ -7,13 +7,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const cacheKey = (domainId: string) => `theme.mobile.override.${domainId}`;
 
 /** 返回启动时立即可用的缓存覆盖层；无则 null。 */
-export async function loadCachedThemeOverride(domainId: string): Promise<unknown | null> {
+export async function loadCachedThemeOverride(
+  domainId: string,
+): Promise<{ primaryColor: string | null } | null> {
   const raw = await AsyncStorage.getItem(cacheKey(domainId));
   if (!raw) {
     return null;
   }
   try {
-    return JSON.parse(raw) as unknown;
+    const parsed = JSON.parse(raw) as { primaryColor?: string | null } | null;
+    return parsed ? { primaryColor: parsed.primaryColor ?? null } : null;
   } catch {
     await AsyncStorage.removeItem(cacheKey(domainId));
     return null;
@@ -25,16 +28,22 @@ export async function loadCachedThemeOverride(domainId: string): Promise<unknown
  * GET /api/mobile/theme/active 为匿名端点（登录前首页也要按主题渲染）。
  * 404/能力关闭均视为"无远程主题"，沿用内置。
  */
-export async function fetchThemeOverride(domainId: string, serverUrl: string): Promise<unknown | null> {
+export async function fetchThemeOverride(
+  domainId: string,
+  serverUrl: string,
+): Promise<{ primaryColor: string | null } | null> {
   try {
-    const res = await fetch(`${serverUrl}/api/mobile/theme/active`, {
+    const res = await fetch(`${serverUrl}/api/mobile/public/theme/active`, {
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
-      const body = (await res.json()) as { code?: number; data?: unknown };
+      const body = (await res.json()) as {
+        code?: number;
+        data?: { themeCode?: string; primaryColor?: string | null } | null;
+      };
       if (body.code === 200 && body.data) {
         await AsyncStorage.setItem(cacheKey(domainId), JSON.stringify(body.data));
-        return body.data;
+        return { primaryColor: body.data.primaryColor ?? null };
       }
     }
   } catch {
