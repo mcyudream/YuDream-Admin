@@ -125,7 +125,7 @@ export function BannerCarousel({ banners, onPress }: BannerCarouselProps) {
                 width: i === index ? 16 : 6,
                 height: 6,
                 borderRadius: 3,
-                backgroundColor: i === index ? t.colors.accent : 'rgba(255,255,255,0.65)',
+                backgroundColor: i === index ? '#ffffff' : 'rgba(255,255,255,0.45)',
               }}
             />
           ))}

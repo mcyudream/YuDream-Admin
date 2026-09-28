@@ -8,7 +8,6 @@ import { BannerCarousel, FeedItem, YdScreen, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import {
   getActiveDomain,
-  hostOf,
   type DomainAccount,
   type DomainBanner,
 } from '@/core/domains/store';
@@ -42,9 +41,9 @@ interface FeedSourceState {
 const PAGE_SIZE = 20;
 
 /**
- * 首页 = 轮播图 + 应用注册的内容源信息流（真实内容条目，仅内容）。
- * 下拉刷新重置回第一页；触底自动为仍有余量的应用加载下一页。
+ * 首页（设计稿 home）：问候顶栏 + 轮播图 + 应用注册的内容源信息流（真实内容条目）。
  * 无内容源的应用其主页卡片作为快捷入口排在列表末尾。
+ * 下拉刷新重置回第一页；触底自动为仍有余量的应用加载下一页。
  */
 export function HomeTabScreen({ navigation }: Props) {
   const t = useTheme();
@@ -211,104 +210,88 @@ export function HomeTabScreen({ navigation }: Props) {
   const greeting = hour < 6 ? '夜深了' : hour < 12 ? '早上好' : hour < 18 ? '下午好' : '晚上好';
 
   return (
-    <YdScreen>
+    <YdScreen padded={false}>
       <FlatList
         data={merged}
         keyExtractor={(entry) => `${entry.kind}:${entry.key}`}
-        contentContainerStyle={{ paddingBottom: t.spacing.xl }}
+        contentContainerStyle={{
+          paddingHorizontal: t.spacing.lg,
+          paddingBottom: 96,
+          gap: t.spacing.md,
+        }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.colors.accent} />
         }
         onEndReachedThreshold={0.3}
         onEndReached={() => void loadMore()}
         ListHeaderComponent={
-          <View style={{ gap: t.spacing.lg, paddingTop: t.spacing.md, paddingBottom: t.spacing.sm }}>
-            {/* 顶栏：站点身份 + 轻量应用入口 */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
-              <View style={{ flex: 1 }}>
-                <YdText variant="title" numberOfLines={1}>
+          <View style={{ gap: t.spacing.md, paddingTop: t.spacing.sm, paddingBottom: 2 }}>
+            {/* 顶栏：问候 + 域标识 + 圆形图标按钮（应用 / 刷新） */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <YdText style={{ fontSize: t.typography.sizeLg, fontWeight: t.typography.weightBold }} numberOfLines={1}>
                   {greeting}
                   {account ? `，${account.nickname}` : ''}
                 </YdText>
-                <YdText variant="caption" numberOfLines={1}>
-                  {domain.name} · {hostOf(domain.serverUrl)}
-                </YdText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                  <YdText variant="caption" numberOfLines={1}>
+                    {domain.name}
+                  </YdText>
+                  <Icon name="chevron-down" size={13} color={t.colors.textTertiary} />
+                </View>
               </View>
-              <Icon
-                name="apps-outline"
-                size={22}
-                color={t.colors.textSecondary}
+              <Pressable
+                accessibilityRole="button"
                 onPress={() => navigation.navigate('应用')}
-                hitSlop={10}
-              />
-              <Icon
-                name="swap-horizontal"
-                size={22}
-                color={t.colors.textSecondary}
-                onPress={() => navigation.navigate('Welcome')}
-                hitSlop={10}
-              />
+                hitSlop={6}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: t.colors.bgSurface,
+                  borderWidth: 1,
+                  borderColor: t.colors.borderSubtle,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="grid-outline" size={18} color={t.colors.textPrimary} />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void onRefresh()}
+                hitSlop={6}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: t.colors.bgSurface,
+                  borderWidth: 1,
+                  borderColor: t.colors.borderSubtle,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name="refresh" size={17} color={t.colors.textSecondary} />
+              </Pressable>
             </View>
             {/* 轮播图 */}
             <BannerCarousel banners={banners} onPress={openBanner} />
-            {/* 轻量应用入口条：常用应用 + 全部 */}
-            {visibleApps.length > 0 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {visibleApps.slice(0, 4).map((app) => (
-                  <Pressable
-                    key={app.code}
-                    onPress={() =>
-                      navigation.navigate('PluginHost', {
-                        code: app.code,
-                        title: appDisplayName(app),
-                        route: app.homeCards?.[0]?.route,
-                      })
-                    }
-                    android_ripple={{ color: t.colors.fillHover, radius: 40 }}
-                    style={{ alignItems: 'center', marginRight: t.spacing.md, paddingHorizontal: t.spacing.xs }}
-                  >
-                    <View
-                      style={{
-                        width: 46,
-                        height: 46,
-                        borderRadius: 14,
-                        backgroundColor: t.colors.bgSurface,
-                        borderWidth: 1,
-                        borderColor: t.colors.borderSubtle,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Icon name={app.icon ?? 'cube-outline'} size={24} color={t.colors.accent} />
-                    </View>
-                    <YdText variant="caption" numberOfLines={1} style={{ marginTop: 4, maxWidth: 64 }}>
-                      {appDisplayName(app)}
-                    </YdText>
-                  </Pressable>
-                ))}
-                <Pressable
-                  onPress={() => navigation.navigate('应用')}
-                  android_ripple={{ color: t.colors.fillHover, radius: 40 }}
-                  style={{ alignItems: 'center', paddingHorizontal: t.spacing.xs }}
-                >
-                  <View
-                    style={{
-                      width: 46,
-                      height: 46,
-                      borderRadius: 14,
-                      backgroundColor: t.colors.fillHover,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <Icon name="grid-outline" size={22} color={t.colors.textSecondary} />
-                  </View>
-                  <YdText variant="caption" style={{ marginTop: 4 }}>
-                    全部
-                  </YdText>
-                </Pressable>
-              </View>
-            ) : null}
+            {/* 动态分节标题 */}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <YdText style={{ fontSize: t.typography.sizeLg, fontWeight: t.typography.weightBold }}>
+                动态
+              </YdText>
+              <View style={{ flex: 1 }} />
+              <Pressable
+                onPress={() => navigation.navigate('应用')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                hitSlop={6}
+              >
+                <YdText variant="caption">查看全部</YdText>
+                <Icon name="chevron-forward" size={13} color={t.colors.textTertiary} />
+              </Pressable>
+            </View>
           </View>
         }
         renderItem={({ item }) => {
@@ -320,22 +303,56 @@ export function HomeTabScreen({ navigation }: Props) {
               />
             );
           }
+          // 无内容源应用的主页卡片：快捷入口条目
           return (
-            <View style={{ paddingHorizontal: t.spacing.lg, paddingVertical: t.spacing.md }}>
-              <YdText numberOfLines={1} style={{ fontWeight: t.typography.weightMedium }}>
-                {item.card.title}
-              </YdText>
-              {item.card.description ? (
-                <YdText variant="caption" numberOfLines={1}>
-                  {item.card.description}
+            <Pressable
+              onPress={() =>
+                navigation.navigate('PluginHost', {
+                  code: item.app.code,
+                  title: appDisplayName(item.app),
+                  route: item.card.route,
+                })
+              }
+              android_ripple={{ color: t.colors.fillHover }}
+              style={({ pressed }) => ({
+                borderRadius: t.radii.lg,
+                borderWidth: 1,
+                borderColor: t.colors.borderSubtle,
+                backgroundColor: pressed ? t.colors.fillHover : t.colors.bgSurface,
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              })}
+            >
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: t.radii.md,
+                  backgroundColor: t.colors.fillHover,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Icon name={item.app.icon ?? 'cube-outline'} size={20} color={t.colors.textPrimary} />
+              </View>
+              <View style={{ flex: 1, gap: 1 }}>
+                <YdText numberOfLines={1} style={{ fontWeight: t.typography.weightMedium, fontSize: t.typography.sizeSm + 1 }}>
+                  {item.card.title}
                 </YdText>
-              ) : null}
-            </View>
+                {item.card.description ? (
+                  <YdText variant="caption" numberOfLines={1}>
+                    {item.card.description}
+                  </YdText>
+                ) : null}
+              </View>
+              <Icon name="chevron-forward" size={15} color={t.colors.textTertiary} />
+            </Pressable>
           );
         }}
-        ItemSeparatorComponent={() => (
-          <View style={{ height: 1, backgroundColor: t.colors.borderSubtle }} />
-        )}
+        ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
         ListEmptyComponent={
           <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.xl }}>
             暂无内容，下拉刷新试试

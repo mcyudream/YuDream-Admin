@@ -1,7 +1,8 @@
 /**
- * 主题 T0：纯聚合值 token。颜色只放中性语义槽位 + 一个品牌强调位，
+ * 主题 FaTheme0：宿主 web 端 shadcn neutral 单色系（packages/themes/index.ts，
+ * OKLCH 已换算 sRGB）。纯聚合值 token：颜色只放中性语义槽位 + 一个品牌强调位，
  * 业务/插件只消费语义名，主题包才可改具体值（与 web 侧规则同构）。
- * 远程主题包下发的 theme.json 即为此结构的深局部覆盖。
+ * 远程主题包下发的 theme.json 即为此结构的深局部覆盖（primaryColor → accent）。
  */
 
 export interface ColorTokens {
@@ -70,8 +71,9 @@ export interface ThemeTokens {
   typography: TypographyTokens;
 }
 
-const spacing: SpacingTokens = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32 };
-const radii: RadiusTokens = { sm: 6, md: 10, lg: 16, full: 9999 };
+/** 设计稿（design/tools/lib.mjs FaTheme0）同源：卡片 r14、控件 r10-12、页边距节奏 12/16 */
+const spacing: SpacingTokens = { xs: 4, sm: 8, md: 12, lg: 20, xl: 28 };
+const radii: RadiusTokens = { sm: 8, md: 12, lg: 14, full: 9999 };
 const typography: TypographyTokens = {
   fontFamilyBase: undefined,
   fontFamilyDisplay: undefined,
@@ -80,33 +82,33 @@ const typography: TypographyTokens = {
   sizeMd: 15,
   sizeLg: 17,
   sizeXl: 20,
-  sizeDisplay: 28,
+  sizeDisplay: 26,
   weightRegular: '400',
   weightMedium: '500',
   weightBold: '700',
-  lineHeight: 1.4,
+  lineHeight: 1.45,
 };
 
 export const lightTheme: ThemeTokens = {
   scheme: 'light',
   colors: {
-    bgPage: '#f6f7f9',
+    bgPage: '#f2f2f2',
     bgSurface: '#ffffff',
     bgElevated: '#ffffff',
-    textPrimary: '#1d2129',
-    textSecondary: '#4e5969',
-    textTertiary: '#86909c',
-    textLink: '#165dff',
-    borderSubtle: '#e5e6eb',
-    borderStrong: '#c9cdd4',
-    fillHover: 'rgba(29,33,41,0.06)',
-    fillPressed: 'rgba(29,33,41,0.12)',
-    accent: '#165dff',
-    accentPressed: '#0e42d2',
-    onAccent: '#ffffff',
-    success: '#00b42a',
-    warning: '#ff7d00',
-    danger: '#f53f3f',
+    textPrimary: '#0a0a0a',
+    textSecondary: '#737373',
+    textTertiary: '#a3a3a3',
+    textLink: '#171717',
+    borderSubtle: '#e5e5e5',
+    borderStrong: '#d4d4d4',
+    fillHover: 'rgba(23,23,23,0.05)',
+    fillPressed: 'rgba(23,23,23,0.10)',
+    accent: '#171717',
+    accentPressed: '#404040',
+    onAccent: '#fafafa',
+    success: '#16a34a',
+    warning: '#d97706',
+    danger: '#dc2626',
     scrim: 'rgba(0,0,0,0.45)',
   },
   spacing,
@@ -117,23 +119,23 @@ export const lightTheme: ThemeTokens = {
 export const darkTheme: ThemeTokens = {
   scheme: 'dark',
   colors: {
-    bgPage: '#0f1115',
-    bgSurface: '#171a21',
-    bgElevated: '#1f232c',
-    textPrimary: '#f2f3f5',
-    textSecondary: '#c5c9d1',
-    textTertiary: '#86909c',
-    textLink: '#6a9bff',
-    borderSubtle: '#2a2e37',
-    borderStrong: '#3d424d',
-    fillHover: 'rgba(255,255,255,0.08)',
-    fillPressed: 'rgba(255,255,255,0.14)',
-    accent: '#4e7cff',
-    accentPressed: '#6a9bff',
-    onAccent: '#ffffff',
-    success: '#3dd598',
-    warning: '#ffb54d',
-    danger: '#ff6b6b',
+    bgPage: '#0a0a0a',
+    bgSurface: '#171717',
+    bgElevated: '#262626',
+    textPrimary: '#fafafa',
+    textSecondary: '#a3a3a3',
+    textTertiary: '#737373',
+    textLink: '#e5e5e5',
+    borderSubtle: '#262626',
+    borderStrong: '#404040',
+    fillHover: 'rgba(250,250,250,0.07)',
+    fillPressed: 'rgba(250,250,250,0.14)',
+    accent: '#e5e5e5',
+    accentPressed: '#fafafa',
+    onAccent: '#171717',
+    success: '#22c55e',
+    warning: '#fbbf24',
+    danger: '#ef4444',
     scrim: 'rgba(0,0,0,0.6)',
   },
   spacing,
