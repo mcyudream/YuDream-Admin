@@ -66,6 +66,8 @@ public class PluginModuleDO extends BaseDO {
     private String mobileIcon;
     /** plugin.yml mobile 块：移动端主页卡片声明；未声明时为 null。 */
     private List<MobileHomeCardDO> mobileHomeCards;
+    /** plugin.yml mobile.admin.cards 管理入口卡声明；未声明时为 null。 */
+    private List<MobileHomeCardDO> mobileAdminCards;
     /** plugin.yml mobile 块：移动端首页信息流内容源端点；未声明时为 null。 */
     private String mobileFeedEndpoint;
     /** plugin.yml mobile 块：信息流分节标题；未声明时为 null。 */
@@ -81,5 +83,7 @@ public class PluginModuleDO extends BaseDO {
         private String description;
         private String icon;
         private String route;
+        /** 管理入口卡所需权限码（主页卡片恒为 null）。 */
+        private String permission;
     }
 }

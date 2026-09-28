@@ -2,6 +2,7 @@ package online.yudream.base.infra.platform.plugin.service;
 
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
+import online.yudream.base.plugin.spi.core.PluginMobileAdminCard;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeFeed;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
@@ -109,6 +110,7 @@ public class PluginYamlDescriptorReader {
         String icon = optionalDisplayValue(mobileValues, "icon", 64);
         List<PluginMobileHomeCard> homeCards = optionalHomeCards(mobileValues);
         PluginMobileHomeFeed homeFeed = optionalHomeFeed(mobileValues);
+        List<PluginMobileAdminCard> adminCards = optionalAdminCards(mobileValues);
         return new PluginMobileSupport(
                 platforms,
                 minHostVersion,
@@ -117,7 +119,8 @@ public class PluginYamlDescriptorReader {
                 description,
                 icon,
                 homeCards,
-                homeFeed
+                homeFeed,
+                adminCards
         );
     }
 
@@ -185,6 +188,65 @@ public class PluginYamlDescriptorReader {
         return List.copyOf(parsed);
     }
 
+
+    /**
+     * mobile.admin.cards 管理入口卡声明：整体可选，逐项校验必填字段；
+     * permission 必填（权限码）——manifest 组装时按当前用户权限逐卡过滤，无权限不下发。
+     */
+    private List<PluginMobileAdminCard> optionalAdminCards(Map<?, ?> mobileValues) {
+        Object admin = mobileValues.get("admin");
+        if (admin == null) {
+            return List.of();
+        }
+        if (!(admin instanceof Map<?, ?> adminValues)) {
+            throw new BizException("plugin.yml 的 mobile.admin 必须是 YAML 对象");
+        }
+        Object cards = adminValues.get("cards");
+        if (cards == null) {
+            return List.of();
+        }
+        if (!(cards instanceof List<?> cardList)) {
+            throw new BizException("plugin.yml 的 mobile.admin.cards 必须是列表");
+        }
+        if (cardList.size() > 10) {
+            throw new BizException("plugin.yml 的 mobile.admin.cards 数量不能超过 10");
+        }
+        List<PluginMobileAdminCard> parsed = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+        for (int index = 0; index < cardList.size(); index++) {
+            Object item = cardList.get(index);
+            String prefix = "plugin.yml 的 mobile.admin.cards[" + index + "]";
+            if (!(item instanceof Map<?, ?> cardValues)) {
+                throw new BizException(prefix + " 必须是 YAML 对象");
+            }
+            String id = requiredFieldValue(cardValues, prefix, "id");
+            if (!id.matches("[a-z0-9][a-z0-9-]{0,63}")) {
+                throw new BizException(prefix + ".id 必须匹配 [a-z0-9-]：" + id);
+            }
+            if (!seenIds.add(id)) {
+                throw new BizException(prefix + ".id 重复：" + id);
+            }
+            String title = requiredFieldValue(cardValues, prefix, "title");
+            if (title.length() > 32) {
+                throw new BizException(prefix + ".title 长度不能超过 32");
+            }
+            String description = optionalFieldValue(cardValues, prefix, "description", 128);
+            String icon = optionalFieldValue(cardValues, prefix, "icon", 64);
+            String route = requiredFieldValue(cardValues, prefix, "route");
+            if (route.length() > 128) {
+                throw new BizException(prefix + ".route 长度不能超过 128");
+            }
+            if (!route.startsWith("/")) {
+                throw new BizException(prefix + ".route 必须以 / 开头：" + route);
+            }
+            String permission = requiredFieldValue(cardValues, prefix, "permission");
+            if (permission.length() > 128) {
+                throw new BizException(prefix + ".permission 长度不能超过 128");
+            }
+            parsed.add(new PluginMobileAdminCard(id, title, description, icon, route, permission));
+        }
+        return List.copyOf(parsed);
+    }
     /**
      * mobile.home.feed 首页信息流内容源端点声明：整体可选，至多一个；与 home.cards 可共存。
      * endpoint 必填、以 / 开头、≤128 字符且不含空白；title 可选 ≤32 字符。

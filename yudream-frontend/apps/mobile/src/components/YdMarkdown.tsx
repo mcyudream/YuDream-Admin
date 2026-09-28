@@ -1,3 +1,4 @@
+import { Image } from 'react-native';
 /**
  * 统一 Markdown 渲染（宿主权威实现）：T0 token 全量映射样式。
  * 插件侧使用同源副本（视觉一致），宿主页面直接复用本组件。
@@ -87,5 +88,41 @@ export interface YdMarkdownProps {
 
 export function YdMarkdown({ source }: YdMarkdownProps) {
   const styles = useMemo(() => buildStyles(currentTokens), [currentTokens]);
-  return <Markdown style={styles}>{source}</Markdown>;
+  return (
+    <Markdown
+      style={styles}
+      rules={{
+        image: (node) => (
+          <FitImage
+            key={node.key}
+            uri={String(node.attributes?.src ?? '')}
+            style={styles.image as Record<string, unknown>}
+          />
+        ),
+      }}
+    >
+      {source}
+    </Markdown>
+  );
+}
+
+/** 图片自适应：onLoad 读取原始宽高比动态撑高，杜绝截断与空占位。 */
+function FitImage({
+  uri,
+  style,
+}: {
+  uri: string;
+  style?: Record<string, unknown>;
+}) {
+  const [ratio, setRatio] = React.useState(16 / 9);
+  return (
+    <Image
+      source={{ uri }}
+      style={[{ width: '100%', aspectRatio: ratio, resizeMode: 'contain', borderRadius: 8 }, style]}
+      onLoad={(e) => {
+        const src = (e as { nativeEvent?: { source?: { width?: number; height?: number } } }).nativeEvent?.source;
+        if (src?.width && src?.height) setRatio(src.width / src.height);
+      }}
+    />
+  );
 }

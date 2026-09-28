@@ -1,5 +1,6 @@
 package online.yudream.base.plugin.spi.core;
 
+import online.yudream.base.plugin.spi.core.PluginMobileAdminCard;
 import java.util.List;
 
 /**
@@ -19,7 +20,8 @@ public record PluginMobileSupport(
         String description,
         String icon,
         List<PluginMobileHomeCard> homeCards,
-        PluginMobileHomeFeed homeFeed
+        PluginMobileHomeFeed homeFeed,
+        List<PluginMobileAdminCard> adminCards
 ) {
 
     public static final String DEFAULT_MIN_HOST_VERSION = "1.0.0";
@@ -32,7 +34,7 @@ public record PluginMobileSupport(
                                String description,
                                String icon,
                                List<PluginMobileHomeCard> homeCards) {
-        this(platforms, minHostVersion, requiredNativeCapabilities, name, description, icon, homeCards, null);
+        this(platforms, minHostVersion, requiredNativeCapabilities, name, description, icon, homeCards, null, List.of());
     }
 
     public PluginMobileSupport {
@@ -48,5 +50,6 @@ public record PluginMobileSupport(
         icon = icon == null || icon.isBlank() ? null : icon.trim();
         homeCards = homeCards == null ? List.of() : List.copyOf(homeCards);
         homeFeed = homeFeed == null ? null : homeFeed;
+        adminCards = adminCards == null ? List.of() : List.copyOf(adminCards);
     }
 }

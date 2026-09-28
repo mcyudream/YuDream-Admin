@@ -10,7 +10,8 @@ public record MobileHomeCard(
         String title,
         String description,
         String icon,
-        String route
+        String route,
+        String permission
 ) {
 
     public MobileHomeCard {
@@ -19,5 +20,6 @@ public record MobileHomeCard(
         description = description == null ? "" : description;
         icon = icon == null ? "" : icon;
         route = route == null ? "" : route;
+        permission = permission == null ? "" : permission;
     }
 }

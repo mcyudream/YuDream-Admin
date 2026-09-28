@@ -38,6 +38,8 @@ public class MobileManifestEntryRes implements Serializable {
     /** 应用向主页注册的卡片 */
     @Builder.Default
     private List<MobileHomeCardRes> homeCards = new ArrayList<>();
+    /** 管理入口卡（已按当前用户权限过滤；无权限为空）。 */
+    private List<MobileAdminCardRes> adminCards = new ArrayList<>();
 
     /** 移动端首页信息流内容源端点声明（未声明时为 null） */
     private MobileHomeFeedRes homeFeed;

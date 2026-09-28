@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 import online.yudream.base.domain.common.base.BaseDomain;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeFeed;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
@@ -72,6 +73,8 @@ public class PluginModule extends BaseDomain {
     private String mobileIcon;
     /** plugin.yml mobile 块持久化：移动端主页卡片声明（未声明时为 null）。 */
     private List<MobileHomeCard> mobileHomeCards;
+    /** plugin.yml mobile.admin.cards 管理入口卡声明（未声明时为 null）。 */
+    private List<MobileAdminCard> mobileAdminCards;
     /** plugin.yml mobile 块持久化：移动端首页信息流内容源端点（未声明时为 null）。 */
     private String mobileFeedEndpoint;
     /** plugin.yml mobile 块持久化：信息流分节标题（未声明时为 null）。 */
@@ -97,6 +100,7 @@ public class PluginModule extends BaseDomain {
                 .mobileDescription(mobile.declared() ? emptyToNull(mobile.description()) : null)
                 .mobileIcon(mobile.declared() ? emptyToNull(mobile.icon()) : null)
                 .mobileHomeCards(mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null)
+                .mobileAdminCards(mobile.declared() && !mobile.adminCards().isEmpty() ? mobile.adminCards() : null)
                 .mobileFeedEndpoint(mobile.declared() && mobile.homeFeed() != null
                         ? emptyToNull(mobile.homeFeed().endpoint()) : null)
                 .mobileFeedTitle(mobile.declared() && mobile.homeFeed() != null
@@ -123,6 +127,7 @@ public class PluginModule extends BaseDomain {
         this.mobileDescription = mobile.declared() ? emptyToNull(mobile.description()) : null;
         this.mobileIcon = mobile.declared() ? emptyToNull(mobile.icon()) : null;
         this.mobileHomeCards = mobile.declared() && !mobile.homeCards().isEmpty() ? mobile.homeCards() : null;
+        this.mobileAdminCards = mobile.declared() && !mobile.adminCards().isEmpty() ? mobile.adminCards() : null;
         this.mobileFeedEndpoint = mobile.declared() && mobile.homeFeed() != null
                 ? emptyToNull(mobile.homeFeed().endpoint()) : null;
         this.mobileFeedTitle = mobile.declared() && mobile.homeFeed() != null
@@ -141,7 +146,7 @@ public class PluginModule extends BaseDomain {
                 ? null
                 : new MobileHomeFeed(mobileFeedEndpoint, mobileFeedTitle);
         return MobilePluginSupport.declared(mobilePlatforms, mobileMinHostVersion, mobileRequiredNativeCapabilities,
-                mobileName, mobileDescription, mobileIcon, mobileHomeCards, homeFeed);
+                mobileName, mobileDescription, mobileIcon, mobileHomeCards, homeFeed, mobileAdminCards);
     }
 
     /** 空串归一为 null，与未声明字段保持同一持久化形态。 */

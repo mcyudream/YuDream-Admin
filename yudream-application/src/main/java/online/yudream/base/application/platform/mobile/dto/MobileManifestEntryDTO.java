@@ -44,6 +44,9 @@ public class MobileManifestEntryDTO implements Serializable {
 
     @Builder.Default
     private List<MobileHomeCardDTO> homeCards = new ArrayList<>();
+    /** 管理入口卡（按当前用户权限过滤后下发；无权限为空）。 */
+    @Builder.Default
+    private List<MobileAdminCardDTO> adminCards = new ArrayList<>();
 
     /** 移动端首页信息流内容源端点声明（plugin.yml mobile.home.feed，未声明时为 null）。 */
     private MobileHomeFeedDTO homeFeed;

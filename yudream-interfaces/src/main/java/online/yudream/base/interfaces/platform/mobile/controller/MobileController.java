@@ -44,7 +44,7 @@ public class MobileController {
                                               @RequestParam(required = false) String capabilitySet) {
         StpUtil.checkLogin();
         MobileManifestQuery query = MobileWebAssembler.toManifestQuery(platform, hostVersion, capabilitySet);
-        MobileManifestDTO manifest = mobileAppService.manifest(query);
+        MobileManifestDTO manifest = mobileAppService.manifest(query, StpUtil.getLoginIdAsLong());
         return Result.ok(MobileWebAssembler.toRes(manifest));
     }
 
