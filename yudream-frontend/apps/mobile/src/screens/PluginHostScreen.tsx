@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
@@ -28,15 +28,35 @@ type AppModuleComponent = ComponentType<AppModuleProps>;
 
 /**
  * 应用容器：经 MF 运行时加载远程模块并渲染其默认导出。
+ * 顶部导航栏为宿主自带样式（页底色、无投影、粗标题，与设计稿同构）；
+ * 插件经 sdk.navigation 改标题/显隐（能力位），自绘头部时隐藏宿主栏。
  * 失败路径已含 last-known-good 回滚（pluginLoader 内）；
  * 仍失败则给出手动回滚入口。
  */
-export function PluginHostScreen({ route }: Props) {
+export function PluginHostScreen({ route, navigation }: Props) {
   const t = useTheme();
   const { code, route: appRoute } = route.params;
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [retryToken, setRetryToken] = useState(0);
-  const sdk = useMemo(() => buildAppSdk(code, t), [code, t]);
+
+  // 设计稿同款导航栏：页底色 + 无投影 + 主文本色粗标题
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: t.colors.bgPage },
+      headerShadowVisible: false,
+      headerTintColor: t.colors.textPrimary,
+      headerTitleStyle: { fontWeight: t.typography.weightBold, fontSize: t.typography.sizeLg },
+    });
+  }, [navigation, t]);
+
+  const sdk = useMemo(
+    () =>
+      buildAppSdk(code, t, {
+        setTitle: (title) => navigation.setOptions({ title }),
+        setHidden: (hidden) => navigation.setOptions({ headerShown: !hidden }),
+      }),
+    [code, t, navigation],
+  );
 
   useEffect(() => {
     let cancelled = false;
