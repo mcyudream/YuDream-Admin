@@ -155,7 +155,7 @@ export function ProfileTabScreen({ navigation }: Props) {
     active?.branding?.themeColor || active?.branding?.loginHeroBackground || t.colors.accent;
 
   return (
-    <YdScreen>
+    <YdScreen padded={false}>
       <ScrollView contentContainerStyle={{ paddingBottom: t.spacing.xl }}>
         {/* 渐变头部：柔和光斑 + 头像 + 昵称 + 徽标 + 设置齿轮 */}
         <View style={{ backgroundColor: headerBg, overflow: 'hidden', paddingBottom: 64 }}>
