@@ -72,7 +72,7 @@ export const ICONS = {
   clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   'circle-plus': '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>',
-  'qr-code': '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21h.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16h.01"/><path d="M16 12h1"/><path d="M21 12h.01"/><path d="M12 21h.01"/>',
+  'qr-code': '<path fill-rule="evenodd" clip-rule="evenodd" d="M3 3h7v7H3V3zm2 2v3h3V5H5zm9-2h7v7h-7V3zm2 2v3h3V5h-3zM3 14h7v7H3v-7zm2 2v3h3v-3H5z" fill="FILL" stroke="none"/><rect x="14" y="14" width="2.6" height="2.6" fill="FILL" stroke="none"/><rect x="18.4" y="14" width="2.6" height="2.6" fill="FILL" stroke="none"/><rect x="14" y="18.4" width="2.6" height="2.6" fill="FILL" stroke="none"/><rect x="16.2" y="16.2" width="2.6" height="2.6" fill="FILL" stroke="none"/><rect x="18.4" y="18.4" width="2.6" height="2.6" fill="FILL" stroke="none"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
   battery: '<rect width="16" height="10" x="2" y="7" rx="2"/><line x1="22" x2="22" y1="11" y2="13"/><rect width="10" height="4" x="5" y="10" rx="0.5" fill="FILL" stroke="none"/>',
   'signal-bars': '<line x1="4" x2="4" y1="18" y2="14" stroke-width="2.6"/><line x1="9" x2="9" y1="18" y2="11" stroke-width="2.6"/><line x1="14" x2="14" y1="18" y2="8" stroke-width="2.6"/><line x1="19" x2="19" y1="18" y2="5" stroke-width="2.6" opacity="0.35"/>',
@@ -122,7 +122,7 @@ var FR={'r':'Light','m':'Medium','b':'Bold'};
 async function preloadFonts(){for(var k in FR){await pixso.loadFontAsync({family:'HarmonyOS Sans SC',style:FR[k]});}}
 function txt(p,s,o){o=o||{};var t=pixso.createText();t.fontName={family:'HarmonyOS Sans SC',style:FR[o.w||'r']};t.characters=String(s);t.fontSize=o.s||15;var lh=o.lh||Math.round((o.s||15)*1.45);t.lineHeight={value:lh,unit:'PIXELS'};if(o.ls){t.letterSpacing={value:o.ls,unit:'PIXELS'};}t.fills=[sol(o.c||T.fg)];if(o.align){t.textAlignHorizontal=o.align;}if(o.op!==undefined){t.opacity=o.op;}if(o.fillW){t.textAutoResize='HEIGHT';}else{t.textAutoResize='WIDTH_AND_HEIGHT';}p.appendChild(t);if(o.fillW){if(p.layoutMode==='HORIZONTAL'){t.layoutGrow=1;}else{t.layoutAlign='STRETCH';}}return t;}
 function box(p,o){o=o||{};var f=pixso.createFrame();if(o.name){f.name=o.name;}
- if(o.dir){f.layoutMode=o.dir;f.itemSpacing=o.gap||0;f.paddingTop=o.pt||0;f.paddingBottom=o.pb||0;f.paddingLeft=o.pl||0;f.paddingRight=o.pr||0;f.primaryAxisAlignItems=o.justify||'MIN';f.counterAxisAlignItems=o.align||'MIN';}
+ if(o.dir){f.layoutMode=o.dir;f.itemSpacing=o.gap||0;if(o.p){o.pt=o.pt||o.p;o.pb=o.pb||o.p;o.pl=o.pl||o.p;o.pr=o.pr||o.p;}f.paddingTop=o.pt||0;f.paddingBottom=o.pb||0;f.paddingLeft=o.pl||0;f.paddingRight=o.pr||0;f.primaryAxisAlignItems=o.justify||'MIN';f.counterAxisAlignItems=o.align||'MIN';}
  if(o.fill){f.fills=[sol(o.fill,o.fillOp)];}else{f.fills=[];}
  if(o.grad){f.fills=[o.grad];}
  if(o.r){f.cornerRadius=o.r;}if(o.tl){f.topLeftRadius=o.tl;}if(o.tr){f.topRightRadius=o.tr;}if(o.bl){f.bottomLeftRadius=o.bl;}if(o.br){f.bottomRightRadius=o.br;}
