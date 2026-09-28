@@ -27,7 +27,7 @@ export function YdListItem({
       descriptionStyle={{ color: t.colors.textTertiary, fontSize: t.typography.sizeSm }}
       descriptionNumberOfLines={1}
       right={trailing ? () => <View style={{ flexDirection: 'row', alignItems: 'center' }}>{trailing}</View> : undefined}
-      style={{ paddingHorizontal: 0, minHeight: 48, borderBottomWidth: 1, borderBottomColor: t.colors.borderSubtle }}
+      style={{ paddingHorizontal: 0, minHeight: 44, paddingVertical: 0 }}
     />
   );
 }

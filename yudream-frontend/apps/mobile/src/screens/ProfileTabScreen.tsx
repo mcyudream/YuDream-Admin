@@ -151,7 +151,8 @@ export function ProfileTabScreen({ navigation }: Props) {
   const pendingCount = Object.values(updates).filter(Boolean).length;
   const quickApps = plugins.slice(0, 5);
 
-  const headerBg = active?.branding?.loginHeroBackground || t.colors.accent;
+  const headerBg =
+    active?.branding?.themeColor || active?.branding?.loginHeroBackground || t.colors.accent;
 
   return (
     <YdScreen>
@@ -254,7 +255,7 @@ export function ProfileTabScreen({ navigation }: Props) {
         </View>
 
         {/* 悬浮四格概览卡 */}
-        <View style={{ paddingHorizontal: t.spacing.lg, marginTop: -52 }}>
+        <View style={{ paddingHorizontal: t.spacing.md, marginTop: -52 }}>
           <YdCard>
             <View style={{ flexDirection: 'row' }}>
               {[
@@ -290,7 +291,7 @@ export function ProfileTabScreen({ navigation }: Props) {
         </View>
 
         {/* 我的应用：插件注册的快捷入口（可更新带角标） */}
-        <View style={{ paddingHorizontal: t.spacing.lg, marginTop: t.spacing.md }}>
+        <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
           <YdCard>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: t.spacing.sm }}>
               <YdText style={{ fontWeight: t.typography.weightMedium, flex: 1 }}>我的应用</YdText>
@@ -363,7 +364,7 @@ export function ProfileTabScreen({ navigation }: Props) {
         </View>
 
         {/* 站点域 */}
-        <View style={{ paddingHorizontal: t.spacing.lg, marginTop: t.spacing.md }}>
+        <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
           <YdCard>
             <View style={{ gap: t.spacing.sm }}>
               <YdText style={{ fontWeight: t.typography.weightMedium }}>我的站点域</YdText>
@@ -405,7 +406,7 @@ export function ProfileTabScreen({ navigation }: Props) {
         </View>
 
         {/* 功能列表 */}
-        <View style={{ paddingHorizontal: t.spacing.lg, marginTop: t.spacing.md }}>
+        <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
           <YdCard>
             <View style={{ gap: t.spacing.xs }}>
               {account?.admin ? (
@@ -439,7 +440,7 @@ export function ProfileTabScreen({ navigation }: Props) {
         </View>
 
         {/* 退出登录 */}
-        <View style={{ paddingHorizontal: t.spacing.lg, marginTop: t.spacing.md }}>
+        <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
           <YdButton title="退出登录" variant="danger" onPress={doLogout} disabled={!account} />
           <YdText variant="caption" style={{ textAlign: 'center', marginTop: t.spacing.md }}>
             YuDream Mobile · 宿主版本 {HOST_VERSION}

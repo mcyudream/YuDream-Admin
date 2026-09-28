@@ -31,7 +31,13 @@ export async function bootstrap(): Promise<BootstrapResult> {
   await warmupFromCache();
 
   // 后台刷新主题（匿名）与站点品牌信息（logo/登录页定制可能被管理员更新）。
-  void fetchThemeOverride(domain.id, domain.serverUrl).catch(() => undefined);
+  void fetchThemeOverride(domain.id, domain.serverUrl)
+    .then((override) => {
+      if (override?.primaryColor) {
+        void updateDomainBranding(domain.id, { themeColor: override.primaryColor });
+      }
+    })
+    .catch(() => undefined);
   void discoverDomain(domain.serverUrl)
     .then((outcome) => {
       if (outcome.kind === 'ok') {

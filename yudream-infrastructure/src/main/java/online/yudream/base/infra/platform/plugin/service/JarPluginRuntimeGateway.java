@@ -725,6 +725,21 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     @Override
+    public Optional<String> siteThemeCss(String themeCode) {
+        if (themeCode == null || themeCode.isBlank() || "default".equals(themeCode)) {
+            return Optional.empty();
+        }
+        PluginRuntimeHolder holder = holder(themeCode);
+        if (!holder.isEnabled()) {
+            return Optional.empty();
+        }
+        return readFrontendAsset(holder, themeCode, "style.css",
+                "META-INF/yudream-plugin/frontend/" + themeCode + "/", "style.css", null)
+                .map(PluginFrontendAssetInfo::body)
+                .map(bytes -> new String(bytes, java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    @Override
     public Optional<String> mobileAssetSha256(String code, String assetPath) {
         PluginRuntimeHolder holder = holder(code);
         if (!holder.isEnabled()) {
