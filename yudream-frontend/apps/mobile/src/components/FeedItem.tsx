@@ -1,6 +1,7 @@
 /**
- * 首页富内容条目：作者行（头像/昵称）+ 标题 + 摘要 + 配图（最多 3 张，
- * 多于 3 张显示「共 N 张」）+ 底部标签与互动计数。纯展示，点击整条打开应用。
+ * 首页富内容条目（设计稿 post-card）：surface 卡片 + 作者行（头像/昵称/时间/标签）
+ * + 标题 + 摘要 + 配图（单图全宽，多图九宫格缩略，多于 3 张显示「共 N 张」）
+ * + 底部互动计数。纯展示，点击整条打开应用。
  */
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
@@ -49,7 +50,6 @@ function formatCount(n: number): string {
 
 export function FeedItem({ item, onPress }: FeedItemProps) {
   const t = useTheme();
-  const thumbWidth = 96;
   const images = item.images.slice(0, 3);
   const hiddenCount = (item.imageCount ?? item.images.length) - images.length;
 
@@ -58,49 +58,64 @@ export function FeedItem({ item, onPress }: FeedItemProps) {
       onPress={onPress}
       android_ripple={{ color: t.colors.fillHover }}
       style={({ pressed }) => ({
-        paddingHorizontal: t.spacing.lg,
-        paddingVertical: t.spacing.md,
-        backgroundColor: pressed ? t.colors.fillHover : t.colors.bgPage,
+        borderRadius: t.radii.lg,
+        borderWidth: 1,
+        borderColor: t.colors.borderSubtle,
+        backgroundColor: pressed ? t.colors.fillHover : t.colors.bgSurface,
+        paddingHorizontal: 14,
+        paddingVertical: 14,
+        gap: 10,
       })}
     >
       {/* 作者行 */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
         {item.author.avatar ? (
           <Image
             source={{ uri: item.author.avatar }}
-            style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: t.colors.fillHover }}
+            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: t.colors.fillHover }}
           />
         ) : (
           <View
             style={{
-              width: 26,
-              height: 26,
-              borderRadius: 13,
-              backgroundColor: t.colors.fillHover,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: t.colors.accent,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Text style={{ color: t.colors.textSecondary, fontSize: 12 }}>
+            <Text style={{ color: t.colors.onAccent, fontSize: 14, fontWeight: '500' }}>
               {(item.author.name || '匿名').slice(0, 1)}
             </Text>
           </View>
         )}
-        <Text
-          numberOfLines={1}
-          style={{
-            flex: 1,
-            color: t.colors.textSecondary,
-            fontSize: t.typography.sizeSm ?? 13,
-            fontWeight: '600',
-          }}
-        >
-          {item.author.name || '匿名'}
-        </Text>
-        {item.createTime ? (
-          <Text style={{ color: t.colors.textTertiary, fontSize: t.typography.sizeSm ?? 12 }}>
-            {relativeTime(item.createTime)}
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text
+            numberOfLines={1}
+            style={{ color: t.colors.textPrimary, fontSize: t.typography.sizeSm, fontWeight: '500' }}
+          >
+            {item.author.name || '匿名'}
           </Text>
+          {item.createTime ? (
+            <Text style={{ color: t.colors.textTertiary, fontSize: t.typography.sizeXs + 1 }}>
+              {relativeTime(item.createTime)}
+            </Text>
+          ) : null}
+        </View>
+        {item.tagName ? (
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 999,
+              backgroundColor: t.colors.fillHover,
+            }}
+          >
+            <Text numberOfLines={1} style={{ color: t.colors.textSecondary, fontSize: t.typography.sizeXs }}>
+              {item.tagName}
+            </Text>
+          </View>
         ) : null}
       </View>
 
@@ -109,10 +124,9 @@ export function FeedItem({ item, onPress }: FeedItemProps) {
         numberOfLines={2}
         style={{
           color: t.colors.textPrimary,
-          fontSize: 17,
+          fontSize: t.typography.sizeMd,
           fontWeight: '700',
-          lineHeight: 24,
-          marginBottom: item.summary ? 4 : 0,
+          lineHeight: 22,
         }}
       >
         {item.title}
@@ -120,20 +134,45 @@ export function FeedItem({ item, onPress }: FeedItemProps) {
       {item.summary ? (
         <Text
           numberOfLines={2}
-          style={{ color: t.colors.textSecondary, fontSize: t.typography.sizeMd ?? 14, lineHeight: 20 }}
+          style={{ color: t.colors.textSecondary, fontSize: t.typography.sizeSm, lineHeight: 19 }}
         >
           {item.summary}
         </Text>
       ) : null}
 
-      {/* 配图 */}
-      {images.length > 0 ? (
-        <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
+      {/* 配图：单图全宽，多图缩略行 */}
+      {images.length === 1 ? (
+        <View>
+          <Image
+            source={{ uri: images[0] }}
+            style={{ width: '100%', height: 118, borderRadius: 10, backgroundColor: t.colors.fillHover }}
+            resizeMode="cover"
+          />
+          {hiddenCount > 0 ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: 0,
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderBottomLeftRadius: 10,
+                borderTopRightRadius: 10,
+                backgroundColor: 'rgba(0,0,0,0.5)',
+              }}
+            >
+              <Text style={{ color: '#ffffff', fontSize: 10 }}>{`共${item.imageCount}张`}</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : images.length > 1 ? (
+        <View style={{ flexDirection: 'row', gap: 4 }}>
           {images.map((uri, i) => (
             <View key={`${item.id}-${i}`}>
               <Image
                 source={{ uri }}
-                style={{ width: thumbWidth, height: 72, borderRadius: 8, backgroundColor: t.colors.fillHover }}
+                style={{ width: 96, height: 72, borderRadius: 8, backgroundColor: t.colors.fillHover }}
               />
               {i === images.length - 1 && hiddenCount > 0 ? (
                 <View
@@ -157,31 +196,28 @@ export function FeedItem({ item, onPress }: FeedItemProps) {
         </View>
       ) : null}
 
-      {/* 底部：标签 + 互动计数 */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 10 }}>
-        {item.tagName ? (
-          <View
-            style={{
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 6,
-              backgroundColor: t.colors.fillHover,
-            }}
-          >
-            <Text numberOfLines={1} style={{ color: t.colors.textSecondary, fontSize: 11 }}>
-              {item.tagName}
+      {/* 互动计数 */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+        {item.viewCount != null ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Icon name="eye-outline" size={14} color={t.colors.textTertiary} />
+            <Text style={{ color: t.colors.textTertiary, fontSize: t.typography.sizeXs + 1 }}>
+              {formatCount(item.viewCount)}
             </Text>
           </View>
         ) : null}
-        <View style={{ flex: 1 }} />
-        <Icon name="chatbubble-outline" size={14} color={t.colors.textTertiary} />
-        <Text style={{ color: t.colors.textTertiary, fontSize: 12, marginLeft: 4, marginRight: 12 }}>
-          {formatCount(item.commentCount ?? 0)}
-        </Text>
-        <Icon name="thumbs-up-outline" size={14} color={t.colors.textTertiary} />
-        <Text style={{ color: t.colors.textTertiary, fontSize: 12, marginLeft: 4 }}>
-          {formatCount(item.likeCount ?? 0)}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon name="chatbubble-outline" size={14} color={t.colors.textTertiary} />
+          <Text style={{ color: t.colors.textTertiary, fontSize: t.typography.sizeXs + 1 }}>
+            {formatCount(item.commentCount ?? 0)}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+          <Icon name="thumbs-up-outline" size={14} color={t.colors.textTertiary} />
+          <Text style={{ color: t.colors.textTertiary, fontSize: t.typography.sizeXs + 1 }}>
+            {formatCount(item.likeCount ?? 0)}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );

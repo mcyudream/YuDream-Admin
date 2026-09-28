@@ -19,13 +19,13 @@ function color(tokens: PluginThemeTokens | null, key: string, fallback: string):
 }
 
 function buildStyles(tokens: PluginThemeTokens | null): Record<string, Record<string, unknown>> {
-  const textPrimary = color(tokens, 'textPrimary', '#1d2129');
-  const textSecondary = color(tokens, 'textSecondary', '#4e5969');
-  const textTertiary = color(tokens, 'textTertiary', '#86909c');
-  const accent = color(tokens, 'accent', '#165dff');
-  const borderSubtle = color(tokens, 'borderSubtle', '#e5e6eb');
+  const textPrimary = color(tokens, 'textPrimary', '#0a0a0a');
+  const textSecondary = color(tokens, 'textSecondary', '#737373');
+  const textTertiary = color(tokens, 'textTertiary', '#a3a3a3');
+  const accent = color(tokens, 'accent', '#171717');
+  const borderSubtle = color(tokens, 'borderSubtle', '#e5e5e5');
   const bgSurface = color(tokens, 'bgSurface', '#ffffff');
-  const fillHover = color(tokens, 'fillHover', 'rgba(29,33,41,0.06)');
+  const fillHover = color(tokens, 'fillHover', 'rgba(23,23,23,0.05)');
   const spacing = tokens?.spacing ?? { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
 
   return {

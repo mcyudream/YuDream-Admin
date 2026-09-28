@@ -62,9 +62,11 @@ export function YdField({
           roundness: t.radii.md,
         }}
         style={{
-          backgroundColor: t.colors.fillHover,
+          backgroundColor: t.colors.bgSurface,
           borderTopLeftRadius: t.radii.md,
           borderTopRightRadius: t.radii.md,
+          borderWidth: 1,
+          borderColor: error ? t.colors.danger : t.colors.borderSubtle,
         }}
         contentStyle={{ color: t.colors.textPrimary, fontSize: t.typography.sizeMd }}
         right={

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Clipboard from '@react-native-clipboard/clipboard';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -13,8 +13,8 @@ import type { RootStackParamList } from '@/navigation/types';
 type Props = NativeStackScreenProps<RootStackParamList, 'DomainAdd'>;
 
 /**
- * 接入域：扫码（能力位，v1 引导手动输入）/ 粘贴 / 手动输入端点地址
- * -> 发现站点 -> 确认添加并进入登录。
+ * 接入站点（设计稿 domainAdd）：扫码卡片（能力位，不可用时引导手动输入）
+ * / 粘贴 / 手动输入端点地址 -> 测试连接发现站点 -> 确认接入并进入登录。
  */
 export function DomainAddScreen({ navigation }: Props) {
   const t = useTheme();
@@ -94,25 +94,89 @@ export function DomainAddScreen({ navigation }: Props) {
   };
 
   return (
-    <YdScreen>
+    <YdScreen padded={false}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={{ flex: 1, gap: t.spacing.lg, paddingTop: t.spacing.lg }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
-            <Icon
-              name="chevron-back"
-              size={24}
-              color={t.colors.textPrimary}
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: t.spacing.lg,
+            paddingTop: t.spacing.sm,
+            paddingBottom: t.spacing.lg,
+            gap: t.spacing.md,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* 导航行 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.xs }}>
+            <Pressable
+              accessibilityRole="button"
               onPress={() => navigation.goBack()}
-              hitSlop={12}
-            />
-            <YdText variant="title">接入站点</YdText>
+              hitSlop={10}
+              style={{
+                width: 40,
+                height: 40,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="chevron-back" size={24} color={t.colors.textPrimary} />
+            </Pressable>
+            <YdText style={{ fontSize: t.typography.sizeLg, fontWeight: t.typography.weightBold }}>
+              接入站点
+            </YdText>
           </View>
 
-          <YdText variant="secondary">输入站点端点地址，或扫描站点提供的接入二维码</YdText>
+          {/* 扫码添加：主色卡片（相机能力不可用时降级提示） */}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void tryScan()}
+            android_ripple={{ color: t.colors.fillPressed }}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+              borderRadius: t.radii.lg,
+              padding: 16,
+              backgroundColor: pressed ? t.colors.accentPressed : t.colors.accent,
+            })}
+          >
+            <View
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: t.radii.md,
+                backgroundColor: `${t.colors.onAccent}26`,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon name="qr-code-outline" size={22} color={t.colors.onAccent} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <YdText style={{ color: t.colors.onAccent, fontWeight: t.typography.weightBold }}>
+                扫码添加
+              </YdText>
+              <YdText
+                numberOfLines={2}
+                style={{ color: `${t.colors.onAccent}B3`, fontSize: t.typography.sizeSm, lineHeight: 18 }}
+              >
+                使用相机扫描站点二维码，自动填入并连接
+              </YdText>
+            </View>
+            <Icon name="chevron-forward" size={16} color={`${t.colors.onAccent}99`} />
+          </Pressable>
 
+          {/* 或手动输入 */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md, paddingVertical: 2 }}>
+            <View style={{ flex: 1, height: 1, backgroundColor: t.colors.borderSubtle }} />
+            <YdText variant="caption">或手动输入</YdText>
+            <View style={{ flex: 1, height: 1, backgroundColor: t.colors.borderSubtle }} />
+          </View>
+
+          {/* 端点地址 */}
           <YdField
             label="端点地址"
             value={rawUrl}
@@ -125,13 +189,20 @@ export function DomainAddScreen({ navigation }: Props) {
             keyboardType="url"
             error={error}
           />
+          <YdText variant="caption" style={{ marginTop: -t.spacing.xs }}>
+            支持 http(s) 站点地址，首次连接将自动获取站点清单与应用目录。
+          </YdText>
 
           <View style={{ flexDirection: 'row', gap: t.spacing.sm }}>
-            <YdButton title="扫码" variant="secondary" onPress={tryScan} style={{ flex: 1 }} />
-            <YdButton title="粘贴" variant="secondary" onPress={paste} style={{ flex: 1 }} />
+            <YdButton title="粘贴" variant="secondary" onPress={paste} style={{ width: 96 }} />
+            <YdButton
+              title={checking ? '正在探测…' : '测试连接'}
+              variant="secondary"
+              onPress={verify}
+              loading={checking}
+              style={{ flex: 1 }}
+            />
           </View>
-
-          <YdButton title={checking ? '正在探测…' : '验证并继续'} onPress={verify} loading={checking} />
 
           {preview ? (
             <YdCard>
@@ -160,7 +231,7 @@ export function DomainAddScreen({ navigation }: Props) {
 
           <View style={{ flex: 1 }} />
           {checking ? <ActivityIndicator color={t.colors.accent} /> : null}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </YdScreen>
   );

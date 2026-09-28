@@ -19,7 +19,7 @@ export function YdScreen({
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: t.colors.bgPage }]} edges={['top', 'left', 'right']}>
       <StatusBar barStyle={t.scheme === 'dark' ? 'light-content' : 'dark-content'} />
-      <View style={[styles.body, padded && { paddingHorizontal: t.spacing.md }, style]}>
+      <View style={[styles.body, padded && { paddingHorizontal: t.spacing.lg }, style]}>
         {children}
       </View>
     </SafeAreaView>
