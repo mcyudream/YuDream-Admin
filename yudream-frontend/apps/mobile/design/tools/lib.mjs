@@ -21,7 +21,7 @@ export const LIGHT = {
   muted: '#f5f5f5', mutedFg: '#737373',
   secondary: '#f5f5f5', secondaryFg: '#171717',
   border: '#e5e5e5', input: '#e5e5e5', ring: '#a3a3a3',
-  destructive: '#dc2626', success: '#16a34a', scrim: '#000000',
+  destructive: '#dc2626', success: '#16a34a', warning: '#d97706', scrim: '#000000',
 };
 
 /** FaTheme0 暗色 */
@@ -33,7 +33,7 @@ export const DARK = {
   muted: '#262626', mutedFg: '#a3a3a3',
   secondary: '#262626', secondaryFg: '#fafafa',
   border: '#262626', input: '#262626', ring: '#525252',
-  destructive: '#ef4444', success: '#22c55e', scrim: '#000000',
+  destructive: '#ef4444', success: '#22c55e', warning: '#fbbf24', scrim: '#000000',
 };
 
 /** lucide 图标（24×24，stroke 2，shadcn 同源） */
@@ -72,9 +72,42 @@ export const ICONS = {
   clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   image: '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
   'circle-plus': '<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/>',
+  'qr-code': '<rect width="5" height="5" x="3" y="3" rx="1"/><rect width="5" height="5" x="16" y="3" rx="1"/><rect width="5" height="5" x="3" y="16" rx="1"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21h.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16h.01"/><path d="M16 12h1"/><path d="M21 12h.01"/><path d="M12 21h.01"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
   battery: '<rect width="16" height="10" x="2" y="7" rx="2"/><line x1="22" x2="22" y1="11" y2="13"/><rect width="10" height="4" x="5" y="10" rx="0.5" fill="FILL" stroke="none"/>',
   'signal-bars': '<line x1="4" x2="4" y1="18" y2="14" stroke-width="2.6"/><line x1="9" x2="9" y1="18" y2="11" stroke-width="2.6"/><line x1="14" x2="14" y1="18" y2="8" stroke-width="2.6"/><line x1="19" x2="19" y1="18" y2="5" stroke-width="2.6" opacity="0.35"/>',
   skin: '<path d="M20 6h-4V4a2 2 0 0 0-4 0v2H4a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h0a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2h0a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  play: '<polygon points="6 3 20 12 6 21 6 3"/>',
+  square: '<rect width="18" height="18" x="3" y="3" rx="2"/>',
+  terminal: '<polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>',
+  'rotate-ccw': '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1 1 10.34 18"/><path d="M7 6h1v4"/><path d="m16.71 13.88.7.71-2.82 2.82"/>',
+  'credit-card': '<rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/>',
+  wallet: '<path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/>',
+  'shopping-bag': '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  package: '<path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/>',
+  trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  calendar: '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  'map-pin': '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  'file-text': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  'list-checks': '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>',
+  'clipboard-check': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  'hard-drive': '<line x1="22" x2="2" y1="12" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" x2="6.01" y1="16" y2="16"/><line x1="10" x2="10.01" y1="16" y2="16"/>',
+  archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  newspaper: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/>',
+  shirt: '<path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z"/>',
+  'graduation-cap': '<path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/>',
+  'file-check': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m9 15 2 2 4-4"/>',
+  cpu: '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+  'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 20h16a2 2 0 0 0 1.73-2Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  activity: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+  banknote: '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  'arrow-left-right': '<path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/>',
+  'arrow-down-left': '<path d="M17 7 7 17"/><path d="M17 17H7V7"/>',
+  'arrow-up-right': '<path d="M7 7h10v10"/><path d="M7 17 17 7"/>',
 };
 
 /**
@@ -122,14 +155,17 @@ function icon(p,name,o){o=o||{};var s=o.size||20,c=o.c||T.fg,sw=o.sw||2;var body
  if(o.center){n.layoutAlign='CENTER';}
  return n;}
 function avatar(p,initial,o){o=o||{};var s=o.size||40;var a=box(p,{w:s,h:s,dir:'HORIZONTAL',justify:'CENTER',align:'CENTER',fill:o.fill||T.primary,r:999,name:'avatar'});txt(a,initial,{s:Math.round(s*0.4),w:'m',c:o.c||T.primaryFg});return a;}
+function img(p,o){o=o||{};var f=box(p,{w:o.w,h:o.h,dir:o.dir,r:o.r,clip:true,name:o.name||'img'});f.fills=[{type:'IMAGE',scaleMode:o.mode||'FILL',imageHash:o.hash}];if(o.stroke){f.strokes=[sol(o.stroke)];f.strokeWeight=1;f.strokeAlign='INSIDE';}return f;}
+function logoMark(p,size,o){o=o||{};return img(p,{w:size,h:size,hash:ASSETS.logo,r:o.r===undefined?Math.round(size*0.24):o.r,name:'logo'});}
 function badge(p,s,o){o=o||{};var b=box(p,{dir:'HORIZONTAL',pt:2,pb:2,pl:8,pr:8,fill:o.fill||T.muted,r:999,align:'CENTER',name:'badge'});txt(b,s,{s:o.s||11,w:o.w||'m',c:o.c||T.mutedFg});return b;}
 `;
 
 /** 组装单屏脚本：body 为 build() 函数体，负责创建并 return 根 frame */
-export function composeScreenBody(tokens, pageName, x, y, body, screenName) {
+export function composeScreenBody(tokens, pageName, x, y, body, screenName, assets) {
   return [
     `const T = ${JSON.stringify(tokens)};`,
     `const ICONS = ${JSON.stringify(ICONS)};`,
+    `const ASSETS = ${JSON.stringify(assets || {})};`,
     `const SCREEN_NAME = ${JSON.stringify(screenName)};`,
     LIB,
     `function targetPage(){var ps=pixso.root.children;for(var i=0;i<ps.length;i++){if(ps[i].name===${JSON.stringify(pageName)}){return ps[i];}}return pixso.currentPage;}`,
@@ -139,6 +175,8 @@ export function composeScreenBody(tokens, pageName, x, y, body, screenName) {
     `}`,
     `const __page = targetPage();`,
     `const __frame = await build();`,
+    `function __dropOld(pg){if(!pg){return;}var f=pg.findOne(function(n){return n.type==='FRAME'&&n.name===SCREEN_NAME&&n!==__frame;});if(f){f.remove();}}`,
+    `__dropOld(__page); if(__page!==pixso.currentPage){__dropOld(pixso.currentPage);}`,
     `__page.appendChild(__frame);`,
     `__frame.x = ${JSON.stringify(x)}; __frame.y = ${JSON.stringify(y)};`,
     `if(!__frame.name || __frame.name === 'Frame'){__frame.name = SCREEN_NAME;}`,
@@ -157,8 +195,8 @@ export function runEval(script) {
 }
 
 /** 运行屏幕构建：构建 + 截图，返回 {id, shotPath} */
-export function buildScreen(name, tokens, pageName, x, y, body) {
-  const script = composeScreenBody(tokens, pageName, x, y, body, name);
+export function buildScreen(name, tokens, pageName, x, y, body, assets) {
+  const script = composeScreenBody(tokens, pageName, x, y, body, name, assets);
   const out = runEval(script);
   let id = null;
   try { id = JSON.parse(out).id; } catch { /* 构建失败时原样打印 */ }

@@ -63,9 +63,10 @@ async function initSession() {
 
 async function rpc(method, params) {
   let sid = readSid();
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     const { status, text } = await post({ jsonrpc: '2.0', id: ++nextId, method, params }, sid);
-    if (status === 404 || status === 400 || /session/i.test(text.slice(0, 300))) {
+    if (status === 404 || status === 400) {
+      console.error('[rpc] attempt ' + attempt + ' status ' + status + ' text: ' + text.slice(0, 250));
       sid = await initSession();
       continue;
     }
@@ -73,7 +74,15 @@ async function rpc(method, params) {
     try { msg = parseSse(text); } catch (e) {
       throw new Error(`响应解析失败(${status}): ${text.slice(0, 300)}`);
     }
-    if (msg.error) throw new Error('MCP error: ' + JSON.stringify(msg.error).slice(0, 800));
+    if (msg.error) {
+      // 仅在错误体表明会话失效时重建；避免误伤正文里恰含 "session" 的成功结果
+      if (/session/i.test(JSON.stringify(msg.error).slice(0, 300))) {
+        console.error('[rpc] session error, re-init: ' + JSON.stringify(msg.error).slice(0, 200));
+        sid = await initSession();
+        continue;
+      }
+      throw new Error('MCP error: ' + JSON.stringify(msg.error).slice(0, 800));
+    }
     return msg.result;
   }
   throw new Error('MCP 会话重建后仍失败');
