@@ -13,6 +13,8 @@ import type { ThemeTokens } from '@/core/theme/tokens';
 export interface SdkNavigationController {
   setTitle: (title: string) => void;
   setHidden: (hidden: boolean) => void;
+  /** 应用内子页返回：传入接管宿主头部返回键（如 返回应用内上一视图），null 恢复默认退出应用。 */
+  setBackAction: (action: (() => void) | null) => void;
 }
 
 export function buildAppSdk(
@@ -30,6 +32,7 @@ export function buildAppSdk(
       // 缺省空实现：旧宿主能力位向前兼容（插件侧可选链消费）
       setTitle: () => undefined,
       setHidden: () => undefined,
+      setBackAction: () => undefined,
     },
     api: {
       request: <T,>(path: string, options?: { method?: string; body?: unknown }) =>

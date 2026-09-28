@@ -1,5 +1,5 @@
-import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { ComponentType } from 'react';
 import type { PluginMobileSdk } from '@yudream/plugin-sdk-mobile';
@@ -49,14 +49,38 @@ export function PluginHostScreen({ route, navigation }: Props) {
     });
   }, [navigation, t]);
 
+  // 应用内子页返回接管：插件经 sdk.navigation.setBackAction 换掉头部返回键
+  const backActionRef = useRef<(() => void) | null>(null);
+  const applyHeaderBack = React.useCallback(() => {
+    const action = backActionRef.current;
+    navigation.setOptions({
+      headerLeft: action
+        ? () => (
+            <Pressable hitSlop={12} onPress={action}>
+              <Text style={{ color: t.colors.textPrimary, fontSize: 26, lineHeight: 32, paddingHorizontal: 4 }}>{'‹'}</Text>
+            </Pressable>
+          )
+        : undefined,
+    });
+  }, [navigation, t]);
+
   const sdk = useMemo(
     () =>
       buildAppSdk(code, t, {
         setTitle: (title) => navigation.setOptions({ title }),
         setHidden: (hidden) => navigation.setOptions({ headerShown: !hidden }),
+        setBackAction: (action) => {
+          backActionRef.current = action;
+          applyHeaderBack();
+        },
       }),
-    [code, t, navigation],
+    [code, t, navigation, applyHeaderBack],
   );
+
+  // 卸载/切换应用时清掉接管，避免下一个应用继承返回行为
+  useEffect(() => () => {
+    backActionRef.current = null;
+  }, [code]);
 
   useEffect(() => {
     let cancelled = false;
