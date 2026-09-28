@@ -51,3 +51,5 @@ node screens.mjs all                # 重建全部 16 屏
 - `pixso.mjs` 的会话失效判定只看 HTTP 404/400 与**错误体**里的 session 字样；
   不能对成功响应正文做 `/session/i` 匹配——屏幕名叫 `quizSession` 时成功结果会被
   误判为会话失效而反复重建（已修复，勿回退）。
+- `box()` 的 padding 只认 `pt/pb/pl/pr`，简写 `p:12` 曾被静默忽略（内边距为 0、
+  文字顶边）——已在 box() 内支持 `p` 展开，但旧屏若见文字贴边先查这里。
