@@ -8,6 +8,7 @@ const P1 = '01 宿主 App';
 const P2 = '02 插件页面';
 const P3 = '03 深色模式';
 const P4 = '04 设计规范';
+const P5 = '05 主题色';
 
 /** Pixso 文档内已创建的图片资源 hash（经本地 8765 资源服务 createImageAsync 生成） */
 const IMAGE_HASHES = {
@@ -25,7 +26,7 @@ function setup() {
   const script = `
 const probe = await pixso.getNodeById('2:1');
 if (probe) { probe.remove(); }
-const names = ['01 宿主 App', '02 插件页面', '03 深色模式', '04 设计规范'];
+const names = ['01 宿主 App', '02 插件页面', '03 深色模式', '04 设计规范', '05 主题色'];
 pixso.currentPage.name = names[0];
 const ids = [pixso.currentPage.id];
 for (let i = 1; i < names.length; i++) {
@@ -1724,6 +1725,12 @@ for (var i=0;i<rels.length;i++){
 return root;
 `;
 
+/** 内置主题色预设（apps/core-arco-design-vue/src/views/system/theme/index.vue 的 colorPresets，
+ *  首位 #18181b 近黑即 FaTheme0 默认，不重复出图） */
+const COLOR_PRESETS = { blue: '#2563eb', green: '#16a34a', red: '#dc2626', purple: '#9333ea', orange: '#ea580c' };
+/** 在 FaTheme0 亮色 token 上替换主色（--primary / --ring 同步） */
+function themed(hex) { return Object.assign({}, LIGHT, { primary: hex, ring: hex }); }
+
 /** 屏幕注册表：name → [tokens, page, x, y, body] */
 export const DEFS = {
   cover: [LIGHT, P1, 0, 0, cover],
@@ -1765,6 +1772,16 @@ export const DEFS = {
   profileDark: [DARK, P3, 420, 0, darkProfile],
   tokens: [LIGHT, P4, 0, 0, tokensSheet],
   components: [LIGHT, P4, 420, 0, componentsSheet],
+  themeBlueLogin: [themed(COLOR_PRESETS.blue), P5, 0, 0, login],
+  themeBlueHome: [themed(COLOR_PRESETS.blue), P5, 420, 0, home],
+  themeGreenLogin: [themed(COLOR_PRESETS.green), P5, 0, 900, login],
+  themeGreenHome: [themed(COLOR_PRESETS.green), P5, 420, 900, home],
+  themeRedLogin: [themed(COLOR_PRESETS.red), P5, 0, 1800, login],
+  themeRedHome: [themed(COLOR_PRESETS.red), P5, 420, 1800, home],
+  themePurpleLogin: [themed(COLOR_PRESETS.purple), P5, 0, 2700, login],
+  themePurpleHome: [themed(COLOR_PRESETS.purple), P5, 420, 2700, home],
+  themeOrangeLogin: [themed(COLOR_PRESETS.orange), P5, 0, 3600, login],
+  themeOrangeHome: [themed(COLOR_PRESETS.orange), P5, 420, 3600, home],
 };
 
 export function buildByName(name) {

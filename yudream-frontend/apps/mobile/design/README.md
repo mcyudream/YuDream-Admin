@@ -21,6 +21,10 @@
   - mc-news 新闻列表 / 详情
 - 页面「03 深色模式」：首页 Dark / 我的 Dark
 - 页面「04 设计规范」：Token 色板与字阶 / 组件样例
+- 页面「05 主题色」：框架内置预设色（主题中心 colorPresets）各出登录 + 首页两屏，
+  蓝 #2563EB / 绿 #16A34A / 红 #DC2626 / 紫 #9333EA / 橙 #EA580C（近黑 #18181B 即
+  FaTheme0 默认，不重复出图）；工具链经 `themed()` 在 FaTheme0 亮色 token 上替换
+  primary/ring 生成，屏幕名 `theme<色><屏>`。
 - 变量集「FaTheme0」：17 个语义色变量，Light / Dark 双模式（--primary、--border、--g-page 等）
 
 ## 重建 / 改稿
