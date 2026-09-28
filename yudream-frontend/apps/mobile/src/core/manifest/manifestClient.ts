@@ -17,6 +17,14 @@ interface ManifestRes {
     name?: string | null;
     description?: string | null;
     icon?: string | null;
+    adminCards?: Array<{
+      id?: string;
+      title?: string;
+      description?: string;
+      icon?: string;
+      route?: string;
+      permission?: string;
+    }> | null;
     homeCards?: Array<{
       id?: string;
       title?: string;
@@ -55,6 +63,16 @@ export async function fetchManifest(): Promise<MobileManifest> {
       name: entry.name ?? undefined,
       description: entry.description ?? undefined,
       icon: entry.icon ?? undefined,
+      adminCards: (entry.adminCards ?? [])
+        .filter((c) => c.id && c.route)
+        .map((c) => ({
+          id: c.id ?? '',
+          title: c.title ?? '',
+          description: c.description ?? undefined,
+          icon: c.icon ?? undefined,
+          route: c.route ?? '',
+          permission: c.permission ?? '',
+        })),
       homeCards: (entry.homeCards ?? [])
         .filter((c) => c.id && c.title && c.route)
         .map((c) => ({

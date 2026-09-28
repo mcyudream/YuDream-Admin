@@ -6,6 +6,7 @@ import online.yudream.base.application.platform.plugin.service.PluginMenuProject
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.service.AgentRuntimeApplicationRegistry;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeFeed;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
@@ -45,6 +46,7 @@ import online.yudream.base.infra.platform.plugin.devmode.PluginDevDirectoryBrows
 import online.yudream.base.infra.platform.plugin.devmode.PluginDevProjectCatalog;
 import online.yudream.base.infra.platform.plugin.devmode.PluginScaffoldGenerator;
 import online.yudream.base.plugin.spi.core.PluginDescriptor;
+import online.yudream.base.plugin.spi.core.PluginMobileAdminCard;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeCard;
 import online.yudream.base.plugin.spi.core.PluginMobileHomeFeed;
 import online.yudream.base.plugin.spi.core.PluginMobileSupport;
@@ -1157,11 +1159,14 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
         List<MobileHomeCard> homeCards = mobileSupport.homeCards().stream()
                 .map(this::toMobileHomeCard)
                 .toList();
+        List<MobileAdminCard> adminCards = mobileSupport.adminCards().stream()
+                .map(this::toMobileAdminCard)
+                .toList();
         MobileHomeFeed homeFeed = mobileSupport.homeFeed() == null
                 ? null
                 : toMobileHomeFeed(mobileSupport.homeFeed());
         return MobilePluginSupport.declared(platforms, mobileSupport.minHostVersion(), mobileSupport.requiredNativeCapabilities(),
-                mobileSupport.name(), mobileSupport.description(), mobileSupport.icon(), homeCards, homeFeed);
+                mobileSupport.name(), mobileSupport.description(), mobileSupport.icon(), homeCards, homeFeed, adminCards);
     }
 
     private MobileHomeFeed toMobileHomeFeed(PluginMobileHomeFeed feed) {
@@ -1169,7 +1174,11 @@ public class JarPluginRuntimeGateway implements PluginRuntimeGateway {
     }
 
     private MobileHomeCard toMobileHomeCard(PluginMobileHomeCard card) {
-        return new MobileHomeCard(card.id(), card.title(), card.description(), card.icon(), card.route());
+        return new MobileHomeCard(card.id(), card.title(), card.description(), card.icon(), card.route(), null);
+    }
+
+    private MobileAdminCard toMobileAdminCard(PluginMobileAdminCard card) {
+        return new MobileAdminCard(card.id(), card.title(), card.description(), card.icon(), card.route(), card.permission());
     }
 
     private PluginPermissionInfo toInfo(PluginPermissionItem item) {

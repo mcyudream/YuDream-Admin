@@ -1,11 +1,13 @@
 package online.yudream.base.application.platform.mobile.assembler;
 
 import online.yudream.base.application.platform.mobile.dto.MobileDeviceDTO;
+import online.yudream.base.application.platform.mobile.dto.MobileAdminCardDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileHomeCardDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileHomeFeedDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileManifestEntryDTO;
 import online.yudream.base.domain.platform.mobile.aggregate.MobileDevice;
 import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.mobile.valobj.MobileHomeFeed;
 import online.yudream.base.domain.platform.mobile.valobj.MobilePluginSupport;
@@ -41,7 +43,8 @@ public class MobileAssembler {
                                                     String assetRevision,
                                                     Optional<String> remoteEntrySha256,
                                                     Optional<String> styleAssetSha256,
-                                                    MobilePluginSupport support) {
+                                                    MobilePluginSupport support,
+                                                    java.util.Set<String> userPermissions) {
         String styleUrl = styleAssetSha256.isPresent()
                 ? mobileAssetUrl(pluginCode, "style.css")
                 : null;
@@ -50,7 +53,7 @@ public class MobileAssembler {
                 .version(pluginVersion)
                 .assetRevision(assetRevision)
                 .remoteEntrySha256(remoteEntrySha256.orElse(null))
-                .remoteEntryUrl(mobileAssetUrl(pluginCode, "remoteEntry.js"))
+                .remoteEntryUrl(mobileAssetUrl(pluginCode, "remoteEntry.js") + "?v=" + pluginVersion)
                 .minHostVersion(support.minHostVersion())
                 .platforms(support.platformTokens())
                 .requiredNativeCapabilities(support.normalizedCapabilityTokens())
@@ -58,9 +61,30 @@ public class MobileAssembler {
                 .description(blankToNull(support.description()))
                 .icon(blankToNull(support.icon()))
                 .homeCards(toHomeCardDTOs(support.homeCards()))
+                .adminCards(toAdminCardDTOs(support.adminCards(), userPermissions))
                 .homeFeed(toHomeFeedDTO(support.homeFeed()))
                 .styleUrl(styleUrl)
                 .build();
+    }
+
+    /** 管理入口卡按用户权限过滤：超管（*）全量下发，其余按 permission 命中。 */
+    public static List<MobileAdminCardDTO> toAdminCardDTOs(List<MobileAdminCard> cards, java.util.Set<String> userPermissions) {
+        if (cards == null || cards.isEmpty() || userPermissions == null || userPermissions.isEmpty()) {
+            return List.of();
+        }
+        boolean superUser = userPermissions.contains("*");
+        return cards.stream()
+                .filter(card -> superUser
+                        || (card.permission() != null && userPermissions.contains(card.permission())))
+                .map(card -> MobileAdminCardDTO.builder()
+                        .id(card.id())
+                        .title(card.title())
+                        .description(blankToNull(card.description()))
+                        .icon(blankToNull(card.icon()))
+                        .route(card.route())
+                        .permission(blankToNull(card.permission()))
+                        .build())
+                .toList();
     }
 
     public static List<MobileHomeCardDTO> toHomeCardDTOs(List<MobileHomeCard> cards) {

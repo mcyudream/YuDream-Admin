@@ -1,11 +1,12 @@
 package online.yudream.base.domain.platform.mobile.valobj;
 
 /**
- * 移动端主页卡片声明（plugin.yml mobile.home.cards[] 的领域镜像）。
- * <p>
- * id 为插件内唯一稳定标识；route 以 {@code /} 开头，指向插件移动端页面。
+ * 管理入口卡（plugin.yml mobile.admin.cards[] 的领域镜像）：
+ * 管理员功能在移动端「管理」聚合中的注册声明。
+ * permission 为打开该入口所需权限码；manifest 组装时按当前用户权限逐卡过滤，
+ * 无权限的入口不下发（前端不可见即不可达）。
  */
-public record MobileHomeCard(
+public record MobileAdminCard(
         String id,
         String title,
         String description,
@@ -14,7 +15,7 @@ public record MobileHomeCard(
         String permission
 ) {
 
-    public MobileHomeCard {
+    public MobileAdminCard {
         id = id == null ? "" : id;
         title = title == null ? "" : title;
         description = description == null ? "" : description;

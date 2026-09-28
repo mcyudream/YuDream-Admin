@@ -51,9 +51,10 @@ public class MobileAppService {
     private final PluginModuleRepo pluginModuleRepo;
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final MobileDeviceRepo mobileDeviceRepo;
+    private final online.yudream.base.application.system.user.service.PermissionAppService permissionAppService;
 
     @Transactional(readOnly = true)
-    public MobileManifestDTO manifest(MobileManifestQuery query) {
+    public MobileManifestDTO manifest(MobileManifestQuery query, Long userId) {
         ensureCapabilityEnabled();
         if (query == null || query.getPlatform() == null) {
             throw new BizException("platform 参数仅支持 android/ios");
@@ -64,11 +65,15 @@ public class MobileAppService {
         }
         Set<String> capabilities = normalizeCapabilities(query.getCapabilitySet());
         Map<String, PluginFrontendModuleInfo> frontendByCode = frontendModulesByCode();
+        // 管理入口卡的权限过滤基准：当前登录用户的权限码集合（超管为 *）
+        java.util.Set<String> userPermissions = userId == null
+                ? java.util.Set.of()
+                : java.util.Set.copyOf(permissionAppService.getUserPermissions(userId));
         List<MobileManifestEntryDTO> entries = pluginModuleRepo.findAll().stream()
                 .filter(PluginModule::enabled)
                 .filter(module -> module.mobileSupport().availableFor(query.getPlatform(), capabilities, query.getHostVersion()))
                 .sorted(java.util.Comparator.comparing(PluginModule::getCode))
-                .map(module -> toEntry(module, frontendByCode.get(module.getCode())))
+                .map(module -> toEntry(module, frontendByCode.get(module.getCode()), userPermissions))
                 .toList();
         return new MobileManifestDTO(query.getPlatform().token(), entries);
     }
@@ -125,7 +130,8 @@ public class MobileAppService {
                 .toList();
     }
 
-    private MobileManifestEntryDTO toEntry(PluginModule module, PluginFrontendModuleInfo frontend) {
+    private MobileManifestEntryDTO toEntry(PluginModule module, PluginFrontendModuleInfo frontend,
+                                           java.util.Set<String> userPermissions) {
         MobilePluginSupport support = module.mobileSupport();
         return MobileAssembler.toEntryDTO(
                 module.getCode(),
@@ -133,7 +139,8 @@ public class MobileAppService {
                 frontend == null ? "" : frontend.assetRevision(),
                 pluginRuntimeGateway.mobileAssetSha256(module.getCode(), "remoteEntry.js"),
                 pluginRuntimeGateway.mobileAssetSha256(module.getCode(), "style.css"),
-                support
+                support,
+                userPermissions
         );
     }
 

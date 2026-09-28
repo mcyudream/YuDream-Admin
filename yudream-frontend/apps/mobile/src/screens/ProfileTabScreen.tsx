@@ -23,7 +23,7 @@ import { logout } from '@/core/auth/authService';
 import { onPluginsChanged, getPlugins } from '@/core/plugins/registry';
 import { getInstalled } from '@/core/plugins/bundleCache';
 import { appDisplayName } from '@/core/manifest/types';
-import type { ManifestPluginEntry } from '@/core/manifest/types';
+import type { ManifestPluginEntry, MobileAdminCard } from '@/core/manifest/types';
 import type { MainTabParamList, RootStackParamList } from '@/navigation/types';
 
 type Props = CompositeScreenProps<
@@ -151,6 +151,10 @@ export function ProfileTabScreen({ navigation }: Props) {
     plugins.reduce((sum, p) => sum + (p.homeFeed ? 1 : 0), 0);
   const pendingCount = Object.values(updates).filter(Boolean).length;
   const quickApps = plugins.slice(0, 5);
+  // 管理入口聚合：后端已按当前用户权限逐卡过滤，无权限应用不下发 adminCards（入口天然隐藏）
+  const adminEntries = plugins.flatMap((p) =>
+    (p.adminCards ?? []).map((card) => ({ app: p, card })),
+  );
 
   // hero 跟随宿主主题色（accent/onAccent 随深浅模式成对反色）；站点品牌绿不侵入移动端
   const headerBg = t.colors.accent;
@@ -295,6 +299,53 @@ export function ProfileTabScreen({ navigation }: Props) {
         </View>
 
         {/* 我的应用：插件注册的快捷入口（可更新带角标） */}
+        {adminEntries.length > 0 ? (
+        <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
+          <YdCard>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: t.spacing.sm }}>
+              <YdText style={{ fontWeight: t.typography.weightMedium, flex: 1 }}>管理应用</YdText>
+            </View>
+            {adminEntries.map(({ app, card }) => (
+              <Pressable
+                key={`${app.code}-${card.id}`}
+                onPress={() =>
+                  navigation.navigate('PluginHost', {
+                    code: app.code,
+                    title: card.title,
+                    route: card.route,
+                  })
+                }
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10 }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 12,
+                    backgroundColor: t.colors.fillHover,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Icon name={card.icon ?? 'settings-outline'} size={20} color={t.colors.accent} />
+                </View>
+                <View style={{ flex: 1, gap: 1 }}>
+                  <YdText style={{ fontWeight: t.typography.weightMedium }}>{card.title}</YdText>
+                  {card.description ? (
+                    <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
+                      {card.description}
+                    </YdText>
+                  ) : null}
+                  <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
+                    {appDisplayName(app)}
+                  </YdText>
+                </View>
+                <Icon name="chevron-forward" size={16} color={t.colors.textTertiary} />
+              </Pressable>
+            ))}
+          </YdCard>
+        </View>
+        ) : null}
         <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
           <YdCard>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: t.spacing.sm }}>

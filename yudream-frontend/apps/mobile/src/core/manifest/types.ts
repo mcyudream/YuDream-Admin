@@ -63,8 +63,20 @@ export interface ManifestPluginEntry {
   icon?: string;
   /** 应用注册的主页卡片 */
   homeCards?: MobileHomeCard[];
+  /** 管理入口卡（后端已按当前用户权限过滤；无权限为空） */
+  adminCards?: MobileAdminCard[];
   /** 应用注册的首页内容源（真实内容条目） */
   homeFeed?: MobileHomeFeed;
+}
+
+/** 管理入口卡（plugin.yml mobile.admin.cards，仅有权用户收到非空列表）。 */
+export interface MobileAdminCard {
+  id: string;
+  title: string;
+  description?: string;
+  icon?: string;
+  route: string;
+  permission: string;
 }
 
 /** 应用展示名：mobile.name 优先，回落 code。 */

@@ -24,7 +24,8 @@ public record MobilePluginSupport(
         String description,
         String icon,
         List<MobileHomeCard> homeCards,
-        MobileHomeFeed homeFeed
+        MobileHomeFeed homeFeed,
+        List<MobileAdminCard> adminCards
 ) {
 
     public static final String DEFAULT_MIN_HOST_VERSION = "1.0.0";
@@ -32,7 +33,7 @@ public record MobilePluginSupport(
     /** plugin.yml 未声明 mobile 块时的空声明。 */
     public static MobilePluginSupport undeclared() {
         return new MobilePluginSupport(false, List.of(), DEFAULT_MIN_HOST_VERSION, List.of(),
-                null, null, null, List.of(), null);
+                null, null, null, List.of(), null, List.of());
     }
 
     /** 声明了 mobile 块但未填字段时按约定回落默认值。 */
@@ -40,7 +41,8 @@ public record MobilePluginSupport(
                                                List<String> requiredNativeCapabilities,
                                                String name, String description, String icon,
                                                List<MobileHomeCard> homeCards,
-                                               MobileHomeFeed homeFeed) {
+                                               MobileHomeFeed homeFeed,
+                                               List<MobileAdminCard> adminCards) {
         List<MobilePlatform> safePlatforms = platforms == null || platforms.isEmpty()
                 ? List.of(MobilePlatform.ANDROID, MobilePlatform.IOS)
                 : List.copyOf(platforms);
@@ -56,8 +58,11 @@ public record MobilePluginSupport(
         List<MobileHomeCard> safeHomeCards = homeCards == null
                 ? List.of()
                 : homeCards.stream().filter(item -> item != null).toList();
+        List<MobileAdminCard> safeAdminCards = adminCards == null
+                ? List.of()
+                : adminCards.stream().filter(item -> item != null).toList();
         return new MobilePluginSupport(true, safePlatforms, safeMinHostVersion, safeCapabilities,
-                safeName, safeDescription, safeIcon, safeHomeCards, homeFeed);
+                safeName, safeDescription, safeIcon, safeHomeCards, homeFeed, safeAdminCards);
     }
 
     public MobilePluginSupport {

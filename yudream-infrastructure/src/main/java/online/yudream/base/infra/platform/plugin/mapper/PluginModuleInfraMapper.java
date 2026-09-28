@@ -57,6 +57,7 @@ public class PluginModuleInfraMapper {
         dataObj.setMobileDescription(module.getMobileDescription());
         dataObj.setMobileIcon(module.getMobileIcon());
         dataObj.setMobileHomeCards(toHomeCardDOs(module.getMobileHomeCards()));
+        dataObj.setMobileAdminCards(toAdminCardDOs(module.getMobileAdminCards()));
         dataObj.setMobileFeedEndpoint(module.getMobileFeedEndpoint());
         dataObj.setMobileFeedTitle(module.getMobileFeedTitle());
         dataObj.setVersion(module.getVersion());
@@ -110,6 +111,7 @@ public class PluginModuleInfraMapper {
                 .mobileDescription(dataObj.getMobileDescription())
                 .mobileIcon(dataObj.getMobileIcon())
                 .mobileHomeCards(toHomeCards(dataObj.getMobileHomeCards()))
+                .mobileAdminCards(toAdminCards(dataObj.getMobileAdminCards()))
                 .mobileFeedEndpoint(dataObj.getMobileFeedEndpoint())
                 .mobileFeedTitle(dataObj.getMobileFeedTitle())
                 .version(dataObj.getVersion())
@@ -142,7 +144,7 @@ public class PluginModuleInfraMapper {
         return cards.stream()
                 .filter(card -> card != null)
                 .map(card -> new PluginModuleDO.MobileHomeCardDO(
-                        card.id(), card.title(), card.description(), card.icon(), card.route()))
+                        card.id(), card.title(), card.description(), card.icon(), card.route(), card.permission()))
                 .toList();
     }
 
@@ -153,7 +155,29 @@ public class PluginModuleInfraMapper {
         return cards.stream()
                 .filter(card -> card != null)
                 .map(card -> new MobileHomeCard(
-                        card.getId(), card.getTitle(), card.getDescription(), card.getIcon(), card.getRoute()))
+                        card.getId(), card.getTitle(), card.getDescription(), card.getIcon(), card.getRoute(), card.getPermission()))
+                .toList();
+    }
+
+    private static List<PluginModuleDO.MobileHomeCardDO> toAdminCardDOs(List<online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new PluginModuleDO.MobileHomeCardDO(
+                        card.id(), card.title(), card.description(), card.icon(), card.route(), card.permission()))
+                .toList();
+    }
+
+    private static List<online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard> toAdminCards(List<PluginModuleDO.MobileHomeCardDO> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard(
+                        card.getId(), card.getTitle(), card.getDescription(), card.getIcon(), card.getRoute(), card.getPermission()))
                 .toList();
     }
 }

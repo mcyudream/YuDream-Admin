@@ -13,8 +13,10 @@ import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
 import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceRegisterRequest;
 import online.yudream.base.interfaces.platform.mobile.request.MobileDeviceUnregisterRequest;
 import online.yudream.base.interfaces.platform.mobile.res.MobileDeviceRes;
+import online.yudream.base.application.platform.mobile.dto.MobileAdminCardDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileHomeCardDTO;
 import online.yudream.base.application.platform.mobile.dto.MobileHomeFeedDTO;
+import online.yudream.base.interfaces.platform.mobile.res.MobileAdminCardRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileHomeCardRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileHomeFeedRes;
 import online.yudream.base.interfaces.platform.mobile.res.MobileManifestEntryRes;
@@ -117,6 +119,7 @@ public class MobileWebAssembler {
                 .description(entry.getDescription())
                 .icon(entry.getIcon())
                 .homeCards(toHomeCardRes(entry.getHomeCards()))
+                .adminCards(toAdminCardRes(entry.getAdminCards()))
                 .homeFeed(toHomeFeedRes(entry.getHomeFeed()))
                 .platforms(entry.getPlatforms())
                 .requiredNativeCapabilities(entry.getRequiredNativeCapabilities())
@@ -132,6 +135,22 @@ public class MobileWebAssembler {
                 .endpoint(feed.getEndpoint())
                 .title(feed.getTitle())
                 .build();
+    }
+
+    private static List<MobileAdminCardRes> toAdminCardRes(List<MobileAdminCardDTO> cards) {
+        if (cards == null || cards.isEmpty()) {
+            return List.of();
+        }
+        return cards.stream()
+                .map(card -> MobileAdminCardRes.builder()
+                        .id(card.getId())
+                        .title(card.getTitle())
+                        .description(card.getDescription())
+                        .icon(card.getIcon())
+                        .route(card.getRoute())
+                        .permission(card.getPermission())
+                        .build())
+                .toList();
     }
 
     private static List<MobileHomeCardRes> toHomeCardRes(List<MobileHomeCardDTO> cards) {
