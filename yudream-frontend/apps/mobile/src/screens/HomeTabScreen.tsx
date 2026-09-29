@@ -28,6 +28,13 @@ type Props = CompositeScreenProps<
 
 type FeedEntry = { key: string; app: ManifestPluginEntry; item: MobileFeedItem };
 
+/**
+ * 每源每页条数取小页：新闻类源 hasMore 极深，大页会让单源刷屏、其他类别
+ * 被压到列表深处（全局时间排序下依然如此）。小页保证刷新首屏与每轮加载
+ * 更多都带出全部类别。
+ */
+const FEED_PAGE_SIZE = 6;
+
 interface FeedSourceState {
   items: MobileFeedItem[];
   page: number;
@@ -83,10 +90,14 @@ export function HomeTabScreen({ navigation }: Props) {
 
   const reloadAll = useCallback(async () => {
     const apps = feedAppsRef.current;
-    const results = await Promise.allSettled(apps.map((app) => fetchAppFeed(app, 1)));
+    const results = await Promise.allSettled(apps.map((app) => fetchAppFeed(app, 1, FEED_PAGE_SIZE)));
     const next: Record<string, FeedSourceState> = {};
     apps.forEach((app, i) => {
       const result = results[i];
+      if (result && result.status === 'rejected') {
+        // 静默吞掉会导致「少了一类」无从排查，至少留 console 痕迹
+        console.warn(`[home] 动态源 ${app.code} 拉取失败`, result.reason);
+      }
       next[app.code] =
         result && result.status === 'fulfilled'
           ? { items: result.value.items, page: 1, hasMore: result.value.hasMore }
@@ -154,7 +165,7 @@ export function HomeTabScreen({ navigation }: Props) {
     setLoadingMore(true);
     try {
       const results = await Promise.allSettled(
-        pending.map((app) => fetchAppFeed(app, (current[app.code]?.page ?? 1) + 1)),
+        pending.map((app) => fetchAppFeed(app, (current[app.code]?.page ?? 1) + 1, FEED_PAGE_SIZE)),
       );
       const next: Record<string, FeedSourceState> = { ...sourcesRef.current };
       pending.forEach((app, i) => {
