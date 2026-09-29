@@ -2,10 +2,10 @@
  * 关于软件：应用 logo/名称/版本 + 手动检查更新 + 完整更新日志（app-release 插件公开端点）。
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Pressable, View } from 'react-native';
+import { FlatList, Image, Pressable, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdCard, YdListItem, YdScreen, YdText } from '@/components';
+import { YdCard, YdListItem, YdScreen, YdText, ydAlert } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { APP_LOGO, APP_NAME } from '@/core/branding';
 import { HOST_VERSION } from '@/core/config/env';
@@ -53,7 +53,7 @@ export function AboutScreen(_: Props) {
       setUpdate(info);
       if (!info?.updateAvailable) {
         // 无更新时轻提示；有更新走弹窗
-        Alert.alert('已是最新版本', `${APP_NAME} ${HOST_VERSION} 已是当前站点最新版本。`);
+        ydAlert('已是最新版本', `${APP_NAME} ${HOST_VERSION} 已是当前站点最新版本。`);
       }
     } finally {
       setChecking(false);

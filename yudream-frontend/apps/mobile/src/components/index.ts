@@ -8,3 +8,4 @@ export { YdListItem } from './YdListItem';
 export { YdMark } from './YdMark';
 export { YdScreen } from './YdScreen';
 export { YdText } from './YdText';
+export { YdDialogHost, ydAlert, type YdDialogButton } from './YdDialog';
