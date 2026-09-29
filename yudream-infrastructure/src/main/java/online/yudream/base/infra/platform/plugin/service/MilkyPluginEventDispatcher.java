@@ -118,13 +118,24 @@ public class MilkyPluginEventDispatcher {
             String replyMessageId = replyMessageId(data.get("segments"));
             if (replyMessageId != null) referrer.put("replyMessageId", replyMessageId);
             Parsed command = parseCommand(content);
-            PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
-                    content, null, command == null ? null : command.name(), referrer, event.eventType(), data, connectionId,
-                    event.selfId(), messageSeq);
             MilkyConnection connection = connectionOf(connectionId);
             String scene = firstText(data, "message_scene");
             String groupOpenid = officialGroupOpenid(connection, scene, channelId);
+            // 发送者的站点身份随事件 referrer 下发：插件侧群消息广播可直接显示用户名称/昵称。
             User user = identities.findUserByEvent(connection, scene, userId, groupOpenid).orElse(null);
+            if (user != null) {
+                String username = text(user.getUsername());
+                String nickname = text(user.getNickname());
+                if (username != null && !username.isBlank()) {
+                    referrer.put("senderUsername", username);
+                }
+                if (nickname != null && !nickname.isBlank()) {
+                    referrer.put("senderNickname", nickname);
+                }
+            }
+            PluginEvent pluginEvent = new PluginEvent(String.valueOf(event.time()), event.eventType(), "milky", userId, channelId,
+                    content, null, command == null ? null : command.name(), referrer, event.eventType(), data, connectionId,
+                    event.selfId(), messageSeq);
             try (MessagingIdentityBindScope ignored = MessagingIdentityBindScope.open(
                     new MessagingIdentityBindScope.Context(
                             connection == null ? null : connection.protocolOrDefault(),
