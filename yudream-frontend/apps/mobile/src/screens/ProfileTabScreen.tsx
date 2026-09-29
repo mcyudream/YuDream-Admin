@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, View } from 'react-native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdButton, YdCard, YdListItem, YdScreen, YdText } from '@/components';
+import { YdButton, YdCard, YdListItem, YdScreen, YdText, ydAlert } from '@/components';
 import { useTheme, useThemeController, type ThemeMode } from '@/core/theme/ThemeProvider';
 import { HOST_VERSION } from '@/core/config/env';
 import {
@@ -93,7 +93,7 @@ export function ProfileTabScreen({ navigation }: Props) {
   };
 
   const confirmRemove = (id: string, name: string) => {
-    Alert.alert('移除站点域', `确定移除「${name}」？将清除其登录凭据与本地缓存。`, [
+    ydAlert('移除站点域', `确定移除「${name}」？将清除其登录凭据与本地缓存。`, [
       { text: '取消', style: 'cancel' },
       {
         text: '移除',
@@ -115,14 +115,14 @@ export function ProfileTabScreen({ navigation }: Props) {
     if (!domain) {
       return;
     }
-    Alert.alert('清除缓存', `清除「${domain.name}」的应用下载缓存？首次打开应用将重新下载。`, [
+    ydAlert('清除缓存', `清除「${domain.name}」的应用下载缓存？首次打开应用将重新下载。`, [
       { text: '取消', style: 'cancel' },
       {
         text: '清除',
         style: 'destructive',
         onPress: () => {
           void removeAllForDomain(domain.id).then(() => {
-            Alert.alert('已清除', '应用缓存已清空。');
+            ydAlert('已清除', '应用缓存已清空。');
           });
         },
       },
