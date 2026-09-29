@@ -26,11 +26,7 @@ type Props = CompositeScreenProps<
   NativeStackScreenProps<RootStackParamList>
 >;
 
-type FeedEntry =
-  | { kind: 'content'; key: string; app: ManifestPluginEntry; item: MobileFeedItem }
-  | { kind: 'card'; key: string; app: ManifestPluginEntry; card: MobileFeedCard };
-
-type MobileFeedCard = NonNullable<ManifestPluginEntry['homeCards']>[number];
+type FeedEntry = { key: string; app: ManifestPluginEntry; item: MobileFeedItem };
 
 interface FeedSourceState {
   items: MobileFeedItem[];
@@ -41,9 +37,9 @@ interface FeedSourceState {
 const PAGE_SIZE = 20;
 
 /**
- * 首页（设计稿 home）：问候顶栏 + 轮播图 + 应用注册的内容源信息流（真实内容条目）。
- * 无内容源的应用其主页卡片作为快捷入口排在列表末尾。
- * 下拉刷新重置回第一页；触底自动为仍有余量的应用加载下一页。
+ * 首页（设计稿 home）：问候顶栏 + 轮播图 + 纯动态时间线。
+ * 动态 = 全部内容源（论坛帖子 / 最新活动 / MC 新闻…）合并后按时间倒序，
+ * 不混入任何应用入口；下拉刷新重置回第一页，触底自动为仍有余量的源加载下一页。
  */
 export function HomeTabScreen({ navigation }: Props) {
   const t = useTheme();
@@ -55,7 +51,6 @@ export function HomeTabScreen({ navigation }: Props) {
   const [prefsVersion, setPrefsVersion] = useState(0);
 
   const [sources, setSources] = useState<Record<string, FeedSourceState>>({});
-  const [cardEntries, setCardEntries] = useState<FeedEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const sourcesRef = useRef<Record<string, FeedSourceState>>({});
@@ -84,10 +79,6 @@ export function HomeTabScreen({ navigation }: Props) {
     () => visibleApps.filter((a) => a.homeFeed?.endpoint),
     [visibleApps],
   );
-  const cardOnlyApps = useMemo(
-    () => visibleApps.filter((a) => !a.homeFeed?.endpoint && (a.homeCards?.length ?? 0) > 0),
-    [visibleApps],
-  );
 
   const reloadAll = useCallback(async () => {
     const apps = feedAppsRef.current;
@@ -111,16 +102,6 @@ export function HomeTabScreen({ navigation }: Props) {
     void reloadAll();
   }, [feedKey, reloadAll]);
 
-  // 无内容源的应用：主页卡片作为快捷条目
-  useEffect(() => {
-    const entries: FeedEntry[] = cardOnlyApps.flatMap((app) =>
-      (app.homeCards ?? []).map(
-        (card): FeedEntry => ({ kind: 'card', key: `${app.code}:${card.id}`, app, card }),
-      ),
-    );
-    setCardEntries(entries);
-  }, [cardOnlyApps]);
-
   const banners: DomainBanner[] = domain?.branding?.homeBanners ?? [];
 
   const openBanner = (banner: DomainBanner) => {
@@ -142,14 +123,14 @@ export function HomeTabScreen({ navigation }: Props) {
   const openContent = (app: ManifestPluginEntry, route: string) =>
     navigation.navigate('PluginHost', { code: app.code, title: appDisplayName(app), route });
 
-  const merged: FeedEntry[] = [
-    ...feedApps.flatMap((app) =>
+  // 动态时间线：全部内容源合并后按时间倒序（论坛帖子 / 最新活动 / MC 新闻…）
+  const merged: FeedEntry[] = feedApps
+    .flatMap((app) =>
       (sources[app.code]?.items ?? []).map(
-        (item): FeedEntry => ({ kind: 'content', key: `${app.code}:${item.id}`, app, item }),
+        (item): FeedEntry => ({ key: `${app.code}:${item.id}`, app, item }),
       ),
-    ),
-    ...cardEntries,
-  ];
+    )
+    .sort((a, b) => Number(b.item.createTime ?? 0) - Number(a.item.createTime ?? 0));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -213,7 +194,7 @@ export function HomeTabScreen({ navigation }: Props) {
     <YdScreen padded={false}>
       <FlatList
         data={merged}
-        keyExtractor={(entry) => `${entry.kind}:${entry.key}`}
+        keyExtractor={(entry) => entry.key}
         contentContainerStyle={{
           paddingHorizontal: t.spacing.lg,
           paddingBottom: 96,
@@ -283,75 +264,13 @@ export function HomeTabScreen({ navigation }: Props) {
                 动态
               </YdText>
               <View style={{ flex: 1 }} />
-              <Pressable
-                onPress={() => navigation.navigate('应用')}
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
-                hitSlop={6}
-              >
-                <YdText variant="caption">查看全部</YdText>
-                <Icon name="chevron-forward" size={13} color={t.colors.textTertiary} />
-              </Pressable>
+              <YdText variant="caption">论坛 · 活动 · 新闻</YdText>
             </View>
           </View>
         }
-        renderItem={({ item }) => {
-          if (item.kind === 'content') {
-            return (
-              <FeedItem
-                item={item.item}
-                onPress={() => openContent(item.app, item.item.route)}
-              />
-            );
-          }
-          // 无内容源应用的主页卡片：快捷入口条目
-          return (
-            <Pressable
-              onPress={() =>
-                navigation.navigate('PluginHost', {
-                  code: item.app.code,
-                  title: appDisplayName(item.app),
-                  route: item.card.route,
-                })
-              }
-              android_ripple={{ color: t.colors.fillHover }}
-              style={({ pressed }) => ({
-                borderRadius: t.radii.lg,
-                borderWidth: 1,
-                borderColor: t.colors.borderSubtle,
-                backgroundColor: pressed ? t.colors.fillHover : t.colors.bgSurface,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 10,
-              })}
-            >
-              <View
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: t.radii.md,
-                  backgroundColor: t.colors.fillHover,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Icon name={item.app.icon ?? 'cube-outline'} size={20} color={t.colors.textPrimary} />
-              </View>
-              <View style={{ flex: 1, gap: 1 }}>
-                <YdText numberOfLines={1} style={{ fontWeight: t.typography.weightMedium, fontSize: t.typography.sizeSm + 1 }}>
-                  {item.card.title}
-                </YdText>
-                {item.card.description ? (
-                  <YdText variant="caption" numberOfLines={1}>
-                    {item.card.description}
-                  </YdText>
-                ) : null}
-              </View>
-              <Icon name="chevron-forward" size={15} color={t.colors.textTertiary} />
-            </Pressable>
-          );
-        }}
+        renderItem={({ item }) => (
+          <FeedItem item={item.item} onPress={() => openContent(item.app, item.item.route)} />
+        )}
         ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
         ListEmptyComponent={
           <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.xl }}>
