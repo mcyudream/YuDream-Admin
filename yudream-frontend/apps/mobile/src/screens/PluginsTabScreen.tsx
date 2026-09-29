@@ -66,11 +66,16 @@ export function PluginsTabScreen({ navigation }: Props) {
   }, [refreshLocal]);
 
   const filtered = useMemo(() => {
+    // 管理功能不进应用列表：仅管理卡片的应用走「我的 → 管理应用」；
+    // 无动态源也无用户主页卡片的应用（当前用户视角无任何可用入口）不展示
+    const usable = plugins.filter(
+      (p) => p.homeFeed?.endpoint || (p.homeCards?.length ?? 0) > 0,
+    );
     const kw = keyword.trim().toLowerCase();
     if (!kw) {
-      return plugins;
+      return usable;
     }
-    return plugins.filter(
+    return usable.filter(
       (p) =>
         appDisplayName(p).toLowerCase().includes(kw) ||
         (p.description ?? '').toLowerCase().includes(kw) ||
