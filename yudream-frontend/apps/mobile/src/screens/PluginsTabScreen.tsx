@@ -90,7 +90,7 @@ export function PluginsTabScreen({ navigation }: Props) {
         keyExtractor={(item) => item.code}
         numColumns={2}
         columnWrapperStyle={{ gap: t.spacing.md, paddingHorizontal: t.spacing.lg }}
-        contentContainerStyle={{ gap: t.spacing.md, paddingVertical: t.spacing.md }}
+        contentContainerStyle={{ gap: t.spacing.md, paddingVertical: t.spacing.md, paddingBottom: 96 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.colors.accent} />
         }

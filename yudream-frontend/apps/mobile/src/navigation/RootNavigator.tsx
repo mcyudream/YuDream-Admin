@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { View } from 'react-native';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import type { RootStackParamList } from './types';
 import { SplashScreen } from '@/screens/SplashScreen';
@@ -34,9 +35,12 @@ export function RootNavigator() {
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
-          // 状态栏颜色交 RNS Screen trait 管理（随主题自适应）；直接写 window
-          // 会在屏幕挂载后被 RNS 的默认色回落覆盖（见 SystemBarsModule 注释）
-          statusBarBackgroundColor: t.colors.bgPage,
+          // 标题条与内容页同底色（surface）+ 去阴影，形成通栏内容页观感；
+          // 状态栏底色同步 surface，避免标题条上方出现色差接缝。
+          headerShadowVisible: false,
+          headerTintColor: t.colors.textPrimary,
+          headerStyle: { backgroundColor: t.colors.bgSurface },
+          statusBarBackgroundColor: t.colors.bgSurface,
           statusBarStyle: t.scheme === 'dark' ? 'light' : 'dark',
           statusBarTranslucent: false,
         }}

@@ -265,6 +265,9 @@ catalogs:
     react-native-image-picker:
       specifier: ^8.2.1
       version: 8.2.1
+    react-native-linear-gradient:
+      specifier: ^2.8.3
+      version: 2.8.3
     react-native-paper:
       specifier: ^5.15.3
       version: 5.15.3
@@ -830,6 +833,9 @@ importers:
       react-native-keychain:
         specifier: ^10.0.0
         version: 10.0.0
+      react-native-linear-gradient:
+        specifier: 'catalog:'
+        version: 2.8.3(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       react-native-paper:
         specifier: 'catalog:'
         version: 5.15.3(react-native-safe-area-context@5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
@@ -8373,6 +8379,12 @@ packages:
   react-native-keychain@10.0.0:
     resolution: {integrity: sha512-YzPKSAnSzGEJ12IK6CctNLU79T1W15WDrElRQ+1/FsOazGX9ucFPTQwgYe8Dy8jiSEDJKM4wkVa3g4lD2Z+Pnw==}
     engines: {node: '>=16'}
+
+  react-native-linear-gradient@2.8.3:
+    resolution: {integrity: sha512-KflAXZcEg54PXkLyflaSZQ3PJp4uC4whM7nT/Uot9m0e/qxFV3p6uor1983D1YOBJbJN7rrWdqIjq0T42jOJyA==}
+    peerDependencies:
+      react: '*'
+      react-native: '*'
 
   react-native-paper@5.15.3:
     resolution: {integrity: sha512-GEyNTmWElIZgnYw09AjjCNupRYzCmP79uAAyGSyCEUZz7KBz1wtJcC0wVUkozR1Rn3PK/td/9LlR6+F1hzmYvA==}
@@ -18323,6 +18335,11 @@ snapshots:
       react-native: 0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1)
 
   react-native-keychain@10.0.0: {}
+
+  react-native-linear-gradient@2.8.3(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
+    dependencies:
+      react: 18.3.1
+      react-native: 0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1)
 
   react-native-paper@5.15.3(react-native-safe-area-context@5.1.0(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1))(react-native@0.76.6(@babel/core@7.29.7)(@babel/preset-env@7.29.7(@babel/core@7.29.7))(@react-native-community/cli-server-api@15.0.1)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
     dependencies:
