@@ -9,6 +9,8 @@ import { loadPluginModule } from '@/core/plugins/pluginLoader';
 import { buildAppSdk } from '@/core/plugins/appSdk';
 import { rollback } from '@/core/plugins/bundleCache';
 import { getActiveDomain } from '@/core/domains/store';
+import { getPlugins } from '@/core/plugins/registry';
+import type { ManifestPluginEntry } from '@/core/manifest/types';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PluginHost'>;
@@ -18,10 +20,12 @@ type LoadState =
   | { kind: 'ready'; Component: AppModuleComponent }
   | { kind: 'error'; message: string };
 
-/** 宿主传给应用模块的入参：sdk 注入 + route（应用内路由，主页卡片声明）。 */
+/** 宿主传给应用模块的入参：sdk 注入 + route + manifest 条目（含权限过滤后的卡片）。 */
 export interface AppModuleProps {
   sdk: PluginMobileSdk;
   route?: string;
+  /** 应用在 manifest 中的条目（adminCards 已按当前用户权限过滤）；供应用做能力显隐。 */
+  entry?: ManifestPluginEntry;
 }
 
 type AppModuleComponent = ComponentType<AppModuleProps>;
@@ -36,6 +40,7 @@ type AppModuleComponent = ComponentType<AppModuleProps>;
 export function PluginHostScreen({ route, navigation }: Props) {
   const t = useTheme();
   const { code, route: appRoute } = route.params;
+  const entry = useMemo(() => getPlugins().find((p) => p.code === code), [code]);
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [retryToken, setRetryToken] = useState(0);
 
@@ -138,7 +143,7 @@ export function PluginHostScreen({ route, navigation }: Props) {
   const { Component } = state;
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bgPage }}>
-      <Component sdk={sdk} route={appRoute} />
+      <Component sdk={sdk} route={appRoute} entry={entry} />
     </View>
   );
 }
