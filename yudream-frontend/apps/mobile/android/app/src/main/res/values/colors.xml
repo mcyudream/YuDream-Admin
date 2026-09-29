@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#040646</color>
+    <!-- 系统栏初始底色（DayNight 夜间见 values-night）；运行期由 RNS trait / SystemBars 桥接管 -->
+    <color name="ydam_system_bar">#F2F2F2</color>
 </resources>

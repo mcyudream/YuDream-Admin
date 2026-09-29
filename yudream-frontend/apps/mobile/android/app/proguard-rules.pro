@@ -14,3 +14,6 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# nimbus-jose shaded gson 引用 errorprone 注解，R8 收缩时仅需忽略
+-dontwarn com.google.errorprone.annotations.**

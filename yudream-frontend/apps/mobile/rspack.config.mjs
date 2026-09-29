@@ -15,7 +15,9 @@ export default (env) => {
     mode,
     context: dirname,
     entry: './index.js',
-    devtool: mode === 'development' ? 'source-map' : false,
+    // 生产也产出 sourcemap：gradle 的 hermesc 步骤需要 packager.map 作为输入，
+// 不参与 APK 打包体积，仅留在中间目录。
+devtool: 'source-map',
     resolve: {
       ...Repack.getResolveOptions(),
       alias: {
@@ -45,8 +47,10 @@ export default (env) => {
       : undefined,
     plugins: [
       new Repack.RepackPlugin(),
+      // 字节码交给 gradle 的 hermesEnabled 管线编译；这里再开会导致 hermesc 对着
+      // 已编译产物当 JS 源二次编译（Invalid UTF-8 continuation byte）。
       new Repack.plugins.HermesBytecodePlugin({
-        enabled: mode === 'production',
+        enabled: false,
         test: /\.(js)?bundle$/,
       }),
       // Re.Pack 5.x：MF2 插件包装 @module-federation/enhanced，负责把 remoteEntry
