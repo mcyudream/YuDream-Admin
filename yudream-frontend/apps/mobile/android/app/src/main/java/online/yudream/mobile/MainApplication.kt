@@ -19,6 +19,7 @@ class MainApplication : Application(), ReactApplication {
             override fun getPackages(): List<ReactPackage> =
                 PackageList(this).packages.apply {
                     // 宿主原生桥（推送、下载保活等）后续在这里手动注册，禁止经 autolink。
+                    add(SystemBarsPackage())
                 }
 
             override fun getJSMainModuleName(): String = "index"

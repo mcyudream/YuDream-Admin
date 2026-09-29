@@ -31,7 +31,16 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer theme={navTheme}>
-      <Stack.Navigator initialRouteName="Splash">
+      <Stack.Navigator
+        initialRouteName="Splash"
+        screenOptions={{
+          // 状态栏颜色交 RNS Screen trait 管理（随主题自适应）；直接写 window
+          // 会在屏幕挂载后被 RNS 的默认色回落覆盖（见 SystemBarsModule 注释）
+          statusBarBackgroundColor: t.colors.bgPage,
+          statusBarStyle: t.scheme === 'dark' ? 'light' : 'dark',
+          statusBarTranslucent: false,
+        }}
+      >
         <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
         <Stack.Screen
           name="Welcome"
