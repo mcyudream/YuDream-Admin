@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Animated, Pressable, View } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/core/theme/ThemeProvider';
@@ -49,20 +50,26 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
 
   return (
     <View
+      pointerEvents="box-none"
       style={{
-        paddingHorizontal: 24,
-        paddingBottom: Math.max(insets.bottom, 10) + 6,
-        backgroundColor: 'transparent',
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
       }}
     >
+      {/* 渐变淡出背景：内容从栏下滑入时自然消隐，而非生硬色块 */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[`${t.colors.bgPage}00`, `${t.colors.bgPage}D9`, t.colors.bgPage]}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 120 }}
+      />
       <View
         style={{
           flexDirection: 'row',
-          backgroundColor: t.colors.bgSurface,
-          borderRadius: 23,
-          borderWidth: 1,
-          borderColor: t.colors.borderSubtle,
-          padding: 3,
+          paddingHorizontal: 24,
+          paddingBottom: Math.max(insets.bottom, 10) + 6,
+          backgroundColor: 'transparent',
         }}
       >
         {items.length === state.routes.length ? (
@@ -72,8 +79,8 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
               position: 'absolute',
               top: 3,
               left: 3,
-              height: BAR_HEIGHT - 6,
-              borderRadius: 19,
+              height: BAR_HEIGHT,
+              borderRadius: 22,
               backgroundColor: t.colors.accent,
               transform: [{ translateX: pillX }],
               width: pillW,
@@ -108,8 +115,8 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
               }}
               style={({ pressed }) => ({
                 flex: 1,
-                height: BAR_HEIGHT - 6,
-                borderRadius: 19,
+                height: BAR_HEIGHT,
+                borderRadius: 22,
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexDirection: 'row',

@@ -156,7 +156,7 @@ export function ProfileTabScreen({ navigation }: Props) {
 
   return (
     <YdScreen padded={false}>
-      <ScrollView contentContainerStyle={{ paddingBottom: t.spacing.xl }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
         {/* 渐变头部：柔和光斑 + 头像 + 昵称 + 徽标 + 设置齿轮 */}
         <View style={{ backgroundColor: headerBg, overflow: 'hidden', paddingBottom: 64 }}>
           <View
