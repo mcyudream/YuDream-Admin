@@ -663,12 +663,16 @@ public class OfficialQqBotApiAdapter {
         if (message.keyboard() != null) {
             body.put("keyboard", message.keyboard());
         }
+        // 被动回复优先（额度 5 条/每条收到消息，远宽于主动消息）：
+        // msg_id 新鲜（4 分钟内收到过该会话消息）才附带；过期或缺失走主动消息。
         String msgId = firstNonBlank(text(payload, "msg_id", "message_id", "message_seq"), inbound == null ? null : inbound.msgId());
         String eventId = firstNonBlank(text(payload, "event_id"), inbound == null ? null : inbound.eventId());
-        if (!blank(msgId)) {
+        boolean passive = inbound != null && blank(text(payload, "msg_id", "message_id", "message_seq"))
+                && inbound.fresh(System.currentTimeMillis());
+        if (passive && !blank(msgId)) {
             body.put("msg_id", msgId);
         }
-        if (!blank(eventId)) {
+        if (passive && !blank(eventId)) {
             body.put("event_id", eventId);
         }
         body.put("msg_seq", sessions.nextMessageSeq(context.connectionId(), peerId));
