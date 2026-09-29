@@ -2,8 +2,8 @@
  * 更新公告弹窗：发现新版本时展示更新日志与「立即更新」；
  * 强制更新时不可关闭、不提供「稍后」，不更新不允许使用软件。
  */
-import React from 'react';
-import { Image, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Easing, Image, Linking, Modal, Pressable, ScrollView, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { YdButton, YdText } from '@/components';
 import { useTheme } from '@/core/theme/ThemeProvider';
@@ -17,6 +17,19 @@ interface Props {
 
 export function UpdateDialog({ info, onDismiss }: Props) {
   const t = useTheme();
+  const enter = useRef(new Animated.Value(0)).current;
+
+  // 公告弹窗弹簧入场：轻微上浮 + 缩放，替代生硬的直切
+  useEffect(() => {
+    if (info?.latest) {
+      enter.setValue(0);
+      Animated.parallel([
+        Animated.spring(enter, { toValue: 1, useNativeDriver: true, friction: 7, tension: 160 }),
+        Animated.timing(enter, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+      ]).start();
+    }
+  }, [info?.latest?.id, enter]);
+
   if (!info?.latest) {
     return null;
   }
@@ -30,11 +43,14 @@ export function UpdateDialog({ info, onDismiss }: Props) {
         onPress={() => !forced && onDismiss()}
         style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 28 }}
       >
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
+        <Pressable onPress={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 420 }}>
+        <Animated.View
           style={{
-            width: '100%',
-            maxWidth: 420,
+            opacity: enter,
+            transform: [
+              { translateY: enter.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) },
+              { scale: enter.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+            ],
             borderRadius: t.radii.lg,
             backgroundColor: t.colors.bgSurface,
             borderWidth: 1,
@@ -124,6 +140,7 @@ export function UpdateDialog({ info, onDismiss }: Props) {
               </YdText>
             )}
           </View>
+        </Animated.View>
         </Pressable>
       </Pressable>
     </Modal>

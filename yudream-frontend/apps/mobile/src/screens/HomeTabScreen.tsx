@@ -207,10 +207,9 @@ export function HomeTabScreen({ navigation }: Props) {
       <FlatList
         data={merged}
         keyExtractor={(entry) => entry.key}
+        style={{ backgroundColor: t.colors.bgSurface }}
         contentContainerStyle={{
-          paddingHorizontal: t.spacing.lg,
           paddingBottom: 96,
-          gap: t.spacing.md,
         }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.colors.accent} />
@@ -218,7 +217,7 @@ export function HomeTabScreen({ navigation }: Props) {
         onEndReachedThreshold={0.3}
         onEndReached={() => void loadMore()}
         ListHeaderComponent={
-          <View style={{ gap: t.spacing.md, paddingTop: t.spacing.sm, paddingBottom: 2 }}>
+          <View style={{ paddingHorizontal: 16, gap: 14, paddingTop: t.spacing.sm, paddingBottom: 10 }}>
             {/* 顶栏：问候 + 域标识 + 圆形图标按钮（应用 / 刷新） */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.sm }}>
               <View style={{ flex: 1, gap: 2 }}>
@@ -241,9 +240,7 @@ export function HomeTabScreen({ navigation }: Props) {
                   width: 36,
                   height: 36,
                   borderRadius: 18,
-                  backgroundColor: t.colors.bgSurface,
-                  borderWidth: 1,
-                  borderColor: t.colors.borderSubtle,
+                  backgroundColor: t.colors.fillHover,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -258,9 +255,7 @@ export function HomeTabScreen({ navigation }: Props) {
                   width: 36,
                   height: 36,
                   borderRadius: 18,
-                  backgroundColor: t.colors.bgSurface,
-                  borderWidth: 1,
-                  borderColor: t.colors.borderSubtle,
+                  backgroundColor: t.colors.fillHover,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -268,8 +263,10 @@ export function HomeTabScreen({ navigation }: Props) {
                 <Icon name="refresh" size={17} color={t.colors.textSecondary} />
               </Pressable>
             </View>
-            {/* 轮播图 */}
-            <BannerCarousel banners={banners} onPress={openBanner} />
+            {/* 轮播图：圆角裁切，弱化大图突兀感 */}
+            <View style={{ borderRadius: 16, overflow: 'hidden' }}>
+              <BannerCarousel banners={banners} onPress={openBanner} />
+            </View>
             {/* 动态分节标题 */}
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <YdText style={{ fontSize: t.typography.sizeLg, fontWeight: t.typography.weightBold }}>
@@ -283,7 +280,9 @@ export function HomeTabScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <FeedItem item={item.item} onPress={() => openContent(item.app, item.item.route)} />
         )}
-        ItemSeparatorComponent={() => <View style={{ height: 0 }} />}
+        ItemSeparatorComponent={() => (
+          <View style={{ height: 1, backgroundColor: t.colors.borderSubtle, marginHorizontal: 16, opacity: 0.7 }} />
+        )}
         ListEmptyComponent={
           <YdText variant="secondary" style={{ textAlign: 'center', marginTop: t.spacing.xl }}>
             暂无内容，下拉刷新试试
