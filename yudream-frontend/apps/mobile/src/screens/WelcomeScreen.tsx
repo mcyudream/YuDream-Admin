@@ -55,7 +55,7 @@ export function WelcomeScreen({ navigation }: Props) {
     <YdScreen>
       <View style={{ flex: 1, gap: t.spacing.lg, paddingTop: t.spacing.xl }}>
         <View style={{ gap: 6, paddingHorizontal: 4 }}>
-          <YdText variant="display">{domains.length > 0 ? '选择站点' : 'YuDream'}</YdText>
+          <YdText variant="display">{domains.length > 0 ? '选择站点' : 'YDAM'}</YdText>
           <YdText variant="secondary">
             {domains.length > 0
               ? '点击切换域，随时添加或移除站点'

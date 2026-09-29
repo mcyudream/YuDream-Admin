@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Image, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { YdMark, YdScreen, YdText } from '@/components';
+import { YdScreen, YdText } from '@/components';
+import { APP_LOGO } from '@/core/branding';
 import { useTheme, useThemeController } from '@/core/theme/ThemeProvider';
 import { bootstrap } from '@/app/bootstrap';
 import type { RootStackParamList } from '@/navigation/types';
@@ -46,7 +47,7 @@ export function SplashScreen({ navigation }: Props) {
   return (
     <YdScreen>
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-        <YdMark name="YuDream" size={72} />
+        <Image source={APP_LOGO} style={{ width: 84, height: 84 }} resizeMode="contain" />
         <ActivityIndicator color={t.colors.accent} style={{ marginTop: 8 }} />
         <YdText variant="secondary">{status}</YdText>
       </View>

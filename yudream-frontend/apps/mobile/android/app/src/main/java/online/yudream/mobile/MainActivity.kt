@@ -10,7 +10,7 @@ class MainActivity : ReactActivity() {
     /**
      * 必须与 index.js 中 AppRegistry.registerComponent 的 appName 一致。
      */
-    override fun getMainComponentName(): String = "YuDream"
+    override fun getMainComponentName(): String = "YDAM"
 
     /**
      * Returns the instance of the [ReactActivityDelegate]. We use [DefaultReactActivityDelegate]

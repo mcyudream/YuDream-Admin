@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { YdText } from '@/components';
+import { UpdateDialog } from '@/components/UpdateDialog';
+import { getActiveDomain } from '@/core/domains/store';
+import { checkAppUpdate, type AppUpdateInfo } from '@/core/update/updateService';
 import { HomeTabScreen } from '@/screens/HomeTabScreen';
 import { PluginsTabScreen } from '@/screens/PluginsTabScreen';
 import { ProfileTabScreen } from '@/screens/ProfileTabScreen';
@@ -83,18 +86,40 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
   );
 }
 
-/** 主界面：底部导航（首页 / 应用 / 我的）。 */
+/** 主界面：底部导航（首页 / 应用 / 我的）+ 启动后更新检查公告弹窗（强制更新不可关闭）。 */
 export function MainTabs() {
+  const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
+
+  // 每次进入主界面（登录成功/冷启动恢复会话）检查一次更新；失败静默（插件未装/网络问题均不阻塞）
+  useEffect(() => {
+    let alive = true;
+    const domain = getActiveDomain();
+    if (!domain) {
+      return;
+    }
+    void checkAppUpdate(domain.serverUrl).then((info) => {
+      if (alive && info?.updateAvailable) {
+        setUpdate(info);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   return (
-    <Tabs.Navigator
-      tabBar={(props) => <PillTabBar {...props} />}
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen name="首页" component={HomeTabScreen} />
-      <Tabs.Screen name="应用" component={PluginsTabScreen} />
-      <Tabs.Screen name="我的" component={ProfileTabScreen} />
-    </Tabs.Navigator>
+    <View style={{ flex: 1 }}>
+      <Tabs.Navigator
+        tabBar={(props) => <PillTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
+        <Tabs.Screen name="首页" component={HomeTabScreen} />
+        <Tabs.Screen name="应用" component={PluginsTabScreen} />
+        <Tabs.Screen name="我的" component={ProfileTabScreen} />
+      </Tabs.Navigator>
+      <UpdateDialog info={update} onDismiss={() => setUpdate(null)} />
+    </View>
   );
 }

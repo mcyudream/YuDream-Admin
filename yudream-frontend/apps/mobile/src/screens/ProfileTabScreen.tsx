@@ -129,13 +129,6 @@ export function ProfileTabScreen({ navigation }: Props) {
     ]);
   };
 
-  const about = () => {
-    Alert.alert(
-      '关于',
-      `YuDream Mobile\n宿主版本 ${HOST_VERSION}\n当前域：${active ? hostOf(active.serverUrl) : '未接入'}`,
-    );
-  };
-
   const modes: { key: ThemeMode; label: string }[] = [
     { key: 'system', label: '跟随系统' },
     { key: 'light', label: '浅色' },
@@ -485,9 +478,9 @@ export function ProfileTabScreen({ navigation }: Props) {
                 trailing={<Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />}
               />
               <YdListItem
-                title="关于"
-                subtitle={`宿主版本 ${HOST_VERSION}`}
-                onPress={about}
+                title="关于软件"
+                subtitle={`${HOST_VERSION} · 版本与完整更新日志`}
+                onPress={() => navigation.navigate('About')}
                 trailing={<Icon name="chevron-forward" size={18} color={t.colors.textTertiary} />}
               />
             </View>
@@ -498,7 +491,7 @@ export function ProfileTabScreen({ navigation }: Props) {
         <View style={{ paddingHorizontal: t.spacing.md, marginTop: t.spacing.md }}>
           <YdButton title="退出登录" variant="danger" onPress={doLogout} disabled={!account} />
           <YdText variant="caption" style={{ textAlign: 'center', marginTop: t.spacing.md }}>
-            YuDream Mobile · 宿主版本 {HOST_VERSION}
+            YDAM · 版本 {HOST_VERSION}
           </YdText>
         </View>
       </ScrollView>
