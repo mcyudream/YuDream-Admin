@@ -105,6 +105,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   if (!res.ok) {
+    // 插件/平台错误体是 JSON（{message, code}）：读出真实原因，别让「HTTP 409」淹没可分析性
+    try {
+      const body = (await res.json()) as { message?: string; code?: number };
+      if (body && body.message) {
+        throw new ApiError(body.message, typeof body.code === 'number' ? body.code : res.status, res.status);
+      }
+    } catch (e) {
+      if (e instanceof ApiError) {
+        throw e;
+      }
+      // 响应体不是 JSON → 落回通用文案
+    }
     throw new ApiError(`请求失败（HTTP ${res.status}）`, res.status, res.status);
   }
 
