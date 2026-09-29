@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Pressable, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/core/theme/ThemeProvider';
@@ -21,23 +21,65 @@ const TAB_ITEMS: { name: keyof MainTabParamList; label: string; icon: string }[]
   { name: '我的', label: '我的', icon: 'person' },
 ];
 
-/** 设计稿同款悬浮药丸 tab 栏：surface 胶囊 + 主色激活药丸（图标+文字同色）。 */
+const BAR_HEIGHT = 44;
+
+/**
+ * 悬浮 tab 栏（紧凑版）：surface 胶囊内一枚弹簧滑块在选中项之间滑动，
+ * 图标/文字随之换色——切换有物理感，不再生硬跳变。
+ * 滑块用 RN 内核 Animated（弹簧），避免为单个动效引入 reanimated 工作流
+ * （reanimated 的 worklet 与 Re.Pack SWC/Hermes release 管线冲突会 SEGV）。
+ */
 function PillTabBar({ state, navigation }: BottomTabBarProps) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  // 每个条目的几何（onLayout 回填），滑块据此定位
+  const [items, setItems] = useState<{ x: number; width: number }[]>([]);
+  const pillX = useRef(new Animated.Value(0)).current;
+  const pillW = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const target = items[state.index];
+    if (target) {
+      Animated.parallel([
+        Animated.spring(pillX, { toValue: target.x, useNativeDriver: true, friction: 8, tension: 200 }),
+        Animated.spring(pillW, { toValue: target.width, useNativeDriver: true, friction: 8, tension: 200 }),
+      ]).start();
+    }
+  }, [state.index, items, pillX, pillW]);
 
   return (
-    <View style={{ paddingHorizontal: t.spacing.lg, paddingBottom: Math.max(insets.bottom, 12) + 8, backgroundColor: 'transparent' }}>
+    <View
+      style={{
+        paddingHorizontal: 24,
+        paddingBottom: Math.max(insets.bottom, 10) + 6,
+        backgroundColor: 'transparent',
+      }}
+    >
       <View
         style={{
           flexDirection: 'row',
           backgroundColor: t.colors.bgSurface,
-          borderRadius: 36,
+          borderRadius: 23,
           borderWidth: 1,
           borderColor: t.colors.borderSubtle,
-          padding: 4,
+          padding: 3,
         }}
       >
+        {items.length === state.routes.length ? (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 3,
+              left: 3,
+              height: BAR_HEIGHT - 6,
+              borderRadius: 19,
+              backgroundColor: t.colors.accent,
+              transform: [{ translateX: pillX }],
+              width: pillW,
+            }}
+          />
+        ) : null}
         {state.routes.map((route, index) => {
           const item = TAB_ITEMS[index];
           if (!item) {
@@ -56,22 +98,34 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
               accessibilityRole="tab"
               accessibilityState={{ selected: focused }}
               onPress={onPress}
-              style={{
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                setItems((prev) => {
+                  const next = [...prev];
+                  next[index] = { x, width };
+                  return next;
+                });
+              }}
+              style={({ pressed }) => ({
                 flex: 1,
-                height: 54,
-                borderRadius: 26,
+                height: BAR_HEIGHT - 6,
+                borderRadius: 19,
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexDirection: 'row',
-                gap: 6,
-                backgroundColor: focused ? t.colors.accent : 'transparent',
-              }}
+                gap: 5,
+                opacity: pressed ? 0.75 : 1,
+              })}
             >
-              <Icon name={focused ? item.icon : `${item.icon}-outline`} size={19} color={focused ? t.colors.onAccent : t.colors.textTertiary} />
+              <Icon
+                name={focused ? item.icon : `${item.icon}-outline`}
+                size={17}
+                color={focused ? t.colors.onAccent : t.colors.textTertiary}
+              />
               <YdText
                 numberOfLines={1}
                 style={{
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: focused ? t.typography.weightMedium : t.typography.weightRegular,
                   color: focused ? t.colors.onAccent : t.colors.textTertiary,
                 }}
@@ -113,6 +167,8 @@ export function MainTabs() {
         tabBar={(props) => <PillTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          // 页面切换 200ms 淡入，配合滑块消掉生硬跳变
+          animation: 'fade',
         }}
       >
         <Tabs.Screen name="首页" component={HomeTabScreen} />
