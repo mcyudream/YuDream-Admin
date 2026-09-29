@@ -55,8 +55,8 @@ android {
         applicationId "online.yudream.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 4
-        versionName "0.2.2"
+        versionCode 5
+        versionName "0.2.3"
     }
     signingConfigs {
         debug {
