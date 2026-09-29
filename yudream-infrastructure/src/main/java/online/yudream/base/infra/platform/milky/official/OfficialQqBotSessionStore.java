@@ -216,7 +216,7 @@ public class OfficialQqBotSessionStore implements MessagingBotNameLookup {
             return;
         }
         lastInbound.computeIfAbsent(connectionId, ignored -> new ConcurrentHashMap<>())
-                .put(peerId, new LastInbound(msgId, eventId));
+                .put(peerId, new LastInbound(msgId, eventId, System.currentTimeMillis()));
     }
 
     public LastInbound lastInbound(Long connectionId, String peerId) {
@@ -383,5 +383,10 @@ public class OfficialQqBotSessionStore implements MessagingBotNameLookup {
     public record Friend(String userId, String nickname) { }
     public record Guild(String guildId, String guildName) { }
     public record Member(String userId, String nickname) { }
-    public record LastInbound(String msgId, String eventId) { }
+    public record LastInbound(String msgId, String eventId, long at) {
+        /** msg_id 是否仍在被动回复有效期内的粗判（官方窗口约 5 分钟，留余量取 4 分钟）。 */
+        public boolean fresh(long now) {
+            return at > 0 && now - at <= 4L * 60 * 1000;
+        }
+    }
 }
