@@ -79,6 +79,7 @@ export function HomeTabScreen({ navigation }: Props) {
     () => visibleApps.filter((a) => a.homeFeed?.endpoint),
     [visibleApps],
   );
+  void visibleApps;
 
   const reloadAll = useCallback(async () => {
     const apps = feedAppsRef.current;

@@ -41,6 +41,8 @@ export interface PluginMobileSdk {
   api: {
     /** 已携带鉴权与 401 刷新重试的站内请求。 */
     request<T>(path: string, options?: { method?: string; body?: unknown }): Promise<T>;
+    /** 鉴权下载站内文件到本地并返回本地路径（旧宿主无此能力位时为 undefined，插件需自行回退）。 */
+    download?(path: string, toFile: string): Promise<string>;
   };
   storage: {
     /** 按插件 code 命名空间隔离的键值存储。 */
