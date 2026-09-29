@@ -40,6 +40,23 @@ export function buildAppSdk(
           method: (options?.method?.toUpperCase() ?? 'GET') as 'GET' | 'POST' | 'PUT' | 'DELETE',
           body: options?.body,
         }),
+      // 鉴权文件下载：带 Authorization 头经下载桥落盘，供插件展示站内受保护图片等
+      download: async (path: string, toFile: string) => {
+        const domain = getActiveDomain();
+        if (!domain) {
+          throw new Error('尚未接入任何站点域');
+        }
+        const { loadTokens } = await import('@/core/auth/tokenStore');
+        const pair = await loadTokens(domain.id);
+        const { bridges } = await import('@/bridges');
+        const task = bridges.download.download(
+          `${domain.serverUrl}${path}`,
+          toFile,
+          pair ? { Authorization: pair.accessToken } : {},
+        );
+        await task.promise;
+        return toFile;
+      },
     },
     storage: {
       get: (key) => AsyncStorage.getItem(ns + key),
