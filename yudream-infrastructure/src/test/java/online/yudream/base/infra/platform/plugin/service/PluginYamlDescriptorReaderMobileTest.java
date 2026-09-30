@@ -66,7 +66,7 @@ class PluginYamlDescriptorReaderMobileTest {
                     - push
                 """);
         assertEquals(new PluginMobileSupport(List.of("ios"), "2.3.0", List.of("biometric", "push"),
-                        null, null, null, null, null),
+                        null, null, null, null, null, null),
                 descriptor.mobileSupport());
     }
 
