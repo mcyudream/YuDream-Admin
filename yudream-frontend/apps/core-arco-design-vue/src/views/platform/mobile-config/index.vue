@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { FaAlert, FaButton, FaCard, FaIcon, FaInput, FaPageHeader, FaPageMain, FaSwitch, useFaToast } from '@yudream/components'
+import { FaImageUpload } from '@yudream/components'
 import apiCapability from '@/api/modules/platform-capability'
 import type { CapabilityItem } from '@/api/modules/platform-capability'
+import apiFiles from '@/api/modules/files'
 
 interface BannerDraft {
   imageUrl: string
@@ -17,13 +19,31 @@ const loading = ref(false)
 const saving = ref(false)
 const enabled = ref(false)
 const iosEnabled = ref(false)
-const loginHeroImage = ref('')
+const loginHeroImage = ref<string[]>([])
 const loginHeroBackground = ref('')
 const banners = ref<BannerDraft[]>([])
 /** mobile-app 能力里除本页键之外的其他配置键（保存时原样保留） */
 const extraConfig = ref<Record<string, string>>({})
 
 const bannerCount = computed(() => banners.value.length)
+
+/** 图片直传站点文件接口（公开读，module 标记来源便于治理） */
+async function uploadToSite({ file }: { file: File }) {
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    throw new Error('请选择图片文件')
+  }
+  const form = new FormData()
+  form.append('file', file)
+  form.append('module', 'mobile-config')
+  form.append('publicAccess', 'true')
+  const res = await apiFiles.upload(form)
+  const url = res.data?.url
+  if (!url) {
+    throw new Error('图片上传后未返回访问地址')
+  }
+  return url
+}
 
 async function load() {
   loading.value = true
@@ -38,7 +58,7 @@ async function load() {
     enabled.value = Boolean(item.enabled)
     const config = item.config || {}
     iosEnabled.value = String(config.iosEnabled ?? '').toLowerCase() === 'true'
-    loginHeroImage.value = String(config.loginHeroImage ?? '')
+    loginHeroImage.value = config.loginHeroImage ? [config.loginHeroImage] : []
     loginHeroBackground.value = String(config.loginHeroBackground ?? '')
     try {
       const parsed = JSON.parse(config.homeBanners || '[]')
@@ -98,11 +118,10 @@ async function save() {
   try {
     const config: Record<string, string> = { ...extraConfig.value }
     config.iosEnabled = String(iosEnabled.value)
-    config.loginHeroImage = loginHeroImage.value.trim()
+    config.loginHeroImage = loginHeroImage.value[0]?.trim() ?? ''
     config.loginHeroBackground = loginHeroBackground.value.trim()
     config.homeBanners = cleaned.length ? JSON.stringify(cleaned) : ''
-    const res = await apiCapability.updateConfig(MOBILE_CODE, config)
-    enabled.value = Boolean(res.data?.enabled)
+    await apiCapability.updateConfig(MOBILE_CODE, config)
     toast.success('移动端配置已保存', { description: 'App 重新进入首页/登录页后生效' })
     await load()
   }
@@ -137,14 +156,33 @@ onMounted(load)
             <span class="section-title">登录页品牌</span>
           </template>
           <div class="section-body">
-            <label class="config-field">
-              <span>登录页主视觉图（站点资产路径或完整 URL，留空用内置样式）</span>
-              <FaInput v-model="loginHeroImage" placeholder="/upload/hero.png 或 https://..." />
-            </label>
-            <label class="config-field">
+            <div class="config-field">
+              <span>登录页主视觉图（留空用内置样式）</span>
+              <FaImageUpload
+                v-model="loginHeroImage"
+                :max="1"
+                :width="240"
+                :height="120"
+                :http-request="uploadToSite"
+              />
+            </div>
+            <div class="config-field">
               <span>登录页 hero 底色（CSS 颜色值，留空用主题 accent）</span>
-              <FaInput v-model="loginHeroBackground" placeholder="如 #101728" />
-            </label>
+              <div class="color-row">
+                <input
+                  type="color"
+                  class="color-picker"
+                  :value="loginHeroBackground || '#101728'"
+                  @input="loginHeroBackground = ($event.target as HTMLInputElement).value"
+                >
+                <FaInput
+                  :model-value="loginHeroBackground"
+                  placeholder="如 #101728"
+                  class="flex-1"
+                  @update:model-value="loginHeroBackground = String($event ?? '')"
+                />
+              </div>
+            </div>
           </div>
         </FaCard>
 
@@ -167,10 +205,18 @@ onMounted(load)
                 {{ index + 1 }}
               </div>
               <div class="banner-row__fields">
-                <label class="config-field">
-                  <span>图片地址</span>
-                  <FaInput v-model="banner.imageUrl" placeholder="/upload/banner.png 或完整 URL" />
-                </label>
+                <div class="config-field">
+                  <span>图片（点击上传，App 内 4:3 裁切展示）</span>
+                  <FaImageUpload
+                    :model-value="banner.imageUrl ? [banner.imageUrl] : []"
+                    :max="1"
+                    :width="120"
+                    :height="68"
+                    accept="image/*"
+                    :http-request="uploadToSite"
+                    @update:model-value="(urls: string[]) => (banner.imageUrl = urls[0] ?? '')"
+                  />
+                </div>
                 <label class="config-field">
                   <span>标题（可空，展示在图上）</span>
                   <FaInput v-model="banner.title" placeholder="站点公告：欢迎来到 YuDream" />
@@ -225,7 +271,7 @@ onMounted(load)
 .mobile-config-grid {
   display: grid;
   gap: 16px;
-  max-width: 860px;
+  max-width: 960px;
 }
 
 .section-title {
@@ -252,7 +298,7 @@ onMounted(load)
   align-items: flex-start;
   padding: 12px;
   border: 1px solid var(--color-border-2);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--color-bg-1);
 }
 
@@ -262,7 +308,7 @@ onMounted(load)
   height: 26px;
   flex: none;
   place-items: center;
-  margin-top: 18px;
+  margin-top: 12px;
   border-radius: 13px;
   background: var(--color-fill-2);
   color: var(--color-text-2);
@@ -279,7 +325,7 @@ onMounted(load)
   display: inline-flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 18px;
+  margin-top: 12px;
 }
 
 .switch-row {
@@ -298,7 +344,28 @@ onMounted(load)
 .save-row {
   position: sticky;
   bottom: 0;
+  z-index: 1;
   padding: 10px 0;
   background: var(--color-bg-1);
+}
+
+.color-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.color-picker {
+  width: 44px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--color-border-2);
+  border-radius: 6px;
+  background: var(--color-bg-1);
+  cursor: pointer;
+}
+
+.flex-1 {
+  flex: 1;
 }
 </style>
