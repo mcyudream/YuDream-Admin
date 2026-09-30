@@ -11,7 +11,8 @@ public record PluginDescriptor(
         List<String> dependencies,
         List<String> softDependencies,
         String icon,
-        String gitUrl
+        String gitUrl,
+        PluginMobileSupport mobileSupport
 ) {
     public PluginDescriptor(String code, String name, String version, String description,
                             String mainClass, List<String> dependencies, List<String> softDependencies) {
@@ -21,6 +22,12 @@ public record PluginDescriptor(
     public PluginDescriptor(String code, String name, String version, String description,
                             String mainClass, List<String> dependencies, List<String> softDependencies, String icon) {
         this(code, name, version, description, mainClass, dependencies, softDependencies, icon, null);
+    }
+
+    public PluginDescriptor(String code, String name, String version, String description,
+                            String mainClass, List<String> dependencies, List<String> softDependencies,
+                            String icon, String gitUrl) {
+        this(code, name, version, description, mainClass, dependencies, softDependencies, icon, gitUrl, null);
     }
 
     public PluginDescriptor {

@@ -1,0 +1,96 @@
+import React, { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { TextInput as PaperInput } from 'react-native-paper';
+import { useTheme } from '@/core/theme/ThemeProvider';
+import { YdText } from './YdText';
+
+/**
+ * 统一输入框（react-native-paper TextInput 封装）：
+ * 灰底填充式 + 浮动标签 + 聚焦 accent 描边 + 密码可见切换 + 错误态。
+ * 登录/接入等全部表单都用它，保证观感一致。
+ * 密码可见切换用文本按钮而非矢量图标：图标字体在部分渠道包缺失时会渲染豆腐块。
+ */
+export function YdField({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  secure = false,
+  error,
+  autoCapitalize = 'none',
+  keyboardType = 'default',
+  onSubmitEditing,
+  autoFocus,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  placeholder?: string;
+  secure?: boolean;
+  error?: string | null;
+  autoCapitalize?: 'none' | 'sentences' | 'words';
+  keyboardType?: 'default' | 'url' | 'email-address';
+  onSubmitEditing?: () => void;
+  autoFocus?: boolean;
+}) {
+  const t = useTheme();
+  const [hidden, setHidden] = useState(secure);
+
+  return (
+    <View>
+      <PaperInput
+        mode="flat"
+        label={label}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        secureTextEntry={hidden}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+        keyboardType={keyboardType}
+        onSubmitEditing={onSubmitEditing}
+        autoFocus={autoFocus}
+        error={!!error}
+        underlineColor="transparent"
+        activeUnderlineColor="transparent"
+        theme={{
+          colors: {
+            onSurfaceVariant: t.colors.textTertiary,
+            primary: t.colors.accent,
+            onSurface: t.colors.textPrimary,
+            error: t.colors.danger,
+          },
+          roundness: t.radii.md,
+        }}
+        style={{
+          backgroundColor: t.colors.bgSurface,
+          borderTopLeftRadius: t.radii.md,
+          borderTopRightRadius: t.radii.md,
+          borderWidth: 1,
+          borderColor: error ? t.colors.danger : t.colors.borderSubtle,
+        }}
+        contentStyle={{
+          color: t.colors.textPrimary,
+          fontSize: t.typography.sizeMd,
+          paddingRight: secure ? 52 : 0,
+        }}
+      />
+      {secure ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={hidden ? '显示密码' : '隐藏密码'}
+          onPress={() => setHidden((v) => !v)}
+          hitSlop={10}
+          style={{ position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' }}
+        >
+          <YdText variant="caption">{hidden ? '显示' : '隐藏'}</YdText>
+        </Pressable>
+      ) : null}
+      {error ? (
+        <YdText variant="caption" style={{ color: t.colors.danger, marginTop: 4 }}>
+          {error}
+        </YdText>
+      ) : null}
+    </View>
+  );
+}

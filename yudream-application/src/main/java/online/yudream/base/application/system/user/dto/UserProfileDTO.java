@@ -29,6 +29,8 @@ public class UserProfileDTO implements Serializable {
     private boolean emailVerified;
     private String avatar;
     private Long avatarFileId;
+    /** 是否管理员：判定口径见 UserAppService#hasAdminRole。 */
+    private boolean admin;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     @Builder.Default

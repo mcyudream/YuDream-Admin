@@ -29,6 +29,7 @@ import online.yudream.base.interfaces.system.user.request.UserSwitchRoleRequest;
 import online.yudream.base.interfaces.system.user.request.UserTokenRefreshRequest;
 import online.yudream.base.interfaces.system.user.res.PasskeyAuthenticationOptionsRes;
 import online.yudream.base.interfaces.system.user.res.UserLoginRes;
+import online.yudream.base.interfaces.system.user.res.UserMeRes;
 import online.yudream.base.interfaces.system.user.res.UserContextRes;
 import online.yudream.base.interfaces.system.user.res.UserDeptRes;
 import online.yudream.base.interfaces.system.user.res.UserProfileRes;
@@ -199,6 +200,11 @@ public class UserController {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @GetMapping("/me")
+    public Result<UserMeRes> me() {
+        return Result.ok(UserWebAssembler.toMeRes(userAppService.profile(StpUtil.getLoginIdAsLong())));
     }
 
     @GetMapping("/me/profile")

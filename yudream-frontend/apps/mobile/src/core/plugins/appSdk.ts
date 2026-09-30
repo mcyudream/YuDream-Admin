@@ -1,0 +1,76 @@
+/**
+ * 应用模块 SDK 桥：为插件远程模块构造宿主注入的 PluginMobileSdk。
+ * 主题 token 只读透传；api/storage 按 App code 命名空间隔离。
+ */
+import { Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { PluginMobileSdk } from '@yudream/plugin-sdk-mobile';
+import { request } from '@/core/api/httpClient';
+import { getActiveDomain } from '@/core/domains/store';
+import { PLATFORM, HOST_VERSION } from '@/core/config/env';
+import type { ThemeTokens } from '@/core/theme/tokens';
+
+export interface SdkNavigationController {
+  setTitle: (title: string) => void;
+  setHidden: (hidden: boolean) => void;
+  /** 应用内子页返回：传入接管宿主头部返回键（如 返回应用内上一视图），null 恢复默认退出应用。 */
+  setBackAction: (action: (() => void) | null) => void;
+}
+
+export function buildAppSdk(
+  appCode: string,
+  theme: ThemeTokens,
+  navigation?: SdkNavigationController,
+): PluginMobileSdk {
+  const ns = `app.${appCode}.`;
+  return {
+    theme: theme as unknown as PluginMobileSdk['theme'],
+    platform: PLATFORM,
+    hostVersion: HOST_VERSION,
+    baseUrl: getActiveDomain()?.serverUrl ?? '',
+    navigation: navigation ?? {
+      // 缺省空实现：旧宿主能力位向前兼容（插件侧可选链消费）
+      setTitle: () => undefined,
+      setHidden: () => undefined,
+      setBackAction: () => undefined,
+    },
+    api: {
+      request: <T,>(path: string, options?: { method?: string; body?: unknown }) =>
+        request<T>(path, {
+          method: (options?.method?.toUpperCase() ?? 'GET') as 'GET' | 'POST' | 'PUT' | 'DELETE',
+          body: options?.body,
+        }),
+      // 鉴权文件下载：带 Authorization 头经下载桥落盘，供插件展示站内受保护图片等
+      download: async (path: string, toFile: string) => {
+        const domain = getActiveDomain();
+        if (!domain) {
+          throw new Error('尚未接入任何站点域');
+        }
+        const { loadTokens } = await import('@/core/auth/tokenStore');
+        const pair = await loadTokens(domain.id);
+        const { bridges } = await import('@/bridges');
+        const task = bridges.download.download(
+          `${domain.serverUrl}${path}`,
+          toFile,
+          pair ? { Authorization: pair.accessToken } : {},
+        );
+        await task.promise;
+        return toFile;
+      },
+    },
+    storage: {
+      get: (key) => AsyncStorage.getItem(ns + key),
+      set: (key, value) => AsyncStorage.setItem(ns + key, value),
+      remove: (key) => AsyncStorage.removeItem(ns + key),
+    },
+    sse: {
+      // v1 不做 SSE：能力位预留，后续经 fetch-SSE 桥实现
+      subscribe: () => ({
+        close: () => undefined,
+      }),
+    },
+    deeplink: {
+      open: (url) => Linking.openURL(url),
+    },
+  };
+}

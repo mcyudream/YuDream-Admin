@@ -1,0 +1,12 @@
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- 系统栏初始底色随 DayNight；RNS trait 与 SystemBars 桥在运行期接管 -->
+        <item name="android:statusBarColor">@color/ydam_system_bar</item>
+        <item name="android:navigationBarColor">@color/ydam_system_bar</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+
+</resources>

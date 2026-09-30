@@ -1,7 +1,11 @@
 package online.yudream.base.infra.platform.plugin.mapper;
 
+import online.yudream.base.domain.platform.mobile.enumerate.MobilePlatform;
+import online.yudream.base.domain.platform.mobile.valobj.MobileHomeCard;
 import online.yudream.base.domain.platform.plugin.aggregate.PluginModule;
 import online.yudream.base.infra.platform.plugin.dataobj.PluginModuleDO;
+
+import java.util.List;
 
 public class PluginModuleInfraMapper {
 
@@ -46,6 +50,16 @@ public class PluginModuleInfraMapper {
         dataObj.setMenusInitialized(module.getMenusInitialized());
         dataObj.setThemeScopes(module.getThemeScopes());
         dataObj.setMarketSourceCode(module.getMarketSourceCode());
+        dataObj.setMobilePlatforms(toPlatformTokens(module.getMobilePlatforms()));
+        dataObj.setMobileMinHostVersion(module.getMobileMinHostVersion());
+        dataObj.setMobileRequiredNativeCapabilities(module.getMobileRequiredNativeCapabilities());
+        dataObj.setMobileName(module.getMobileName());
+        dataObj.setMobileDescription(module.getMobileDescription());
+        dataObj.setMobileIcon(module.getMobileIcon());
+        dataObj.setMobileHomeCards(toHomeCardDOs(module.getMobileHomeCards()));
+        dataObj.setMobileAdminCards(toAdminCardDOs(module.getMobileAdminCards()));
+        dataObj.setMobileFeedEndpoint(module.getMobileFeedEndpoint());
+        dataObj.setMobileFeedTitle(module.getMobileFeedTitle());
         dataObj.setVersion(module.getVersion());
         dataObj.setCreateTime(module.getCreateTime());
         dataObj.setUpdateTime(module.getUpdateTime());
@@ -90,9 +104,80 @@ public class PluginModuleInfraMapper {
                 .menusInitialized(dataObj.getMenusInitialized())
                 .themeScopes(dataObj.getThemeScopes())
                 .marketSourceCode(dataObj.getMarketSourceCode())
+                .mobilePlatforms(toPlatforms(dataObj.getMobilePlatforms()))
+                .mobileMinHostVersion(dataObj.getMobileMinHostVersion())
+                .mobileRequiredNativeCapabilities(dataObj.getMobileRequiredNativeCapabilities())
+                .mobileName(dataObj.getMobileName())
+                .mobileDescription(dataObj.getMobileDescription())
+                .mobileIcon(dataObj.getMobileIcon())
+                .mobileHomeCards(toHomeCards(dataObj.getMobileHomeCards()))
+                .mobileAdminCards(toAdminCards(dataObj.getMobileAdminCards()))
+                .mobileFeedEndpoint(dataObj.getMobileFeedEndpoint())
+                .mobileFeedTitle(dataObj.getMobileFeedTitle())
                 .version(dataObj.getVersion())
                 .createTime(dataObj.getCreateTime())
                 .updateTime(dataObj.getUpdateTime())
                 .build();
+    }
+
+    private static List<String> toPlatformTokens(List<MobilePlatform> platforms) {
+        if (platforms == null) {
+            return null;
+        }
+        return platforms.stream().map(MobilePlatform::token).toList();
+    }
+
+    private static List<MobilePlatform> toPlatforms(List<String> tokens) {
+        if (tokens == null) {
+            return null;
+        }
+        return tokens.stream()
+                .filter(token -> token != null && !token.isBlank())
+                .map(MobilePlatform::fromToken)
+                .toList();
+    }
+
+    private static List<PluginModuleDO.MobileHomeCardDO> toHomeCardDOs(List<MobileHomeCard> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new PluginModuleDO.MobileHomeCardDO(
+                        card.id(), card.title(), card.description(), card.icon(), card.route(), card.permission()))
+                .toList();
+    }
+
+    private static List<MobileHomeCard> toHomeCards(List<PluginModuleDO.MobileHomeCardDO> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new MobileHomeCard(
+                        card.getId(), card.getTitle(), card.getDescription(), card.getIcon(), card.getRoute(), card.getPermission()))
+                .toList();
+    }
+
+    private static List<PluginModuleDO.MobileHomeCardDO> toAdminCardDOs(List<online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new PluginModuleDO.MobileHomeCardDO(
+                        card.id(), card.title(), card.description(), card.icon(), card.route(), card.permission()))
+                .toList();
+    }
+
+    private static List<online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard> toAdminCards(List<PluginModuleDO.MobileHomeCardDO> cards) {
+        if (cards == null) {
+            return null;
+        }
+        return cards.stream()
+                .filter(card -> card != null)
+                .map(card -> new online.yudream.base.domain.platform.mobile.valobj.MobileAdminCard(
+                        card.getId(), card.getTitle(), card.getDescription(), card.getIcon(), card.getRoute(), card.getPermission()))
+                .toList();
     }
 }
