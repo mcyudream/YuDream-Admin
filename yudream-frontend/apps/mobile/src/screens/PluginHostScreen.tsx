@@ -44,10 +44,10 @@ export function PluginHostScreen({ route, navigation }: Props) {
   const [state, setState] = useState<LoadState>({ kind: 'loading' });
   const [retryToken, setRetryToken] = useState(0);
 
-  // 导航栏与内容页同底色（surface）+ 无投影：内容页通栏观感，避免标题条灰色断层
+  // 导航栏与内容页同底色（bgPage）+ 无投影：整页通栏无色差（与 RootNavigator screenOptions 对齐）
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerStyle: { backgroundColor: t.colors.bgSurface },
+      headerStyle: { backgroundColor: t.colors.bgPage },
       headerShadowVisible: false,
       headerTintColor: t.colors.textPrimary,
       headerTitleStyle: { fontWeight: t.typography.weightBold, fontSize: t.typography.sizeLg },

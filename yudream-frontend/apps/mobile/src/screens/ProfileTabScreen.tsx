@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { YdButton, YdCard, YdListItem, YdScreen, YdText, ydAlert } from '@/components';
+import { YdButton, YdCard, YdListItem, YdText, ydAlert } from '@/components';
 import { useTheme, useThemeController, type ThemeMode } from '@/core/theme/ThemeProvider';
 import { HOST_VERSION } from '@/core/config/env';
 import {
@@ -153,12 +155,35 @@ export function ProfileTabScreen({ navigation }: Props) {
   const headerBg = t.colors.accent;
   const logoUrl = resolveAssetUrl(active?.serverUrl ?? '', active?.branding?.logo);
   const avatarUrl = account?.avatar ? resolveAssetUrl(active?.serverUrl ?? '', account.avatar) : '';
+  const insets = useSafeAreaInsets();
+
+  // hero 直接顶到状态栏底下（edge-to-edge）：浅色模式 hero 是深色，压栏时需浅色图标。
+  // 走父级原生栈的 RNS statusBarStyle trait（RN <StatusBar> 组件会以 legacy
+  // systemUiVisibility 破坏 edge-to-edge，禁用）；离开本页恢复按主题的默认风格。
+  useFocusEffect(
+    useCallback(() => {
+      const stack = navigation.getParent();
+      if (!stack) {
+        return;
+      }
+      stack.setOptions({
+        statusBarStyle: t.scheme === 'dark' ? 'dark' : 'light',
+      });
+      return () => {
+        stack.setOptions({
+          statusBarStyle: t.scheme === 'dark' ? 'light' : 'dark',
+        });
+      };
+    }, [navigation, t.scheme]),
+  );
 
   return (
-    <YdScreen padded={false}>
+    <View style={{ flex: 1, backgroundColor: t.colors.bgPage }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
-        {/* 渐变头部：柔和光斑 + 头像 + 昵称 + 徽标 + 设置齿轮 */}
-        <View style={{ backgroundColor: headerBg, overflow: 'hidden', paddingBottom: 64 }}>
+        {/* 渐变头部：柔和光斑 + 头像 + 昵称 + 徽标 + 设置齿轮；paddingTop 预留状态栏高度 */}
+        <View
+          style={{ backgroundColor: headerBg, overflow: 'hidden', paddingTop: insets.top, paddingBottom: 64 }}
+        >
           <View
             pointerEvents="none"
             style={{
@@ -495,6 +520,6 @@ export function ProfileTabScreen({ navigation }: Props) {
           </YdText>
         </View>
       </ScrollView>
-    </YdScreen>
+    </View>
   );
 }

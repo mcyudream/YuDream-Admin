@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ydam_system_bar">#0A0A0A</color>
+    <color name="ydam_system_bar">#0A0A0A</color><!-- 底部导航栏底色（= dark bgPage） -->
 </resources>
