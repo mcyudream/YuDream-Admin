@@ -36,14 +36,13 @@ export function RootNavigator() {
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
-          // 状态栏/标题条与页面主体同底色（bgPage）+ 去阴影，整页通栏无色差；
-          // 与 android 主题初始色 ydam_system_bar（bgPage）一致，冷启动也不会闪色带。
+          // edge-to-edge：状态栏常透明，视觉由页面自身底色 + statusBarStyle 决定；
+          // 禁止再设 statusBarBackgroundColor——RNS 会在每次屏幕挂载后回落覆盖透明色。
+          // 标题条与页面同底色（bgPage）+ 去阴影；原生 header 自动按状态栏高度下沉。
           headerShadowVisible: false,
           headerTintColor: t.colors.textPrimary,
           headerStyle: { backgroundColor: t.colors.bgPage },
-          statusBarBackgroundColor: t.colors.bgPage,
           statusBarStyle: t.scheme === 'dark' ? 'light' : 'dark',
-          statusBarTranslucent: false,
         }}
       >
         <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
