@@ -145,6 +145,9 @@ public class PluginWebAssembler {
                 .rollbackAvailable(dto.isRollbackAvailable())
                 .rollbackVersion(dto.getRollbackVersion())
                 .marketSourceCode(dto.getMarketSourceCode())
+                .mobilePlatforms(dto.getMobilePlatforms())
+                .mobileMinHostVersion(dto.getMobileMinHostVersion())
+                .mobileRequiredNativeCapabilities(dto.getMobileRequiredNativeCapabilities())
                 .build();
     }
 

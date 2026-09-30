@@ -52,4 +52,38 @@ public class PluginModuleDO extends BaseDO {
     private Boolean menusInitialized;
     private List<String> themeScopes;
     private String marketSourceCode;
+    /** plugin.yml mobile 块：android/ios 小写 token 列表；未声明移动支持时为 null。 */
+    private List<String> mobilePlatforms;
+    /** plugin.yml mobile 块：宿主最低版本；未声明时为 null。 */
+    private String mobileMinHostVersion;
+    /** plugin.yml mobile 块：要求的原生能力；未声明时为 null。 */
+    private List<String> mobileRequiredNativeCapabilities;
+    /** plugin.yml mobile 块：移动端展示名；未声明时为 null。 */
+    private String mobileName;
+    /** plugin.yml mobile 块：移动端描述；未声明时为 null。 */
+    private String mobileDescription;
+    /** plugin.yml mobile 块：移动端图标（Ionicons 名）；未声明时为 null。 */
+    private String mobileIcon;
+    /** plugin.yml mobile 块：移动端主页卡片声明；未声明时为 null。 */
+    private List<MobileHomeCardDO> mobileHomeCards;
+    /** plugin.yml mobile.admin.cards 管理入口卡声明；未声明时为 null。 */
+    private List<MobileHomeCardDO> mobileAdminCards;
+    /** plugin.yml mobile 块：移动端首页信息流内容源端点；未声明时为 null。 */
+    private String mobileFeedEndpoint;
+    /** plugin.yml mobile 块：信息流分节标题；未声明时为 null。 */
+    private String mobileFeedTitle;
+
+    /** mobile.home.cards[] 的持久化形态。 */
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class MobileHomeCardDO {
+        private String id;
+        private String title;
+        private String description;
+        private String icon;
+        private String route;
+        /** 管理入口卡所需权限码（主页卡片恒为 null）。 */
+        private String permission;
+    }
 }

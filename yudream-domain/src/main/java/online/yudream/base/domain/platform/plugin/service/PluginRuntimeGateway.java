@@ -78,6 +78,19 @@ public interface PluginRuntimeGateway {
 
     Optional<PluginFrontendAssetInfo> frontendAsset(String code, String assetPath);
 
+    /**
+     * 插件移动产物（JAR 内 META-INF/yudream-plugin/frontend-mobile/{code}/ 下的文件）的 SHA-256。
+     * 供移动 manifest 下发 remoteEntry 校验值；产物不存在或运行时不支持时为空。
+     */
+    /** 读取主题插件的前端 style.css 文本（站点主题色提取用）；缺省不可读。 */
+    default Optional<String> siteThemeCss(String themeCode) {
+        return Optional.empty();
+    }
+
+    default Optional<String> mobileAssetSha256(String code, String assetPath) {
+        return Optional.empty();
+    }
+
     PluginHttpDispatchResult dispatch(PluginHttpDispatchRequest request);
 
     /**
