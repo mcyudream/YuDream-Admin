@@ -1,5 +1,7 @@
 package online.yudream.base.application.platform.mobile.service;
 
+import online.yudream.base.application.system.user.service.PermissionAppService;
+
 import online.yudream.base.application.platform.capability.service.CapabilityAppService;
 import online.yudream.base.application.platform.mobile.cmd.MobileDeviceRegisterCmd;
 import online.yudream.base.application.platform.mobile.cmd.MobileDeviceUnregisterCmd;
@@ -55,7 +57,7 @@ class MobileAppServiceTest {
         harness.plugin("disabled-mobile", PluginStatus.DISABLED, List.of("android", "ios"), "2.0.0", List.of());
         harness.plugin("enabled-desktop-only", PluginStatus.ENABLED, null, null, null);
 
-        MobileManifestDTO manifest = harness.service.manifest(query("android", "2.0.0", ""));
+        MobileManifestDTO manifest = harness.service.manifest(query("android", "2.0.0", ""), 1000L);
 
         assertEquals(List.of("enabled-mobile"), manifest.getEntries().stream()
                 .map(entry -> entry.getCode()).toList());
@@ -67,14 +69,14 @@ class MobileAppServiceTest {
         harness.plugin("travel", PluginStatus.ENABLED, List.of("android", "ios"), "2.1.0", List.of("push"));
         harness.plugin("android-only", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of());
 
-        MobileManifestDTO ios = harness.service.manifest(query("ios", "2.1.0", "push"));
+        MobileManifestDTO ios = harness.service.manifest(query("ios", "2.1.0", "push"), 1000L);
         assertEquals(1, ios.getEntries().size());
         var entry = ios.getEntries().get(0);
         assertEquals("travel", entry.getCode());
         assertEquals("1.2.3", entry.getVersion());
         assertEquals("rev-1", entry.getAssetRevision());
         assertEquals("feedc0ffee", entry.getRemoteEntrySha256());
-        assertEquals("/api/platform/plugins/travel/assets/mobile/remoteEntry.js", entry.getRemoteEntryUrl());
+        assertEquals("/api/platform/plugins/travel/assets/mobile/remoteEntry.js?v=1.2.3", entry.getRemoteEntryUrl());
         assertEquals("2.1.0", entry.getMinHostVersion());
         assertEquals(List.of("android", "ios"), entry.getPlatforms());
         assertEquals(List.of("push"), entry.getRequiredNativeCapabilities());
@@ -82,11 +84,11 @@ class MobileAppServiceTest {
         assertNull(entry.getStyleUrl());
 
         // iOS 宿主版本低于插件下限 → 过滤
-        assertTrue(harness.service.manifest(query("ios", "2.0.9", "push")).getEntries().isEmpty());
+        assertTrue(harness.service.manifest(query("ios", "2.0.9", "push"), 1000L).getEntries().isEmpty());
         // iOS 缺少要求的原生能力 → 过滤
-        assertTrue(harness.service.manifest(query("ios", "3.0.0", "")).getEntries().isEmpty());
+        assertTrue(harness.service.manifest(query("ios", "3.0.0", ""), 1000L).getEntries().isEmpty());
         // android 查询（宿主版本满足两家下限）包含 android-only 插件
-        Set<String> androidCodes = harness.service.manifest(query("android", "2.1.0", "push")).getEntries().stream()
+        Set<String> androidCodes = harness.service.manifest(query("android", "2.1.0", "push"), 1000L).getEntries().stream()
                 .map(item -> item.getCode()).collect(java.util.stream.Collectors.toSet());
         assertEquals(Set.of("travel", "android-only"), androidCodes);
     }
@@ -97,12 +99,12 @@ class MobileAppServiceTest {
         MobileTestHarness harness = MobileTestHarness.create(true, iosEnabled(null));
         harness.plugin("travel", PluginStatus.ENABLED, List.of("android", "ios"), "2.1.0", List.of());
 
-        assertTrue(harness.service.manifest(query("ios", "9.9.9", "")).getEntries().isEmpty());
-        assertEquals(1, harness.service.manifest(query("android", "9.9.9", "")).getEntries().size());
+        assertTrue(harness.service.manifest(query("ios", "9.9.9", ""), 1000L).getEntries().isEmpty());
+        assertEquals(1, harness.service.manifest(query("android", "9.9.9", ""), 1000L).getEntries().size());
 
         // 显式关闭同理
         harness.capabilityModules.put(CAPABILITY_CODE, capabilityModule("false"));
-        assertTrue(harness.service.manifest(query("ios", "9.9.9", "")).getEntries().isEmpty());
+        assertTrue(harness.service.manifest(query("ios", "9.9.9", ""), 1000L).getEntries().isEmpty());
     }
 
     @Test
@@ -110,10 +112,10 @@ class MobileAppServiceTest {
         MobileTestHarness harness = MobileTestHarness.create(true, iosEnabled("true"));
         harness.plugin("forum", PluginStatus.ENABLED, List.of("android", "ios"), "2.0.0", List.of(),
                 "论坛", "社区讨论", "chatbubbles-outline",
-                List.of(new MobileHomeCard("latest-posts", "最新帖子", "社区最新动态", "flame-outline", "/posts/latest"),
-                        new MobileHomeCard("hot-posts", "热门帖子", "", "", "/posts/hot")));
+                List.of(new MobileHomeCard("latest-posts", "最新帖子", "社区最新动态", "flame-outline", "/posts/latest", null),
+                        new MobileHomeCard("hot-posts", "热门帖子", "", "", "/posts/hot", null)));
 
-        MobileManifestDTO manifest = harness.service.manifest(query("android", "2.0.0", ""));
+        MobileManifestDTO manifest = harness.service.manifest(query("android", "2.0.0", ""), 1000L);
         var entry = manifest.getEntries().stream()
                 .filter(item -> item.getCode().equals("forum")).findFirst().orElseThrow();
         assertEquals("论坛", entry.getName());
@@ -133,7 +135,7 @@ class MobileAppServiceTest {
 
         // 未声明展示与主页卡片的插件：字段保持 null/空列表，过滤不受影响
         harness.plugin("plain", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of());
-        var plain = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+        var plain = harness.service.manifest(query("android", "2.0.0", ""), 1000L).getEntries().stream()
                 .filter(item -> item.getCode().equals("plain")).findFirst().orElseThrow();
         assertNull(plain.getName());
         assertNull(plain.getDescription());
@@ -150,13 +152,13 @@ class MobileAppServiceTest {
         harness.plugin("wiki", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of(),
                 null, null, null, List.of(), new MobileHomeFeed("/public/mobile-feed", " "));
 
-        var forum = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+        var forum = harness.service.manifest(query("android", "2.0.0", ""), 1000L).getEntries().stream()
                 .filter(item -> item.getCode().equals("forum")).findFirst().orElseThrow();
         assertNotNull(forum.getHomeFeed());
         assertEquals("/public/mobile-feed", forum.getHomeFeed().getEndpoint());
         assertEquals("论坛动态", forum.getHomeFeed().getTitle());
 
-        var wiki = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+        var wiki = harness.service.manifest(query("android", "2.0.0", ""), 1000L).getEntries().stream()
                 .filter(item -> item.getCode().equals("wiki")).findFirst().orElseThrow();
         assertNotNull(wiki.getHomeFeed());
         assertEquals("/public/mobile-feed", wiki.getHomeFeed().getEndpoint());
@@ -164,7 +166,7 @@ class MobileAppServiceTest {
 
         // 未声明 feed 的插件：homeFeed 保持 null，过滤不受影响
         harness.plugin("plain", PluginStatus.ENABLED, List.of("android"), "1.0.0", List.of());
-        var plain = harness.service.manifest(query("android", "2.0.0", "")).getEntries().stream()
+        var plain = harness.service.manifest(query("android", "2.0.0", ""), 1000L).getEntries().stream()
                 .filter(item -> item.getCode().equals("plain")).findFirst().orElseThrow();
         assertNull(plain.getHomeFeed());
     }
@@ -173,14 +175,14 @@ class MobileAppServiceTest {
     void manifestRejectsWhenCapabilityGateClosed() {
         MobileTestHarness harness = MobileTestHarness.create(false, iosEnabled("true"));
         BizException exception = assertThrows(BizException.class,
-                () -> harness.service.manifest(query("android", "2.0.0", "")));
+                () -> harness.service.manifest(query("android", "2.0.0", ""), 1000L));
         assertTrue(exception.getMessage().contains("移动应用"));
     }
 
     @Test
     void manifestFailsOnIllegalPlatform() {
         MobileTestHarness harness = MobileTestHarness.create(true, iosEnabled("true"));
-        assertThrows(BizException.class, () -> harness.service.manifest(query("harmony", "1.0.0", "")));
+        assertThrows(BizException.class, () -> harness.service.manifest(query("harmony", "1.0.0", ""), 1000L));
     }
 
     @Test
@@ -260,8 +262,14 @@ class MobileAppServiceTest {
                     .build());
             StubCapabilityGate gate = new StubCapabilityGate(capabilityEnabled);
             StubPluginRuntimeGateway gateway = new StubPluginRuntimeGateway();
+            var permissionService = new PermissionAppService(null, null, null) {
+                @Override
+                public List<String> getUserPermissions(Long userId) {
+                    return List.of("*");
+                }
+            };
             this.service = new MobileAppService(gate, new StubCapabilityModuleRepo(), new StubPluginModuleRepo(),
-                    gateway, new StubMobileDeviceRepo());
+                    gateway, new StubMobileDeviceRepo(), permissionService);
         }
 
         static MobileTestHarness create(boolean capabilityEnabled, Map<String, String> capabilityConfig) {

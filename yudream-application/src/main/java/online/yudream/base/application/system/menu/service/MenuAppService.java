@@ -55,7 +55,8 @@ public class MenuAppService {
             Map.entry("platform:plugin-publish", "plugin-market-source"),
             Map.entry("platform:plugin-review", "plugin-market-source"),
             Map.entry("platform:ai:generate", "ai"),
-            Map.entry("platform:render:use", "message-render")
+            Map.entry("platform:render:use", "message-render"),
+            Map.entry("platform:mobile-config", "mobile-app")
     );
 
     private final MenuDomainService menuDomainService;

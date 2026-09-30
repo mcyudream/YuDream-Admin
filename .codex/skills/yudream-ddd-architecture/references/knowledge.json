@@ -34,7 +34,7 @@
     },
     {
       "key": "platform-capability-menu-filter",
-      "text": "除 platform:capability 能力管理入口外，平台功能菜单应在对应能力关闭时从 /api/menu/routes 隐藏；能力 Provider 必须保持懒初始化，关闭状态不能连接中间件。"
+      "text": "除 platform:capability 能力管理入口外，平台功能菜单应在对应能力关闭/未注册时从 /api/menu/routes 隐藏：MenuAppService.PLATFORM_MENU_CAPABILITIES 显式映射（命中后能力文档缺失即隐藏）；未映射的 platform:* 菜单按 code 第二段推断能力码，但推断路径在能力文档缺失时放行——因此菜单 code 与能力码不一致时必须显式映射（如 platform:mobile-config → mobile-app）。能力 Provider 必须保持懒初始化，关闭状态不能连接中间件。"
     },
     {
       "key": "plugin-user-ownership-from-session",
