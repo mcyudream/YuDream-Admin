@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { FaAlert, FaButton, FaCard, FaIcon, FaInput, FaPageHeader, FaPageMain, FaSwitch, useFaToast } from '@yudream/components'
 import apiCapability from '@/api/modules/platform-capability'
 import type { CapabilityItem } from '@/api/modules/platform-capability'
