@@ -2,7 +2,7 @@
  * 关于软件：应用 logo/名称/版本 + 手动检查更新 + 完整更新日志（app-release 插件公开端点）。
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { FlatList, Image, Pressable, View } from 'react-native';
+import { FlatList, Image, Pressable, ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { YdCard, YdListItem, YdScreen, YdText, ydAlert } from '@/components';
@@ -14,6 +14,7 @@ import {
   checkAppUpdate,
   fetchChangelogs,
   formatUpdateSize,
+  OFFICIAL_UPDATE_BASE,
   type AppUpdateInfo,
   type ChangelogEntry,
 } from '@/core/update/updateService';
@@ -30,10 +31,7 @@ export function AboutScreen(_: Props) {
 
   useEffect(() => {
     let alive = true;
-    if (!domain) {
-      return;
-    }
-    void fetchChangelogs(domain.serverUrl).then((entries) => {
+    void fetchChangelogs().then((entries) => {
       if (alive) {
         setLogs(entries);
       }
@@ -41,28 +39,36 @@ export function AboutScreen(_: Props) {
     return () => {
       alive = false;
     };
-  }, [domain?.id]);
+  }, []);
 
   const runCheck = useCallback(async () => {
-    if (!domain || checking) {
+    if (checking) {
       return;
     }
     setChecking(true);
     try {
-      const info = await checkAppUpdate(domain.serverUrl);
+      const info = await checkAppUpdate();
       setUpdate(info);
       if (!info?.updateAvailable) {
         // 无更新时轻提示；有更新走弹窗
-        ydAlert('已是最新版本', `${APP_NAME} ${HOST_VERSION} 已是当前站点最新版本。`);
+        ydAlert('已是最新版本', `${APP_NAME} ${HOST_VERSION} 已是官方站点最新版本。`);
       }
     } finally {
       setChecking(false);
     }
-  }, [domain?.id, checking]);
+  }, [checking]);
 
   return (
-    <YdScreen>
-      <View style={{ alignItems: 'center', gap: 6, paddingVertical: t.spacing.xl }}>
+    <YdScreen padded={false}>
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: t.spacing.lg,
+          paddingTop: t.spacing.lg,
+          paddingBottom: t.spacing.xl,
+          gap: t.spacing.md,
+        }}
+      >
+      <View style={{ alignItems: 'center', gap: 6, paddingVertical: t.spacing.xs }}>
         <View
           style={{
             width: 88,
@@ -118,7 +124,7 @@ export function AboutScreen(_: Props) {
         />
         <Pressable onPress={() => void runCheck()} style={{ paddingHorizontal: t.spacing.lg, paddingBottom: t.spacing.sm }}>
           <YdText variant="caption" style={{ color: t.colors.textTertiary }}>
-            {checking ? '正在检查更新…' : '更新包由站点「更新发布」通道分发'}
+            {checking ? '正在检查更新…' : '更新包由官方站点 www.swustmc.cn 分发'}
           </YdText>
         </Pressable>
       </YdCard>
@@ -160,6 +166,7 @@ export function AboutScreen(_: Props) {
       <YdText variant="caption" style={{ textAlign: 'center', marginTop: t.spacing.md }}>
         {APP_NAME} · YuDream Admin 的移动客户端
       </YdText>
+      </ScrollView>
     </YdScreen>
   );
 }

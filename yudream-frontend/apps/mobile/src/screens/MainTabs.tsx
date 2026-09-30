@@ -7,7 +7,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { YdText } from '@/components';
 import { UpdateDialog } from '@/components/UpdateDialog';
-import { getActiveDomain } from '@/core/domains/store';
 import { checkAppUpdate, type AppUpdateInfo } from '@/core/update/updateService';
 import { HomeTabScreen } from '@/screens/HomeTabScreen';
 import { PluginsTabScreen } from '@/screens/PluginsTabScreen';
@@ -151,14 +150,11 @@ function PillTabBar({ state, navigation }: BottomTabBarProps) {
 export function MainTabs() {
   const [update, setUpdate] = useState<AppUpdateInfo | null>(null);
 
-  // 每次进入主界面（登录成功/冷启动恢复会话）检查一次更新；失败静默（插件未装/网络问题均不阻塞）
+  // 每次进入主界面（登录成功/冷启动恢复会话）检查一次更新；失败静默（插件未装/网络问题均不阻塞）。
+  // 更新通道固定官方站点，不随激活域走。
   useEffect(() => {
     let alive = true;
-    const domain = getActiveDomain();
-    if (!domain) {
-      return;
-    }
-    void checkAppUpdate(domain.serverUrl).then((info) => {
+    void checkAppUpdate().then((info) => {
       if (alive && info?.updateAvailable) {
         setUpdate(info);
       }
