@@ -18,6 +18,8 @@ const toast = useFaToast()
 const loading = ref(false)
 const saving = ref(false)
 const enabled = ref(false)
+/** 能力就绪：mobile-app 能力已注册（服务端含该能力的运行时）。未就绪时整页只读。 */
+const capabilityReady = ref(false)
 const iosEnabled = ref(false)
 const loginHeroImage = ref<string[]>([])
 const loginHeroBackground = ref('')
@@ -52,9 +54,11 @@ async function load() {
     const rows: CapabilityItem[] = res.data
     const item = rows.find(row => row.code === MOBILE_CODE)
     if (!item) {
-      toast.error('未找到 mobile-app 能力，请先确认平台能力已注册')
+      capabilityReady.value = false
+      toast.error('未找到 mobile-app 能力：服务端需部署包含该能力的版本并重启', { description: '请更新服务端后刷新本页' })
       return
     }
+    capabilityReady.value = true
     enabled.value = Boolean(item.enabled)
     const config = item.config || {}
     iosEnabled.value = String(config.iosEnabled ?? '').toLowerCase() === 'true'
@@ -146,11 +150,14 @@ onMounted(load)
     </FaPageHeader>
 
     <FaPageMain>
-      <FaAlert v-if="!enabled" type="warning">
+      <FaAlert v-if="!capabilityReady" type="warning">
+        mobile-app 能力未注册：当前服务端未包含该能力（需部署合并后的服务端并重启）。配置编辑已禁用。
+      </FaAlert>
+      <FaAlert v-else-if="!enabled" type="warning">
         mobile-app 能力当前未启用：配置可先编辑保存，但 App 端在能力启用前不会拉取这些内容。
       </FaAlert>
 
-      <div class="mobile-config-grid">
+      <div class="mobile-config-grid" :class="{ 'ar-readonly': !capabilityReady }" :inert="!capabilityReady">
         <FaCard class="section">
           <template #header>
             <span class="section-title">登录页品牌</span>
@@ -257,7 +264,7 @@ onMounted(load)
         </FaCard>
 
         <div class="save-row">
-          <FaButton :loading="saving" @click="save">
+          <FaButton :loading="saving" :disabled="!capabilityReady" @click="save">
             <FaIcon name="i-ri:save-3-line" />
             保存移动端配置
           </FaButton>
@@ -367,5 +374,13 @@ onMounted(load)
 
 .flex-1 {
   flex: 1;
+}
+</style>
+
+<style scoped>
+.ar-readonly {
+  opacity: 0.55;
+  pointer-events: none;
+  user-select: none;
 }
 </style>
