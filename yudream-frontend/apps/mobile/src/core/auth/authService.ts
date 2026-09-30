@@ -14,7 +14,8 @@ import type { ResultEnvelope } from '@/core/api/envelope';
 
 export interface LoginResult {
   token: string;
-  refreshToken: string;
+  /** 单 token 站点（dualTokenEnabled=false）为 null */
+  refreshToken: string | null;
   dualTokenEnabled: boolean;
   expiresIn: number;
   userId: string;

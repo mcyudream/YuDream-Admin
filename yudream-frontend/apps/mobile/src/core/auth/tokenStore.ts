@@ -1,6 +1,8 @@
 /**
  * 双 token 存储（按域隔离）：后端既有双 token 机制（access + refresh）。
  * 敏感值一律走安全存储桥；刷新旋转由 authService 负责。
+ * 兼容单 token 站点（dualTokenEnabled=false，refreshToken 为 null）：跳过存储，
+ * 读取时回落空串——刷新端点会自然失败，会话仍以长效 access token 维持。
  */
 import { bridges } from '@/bridges';
 
@@ -17,15 +19,20 @@ export async function loadTokens(domainId: string): Promise<TokenPair | null> {
     bridges.secureStorage.get(accessKey(domainId)),
     bridges.secureStorage.get(refreshKey(domainId)),
   ]);
-  if (!accessToken || !refreshToken) {
+  if (!accessToken) {
     return null;
   }
-  return { accessToken, refreshToken };
+  return { accessToken, refreshToken: refreshToken ?? '' };
 }
 
-export async function saveTokens(domainId: string, pair: TokenPair): Promise<void> {
+export async function saveTokens(
+  domainId: string,
+  pair: { accessToken: string; refreshToken: string | null },
+): Promise<void> {
   await bridges.secureStorage.set(accessKey(domainId), pair.accessToken);
-  await bridges.secureStorage.set(refreshKey(domainId), pair.refreshToken);
+  if (pair.refreshToken) {
+    await bridges.secureStorage.set(refreshKey(domainId), pair.refreshToken);
+  }
 }
 
 export async function clearTokens(domainId: string): Promise<void> {
