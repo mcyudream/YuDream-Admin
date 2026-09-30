@@ -13,6 +13,8 @@ android/build/
 .cxx/
 android/app/debug.keystore
 *.keystore
+# 正式发布签名必须入库防丢（另备份 D:\docs）
+!yudream-release.keystore
 
 # OS
 .DS_Store
