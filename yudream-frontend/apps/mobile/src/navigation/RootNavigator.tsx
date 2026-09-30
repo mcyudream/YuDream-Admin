@@ -7,6 +7,7 @@ import type { RootStackParamList } from './types';
 import { SplashScreen } from '@/screens/SplashScreen';
 import { WelcomeScreen } from '@/screens/WelcomeScreen';
 import { DomainAddScreen } from '@/screens/DomainAddScreen';
+import { ScanScreen } from '@/screens/ScanScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { MainTabs } from '@/screens/MainTabs';
 import { PluginHostScreen } from '@/screens/PluginHostScreen';
@@ -35,12 +36,12 @@ export function RootNavigator() {
       <Stack.Navigator
         initialRouteName="Splash"
         screenOptions={{
-          // 标题条与内容页同底色（surface）+ 去阴影，形成通栏内容页观感；
-          // 状态栏底色同步 surface，避免标题条上方出现色差接缝。
+          // 状态栏/标题条与页面主体同底色（bgPage）+ 去阴影，整页通栏无色差；
+          // 与 android 主题初始色 ydam_system_bar（bgPage）一致，冷启动也不会闪色带。
           headerShadowVisible: false,
           headerTintColor: t.colors.textPrimary,
-          headerStyle: { backgroundColor: t.colors.bgSurface },
-          statusBarBackgroundColor: t.colors.bgSurface,
+          headerStyle: { backgroundColor: t.colors.bgPage },
+          statusBarBackgroundColor: t.colors.bgPage,
           statusBarStyle: t.scheme === 'dark' ? 'light' : 'dark',
           statusBarTranslucent: false,
         }}
@@ -55,6 +56,11 @@ export function RootNavigator() {
           name="DomainAdd"
           component={DomainAddScreen}
           options={{ headerShown: false, presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="Scan"
+          component={ScanScreen}
+          options={{ headerShown: false, presentation: 'fullScreenModal' }}
         />
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
