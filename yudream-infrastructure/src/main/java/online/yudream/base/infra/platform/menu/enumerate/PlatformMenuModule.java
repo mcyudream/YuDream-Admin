@@ -355,6 +355,15 @@ public enum PlatformMenuModule {
             icon = "i-ri:tools-line", sort = 57, permission = "platform:agent:tool:view")
     AGENT_TOOLS,
 
+    @MenuNode(code = "platform:mobile-config", name = "移动端配置", type = MenuNodeType.MENU,
+            parentName = "APP_HUB", path = "/platform/mobile-config", component = "platform/mobile-config/index.vue",
+            icon = "i-ri:smartphone-line", sort = 56, permission = "platform:mobile-config:view")
+    MOBILE_CONFIG,
+
+    @MenuNode(code = "platform:mobile-config:view", name = "查看移动端配置", type = MenuNodeType.BUTTON,
+            parentName = "MOBILE_CONFIG", permission = "platform:mobile-config:view")
+    MOBILE_CONFIG_VIEW,
+
     @MenuNode(code = "platform:agent:view", name = "查看 Agent 应用", type = MenuNodeType.BUTTON,
             parentName = "AGENT", permission = "platform:agent:view")
     AGENT_VIEW,

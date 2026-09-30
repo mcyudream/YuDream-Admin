@@ -20,6 +20,7 @@ import java.util.Map;
 public class DashboardCardRegistry {
 
     private static final String DATAVIZ_CAPABILITY_CODE = "dataviz";
+    private static final String MOBILE_APP_CAPABILITY_CODE = "mobile-app";
 
     private final PluginRuntimeGateway pluginRuntimeGateway;
     private final CapabilityModuleRepo capabilityModuleRepo;
@@ -138,6 +139,28 @@ public class DashboardCardRegistry {
                 50,
                 false
         ));
+        if (mobileAppEnabled()) {
+            cards.add(new DashboardCardDefinition(
+                    "platform.mobile.pair",
+                    "移动应用配对",
+                    "用 YDAM App 扫码把本站点添加为 App 域，扫码入口与配置在移动端配置页。",
+                    "i-ri:qr-code-line",
+                    "平台",
+                    "SYSTEM",
+                    null,
+                    "platform:mobile-config:view",
+                    "MOBILE_PAIR",
+                    "/platform/mobile-config",
+                    null,
+                    "purple",
+                    4,
+                    3,
+                    3,
+                    2,
+                    45,
+                    false
+            ));
+        }
         if (datavizEnabled()) {
             cards.add(new DashboardCardDefinition(
                     "platform.dataviz.capability-stats",
@@ -221,6 +244,19 @@ public class DashboardCardRegistry {
             ));
         }
         return cards;
+    }
+
+    /** mobile-app 能力注册且启用时才下发「移动应用」扫码配对卡。 */
+    private boolean mobileAppEnabled() {
+        boolean providerAvailable = capabilityProviders.stream()
+                .map(CapabilityProvider::descriptor)
+                .anyMatch(descriptor -> MOBILE_APP_CAPABILITY_CODE.equals(descriptor.code()));
+        if (!providerAvailable) {
+            return false;
+        }
+        return capabilityModuleRepo.findByCode(MOBILE_APP_CAPABILITY_CODE)
+                .map(CapabilityModule::enabled)
+                .orElse(false);
     }
 
     private boolean datavizEnabled() {

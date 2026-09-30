@@ -5,6 +5,7 @@ import { nextTick } from 'vue'
 import apiDashboard from '@/api/modules/system-dashboard'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
+import DashboardMobilePairCard from './dashboard/DashboardMobilePairCard.vue'
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
 import DashboardGuideCard from './dashboard/DashboardGuideCard.vue'
@@ -533,6 +534,8 @@ function resolveCardComponent(card?: DashboardCard) {
       return DashboardMonitorCard
     case 'CAPABILITY_STATS':
       return DashboardCapabilityStatsCard
+    case 'MOBILE_PAIR':
+      return DashboardMobilePairCard
     case 'PLUGIN_STATS':
       return DashboardPluginStatsCard
     case 'DATAVIZ_CAPABILITY_STATS':
@@ -577,6 +580,7 @@ function genericCardProps(card: DashboardCard) {
       }
     case 'CAPABILITY_STATS':
     case 'PLUGIN_STATS':
+    case 'MOBILE_PAIR':
       return base
     case 'ENDPOINT_CARD':
       return {
