@@ -84,7 +84,8 @@ const deeplink: DeeplinkBridge = {
   },
 };
 
-// v1 相机扫描未接入（模拟器亦无摄像头）；接口占位，UI 按 available() 引导手动输入/粘贴。
+// 实时扫码已由 ScanScreen + react-native-vision-camera 承接（导航 merge 回传）；
+// bridge 保留接口占位，供未来无 UI 的全局扫码调用接入。
 const scanner: ScannerBridge = {
   async scan() {
     return null;

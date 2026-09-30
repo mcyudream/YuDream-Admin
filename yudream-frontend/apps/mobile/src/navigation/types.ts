@@ -1,7 +1,10 @@
 export type RootStackParamList = {
   Splash: undefined;
   Welcome: undefined;
-  DomainAdd: undefined;
+  /** 接入站点；scanned 为扫码回传的站点地址（merge 回传） */
+  DomainAdd: { scanned?: string } | undefined;
+  /** 相机扫一扫：解析二维码后 merge 回传给 DomainAdd */
+  Scan: undefined;
   Login: undefined;
   Main: undefined;
   /** 应用容器：route 为应用内路由（home 卡片声明），透传给插件模块 */

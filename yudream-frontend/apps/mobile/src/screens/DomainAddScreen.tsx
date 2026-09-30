@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Clipboard from '@react-native-clipboard/clipboard';
@@ -7,7 +7,6 @@ import { YdButton, YdCard, YdField, YdMark, YdScreen, YdText } from '@/component
 import { useTheme } from '@/core/theme/ThemeProvider';
 import { discoverDomain } from '@/core/domains/discover';
 import { addDomain, normalizeServerUrl, setActiveDomain } from '@/core/domains/store';
-import { bridges } from '@/bridges';
 import type { RootStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'DomainAdd'>;
@@ -16,7 +15,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'DomainAdd'>;
  * 接入站点（设计稿 domainAdd）：扫码卡片（能力位，不可用时引导手动输入）
  * / 粘贴 / 手动输入端点地址 -> 测试连接发现站点 -> 确认接入并进入登录。
  */
-export function DomainAddScreen({ navigation }: Props) {
+export function DomainAddScreen({ navigation, route }: Props) {
   const t = useTheme();
   const [rawUrl, setRawUrl] = useState('');
   const [checking, setChecking] = useState(false);
@@ -28,16 +27,20 @@ export function DomainAddScreen({ navigation }: Props) {
     branding: { logo?: string; loginHeroImage?: string; loginHeroBackground?: string };
   } | null>(null);
 
-  const tryScan = async () => {
-    if (!(await bridges.scanner.available())) {
-      setError('相机扫码将在后续版本提供，可手动输入或粘贴地址');
+  // Scan 屏 merge 回传的扫码结果：填入地址并触发连接测试
+  useEffect(() => {
+    const scanned = route.params?.scanned;
+    if (!scanned) {
       return;
     }
-    const text = await bridges.scanner.scan();
-    if (text) {
-      setRawUrl(normalizeServerUrl(text));
-      setError(null);
-    }
+    setRawUrl(normalizeServerUrl(scanned));
+    setError(null);
+    navigation.setParams({ scanned: undefined });
+  }, [route.params?.scanned, navigation]);
+
+  const tryScan = () => {
+    // 可用性/权限在 Scan 屏内引导：无相机或未授权时该屏自会给出提示与授权按钮
+    navigation.navigate('Scan');
   };
 
   const paste = () => {
