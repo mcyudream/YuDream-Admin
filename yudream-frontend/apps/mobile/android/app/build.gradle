@@ -65,14 +65,20 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // 正式发布签名「余梦 YuDream」；keystore 另备份于 D:\docs，丢失将无法再为已装用户推更新
+            storeFile file('yudream-release.keystore')
+            storePassword 'yd901455'
+            keyAlias 'yudream'
+            keyPassword 'yd901455'
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // 发布版需切换到正式发布签名（见 README「发布」一节）
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
