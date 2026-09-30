@@ -31,7 +31,7 @@ class MobilePluginSupportTest {
     @Test
     void declaredBlockAppliesDocumentedDefaults() {
         MobilePluginSupport support = MobilePluginSupport.declared(List.of(), null, List.of(" "),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertTrue(support.declared());
         assertTrue(support.supports(MobilePlatform.ANDROID));
         assertTrue(support.supports(MobilePlatform.IOS));
@@ -48,7 +48,7 @@ class MobilePluginSupportTest {
     @Test
     void platformFilterMatchesDeclaredPlatformOnly() {
         MobilePluginSupport androidOnly = MobilePluginSupport.declared(List.of(MobilePlatform.ANDROID), null, List.of(),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertTrue(androidOnly.supports(MobilePlatform.ANDROID));
         assertFalse(androidOnly.supports(MobilePlatform.IOS));
         // manifest 过滤：ios 请求在 android-only 插件上被过滤
@@ -60,7 +60,7 @@ class MobilePluginSupportTest {
         // 协议层 iOS 席位：插件声明 android+ios，要求 camera+push；iOS 宿主上报满足版本与能力
         MobilePluginSupport support = MobilePluginSupport.declared(
                 List.of(MobilePlatform.ANDROID, MobilePlatform.IOS), "2.1.0", List.of("camera", "push"),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertTrue(support.availableFor(MobilePlatform.IOS, Set.of("camera", "push", "extra"), "2.1.0"));
         assertTrue(support.availableFor(MobilePlatform.IOS, Set.of("camera", "push"), "3.0.0"));
         // iOS 缺能力 → 过滤
@@ -74,11 +74,11 @@ class MobilePluginSupportTest {
     @Test
     void capabilitySetEmptyFailsOnlyWhenPluginRequiresCapabilities() {
         MobilePluginSupport requiring = MobilePluginSupport.declared(null, null, List.of("biometric"),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertFalse(requiring.satisfiesNativeCapabilities(Set.of()));
         assertFalse(requiring.satisfiesNativeCapabilities(null));
         MobilePluginSupport plain = MobilePluginSupport.declared(null, null, List.of(),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertTrue(plain.satisfiesNativeCapabilities(Set.of()));
         assertTrue(plain.satisfiesNativeCapabilities(null));
     }
@@ -94,18 +94,18 @@ class MobilePluginSupportTest {
     @Test
     void capabilityTokensNormalizeToLowercase() {
         MobilePluginSupport support = MobilePluginSupport.declared(null, null, List.of("Camera", " PUSH "),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertEquals(List.of("camera", "push"), support.normalizedCapabilityTokens());
     }
 
     @Test
     void displayAndHomeCardsPassThroughWithoutAffectingFilter() {
         List<MobileHomeCard> cards = List.of(
-                new MobileHomeCard("latest-posts", "最新帖子", "社区最新动态", "flame-outline", "/posts/latest"),
-                new MobileHomeCard(null, null, null, null, null));
+                new MobileHomeCard("latest-posts", "最新帖子", "社区最新动态", "flame-outline", "/posts/latest", null),
+                new MobileHomeCard(null, null, null, null, null, null));
         MobilePluginSupport support = MobilePluginSupport.declared(
                 List.of(MobilePlatform.ANDROID), "1.2.3", List.of(),
-                "论坛", " 社区讨论 ", "chatbubbles-outline", cards, null);
+                "论坛", " 社区讨论 ", "chatbubbles-outline", cards, null, null);
         assertEquals("论坛", support.name());
         assertEquals("社区讨论", support.description());
         assertEquals("chatbubbles-outline", support.icon());
@@ -122,7 +122,7 @@ class MobilePluginSupportTest {
     void homeFeedPassesThroughWithoutAffectingFilter() {
         MobilePluginSupport support = MobilePluginSupport.declared(
                 List.of(MobilePlatform.ANDROID, MobilePlatform.IOS), null, List.of(),
-                null, null, null, null, new MobileHomeFeed("/public/mobile-feed", "论坛动态"));
+                null, null, null, null, new MobileHomeFeed("/public/mobile-feed", "论坛动态"), null);
         assertEquals("/public/mobile-feed", support.homeFeed().endpoint());
         assertEquals("论坛动态", support.homeFeed().title());
         // 信息流内容源声明不参与 manifest 过滤判定
@@ -131,9 +131,9 @@ class MobilePluginSupportTest {
         // homeFeed 为 null 的声明保持 null，等值比较含 feed 组件
         MobilePluginSupport withoutFeed = MobilePluginSupport.declared(
                 List.of(MobilePlatform.ANDROID), null, List.of(),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         assertNull(withoutFeed.homeFeed());
         assertEquals(MobilePluginSupport.declared(List.of(MobilePlatform.ANDROID), null, List.of(),
-                null, null, null, null, null), withoutFeed);
+                null, null, null, null, null, null), withoutFeed);
     }
 }
