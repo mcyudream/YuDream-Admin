@@ -1,8 +1,35 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import * as Repack from '@callstack/repack';
 import { rspack } from '@rspack/core';
 
 const dirname = Repack.getDirname(import.meta.url);
+
+// .env（可选）：YDAM_OFFICIAL_UPDATE_BASE 指定官方更新源站点，默认 www.swustmc.cn。
+// 简单 KEY=VALUE 解析即够，不引入 dotenv 依赖。
+function loadEnvFile() {
+  try {
+    const raw = fs.readFileSync(path.join(dirname, '.env'), 'utf8');
+    const map = {};
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) {
+        continue;
+      }
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0) {
+        continue;
+      }
+      map[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+const envFile = loadEnvFile();
+const officialUpdateBase = envFile.YDAM_OFFICIAL_UPDATE_BASE ?? 'https://www.swustmc.cn';
 
 export default (env) => {
   const {
@@ -74,6 +101,7 @@ devtool: 'source-map',
       }),
       new rspack.DefinePlugin({
         __PLATFORM__: JSON.stringify(platform),
+        __YDAM_OFFICIAL_UPDATE_BASE__: JSON.stringify(officialUpdateBase),
       }),
     ].filter(Boolean),
   };

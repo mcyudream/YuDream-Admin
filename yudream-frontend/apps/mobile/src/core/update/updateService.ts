@@ -1,8 +1,11 @@
 /**
  * App 更新检查：对接 app-release 插件的匿名公开端点。
+ * 更新通道固定官方站点（不随激活域走）：任何域的 App 都从官方源检查与下载更新。
  * 版本线（versionCode）与 android/app/build.gradle 的 versionCode 手工同步。
  */
-import { HOST_VERSION_CODE } from '@/core/config/env';
+import { HOST_VERSION_CODE, OFFICIAL_UPDATE_BASE } from '@/core/config/env';
+
+export { OFFICIAL_UPDATE_BASE };
 
 export interface AppUpdateLatest {
   id: string;
@@ -30,7 +33,7 @@ export interface AppUpdateInfo extends AppUpdateCheck {
  * 检查更新。插件未装/未启用/网络失败一律返回 null（视作无需更新），
  * 保证更新通道故障不会阻塞 App 正常使用。
  */
-export async function checkAppUpdate(serverUrl: string): Promise<AppUpdateInfo | null> {
+export async function checkAppUpdate(serverUrl: string = OFFICIAL_UPDATE_BASE): Promise<AppUpdateInfo | null> {
   try {
     const res = await fetch(
       `${serverUrl}/api/plugins/app-release/public/check?platform=android&versionCode=${HOST_VERSION_CODE}`,
@@ -64,7 +67,7 @@ export interface ChangelogEntry {
 }
 
 /** 完整更新日志（已发布版本，新到旧）。 */
-export async function fetchChangelogs(serverUrl: string): Promise<ChangelogEntry[]> {
+export async function fetchChangelogs(serverUrl: string = OFFICIAL_UPDATE_BASE): Promise<ChangelogEntry[]> {
   try {
     const res = await fetch(`${serverUrl}/api/plugins/app-release/public/changelogs?platform=android`);
     if (!res.ok) {
