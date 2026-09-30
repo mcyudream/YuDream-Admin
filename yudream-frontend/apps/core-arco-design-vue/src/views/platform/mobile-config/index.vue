@@ -29,6 +29,9 @@ const extraConfig = ref<Record<string, string>>({})
 
 const bannerCount = computed(() => banners.value.length)
 
+/** 可编辑 = 能力已注册且已启用；未注册或已停用都整页只读 */
+const editable = computed(() => capabilityReady.value && enabled.value)
+
 /** 图片直传站点文件接口（公开读，module 标记来源便于治理） */
 async function uploadToSite({ file }: { file: File }) {
   if (!file.type.startsWith('image/')) {
@@ -154,10 +157,11 @@ onMounted(load)
         mobile-app 能力未注册：当前服务端未包含该能力（需部署合并后的服务端并重启）。配置编辑已禁用。
       </FaAlert>
       <FaAlert v-else-if="!enabled" type="warning">
-        mobile-app 能力当前未启用：配置可先编辑保存，但 App 端在能力启用前不会拉取这些内容。
+        mobile-app 能力已停用：移动端清单、设备注册与推送通道已全部关闭（App 端接口返回「能力未启用」）。
+        如需修改配置，请先到「平台 → 能力管理」启用 mobile-app。
       </FaAlert>
 
-      <div class="mobile-config-grid" :class="{ 'ar-readonly': !capabilityReady }" :inert="!capabilityReady">
+      <div class="mobile-config-grid" :class="{ 'ar-readonly': !editable }" :inert="!editable">
         <FaCard class="section">
           <template #header>
             <span class="section-title">登录页品牌</span>
@@ -264,7 +268,7 @@ onMounted(load)
         </FaCard>
 
         <div class="save-row">
-          <FaButton :loading="saving" :disabled="!capabilityReady" @click="save">
+          <FaButton :loading="saving" :disabled="!editable" @click="save">
             <FaIcon name="i-ri:save-3-line" />
             保存移动端配置
           </FaButton>
