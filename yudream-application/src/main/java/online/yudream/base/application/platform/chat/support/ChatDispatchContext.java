@@ -6,7 +6,13 @@ import online.yudream.base.domain.platform.chat.valobj.ChatActivity;
 import java.util.List;
 import java.util.function.Consumer;
 
+/**
+ * 聊天调度上下文。sessionId 为平台会话 ID 字符串（有状态 Harness 运行的寻址键）；
+ * 一次性运行（streamOnce）为 null，此时 history 由调用方显式提供。
+ */
 public record ChatDispatchContext(
+        Long userId,
+        String sessionId,
         String question,
         String providerCode,
         String modelCode,
@@ -21,6 +27,8 @@ public record ChatDispatchContext(
         Consumer<ChatActivity> onActivity
 ) {
     public ChatDispatchContext(
+            Long userId,
+            String sessionId,
             String question,
             String providerCode,
             String modelCode,
@@ -33,7 +41,7 @@ public record ChatDispatchContext(
             Consumer<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> onTool,
             Consumer<ChatActivity> onActivity
     ) {
-        this(question, providerCode, modelCode, agentCode, spaceSlug, attachments, history, permissionCodes,
-                onDelta, ignored -> { }, onTool, onActivity);
+        this(userId, sessionId, question, providerCode, modelCode, agentCode, spaceSlug, attachments, history,
+                permissionCodes, onDelta, ignored -> { }, onTool, onActivity);
     }
 }

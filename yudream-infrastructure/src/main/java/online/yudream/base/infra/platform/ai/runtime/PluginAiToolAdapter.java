@@ -78,6 +78,13 @@ public class PluginAiToolAdapter extends ToolBase {
             var value = delegate.execute(context, new PluginAiToolCall(descriptor.name(), inputOf(param)));
             var result = new online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult(
                     descriptor.name(), value.action(), context.traceId(), value.message(), value.payload());
+            io.agentscope.core.agent.RuntimeContext runtimeContext = param.getRuntimeContext();
+            if (runtimeContext != null) {
+                HarnessToolCollector collector = runtimeContext.get(HarnessToolCollector.class);
+                if (collector != null) {
+                    collector.record(result);
+                }
+            }
             return Mono.just(result(param, ToolResultState.SUCCESS, ToolSchemas.resultJson(result)));
         } catch (Exception e) {
             log.debug("plugin AI tool execution failed: tool={}", descriptor.name(), e);

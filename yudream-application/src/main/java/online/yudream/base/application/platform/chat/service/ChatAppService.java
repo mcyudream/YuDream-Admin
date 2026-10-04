@@ -80,6 +80,8 @@ public class ChatAppService {
         ChatMessage assistantMessage = persistAssistantMessage(session, userId);
         try {
             ChatDispatchContext context = new ChatDispatchContext(
+                    userId,
+                    String.valueOf(session.getId()),
                     effectiveQuestion(cmd) + wikiContext.prompt(),
                     cmd.getProviderCode(),
                     cmd.getModelCode(),
@@ -166,6 +168,8 @@ public class ChatAppService {
         ChatScopeType scopeType = cmd.getScopeType() == null ? ChatScopeType.GENERAL : cmd.getScopeType();
         ChatRunState runState = new ChatRunState();
         ChatDispatchContext context = new ChatDispatchContext(
+                userId,
+                null,
                 effectiveQuestion(cmd) + wikiContext.prompt(),
                 cmd.getProviderCode(),
                 cmd.getModelCode(),
