@@ -91,12 +91,24 @@ public class AgentToolAdapter extends ToolBase {
         }
         try {
             AiAgentToolResult result = delegate.execute(new AiAgentToolCall(descriptor.name(), inputOf(param)));
+            recordIfPresent(param, result);
             return Mono.just(result(param, ToolResultState.SUCCESS, ToolSchemas.resultJson(result)));
         } catch (BizException e) {
             return Mono.just(result(param, ToolResultState.ERROR, e.getMessage()));
         } catch (Exception e) {
             log.debug("AI tool execution failed: tool={}", descriptor.name(), e);
             return Mono.just(result(param, ToolResultState.ERROR, "工具执行失败：" + e.getMessage()));
+        }
+    }
+
+    private void recordIfPresent(ToolCallParam param, AiAgentToolResult result) {
+        RuntimeContext runtimeContext = param.getRuntimeContext();
+        if (runtimeContext == null) {
+            return;
+        }
+        HarnessToolCollector collector = runtimeContext.get(HarnessToolCollector.class);
+        if (collector != null) {
+            collector.record(result);
         }
     }
 
