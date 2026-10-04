@@ -76,6 +76,7 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
     private final MongoBaseStore baseStore;
     private final AgentPermissionGateway permissionGateway;
     private final ObjectProvider<AiAgentTool> aiAgentToolProvider;
+    private final MongoAgentSkillRepository skillRepository;
     private AgentToolExecutionGuard toolExecutionGuard = AgentToolExecutionGuard.ALLOW_ALL;
     private final Map<String, HarnessAgent> agents = new ConcurrentHashMap<>();
     private volatile AgentToolCatalog toolkitCatalog = AgentToolCatalog.disabled();
@@ -94,7 +95,8 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
             MongoAgentStateStore stateStore,
             MongoBaseStore baseStore,
             AgentPermissionGateway permissionGateway,
-            ObjectProvider<AiAgentTool> aiAgentToolProvider
+            ObjectProvider<AiAgentTool> aiAgentToolProvider,
+            MongoAgentSkillRepository skillRepository
     ) {
         this.models = models;
         this.providerConfigParser = providerConfigParser;
@@ -105,6 +107,7 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         this.baseStore = baseStore;
         this.permissionGateway = permissionGateway;
         this.aiAgentToolProvider = aiAgentToolProvider;
+        this.skillRepository = skillRepository;
     }
 
     @Override
@@ -175,6 +178,8 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         if (!properties.isMemoryHooksEnabled()) {
             builder.disableMemoryHooks();
         }
+        // 平台技能库（MongoDB）作为框架级统一技能源；workspace/<user>/skills 仍可按用户覆盖。
+        builder.skillRepository(skillRepository);
         if (properties.isSystemToolsEnabled()) {
             ToolkitHolder toolkit = toolkit();
             builder.toolkit(toolkit.toolkit());

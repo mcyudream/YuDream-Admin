@@ -39,4 +39,34 @@ public final class AgentInfraMapper {
                 .name(value.getName()).code(value.getCode()).description(value.getDescription()).type(value.getType()).inputSchemaJson(value.getInputSchemaJson())
                 .outputExampleJson(value.getOutputExampleJson()).pythonCode(value.getPythonCode()).timeoutMillis(value.getTimeoutMillis()).permissionCode(value.getPermissionCode()).enabled(value.getEnabled()).build();
     }
+
+    public static online.yudream.base.infra.platform.agent.dataobj.AgentSkillDO toDataObj(online.yudream.base.domain.platform.agent.aggregate.AgentSkill value) {
+        if (value == null) return null;
+        online.yudream.base.infra.platform.agent.dataobj.AgentSkillDO data = new online.yudream.base.infra.platform.agent.dataobj.AgentSkillDO();
+        data.setId(value.getId()); data.setVersion(value.getVersion()); data.setCreateTime(value.getCreateTime()); data.setUpdateTime(value.getUpdateTime());
+        data.setName(value.getName()); data.setDescription(value.getDescription()); data.setContent(value.getContent());
+        data.setResourcesJson(online.yudream.base.infra.platform.ai.runtime.ToolSchemas.resultJson(value.getResources()));
+        data.setEnabled(Boolean.TRUE.equals(value.getEnabled())); data.setBuiltin(Boolean.TRUE.equals(value.getBuiltin()));
+        return data;
+    }
+
+    public static online.yudream.base.domain.platform.agent.aggregate.AgentSkill toDomain(online.yudream.base.infra.platform.agent.dataobj.AgentSkillDO value) {
+        if (value == null) return null;
+        return online.yudream.base.domain.platform.agent.aggregate.AgentSkill.builder().id(value.getId()).version(value.getVersion())
+                .createTime(value.getCreateTime()).updateTime(value.getUpdateTime())
+                .name(value.getName()).description(value.getDescription()).content(value.getContent())
+                .resources(parseResources(value.getResourcesJson())).enabled(value.isEnabled()).builtin(value.isBuiltin()).build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.Map<String, String> parseResources(String resourcesJson) {
+        if (resourcesJson == null || resourcesJson.isBlank()) {
+            return java.util.Map.of();
+        }
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(resourcesJson, java.util.Map.class);
+        } catch (Exception e) {
+            return java.util.Map.of();
+        }
+    }
 }
