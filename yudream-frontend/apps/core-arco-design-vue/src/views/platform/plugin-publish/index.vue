@@ -336,7 +336,7 @@ const uploadHint = computed(() => {
         管理你发布到本机市场源的插件：上传新版本、编辑分类标签，或通过 API Key 走流水线发布。
       </template>
       <FaButton v-auth="'platform:plugin-market-source:upload'" @click="openUpload()">
-        <FaIcon name="i-ri:upload-2-line" />
+        <FaIcon name="morph:upload" />
         上传插件
       </FaButton>
     </FaPageHeader>
@@ -364,7 +364,7 @@ const uploadHint = computed(() => {
             <code class="min-w-0 break-all text-xs">{{ publicV2Url }}</code>
             <FaButton variant="link" size="sm" @click="copyPublicUrl">复制 v2 基址</FaButton>
             <FaButton variant="outline" size="sm" @click="openCiTemplates">
-              <FaIcon name="i-ri:code-s-slash-line" />
+              <FaIcon name="morph:code" />
               查看 CI 模板
             </FaButton>
           </div>
@@ -464,7 +464,7 @@ const uploadHint = computed(() => {
             <input ref="fileInput" type="file" accept=".jar" class="hidden" @change="onUploadFileChange">
             <div class="flex items-center gap-2">
               <FaButton variant="outline" @click="fileInput?.click()">
-                <FaIcon name="i-ri:file-add-line" />
+                <FaIcon name="morph:file-plus" />
                 选择文件
               </FaButton>
               <span class="min-w-0 break-all text-sm text-secondary-foreground/60">{{ uploadFile?.name || '未选择' }}</span>
@@ -547,7 +547,7 @@ const uploadHint = computed(() => {
             <code class="min-w-0 break-all text-xs">YUDREAM_MARKET_URL={{ marketOrigin }}</code>
             <FaButton variant="link" size="sm" @click="copyMarketOrigin">复制变量值</FaButton>
             <FaButton variant="outline" size="sm" @click="copyCurrentCiTemplate">
-              <FaIcon name="i-ri:file-copy-line" />
+              <FaIcon name="morph:copy" />
               复制当前文件
             </FaButton>
             <FaButton variant="outline" size="sm" @click="copyAllCiTemplates">复制全部文件</FaButton>

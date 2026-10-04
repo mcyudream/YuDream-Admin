@@ -52,17 +52,17 @@ function choose() {
       <div class="browser__bar">
         <FaTooltip text="返回盘符列表" side="bottom">
           <FaButton variant="outline" size="icon" :disabled="loading" @click="navigate('')">
-            <FaIcon name="i-ri:computer-line" />
+            <FaIcon name="morph:monitor" />
           </FaButton>
         </FaTooltip>
         <FaTooltip text="上一级" side="bottom">
           <FaButton variant="outline" size="icon" :disabled="loading || !browse?.parent" @click="browse?.parent && navigate(browse.parent)">
-            <FaIcon name="i-ri:arrow-up-line" />
+            <FaIcon name="morph:arrow-up" />
           </FaButton>
         </FaTooltip>
         <FaInput v-model="pathInput" class="flex-1" placeholder="粘贴宿主机绝对路径后回车" @keydown.enter="go" />
         <FaButton variant="outline" size="icon" :loading="loading" title="刷新" @click="go">
-          <FaIcon name="i-ri:refresh-line" />
+          <FaIcon name="morph:refresh-cw" />
         </FaButton>
       </div>
 
@@ -74,7 +74,7 @@ function choose() {
           class="browser-entry"
           @click="navigate(entry.path)"
         >
-          <FaIcon :name="browse?.rootList ? 'i-ri:hard-drive-3-line' : 'i-ri:folder-3-line'" class="browser-entry__icon" />
+          <FaIcon :name="browse?.rootList ? 'morph:hard-drive' : 'morph:folder'" class="browser-entry__icon" />
           <span class="browser-entry__name">{{ entry.name }}</span>
           <FaTag v-if="entry.hasPluginYml" class="text-xs">
             插件模块{{ entry.inferredCode ? ` · ${entry.inferredCode}` : '' }}

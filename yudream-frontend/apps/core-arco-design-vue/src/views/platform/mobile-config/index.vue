@@ -202,7 +202,7 @@ onMounted(load)
             <div class="section-title-row">
               <span class="section-title">首页轮播图（{{ bannerCount }}）</span>
               <FaButton size="sm" @click="addBanner">
-                <FaIcon name="i-ri:add-line" />
+                <FaIcon name="morph:plus" />
                 添加轮播
               </FaButton>
             </div>
@@ -239,13 +239,13 @@ onMounted(load)
               </div>
               <div class="banner-row__ops">
                 <FaButton size="sm" variant="ghost" :disabled="index === 0" title="上移" @click="moveBanner(index, -1)">
-                  <FaIcon name="i-ri:arrow-up-line" />
+                  <FaIcon name="morph:arrow-up" />
                 </FaButton>
                 <FaButton size="sm" variant="ghost" :disabled="index === banners.length - 1" title="下移" @click="moveBanner(index, 1)">
-                  <FaIcon name="i-ri:arrow-down-line" />
+                  <FaIcon name="morph:arrow-down" />
                 </FaButton>
                 <FaButton size="sm" variant="ghost" title="删除" @click="removeBanner(index)">
-                  <FaIcon name="i-ri:delete-bin-line" />
+                  <FaIcon name="morph:trash-2" />
                 </FaButton>
               </div>
             </div>
@@ -269,7 +269,7 @@ onMounted(load)
 
         <div class="save-row">
           <FaButton :loading="saving" :disabled="!editable" @click="save">
-            <FaIcon name="i-ri:save-3-line" />
+            <FaIcon name="morph:save" />
             保存移动端配置
           </FaButton>
         </div>

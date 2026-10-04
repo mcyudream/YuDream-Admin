@@ -10,7 +10,7 @@ const routes: RouteRecordRaw = {
   name: 'multilevelMenuExample',
   meta: {
     title: '多级导航',
-    icon: 'i-heroicons-solid:menu-alt-3',
+    icon: 'morph:menu',
   },
   children: [
     {

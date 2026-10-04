@@ -47,23 +47,23 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
         :fallback="displayName.slice(0, 2)"
         class="dashboard-profile__avatar"
       >
-        <FaIcon name="i-ri:user-smile-line" />
+        <FaIcon name="morph:circle-user-round" />
       </FaAvatar>
     </div>
 
     <div class="dashboard-profile__chips">
       <span>
-        <FaIcon name="i-ri:shield-user-line" />
+        <FaIcon name="morph:shield-user" />
         {{ role || '未选择角色' }}
       </span>
       <span>
-        <FaIcon name="i-ri:building-4-line" />
+        <FaIcon name="morph:building" />
         {{ dept || '未选择部门' }}
       </span>
     </div>
 
     <div v-if="impersonating" class="dashboard-profile__impersonate">
-      <FaIcon name="i-ri:spy-line" />
+      <FaIcon name="morph:venetian-mask" />
       正在以 {{ impersonatorAccount }} 发起伪装访问
     </div>
   </div>

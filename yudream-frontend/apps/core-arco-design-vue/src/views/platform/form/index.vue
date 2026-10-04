@@ -187,7 +187,7 @@ function dateText(value?: string) {
   <div>
     <FaPageHeader title="动态表单" class="mb-0">
       <FaButton v-auth="'platform:form:edit'" @click="openCreate">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
         新建表单
       </FaButton>
     </FaPageHeader>
@@ -212,7 +212,7 @@ function dateText(value?: string) {
               <div class="flex gap-2 md:justify-end">
                 <FaButton variant="outline" @click="resetSearch">重置</FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>

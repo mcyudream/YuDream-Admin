@@ -87,7 +87,7 @@ function contextMenuItems(routeItem: TabbarRecordRaw) {
     [
       {
         label: '关闭标签页',
-        icon: 'i-ri:close-line',
+        icon: 'morph:x',
         disabled: !tabbar.checkClose(routeItem.tabId),
         handle: () => tabbar.closeById(routeItem.tabId),
       },
@@ -95,7 +95,7 @@ function contextMenuItems(routeItem: TabbarRecordRaw) {
     [
       {
         label: '关闭其它标签页',
-        icon: 'i-mdi:close',
+        icon: 'morph:x',
         disabled: !tabbar.checkCloseOtherSide(routeItem.tabId),
         handle: () => {
           tabbar.closeOtherSide(routeItem.tabId)
@@ -103,7 +103,7 @@ function contextMenuItems(routeItem: TabbarRecordRaw) {
       },
       {
         label: '关闭左侧标签页',
-        icon: 'i-mdi:arrow-expand-left',
+        icon: 'morph:chevrons-left',
         disabled: !tabbar.checkCloseLeftSide(routeItem.tabId),
         handle: () => {
           tabbar.closeLeftSide(routeItem.tabId)
@@ -111,7 +111,7 @@ function contextMenuItems(routeItem: TabbarRecordRaw) {
       },
       {
         label: '关闭右侧标签页',
-        icon: 'i-mdi:arrow-expand-right',
+        icon: 'morph:chevrons-right',
         disabled: !tabbar.checkCloseRightSide(routeItem.tabId),
         handle: () => {
           tabbar.closeRightSide(routeItem.tabId)
@@ -208,7 +208,7 @@ watch(() => keys.alt, (val) => {
                       {{ generateTitle(element.title) }}
                     </div>
                     <div v-if="appTabbarStore.list.length > 1" class="action-icon" @click.stop="tabbar.closeById(element.tabId)">
-                      <FaIcon name="i-ri:close-fill" />
+                      <FaIcon name="morph:x" />
                     </div>
                     <div v-show="appSettingsStore.settings.tabbar.hotkeys && keys.alt && getVisibleTabIndex(index) >= 0 && getVisibleTabIndex(index) < 9" class="hotkey-number">
                       {{ getVisibleTabIndex(index) + 1 }}

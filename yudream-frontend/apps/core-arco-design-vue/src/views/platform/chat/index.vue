@@ -67,8 +67,8 @@ const modelValue = computed({
   },
 })
 const wikiMentionItems = computed<YdSuggestionItem[]>(() => [
-  { key: '__all__', label: 'wiki 全部知识库', description: '检索所有可用知识库', icon: 'i-ri:global-line', value: 'wiki 全部知识库' },
-  ...wikiSpaces.value.map(space => ({ key: space.slug, label: `wiki ${space.name}`, description: space.slug, icon: 'i-ri:book-shelf-line', value: `wiki ${space.name}` })),
+  { key: '__all__', label: 'wiki 全部知识库', description: '检索所有可用知识库', icon: 'morph:globe', value: 'wiki 全部知识库' },
+  ...wikiSpaces.value.map(space => ({ key: space.slug, label: `wiki ${space.name}`, description: space.slug, icon: 'morph:library', value: `wiki ${space.name}` })),
 ])
 const suggestions = ['帮我写一份项目周报', '梳理一下知识库内容', '分析当前数据并给出建议', '帮我审查这段代码']
 
@@ -261,7 +261,7 @@ onMounted(async () => {
     <section class="chat-page__main">
       <header class="chat-page__top">
         <FaTooltip text="会话记录">
-          <button type="button" class="chat-page__history" aria-label="会话记录" @click="sessionDrawerVisible = true"><FaIcon name="i-ri:menu-line" /></button>
+          <button type="button" class="chat-page__history" aria-label="会话记录" @click="sessionDrawerVisible = true"><FaIcon name="morph:menu" /></button>
         </FaTooltip>
         <div v-if="quota" class="chat-page__quota" :title="`今日已用 ${quota.usedTokens.toLocaleString()} tokens`"><span class="chat-page__quota-ring" />剩余额度 {{ quota.remainingTokens.toLocaleString() }}</div>
       </header>
@@ -271,19 +271,19 @@ onMounted(async () => {
         <template #actions>
           <div class="chat-page__context-controls">
             <div class="chat-context">
-              <FaTooltip text="引用知识库。也可输入 @wiki 选择并自动填充"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': wikiContextSlug }" aria-label="知识库上下文" @click="wikiMenuOpen = !wikiMenuOpen"><FaIcon name="i-ri:book-shelf-line" /><span>{{ wikiContextLabel || '知识库' }}</span></button></FaTooltip>
+              <FaTooltip text="引用知识库。也可输入 @wiki 选择并自动填充"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': wikiContextSlug }" aria-label="知识库上下文" @click="wikiMenuOpen = !wikiMenuOpen"><FaIcon name="morph:library" /><span>{{ wikiContextLabel || '知识库' }}</span></button></FaTooltip>
               <div v-if="wikiMenuOpen" class="chat-context__menu">
-                <button type="button" :class="{ active: wikiContextSlug === '__all__' }" @click="selectWikiContext('__all__')"><FaIcon name="i-ri:global-line" />检索全部知识库</button>
-                <button v-for="space in wikiSpaces" :key="space.slug" type="button" :class="{ active: wikiContextSlug === space.slug }" @click="selectWikiContext(space.slug)"><FaIcon name="i-ri:book-2-line" />{{ space.name }}</button>
-                <button v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><FaIcon name="i-ri:close-line" />关闭知识库</button>
+                <button type="button" :class="{ active: wikiContextSlug === '__all__' }" @click="selectWikiContext('__all__')"><FaIcon name="morph:globe" />检索全部知识库</button>
+                <button v-for="space in wikiSpaces" :key="space.slug" type="button" :class="{ active: wikiContextSlug === space.slug }" @click="selectWikiContext(space.slug)"><FaIcon name="morph:book" />{{ space.name }}</button>
+                <button v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><FaIcon name="morph:x" />关闭知识库</button>
               </div>
             </div>
             <div class="chat-control chat-control--select">
-              <FaIcon name="i-ri:robot-2-line" />
+              <FaIcon name="morph:bot" />
               <FaSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
             </div>
             <div class="chat-control chat-control--select chat-control--model" :title="activeModel ? `${activeModel.providerName} · ${activeModel.modelName}` : '选择模型'">
-              <FaIcon name="i-ri:cpu-line" />
+              <FaIcon name="morph:cpu" />
               <FaSelect v-model="modelValue" placeholder="选择模型" :options="modelOptions" class="w-full" />
             </div>
           </div>

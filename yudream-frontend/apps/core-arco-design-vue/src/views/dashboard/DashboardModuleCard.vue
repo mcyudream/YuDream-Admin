@@ -30,7 +30,7 @@ defineProps<Props>()
 
     <div class="dashboard-module__actions">
       <FaButton v-if="card.actionPath" size="sm" @click="onOpen?.(card)">
-        <FaIcon name="i-ri:arrow-right-line" />
+        <FaIcon name="morph:arrow-right" />
         打开
       </FaButton>
     </div>

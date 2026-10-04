@@ -157,7 +157,7 @@ onBeforeUnmount(disposeChart)
 <template>
   <div class="yd-chat-graph">
     <div v-if="!hasEdges" class="yd-chat-graph__empty">
-      <FaIcon name="i-ri:node-tree"/>
+      <FaIcon name="morph:list-tree"/>
       <span>未返回关联关系</span>
     </div>
     <div v-else ref="chartEl" class="yd-chat-graph__canvas" :class="{ 'is-compact': compact }"/>

@@ -263,15 +263,15 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
   <div>
     <FaPageHeader title="Agent 执行流" class="mb-0">
       <FaButton variant="outline" :loading="loading || statsLoading" @click="refresh">
-        <FaIcon name="i-ri:refresh-line" />
+        <FaIcon name="morph:refresh-cw" />
         刷新
       </FaButton>
       <FaButton v-auth="'system:monitor:agent-trace:export'" variant="outline" @click="exportExcel">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
       <FaButton v-auth="'system:monitor:agent-trace:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
-        <FaIcon name="i-ri:delete-bin-6-line" />
+        <FaIcon name="morph:trash-2" />
         清空
       </FaButton>
     </FaPageHeader>
@@ -341,7 +341,7 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
                   重置
                 </FaButton>
                 <FaButton :loading="loading" @click="refresh">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -477,7 +477,7 @@ const detailSteps = computed<AgentTraceStep[]>(() => detail.value?.steps || [])
                   {{ step.toolName }}
                 </FaTag>
                 <span class="text-xs text-secondary-foreground/60 shrink-0">{{ formatDuration(step.durationMs) }}</span>
-                <FaIcon :name="open ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="shrink-0 size-4" />
+                <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="shrink-0 size-4" />
               </div>
             </template>
             <div class="trace-step__body">

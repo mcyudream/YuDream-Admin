@@ -23,7 +23,7 @@ const emit = defineEmits<{
         <strong>{{ sourceName }} → {{ targetName }}</strong>
       </div>
       <button type="button" title="关闭连线设置" aria-label="关闭连线设置" @click="emit('close')">
-        <FaIcon name="i-ri:close-line" />
+        <FaIcon name="morph:x" />
       </button>
     </header>
 
@@ -62,7 +62,7 @@ const emit = defineEmits<{
 
     <footer class="inspector-footer">
       <FaButton class="w-full" variant="destructive" @click="emit('delete')">
-        <FaIcon name="i-ri:delete-bin-line" /> 删除连线
+        <FaIcon name="morph:trash-2" /> 删除连线
       </FaButton>
     </footer>
   </aside>

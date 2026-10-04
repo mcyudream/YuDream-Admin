@@ -51,25 +51,25 @@ const dropdownItems = computed(() => [
     ...(appAccountStore.isImpersonating
       ? [{
           label: `\u9000\u51fa\u4f2a\u88c5\uff08${appAccountStore.impersonatorAccount}\uff09`,
-          icon: 'i-ri:logout-circle-r-line',
+          icon: 'morph:log-out',
           handle: () => appAccountStore.exitImpersonation(),
         }]
       : []),
     ...(appSettingsStore.settings.app.home.enable
-      ? [{ label: generateTitle(appSettingsStore.settings.app.home.title), icon: 'i-mdi:home', handle: () => router.push({ path: appSettingsStore.settings.app.home.fullPath }) }]
+      ? [{ label: generateTitle(appSettingsStore.settings.app.home.title), icon: 'morph:house', handle: () => router.push({ path: appSettingsStore.settings.app.home.fullPath }) }]
       : []),
-    { label: '\u5207\u6362\u90e8\u95e8/\u89d2\u8272', icon: 'i-mdi:swap-horizontal', handle: () => deptRoleSwitchModal.open() },
-    { label: '\u4e2a\u4eba\u8bbe\u7f6e', icon: 'i-mdi:account', handle: () => profileModal.open() },
+    { label: '\u5207\u6362\u90e8\u95e8/\u89d2\u8272', icon: 'morph:arrow-left-right', handle: () => deptRoleSwitchModal.open() },
+    { label: '\u4e2a\u4eba\u8bbe\u7f6e', icon: 'morph:circle-user-round', handle: () => profileModal.open() },
   ],
   [
     ...(appSettingsStore.mode === 'pc'
-      ? [{ label: '\u5feb\u6377\u952e', icon: 'i-mdi:keyboard', handle: () => eventBus.emit('global-hotkeys-intro-toggle') }]
+      ? [{ label: '\u5feb\u6377\u952e', icon: 'morph:keyboard', handle: () => eventBus.emit('global-hotkeys-intro-toggle') }]
       : []),
   ],
   [
     {
       label: '\u9000\u51fa\u767b\u5f55',
-      icon: 'i-mdi:logout',
+      icon: 'morph:log-out',
       handle: () => appAccountStore.logout(appSettingsStore.settings.app.home.fullPath),
     },
   ],
@@ -100,13 +100,13 @@ const dropdownItems = computed(() => [
       }, props.class)"
     >
       <FaAvatar :src="appAccountStore.avatar" :class="cn('size-6', { 'size-full': onlyAvatar })">
-        <FaIcon name="i-carbon:user-avatar-filled" class="text-secondary-foreground/50 size-6" />
+        <FaIcon name="morph:circle-user-round" class="text-secondary-foreground/50 size-6" />
       </FaAvatar>
       <div v-if="!onlyAvatar" class="flex-center-between flex-1 gap-2 min-w-0">
         <div class="text-start flex-1 truncate">
           {{ appAccountStore.account }}
         </div>
-        <FaIcon name="i-material-symbols:expand-all-rounded" />
+        <FaIcon name="morph:unfold-vertical" />
       </div>
     </FaButton>
   </FaDropdown>

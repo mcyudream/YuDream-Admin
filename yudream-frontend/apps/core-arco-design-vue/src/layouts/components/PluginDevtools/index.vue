@@ -97,13 +97,13 @@ useEventListener('keydown', (event: KeyboardEvent) => {
 
 // ---------- 页面导航 ----------
 const navItems = [
-  { label: '概览', value: 'overview', icon: 'i-ri:dashboard-line' },
-  { label: '插件', value: 'plugins', icon: 'i-ri:puzzle-2-line' },
+  { label: '概览', value: 'overview', icon: 'morph:gauge' },
+  { label: '插件', value: 'plugins', icon: 'morph:puzzle' },
   { label: 'QQ沙盒', value: 'qq-sandbox', icon: 'i-ri:qq-line' },
-  { label: '追踪', value: 'traces', icon: 'i-ri:node-tree' },
-  { label: '日志', value: 'logs', icon: 'i-ri:file-list-3-line' },
-  { label: '审查', value: 'audit', icon: 'i-ri:search-eye-line' },
-  { label: '设置', value: 'settings', icon: 'i-ri:settings-3-line' },
+  { label: '追踪', value: 'traces', icon: 'morph:list-tree' },
+  { label: '日志', value: 'logs', icon: 'morph:file-text' },
+  { label: '审查', value: 'audit', icon: 'morph:zoom-in' },
+  { label: '设置', value: 'settings', icon: 'morph:settings' },
 ] as const
 
 onMounted(async () => {
@@ -132,7 +132,7 @@ onMounted(async () => {
           title="展开插件开发者工具"
           @click="handleStripActivate"
         >
-          <FaIcon name="i-ri:bug-line" class="size-3.5" />
+          <FaIcon name="morph:bug" class="size-3.5" />
           <span v-if="store.unreadCount" class="devtools-fab__dot" />
         </div>
         <FaBadge v-else :value="store.unreadCount" variant="destructive">
@@ -151,7 +151,7 @@ onMounted(async () => {
               @lostpointercapture="handleLostPointerCapture"
               @click="handleActivate(togglePanel)"
             >
-              <FaIcon name="i-ri:bug-line" class="size-5" />
+              <FaIcon name="morph:bug" class="size-5" />
             </FaButton>
           </FaTooltip>
         </FaBadge>
@@ -174,7 +174,7 @@ onMounted(async () => {
             @pointercancel="handleHeaderPointerUp"
             @lostpointercapture="handleHeaderPointerUp"
           >
-            <FaIcon name="i-ri:bug-line" class="shrink-0 size-4" />
+            <FaIcon name="morph:bug" class="shrink-0 size-4" />
             <span class="devtools-panel__title">插件开发者工具</span>
             <FaTooltip :text="`生命周期流${store.lifecycleConnected ? '已连接' : '未连接'}`" side="bottom">
               <span class="sse-dot" :class="store.lifecycleConnected ? 'sse-dot--on' : ''" />
@@ -185,12 +185,12 @@ onMounted(async () => {
             <div class="flex-1" />
             <span class="devtools-panel__shortcut">Ctrl+Shift+D</span>
             <FaButton variant="ghost" size="icon-sm" aria-label="关闭" @click="store.closeDrawer()">
-              <FaIcon name="i-ri:close-line" class="size-4" />
+              <FaIcon name="morph:x" class="size-4" />
             </FaButton>
           </header>
 
           <div v-if="!store.status" class="devtools-unavailable">
-            <FaIcon name="i-ri:cloud-off-line" class="size-8" />
+            <FaIcon name="morph:cloud-off" class="size-8" />
             <p>后端开发者工具接口不可用{{ store.statusError ? `：${store.statusError}` : '。' }}</p>
             <p class="text-xs">
               请确认后端已部署包含插件开发者工具的版本并以管理员身份登录；vite dev 环境下此面板仅作降级展示。

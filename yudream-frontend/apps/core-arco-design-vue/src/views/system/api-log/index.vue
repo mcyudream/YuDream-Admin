@@ -128,11 +128,11 @@ async function clearApiLogs() {
   <div>
     <FaPageHeader title="&#25509;&#21475;&#26085;&#24535;" class="mb-0">
       <FaButton v-auth="'system:monitor:api-log:export'" variant="outline" @click="exportApiLogs">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
       <FaButton v-auth="'system:monitor:api-log:delete'" variant="destructive" :loading="clearing" @click="confirmClearApiLogs">
-        <FaIcon name="i-ri:delete-bin-6-line" />
+        <FaIcon name="morph:trash-2" />
         清空日志
       </FaButton>
     </FaPageHeader>
@@ -159,7 +159,7 @@ async function clearApiLogs() {
                   &#37325;&#32622;
                 </FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   &#31579;&#36873;
                 </FaButton>
               </div>

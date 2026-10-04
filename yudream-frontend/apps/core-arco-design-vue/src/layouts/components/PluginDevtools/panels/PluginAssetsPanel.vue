@@ -317,10 +317,10 @@ async function runCommandTest() {
           :title="viewMode === 'graph' ? '返回清单视图' : '依赖图：查看插件间硬/软依赖与禁用影响'"
           @click="viewMode = viewMode === 'graph' ? 'list' : 'graph'"
         >
-          <FaIcon :name="viewMode === 'graph' ? 'i-ri:list-check-2' : 'i-ri:node-tree'" />
+          <FaIcon :name="viewMode === 'graph' ? 'morph:list-checks' : 'morph:list-tree'" />
         </FaButton>
         <FaButton variant="outline" size="icon" :loading="pluginsLoading" title="刷新插件列表" @click="loadPlugins">
-          <FaIcon name="i-ri:refresh-line" />
+          <FaIcon name="morph:refresh-cw" />
         </FaButton>
       </div>
 
@@ -336,7 +336,7 @@ async function runCommandTest() {
             </FaTag>
             <div class="flex-1" />
             <FaButton variant="ghost" size="sm" title="预览禁用该插件时的级联影响" @click="openDisablePreview(plugin.code)">
-              <FaIcon name="i-ri:eye-line" />
+              <FaIcon name="morph:eye" />
               禁用预览
             </FaButton>
           </div>
@@ -409,7 +409,7 @@ async function runCommandTest() {
               {{ plugin.code }}<span v-if="plugin.version"> · v{{ plugin.version }}</span>
             </div>
           </div>
-          <FaIcon name="i-ri:arrow-right-s-line" class="text-secondary-foreground/60 shrink-0 size-4" />
+          <FaIcon name="morph:chevron-right" class="text-secondary-foreground/60 shrink-0 size-4" />
         </div>
       </template>
       <div v-if="!plugins.length && !pluginsLoading" class="panel-empty">
@@ -421,13 +421,13 @@ async function runCommandTest() {
     <template v-else>
       <div class="plugins-toolbar">
         <FaButton variant="ghost" size="sm" @click="backToList">
-          <FaIcon name="i-ri:arrow-left-s-line" />
+          <FaIcon name="morph:chevron-left" />
           插件清单
         </FaButton>
         <div class="flex-1" />
         <FaTooltip v-if="selectedPlugin.status !== 'ENABLED'" text="启用插件，注册端点、指令、权限等运行时贡献" side="bottom">
           <FaButton size="sm" :loading="enabling" @click="enablePlugin">
-            <FaIcon name="i-ri:play-line" />
+            <FaIcon name="morph:play" />
             启用
           </FaButton>
         </FaTooltip>
@@ -439,7 +439,7 @@ async function runCommandTest() {
             :loading="frontendReloading"
             @click="reloadFrontend()"
           >
-            <FaIcon name="i-ri:refresh-line" />
+            <FaIcon name="morph:refresh-cw" />
             前端重载
           </FaButton>
         </FaTooltip>
@@ -451,7 +451,7 @@ async function runCommandTest() {
             :loading="reloading"
             @click="reloadPlugin()"
           >
-            <FaIcon name="i-ri:restart-line" />
+            <FaIcon name="morph:rotate-cw" />
             Java 重载
           </FaButton>
         </FaTooltip>
@@ -477,10 +477,10 @@ async function runCommandTest() {
       </div>
       <template v-else-if="assets">
         <div v-if="!assets.enabled" class="plugin-not-enabled">
-          <FaIcon name="i-ri:information-line" class="shrink-0 size-4" />
+          <FaIcon name="morph:info" class="shrink-0 size-4" />
           <span>插件当前未启用，下方运行时贡献为空属预期；点击右上角「启用」后才会注册端点、指令、权限等。</span>
         </div>
-        <AssetSection title="HTTP 端点" icon="i-ri:global-line" :count="assets.httpEndpoints.length" default-open>
+        <AssetSection title="HTTP 端点" icon="morph:globe" :count="assets.httpEndpoints.length" default-open>
           <div
             v-for="endpoint in assets.httpEndpoints" :key="`${endpoint.method}:${endpoint.fullPath}`"
             class="asset-row"
@@ -498,7 +498,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="QQ 指令" icon="i-ri:terminal-box-line" :count="assets.commands.length" default-open>
+        <AssetSection title="QQ 指令" icon="morph:square-terminal" :count="assets.commands.length" default-open>
           <div v-for="command in assets.commands" :key="command.code" class="asset-row">
             <span class="text-xs font-mono">/{{ command.command }}</span>
             <span class="asset-row__main text-xs">{{
@@ -518,7 +518,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="前端模块与路由" icon="i-ri:window-line" :count="assets.frontendModules.length">
+        <AssetSection title="前端模块与路由" icon="morph:app-window" :count="assets.frontendModules.length">
           <div v-for="module in assets.frontendModules" :key="module.pluginCode" class="frontend-module">
             <div class="asset-row">
               <FaTag variant="outline" class="text-xs">
@@ -537,7 +537,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="权限" icon="i-ri:shield-keyhole-line" :count="assets.permissions.length">
+        <AssetSection title="权限" icon="morph:shield" :count="assets.permissions.length">
           <div v-for="permission in assets.permissions" :key="permission.code" class="asset-row">
             <span class="text-xs font-mono">{{ permission.code }}</span>
             <span class="asset-row__main text-xs">{{ permission.name }}</span>
@@ -547,7 +547,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="菜单" icon="i-ri:menu-line" :count="assets.menus.length">
+        <AssetSection title="菜单" icon="morph:menu" :count="assets.menus.length">
           <div v-for="menu in assets.menus" :key="menu.path" class="asset-row">
             <FaIcon v-if="menu.icon" :name="menu.icon" class="size-3.5" />
             <span class="text-xs">{{ menu.title }}</span>
@@ -561,7 +561,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="AI 工具" icon="i-ri:tools-line" :count="assets.aiTools.length">
+        <AssetSection title="AI 工具" icon="morph:wrench" :count="assets.aiTools.length">
           <div v-for="tool in assets.aiTools" :key="tool.name" class="asset-row">
             <span class="text-xs font-mono">{{ tool.name }}</span>
             <span class="asset-row__main text-xs">{{ tool.title || tool.description }}</span>
@@ -577,7 +577,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="声明式 Agent" icon="i-ri:robot-2-line" :count="assets.agents.length">
+        <AssetSection title="声明式 Agent" icon="morph:bot" :count="assets.agents.length">
           <div v-for="agent in assets.agents" :key="agent.id" class="asset-row">
             <FaIcon v-if="agent.icon" :name="agent.icon" class="size-3.5" />
             <span class="text-xs">{{ agent.name }}</span>
@@ -591,7 +591,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="平台能力" icon="i-ri:apps-2-line" :count="assets.capabilities.length">
+        <AssetSection title="平台能力" icon="morph:layout-grid" :count="assets.capabilities.length">
           <div v-for="capability in assets.capabilities" :key="capability.code" class="asset-row">
             <span class="text-xs">{{ capability.name }}</span>
             <span class="asset-row__main text-xs text-secondary-foreground/60 font-mono">{{ capability.code }}</span>
@@ -604,7 +604,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="消息交互" icon="i-ri:message-3-line" :count="assets.messageInteractions.length">
+        <AssetSection title="消息交互" icon="morph:message-square" :count="assets.messageInteractions.length">
           <div v-for="(interaction, index) in assets.messageInteractions" :key="index" class="asset-row">
             <FaTag variant="outline" class="text-xs">
               {{ interaction.kind }}
@@ -620,7 +620,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="首页卡片" icon="i-ri:dashboard-line" :count="assets.dashboardCards.length">
+        <AssetSection title="首页卡片" icon="morph:gauge" :count="assets.dashboardCards.length">
           <div v-for="card in assets.dashboardCards" :key="card.code" class="asset-row">
             <span class="text-xs">{{ card.title }}</span>
             <span class="asset-row__main text-xs text-secondary-foreground/60">{{ card.description }}</span>
@@ -630,7 +630,7 @@ async function runCommandTest() {
           </div>
         </AssetSection>
 
-        <AssetSection title="服务导出" icon="i-ri:share-forward-line" :count="assets.exposedServices.length">
+        <AssetSection title="服务导出" icon="morph:share" :count="assets.exposedServices.length">
           <div v-for="service in assets.exposedServices" :key="service" class="asset-row">
             <span class="text-xs font-mono">{{ service }}</span>
           </div>
@@ -673,7 +673,7 @@ async function runCommandTest() {
 
         <div class="tester__actions">
           <FaButton :loading="endpointTesting" @click="runEndpointTest">
-            <FaIcon name="i-ri:send-plane-line" />
+            <FaIcon name="morph:send" />
             发送请求
           </FaButton>
         </div>
@@ -717,7 +717,7 @@ async function runCommandTest() {
 
         <div class="tester__actions">
           <FaButton :loading="commandTesting" :disabled="!commandInput.trim()" @click="runCommandTest">
-            <FaIcon name="i-ri:play-line" />
+            <FaIcon name="morph:play" />
             触发
           </FaButton>
           <span class="text-xs text-secondary-foreground/60">在插件作用域内同步调用处理器，绕过权限与匿名检查</span>
@@ -751,7 +751,7 @@ async function runCommandTest() {
           <span class="text-xs font-mono">{{ preview.code }}</span>
         </div>
         <div v-if="previewSafe" class="preview-safe">
-          <FaIcon name="i-ri:checkbox-circle-line" class="shrink-0 size-4" />
+          <FaIcon name="morph:circle-check" class="shrink-0 size-4" />
           <span>没有其他插件依赖它，可安全禁用或卸载。</span>
         </div>
         <template v-else>
@@ -764,7 +764,7 @@ async function runCommandTest() {
                 <FaTag variant="destructive" class="text-xs font-mono">
                   {{ blocker }}
                 </FaTag>
-                <FaIcon name="i-ri:arrow-right-line" class="text-secondary-foreground/60 shrink-0 size-3.5" />
+                <FaIcon name="morph:arrow-right" class="text-secondary-foreground/60 shrink-0 size-3.5" />
               </template>
               <FaTag variant="outline" class="text-xs font-mono">
                 {{ preview.code }}

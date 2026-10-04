@@ -368,14 +368,14 @@ onBeforeUnmount(() => { eventAbort?.abort(); eventAbort = null })
     <div v-if="loading" class="workspace-loading">加载中...</div>
     <aside class="conversation-rail">
       <nav class="rail-tabs" aria-label="会话分类">
-        <button :class="{ active: activeView === 'recent' }" @click="switchView('recent')"><FaIcon name="i-ri:history-line" />最近</button>
-        <button :class="{ active: activeView === 'friends' }" @click="switchView('friends')"><FaIcon name="i-ri:user-3-line" />好友</button>
-        <button :class="{ active: activeView === 'groups' }" @click="switchView('groups')"><FaIcon name="i-ri:group-line" />群组</button>
-        <button class="icon-tab" :class="{ active: activeView === 'notifications' }" title="通知" @click="switchView('notifications')"><FaIcon name="i-ri:notification-3-line" /></button>
+        <button :class="{ active: activeView === 'recent' }" @click="switchView('recent')"><FaIcon name="morph:history" />最近</button>
+        <button :class="{ active: activeView === 'friends' }" @click="switchView('friends')"><FaIcon name="morph:user" />好友</button>
+        <button :class="{ active: activeView === 'groups' }" @click="switchView('groups')"><FaIcon name="morph:users" />群组</button>
+        <button class="icon-tab" :class="{ active: activeView === 'notifications' }" title="通知" @click="switchView('notifications')"><FaIcon name="morph:bell" /></button>
       </nav>
 
       <template v-if="activeView !== 'notifications'">
-        <div class="rail-search"><FaIcon name="i-ri:search-line" /><input v-model="search" :placeholder="activeView === 'groups' ? '搜索群组' : '搜索好友、群聊'" /></div>
+        <div class="rail-search"><FaIcon name="morph:search" /><input v-model="search" :placeholder="activeView === 'groups' ? '搜索群组' : '搜索好友、群聊'" /></div>
         <div class="peer-scroll">
           <button v-for="peer in visiblePeers" :key="`${peer.scene}-${peer.id}`" class="peer-row" :class="{ selected: selected?.id === peer.id && selected?.scene === peer.scene }" @click="openPeer(peer)">
             <FaBadge :value="Number(peer.unread) || 0" badge-class="start-[100%] -translate-x-[50%]"><FaAvatar :src="peer.avatar || ''" :fallback="peer.name.slice(0, 1)" class="size-[42px]" /></FaBadge>
@@ -397,7 +397,7 @@ onBeforeUnmount(() => { eventAbort?.abort(); eventAbort = null })
         <template v-if="selected"><FaAvatar :src="selected.avatar || ''" :fallback="selected.name.slice(0, 1)" class="size-[38px]" /><div><h2>{{ selected.name }}</h2><p>{{ selected.scene === 'group' ? `群聊 ${selected.id}${selected.memberCount ? ` · ${selected.memberCount} 人` : ''}` : `私聊 ${selected.id}` }}</p></div></template>
         <span v-else class="placeholder-title">选择一个会话</span>
         <span v-if="selected" class="message-count">{{ messages.length }} 条消息</span>
-        <div class="header-actions"><FaButton variant="ghost" title="全部 Milky API" @click="showApi = true"><FaIcon name="i-ri:terminal-box-line" /></FaButton><FaButton v-if="selected?.scene === 'group'" variant="ghost" title="群资料与成员" @click="loadGroupDetails"><FaIcon name="i-ri:team-line" /></FaButton></div>
+        <div class="header-actions"><FaButton variant="ghost" title="全部 Milky API" @click="showApi = true"><FaIcon name="morph:square-terminal" /></FaButton><FaButton v-if="selected?.scene === 'group'" variant="ghost" title="群资料与成员" @click="loadGroupDetails"><FaIcon name="morph:users" /></FaButton></div>
       </header>
 
       <div ref="messageScroll" class="message-scroll">
@@ -410,14 +410,14 @@ onBeforeUnmount(() => { eventAbort?.abort(); eventAbort = null })
       </div>
 
       <footer class="composer" :class="{ disabled: !selected }">
-        <div v-if="quoted" class="quote-bar">正在回复：{{ segmentText(quoted) }}<button @click="quoted = null"><FaIcon name="i-ri:close-line" /></button></div>
+        <div v-if="quoted" class="quote-bar">正在回复：{{ segmentText(quoted) }}<button @click="quoted = null"><FaIcon name="morph:x" /></button></div>
         <div class="composer-tools"><div class="tool-popover"><button type="button" title="Emoji" @click="emojiOpen = !emojiOpen">🙂</button><div v-if="emojiOpen" class="inline-panel emoji-grid"><button v-for="emoji in emojis" :key="emoji" type="button" @click="addEmoji(emoji)">{{ emoji }}</button></div></div><div v-if="selected?.scene === 'group'" class="tool-popover"><button type="button" title="提及成员" @click="mentionOpen = !mentionOpen">@</button><div v-if="mentionOpen" class="inline-panel mention-panel"><input v-model="mentionSearch" class="mention-search" placeholder="搜索群成员" /><button type="button" class="mention-option" @click="mentionAll"><span class="mention-avatar">@</span><span>全体成员</span></button><button v-for="member in visibleMentionMembers" :key="member.user_id" type="button" class="mention-option" @click="mention(member)"><FaAvatar :src="member.avatar || ''" :fallback="String(member.card || member.nickname || member.user_id).slice(0, 1)" class="size-[26px]" /><span>{{ member.card || member.nickname || member.user_id }}</span></button><span v-if="!visibleMentionMembers.length" class="mention-empty">未找到成员</span></div></div><button type="button" title="图片或文件" @click="chooseFile">📎</button><input ref="fileInput" type="file" class="hidden" @change="uploadFile" /></div>
         <textarea ref="composer" v-model="content" :disabled="!selected || sending" placeholder="输入消息，Ctrl + Enter 发送" @keydown.ctrl.enter.prevent="send()" />
-        <FaButton class="send-button" :disabled="!selected || !content.trim() || sending" @click="send()"><FaIcon name="i-ri:send-plane-2-line" /></FaButton>
+        <FaButton class="send-button" :disabled="!selected || !content.trim() || sending" @click="send()"><FaIcon name="morph:send" /></FaButton>
       </footer>
     </main>
 
-    <aside v-if="showMembers && selected?.scene === 'group'" class="detail-rail"><header><div><b>群成员</b><small>{{ groupInfo?.member_count || selected.memberCount || members.length }} 人</small></div><button @click="showMembers = false"><FaIcon name="i-ri:close-line" /></button></header><div v-if="groupInfo" class="group-summary"><FaAvatar :src="selected.avatar || ''" :fallback="selected.name.slice(0, 1)" class="size-[54px]" /><b>{{ groupInfo.group_name || selected.name }}</b><small>{{ selected.id }}</small></div><div class="member-scroll"><div v-for="member in members" :key="member.user_id" class="member-row"><FaAvatar :src="member.avatar || ''" :fallback="String(member.card || member.nickname || member.user_id).slice(0, 1)" class="size-[34px]" /><span><b>{{ member.card || member.nickname || member.user_id }}</b><small>{{ member.role || '成员' }}</small></span></div></div></aside>
+    <aside v-if="showMembers && selected?.scene === 'group'" class="detail-rail"><header><div><b>群成员</b><small>{{ groupInfo?.member_count || selected.memberCount || members.length }} 人</small></div><button @click="showMembers = false"><FaIcon name="morph:x" /></button></header><div v-if="groupInfo" class="group-summary"><FaAvatar :src="selected.avatar || ''" :fallback="selected.name.slice(0, 1)" class="size-[54px]" /><b>{{ groupInfo.group_name || selected.name }}</b><small>{{ selected.id }}</small></div><div class="member-scroll"><div v-for="member in members" :key="member.user_id" class="member-row"><FaAvatar :src="member.avatar || ''" :fallback="String(member.card || member.nickname || member.user_id).slice(0, 1)" class="size-[34px]" /><span><b>{{ member.card || member.nickname || member.user_id }}</b><small>{{ member.role || '成员' }}</small></span></div></div></aside>
 
     <FaDrawer v-model="showApi" :title="props.protocol === 'official' ? '官方 OpenAPI 工作台' : 'Milky API 工作台'" :z-index="3000" :footer="false" content-class="sm:max-w-[560px]"><div class="api-workbench"><FaSelect v-model="apiName" :options="apiCatalog.map(api => ({ label: `${api.category} / ${api.name}`, value: api.name }))" /><FaTextarea v-model="apiPayload" rows="12" placeholder="请求 JSON" /><FaButton @click="runApi">调用 {{ apiName }}</FaButton><pre v-if="apiResult">{{ apiResult }}</pre></div></FaDrawer>
   </section>

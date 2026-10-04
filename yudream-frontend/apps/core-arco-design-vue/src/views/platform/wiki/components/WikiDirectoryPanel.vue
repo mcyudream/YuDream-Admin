@@ -194,23 +194,23 @@ function removeSourceChip(source: string) {
       <div class="dir-tree__toolbar">
         <FaInput v-model="treeKeyword" clearable placeholder="搜索页面…">
           <template #start>
-            <FaIcon name="i-ri:search-line" />
+            <FaIcon name="morph:search" />
           </template>
         </FaInput>
         <div class="dir-tree__actions">
           <FaTooltip text="新建页面">
             <FaButton size="icon-sm" variant="ghost" @click="openCreate('PAGE')">
-              <FaIcon name="i-ri:file-add-line" />
+              <FaIcon name="morph:file-plus" />
             </FaButton>
           </FaTooltip>
           <FaTooltip text="新建目录">
             <FaButton size="icon-sm" variant="ghost" @click="openCreate('DIRECTORY')">
-              <FaIcon name="i-ri:folder-add-line" />
+              <FaIcon name="morph:folder-plus" />
             </FaButton>
           </FaTooltip>
           <FaTooltip text="刷新目录">
             <FaButton size="icon-sm" variant="ghost" :loading="store.loadingTree.value" @click="store.reloadTree()">
-              <FaIcon name="i-ri:refresh-line" />
+              <FaIcon name="morph:refresh-cw" />
             </FaButton>
           </FaTooltip>
         </div>
@@ -227,7 +227,7 @@ function removeSourceChip(source: string) {
           @click="store.selectNode(item)"
         >
           <FaIcon
-            :name="item.nodeType === 'DIRECTORY' ? 'i-ri:folder-3-line' : 'i-ri:file-text-line'"
+            :name="item.nodeType === 'DIRECTORY' ? 'morph:folder' : 'morph:file-text'"
             class="dir-node__icon"
             :class="{ 'dir-node__icon--dir': item.nodeType === 'DIRECTORY' }"
           />
@@ -244,11 +244,11 @@ function removeSourceChip(source: string) {
             :title="`删除${item.nodeType === 'DIRECTORY' ? '目录' : '页面'}`"
             @click.stop="removeNode(item)"
           >
-            <FaIcon name="i-ri:delete-bin-line" />
+            <FaIcon name="morph:trash-2" />
           </span>
         </button>
         <div v-if="!filteredTree.length" class="dir-tree__empty">
-          <FaIcon name="i-ri:folder-open-line" />
+          <FaIcon name="morph:folder-open" />
           <p>{{ treeKeyword ? '没有匹配的页面' : '暂无页面，先在「资料源」导入资料' }}</p>
         </div>
       </FaScrollArea>
@@ -261,10 +261,10 @@ function removeSourceChip(source: string) {
           <FaInput v-model="editorTitle" class="dir-editor__title" placeholder="页面标题" :disabled="node.nodeType === 'DIRECTORY'" />
           <div class="dir-editor__mode">
             <button type="button" :class="{ active: viewMode === 'edit' }" @click="viewMode = 'edit'">
-              <FaIcon name="i-ri:edit-line" /> 编辑
+              <FaIcon name="morph:pencil" /> 编辑
             </button>
             <button type="button" :class="{ active: viewMode === 'preview' }" @click="viewMode = 'preview'">
-              <FaIcon name="i-ri:eye-line" /> 预览
+              <FaIcon name="morph:eye" /> 预览
             </button>
           </div>
         </div>
@@ -277,24 +277,24 @@ function removeSourceChip(source: string) {
           <a-input-tag v-model:model-value="editorTags" placeholder="标签" allow-clear class="dir-editor__tags" />
         </div>
         <div v-if="node.sources?.length" class="dir-editor__sources">
-          <span class="dir-editor__sources-label"><FaIcon name="i-ri:database-2-line" /> 资料来源</span>
+          <span class="dir-editor__sources-label"><FaIcon name="morph:database" /> 资料来源</span>
           <span v-for="source in node.sources" :key="source" class="dir-source-chip">
             {{ source }}
-            <FaIcon name="i-ri:close-line" class="dir-source-chip__close" @click="removeSourceChip(source)" />
+            <FaIcon name="morph:x" class="dir-source-chip__close" @click="removeSourceChip(source)" />
           </span>
         </div>
         <div class="dir-editor__actions">
           <FaButton :loading="saving" @click="saveNode">
-            <FaIcon name="i-ri:save-3-line" /> 保存
+            <FaIcon name="morph:save" /> 保存
           </FaButton>
           <FaButton v-if="node.nodeType === 'PAGE' && !node.publishedVersionId" variant="outline" @click="publish">
-            <FaIcon name="i-ri:send-plane-line" /> 发布
+            <FaIcon name="morph:send" /> 发布
           </FaButton>
           <FaButton v-if="node.nodeType === 'PAGE' && node.publishedVersionId" variant="outline" @click="unpublish">
-            <FaIcon name="i-ri:arrow-go-back-line" /> 取消发布
+            <FaIcon name="morph:undo-2" /> 取消发布
           </FaButton>
           <FaButton variant="destructive" :loading="deletingNodeId === node.id" @click="removeNode(node)">
-            <FaIcon name="i-ri:delete-bin-line" /> 删除
+            <FaIcon name="morph:trash-2" /> 删除
           </FaButton>
           <span v-if="node.path" class="dir-editor__path">{{ node.path }}</span>
         </div>
@@ -315,7 +315,7 @@ function removeSourceChip(source: string) {
     </section>
 
     <section v-else class="dir-empty">
-      <FaIcon name="i-ri:node-tree" />
+      <FaIcon name="morph:list-tree" />
       <strong>选择左侧页面开始编辑</strong>
       <p>页面内容支持 [[wikilink]] 语法，预览中可点击跳转</p>
     </section>

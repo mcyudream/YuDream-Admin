@@ -96,10 +96,10 @@ const showAllVariables = ref(false)
 type PublishTab = 'publish' | 'seo' | 'js' | 'variables'
 const publishTab = ref<PublishTab>('publish')
 const publishTabs: { label: string, value: PublishTab, icon: string }[] = [
-  { label: '发布', value: 'publish', icon: 'i-ri:send-plane-line' },
-  { label: 'SEO', value: 'seo', icon: 'i-ri:search-eye-line' },
-  { label: 'JS', value: 'js', icon: 'i-ri:code-line' },
-  { label: '变量', value: 'variables', icon: 'i-ri:braces-line' },
+  { label: '发布', value: 'publish', icon: 'morph:send' },
+  { label: 'SEO', value: 'seo', icon: 'morph:zoom-in' },
+  { label: 'JS', value: 'js', icon: 'morph:code' },
+  { label: '变量', value: 'variables', icon: 'morph:braces' },
 ]
 
 const pageForm = reactive<CmsPagePayload>({
@@ -147,10 +147,10 @@ const layoutOptions: { label: string, value: SiteLayoutMode }[] = [
   { label: '后台管理布局', value: 'ADMIN' },
 ]
 const sectionPresets: { type: HomeSectionType, label: string, icon: string }[] = [
-  { type: 'HERO', label: '首屏', icon: 'i-ri:layout-top-line' },
-  { type: 'FEATURE', label: '特色', icon: 'i-ri:sparkling-line' },
-  { type: 'CONTENT', label: '内容', icon: 'i-ri:article-line' },
-  { type: 'CTA', label: '行动', icon: 'i-ri:cursor-line' },
+  { type: 'HERO', label: '首屏', icon: 'morph:panel-top' },
+  { type: 'FEATURE', label: '特色', icon: 'morph:sparkles' },
+  { type: 'CONTENT', label: '内容', icon: 'morph:newspaper' },
+  { type: 'CTA', label: '行动', icon: 'morph:mouse-pointer' },
 ]
 
 const selectedPage = computed(() => pages.value.find(item => item.id === selectedPageId.value) || null)
@@ -1024,27 +1024,27 @@ function sectionTitle(type: HomeSectionType) {
   <div class="cms-workbench">
     <FaPageHeader title="主题中心" class="cms-header">
       <FaButton v-if="activeTab === 'pages'" v-auth="'platform:cms:edit'" :loading="saving" @click="savePage">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存页面
       </FaButton>
       <FaButton v-else-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveHome">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存首页
       </FaButton>
       <FaButton v-else-if="activeTab === 'navigation'" v-auth="'platform:cms:edit'" :loading="saving" @click="saveNavigation">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存首页配置
       </FaButton>
       <FaButton v-if="activeTab === 'home'" v-auth="'platform:cms:edit'" :variant="home.published ? 'outline' : 'default'" :loading="saving" @click="confirmToggleHomePublish">
-        <FaIcon :name="home.published ? 'i-ri:inbox-unarchive-line' : 'i-ri:send-plane-line'" />
+        <FaIcon :name="home.published ? 'morph:archive-restore' : 'morph:send'" />
         {{ home.published ? '取消发布首页' : '发布首页' }}
       </FaButton>
       <FaButton v-else-if="activeTab === 'presets'" v-auth="'platform:cms:edit'" @click="openPresetDialog">
-        <FaIcon name="i-ri:bookmark-3-line" />
+        <FaIcon name="morph:bookmark" />
         把当前首页存为方案
       </FaButton>
       <FaButton v-if="activeTab === 'media'" v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
-        <FaIcon name="i-ri:upload-cloud-2-line" />
+        <FaIcon name="morph:cloud-upload" />
         上传媒体
       </FaButton>
       <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
@@ -1053,27 +1053,27 @@ function sectionTitle(type: HomeSectionType) {
     <FaPageMain>
       <div class="cms-tabs">
         <button type="button" :class="{ active: activeTab === 'theme' }" @click="activeTab = 'theme'">
-          <FaIcon name="i-ri:palette-line" />
+          <FaIcon name="morph:palette" />
           整站主题
         </button>
         <button type="button" :class="{ active: activeTab === 'pages' }" @click="activeTab = 'pages'">
-          <FaIcon name="i-ri:file-list-3-line" />
+          <FaIcon name="morph:file-text" />
           页面库
         </button>
         <button type="button" :class="{ active: activeTab === 'home' }" @click="activeTab = 'home'">
-          <FaIcon name="i-ri:home-4-line" />
+          <FaIcon name="morph:house" />
           首页外观
         </button>
         <button type="button" :class="{ active: activeTab === 'navigation' }" @click="activeTab = 'navigation'">
-          <FaIcon name="i-ri:menu-search-line" />
+          <FaIcon name="morph:text-search" />
           导航菜单
         </button>
         <button type="button" :class="{ active: activeTab === 'presets' }" @click="activeTab = 'presets'">
-          <FaIcon name="i-ri:stack-line" />
+          <FaIcon name="morph:layers" />
           首页方案
         </button>
         <button type="button" :class="{ active: activeTab === 'media' }" @click="activeTab = 'media'">
-          <FaIcon name="i-ri:image-2-line" />
+          <FaIcon name="morph:image" />
           媒体库
         </button>
         <div class="theme-scope-picker">
@@ -1081,7 +1081,7 @@ function sectionTitle(type: HomeSectionType) {
           <FaSelect v-model="currentTheme" :options="editableThemeOptions" />
         </div>
         <a class="public-link" href="/site" target="_blank" rel="noopener noreferrer">
-          <FaIcon name="i-ri:external-link-line" />
+          <FaIcon name="morph:external-link" />
           访问站点
         </a>
       </div>
@@ -1098,7 +1098,7 @@ function sectionTitle(type: HomeSectionType) {
             <div class="theme-card__preview">
               <img v-if="themePreviewUrl(theme)" :src="themePreviewUrl(theme)" :alt="theme.name">
               <div v-else class="theme-card__preview-fallback">
-                <FaIcon :name="theme.pluginCode ? 'i-ri:puzzle-2-line' : 'i-ri:home-4-line'" />
+                <FaIcon :name="theme.pluginCode ? 'morph:puzzle' : 'morph:house'" />
               </div>
               <FaTag v-if="theme.active" class="theme-card__current" variant="default">
                 当前
@@ -1130,28 +1130,28 @@ function sectionTitle(type: HomeSectionType) {
                   v-if="theme.hasConfigSchema" v-auth="'platform:theme-center:config'"
                   size="sm" variant="outline" @click="openThemeConfig(theme)"
                 >
-                  <FaIcon name="i-ri:settings-3-line" />
+                  <FaIcon name="morph:settings" />
                   配置
                 </FaButton>
                 <FaButton
                   v-if="theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" :loading="themeSwitching" @click="confirmActivateTheme(theme)"
                 >
-                  <FaIcon name="i-ri:check-line" />
+                  <FaIcon name="morph:check" />
                   启用主题
                 </FaButton>
                 <FaButton
                   v-if="theme.pluginCode && theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" variant="outline" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
                 >
-                  <FaIcon name="i-ri:refresh-line" />
+                  <FaIcon name="morph:refresh-cw" />
                   恢复默认
                 </FaButton>
                 <FaButton
                   v-if="!theme.pluginCode && !theme.active" v-auth="'platform:theme-center:use'"
                   size="sm" :loading="themeSwitching" @click="confirmRestoreDefaultTheme"
                 >
-                  <FaIcon name="i-ri:refresh-line" />
+                  <FaIcon name="morph:refresh-cw" />
                   恢复默认主题
                 </FaButton>
               </div>
@@ -1168,10 +1168,10 @@ function sectionTitle(type: HomeSectionType) {
           <div class="page-list__toolbar">
             <FaInput v-model="search.keyword" clearable placeholder="搜索标题、路径" @keydown.enter="loadPages" @clear="loadPages" />
             <FaButton v-auth="'platform:cms:edit'" @click="createPage">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
             </FaButton>
             <FaButton v-auth="'platform:cms:edit'" variant="outline" @click="blockLibraryVisible = true">
-              <FaIcon name="i-ri:building-2-line" />
+              <FaIcon name="morph:building-2" />
               区块库
             </FaButton>
           </div>
@@ -1195,10 +1195,10 @@ function sectionTitle(type: HomeSectionType) {
               </button>
               <div class="page-list-card__actions">
                 <a :href="`/site/${item.slug}`" target="_blank" rel="noopener noreferrer" title="预览">
-                  <FaIcon name="i-ri:external-link-line" />
+                  <FaIcon name="morph:external-link" />
                 </a>
                 <button v-auth="'platform:cms:delete'" type="button" title="删除" @click.stop="confirmDeletePage(item)">
-                  <FaIcon name="i-ri:delete-bin-line" />
+                  <FaIcon name="morph:trash-2" />
                 </button>
               </div>
             </article>
@@ -1231,7 +1231,7 @@ function sectionTitle(type: HomeSectionType) {
                   打开构建器
                 </FaButton>
                 <FaButton variant="outline" @click="editorMode = 'html'">
-                  <FaIcon name="i-ri:code-s-slash-line" />
+                  <FaIcon name="morph:code" />
                   查看 HTML
                 </FaButton>
               </div>
@@ -1246,17 +1246,17 @@ function sectionTitle(type: HomeSectionType) {
               </div>
               <div class="runtime-overview__grid">
                 <article>
-                  <FaIcon name="i-ri:time-line" />
+                  <FaIcon name="morph:clock" />
                   <strong>{{ templateContext.knowledge.latest.length }}</strong>
                   <span>最新 Wiki 条目</span>
                 </article>
                 <article>
-                  <FaIcon name="i-ri:star-line" />
+                  <FaIcon name="morph:star" />
                   <strong>{{ templateContext.knowledge.featured.length }}</strong>
                   <span>编辑推荐条目</span>
                 </article>
                 <article>
-                  <FaIcon name="i-ri:article-line" />
+                  <FaIcon name="morph:newspaper" />
                   <strong>{{ templateContext.cms.pages.latest.length }}</strong>
                   <span>最新 CMS 页面</span>
                 </article>
@@ -1331,7 +1331,7 @@ function sectionTitle(type: HomeSectionType) {
                 {{ selectedPage?.status === 'PUBLISHED' ? '取消发布' : '发布' }}
               </FaButton>
               <FaButton v-if="selectedPage" v-auth="'platform:cms:delete'" variant="ghost" @click="confirmDeletePage()">
-                <FaIcon name="i-ri:delete-bin-line" />
+                <FaIcon name="morph:trash-2" />
                 删除
               </FaButton>
               <a :href="pagePublicUrl" target="_blank" rel="noopener noreferrer">预览公开页</a>
@@ -1404,11 +1404,11 @@ function sectionTitle(type: HomeSectionType) {
               </div>
               <div class="builder-entry__actions">
                 <FaButton v-auth="'platform:cms:edit'" @click="openGrapesEditor('home')">
-                  <FaIcon name="i-ri:layout-grid-line" />
+                  <FaIcon name="morph:layout-grid" />
                   打开首页构建器
                 </FaButton>
                 <FaButton variant="outline" @click="homeHtml = ''; homeCss = ''; homeJs = ''; homeProjectJson = ''">
-                  <FaIcon name="i-ri:eraser-line" />
+                  <FaIcon name="morph:eraser" />
                   清空动态内容
                 </FaButton>
               </div>
@@ -1431,7 +1431,7 @@ function sectionTitle(type: HomeSectionType) {
               <div class="builder-block__head">
                 <FaTag variant="secondary">{{ section.type }}</FaTag>
                 <FaButton size="sm" variant="ghost" @click="removeHomeSection(section)">
-                  <FaIcon name="i-ri:delete-bin-line" />
+                  <FaIcon name="morph:trash-2" />
                 </FaButton>
               </div>
               <FaInput v-model="section.title" placeholder="区块标题" />
@@ -1487,7 +1487,7 @@ function sectionTitle(type: HomeSectionType) {
               <p>管理当前编辑主题的导航菜单：可新增、删除、改名、调整链接、上级与排序。导航随主题保存与切换，当该主题是公开站当前主题时立即生效。</p>
             </div>
             <FaButton v-auth="'platform:cms:edit'" size="sm" @click="addNavigationItem()">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
               新增菜单
             </FaButton>
           </div>
@@ -1500,11 +1500,11 @@ function sectionTitle(type: HomeSectionType) {
               </div>
               <div class="navigation-item-actions">
                 <FaButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="addNavigationItem(item.id)">
-                  <FaIcon name="i-ri:add-line" />
+                  <FaIcon name="morph:plus" />
                   子菜单
                 </FaButton>
                 <FaButton v-auth="'platform:cms:edit'" size="sm" variant="outline" @click="removeNavigationItem(item)">
-                  <FaIcon name="i-ri:delete-bin-line" />
+                  <FaIcon name="morph:trash-2" />
                   删除
                 </FaButton>
               </div>
@@ -1546,7 +1546,7 @@ function sectionTitle(type: HomeSectionType) {
                   <div v-for="item in rootNavigationItems.filter(nav => nav.visible)" :key="item.id" class="cms-nav-preview__menu">
                     <a :href="item.url" class="cms-nav-preview__link">
                       {{ item.label }}
-                      <FaIcon v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" name="i-ri:arrow-down-s-line" />
+                      <FaIcon v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" name="morph:chevron-down" />
                     </a>
                     <div v-if="navigationItems.some(child => child.parentId === item.id && child.visible)" class="cms-nav-preview__dropdown">
                       <a v-for="child in navigationItems.filter(child => child.parentId === item.id && child.visible).sort((a, b) => a.sort - b.sort)" :key="child.id" :href="child.url" class="cms-nav-preview__sublink">
@@ -1576,7 +1576,7 @@ function sectionTitle(type: HomeSectionType) {
           <div class="media-actions">
             <FaInput v-model="mediaSearch.keyword" clearable placeholder="搜索文件名" class="w-64" @keydown.enter="loadMedia" @clear="loadMedia" />
             <FaButton v-auth="'platform:cms:edit'" :loading="loading" @click="pickMedia">
-              <FaIcon name="i-ri:upload-cloud-2-line" />
+              <FaIcon name="morph:cloud-upload" />
               上传
             </FaButton>
           </div>
@@ -1589,7 +1589,7 @@ function sectionTitle(type: HomeSectionType) {
               <div class="media-card__overlay">
                 <div class="media-card__actions">
                   <FaButton size="sm" variant="outline" @click="copyMediaUrl(item)">
-                    <FaIcon name="i-ri:file-copy-line" />
+                    <FaIcon name="morph:copy" />
                     复制地址
                   </FaButton>
                   <FaButton size="sm" @click="useMediaAsCover(item)">
@@ -1618,7 +1618,7 @@ function sectionTitle(type: HomeSectionType) {
             <p>把当前编辑主题的首页定制（横幅、区块、导航、页脚、自定义代码）存为可命名方案，一键切换；切换前会自动快照当前定制，可随时切回。方案按主题隔离，每个主题只看到自己的方案；启用自带方案的主题时，对应方案出现在该主题名下。</p>
           </div>
           <FaButton v-auth="'platform:cms:edit'" @click="openPresetDialog">
-            <FaIcon name="i-ri:bookmark-3-line" />
+            <FaIcon name="morph:bookmark" />
             存为方案
           </FaButton>
         </div>
@@ -1643,11 +1643,11 @@ function sectionTitle(type: HomeSectionType) {
             </div>
             <div class="preset-card__actions">
               <FaButton v-auth="'platform:cms:publish'" size="sm" @click="confirmApplyPreset(preset)">
-                <FaIcon name="i-ri:check-line" />
+                <FaIcon name="morph:check" />
                 应用
               </FaButton>
               <FaButton v-auth="'platform:cms:delete'" size="sm" variant="ghost" @click="confirmDeletePreset(preset)">
-                <FaIcon name="i-ri:delete-bin-line" />
+                <FaIcon name="morph:trash-2" />
                 删除
               </FaButton>
             </div>
@@ -1671,7 +1671,7 @@ function sectionTitle(type: HomeSectionType) {
         </div>
         <div class="preset-form-actions">
           <FaButton :loading="presetSaving" @click="savePreset">
-            <FaIcon name="i-ri:save-3-line" />
+            <FaIcon name="morph:save" />
             保存方案
           </FaButton>
         </div>

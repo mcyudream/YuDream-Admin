@@ -162,7 +162,7 @@ function nextPage() {
     >
       <span class="yd-icon-picker__preview">
         <FaIcon v-if="value" :name="value" />
-        <FaIcon v-else name="i-ri:apps-2-line" class="opacity-40" />
+        <FaIcon v-else name="morph:layout-grid" class="opacity-40" />
       </span>
       <span class="yd-icon-picker__label">{{ value || placeholder }}</span>
       <span class="yd-icon-picker__suffix">
@@ -173,9 +173,9 @@ function nextPage() {
           aria-label="清空"
           @click.stop="clearIcon"
         >
-          <FaIcon name="i-ri:close-circle-fill" />
+          <FaIcon name="morph:circle-x" />
         </button>
-        <FaIcon name="i-ri:arrow-down-s-line" />
+        <FaIcon name="morph:chevron-down" />
       </span>
     </div>
     <template #panel>
@@ -241,11 +241,11 @@ function nextPage() {
             <span>{{ filteredIcons.length }} 个</span>
             <div class="yd-icon-picker__pager-actions">
               <FaButton variant="ghost" size="icon" :disabled="page <= 1" aria-label="上一页" @click="prevPage">
-                <FaIcon name="i-ri:arrow-left-s-line" />
+                <FaIcon name="morph:chevron-left" />
               </FaButton>
               <span>{{ page }} / {{ totalPages }}</span>
               <FaButton variant="ghost" size="icon" :disabled="page >= totalPages" aria-label="下一页" @click="nextPage">
-                <FaIcon name="i-ri:arrow-right-s-line" />
+                <FaIcon name="morph:chevron-right" />
               </FaButton>
             </div>
           </div>

@@ -9,7 +9,7 @@ import FaPopover from '../index.vue'
   <FaPopover>
     <FaButton>
       浮动面板
-      <FaIcon name="i-ep:caret-bottom" />
+      <FaIcon name="morph:chevron-down" />
     </FaButton>
     <template #panel>
       <div class="flex h-30 w-60 items-center justify-center">

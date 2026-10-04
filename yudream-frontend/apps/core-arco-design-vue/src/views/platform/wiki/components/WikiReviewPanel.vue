@@ -110,12 +110,12 @@ watch(filter, () => {
             </button>
           </div>
           <FaButton size="sm" variant="outline" :loading="loading" @click="load">
-            <FaIcon name="i-ri:refresh-line" /> 刷新
+            <FaIcon name="morph:refresh-cw" /> 刷新
           </FaButton>
         </div>
 
         <div v-if="!filtered.length && !loading" class="rev-empty">
-          <FaIcon name="i-ri:checkbox-multiple-line" />
+          <FaIcon name="morph:list-checks" />
           <strong>{{ filter === 'PENDING' ? '没有待处理的审阅项' : '暂无审阅项' }}</strong>
           <p>摄入或 Lint 后发现的问题会出现在这里</p>
         </div>
@@ -138,20 +138,20 @@ watch(filter, () => {
                 class="rev-card__page"
                 @click="store.openPage({ title })"
               >
-                <FaIcon name="i-ri:file-text-line" /> {{ title }}
+                <FaIcon name="morph:file-text" /> {{ title }}
               </button>
             </div>
             <div class="rev-card__footer">
               <span v-if="item.suggestedAction" class="rev-card__suggest">
-                <FaIcon name="i-ri:lightbulb-line" /> {{ item.suggestedAction }}
+                <FaIcon name="morph:lightbulb" /> {{ item.suggestedAction }}
               </span>
               <span class="rev-card__time">{{ new Date(item.createTime).toLocaleString('zh-CN') }}</span>
               <div v-if="!['RESOLVED', 'DISMISSED', 'DONE'].includes(item.status)" class="rev-card__actions">
                 <FaButton size="sm" :loading="acting === item.id" @click="act(item, 'done')">
-                  <FaIcon name="i-ri:check-line" /> 完成
+                  <FaIcon name="morph:check" /> 完成
                 </FaButton>
                 <FaButton size="sm" variant="outline" :disabled="acting === item.id" @click="act(item, 'dismiss')">
-                  <FaIcon name="i-ri:close-line" /> 忽略
+                  <FaIcon name="morph:x" /> 忽略
                 </FaButton>
                 <FaButton
                   v-if="item.searchQueries?.length"
@@ -160,7 +160,7 @@ watch(filter, () => {
                   :disabled="acting === item.id"
                   @click="act(item, 'deep_research')"
                 >
-                  <FaIcon name="i-ri:flask-line" /> 发起研究
+                  <FaIcon name="morph:flask-conical" /> 发起研究
                 </FaButton>
               </div>
             </div>

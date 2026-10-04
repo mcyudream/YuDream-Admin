@@ -117,7 +117,7 @@ function resolveLoadError(error: any) {
     />
   </div>
   <div v-else class="dashboard-card__content dashboard-remote-state">
-    <FaIcon :name="remoteLoading ? 'i-ri:loader-4-line' : 'i-ri:puzzle-2-line'" :class="{ 'animate-spin': remoteLoading }" />
+    <FaIcon :name="remoteLoading ? 'morph:loader-circle' : 'morph:puzzle'" :class="{ 'animate-spin': remoteLoading }" />
     <div>
       <strong>{{ remoteLoading ? '正在加载插件卡片' : '插件卡片不可用' }}</strong>
       <span>{{ remoteLoading ? '正在读取插件前端组件。' : remoteError }}</span>

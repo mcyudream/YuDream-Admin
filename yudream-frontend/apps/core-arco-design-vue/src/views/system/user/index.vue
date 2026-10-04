@@ -478,19 +478,19 @@ function importUsers() {
   <div>
     <FaPageHeader title="用户管理" class="mb-0">
       <FaButton v-auth="'system:user:export'" variant="outline" @click="exportUsers">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
       <FaButton v-auth="'system:user:import'" variant="outline" @click="downloadUserTemplate">
-        <FaIcon name="i-ri:download-2-line" />
+        <FaIcon name="morph:download" />
         模板
       </FaButton>
       <FaButton v-auth="'system:user:import'" variant="outline" @click="importUsers">
-        <FaIcon name="i-ri:upload-2-line" />
+        <FaIcon name="morph:upload" />
         导入
       </FaButton>
       <FaButton v-auth="'system:user:create'" @click="openCreate">
-        <FaIcon name="i-ri:user-add-line" />
+        <FaIcon name="morph:user-plus" />
         新增用户
       </FaButton>
     </FaPageHeader>
@@ -520,7 +520,7 @@ function importUsers() {
                   重置
                 </FaButton>
                 <FaButton @click="loadUsers">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -732,7 +732,7 @@ function importUsers() {
           <div v-if="selectedDeptRoleSections.length" class="space-y-3 w-full">
             <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="rounded-md border p-3">
               <div class="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FaIcon name="i-ri:organization-chart" />
+                <FaIcon name="morph:network" />
                 {{ section.deptName }}
               </div>
               <FaSelect
@@ -781,7 +781,7 @@ function importUsers() {
           <div v-if="selectedDeptRoleSections.length" class="space-y-3 w-full">
             <div v-for="section in selectedDeptRoleSections" :key="section.deptId" class="rounded-md border p-3">
               <div class="mb-2 flex items-center gap-2 text-sm font-medium">
-                <FaIcon name="i-ri:organization-chart" />
+                <FaIcon name="morph:network" />
                 {{ section.deptName }}
               </div>
               <FaSelect

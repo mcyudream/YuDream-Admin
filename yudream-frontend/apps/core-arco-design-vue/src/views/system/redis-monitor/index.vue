@@ -14,14 +14,14 @@ const data = ref<RedisMonitor>({
 })
 
 const stats = computed(() => [
-  { label: '\u8fde\u63a5\u72b6\u6001', value: data.value.connected ? '\u6b63\u5e38' : '\u5f02\u5e38', icon: 'i-ri:pulse-line', tone: data.value.connected ? 'ok' : 'bad' },
-  { label: 'Redis \u7248\u672c', value: data.value.version || '-', icon: 'i-ri:git-branch-line' },
-  { label: 'Key \u603b\u6570', value: data.value.dbSize ?? 0, icon: 'i-ri:key-2-line' },
-  { label: '\u5185\u5b58\u4f7f\u7528', value: data.value.usedMemory || '-', icon: 'i-ri:database-2-line' },
-  { label: '\u5ba2\u6237\u7aef', value: data.value.connectedClients ?? 0, icon: 'i-ri:computer-line' },
-  { label: '\u6bcf\u79d2\u547d\u4ee4', value: data.value.opsPerSecond ?? 0, icon: 'i-ri:speed-up-line' },
-  { label: '\u547d\u4ee4\u603b\u6570', value: data.value.totalCommands ?? 0, icon: 'i-ri:terminal-box-line' },
-  { label: '\u547d\u4e2d\u7387', value: `${data.value.hitRate ?? 0}%`, icon: 'i-ri:crosshair-2-line' },
+  { label: '\u8fde\u63a5\u72b6\u6001', value: data.value.connected ? '\u6b63\u5e38' : '\u5f02\u5e38', icon: 'morph:activity', tone: data.value.connected ? 'ok' : 'bad' },
+  { label: 'Redis \u7248\u672c', value: data.value.version || '-', icon: 'morph:git-branch' },
+  { label: 'Key \u603b\u6570', value: data.value.dbSize ?? 0, icon: 'morph:key-round' },
+  { label: '\u5185\u5b58\u4f7f\u7528', value: data.value.usedMemory || '-', icon: 'morph:database' },
+  { label: '\u5ba2\u6237\u7aef', value: data.value.connectedClients ?? 0, icon: 'morph:monitor' },
+  { label: '\u6bcf\u79d2\u547d\u4ee4', value: data.value.opsPerSecond ?? 0, icon: 'morph:fast-forward' },
+  { label: '\u547d\u4ee4\u603b\u6570', value: data.value.totalCommands ?? 0, icon: 'morph:square-terminal' },
+  { label: '\u547d\u4e2d\u7387', value: `${data.value.hitRate ?? 0}%`, icon: 'morph:crosshair' },
 ])
 
 const keyspaceRows = computed(() => Object.entries(data.value.keyspace || {}).map(([db, value]) => ({ db, value })))
@@ -137,7 +137,7 @@ function ttlText(ttl?: number) {
                   <FaInput v-model="pattern" clearable placeholder="Key &#21305;&#37197;&#65292;&#20363;&#22914; yudream:*" @keydown.enter="load" @clear="load" />
                   <div class="flex gap-2 md:justify-end">
                     <FaButton :loading="loading" @click="load">
-                      <FaIcon name="i-ri:search-line" />
+                      <FaIcon name="morph:search" />
                       &#31579;&#36873;
                     </FaButton>
                   </div>

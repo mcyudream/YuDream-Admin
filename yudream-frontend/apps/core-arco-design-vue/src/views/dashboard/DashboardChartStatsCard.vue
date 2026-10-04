@@ -85,7 +85,7 @@ async function loadDataset() {
     <div class="chart-footer">
       <span>{{ card.description || chartConfig.fallback }}</span>
       <button v-if="card.actionPath" type="button" class="chart-open-button" title="管理" @click="props.onOpen?.(card)">
-        <FaIcon name="i-ri:arrow-right-line" />
+        <FaIcon name="morph:arrow-right" />
       </button>
     </div>
   </div>

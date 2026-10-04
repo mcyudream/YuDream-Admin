@@ -136,7 +136,7 @@ const htmlSrcdoc = computed(() => {
                   重置
                 </FaButton>
                 <FaButton :loading="loading" @click="applySearch">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>

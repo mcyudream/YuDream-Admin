@@ -40,7 +40,7 @@ function toggle() {
     <slot :fold="fold" :toggle="toggle" />
     <div v-if="showToggle" class="text-center w-full translate-y-1/2 bottom-0 left-0 absolute">
       <button class="text-xs font-medium px-2 outline-none border-size-0 rounded bg-secondary inline-flex h-5 cursor-pointer select-none items-center" @click="toggle">
-        <Icon :name="fold ? 'i-ep:caret-bottom' : 'i-ep:caret-top' " />
+        <Icon :name="fold ? 'morph:chevron-down' : 'morph:chevron-up' " />
       </button>
     </div>
   </div>

@@ -39,25 +39,25 @@ const items = [
     <FaDropdown :items="items" side="top">
       <FaButton variant="outline">
         Top
-        <FaIcon name="i-ep:caret-top" />
+        <FaIcon name="morph:chevron-up" />
       </FaButton>
     </FaDropdown>
     <FaDropdown :items="items" side="right">
       <FaButton variant="outline">
         Right
-        <FaIcon name="i-ep:caret-right" />
+        <FaIcon name="morph:chevron-right" />
       </FaButton>
     </FaDropdown>
     <FaDropdown :items="items" side="bottom">
       <FaButton variant="outline">
         Bottom
-        <FaIcon name="i-ep:caret-bottom" />
+        <FaIcon name="morph:chevron-down" />
       </FaButton>
     </FaDropdown>
     <FaDropdown :items="items" side="left">
       <FaButton variant="outline">
         Left
-        <FaIcon name="i-ep:caret-left" />
+        <FaIcon name="morph:chevron-left" />
       </FaButton>
     </FaDropdown>
   </div>

@@ -353,13 +353,13 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
     <header v-if="sessionStore" class="yd-agent-chat__head">
       <FaTooltip text="会话记录">
         <button type="button" class="yd-agent-chat__head-btn" aria-label="会话记录" @click="sessionDrawerOpen = !sessionDrawerOpen">
-          <FaIcon name="i-ri:menu-line" />
+          <FaIcon name="morph:menu" />
         </button>
       </FaTooltip>
       <span class="yd-agent-chat__title" :title="activeTitle">{{ activeTitle }}</span>
       <FaTooltip text="新建会话">
         <button type="button" class="yd-agent-chat__head-btn" aria-label="新建会话" @click="createSession">
-          <FaIcon name="i-ri:add-line" />
+          <FaIcon name="morph:plus" />
         </button>
       </FaTooltip>
     </header>
@@ -386,7 +386,7 @@ defineExpose({ sendPrompt, stop, streaming, activeSession, messages, selectSessi
           <div class="yd-agent-chat__drawer-head">
             <strong>会话记录</strong>
             <button type="button" class="yd-agent-chat__head-btn" aria-label="关闭" @click="sessionDrawerOpen = false">
-              <FaIcon name="i-ri:close-line" />
+              <FaIcon name="morph:x" />
             </button>
           </div>
           <YdChatSessionList

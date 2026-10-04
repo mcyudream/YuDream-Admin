@@ -52,7 +52,7 @@ const form = reactive<AgentApplicationPayload>({
   name: '',
   code: '',
   description: '',
-  icon: 'i-ri:robot-2-line',
+  icon: 'morph:bot',
   systemPrompt: '',
   workflowJson: '',
   toolCodes: [],
@@ -706,22 +706,22 @@ function validateCurrentWorkflow() {
     <FaPageHeader :title="runtimeReadonly ? '查看插件 Agent 编排' : id ? '编辑 Agent 应用' : '新建 Agent 应用'" class="editor-page-header mb-0">
       <div class="header-actions">
         <FaButton variant="outline" @click="router.push('/platform/agent')">
-          <FaIcon name="i-ri:arrow-left-line" /> 返回
+          <FaIcon name="morph:arrow-left" /> 返回
         </FaButton>
         <FaButton variant="outline" title="导出工作流 JSON" @click="exportWorkflow">
-          <FaIcon name="i-ri:download-2-line" /> 导出
+          <FaIcon name="morph:download" /> 导出
         </FaButton>
         <FaButton v-if="runtimeReadonly" :loading="saving" @click="importRuntimeApplication">
-          <FaIcon name="i-ri:download-cloud-2-line" /> 导入并编辑
+          <FaIcon name="morph:cloud-download" /> 导入并编辑
         </FaButton>
         <FaButton v-if="!runtimeReadonly" :variant="rightMode === 'debug' ? 'default' : 'outline'" @click="rightMode = 'debug'">
-          <FaIcon name="i-ri:bug-line" /> 调试
+          <FaIcon name="morph:bug" /> 调试
         </FaButton>
         <FaButton v-if="!runtimeReadonly" variant="outline" :loading="saving" @click="save(false)">
-          <FaIcon name="i-ri:save-3-line" /> 保存
+          <FaIcon name="morph:save" /> 保存
         </FaButton>
         <FaButton v-if="!runtimeReadonly" :loading="saving" @click="save(true)">
-          <FaIcon name="i-ri:send-plane-line" /> 发布
+          <FaIcon name="morph:send" /> 发布
         </FaButton>
       </div>
     </FaPageHeader>
@@ -741,24 +741,24 @@ function validateCurrentWorkflow() {
           <span>{{ runtimeReadonly ? '插件运行时编排' : '新建连线' }}</span>
           <div v-if="!runtimeReadonly" class="connection-switch" aria-label="连线样式">
             <button type="button" :class="{ active: defaultConnectionStyle === 'arrow' }" title="箭头连线" @click="defaultConnectionStyle = 'arrow'">
-              <FaIcon name="i-ri:arrow-right-line" /> 箭头
+              <FaIcon name="morph:arrow-right" /> 箭头
             </button>
             <button type="button" :class="{ active: defaultConnectionStyle === 'line' }" title="普通线段" @click="defaultConnectionStyle = 'line'">
-              <FaIcon name="i-ri:subtract-line" /> 线段
+              <FaIcon name="morph:minus" /> 线段
             </button>
           </div>
           <i v-if="!runtimeReadonly" />
           <button type="button" class="toolbar-icon" title="适应画布" aria-label="适应画布" @click="fitCanvas">
-            <FaIcon name="i-ri:fullscreen-line" />
+            <FaIcon name="morph:maximize" />
           </button>
           <button v-if="!runtimeReadonly" type="button" class="toolbar-icon" title="重置基础流程" aria-label="重置基础流程" @click="resetWorkflow">
-            <FaIcon name="i-ri:restart-line" />
+            <FaIcon name="morph:rotate-cw" />
           </button>
           <button v-if="!runtimeReadonly && legacyToolNodeCount" type="button" class="toolbar-icon" title="迁移兼容工具节点" aria-label="迁移兼容工具节点" @click="migrateLegacyTools">
-            <FaIcon name="i-ri:git-merge-line" />
+            <FaIcon name="morph:git-merge" />
           </button>
           <button v-if="!runtimeReadonly" type="button" class="toolbar-icon danger" :disabled="!hasSelection" title="删除选中项" aria-label="删除选中项" @click="deleteSelection">
-            <FaIcon name="i-ri:delete-bin-line" />
+            <FaIcon name="morph:trash-2" />
           </button>
         </div>
 

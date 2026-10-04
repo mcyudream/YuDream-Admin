@@ -31,15 +31,15 @@ const space = computed(() => spaces.value.find(item => item.id === spaceId.value
 const flatTree = computed(() => flattenTree(tree.value))
 
 const panels = [
-  {key: 'directory', label: 'Wiki 目录', icon: 'i-ri:node-tree', component: shallowRef(WikiDirectoryPanel)},
-  {key: 'sources', label: '资料源', icon: 'i-ri:database-2-line', component: shallowRef(WikiSourcesPanel)},
-  {key: 'ingest', label: '摄入队列', icon: 'i-ri:stack-line', component: shallowRef(WikiIngestPanel)},
-  {key: 'search', label: '检索', icon: 'i-ri:search-eye-line', component: shallowRef(WikiSearchPanel)},
-  {key: 'graph', label: '图谱', icon: 'i-ri:mind-map', component: shallowRef(WikiGraphPanel)},
-  {key: 'lint', label: 'Lint', icon: 'i-ri:shield-check-line', component: shallowRef(WikiLintPanel)},
-  {key: 'review', label: '审核', icon: 'i-ri:checkbox-multiple-line', component: shallowRef(WikiReviewPanel)},
-  {key: 'research', label: '深度研究', icon: 'i-ri:flask-line', component: shallowRef(WikiResearchPanel)},
-  {key: 'settings', label: '设置', icon: 'i-ri:settings-3-line', component: shallowRef(WikiSettingsPanel)},
+  {key: 'directory', label: 'Wiki 目录', icon: 'morph:list-tree', component: shallowRef(WikiDirectoryPanel)},
+  {key: 'sources', label: '资料源', icon: 'morph:database', component: shallowRef(WikiSourcesPanel)},
+  {key: 'ingest', label: '摄入队列', icon: 'morph:layers', component: shallowRef(WikiIngestPanel)},
+  {key: 'search', label: '检索', icon: 'morph:zoom-in', component: shallowRef(WikiSearchPanel)},
+  {key: 'graph', label: '图谱', icon: 'morph:waypoints', component: shallowRef(WikiGraphPanel)},
+  {key: 'lint', label: 'Lint', icon: 'morph:shield-check', component: shallowRef(WikiLintPanel)},
+  {key: 'review', label: '审核', icon: 'morph:list-checks', component: shallowRef(WikiReviewPanel)},
+  {key: 'research', label: '深度研究', icon: 'morph:flask-conical', component: shallowRef(WikiResearchPanel)},
+  {key: 'settings', label: '设置', icon: 'morph:settings', component: shallowRef(WikiSettingsPanel)},
 ]
 
 const panelGroups = [
@@ -247,7 +247,7 @@ onMounted(loadSpaces)
         :description="space ? `${space.name} · /wiki/${space.slug}` : '资料源 → 摄入 → 自动维护的知识库'"
     >
       <FaButton variant="outline" :disabled="!space" @click="rebuild">
-        <FaIcon name="i-ri:refresh-line"/>
+        <FaIcon name="morph:refresh-cw"/>
         重建索引
       </FaButton>
     </FaPageHeader>
@@ -259,10 +259,10 @@ onMounted(loadSpaces)
       </label>
       <div class="wiki-toolbar__actions">
         <FaButton variant="outline" @click="createVisible = true">
-          <FaIcon name="i-ri:add-line" />新建知识库
+          <FaIcon name="morph:plus" />新建知识库
         </FaButton>
         <FaButton variant="ghost" :disabled="!space" :loading="!!deletingSpaceId" @click="space && removeSpace(space)">
-          <FaIcon name="i-ri:delete-bin-line" />删除知识库
+          <FaIcon name="morph:trash-2" />删除知识库
         </FaButton>
       </div>
       <label class="wiki-mobile-nav">
@@ -291,12 +291,12 @@ onMounted(loadSpaces)
       <main class="wiki-main" :aria-label="activeItem.label">
         <div class="wiki-main__heading">
           <span>{{ activeGroup.label }}</span>
-          <FaIcon name="i-ri:arrow-right-s-line" />
+          <FaIcon name="morph:chevron-right" />
           <h2>{{ activeItem.label }}</h2>
         </div>
         <div v-if="!spacesLoaded" class="wiki-empty" role="status">正在加载知识库…</div>
         <div v-else-if="!space" class="wiki-empty">
-          <FaIcon name="i-ri:book-shelf-line" class="text-3xl" />
+          <FaIcon name="morph:library" class="text-3xl" />
           <p>暂无知识库，新建后即可管理资料与页面。</p>
           <FaButton @click="createVisible = true">新建知识库</FaButton>
         </div>

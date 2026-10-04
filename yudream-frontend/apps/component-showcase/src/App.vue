@@ -19,11 +19,11 @@ interface Category {
 }
 
 const categories: Category[] = [
-  { key: 'basic', label: '基础', en: 'Basic', icon: 'i-ri:apps-2-line', group: '通用', description: '按钮、标签、徽章、头像等最基础的视觉元件。', section: BasicSection },
-  { key: 'form', label: '表单', en: 'Form', icon: 'i-ri:edit-box-line', group: '数据录入', description: '输入框、多行文本、选择器、开关等表单控件。', section: FormSection },
-  { key: 'data', label: '数据展示', en: 'Data Display', icon: 'i-ri:layout-grid-line', group: '数据展示', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
-  { key: 'feedback', label: '反馈', en: 'Feedback', icon: 'i-ri:notification-2-line', group: '反馈', description: '气泡提示、弹窗、图片预览等交互反馈组件。', section: FeedbackSection },
-  { key: 'ai', label: 'AI 助手', en: 'AI Chat', icon: 'i-ri:sparkling-2-line', group: 'AI 助手', description: '会话、消息气泡、输入区、附件、思考链、动作与 AG-UI 流式元件。', section: AiSection },
+  { key: 'basic', label: '基础', en: 'Basic', icon: 'morph:layout-grid', group: '通用', description: '按钮、标签、徽章、头像等最基础的视觉元件。', section: BasicSection },
+  { key: 'form', label: '表单', en: 'Form', icon: 'morph:square-pen', group: '数据录入', description: '输入框、多行文本、选择器、开关等表单控件。', section: FormSection },
+  { key: 'data', label: '数据展示', en: 'Data Display', icon: 'morph:layout-grid', group: '数据展示', description: '卡片、页签、分页、进度条、滚动区域等数据承载组件。', section: DataSection },
+  { key: 'feedback', label: '反馈', en: 'Feedback', icon: 'morph:bell', group: '反馈', description: '气泡提示、弹窗、图片预览等交互反馈组件。', section: FeedbackSection },
+  { key: 'ai', label: 'AI 助手', en: 'AI Chat', icon: 'morph:sparkles', group: 'AI 助手', description: '会话、消息气泡、输入区、附件、思考链、动作与 AG-UI 流式元件。', section: AiSection },
 ]
 
 const active = ref('basic')
@@ -59,7 +59,7 @@ const activeCategory = computed(() => categories.find(item => item.key === activ
     <aside class="sidebar">
       <div class="sidebar__brand">
         <div class="sidebar__logo">
-          <FaIcon name="i-ri:stack-line" />
+          <FaIcon name="morph:layers" />
         </div>
           <div class="sidebar__brand-text">
           <div class="sidebar__title">
@@ -74,7 +74,7 @@ const activeCategory = computed(() => categories.find(item => item.key === activ
       <div class="sidebar__search">
         <FaInput v-model="keyword" clearable placeholder="搜索组件" class="w-full">
           <template #start>
-            <FaIcon name="i-ri:search-line" />
+            <FaIcon name="morph:search" />
           </template>
         </FaInput>
       </div>
@@ -114,11 +114,11 @@ const activeCategory = computed(() => categories.find(item => item.key === activ
       <header class="content__header">
         <div class="content__header-main">
           <div class="content__crumb">
-            <FaIcon name="i-ri:home-4-line" />
+            <FaIcon name="morph:house" />
             <span>组件</span>
-            <FaIcon name="i-ri:arrow-right-s-line" class="content__crumb-sep" />
+            <FaIcon name="morph:chevron-right" class="content__crumb-sep" />
             <span>{{ activeCategory.group }}</span>
-            <FaIcon name="i-ri:arrow-right-s-line" class="content__crumb-sep" />
+            <FaIcon name="morph:chevron-right" class="content__crumb-sep" />
             <span class="content__crumb-current">{{ activeCategory.label }}</span>
           </div>
           <div class="content__heading">

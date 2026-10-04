@@ -81,15 +81,15 @@ const aiModelKindOptions = [
 ]
 
 const groups: CapabilityGroup[] = [
-  { type: 'REALTIME', title: '实时通信', icon: 'i-ri:pulse-line' },
-  { type: 'MESSAGING', title: '消息队列', icon: 'i-ri:message-3-line' },
-  { type: 'DOCUMENTATION', title: '接口文档', icon: 'i-ri:file-list-3-line' },
-  { type: 'INTEGRATION', title: '集成运行', icon: 'i-ri:terminal-box-line' },
-  { type: 'DOCUMENT', title: '文档生成', icon: 'i-ri:file-word-2-line' },
+  { type: 'REALTIME', title: '实时通信', icon: 'morph:activity' },
+  { type: 'MESSAGING', title: '消息队列', icon: 'morph:message-square' },
+  { type: 'DOCUMENTATION', title: '接口文档', icon: 'morph:file-text' },
+  { type: 'INTEGRATION', title: '集成运行', icon: 'morph:square-terminal' },
+  { type: 'DOCUMENT', title: '文档生成', icon: 'morph:file-text' },
   { type: 'CONTENT', title: '内容定制', icon: 'i-ri:layout-masonry-line' },
-  { type: 'GRAPH', title: '图数据库', icon: 'i-ri:share-circle-line' },
-  { type: 'AI', title: 'AI 助手', icon: 'i-ri:sparkling-2-line' },
-  { type: 'DISTRIBUTION', title: '插件分发', icon: 'i-ri:store-2-line' },
+  { type: 'GRAPH', title: '图数据库', icon: 'morph:share-2' },
+  { type: 'AI', title: 'AI 助手', icon: 'morph:sparkles' },
+  { type: 'DISTRIBUTION', title: '插件分发', icon: 'morph:store' },
 ]
 
 const selected = computed(() => rows.value.find(item => item.code === selectedCode.value) || rows.value[0])
@@ -118,10 +118,10 @@ const summary = computed(() => {
   const enabled = rows.value.filter(item => item.enabled).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
   return [
-    { label: '能力总数', value: rows.value.length, icon: 'i-ri:node-tree' },
-    { label: '已启用', value: enabled, icon: 'i-ri:checkbox-circle-line', tone: 'ok' },
-    { label: '异常', value: error, icon: 'i-ri:error-warning-line', tone: error > 0 ? 'bad' : 'ok' },
-    { label: '实时连接', value: connectionCount(), icon: 'i-ri:pulse-line' },
+    { label: '能力总数', value: rows.value.length, icon: 'morph:list-tree' },
+    { label: '已启用', value: enabled, icon: 'morph:circle-check', tone: 'ok' },
+    { label: '异常', value: error, icon: 'morph:triangle-alert', tone: error > 0 ? 'bad' : 'ok' },
+    { label: '实时连接', value: connectionCount(), icon: 'morph:activity' },
   ]
 })
 
@@ -832,7 +832,7 @@ function splitModelList(value: string) {
               type="button"
               @click="selectedCode = item.code"
             >
-              <FaIcon :name="item.icon || 'i-ri:puzzle-2-line'" />
+              <FaIcon :name="item.icon || 'morph:puzzle'" />
               <span>{{ item.name }}</span>
               <FaTag :variant="statusVariant(item.status)">{{ statusText(item.status) }}</FaTag>
             </button>
@@ -843,7 +843,7 @@ function splitModelList(value: string) {
           <div class="detail-header">
             <div class="detail-title">
               <div class="detail-icon">
-                <FaIcon :name="selected.icon || 'i-ri:puzzle-2-line'" />
+                <FaIcon :name="selected.icon || 'morph:puzzle'" />
               </div>
               <div>
                 <h2>{{ selected.name }}</h2>
@@ -852,7 +852,7 @@ function splitModelList(value: string) {
             </div>
             <div class="detail-actions">
               <FaButton v-auth="'platform:capability:config'" variant="outline" @click="openConfig(selected)">
-                <FaIcon name="i-ri:settings-4-line" />
+                <FaIcon name="morph:settings-2" />
                 配置
               </FaButton>
               <FaButton
@@ -862,7 +862,7 @@ function splitModelList(value: string) {
                 :loading="actionLoading === `${selected.code}:test`"
                 @click="testCapability(selected)"
               >
-                <FaIcon name="i-ri:send-plane-line" />
+                <FaIcon name="morph:send" />
                 测试
               </FaButton>
               <FaButton
@@ -872,7 +872,7 @@ function splitModelList(value: string) {
                 :loading="actionLoading === `${selected.code}:toggle`"
                 @click="toggleCapability(selected)"
               >
-                <FaIcon :name="selected.enabled ? 'i-ri:pause-circle-line' : 'i-ri:play-circle-line'" />
+                <FaIcon :name="selected.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
                 {{ selected.enabled ? '禁用' : '启用' }}
               </FaButton>
             </div>
@@ -887,7 +887,7 @@ function splitModelList(value: string) {
                   取消
                 </FaButton>
                 <FaButton size="sm" @click="saveConfig">
-                  <FaIcon name="i-ri:check-line" />
+                  <FaIcon name="morph:check" />
                   保存配置
                 </FaButton>
               </div>
@@ -917,12 +917,12 @@ function splitModelList(value: string) {
                     :class="{ 'is-active': providerIndex === activeProviderIndex }"
                     @click="selectAiProvider(providerIndex)"
                   >
-                    <FaIcon name="i-ri:cloud-line" class="ai-provider-nav__icon" />
+                    <FaIcon name="morph:cloud" class="ai-provider-nav__icon" />
                     <span class="ai-provider-nav__name">{{ provider.name || provider.code || `供应商 ${providerIndex + 1}` }}</span>
                     <span class="ai-provider-nav__badge" :class="{ off: !provider.enabled }">{{ provider.enabled ? '启用' : '停用' }}</span>
                   </button>
                   <FaButton variant="outline" size="sm" class="ai-provider-nav__add" @click="addAiProvider">
-                    <FaIcon name="i-ri:add-line" />
+                    <FaIcon name="morph:plus" />
                     添加供应商
                   </FaButton>
                 </aside>
@@ -935,7 +935,7 @@ function splitModelList(value: string) {
                       <span class="ai-switch-label">启用</span>
                       <FaSwitch v-model="activeProvider.enabled" />
                       <FaButton size="sm" variant="ghost" :disabled="aiProviders.length <= 1" title="删除供应商" @click="removeAiProvider(activeProviderIndex)">
-                        <FaIcon name="i-ri:delete-bin-line" />
+                        <FaIcon name="morph:trash-2" />
                       </FaButton>
                     </div>
                   </div>
@@ -984,7 +984,7 @@ function splitModelList(value: string) {
                     <div class="ai-model-table__head">
                       <span>模型（{{ activeProvider.models.length }}）</span>
                       <FaButton size="sm" variant="outline" @click="addAiModel(activeProvider)">
-                        <FaIcon name="i-ri:add-line" />
+                        <FaIcon name="morph:plus" />
                         添加模型
                       </FaButton>
                     </div>
@@ -1010,7 +1010,7 @@ function splitModelList(value: string) {
                           <td class="ai-model-table__switch" data-label="视觉"><FaSwitch v-model="model.vision" /></td>
                           <td class="ai-model-table__op">
                             <FaButton size="sm" variant="ghost" :disabled="activeProvider.models.length <= 1" title="删除模型" @click="removeAiModel(activeProvider, modelIndex)">
-                              <FaIcon name="i-ri:delete-bin-line" />
+                              <FaIcon name="morph:trash-2" />
                             </FaButton>
                           </td>
                         </tr>

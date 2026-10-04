@@ -63,7 +63,7 @@ async function loadStats() {
       <span v-if="loading">正在刷新插件状态</span>
       <span v-else>{{ message || '统计来自插件运行时列表' }}</span>
       <FaButton v-if="card.actionPath" size="sm" variant="outline" @click="onOpen?.(card)">
-        <FaIcon name="i-ri:arrow-right-line" />
+        <FaIcon name="morph:arrow-right" />
         管理
       </FaButton>
     </div>

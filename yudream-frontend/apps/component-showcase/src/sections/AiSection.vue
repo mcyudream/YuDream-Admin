@@ -183,16 +183,16 @@ onUnmounted(() => {
 })
 
 const prompts: YdPromptItem[] = [
-  { key: 'write', label: '写一份项目周报', icon: 'i-ri:quill-pen-line', description: '结构化输出本周进展与计划' },
-  { key: 'kb', label: '梳理知识库内容', icon: 'i-ri:book-2-line', description: '总结重点文档与关联' },
-  { key: 'data', label: '分析数据给建议', icon: 'i-ri:line-chart-line', description: '输出可执行建议清单' },
-  { key: 'code', label: '审查这段代码', icon: 'i-ri:code-s-slash-line', description: '发现问题并给出修改建议' },
+  { key: 'write', label: '写一份项目周报', icon: 'morph:feather', description: '结构化输出本周进展与计划' },
+  { key: 'kb', label: '梳理知识库内容', icon: 'morph:book', description: '总结重点文档与关联' },
+  { key: 'data', label: '分析数据给建议', icon: 'morph:chart-line', description: '输出可执行建议清单' },
+  { key: 'code', label: '审查这段代码', icon: 'morph:code', description: '发现问题并给出修改建议' },
 ]
 
 const suggestionItems: YdSuggestionItem[] = [
-  { key: 'translate', label: '/翻译', icon: 'i-ri:translate-2', description: '把内容翻译成指定语言', value: '请把以下内容翻译成英文：' },
-  { key: 'summary', label: '/总结', icon: 'i-ri:file-list-3-line', description: '提炼要点输出摘要', value: '请总结以下内容：' },
-  { key: 'polish', label: '/润色', icon: 'i-ri:magic-line', description: '优化表达与结构', value: '请润色以下内容：' },
+  { key: 'translate', label: '/翻译', icon: 'morph:languages', description: '把内容翻译成指定语言', value: '请把以下内容翻译成英文：' },
+  { key: 'summary', label: '/总结', icon: 'morph:file-text', description: '提炼要点输出摘要', value: '请总结以下内容：' },
+  { key: 'polish', label: '/润色', icon: 'morph:wand-sparkles', description: '优化表达与结构', value: '请润色以下内容：' },
 ]
 const suggestionText = ref('/')
 
@@ -294,7 +294,7 @@ function onActionClick(action: YdChatAction) {
       >
         <template #empty>
           <div class="grid justify-items-center gap-2">
-            <FaIcon name="i-ri:sparkling-2-line" class="text-2xl text-primary" />
+            <FaIcon name="morph:sparkles" class="text-2xl text-primary" />
             <span>向示例知识库提问吧</span>
           </div>
         </template>
@@ -346,13 +346,13 @@ function onActionClick(action: YdChatAction) {
     <div class="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
       <div class="rounded-lg border border-[var(--color-border-2)] p-3">
         <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-          <FaIcon name="i-ri:settings-4-line" class="text-primary" /> 统一文案
+          <FaIcon name="morph:settings-2" class="text-primary" /> 统一文案
         </p>
         <p class="m-0 text-xs text-[var(--color-text-3)]">placeholder / thinkingText / disclaimer 一次配置全站生效。</p>
       </div>
       <div class="rounded-lg border border-[var(--color-border-2)] p-3">
         <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-          <FaIcon name="i-ri:exchange-line" class="text-primary" /> 内容转换
+          <FaIcon name="morph:arrow-left-right" class="text-primary" /> 内容转换
         </p>
         <p class="m-0 text-xs text-[var(--color-text-3)]">transformContent 全局处理 wikilink 等自定义协议。</p>
       </div>
@@ -374,13 +374,13 @@ function onActionClick(action: YdChatAction) {
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <div class="rounded-lg border border-[var(--color-border-2)] p-3">
           <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-            <FaIcon name="i-ri:rss-line" class="text-primary" /> SSE
+            <FaIcon name="morph:rss" class="text-primary" /> SSE
           </p>
           <p class="m-0 text-xs text-[var(--color-text-3)]">fetch + ReadableStream 增量解析，适合单向流式问答。</p>
         </div>
         <div class="rounded-lg border border-[var(--color-border-2)] p-3">
           <p class="m-0 mb-1 flex items-center gap-1 font-medium">
-            <FaIcon name="i-ri:exchange-line" class="text-primary" /> WebSocket
+            <FaIcon name="morph:arrow-left-right" class="text-primary" /> WebSocket
           </p>
           <p class="m-0 text-xs text-[var(--color-text-3)]">一问一连接，支持双向交互与结构化 AG-UI 事件。</p>
         </div>

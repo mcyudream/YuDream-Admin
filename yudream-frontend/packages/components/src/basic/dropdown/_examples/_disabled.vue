@@ -42,7 +42,7 @@ const items = [
   <FaDropdown :items="items">
     <FaButton variant="outline">
       更多操作
-      <FaIcon name="i-ep:caret-bottom" />
+      <FaIcon name="morph:chevron-down" />
     </FaButton>
   </FaDropdown>
 </template>

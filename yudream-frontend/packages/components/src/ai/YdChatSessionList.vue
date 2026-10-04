@@ -41,12 +41,12 @@ const normalSessions = computed(() => filtered.value.filter(session => !session.
 
 function scopeIcon(scopeType?: string): string {
   if (scopeType === 'WIKI') {
-    return 'i-ri:book-2-line'
+    return 'morph:book'
   }
   if (scopeType === 'AGENT') {
-    return 'i-ri:robot-2-line'
+    return 'morph:bot'
   }
-  return 'i-ri:chat-3-line'
+  return 'morph:message-circle'
 }
 </script>
 
@@ -54,11 +54,11 @@ function scopeIcon(scopeType?: string): string {
   <aside class="yd-session-list">
     <div class="yd-session-list__head">
       <FaButton variant="outline" class="yd-session-list__new" @click="emits('create')">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
         新建会话
       </FaButton>
       <div class="yd-session-list__search">
-        <FaIcon name="i-ri:search-line" class="yd-session-list__search-icon" />
+        <FaIcon name="morph:search" class="yd-session-list__search-icon" />
         <input v-model="keyword" type="search" placeholder="搜索会话" class="yd-session-list__search-input">
       </div>
     </div>
@@ -85,11 +85,11 @@ function scopeIcon(scopeType?: string): string {
         >
           <FaIcon :name="scopeIcon(session.scopeType)" class="yd-session__icon" />
           <span class="yd-session__title">{{ session.title }}</span>
-          <FaIcon name="i-ri:pushpin-2-fill" class="yd-session__pin" />
+          <FaIcon name="morph:pin" class="yd-session__pin" />
           <span class="yd-session__actions">
-            <button type="button" title="重命名" @click.stop="emits('rename', session)"><FaIcon name="i-ri:edit-line" /></button>
-            <button type="button" title="取消置顶" @click.stop="emits('pin', session)"><FaIcon name="i-ri:pushpin-line" /></button>
-            <button type="button" title="删除" @click.stop="emits('remove', session)"><FaIcon name="i-ri:delete-bin-line" /></button>
+            <button type="button" title="重命名" @click.stop="emits('rename', session)"><FaIcon name="morph:pencil" /></button>
+            <button type="button" title="取消置顶" @click.stop="emits('pin', session)"><FaIcon name="morph:pin" /></button>
+            <button type="button" title="删除" @click.stop="emits('remove', session)"><FaIcon name="morph:trash-2" /></button>
           </span>
         </button>
       </template>
@@ -108,9 +108,9 @@ function scopeIcon(scopeType?: string): string {
         <FaIcon :name="scopeIcon(session.scopeType)" class="yd-session__icon" />
         <span class="yd-session__title">{{ session.title }}</span>
         <span class="yd-session__actions">
-          <button type="button" title="重命名" @click.stop="emits('rename', session)"><FaIcon name="i-ri:edit-line" /></button>
-          <button type="button" title="置顶" @click.stop="emits('pin', session)"><FaIcon name="i-ri:pushpin-line" /></button>
-          <button type="button" title="删除" @click.stop="emits('remove', session)"><FaIcon name="i-ri:delete-bin-line" /></button>
+          <button type="button" title="重命名" @click.stop="emits('rename', session)"><FaIcon name="morph:pencil" /></button>
+          <button type="button" title="置顶" @click.stop="emits('pin', session)"><FaIcon name="morph:pin" /></button>
+          <button type="button" title="删除" @click.stop="emits('remove', session)"><FaIcon name="morph:trash-2" /></button>
         </span>
       </button>
     </div>

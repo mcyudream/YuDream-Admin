@@ -104,7 +104,7 @@ async function exportOnlineUsers() {
   <div>
     <FaPageHeader :title="onlineCountText" class="mb-0">
       <FaButton v-auth="'system:monitor:online:export'" variant="outline" @click="exportOnlineUsers">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
     </FaPageHeader>

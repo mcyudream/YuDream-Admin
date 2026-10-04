@@ -88,7 +88,7 @@ function typeText(type: CapabilityItem['type']) {
       <span v-if="loading">正在刷新平台能力</span>
       <span v-else>{{ message || '展示当前项目允许加载的能力' }}</span>
       <FaButton v-if="card.actionPath" size="sm" variant="outline" @click="props.onOpen?.(card)">
-        <FaIcon name="i-ri:arrow-right-line" />
+        <FaIcon name="morph:arrow-right" />
         管理
       </FaButton>
     </div>

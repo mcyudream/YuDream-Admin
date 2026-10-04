@@ -366,11 +366,11 @@ function menuIcon(menu?: MenuManageItem) {
 
 function treeIcon(type?: MenuNodeType) {
   const icons: Record<MenuNodeType, string> = {
-    CATEGORY: 'i-ri:folder-3-line',
-    LAYOUT: 'i-ri:layout-2-line',
-    MENU: 'i-ri:menu-2-line',
-    LINK: 'i-ri:links-line',
-    BUTTON: 'i-ri:checkbox-circle-line',
+    CATEGORY: 'morph:folder',
+    LAYOUT: 'morph:layout-dashboard',
+    MENU: 'morph:menu',
+    LINK: 'morph:link',
+    BUTTON: 'morph:circle-check',
   }
   return icons[type || 'MENU']
 }
@@ -433,16 +433,16 @@ function importMenus() {
           <h2>菜单列表</h2>
           <div class="menu-toolbar">
             <FaButton v-auth="'system:menu:export'" variant="ghost" size="sm" title="导出菜单" @click="exportMenus">
-              <FaIcon name="i-ri:file-excel-2-line" />
+              <FaIcon name="morph:file-spreadsheet" />
             </FaButton>
             <FaButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="下载模板" @click="downloadMenuTemplate">
-              <FaIcon name="i-ri:download-2-line" />
+              <FaIcon name="morph:download" />
             </FaButton>
             <FaButton v-auth="'system:menu:import'" variant="ghost" size="sm" title="导入菜单" @click="importMenus">
-              <FaIcon name="i-ri:upload-2-line" />
+              <FaIcon name="morph:upload" />
             </FaButton>
             <FaButton v-auth="'system:menu:create'" variant="ghost" size="sm" title="新增菜单" @click="openCreate()">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
             </FaButton>
             <FaButton
               v-if="selectedMenu?.status === 'DISABLED'"
@@ -452,7 +452,7 @@ function importMenus() {
               title="启用菜单"
               @click="confirmEnable()"
             >
-              <FaIcon name="i-ri:play-circle-line" />
+              <FaIcon name="morph:circle-play" />
             </FaButton>
             <FaButton
               v-if="selectedMenu?.status === 'ACTIVE'"
@@ -462,7 +462,7 @@ function importMenus() {
               title="停用菜单"
               @click="confirmDisable()"
             >
-              <FaIcon name="i-ri:pause-circle-line" />
+              <FaIcon name="morph:circle-pause" />
             </FaButton>
             <FaButton
               v-if="selectedMenu"
@@ -472,7 +472,7 @@ function importMenus() {
               title="删除菜单"
               @click="confirmDelete()"
             >
-              <FaIcon name="i-ri:delete-bin-line" />
+              <FaIcon name="morph:trash-2" />
             </FaButton>
           </div>
         </div>
@@ -515,7 +515,7 @@ function importMenus() {
                   title="新增子菜单"
                   @click.stop="openCreate(node.menu)"
                 >
-                  <FaIcon name="i-ri:add-line" />
+                  <FaIcon name="morph:plus" />
                 </FaButton>
               </div>
             </template>
@@ -529,11 +529,11 @@ function importMenus() {
             <h2>菜单详情</h2>
             <div class="menu-actions">
               <FaButton v-auth="'system:menu:create'" variant="outline" size="sm" :disabled="!canCreateChild" @click="openCreateFromSelected">
-                <FaIcon name="i-ri:add-line" />
+                <FaIcon name="morph:plus" />
                 新增子菜单
               </FaButton>
               <FaButton v-auth="'system:menu:edit'" variant="outline" size="sm" :disabled="!selectedMenu" @click="openEdit()">
-                <FaIcon name="i-ri:edit-2-line" />
+                <FaIcon name="morph:pencil" />
                 编辑
               </FaButton>
               <FaButton
@@ -543,7 +543,7 @@ function importMenus() {
                 size="sm"
                 @click="confirmEnable()"
               >
-                <FaIcon name="i-ri:play-circle-line" />
+                <FaIcon name="morph:circle-play" />
                 启用
               </FaButton>
               <FaButton
@@ -553,7 +553,7 @@ function importMenus() {
                 size="sm"
                 @click="confirmDisable()"
               >
-                <FaIcon name="i-ri:pause-circle-line" />
+                <FaIcon name="morph:circle-pause" />
                 停用
               </FaButton>
               <FaButton
@@ -563,7 +563,7 @@ function importMenus() {
                 size="sm"
                 @click="confirmDelete()"
               >
-                <FaIcon name="i-ri:delete-bin-line" />
+                <FaIcon name="morph:trash-2" />
                 删除
               </FaButton>
             </div>
@@ -663,7 +663,7 @@ function importMenus() {
             <template #cell-operation="{ row }">
               <div class="flex-center gap-2">
                 <FaButton v-auth="'system:menu:edit'" variant="ghost" size="sm" title="编辑" @click="openEdit(row.original)">
-                  <FaIcon name="i-ri:edit-2-line" />
+                  <FaIcon name="morph:pencil" />
                 </FaButton>
                 <FaButton
                   v-if="row.original.status === 'DISABLED'"
@@ -673,7 +673,7 @@ function importMenus() {
                   title="启用"
                   @click="confirmEnable(row.original)"
                 >
-                  <FaIcon name="i-ri:play-circle-line" />
+                  <FaIcon name="morph:circle-play" />
                 </FaButton>
                 <FaButton
                   v-if="row.original.status === 'ACTIVE'"
@@ -683,7 +683,7 @@ function importMenus() {
                   title="停用"
                   @click="confirmDisable(row.original)"
                 >
-                  <FaIcon name="i-ri:pause-circle-line" />
+                  <FaIcon name="morph:circle-pause" />
                 </FaButton>
                 <FaButton
                   v-auth="'system:menu:delete'"
@@ -692,7 +692,7 @@ function importMenus() {
                   title="删除"
                   @click="confirmDelete(row.original)"
                 >
-                  <FaIcon name="i-ri:delete-bin-line" />
+                  <FaIcon name="morph:trash-2" />
                 </FaButton>
               </div>
             </template>

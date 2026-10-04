@@ -29,10 +29,10 @@ function activityStatus(activity: YdChatActivity): string {
 }
 
 function activityIcon(activity: YdChatActivity): string {
-  if (activityStatus(activity) === 'cancelled') return 'i-ri:stop-circle-line'
-  if (activity.activityType === 'wiki-retrieval') return 'i-ri:search-line'
-  if (activity.activityType === 'wiki-graph') return 'i-ri:mind-map'
-  return activityStatus(activity) === 'error' ? 'i-ri:error-warning-line' : activityStatus(activity) === 'complete' ? 'i-ri:checkbox-circle-line' : 'i-ri:loader-4-line'
+  if (activityStatus(activity) === 'cancelled') return 'morph:circle-stop'
+  if (activity.activityType === 'wiki-retrieval') return 'morph:search'
+  if (activity.activityType === 'wiki-graph') return 'morph:waypoints'
+  return activityStatus(activity) === 'error' ? 'morph:triangle-alert' : activityStatus(activity) === 'complete' ? 'morph:circle-check' : 'morph:loader-circle'
 }
 
 function activityLabel(activity: YdChatActivity): string {
@@ -82,7 +82,7 @@ watch(() => props.activities, (activities) => {
         <div v-if="activity.activityType === 'wiki-retrieval' && activity.hits?.length" class="yd-chat-process__detail">
           <button v-if="activity.hits.length > 3" type="button" class="yd-chat-process__toggle" @click="toggleRetrieval(index)">
             <span>{{ expandedRetrievals[index] ? '收起命中' : `展开 ${activity.hits.length} 条命中` }}</span>
-            <FaIcon :name="expandedRetrievals[index] ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" />
+            <FaIcon :name="expandedRetrievals[index] ? 'morph:chevron-up' : 'morph:chevron-down'" />
           </button>
           <div class="yd-chat-process__hits">
             <button
@@ -105,7 +105,7 @@ watch(() => props.activities, (activities) => {
         <div v-if="activity.activityType === 'wiki-graph' && activity.graph" class="yd-chat-process__detail">
           <button type="button" class="yd-chat-process__toggle" @click="toggleGraph(index)">
             <span>{{ activity.graph.nodes.length }} 个节点 · {{ activity.graph.edges.length }} 条关系</span>
-            <FaIcon :name="expandedGraphs[index] ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" />
+            <FaIcon :name="expandedGraphs[index] ? 'morph:chevron-up' : 'morph:chevron-down'" />
           </button>
           <YdChatGraph
             v-if="expandedGraphs[index]"

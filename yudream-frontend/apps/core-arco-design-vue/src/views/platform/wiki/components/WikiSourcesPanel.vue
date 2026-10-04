@@ -195,14 +195,14 @@ watch(() => store.spaceId.value, load)
         <FaCard class="src-import">
           <div class="src-import__grid">
             <label class="src-field">
-              <span><FaIcon name="i-ri:folder-line" /> 目标目录</span>
+              <span><FaIcon name="morph:folder" /> 目标目录</span>
               <FaInput v-model="folderPath" placeholder="/" />
             </label>
             <div class="src-field">
-              <span><FaIcon name="i-ri:upload-cloud-2-line" /> 上传文件</span>
+              <span><FaIcon name="morph:cloud-upload" /> 上传文件</span>
               <div>
                 <FaButton variant="outline" :loading="uploading" @click="pickFile">
-                  <FaIcon name="i-ri:upload-2-line" /> 选择文件上传
+                  <FaIcon name="morph:upload" /> 选择文件上传
                 </FaButton>
                 <input ref="fileInput" type="file" hidden @change="onFileChange">
               </div>
@@ -211,17 +211,17 @@ watch(() => store.spaceId.value, load)
               <span><FaIcon name="i-ri:markdown-line" /> 在线文档</span>
               <div>
                 <FaButton variant="outline" @click="openTextEditor()">
-                  <FaIcon name="i-ri:quill-pen-line" /> 新建 Markdown 文档
+                  <FaIcon name="morph:feather" /> 新建 Markdown 文档
                 </FaButton>
               </div>
             </div>
             <label class="src-field src-field--urls">
-              <span><FaIcon name="i-ri:link" /> 批量 URL 导入（每行一个）</span>
+              <span><FaIcon name="morph:link" /> 批量 URL 导入（每行一个）</span>
               <FaTextarea v-model="urlsText" :rows="3" placeholder="https://example.com/docs/a&#10;https://example.com/docs/b" />
             </label>
             <div class="src-field src-field--action">
               <FaButton :loading="importing" @click="importUrls">
-                <FaIcon name="i-ri:download-cloud-2-line" /> 导入 URL
+                <FaIcon name="morph:cloud-download" /> 导入 URL
               </FaButton>
             </div>
           </div>
@@ -229,10 +229,10 @@ watch(() => store.spaceId.value, load)
 
         <!-- 资料列表 -->
         <div v-if="loading && !sources.length" class="src-loading">
-          <FaIcon name="i-ri:loader-4-line" class="src-spin" /> 加载资料中…
+          <FaIcon name="morph:loader-circle" class="src-spin" /> 加载资料中…
         </div>
         <div v-else-if="!sortedSources.length" class="src-empty">
-          <FaIcon name="i-ri:database-2-line" />
+          <FaIcon name="morph:database" />
           <strong>暂无资料</strong>
           <p>上传文件或导入 URL，系统会自动抽取文本与图片</p>
         </div>
@@ -240,7 +240,7 @@ watch(() => store.spaceId.value, load)
           <FaCard v-for="source in pagedSources" :key="source.id" class="src-card">
             <div class="src-card__head">
               <div class="src-card__title">
-                <FaIcon :name="source.kind === 'URL' ? 'i-ri:global-line' : source.kind === 'TEXT' ? 'i-ri:markdown-line' : 'i-ri:file-2-line'" class="src-card__kind-icon" />
+                <FaIcon :name="source.kind === 'URL' ? 'morph:globe' : source.kind === 'TEXT' ? 'i-ri:markdown-line' : 'morph:file'" class="src-card__kind-icon" />
                 <strong>{{ source.title }}</strong>
                 <span class="src-card__path">{{ source.folderPath }} · {{ source.format || source.mimeType }}</span>
               </div>
@@ -255,7 +255,7 @@ watch(() => store.spaceId.value, load)
             </div>
 
             <p v-if="source.extractionError || source.ingestError" class="src-card__error">
-              <FaIcon name="i-ri:error-warning-line" /> {{ source.extractionError || source.ingestError }}
+              <FaIcon name="morph:triangle-alert" /> {{ source.extractionError || source.ingestError }}
             </p>
 
             <div v-if="(source.images || []).length" class="src-card__images">
@@ -268,7 +268,7 @@ watch(() => store.spaceId.value, load)
                 @click="previewImage(source, index)"
               >
                 <img v-if="img.url" :src="resolveApiFileUrl(img.url)" :alt="img.caption || '资料图片'" loading="lazy">
-                <span v-else class="src-thumb__placeholder"><FaIcon name="i-ri:image-line" /></span>
+                <span v-else class="src-thumb__placeholder"><FaIcon name="morph:image" /></span>
                 <span v-if="img.caption" class="src-thumb__caption">{{ img.caption }}</span>
               </button>
               <button
@@ -282,20 +282,20 @@ watch(() => store.spaceId.value, load)
             </div>
 
             <div class="src-card__footer">
-              <span class="src-card__count"><FaIcon name="i-ri:image-line" /> {{ (source.images || []).length }} 张图片</span>
+              <span class="src-card__count"><FaIcon name="morph:image" /> {{ (source.images || []).length }} 张图片</span>
               <span v-if="source.url" class="src-card__url">{{ source.url }}</span>
               <div class="src-card__actions">
                 <FaButton v-if="source.kind === 'TEXT'" size="sm" variant="outline" @click="openTextEditor(source)">
-                  <FaIcon name="i-ri:edit-line" /> 编辑
+                  <FaIcon name="morph:pencil" /> 编辑
                 </FaButton>
                 <FaButton size="sm" @click="ingest(source)">
-                  <FaIcon name="i-ri:play-line" /> 摄入
+                  <FaIcon name="morph:play" /> 摄入
                 </FaButton>
                 <FaButton size="sm" variant="outline" :disabled="!(source.images || []).length" @click="caption(source)">
-                  <FaIcon name="i-ri:sparkling-2-line" /> 补 caption
+                  <FaIcon name="morph:sparkles" /> 补 caption
                 </FaButton>
                 <FaButton size="sm" variant="ghost" class="src-danger" @click="removeSource(source)">
-                  <FaIcon name="i-ri:delete-bin-line" /> 删除
+                  <FaIcon name="morph:trash-2" /> 删除
                 </FaButton>
               </div>
             </div>

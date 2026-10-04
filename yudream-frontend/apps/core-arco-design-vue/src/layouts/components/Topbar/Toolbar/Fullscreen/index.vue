@@ -12,6 +12,6 @@ const { isFullscreen, toggle } = useFullscreen()
 
 <template>
   <FaButton v-if="appSettingsStore.mode === 'pc'" variant="ghost" size="icon-sm" @click="toggle">
-    <FaIcon :name="isFullscreen ? 'i-ri:fullscreen-exit-line' : 'i-ri:fullscreen-line'" class="size-4" />
+    <FaIcon :name="isFullscreen ? 'morph:minimize' : 'morph:maximize'" class="size-4" />
   </FaButton>
 </template>

@@ -11,7 +11,7 @@ const props = defineProps<{
   <div class="dashboard-card__content dashboard-guide">
     <p>{{ card.description || '完成必要配置后，即可开始使用此功能。' }}</p>
     <FaButton v-if="card.actionPath" size="sm" @click="onOpen(card)">
-      <FaIcon name="i-ri:arrow-right-line" />
+      <FaIcon name="morph:arrow-right" />
       开始配置
     </FaButton>
   </div>

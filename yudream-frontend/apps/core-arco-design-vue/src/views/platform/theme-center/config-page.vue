@@ -67,11 +67,11 @@ onMounted(load)
   <div>
     <FaPageHeader :title="themeName ? `主题配置：${themeName}` : '主题配置'" class="theme-config-header">
       <FaButton variant="outline" @click="back">
-        <FaIcon name="i-ri:arrow-left-line" />
+        <FaIcon name="morph:arrow-left" />
         返回主题中心
       </FaButton>
       <FaButton v-auth="'platform:theme-center:config'" :loading="saving" :disabled="loading || !config" @click="save">
-        <FaIcon name="i-ri:save-line" />
+        <FaIcon name="morph:save" />
         保存配置
       </FaButton>
     </FaPageHeader>

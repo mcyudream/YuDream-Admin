@@ -284,12 +284,12 @@ function openPublicMarket() {
         </div>
       </div>
       <div v-if="localSourceEnabled" class="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-3 text-sm">
-        <FaIcon name="i-ri:link" class="shrink-0" />
+        <FaIcon name="morph:link" class="shrink-0" />
         <span class="shrink-0 text-secondary-foreground/60">对外 v2 源基址</span>
         <code class="min-w-0 break-all">{{ publicV2Url }}</code>
         <FaButton variant="link" size="sm" @click="copyPublicUrl">复制</FaButton>
         <FaButton variant="outline" size="sm" :disabled="!publicEnabled" @click="openPublicMarket">
-          <FaIcon name="i-ri:external-link-line" />
+          <FaIcon name="morph:external-link" />
           公开社区
         </FaButton>
         <span class="w-full text-xs text-secondary-foreground/60">
@@ -310,11 +310,11 @@ function openPublicMarket() {
           <template #toolbar>
             <div class="flex flex-wrap items-center justify-end gap-2">
               <FaButton v-auth="'platform:plugin-market-source:run'" variant="outline" :loading="syncing" @click="confirmSyncAll">
-                <FaIcon name="i-ri:refresh-line" />
+                <FaIcon name="morph:refresh-cw" />
                 全部同步
               </FaButton>
               <FaButton v-auth="'platform:plugin-market-source:create'" @click="openForm()">
-                <FaIcon name="i-ri:add-line" />
+                <FaIcon name="morph:plus" />
                 添加市场源
               </FaButton>
             </div>
@@ -335,7 +335,7 @@ function openPublicMarket() {
           <template #cell-rootUrl="{ row }">
             <span class="break-all text-sm">{{ row.original.builtIn || row.original.type === 'LOCAL' ? '本机发布物（进程内直读）' : row.original.rootUrl }}</span>
             <div v-if="row.original.tokenConfigured" class="text-xs text-secondary-foreground/60">
-              <FaIcon name="i-ri:key-2-line" />
+              <FaIcon name="morph:key-round" />
               已配置访问令牌
             </div>
           </template>

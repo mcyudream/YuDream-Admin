@@ -250,7 +250,7 @@ async function copyPublicUrl() {
 
         <form class="discover-search" @submit.prevent="onSearch">
           <label class="discover-search__field discover-control">
-            <FaIcon name="i-ri:search-line" />
+            <FaIcon name="morph:search" />
             <input v-model="search" type="search" placeholder="搜索名称、编码或描述">
           </label>
           <label class="discover-sort discover-control">
@@ -330,7 +330,7 @@ async function copyPublicUrl() {
               >
                 <div class="discover-card__icon">
                   <img v-if="isImageIcon(item.icon)" :src="iconUrl(item.icon)" :alt="item.displayName || item.code">
-                  <FaIcon v-else :name="item.icon || 'i-ri:puzzle-2-line'" />
+                  <FaIcon v-else :name="item.icon || 'morph:puzzle'" />
                 </div>
                 <div class="discover-card__body">
                   <div class="discover-card__title">

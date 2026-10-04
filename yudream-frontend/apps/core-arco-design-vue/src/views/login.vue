@@ -31,7 +31,7 @@ const bindingToken = typeof route.query.externalLoginBindingToken === 'string' &
   : undefined
 const formType = ref<'binding' | 'login' | 'register' | 'resetPassword'>(bindingToken && route.query.form !== 'register' ? 'binding' : route.query.form === 'register' ? 'register' : 'login')
 const externalProviders = ref<{ code: string, name?: string, supportedTypes: string, icon?: string, presentation?: string, sort?: number }[]>([])
-const externalTypeMeta: Record<string, { label: string, icon: string }> = { qq: { label: 'QQ 登录', icon: 'i-ri:qq-line' }, wx: { label: '微信登录', icon: 'i-ri:wechat-line' }, google: { label: 'Google 登录', icon: 'i-ri:google-line' }, gitee: { label: 'Gitee 登录', icon: 'i-ri:git-repository-line' }, github: { label: 'GitHub 登录', icon: 'i-ri:github-line' } }
+const externalTypeMeta: Record<string, { label: string, icon: string }> = { qq: { label: 'QQ 登录', icon: 'i-ri:qq-line' }, wx: { label: '微信登录', icon: 'i-ri:wechat-line' }, google: { label: 'Google 登录', icon: 'i-ri:google-line' }, gitee: { label: 'Gitee 登录', icon: 'morph:folder-git-2' }, github: { label: 'GitHub 登录', icon: 'i-ri:github-line' } }
 const externalEntries = computed<ExternalLoginEntry[]>(() => externalProviders.value.flatMap((provider) => {
   const types = (provider.supportedTypes || '').split(',').map(item => item.trim().toLowerCase()).filter(Boolean)
   const resolvedTypes = types.length ? types : ['default']
@@ -41,7 +41,7 @@ const externalEntries = computed<ExternalLoginEntry[]>(() => externalProviders.v
     providerCode: provider.code,
     type,
     label: provider.icon ? (provider.name || provider.code) : (externalTypeMeta[type]?.label || provider.name || `${type} 登录`),
-    icon: provider.icon || externalTypeMeta[type]?.icon || 'i-ri:links-line',
+    icon: provider.icon || externalTypeMeta[type]?.icon || 'morph:link',
     presentation,
     sort: provider.sort ?? 0,
   }))
@@ -90,9 +90,9 @@ onMounted(async () => { try { externalProviders.value = (await apiSecurity.publi
       <FaButton variant="ghost" size="icon-sm">
         <FaIcon
           :name="{
-            left: 'i-icon-park-outline:left-bar',
-            center: 'i-icon-park-outline:square',
-            right: 'i-icon-park-outline:right-bar',
+            left: 'morph:panel-left',
+            center: 'morph:square',
+            right: 'morph:panel-right',
           }[layoutAlign]" class="size-4"
         />
       </FaButton>

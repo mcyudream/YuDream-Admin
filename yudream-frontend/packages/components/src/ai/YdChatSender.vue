@@ -128,7 +128,7 @@ function onMentionSelect(item: YdSuggestionItem) {
         :disabled="loading || disabled"
         @click="emits('suggestionClick', item)"
       >
-        <FaIcon name="i-ri:sparkling-2-line" />
+        <FaIcon name="morph:sparkles" />
         {{ item }}
       </button>
     </div>
@@ -170,7 +170,7 @@ function onMentionSelect(item: YdSuggestionItem) {
           :disabled="loading || disabled"
           @click="pickFiles"
         >
-          <FaIcon name="i-ri:add-line" class="yd-sender__attach-icon" />
+          <FaIcon name="morph:plus" class="yd-sender__attach-icon" />
         </FaButton>
         <!-- 上下文/模型选择等，集成进输入框工具条 -->
         <slot name="actions" />
@@ -183,7 +183,7 @@ function onMentionSelect(item: YdSuggestionItem) {
           title="停止生成"
           @click="emits('stop')"
         >
-          <FaIcon name="i-ri:stop-fill" />
+          <FaIcon name="morph:square" />
         </FaButton>
         <FaButton
           v-else
@@ -193,7 +193,7 @@ function onMentionSelect(item: YdSuggestionItem) {
           :disabled="!canSend"
           @click="submit"
         >
-          <FaIcon name="i-ri:arrow-up-line" />
+          <FaIcon name="morph:arrow-up" />
         </FaButton>
       </div>
     </div>

@@ -106,17 +106,17 @@ function levelClass(entryLevel: string) {
       <FaInput v-model="keyword" placeholder="关键字过滤" class="logs-toolbar__keyword" clearable />
       <FaTooltip :text="paused ? '继续接收' : '暂停追加'" side="bottom">
         <FaButton variant="ghost" size="icon-sm" :aria-label="paused ? '继续' : '暂停'" @click="togglePause">
-          <FaIcon :name="paused ? 'i-ri:play-line' : 'i-ri:pause-line'" class="size-4" />
+          <FaIcon :name="paused ? 'morph:play' : 'morph:pause'" class="size-4" />
         </FaButton>
       </FaTooltip>
       <FaTooltip text="清空列表" side="bottom">
         <FaButton variant="ghost" size="icon-sm" aria-label="清空" @click="clear">
-          <FaIcon name="i-ri:delete-bin-line" class="size-4" />
+          <FaIcon name="morph:trash-2" class="size-4" />
         </FaButton>
       </FaTooltip>
       <FaTooltip text="重新加载" side="bottom">
         <FaButton variant="ghost" size="icon-sm" aria-label="刷新" :loading="loading" @click="reload">
-          <FaIcon name="i-ri:refresh-line" class="size-4" />
+          <FaIcon name="morph:refresh-cw" class="size-4" />
         </FaButton>
       </FaTooltip>
     </div>
@@ -130,7 +130,7 @@ function levelClass(entryLevel: string) {
     </div>
 
     <div v-if="!pluginCode" class="logs-empty">
-      <FaIcon name="i-ri:file-list-3-line" class="size-8" />
+      <FaIcon name="morph:file-text" class="size-8" />
       <p>选择一个插件查看其运行日志</p>
       <p class="logs-empty__hint">
         日志按插件包名前缀（online.yudream.base.plugin.*）过滤，覆盖宿主环形缓冲中的近期日志
@@ -153,7 +153,7 @@ function levelClass(entryLevel: string) {
           <span class="log-entry__message">{{ entry.message }}</span>
           <FaIcon
             v-if="entry.throwable"
-            :name="expandedSequences.has(entry.sequence) ? 'i-ri:arrow-down-s-line' : 'i-ri:arrow-right-s-line'"
+            :name="expandedSequences.has(entry.sequence) ? 'morph:chevron-down' : 'morph:chevron-right'"
             class="shrink-0 size-3.5"
           />
         </div>

@@ -169,7 +169,7 @@ function changeClasses(value: unknown) {
         <strong>{{ node.data.title || '未命名节点' }}</strong>
       </div>
       <button type="button" title="关闭节点设置" aria-label="关闭节点设置" @click="emit('close')">
-        <FaIcon name="i-ri:close-line" />
+        <FaIcon name="morph:x" />
       </button>
     </header>
 
@@ -378,7 +378,7 @@ function changeClasses(value: unknown) {
 
     <footer class="inspector-footer">
       <FaButton class="w-full" variant="destructive" @click="emit('delete')">
-        <FaIcon name="i-ri:delete-bin-line" /> 删除节点
+        <FaIcon name="morph:trash-2" /> 删除节点
       </FaButton>
     </footer>
   </aside>

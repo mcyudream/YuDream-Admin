@@ -22,7 +22,7 @@ import FaHoverCard from '../index.vue'
             一个前端开发工程师
           </p>
           <div class="pt-2 flex items-center">
-            <FaIcon name="i-ci:calendar-days" class="mr-2 opacity-70 h-4 w-4" />
+            <FaIcon name="morph:calendar-days" class="mr-2 opacity-70 h-4 w-4" />
             <span class="text-xs text-muted-foreground">
               2020 年注册
             </span>

@@ -58,7 +58,7 @@ function handleCollaspe() {
     >
       <slot />
       <Button v-if="collaspe" variant="link" size="icon" class="opacity-0 transition-all inset-b-0 inset-s-1/2 absolute group-hover/pagemain:opacity-100 -translate-x-1/2" :class="{ 'rotate-x-180': !isCollaspe }" @click="handleCollaspe">
-        <Icon name="i-ep:arrow-down" class="text-xl" />
+        <Icon name="morph:arrow-down" class="text-xl" />
       </Button>
     </div>
   </div>

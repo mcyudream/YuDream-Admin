@@ -150,7 +150,7 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
           </div>
           <div class="mt-2 flex justify-end">
             <FaButton v-auth="'system:setting:edit'" :loading="saving" @click="saveSettings">
-              <FaIcon name="i-ri:save-3-line" />
+              <FaIcon name="morph:save" />
               保存设置
             </FaButton>
           </div>
@@ -163,10 +163,10 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
             </div>
             <div class="asset-preview">
               <img v-if="form.logo" :src="form.logo" alt="Logo">
-              <FaIcon v-else name="i-ri:image-line" class="size-8 text-muted-foreground" />
+              <FaIcon v-else name="morph:image" class="size-8 text-muted-foreground" />
             </div>
             <FaButton variant="outline" class="w-full" @click="logoInput?.click()">
-              <FaIcon name="i-ri:upload-cloud-2-line" />
+              <FaIcon name="morph:cloud-upload" />
               上传 Logo
             </FaButton>
             <input ref="logoInput" type="file" accept="image/*" hidden @change="uploadAsset($event, 'logo')">
@@ -178,10 +178,10 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
             </div>
             <div class="asset-preview asset-preview--small">
               <img v-if="form.favicon" :src="form.favicon" alt="Favicon">
-              <FaIcon v-else name="i-ri:global-line" class="size-7 text-muted-foreground" />
+              <FaIcon v-else name="morph:globe" class="size-7 text-muted-foreground" />
             </div>
             <FaButton variant="outline" class="w-full" @click="faviconInput?.click()">
-              <FaIcon name="i-ri:upload-cloud-2-line" />
+              <FaIcon name="morph:cloud-upload" />
               上传 Favicon
             </FaButton>
             <input ref="faviconInput" type="file" accept="image/*" hidden @change="uploadAsset($event, 'favicon')">
@@ -193,10 +193,10 @@ async function uploadAsset(event: Event, type: 'logo' | 'favicon' | 'loginBanner
             </div>
             <div class="asset-preview">
               <img v-if="form.loginBanner" :src="form.loginBanner" alt="登录页 Banner">
-              <FaIcon v-else name="i-ri:image-line" class="size-8 text-muted-foreground" />
+              <FaIcon v-else name="morph:image" class="size-8 text-muted-foreground" />
             </div>
             <FaButton variant="outline" class="w-full" @click="loginBannerInput?.click()">
-              <FaIcon name="i-ri:upload-cloud-2-line" />
+              <FaIcon name="morph:cloud-upload" />
               上传登录页 Banner
             </FaButton>
             <input ref="loginBannerInput" type="file" accept="image/*" hidden @change="uploadAsset($event, 'loginBanner')">

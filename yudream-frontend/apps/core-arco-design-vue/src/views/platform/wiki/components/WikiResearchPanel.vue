@@ -59,25 +59,25 @@ async function start() {
       <div class="res-inner">
         <FaCard class="res-hero">
           <div class="res-hero__icon">
-            <FaIcon name="i-ri:flask-line" />
+            <FaIcon name="morph:flask-conical" />
           </div>
           <strong>深度研究</strong>
           <p>给一个研究起点，系统会规划检索查询、执行检索与网络调研，并把结果写成 Wiki 页面</p>
           <div class="res-hero__bar">
             <FaInput v-model="seed" clearable placeholder="研究起点 / 主题，例如：支付渠道的费率对比" @keydown.enter="makePlan">
               <template #start>
-                <FaIcon name="i-ri:compass-3-line" />
+                <FaIcon name="morph:compass" />
               </template>
             </FaInput>
             <FaButton :loading="planning" @click="makePlan">
-              <FaIcon name="i-ri:magic-line" /> 生成研究计划
+              <FaIcon name="morph:wand-sparkles" /> 生成研究计划
             </FaButton>
           </div>
         </FaCard>
 
         <FaCard v-if="plan" class="res-plan">
           <div class="res-plan__head">
-            <FaIcon name="i-ri:file-list-3-line" class="res-plan__icon" />
+            <FaIcon name="morph:file-text" class="res-plan__icon" />
             <div>
               <strong>{{ plan.topic }}</strong>
               <p>{{ plan.rationale }}</p>
@@ -86,13 +86,13 @@ async function start() {
           <div class="res-plan__queries">
             <span class="res-plan__queries-label">检索查询（{{ plan.queries.length }}）</span>
             <span v-for="(query, index) in plan.queries" :key="query" class="res-query">
-              <FaIcon name="i-ri:search-line" /> {{ query }}
-              <FaIcon name="i-ri:close-line" class="res-query__remove" @click="removeQuery(index)" />
+              <FaIcon name="morph:search" /> {{ query }}
+              <FaIcon name="morph:x" class="res-query__remove" @click="removeQuery(index)" />
             </span>
           </div>
           <div class="res-plan__actions">
             <FaButton :loading="starting" :disabled="!plan.queries.length" @click="start">
-              <FaIcon name="i-ri:rocket-line" /> 启动研究
+              <FaIcon name="morph:rocket" /> 启动研究
             </FaButton>
             <FaButton variant="outline" @click="plan = null">
               放弃计划

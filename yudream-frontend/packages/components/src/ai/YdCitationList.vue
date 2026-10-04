@@ -51,9 +51,9 @@ function openImage(url: string) {
 <template>
   <div v-if="citations.length" class="yd-citations">
     <button type="button" class="yd-citations__head" @click="open = !open">
-      <FaIcon name="i-ri:book-marked-line" />
+      <FaIcon name="morph:book-marked" />
       <span>{{ label }}（{{ citations.length }}）</span>
-      <FaIcon :name="open ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="yd-citations__chevron" />
+      <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="yd-citations__chevron" />
     </button>
     <div v-show="open" class="yd-citations__list">
       <button
@@ -69,7 +69,7 @@ function openImage(url: string) {
           <span class="yd-citation__title">{{ citation.title }}</span>
           <span v-if="citation.excerpt" class="yd-citation__excerpt">{{ citation.excerpt }}</span>
         </span>
-        <FaIcon name="i-ri:arrow-right-up-line" class="yd-citation__arrow" />
+        <FaIcon name="morph:arrow-up-right" class="yd-citation__arrow" />
       </button>
     </div>
     <div v-if="images.length" v-show="open" class="yd-citations__images">

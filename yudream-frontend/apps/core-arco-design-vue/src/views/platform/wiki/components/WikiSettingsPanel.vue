@@ -222,7 +222,7 @@ onMounted(loadGraphTables)
         <FaCard title="AI 模型" description="供应商与模型均从平台模型目录中选择" class="set-card">
           <div class="set-grid">
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="i-ri:chat-3-line" /> 问答模型（chat）</span>
+              <span class="set-model__label"><FaIcon name="morph:message-circle" /> 问答模型（chat）</span>
               <FaSelect
                 :model-value="form.chatProviderCode"
                 :options="providerOptions"
@@ -232,7 +232,7 @@ onMounted(loadGraphTables)
               <FaSelect v-model="form.chatModelCode" :options="chatModelOptions" placeholder="选择模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="i-ri:quill-pen-line" /> 摄入写作模型（ingest）</span>
+              <span class="set-model__label"><FaIcon name="morph:feather" /> 摄入写作模型（ingest）</span>
               <FaSelect
                 :model-value="form.ingestProviderCode"
                 :options="providerOptions"
@@ -242,7 +242,7 @@ onMounted(loadGraphTables)
               <FaSelect v-model="form.ingestModelCode" :options="ingestModelOptions" placeholder="选择模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="i-ri:eye-line" /> 视觉模型（图片 caption）</span>
+              <span class="set-model__label"><FaIcon name="morph:eye" /> 视觉模型（图片 caption）</span>
               <FaSelect
                 :model-value="form.visionProviderCode"
                 :options="providerOptions"
@@ -252,7 +252,7 @@ onMounted(loadGraphTables)
               <FaSelect v-model="form.visionModelCode" :options="visionModelOptions" placeholder="选择支持视觉的模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="i-ri:quill-pen-line" /> 向量模型（embedding）</span>
+              <span class="set-model__label"><FaIcon name="morph:feather" /> 向量模型（embedding）</span>
               <FaSelect
                 :model-value="form.embeddingProviderCode"
                 :options="providerOptions"
@@ -262,7 +262,7 @@ onMounted(loadGraphTables)
               <FaSelect v-model="form.embeddingModelCode" :options="embeddingModelOptions" placeholder="选择向量模型" />
             </div>
             <div class="set-model">
-              <span class="set-model__label"><FaIcon name="i-ri:mind-map" /> 图谱模型（graph）</span>
+              <span class="set-model__label"><FaIcon name="morph:waypoints" /> 图谱模型（graph）</span>
               <FaSelect
                 :model-value="form.graphProviderCode"
                 :options="providerOptions"
@@ -271,7 +271,7 @@ onMounted(loadGraphTables)
               />
               <FaSelect v-model="form.graphModelCode" :options="graphModelOptions" placeholder="选择模型" />
             </div>
-            <p v-if="catalogLoading" class="set-hint"><FaIcon name="i-ri:loader-4-line" /> 正在加载模型目录…</p>
+            <p v-if="catalogLoading" class="set-hint"><FaIcon name="morph:loader-circle" /> 正在加载模型目录…</p>
           </div>
         </FaCard>
 
@@ -381,20 +381,20 @@ onMounted(loadGraphTables)
               <p>目录、页面、资料源、摄入任务与审核项将被一并删除，不可恢复。</p>
             </div>
             <FaButton variant="destructive" :loading="deleting" @click="removeSpace">
-              <FaIcon name="i-ri:delete-bin-line" /> 删除知识库
+              <FaIcon name="morph:trash-2" /> 删除知识库
             </FaButton>
           </div>
         </FaCard>
 
         <div class="set-actions">
           <FaButton :loading="saving" @click="save">
-            <FaIcon name="i-ri:save-3-line" /> 保存设置
+            <FaIcon name="morph:save" /> 保存设置
           </FaButton>
         </div>
       </div>
 
       <div v-else class="set-empty">
-        <FaIcon name="i-ri:settings-3-line" />
+        <FaIcon name="morph:settings" />
         <strong>请先选择知识库</strong>
       </div>
     </FaScrollArea>

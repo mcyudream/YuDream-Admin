@@ -39,19 +39,19 @@ const items = [
     <FaDropdown :items="items" :side-offset="12">
       <FaButton variant="outline">
         Side offset
-        <FaIcon name="i-ep:caret-bottom" />
+        <FaIcon name="morph:chevron-down" />
       </FaButton>
     </FaDropdown>
     <FaDropdown :items="items" align="start" :align-offset="24">
       <FaButton variant="outline">
         Align offset
-        <FaIcon name="i-ep:caret-bottom" />
+        <FaIcon name="morph:chevron-down" />
       </FaButton>
     </FaDropdown>
     <FaDropdown :items="items" :side-offset="12" :align-offset="-24">
       <FaButton variant="outline">
         Both
-        <FaIcon name="i-ep:caret-bottom" />
+        <FaIcon name="morph:chevron-down" />
       </FaButton>
     </FaDropdown>
   </div>

@@ -86,7 +86,7 @@ function open(url: string) {
   <div>
     <FaPageHeader title="Arco Design Vue" description="框架内置 Arco Design Vue 组件库，本页仅展示部分组件，更多组件及使用说明请查看 Arco Design Vue 官网。">
       <FaButton variant="outline" @click="open('https://arco.design/vue/docs/start')">
-        <FaIcon name="i-ant-design:link-outlined" />
+        <FaIcon name="morph:link" />
         Arco Design Vue 官网
       </FaButton>
     </FaPageHeader>

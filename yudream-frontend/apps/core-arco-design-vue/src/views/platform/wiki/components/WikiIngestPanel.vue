@@ -204,16 +204,16 @@ watch(() => store.spaceId.value, () => {
           </div>
           <div class="ing-head__actions">
             <FaButton v-if="sortedTasks.length" size="sm" variant="ghost" class="ing-danger" @click="clearTasks">
-              <FaIcon name="i-ri:delete-bin-line" /> 清空队列
+              <FaIcon name="morph:trash-2" /> 清空队列
             </FaButton>
             <FaButton size="sm" variant="outline" :loading="loading" @click="load">
-              <FaIcon name="i-ri:refresh-line" /> 刷新
+              <FaIcon name="morph:refresh-cw" /> 刷新
             </FaButton>
           </div>
         </div>
 
         <div v-if="!sortedTasks.length && !loading" class="ing-empty">
-          <FaIcon name="i-ri:stack-line" />
+          <FaIcon name="morph:layers" />
           <strong>暂无摄入任务</strong>
           <p>在「资料源」面板对资料点击「摄入」，或在「深度研究」启动研究</p>
         </div>
@@ -237,7 +237,7 @@ watch(() => store.spaceId.value, () => {
                   class="ing-danger"
                   @click="cancelTask(task)"
                 >
-                  <FaIcon name="i-ri:stop-circle-line" /> 取消
+                  <FaIcon name="morph:circle-stop" /> 取消
                 </FaButton>
                 <FaButton
                   v-if="['FAILED', 'CANCELLED'].includes(task.status)"
@@ -245,7 +245,7 @@ watch(() => store.spaceId.value, () => {
                   variant="outline"
                   @click="retryTask(task)"
                 >
-                  <FaIcon name="i-ri:restart-line" /> 重试
+                  <FaIcon name="morph:rotate-cw" /> 重试
                 </FaButton>
                 <FaButton
                   v-if="!['QUEUED'].includes(task.status)"
@@ -254,7 +254,7 @@ watch(() => store.spaceId.value, () => {
                   class="ing-danger"
                   @click="deleteTask(task)"
                 >
-                  <FaIcon name="i-ri:delete-bin-line" /> 删除
+                  <FaIcon name="morph:trash-2" /> 删除
                 </FaButton>
               </div>
             </div>
@@ -268,7 +268,7 @@ watch(() => store.spaceId.value, () => {
               <span class="ing-card__attempts">尝试 {{ task.attempts }}/{{ task.maxAttempts }}</span>
             </div>
             <p v-if="task.errorMessage" class="ing-card__error">
-              <FaIcon name="i-ri:error-warning-line" /> {{ task.errorMessage }}
+              <FaIcon name="morph:triangle-alert" /> {{ task.errorMessage }}
             </p>
           </FaCard>
         </div>

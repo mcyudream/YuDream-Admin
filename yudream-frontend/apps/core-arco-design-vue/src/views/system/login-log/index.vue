@@ -118,11 +118,11 @@ async function clearLoginLogs() {
   <div>
     <FaPageHeader title="&#30331;&#24405;&#26085;&#24535;" class="mb-0">
       <FaButton v-auth="'system:monitor:login-log:export'" variant="outline" @click="exportLoginLogs">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
       <FaButton v-auth="'system:monitor:login-log:delete'" variant="destructive" :loading="clearing" @click="confirmClearLoginLogs">
-        <FaIcon name="i-ri:delete-bin-6-line" />
+        <FaIcon name="morph:trash-2" />
         清空日志
       </FaButton>
     </FaPageHeader>
@@ -149,7 +149,7 @@ async function clearLoginLogs() {
                   &#37325;&#32622;
                 </FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   &#31579;&#36873;
                 </FaButton>
               </div>

@@ -223,15 +223,15 @@ function defaultOptions() {
   <div>
     <FaPageHeader :title="pageTitle" class="mb-0">
       <FaButton variant="outline" @click="returnToList">
-        <FaIcon name="i-ri:arrow-left-line" />
+        <FaIcon name="morph:arrow-left" />
         返回列表
       </FaButton>
       <FaButton v-if="selected" v-auth="'platform:form:submission:view'" variant="outline" @click="openSubmissions">
-        <FaIcon name="i-ri:inbox-archive-line" />
+        <FaIcon name="morph:archive" />
         提交结果
       </FaButton>
       <FaButton v-auth="'platform:form:edit'" :loading="saving" @click="saveDesigner">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存设计
       </FaButton>
     </FaPageHeader>

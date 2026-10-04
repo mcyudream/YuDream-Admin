@@ -44,15 +44,15 @@ function openHit(hit: WikiSearchHit) {
       <div class="srch-inner">
         <FaCard class="srch-bar-card">
           <div class="srch-bar">
-            <FaInput v-model="query" clearable placeholder="输入问题或关键词，回车检索" class="srch-input" @keydown.enter="search"><template #start><FaIcon name="i-ri:search-line" /></template></FaInput>
-            <FaButton :loading="searching" @click="search"><FaIcon name="i-ri:search-line" /> 搜索</FaButton>
+            <FaInput v-model="query" clearable placeholder="输入问题或关键词，回车检索" class="srch-input" @keydown.enter="search"><template #start><FaIcon name="morph:search" /></template></FaInput>
+            <FaButton :loading="searching" @click="search"><FaIcon name="morph:search" /> 搜索</FaButton>
           </div>
         </FaCard>
-        <div v-if="!searched" class="srch-empty"><FaIcon name="i-ri:search-line" /><strong>搜索知识库</strong><p>输入关键词，查看当前知识库中的相关内容。</p></div>
-        <div v-else-if="!searching && !hits.length" class="srch-empty"><FaIcon name="i-ri:file-search-line" /><strong>没有命中结果</strong><p>换个关键词试试。</p></div>
+        <div v-if="!searched" class="srch-empty"><FaIcon name="morph:search" /><strong>搜索知识库</strong><p>输入关键词，查看当前知识库中的相关内容。</p></div>
+        <div v-else-if="!searching && !hits.length" class="srch-empty"><FaIcon name="morph:file-search" /><strong>没有命中结果</strong><p>换个关键词试试。</p></div>
         <div v-else class="srch-hits">
           <button v-for="(hit, index) in hits" :key="`${hit.kind}-${hit.nodeId || hit.sourceId || index}`" type="button" class="srch-hit" @click="openHit(hit)">
-            <div class="srch-hit__head"><FaIcon :name="hit.kind === 'SOURCE' ? 'i-ri:file-2-line' : 'i-ri:book-open-line'" /><strong>{{ hit.title }}</strong></div>
+            <div class="srch-hit__head"><FaIcon :name="hit.kind === 'SOURCE' ? 'morph:file' : 'morph:book-open'" /><strong>{{ hit.title }}</strong></div>
             <div class="srch-hit__path">{{ hit.path }}</div>
             <p class="srch-hit__content">{{ hit.content }}</p>
           </button>

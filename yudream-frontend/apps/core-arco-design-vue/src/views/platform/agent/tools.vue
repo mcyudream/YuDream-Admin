@@ -85,7 +85,7 @@ function remove(row: AgentTool) {
   <div>
     <FaPageHeader title="Agent 工具" class="mb-0">
       <FaButton v-auth="'platform:agent:tool:edit'" @click="create">
-        <FaIcon name="i-ri:add-line" /> 新建 Python 工具
+        <FaIcon name="morph:plus" /> 新建 Python 工具
       </FaButton>
     </FaPageHeader>
     <FaPageMain>
@@ -94,7 +94,7 @@ function remove(row: AgentTool) {
           <div><h3>系统工具</h3><p>由平台能力注册，可在 Agent 应用中按权限使用。</p></div>
         </div><div class="system-tool-grid">
           <article v-for="tool in systemTools" :key="tool.code">
-            <FaIcon name="i-ri:flashlight-line" /><div><strong>{{ tool.name }}</strong><code>{{ tool.code }}</code><p>{{ tool.description || '系统提供的能力' }}</p></div>
+            <FaIcon name="morph:flashlight" /><div><strong>{{ tool.name }}</strong><code>{{ tool.code }}</code><p>{{ tool.description || '系统提供的能力' }}</p></div>
           </article><FaEmpty v-if="!systemTools.length" description="暂无已启用的系统工具" />
         </div>
       </section>

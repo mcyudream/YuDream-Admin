@@ -20,7 +20,7 @@ const value = shallowRef('')
     <template #start>
       <span>script.ts</span>
       <FaButton variant="ghost" size="icon" class="size-6">
-        <FaIcon name="i-ep:refresh" />
+        <FaIcon name="morph:refresh-cw" />
       </FaButton>
     </template>
     <template #end>

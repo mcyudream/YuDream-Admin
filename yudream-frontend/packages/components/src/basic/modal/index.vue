@@ -259,10 +259,10 @@ function handleAnimationEnd() {
           <DialogTitle class="flex-center gap-x-2 sm:justify-start" :class="{ 'sm:justify-center': props.center }">
             <Icon
               v-if="props.icon" :name="{
-                info: 'i-ant-design:info-circle-filled',
-                success: 'i-ant-design:check-circle-filled',
-                warning: 'i-ant-design:exclamation-circle-filled',
-                error: 'i-ant-design:close-circle-filled',
+                info: 'morph:info',
+                success: 'morph:circle-check',
+                warning: 'morph:triangle-alert',
+                error: 'morph:circle-x',
               }[props.icon]" class="size-6" :class="{
                 'text-blue-600 dark:text-blue-400': props.icon === 'info',
                 'text-green-600 dark:text-green-400': props.icon === 'success',
@@ -285,7 +285,7 @@ function handleAnimationEnd() {
         <slot />
       </div>
       <div v-show="props.loading" class="bg-popover/75 flex-center size-full inset-0 absolute z-1000">
-        <Icon name="i-line-md:loading-twotone-loop" class="size-10" />
+        <Icon name="morph:loader-circle+animate-spin" class="size-10" />
       </div>
       <DialogFooter
         v-if="footer" :class="cn('p-3 gap-y-2', props.footerClass, {

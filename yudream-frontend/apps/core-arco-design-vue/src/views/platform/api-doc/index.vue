@@ -180,15 +180,15 @@ function appendQuery(url: string, params: Record<string, string>) {
   <div>
     <FaPageHeader title="API 文档" class="mb-0">
       <FaButton variant="outline" :disabled="!form.enabled" @click="openOpenApi">
-        <FaIcon name="i-ri:braces-line" />
+        <FaIcon name="morph:braces" />
         OpenAPI
       </FaButton>
       <FaButton variant="outline" :disabled="!form.enabled" @click="openSwagger">
-        <FaIcon name="i-ri:external-link-line" />
+        <FaIcon name="morph:external-link" />
         Swagger UI
       </FaButton>
       <FaButton v-auth="'platform:docs:config'" :loading="saving" @click="saveSettings">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存配置
       </FaButton>
     </FaPageHeader>
@@ -200,14 +200,14 @@ function appendQuery(url: string, params: Record<string, string>) {
             <div class="switch-grid">
               <div class="switch-item">
                 <div class="switch-label">
-                  <FaIcon name="i-ri:file-list-2-line" />
+                  <FaIcon name="morph:file-text" />
                   <span>启用文档</span>
                 </div>
                 <FaSwitch v-model="form.enabled" />
               </div>
               <div class="switch-item">
                 <div class="switch-label">
-                  <FaIcon name="i-ri:key-2-line" />
+                  <FaIcon name="morph:key-round" />
                   <span>允许 API Key</span>
                 </div>
                 <FaSwitch v-model="form.apiKeyAccessEnabled" />
@@ -237,7 +237,7 @@ function appendQuery(url: string, params: Record<string, string>) {
         <section class="preview-panel">
           <div class="preview-toolbar">
             <div class="preview-title">
-              <FaIcon name="i-ri:window-line" />
+              <FaIcon name="morph:app-window" />
               <span>文档预览</span>
             </div>
             <FaTag :variant="form.enabled ? 'default' : 'secondary'">
@@ -246,11 +246,11 @@ function appendQuery(url: string, params: Record<string, string>) {
           </div>
           <iframe v-if="swaggerPreviewReady" :srcdoc="swaggerPreviewHtml" title="Swagger UI" />
           <div v-else-if="form.enabled" class="empty-preview">
-            <FaIcon name="i-ri:loader-4-line" />
+            <FaIcon name="morph:loader-circle" />
             <span>正在获取 API 文档访问票据</span>
           </div>
           <div v-else class="empty-preview">
-            <FaIcon name="i-ri:file-lock-line" />
+            <FaIcon name="morph:file-lock" />
             <span>API 文档未启用</span>
           </div>
         </section>

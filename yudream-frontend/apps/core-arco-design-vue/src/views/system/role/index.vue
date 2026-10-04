@@ -310,15 +310,15 @@ function importRoles() {
   <div>
     <FaPageHeader title="角色管理" class="mb-0">
       <FaButton v-auth="'system:role:export'" variant="outline" @click="exportRoles">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
       <FaButton v-auth="'system:role:import'" variant="outline" @click="downloadRoleTemplate">
-        <FaIcon name="i-ri:download-2-line" />
+        <FaIcon name="morph:download" />
         模板
       </FaButton>
       <FaButton v-auth="'system:role:import'" variant="outline" @click="importRoles">
-        <FaIcon name="i-ri:upload-2-line" />
+        <FaIcon name="morph:upload" />
         导入
       </FaButton>
       <FaButton v-auth="'system:role:create'" @click="openCreate">
@@ -350,7 +350,7 @@ function importRoles() {
                   重置
                 </FaButton>
                 <FaButton @click="loadRoles">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>

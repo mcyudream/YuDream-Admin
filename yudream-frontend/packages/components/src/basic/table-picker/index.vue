@@ -263,9 +263,9 @@ const tableSlots = computed(() => Object.keys(slots).filter(name => /^(?:cell|he
         aria-label="清空"
         @click.stop="clearAll"
       >
-        <FaIcon name="i-ri:close-circle-fill" />
+        <FaIcon name="morph:circle-x" />
       </button>
-      <FaIcon name="i-ri:search-line" class="yd-table-picker__trigger-icon" />
+      <FaIcon name="morph:search" class="yd-table-picker__trigger-icon" />
     </span>
   </div>
 
@@ -321,7 +321,7 @@ const tableSlots = computed(() => Object.keys(slots).filter(name => /^(?:cell|he
         </template>
       </FaTable>
       <div v-if="loading" class="yd-table-picker__loading">
-        <FaIcon name="i-ri:loader-4-line" class="animate-spin" />
+        <FaIcon name="morph:loader-circle" class="animate-spin" />
       </div>
     </div>
 

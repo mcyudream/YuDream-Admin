@@ -36,6 +36,6 @@ function handleSuccess() {
     :max="0"
     @on-success="handleSuccess"
   >
-    <FaIcon name="i-noto:identification-card" class="opacity-50 size-50" />
+    <FaIcon name="morph:id-card" class="opacity-50 size-50" />
   </FaImageUpload>
 </template>
