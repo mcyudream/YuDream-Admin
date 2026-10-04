@@ -9,13 +9,12 @@ import online.yudream.base.application.platform.wiki.dto.WikiChatResultDTO;
 import online.yudream.base.application.platform.wiki.dto.WikiSearchHitDTO;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
-import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
-import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
+import online.yudream.base.domain.platform.ai.service.HarnessAgentGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
-import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
-import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
-import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
+import online.yudream.base.domain.platform.ai.valobj.AiUsage;
+import online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest;
+import online.yudream.base.domain.platform.ai.valobj.HarnessRunResult;
 import online.yudream.base.domain.platform.capability.aggregate.CapabilityModule;
 import online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo;
 import online.yudream.base.domain.platform.wiki.aggregate.WikiNode;
@@ -33,20 +32,28 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
  * Wiki 问答：先检索注入上下文（RAG），LLM 仍可通过 wiki.search 原生工具深挖；回答带页面引用。
+ * 生成走 Harness 会话代理：带 (userId, sessionId) 的调用获得框架管理的跨轮次上下文；
+ * 匿名/一次性调用无状态运行（history 由调用方显式提供）。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class WikiChatAppService {
 
+    /** 管理端检索工具（wiki.search 有权限码实现）的模型侧安全名 */
+    static final String ADMIN_TOOL_NAME = "wiki_search";
+    /** 公开检索工具（wiki.search 无权限码实现）的模型侧派生别名 */
+    static final String PUBLIC_TOOL_NAME = "wiki_search_public";
+
     private final CapabilityAppService capabilities;
     private final CapabilityModuleRepo capabilityModuleRepo;
-    private final AiGenerationGateway aiGeneration;
+    private final HarnessAgentGateway harnessAgents;
     private final WikiSpaceRepo spaceRepo;
     private final WikiNodeRepo nodeRepo;
     private final WikiPageVersionRepo versionRepo;
@@ -56,11 +63,8 @@ public class WikiChatAppService {
 
     public WikiChatResultDTO chat(Long spaceId, String question, List<AiChatMessage> history) {
         Prepared prepared = prepare(spaceId, question, history, null);
-        AiGenerationResult result;
-        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(wikiSearchTool))) {
-            result = aiGeneration.generate(prepared.request());
-        }
-        return toResult(result, "", prepared.hits());
+        return generateAndFinish(prepared, wikiSearchTool, ADMIN_TOOL_NAME, "platform:wiki:tool:search",
+                null, null, null, null, null, null);
     }
 
     /**
@@ -82,13 +86,26 @@ public class WikiChatAppService {
 
     /**
      * 管理端流式问答，分别转发正文、真实 reasoning、工具和结构化过程事件。
+     * 提供 userId+sessionId 时走有状态 Harness 会话（跨轮次上下文由框架管理），否则无状态。
      */
     public WikiChatResultDTO chatStream(Long spaceId, String question, List<AiChatMessage> history,
                                         Consumer<String> onDelta, Consumer<String> onReasoningDelta,
                                         Consumer<AiAgentToolResult> onTool,
                                         Consumer<WikiChatActivityDTO> onActivity) {
+        return chatStream(spaceId, null, null, question, history, onDelta, onReasoningDelta, onTool, onActivity);
+    }
+
+    /**
+     * 管理端流式问答（可带会话身份）。
+     */
+    public WikiChatResultDTO chatStream(Long spaceId, Long userId, String sessionId, String question,
+                                        List<AiChatMessage> history,
+                                        Consumer<String> onDelta, Consumer<String> onReasoningDelta,
+                                        Consumer<AiAgentToolResult> onTool,
+                                        Consumer<WikiChatActivityDTO> onActivity) {
         Prepared prepared = prepare(spaceId, question, history, onActivity);
-        return generateAndFinish(prepared, wikiSearchTool, onDelta, onReasoningDelta, onTool, onActivity);
+        return generateAndFinish(prepared, wikiSearchTool, ADMIN_TOOL_NAME,
+                "platform:wiki:tool:search", userId, sessionId, onDelta, onReasoningDelta, onTool, onActivity);
     }
 
     /**
@@ -110,8 +127,20 @@ public class WikiChatAppService {
 
     /**
      * 公开站点流式问答，分别转发正文、reasoning、工具和结构化过程事件。
+     * 提供 userId+sessionId 时走有状态 Harness 会话，否则无状态（匿名调用必须无状态）。
      */
     public WikiChatResultDTO chatStreamBySlug(String slug, String question, List<AiChatMessage> history,
+                                              Consumer<String> onDelta, Consumer<String> onReasoningDelta,
+                                              Consumer<AiAgentToolResult> onTool,
+                                              Consumer<WikiChatActivityDTO> onActivity) {
+        return chatStreamBySlug(slug, null, null, question, history, onDelta, onReasoningDelta, onTool, onActivity);
+    }
+
+    /**
+     * 公开站点流式问答（可带会话身份）。
+     */
+    public WikiChatResultDTO chatStreamBySlug(String slug, Long userId, String sessionId, String question,
+                                              List<AiChatMessage> history,
                                               Consumer<String> onDelta, Consumer<String> onReasoningDelta,
                                               Consumer<AiAgentToolResult> onTool,
                                               Consumer<WikiChatActivityDTO> onActivity) {
@@ -121,17 +150,21 @@ public class WikiChatAppService {
             throw new BizException("该知识库未开放公开阅读");
         }
         Prepared prepared = prepare(space, question, history, true, onActivity);
-        return generateAndFinish(prepared, publicSearchTool, onDelta, onReasoningDelta, onTool, onActivity);
+        return generateAndFinish(prepared, publicSearchTool, PUBLIC_TOOL_NAME, null, userId, sessionId,
+                onDelta, onReasoningDelta, onTool, onActivity);
     }
 
-    private WikiChatResultDTO generateAndFinish(Prepared prepared, AiAgentTool searchTool,
+    private WikiChatResultDTO generateAndFinish(Prepared prepared, AiAgentTool searchTool, String allowedToolName,
+                                                String toolPermissionCode, Long userId, String sessionId,
                                                 Consumer<String> onDelta,
                                                 Consumer<AiAgentToolResult> onTool,
                                                 Consumer<WikiChatActivityDTO> onActivity) {
-        return generateAndFinish(prepared, searchTool, onDelta, null, onTool, onActivity);
+        return generateAndFinish(prepared, searchTool, allowedToolName, toolPermissionCode, userId, sessionId,
+                onDelta, null, onTool, onActivity);
     }
 
-    private WikiChatResultDTO generateAndFinish(Prepared prepared, AiAgentTool searchTool,
+    private WikiChatResultDTO generateAndFinish(Prepared prepared, AiAgentTool searchTool, String allowedToolName,
+                                                String toolPermissionCode, Long userId, String sessionId,
                                                 Consumer<String> onDelta,
                                                 Consumer<String> onReasoningDelta,
                                                 Consumer<AiAgentToolResult> onTool,
@@ -147,15 +180,29 @@ public class WikiChatAppService {
                 onReasoningDelta.accept(delta);
             }
         };
-        AiGenerationResult result;
-        try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(List.of(searchTool))) {
-            result = aiGeneration.generateStream(prepared.request(), onDelta, reasoningConsumer, onTool, null);
-        }
+        boolean stateful = userId != null && sessionId != null && !sessionId.isBlank();
+        HarnessRunRequest request = new HarnessRunRequest(
+                userId,
+                stateful ? "wiki-" + prepared.spaceKey() + "-" + sessionId : null,
+                "wiki-qa",
+                prepared.systemPrompt(),
+                prepared.question(),
+                List.of(),
+                prepared.providerCode(),
+                prepared.modelCode(),
+                prepared.config(),
+                true,
+                toolPermissionCode == null ? List.of() : List.of(toolPermissionCode),
+                stateful ? List.of() : prepared.history(),
+                List.of(allowedToolName));
+        HarnessRunResult result = harnessAgents.run(request, onDelta, reasoningConsumer, onTool);
         emitActivity(onActivity, progress("complete", "completed", "回答完成", "回答已生成。"));
         return toResult(result, reasoning.toString(), prepared.hits());
     }
 
-    private record Prepared(AiGenerationRequest request, List<WikiSearchHitDTO> hits) {
+    private record Prepared(String spaceKey, String systemPrompt, String question, String providerCode,
+                            String modelCode, Map<String, String> config, List<AiChatMessage> history,
+                            List<WikiSearchHitDTO> hits) {
     }
 
     private Prepared prepare(Long spaceId, String question, List<AiChatMessage> history,
@@ -207,16 +254,13 @@ public class WikiChatAppService {
                 + "6. 若内容中给出了「相关图片」，在回答的合适位置用 Markdown 图片语法原样引用展示（保留给出的图片地址与说明）。\n\n"
                 + "知识库目的：\n" + nullToEmpty(space.getPurpose()) + "\n\n"
                 + "知识库相关内容：\n" + contextOf(hits);
-        Map<String, String> config = aiConfig();
-        AiGenerationRequest request = new AiGenerationRequest(system, question, (String) null,
-                space.getChatProviderCode(), space.getChatModelCode(), config,
-                history == null ? List.of() : history, true, AiToolMode.AUTO);
-        return new Prepared(request, hits);
+        return new Prepared(space.getSlug(), system, question, space.getChatProviderCode(),
+                space.getChatModelCode(), aiConfig(), history == null ? List.of() : history, hits);
     }
 
-    private WikiChatResultDTO toResult(AiGenerationResult result, String reasoning, List<WikiSearchHitDTO> retrieved) {
+    private WikiChatResultDTO toResult(HarnessRunResult result, String reasoning, List<WikiSearchHitDTO> retrieved) {
         Map<String, WikiChatResultDTO.Citation> citations = new LinkedHashMap<>();
-        for (WikiChatResultDTO.Citation citation : extractCitations(result)) {
+        for (WikiChatResultDTO.Citation citation : extractCitations(result == null ? null : result.toolResults())) {
             citations.putIfAbsent(citation.title() + "|" + citation.path(), citation);
         }
         for (WikiSearchHitDTO hit : retrieved) {
@@ -232,12 +276,12 @@ public class WikiChatAppService {
                     .images(hitImages(hit))
                     .build());
         }
-        String answer = result == null ? "" : (result.summary() == null ? "" : result.summary());
+        String answer = result == null ? "" : result.content();
         return WikiChatResultDTO.builder()
                 .answer(answer)
                 .reasoning(reasoning)
                 .citations(new ArrayList<>(citations.values()))
-                .usage(result == null ? online.yudream.base.domain.platform.ai.valobj.AiUsage.empty() : result.usage())
+                .usage(result == null ? AiUsage.empty() : result.usage())
                 .build();
     }
 
@@ -412,14 +456,15 @@ public class WikiChatAppService {
         return context.toString();
     }
 
-    private List<WikiChatResultDTO.Citation> extractCitations(AiGenerationResult result) {
+    private List<WikiChatResultDTO.Citation> extractCitations(List<AiAgentToolResult> toolResults) {
         List<WikiChatResultDTO.Citation> citations = new ArrayList<>();
-        if (result == null || result.toolResults() == null) {
+        if (toolResults == null) {
             return citations;
         }
-        for (AiAgentToolResult tool : result.toolResults()) {
+        for (AiAgentToolResult tool : toolResults) {
             if (tool == null || tool.payload() == null
-                    || !("wiki.search".equals(tool.toolName()) || "wiki_search".equals(tool.toolName()))) {
+                    || !("wiki.search".equals(tool.toolName()) || "wiki_search".equals(tool.toolName())
+                         || "wiki_search_public".equals(tool.toolName()))) {
                 continue;
             }
             Object hits = tool.payload().get("hits");

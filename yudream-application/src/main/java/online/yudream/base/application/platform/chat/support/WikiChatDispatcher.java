@@ -32,10 +32,14 @@ public class WikiChatDispatcher implements ChatDispatcher {
         if (!StringUtils.hasText(context.spaceSlug())) {
             throw new BizException("请选择要问答的知识库");
         }
+        // send() 带 sessionId（有状态 Harness 会话，上下文由框架管理）；streamOnce 为 null（无状态、history 透传）。
+        boolean stateful = StringUtils.hasText(context.sessionId());
         WikiChatResultDTO result = wikiChatAppService.chatStreamBySlug(
                 context.spaceSlug(),
+                context.userId(),
+                stateful ? "chat-" + context.sessionId() : null,
                 context.question(),
-                context.history(),
+                stateful ? List.of() : context.history(),
                 context.onDelta(),
                 context.onReasoningDelta(),
                 context.onTool(),

@@ -43,7 +43,9 @@ public class PerCallToolFilterMiddleware implements MiddlewareBase {
         AgentToolPermissions permissions = runtimeContext.get(AgentToolPermissions.class);
         List<String> codes = permissions == null ? List.of() : permissions.codes();
         boolean explicit = permissions != null && permissions.explicitContext();
+        java.util.Set<String> allowed = catalog.allowed();
         List<ToolSchema> visible = input.tools().stream()
+                .filter(schema -> allowed.isEmpty() || allowed.contains(schema.getName()))
                 .filter(schema -> hasPermission(catalog.permissions().get(schema.getName()), codes, explicit))
                 .toList();
         return next.apply(new ReasoningInput(input.messages(), visible, input.options()));

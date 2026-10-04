@@ -17,6 +17,12 @@ public class WikiChatRequest {
     @Size(max = 10, message = "历史对话不能超过 10 轮")
     private List<ChatTurn> history;
 
+    /**
+     * 可选会话标识：提供时走 Harness 有状态会话（服务端管理跨轮次上下文，history 可不传）。
+     */
+    @Size(max = 64, message = "会话标识长度不能超过 64 字符")
+    private String sessionId;
+
     @Data
     public static class ChatTurn {
         @Size(max = 20, message = "角色长度不能超过 20 字符")
