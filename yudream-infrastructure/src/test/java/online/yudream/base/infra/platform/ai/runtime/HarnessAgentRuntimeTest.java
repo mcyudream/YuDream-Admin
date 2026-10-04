@@ -92,7 +92,8 @@ class HarnessAgentRuntimeTest extends MongoStoreTestBase {
                     public Stream<online.yudream.base.domain.platform.ai.service.AiAgentTool> stream() {
                         return Stream.empty();
                     }
-                });
+                },
+                new MongoAgentSkillRepository(mongo));
         runtime = agentRuntime;
     }
 
