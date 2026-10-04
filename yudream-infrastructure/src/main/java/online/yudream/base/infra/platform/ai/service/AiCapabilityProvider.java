@@ -5,6 +5,7 @@ import online.yudream.base.domain.platform.capability.service.CapabilityProvider
 import online.yudream.base.domain.platform.capability.valobj.CapabilityDescriptor;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityHealth;
 import online.yudream.base.domain.platform.capability.valobj.CapabilityTestResult;
+import online.yudream.base.infra.platform.ai.runtime.AgentScopeGenerationGateway;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -20,13 +21,13 @@ public class AiCapabilityProvider implements CapabilityProvider {
 
     public static final String CODE = "ai";
 
-    private final OpenAiCompatibleGenerationGateway generationGateway;
+    private final AgentScopeGenerationGateway generationGateway;
     private final AiProviderConfigParser providerConfigParser;
     private final AtomicBoolean enabled = new AtomicBoolean(false);
     private Map<String, String> config = Map.of();
 
     public AiCapabilityProvider(
-            OpenAiCompatibleGenerationGateway generationGateway,
+            AgentScopeGenerationGateway generationGateway,
             AiProviderConfigParser providerConfigParser
     ) {
         this.generationGateway = generationGateway;
