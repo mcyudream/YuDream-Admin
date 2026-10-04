@@ -394,5 +394,26 @@ public enum PlatformMenuModule {
 
     @MenuNode(code = "platform:agent:tool:delete", name = "删除 Agent 工具", type = MenuNodeType.BUTTON,
             parentName = "AGENT_TOOLS", permission = "platform:agent:tool:delete")
-    AGENT_TOOL_DELETE
+    AGENT_TOOL_DELETE,
+
+    @MenuNode(code = "platform:agent-skill", name = "平台技能库", type = MenuNodeType.MENU,
+            parentName = "APP_HUB", path = "/platform/agent-skill", component = "platform/agent-skill/index.vue",
+            icon = "i-ri:book-2-line", sort = 55, permission = "platform:agent-skill:view")
+    AGENT_SKILL,
+
+    @MenuNode(code = "platform:agent-skill:view", name = "查看平台技能库", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_SKILL", permission = "platform:agent-skill:view")
+    AGENT_SKILL_VIEW,
+
+    @MenuNode(code = "platform:agent-skill:create", name = "创建平台技能", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_SKILL", permission = "platform:agent-skill:create")
+    AGENT_SKILL_CREATE,
+
+    @MenuNode(code = "platform:agent-skill:edit", name = "编辑平台技能", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_SKILL", permission = "platform:agent-skill:edit")
+    AGENT_SKILL_EDIT,
+
+    @MenuNode(code = "platform:agent-skill:delete", name = "删除平台技能", type = MenuNodeType.BUTTON,
+            parentName = "AGENT_SKILL", permission = "platform:agent-skill:delete")
+    AGENT_SKILL_DELETE
 }
