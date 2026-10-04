@@ -57,8 +57,12 @@
 
 ## 5. AI/Agent 与 CMS 要点
 
-- AI 配置必须 provider-first 列表结构（`providers` 数组，每个 provider 持有 base URL、key、代理、默认模型与模型清单）；前端传 `providerCode` + `modelCode`。
-- Spring AI 集成使用原生 tool calling，模型-工具交互不要求模型手工产出项目自定义 `toolCalls` JSON；`AiAgentTool` 为项目抽象，infra 负责适配。
+- AI 底层由 AgentScope Java（`io.agentscope:agentscope-harness`）承载，禁止在框架中手搓 AI 底层逻辑：模型实例构建/连接复用（`AgentScopeModels`）、流式拆包、工具调用循环、结构化输出与降级、重试一律交给框架。供应商差异经 `AiProviderAdapter` 产出 AgentScope `GenerateOptions`（`additionalBodyParams` 注入 thinking、`toolChoice`、`reasoningEffort` 等）。
+- AI 配置必须 provider-first 列表结构（`providers` 数组，每个 provider 持有 base URL、key、代理、默认模型与模型清单）；前端传 `providerCode` + `modelCode`。Kimi/DeepSeek 等兼容供应商走 AgentScope 官方 compat formatter，并禁用「结构化输出与工具共存」的原生路径。
+- 有状态会话（通用聊天、Wiki 问答等）走 `HarnessAgentRuntime`（`HarnessAgent` 单例 per agentCode + MongoDB `AgentStateStore`/`BaseStore`，`IsolationScope.USER` 多副本隔离）：上下文、压缩、双层长期记忆由框架 `AgentState` 管理，平台消息表仅作 UI 投影，禁止再手工裁剪历史；聊天型 Agent 必须禁用宿主文件系统与 shell 工具。无状态/一次性调用走 `AgentScopeGenerationGateway`（domain `AiGenerationGateway` 端口）。
+- Agent 工具权限四层控制：① schema 层按权限快照过滤模型可见工具（`PerCallToolFilterMiddleware`）；② 规则/模式层（`PermissionContextState`）；③ 执行层以 RuntimeContext 权限快照复核、fail-closed（`AgentToolAdapter`）；④ 沙箱守卫最后把关。插件 DESTRUCTIVE/需确认工具必须走权限系统 ASK（HITL）。工具描述符到模型 schema 的归一化与安全名转换走 `ToolSchemas`。
+- 技能框架级统一管理：`platformAgentSkill`（`MongoAgentSkillRepository implements AgentSkillRepository`）是所有 Harness Agent 的技能源，启用技能随每轮推理进入 `<available_skills>`；管理端 `/api/platform/agent-skills`（view/create/edit/delete 按动作词表拆分）。
+- Agent 路径（ReActAgent/HarnessAgent）的 system prompt 必须经 `sysPrompt`/`onSystemPrompt` 注入，输入消息列表禁止携带 SYSTEM 消息；模型可见工具名一律 `ToolSchemas.safeName`。
 - SSE 必须端到端真流式；事件使用可扩展信封（`ai.message`/`ai.tool`/`ai.result`/`ai.error` 等，含 `event/action/module/traceId/timestamp/payload`）。发送结构化 `ai.error` 后正常 complete，不得再 `completeWithError`。
 - CMS 改动必须是完整发布闭环：权限菜单、管理路由、公开路由与渲染、发布/下线、SEO、页面/模板元数据，以及 GrapesJS 可视化构建兼容存储（`htmlContent`/`cssContent`/`builderProjectJson`）。
 

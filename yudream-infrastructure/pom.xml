@@ -131,16 +131,13 @@
             <artifactId>webauthn-server-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-openai</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-client-chat</artifactId>
-        </dependency>
-        <dependency>
             <groupId>io.projectreactor.netty</groupId>
             <artifactId>reactor-netty-http</artifactId>
+        </dependency>
+        <!-- WebClient（官Q/Milky/渲染/备份等出站 HTTP）：原经 spring-ai 传递，现显式声明 -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
         </dependency>
         <!-- AgentScope Java v2：Harness 级 agent 框架（core 随 harness 传递） -->
         <dependency>

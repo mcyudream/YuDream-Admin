@@ -447,7 +447,7 @@
     },
     {
       "key": "ai-tool-result-final-text",
-      "text": "Spring AI 工具调用完成后必须保留模型的最终自然语言文本；AiGenerationResult 不能因为 toolResults 非空而清空 summary/content。只显示工具完成状态会掩盖 web.fetch 等读取工具已经返回的分析结论。"
+      "text": "框架工具调用完成后必须保留模型的最终自然语言文本（AgentScope 最终 Msg 正文优先，正文为空才回落首条工具消息）；AiGenerationResult 不能因为 toolResults 非空而清空 summary/content。只显示工具完成状态会掩盖 web.fetch 等读取工具已经返回的分析结论。"
     },
     {
       "key": "cms-locked-chrome-validation",
