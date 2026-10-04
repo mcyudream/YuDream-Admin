@@ -87,7 +87,7 @@ function browseAuthor() {
     <main class="plugin">
       <div class="plugin__inner">
         <button type="button" class="plugin-back" @click="router.push({ name: 'publicMarketHome' })">
-          <FaIcon name="i-ri:arrow-left-line" />
+          <FaIcon name="morph:arrow-left" />
           返回市场
         </button>
         <div v-if="loading" class="plugin-empty">加载中…</div>
@@ -96,7 +96,7 @@ function browseAuthor() {
           <header class="plugin-hero">
             <div class="plugin-hero__icon">
               <img v-if="isImageIcon(detail.icon)" :src="iconUrl(detail.icon)" :alt="detail.displayName || detail.code">
-              <FaIcon v-else :name="detail.icon || 'i-ri:puzzle-2-line'" />
+              <FaIcon v-else :name="detail.icon || 'morph:puzzle'" />
             </div>
             <div class="plugin-hero__copy">
               <p class="plugin-code">{{ detail.code }}</p>

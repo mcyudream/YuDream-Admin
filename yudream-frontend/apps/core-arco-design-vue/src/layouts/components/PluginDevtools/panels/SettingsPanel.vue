@@ -266,18 +266,18 @@ function handleResetPanel() {
         </FaTag>
         <div class="flex-1" />
         <FaButton variant="outline" size="icon" :loading="store.devProjectsLoading" title="刷新" @click="store.loadDevProjects()">
-          <FaIcon name="i-ri:refresh-line" />
+          <FaIcon name="morph:refresh-cw" />
         </FaButton>
         <FaButton variant="outline" size="sm" @click="openScaffold">
-          <FaIcon name="i-ri:magic-line" />
+          <FaIcon name="morph:wand-sparkles" />
           新建插件
         </FaButton>
         <FaButton variant="outline" size="sm" @click="openBatch">
-          <FaIcon name="i-ri:folder-add-line" />
+          <FaIcon name="morph:folder-plus" />
           批量登记
         </FaButton>
         <FaButton size="sm" @click="openAdd">
-          <FaIcon name="i-ri:add-line" />
+          <FaIcon name="morph:plus" />
           登记目录
         </FaButton>
       </div>
@@ -309,22 +309,22 @@ function handleResetPanel() {
         </div>
         <FaTooltip text="加载并启用该插件" side="top">
           <FaButton variant="ghost" size="icon" :loading="enablingCode === project.code" @click="enable(project)">
-            <FaIcon name="i-ri:play-line" />
+            <FaIcon name="morph:play" />
           </FaButton>
         </FaTooltip>
         <FaTooltip text="重挂载该插件前端远程模块" side="top">
           <FaButton variant="ghost" size="icon" :loading="frontendReloadingCode === project.code" @click="reloadFrontend(project)">
-            <FaIcon name="i-ri:refresh-line" />
+            <FaIcon name="morph:refresh-cw" />
           </FaButton>
         </FaTooltip>
         <FaTooltip text="立即 Java 重载该插件" side="top">
           <FaButton variant="ghost" size="icon" :loading="reloadingCode === project.code" @click="reload(project)">
-            <FaIcon name="i-ri:restart-line" />
+            <FaIcon name="morph:rotate-cw" />
           </FaButton>
         </FaTooltip>
         <FaTooltip v-if="project.source === 'FILE'" text="从清单文件移除" side="top">
           <FaButton variant="ghost" size="icon" :loading="removingCode === project.code" @click="remove(project)">
-            <FaIcon name="i-ri:delete-bin-line" />
+            <FaIcon name="morph:trash-2" />
           </FaButton>
         </FaTooltip>
       </div>
@@ -373,7 +373,7 @@ function handleResetPanel() {
           <div class="add-form__path">
             <FaInput v-model="addForm.path" class="flex-1" placeholder="D:/code/yudream-admin-plugins/yudream-plugin-xxx" />
             <FaButton variant="outline" @click="browseOpen = true">
-              <FaIcon name="i-ri:folder-open-line" />
+              <FaIcon name="morph:folder-open" />
               浏览
             </FaButton>
           </div>
@@ -416,7 +416,7 @@ function handleResetPanel() {
           <div class="add-form__path">
             <FaInput v-model="batchPath" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
             <FaButton variant="outline" @click="batchBrowseOpen = true">
-              <FaIcon name="i-ri:folder-open-line" />
+              <FaIcon name="morph:folder-open" />
               浏览
             </FaButton>
           </div>
@@ -461,7 +461,7 @@ function handleResetPanel() {
           <div class="add-form__path">
             <FaInput v-model="scaffoldForm.parentDir" class="flex-1" placeholder="D:/code/yudream-admin-plugins" />
             <FaButton variant="outline" @click="scaffoldBrowseOpen = true">
-              <FaIcon name="i-ri:folder-open-line" />
+              <FaIcon name="morph:folder-open" />
               浏览
             </FaButton>
           </div>

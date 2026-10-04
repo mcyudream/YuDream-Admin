@@ -157,16 +157,16 @@ function handleAnimationEnd() {
         </template>
         <ButtonGroup class="scale-125 bottom-4 left-1/2 absolute backdrop-blur-xs -translate-x-1/2">
           <Button variant="outline" size="icon" class="border-none bg-muted/50" @click="handleZoomIn">
-            <Icon name="i-carbon:zoom-in" class="size-5" />
+            <Icon name="morph:zoom-in" class="size-5" />
           </Button>
           <Button variant="outline" size="icon" class="border-none bg-muted/50" @click="handleZoomOut">
-            <Icon name="i-carbon:zoom-out" class="size-5" />
+            <Icon name="morph:zoom-out" class="size-5" />
           </Button>
           <Button variant="outline" size="icon" class="border-none bg-muted/50" @click="handleOriginalSize">
             <Icon name="i-lucide:maximize" class="size-5" />
           </Button>
           <Button variant="outline" size="icon" class="border-none bg-muted/50" @click="handleRotateLeft">
-            <Icon name="i-carbon:rotate" class="size-5" />
+            <Icon name="morph:rotate-cw" class="size-5" />
           </Button>
           <Button variant="outline" size="icon" class="border-none bg-muted/50" @click="handleRotateRight">
             <Icon name="i-carbon:rotate-180" class="size-5" />

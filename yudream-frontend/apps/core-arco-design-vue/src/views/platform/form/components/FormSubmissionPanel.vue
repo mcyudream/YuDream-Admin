@@ -116,7 +116,7 @@ function formatValue(value: unknown) {
       </div>
       <div class="panel-actions">
         <FaButton v-auth="'platform:form:submission:export'" variant="outline" :disabled="!formId" :loading="exporting" @click="exportExcel">
-          <FaIcon name="i-ri:file-excel-2-line" />
+          <FaIcon name="morph:file-spreadsheet" />
           导出
         </FaButton>
       </div>

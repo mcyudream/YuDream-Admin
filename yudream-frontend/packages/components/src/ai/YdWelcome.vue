@@ -14,7 +14,7 @@ withDefaults(defineProps<{
   title: '今天想让我帮你做什么？',
   description: '',
   suggestions: () => [],
-  icon: 'i-ri:sparkling-2-fill',
+  icon: 'morph:sparkles',
 })
 
 const emits = defineEmits<{
@@ -43,9 +43,9 @@ const emits = defineEmits<{
         class="yd-welcome__prompt"
         @click="emits('select', item)"
       >
-        <FaIcon name="i-ri:sparkling-line" class="yd-welcome__prompt-icon" />
+        <FaIcon name="morph:sparkles" class="yd-welcome__prompt-icon" />
         <span>{{ item }}</span>
-        <FaIcon name="i-ri:arrow-right-up-line" class="yd-welcome__prompt-arrow" />
+        <FaIcon name="morph:arrow-up-right" class="yd-welcome__prompt-arrow" />
       </button>
     </div>
   </section>

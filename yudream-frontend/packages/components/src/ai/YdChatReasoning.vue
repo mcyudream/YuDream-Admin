@@ -25,9 +25,9 @@ const expanded = ref(props.defaultExpanded)
 <template>
   <section class="yd-reasoning-block">
     <button type="button" class="yd-reasoning-block__head" @click="expanded = !expanded">
-      <FaIcon name="i-ri:brain-line" :class="{ 'is-thinking': pending }" />
+      <FaIcon name="morph:brain" :class="{ 'is-thinking': pending }" />
       <span>{{ title ?? config.reasoningTitle ?? '深度思考' }}</span>
-      <FaIcon :name="expanded ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="yd-reasoning-block__chevron" />
+      <FaIcon :name="expanded ? 'morph:chevron-up' : 'morph:chevron-down'" class="yd-reasoning-block__chevron" />
     </button>
     <div v-show="expanded" class="yd-reasoning-block__body">
       {{ content }}

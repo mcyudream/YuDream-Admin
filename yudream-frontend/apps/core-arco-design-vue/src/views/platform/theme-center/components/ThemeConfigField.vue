@@ -214,13 +214,13 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
           <span>#{{ index + 1 }}</span>
           <div class="theme-config-field__list-item-actions">
             <FaButton size="sm" variant="ghost" :disabled="index === 0" @click="moveItem(index, -1)">
-              <FaIcon name="i-ri:arrow-up-line" />
+              <FaIcon name="morph:arrow-up" />
             </FaButton>
             <FaButton size="sm" variant="ghost" :disabled="index === listItems.length - 1" @click="moveItem(index, 1)">
-              <FaIcon name="i-ri:arrow-down-line" />
+              <FaIcon name="morph:arrow-down" />
             </FaButton>
             <FaButton size="sm" variant="ghost" @click="removeItem(index)">
-              <FaIcon name="i-ri:delete-bin-line" />
+              <FaIcon name="morph:trash-2" />
             </FaButton>
           </div>
         </div>
@@ -236,7 +236,7 @@ async function uploadThemeImage({ file, onProgress }: { file: File, onProgress: 
         </div>
       </div>
       <FaButton variant="outline" size="sm" @click="createItem">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
         添加一项
       </FaButton>
     </div>

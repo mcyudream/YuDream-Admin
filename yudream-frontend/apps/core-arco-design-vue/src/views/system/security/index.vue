@@ -134,11 +134,11 @@ const hostProviderOptions = computed(() => {
 })
 
 const tabOptions = [
-  { key: 'policy', label: '安全策略', icon: 'i-ri:shield-check-line' },
-  { key: 'apiKey', label: 'API Key', icon: 'i-ri:key-2-line' },
-  { key: 'oauth', label: 'OAuth', icon: 'i-ri:login-circle-line' },
-  { key: 'external', label: '第三方登录', icon: 'i-ri:links-line' },
-  { key: 'passkey', label: 'Passkey', icon: 'i-ri:fingerprint-line' },
+  { key: 'policy', label: '安全策略', icon: 'morph:shield-check' },
+  { key: 'apiKey', label: 'API Key', icon: 'morph:key-round' },
+  { key: 'oauth', label: 'OAuth', icon: 'morph:log-in' },
+  { key: 'external', label: '第三方登录', icon: 'morph:link' },
+  { key: 'passkey', label: 'Passkey', icon: 'morph:fingerprint' },
 ] as const
 
 const oauthEnabled = computed(() => policy.oauthServerEnabled || policy.oauthClientEnabled)
@@ -157,12 +157,12 @@ const tabs = computed(() => tabOptions.filter((tab) => {
 }))
 
 const policyCards = computed(() => [
-  { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求体和响应体使用 RSA-OAEP + AES-GCM 加密', icon: 'i-ri:lock-password-line' },
-  { key: 'dualTokenEnabled', label: '双 Token', desc: '访问令牌与刷新令牌分离，可配置有效期', icon: 'i-ri:token-swap-line' },
-  { key: 'apiKeyEnabled', label: 'API Key', desc: '第三方访问密钥认证，权限不超过创建人', icon: 'i-ri:key-2-line' },
-  { key: 'passkeyEnabled', label: 'Passkey', desc: '无密码登录扩展入口', icon: 'i-ri:fingerprint-line' },
-  { key: 'oauthServerEnabled', label: 'OAuth 服务端', desc: '向第三方应用签发授权', icon: 'i-ri:server-line' },
-  { key: 'oauthClientEnabled', label: 'OAuth 客户端', desc: '接入外部身份提供商', icon: 'i-ri:login-circle-line' },
+  { key: 'apiEncryptionEnabled', label: '接口加密', desc: '请求体和响应体使用 RSA-OAEP + AES-GCM 加密', icon: 'morph:lock-keyhole' },
+  { key: 'dualTokenEnabled', label: '双 Token', desc: '访问令牌与刷新令牌分离，可配置有效期', icon: 'morph:arrow-left-right' },
+  { key: 'apiKeyEnabled', label: 'API Key', desc: '第三方访问密钥认证，权限不超过创建人', icon: 'morph:key-round' },
+  { key: 'passkeyEnabled', label: 'Passkey', desc: '无密码登录扩展入口', icon: 'morph:fingerprint' },
+  { key: 'oauthServerEnabled', label: 'OAuth 服务端', desc: '向第三方应用签发授权', icon: 'morph:server' },
+  { key: 'oauthClientEnabled', label: 'OAuth 客户端', desc: '接入外部身份提供商', icon: 'morph:log-in' },
 ] as const)
 
 const permissionGroups = computed(() => {
@@ -810,7 +810,7 @@ function normalizeDateTime(value?: string) {
   <div>
     <FaPageHeader title="安全中心" class="mb-0">
       <FaButton v-if="activeTab === 'policy'" v-auth="'system:security:edit'" :loading="savingPolicy" @click="savePolicy">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存策略
       </FaButton>
     </FaPageHeader>
@@ -825,7 +825,7 @@ function normalizeDateTime(value?: string) {
 
       <section v-if="activeTab === 'policy'" class="panel">
         <div class="section-title">
-          <FaIcon name="i-ri:shield-check-line" />
+          <FaIcon name="morph:shield-check" />
           安全策略
         </div>
         <div class="policy-grid">
@@ -854,15 +854,15 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'apiKey'" class="panel">
-        <FaAlert v-if="!policy.apiKeyEnabled" icon="i-ri:information-line" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
+        <FaAlert v-if="!policy.apiKeyEnabled" icon="morph:info" title="API Key 未启用" :description="apiKeyDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
-            <FaIcon name="i-ri:key-line" />
+            <FaIcon name="morph:key" />
             API Key
           </div>
           <div class="key-actions">
             <FaButton v-auth="'system:security:api-key:create'" :disabled="!policy.apiKeyEnabled" @click="guardedOpenCreate">
-              <FaIcon name="i-ri:key-2-line" />
+              <FaIcon name="morph:key-round" />
               创建
             </FaButton>
           </div>
@@ -885,7 +885,7 @@ function normalizeDateTime(value?: string) {
                 <div class="flex gap-2 md:justify-end">
                   <FaButton variant="outline" :disabled="!policy.apiKeyEnabled" @click="resetSearch">重置</FaButton>
                   <FaButton :disabled="!policy.apiKeyEnabled" @click="guardedLoadApiKeys">
-                    <FaIcon name="i-ri:search-line" />
+                    <FaIcon name="morph:search" />
                     筛选
                   </FaButton>
                 </div>
@@ -953,21 +953,21 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'oauth'" class="panel">
-        <FaAlert v-if="!oauthPaneEnabled()" icon="i-ri:information-line" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
+        <FaAlert v-if="!oauthPaneEnabled()" icon="morph:info" title="OAuth 能力未启用" :description="oauthDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
-            <FaIcon name="i-ri:login-circle-line" />
+            <FaIcon name="morph:log-in" />
             OAuth
           </div>
           <div class="key-actions">
             <FaButton v-if="policy.oauthServerEnabled" :variant="oauthPane === 'clients' ? 'default' : 'outline'" @click="oauthPane = 'clients'">服务端客户端</FaButton>
             <FaButton v-if="policy.oauthClientEnabled" :variant="oauthPane === 'providers' ? 'default' : 'outline'" @click="oauthPane = 'providers'">外部提供商</FaButton>
             <FaButton v-if="oauthPane === 'clients'" v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthServerEnabled" @click="guardedOpenOAuthClient()">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
               新增客户端
             </FaButton>
             <FaButton v-else v-auth="'system:security:oauth:edit'" :disabled="!policy.oauthClientEnabled" @click="guardedOpenOAuthProvider()">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
               新增提供商
             </FaButton>
           </div>
@@ -1085,8 +1085,8 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'external'" class="panel">
-        <div class="key-toolbar"><div class="section-title"><FaIcon name="i-ri:links-line" />第三方登录</div></div>
-        <FaAlert icon="i-ri:information-line" title="Wwoyun 是内置默认提供方" description="接口地址默认为 https://login.wwoyun.cn/connect.php，可按实际部署修改。关闭状态开关即可从登录页拿掉入口，不必清空凭据。插件托管的提供方在各自设置页配置。" />
+        <div class="key-toolbar"><div class="section-title"><FaIcon name="morph:link" />第三方登录</div></div>
+        <FaAlert icon="morph:info" title="Wwoyun 是内置默认提供方" description="接口地址默认为 https://login.wwoyun.cn/connect.php，可按实际部署修改。关闭状态开关即可从登录页拿掉入口，不必清空凭据。插件托管的提供方在各自设置页配置。" />
         <FaAlert v-if="pluginManagedProviders.length" class="mt-3" title="插件托管提供方" :description="pluginManagedProviders.map(item => `${item.name || item.code}${item.enabled ? '' : '（未启用）'}`).join('、')" />
         <a-form :model="externalLoginForm" layout="vertical" class="mt-4">
           <div class="form-grid">
@@ -1120,7 +1120,7 @@ function normalizeDateTime(value?: string) {
           </a-form-item>
           <div class="flex justify-end">
             <FaButton v-auth="'system:security:external-login:edit'" @click="saveExternalLogin">
-              <FaIcon name="i-ri:save-3-line" />
+              <FaIcon name="morph:save" />
               保存配置
             </FaButton>
           </div>
@@ -1128,10 +1128,10 @@ function normalizeDateTime(value?: string) {
       </section>
 
       <section v-if="activeTab === 'passkey'" class="panel">
-        <FaAlert v-if="!policy.passkeyEnabled" icon="i-ri:information-line" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
+        <FaAlert v-if="!policy.passkeyEnabled" icon="morph:info" title="Passkey 未启用" :description="passkeyDisabledMessage()" />
         <div class="key-toolbar">
           <div class="section-title">
-            <FaIcon name="i-ri:fingerprint-line" />
+            <FaIcon name="morph:fingerprint" />
             Passkey 凭据
           </div>
         </div>
@@ -1142,7 +1142,7 @@ function normalizeDateTime(value?: string) {
                 <FaInput v-model="passkeySearch.userId" placeholder="用户 ID（留空全部）" :disabled="!policy.passkeyEnabled" @keydown.enter="guardedLoadPasskeys" />
                 <div class="flex gap-2 md:justify-end">
                   <FaButton v-auth="'system:security:passkey:view'" :loading="loading" :disabled="!policy.passkeyEnabled" @click="guardedLoadPasskeys">
-                    <FaIcon name="i-ri:search-line" />
+                    <FaIcon name="morph:search" />
                     筛选
                   </FaButton>
                 </div>
@@ -1327,7 +1327,7 @@ function normalizeDateTime(value?: string) {
       <div class="secret-box">
         <code>{{ oneTimeSecret }}</code>
         <FaButton variant="outline" @click="copySecret">
-          <FaIcon name="i-ri:file-copy-line" />
+          <FaIcon name="morph:copy" />
           复制
         </FaButton>
       </div>

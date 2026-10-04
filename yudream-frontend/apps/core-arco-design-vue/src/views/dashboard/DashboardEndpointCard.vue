@@ -37,12 +37,12 @@ function handleDragStart(event: DragEvent) {
     >
       <code>{{ endpointUrl }}</code>
       <span class="dashboard-endpoint__copy" :class="toneTextClass(card.tone)">
-        <FaIcon name="i-ri:file-copy-line" />
+        <FaIcon name="morph:copy" />
       </span>
     </button>
 
     <div class="dashboard-endpoint__hint">
-      <FaIcon name="i-ri:information-line" />
+      <FaIcon name="morph:info" />
       <span>点击可复制地址，也可以把地址卡片拖拽到支持拖入配置的客户端。</span>
     </div>
   </div>

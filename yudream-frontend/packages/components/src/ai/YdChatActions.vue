@@ -72,7 +72,7 @@ function onFeedback(value: 'like' | 'dislike') {
       :title="copied ? '已复制' : '复制'"
       @click="onCopy"
     >
-      <FaIcon :name="copied ? 'i-ri:check-line' : 'i-ri:file-copy-line'" />
+      <FaIcon :name="copied ? 'morph:check' : 'morph:copy'" />
       <span v-if="!iconOnly">{{ copied ? '已复制' : '复制' }}</span>
     </button>
     <button
@@ -82,7 +82,7 @@ function onFeedback(value: 'like' | 'dislike') {
       title="重新生成"
       @click="emits('regenerate')"
     >
-      <FaIcon name="i-ri:refresh-line" />
+      <FaIcon name="morph:refresh-cw" />
       <span v-if="!iconOnly">重新生成</span>
     </button>
     <template v-if="feedback">
@@ -93,7 +93,7 @@ function onFeedback(value: 'like' | 'dislike') {
         title="有帮助"
         @click="onFeedback('like')"
       >
-        <FaIcon :name="feedbackState === 'like' ? 'i-ri:thumb-up-fill' : 'i-ri:thumb-up-line'" />
+        <FaIcon :name="feedbackState === 'like' ? 'morph:thumbs-up' : 'morph:thumbs-up'" />
       </button>
       <button
         type="button"
@@ -102,7 +102,7 @@ function onFeedback(value: 'like' | 'dislike') {
         title="没帮助"
         @click="onFeedback('dislike')"
       >
-        <FaIcon :name="feedbackState === 'dislike' ? 'i-ri:thumb-down-fill' : 'i-ri:thumb-down-line'" />
+        <FaIcon :name="feedbackState === 'dislike' ? 'morph:thumbs-down' : 'morph:thumbs-down'" />
       </button>
     </template>
     <button

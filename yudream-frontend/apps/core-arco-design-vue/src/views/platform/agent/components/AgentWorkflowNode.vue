@@ -42,11 +42,11 @@ function handleStyle(handle: string) {
     <Handle v-if="data.kind !== 'start' && data.kind !== 'input'" id="target" type="target" :position="Position.Left" :connectable="connectable" />
 
     <button v-if="!readonly" class="node-delete nodrag nowheel" type="button" title="删除节点" aria-label="删除节点" @click.stop="emit('delete', id)">
-      <FaIcon name="i-ri:close-line" />
+      <FaIcon name="morph:x" />
     </button>
 
     <span v-if="debugStatus" class="node-debug-status">
-      <FaIcon :name="debugStatus === 'RUNNING' ? 'i-ri:loader-4-line' : debugStatus === 'COMPLETED' ? 'i-ri:check-line' : debugStatus === 'FAILED' ? 'i-ri:close-line' : 'i-ri:skip-forward-line'" />
+      <FaIcon :name="debugStatus === 'RUNNING' ? 'morph:loader-circle' : debugStatus === 'COMPLETED' ? 'morph:check' : debugStatus === 'FAILED' ? 'morph:x' : 'morph:skip-forward'" />
       {{ debugStatus === 'RUNNING' ? '运行中' : debugStatus === 'COMPLETED' ? '已完成' : debugStatus === 'FAILED' ? '失败' : '已跳过' }}
     </span>
 
@@ -56,23 +56,23 @@ function handleStyle(handle: string) {
         <strong>{{ data.title || '未命名节点' }}</strong>
         <small>{{ data.label }}</small>
       </span>
-      <FaIcon class="node-more" name="i-ri:more-2-fill" />
+      <FaIcon class="node-more" name="morph:ellipsis" />
     </div>
 
     <p>{{ data.description || '选择节点后在右侧完善配置' }}</p>
 
     <div v-if="data.kind === 'tool'" class="node-tool legacy-tool">
-      <FaIcon name="i-ri:tools-line" />
+      <FaIcon name="morph:wrench" />
       <span>兼容节点 · {{ data.toolCode || '尚未选择工具' }}</span>
     </div>
     <div v-else-if="isModelNode" class="node-model">
-      <FaIcon :name="data.vision ? 'i-ri:image-circle-line' : 'i-ri:chat-3-line'" />
+      <FaIcon :name="data.vision ? 'i-ri:image-circle-line' : 'morph:message-circle'" />
       <span>{{ data.modelCode ? `${data.providerCode} / ${data.modelCode}` : '尚未选择模型' }}</span>
     </div>
     <div v-if="isToolEnabledModel" class="node-badges">
-      <span><FaIcon name="i-ri:tools-line" /> 工具 {{ data.toolCodes.length }} · {{ toolModeLabel }}</span>
-      <span v-if="data.kind === 'vision'"><FaIcon name="i-ri:image-2-line" /> 图片变量</span>
-      <span v-else-if="data.vision"><FaIcon name="i-ri:eye-line" /> Vision 可用</span>
+      <span><FaIcon name="morph:wrench" /> 工具 {{ data.toolCodes.length }} · {{ toolModeLabel }}</span>
+      <span v-if="data.kind === 'vision'"><FaIcon name="morph:image" /> 图片变量</span>
+      <span v-else-if="data.vision"><FaIcon name="morph:eye" /> Vision 可用</span>
     </div>
 
     <div class="node-io">

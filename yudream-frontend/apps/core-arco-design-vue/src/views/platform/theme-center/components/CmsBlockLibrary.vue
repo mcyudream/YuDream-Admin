@@ -250,7 +250,7 @@ function onPageSizeChange(size: number) {
           class="w-[160px]"
         />
         <FaButton @click="openCreate">
-          <FaIcon name="i-ri:add-line" />
+          <FaIcon name="morph:plus" />
           新增区块
         </FaButton>
       </div>

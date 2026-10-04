@@ -651,7 +651,7 @@ function caseTime(item: QqSandboxCase) {
       <span v-if="pluginCode" class="plugin-scope">
         目标：{{ pluginCode }}
         <button type="button" class="plugin-scope__clear" aria-label="清除插件范围" @click="pluginCode = ''">
-          <FaIcon name="i-ri:close-line" class="size-3" />
+          <FaIcon name="morph:x" class="size-3" />
         </button>
       </span>
       <div class="flex-1" />
@@ -660,7 +660,7 @@ function caseTime(item: QqSandboxCase) {
           variant="outline" size="icon" aria-label="用例列表"
           :loading="sandbox.replaying" @click="openCases"
         >
-          <FaIcon name="i-ri:play-list-add-line" />
+          <FaIcon name="morph:list-plus" />
         </FaButton>
       </FaTooltip>
       <FaTooltip :text="collectableSteps.length ? `把当前时间线存为用例（${collectableSteps.length} 步）` : '先发送消息后才能存为用例'" side="bottom">
@@ -668,7 +668,7 @@ function caseTime(item: QqSandboxCase) {
           variant="outline" size="icon" aria-label="存为用例"
           :disabled="!collectableSteps.length" @click="openSaveCase"
         >
-          <FaIcon name="i-ri:save-3-line" />
+          <FaIcon name="morph:save" />
         </FaButton>
       </FaTooltip>
       <FaTooltip :text="showConfig ? '收起身份模拟设置' : '身份模拟设置（默认自动模拟）'" side="bottom">
@@ -676,7 +676,7 @@ function caseTime(item: QqSandboxCase) {
           :variant="showConfig ? 'secondary' : 'outline'" size="icon"
           aria-label="身份模拟设置" @click="showConfig = !showConfig"
         >
-          <FaIcon name="i-ri:id-card-line" />
+          <FaIcon name="morph:id-card" />
         </FaButton>
       </FaTooltip>
       <FaTooltip :text="preferences.autoScroll ? '关闭自动滚动' : '开启自动滚动'" side="bottom">
@@ -684,15 +684,15 @@ function caseTime(item: QqSandboxCase) {
           variant="outline" size="icon" :aria-label="preferences.autoScroll ? '关闭自动滚动' : '开启自动滚动'"
           @click="preferences.autoScroll = !preferences.autoScroll"
         >
-          <FaIcon :name="preferences.autoScroll ? 'i-ri:arrow-down-double-line' : 'i-ri:pause-mini-line'" />
+          <FaIcon :name="preferences.autoScroll ? 'morph:chevrons-down' : 'morph:pause'" />
         </FaButton>
       </FaTooltip>
       <FaButton v-if="!sessionActive" size="sm" :loading="sandbox.creating" @click="startSession">
-        <FaIcon name="i-ri:play-line" />
+        <FaIcon name="morph:play" />
         启动
       </FaButton>
       <FaButton v-else variant="outline" size="sm" @click="stopSession">
-        <FaIcon name="i-ri:stop-line" />
+        <FaIcon name="morph:square" />
         结束
       </FaButton>
     </div>
@@ -707,13 +707,13 @@ function caseTime(item: QqSandboxCase) {
         variant="ghost" size="icon-sm" title="导出时间线 JSON" :disabled="!sandbox.events.length"
         aria-label="导出时间线 JSON" @click="exportTimeline"
       >
-        <FaIcon name="i-ri:download-2-line" />
+        <FaIcon name="morph:download" />
       </FaButton>
       <FaButton
         variant="ghost" size="icon-sm" title="清空内存时间线" :disabled="!sandbox.events.length"
         @click="sandbox.resetTimeline"
       >
-        <FaIcon name="i-ri:delete-bin-line" />
+        <FaIcon name="morph:trash-2" />
       </FaButton>
     </div>
 
@@ -865,7 +865,7 @@ function caseTime(item: QqSandboxCase) {
                 :variant="showMessageOptions ? 'secondary' : 'ghost'" size="icon-sm"
                 aria-label="更多消息选项" @click="showMessageOptions = !showMessageOptions"
               >
-                <FaIcon name="i-ri:equalizer-line" />
+                <FaIcon name="morph:sliders-horizontal" />
               </FaButton>
             </FaTooltip>
             <FaTooltip text="发送" side="left">
@@ -873,7 +873,7 @@ function caseTime(item: QqSandboxCase) {
                 size="icon" :loading="sandbox.sending" :disabled="!sendReady"
                 aria-label="发送" @click="send"
               >
-                <FaIcon name="i-ri:send-plane-2-line" />
+                <FaIcon name="morph:send" />
               </FaButton>
             </FaTooltip>
           </div>
@@ -941,11 +941,11 @@ function caseTime(item: QqSandboxCase) {
           </div>
           <div class="case-list__actions">
             <FaButton size="sm" :loading="sandbox.replaying" @click="runReplayCase(item.id)">
-              <FaIcon name="i-ri:play-line" />
+              <FaIcon name="morph:play" />
               回放
             </FaButton>
             <FaButton variant="outline" size="sm" @click="removeCase(item.id)">
-              <FaIcon name="i-ri:delete-bin-line" />
+              <FaIcon name="morph:trash-2" />
             </FaButton>
           </div>
         </li>

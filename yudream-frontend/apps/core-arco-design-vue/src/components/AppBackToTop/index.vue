@@ -62,7 +62,7 @@ function handleBackToTop() {
   <Teleport to="body">
     <Transition v-bind="transitionClass">
       <FaButton v-if="scrollTop >= 200" variant="outline" size="icon" class="rounded-full h-12 w-12 transition-all inset-b-4 fixed z-2000 dark:bg-background -inset-e-9 dark:hover:bg-background/50" :class="{ 'inset-e-3!': show }" @mouseenter="handleMouseenter" @mouseleave="handleMouseleave" @click="handleBackToTop">
-        <FaIcon name="i-icon-park-outline:to-top-one" class="size-6" />
+        <FaIcon name="morph:arrow-up-to-line" class="size-6" />
       </FaButton>
     </Transition>
   </Teleport>

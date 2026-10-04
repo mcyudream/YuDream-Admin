@@ -75,7 +75,7 @@ async function saveTheme() {
         </div>
         <div class="flex items-center gap-2">
           <FaButton :loading="saving" @click="saveTheme">
-            <FaIcon name="i-ri:save-3-line" />
+            <FaIcon name="morph:save" />
             &#20445;&#23384;&#35774;&#32622;
           </FaButton>
         </div>
@@ -93,9 +93,9 @@ async function saveTheme() {
             <FaButtonGroup>
               <FaButton
                 v-for="item in [
-                  { icon: 'i-ri:sun-line', value: 'light' },
-                  { icon: 'i-ri:moon-line', value: 'dark' },
-                  { icon: 'i-codicon:color-mode', value: '' },
+                  { icon: 'morph:sun', value: 'light' },
+                  { icon: 'morph:moon', value: 'dark' },
+                  { icon: 'morph:sun-moon', value: '' },
                 ]" :key="item.icon" :variant="appSettingsStore.settings.theme.colorScheme === item.value ? 'default' : 'outline'" size="sm" @click="appSettingsStore.settings.theme.colorScheme = (item.value as any)"
               >
                 <FaIcon :name="item.icon" />
@@ -178,7 +178,7 @@ async function saveTheme() {
           </div>
           <div class="flex justify-end">
             <FaButton variant="outline" size="sm" @click="goPluginManage">
-              <FaIcon name="i-ri:puzzle-line" />
+              <FaIcon name="morph:puzzle" />
               前往插件管理
             </FaButton>
           </div>
@@ -304,28 +304,28 @@ async function saveTheme() {
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="i-ic:twotone-double-arrow" />
+              <FaIcon name="morph:chevrons-right" />
               &#38754;&#21253;&#23633;&#23548;&#33322;
             </div>
             <FaSwitch v-model="appSettingsStore.settings.toolbar.breadcrumb" />
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="i-ri:search-line" />
+              <FaIcon name="morph:search" />
               &#23548;&#33322;&#25628;&#32034;
             </div>
             <FaSwitch v-model="appSettingsStore.settings.toolbar.menuSearch.enable" />
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="i-ri:fullscreen-line" />
+              <FaIcon name="morph:maximize" />
               &#20840;&#23631;
             </div>
             <FaSwitch v-model="appSettingsStore.settings.toolbar.fullscreen" />
           </div>
           <div class="setting-item">
             <div class="label">
-              <FaIcon name="i-ri:sun-line" />
+              <FaIcon name="morph:sun" />
               &#39068;&#33394;&#20027;&#39064;
             </div>
             <FaSwitch v-model="appSettingsStore.settings.toolbar.colorScheme" />

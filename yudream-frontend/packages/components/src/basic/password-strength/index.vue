@@ -69,7 +69,7 @@ const strengthColor = computed(() => {
       />
     </div>
     <Tooltip>
-      <Icon name="i-ri:question-line" class="text-sm text-muted-foreground cursor-help" />
+      <Icon name="morph:circle-question-mark" class="text-sm text-muted-foreground cursor-help" />
       <template #content>
         <div class="py-1">
           <ul class="text-sm text-muted-foreground space-y-1">
@@ -79,7 +79,7 @@ const strengthColor = computed(() => {
               class="flex-center-start gap-1"
               :class="{ 'text-green-600': item.matched }"
             >
-              <Icon :name="item.matched ? 'i-carbon:checkmark' : 'i-carbon:close'" />
+              <Icon :name="item.matched ? 'morph:check' : 'morph:x'" />
               {{ item.label }}
             </li>
           </ul>

@@ -164,7 +164,7 @@ function goHome() {
   <main class="pay-result-page">
     <section class="pay-result-panel">
       <div class="pay-result-icon" :class="{ 'is-warning': !hasOrder || lookupMessage, 'is-paid': paid }">
-        <FaIcon :name="paid ? 'i-ri:checkbox-circle-line' : hasOrder ? 'i-ri:time-line' : 'i-ri:error-warning-line'" />
+        <FaIcon :name="paid ? 'morph:circle-check' : hasOrder ? 'morph:clock' : 'morph:triangle-alert'" />
       </div>
 
       <div class="pay-result-content">
@@ -176,7 +176,7 @@ function goHome() {
       </div>
 
       <div v-if="hasOrder" class="pay-result-status" :class="{ 'is-muted': lookupMessage }">
-        <FaIcon :name="loadingOrder ? 'i-lucide:loader' : order ? 'i-ri:file-list-3-line' : 'i-ri:information-line'" :class="{ 'pay-result-spin': loadingOrder }" />
+        <FaIcon :name="loadingOrder ? 'i-lucide:loader' : order ? 'morph:file-text' : 'morph:info'" :class="{ 'pay-result-spin': loadingOrder }" />
         <span>{{ loadingOrder ? '正在查询订单状态...' : order ? `订单${statusLabel(order.status)}` : lookupMessage }}</span>
       </div>
 
@@ -189,11 +189,11 @@ function goHome() {
 
       <div class="pay-result-actions">
         <FaButton @click="goWallet">
-          <FaIcon name="i-ri:wallet-3-line" />
+          <FaIcon name="morph:wallet" />
           查看钱包
         </FaButton>
         <FaButton variant="outline" @click="goHome">
-          <FaIcon name="i-ri:home-4-line" />
+          <FaIcon name="morph:house" />
           返回首页
         </FaButton>
       </div>

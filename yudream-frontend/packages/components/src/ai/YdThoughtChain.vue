@@ -34,10 +34,10 @@ function statusIcon(item: YdThoughtChainItem): string {
     return item.icon
   }
   switch (item.status) {
-    case 'success': return 'i-ri:checkbox-circle-line'
-    case 'error': return 'i-ri:error-warning-line'
-    case 'running': return 'i-ri:loader-4-line'
-    default: return 'i-ri:record-circle-line'
+    case 'success': return 'morph:circle-check'
+    case 'error': return 'morph:triangle-alert'
+    case 'running': return 'morph:loader-circle'
+    default: return 'morph:circle-dot'
   }
 }
 </script>
@@ -50,10 +50,10 @@ function statusIcon(item: YdThoughtChainItem): string {
       class="yd-thought-chain__head"
       @click="expanded = !expanded"
     >
-      <FaIcon name="i-ri:mind-map" />
+      <FaIcon name="morph:waypoints" />
       <span>{{ title }}</span>
       <span class="yd-thought-chain__count">{{ items.length }} 步</span>
-      <FaIcon :name="expanded ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="yd-thought-chain__chevron" />
+      <FaIcon :name="expanded ? 'morph:chevron-up' : 'morph:chevron-down'" class="yd-thought-chain__chevron" />
     </button>
     <ol v-show="!collapsible || expanded" class="yd-thought-chain__list">
       <li

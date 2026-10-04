@@ -263,7 +263,7 @@ function removeFile(idx: number) {
       @click="fileInputRef?.click()"
     >
       <slot>
-        <Icon name="i-icon-park-outline:upload" class="text-2xl text-card-foreground/50 mb-2" />
+        <Icon name="morph:upload" class="text-2xl text-card-foreground/50 mb-2" />
         <div class="text-sm text-card-foreground/70">
           {{ props.description }}
         </div>
@@ -299,17 +299,17 @@ function removeFile(idx: number) {
         </div>
         <div v-if="item.status === 'uploading'" class="bg-primary/5 pointer-events-none inset-0 absolute z-0" :style="{ width: `${item.progress}%` }" />
         <div v-else-if="item.status === 'success'" class="flex-center size-10">
-          <Icon name="i-ix:upload-success" class="text-lg text-green-600" />
+          <Icon name="morph:circle-check-big" class="text-lg text-green-600" />
         </div>
         <div v-else-if="item.status === 'error'" class="flex-center size-10">
-          <Icon name="i-ix:upload-fail" class="text-lg text-red-600" />
+          <Icon name="morph:circle-x" class="text-lg text-red-600" />
         </div>
         <ButtonGroup v-if="!props.disabled" class="opacity-0 transition-opacity inset-e-2 top-1/2 absolute group-hover/file-upload-item:opacity-100 -translate-y-1/2">
           <Button v-if="item.status === 'error'" variant="outline" size="icon" @click.stop="uploadFile(item.file!, index)">
-            <Icon name="i-icon-park-outline:upload" class="text-lg cursor-pointer" />
+            <Icon name="morph:upload" class="text-lg cursor-pointer" />
           </Button>
           <Button v-if="item.status !== 'uploading'" variant="outline" size="icon" @click.stop="removeFile(index)">
-            <Icon name="i-icon-park-outline:delete" class="text-lg text-red-500 cursor-pointer" />
+            <Icon name="morph:trash-2" class="text-lg text-red-500 cursor-pointer" />
           </Button>
         </ButtonGroup>
       </div>

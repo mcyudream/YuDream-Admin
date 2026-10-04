@@ -110,7 +110,7 @@ const operationTitle = computed(() => {
 
   <details v-else class="version-card version-card--compact">
     <summary class="version-summary">
-      <FaIcon name="i-ri:arrow-right-s-line" class="version-caret" />
+      <FaIcon name="morph:chevron-right" class="version-caret" />
       <h3>{{ item.releaseVersion }}</h3>
       <FaTag v-if="item.sourceName" variant="secondary" :title="`来源：${item.sourceName}`">{{ item.sourceName }}</FaTag>
       <FaTag v-if="operationLabel" variant="secondary" :title="operationTitle">{{ operationLabel }}</FaTag>

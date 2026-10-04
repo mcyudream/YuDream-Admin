@@ -68,22 +68,22 @@ function openInChatPage() {
   <div class="chat-panel">
     <header class="chat-head">
       <div class="chat-head__title">
-        <FaIcon name="i-ri:chat-smile-3-line" />
+        <FaIcon name="morph:message-circle-more" />
         <strong>智能问答</strong>
         <span v-if="spaceName">基于「{{ spaceName }}」检索回答</span>
       </div>
       <div class="chat-head__side">
         <span v-if="streaming && toolHint" class="chat-head__tool">
-          <FaIcon name="i-ri:loader-4-line" class="chat-head__spin" /> {{ toolHint }}
+          <FaIcon name="morph:loader-circle" class="chat-head__spin" /> {{ toolHint }}
         </span>
         <FaTooltip text="在 AI 助手中打开">
           <FaButton size="icon-sm" variant="ghost" @click="openInChatPage">
-            <FaIcon name="i-ri:external-link-line" />
+            <FaIcon name="morph:external-link" />
           </FaButton>
         </FaTooltip>
         <FaTooltip text="清空对话">
           <FaButton size="icon-sm" variant="ghost" :disabled="!messages.length" @click="clear">
-            <FaIcon name="i-ri:delete-bin-line" />
+            <FaIcon name="morph:trash-2" />
           </FaButton>
         </FaTooltip>
       </div>
@@ -100,7 +100,7 @@ function openInChatPage() {
     >
       <template #empty>
         <div class="chat-empty">
-          <div class="chat-empty__icon"><FaIcon name="i-ri:chat-smile-3-line" /></div>
+          <div class="chat-empty__icon"><FaIcon name="morph:message-circle-more" /></div>
           <strong>向知识库提问</strong>
           <p>回答会实时流式输出，自动检索 Wiki 页面并附带来源引用，引用可点击跳转</p>
         </div>

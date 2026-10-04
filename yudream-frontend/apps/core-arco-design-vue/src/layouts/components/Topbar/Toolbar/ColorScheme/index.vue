@@ -50,8 +50,8 @@ function toggleColorScheme(event: MouseEvent) {
   <FaButton variant="ghost" size="icon-sm" @click="toggleColorScheme">
     <FaIcon
       :name="{
-        light: 'i-ri:sun-line',
-        dark: 'i-ri:moon-line',
+        light: 'morph:sun',
+        dark: 'morph:moon',
       }[appSettingsStore.currentColorScheme!]" class="size-4"
     />
   </FaButton>

@@ -93,7 +93,7 @@ onMounted(load)
         <div class="mb-3 text-sm text-muted-foreground">先选择系统用户，再按已启用连接分别生成绑定码。用户需向对应机器人发送 `/绑定 绑定码`。</div>
         <div class="flex flex-wrap items-center gap-3">
           <FaInput v-model="bindingUserId" class="w-72" placeholder="输入系统用户 ID" />
-          <FaButton :loading="loadingTargets" @click="loadBindingTargets"><FaIcon name="i-ri:robot-2-line" />加载连接</FaButton>
+          <FaButton :loading="loadingTargets" @click="loadBindingTargets"><FaIcon name="morph:bot" />加载连接</FaButton>
         </div>
         <div v-if="bindingCode" class="mt-3 flex flex-wrap items-center gap-3">
           <code class="rounded bg-[var(--color-fill-1)] px-3 py-2 text-base font-semibold">{{ bindingCode.code }}</code>
@@ -108,7 +108,7 @@ onMounted(load)
             <div class="flex flex-wrap items-center gap-2">
               <FaTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</FaTag>
               <FaButton size="sm" :loading="issuingCode && issuingConnectionId === target.connectionId" @click="issueBindingCode(target.connectionId)">
-                <FaIcon name="i-ri:key-2-line" />生成绑定码
+                <FaIcon name="morph:key-round" />生成绑定码
               </FaButton>
             </div>
           </div>

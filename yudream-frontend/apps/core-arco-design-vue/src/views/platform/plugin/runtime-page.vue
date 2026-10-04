@@ -19,7 +19,7 @@ const { plugin, sdk, remoteComponent, remoteError, remoteLoading } = usePluginRe
       </div>
       <div v-else class="plugin-runtime-empty">
         <div class="runtime-icon">
-          <FaIcon name="i-ri:puzzle-2-line" />
+          <FaIcon name="morph:puzzle" />
         </div>
         <div>
           <h2>{{ remoteLoading ? '正在加载插件前端' : '插件前端不可用' }}</h2>

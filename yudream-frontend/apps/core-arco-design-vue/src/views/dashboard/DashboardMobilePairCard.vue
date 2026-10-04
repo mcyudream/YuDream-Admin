@@ -67,7 +67,7 @@ async function renderQr() {
         <div class="pair-text">
           <strong>用 YDAM App 扫码添加本站点</strong>
           <p class="pair-url">
-            <FaIcon name="i-ri:global-line" />
+            <FaIcon name="morph:globe" />
             {{ pairUrl }}
           </p>
           <p class="pair-hint">
@@ -80,14 +80,14 @@ async function renderQr() {
       </div>
     </template>
     <div v-else class="pair-empty">
-      <FaIcon name="i-ri:qr-code-line" class="pair-empty__icon" />
+      <FaIcon name="morph:qr-code" class="pair-empty__icon" />
       <p>{{ loading ? '正在检查移动应用能力…' : (message || 'mobile-app 能力未启用：请先在「平台 → 能力管理」启用后再扫码配对。') }}</p>
     </div>
 
     <div class="pair-footer">
       <span>站点公开地址即二维码内容</span>
       <FaButton v-if="card.actionPath" size="sm" variant="outline" @click="props.onOpen?.(card)">
-        <FaIcon name="i-ri:arrow-right-line" />
+        <FaIcon name="morph:arrow-right" />
         移动端配置
       </FaButton>
     </div>

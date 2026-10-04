@@ -486,7 +486,7 @@ onMounted(() => {
                 <!-- 图例默认收成胶囊，悬停/聚焦展开，避免遮住内圈节点 -->
                 <div class="graph-panel graph-legend-panel">
                   <div class="graph-panel-title">
-                    <FaIcon name="i-ri:information-line" />
+                    <FaIcon name="morph:info" />
                     图例
                   </div>
                   <div class="graph-legend-body">
@@ -508,7 +508,7 @@ onMounted(() => {
 
                 <div v-if="selectedNode" class="graph-panel graph-detail-panel">
                   <div class="graph-panel-title">
-                    <FaIcon name="i-ri:apps-2-line" />
+                    <FaIcon name="morph:layout-grid" />
                     {{ selectedNode.name }}
                   </div>
                   <div class="graph-detail">

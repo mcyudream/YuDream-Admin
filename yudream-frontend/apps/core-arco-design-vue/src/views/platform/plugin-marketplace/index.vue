@@ -467,15 +467,15 @@ function rollbackConfirmationContent(cascade: boolean) {
           <span class="result-count">共 {{ pagination.total }} 个结果</span>
           <FaButton v-if="hasActiveFilters" variant="link" @click="resetFilters">重置筛选</FaButton>
           <FaButton variant="outline" :loading="loading" @click="load">
-            <FaIcon name="i-ri:refresh-line" />
+            <FaIcon name="morph:refresh-cw" />
             刷新
           </FaButton>
           <FaButton v-auth="'platform:plugin-market-source:create'" variant="outline" @click="openAddSource">
-            <FaIcon name="i-ri:add-line" />
+            <FaIcon name="morph:plus" />
             添加市场源
           </FaButton>
           <FaButton v-if="publicMarketEnabled" variant="outline" @click="openPublicMarket">
-            <FaIcon name="i-ri:external-link-line" />
+            <FaIcon name="morph:external-link" />
             公开社区
           </FaButton>
         </div>
@@ -503,7 +503,7 @@ function rollbackConfirmationContent(cascade: boolean) {
           type="button"
           @click="selectPlugin(item.code)"
         >
-          <FaIcon :name="getDescriptor(item).icon || 'i-ri:store-2-line'" class="plugin-icon" />
+          <FaIcon :name="getDescriptor(item).icon || 'morph:store'" class="plugin-icon" />
           <div class="plugin-card-body">
             <div class="plugin-card-title">
               <strong>{{ getDescriptor(item).displayName || getDescriptor(item).code }}</strong>
@@ -585,7 +585,7 @@ function rollbackConfirmationContent(cascade: boolean) {
 
         <div v-if="historyVersions.length" class="history-versions">
           <button class="history-toggle" type="button" @click="showHistory = !showHistory">
-            <FaIcon name="i-ri:arrow-right-s-line" class="history-caret" :class="{ expanded: showHistory }" />
+            <FaIcon name="morph:chevron-right" class="history-caret" :class="{ expanded: showHistory }" />
             历史版本（{{ historyVersions.length }}）
           </button>
           <div v-show="showHistory" class="history-list">

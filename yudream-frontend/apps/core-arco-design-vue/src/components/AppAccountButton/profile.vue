@@ -46,7 +46,7 @@ const externalTypeMeta: Record<string, { label: string, icon: string }> = {
   qq: { label: 'QQ', icon: 'i-ri:qq-line' },
   wx: { label: '微信', icon: 'i-ri:wechat-line' },
   google: { label: 'Google', icon: 'i-ri:google-line' },
-  gitee: { label: 'Gitee', icon: 'i-ri:git-repository-line' },
+  gitee: { label: 'Gitee', icon: 'morph:folder-git-2' },
   github: { label: 'GitHub', icon: 'i-ri:github-line' },
 }
 const bindableEntries = computed(() => bindableProviders.value.flatMap((provider) => {
@@ -56,7 +56,7 @@ const bindableEntries = computed(() => bindableProviders.value.flatMap((provider
     providerCode: provider.code,
     type,
     label: provider.icon ? (provider.name || provider.code) : (externalTypeMeta[type]?.label || provider.name || type),
-    icon: provider.icon || externalTypeMeta[type]?.icon || 'i-ri:links-line',
+    icon: provider.icon || externalTypeMeta[type]?.icon || 'morph:link',
   }))
 }))
 
@@ -79,15 +79,15 @@ const apiKeyForm = reactive<ApiKeyCreatePayload>({
 })
 
 const tabs = computed<{ key: ProfileTab, title: string, description: string, icon: string }[]>(() => [
-  { key: 'profile', title: '个人资料', description: '头像、昵称和联系方式', icon: 'i-ri:user-3-line' },
+  { key: 'profile', title: '个人资料', description: '头像、昵称和联系方式', icon: 'morph:user' },
   {
     key: 'security',
     title: '登录安全',
     description: appFeatureStore.passkeyEnabled ? '密码和 Passkey 凭据' : '账号密码安全',
-    icon: 'i-ri:shield-keyhole-line',
+    icon: 'morph:shield',
   },
-  { key: 'external', title: '第三方账号', description: '绑定已启用的外部登录提供方', icon: 'i-ri:links-line' },
-  ...(appFeatureStore.apiKeyEnabled ? [{ key: 'apiKey' as const, title: 'API Key', description: '用户级访问密钥', icon: 'i-ri:key-2-line' }] : []),
+  { key: 'external', title: '第三方账号', description: '绑定已启用的外部登录提供方', icon: 'morph:link' },
+  ...(appFeatureStore.apiKeyEnabled ? [{ key: 'apiKey' as const, title: 'API Key', description: '用户级访问密钥', icon: 'morph:key-round' }] : []),
 ])
 
 const permissionGroups = computed(() => {
@@ -514,7 +514,7 @@ function dateText(value?: string) {
         <div class="avatar-wrap">
           <FaAvatar :src="profile.avatar" :fallback="profile.username.slice(0, 2)" class="size-18" />
           <button type="button" class="avatar-edit" @click="pickAvatar">
-            <FaIcon name="i-ri:camera-line" />
+            <FaIcon name="morph:camera" />
           </button>
           <input ref="avatarInput" type="file" accept="image/*" hidden @change="uploadAvatar">
         </div>
@@ -582,7 +582,7 @@ function dateText(value?: string) {
               </div>
               <FaTag :variant="target.bound ? 'default' : 'secondary'">{{ target.bound ? '已绑定' : '未绑定' }}</FaTag>
               <FaButton size="sm" :loading="issuingQqBindingCode && issuingConnectionId === target.connectionId" @click="issueQqBindingCode(target.connectionId)">
-                <FaIcon name="i-ri:key-2-line" />生成绑定码
+                <FaIcon name="morph:key-round" />生成绑定码
               </FaButton>
             </article>
             <div v-if="!loadingBindingTargets && !bindingTargets.length" class="text-sm text-muted-foreground">暂无已启用的机器人连接。</div>
@@ -617,7 +617,7 @@ function dateText(value?: string) {
               </div>
               <div class="panel-actions">
                 <FaButton :loading="bindingPasskey" @click="bindPasskey">
-                  <FaIcon name="i-ri:fingerprint-line" />
+                  <FaIcon name="morph:fingerprint" />
                   绑定
                 </FaButton>
               </div>
@@ -629,7 +629,7 @@ function dateText(value?: string) {
               </div>
               <article v-for="item in passkeys" :key="item.id" class="credential-item">
                 <div class="credential-icon">
-                  <FaIcon name="i-ri:fingerprint-line" />
+                  <FaIcon name="morph:fingerprint" />
                 </div>
                 <div class="credential-info">
                   <strong>{{ item.deviceName || '未命名设备' }}</strong>
@@ -660,7 +660,7 @@ function dateText(value?: string) {
           </div>
           <div v-else class="empty-state">暂无已启用的第三方登录提供方</div>
         </section>
-        <section class="inner-panel"><div class="panel-head"><div><h3>已绑定账号</h3></div><FaButton variant="ghost" size="sm" :loading="loadingExternalAccounts" @click="loadExternalAccounts"><FaIcon name="i-ri:refresh-line" /></FaButton></div>
+        <section class="inner-panel"><div class="panel-head"><div><h3>已绑定账号</h3></div><FaButton variant="ghost" size="sm" :loading="loadingExternalAccounts" @click="loadExternalAccounts"><FaIcon name="morph:refresh-cw" /></FaButton></div>
           <div class="credential-list"><div v-if="!externalAccounts.length" class="empty-state">暂无第三方账号</div><article v-for="item in externalAccounts" :key="item.id" class="credential-item"><FaAvatar :src="item.avatarUrl" :fallback="item.platformType.slice(0, 2)" class="size-10" /><div class="credential-info"><strong>{{ item.nickname || item.socialUid }}</strong><span>{{ item.providerCode }} · {{ item.platformType }} · {{ item.socialUid }}</span></div><FaButton size="sm" variant="outline" :disabled="!item.avatarUrl" @click="useExternalAvatar(item)">使用头像</FaButton><FaButton variant="destructive" size="sm" @click="revokeExternal(item)">解除</FaButton></article></div>
         </section>
       </section>
@@ -680,7 +680,7 @@ function dateText(value?: string) {
             <code>{{ createdApiKeyPlaintext }}</code>
           </div>
           <FaButton @click="copyPlaintext">
-            <FaIcon name="i-ri:file-copy-line" />
+            <FaIcon name="morph:copy" />
             复制
           </FaButton>
         </div>
@@ -727,7 +727,7 @@ function dateText(value?: string) {
             </a-form-item>
             <div class="md:col-span-2 flex justify-end">
               <FaButton :loading="creatingApiKey" @click="createApiKey">
-                <FaIcon name="i-ri:key-2-line" />
+                <FaIcon name="morph:key-round" />
                 创建 API Key
               </FaButton>
             </div>
@@ -748,7 +748,7 @@ function dateText(value?: string) {
             </div>
             <article v-for="item in apiKeys" :key="item.id" class="credential-item">
               <div class="credential-icon">
-                <FaIcon name="i-ri:key-2-line" />
+                <FaIcon name="morph:key-round" />
               </div>
               <div class="credential-info">
                 <strong>{{ item.name }}</strong>
@@ -773,7 +773,7 @@ function dateText(value?: string) {
       </section>
 
       <footer v-if="active === 'profile'" class="profile-footer">
-        <FaButton :loading="saving" @click="saveProfile"><FaIcon name="i-ri:save-3-line" />保存资料</FaButton>
+        <FaButton :loading="saving" @click="saveProfile"><FaIcon name="morph:save" />保存资料</FaButton>
       </footer>
     </main>
   </div>

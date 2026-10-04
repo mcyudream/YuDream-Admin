@@ -59,13 +59,13 @@ const ruleGroups = computed(() => {
       </span>
       <div class="flex-1" />
       <FaButton variant="outline" size="sm" :loading="loading" @click="loadReport">
-        <FaIcon name="i-ri:refresh-line" />
+        <FaIcon name="morph:refresh-cw" />
         刷新
       </FaButton>
     </div>
 
     <div v-if="unavailable" class="audit-unavailable">
-      <FaIcon name="i-ri:search-eye-line" class="size-8" />
+      <FaIcon name="morph:zoom-in" class="size-8" />
       <p>审查服务未就绪（{{ unavailable }}）</p>
       <p class="text-xs">
         该报告由 vite dev 中间件 /__yudream-devtools/audit.json 提供（pnpm audit:ui 生成），
@@ -113,7 +113,7 @@ const ruleGroups = computed(() => {
       </div>
 
       <div v-if="!ruleGroups.length" class="audit-clean">
-        <FaIcon name="i-ri:checkbox-circle-line" class="size-6" />
+        <FaIcon name="morph:circle-check" class="size-6" />
         未发现违规项
       </div>
     </template>

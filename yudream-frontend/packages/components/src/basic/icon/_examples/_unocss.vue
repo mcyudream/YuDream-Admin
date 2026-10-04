@@ -5,9 +5,9 @@ import FaIcon from '../index.vue'
 const icons = [
   'i-lucide:search',
   'i-lucide:settings',
-  'i-ep:edit',
-  'i-ri:notification-3-line',
-  'i-tabler:chart-area-line',
+  'morph:pencil',
+  'morph:bell',
+  'morph:chart-area',
 ]
 </script>
 

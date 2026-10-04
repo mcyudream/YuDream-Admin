@@ -22,7 +22,7 @@ const open = ref(props.defaultOpen)
         <FaTag variant="secondary" class="text-xs">
           {{ count ?? 0 }}
         </FaTag>
-        <FaIcon :name="open ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="size-4" />
+        <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="size-4" />
       </div>
     </template>
     <div class="asset-section__body">

@@ -230,7 +230,7 @@ async function save() {
           <div class="flex w-full items-center gap-2">
             <FaInput v-model="mailTestTo" class="min-w-0 flex-1" placeholder="接收测试邮件的地址" />
             <FaButton variant="outline" :loading="testingMail" @click="testMail">
-              <FaIcon name="i-ri:send-plane-line" />
+              <FaIcon name="morph:send" />
               发送测试邮件
             </FaButton>
           </div>
@@ -270,7 +270,7 @@ async function save() {
           <div class="flex w-full items-center justify-between gap-2">
             <FaSwitch v-model="storage.pathStyle" />
             <FaButton variant="outline" :loading="testingStorage" @click="testStorage">
-              <FaIcon name="i-ri:plug-line" />
+              <FaIcon name="morph:plug" />
               测试连接
             </FaButton>
           </div>
@@ -284,7 +284,7 @@ async function save() {
 
     <div class="flex justify-end">
       <FaButton v-auth="'system:setting:edit'" :loading="saving" @click="save">
-        <FaIcon name="i-ri:save-3-line" />
+        <FaIcon name="morph:save" />
         保存集成配置
       </FaButton>
     </div>

@@ -62,10 +62,10 @@ const summary = computed(() => {
   const loaded = rows.value.filter(item => item.loaded).length
   const error = rows.value.filter(item => item.status === 'ERROR').length
   return [
-    { label: '插件总数', value: rows.value.length, icon: 'i-ri:puzzle-2-line' },
-    { label: '已加载', value: loaded, icon: 'i-ri:download-cloud-line' },
-    { label: '已启用', value: enabled, icon: 'i-ri:checkbox-circle-line', tone: 'ok' },
-    { label: '异常', value: error, icon: 'i-ri:error-warning-line', tone: error > 0 ? 'bad' : 'ok' },
+    { label: '插件总数', value: rows.value.length, icon: 'morph:puzzle' },
+    { label: '已加载', value: loaded, icon: 'morph:cloud-download' },
+    { label: '已启用', value: enabled, icon: 'morph:circle-check', tone: 'ok' },
+    { label: '异常', value: error, icon: 'morph:triangle-alert', tone: error > 0 ? 'bad' : 'ok' },
   ]
 })
 
@@ -118,24 +118,24 @@ function updatePlanFor(code: string) {
 }
 
 const pluginIconFallbacks: Record<string, string> = {
-  'ai-chatbot': 'i-ri:robot-2-line',
+  'ai-chatbot': 'morph:bot',
   'yudream-alipay': 'i-ri:alipay-line',
-  'authlib-injector': 'i-ri:shield-keyhole-line',
-  'mc-wiki': 'i-ri:book-open-line',
-  mcguess: 'i-ri:question-answer-line',
-  'minecraft-server': 'i-ri:server-line',
-  'project-progress': 'i-ri:task-line',
-  'qq-binding': 'i-ri:links-line',
+  'authlib-injector': 'morph:shield',
+  'mc-wiki': 'morph:book-open',
+  mcguess: 'morph:messages-square',
+  'minecraft-server': 'morph:server',
+  'project-progress': 'morph:list-todo',
+  'qq-binding': 'morph:link',
   'qqbot-automation': 'i-ri:chat-settings-line',
-  'yudream-student-info': 'i-ri:graduation-cap-line',
-  'yudream-wallet': 'i-ri:wallet-3-line',
-  'web-card': 'i-ri:layout-4-line',
-  'world-map': 'i-ri:map-2-line',
-  'yudream-skin': 'i-ri:t-shirt-2-line',
+  'yudream-student-info': 'morph:graduation-cap',
+  'yudream-wallet': 'morph:wallet',
+  'web-card': 'morph:layout-dashboard',
+  'world-map': 'morph:map',
+  'yudream-skin': 'morph:shirt',
 }
 
 function pluginIcon(item: PluginModule) {
-  const icon = item.icon || pluginIconFallbacks[item.code] || 'i-ri:puzzle-2-line'
+  const icon = item.icon || pluginIconFallbacks[item.code] || 'morph:puzzle'
   if (/^https?:\/\//.test(icon) || icon.includes(':')) {
     return icon
   }
@@ -523,16 +523,16 @@ function actionText(action: string) {
       <div class="plugin-toolbar">
         <div class="plugin-toolbar-actions">
           <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="uploading" @click="uploadInput?.click()">
-            <FaIcon name="i-ri:upload-cloud-2-line" />
+            <FaIcon name="morph:cloud-upload" />
             上传 JAR
           </FaButton>
           <input ref="uploadInput" type="file" accept=".jar,application/java-archive" hidden @change="uploadJar">
           <FaButton variant="outline" :loading="checkingUpdates" :disabled="loading" @click="checkUpdates">
-            <FaIcon name="i-ri:arrow-up-circle-line" />
+            <FaIcon name="morph:circle-arrow-up" />
             检查更新
           </FaButton>
           <FaButton v-auth="'platform:plugin:manage'" variant="outline" :loading="loading" @click="refresh">
-            <FaIcon name="i-ri:folder-open-line" />
+            <FaIcon name="morph:folder-open" />
             扫描目录
           </FaButton>
         </div>
@@ -673,7 +673,7 @@ function actionText(action: string) {
                 :loading="actionLoading === `${selected.code}:update`"
                 @click="confirmUpdate(selected)"
               >
-                <FaIcon name="i-ri:arrow-up-circle-line" />
+                <FaIcon name="morph:circle-arrow-up" />
                 确认更新
               </FaButton>
               <FaButton
@@ -683,7 +683,7 @@ function actionText(action: string) {
                 :loading="actionLoading === `${selected.code}:rollback`"
                 @click="confirmRollback(selected)"
               >
-                <FaIcon name="i-ri:history-line" />
+                <FaIcon name="morph:history" />
                 回滚到 {{ selected.rollbackVersion || '备份版本' }}
               </FaButton>
             </div>
@@ -709,7 +709,7 @@ function actionText(action: string) {
               :loading="actionLoading === `${selected.code}:open`"
               @click="openPluginPage(selected.code)"
             >
-              <FaIcon name="i-ri:external-link-line" />
+              <FaIcon name="morph:external-link" />
               打开插件页面
             </FaButton>
             <FaButton
@@ -719,7 +719,7 @@ function actionText(action: string) {
               :loading="actionLoading === `${selected.code}:load`"
               @click="runAction(selected.code, 'load')"
             >
-              <FaIcon name="i-ri:download-cloud-line" />
+              <FaIcon name="morph:cloud-download" />
               加载
             </FaButton>
             <FaButton
@@ -728,7 +728,7 @@ function actionText(action: string) {
               :loading="actionLoading === `${selected.code}:enable`"
               @click="runAction(selected.code, 'enable')"
             >
-              <FaIcon name="i-ri:play-circle-line" />
+              <FaIcon name="morph:circle-play" />
               启用
             </FaButton>
             <FaButton
@@ -738,7 +738,7 @@ function actionText(action: string) {
               :loading="actionLoading === `${selected.code}:disable`"
               @click="runAction(selected.code, 'disable')"
             >
-              <FaIcon name="i-ri:pause-circle-line" />
+              <FaIcon name="morph:circle-pause" />
               禁用
             </FaButton>
             <FaButton
@@ -757,7 +757,7 @@ function actionText(action: string) {
               :loading="actionLoading === `${selected.code}:remove`"
               @click="confirmRemove(selected)"
             >
-              <FaIcon name="i-ri:delete-bin-line" />
+              <FaIcon name="morph:trash-2" />
               删除记录
             </FaButton>
           </div>

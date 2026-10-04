@@ -86,7 +86,7 @@ function hasPermission(permission: string) {
       <span v-if="loading">正在刷新监控数据</span>
       <span v-else>{{ message || redis?.message || '监控数据来自系统实时接口' }}</span>
       <FaButton v-if="card.actionPath" size="sm" variant="outline" @click="onOpen?.(card)">
-        <FaIcon name="i-ri:arrow-right-line" />
+        <FaIcon name="morph:arrow-right" />
         查看
       </FaButton>
     </div>

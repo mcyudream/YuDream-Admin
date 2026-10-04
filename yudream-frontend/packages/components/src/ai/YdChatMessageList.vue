@@ -119,14 +119,14 @@ defineExpose({ scrollToBottom })
 
       <!-- 助手消息 -->
       <div v-else class="yd-msg">
-        <div class="yd-msg__avatar"><FaIcon name="i-ri:sparkling-2-line" /></div>
+        <div class="yd-msg__avatar"><FaIcon name="morph:sparkles" /></div>
         <div class="yd-msg__body">
           <!-- 深度思考 -->
           <section v-if="message.reasoning" class="yd-reasoning">
             <button type="button" class="yd-reasoning__head" @click="toggleReasoning(index)">
-              <FaIcon name="i-ri:brain-line" />
+              <FaIcon name="morph:brain" />
               <span>{{ reasoningLabel }}</span>
-              <FaIcon :name="expandedReasoning[index] ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="yd-reasoning__chevron" />
+              <FaIcon :name="expandedReasoning[index] ? 'morph:chevron-up' : 'morph:chevron-down'" class="yd-reasoning__chevron" />
             </button>
             <div v-show="expandedReasoning[index]" class="yd-reasoning__body">
               {{ message.reasoning }}
@@ -150,7 +150,7 @@ defineExpose({ scrollToBottom })
               :class="{ 'is-complete': tool.status === 'complete', 'is-error': tool.status === 'error' }"
             >
               <FaIcon
-                :name="tool.status === 'complete' ? 'i-ri:checkbox-circle-line' : tool.status === 'error' ? 'i-ri:error-warning-line' : 'i-ri:loader-4-line'"
+                :name="tool.status === 'complete' ? 'morph:circle-check' : tool.status === 'error' ? 'morph:triangle-alert' : 'morph:loader-circle'"
                 class="yd-tool__icon"
                 :class="{ 'yd-tool__icon--spin': tool.status !== 'complete' && tool.status !== 'error' }"
               />
@@ -194,11 +194,11 @@ defineExpose({ scrollToBottom })
 
           <div v-if="!message.error && message.content && !message.pending" class="yd-message-tools">
             <button type="button" class="yd-message-tool" @click="emits('copyMessage', message)">
-              <FaIcon name="i-ri:file-copy-line" />
+              <FaIcon name="morph:copy" />
               <span>复制</span>
             </button>
             <button type="button" class="yd-message-tool" @click="emits('regenerateMessage', message)">
-              <FaIcon name="i-ri:refresh-line" />
+              <FaIcon name="morph:refresh-cw" />
               <span>重新生成</span>
             </button>
           </div>
@@ -211,9 +211,9 @@ defineExpose({ scrollToBottom })
               class="yd-action"
               @click="emits('actionClick', action)"
             >
-              <FaIcon v-if="action.action === 'copy'" name="i-ri:file-copy-line" />
-              <FaIcon v-else-if="action.action === 'open'" name="i-ri:external-link-line" />
-              <FaIcon v-else name="i-ri:arrow-right-line" />
+              <FaIcon v-if="action.action === 'copy'" name="morph:copy" />
+              <FaIcon v-else-if="action.action === 'open'" name="morph:external-link" />
+              <FaIcon v-else name="morph:arrow-right" />
               {{ action.label }}
             </button>
           </div>
@@ -232,7 +232,7 @@ defineExpose({ scrollToBottom })
       title="回到底部"
       @click="scrollToBottom(true)"
     >
-      <FaIcon name="i-ri:arrow-down-line" />
+      <FaIcon name="morph:arrow-down" />
     </button>
   </div>
 </template>

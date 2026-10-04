@@ -52,11 +52,11 @@ function add(template: AgentNodeTemplate) {
         <strong>节点库</strong>
         <span>拖拽到画布或单击添加</span>
       </div>
-      <FaIcon name="i-ri:apps-2-line" />
+      <FaIcon name="morph:layout-grid" />
     </div>
 
     <div class="palette-search">
-      <FaIcon name="i-ri:search-line" />
+      <FaIcon name="morph:search" />
       <FaInput v-model="keyword" clearable class="w-full" placeholder="搜索节点" aria-label="搜索节点" />
     </div>
 
@@ -82,12 +82,12 @@ function add(template: AgentNodeTemplate) {
             <strong>{{ item.label }}</strong>
             <small>{{ item.description }}</small>
           </span>
-          <FaIcon class="palette-grip" name="i-ri:draggable" />
+          <FaIcon class="palette-grip" name="morph:move" />
         </button>
       </section>
 
       <div v-if="!visibleGroups.length" class="palette-empty">
-        <FaIcon name="i-ri:search-eye-line" />
+        <FaIcon name="morph:zoom-in" />
         <span>没有匹配的节点</span>
       </div>
     </div>

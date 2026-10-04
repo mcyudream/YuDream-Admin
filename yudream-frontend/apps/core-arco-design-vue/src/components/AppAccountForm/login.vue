@@ -68,7 +68,7 @@ const activeExternalLabel = computed(() => {
   const label = activeExternalEntry.value?.label ?? ''
   return label.endsWith('登录') ? label : `${label}登录`
 })
-const activeExternalIcon = computed(() => activeExternalEntry.value?.icon || 'i-ri:links-line')
+const activeExternalIcon = computed(() => activeExternalEntry.value?.icon || 'morph:link')
 
 const loginTabs = computed(() => {
   const tabs: { label: string, value: string, icon?: string, sort: number }[] = [
@@ -264,7 +264,7 @@ function rememberAccount(account: string, remember?: boolean) {
         登录
       </FaButton>
       <FaButton v-else-if="type === 'passkey'" :loading="passkeyLoading" size="lg" class="w-full" type="button" @click="loginWithPasskey">
-        <FaIcon name="i-ri:fingerprint-line" />
+        <FaIcon name="morph:fingerprint" />
         使用 Passkey 登录
       </FaButton>
       <FaButton v-else-if="activeExternalEntry" :loading="props.externalLoading" size="lg" class="w-full" type="button" @click="loginWithExternalTab">

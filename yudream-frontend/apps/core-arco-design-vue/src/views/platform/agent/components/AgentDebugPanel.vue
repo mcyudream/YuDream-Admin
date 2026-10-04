@@ -111,10 +111,10 @@ function onKeydown(event: KeyboardEvent) {
 
 function statusIcon(status: AgentDebugStatus) {
   return ({
-    RUNNING: 'i-ri:loader-4-line',
-    COMPLETED: 'i-ri:check-line',
-    SKIPPED: 'i-ri:skip-forward-line',
-    FAILED: 'i-ri:close-line',
+    RUNNING: 'morph:loader-circle',
+    COMPLETED: 'morph:check',
+    SKIPPED: 'morph:skip-forward',
+    FAILED: 'morph:x',
   } as const)[status]
 }
 </script>
@@ -123,7 +123,7 @@ function statusIcon(status: AgentDebugStatus) {
   <aside class="debug-panel">
     <header class="debug-header">
       <div class="debug-title">
-        <span class="debug-mark"><FaIcon name="i-ri:bug-line" /></span>
+        <span class="debug-mark"><FaIcon name="morph:bug" /></span>
         <span>
           <strong>Agent 调试</strong>
           <small><i :class="{ active: running }" />{{ running ? '运行中' : modelLabel || '未选择模型' }}</small>
@@ -131,23 +131,23 @@ function statusIcon(status: AgentDebugStatus) {
       </div>
       <div class="debug-actions">
         <button type="button" title="清空调试记录" aria-label="清空调试记录" :disabled="running || !messages.length" @click="emit('clear')">
-          <FaIcon name="i-ri:delete-bin-6-line" />
+          <FaIcon name="morph:trash-2" />
         </button>
         <button type="button" title="返回配置" aria-label="返回配置" @click="emit('close')">
-          <FaIcon name="i-ri:close-line" />
+          <FaIcon name="morph:x" />
         </button>
       </div>
     </header>
 
     <div ref="scrollEl" class="message-scroll">
       <div v-if="!messages.length" class="debug-empty">
-        <span><FaIcon name="i-ri:chat-3-line" /></span>
+        <span><FaIcon name="morph:message-circle" /></span>
         <strong>暂无调试记录</strong>
       </div>
 
       <article v-for="message in messages" :key="message.id" class="chat-message" :class="message.role">
         <div class="message-avatar">
-          <FaIcon :name="message.role === 'user' ? 'i-ri:user-3-line' : 'i-ri:robot-2-line'" />
+          <FaIcon :name="message.role === 'user' ? 'morph:user' : 'morph:bot'" />
         </div>
         <div class="message-main">
           <div class="message-meta">
@@ -166,7 +166,7 @@ function statusIcon(status: AgentDebugStatus) {
 
           <div v-if="message.tools?.length" class="tool-results">
             <div v-for="(tool, index) in message.tools" :key="`${tool.toolName}-${index}`">
-              <FaIcon name="i-ri:tools-line" />
+              <FaIcon name="morph:wrench" />
               <span><strong>{{ tool.toolName }}</strong><small>{{ tool.message || tool.action || '工具执行完成' }}</small></span>
             </div>
           </div>
@@ -174,7 +174,7 @@ function statusIcon(status: AgentDebugStatus) {
           <div v-if="message.attachments?.length" class="message-attachments">
             <span v-for="attachment in message.attachments" :key="attachment.id">
               <img v-if="attachment.dataUrl" :src="attachment.dataUrl" :alt="attachment.name">
-              <FaIcon v-else name="i-ri:file-text-line" />{{ attachment.name }}
+              <FaIcon v-else name="morph:file-text" />{{ attachment.name }}
             </span>
           </div>
 
@@ -189,9 +189,9 @@ function statusIcon(status: AgentDebugStatus) {
       <div v-if="attachments.length" class="attachment-list">
         <span v-for="attachment in attachments" :key="attachment.id">
           <img v-if="attachment.dataUrl" :src="attachment.dataUrl" :alt="attachment.name">
-          <FaIcon v-else name="i-ri:file-text-line" />
+          <FaIcon v-else name="morph:file-text" />
           <b>{{ attachment.name }}</b>
-          <button type="button" title="移除附件" aria-label="移除附件" @click="attachments = attachments.filter(item => item.id !== attachment.id)"><FaIcon name="i-ri:close-line" /></button>
+          <button type="button" title="移除附件" aria-label="移除附件" @click="attachments = attachments.filter(item => item.id !== attachment.id)"><FaIcon name="morph:x" /></button>
         </span>
       </div>
       <p v-if="attachmentError" class="attachment-error">
@@ -201,15 +201,15 @@ function statusIcon(status: AgentDebugStatus) {
       <div class="composer-footer">
         <div>
           <button v-if="allowImage || allowFiles" type="button" title="添加附件" aria-label="添加附件" :disabled="running" @click="pickFiles">
-            <FaIcon :name="allowImage ? 'i-ri:image-add-line' : 'i-ri:attachment-2'" />
+            <FaIcon :name="allowImage ? 'morph:image-plus' : 'morph:paperclip'" />
           </button>
           <span>{{ input.length }}/2000</span>
         </div>
         <button v-if="running" type="button" class="send-button stop" title="停止调试" aria-label="停止调试" @click="emit('stop')">
-          <FaIcon name="i-ri:stop-fill" />
+          <FaIcon name="morph:square" />
         </button>
         <button v-else type="button" class="send-button" title="发送消息" aria-label="发送消息" :disabled="!input.trim() && !attachments.length" @click="send">
-          <FaIcon name="i-ri:send-plane-2-fill" />
+          <FaIcon name="morph:send" />
         </button>
       </div>
       <input ref="fileInput" class="file-input" type="file" :accept="fileAccept" multiple @change="onFileChange">

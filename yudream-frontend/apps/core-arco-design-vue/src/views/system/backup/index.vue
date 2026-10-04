@@ -17,10 +17,10 @@ const modal = useFaModal()
 const toast = useFaToast()
 
 const tabList = [
-  { label: '导出与导入', value: 'export', icon: 'i-ri:download-cloud-2-line' },
-  { label: '任务记录', value: 'jobs', icon: 'i-ri:history-line' },
-  { label: '异地目标', value: 'targets', icon: 'i-ri:cloud-line' },
-  { label: '备份计划', value: 'plans', icon: 'i-ri:timer-line' },
+  { label: '导出与导入', value: 'export', icon: 'morph:cloud-download' },
+  { label: '任务记录', value: 'jobs', icon: 'morph:history' },
+  { label: '异地目标', value: 'targets', icon: 'morph:cloud' },
+  { label: '备份计划', value: 'plans', icon: 'morph:timer' },
 ]
 const activeTab = ref('export')
 
@@ -740,7 +740,7 @@ function formatArchiveTime(millis?: number) {
                 </div>
                 <div>
                   <FaButton v-auth="'system:backup:export'" :loading="exporting" :disabled="hasActiveJob()" @click="confirmExport">
-                    <FaIcon name="i-ri:save-3-line" />
+                    <FaIcon name="morph:save" />
                     立即执行备份
                   </FaButton>
                 </div>
@@ -756,7 +756,7 @@ function formatArchiveTime(millis?: number) {
               <div class="mt-4">
                 <input ref="importInputRef" type="file" accept=".zip" class="hidden" @change="onImportFile">
                 <FaButton v-auth="'system:backup:import'" variant="outline" :loading="importing" @click="pickImportFile">
-                  <FaIcon name="i-ri:upload-cloud-2-line" />
+                  <FaIcon name="morph:cloud-upload" />
                   选择备份归档并分析
                 </FaButton>
                 <template v-if="importing">
@@ -768,7 +768,7 @@ function formatArchiveTime(millis?: number) {
               </div>
               <FaAlert
                 class="mt-4"
-                icon="i-ri:information-line"
+                icon="morph:info"
                 title="跨主机导入提示"
                 description="若源站主密钥（YUDREAM_CREDENTIAL_KEY）不同，归档中加密存储的凭据需导入后重新配置。"
               />
@@ -791,7 +791,7 @@ function formatArchiveTime(millis?: number) {
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <span class="text-xs text-secondary-foreground/60">每 3 秒自动刷新执行中任务</span>
                 <FaButton variant="outline" size="sm" :loading="jobsLoading" @click="loadJobs()">
-                  <FaIcon name="i-ri:refresh-line" />
+                  <FaIcon name="morph:refresh-cw" />
                   刷新
                 </FaButton>
               </div>
@@ -906,7 +906,7 @@ function formatArchiveTime(millis?: number) {
             <template #toolbar>
               <div class="flex justify-end">
                 <FaButton v-auth="'system:backup:config'" @click="openTargetForm()">
-                  <FaIcon name="i-ri:add-line" />
+                  <FaIcon name="morph:plus" />
                   添加目标
                 </FaButton>
               </div>
@@ -988,7 +988,7 @@ function formatArchiveTime(millis?: number) {
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <span class="text-xs text-secondary-foreground/60">cron 为 6 位 Spring 表达式（秒 分 时 日 月 周），如每天 3 点：0 0 3 * * *</span>
                 <FaButton v-auth="'system:backup:config'" :disabled="targets.length === 0" @click="openPlanForm()">
-                  <FaIcon name="i-ri:add-line" />
+                  <FaIcon name="morph:plus" />
                   添加计划
                 </FaButton>
               </div>
@@ -1073,7 +1073,7 @@ function formatArchiveTime(millis?: number) {
           </div>
           <FaAlert
             v-if="analysis.warnings.length"
-            icon="i-ri:alert-line"
+            icon="morph:triangle-alert"
             title="导入前请注意"
             :description="analysis.warnings.join('；')"
             class="mb-3"
@@ -1195,7 +1195,7 @@ function formatArchiveTime(millis?: number) {
             </div>
           </a-form-item>
           <FaAlert
-            icon="i-ri:key-2-line"
+            icon="morph:key-round"
             title="凭据与安全"
             description="密码经主密钥加密存储；WebDAV 建议使用 HTTPS（非 80 端口默认按 HTTPS 访问）。归档将写入基础路径下，文件名前缀 yudream-backup-。"
           />
@@ -1268,7 +1268,7 @@ function formatArchiveTime(millis?: number) {
             <FaCheckboxGroup v-model="planScopeModel" :options="scopeCheckOptions" />
           </a-form-item>
           <FaAlert
-            icon="i-ri:information-line"
+            icon="morph:info"
             title="调度说明"
             description="到点后按所选范围生成全量归档并推送到异地目标，自动清理超出保留份数的旧备份（按前缀匹配）。"
           />

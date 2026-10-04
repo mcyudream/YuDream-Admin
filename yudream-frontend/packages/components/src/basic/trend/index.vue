@@ -61,7 +61,7 @@ const sizeClasses = {
     <span v-if="suffix" class="opacity-70">{{ suffix }}</span>
     <div class="flex items-center justify-center relative">
       <Icon
-        :name="isUp ? 'i-ep:caret-top' : 'i-ep:caret-top'"
+        :name="isUp ? 'morph:chevron-up' : 'morph:chevron-up'"
         :rotate="isUp ? 0 : 180"
         class="transition-transform duration-300"
         :class="[

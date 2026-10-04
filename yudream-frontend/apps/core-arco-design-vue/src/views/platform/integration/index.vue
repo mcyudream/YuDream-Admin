@@ -75,10 +75,10 @@ const languageOptions: { label: string; value: RuntimeLanguage }[] = [
   { label: 'Python', value: 'PYTHON' },
 ]
 const tabs = [
-  { key: 'connectors', label: 'HTTP 连接器', icon: 'i-ri:link-m' },
-  { key: 'httpLogs', label: 'HTTP 日志', icon: 'i-ri:file-list-3-line' },
-  { key: 'scripts', label: '运行脚本', icon: 'i-ri:terminal-box-line' },
-  { key: 'runtimeLogs', label: '运行日志', icon: 'i-ri:bug-line' },
+  { key: 'connectors', label: 'HTTP 连接器', icon: 'morph:link' },
+  { key: 'httpLogs', label: 'HTTP 日志', icon: 'morph:file-text' },
+  { key: 'scripts', label: '运行脚本', icon: 'morph:square-terminal' },
+  { key: 'runtimeLogs', label: '运行日志', icon: 'morph:bug' },
 ] as const
 
 const connectorColumns = computed<TableColumn<HttpConnector>[]>(() => [
@@ -445,11 +445,11 @@ function executionVariant(status: ExecutionStatus) {
   <div>
     <FaPageHeader title="集成调用" class="mb-0">
       <FaButton v-if="activeTab === 'connectors'" v-auth="'platform:integration:edit'" @click="openCreateConnector">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
         新增连接器
       </FaButton>
       <FaButton v-if="activeTab === 'scripts'" v-auth="'platform:integration:edit'" @click="openCreateScript">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
         新增脚本
       </FaButton>
     </FaPageHeader>
@@ -487,7 +487,7 @@ function executionVariant(status: ExecutionStatus) {
               <div class="flex gap-2 md:justify-end">
                 <FaButton variant="outline" @click="resetSearch">重置</FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -583,7 +583,7 @@ function executionVariant(status: ExecutionStatus) {
               <div class="flex gap-2 md:justify-end">
                 <FaButton variant="outline" @click="resetSearch">重置</FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -659,7 +659,7 @@ function executionVariant(status: ExecutionStatus) {
               <div class="flex gap-2 md:justify-end">
                 <FaButton variant="outline" @click="resetSearch">重置</FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -754,7 +754,7 @@ function executionVariant(status: ExecutionStatus) {
               <div class="flex gap-2 md:justify-end">
                 <FaButton variant="outline" @click="resetSearch">重置</FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>

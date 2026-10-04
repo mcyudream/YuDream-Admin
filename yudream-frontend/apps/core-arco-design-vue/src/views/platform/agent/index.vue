@@ -198,10 +198,10 @@ function statusVariant(status: AgentApplicationStatus) {
     <FaPageHeader title="Agent 应用" class="mb-0">
       <div class="flex gap-2">
         <FaButton variant="outline" @click="router.push('/platform/agent/tools')">
-          <FaIcon name="i-ri:tools-line" /> 工具
+          <FaIcon name="morph:wrench" /> 工具
         </FaButton>
         <FaButton v-auth="'platform:agent:edit'" @click="create">
-          <FaIcon name="i-ri:add-line" /> 新建应用
+          <FaIcon name="morph:plus" /> 新建应用
         </FaButton>
       </div>
     </FaPageHeader>
@@ -222,7 +222,7 @@ function statusVariant(status: AgentApplicationStatus) {
       <div v-loading="loading" class="agent-grid">
         <article v-for="row in rows" :key="row.id" class="agent-card">
           <div class="agent-card__head">
-            <span class="agent-icon"><FaIcon :name="row.icon || 'i-ri:robot-2-line'" /></span><FaTag :variant="statusVariant(row.status)">
+            <span class="agent-icon"><FaIcon :name="row.icon || 'morph:bot'" /></span><FaTag :variant="statusVariant(row.status)">
               {{ statusText(row.status) }}
             </FaTag>
           </div>
@@ -250,18 +250,18 @@ function statusVariant(status: AgentApplicationStatus) {
       <div class="gap-4 grid">
         <FaTextarea v-model="runInput" :autosize="{ minRows: 4, maxRows: 8 }" placeholder="输入任务或问题" />
         <div v-if="runAttachments.length" class="runner-attachments">
-          <span v-for="item in runAttachments" :key="item.id"><img v-if="item.type.startsWith('image/')" :src="item.dataUrl" :alt="item.name"><FaIcon v-else name="i-ri:file-text-line" /><b>{{ item.name }}</b><button type="button" title="移除附件" @click="runAttachments = runAttachments.filter(current => current.id !== item.id)"><FaIcon name="i-ri:close-line" /></button></span>
+          <span v-for="item in runAttachments" :key="item.id"><img v-if="item.type.startsWith('image/')" :src="item.dataUrl" :alt="item.name"><FaIcon v-else name="morph:file-text" /><b>{{ item.name }}</b><button type="button" title="移除附件" @click="runAttachments = runAttachments.filter(current => current.id !== item.id)"><FaIcon name="morph:x" /></button></span>
         </div>
         <p v-if="runnerError" class="runner-error">
           {{ runnerError }}
         </p>
         <div class="runner-actions">
           <FaButton v-if="runnerAccept" variant="outline" @click="pickRunnerFiles">
-            <FaIcon name="i-ri:attachment-2" /> 添加附件
+            <FaIcon name="morph:paperclip" /> 添加附件
           </FaButton>
           <input ref="runnerFileInput" class="hidden" type="file" multiple :accept="runnerAccept" @change="onRunnerFiles">
           <FaButton :loading="actionLoading === 'run'" :disabled="!runInput.trim() && !runAttachments.length" @click="run">
-            <FaIcon name="i-ri:play-line" /> 运行应用
+            <FaIcon name="morph:play" /> 运行应用
           </FaButton>
         </div>
         <section v-if="runResult" class="run-result">

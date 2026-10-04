@@ -6,6 +6,6 @@ import FaTooltip from '../index.vue'
 
 <template>
   <FaTooltip text="注意噢！">
-    <FaIcon name="i-ri:question-line" class="text-lg cursor-help" />
+    <FaIcon name="morph:circle-question-mark" class="text-lg cursor-help" />
   </FaTooltip>
 </template>

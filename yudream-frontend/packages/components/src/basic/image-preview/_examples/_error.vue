@@ -10,7 +10,7 @@ import FaImagePreview from '../index.vue'
     <FaImagePreview src="https://fantastic-admin.hurui.me/not-found.png">
       <template #error>
         <div class="text-sm text-secondary-foreground/50 flex-col-center gap-1">
-          <FaIcon name="i-ph:image-broken-duotone" class="size-8" />
+          <FaIcon name="morph:image-off" class="size-8" />
           <div>
             图片加载失败
           </div>

@@ -47,11 +47,11 @@ async function copyCode() {
     <footer v-if="code" class="demo-card__code">
       <div class="demo-card__code-bar">
         <button type="button" class="demo-card__code-toggle" @click="codeVisible = !codeVisible">
-          <FaIcon :name="codeVisible ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" />
+          <FaIcon :name="codeVisible ? 'morph:chevron-up' : 'morph:chevron-down'" />
           {{ codeVisible ? '收起代码' : '展开代码' }}
         </button>
         <FaButton v-if="codeVisible" size="icon-sm" variant="ghost" title="复制代码" @click="copyCode">
-          <FaIcon name="i-ri:file-copy-line" />
+          <FaIcon name="morph:copy" />
         </FaButton>
       </div>
       <div v-if="codeVisible" class="demo-card__code-body">

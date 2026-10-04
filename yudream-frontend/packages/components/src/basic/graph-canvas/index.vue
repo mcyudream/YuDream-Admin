@@ -492,16 +492,16 @@ watch(() => props.highlightNeighbors, () => renderer?.refresh())
           :title="isFullscreen ? '退出全屏' : '全屏'"
           @click="toggleFullscreen"
         >
-          <Icon :name="isFullscreen ? 'i-ri:fullscreen-exit-line' : 'i-ri:fullscreen-line'" />
+          <Icon :name="isFullscreen ? 'morph:minimize' : 'morph:maximize'" />
         </button>
         <button type="button" class="yd-graph-canvas__control" aria-label="放大" title="放大" @click="zoomIn">
-          <Icon name="i-ri:add-line" />
+          <Icon name="morph:plus" />
         </button>
         <button type="button" class="yd-graph-canvas__control" aria-label="缩小" title="缩小" @click="zoomOut">
-          <Icon name="i-ri:subtract-line" />
+          <Icon name="morph:minus" />
         </button>
         <button type="button" class="yd-graph-canvas__control" aria-label="复位视图" title="复位视图" @click="reset">
-          <Icon name="i-ri:aim-line" />
+          <Icon name="morph:crosshair" />
         </button>
       </slot>
     </div>

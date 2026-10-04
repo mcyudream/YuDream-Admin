@@ -35,8 +35,8 @@ const generateDataJson = ref('{}')
 const lastRecord = ref<WordGenerationRecord | null>(null)
 
 const tabs = [
-  { key: 'templates', label: '模板管理', icon: 'i-ri:file-word-2-line' },
-  { key: 'records', label: '生成记录', icon: 'i-ri:file-list-3-line' },
+  { key: 'templates', label: '模板管理', icon: 'morph:file-text' },
+  { key: 'records', label: '生成记录', icon: 'morph:file-text' },
 ] as const
 const statusOptions: { label: string, value: TemplateStatus }[] = [
   { label: '启用', value: 'ACTIVE' },
@@ -336,7 +336,7 @@ function generationVariant(status: GenerationStatus) {
   <div>
     <FaPageHeader title="Word 模板" class="mb-0">
       <FaButton v-if="activeTab === 'templates'" v-auth="'platform:document:edit'" @click="pickCreateFile">
-        <FaIcon name="i-ri:upload-cloud-2-line" />
+        <FaIcon name="morph:cloud-upload" />
         上传模板
       </FaButton>
       <input ref="fileInput" type="file" accept=".docx" hidden @change="onCreateFileChange">
@@ -496,7 +496,7 @@ function generationVariant(status: GenerationStatus) {
                   重置
                 </FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -613,7 +613,7 @@ function generationVariant(status: GenerationStatus) {
                   重置
                 </FaButton>
                 <FaButton :loading="loading" @click="load">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>
@@ -719,7 +719,7 @@ function generationVariant(status: GenerationStatus) {
           </div>
           <pre>{{ lastRecord ? JSON.stringify(lastRecord, null, 2) : '尚未生成' }}</pre>
           <FaButton v-if="lastRecord?.outputFileUrl" variant="outline" @click="openFile(lastRecord.outputFileUrl)">
-            <FaIcon name="i-ri:download-2-line" />
+            <FaIcon name="morph:download" />
             下载生成文件
           </FaButton>
         </section>

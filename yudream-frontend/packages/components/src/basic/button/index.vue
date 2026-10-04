@@ -19,7 +19,7 @@ const props = defineProps<{
 
 <template>
   <Button :variant :size :disabled="props.disabled || props.loading" :class="props.class">
-    <Icon v-if="loading" name="i-line-md:loading-twotone-loop" />
+    <Icon v-if="loading" name="morph:loader-circle+animate-spin" />
     <slot />
   </Button>
 </template>

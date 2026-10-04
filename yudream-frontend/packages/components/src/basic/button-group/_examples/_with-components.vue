@@ -17,7 +17,7 @@ const currency = shallowRef('CNY')
     <FaButtonGroup>
       <FaInput />
       <FaButton variant="outline" size="icon">
-        <FaIcon name="i-ep:search" />
+        <FaIcon name="morph:search" />
       </FaButton>
     </FaButtonGroup>
     <FaButtonGroup>
@@ -49,7 +49,7 @@ const currency = shallowRef('CNY')
         ]"
       >
         <FaButton variant="outline" size="icon">
-          <FaIcon name="i-ep:caret-bottom" />
+          <FaIcon name="morph:chevron-down" />
         </FaButton>
       </FaDropdown>
     </FaButtonGroup>

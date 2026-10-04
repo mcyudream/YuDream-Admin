@@ -155,7 +155,7 @@ function exportTrace() {
     <template v-if="selectedTraceId">
       <div class="trace-detail__header">
         <FaButton variant="outline" size="sm" @click="backToList">
-          <FaIcon name="i-ri:arrow-left-line" />
+          <FaIcon name="morph:arrow-left" />
           返回列表
         </FaButton>
         <div class="trace-detail__meta">
@@ -167,7 +167,7 @@ function exportTrace() {
           <span class="text-xs text-secondary-foreground/60">{{ formatDuration(selectedLive?.durationMs ?? detail?.durationMs) }}</span>
         </div>
         <FaButton variant="outline" size="sm" :disabled="!detail && !selectedLive" @click="exportTrace">
-          <FaIcon name="i-ri:download-line" />
+          <FaIcon name="morph:download" />
           导出 JSON
         </FaButton>
       </div>
@@ -210,7 +210,7 @@ function exportTrace() {
                   {{ step.toolName }}
                 </FaTag>
                 <span class="text-xs text-secondary-foreground/60 shrink-0">{{ formatDuration(step.durationMs) }}</span>
-                <FaIcon :name="open ? 'i-ri:arrow-up-s-line' : 'i-ri:arrow-down-s-line'" class="shrink-0 size-4" />
+                <FaIcon :name="open ? 'morph:chevron-up' : 'morph:chevron-down'" class="shrink-0 size-4" />
               </div>
             </template>
             <div class="trace-step__body">
@@ -256,11 +256,11 @@ function exportTrace() {
         <FaSelect v-model="filterSource" :options="sourceOptions" class="shrink-0 w-28" />
         <FaSelect v-model="filterStatus" :options="statusOptions" class="shrink-0 w-28" />
         <FaButton variant="outline" size="icon" :loading="pageLoading" title="刷新" @click="loadPage">
-          <FaIcon name="i-ri:refresh-line" />
+          <FaIcon name="morph:refresh-cw" />
         </FaButton>
       </div>
 
-      <AssetSection title="实时执行" icon="i-ri:pulse-line" :count="store.liveTraces.filter(t => t.status === 'RUNNING').length" default-open>
+      <AssetSection title="实时执行" icon="morph:activity" :count="store.liveTraces.filter(t => t.status === 'RUNNING').length" default-open>
         <div v-for="trace in store.liveTraces" :key="trace.traceId" class="trace-row" @click="openTrace(trace.traceId, true)">
           <FaTag :variant="statusVariant(trace.status)" class="text-xs shrink-0">
             {{ statusText(trace.status) }}
@@ -282,7 +282,7 @@ function exportTrace() {
         </div>
       </AssetSection>
 
-      <AssetSection title="历史记录" icon="i-ri:history-line" :count="page?.total ?? 0" default-open>
+      <AssetSection title="历史记录" icon="morph:history" :count="page?.total ?? 0" default-open>
         <div v-for="trace in page?.list || []" :key="trace.traceId" class="trace-row" @click="openTrace(trace.traceId, false)">
           <FaTag :variant="statusVariant(trace.status)" class="text-xs shrink-0">
             {{ statusText(trace.status) }}

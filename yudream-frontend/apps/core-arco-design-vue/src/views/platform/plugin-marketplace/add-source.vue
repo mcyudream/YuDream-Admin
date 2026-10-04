@@ -83,11 +83,11 @@ async function save() {
         订阅远程插件市场。不需要启用「插件市场源」能力；该能力只提供本机源与公开社区。
       </template>
       <FaButton variant="outline" @click="back">
-        <FaIcon name="i-ri:arrow-left-line" />
+        <FaIcon name="morph:arrow-left" />
         返回插件市场
       </FaButton>
       <FaButton :loading="saving" @click="save">
-        <FaIcon name="i-ri:save-line" />
+        <FaIcon name="morph:save" />
         保存
       </FaButton>
     </FaPageHeader>

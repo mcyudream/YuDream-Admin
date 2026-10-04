@@ -365,15 +365,15 @@ async function saveDockerSettings() {
         <span>实时查看宿主控制台运行日志（含插件、Milky 机器人及可选 docker 容器日志），自动缓存上限 {{ stats.maxEntries }} 条并自动清理。</span>
       </template>
       <FaButton v-auth="'system:runtime-log:config'" variant="outline" @click="settingsOpen = !settingsOpen">
-        <FaIcon name="i-ri:database-2-line" />
+        <FaIcon name="morph:database" />
         容器日志配置
       </FaButton>
       <FaButton v-auth="'system:runtime-log:download'" variant="outline" :loading="downloading" @click="downloadLogs">
-        <FaIcon name="i-ri:download-2-line" />
+        <FaIcon name="morph:download" />
         下载日志
       </FaButton>
       <FaButton v-auth="'system:runtime-log:delete'" variant="destructive" :loading="clearing" @click="confirmClear">
-        <FaIcon name="i-ri:delete-bin-6-line" />
+        <FaIcon name="morph:trash-2" />
         清空缓存
       </FaButton>
     </FaPageHeader>
@@ -405,7 +405,7 @@ async function saveDockerSettings() {
         </div>
         <div class="settings-actions">
           <FaButton :loading="saving" @click="saveDockerSettings">
-            <FaIcon name="i-ri:save-3-line" />
+            <FaIcon name="morph:save" />
             保存配置
           </FaButton>
         </div>
@@ -416,7 +416,7 @@ async function saveDockerSettings() {
         <FaPopover v-model:open="modulePickerOpen" class="module-picker-popover" align="start">
           <FaButton variant="outline" class="toolbar-module-trigger">
             <span class="module-trigger-label">{{ moduleFilterLabel }}</span>
-            <FaIcon name="i-ri:arrow-down-s-line" />
+            <FaIcon name="morph:chevron-down" />
           </FaButton>
           <template #panel>
             <div class="module-picker">
@@ -487,7 +487,7 @@ async function saveDockerSettings() {
               <span class="log-thread">{{ entry.thread }}</span>
               <FaIcon
                 v-if="entry.throwable"
-                name="i-ri:error-warning-line"
+                name="morph:triangle-alert"
                 class="log-expand"
                 :class="{ 'is-open': expanded.has(entry.sequence) }"
               />

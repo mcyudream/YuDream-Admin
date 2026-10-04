@@ -157,16 +157,16 @@ onBeforeUnmount(() => {
 <template>
   <section ref="rootEl" class="yd-chat-window" :class="{ 'is-fullscreen': state.fullscreen }" :style="style" aria-label="AI 聊天窗口">
     <header class="yd-chat-window__head" @pointerdown="startDrag">
-      <span class="yd-chat-window__title"><FaIcon name="i-ri:chat-3-line" />{{ title }}</span>
+      <span class="yd-chat-window__title"><FaIcon name="morph:message-circle" />{{ title }}</span>
       <span class="yd-chat-window__tools">
         <button v-if="maximizable" type="button" title="最大化" @click="toggleMaximize">
-          <FaIcon :name="state.maximized ? 'i-ri:contract-left-right-line' : 'i-ri:expand-left-right-line'" />
+          <FaIcon :name="state.maximized ? 'morph:fold-horizontal' : 'morph:unfold-horizontal'" />
         </button>
         <button v-if="fullscreenable" type="button" title="全屏" @click="toggleFullscreen">
-          <FaIcon :name="state.fullscreen ? 'i-ri:fullscreen-exit-line' : 'i-ri:fullscreen-line'" />
+          <FaIcon :name="state.fullscreen ? 'morph:minimize' : 'morph:maximize'" />
         </button>
         <button type="button" title="关闭" @click="emits('close')">
-          <FaIcon name="i-ri:close-line" />
+          <FaIcon name="morph:x" />
         </button>
       </span>
     </header>
@@ -174,7 +174,7 @@ onBeforeUnmount(() => {
       <slot />
     </div>
     <button v-if="resizable && !state.maximized && !state.fullscreen" type="button" class="yd-chat-window__resize" @pointerdown="startResize">
-      <FaIcon name="i-ri:corner-down-right-line" />
+      <FaIcon name="morph:corner-down-right" />
     </button>
   </section>
 </template>

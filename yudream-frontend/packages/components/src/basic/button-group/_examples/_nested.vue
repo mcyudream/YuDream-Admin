@@ -26,10 +26,10 @@ import FaButtonGroup from '../index.vue'
     </FaButtonGroup>
     <FaButtonGroup>
       <FaButton variant="outline" size="icon">
-        <FaIcon name="i-ep:arrow-left" />
+        <FaIcon name="morph:arrow-left" />
       </FaButton>
       <FaButton variant="outline" size="icon">
-        <FaIcon name="i-ep:arrow-right" />
+        <FaIcon name="morph:arrow-right" />
       </FaButton>
     </FaButtonGroup>
   </FaButtonGroup>

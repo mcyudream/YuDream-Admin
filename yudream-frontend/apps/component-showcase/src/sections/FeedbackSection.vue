@@ -52,7 +52,7 @@ const demoImages = [
         </FaButton>
       </FaTooltip>
       <FaTooltip text="注意噢！">
-        <FaIcon name="i-ri:question-line" class="cursor-help text-lg" />
+        <FaIcon name="morph:circle-question-mark" class="cursor-help text-lg" />
       </FaTooltip>
     </div>
   </DemoCard>

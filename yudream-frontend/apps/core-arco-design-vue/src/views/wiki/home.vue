@@ -68,16 +68,16 @@ onBeforeUnmount(clearPublicSeo)
           <dl><div><dt>{{ spaces.length }}</dt><dd>知识空间</dd></div><div><dt>{{ publicPageCount }}</dt><dd>公开页面</dd></div></dl>
         </div>
       </div>
-      <form class="wiki-home__search" @submit.prevent="search"><FaInput v-model="query" clearable placeholder="输入问题或关键词，回车搜索"><template #start><FaIcon name="i-ri:search-line" /></template></FaInput><FaButton html-type="submit"><FaIcon name="i-ri:search-line" /> 搜索</FaButton></form>
+      <form class="wiki-home__search" @submit.prevent="search"><FaInput v-model="query" clearable placeholder="输入问题或关键词，回车搜索"><template #start><FaIcon name="morph:search" /></template></FaInput><FaButton html-type="submit"><FaIcon name="morph:search" /> 搜索</FaButton></form>
       <div class="wiki-home__section-head"><div><h2>知识空间</h2><p>按主题浏览公开文档。</p></div></div>
       <section class="wiki-home__spaces">
-        <FaCard v-for="space in spaces" :key="space.slug" class="wiki-home__space" content-class="wiki-home__space-content" @click="router.push(`/wiki/${encodeURIComponent(space.slug)}`)"><FaIcon name="i-ri:book-open-line" /><strong>{{ space.name }}</strong><p>{{ space.description || '查看已发布文档' }}</p><span>进入知识库 <FaIcon name="i-ri:arrow-right-line" /></span></FaCard>
+        <FaCard v-for="space in spaces" :key="space.slug" class="wiki-home__space" content-class="wiki-home__space-content" @click="router.push(`/wiki/${encodeURIComponent(space.slug)}`)"><FaIcon name="morph:book-open" /><strong>{{ space.name }}</strong><p>{{ space.description || '查看已发布文档' }}</p><span>进入知识库 <FaIcon name="morph:arrow-right" /></span></FaCard>
         <a-empty v-if="!loading && !spaces.length" description="暂无公开知识库" />
       </section>
       <section v-if="recentPages.length" class="wiki-home__recent">
         <div class="wiki-home__section-head"><div><h2>最近内容</h2><p>从公开知识空间快速进入页面。</p></div><a href="/wiki/search">搜索全部</a></div>
         <div class="wiki-home__recent-list">
-          <a v-for="page in recentPages" :key="page.url" :href="page.url"><span><small>{{ page.spaceName }}</small><strong>{{ page.title }}</strong><p>{{ page.summary }}</p></span><FaIcon name="i-ri:arrow-right-up-line" /></a>
+          <a v-for="page in recentPages" :key="page.url" :href="page.url"><span><small>{{ page.spaceName }}</small><strong>{{ page.title }}</strong><p>{{ page.summary }}</p></span><FaIcon name="morph:arrow-up-right" /></a>
         </div>
       </section>
     </section>

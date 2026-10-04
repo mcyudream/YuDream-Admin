@@ -85,10 +85,10 @@ const IconWrapper = defineComponent({
       <span v-else-if="outputType === 'img'" :key="`img-${name}`" class="flex shrink-0 size-inherit items-center inset-0 justify-center absolute">
         <UseImage :src="name" class="shrink-0 size-inherit">
           <template #loading>
-            <i class="i-line-md:loading-loop size-inherit" />
+            <i class="i-lucide:loader-circle animate-spin size-inherit" />
           </template>
           <template #error>
-            <i class="i-ph:image-broken-duotone size-inherit" />
+            <i class="i-lucide:image-off size-inherit" />
           </template>
         </UseImage>
       </span>

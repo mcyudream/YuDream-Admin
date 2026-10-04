@@ -189,10 +189,10 @@ onBeforeUnmount(() => {
         :class="{ 'is-open': mobileNavOpen }"
         :aria-hidden="isMobileNav && !mobileNavOpen"
       >
-        <div class="wiki-public-sidebar__title"><FaIcon name="i-ri:folder-3-line" /> 文档目录</div>
+        <div class="wiki-public-sidebar__title"><FaIcon name="morph:folder" /> 文档目录</div>
         <nav class="wiki-public-nav" aria-label="文档目录"><FaButton v-for="node in pages" :key="node.id" :class="{ active: !documentId && node.id === active?.id }" @click="open(node)">{{ node.title }}</FaButton></nav>
         <template v-if="documents.length">
-          <div class="wiki-public-sidebar__title wiki-public-sidebar__title--documents"><FaIcon name="i-ri:file-list-3-line" /> 原文档</div>
+          <div class="wiki-public-sidebar__title wiki-public-sidebar__title--documents"><FaIcon name="morph:file-text" /> 原文档</div>
           <nav class="wiki-public-nav" aria-label="原文档目录">
             <template v-for="group in documentGroups" :key="group.folder">
               <div v-if="group.folder !== '/'" class="wiki-public-nav__folder">{{ group.folder }}</div>
@@ -208,21 +208,21 @@ onBeforeUnmount(() => {
           <p v-if="documentLoading" class="wiki-public-error">原文档加载中...</p>
           <p v-else-if="documentError" class="wiki-public-error">{{ documentError }}</p>
           <template v-else-if="documentDetail">
-            <div class="wiki-public-crumb"><a href="/wiki">知识库</a><FaIcon name="i-ri:arrow-right-s-line" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><FaIcon name="i-ri:arrow-right-s-line" /><span>原文档</span><FaIcon name="i-ri:arrow-right-s-line" /><span>{{ documentDetail.title }}</span></div>
+            <div class="wiki-public-crumb"><a href="/wiki">知识库</a><FaIcon name="morph:chevron-right" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><FaIcon name="morph:chevron-right" /><span>原文档</span><FaIcon name="morph:chevron-right" /><span>{{ documentDetail.title }}</span></div>
             <h1>{{ documentDetail.title }}</h1>
             <div class="wiki-public-meta"><span class="wiki-public-meta__type">原文档</span><span v-if="documentDetail.folderPath && documentDetail.folderPath !== '/'" class="wiki-public-meta__tag">{{ documentDetail.folderPath }}</span><span v-if="documentDetail.kind" class="wiki-public-meta__tag">{{ documentDetail.kind }}</span></div>
             <div class="wiki-public-article"><MdPreview :model-value="documentMarkdown" language="zh-CN" preview-theme="default" code-theme="github" class="wiki-public-markdown" /></div>
           </template>
         </template>
         <template v-else-if="active">
-          <div class="wiki-public-crumb"><a href="/wiki">知识库</a><FaIcon name="i-ri:arrow-right-s-line" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><FaIcon name="i-ri:arrow-right-s-line" /><span>{{ active.title }}</span></div>
+          <div class="wiki-public-crumb"><a href="/wiki">知识库</a><FaIcon name="morph:chevron-right" /><a :href="`/wiki/${encodeURIComponent(spaceSlug)}`">{{ spaceSlug }}</a><FaIcon name="morph:chevron-right" /><span>{{ active.title }}</span></div>
           <h1>{{ active.title }}</h1>
           <div v-if="active.pageType || active.tags?.length" class="wiki-public-meta"><span v-if="active.pageType" class="wiki-public-meta__type">{{ pageTypeLabel(active.pageType) }}</span><span v-for="tag in active.tags || []" :key="tag" class="wiki-public-meta__tag"># {{ tag }}</span></div>
           <p v-if="active.summary" class="wiki-public-summary">{{ active.summary }}</p>
           <div class="wiki-public-article" @click="onContentClick"><MdPreview :model-value="activeMarkdown" language="zh-CN" preview-theme="default" code-theme="github" class="wiki-public-markdown" /></div>
-          <section v-if="relatedPages.length" class="wiki-public-related"><div class="wiki-public-related__title"><FaIcon name="i-ri:links-line" /> 相关页面</div><FaButton v-for="node in relatedPages" :key="node.id" type="button" @click="open(node)"><FaIcon name="i-ri:file-text-line" /> {{ node.title }}</FaButton></section>
+          <section v-if="relatedPages.length" class="wiki-public-related"><div class="wiki-public-related__title"><FaIcon name="morph:link" /> 相关页面</div><FaButton v-for="node in relatedPages" :key="node.id" type="button" @click="open(node)"><FaIcon name="morph:file-text" /> {{ node.title }}</FaButton></section>
         </template>
-        <section v-else class="wiki-public-empty"><FaIcon name="i-ri:book-open-line" /><strong>暂无已发布页面</strong><a href="/wiki">返回知识库列表</a></section>
+        <section v-else class="wiki-public-empty"><FaIcon name="morph:book-open" /><strong>暂无已发布页面</strong><a href="/wiki">返回知识库列表</a></section>
       </main>
     </div>
 

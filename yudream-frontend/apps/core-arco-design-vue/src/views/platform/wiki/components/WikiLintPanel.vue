@@ -11,9 +11,9 @@ const report = ref<WikiLintReport | null>(null)
 const running = ref(false)
 
 const severityMeta: Record<string, { label: string, color: string, icon: string }> = {
-  error: { label: '错误', color: '#ef4444', icon: 'i-ri:close-circle-line' },
-  warn: { label: '警告', color: '#f59e0b', icon: 'i-ri:error-warning-line' },
-  info: { label: '提示', color: '#0ea5e9', icon: 'i-ri:information-line' },
+  error: { label: '错误', color: '#ef4444', icon: 'morph:circle-x' },
+  warn: { label: '警告', color: '#f59e0b', icon: 'morph:triangle-alert' },
+  info: { label: '提示', color: '#0ea5e9', icon: 'morph:info' },
 }
 
 async function run() {
@@ -52,24 +52,24 @@ function meta(severity: string) {
               <p>检查孤立页面、断链、覆盖缺口与结构问题</p>
             </div>
             <FaButton :loading="running" @click="run">
-              <FaIcon name="i-ri:shield-check-line" /> 运行 Lint
+              <FaIcon name="morph:shield-check" /> 运行 Lint
             </FaButton>
           </div>
           <p v-if="report" class="lint-summary">
-            <FaIcon name="i-ri:file-list-3-line" /> {{ report.summary }}
+            <FaIcon name="morph:file-text" /> {{ report.summary }}
             <span class="lint-summary__time">{{ new Date(report.generatedAt).toLocaleString('zh-CN') }}</span>
           </p>
         </FaCard>
 
         <div v-if="!report && !running" class="lint-empty">
-          <FaIcon name="i-ri:shield-check-line" />
+          <FaIcon name="morph:shield-check" />
           <strong>还没有 Lint 报告</strong>
           <p>点击「运行 Lint」对当前知识库做一次全面体检</p>
         </div>
 
         <template v-else-if="report">
           <div v-if="!report.issues.length" class="lint-empty">
-            <FaIcon name="i-ri:checkbox-circle-line" />
+            <FaIcon name="morph:circle-check" />
             <strong>未发现问题</strong>
             <p>知识库结构健康</p>
           </div>
@@ -90,11 +90,11 @@ function meta(severity: string) {
                 class="lint-issue__page"
                 @click="store.openPage({ title })"
               >
-                <FaIcon name="i-ri:file-text-line" /> {{ title }}
+                <FaIcon name="morph:file-text" /> {{ title }}
               </button>
             </div>
             <p v-if="issue.suggestedAction" class="lint-issue__action">
-              <FaIcon name="i-ri:lightbulb-line" /> 建议：{{ issue.suggestedAction }}
+              <FaIcon name="morph:lightbulb" /> 建议：{{ issue.suggestedAction }}
             </p>
           </FaCard>
         </template>

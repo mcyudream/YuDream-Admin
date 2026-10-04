@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import YdIconPicker from '../index.vue'
 
-const icon = ref('i-ri:settings-3-line')
+const icon = ref('morph:settings')
 </script>
 
 <template>

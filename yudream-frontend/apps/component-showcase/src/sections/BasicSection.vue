@@ -50,13 +50,13 @@ function closeTag(id: number) {
         大按钮
       </FaButton>
       <FaButton size="icon-sm" variant="outline">
-        <FaIcon name="i-ri:search-line" />
+        <FaIcon name="morph:search" />
       </FaButton>
       <FaButton size="icon" variant="outline">
-        <FaIcon name="i-ri:settings-3-line" />
+        <FaIcon name="morph:settings" />
       </FaButton>
       <FaButton size="icon-lg" variant="outline">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
       </FaButton>
     </div>
 
@@ -97,16 +97,16 @@ function closeTag(id: number) {
       带图标
     </p>
     <div class="demo-row">
-      <FaTag icon="i-ri:check-line">
+      <FaTag icon="morph:check">
         成功
       </FaTag>
-      <FaTag icon="i-ri:alert-line" variant="destructive">
+      <FaTag icon="morph:triangle-alert" variant="destructive">
         警告
       </FaTag>
-      <FaTag icon="i-ri:information-line" variant="outline">
+      <FaTag icon="morph:info" variant="outline">
         信息
       </FaTag>
-      <FaTag icon="i-ri:star-line" variant="secondary">
+      <FaTag icon="morph:star" variant="secondary">
         收藏
       </FaTag>
     </div>
@@ -130,19 +130,19 @@ function closeTag(id: number) {
   <DemoCard title="FaBadge" description="圆点 / 数字 / 文本 / 变体">
     <div class="demo-row !gap-8">
       <FaBadge :value="true">
-        <FaIcon name="i-ri:notification-3-line" class="text-xl" />
+        <FaIcon name="morph:bell" class="text-xl" />
       </FaBadge>
       <FaBadge :value="99">
-        <FaIcon name="i-ri:notification-3-line" class="text-xl" />
+        <FaIcon name="morph:bell" class="text-xl" />
       </FaBadge>
       <FaBadge value="新">
-        <FaIcon name="i-ri:mail-line" class="text-xl" />
+        <FaIcon name="morph:mail" class="text-xl" />
       </FaBadge>
       <FaBadge value="9" variant="secondary">
-        <FaIcon name="i-ri:message-3-line" class="text-xl" />
+        <FaIcon name="morph:message-square" class="text-xl" />
       </FaBadge>
       <FaBadge value="9" variant="destructive">
-        <FaIcon name="i-ri:alarm-warning-line" class="text-xl" />
+        <FaIcon name="morph:alarm-clock" class="text-xl" />
       </FaBadge>
     </div>
   </DemoCard>

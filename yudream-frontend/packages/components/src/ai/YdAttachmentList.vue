@@ -15,12 +15,12 @@ const emits = defineEmits<{
 
 function icon(attachment: YdChatAttachment): string {
   if (attachment.kind === 'IMAGE' || attachment.contentType?.startsWith('image/')) {
-    return 'i-ri:image-line'
+    return 'morph:image'
   }
   if (attachment.kind === 'DOCUMENT') {
-    return 'i-ri:file-text-line'
+    return 'morph:file-text'
   }
-  return 'i-ri:attachment-2'
+  return 'morph:paperclip'
 }
 </script>
 
@@ -43,7 +43,7 @@ function icon(attachment: YdChatAttachment): string {
         class="yd-attachment__remove"
         @click.prevent.stop="emits('remove', attachment)"
       >
-        <FaIcon name="i-ri:close-line" />
+        <FaIcon name="morph:x" />
       </button>
     </a>
   </div>

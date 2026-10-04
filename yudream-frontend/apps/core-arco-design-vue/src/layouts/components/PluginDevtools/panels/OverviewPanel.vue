@@ -167,7 +167,7 @@ function formatDuration(ms?: number) {
       </span>
       <div class="flex-1" />
       <FaButton variant="outline" size="sm" :disabled="!store.lifecycleEvents.length" @click="store.clearEvents()">
-        <FaIcon name="i-ri:delete-bin-line" />
+        <FaIcon name="morph:trash-2" />
         清空
       </FaButton>
     </div>
@@ -187,7 +187,7 @@ function formatDuration(ms?: number) {
           v-if="diffEntries(event).length" type="button" class="event-row__diff"
           :aria-expanded="expandedDiffs.has(index)" @click="toggleDiff(index)"
         >
-          <FaIcon :name="expandedDiffs.has(index) ? 'i-ri:arrow-down-s-line' : 'i-ri:arrow-right-s-line'" class="size-3" />
+          <FaIcon :name="expandedDiffs.has(index) ? 'morph:chevron-down' : 'morph:chevron-right'" class="size-3" />
           {{ diffSummary(event) }}
         </button>
         <ul v-if="expandedDiffs.has(index)" class="event-row__diff-detail">

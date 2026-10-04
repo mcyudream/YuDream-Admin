@@ -205,13 +205,13 @@ watch(() => props.chromeLayout, (layout, previousLayout) => {
 
 const rightPanelTabs = computed(() => {
   const tabs: { label: string, value: RightPanelTab, icon: string }[] = [
-    { label: '图层', value: 'layers', icon: 'i-ri:stack-line' },
-    { label: '属性', value: 'traits', icon: 'i-ri:settings-3-line' },
-    { label: '样式', value: 'styles', icon: 'i-ri:palette-line' },
-    { label: '源码', value: 'source', icon: 'i-ri:code-s-slash-line' },
+    { label: '图层', value: 'layers', icon: 'morph:layers' },
+    { label: '属性', value: 'traits', icon: 'morph:settings' },
+    { label: '样式', value: 'styles', icon: 'morph:palette' },
+    { label: '源码', value: 'source', icon: 'morph:code' },
   ]
   return props.aiEnabled
-    ? [{ label: 'AI', value: 'ai' as const, icon: 'i-ri:sparkling-2-line' }, ...tabs]
+    ? [{ label: 'AI', value: 'ai' as const, icon: 'morph:sparkles' }, ...tabs]
     : tabs
 })
 
@@ -2744,32 +2744,32 @@ function selectBreadcrumb(component: any) {
       </div>
       <div class="grapes-header__actions">
         <div class="workbench-command-group">
-          <FaTooltip text="撤销"><button type="button" class="workbench-icon-button" @click="command('core:undo')"><FaIcon name="i-ri:arrow-go-back-line" /></button></FaTooltip>
-          <FaTooltip text="重做"><button type="button" class="workbench-icon-button" @click="command('core:redo')"><FaIcon name="i-ri:arrow-go-forward-line" /></button></FaTooltip>
-          <FaTooltip text="复制选中元素"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><FaIcon name="i-ri:file-copy-line" /></button></FaTooltip>
-          <FaTooltip text="删除选中元素"><button type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><FaIcon name="i-ri:delete-bin-line" /></button></FaTooltip>
+          <FaTooltip text="撤销"><button type="button" class="workbench-icon-button" @click="command('core:undo')"><FaIcon name="morph:undo-2" /></button></FaTooltip>
+          <FaTooltip text="重做"><button type="button" class="workbench-icon-button" @click="command('core:redo')"><FaIcon name="morph:redo-2" /></button></FaTooltip>
+          <FaTooltip text="复制选中元素"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="duplicateSelected"><FaIcon name="morph:copy" /></button></FaTooltip>
+          <FaTooltip text="删除选中元素"><button type="button" class="workbench-icon-button is-danger" :disabled="!hasSelectedComponent" @click="command('core:component-delete')"><FaIcon name="morph:trash-2" /></button></FaTooltip>
         </div>
         <div class="workbench-device-switch" aria-label="画布设备">
-          <FaTooltip text="桌面"><button type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><FaIcon name="i-ri:computer-line" /></button></FaTooltip>
-          <FaTooltip text="平板"><button type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><FaIcon name="i-ri:tablet-line" /></button></FaTooltip>
-          <FaTooltip text="手机"><button type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><FaIcon name="i-ri:smartphone-line" /></button></FaTooltip>
+          <FaTooltip text="桌面"><button type="button" :class="{ active: activeDevice === 'desktop' }" @click="setDevice('desktop')"><FaIcon name="morph:monitor" /></button></FaTooltip>
+          <FaTooltip text="平板"><button type="button" :class="{ active: activeDevice === 'tablet' }" @click="setDevice('tablet')"><FaIcon name="morph:tablet" /></button></FaTooltip>
+          <FaTooltip text="手机"><button type="button" :class="{ active: activeDevice === 'mobile' }" @click="setDevice('mobile')"><FaIcon name="morph:smartphone" /></button></FaTooltip>
         </div>
         <div class="workbench-command-group grapes-header__zoom">
-          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><FaIcon name="i-ri:subtract-line" /></button>
+          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(-10)"><FaIcon name="morph:minus" /></button>
           <button type="button" class="workbench-zoom-value" @click="resetCanvasZoom">{{ canvasZoom }}%</button>
-          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><FaIcon name="i-ri:add-line" /></button>
-          <FaTooltip text="适应窗口"><button type="button" class="workbench-icon-button" @click="fitCanvasToWorkspace"><FaIcon name="i-ri:fullscreen-line" /></button></FaTooltip>
+          <button type="button" class="workbench-icon-button" @click="changeCanvasZoom(10)"><FaIcon name="morph:plus" /></button>
+          <FaTooltip text="适应窗口"><button type="button" class="workbench-icon-button" @click="fitCanvasToWorkspace"><FaIcon name="morph:maximize" /></button></FaTooltip>
         </div>
         <div class="workbench-command-group">
-          <FaTooltip :text="previewActive ? '退出预览' : '预览页面'"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'i-ri:edit-box-line' : 'i-ri:eye-line'" /></button></FaTooltip>
-          <FaTooltip v-if="chromeFrame" text="还原固定布局"><button type="button" class="workbench-icon-button" @click="restoreLockedLayout"><FaIcon name="i-ri:layout-line" /></button></FaTooltip>
-          <FaTooltip text="保存为区块"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><FaIcon name="i-ri:archive-drawer-line" /></button></FaTooltip>
+          <FaTooltip :text="previewActive ? '退出预览' : '预览页面'"><button type="button" class="workbench-icon-button" :class="{ active: previewActive }" @click="togglePreview"><FaIcon :name="previewActive ? 'morph:square-pen' : 'morph:eye'" /></button></FaTooltip>
+          <FaTooltip v-if="chromeFrame" text="还原固定布局"><button type="button" class="workbench-icon-button" @click="restoreLockedLayout"><FaIcon name="morph:layout-dashboard" /></button></FaTooltip>
+          <FaTooltip text="保存为区块"><button type="button" class="workbench-icon-button" :disabled="!hasSelectedComponent" @click="openSaveBlockDialog"><FaIcon name="morph:archive" /></button></FaTooltip>
         </div>
         <FaButton size="sm" :disabled="!editorReady" @click="save">
-          <FaIcon name="i-ri:save-3-line" />
+          <FaIcon name="morph:save" />
           {{ editorDirty ? '保存修改' : '保存' }}
         </FaButton>
-        <FaTooltip text="关闭构建器"><button type="button" class="workbench-icon-button" @click="emit('close')"><FaIcon name="i-ri:close-line" /></button></FaTooltip>
+        <FaTooltip text="关闭构建器"><button type="button" class="workbench-icon-button" @click="emit('close')"><FaIcon name="morph:x" /></button></FaTooltip>
       </div>
     </header>
 
@@ -2777,14 +2777,14 @@ function selectBreadcrumb(component: any) {
       <aside class="grapes-sidebar left" :class="{ collapsed: leftSidebarCollapsed }">
         <div class="sidebar-rail-head">
           <div class="left-workspace-tabs" role="tablist" aria-label="素材工作区">
-            <button type="button" :class="{ active: leftWorkspace === 'blocks' }" @click="leftWorkspace = 'blocks'; leftSidebarCollapsed = false"><FaIcon name="i-ri:layout-grid-line" /><span>区块</span></button>
-            <button type="button" :class="{ active: leftWorkspace === 'media' }" @click="leftWorkspace = 'media'; leftSidebarCollapsed = false"><FaIcon name="i-ri:image-2-line" /><span>媒体</span></button>
+            <button type="button" :class="{ active: leftWorkspace === 'blocks' }" @click="leftWorkspace = 'blocks'; leftSidebarCollapsed = false"><FaIcon name="morph:layout-grid" /><span>区块</span></button>
+            <button type="button" :class="{ active: leftWorkspace === 'media' }" @click="leftWorkspace = 'media'; leftSidebarCollapsed = false"><FaIcon name="morph:image" /><span>媒体</span></button>
           </div>
-          <FaTooltip :text="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><FaIcon :name="leftSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></FaTooltip>
+          <FaTooltip :text="leftSidebarCollapsed ? '展开左侧栏' : '收起左侧栏'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="leftSidebarCollapsed = !leftSidebarCollapsed"><FaIcon :name="leftSidebarCollapsed ? 'morph:panel-left-open' : 'morph:panel-left-close'" /></button></FaTooltip>
         </div>
         <section v-show="leftWorkspace === 'blocks'" class="block-panel">
           <div class="block-panel__search-wrap">
-            <FaIcon name="i-ri:search-line" class="block-panel__search-icon" />
+            <FaIcon name="morph:search" class="block-panel__search-icon" />
             <input
               v-model="blockSearch"
               type="text"
@@ -2808,7 +2808,7 @@ function selectBreadcrumb(component: any) {
         <section v-show="leftWorkspace === 'media'" class="media-panel">
           <div class="media-head">
             <div><h3>媒体资源</h3><span>{{ mediaItems.length }} 项</span></div>
-            <FaButton size="sm" @click="pickMedia"><FaIcon name="i-ri:upload-cloud-2-line" />上传</FaButton>
+            <FaButton size="sm" @click="pickMedia"><FaIcon name="morph:cloud-upload" />上传</FaButton>
           </div>
           <input ref="mediaInput" type="file" accept="image/*" hidden @change="uploadMedia">
           <div class="media-grid">
@@ -2846,7 +2846,7 @@ function selectBreadcrumb(component: any) {
             <span>{{ tab.label }}</span>
           </button>
         </div>
-          <FaTooltip :text="rightSidebarCollapsed ? '展开检查器' : '收起检查器'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><FaIcon :name="rightSidebarCollapsed ? 'i-ri:sidebar-unfold-line' : 'i-ri:sidebar-fold-line'" /></button></FaTooltip>
+          <FaTooltip :text="rightSidebarCollapsed ? '展开检查器' : '收起检查器'"><button type="button" class="workbench-icon-button sidebar-collapse-button" @click="rightSidebarCollapsed = !rightSidebarCollapsed"><FaIcon :name="rightSidebarCollapsed ? 'morph:panel-left-open' : 'morph:panel-left-close'" /></button></FaTooltip>
         </div>
 
         <section v-if="aiEnabled && rightPanelTab === 'ai'" class="right-panel ai-panel active">
@@ -2892,9 +2892,9 @@ function selectBreadcrumb(component: any) {
                     :aria-expanded="agentSelectOpen"
                     @click.stop="toggleAgentSelect"
                   >
-                    <FaIcon name="i-ri:cpu-line" class="ai-agent-select-icon" />
+                    <FaIcon name="morph:cpu" class="ai-agent-select-icon" />
                     <span class="ai-agent-select-label">{{ aiModelLabel }}</span>
-                    <FaIcon name="i-ri:arrow-down-s-line" class="ai-agent-select-caret" />
+                    <FaIcon name="morph:chevron-down" class="ai-agent-select-caret" />
                   </button>
                   <!-- 内联向上展开的弹层：teleport 到 body 的固定层在本构建器页面不渲染，故内联 -->
                   <div v-if="agentSelectOpen" class="ai-agent-pop" role="listbox" @click.stop>
@@ -2909,7 +2909,7 @@ function selectBreadcrumb(component: any) {
                       @click="pickAgent(opt.value)"
                     >
                       <span class="ai-agent-pop-item-label">{{ opt.label }}</span>
-                      <FaIcon v-if="opt.value === aiModelValue" name="i-ri:check-line" class="ai-agent-pop-item-check" />
+                      <FaIcon v-if="opt.value === aiModelValue" name="morph:check" class="ai-agent-pop-item-check" />
                     </button>
                   </div>
                 </div>
@@ -2960,11 +2960,11 @@ function selectBreadcrumb(component: any) {
             </div>
             <div class="source-panel__actions">
               <FaButton variant="outline" size="sm" :disabled="!hasSelectedComponent || !selectedSourceCode.trim()" @click="formatSelectedSource">
-                <FaIcon name="i-ri:align-left" />
+                <FaIcon name="morph:align-left" />
                 格式化
               </FaButton>
               <FaButton size="sm" :disabled="!hasSelectedComponent || selectedSourceLocked || !selectedSourceDirty" @click="applySelectedSource">
-                <FaIcon name="i-ri:check-line" />
+                <FaIcon name="morph:check" />
                 应用
               </FaButton>
             </div>
@@ -2989,11 +2989,11 @@ function selectBreadcrumb(component: any) {
                 <strong>关联 CSS</strong>
                 <div class="source-editor-section__actions">
                   <FaButton variant="outline" size="sm" :disabled="!selectedCssCode.trim()" @click="formatSelectedCss">
-                    <FaIcon name="i-ri:align-left" />
+                    <FaIcon name="morph:align-left" />
                     格式化
                   </FaButton>
                   <FaButton size="sm" :disabled="!hasSelectedComponent || !selectedCssDirty || !selectedCssCode.trim()" @click="applySelectedCss">
-                    <FaIcon name="i-ri:check-line" />
+                    <FaIcon name="morph:check" />
                     应用
                   </FaButton>
                   <span>根据当前选择匹配规则</span>
@@ -3013,7 +3013,7 @@ function selectBreadcrumb(component: any) {
                 <strong>页面 JS</strong>
                 <div class="source-editor-section__actions">
                   <FaButton variant="outline" size="sm" @click="formatPageJs">
-                    <FaIcon name="i-ri:align-left" />
+                    <FaIcon name="morph:align-left" />
                     格式化
                   </FaButton>
                   <span>自动注入预览并随页面保存</span>

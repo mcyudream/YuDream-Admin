@@ -233,7 +233,7 @@ const edges: YdGraphEdge[] = [
                 header slot 会覆盖 title 和 description
               </div>
             </div>
-            <FaIcon name="i-ri:badge-check-line" class="size-5 text-primary" />
+            <FaIcon name="morph:badge-check" class="size-5 text-primary" />
           </div>
         </template>
 
@@ -328,7 +328,7 @@ const edges: YdGraphEdge[] = [
 
             <div class="atlas__panel">
               <div class="atlas__panel-title">
-                <FaIcon name="i-ri:information-line" />
+                <FaIcon name="morph:info" />
                 图谱说明
               </div>
               <p class="atlas__panel-text">
@@ -343,7 +343,7 @@ const edges: YdGraphEdge[] = [
 
             <div class="atlas__panel">
               <div class="atlas__panel-title">
-                <FaIcon name="i-ri:apps-2-line" />
+                <FaIcon name="morph:layout-grid" />
                 聚类
               </div>
               <button
@@ -357,7 +357,7 @@ const edges: YdGraphEdge[] = [
                 <span class="atlas__cluster-dot" :style="{ background: cluster.color }" />
                 <span class="atlas__cluster-label">{{ cluster.label }}</span>
                 <span class="atlas__cluster-count">{{ cluster.count }}</span>
-                <FaIcon :name="hiddenClusters.has(cluster.key) ? 'i-ri:eye-off-line' : 'i-ri:eye-line'" />
+                <FaIcon :name="hiddenClusters.has(cluster.key) ? 'morph:eye-off' : 'morph:eye'" />
               </button>
             </div>
           </div>

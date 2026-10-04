@@ -458,7 +458,7 @@ function collectMenuActions(menus: any[], category: string, target: DashboardAct
       title,
       description: category,
       category,
-      icon: menu.meta?.icon || 'i-ri:arrow-right-line',
+      icon: menu.meta?.icon || 'morph:arrow-right',
       actionPath: path,
       tone: toneForPath(path),
     })
@@ -614,20 +614,20 @@ function cardProps(card: DashboardCard) {
         </div>
         <div class="dashboard-toolbar">
           <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="outline" size="sm" @click="openPublicHome">
-            <FaIcon name="i-ri:home-4-line" />
+            <FaIcon name="morph:house" />
             访问首页
           </FaButton>
           <FaButton v-if="!editMode && canConfigureDefault" variant="outline" size="sm" @click="startDefaultEdit">
-            <FaIcon name="i-ri:layout-2-line" />
+            <FaIcon name="morph:layout-dashboard" />
             配置默认首页
           </FaButton>
           <FaButton v-if="!editMode" size="sm" @click="startEdit">
-            <FaIcon name="i-ri:edit-line" />
+            <FaIcon name="morph:pencil" />
             编辑首页
           </FaButton>
           <template v-else>
             <FaButton variant="outline" size="sm" @click="drawerVisible = true">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
               添加卡片
             </FaButton>
             <FaButton variant="ghost" size="sm" @click="cancelEdit">
@@ -637,7 +637,7 @@ function cardProps(card: DashboardCard) {
               {{ layoutMode === 'default' ? '撤销调整' : '恢复默认' }}
             </FaButton>
             <FaButton size="sm" :loading="saving" @click="saveLayout">
-              <FaIcon name="i-ri:save-3-line" />
+              <FaIcon name="morph:save" />
               {{ layoutMode === 'default' ? '保存默认布局' : '保存布局' }}
             </FaButton>
           </template>
@@ -645,7 +645,7 @@ function cardProps(card: DashboardCard) {
       </div>
 
       <div v-if="loading && !workspace" class="dashboard-loading">
-        <FaIcon name="i-ri:loader-4-line" class="animate-spin" />
+        <FaIcon name="morph:loader-circle" class="animate-spin" />
         正在加载首页
       </div>
 
@@ -666,11 +666,11 @@ function cardProps(card: DashboardCard) {
           <article class="grid-stack-item-content dashboard-card">
             <header class="dashboard-card__header">
               <button v-if="editMode" type="button" class="card-drag-handle" title="拖拽卡片">
-                <FaIcon name="i-ri:drag-move-2-line" />
+                <FaIcon name="morph:move" />
               </button>
               <div class="dashboard-card__heading">
                 <span class="dashboard-card__icon" :class="toneIconClass(cardMap.get(item.cardCode)?.tone)">
-                  <FaIcon :name="cardMap.get(item.cardCode)?.icon || 'i-ri:layout-grid-line'" />
+                  <FaIcon :name="cardMap.get(item.cardCode)?.icon || 'morph:layout-grid'" />
                 </span>
                 <div class="dashboard-card__title-block">
                   <h2>{{ displayCardTitle(cardMap.get(item.cardCode)) }}</h2>
@@ -683,7 +683,7 @@ function cardProps(card: DashboardCard) {
                 title="隐藏卡片"
                 @click="hideCard(item.cardCode)"
               >
-                <FaIcon name="i-ri:eye-off-line" />
+                <FaIcon name="morph:eye-off" />
               </button>
             </header>
 
@@ -707,7 +707,7 @@ function cardProps(card: DashboardCard) {
           </div>
           <button v-for="card in group.items" :key="card.code" type="button" class="picker-card" @click="addCard(card)">
             <span class="picker-card__icon" :class="toneIconClass(card.tone)">
-              <FaIcon :name="card.icon || 'i-ri:layout-grid-line'" />
+              <FaIcon :name="card.icon || 'morph:layout-grid'" />
             </span>
             <span class="picker-card__main">
               <strong>{{ card.title }}</strong>
@@ -718,12 +718,12 @@ function cardProps(card: DashboardCard) {
               </span>
             </span>
             <span class="picker-card__add">
-              <FaIcon name="i-ri:add-line" />
+              <FaIcon name="morph:plus" />
             </span>
           </button>
         </div>
         <div v-if="!hiddenCards.length" class="picker-empty">
-          <FaIcon name="i-ri:checkbox-circle-line" />
+          <FaIcon name="morph:circle-check" />
           <strong>所有卡片已显示</strong>
         </div>
       </div>

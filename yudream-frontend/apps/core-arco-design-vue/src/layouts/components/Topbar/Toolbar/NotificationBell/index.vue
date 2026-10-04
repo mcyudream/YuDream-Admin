@@ -20,21 +20,21 @@ const hasToken = computed(() => !!localStorage.getItem('token'))
 function typeIcon(item: NotificationItem) {
   if (!item.read) {
     // 未读消息红点
-    return 'i-ri:circle-fill text-red-500 text-[10px]'
+    return 'i-lucide:circle text-red-500 text-[10px]'
   }
   switch (item.type) {
     case 'reply':
-      return 'i-ri:chat-3-line text-secondary-foreground/60'
+      return 'i-lucide:message-circle text-secondary-foreground/60'
     case 'like':
-      return 'i-ri:thumb-up-line text-secondary-foreground/60'
+      return 'i-lucide:thumbs-up text-secondary-foreground/60'
     default:
-      return 'i-ri:notification-3-line text-secondary-foreground/60'
+      return 'i-lucide:bell text-secondary-foreground/60'
   }
 }
 
 function dropdownItems() {
   if (!list.value.length) {
-    return [[{ label: '暂无消息', icon: 'i-ri:inbox-line', handle: () => {} }]]
+    return [[{ label: '暂无消息', icon: 'morph:inbox', handle: () => {} }]]
   }
   return [
     list.value.map(item => ({
@@ -162,7 +162,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
     <button class="relative flex-center size-10 cursor-pointer border-0 rounded-lg bg-transparent" title="通知中心">
-      <FaIcon name="i-ri:notification-3-line" class="text-lg" />
+      <FaIcon name="morph:bell" class="text-lg" />
       <span
         v-if="unread > 0"
         class="absolute top-1 right-0.5 flex-center min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-700 leading-none"

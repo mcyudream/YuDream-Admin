@@ -32,7 +32,7 @@ const authorizedTools = computed(() => props.toolCodes.map((code) => {
         <span>应用设置</span>
         <strong>{{ form.name || '未命名 Agent 应用' }}</strong>
       </div>
-      <FaIcon name="i-ri:settings-3-line" />
+      <FaIcon name="morph:settings" />
     </header>
 
     <div class="inspector-body">

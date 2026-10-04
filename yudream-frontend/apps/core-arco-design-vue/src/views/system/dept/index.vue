@@ -189,19 +189,19 @@ function importDepts() {
   <div>
     <FaPageHeader title="部门管理" class="mb-0">
       <FaButton v-auth="'system:dept:export'" variant="outline" @click="exportDepts">
-        <FaIcon name="i-ri:file-excel-2-line" />
+        <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
       <FaButton v-auth="'system:dept:import'" variant="outline" @click="downloadDeptTemplate">
-        <FaIcon name="i-ri:download-2-line" />
+        <FaIcon name="morph:download" />
         模板
       </FaButton>
       <FaButton v-auth="'system:dept:import'" variant="outline" @click="importDepts">
-        <FaIcon name="i-ri:upload-2-line" />
+        <FaIcon name="morph:upload" />
         导入
       </FaButton>
       <FaButton v-auth="'system:dept:create'" @click="openCreate()">
-        <FaIcon name="i-ri:organization-chart" />
+        <FaIcon name="morph:network" />
         新增部门
       </FaButton>
     </FaPageHeader>
@@ -230,7 +230,7 @@ function importDepts() {
                   重置
                 </FaButton>
                 <FaButton @click="loadTree">
-                  <FaIcon name="i-ri:search-line" />
+                  <FaIcon name="morph:search" />
                   筛选
                 </FaButton>
               </div>

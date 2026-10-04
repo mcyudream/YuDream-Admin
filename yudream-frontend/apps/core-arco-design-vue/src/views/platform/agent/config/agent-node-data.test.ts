@@ -7,7 +7,7 @@ import { agentModelKind, agentSourceHandles, createAgentNodeData, declaresAgentN
 const template: AgentNodeTemplate = {
   kind: 'search',
   label: '知识检索',
-  icon: 'i-ri:book-open-line',
+  icon: 'morph:book-open',
   color: '#7c3aed',
   description: '从知识库检索相关内容',
   inputName: 'str.query',

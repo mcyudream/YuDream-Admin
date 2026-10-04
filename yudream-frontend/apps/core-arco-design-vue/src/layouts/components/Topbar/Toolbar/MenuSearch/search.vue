@@ -190,11 +190,11 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
     <template #header>
       <div class="flex flex-shrink-0 h-12 items-center">
         <div class="flex-center h-full w-14">
-          <FaIcon name="i-ri:search-line" class="text-foreground/30 size-4" />
+          <FaIcon name="morph:search" class="text-foreground/30 size-4" />
         </div>
         <input v-model="searchInput" placeholder="支持标题、拼音(首字母)、URL模糊查询" class="text-base text-foreground border-0 rounded-md bg-transparent h-full w-full focus-outline-none placeholder-foreground/30" @keydown.esc.prevent="isShow = false" @keydown.up.prevent="keyUp" @keydown.down.prevent="keyDown" @keydown.enter.prevent="keyEnter">
         <div v-if="appSettingsStore.mode === 'mobile'" class="border-s flex-center h-full w-14">
-          <FaIcon name="i-carbon:close" class="size-4" @click="isShow = false" />
+          <FaIcon name="morph:x" class="size-4" @click="isShow = false" />
         </div>
       </div>
     </template>
@@ -207,10 +207,10 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
           </div>
           <div class="text-xs inline-flex gap-1 items-center">
             <FaKbd>
-              <FaIcon name="i-ant-design:caret-up-filled" />
+              <FaIcon name="morph:chevron-up" />
             </FaKbd>
             <FaKbd>
-              <FaIcon name="i-ant-design:caret-down-filled" />
+              <FaIcon name="morph:chevron-down" />
             </FaKbd>
             <span>切换</span>
           </div>
@@ -241,7 +241,7 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
       </template>
       <template v-else-if="searchInput === ''">
         <div class="text-secondary-foreground/50 py-6 flex-col-center h-full">
-          <FaIcon name="i-tabler:mood-smile" class="size-10" />
+          <FaIcon name="morph:smile" class="size-10" />
           <p class="text-base m-2">
             输入你要搜索的导航
           </p>
@@ -249,7 +249,7 @@ function pageJump(path: listTypes['path'], link: listTypes['link']) {
       </template>
       <template v-else>
         <div class="text-secondary-foreground/50 py-6 flex-col-center h-full">
-          <FaIcon name="i-tabler:mood-empty" class="size-10" />
+          <FaIcon name="morph:meh" class="size-10" />
           <p class="text-base m-2">
             没有找到你想要的
           </p>

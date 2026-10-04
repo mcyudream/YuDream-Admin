@@ -55,37 +55,37 @@ const stats = computed(() => {
       label: 'CPU',
       value: percentText(data?.cpuUsagePercent),
       hint: loadText(data),
-      icon: 'i-ri:cpu-line',
+      icon: 'morph:cpu',
     },
     {
       label: '主机内存',
       value: percentText(hostMemoryUsage.value),
       hint: `${formatBytes(data?.memoryUsedBytes)} / ${formatBytes(data?.memoryTotalBytes)}`,
-      icon: 'i-ri:database-2-line',
+      icon: 'morph:database',
     },
     {
       label: '程序内存',
       value: percentText(programHeapUsage.value),
       hint: [heapHint(data), rssHint].filter(Boolean).join(' · '),
-      icon: 'i-ri:stack-line',
+      icon: 'morph:layers',
     },
     {
       label: '磁盘',
       value: percentText(diskUsage.value),
       hint: `${formatBytes(data?.diskUsedBytes)} / ${formatBytes(data?.diskTotalBytes)}`,
-      icon: 'i-ri:hard-drive-2-line',
+      icon: 'morph:hard-drive',
     },
     {
       label: '网络',
       value: formatRate(data?.networkRecvBytesPerSec),
       hint: `发送 ${formatRate(data?.networkSentBytesPerSec)}`,
-      icon: 'i-ri:wifi-line',
+      icon: 'morph:wifi',
     },
     {
       label: '线程',
       value: data?.jvmThreadCount ?? '-',
       hint: data?.jvmDaemonThreadCount != null ? `守护 ${data.jvmDaemonThreadCount}` : '',
-      icon: 'i-ri:node-tree',
+      icon: 'morph:list-tree',
     },
   ]
 })
@@ -362,7 +362,7 @@ function stackPreview(row: HostThreadHotspot) {
       </template>
       <FaSelect v-model="hours" :options="hourOptions" class="w-full min-w-0 sm:w-[140px]" @update:model-value="loadHistory" />
       <FaButton class="shrink-0" :loading="loading || historyLoading" @click="refreshAll">
-        <FaIcon name="i-ri:refresh-line" />
+        <FaIcon name="morph:refresh-cw" />
         刷新
       </FaButton>
     </FaPageHeader>
@@ -376,7 +376,7 @@ function stackPreview(row: HostThreadHotspot) {
           <FaTag :variant="severityTag(analysis.severity)">{{ severityLabel(analysis.severity) }}</FaTag>
         </div>
         <FaAlert
-          :icon="analysis.severity === 'warn' ? 'i-ri:error-warning-line' : 'i-ri:lightbulb-line'"
+          :icon="analysis.severity === 'warn' ? 'morph:triangle-alert' : 'morph:lightbulb'"
           :title="analysis.headline"
           :description="analysis.summary"
           :variant="analysis.severity === 'warn' ? 'destructive' : 'default'"

@@ -25,7 +25,7 @@ function open() {
     <Transition name="fade" mode="out-in" appear>
       <FaPageMain :key="route.meta.link" class="flex flex-1 flex-col justify-center">
         <div class="flex flex-col items-center">
-          <FaIcon name="i-icon-park-twotone:planet" class="text-primary/80 size-30" />
+          <FaIcon name="morph:earth" class="text-primary/80 size-30" />
           <div class="text-xl text-dark my-2 dark-text-white">
             是否访问此链接
           </div>
@@ -37,7 +37,7 @@ function open() {
             </FaTooltip>
           </div>
           <FaButton class="my-4" @click="open">
-            <FaIcon name="i-ri:external-link-fill" />
+            <FaIcon name="morph:external-link" />
             立即访问
           </FaButton>
         </div>

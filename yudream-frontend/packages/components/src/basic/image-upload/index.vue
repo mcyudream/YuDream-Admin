@@ -291,10 +291,10 @@ function onBeforeLeave(el: Element) {
         <img :src="item.src" class="h-full w-full object-contain">
         <div v-if="!props.disabled" class="text-white p-2 rounded-lg bg-black/50 opacity-0 grid grid-cols-2 transition-opacity inset-0 place-items-center absolute group-hover/image-upload:opacity-100">
           <div class="opacity-60 flex-center cursor-pointer transition-all hover:(opacity-100 scale-110)" @click.prevent="onPreview(index)">
-            <Icon name="i-icon-park-outline:preview-open" class="size-6" />
+            <Icon name="morph:eye" class="size-6" />
           </div>
           <div class="opacity-60 flex-center cursor-pointer transition-all hover:(opacity-100 scale-110)" @click.prevent="onRemove(index)">
-            <Icon name="i-icon-park-outline:delete" class="size-6" />
+            <Icon name="morph:trash-2" class="size-6" />
           </div>
           <div
             v-show="images.length > 1" :class="cn('flex-center cursor-pointer opacity-60 transition-all', {
@@ -302,7 +302,7 @@ function onBeforeLeave(el: Element) {
               'cursor-not-allowed': index === 0,
             })" @click="onMove(index, 'forward')"
           >
-            <Icon name="i-icon-park-outline:arrow-circle-left" class="size-6" />
+            <Icon name="morph:circle-chevron-left" class="size-6" />
           </div>
           <div
             v-show="images.length > 1" :class="cn('flex-center cursor-pointer opacity-60 transition-all', {
@@ -310,7 +310,7 @@ function onBeforeLeave(el: Element) {
               'cursor-not-allowed': index === images.length - 1,
             })" @click="onMove(index, 'backward')"
           >
-            <Icon name="i-icon-park-outline:arrow-circle-right" class="size-6" />
+            <Icon name="morph:circle-chevron-right" class="size-6" />
           </div>
         </div>
       </div>
@@ -330,7 +330,7 @@ function onBeforeLeave(el: Element) {
       >
         <slot>
           <div class="text-primary p-0 border border-2 rounded-lg border-dashed flex-center size-full">
-            <Icon name="i-icon-park-outline:upload" class="text-2xl text-card-foreground/50" />
+            <Icon name="morph:upload" class="text-2xl text-card-foreground/50" />
           </div>
         </slot>
         <template v-if="isUploading && uploadProgress > 0 && uploadProgress < 100">

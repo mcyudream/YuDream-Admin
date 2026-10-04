@@ -47,7 +47,7 @@ const emits = defineEmits<{
 
 const config = useYdChatConfig()
 
-const avatarIcon = computed(() => props.avatar ?? config.assistantAvatar ?? 'i-ri:sparkling-2-line')
+const avatarIcon = computed(() => props.avatar ?? config.assistantAvatar ?? 'morph:sparkles')
 const hint = computed(() => props.thinkingText ?? config.thinkingText ?? '正在思考…')
 
 const thinking = computed(() =>

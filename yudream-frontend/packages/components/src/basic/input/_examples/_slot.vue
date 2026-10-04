@@ -18,7 +18,7 @@ const value2 = ref('')
       </template>
       <template #end>
         <FaTooltip text="可输入域名、IP、端口、URL 等">
-          <FaIcon name="i-ri:question-line" class="text-base text-orange cursor-help" />
+          <FaIcon name="morph:circle-question-mark" class="text-base text-orange cursor-help" />
         </FaTooltip>
       </template>
     </FaInput>

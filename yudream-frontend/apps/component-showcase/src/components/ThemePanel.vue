@@ -29,7 +29,7 @@ watch(customColor, (value) => {
 
 <template>
   <FaButton size="icon-sm" variant="outline" title="主题定制" @click="open = true">
-    <FaIcon name="i-ri:palette-line" />
+    <FaIcon name="morph:palette" />
   </FaButton>
 
   <FaDrawer v-model="open" title="主题定制" description="与主应用主题机制对齐，实时预览，选择保存在本地" :footer="false" content-class="w-[320px]">
@@ -56,7 +56,7 @@ watch(customColor, (value) => {
             :title="preset.label"
             @click="setPrimaryColor(preset.value)"
           >
-            <FaIcon v-if="primaryColor === preset.value" name="i-ri:check-line" />
+            <FaIcon v-if="primaryColor === preset.value" name="morph:check" />
           </button>
         </div>
         <div class="theme-panel__custom">
@@ -91,7 +91,7 @@ watch(customColor, (value) => {
       </section>
 
       <FaButton variant="outline" size="sm" class="theme-panel__reset" @click="reset">
-        <FaIcon name="i-ri:restart-line" />
+        <FaIcon name="morph:rotate-cw" />
         恢复默认
       </FaButton>
     </div>

@@ -181,7 +181,7 @@ onMounted(load)
   <div>
     <FaPageHeader title="QQ 消息平台">
       <FaButton v-auth="'platform:milky:config'" @click="openCreate">
-        <FaIcon name="i-ri:add-line" />
+        <FaIcon name="morph:plus" />
         新增连接
       </FaButton>
     </FaPageHeader>
@@ -201,19 +201,19 @@ onMounted(load)
         <template #cell-actions="{ row }">
           <div class="flex items-center gap-1">
             <FaButton size="sm" variant="ghost" title="编辑" @click="openEdit(row.original)">
-              <FaIcon name="i-ri:edit-line" />
+              <FaIcon name="morph:pencil" />
             </FaButton>
             <FaButton size="sm" variant="ghost" title="测试连接" @click="test(row.original)">
-              <FaIcon name="i-ri:radar-line" />
+              <FaIcon name="morph:radar" />
             </FaButton>
             <FaButton v-if="row.original.protocol === 'official'" size="sm" variant="ghost" title="回填 @ 身份" @click="openMentionBind(row.original)">
-              <FaIcon name="i-ri:at-line" />
+              <FaIcon name="morph:at-sign" />
             </FaButton>
             <FaButton size="sm" variant="ghost" :title="row.original.enabled ? '停用' : '启用'" @click="toggle(row.original)">
-              <FaIcon :name="row.original.enabled ? 'i-ri:pause-circle-line' : 'i-ri:play-circle-line'" />
+              <FaIcon :name="row.original.enabled ? 'morph:circle-pause' : 'morph:circle-play'" />
             </FaButton>
             <FaButton size="sm" variant="ghost" :disabled="!row.original.enabled" title="WebQQ" @click="openChat(row.original)">
-              <FaIcon name="i-ri:chat-3-line" />
+              <FaIcon name="morph:message-circle" />
             </FaButton>
           </div>
         </template>

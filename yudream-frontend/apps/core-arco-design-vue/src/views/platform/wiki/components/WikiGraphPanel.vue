@@ -18,10 +18,10 @@ let resizeObserver: ResizeObserver | null = null
 const paletteTokens = ['rgb(var(--primary-2))', 'rgb(var(--primary-3))', 'rgb(var(--primary-4))', 'rgb(var(--primary-5))', 'rgb(var(--primary-6))', 'rgb(var(--primary-7))', 'rgb(var(--primary-8))', 'rgb(var(--primary-9))', 'rgb(var(--primary-10))', 'var(--color-text-2)']
 
 const insightKindMeta: Record<string, { label: string, icon: string }> = {
-  SURPRISING_CONNECTION: {label: '惊奇连接', icon: 'i-ri:sparkling-2-line'},
-  ORPHAN: {label: '孤立页面', icon: 'i-ri:ghost-line'},
+  SURPRISING_CONNECTION: {label: '惊奇连接', icon: 'morph:sparkles'},
+  ORPHAN: {label: '孤立页面', icon: 'morph:ghost'},
   SPARSE_COMMUNITY: {label: '稀疏社区', icon: 'i-ri:bubble-chart-line'},
-  BRIDGE: {label: '桥接页面', icon: 'i-ri:links-line'},
+  BRIDGE: {label: '桥接页面', icon: 'morph:link'},
 }
 
 const nodeIndex = computed(() => {
@@ -251,7 +251,7 @@ function focusInsight(index: number) {
 }
 
 function insightMeta(kind: string) {
-  return insightKindMeta[kind] || {label: kind, icon: 'i-ri:lightbulb-line'}
+  return insightKindMeta[kind] || {label: kind, icon: 'morph:lightbulb'}
 }
 
 onMounted(() => {
@@ -283,21 +283,21 @@ watch(() => store.spaceId.value, load)
     <div class="graph-canvas-card">
       <div class="graph-canvas__toolbar">
         <span class="graph-canvas__hint">
-          <FaIcon name="i-ri:drag-move-2-line"/> 拖拽平移 / 滚轮缩放 / 悬停高亮邻居 / 点击节点打开页面
+          <FaIcon name="morph:move"/> 拖拽平移 / 滚轮缩放 / 悬停高亮邻居 / 点击节点打开页面
         </span>
         <FaButton size="sm" variant="outline" :loading="loading" @click="load">
-          <FaIcon name="i-ri:refresh-line"/>
+          <FaIcon name="morph:refresh-cw"/>
           刷新图谱
         </FaButton>
       </div>
       <div ref="chartEl" class="graph-canvas"/>
       <div v-if="!loading && (!graph || !graph.nodes.length)" class="graph-canvas__empty">
-        <FaIcon name="i-ri:mind-map"/>
+        <FaIcon name="morph:waypoints"/>
         <strong>暂无图谱数据</strong>
         <p>摄入更多资料后，系统会自动构建知识图谱</p>
       </div>
       <div v-if="loading" class="graph-canvas__loading">
-        <FaIcon name="i-ri:loader-4-line" class="graph-spin"/>
+        <FaIcon name="morph:loader-circle" class="graph-spin"/>
         正在加载图谱…
       </div>
     </div>

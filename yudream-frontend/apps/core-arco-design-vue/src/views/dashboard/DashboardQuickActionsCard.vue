@@ -32,13 +32,13 @@ defineProps<Props>()
         @click="onOpen?.(action)"
       >
         <span class="dashboard-quick__icon" :class="toneIconClass(action.tone || card.tone)">
-          <FaIcon :name="action.icon || 'i-ri:arrow-right-line'" />
+          <FaIcon :name="action.icon || 'morph:arrow-right'" />
         </span>
         <span class="dashboard-quick__main">
           <strong>{{ action.title }}</strong>
           <span>{{ action.description || action.category }}</span>
         </span>
-        <FaIcon name="i-ri:arrow-right-s-line" class="dashboard-quick__arrow" />
+        <FaIcon name="morph:chevron-right" class="dashboard-quick__arrow" />
       </button>
     </div>
     <div v-else class="dashboard-quick__empty">
