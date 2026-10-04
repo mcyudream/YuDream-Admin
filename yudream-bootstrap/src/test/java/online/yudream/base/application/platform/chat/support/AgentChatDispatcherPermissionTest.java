@@ -57,6 +57,8 @@ class AgentChatDispatcherPermissionTest {
 
     private ChatDispatchContext context(List<String> permissionCodes) {
         return new ChatDispatchContext(
+                1L,
+                null,
                 "question",
                 null,
                 null,

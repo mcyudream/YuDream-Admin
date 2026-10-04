@@ -165,6 +165,8 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                         .triggerMessages(properties.getCompactionTriggerMessages())
                         .keepMessages(properties.getCompactionKeepMessages())
                         .build())
+                // 数据控制：超大工具结果卸载到工作区，上下文只留首尾预览 + read_file 指针。
+                .toolResultEviction(io.agentscope.harness.agent.memory.compaction.ToolResultEvictionConfig.defaults())
                 .maxContextTokens(properties.getMaxContextTokens())
                 .permissionContext(PermissionContextState.builder()
                         .mode(PermissionMode.DEFAULT)
@@ -196,17 +198,37 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         if (!request.toolCallingEnabled()) {
             return AgentToolCatalog.disabled();
         }
-        return toolkitCatalog;
+        return new AgentToolCatalog(true, toolkitCatalog.permissions(),
+                new java.util.LinkedHashSet<>(request.allowedToolNames()));
     }
 
     private ToolkitHolder toolkit() {
         io.agentscope.core.tool.Toolkit toolkit = new io.agentscope.core.tool.Toolkit();
         Map<String, String> nameToPermission = new LinkedHashMap<>();
-        aiAgentToolProvider.stream().forEach(tool -> {
+        // 同平台名工具（如 wiki.search 的管理端/公开端两实现）确定性消解：
+        // 有权限码的实现保留安全名，无权限码的公开实现派生「_public」别名，
+        // 运行次经 allowedToolNames 白名单精确选择，互不越权。
+        List<AiAgentTool> tools = new ArrayList<>();
+        aiAgentToolProvider.stream().forEach(tools::add);
+        tools.sort(java.util.Comparator.comparing(
+                (AiAgentTool tool) -> StringUtils.hasText(tool.descriptor().permissionCode()) ? 0 : 1));
+        Map<String, Integer> nameCounts = new LinkedHashMap<>();
+        for (AiAgentTool tool : tools) {
             AgentToolAdapter adapter = new AgentToolAdapter(tool, permissionGateway, toolExecutionGuard);
+            String platformName = adapter.platformToolName();
+            int seen = nameCounts.merge(platformName, 1, Integer::sum);
+            String modelName = adapter.getName();
+            if (seen > 1) {
+                modelName = StringUtils.hasText(adapter.permissionCode())
+                        ? modelName + "_" + seen
+                        : modelName + "_public";
+            }
+            if (!modelName.equals(adapter.getName())) {
+                adapter = new AgentToolAdapter(tool, permissionGateway, toolExecutionGuard, modelName);
+            }
             toolkit.registerAgentTool(adapter);
             nameToPermission.put(adapter.getName(), adapter.permissionCode());
-        });
+        }
         return new ToolkitHolder(toolkit, Map.copyOf(nameToPermission));
     }
 

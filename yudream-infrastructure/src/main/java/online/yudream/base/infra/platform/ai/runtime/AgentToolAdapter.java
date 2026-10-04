@@ -46,8 +46,21 @@ public class AgentToolAdapter extends ToolBase {
             AgentPermissionGateway permissionGateway,
             AgentToolExecutionGuard executionGuard
     ) {
+        this(delegate, permissionGateway, executionGuard, ToolSchemas.safeName(delegate.descriptor().name()));
+    }
+
+    /**
+     * alias 用于同平台名多实现（如 wiki.search 管理端/公开端）的模型侧名字消解；
+     * 平台侧关联仍用 descriptor.name()。
+     */
+    public AgentToolAdapter(
+            AiAgentTool delegate,
+            AgentPermissionGateway permissionGateway,
+            AgentToolExecutionGuard executionGuard,
+            String alias
+    ) {
         super(ToolBase.builder()
-                .name(ToolSchemas.safeName(delegate.descriptor().name()))
+                .name(alias)
                 .description(delegate.descriptor().description())
                 .inputSchema(ToolSchemas.normalize(delegate.descriptor()))
                 .readOnly(delegate.risk() == AgentToolRisk.READ)

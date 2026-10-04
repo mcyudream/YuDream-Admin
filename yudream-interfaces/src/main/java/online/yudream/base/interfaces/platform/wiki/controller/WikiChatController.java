@@ -10,6 +10,7 @@ import online.yudream.base.interfaces.platform.wiki.assembler.WikiWebAssembler;
 import online.yudream.base.interfaces.platform.wiki.request.WikiChatRequest;
 import online.yudream.base.interfaces.platform.wiki.res.WikiChatResultRes;
 import online.yudream.base.interfaces.platform.wiki.support.WikiChatExecution;
+import online.yudream.base.interfaces.system.security.support.SecurityPrincipalSupport;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,7 +24,8 @@ import java.time.Duration;
 
 /**
  * Wiki 管理端问答接口，仅负责边界校验、应用服务接线和响应装配。
- */
+ * 会话身份在控制器线程解析后传入（虚拟线程内无 Sa-Token 上下文）；
+ * 带 sessionId 的调用走 Harness 有状态会话，服务端管理跨轮次上下文。 */
 @RestController
 @RequestMapping("/api/platform/wiki")
 @RequiredArgsConstructor
@@ -40,7 +42,8 @@ public class WikiChatController {
     public Result<WikiChatResultRes> chat(@PathVariable Long spaceId,
                                           @Valid @RequestBody WikiChatRequest request) {
         return Result.ok(WikiKnowledgeWebAssembler.toRes(
-                service.chat(spaceId, request.getQuestion(), WikiWebAssembler.chatHistory(request))));
+                service.chatStream(spaceId, SecurityPrincipalSupport.current().userId(), request.getSessionId(),
+                        request.getQuestion(), WikiWebAssembler.chatHistory(request), null, null, null, null)));
     }
 
     /**
@@ -50,9 +53,12 @@ public class WikiChatController {
     @PermissionRegister(code = "platform:wiki:view", name = "Wiki 流式问答", module = "平台能力", desc = "基于知识库内容的 LLM 流式问答")
     public SseEmitter chatStream(@PathVariable Long spaceId,
                                  @Valid @RequestBody WikiChatRequest request) {
+        Long legacyUserId = SecurityPrincipalSupport.current().userId();
         return execution.startLegacy(sseTimeout, spaceId, (onDelta, onReasoning, onTool, onActivity) ->
                 service.chatStream(
                         spaceId,
+                        legacyUserId,
+                        request.getSessionId(),
                         request.getQuestion(),
                         WikiWebAssembler.chatHistory(request),
                         onDelta,
@@ -65,9 +71,12 @@ public class WikiChatController {
     @PermissionRegister(code = "platform:wiki:view", name = "Wiki 智能问答（AG-UI）", module = "平台能力", desc = "基于知识库内容的 LLM 流式问答（AG-UI 协议）")
     public SseEmitter chatAgui(@PathVariable Long spaceId,
                                @Valid @RequestBody WikiChatRequest request) {
+        Long aguiUserId = SecurityPrincipalSupport.current().userId();
         return execution.startAgui(sseTimeout, spaceId, (onDelta, onReasoning, onTool, onActivity) ->
                 service.chatStream(
                         spaceId,
+                        aguiUserId,
+                        request.getSessionId(),
                         request.getQuestion(),
                         WikiWebAssembler.chatHistory(request),
                         onDelta,
