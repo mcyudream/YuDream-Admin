@@ -1,32 +1,37 @@
 package online.yudream.base.infra.platform.ai.service.provider;
 
 import cn.hutool.json.JSONUtil;
+import io.agentscope.core.formatter.JsonSchema;
+import io.agentscope.core.formatter.ResponseFormat;
+import io.agentscope.core.model.GenerateOptions;
+import io.agentscope.core.model.ToolChoice;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
-import org.springframework.ai.openai.OpenAiChatOptions;
-import org.springframework.ai.openai.api.ResponseFormat;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * 把平台供应商配置（温度、extraBody 模板、thinking、reasoningEffort、结构化输出）
+ * 装配为 AgentScope {@link GenerateOptions}；Kimi/DeepSeek 等差异在子类覆写。
+ */
 public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProviderAdapter {
 
     private static final String DEFAULT_TEMPERATURE = "0.4";
 
     @Override
-    public OpenAiChatOptions chatOptions(AiProviderEndpoint provider, AiModelEndpoint model, AiGenerationRequest request) {
+    public GenerateOptions generateOptions(AiProviderEndpoint provider, AiModelEndpoint model, AiGenerationRequest request) {
         Map<String, Object> extraBody = extraBody(provider, model, request);
         applyProviderDefaults(provider, model, request, extraBody);
-        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder()
-                .model(model.modelName())
+        GenerateOptions.Builder builder = GenerateOptions.builder()
                 .temperature(temperature(provider, model));
         if (request.toolCallingEnabled()
                 && request.toolMode() == AiToolMode.REQUIRED
                 && supportsRequiredToolChoice(provider, model)) {
-            builder.toolChoice("required");
+            builder.toolChoice(new ToolChoice.Required());
         }
         applyStructuredOutput(builder, request);
         String reasoningEffort = reasoningEffort(provider, model, request, extraBody);
@@ -34,31 +39,28 @@ public abstract class AbstractOpenAiCompatibleProviderAdapter implements AiProvi
             builder.reasoningEffort(reasoningEffort);
         }
         if (!extraBody.isEmpty()) {
-            builder.extraBody(extraBody);
+            builder.additionalBodyParams(extraBody);
         }
         return builder.build();
     }
 
-    private void applyStructuredOutput(OpenAiChatOptions.Builder builder, AiGenerationRequest request) {
-        var structured = request.structuredOutput();
+    private void applyStructuredOutput(GenerateOptions.Builder builder, AiGenerationRequest request) {
+        AiStructuredOutput structured = request.structuredOutput();
         if (structured == null || !structured.enabled()) {
             return;
         }
+        // JSON_SCHEMA 的原生/降级切换由框架结构化输出路径处理，这里只下发 JSON_OBJECT。
         if (structured.mode() == AiStructuredOutput.Mode.JSON_OBJECT) {
-            builder.responseFormat(ResponseFormat.builder()
-                    .type(ResponseFormat.Type.JSON_OBJECT)
-                    .build());
-            return;
+            builder.responseFormat(ResponseFormat.jsonObject());
         }
-        ResponseFormat.JsonSchema jsonSchema = ResponseFormat.JsonSchema.builder()
+    }
+
+    static JsonSchema jsonSchema(AiStructuredOutput structured) {
+        JsonSchema.Builder builder = JsonSchema.builder()
                 .name(StringUtils.hasText(structured.name()) ? structured.name() : "structured_result")
                 .schema(structured.schema())
-                .strict(structured.strict())
-                .build();
-        builder.responseFormat(ResponseFormat.builder()
-                .type(ResponseFormat.Type.JSON_SCHEMA)
-                .jsonSchema(jsonSchema)
-                .build());
+                .strict(structured.strict());
+        return builder.build();
     }
 
     /** Compatibility providers opt in only when their native API guarantees `tool_choice=required`. */
