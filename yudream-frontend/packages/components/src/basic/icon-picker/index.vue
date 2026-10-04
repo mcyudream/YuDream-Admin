@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
+import type { YdIconOption } from './icons'
 import { computed, ref, watch } from 'vue'
 import { cn } from '#utils'
 import FaButton from '../button/index.vue'
 import FaIcon from '../icon/index.vue'
+import { MORPH_ICON_CATALOG, MORPH_ICON_FREQUENT, parseMorphIconName } from '../icon/morph-icons'
 import FaInput from '../input/index.vue'
 import FaPopover from '../popover/index.vue'
 import FaScrollArea from '../scroll-area/index.vue'
@@ -12,8 +14,6 @@ import { YD_ICON_CATALOG, YD_ICON_FREQUENT } from './icons'
 defineOptions({
   name: 'YdIconPicker',
 })
-
-const PAGE_SIZE = 64
 
 const props = withDefaults(defineProps<{
   placeholder?: string
@@ -30,25 +30,52 @@ const emit = defineEmits<{
   change: [value: string | undefined]
 }>()
 
+const PAGE_SIZE = 64
+
+type IconSource = 'morph' | 'remix'
+
+// Morphicons（lucide 数据集）为第一优先级图标源，Remix 为回退源
+const sources: { key: IconSource, label: string }[] = [
+  { key: 'morph', label: 'Morphicons' },
+  { key: 'remix', label: 'Remix' },
+]
+
+const sourceCatalogs: Record<IconSource, { catalog: YdIconOption[], frequent: string[], match: (value: string) => boolean }> = {
+  morph: {
+    catalog: MORPH_ICON_CATALOG,
+    frequent: MORPH_ICON_FREQUENT,
+    match: value => !!parseMorphIconName(value),
+  },
+  remix: {
+    catalog: YD_ICON_CATALOG,
+    frequent: YD_ICON_FREQUENT,
+    match: value => value.startsWith('i-ri:'),
+  },
+}
+
 const value = defineModel<string | undefined>()
 const open = ref(false)
 const keyword = ref('')
 const page = ref(1)
+const source = ref<IconSource>('morph')
+
+const activeSourceLabel = computed(() => sources.find(item => item.key === source.value)?.label ?? '')
+const activeCatalog = computed(() => sourceCatalogs[source.value])
 
 const frequentIcons = computed(() => {
-  const names = new Set(YD_ICON_FREQUENT)
-  if (value.value && /^i-ri:/.test(value.value)) {
+  const names = new Set(activeCatalog.value.frequent)
+  if (value.value && activeCatalog.value.match(value.value)) {
     names.add(value.value)
   }
-  return YD_ICON_CATALOG.filter(item => names.has(item.name))
+  return activeCatalog.value.catalog.filter(item => names.has(item.name))
 })
 
 const filteredIcons = computed(() => {
   const query = keyword.value.trim().toLowerCase()
   if (!query) {
-    return YD_ICON_CATALOG
+    return activeCatalog.value.catalog
   }
-  return YD_ICON_CATALOG.filter(item =>
+  return activeCatalog.value.catalog.filter(item =>
     item.name.toLowerCase().includes(query) || item.keywords.toLowerCase().includes(query),
   )
 })
@@ -61,6 +88,9 @@ const pagedIcons = computed(() => {
 })
 
 watch(open, (visible) => {
+  if (visible && value.value) {
+    source.value = sourceCatalogs.remix.match(value.value) ? 'remix' : 'morph'
+  }
   if (!visible) {
     keyword.value = ''
   }
@@ -82,6 +112,15 @@ function onTriggerClick(event: Event) {
     event.preventDefault()
     event.stopPropagation()
   }
+}
+
+function switchSource(next: IconSource) {
+  if (source.value === next) {
+    return
+  }
+  source.value = next
+  keyword.value = ''
+  page.value = 1
 }
 
 function selectIcon(name: string) {
@@ -147,8 +186,21 @@ function nextPage() {
           placeholder="搜索图标名称"
           class="w-full"
         />
+        <div class="yd-icon-picker__sources">
+          <button
+            v-for="item in sources"
+            :key="item.key"
+            type="button"
+            class="yd-icon-picker__source" :class="[{ 'is-active': source === item.key }]"
+            @click="switchSource(item.key)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
         <div v-if="!keyword && frequentIcons.length" class="yd-icon-picker__group">
-          <div class="yd-icon-picker__title">常用</div>
+          <div class="yd-icon-picker__title">
+            常用
+          </div>
           <div class="yd-icon-picker__grid">
             <FaButton
               v-for="item in frequentIcons"
@@ -156,7 +208,7 @@ function nextPage() {
               variant="ghost"
               size="icon"
               :title="item.name"
-              :class="['yd-icon-picker__item', { 'is-active': value === item.name }]"
+              class="yd-icon-picker__item" :class="[{ 'is-active': value === item.name }]"
               @click="selectIcon(item.name)"
             >
               <FaIcon :name="item.name" />
@@ -165,7 +217,7 @@ function nextPage() {
         </div>
         <div class="yd-icon-picker__group">
           <div class="yd-icon-picker__title">
-            {{ keyword ? `匹配 ${filteredIcons.length} 个` : `系统图标 ${filteredIcons.length} 个` }}
+            {{ keyword ? `匹配 ${filteredIcons.length} 个` : `${activeSourceLabel} 图标 ${filteredIcons.length} 个` }}
           </div>
           <FaScrollArea class="yd-icon-picker__scroll">
             <div v-if="pagedIcons.length" class="yd-icon-picker__grid">
@@ -175,7 +227,7 @@ function nextPage() {
                 variant="ghost"
                 size="icon"
                 :title="item.name"
-                :class="['yd-icon-picker__item', { 'is-active': value === item.name }]"
+                class="yd-icon-picker__item" :class="[{ 'is-active': value === item.name }]"
                 @click="selectIcon(item.name)"
               >
                 <FaIcon :name="item.name" />
@@ -269,6 +321,32 @@ function nextPage() {
   flex-direction: column;
   gap: 12px;
   padding: 12px;
+}
+
+.yd-icon-picker__sources {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  border-radius: var(--border-radius-medium, 6px);
+  background: var(--color-fill-2);
+}
+
+.yd-icon-picker__source {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  border-radius: calc(var(--border-radius-medium, 6px) - 2px);
+  color: var(--color-text-3);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.yd-icon-picker__source.is-active {
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 10%);
 }
 
 .yd-icon-picker__group {

@@ -2,6 +2,8 @@ import Iconify from './_iconify.vue'
 import IconifyRaw from './_iconify.vue?raw'
 import Image from './_image.vue'
 import ImageRaw from './_image.vue?raw'
+import Morph from './_morph.vue'
+import MorphRaw from './_morph.vue?raw'
 import Svg from './_svg.vue'
 import SvgRaw from './_svg.vue?raw'
 import Transition from './_transition.vue'
@@ -14,6 +16,11 @@ export default [
     title: 'SVG文件',
     component: Svg,
     componentRaw: SvgRaw,
+  },
+  {
+    title: 'Morphicons',
+    component: Morph,
+    componentRaw: MorphRaw,
   },
   {
     title: 'Iconify',

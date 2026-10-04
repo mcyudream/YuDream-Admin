@@ -2,8 +2,10 @@
 import type { HTMLAttributes } from 'vue'
 import { Icon } from '@iconify/vue'
 import { UseImage } from '@vueuse/components'
+import { MorphIcon } from 'morphicons/vue'
 import { computed, defineComponent, h, Transition } from 'vue'
 import { cn } from '#utils'
+import { parseMorphIconName, resolveMorphIconNode } from './morph-icons'
 
 defineOptions({
   name: 'BuiltInIcon',
@@ -15,6 +17,18 @@ const props = defineProps<{
   class?: HTMLAttributes['class']
 }>()
 
+const morphNode = computed(() => {
+  const morphName = parseMorphIconName(props.name)
+  if (!morphName) {
+    return undefined
+  }
+  const node = resolveMorphIconNode(morphName)
+  if (!node && import.meta.env.DEV) {
+    console.warn(`[FaIcon] MorphIcons 未收录 "${props.name}"，已回退 Iconify 通道`)
+  }
+  return node
+})
+
 const outputType = computed(() => {
   if (!props.name) {
     return
@@ -24,6 +38,9 @@ const outputType = computed(() => {
   }
   if (/^https?:\/\//.test(props.name) || hasPathFeatures(props.name)) {
     return 'img'
+  }
+  else if (morphNode.value) {
+    return 'morph'
   }
   else if (/^i-[^:]+:[^:]+/.test(props.name)) {
     return 'iconify'
@@ -57,6 +74,10 @@ const IconWrapper = defineComponent({
     <IconWrapper>
       <span v-if="outputType === 'iconify'" :key="`iconify-${name}`" class="flex shrink-0 size-inherit items-center inset-0 justify-center absolute">
         <Icon :icon="iconName" class="shrink-0 size-inherit!" />
+      </span>
+      <!-- morph 分支不加内层 key：名称切换时同一个 MorphIcon 实例收到新 icon prop，自动播放弹簧变形动画 -->
+      <span v-else-if="outputType === 'morph'" class="flex shrink-0 size-inherit items-center inset-0 justify-center absolute">
+        <MorphIcon :icon="morphNode" class="shrink-0 size-inherit!" color="currentColor" reduced-motion="user" />
       </span>
       <svg v-else-if="outputType === 'svg'" :key="`svg-${name}`" class="shrink-0 size-inherit inset-0 absolute" aria-hidden="true">
         <use :xlink:href="`./__spritemap#sprite-${name}`" />

@@ -61,6 +61,7 @@ pnpm lint         # 运行全量 lint（tsc + eslint + stylelint）
 
 ## 注意事项
 
+- 图标系统第一优先级为 Morphicons（`packages/components/src/basic/icon/morph-icons.ts`，全量打包 lucide IconNode 数据，经 `morphicons/vue` 渲染并自带弹簧变形动画）：FaIcon 名称用 `morph:<lucide-kebab-name>`（`lucide:` 前缀等价兼容），未收录时自动回退 Iconify 通道（`i-<集合>:<图标>` 照旧，UnoCSS `i-*:*` 原子类不受影响）。新页面/新菜单图标优先从 `YdIconPicker` 的 Morphicons 源选择，存量 Remix/Iconify 名称无需迁移。
 - 框架内建组件在 `packages/components/` 子包中，优先使用内建组件而非第三方组件或自定义实现；页面控件优先使用 `Fa*`，AI/对话等领域能力优先使用 `Yd*`。
 - 主题、主色和深浅模式由后台主题配置与组件体系统一控制。业务页面不得自行声明品牌色、固定色板或手写主色强调态；只使用中性语义变量和组件内建状态样式。
 - 在任何情况下都请勿直接修改内建组件，确定修改前需要和用户进行确认
