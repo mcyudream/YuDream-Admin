@@ -50,7 +50,9 @@ public class CmsWorkspacePublishService {
         AiAgentToolResult result = validateTool.execute(new AiAgentToolCall("cms.canvas.validate", Map.of(
                 "htmlContent", new String(html, StandardCharsets.UTF_8),
                 "cssContent", new String(css, StandardCharsets.UTF_8),
-                "jsContent", new String(js, StandardCharsets.UTF_8))));
+                "jsContent", new String(js, StandardCharsets.UTF_8),
+                // 静态站点工作区：页面允许自带 script（第三方/内联），数据互通走平台 lib.js
+                "allowScripts", true)));
         Object valid = result.payload() == null ? null : result.payload().get("valid");
         if (!Boolean.TRUE.equals(valid)) {
             Object errors = result.payload() == null ? List.of() : result.payload().get("errors");
