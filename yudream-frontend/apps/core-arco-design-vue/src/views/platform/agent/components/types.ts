@@ -36,6 +36,8 @@ export interface AgentNodeData extends AgentNodeTemplate {
   prompt: string
   toolCodes: string[]
   toolMode: AgentToolMode
+  /** llm 节点可选：经 Harness 会话启用文件工作区 */
+  workspace?: boolean
   toolConfigDeclared: boolean
   toolCode: string
   outputSchema: string
