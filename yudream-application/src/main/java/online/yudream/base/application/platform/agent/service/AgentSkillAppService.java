@@ -3,6 +3,7 @@ package online.yudream.base.application.platform.agent.service;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.platform.agent.cmd.AgentSkillSaveCmd;
 import online.yudream.base.application.platform.agent.query.AgentSkillPageQuery;
+import online.yudream.base.application.platform.agent.support.AgentSkillZipParser;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.common.exception.BizException;
 import online.yudream.base.domain.platform.agent.aggregate.AgentSkill;
@@ -36,6 +37,19 @@ public class AgentSkillAppService {
                 : requireSkill(cmd.getId());
         skill.apply(cmd.getName(), cmd.getDescription(), cmd.getContent(), cmd.getResources(),
                 cmd.getEnabled(), skill.getBuiltin());
+        return skillRepo.save(skill);
+    }
+
+    /**
+     * 上传技能压缩包：检测 SKILL.md（根目录或单一顶层文件夹）自动整理目录，
+     * frontmatter 提供 name/description，其余文本文件归入资源。
+     */
+    public AgentSkill uploadZip(String fileName, byte[] data) {
+        AgentSkillZipParser.Parsed parsed = AgentSkillZipParser.parse(data, fileName);
+        skillRepo.findByName(parsed.name()).ifPresent(existing -> {
+            throw new BizException("技能「" + parsed.name() + "」已存在，请先删除或重命名后再上传");
+        });
+        AgentSkill skill = AgentSkill.create(parsed.name(), parsed.description(), parsed.content(), parsed.resources());
         return skillRepo.save(skill);
     }
 

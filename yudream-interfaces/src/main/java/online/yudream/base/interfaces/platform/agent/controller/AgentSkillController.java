@@ -9,6 +9,10 @@ import online.yudream.base.domain.platform.agent.aggregate.AgentSkill;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,6 +59,12 @@ public class AgentSkillController {
     @PermissionRegister(code = "platform:agent-skill:create", name = "创建 Agent 技能", module = "平台能力", desc = "新增平台技能")
     public Result<AgentSkill> save(@RequestBody AgentSkillSaveCmd cmd) {
         return Result.ok(skillAppService.save(cmd));
+    }
+
+    @PostMapping("/upload")
+    @PermissionRegister(code = "platform:agent-skill:create", name = "上传技能压缩包", module = "平台能力", desc = "上传技能压缩包并自动整理目录")
+    public Result<AgentSkill> upload(@RequestPart("file") MultipartFile file) throws IOException {
+        return Result.ok(skillAppService.uploadZip(file.getOriginalFilename(), file.getBytes()));
     }
 
     @PutMapping("/{id}/enabled/{enabled}")
