@@ -108,6 +108,12 @@
   }
 
   function render(root) {
+    // 插件插槽：context.contributions.slots[slot] 为宿主已净化的片段 HTML
+    var slots = (root && root.contributions && root.contributions.slots) || {};
+    Array.prototype.slice.call(document.querySelectorAll('[data-yb-slot]')).forEach(function (el) {
+      var fragment = slots[el.getAttribute('data-yb-slot')];
+      if (fragment) el.innerHTML = fragment;
+    });
     var nodes = Array.prototype.slice.call(document.querySelectorAll('[data-yb-for],[data-yb-repeat]'));
     nodes.forEach(function (el) {
       var ifAttr = el.getAttribute('data-yb-if');
