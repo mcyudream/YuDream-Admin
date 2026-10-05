@@ -29,6 +29,7 @@ public class CmsWorkspaceService implements online.yudream.base.application.plat
     static final String AGENT_ID = "cms-builder";
     static final String PREFIX_SEGMENT = "cms";
     static final String PUBLISHED_SEGMENT = "cms-published";
+    static final List<String> SITE_PUBLISHED_NS = List.of("cms", "published", "site");
 
     private final MongoBaseStore store;
 
@@ -85,7 +86,7 @@ public class CmsWorkspaceService implements online.yudream.base.application.plat
         return entries;
     }
 
-    /** 发布快照：工作区整树复制到发布命名空间（原子性以逐文件覆盖为准，公开端读发布区）。 */
+    /** 发布快照：工作区整树复制到发布命名空间与站点级命名空间（公开端只读站点区）。 */
     public int publish(Long userId) {
         List<WorkspaceEntry> files = list(userId);
         if (files.isEmpty()) {
@@ -94,24 +95,36 @@ public class CmsWorkspaceService implements online.yudream.base.application.plat
         int count = 0;
         for (WorkspaceEntry entry : files) {
             byte[] data = readFile(userId, entry.path());
-            Map<String, Object> value = new LinkedHashMap<>();
-            boolean binary = isBinary(data);
-            value.put("content", binary
-                    ? Base64.getEncoder().encodeToString(data)
-                    : new String(data, java.nio.charset.StandardCharsets.UTF_8));
-            value.put("encoding", binary ? "base64" : "text");
-            value.put("created_at", Instant.now().toString());
-            value.put("modified_at", Instant.now().toString());
-            store.put(ns(userId, PUBLISHED_SEGMENT), entry.path(), value);
+            writeSnapshot(ns(userId, PUBLISHED_SEGMENT), entry.path(), data);
+            writeSnapshot(SITE_PUBLISHED_NS, entry.path(), data);
             count++;
         }
         log.info("CMS 工作区已发布快照：user={} files={}", userId, count);
         return count;
     }
 
-    /** 公开端读取发布区文件（匿名）。 */
+    private void writeSnapshot(List<String> namespace, String path, byte[] data) {
+        Map<String, Object> value = new LinkedHashMap<>();
+        boolean binary = isBinary(data);
+        value.put("content", binary
+                ? Base64.getEncoder().encodeToString(data)
+                : new String(data, java.nio.charset.StandardCharsets.UTF_8));
+        value.put("encoding", binary ? "base64" : "text");
+        value.put("created_at", Instant.now().toString());
+        value.put("modified_at", Instant.now().toString());
+        store.put(namespace, path, value);
+    }
+
+    @Override
     public byte[] readPublished(Long userId, String path) {
         StoreItem item = store.get(ns(userId, PUBLISHED_SEGMENT), normalize(path));
+        return item == null ? null : decode(item.value());
+    }
+
+    /** 公开端读取站点发布区文件（匿名，最后发布者胜）。 */
+    @Override
+    public byte[] readPublishedSite(String path) {
+        StoreItem item = store.get(SITE_PUBLISHED_NS, normalize(path));
         return item == null ? null : decode(item.value());
     }
 
