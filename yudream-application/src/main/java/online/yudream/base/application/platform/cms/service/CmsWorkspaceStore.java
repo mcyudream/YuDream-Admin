@@ -8,6 +8,8 @@ import java.util.List;
  */
 public interface CmsWorkspaceStore {
 
+    void delete(Long userId, String path);
+
     byte[] readFile(Long userId, String path);
 
     void writeFile(Long userId, String path, byte[] data);

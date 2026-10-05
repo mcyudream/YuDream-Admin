@@ -3,6 +3,7 @@ import type { WorkspaceEntry } from '@/api/modules/platform-cms-workspace'
 import { cmsWorkspaceChatEndpoint, cmsWorkspaceRawUrl } from '@/api/modules/platform-cms-workspace'
 import apiWorkspace from '@/api/modules/platform-cms-workspace'
 import { useYdChatStream, YdChatMessageList, YdChatSender } from '@yudream/components'
+import CmsGrapesEditor from '@/views/platform/theme-center/components/CmsGrapesEditor.vue'
 import { computed, ref, watch } from 'vue'
 
 const toast = useFaToast()
@@ -14,6 +15,13 @@ const editingContent = ref('')
 const uploadInput = ref<HTMLInputElement>()
 const previewKey = ref(0)
 const targetKey = 'home'
+const canvasVisible = ref(false)
+const canvasHtml = ref('')
+const canvasCss = ref('')
+const canvasJs = ref('')
+const canvasProjectJson = ref('')
+
+const canvasFilePath = computed(() => selectedPath.value || 'pages/index.html')
 
 const { messages, streaming, send, stop, clear } = useYdChatStream({
   endpoint: () => cmsWorkspaceChatEndpoint(targetKey),
@@ -106,6 +114,47 @@ function confirmPublish() {
     },
   })
 }
+/** 画布工作区模式：读工作区文件导入 GrapesJS（html/css 回退链 + .grapes.json 旁车），保存写回工作区。 */
+async function openCanvas() {
+  const htmlPath = selectedPath.value && selectedPath.value.endsWith('.html')
+    ? selectedPath.value
+    : 'pages/index.html'
+  const [html, css, project] = await Promise.all([
+    apiWorkspace.read(htmlPath).then(res => res.data.content).catch(() => ''),
+    apiWorkspace.read('assets/css/site.css').then(res => res.data.content).catch(() => ''),
+    apiWorkspace.read(htmlPath.replace(/\.html$/, '.grapes.json')).then(res => res.data.content).catch(() => ''),
+  ])
+  canvasHtml.value = html
+  canvasCss.value = css
+  canvasJs.value = ''
+  canvasProjectJson.value = project || ''
+  canvasVisible.value = true
+}
+async function onCanvasSave(payload: { htmlContent: string; cssContent: string; jsContent: string; builderProjectJson: string }) {
+  const htmlPath = canvasFilePath.value
+  await apiWorkspace.write(htmlPath, payload.htmlContent)
+  await apiWorkspace.write('assets/css/site.css', payload.cssContent)
+  if (payload.jsContent) {
+    await apiWorkspace.write('assets/js/site.js', payload.jsContent)
+  }
+  await apiWorkspace.write(htmlPath.replace(/\.html$/, '.grapes.json'), payload.builderProjectJson)
+  toast.success('已保存到工作区')
+  canvasVisible.value = false
+  previewKey.value++
+  await refresh()
+  selectedPath.value = htmlPath
+}
+async function deleteEntry(entry: WorkspaceEntry) {
+  modal.confirm({
+    title: '删除文件',
+    content: `确定删除「${entry.path}」吗？`,
+    onConfirm: async () => {
+      await apiWorkspace.delete(entry.path)
+      toast.success('已删除')
+      await refresh()
+    },
+  })
+}
 function isTextPath(path: string) {
   return /\.(html?|css|js|json|md|svg|txt)$/i.test(path)
 }
@@ -146,6 +195,7 @@ function fileName(path: string) {
               @click="selectedPath = entry.path"
             >
               <FaIcon name="morph:file-code" /> {{ fileName(entry.path) }}
+              <button class="del" title="删除" @click.stop="deleteEntry(entry)">×</button>
             </button>
             <div v-if="!textEntries.length" class="group-empty">暂无文件，先让 AI 生成或新建页面</div>
           </div>
@@ -153,6 +203,7 @@ function fileName(path: string) {
             <div class="group-title">资产</div>
             <div v-for="entry in assetEntries" :key="entry.path" class="file-item static">
               <FaIcon name="morph:paperclip" /> {{ fileName(entry.path) }}
+              <button class="del" title="删除" @click="deleteEntry(entry)">×</button>
             </div>
             <div v-if="!assetEntries.length" class="group-empty">暂无资产</div>
           </div>
@@ -160,7 +211,17 @@ function fileName(path: string) {
         <section class="editor-pane">
           <div class="pane-head">
             <span class="min-w-0 truncate">{{ selectedPath || '选择左侧文件' }}</span>
-            <FaButton size="sm" variant="outline" :disabled="!selectedPath" @click="saveSelected">保存</FaButton>
+            <div class="flex gap-1">
+              <FaButton
+                v-if="selectedPath.endsWith('.html')"
+                size="sm"
+                variant="outline"
+                @click="openCanvas"
+              >
+                画布编辑
+              </FaButton>
+              <FaButton size="sm" variant="outline" :disabled="!selectedPath" @click="saveSelected">保存</FaButton>
+            </div>
           </div>
           <FaTextarea
             v-model="editingContent"
@@ -194,6 +255,21 @@ function fileName(path: string) {
       </div>
     </FaPageMain>
     <input ref="uploadInput" type="file" class="hidden" @change="onUploadChange">
+    <div v-if="canvasVisible" class="canvas-overlay">
+      <CmsGrapesEditor
+        :title="`画布编辑：${canvasFilePath}`"
+        :html-content="canvasHtml"
+        :css-content="canvasCss"
+        :js-content="canvasJs"
+        :builder-project-json="canvasProjectJson"
+        page-template="DEFAULT"
+        :history-target-type="'page'"
+        :history-target-id="canvasFilePath"
+        :history-target-label="canvasFilePath"
+        @close="canvasVisible = false"
+        @save="onCanvasSave"
+      />
+    </div>
   </div>
 </template>
 
@@ -218,4 +294,5 @@ function fileName(path: string) {
 @media (max-width: 1024px) {
   .workbench { grid-template-columns: 1fr; }
 }
+.canvas-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--color-bg-1); }
 </style>

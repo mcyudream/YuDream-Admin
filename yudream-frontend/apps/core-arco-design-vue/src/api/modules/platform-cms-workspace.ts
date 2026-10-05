@@ -32,6 +32,8 @@ export default {
     form.append('file', file)
     return systemClient.post<unknown, ApiResponse<void>>(`api/platform/ai/cms/workspace/upload?path=${encodeURIComponent(path)}`, form)
   },
+  delete: (path: string) =>
+    systemClient.delete<unknown, ApiResponse<void>>('api/platform/ai/cms/workspace/file', { params: { path } }),
   publish: (themeCode = 'default', published = true) =>
     systemClient.post<unknown, ApiResponse<{ files: number; pages: number }>>('api/platform/ai/cms/workspace/publish', { themeCode, published }),
 }

@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,6 +69,13 @@ public class CmsWorkspaceController {
                 "content", binary
                         ? Base64.getEncoder().encodeToString(data)
                         : new String(data, StandardCharsets.UTF_8)));
+    }
+
+    @DeleteMapping("/file")
+    @PermissionRegister(code = "platform:ai:generate", name = "删除 CMS 工作区文件", module = "平台能力", desc = "删除工作区文件")
+    public Result<Void> delete(@RequestParam String path) {
+        workspaceStore.delete(currentUserId(), path);
+        return Result.ok(null);
     }
 
     @PostMapping("/file")
