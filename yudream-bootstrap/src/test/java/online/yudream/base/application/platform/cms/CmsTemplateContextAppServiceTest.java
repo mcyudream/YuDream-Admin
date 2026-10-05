@@ -60,7 +60,7 @@ class CmsTemplateContextAppServiceTest {
     @BeforeEach
     void setUp() {
         service = new CmsTemplateContextAppService(capabilities, cmsPages, wikiSpaces, wikiNodes, wikiVersions,
-                siteThemeQueryService, new ThemeBlockAppService(pluginExtensionQuery, new ObjectMapper()));
+                siteThemeQueryService, new ThemeBlockAppService(pluginExtensionQuery, new ObjectMapper()), pluginExtensionQuery);
         lenient().when(siteThemeQueryService.activeSiteThemeCode()).thenReturn("default");
     }
 

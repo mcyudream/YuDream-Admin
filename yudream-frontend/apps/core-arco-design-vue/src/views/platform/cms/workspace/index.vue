@@ -84,7 +84,7 @@ function createPage() {
     toast.error('路径必须位于 pages/ 下且以 .html 结尾')
     return
   }
-  void apiWorkspace.write(normalized, '<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="UTF-8">\n  <script src="/api/platform/ai/cms/workspace/lib.js"><\/script>\n</head>\n<body>\n  <main class="yb-ai-page"></main>\n</body>\n</html>\n').then(async () => {
+  void apiWorkspace.write(normalized, '<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="UTF-8">\n</head>\n<body>\n  <main class="yb-ai-page"></main>\n</body>\n</html>\n').then(async () => {
     toast.success('页面已创建')
     await refresh()
     selectedPath.value = normalized
