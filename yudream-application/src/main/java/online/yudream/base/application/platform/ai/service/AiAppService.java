@@ -32,7 +32,64 @@ public class AiAppService {
     private final online.yudream.base.application.system.setting.service.SettingAppService settingAppService;
     private final online.yudream.base.domain.platform.capability.repo.CapabilityModuleRepo capabilityModuleRepo;
     private final online.yudream.base.domain.platform.ai.service.AiGenerationGateway generationGateway;
+    private final online.yudream.base.domain.platform.ai.service.HarnessAgentGateway harnessAgents;
     private final List<online.yudream.base.domain.platform.ai.service.AiAgentTool> systemTools;
+
+    /**
+     * CMS 静态站点工作区 builder：Harness 文件工具直执行（无需浏览器桥），会话按
+     * (cms-builder, 编辑者, targetKey) 隔离，工作区跨轮次持久；发布由用户在界面触发。
+     */
+    public CmsPageGenerateDTO streamCmsWorkspace(
+            Long userId,
+            String targetKey,
+            String question,
+            List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history,
+            java.util.function.Consumer<String> onDelta,
+            java.util.function.Consumer<String> onReasoningDelta,
+            java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> onTool,
+            java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiGenerationProgress> onProgress
+    ) {
+        capabilityAppService.ensureEnabled("ai", "AI 助手");
+        String target = targetKey == null || targetKey.isBlank() ? "home" : targetKey.trim();
+        var request = new online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest(
+                userId,
+                "cms-" + target,
+                "cms-builder",
+                workspaceSystemPrompt(target),
+                question == null ? "" : question,
+                List.of(),
+                null,
+                null,
+                aiConfig(),
+                true,
+                List.of("platform:ai:tool:cms-chrome-style"),
+                history == null ? List.of() : history,
+                List.of("cms_chrome_style"));
+        var result = harnessAgents.run(request, onDelta, onReasoningDelta, onTool);
+        return CmsPageGenerateDTO.builder()
+                .title(target)
+                .summary(result.content())
+                .build();
+    }
+
+    /** 工作区 builder 系统提示词：多页面静态站点 + 文件工具 + lib.js 接入 + data-yb-* 约定。 */
+    private String workspaceSystemPrompt(String targetKey) {
+        return "你是 YuDreamAdmin CMS 静态站点工作区的构建代理，正在编辑站点区块「" + targetKey + "」。\n"
+                + "工作区是多文件静态站点：pages/ 下每页一个 HTML（pages/index.html 为首页），\n"
+                + "assets/css、assets/js、assets/img|video 存放样式脚本与二进制资产。规则：\n"
+                + "1. 先读后写：用 list_files/read_file 查看现状，再做小步修改；改完读回确认。\n"
+                + "2. 页面必须是完整静态 HTML，并在 <head> 引入运行时库：\n"
+                + "   <script src=\"/api/platform/ai/cms/workspace/lib.js\"></script>\n"
+                + "3. 数据注入只用 data-yb-for/repeat、data-yb-if、data-yb-limit、data-yb-html/markdown\n"
+                + "   与 {{dotted.path}} 变量；禁写 JavaScript 表达式与 <script> 标签。\n"
+                + "4. CSS 只用 yb-ai- 前缀类选择器（含 @media 内部），禁止裸元素选择器；\n"
+                + "   样式写入 assets/css/site.css，交互 JS 写入 assets/js/site.js 并遵守\n"
+                + "   window.__YU_CMS_REGISTER_CLEANUP__ 生命周期约定。\n"
+                + "5. 图片/视频引用工作区内相对路径（assets/...），二进制资产由用户上传，你只写引用。\n"
+                + "6. 导航栏/页脚等基础结构优先复用区块库模板，不要每次重新发明。\n"
+                + "7. 发布由用户在界面触发，你只维护工作区文件，不要声称已发布。\n"
+                + "全程使用中文与用户交流。";
+    }
 
     /**
      * CMS Agent v2：coding-agent 式客户端工具闭环。画布工具在浏览器 GrapesJS 上真实执行，
