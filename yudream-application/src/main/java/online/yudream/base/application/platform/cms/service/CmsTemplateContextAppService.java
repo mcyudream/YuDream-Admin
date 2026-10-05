@@ -26,6 +26,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -47,6 +48,7 @@ public class CmsTemplateContextAppService {
     private final WikiPageVersionRepo wikiVersions;
     private final SiteThemeQueryService siteThemeQueryService;
     private final ThemeBlockAppService themeBlockAppService;
+    private final online.yudream.base.plugin.spi.system.extension.PluginExtensionQuery pluginExtensionQuery;
 
     @Transactional(readOnly = true)
     public CmsTemplateContextDTO query() {
@@ -75,7 +77,60 @@ public class CmsTemplateContextAppService {
                         .build())
                 .knowledge(knowledge)
                 .blocks(themeBlockAppService.resolveBlocks(safeQuery.getBlocks(), theme, safeQuery.getBlockLimit()))
+                .contributions(contributions())
                 .build();
+    }
+
+    /**
+     * 聚合启用插件经 SPI 注册的站点贡献：菜单项与插槽片段（净化后注入上下文）。
+     * 插件禁用/卸载时扩展自动回收，贡献随之消失。
+     */
+    private CmsTemplateContextDTO.CmsTemplateContributionsDTO contributions() {
+        List<online.yudream.base.plugin.spi.theme.PluginSiteContribution> providers =
+                pluginExtensionQuery.extensions(online.yudream.base.plugin.spi.theme.PluginSiteContribution.class);
+        if (providers.isEmpty()) {
+            return CmsTemplateContextDTO.CmsTemplateContributionsDTO.builder()
+                    .menu(List.of()).slots(Map.of()).build();
+        }
+        List<CmsTemplateContextDTO.ContributionMenuItemDTO> menu = new java.util.ArrayList<>();
+        Map<String, String> slots = new LinkedHashMap<>();
+        providers.stream()
+                .sorted(java.util.Comparator.comparing(provider -> String.valueOf(provider.pluginCode())))
+                .forEach(provider -> {
+                    provider.menuItems().stream()
+                            .filter(item -> item != null && hasText(item.label()) && hasText(item.path()))
+                            .sorted(java.util.Comparator.comparingInt(online.yudream.base.plugin.spi.theme.PluginSiteContribution.MenuItem::order))
+                            .forEach(item -> menu.add(CmsTemplateContextDTO.ContributionMenuItemDTO.builder()
+                                    .pluginCode(provider.pluginCode())
+                                    .label(item.label().trim())
+                                    .path(item.path().trim())
+                                    .icon(item.icon())
+                                    .order(item.order())
+                                    .build()));
+                    provider.slotFragments().stream()
+                            .filter(fragment -> fragment != null && hasText(fragment.slot()) && hasText(fragment.html()))
+                            .sorted(java.util.Comparator.comparingInt(online.yudream.base.plugin.spi.theme.PluginSiteContribution.SlotFragment::order))
+                            .forEach(fragment -> slots.merge(fragment.slot().trim(), sanitize(fragment.html()), (left, right) -> left + "\n" + right));
+                });
+        return CmsTemplateContextDTO.CmsTemplateContributionsDTO.builder()
+                .menu(List.copyOf(menu))
+                .slots(Map.copyOf(slots))
+                .build();
+    }
+
+    /** 插槽片段净化：剥离 script/iframe 容器、事件属性与 javascript: URL。 */
+    private static String sanitize(String html) {
+        return html == null ? ""
+                : html
+                .replaceAll("(?is)<\\s*script[^>]*>.*?<\\s*/\\s*script>", "")
+                .replaceAll("(?is)<\\s*/\\s*script[^>]*>", "")
+                .replaceAll("(?is)<\\s*iframe[^>]*>.*?<\\s*/\\s*iframe>", "")
+                .replaceAll("(?i)\\son\\w+\\s*=\\s*(\"[^\"]*\"|'[^']*'|[^\\s>])", "")
+                .replaceAll("(?i)javascript\\s*:", "");
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private CmsTemplateContextDTO.CmsTemplateKnowledgeDTO knowledge(CmsTemplateContextQuery query) {
