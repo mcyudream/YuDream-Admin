@@ -47,6 +47,9 @@ public class CmsCanvasValidateAiTool implements AiAgentTool {
         String html = text(args.get("htmlContent"));
         String css = text(args.get("cssContent"));
         String js = text(args.get("jsContent"));
+        // 画布语义默认禁 script（GrapesJS 画布不含脚本）；文件工作区等静态托管场景
+        // 传 allowScripts=true 放行页面自带 script（第三方/内联均可）。
+        boolean allowScripts = Boolean.parseBoolean(String.valueOf(args.getOrDefault("allowScripts", Boolean.FALSE)));
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
@@ -62,7 +65,7 @@ public class CmsCanvasValidateAiTool implements AiAgentTool {
         if (StringUtils.hasText(js) && (!balanced(js, '{', '}') || !balanced(js, '(', ')') || !balanced(js, '[', ']'))) {
             errors.add("JavaScript 括号不完整");
         }
-        if (html.toLowerCase().contains("<script")) {
+        if (!allowScripts && html.toLowerCase().contains("<script")) {
             errors.add("HTML 中不能包含 script 标签，脚本必须放入 jsContent");
         }
         if (js.toLowerCase().contains("<script")) {
