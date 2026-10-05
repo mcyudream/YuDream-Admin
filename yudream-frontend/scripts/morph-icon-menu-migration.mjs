@@ -192,7 +192,8 @@ function walk(list) {
 }
 walk(tree)
 
-const pending = flat.filter(m => m.icon && targets.has(m.icon))
+// 注意：null 目标（保留回退）必须排除，否则会把 icon 改写成字面量 "morph:null"
+const pending = flat.filter(m => m.icon && targets.get(m.icon))
 console.log(`菜单节点 ${flat.length}，待更新 ${pending.length}，保留回退 ${flat.filter(m => m.icon && targets.get(m.icon) === null).length}`)
 
 const rollback = []
