@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AgentSkill } from '@/api/modules/platform-agent-skill'
+import type { TableColumn } from '@yudream/components'
 import apiSkill from '@/api/modules/platform-agent-skill'
 import { useMediaQuery } from '@vueuse/core'
+import { computed, shallowRef } from 'vue'
 
 const toast = useFaToast()
 const modal = useFaModal()
@@ -9,12 +11,24 @@ const loading = ref(false)
 const visible = ref(false)
 const editing = ref<AgentSkill | null>(null)
 const rows = ref<AgentSkill[]>([])
+const selectedRows = shallowRef<AgentSkill[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 const isCompact = useMediaQuery('(max-width: 640px)')
 const paginationLayout = computed(() => isCompact.value ? 'total, pager' : 'total, sizes, ->, pager, jumper')
 const keyword = ref('')
 const resourcesText = ref('{}')
+const uploadInput = ref<HTMLInputElement>()
 const form = reactive({ name: '', description: '', content: '', enabled: true })
+
+const columns = computed<TableColumn<AgentSkill>[]>(() => [
+  { type: 'selection', fixed: 'left', width: 44 },
+  { accessorKey: 'name', header: '名称' },
+  { accessorKey: 'description', header: '描述' },
+  { id: 'builtin', header: '来源', width: 90 },
+  { id: 'enabled', header: '状态', width: 90 },
+  { accessorKey: 'updateTime', header: '更新时间', width: 170 },
+  { id: 'operation', header: '操作', width: 200 },
+])
 
 onMounted(load)
 async function load() {
@@ -23,8 +37,12 @@ async function load() {
     const res = await apiSkill.page({ ...pagination, keyword: keyword.value || undefined })
     rows.value = res.data.records
     pagination.total = Number(res.data.total || 0)
+    selectedRows.value = []
   }
   finally { loading.value = false }
+}
+function onSelectionChange(selected: AgentSkill[]) {
+  selectedRows.value = selected
 }
 function resetForm() {
   Object.assign(form, { name: '', description: '', content: '', enabled: true })
@@ -85,16 +103,17 @@ async function save() {
   visible.value = false
   await load()
 }
+async function setEnabled(row: AgentSkill, enabling: boolean) {
+  await apiSkill.setEnabled(row.id, enabling)
+  toast.success('已保存')
+  await load()
+}
 function confirmToggle(row: AgentSkill) {
   const enabling = !row.enabled
   modal.confirm({
     title: enabling ? '确认启用' : '确认停用',
     content: `确认${enabling ? '启用' : '停用'}技能「${row.name}」吗？${enabling ? '启用后所有 Agent 可在技能目录中发现并加载它。' : '停用后 Agent 不再看到该技能。'}`,
-    onConfirm: async () => {
-      await apiSkill.setEnabled(row.id, enabling)
-      toast.success('已保存')
-      await load()
-    },
+    onConfirm: () => setEnabled(row, enabling),
   })
 }
 function remove(row: AgentSkill) {
@@ -107,6 +126,64 @@ function remove(row: AgentSkill) {
       await load()
     },
   })
+}
+async function batchSetEnabled(enabling: boolean) {
+  const targets = selectedRows.value
+  if (!targets.length) {
+    toast.warning('请先勾选技能')
+    return
+  }
+  modal.confirm({
+    title: enabling ? '批量启用' : '批量停用',
+    content: `确认${enabling ? '启用' : '停用'}选中的 ${targets.length} 个技能吗？`,
+    onConfirm: async () => {
+      for (const row of targets) {
+        await apiSkill.setEnabled(row.id, enabling)
+      }
+      toast.success(`已${enabling ? '启用' : '停用'} ${targets.length} 个技能`)
+      await load()
+    },
+  })
+}
+function batchRemove() {
+  const targets = selectedRows.value.filter(row => !row.builtin)
+  if (!selectedRows.value.length) {
+    toast.warning('请先勾选技能')
+    return
+  }
+  if (!targets.length) {
+    toast.warning('勾选的都是内置技能，不可删除')
+    return
+  }
+  modal.confirm({
+    title: '批量删除',
+    content: `确定删除选中的 ${targets.length} 个技能吗？内置技能已自动跳过。`,
+    onConfirm: async () => {
+      for (const row of targets) {
+        await apiSkill.delete(row.id)
+      }
+      toast.success(`已删除 ${targets.length} 个技能`)
+      await load()
+    },
+  })
+}
+function pickZip() {
+  uploadInput.value?.click()
+}
+async function onZipChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) {
+    return
+  }
+  if (!file.name.toLowerCase().endsWith('.zip')) {
+    toast.error('请选择 .zip 压缩包')
+    return
+  }
+  const res = await apiSkill.uploadZip(file)
+  toast.success(`技能「${res.data.name}」已导入${res.data.enabled ? '' : '（当前为停用状态）'}`)
+  await load()
 }
 function formatTime(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 19) : '-'
@@ -122,14 +199,36 @@ function formatTime(value?: string) {
     </FaPageHeader>
     <FaPageMain>
       <section class="skill-section">
-        <div class="section-head">
-          <div>
-            <h3>技能目录</h3>
-            <p>技能以 SKILL.md 形式进入所有 Agent 的可用技能列表，由模型按需加载；references 资源随技能提供。</p>
-          </div>
-          <FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 描述" @keydown.enter="load" />
-        </div>
-        <FaResponsiveTable v-loading="loading" row-key="id" :data="rows" :columns="[{ accessorKey: 'name', header: '名称' }, { accessorKey: 'description', header: '描述' }, { id: 'builtin', header: '来源' }, { id: 'enabled', header: '状态' }, { accessorKey: 'updateTime', header: '更新时间' }, { id: 'operation', header: '操作' }]">
+        <FaResponsiveTable
+          v-loading="loading"
+          row-key="id"
+          :data="rows"
+          :columns="columns"
+          selectable
+          multiple
+          @selection-change="onSelectionChange"
+        >
+          <template #toolbar>
+            <div class="toolbar">
+              <FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 描述" @keydown.enter="load" />
+              <div class="flex-1" />
+              <template v-if="selectedRows.length">
+                <span class="selected-hint">已选 {{ selectedRows.length }} 项</span>
+                <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(true)">
+                  批量启用
+                </FaButton>
+                <FaButton v-auth="'platform:agent-skill:edit'" size="sm" variant="outline" @click="batchSetEnabled(false)">
+                  批量停用
+                </FaButton>
+                <FaButton v-auth="'platform:agent-skill:delete'" size="sm" variant="destructive" @click="batchRemove">
+                  批量删除
+                </FaButton>
+              </template>
+              <FaButton v-auth="'platform:agent-skill:create'" size="sm" variant="outline" @click="pickZip">
+                <FaIcon name="morph:upload" /> 上传压缩包
+              </FaButton>
+            </div>
+          </template>
           <template #cell-builtin="{ row }">
             <FaTag :variant="row.original.builtin ? 'secondary' : 'default'">
               {{ row.original.builtin ? '内置' : '自定义' }}
@@ -197,6 +296,7 @@ function formatTime(value?: string) {
         <FaPagination v-model:page="pagination.page" v-model:size="pagination.size" :total="pagination.total" :layout="paginationLayout" class="mt-3" @page-change="load" @size-change="load" />
       </section>
     </FaPageMain>
+    <input ref="uploadInput" type="file" accept=".zip" class="hidden" @change="onZipChange">
     <FaModal v-model="visible" :title="editing ? '编辑技能' : '新建技能'" class="sm:max-w-3xl">
       <div class="skill-form">
         <div class="gap-4 grid sm:grid-cols-2">
@@ -238,9 +338,8 @@ function formatTime(value?: string) {
 
 <style scoped>
 .skill-section { display: grid; gap: 16px; }
-.section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
-.section-head h3, .section-head p { margin: 0; }
-.section-head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.selected-hint { color: var(--color-text-3); font-size: 12px; }
 .skill-form { display: grid; gap: 16px; }
 .form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }
 .form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }
@@ -250,8 +349,4 @@ function formatTime(value?: string) {
 .check-line span { display: grid; gap: 2px; }
 .check-line b { color: var(--color-text-1); font-weight: 500; }
 .check-line small { color: var(--color-text-3); font-size: 10px; }
-@media (max-width: 640px) {
-  .section-head { flex-direction: column; align-items: stretch; }
-  .section-head > .w-72 { width: 100%; }
-}
 </style>
