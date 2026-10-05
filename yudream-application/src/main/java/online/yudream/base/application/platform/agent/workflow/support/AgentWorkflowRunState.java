@@ -23,6 +23,7 @@ public final class AgentWorkflowRunState {
     private final Consumer<AiAgentToolResult> onTool;
     private final Consumer<AiGenerationProgress> onProgress;
     private final AgentModelToolResolver modelToolResolver;
+    private final String runKey;
     private final List<AiAgentToolResult> toolResults = new ArrayList<>();
     private final StringBuilder reasoning = new StringBuilder();
     private AiUsage usage = AiUsage.empty();
@@ -60,7 +61,8 @@ public final class AgentWorkflowRunState {
             Consumer<AiAgentToolResult> onTool,
             AgentModelToolResolver modelToolResolver
     ) {
-        this(application, command, aiConfig, systemToolCodes, onDelta, onReasoningDelta, onTool, null, modelToolResolver);
+        this(application, command, aiConfig, systemToolCodes, onDelta, onReasoningDelta, onTool, null, modelToolResolver,
+                java.util.UUID.randomUUID().toString());
     }
 
     public AgentWorkflowRunState(
@@ -72,7 +74,8 @@ public final class AgentWorkflowRunState {
             Consumer<String> onReasoningDelta,
             Consumer<AiAgentToolResult> onTool,
             Consumer<AiGenerationProgress> onProgress,
-            AgentModelToolResolver modelToolResolver
+            AgentModelToolResolver modelToolResolver,
+            String runKey
     ) {
         this.application = application;
         this.command = command;
@@ -83,6 +86,12 @@ public final class AgentWorkflowRunState {
         this.onTool = onTool;
         this.onProgress = onProgress;
         this.modelToolResolver = modelToolResolver;
+        this.runKey = runKey == null || runKey.isBlank() ? java.util.UUID.randomUUID().toString() : runKey;
+    }
+
+    /** 一次工作流运行的稳定标识：工作区会话按它隔离。 */
+    public String runKey() {
+        return runKey;
     }
 
     public AgentApplication application() {

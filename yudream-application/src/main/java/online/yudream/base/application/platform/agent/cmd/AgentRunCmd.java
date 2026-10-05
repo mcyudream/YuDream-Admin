@@ -8,6 +8,8 @@ import java.util.List;
 @Data
 public class AgentRunCmd {
     private Long applicationId;
+    /** 发起运行的用户（有状态工作区会话按它隔离）；系统/匿名触发可为空。 */
+    private Long userId;
     private String input;
     private String providerCode;
     private String modelCode;
