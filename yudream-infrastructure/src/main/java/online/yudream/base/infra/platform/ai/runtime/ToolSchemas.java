@@ -69,7 +69,7 @@ public final class ToolSchemas {
      * 模型侧工具名只保留安全字符；平台侧仍用原始 descriptor.name 关联。
      */
     public static String safeName(String name) {
-        return name == null ? "tool" : name.replaceAll("[^a-zA-Z0-9_-]", "_");
+        return online.yudream.base.domain.platform.ai.valobj.AgentToolNames.safeName(name);
     }
 
     /**

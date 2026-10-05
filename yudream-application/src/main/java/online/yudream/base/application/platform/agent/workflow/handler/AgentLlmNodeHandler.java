@@ -14,9 +14,13 @@ import online.yudream.base.domain.platform.ai.enumerate.AiToolMode;
 import online.yudream.base.domain.platform.ai.service.AiAgentTool;
 import online.yudream.base.domain.platform.ai.service.AiAgentToolExecutionScope;
 import online.yudream.base.domain.platform.ai.service.AiGenerationGateway;
+import online.yudream.base.domain.platform.ai.service.HarnessAgentGateway;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationResult;
 import online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput;
+import online.yudream.base.domain.platform.ai.valobj.AgentToolNames;
+import online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest;
+import online.yudream.base.domain.platform.ai.valobj.HarnessRunResult;
 import org.springframework.util.StringUtils;
 
 import java.util.LinkedHashSet;
@@ -30,11 +34,15 @@ import java.util.Objects;
 public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
     private static final List<String> MODEL_KINDS = List.of("llm", "extract", "classify", "vision", "understand");
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() { };
+    /** 工作区 profile 下 Harness 内置文件工具的安全名；工作区节点始终可见。 */
+    private static final List<String> WORKSPACE_FILE_TOOLS =
+            List.of("read_file", "write_file", "edit_file", "list_files", "grep_files", "glob_files");
 
     private final String kind;
     private final AgentWorkflowValueResolver values;
     private final ObjectMapper objectMapper;
     private final AiGenerationGateway gateway;
+    private final HarnessAgentGateway harnessAgents;
     private final AgentWorkflowRunState state;
 
     public AgentLlmNodeHandler(
@@ -42,6 +50,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             AgentWorkflowValueResolver values,
             ObjectMapper objectMapper,
             AiGenerationGateway gateway,
+            HarnessAgentGateway harnessAgents,
             AgentWorkflowRunState state
     ) {
         if (!MODEL_KINDS.contains(kind)) {
@@ -51,6 +60,7 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         this.values = values;
         this.objectMapper = objectMapper;
         this.gateway = gateway;
+        this.harnessAgents = harnessAgents;
         this.state = state;
     }
 
@@ -79,8 +89,23 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
         String nodePrompt = values.render(values.text(node, "prompt"), context);
         String userPrompt = stringify(values.input(node, context));
         List<String> images = images(node, context);
+        String system = systemPrompt(nodePrompt, node, toolMode);
+        boolean useWorkspace = "llm".equals(kind) && values.bool(node, "workspace", false);
+
+        int toolResultsBefore = state.toolResultCount();
+        List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults = new ArrayList<>();
+        AiGenerationResult generated;
+        if (useWorkspace) {
+            HarnessRunResult result = workspaceRun(node, system, userPrompt, providerCode, modelCode, toolMode, tools,
+                    callbackResults);
+            state.addUsage(result.usage());
+            if (toolMode == AiToolMode.REQUIRED && state.toolResultCount() == toolResultsBefore) {
+                throw new BizException(node.title() + "必须调用工具后才能继续");
+            }
+            return values.result(node, output(node, result.content()));
+        }
         AiGenerationRequest request = new AiGenerationRequest(
-                systemPrompt(nodePrompt, node, toolMode),
+                system,
                 userPrompt,
                 null,
                 images,
@@ -93,9 +118,6 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
                 structuredOutput(node)
         );
 
-        int toolResultsBefore = state.toolResultCount();
-        List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults = new ArrayList<>();
-        AiGenerationResult generated;
         try (AiAgentToolExecutionScope ignored = AiAgentToolExecutionScope.open(tools)) {
             generated = "understand".equals(kind)
                     ? gateway.generate(request)
@@ -110,6 +132,46 @@ public final class AgentLlmNodeHandler implements AgentWorkflowNodeHandler {
             throw new BizException(node.title() + "必须调用工具后才能继续");
         }
         return values.result(node, output(node, generated.summary()));
+    }
+
+    /**
+     * 工作区运行（仅 llm 节点、节点勾选 workspace 时）：走 Harness 会话代理，
+     * agentCode「workflow」profile 启用文件工具；同一运行内的节点共享会话上下文，
+     * 工作区文件按 (workflow agent, userId) 跨运行复用；不用工作区的节点保持无状态网关路径。
+     */
+    private HarnessRunResult workspaceRun(
+            AgentWorkflowNode node,
+            String system,
+            String userPrompt,
+            String providerCode,
+            String modelCode,
+            AiToolMode toolMode,
+            List<AiAgentTool> tools,
+            List<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> callbackResults
+    ) {
+        LinkedHashSet<String> allowed = new LinkedHashSet<>(WORKSPACE_FILE_TOOLS);
+        for (AiAgentTool tool : tools) {
+            allowed.add(AgentToolNames.safeName(tool.descriptor().name()));
+        }
+        var command = state.command();
+        HarnessRunRequest request = new HarnessRunRequest(
+                command.getUserId(),
+                "wf-" + state.runKey(),
+                "workflow",
+                system,
+                userPrompt,
+                List.of(),
+                providerCode,
+                modelCode,
+                state.aiConfig(),
+                toolMode != AiToolMode.NONE,
+                command.getPermissionCodes(),
+                List.of(),
+                List.copyOf(allowed));
+        return harnessAgents.run(request, state::emitDelta, state::emitReasoningDelta, result -> {
+            callbackResults.add(result);
+            state.addToolResult(result);
+        });
     }
 
     private Object output(AgentWorkflowNode node, String summary) {

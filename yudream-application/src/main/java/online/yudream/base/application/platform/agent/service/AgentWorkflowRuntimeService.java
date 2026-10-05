@@ -58,6 +58,7 @@ public class AgentWorkflowRuntimeService {
     private final RuntimeExecutor runtimeExecutor;
     private final AgentToolRepo toolRepo;
     private final ObjectProvider<AiGenerationGateway> generationGateways;
+    private final ObjectProvider<online.yudream.base.domain.platform.ai.service.HarnessAgentGateway> harnessAgentGateways;
     private final ObjectProvider<AiAgentTool> systemToolProvider;
     private final AgentKnowledgeOperations knowledgeOperations;
     private final DocumentTextExtractor documentTextExtractor;
@@ -149,7 +150,8 @@ public class AgentWorkflowRuntimeService {
                 tracedReasoningDelta,
                 tracedTool,
                 onProgress,
-                new AgentModelToolResolver(toolExecutor)
+                new AgentModelToolResolver(toolExecutor),
+                trace.traceId()
         );
         AgentWorkflowValueResolver values = new AgentWorkflowValueResolver(objectMapper);
         AgentWorkflowGraphParser graphParser = new AgentWorkflowGraphParser(objectMapper);
@@ -201,12 +203,13 @@ public class AgentWorkflowRuntimeService {
             handlers.add(new AgentKnowledgeNodeHandler(kind, values, objectMapper, knowledgeOperations));
         }
         AiGenerationGateway generationGateway = generationGateways.getIfAvailable();
+        var harnessAgents = harnessAgentGateways.getIfAvailable();
         if (generationGateway != null) {
-            handlers.add(new AgentLlmNodeHandler("understand", values, objectMapper, generationGateway, state));
-            handlers.add(new AgentLlmNodeHandler("llm", values, objectMapper, generationGateway, state));
-            handlers.add(new AgentLlmNodeHandler("extract", values, objectMapper, generationGateway, state));
-            handlers.add(new AgentLlmNodeHandler("classify", values, objectMapper, generationGateway, state));
-            handlers.add(new AgentLlmNodeHandler("vision", values, objectMapper, generationGateway, state));
+            handlers.add(new AgentLlmNodeHandler("understand", values, objectMapper, generationGateway, harnessAgents, state));
+            handlers.add(new AgentLlmNodeHandler("llm", values, objectMapper, generationGateway, harnessAgents, state));
+            handlers.add(new AgentLlmNodeHandler("extract", values, objectMapper, generationGateway, harnessAgents, state));
+            handlers.add(new AgentLlmNodeHandler("classify", values, objectMapper, generationGateway, harnessAgents, state));
+            handlers.add(new AgentLlmNodeHandler("vision", values, objectMapper, generationGateway, harnessAgents, state));
         }
         return handlers;
     }

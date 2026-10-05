@@ -339,7 +339,7 @@ class AgentLlmNodeHandlerTest {
         } catch (Exception exception) {
             throw new AssertionError(exception);
         }
-        return new AgentLlmNodeHandler(kind, values, mapper, gateway, state).execute(node, new AgentWorkflowContext("input"))
+        return new AgentLlmNodeHandler(kind, values, mapper, gateway, null, state).execute(node, new AgentWorkflowContext("input"))
                 .output();
     }
 

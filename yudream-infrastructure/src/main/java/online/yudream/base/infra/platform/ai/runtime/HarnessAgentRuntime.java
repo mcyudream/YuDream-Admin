@@ -170,13 +170,16 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                 .maxContextTokens(properties.getMaxContextTokens())
                 .permissionContext(PermissionContextState.builder()
                         .mode(PermissionMode.DEFAULT)
-                        .build())
-                // 聊天型 Agent 不暴露宿主文件系统与 shell；数据面工具走平台 AiAgentTool 白名单。
-                .disableFilesystemTools()
-                .disableShellTool()
-                .middleware(new PerCallModelMiddleware())
-                .middleware(new PerCallSystemPromptMiddleware())
-                .middleware(new PerCallToolFilterMiddleware(permissionGateway));
+                        .build());
+                // 聊天型 Agent 不暴露宿主文件系统与 shell；工作流工作区 profile（agentCode 前缀
+                // workflow）启用文件工具（read/write/edit/list/grep/glob），shell 任何 profile 都不开放。
+                if (!code.startsWith("workflow")) {
+                    builder.disableFilesystemTools();
+                }
+                builder.disableShellTool();
+                builder.middleware(new PerCallModelMiddleware());
+                builder.middleware(new PerCallSystemPromptMiddleware());
+                builder.middleware(new PerCallToolFilterMiddleware(permissionGateway));
         if (!properties.isMemoryHooksEnabled()) {
             builder.disableMemoryHooks();
         }
