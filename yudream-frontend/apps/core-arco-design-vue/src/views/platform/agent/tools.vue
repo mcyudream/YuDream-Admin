@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import type { AgentTool, SystemAgentTool } from '@/api/modules/platform-agent'
+import type { TableColumn } from '@yudream/components'
 import apiAgent from '@/api/modules/platform-agent'
 import { useMediaQuery } from '@vueuse/core'
+import { computed, shallowRef } from 'vue'
 import AgentJsonCodeEditor from './components/AgentJsonCodeEditor.vue'
 import { defaultAgentToolInputSchema, defaultAgentToolOutputExample, isJsonObject } from './config/agent-json'
 
@@ -11,6 +13,7 @@ const loading = ref(false)
 const visible = ref(false)
 const editing = ref<AgentTool | null>(null)
 const rows = ref<AgentTool[]>([])
+const selectedRows = shallowRef<AgentTool[]>([])
 const systemTools = ref<SystemAgentTool[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
 // 窄屏下分页隐藏每页条数与跳转输入，避免换行挤压
@@ -19,6 +22,15 @@ const toolsPaginationLayout = computed(() => isCompact.value ? 'total, pager' : 
 const keyword = ref('')
 const defaultPythonCode = 'def run(params: dict) -> dict:\n    name = str(params.get("name", ""))\n    return {\n        "success": True,\n        "message": f"Hello, {name}",\n    }'
 const form = reactive({ name: '', code: '', description: '', inputSchemaJson: defaultAgentToolInputSchema, outputExampleJson: defaultAgentToolOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
+const toolColumns = computed<TableColumn<AgentTool>[]>(() => [
+  { type: 'selection', fixed: 'left', width: 44 },
+  { accessorKey: 'name', header: '名称' },
+  { accessorKey: 'code', header: '编码' },
+  { accessorKey: 'description', header: '描述' },
+  { accessorKey: 'timeoutMillis', header: '超时(ms)' },
+  { id: 'enabled', header: '状态' },
+  { id: 'operation', header: '操作' },
+])
 
 onMounted(load)
 async function load() {
@@ -28,8 +40,29 @@ async function load() {
     rows.value = custom.data.records
     pagination.total = Number(custom.data.total || 0)
     systemTools.value = system.data
+    selectedRows.value = []
   }
   finally { loading.value = false }
+}
+function onSelectionChange(selected: AgentTool[]) {
+  selectedRows.value = selected
+}
+function batchRemove() {
+  if (!selectedRows.value.length) {
+    toast.warning('请先勾选工具')
+    return
+  }
+  modal.confirm({
+    title: '批量删除 Python 工具',
+    content: `确定删除选中的 ${selectedRows.value.length} 个工具吗？已被应用使用时需要先移除节点。`,
+    onConfirm: async () => {
+      for (const row of selectedRows.value) {
+        await apiAgent.deleteTool(row.id)
+      }
+      toast.success(`已删除 ${selectedRows.value.length} 个工具`)
+      await load()
+    },
+  })
 }
 function resetForm() {
   Object.assign(form, { name: '', code: '', description: '', inputSchemaJson: defaultAgentToolInputSchema, outputExampleJson: defaultAgentToolOutputExample, pythonCode: defaultPythonCode, timeoutMillis: 10000, permissionCode: '', enabled: true })
@@ -101,7 +134,14 @@ function remove(row: AgentTool) {
       <section class="custom-tools">
         <div class="section-head">
           <div><h3>Python 工具</h3><p>通过 <code>run(params: dict) -&gt; dict</code> 接收参数并返回结构化结果。</p></div><FaInput v-model="keyword" class="w-72" clearable placeholder="名称 / 编码" @keydown.enter="load" />
-        </div><FaResponsiveTable v-loading="loading" row-key="id" :data="rows" :columns="[{ accessorKey: 'name', header: '名称' }, { accessorKey: 'code', header: '编码' }, { accessorKey: 'description', header: '描述' }, { accessorKey: 'timeoutMillis', header: '超时(ms)' }, { id: 'enabled', header: '状态' }, { id: 'operation', header: '操作' }]">
+        </div>
+        <div v-if="selectedRows.length" class="batch-bar">
+          <span>已选 {{ selectedRows.length }} 项</span>
+          <FaButton v-auth="'platform:agent:tool:delete'" size="sm" variant="destructive" @click="batchRemove">
+            批量删除
+          </FaButton>
+        </div>
+        <FaResponsiveTable v-loading="loading" row-key="id" :data="rows" :columns="toolColumns" selectable multiple @selection-change="onSelectionChange">
           <template #cell-enabled="{ row }">
             <FaTag :variant="row.original.enabled ? 'default' : 'secondary'">
               {{ row.original.enabled ? '启用' : '停用' }}
@@ -196,7 +236,8 @@ function remove(row: AgentTool) {
 </template>
 
 <style scoped>
-.system-tools, .custom-tools { display: grid; gap: 16px; }.custom-tools { margin-top: 24px; }.section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }.section-head h3, .section-head p { margin: 0; }.section-head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }.system-tool-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }.system-tool-grid article { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }.system-tool-grid article > :first-child { color: rgb(var(--primary-6)); }.system-tool-grid div { display: grid; gap: 5px; }.system-tool-grid p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.5; }.system-tool-grid code { color: var(--color-text-3); font-size: 11px; }.tool-form { display: grid; gap: 16px; }.form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }.form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }.form-field small { color: var(--color-text-3); font-size: 10px; line-height: 1.5; }.check-line { display: grid; grid-template-columns: 17px minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; cursor: pointer; }.check-line input { margin-top: 2px; accent-color: rgb(var(--primary-6)); }.check-line span { display: grid; gap: 2px; }.check-line b { color: var(--color-text-1); font-weight: 500; }.check-line small { color: var(--color-text-3); font-size: 10px; }
+.system-tools, .custom-tools { display: grid; gap: 16px; }.custom-tools { margin-top: 24px; }
+.batch-bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; color: var(--color-text-3); }section-head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }.section-head h3, .section-head p { margin: 0; }.section-head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }.system-tool-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }.system-tool-grid article { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--color-border-2); border-radius: 6px; background: var(--color-bg-1); }.system-tool-grid article > :first-child { color: rgb(var(--primary-6)); }.system-tool-grid div { display: grid; gap: 5px; }.system-tool-grid p { margin: 0; color: var(--color-text-3); font-size: 12px; line-height: 1.5; }.system-tool-grid code { color: var(--color-text-3); font-size: 11px; }.tool-form { display: grid; gap: 16px; }.form-field { display: grid; gap: 7px; color: var(--color-text-2); font-size: 12px; }.form-field.required > span::after { margin-left: 3px; color: rgb(var(--danger-6)); content: '*'; }.form-field small { color: var(--color-text-3); font-size: 10px; line-height: 1.5; }.check-line { display: grid; grid-template-columns: 17px minmax(0, 1fr); align-items: start; gap: 8px; padding: 10px; border: 1px solid var(--color-border-2); border-radius: 6px; font-size: 12px; cursor: pointer; }.check-line input { margin-top: 2px; accent-color: rgb(var(--primary-6)); }.check-line span { display: grid; gap: 2px; }.check-line b { color: var(--color-text-1); font-weight: 500; }.check-line small { color: var(--color-text-3); font-size: 10px; }
 @media (max-width: 640px) {
   .section-head { flex-direction: column; align-items: stretch; }
   .section-head > .w-72 { width: 100%; }

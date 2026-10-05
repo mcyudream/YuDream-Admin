@@ -28,4 +28,9 @@ export default {
   create: (data: AgentSkillPayload) => systemClient.post<unknown, ApiResponse<AgentSkill>>('api/platform/agent-skills', data),
   setEnabled: (id: string, enabled: boolean) => systemClient.put<unknown, ApiResponse<AgentSkill>>(`api/platform/agent-skills/${id}/enabled/${enabled}`),
   delete: (id: string) => systemClient.delete<unknown, ApiResponse<void>>(`api/platform/agent-skills/${id}`),
+  uploadZip: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return systemClient.post<unknown, ApiResponse<AgentSkill>>('api/platform/agent-skills/upload', form)
+  },
 }
