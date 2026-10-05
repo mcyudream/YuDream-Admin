@@ -157,6 +157,72 @@ public class CmsWorkspaceController {
                 .body(body);
     }
 
+    /** 工作区文件原样输出（编辑器预览数据源；登录态）。 */
+    @GetMapping("/raw/**")
+    @PermissionRegister(code = "platform:ai:generate", name = "CMS 工作区文件原样读取", module = "平台能力", desc = "按扩展名回 Content-Type 输出工作区文件")
+    public org.springframework.http.ResponseEntity<byte[]> raw(jakarta.servlet.http.HttpServletRequest request) {
+        String path = pathAfter(request, "/raw/");
+        byte[] data = workspaceStore.readFile(currentUserId(), path);
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(contentTypeOf(path, data))
+                .body(data);
+    }
+
+    /** 预览：读工作区 HTML 并注入 <base href>，相对资产引用落到 /raw/ 前缀。 */
+    @GetMapping("/preview/**")
+    @PermissionRegister(code = "platform:ai:generate", name = "CMS 工作区预览", module = "平台能力", desc = "以页面方式预览工作区 HTML")
+    public org.springframework.http.ResponseEntity<byte[]> preview(jakarta.servlet.http.HttpServletRequest request) {
+        String path = pathAfter(request, "/preview/");
+        if (path.isBlank() || path.endsWith("/")) {
+            path = path + "index.html";
+        }
+        byte[] data = workspaceStore.readFile(currentUserId(), path);
+        if (isHtml(path, data)) {
+            String text = new String(data, StandardCharsets.UTF_8);
+            if (!text.contains("<base ") && text.contains("<head")) {
+                text = text.replaceFirst("(?i)<head[^>]*>",
+                        "<head><base href=\"/api/platform/ai/cms/workspace/raw/\">");
+                data = text.getBytes(StandardCharsets.UTF_8);
+            }
+            return org.springframework.http.ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_HTML)
+                    .body(data);
+        }
+        return raw(request);
+    }
+
+    private static String pathAfter(jakarta.servlet.http.HttpServletRequest request, String marker) {
+        String uri = request.getRequestURI();
+        int index = uri.indexOf(marker);
+        return index < 0 ? "" : uri.substring(index + marker.length());
+    }
+
+    private static MediaType contentTypeOf(String path, byte[] data) {
+        String lower = path.toLowerCase();
+        Map<String, MediaType> byExt = Map.ofEntries(
+                Map.entry(".html", MediaType.TEXT_HTML),
+                Map.entry(".htm", MediaType.TEXT_HTML),
+                Map.entry(".css", MediaType.valueOf("text/css;charset=UTF-8")),
+                Map.entry(".js", MediaType.parseMediaType("application/javascript;charset=UTF-8")),
+                Map.entry(".json", MediaType.APPLICATION_JSON),
+                Map.entry(".md", MediaType.valueOf("text/markdown;charset=UTF-8")),
+                Map.entry(".png", MediaType.IMAGE_PNG),
+                Map.entry(".jpg", MediaType.IMAGE_JPEG),
+                Map.entry(".jpeg", MediaType.IMAGE_JPEG),
+                Map.entry(".gif", MediaType.IMAGE_GIF),
+                Map.entry(".webp", MediaType.valueOf("image/webp")),
+                Map.entry(".svg", MediaType.valueOf("image/svg+xml")),
+                Map.entry(".ico", MediaType.valueOf("image/x-icon")),
+                Map.entry(".mp4", MediaType.valueOf("video/mp4")),
+                Map.entry(".webm", MediaType.valueOf("video/webm")),
+                Map.entry(".mp3", MediaType.valueOf("audio/mpeg")));
+        return byExt.entrySet().stream()
+                .filter(entry -> lower.endsWith(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .findFirst()
+                .orElse(isBinary(data) ? MediaType.APPLICATION_OCTET_STREAM : MediaType.TEXT_HTML);
+    }
+
     private static void send(SseEmitter emitter, Object payload) {
         try {
             emitter.send(SseEmitter.event().data(payload, MediaType.APPLICATION_JSON));
@@ -206,5 +272,13 @@ public class CmsWorkspaceController {
             }
         }
         return false;
+    }
+
+    private static boolean isHtml(String path, byte[] data) {
+        if (path.endsWith(".html") || path.endsWith(".htm")) {
+            return true;
+        }
+        String head = new String(data, 0, Math.min(data.length, 256), StandardCharsets.UTF_8).toLowerCase();
+        return head.contains("<!doctype html") || head.contains("<html");
     }
 }
