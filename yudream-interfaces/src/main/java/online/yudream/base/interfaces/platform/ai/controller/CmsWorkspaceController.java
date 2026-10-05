@@ -46,6 +46,7 @@ public class CmsWorkspaceController {
 
     private final CmsWorkspaceStore workspaceStore;
     private final AiAppService aiAppService;
+    private final online.yudream.base.application.platform.cms.service.CmsWorkspacePublishService publishService;
 
     @Value("${yudream.platform.ai.client.sse-timeout:30m}")
     private Duration sseTimeout;
@@ -84,9 +85,15 @@ public class CmsWorkspaceController {
     }
 
     @PostMapping("/publish")
-    @PermissionRegister(code = "platform:ai:generate", name = "发布 CMS 工作区", module = "平台能力", desc = "将工作区整树快照为发布版本")
-    public Result<Map<String, Object>> publish() {
-        return Result.ok(Map.of("files", workspaceStore.publish(currentUserId())));
+    @PermissionRegister(code = "platform:ai:generate", name = "发布 CMS 工作区", module = "平台能力", desc = "校验并将工作区整树快照为发布版本，同步站点页面")
+    public Result<Map<String, Object>> publish(@RequestBody(required = false) PublishRequest request) {
+        var body = request == null ? new PublishRequest("default", true) : request;
+        return Result.ok(publishService.publish(currentUserId(),
+                body.themeCode() == null ? "default" : body.themeCode(),
+                body.published() == null || body.published()));
+    }
+
+    public record PublishRequest(String themeCode, Boolean published) {
     }
 
     /** builder 对话：Harness 文件工具服务端直执行，AG-UI 事件流与 v1 生成端点同构。 */

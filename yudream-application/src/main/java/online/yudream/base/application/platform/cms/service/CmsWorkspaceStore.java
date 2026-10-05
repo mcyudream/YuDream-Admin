@@ -18,6 +18,9 @@ public interface CmsWorkspaceStore {
 
     byte[] readPublished(Long userId, String path);
 
+    /** 公开端读取站点级发布快照（匿名，最后发布者胜）。 */
+    byte[] readPublishedSite(String path);
+
     record WorkspaceEntry(String path, long size, String updatedAt) {
     }
 }
