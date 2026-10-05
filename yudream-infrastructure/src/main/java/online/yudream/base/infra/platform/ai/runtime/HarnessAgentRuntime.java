@@ -144,6 +144,25 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         return agents.computeIfAbsent(agentCode(request), this::buildAgent);
     }
 
+    /** 拥有文件工作区的 agent profile 前缀：工作流与 CMS 静态站点 builder。 */
+    static boolean workspaceProfile(String agentCode) {
+        return agentCode != null && (agentCode.startsWith("workflow") || agentCode.startsWith("cms-builder"));
+    }
+
+    /**
+     * 工作区文件系统：USER 隔离；工作区 profile 额外路由 cms/** 到 KV，
+     * 供 CMS 静态站点文件树（pages/assets）与 IO 端点共享。
+     */
+    private RemoteFilesystemSpec workspaceSpec(String agentCode) {
+        RemoteFilesystemSpec spec = new RemoteFilesystemSpec(baseStore)
+                .isolationScope(IsolationScope.USER)
+                .anonymousUserId(properties.getAnonymousUserId());
+        if (workspaceProfile(agentCode)) {
+            spec.addSharedPrefix("cms/");
+        }
+        return spec;
+    }
+
     private String agentCode(HarnessRunRequest request) {
         return StringUtils.hasText(request.agentCode()) ? request.agentCode() : "general";
     }
@@ -158,9 +177,7 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                 .stateStore(stateStore)
                 .distributedStore(new MongoDistributedStore(stateStore, baseStore))
                 .workspace(workspaceDir())
-                .filesystem(new RemoteFilesystemSpec(baseStore)
-                        .isolationScope(IsolationScope.USER)
-                        .anonymousUserId(properties.getAnonymousUserId()))
+                .filesystem(workspaceSpec(code))
                 .compaction(CompactionConfig.builder()
                         .triggerMessages(properties.getCompactionTriggerMessages())
                         .keepMessages(properties.getCompactionKeepMessages())
@@ -171,9 +188,9 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                 .permissionContext(PermissionContextState.builder()
                         .mode(PermissionMode.DEFAULT)
                         .build());
-                // 聊天型 Agent 不暴露宿主文件系统与 shell；工作流工作区 profile（agentCode 前缀
-                // workflow）启用文件工具（read/write/edit/list/grep/glob），shell 任何 profile 都不开放。
-                if (!code.startsWith("workflow")) {
+                // 聊天型 Agent 不暴露宿主文件系统与 shell；工作流/CMS builder 工作区 profile
+                // 启用文件工具（read/write/edit/list/grep/glob），shell 任何 profile 都不开放。
+                if (!workspaceProfile(code)) {
                     builder.disableFilesystemTools();
                 }
                 builder.disableShellTool();
