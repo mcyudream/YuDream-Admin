@@ -190,8 +190,12 @@ public class CmsWorkspaceController {
             if (!text.contains("<base ") && text.contains("<head")) {
                 text = text.replaceFirst("(?i)<head[^>]*>",
                         "<head><base href=\"/api/platform/ai/cms/workspace/raw/\">");
-                data = text.getBytes(StandardCharsets.UTF_8);
             }
+            if (!text.contains("/lib.js") && text.contains("<head")) {
+                text = text.replaceFirst("(?i)<head[^>]*>",
+                        "<head><script src=\"/api/platform/ai/cms/workspace/lib.js\"></script>");
+            }
+            data = text.getBytes(StandardCharsets.UTF_8);
             return org.springframework.http.ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
                     .body(data);

@@ -46,7 +46,7 @@ public class CmsPublicSiteController {
         if (isHtml(path, data)) {
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_HTML)
-                    .body(injectBase(data));
+                    .body(injectLib(injectBase(data)));
         }
         return ResponseEntity.ok().contentType(contentTypeOf(path)).body(data);
     }
@@ -59,6 +59,18 @@ public class CmsPublicSiteController {
                 .contentType(MediaType.parseMediaType("application/javascript;charset=UTF-8"))
                 .header("Cache-Control", "public, max-age=300")
                 .body(body);
+    }
+
+    private static final String PUBLIC_LIB_TAG =
+            "<head><script src=\"/api/public/cms/lib.js\"></script></head>";
+
+    /** HTML 注入运行时库（紧随 base 之后）：静态页无需手写引入，agent 页面保持无脚本。 */
+    private static byte[] injectLib(byte[] html) {
+        String text = new String(html, StandardCharsets.UTF_8);
+        if (text.contains("/lib.js") || !text.contains("<head")) {
+            return html;
+        }
+        return text.replaceFirst("(?i)<head[^>]*>", PUBLIC_LIB_TAG).getBytes(StandardCharsets.UTF_8);
     }
 
     private static String extractPath(jakarta.servlet.http.HttpServletRequest request) {
