@@ -39,6 +39,11 @@ public class CmsWorkspaceService implements online.yudream.base.application.plat
                 segment);
     }
 
+    @Override
+    public void delete(Long userId, String path) {
+        store.delete(ns(userId, PREFIX_SEGMENT), normalize(path));
+    }
+
     public byte[] readFile(Long userId, String path) {
         StoreItem item = store.get(ns(userId, PREFIX_SEGMENT), normalize(path));
         if (item == null) {
