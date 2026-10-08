@@ -59,8 +59,18 @@ const modelOptions = computed(() => chatModels.value.map(item => ({
   value: `${item.providerCode}::${item.modelCode}`,
 })))
 const wikiContextLabel = computed(() => wikiContextSlug.value === '__all__' ? '全部知识库' : wikiSpaces.value.find(item => item.slug === wikiContextSlug.value)?.name ?? '')
-function toggleConsole() {
-  baseScopeType.value = baseScopeType.value === 'CONSOLE' ? 'GENERAL' : 'CONSOLE'
+const consoleMenuOpen = ref(false)
+const consoleProfileLabel = computed(() => baseScopeType.value === 'CONSOLE'
+  ? (consoleProfile.value === 'cms-builder' ? '控制台·CMS 构建' : '控制台·通用')
+  : '控制台')
+function selectConsoleProfile(profile: 'general' | 'cms-builder' | null) {
+  consoleMenuOpen.value = false
+  if (profile === null) {
+    baseScopeType.value = 'GENERAL'
+    return
+  }
+  consoleProfile.value = profile
+  baseScopeType.value = 'CONSOLE'
 }
 const welcomeTitle = computed(() => activeAgent.value?.name || '今天想让我帮你做什么？')
 const isEmpty = computed(() => messages.value.length === 0)
@@ -284,7 +294,14 @@ onMounted(async () => {
                 <button v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><FaIcon name="morph:x" />关闭知识库</button>
               </div>
             </div>
-            <FaTooltip text="AI 控制台：会话绑定工作区，助手可读写工作区文件（CMS 站点等）"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': baseScopeType === 'CONSOLE' }" aria-label="AI 控制台" @click="toggleConsole"><FaIcon name="morph:terminal" /><span>控制台</span></button></FaTooltip>
+            <div class="chat-context">
+              <FaTooltip text="AI 控制台：会话绑定工作区，助手可读写工作区文件（CMS 站点等）"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': baseScopeType === 'CONSOLE' }" aria-label="AI 控制台" @click="consoleMenuOpen = !consoleMenuOpen"><FaIcon name="morph:terminal" /><span>{{ consoleProfileLabel }}</span></button></FaTooltip>
+              <div v-if="consoleMenuOpen" class="chat-context__menu">
+                <button type="button" @click="selectConsoleProfile(null)"><FaIcon name="morph:x" />关闭控制台</button>
+                <button type="button" :class="{ active: consoleProfile === 'general' }" @click="selectConsoleProfile('general')"><FaIcon name="morph:terminal" />通用助手（纯对话）</button>
+                <button type="button" :class="{ active: consoleProfile === 'cms-builder' }" @click="selectConsoleProfile('cms-builder')"><FaIcon name="morph:layout-template" />CMS 站点构建（可读写站点文件）</button>
+              </div>
+            </div>
             <div class="chat-control chat-control--select">
               <FaIcon name="morph:bot" />
               <FaSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
