@@ -94,6 +94,7 @@ public class PluginAiFrameworkService implements PluginAiService {
             online.yudream.base.plugin.spi.system.ai.PluginAiExecutionContext executionContext
     ) {
         AgentRunCmd command = new AgentRunCmd();
+        command.setUserId(executionContext == null ? null : executionContext.userId());
         command.setInput(request.userPrompt());
         command.setRuntimeSystemPrompt(request.systemPrompt());
         command.setProviderCode(request.providerCode());
