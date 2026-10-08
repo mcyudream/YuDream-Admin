@@ -21,6 +21,7 @@ public record ChatDispatchContext(
         List<ChatAttachmentDTO> attachments,
         List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history,
         List<String> permissionCodes,
+        List<online.yudream.base.domain.platform.ai.valobj.ToolConfirmationDecision> confirmDecisions,
         Consumer<String> onDelta,
         Consumer<String> onReasoningDelta,
         Consumer<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> onTool,
@@ -42,6 +43,6 @@ public record ChatDispatchContext(
             Consumer<ChatActivity> onActivity
     ) {
         this(userId, sessionId, question, providerCode, modelCode, agentCode, spaceSlug, attachments, history,
-                permissionCodes, onDelta, ignored -> { }, onTool, onActivity);
+                permissionCodes, List.of(), onDelta, ignored -> { }, onTool, onActivity);
     }
 }

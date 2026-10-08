@@ -4,12 +4,15 @@ import io.agentscope.core.agent.RuntimeContext;
 import io.agentscope.core.event.AgentEvent;
 import io.agentscope.core.event.ModelCallEndEvent;
 import io.agentscope.core.event.TextBlockDeltaEvent;
+import io.agentscope.core.event.RequireUserConfirmEvent;
 import io.agentscope.core.event.ThinkingBlockDeltaEvent;
 import io.agentscope.core.message.AssistantMessage;
 import io.agentscope.core.message.ContentBlock;
 import io.agentscope.core.message.DataBlock;
 import io.agentscope.core.message.Msg;
+import io.agentscope.core.message.MsgRole;
 import io.agentscope.core.message.TextBlock;
+import io.agentscope.core.message.ToolUseBlock;
 import io.agentscope.core.message.UserMessage;
 import io.agentscope.core.model.ChatUsage;
 import io.agentscope.core.model.GenerateOptions;
@@ -31,8 +34,11 @@ import online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult;
 import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
 import online.yudream.base.domain.platform.ai.valobj.AiGenerationRequest;
 import online.yudream.base.domain.platform.ai.valobj.AiUsage;
+import io.agentscope.core.event.ConfirmResult;
 import online.yudream.base.domain.platform.ai.valobj.HarnessRunRequest;
 import online.yudream.base.domain.platform.ai.valobj.HarnessRunResult;
+import online.yudream.base.domain.platform.ai.valobj.PendingToolConfirmation;
+import online.yudream.base.domain.platform.ai.valobj.ToolConfirmationDecision;
 import online.yudream.base.infra.platform.ai.service.AiClientProperties;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderAdapter;
 import online.yudream.base.infra.platform.ai.service.provider.AiProviderConfigParser;
@@ -124,9 +130,10 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         HarnessAgent agent = agents.computeIfAbsent(cacheKey,
                 ignored -> buildAgent(agentCode(request), selection));
         HarnessToolCollector collector = new HarnessToolCollector(onTool);
+        String sessionId = request.sessionId() == null ? "once-" + UUID.randomUUID() : request.sessionId();
         RuntimeContext context = RuntimeContext.builder()
                 .userId(userId(request))
-                .sessionId(request.sessionId() == null ? "once-" + UUID.randomUUID() : request.sessionId())
+                .sessionId(sessionId)
                 .put(AgentToolPermissions.class, AgentToolPermissions.explicit(request.permissionCodes()))
                 .put(AgentToolCatalog.class, catalog(request))
                 .put(AgentSystemPromptOverride.class, new AgentSystemPromptOverride(request.systemPrompt()))
@@ -135,9 +142,55 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
 
         StringBuilder content = new StringBuilder();
         StringBuilder reasoning = new StringBuilder();
-        AiUsage usage = consume(agent.streamEvents(inputMessages(request), context),
-                content, reasoning);
-        return new HarnessRunResult(content.toString(), reasoning.toString(), usage, collector.snapshot());
+        List<PendingToolConfirmation> pending = new ArrayList<>();
+        List<Msg> inputs = request.confirmDecisions().isEmpty()
+                ? inputMessages(request)
+                : resumeMessages(agent, agentCode(request), userId(request), sessionId, request.confirmDecisions());
+        AiUsage usage = consume(agent.streamEvents(inputs, context), content, reasoning, pending);
+        return new HarnessRunResult(content.toString(), reasoning.toString(), usage,
+                collector.snapshot(), pending);
+    }
+
+    /**
+     * HITL 恢复：把用户的批准/拒绝决定包装为携带 METADATA_CONFIRM_RESULTS 的消息
+     * 交回 agent 续跑（框架按 toolCallId 匹配暂挂的 ASK 工具调用，approved=false
+     * 时以权限拒绝反馈给模型继续推理）。
+     */
+    private List<Msg> resumeMessages(HarnessAgent agent, String agentCode, String userId, String sessionId,
+                                     List<ToolConfirmationDecision> decisions) {
+        Map<String, Boolean> decisionById = new java.util.LinkedHashMap<>();
+        for (ToolConfirmationDecision decision : decisions) {
+            if (StringUtils.hasText(decision.toolCallId())) {
+                decisionById.put(decision.toolCallId(), decision.approved());
+            }
+        }
+        // 从持久化会话状态找回暂挂的 ASK 工具调用块（跨 HTTP 请求恢复）
+        io.agentscope.core.state.AgentState state = stateStore
+                .get(agentCode, userId, sessionId, io.agentscope.core.state.AgentState.class)
+                .orElse(null);
+        List<ConfirmResult> confirmations = new ArrayList<>();
+        if (state != null) {
+            for (Msg msg : state.getContext()) {
+                for (io.agentscope.core.message.ContentBlock block : msg.getContent()) {
+                    if (block instanceof ToolUseBlock toolCall
+                            && toolCall.getState() == io.agentscope.core.message.ToolCallState.ASKING
+                            && toolCall.getId() != null
+                            && decisionById.containsKey(toolCall.getId())) {
+                        confirmations.add(new ConfirmResult(decisionById.get(toolCall.getId()), toolCall));
+                    }
+                }
+            }
+        }
+        if (confirmations.isEmpty()) {
+            throw new online.yudream.base.domain.common.exception.BizException("没有待确认的工具调用");
+        }
+        Msg resume = Msg.builder()
+                .name("user")
+                .role(MsgRole.USER)
+                .textContent("")
+                .metadata(Map.of(Msg.METADATA_CONFIRM_RESULTS, List.copyOf(confirmations)))
+                .build();
+        return List.of(resume);
     }
 
     /**
@@ -361,7 +414,8 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
     // 事件消费：文本/思考增量与 token 用量
     // ------------------------------------------------------------------
 
-    private AiUsage consume(Flux<AgentEvent> events, StringBuilder content, StringBuilder reasoning) {
+    private AiUsage consume(Flux<AgentEvent> events, StringBuilder content, StringBuilder reasoning,
+                            List<PendingToolConfirmation> pending) {
         List<ChatUsage> usages = Collections.synchronizedList(new ArrayList<>());
         try {
             events.doOnNext(event -> {
@@ -373,6 +427,16 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                             reasoning.append(thinking.getDelta());
                         } else if (event instanceof ModelCallEndEvent modelEnd && modelEnd.getUsage() != null) {
                             usages.add(modelEnd.getUsage());
+                        } else if (event instanceof RequireUserConfirmEvent confirm) {
+                            // HITL：工具校验 ASK → 收集待确认调用；框架持久化后等待
+                            // 下一轮携带 ConfirmResult 的恢复调用
+                            for (ToolUseBlock block : confirm.getToolCalls()) {
+                                pending.add(new PendingToolConfirmation(
+                                        block.getId(),
+                                        block.getName(),
+                                        block.getInput() == null ? Map.of() : block.getInput(),
+                                        "该工具需要用户确认后才能执行"));
+                            }
                         }
                     })
                     .blockLast(aiClientProperties.getReadTimeout());

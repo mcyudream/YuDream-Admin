@@ -33,7 +33,7 @@ class WikiChatDispatcherReasoningTest {
         List<String> reasoning = new ArrayList<>();
         List<Object> activities = new ArrayList<>();
         ChatDispatchContext context = new ChatDispatchContext(
-                1L, null, "question", null, null, null, "docs", List.of(), List.of(), List.of(),
+                1L, null, "question", null, null, null, "docs", List.of(), List.of(), List.of(), List.of(),
                 ignored -> { }, reasoning::add, ignored -> { }, activities::add);
 
         ChatDispatchResult result = new WikiChatDispatcher(wiki).dispatch(context);

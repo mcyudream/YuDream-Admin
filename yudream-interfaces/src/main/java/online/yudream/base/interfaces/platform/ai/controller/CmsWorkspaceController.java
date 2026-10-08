@@ -124,6 +124,8 @@ public class CmsWorkspaceController {
                         targetKey,
                         request.question(),
                         request.history() == null ? List.of() : request.history(),
+                        request.providerCode(),
+                        request.modelCode(),
                         delta -> send(emitter, AiWebAssembler.toAguiTextChunk(traceId, delta)),
                         reasoning -> send(emitter, AiWebAssembler.toAguiThinkingChunk(traceId, reasoning)),
                         tool -> {
@@ -152,7 +154,9 @@ public class CmsWorkspaceController {
 
     public record WorkspaceChatRequest(
             @NotBlank(message = "问题不能为空") String question,
-            List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history) {
+            List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history,
+            String providerCode,
+            String modelCode) {
     }
 
     /** 框架运行时库：静态页一行 <script src> 接入 data-yb-* 渲染与后端数据互通。 */

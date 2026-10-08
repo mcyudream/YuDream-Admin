@@ -42,7 +42,8 @@ class GeneralChatDispatcherPermissionTest {
         List<Object> activities = new ArrayList<>();
         GeneralChatDispatcher dispatcher = new GeneralChatDispatcher(harnessAgents, capabilityModuleRepo);
         ChatDispatchContext context = new ChatDispatchContext(
-                1L, null, "question", null, null, null, null, List.of(), List.of(), List.of(),
+                1L, null, "question", null, null, null, null,
+                List.of(), List.of(), List.of(), List.of(),
                 deltas::add, reasoning::add, ignored -> { }, activities::add);
 
         ChatDispatchResult result = dispatcher.dispatch(context);
@@ -75,6 +76,7 @@ class GeneralChatDispatcherPermissionTest {
                 List.of(),
                 List.of(),
                 List.of("platform:wiki:search"),
+                List.of(),
                 ignored -> {
                 },
                 ignored -> {

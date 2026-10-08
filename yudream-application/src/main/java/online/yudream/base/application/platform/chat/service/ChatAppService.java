@@ -90,6 +90,7 @@ public class ChatAppService {
                     cmd.getAttachments() == null ? List.of() : cmd.getAttachments(),
                     history,
                     permissionCodes,
+                    cmd.getConfirmDecisions() == null ? List.of() : cmd.getConfirmDecisions(),
                     onDelta == null ? ignored -> {
                     } : onDelta,
                     delta -> {
@@ -178,6 +179,7 @@ public class ChatAppService {
                 cmd.getAttachments() == null ? List.of() : cmd.getAttachments(),
                 cmd.getHistory() == null ? List.of() : cmd.getHistory(),
                 permissionSnapshot(cmd),
+                cmd.getConfirmDecisions() == null ? List.of() : cmd.getConfirmDecisions(),
                 onDelta == null ? ignored -> {
                 } : onDelta,
                 delta -> {

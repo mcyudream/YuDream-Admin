@@ -21,18 +21,17 @@ public record HarnessRunRequest(
         boolean toolCallingEnabled,
         List<String> permissionCodes,
         List<AiChatMessage> history,
-        List<String> allowedToolNames
+        List<String> allowedToolNames,
+        List<ToolConfirmationDecision> confirmDecisions
 ) {
     public HarnessRunRequest {
         imageDataUrls = imageDataUrls == null ? List.of() : List.copyOf(imageDataUrls);
         permissionCodes = permissionCodes == null ? List.of() : List.copyOf(permissionCodes);
         history = history == null ? List.of() : List.copyOf(history);
         allowedToolNames = allowedToolNames == null ? List.of() : List.copyOf(allowedToolNames);
+        confirmDecisions = confirmDecisions == null ? List.of() : List.copyOf(confirmDecisions);
     }
 
-    /**
-     * 兼容既有调用方：不带工具白名单（按权限快照全部可见）。
-     */
     public HarnessRunRequest(
             Long userId,
             String sessionId,
@@ -49,6 +48,28 @@ public record HarnessRunRequest(
     ) {
         this(userId, sessionId, agentCode, systemPrompt, userPrompt, imageDataUrls, providerCode, modelCode,
                 config, toolCallingEnabled, permissionCodes, history, List.of());
+    }
+
+    /**
+     * 兼容既有调用方：不带工具白名单与确认决定（按权限快照全部可见）。
+     */
+    public HarnessRunRequest(
+            Long userId,
+            String sessionId,
+            String agentCode,
+            String systemPrompt,
+            String userPrompt,
+            List<String> imageDataUrls,
+            String providerCode,
+            String modelCode,
+            Map<String, String> config,
+            boolean toolCallingEnabled,
+            List<String> permissionCodes,
+            List<AiChatMessage> history,
+            List<String> allowedToolNames
+    ) {
+        this(userId, sessionId, agentCode, systemPrompt, userPrompt, imageDataUrls, providerCode, modelCode,
+                config, toolCallingEnabled, permissionCodes, history, allowedToolNames, List.of());
     }
 
     public static HarnessRunRequest stateless(Long userId, String agentCode, String systemPrompt, String userPrompt) {
