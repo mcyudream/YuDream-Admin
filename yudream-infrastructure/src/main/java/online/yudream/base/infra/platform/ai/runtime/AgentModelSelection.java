@@ -4,8 +4,13 @@ import io.agentscope.core.model.GenerateOptions;
 import io.agentscope.core.model.Model;
 
 /**
- * RuntimeContext 中的按次调用模型选择：会话可指定 provider/model，
- * 经 PerCallModelMiddleware 在 onModelCall 时替换 agent 构建期绑定的默认模型。
+ * RuntimeContext 中的按次调用模型选择（携带模型配置身份键）。
+ * 模型绑定已前移到 agent 实例缓存键（(profile, modelKey) 多实例），
+ * 本记录保留用于会话寻址与兼容。
  */
-public record AgentModelSelection(Model model, GenerateOptions options) {
+public record AgentModelSelection(Model model, GenerateOptions options, String modelKey) {
+
+    public AgentModelSelection(Model model, GenerateOptions options) {
+        this(model, options, null);
+    }
 }

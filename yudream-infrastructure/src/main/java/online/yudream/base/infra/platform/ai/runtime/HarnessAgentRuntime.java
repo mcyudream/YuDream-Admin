@@ -117,14 +117,18 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
             Consumer<String> onReasoningDelta,
             Consumer<AiAgentToolResult> onTool
     ) {
-        HarnessAgent agent = agentFor(request);
+        // 模型在构建期绑定（agent 按 (profile, 模型身份) 缓存），不依赖 middleware 替换。
+        AgentModelSelection selection = selection(request);
+        String cacheKey = agentCode(request) + "::"
+                + (selection == null ? "default" : String.valueOf(selection.modelKey()));
+        HarnessAgent agent = agents.computeIfAbsent(cacheKey,
+                ignored -> buildAgent(agentCode(request), selection));
         HarnessToolCollector collector = new HarnessToolCollector(onTool);
         RuntimeContext context = RuntimeContext.builder()
                 .userId(userId(request))
                 .sessionId(request.sessionId() == null ? "once-" + UUID.randomUUID() : request.sessionId())
                 .put(AgentToolPermissions.class, AgentToolPermissions.explicit(request.permissionCodes()))
                 .put(AgentToolCatalog.class, catalog(request))
-                .put(AgentModelSelection.class, selection(request))
                 .put(AgentSystemPromptOverride.class, new AgentSystemPromptOverride(request.systemPrompt()))
                 .put(HarnessToolCollector.class, collector)
                 .build();
@@ -134,19 +138,6 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         AiUsage usage = consume(agent.streamEvents(inputMessages(request), context),
                 content, reasoning);
         return new HarnessRunResult(content.toString(), reasoning.toString(), usage, collector.snapshot());
-    }
-
-    // ------------------------------------------------------------------
-    // Agent 装配
-    // ------------------------------------------------------------------
-
-    HarnessAgent agentFor(HarnessRunRequest request) {
-        return agents.computeIfAbsent(agentCode(request), this::buildAgent);
-    }
-
-    /** 拥有文件工作区的 agent profile 前缀：工作流与 CMS 静态站点 builder。 */
-    static boolean workspaceProfile(String agentCode) {
-        return agentCode != null && (agentCode.startsWith("workflow") || agentCode.startsWith("cms-builder"));
     }
 
     /**
@@ -167,12 +158,31 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
         return StringUtils.hasText(request.agentCode()) ? request.agentCode() : "general";
     }
 
-    HarnessAgent buildAgent(String code) {
+    HarnessAgent agentFor(HarnessRunRequest request) {
+        AgentModelSelection selection = selection(request);
+        String cacheKey = agentCode(request) + "::"
+                + (selection == null ? "default" : String.valueOf(selection.modelKey()));
+        return agents.computeIfAbsent(cacheKey, ignored -> buildAgent(agentCode(request), selection));
+    }
+
+    /** 拥有文件工作区的 agent profile 前缀：工作流与 CMS 静态站点 builder。 */
+    static boolean workspaceProfile(String agentCode) {
+        return agentCode != null && (agentCode.startsWith("workflow") || agentCode.startsWith("cms-builder"));
+    }
+
+    /**
+     * 模型在构建期绑定（Agent 实例按 (profile, 模型身份) 缓存多实例）；
+     * 同 profile 不同供应商模型的请求各得一个实例。
+     */
+    HarnessAgent buildAgent(String code, AgentModelSelection selection) {
+        Model model = selection == null || selection.model() == null ? defaultModel() : selection.model();
+        log.info("[agent-build] code={} modelClass={} modelName={}", code,
+                model.getClass().getSimpleName(), model.getModelName());
         HarnessAgent.Builder builder = HarnessAgent.builder()
                 .name(code)
                 .agentId(code)
                 .sysPrompt(defaultSystemPrompt())
-                .model(defaultModel())
+                .model(model)
                 .maxIters(properties.getMaxIters())
                 .stateStore(stateStore)
                 .distributedStore(new MongoDistributedStore(stateStore, baseStore))
@@ -188,15 +198,14 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                 .permissionContext(PermissionContextState.builder()
                         .mode(PermissionMode.DEFAULT)
                         .build());
-                // 聊天型 Agent 不暴露宿主文件系统与 shell；工作流/CMS builder 工作区 profile
-                // 启用文件工具（read/write/edit/list/grep/glob），shell 任何 profile 都不开放。
-                if (!workspaceProfile(code)) {
-                    builder.disableFilesystemTools();
-                }
-                builder.disableShellTool();
-                builder.middleware(new PerCallModelMiddleware());
-                builder.middleware(new PerCallSystemPromptMiddleware());
-                builder.middleware(new PerCallToolFilterMiddleware(permissionGateway));
+        // 聊天型 Agent 不暴露宿主文件系统与 shell；工作流/CMS builder 工作区 profile
+        // 启用文件工具（read/write/edit/list/grep/glob），shell 任何 profile 都不开放。
+        if (!workspaceProfile(code)) {
+            builder.disableFilesystemTools();
+        }
+        builder.disableShellTool();
+        builder.middleware(new PerCallSystemPromptMiddleware());
+        builder.middleware(new PerCallToolFilterMiddleware(permissionGateway));
         if (!properties.isMemoryHooksEnabled()) {
             builder.disableMemoryHooks();
         }
@@ -292,7 +301,8 @@ public class HarnessAgentRuntime implements HarnessAgentGateway {
                         config(request), List.<AiChatMessage>of(), false,
                         online.yudream.base.domain.platform.ai.enumerate.AiToolMode.NONE,
                         online.yudream.base.domain.platform.ai.valobj.AiStructuredOutput.none()));
-        return new AgentModelSelection(models.resolve(resolved), options);
+        String modelKey = AgentScopeModels.identityOf(resolved.provider(), resolved.model());
+        return new AgentModelSelection(models.resolve(resolved), options, modelKey);
     }
 
     private Map<String, String> config(HarnessRunRequest request) {
