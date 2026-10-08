@@ -67,6 +67,7 @@ class AgentChatDispatcherPermissionTest {
                 List.of(),
                 List.of(),
                 permissionCodes,
+                List.of(),
                 ignored -> {
                 },
                 ignored -> {

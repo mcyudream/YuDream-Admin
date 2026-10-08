@@ -4,6 +4,7 @@ import lombok.Data;
 import online.yudream.base.application.platform.chat.dto.ChatAttachmentDTO;
 import online.yudream.base.application.platform.chat.dto.ChatContextRefDTO;
 import online.yudream.base.domain.platform.ai.valobj.AiChatMessage;
+import online.yudream.base.domain.platform.ai.valobj.ToolConfirmationDecision;
 import online.yudream.base.domain.platform.chat.enumerate.ChatScopeType;
 
 import java.util.List;
@@ -21,4 +22,6 @@ public class ChatSendCmd {
     private List<ChatAttachmentDTO> attachments = List.of();
     private List<AiChatMessage> history = List.of();
     private List<String> permissionCodes = List.of();
+    /** HITL 恢复：对上一轮暂挂工具调用的批准/拒绝决定。 */
+    private List<ToolConfirmationDecision> confirmDecisions = List.of();
 }

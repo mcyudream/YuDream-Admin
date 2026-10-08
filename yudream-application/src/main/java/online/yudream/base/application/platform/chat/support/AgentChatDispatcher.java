@@ -32,6 +32,7 @@ public class AgentChatDispatcher implements ChatDispatcher {
             throw new BizException("请选择要使用的 Agent 应用");
         }
         AgentRunCmd command = new AgentRunCmd();
+        command.setUserId(context.userId());
         command.setInput(context.question());
         command.setProviderCode(context.providerCode());
         command.setModelCode(context.modelCode());

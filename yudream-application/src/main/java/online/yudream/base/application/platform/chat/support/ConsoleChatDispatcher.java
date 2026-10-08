@@ -61,7 +61,8 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
                 true,
                 permissionCodes,
                 stateful ? List.of() : context.history(),
-                allowed);
+                allowed,
+                context.confirmDecisions());
         HarnessRunResult result = harnessAgents.run(
                 request,
                 context.onDelta(),
