@@ -1,7 +1,7 @@
 import type { ApiResponse } from './system-client'
 import systemClient from './system-client'
 
-export type ChatScopeType = 'GENERAL' | 'AGENT' | 'WIKI'
+export type ChatScopeType = 'GENERAL' | 'AGENT' | 'WIKI' | 'CONSOLE'
 
 export interface ChatSession {
   id: string
