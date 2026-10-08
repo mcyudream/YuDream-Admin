@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { WorkspaceEntry } from '@/api/modules/platform-cms-workspace'
-import { cmsWorkspaceChatEndpoint, cmsWorkspaceRawUrl } from '@/api/modules/platform-cms-workspace'
+import { cmsWorkspaceChatEndpoint } from '@/api/modules/platform-cms-workspace'
 import apiWorkspace from '@/api/modules/platform-cms-workspace'
 import { useYdChatStream, YdChatMessageList, YdChatSender } from '@yudream/components'
 import CmsGrapesEditor from '@/views/platform/theme-center/components/CmsGrapesEditor.vue'
@@ -11,17 +11,22 @@ const modal = useFaModal()
 const loading = ref(false)
 const entries = ref<WorkspaceEntry[]>([])
 const selectedPath = ref('')
-const editingContent = ref('')
 const uploadInput = ref<HTMLInputElement>()
 const previewKey = ref(0)
 const targetKey = 'home'
+
+const editVisible = ref(false)
+const editPath = ref('')
+const editContent = ref('')
+const previewVisible = ref(false)
+const previewDoc = ref('')
 const canvasVisible = ref(false)
 const canvasHtml = ref('')
 const canvasCss = ref('')
 const canvasJs = ref('')
 const canvasProjectJson = ref('')
-
 const canvasFilePath = computed(() => selectedPath.value || 'pages/index.html')
+const chatOpen = ref(false)
 
 const { messages, streaming, send, stop, clear } = useYdChatStream({
   endpoint: () => cmsWorkspaceChatEndpoint(targetKey),
@@ -30,51 +35,38 @@ const { messages, streaming, send, stop, clear } = useYdChatStream({
   historyLimit: 8,
 })
 
-const textEntries = computed(() =>
-  entries.value
-    .filter(entry => isTextPath(entry.path))
-    .sort((a, b) => a.path.localeCompare(b.path)),
-)
-const assetEntries = computed(() =>
-  entries.value.filter(entry => !isTextPath(entry.path)).sort((a, b) => a.path.localeCompare(b.path)),
-)
-const previewUrl = computed(() => `${cmsWorkspaceRawUrl(`preview/pages/`)}index.html?v=${previewKey.value}`)
 
 watch(selectedPath, loadSelected)
-onMounted(() => {
-  void refresh()
-  clear()
-})
+onMounted(refresh)
 
 async function refresh() {
   loading.value = true
   try {
     entries.value = (await apiWorkspace.list()).data
-    if (!entries.value.some(entry => entry.path === selectedPath.value)) {
-      const first = textEntries.value.find(entry => entry.path.endsWith('.html')) ?? textEntries.value[0]
-      selectedPath.value = first ? first.path : ''
-      editingContent.value = ''
-    }
     previewKey.value++
   }
   finally { loading.value = false }
 }
 async function loadSelected() {
-  if (!selectedPath.value) {
-    editingContent.value = ''
-    return
-  }
+  if (!selectedPath.value || !selectedPath.value.endsWith('.html')) return
   const res = await apiWorkspace.read(selectedPath.value)
-  editingContent.value = res.data.encoding === 'text' ? res.data.content : ''
+  editPath.value = selectedPath.value
+  editContent.value = res.data.encoding === 'text' ? res.data.content : ''
 }
-async function saveSelected() {
-  if (!selectedPath.value) {
-    toast.warning('请先选择文件')
-    return
-  }
-  await apiWorkspace.write(selectedPath.value, editingContent.value)
+function openEdit(path: string) {
+  selectedPath.value = path
+  void loadSelected().then(() => {
+    editPath.value = path
+    editVisible.value = true
+  })
+}
+async function saveEdit() {
+  await apiWorkspace.write(editPath.value, editContent.value)
   toast.success('已保存')
+  editVisible.value = false
   previewKey.value++
+  await refresh()
+  selectedPath.value = editPath.value
 }
 function createPage() {
   const path = window.prompt('页面路径（pages/ 下，如 about/index.html）')
@@ -84,10 +76,11 @@ function createPage() {
     toast.error('路径必须位于 pages/ 下且以 .html 结尾')
     return
   }
-  void apiWorkspace.write(normalized, '<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="UTF-8">\n</head>\n<body>\n  <main class="yb-ai-page"></main>\n</body>\n</html>\n').then(async () => {
+  const skeleton = '<!doctype html>\n<html lang="zh-CN">\n<head>\n  <meta charset="UTF-8">\n</head>\n<body>\n  <main class="yb-ai-page"></main>\n</body>\n</html>\n'
+  void apiWorkspace.write(normalized, skeleton).then(async () => {
     toast.success('页面已创建')
     await refresh()
-    selectedPath.value = normalized
+    void openEdit(normalized)
   })
 }
 function pickUpload() {
@@ -103,26 +96,71 @@ async function onUploadChange(event: Event) {
   toast.success(`资产已上传：${path}`)
   await refresh()
 }
-function confirmPublish() {
+function deleteEntry(entry: WorkspaceEntry) {
   modal.confirm({
-    title: '发布站点',
-    content: '将先运行完整性校验（HTML/CSS/JS 结构与类覆盖），通过后整树快照为发布版本并同步站点页面。确认发布？',
+    title: '删除文件',
+    content: `确定删除「${entry.path}」吗？`,
     onConfirm: async () => {
-      const res = await apiWorkspace.publish()
-      toast.success(`已发布：${res.data.files} 个文件、${res.data.pages} 个页面`)
-      window.open(`${cmsWorkspaceRawUrl('').replace('/workspace/raw/', '/public/cms/site/')}pages/index.html`, '_blank')
+      await apiWorkspace.delete(entry.path)
+      if (selectedPath.value === entry.path) selectedPath.value = ''
+      toast.success('已删除')
+      await refresh()
     },
   })
 }
-/** 画布工作区模式：读工作区文件导入 GrapesJS（html/css 回退链 + .grapes.json 旁车），保存写回工作区。 */
-async function openCanvas() {
-  const htmlPath = selectedPath.value && selectedPath.value.endsWith('.html')
-    ? selectedPath.value
-    : 'pages/index.html'
+function confirmPublish() {
+  modal.confirm({
+    title: '发布站点',
+    content: '先运行完整性校验，通过后整树快照为发布版本并同步站点页面。确认发布？',
+    onConfirm: async () => {
+      const res = await apiWorkspace.publish()
+      toast.success(`已发布：${res.data.files} 个文件、${res.data.pages} 个页面`)
+      previewKey.value++
+    },
+  })
+}
+async function openPreview(entry: WorkspaceEntry) {
+  const cssRes = await apiWorkspace.read('assets/css/site.css').then(res => res.data).catch(() => null)
+  const htmlRes = await apiWorkspace.read(entry.path).then(res => res.data).catch(() => null)
+  if (!htmlRes) {
+    toast.warning('页面不存在')
+    return
+  }
+  let html = htmlRes.encoding === 'text' ? htmlRes.content : ''
+  const css = cssRes && cssRes.encoding === 'text' ? cssRes.content : ''
+  if (css) html = html.replace(/<\/head>/i, `<style>${css.replace(/<\/style/gi, '')}</style></head>`)
+  // 预览内联二进制资产：引用转 data URL，绕过 iframe 认证问题
+  const assetPattern = /(?:src|href)="(assets\/[^"]+)"/g
+  const referenced = new Set<string>()
+  let match: RegExpExecArray | null
+  while ((match = assetPattern.exec(html))) referenced.add(match[1])
+  for (const ref of referenced) {
+    try {
+      const res = await apiWorkspace.read(ref)
+      const data = res.data.encoding === 'base64' ? res.data.content : btoa(unescape(encodeURIComponent(res.data.content)))
+      html = html.split(`"${ref}"`).join(`"data:${mimeOf(ref)};base64,${data}"`)
+    }
+    catch { /* 缺失资产保留原引用 */ }
+  }
+  previewDoc.value = html
+  previewVisible.value = true
+}
+function mimeOf(path: string) {
+  const lower = path.toLowerCase()
+  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.gif')) return 'image/gif'
+  if (lower.endsWith('.webp')) return 'image/webp'
+  if (lower.endsWith('.svg')) return 'image/svg+xml'
+  if (lower.endsWith('.mp4')) return 'video/mp4'
+  if (lower.endsWith('.webm')) return 'video/webm'
+  return 'image/jpeg'
+}
+async function openCanvas(entry: WorkspaceEntry) {
+  selectedPath.value = entry.path
   const [html, css, project] = await Promise.all([
-    apiWorkspace.read(htmlPath).then(res => res.data.content).catch(() => ''),
-    apiWorkspace.read('assets/css/site.css').then(res => res.data.content).catch(() => ''),
-    apiWorkspace.read(htmlPath.replace(/\.html$/, '.grapes.json')).then(res => res.data.content).catch(() => ''),
+    apiWorkspace.read(entry.path).then(res => (res.data.encoding === 'text' ? res.data.content : '')).catch(() => ''),
+    apiWorkspace.read('assets/css/site.css').then(res => (res.data.encoding === 'text' ? res.data.content : '')).catch(() => ''),
+    apiWorkspace.read(entry.path.replace(/\.html$/, '.grapes.json')).then(res => (res.data.encoding === 'text' ? res.data.content : '')).catch(() => ''),
   ])
   canvasHtml.value = html
   canvasCss.value = css
@@ -134,29 +172,26 @@ async function onCanvasSave(payload: { htmlContent: string; cssContent: string; 
   const htmlPath = canvasFilePath.value
   await apiWorkspace.write(htmlPath, payload.htmlContent)
   await apiWorkspace.write('assets/css/site.css', payload.cssContent)
-  if (payload.jsContent) {
-    await apiWorkspace.write('assets/js/site.js', payload.jsContent)
-  }
+  if (payload.jsContent) await apiWorkspace.write('assets/js/site.js', payload.jsContent)
   await apiWorkspace.write(htmlPath.replace(/\.html$/, '.grapes.json'), payload.builderProjectJson)
   toast.success('已保存到工作区')
   canvasVisible.value = false
   previewKey.value++
   await refresh()
-  selectedPath.value = htmlPath
 }
-async function deleteEntry(entry: WorkspaceEntry) {
-  modal.confirm({
-    title: '删除文件',
-    content: `确定删除「${entry.path}」吗？`,
-    onConfirm: async () => {
-      await apiWorkspace.delete(entry.path)
-      toast.success('已删除')
-      await refresh()
-    },
-  })
+function openChat() {
+  chatOpen.value = true
+  if (!messages.value.length) clear()
 }
-function isTextPath(path: string) {
-  return /\.(html?|css|js|json|md|svg|txt)$/i.test(path)
+function ask(text: string) {
+  void send(text)
+}
+function formatSize(size: number) {
+  const value = Number(size || 0)
+  return value < 1024 ? `${value} B` : `${(value / 1024).toFixed(1)} KB`
+}
+function isHtmlPath(path: string) {
+  return path.endsWith('.html')
 }
 function fileName(path: string) {
   return path.split('/').pop() || path
@@ -167,94 +202,81 @@ function fileName(path: string) {
   <div>
     <FaPageHeader title="CMS 站点工作区" class="mb-0">
       <template #right>
-        <FaButton size="sm" variant="outline" @click="pickUpload">
-          <FaIcon name="morph:upload" /> 上传资产
-        </FaButton>
-        <FaButton size="sm" variant="outline" @click="createPage">
-          <FaIcon name="morph:file-plus" /> 新建页面
-        </FaButton>
-        <FaButton size="sm" variant="outline" @click="refresh">
-          <FaIcon name="morph:refresh-cw" /> 刷新
-        </FaButton>
-        <FaButton v-auth="'platform:ai:generate'" size="sm" @click="confirmPublish">
-          <FaIcon name="morph:rocket" /> 发布站点
-        </FaButton>
+        <FaButton size="sm" variant="outline" @click="createPage">新建页面</FaButton>
+        <FaButton size="sm" variant="outline" @click="pickUpload">上传资产</FaButton>
+        <FaButton size="sm" variant="outline" @click="openChat">AI 构建</FaButton>
+        <FaButton size="sm" @click="confirmPublish">发布站点</FaButton>
       </template>
     </FaPageHeader>
-    <FaPageMain class="!px-0">
-      <div class="workbench">
-        <aside class="files-pane">
-          <div class="pane-head">页面与文件</div>
-          <div class="file-group">
-            <div class="group-title">页面</div>
-            <button
-              v-for="entry in textEntries"
-              :key="entry.path"
-              class="file-item"
-              :class="{ active: entry.path === selectedPath }"
-              @click="selectedPath = entry.path"
-            >
-              <FaIcon name="morph:file-code" /> {{ fileName(entry.path) }}
-              <button class="del" title="删除" @click.stop="deleteEntry(entry)">×</button>
-            </button>
-            <div v-if="!textEntries.length" class="group-empty">暂无文件，先让 AI 生成或新建页面</div>
+    <FaPageMain>
+      <div class="ws-section">
+        <div class="ws-section__head">
+          <div>
+            <h3>站点文件</h3>
+            <p>pages/ 下每页一个 HTML；assets/ 存放样式、脚本与图片视频。页面通过 data-yb-* 与模板变量接入站点数据，发布前会自动做完整性校验。</p>
           </div>
-          <div class="file-group">
-            <div class="group-title">资产</div>
-            <div v-for="entry in assetEntries" :key="entry.path" class="file-item static">
-              <FaIcon name="morph:paperclip" /> {{ fileName(entry.path) }}
-              <button class="del" title="删除" @click="deleteEntry(entry)">×</button>
-            </div>
-            <div v-if="!assetEntries.length" class="group-empty">暂无资产</div>
-          </div>
-        </aside>
-        <section class="editor-pane">
-          <div class="pane-head">
-            <span class="min-w-0 truncate">{{ selectedPath || '选择左侧文件' }}</span>
-            <div class="flex gap-1">
-              <FaButton
-                v-if="selectedPath.endsWith('.html')"
-                size="sm"
-                variant="outline"
-                @click="openCanvas"
-              >
-                画布编辑
-              </FaButton>
-              <FaButton size="sm" variant="outline" :disabled="!selectedPath" @click="saveSelected">保存</FaButton>
-            </div>
-          </div>
-          <FaTextarea
-            v-model="editingContent"
-            class="editor h-full w-full"
-            input-class="font-mono"
-            :autosize="false"
-            placeholder="选择文件后编辑"
-          />
-        </section>
-        <section class="preview-pane">
-          <div class="pane-head">
-            预览
-            <FaButton size="sm" variant="ghost" @click="previewKey++">刷新</FaButton>
-          </div>
-          <iframe :key="previewKey" :src="previewUrl" class="preview" title="站点预览" />
-        </section>
-        <section class="chat-pane">
-          <div class="pane-head">AI 构建</div>
-          <div class="chat-body">
-            <YdChatMessageList :messages="messages">
-              <template #empty>
-                <div class="chat-empty">
-                  <strong>描述你想要的页面</strong>
-                  <p>例如：给首页加一个三列特性区块，样式用 yb-ai- 前缀</p>
-                </div>
+          <FaButton size="sm" variant="ghost" @click="refresh">
+            <FaIcon name="morph:refresh-cw" /> 刷新
+          </FaButton>
+        </div>
+        <FaResponsiveTable
+          v-loading="loading"
+          row-key="path"
+          :data="entries"
+          :columns="[
+            { accessorKey: 'path', header: '文件路径' },
+            { accessorKey: 'size', header: '大小', width: 110 },
+            { accessorKey: 'updatedAt', header: '更新时间', width: 180 },
+            { id: 'operation', header: '操作', width: 300 }
+          ]"
+        >
+          <template #cell-path="{ row }">
+            <span class="min-w-0 break-all">{{ fileName(row.original.path) }}</span>
+          </template>
+          <template #cell-size="{ row }">{{ formatSize(Number(row.original.size || 0)) }}</template>
+          <template #cell-operation="{ row }">
+            <div class="flex gap-2 justify-center">
+              <template v-if="isHtmlPath(row.original.path)">
+                <FaButton size="sm" variant="outline" @click="openEdit(row.original.path)">编辑</FaButton>
+                <FaButton size="sm" variant="outline" @click="openCanvas(row.original)">画布</FaButton>
               </template>
-            </YdChatMessageList>
-          </div>
-          <YdChatSender :loading="streaming" @send="send" @stop="stop" />
-        </section>
+              <FaButton size="sm" variant="outline" @click="openPreview(row.original)">预览</FaButton>
+              <FaButton size="sm" variant="destructive" @click="deleteEntry(row.original)">删除</FaButton>
+            </div>
+          </template>
+          <template #card="{ row }">
+            <FaCard class="w-full">
+              <div class="flex flex-col gap-3">
+                <span class="min-w-0 break-all text-sm font-medium">{{ row.path }}</span>
+                <div class="flex flex-wrap gap-2 border-t pt-3">
+                  <template v-if="isHtmlPath(row.path)">
+                    <FaButton size="sm" variant="outline" @click="openEdit(row.path)">编辑</FaButton>
+                    <FaButton size="sm" variant="outline" @click="openCanvas(row)">画布</FaButton>
+                  </template>
+                  <FaButton size="sm" variant="outline" @click="openPreview(row)">预览</FaButton>
+                  <FaButton size="sm" variant="destructive" @click="deleteEntry(row)">删除</FaButton>
+                </div>
+              </div>
+            </FaCard>
+          </template>
+        </FaResponsiveTable>
       </div>
     </FaPageMain>
+
     <input ref="uploadInput" type="file" class="hidden" @change="onUploadChange">
+
+    <FaModal v-model="editVisible" :title="`编辑：${editPath}`" class="sm:max-w-5xl">
+      <FaTextarea v-model="editContent" class="w-full" input-class="font-mono" :autosize="false" :rows="22" />
+      <template #footer>
+        <FaButton variant="outline" @click="editVisible = false">取消</FaButton>
+        <FaButton @click="saveEdit">保存</FaButton>
+      </template>
+    </FaModal>
+
+    <FaModal v-model="previewVisible" title="页面预览" class="sm:max-w-6xl">
+      <iframe :srcdoc="previewDoc" class="preview-frame" title="页面预览" />
+    </FaModal>
+
     <div v-if="canvasVisible" class="canvas-overlay">
       <CmsGrapesEditor
         :title="`画布编辑：${canvasFilePath}`"
@@ -263,36 +285,50 @@ function fileName(path: string) {
         :js-content="canvasJs"
         :builder-project-json="canvasProjectJson"
         page-template="DEFAULT"
-        :history-target-type="'page'"
+        history-target-type="page"
         :history-target-id="canvasFilePath"
         :history-target-label="canvasFilePath"
         @close="canvasVisible = false"
         @save="onCanvasSave"
       />
     </div>
+
+    <div v-if="chatOpen" class="chat-drawer">
+      <div class="chat-drawer__head">
+        <div class="min-w-0">
+          <strong>AI 构建助手</strong>
+          <span>描述要改的页面与区块，助手会读写工作区文件</span>
+        </div>
+        <button class="chat-drawer__close" @click="chatOpen = false; clear()">×</button>
+      </div>
+      <div class="chat-drawer__body">
+        <YdChatMessageList :messages="messages">
+          <template #empty>
+            <div class="chat-empty">
+              <strong>描述你想要的页面</strong>
+              <p>例如：给首页加一个三列特性区块，样式用 yb-ai- 前缀</p>
+            </div>
+          </template>
+        </YdChatMessageList>
+      </div>
+      <YdChatSender :loading="streaming" @send="ask" @stop="stop" />
+    </div>
   </div>
 </template>
 
 <style scoped>
-.workbench { display: grid; grid-template-columns: 220px minmax(0, 1.2fr) minmax(0, 1fr) 320px; gap: 12px; min-height: calc(100vh - 220px); }
-.files-pane, .editor-pane, .preview-pane, .chat-pane { display: flex; min-width: 0; flex-direction: column; overflow: hidden; border: 1px solid var(--color-border-2); border-radius: 8px; background: var(--color-bg-1); }
-.pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--color-border-2); font-size: 12px; font-weight: 500; color: var(--color-text-2); }
-.file-group { padding: 8px; }
-.group-title { padding: 4px 8px; color: var(--color-text-3); font-size: 11px; }
-.group-empty { padding: 8px; color: var(--color-text-3); font-size: 11px; }
-.file-item { display: flex; width: 100%; align-items: center; gap: 6px; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--color-text-2); font-size: 12px; text-align: left; cursor: pointer; }
-.file-item:hover { background: var(--color-fill-2); }
-.file-item.active { color: rgb(var(--primary-6)); background: var(--color-fill-2); font-weight: 500; }
-.file-item.static { cursor: default; }
-.file-item .del { margin-left: auto; border: 0; background: transparent; color: var(--color-text-3); cursor: pointer; }
-.editor :deep(textarea) { min-height: 100%; resize: none; }
-.editor { min-height: 0; }
-.preview { width: 100%; min-height: 0; border: 0; background: #fff; flex: 1; }
-.chat-body { min-height: 0; overflow: auto; padding: 0 12px; flex: 1; }
-.chat-empty { display: grid; gap: 6px; padding: 24px 8px; color: var(--color-text-3); font-size: 12px; justify-items: center; text-align: center; }
-.chat-empty strong { color: var(--color-text-1); }
-@media (max-width: 1024px) {
-  .workbench { grid-template-columns: 1fr; }
-}
+.ws-section { display: grid; gap: 16px; }
+.ws-section__head { display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+.ws-section__head h3, .ws-section__head p { margin: 0; }
+.ws-section__head p { margin-top: 6px; color: var(--color-text-3); font-size: 13px; }
+.preview-frame { width: 100%; height: 68vh; border: 1px solid var(--color-border-2); background: #fff; }
 .canvas-overlay { position: fixed; inset: 0; z-index: 1000; background: var(--color-bg-1); }
+.chat-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 1100; display: flex; width: 460px; max-width: 100vw; flex-direction: column; border-left: 1px solid var(--color-border-2); background: var(--color-bg-1); box-shadow: -8px 0 24px rgb(0 0 0 / 12%); }
+.chat-drawer__head { position: relative; display: grid; gap: 2px; padding: 14px 40px 14px 16px; border-bottom: 1px solid var(--color-border-2); }
+.chat-drawer__head strong { color: var(--color-text-1); font-size: 13px; }
+.chat-drawer__head span { color: var(--color-text-3); font-size: 11px; }
+.chat-drawer__close { position: absolute; top: 12px; right: 12px; display: grid; width: 28px; height: 28px; place-items: center; border: 0; border-radius: 6px; color: var(--color-text-3); background: var(--color-fill-2); cursor: pointer; }
+.chat-drawer__body { min-height: 0; overflow: auto; padding: 12px 16px; flex: 1; }
+.chat-empty { display: grid; gap: 6px; max-width: 320px; padding: 32px 12px; color: var(--color-text-3); font-size: 12px; justify-items: center; text-align: center; }
+.chat-empty strong { color: var(--color-text-1); }
 </style>
