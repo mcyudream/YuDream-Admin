@@ -168,6 +168,40 @@ async function openCanvas(entry: WorkspaceEntry) {
   canvasProjectJson.value = project || ''
   canvasVisible.value = true
 }
+
+/** @文件引用：抽屉内 @ 触发工作区文本文件联想，选中后内容注入本轮提示。 */
+const fileMentionItems = computed(() =>
+  entries.value
+    .filter(entry => entry.path.endsWith('.html') || /\.(css|js|json|md|svg|txt)$/i.test(entry.path))
+    .filter(entry => entry.path !== selectedPath.value)
+    .map(entry => ({
+      key: entry.path,
+      label: `@${fileName(entry.path)}`,
+      description: entry.path,
+      icon: 'morph:file-code',
+      value: entry.path,
+    })),
+)
+const pendingRefs = ref<string[]>([])
+function onFileMentionSelect(item: { value?: string }) {
+  if (item.value && !pendingRefs.value.includes(item.value)) {
+    pendingRefs.value = [...pendingRefs.value, item.value]
+  }
+}
+async function ask(text: string) {
+  let full = text
+  for (const refPath of pendingRefs.value) {
+    try {
+      const res = await apiWorkspace.read(refPath)
+      if (res.data.encoding === 'text') {
+        full = `【引用文件 ${refPath}】\n${res.data.content}\n\n` + full
+      }
+    }
+    catch { /* 引用读取失败忽略该文件 */ }
+  }
+  pendingRefs.value = []
+  void send(full)
+}
 async function onCanvasSave(payload: { htmlContent: string; cssContent: string; jsContent: string; builderProjectJson: string }) {
   const htmlPath = canvasFilePath.value
   await apiWorkspace.write(htmlPath, payload.htmlContent)
@@ -182,9 +216,6 @@ async function onCanvasSave(payload: { htmlContent: string; cssContent: string; 
 function openChat() {
   chatOpen.value = true
   if (!messages.value.length) clear()
-}
-function ask(text: string) {
-  void send(text)
 }
 function formatSize(size: number) {
   const value = Number(size || 0)
@@ -311,7 +342,13 @@ function fileName(path: string) {
           </template>
         </YdChatMessageList>
       </div>
-      <YdChatSender :loading="streaming" @send="ask" @stop="stop" />
+      <YdChatSender
+        :loading="streaming"
+        :mention-items="fileMentionItems"
+        @send="ask"
+        @stop="stop"
+        @mention-select="onFileMentionSelect"
+      />
     </div>
   </div>
 </template>
