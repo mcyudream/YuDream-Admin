@@ -72,7 +72,10 @@ public class ConsoleChatDispatcher implements ChatDispatcher {
 
     private List<String> allowedTools(String agentCode) {
         return switch (agentCode) {
-            case "cms-builder" -> List.of("cms_chrome_style");
+            // CMS builder：文件工具 + chrome 样式（页面构建的核心工具面）
+            case "cms-builder" -> List.of(
+                    "read_file", "write_file", "edit_file", "list_files", "grep_files", "glob_files",
+                    "cms_chrome_style");
             default -> List.of();
         };
     }

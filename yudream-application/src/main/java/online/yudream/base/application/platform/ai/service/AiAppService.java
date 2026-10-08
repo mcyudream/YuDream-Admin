@@ -38,12 +38,15 @@ public class AiAppService {
     /**
      * CMS 静态站点工作区 builder：Harness 文件工具直执行（无需浏览器桥），会话按
      * (cms-builder, 编辑者, targetKey) 隔离，工作区跨轮次持久；发布由用户在界面触发。
+     * providerCode/modelCode 决定本次会话绑定的模型（agent 实例按 (profile, 模型身份) 缓存）。
      */
     public CmsPageGenerateDTO streamCmsWorkspace(
             Long userId,
             String targetKey,
             String question,
             List<online.yudream.base.domain.platform.ai.valobj.AiChatMessage> history,
+            String providerCode,
+            String modelCode,
             java.util.function.Consumer<String> onDelta,
             java.util.function.Consumer<String> onReasoningDelta,
             java.util.function.Consumer<online.yudream.base.domain.platform.ai.valobj.AiAgentToolResult> onTool,
@@ -58,8 +61,8 @@ public class AiAppService {
                 workspaceSystemPrompt(target),
                 question == null ? "" : question,
                 List.of(),
-                null,
-                null,
+                providerCode,
+                modelCode,
                 aiConfig(),
                 true,
                 List.of("platform:ai:tool:cms-chrome-style"),

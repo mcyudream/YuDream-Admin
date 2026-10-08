@@ -50,10 +50,21 @@ public class AgentScopeModels {
      * 按配置身份解析（带缓存的）AgentScope 模型实例；配置任意字段变化都会得到新实例。
      */
     public Model resolve(ResolvedAiModel resolved) {
-        String key = cacheKey(resolved.provider(), resolved.model());
+        String key = identityOf(resolved.provider(), resolved.model());
         synchronized (cache) {
             return cache.computeIfAbsent(key, ignored -> build(resolved.provider(), resolved.model()));
         }
+    }
+
+    /** 模型配置身份键：agent 实例按 (agentCode, 该键) 缓存，构建期绑定模型。 */
+    public static String identityOf(AiProviderEndpoint provider, AiModelEndpoint model) {
+        return String.join("|",
+                String.valueOf(provider.type()),
+                provider.endpointBaseUrl(),
+                provider.completionsPath(),
+                String.valueOf(provider.apiKey()),
+                String.valueOf(proxyUrlNormalized(provider.proxyUrl())),
+                model.modelName());
     }
 
     private Model build(AiProviderEndpoint provider, AiModelEndpoint model) {
@@ -112,16 +123,6 @@ public class AgentScopeModels {
             throw new IllegalArgumentException("AI 代理地址配置无效：代理地址必须包含主机和端口");
         }
         return ProxyConfig.http(uri.getHost(), uri.getPort());
-    }
-
-    private static String cacheKey(AiProviderEndpoint provider, AiModelEndpoint model) {
-        return String.join("|",
-                String.valueOf(provider.type()),
-                provider.endpointBaseUrl(),
-                provider.completionsPath(),
-                String.valueOf(provider.apiKey()),
-                String.valueOf(proxyUrlNormalized(provider.proxyUrl())),
-                model.modelName());
     }
 
     private static String proxyUrlNormalized(String proxyUrl) {
