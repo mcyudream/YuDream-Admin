@@ -14,7 +14,8 @@ const sessions = ref<ChatSession[]>([])
 const sessionsLoading = ref(false)
 const quota = ref<ChatQuota | null>(null)
 const agentCode = ref('')
-const baseScopeType = ref<Extract<ChatScopeType, 'GENERAL' | 'WIKI'>>('GENERAL')
+const baseScopeType = ref<Extract<ChatScopeType, 'GENERAL' | 'WIKI' | 'CONSOLE'>>('GENERAL')
+const consoleProfile = ref<'general' | 'cms-builder'>('general')
 const wikiContextSlug = ref<string | null>(null)
 const providerCode = ref('')
 const modelCode = ref('')
@@ -35,7 +36,9 @@ const { messages, streaming, send, stop } = useYdChatStream({
   buildBody: (question, history, currentAttachments) => ({
     sessionId: activeId.value,
     scopeType: agentCode.value ? 'AGENT' : baseScopeType.value,
-    agentCode: agentCode.value || undefined,
+    agentCode: baseScopeType.value === 'CONSOLE'
+      ? consoleProfile.value
+      : (agentCode.value || undefined),
     spaceSlug: wikiContextSlug.value && wikiContextSlug.value !== '__all__' ? wikiContextSlug.value : undefined,
     contextRefs: wikiContextSlug.value ? [{ type: 'wiki', target: wikiContextSlug.value === '__all__' ? 'all' : wikiContextSlug.value, label: wikiContextLabel.value }] : [],
     providerCode: providerCode.value || undefined,
@@ -56,6 +59,9 @@ const modelOptions = computed(() => chatModels.value.map(item => ({
   value: `${item.providerCode}::${item.modelCode}`,
 })))
 const wikiContextLabel = computed(() => wikiContextSlug.value === '__all__' ? '全部知识库' : wikiSpaces.value.find(item => item.slug === wikiContextSlug.value)?.name ?? '')
+function toggleConsole() {
+  baseScopeType.value = baseScopeType.value === 'CONSOLE' ? 'GENERAL' : 'CONSOLE'
+}
 const welcomeTitle = computed(() => activeAgent.value?.name || '今天想让我帮你做什么？')
 const isEmpty = computed(() => messages.value.length === 0)
 const modelValue = computed({
@@ -278,6 +284,7 @@ onMounted(async () => {
                 <button v-if="wikiContextSlug" type="button" class="chat-context__clear" @click="selectWikiContext(null)"><FaIcon name="morph:x" />关闭知识库</button>
               </div>
             </div>
+            <FaTooltip text="AI 控制台：会话绑定工作区，助手可读写工作区文件（CMS 站点等）"><button type="button" class="chat-control chat-control--icon" :class="{ 'is-active': baseScopeType === 'CONSOLE' }" aria-label="AI 控制台" @click="toggleConsole"><FaIcon name="morph:terminal" /><span>控制台</span></button></FaTooltip>
             <div class="chat-control chat-control--select">
               <FaIcon name="morph:bot" />
               <FaSelect :model-value="agentCode" placeholder="Agent" :options="[{ label: '默认 Agent', value: '' }, ...agents.map(item => ({ label: item.name, value: item.code }))]" class="w-full" @update:model-value="value => (agentCode = typeof value === 'string' ? value : '')" />
