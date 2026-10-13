@@ -1,8 +1,8 @@
 export type DashboardTone = 'blue' | 'green' | 'amber' | 'rose' | 'purple' | 'cyan' | 'gray' | 'orange' | string
 
 // Keep legacy card metadata compatible; visual emphasis follows the active theme.
-export function toneIconClass(_tone?: DashboardTone) {
-  return 'text-[var(--color-text-2)]'
+export function toneIconClass(tone?: DashboardTone) {
+  return tone === 'green' ? 'yd-dashboard-tone-success' : tone === 'amber' || tone === 'orange' ? 'yd-dashboard-tone-warning' : tone === 'gray' ? 'yd-dashboard-tone-neutral' : 'yd-dashboard-tone-info'
 }
 
 export function toneBorderClass(_tone?: DashboardTone) {

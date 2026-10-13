@@ -1,0 +1,31 @@
+/* Workbench defaults stay below ADMIN plugin theme declarations. */
+@layer yudream-base {
+  :where(:root) {
+    --yd-dashboard-feature-bg: color-mix(in oklab, rgb(var(--primary-6)) 28%, #18232f);
+    --yd-dashboard-feature-text: #f8fafc;
+    --yd-dashboard-feature-muted: #c8d3df;
+    --yd-dashboard-info: rgb(var(--primary-6));
+    --yd-dashboard-success: rgb(var(--success-6));
+    --yd-dashboard-warning: rgb(var(--warning-6));
+  }
+
+  :where(:root.dark) {
+    --yd-dashboard-info: color-mix(in srgb, rgb(var(--primary-6)) 40%, #fff);
+  }
+}
+
+.yd-dashboard-tone-info {
+  color: var(--yd-dashboard-info);
+}
+
+.yd-dashboard-tone-success {
+  color: var(--yd-dashboard-success);
+}
+
+.yd-dashboard-tone-warning {
+  color: var(--yd-dashboard-warning);
+}
+
+.yd-dashboard-tone-neutral {
+  color: var(--color-text-2);
+}

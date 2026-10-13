@@ -49,8 +49,8 @@ defineEmits<{
 .dashboard-metrics__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 0;
+  gap: 18px 24px;
+  margin: 6px 0 0;
 }
 
 .dashboard-metrics__item {
@@ -58,10 +58,8 @@ defineEmits<{
   gap: 6px;
   align-content: start;
   min-width: 0;
-  padding: 10px 12px;
-  background: var(--color-fill-1);
-  border: 1px solid var(--color-border-1);
-  border-radius: calc(var(--yd-surface-radius, 18px) * 0.66);
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--color-border-1);
 }
 
 .dashboard-metrics__item dt {
@@ -73,7 +71,7 @@ defineEmits<{
 .dashboard-metrics__item dd {
   min-width: 0;
   margin: 0;
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
   line-height: 1.2;

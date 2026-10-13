@@ -25,6 +25,7 @@ function clamp(value: number, min: number, max: number) {
  * 位置持久化为 {side, topRatio, docked}（比例而非绝对像素，适配窗口缩放）。
  */
 export function useDevtoolsFab(fabRef: Ref<HTMLElement | null>) {
+  let compactViewport = window.innerWidth <= 768
   const state = reactive({
     initialized: false,
     side: 'right' as FabSide,
@@ -224,16 +225,26 @@ export function useDevtoolsFab(fabRef: Ref<HTMLElement | null>) {
     applyAnchoredPosition()
   }
 
-  function handleViewportResize() {
+  async function handleViewportResize() {
     if (!state.initialized) {
       return
     }
+    const compact = window.innerWidth <= 768
+    if (compact && !compactViewport) {
+      state.docked = true
+      await nextTick()
+    }
+    compactViewport = compact
     syncMetrics()
     applyAnchoredPosition()
   }
 
   onMounted(async () => {
     hydrate()
+    // Temporary mobile presentation; keep the saved desktop preference intact.
+    if (compactViewport) {
+      state.docked = true
+    }
     await nextTick()
     syncMetrics()
     applyAnchoredPosition()

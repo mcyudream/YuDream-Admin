@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { GridStack, GridStackNode, GridStackOptions, GridStackWidget } from 'gridstack'
-import type { DashboardBreakpoint, DashboardCard, DashboardGridPlacement, DashboardLayout, DashboardLayoutItem, DashboardWorkspace } from '@/api/modules/system-dashboard'
-import { nextTick } from 'vue'
+import type { DashboardBreakpoint, DashboardCard, DashboardLayout, DashboardLayoutItem, DashboardWorkspace } from '@/api/modules/system-dashboard'
 import apiDashboard from '@/api/modules/system-dashboard'
 import { useAppFeatureStore } from '@/store/modules/app/features'
+import DashboardCanvas from './dashboard/DashboardCanvas.vue'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
@@ -15,16 +14,9 @@ import DashboardPluginStatsCard from './dashboard/DashboardPluginStatsCard.vue'
 import DashboardProfileCard from './dashboard/DashboardProfileCard.vue'
 import DashboardQuickActionsCard from './dashboard/DashboardQuickActionsCard.vue'
 import DashboardRemotePluginCard from './dashboard/DashboardRemotePluginCard.vue'
+import { addLayoutCard, arrangeLayout, cloneItems, COLUMNS, normalizeLayout } from './dashboard/layout'
 import { toneIconClass } from './dashboard/tone.ts'
-import 'gridstack/dist/gridstack.min.css'
-
-const BREAKPOINTS: DashboardBreakpoint[] = ['lg', 'md', 'sm', 'xs']
-const BREAKPOINT_COLUMNS: Record<DashboardBreakpoint, number> = {
-  lg: 12,
-  md: 8,
-  sm: 4,
-  xs: 1,
-}
+import '@/assets/styles/dashboard-appearance.css'
 
 interface DashboardInsight {
   label: string
@@ -57,65 +49,46 @@ const workspace = ref<DashboardWorkspace | null>(null)
 const defaultCards = ref<DashboardCard[]>([])
 const defaultLayout = ref<DashboardLayout | null>(null)
 const draftItems = ref<DashboardLayoutItem[]>([])
-const gridRef = ref<HTMLElement | null>(null)
-const viewportWidth = ref(typeof window === 'undefined' ? 1440 : window.innerWidth)
-
-let grid: GridStack | null = null
-
+const activeBreakpoint = ref<DashboardBreakpoint>('lg')
+const cardSearch = ref('')
+const history = ref<DashboardLayoutItem[][]>([])
+const historyIndex = ref(0)
 const cards = computed(() => {
   const source = layoutMode.value === 'default' ? defaultCards.value : (workspace.value?.cards ?? [])
   return source.filter(canViewCard)
 })
 const cardMap = computed(() => new Map(cards.value.map(card => [card.code, card])))
-const activeBreakpoint = computed<DashboardBreakpoint>(() => {
-  if (viewportWidth.value < 640) {
-    return 'xs'
-  }
-  if (viewportWidth.value < 960) {
-    return 'sm'
-  }
-  if (viewportWidth.value < 1280) {
-    return 'md'
-  }
-  return 'lg'
-})
 const visibleItems = computed(() => draftItems.value.filter(item => item.visible && cardMap.value.has(item.cardCode)))
-const hiddenCards = computed(() => cards.value.filter((card) => {
-  const item = draftItems.value.find(row => row.cardCode === card.code)
-  return !item || !item.visible
-}))
+const hiddenCards = computed(() => cards.value.filter(card => !draftItems.value.some(item => item.cardCode === card.code && item.visible)))
 const hiddenCardGroups = computed(() => {
   const groups = new Map<string, DashboardCard[]>()
+  const query = cardSearch.value.trim().toLowerCase()
   for (const card of hiddenCards.value) {
-    const groupName = card.source === 'PLUGIN' ? `插件：${card.pluginCode || '未命名插件'}` : (card.category || '系统')
+    if (query && ![card.title, card.description, card.category, card.pluginCode].join(' ').toLowerCase().includes(query)) {
+      continue
+    }
+    const groupName = card.source === 'PLUGIN' ? `插件 · ${card.pluginCode || '扩展'}` : (card.category || '系统')
     groups.set(groupName, [...(groups.get(groupName) ?? []), card])
   }
   return Array.from(groups.entries()).map(([name, items]) => ({ name, items }))
 })
 const canConfigureDefault = computed(() => accountStore.permissions.includes('*') || accountStore.permissions.includes('system:dashboard:config'))
-const roleSummary = computed(() => accountStore.currentRole ? `${accountStore.currentRole.name} / ${accountStore.currentRole.code}` : '未选择角色')
+const roleSummary = computed(() => accountStore.currentRole?.name || '未选择角色')
 const deptSummary = computed(() => accountStore.currentDept?.name || '未选择部门')
-const drawerContentClass = computed(() => viewportWidth.value < 640 ? 'w-full sm:max-w-full' : 'sm:max-w-[460px]')
 const quickActions = computed(() => preferredMenuActions(menuActions()).slice(0, 8))
-const layoutSummary = computed(() => workspace.value?.userLayout ? '个人布局' : '默认布局')
+const layoutSummary = computed(() => workspace.value?.userLayout ? '个人工作空间' : '默认工作空间')
+const breakpointLabel = computed(() => ({ lg: '宽屏', md: '桌面', sm: '平板', xs: '手机' })[activeBreakpoint.value])
+const dirty = computed(() => JSON.stringify(draftItems.value) !== JSON.stringify(history.value[0]))
+const canUndo = computed(() => historyIndex.value > 0)
+const canRedo = computed(() => historyIndex.value < history.value.length - 1)
 
 function canViewCard(card: DashboardCard) {
   return !card.permission || accountStore.permissions.includes('*') || accountStore.permissions.includes(card.permission)
 }
 
-onMounted(async () => {
-  window.addEventListener('resize', handleResize)
+onMounted(() => {
   featureStore.load()
-  await loadWorkspace()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize)
-  destroyGrid()
-})
-
-watch([activeBreakpoint, editMode, () => visibleItems.value.map(item => item.cardCode).join('|')], async () => {
-  await renderGrid()
+  loadWorkspace()
 })
 
 async function loadWorkspace() {
@@ -124,11 +97,10 @@ async function loadWorkspace() {
   try {
     const res = await apiDashboard.workspace()
     workspace.value = res.data
-    draftItems.value = cloneItems(res.data.effectiveLayout.items)
-    await renderGrid()
+    draftItems.value = initialItems(res.data.effectiveLayout)
   }
   catch (error) {
-    loadError.value = error instanceof Error ? error.message : '首页加载失败'
+    loadError.value = error instanceof Error ? error.message : '工作台加载失败'
     toast.error(loadError.value)
   }
   finally {
@@ -136,89 +108,47 @@ async function loadWorkspace() {
   }
 }
 
-function handleResize() {
-  viewportWidth.value = window.innerWidth
+function beginHistory() {
+  history.value = [cloneItems(draftItems.value)]
+  historyIndex.value = 0
 }
 
-async function renderGrid() {
-  await nextTick()
-  destroyGrid()
-  if (!gridRef.value) {
+function initialItems(layout?: DashboardLayout | null) {
+  const items = normalizeLayout(layout?.items ?? [], cards.value)
+  // Preserve explicitly saved layouts. A generated first-visit layout uses the
+  // same recommendation engine as the editor, on every supported screen.
+  return layout?.id ? items : arrangeLayout(items, cards.value, 'recommended')
+}
+
+function changeLayout(items: DashboardLayoutItem[]) {
+  if (!editMode.value || saving.value) {
     return
   }
-  const options: GridStackOptions = {
-    column: BREAKPOINT_COLUMNS[activeBreakpoint.value],
-    cellHeight: activeBreakpoint.value === 'xs' ? 100 : 108,
-    margin: activeBreakpoint.value === 'xs' ? 10 : 14,
-    float: false,
-    disableDrag: !editMode.value,
-    disableResize: !editMode.value || activeBreakpoint.value === 'xs',
-    resizable: { handles: 'e, se, s, sw, w' },
-    draggable: { handle: '.card-drag-handle' },
-  }
-  const mod = await import('gridstack')
-  grid = mod.GridStack.init(options, gridRef.value)
-  grid.on('change', (_event, nodes) => syncGridNodes(nodes))
-}
-
-function destroyGrid() {
-  if (grid) {
-    grid.destroy(false)
-    grid = null
-  }
-}
-
-function widgetFor(item: DashboardLayoutItem): GridStackWidget {
-  const card = cardMap.value.get(item.cardCode)
-  const placement = placementFor(item)
-  return {
-    x: placement.x,
-    y: placement.y,
-    w: placement.w,
-    h: placement.h,
-    minW: activeBreakpoint.value === 'xs' ? 1 : Math.min(card?.minW || 1, BREAKPOINT_COLUMNS[activeBreakpoint.value]),
-    minH: card?.minH || 2,
-  }
-}
-
-function placementFor(item: DashboardLayoutItem): DashboardGridPlacement {
-  const fallback = item.placements.lg || { x: 0, y: 0, w: 4, h: 3 }
-  const next = item.placements[activeBreakpoint.value] || fallback
-  if (activeBreakpoint.value === 'xs') {
-    return { ...next, x: 0, w: 1 }
-  }
-  return next
-}
-
-function syncGridNodes(nodes?: GridStackNode[]) {
-  if (!editMode.value || !nodes?.length) {
+  const next = normalizeLayout(items, cards.value)
+  if (JSON.stringify(next) === JSON.stringify(draftItems.value)) {
     return
-  }
-  const breakpoint = activeBreakpoint.value
-  const next = cloneItems(draftItems.value)
-  for (const node of nodes) {
-    const cardCode = node.el?.getAttribute('data-card-code')
-    if (!cardCode) {
-      continue
-    }
-    const item = next.find(row => row.cardCode === cardCode)
-    if (!item) {
-      continue
-    }
-    item.placements[breakpoint] = {
-      x: node.x || 0,
-      y: node.y || 0,
-      w: breakpoint === 'xs' ? 1 : (node.w || 1),
-      h: node.h || 1,
-    }
   }
   draftItems.value = next
+  history.value = [...history.value.slice(0, historyIndex.value + 1), cloneItems(next)]
+  historyIndex.value = history.value.length - 1
+}
+
+function undo() {
+  if (canUndo.value) {
+    draftItems.value = cloneItems(history.value[--historyIndex.value])
+  }
+}
+
+function redo() {
+  if (canRedo.value) {
+    draftItems.value = cloneItems(history.value[++historyIndex.value])
+  }
 }
 
 function startEdit() {
   layoutMode.value = 'personal'
   editMode.value = true
-  draftItems.value = cloneItems(workspace.value?.effectiveLayout.items ?? [])
+  beginHistory()
 }
 
 function openCardPicker() {
@@ -231,19 +161,16 @@ function openCardPicker() {
 async function startDefaultEdit() {
   loading.value = true
   try {
-    const [cardRes, layoutRes] = await Promise.all([
-      apiDashboard.cards(),
-      apiDashboard.defaultLayout(),
-    ])
+    const [cardRes, layoutRes] = await Promise.all([apiDashboard.cards(), apiDashboard.defaultLayout()])
     defaultCards.value = cardRes.data
     defaultLayout.value = layoutRes.data
     layoutMode.value = 'default'
+    draftItems.value = initialItems(layoutRes.data)
     editMode.value = true
-    draftItems.value = cloneItems(layoutRes.data.items ?? [])
-    await renderGrid()
+    beginHistory()
   }
   catch (error) {
-    toast.error(error instanceof Error ? error.message : '默认首页加载失败')
+    toast.error(error instanceof Error ? error.message : '默认工作台加载失败')
   }
   finally {
     loading.value = false
@@ -253,146 +180,102 @@ async function startDefaultEdit() {
 function cancelEdit() {
   editMode.value = false
   drawerVisible.value = false
-  if (layoutMode.value === 'default') {
-    layoutMode.value = 'personal'
-  }
-  draftItems.value = cloneItems(workspace.value?.effectiveLayout.items ?? [])
+  layoutMode.value = 'personal'
+  draftItems.value = initialItems(workspace.value?.effectiveLayout)
 }
 
 async function saveLayout() {
   saving.value = true
   try {
-    await nextTick()
-    syncAllGridItems()
+    const payload = { items: cloneItems(draftItems.value) }
     if (layoutMode.value === 'default') {
-      await apiDashboard.saveDefaultLayout({ items: cloneItems(draftItems.value) })
-      toast.success('默认首页已保存')
-      layoutMode.value = 'personal'
+      await apiDashboard.saveDefaultLayout(payload)
+      toast.success('默认工作台已保存')
     }
     else {
-      await apiDashboard.saveMyLayout({ items: cloneItems(draftItems.value) })
-      toast.success('首页布局已保存')
+      await apiDashboard.saveMyLayout(payload)
+      toast.success('工作台布局已保存')
     }
     editMode.value = false
     drawerVisible.value = false
+    layoutMode.value = 'personal'
     await loadWorkspace()
   }
   catch (error) {
-    toast.error(error instanceof Error ? error.message : '保存失败')
+    toast.error(error instanceof Error ? error.message : '保存失败，调整已保留，可以重试')
   }
   finally {
     saving.value = false
   }
 }
 
-async function resetLayout() {
-  saving.value = true
-  try {
-    if (layoutMode.value === 'default') {
-      draftItems.value = cloneItems(defaultLayout.value?.items ?? [])
-      toast.success('已恢复为当前默认布局')
-    }
-    else {
-      await apiDashboard.resetMyLayout()
-      toast.success('已恢复默认布局')
-      editMode.value = false
-      drawerVisible.value = false
-      await loadWorkspace()
-    }
-  }
-  catch (error) {
-    toast.error(error instanceof Error ? error.message : '重置失败')
-  }
-  finally {
-    saving.value = false
-  }
+function resetLayout() {
+  changeLayout(initialItems(layoutMode.value === 'default' ? defaultLayout.value : workspace.value?.defaultLayout))
 }
 
-function syncAllGridItems() {
-  if (!grid) {
-    return
-  }
-  syncGridNodes(grid.engine.nodes)
+function arrange(mode: 'compact' | 'recommended') {
+  changeLayout(arrangeLayout(draftItems.value, cards.value, mode, mode === 'compact' ? activeBreakpoint.value : undefined))
 }
 
-async function addCard(card: DashboardCard) {
-  syncAllGridItems()
-  const existing = draftItems.value.find(item => item.cardCode === card.code)
-  if (existing) {
-    existing.visible = true
-    draftItems.value = cloneItems(draftItems.value)
-    await renderGrid()
-    return
+function addCard(card: DashboardCard) {
+  changeLayout(addLayoutCard(draftItems.value, cards.value, card))
+}
+
+function hideCard(cardCode: string) {
+  changeLayout(draftItems.value.map(item => item.cardCode === cardCode ? { ...item, visible: false } : item))
+}
+
+function resizeCard(card: DashboardCard, size: 'standard' | 'wide' | 'taller' | 'shorter') {
+  const next = cloneItems(draftItems.value)
+  const p = next.find(item => item.cardCode === card.code)!.placements[activeBreakpoint.value]!
+  if (size === 'wide') {
+    p.w = COLUMNS[activeBreakpoint.value]
+    p.x = 0
   }
-  draftItems.value = [
-    ...draftItems.value,
-    {
-      cardCode: card.code,
-      visible: true,
-      placements: defaultPlacements(card, draftItems.value),
-    },
+  else if (size === 'standard') {
+    p.w = Math.min(card.defaultW, COLUMNS[activeBreakpoint.value])
+    p.h = card.defaultH
+  }
+  else {
+    p.h = Math.max(card.minH, p.h + (size === 'taller' ? 1 : -1))
+  }
+  changeLayout(next)
+}
+
+function moveCard(card: DashboardCard, direction: number) {
+  const next = cloneItems(draftItems.value)
+  const ordered = next.filter(item => item.visible && cardMap.value.has(item.cardCode)).sort((a, b) => {
+    const pa = a.placements[activeBreakpoint.value]!
+    const pb = b.placements[activeBreakpoint.value]!
+    return pa.y - pb.y || pa.x - pb.x
+  })
+  const index = ordered.findIndex(item => item.cardCode === card.code)
+  const target = Math.max(0, Math.min(ordered.length - 1, index + direction))
+  ;[ordered[index], ordered[target]] = [ordered[target], ordered[index]]
+  let y = 0
+  for (const item of ordered) {
+    const p = item.placements[activeBreakpoint.value]!
+    p.y = y
+    p.x = 0
+    y += p.h
+  }
+  changeLayout(arrangeLayout(next, cards.value, 'compact', activeBreakpoint.value))
+}
+
+function cardMenu(card: DashboardCard) {
+  return [
+    [
+      { label: '标准尺寸', icon: 'morph:square', handle: () => resizeCard(card, 'standard') },
+      { label: '铺满一行', icon: 'morph:unfold-horizontal', handle: () => resizeCard(card, 'wide') },
+      { label: '增加高度', icon: 'morph:plus', handle: () => resizeCard(card, 'taller') },
+      { label: '减少高度', icon: 'morph:minus', handle: () => resizeCard(card, 'shorter') },
+    ],
+    [
+      { label: '向前移动', icon: 'morph:arrow-up', handle: () => moveCard(card, -1) },
+      { label: '向后移动', icon: 'morph:arrow-down', handle: () => moveCard(card, 1) },
+      { label: '移出工作台', icon: 'morph:eye-off', handle: () => hideCard(card.code) },
+    ],
   ]
-  await renderGrid()
-}
-
-async function hideCard(cardCode: string) {
-  syncAllGridItems()
-  draftItems.value = draftItems.value.map(item => item.cardCode === cardCode ? { ...item, visible: false } : item)
-  await renderGrid()
-}
-
-function defaultPlacements(card: DashboardCard, existingItems: DashboardLayoutItem[]) {
-  const placements: Partial<Record<DashboardBreakpoint, DashboardGridPlacement>> = {}
-  for (const breakpoint of BREAKPOINTS) {
-    const columns = BREAKPOINT_COLUMNS[breakpoint]
-    const width = breakpoint === 'xs' ? 1 : Math.min(card.defaultW || 4, columns)
-    const height = Math.max(card.defaultH || 3, card.minH || 2)
-    const heights = Array.from({ length: columns }).fill(0) as number[]
-    for (const item of existingItems) {
-      if (!item.visible) {
-        continue
-      }
-      const placement = item.placements[breakpoint] || item.placements.lg
-      if (!placement) {
-        continue
-      }
-      const itemWidth = breakpoint === 'xs' ? 1 : Math.min(Math.max(placement.w || 1, 1), columns)
-      const itemX = breakpoint === 'xs' ? 0 : Math.min(Math.max(placement.x || 0, 0), Math.max(columns - itemWidth, 0))
-      const itemBottom = Math.max(placement.y || 0, 0) + Math.max(placement.h || 1, 1)
-      for (let col = itemX; col < itemX + itemWidth; col++) {
-        heights[col] = Math.max(heights[col], itemBottom)
-      }
-    }
-    const slot = lowestSlot(heights, width)
-    placements[breakpoint] = {
-      x: slot.x,
-      y: slot.y,
-      w: width,
-      h: height,
-    }
-  }
-  return placements
-}
-
-function lowestSlot(heights: number[], width: number) {
-  let x = 0
-  let y = Number.MAX_SAFE_INTEGER
-  for (let index = 0; index <= heights.length - width; index++) {
-    const candidateY = Math.max(...heights.slice(index, index + width))
-    if (candidateY < y) {
-      x = index
-      y = candidateY
-    }
-  }
-  return { x, y: y === Number.MAX_SAFE_INTEGER ? 0 : y }
-}
-
-function cloneItems(items: DashboardLayoutItem[]) {
-  return items.map(item => ({
-    cardCode: item.cardCode,
-    visible: item.visible,
-    placements: Object.fromEntries(Object.entries(item.placements || {}).map(([key, placement]) => [key, { ...placement }])),
-  })) as DashboardLayoutItem[]
 }
 
 function openCard(card?: { actionPath?: string }) {
@@ -620,46 +503,64 @@ function cardProps(card: DashboardCard) {
         <div class="dashboard-greeting">
           <div class="dashboard-greeting__title">
             <h1>工作台</h1>
-            <span v-if="workspace && !editMode" class="dashboard-layout-label">{{ layoutSummary }}</span>
-            <span v-else-if="editMode" class="dashboard-layout-label">编辑模式</span>
+            <span class="dashboard-layout-label">{{ editMode ? (layoutMode === 'default' ? '编辑默认布局' : '编辑个人布局') : layoutSummary }}</span>
           </div>
           <p v-if="editMode" class="dashboard-edit-hint">
-            {{ layoutMode === 'default' ? '正在配置所有用户的默认首页' : '正在编辑你的个人首页，可拖拽卡片并调整大小' }}
+            拖动标题调整位置，拖动右下角缩放；也可用卡片菜单调整。
           </p>
           <p v-else class="dashboard-edit-hint">
-            常用入口、运行状态与工作动态，尽在这里。
+            从这里开始今天的工作。
           </p>
         </div>
         <div class="dashboard-toolbar">
-          <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="outline" size="sm" @click="openPublicHome">
+          <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="ghost" size="sm" @click="openPublicHome">
             <FaIcon name="morph:house" />
             访问首页
           </FaButton>
-          <FaButton v-if="!editMode && canConfigureDefault" variant="outline" size="sm" @click="startDefaultEdit">
-            <FaIcon name="morph:layout-dashboard" />
-            配置默认首页
-          </FaButton>
-          <FaButton v-if="!editMode" size="sm" :disabled="!workspace" @click="startEdit">
+          <FaButton v-if="!editMode" size="sm" :disabled="!workspace || loading" @click="startEdit">
             <FaIcon name="morph:sliders-horizontal" />
             自定义工作台
           </FaButton>
-          <template v-else>
-            <FaButton variant="outline" size="sm" @click="drawerVisible = true">
-              <FaIcon name="morph:plus" />
-              添加卡片
+          <FaDropdown v-if="!editMode && canConfigureDefault" :items="[[{ label: '配置默认工作台', icon: 'morph:users', handle: startDefaultEdit }]]" align="end">
+            <FaButton variant="ghost" size="icon-sm" aria-label="工作台设置" :disabled="loading">
+              <FaIcon name="morph:ellipsis" />
             </FaButton>
-            <FaButton variant="ghost" size="sm" @click="cancelEdit">
+          </FaDropdown>
+          <template v-if="editMode">
+            <span class="dashboard-save-state" role="status">{{ dirty ? '有未保存的调整' : '已与保存的布局同步' }}</span>
+            <FaButton variant="outline" size="sm" :disabled="saving" @click="cancelEdit">
               取消
             </FaButton>
-            <FaButton variant="outline" size="sm" :loading="saving" @click="resetLayout">
-              {{ layoutMode === 'default' ? '撤销调整' : '恢复默认' }}
-            </FaButton>
             <FaButton size="sm" :loading="saving" @click="saveLayout">
-              <FaIcon name="morph:save" />
-              {{ layoutMode === 'default' ? '保存默认布局' : '保存布局' }}
+              <FaIcon name="morph:check" />保存并退出
             </FaButton>
           </template>
         </div>
+      </div>
+
+      <div v-if="editMode" class="dashboard-editor-bar" :inert="saving || undefined">
+        <div class="dashboard-editor-bar__group">
+          <FaButton size="sm" @click="drawerVisible = true">
+            <FaIcon name="morph:plus" />添加卡片
+          </FaButton>
+          <FaButton size="icon-sm" variant="ghost" :disabled="!canUndo" aria-label="撤销调整" @click="undo">
+            <FaIcon name="morph:undo-2" />
+          </FaButton>
+          <FaButton size="icon-sm" variant="ghost" :disabled="!canRedo" aria-label="重做调整" @click="redo">
+            <FaIcon name="morph:redo-2" />
+          </FaButton>
+          <span class="dashboard-editor-divider" />
+          <FaButton size="sm" variant="ghost" title="保持尺寸，收紧当前屏幕的卡片间隙" @click="arrange('compact')">
+            <FaIcon name="morph:align-start-vertical" />整理空隙
+          </FaButton>
+          <FaButton size="sm" variant="ghost" title="为所有屏幕重新推荐尺寸与位置，可撤销" @click="arrange('recommended')">
+            <FaIcon name="morph:panels-top-left" />推荐排布
+          </FaButton>
+          <FaButton size="sm" variant="ghost" @click="resetLayout">
+            使用默认布局
+          </FaButton>
+        </div>
+        <span class="dashboard-editor-caption">{{ breakpointLabel }} · {{ COLUMNS[activeBreakpoint] }} 列 · {{ visibleItems.length }} 张卡片</span>
       </div>
 
       <div v-if="loading && !workspace" class="dashboard-loading" role="status" aria-live="polite">
@@ -682,58 +583,40 @@ function cardProps(card: DashboardCard) {
         </FaButton>
       </div>
 
-      <div v-else ref="gridRef" class="grid-stack dashboard-grid" :class="{ editing: editMode }">
-        <div
-          v-for="(item, index) in visibleItems"
-          :key="item.cardCode"
-          class="grid-stack-item"
-          :data-card-code="item.cardCode"
-          v-bind="widgetFor(item)"
-          :gs-x="widgetFor(item).x"
-          :gs-y="widgetFor(item).y"
-          :gs-w="widgetFor(item).w"
-          :gs-h="widgetFor(item).h"
-          :gs-min-w="widgetFor(item).minW"
-          :gs-min-h="widgetFor(item).minH"
-        >
+      <DashboardCanvas v-else :items="draftItems" :cards="cards" :editing="editMode && !saving" @change="changeLayout" @breakpoint="activeBreakpoint = $event">
+        <template #default="{ card, index, ready }">
           <article
             class="grid-stack-item-content dashboard-card"
-            :class="{ 'dashboard-card--welcome': cardMap.get(item.cardCode)?.component === 'PROFILE_SUMMARY' }"
+            :class="{
+              'dashboard-card--welcome': card.component === 'PROFILE_SUMMARY',
+              'dashboard-card--quick': card.component === 'QUICK_ACTIONS',
+            }"
             :style="{ '--dashboard-card-index': Math.min(index, 7) }"
+            :aria-label="card.title"
           >
             <header class="dashboard-card__header">
-              <button v-if="editMode" type="button" class="card-drag-handle" title="拖拽卡片">
-                <FaIcon name="morph:move" class="pointer-events-none" />
-              </button>
               <div class="dashboard-card__heading">
-                <span class="dashboard-card__icon" :class="toneIconClass(cardMap.get(item.cardCode)?.tone)">
-                  <FaIcon :name="cardMap.get(item.cardCode)?.icon || 'morph:layout-grid'" />
+                <FaIcon v-if="editMode" name="morph:grip-vertical" class="dashboard-card__grip" />
+                <span v-else class="dashboard-card__icon" :class="toneIconClass(card.tone)">
+                  <FaIcon :name="card.icon || 'morph:layout-grid'" />
                 </span>
                 <div class="dashboard-card__title-block">
-                  <h2>{{ displayCardTitle(cardMap.get(item.cardCode)) }}</h2>
+                  <h2>{{ displayCardTitle(card) }}</h2>
                 </div>
               </div>
-              <span v-if="!editMode && cardMap.get(item.cardCode)?.source === 'PLUGIN'" class="dashboard-card__source">插件</span>
-              <button
-                v-if="editMode"
-                type="button"
-                class="card-hide-button"
-                title="隐藏卡片"
-                @click="hideCard(item.cardCode)"
-              >
-                <FaIcon name="morph:eye-off" />
-              </button>
+              <span v-if="card.source === 'PLUGIN' && !editMode" class="dashboard-card__kind">扩展</span>
+              <FaDropdown v-if="editMode" :items="cardMenu(card)" align="end">
+                <FaButton variant="ghost" size="icon-sm" :aria-label="`调整${card.title}`">
+                  <FaIcon name="morph:ellipsis" />
+                </FaButton>
+              </FaDropdown>
             </header>
-
-            <component
-              :is="resolveCardComponent(cardMap.get(item.cardCode))"
-              v-if="cardMap.get(item.cardCode)"
-              :class="{ 'dashboard-card__content--chart': resolveCardComponent(cardMap.get(item.cardCode)) === DashboardChartStatsCard }"
-              v-bind="cardProps(cardMap.get(item.cardCode)!)"
-            />
+            <div class="dashboard-card__body" :inert="editMode || undefined">
+              <component :is="resolveCardComponent(card)" v-if="ready" v-bind="cardProps(card)" />
+            </div>
           </article>
-        </div>
-      </div>
+        </template>
+      </DashboardCanvas>
       <div v-if="!loading && workspace && !visibleItems.length" class="dashboard-empty">
         <FaIcon name="morph:panels-top-left" />
         <strong>从一张卡片开始</strong>
@@ -745,33 +628,33 @@ function cardProps(card: DashboardCard) {
       </div>
     </div>
 
-    <FaDrawer v-model="drawerVisible" title="添加首页卡片" :footer="false" :content-class="drawerContentClass">
+    <FaDrawer v-model="drawerVisible" title="卡片库" :footer="false" content-class="w-full sm:max-w-[460px]">
       <div class="card-picker">
+        <p class="card-picker-intro">
+          系统信息与插件内容，都可以自由组合。添加后保存布局即可保留。
+        </p>
+        <FaInput v-model="cardSearch" clearable placeholder="搜索卡片、功能或插件" aria-label="搜索卡片" />
         <div v-for="group in hiddenCardGroups" :key="group.name" class="card-picker-group">
           <div class="card-picker-group__title">
             <strong>{{ group.name }}</strong>
             <span>{{ group.items.length }}</span>
           </div>
-          <button v-for="card in group.items" :key="card.code" type="button" class="picker-card" @click="addCard(card)">
+          <button v-for="card in group.items" :key="card.code" type="button" class="picker-card" :aria-label="`添加${card.title}`" @click="addCard(card)">
             <span class="picker-card__icon" :class="toneIconClass(card.tone)">
               <FaIcon :name="card.icon || 'morph:layout-grid'" />
             </span>
             <span class="picker-card__main">
               <strong>{{ card.title }}</strong>
               <small>{{ card.description || card.category }}</small>
-              <span class="picker-card__meta">
-                <em>{{ sourceText(card) }}</em>
-                <em>{{ card.defaultW }} x {{ card.defaultH }}</em>
-              </span>
             </span>
             <span class="picker-card__add">
               <FaIcon name="morph:plus" />
             </span>
           </button>
         </div>
-        <div v-if="!hiddenCards.length" class="picker-empty">
-          <FaIcon name="morph:circle-check" />
-          <strong>所有卡片已显示</strong>
+        <div v-if="!hiddenCardGroups.length" class="picker-empty">
+          <FaIcon name="morph:search" />
+          <strong>{{ cardSearch ? '没有匹配的卡片' : '所有可用卡片已加入工作台' }}</strong>
         </div>
       </div>
     </FaDrawer>
@@ -849,10 +732,7 @@ function cardProps(card: DashboardCard) {
   justify-content: flex-end;
 }
 
-.dashboard-grid {
-  margin: var(--yd-workspace-gap, 24px) -7px 0;
-}
-
+/* The frame is identical in view and edit; controls share a fixed header. */
 .grid-stack-item-content.dashboard-card {
   display: flex;
   flex-direction: column;
@@ -863,34 +743,40 @@ function cardProps(card: DashboardCard) {
   background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
   border-radius: var(--yd-surface-radius, 18px);
-  box-shadow: var(--yd-surface-shadow, 0 2px 8px color-mix(in srgb, var(--color-text-1) 3%, transparent));
-  transition: border-color var(--yd-motion-duration-normal, 240ms) ease, box-shadow var(--yd-motion-duration-normal, 240ms) ease;
-  animation: dashboard-card-enter var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
-  animation-delay: calc(var(--dashboard-card-index, 0) * var(--yd-motion-stagger, 45ms));
+  box-shadow: var(--yd-surface-shadow);
+  transition: box-shadow var(--yd-motion-duration-normal) ease;
+  animation: dashboard-card-enter var(--yd-motion-duration-slow) var(--yd-motion-ease) both;
+  animation-delay: calc(var(--dashboard-card-index, 0) * var(--yd-motion-stagger));
 }
 
 .dashboard-card:hover,
 .dashboard-card:focus-within {
-  border-color: var(--color-border-3);
-  box-shadow: var(--yd-surface-shadow-hover, 0 6px 24px color-mix(in srgb, var(--color-text-1) 6%, transparent));
+  box-shadow: var(--yd-surface-shadow-hover);
 }
 
-.dashboard-card--welcome {
-  background: linear-gradient(125deg, var(--color-bg-2), var(--color-fill-1));
+.grid-stack-item-content.dashboard-card--welcome {
+  color: var(--yd-dashboard-feature-text);
+  background: var(--yd-dashboard-feature-bg);
+  border-color: transparent;
 }
 
-.editing .dashboard-card {
-  cursor: default;
-  outline: 1px dashed var(--color-border-3);
-  outline-offset: -4px;
-  animation: none;
+.dashboard-card--welcome .dashboard-card__header,
+.dashboard-card--welcome .dashboard-card__title-block h2 {
+  color: var(--yd-dashboard-feature-muted);
+}
+
+.dashboard-card--welcome .dashboard-card__icon {
+  color: inherit;
+  background: transparent;
 }
 
 .dashboard-card__header {
   display: flex;
+  flex: 0 0 56px;
   gap: 10px;
   align-items: center;
-  padding: 18px 20px 14px;
+  min-width: 0;
+  padding: 10px 20px;
 }
 
 .dashboard-card__heading {
@@ -901,21 +787,17 @@ function cardProps(card: DashboardCard) {
   min-width: 0;
 }
 
-.dashboard-card__icon {
+.dashboard-card__icon,
+.dashboard-card__grip {
   display: grid;
-  flex: 0 0 auto;
+  flex: 0 0 24px;
   place-items: center;
-  width: 32px;
-  height: 32px;
-  font-size: 16px;
-  color: var(--color-text-2);
-  background: var(--color-fill-2);
-  border-radius: 10px;
+  width: 24px;
+  height: 24px;
+  font-size: 17px;
 }
 
 .dashboard-card__title-block {
-  display: grid;
-  gap: 2px;
   min-width: 0;
 }
 
@@ -923,64 +805,80 @@ function cardProps(card: DashboardCard) {
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.3;
-  color: var(--color-text-1);
+  line-height: 1.4;
+  color: var(--color-text-2);
   white-space: nowrap;
 }
 
-.card-drag-handle,
-.card-hide-button {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  color: var(--color-text-3);
-  cursor: pointer;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
+.dashboard-card__kind {
+  font-size: 10px;
+  color: var(--color-text-4);
+  letter-spacing: 0.1em;
 }
 
-.editing .card-drag-handle {
-  color: var(--color-text-2);
-  cursor: grab;
-  background: var(--color-fill-2);
-  border-color: var(--color-border-2);
-}
-
-.card-drag-handle:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.card-hide-button:hover,
-.editing .card-drag-handle:hover {
-  color: var(--color-text-1);
-  background: var(--color-fill-2);
-  border-color: var(--color-border-3);
-}
-
-.card-drag-handle:focus-visible,
-.card-hide-button:focus-visible,
-.picker-card:focus-visible {
-  outline: 2px solid var(--color-text-2);
-  outline-offset: 3px;
-}
-
-.dashboard-card__content {
+.dashboard-card__body {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dashboard-card__body :deep(.dashboard-card__content) {
+  flex: 1;
+  min-width: 0;
   min-height: 0;
   margin: 0 20px 20px;
   overflow: auto;
 }
 
-.dashboard-card__content--chart {
+.dashboard-card__body :deep(.dashboard-remote-host > .dashboard-card__content) {
+  margin: 0;
+}
+
+.dashboard-card__body :deep(.dashboard-chart-stats) {
   overflow: hidden;
+}
+
+.dashboard-editor-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  margin-top: 20px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-control-radius);
+}
+
+.dashboard-editor-bar__group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.dashboard-editor-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--color-border-2);
+}
+
+.dashboard-editor-caption,
+.dashboard-save-state,
+.card-picker-intro {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-3);
+}
+
+.card-picker-intro {
+  margin: 0;
 }
 
 .dashboard-loading {
@@ -1248,6 +1146,7 @@ function cardProps(card: DashboardCard) {
   .dashboard-shell {
     width: calc(100% - 24px);
     padding-top: 20px;
+    padding-bottom: calc(84px + env(safe-area-inset-bottom));
   }
 
   .dashboard-header {

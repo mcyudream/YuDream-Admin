@@ -42,7 +42,6 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
       <div class="dashboard-profile__copy">
         <span class="dashboard-profile__date"><FaIcon name="morph:calendar-days" />{{ todayText }}</span>
         <h3>{{ greeting }}，{{ displayName }}</h3>
-        <p>欢迎回来，从这里开始今天的工作。</p>
       </div>
       <FaAvatar
         :src="avatar || ''"
@@ -76,13 +75,13 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   display: grid;
   gap: 18px;
   align-content: space-between;
+  padding-top: 12px;
 }
 
 .dashboard-profile__welcome {
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  justify-content: space-between;
   min-width: 0;
 }
 
@@ -97,19 +96,20 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   gap: 6px;
   align-items: center;
   font-size: 12px;
-  color: var(--color-text-3);
+  color: var(--yd-dashboard-feature-muted);
 }
 
 .dashboard-profile__copy h3 {
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: clamp(22px, 4.8cqi, 30px);
+  font-size: clamp(24px, 7cqi, 34px);
   font-weight: 700;
   line-height: 1.35;
-  color: var(--color-text-1);
+  color: var(--yd-dashboard-feature-text);
   letter-spacing: -0.04em;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .dashboard-profile__copy p {
@@ -126,22 +126,24 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 68px;
-  height: 68px;
+  width: 48px;
+  height: 48px;
+  margin-left: auto;
   overflow: hidden;
   font-size: 26px;
   color: var(--color-text-1);
-  background: var(--color-fill-2);
-  border: 1px solid var(--color-border-2);
+  background: color-mix(in srgb, var(--yd-dashboard-feature-text) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--yd-dashboard-feature-text) 24%, transparent);
   border-radius: var(--yd-surface-radius, 18px);
-  box-shadow: 0 5px 14px color-mix(in srgb, var(--color-text-1) 6%, transparent);
 }
 
 .dashboard-profile__chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 4px 16px;
   min-width: 0;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--yd-dashboard-feature-text) 18%, transparent);
 }
 
 .dashboard-profile__chips span {
@@ -150,15 +152,13 @@ const todayText = computed(() => new Intl.DateTimeFormat('zh-CN', {
   align-items: center;
   max-width: 100%;
   min-height: 30px;
-  padding: 0 10px;
+  padding: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 12px;
-  color: var(--color-text-2);
+  color: var(--yd-dashboard-feature-muted);
   white-space: nowrap;
-  background: var(--color-fill-2);
-  border: 1px solid var(--color-border-1);
-  border-radius: 999px;
+  background: transparent;
 }
 
 .dashboard-profile__chips :deep(.fa-icon) {
