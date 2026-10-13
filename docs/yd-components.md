@@ -1,10 +1,12 @@
 # YD 通用组件库
 
+视觉语言、场景选型、严格 YD-only 使用边界及持续维护要求见 [YD 视觉与组件使用规范](yd-ui-guidelines.md)。
+
 Coding Agent 会话、Harness、Skills、MCP、工作区以及回答引用/工具卡片的组合契约见 [YD Agent 工作台](yd-agent-workbench.md)。
 
 YD 在既有 FA 组件、主题变量和交互基础上提供自己的外观层，并按 [FA Pro 公开组件目录](https://fantastic-admin.hurui.me/components/pro/FaAnimatedBeam.html) 的 47 个参考项独立实现通用交互、日历和动效能力。参考目录用于确定功能范围；YD 没有复制闭源 Pro 源码，也不承诺 FA Pro 的属性、插槽或事件兼容。下方矩阵记录当前实现的能力与边界。
 
-新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。组件源码、resolver 与插件 SDK 的宿主共享映射已接入本仓工作区；本次未变更契约版本，也未发布到 Nexus。下游生产插件需等契约正式发布并验签后再升级依赖。
+新增入口与既有 `YdDatePicker`、`YdRangePicker`、`YdTimePicker`、`YdIconPicker`、AI 和图形组件共用 `@yudream/components`。组件源码、resolver 与插件 SDK 的宿主共享映射已接入本仓工作区。契约发布记录与下游同步状态见 [YD 契约发布记录](yd-contract-releases.md)，只有发布及验签完成的版本才能用于生产插件。
 
 ## 接入与基础二次封装
 
