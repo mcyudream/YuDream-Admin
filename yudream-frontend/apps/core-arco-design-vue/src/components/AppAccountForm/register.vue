@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import type { Component } from 'vue'
+import type { VerificationMethod } from '@/api/modules/user'
+import type { PluginRemoteModuleLease } from '@/plugins/remote-loader'
 import { toTypedSchema } from '@vee-validate/zod'
 import { useForm } from 'vee-validate'
 import * as z from 'zod'
-import apiUser from '@/api/modules/user'
-import type { VerificationMethod } from '@/api/modules/user'
-import { FormControl, FormDescription, FormField, FormItem, FormMessage } from '@/ui/shadcn/ui/form'
-import { acquirePluginRemoteModuleByCode, type PluginRemoteModuleLease } from '@/plugins/remote-loader'
-import { createPluginSdk } from '@/plugins/sdk'
 import apiPlugin from '@/api/modules/platform-plugin'
+import apiUser from '@/api/modules/user'
+import { acquirePluginRemoteModuleByCode } from '@/plugins/remote-loader'
+import { createPluginSdk } from '@/plugins/sdk'
+import { FormControl, FormDescription, FormField, FormItem, FormMessage } from '@/ui/shadcn/ui/form'
 
 defineOptions({
   name: 'RegisterForm',
@@ -41,6 +42,28 @@ const methodStates = ref<Record<string, { status: 'NONE' | 'PASSED' | 'PENDING',
 let loadSequence = 0
 let statusSequence = 0
 let emailCheckTimer: ReturnType<typeof setTimeout> | null = null
+
+const form = useForm({
+  validationSchema: toTypedSchema(
+    z.object({
+      account: z.string().min(1, '请输入用户名').min(3, '用户名至少3位'),
+      email: z.string().min(1, '请输入邮箱').email('邮箱格式不正确'),
+      nickname: z.string().optional(),
+      password: z.string().min(1, '请输入密码').min(6, '密码长度为6到18位').max(18, '密码长度为6到18位'),
+      checkPassword: z.string().min(1, '请再次输入密码'),
+    }).refine(data => data.password === data.checkPassword, {
+      message: '两次输入的密码不一致',
+      path: ['checkPassword'],
+    }),
+  ),
+  initialValues: {
+    account: props.account ?? '',
+    email: typeof route.query.email === 'string' ? route.query.email : '',
+    nickname: '',
+    password: '',
+    checkPassword: '',
+  },
+})
 
 function methodState(code: string) {
   return methodStates.value[code] || { status: 'NONE', checking: false }
@@ -215,28 +238,6 @@ function fallbackToPage() {
   router.push({ path: `/${method.code}`, query })
 }
 
-const form = useForm({
-  validationSchema: toTypedSchema(
-    z.object({
-      account: z.string().min(1, '请输入用户名').min(3, '用户名至少3位'),
-      email: z.string().min(1, '请输入邮箱').email('邮箱格式不正确'),
-      nickname: z.string().optional(),
-      password: z.string().min(1, '请输入密码').min(6, '密码长度为6到18位').max(18, '密码长度为6到18位'),
-      checkPassword: z.string().min(1, '请再次输入密码'),
-    }).refine(data => data.password === data.checkPassword, {
-      message: '两次输入的密码不一致',
-      path: ['checkPassword'],
-    }),
-  ),
-  initialValues: {
-    account: props.account ?? '',
-    email: typeof route.query.email === 'string' ? route.query.email : '',
-    nickname: '',
-    password: '',
-    checkPassword: '',
-  },
-})
-
 watch(() => form.values.email, () => {
   if (emailCheckTimer) {
     clearTimeout(emailCheckTimer)
@@ -273,11 +274,11 @@ const onSubmit = form.handleSubmit((values) => {
   <div class="p-12 flex-col-stretch-center min-h-500px w-full">
     <form @submit="onSubmit">
       <div class="mb-8 space-y-2">
-        <h3 class="text-4xl font-bold">
-          探索从这里开始 🚀
-        </h3>
+        <h2 class="text-4xl font-bold">
+          创建账号
+        </h2>
         <p class="text-sm text-muted-foreground lg:text-base">
-          {{ props.bindingToken ? '注册后将绑定该第三方账号' : '注册后即可开启旅程' }}
+          {{ props.bindingToken ? '注册后将绑定该第三方账号' : '填写账号信息，完成注册。' }}
         </p>
       </div>
       <FormField v-slot="{ componentField, errors }" name="account">
@@ -353,12 +354,12 @@ const onSubmit = form.handleSubmit((values) => {
           </Transition>
         </FormItem>
       </FormField>
-      <div v-if="verificationMethods.length" class="mb-4 rounded-md border p-3 text-sm">
-        <p class="mb-2 text-secondary-foreground">
+      <div v-if="verificationMethods.length" class="text-sm mb-4 p-3 border rounded-md">
+        <p class="text-secondary-foreground mb-2">
           注册前请先完成身份核验。人工审核通过前无法注册。
         </p>
         <div class="flex flex-col gap-2">
-          <div v-for="method in verificationMethods" :key="method.code" class="flex items-start justify-between gap-3">
+          <div v-for="method in verificationMethods" :key="method.code" class="flex gap-3 items-start justify-between">
             <div class="min-w-0">
               <div class="font-medium">
                 {{ method.displayName }}
@@ -417,7 +418,9 @@ const onSubmit = form.handleSubmit((values) => {
       @close="closeVerification"
     >
       <div class="register-verify-modal">
-        <p v-if="verifyLoading" class="text-sm text-muted-foreground">正在加载核验表单…</p>
+        <p v-if="verifyLoading" class="text-sm text-muted-foreground">
+          正在加载核验表单…
+        </p>
         <p v-else-if="verifyError" class="text-sm text-destructive">
           {{ verifyError }}
           <FaButton type="button" variant="link" class="p-0 h-auto" @click="fallbackToPage">
