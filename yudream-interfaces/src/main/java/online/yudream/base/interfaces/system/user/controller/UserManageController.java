@@ -39,6 +39,13 @@ public class UserManageController {
     private final UserAppService userAppService;
     private final LoginTokenAppService loginTokenAppService;
 
+    @GetMapping("/{id}")
+    @PermissionRegister(code = "system:user:view", name = "查看用户", module = "系统管理", desc = "查看用户资料")
+    public Result<UserManageRes> get(@PathVariable Long id) {
+        StpUtil.checkPermission("system:user:view");
+        return Result.ok(UserManageWebAssembler.toRes(userManageAppService.get(id)));
+    }
+
     @GetMapping
     @PermissionRegister(code = "system:user:view", name = "查看用户", module = "系统管理", desc = "查看用户列表")
     public Result<PageResult<UserManageRes>> page(UserPageQuery query) {

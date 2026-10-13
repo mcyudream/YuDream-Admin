@@ -50,6 +50,11 @@ public class UserManageAppService {
     private final MessagingIdentityAppService messagingIdentityAppService;
 
     @Transactional(readOnly = true)
+    public UserManageDTO get(Long id) {
+        return toDTO(getUser(id));
+    }
+
+    @Transactional(readOnly = true)
     public PageResult<UserManageDTO> page(UserPageQuery query) {
         PageResult<User> page = userRepo.page(
                 query.getKeyword(),

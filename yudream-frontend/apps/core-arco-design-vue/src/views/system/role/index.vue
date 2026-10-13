@@ -1,21 +1,39 @@
 <script setup lang="ts">
 import type { TableColumn } from '@yudream/components'
 import type { DeptManageItem } from '@/api/modules/system-dept'
+import type { PermissionOverview, PermissionOverviewQuery } from '@/api/modules/system-permission'
 import type { IdValue, PermissionItem, RoleLevel, RoleManageItem, RolePayload, RoleStatus } from '@/api/modules/system-role'
 import apiDept from '@/api/modules/system-dept'
 import apiExcel from '@/api/modules/system-excel'
+import apiPermission from '@/api/modules/system-permission'
 import apiRole from '@/api/modules/system-role'
 import { excelForm, importResultMessage, pickExcelFile, saveExcelResponse } from '@/utils/excel'
+import { buildPermissionTree, mergeVisiblePermissions, permissionCategoryOf, permissionResourceOf, permissionTreeKeys } from '@/utils/permission-catalog'
+import PermissionConstellation from './components/PermissionConstellation.vue'
+import PermissionMatrix from './components/PermissionMatrix.vue'
 
 const modal = useFaModal()
 const toast = useFaToast()
+const router = useRouter()
+const { auth } = useAppAuth()
+const activeView = ref<string | number>('list')
+const viewOptions = [
+  { value: 'list', label: '列表', icon: 'morph:list' },
+  { value: 'matrix', label: '矩阵', icon: 'morph:table' },
+  { value: 'trace', label: '溯源', icon: 'morph:orbit' },
+]
+const overview = ref<PermissionOverview>()
+const overviewLoading = ref(false)
+const overviewError = ref('')
+const overviewQuery = reactive<PermissionOverviewQuery>({ userPage: 1, userSize: 30 })
+let overviewRequest = 0
 
 const loading = ref(false)
 const rows = ref<RoleManageItem[]>([])
 const depts = ref<DeptManageItem[]>([])
 const permissions = ref<PermissionItem[]>([])
 const pagination = reactive({ page: 1, size: 10, total: 0 })
-const search = reactive<{ keyword: string; deptId?: IdValue; status?: RoleStatus }>({ keyword: '' })
+const search = reactive<{ keyword: string, deptId?: IdValue, status?: RoleStatus }>({ keyword: '' })
 
 const formVisible = ref(false)
 const editing = ref<RoleManageItem | null>(null)
@@ -39,82 +57,14 @@ const levelOptions = [
   { label: '访客', value: 'GUEST' },
 ]
 const deptOptions = computed(() => flattenDepts(depts.value).map(item => ({ label: item.name, value: item.id })))
-const permissionGroups = computed(() => {
-  const groups: Record<string, PermissionItem[]> = {}
-  permissions.value.forEach((item) => {
-    if (item.status === 'DEPRECATED') {
-      return
-    }
-    const key = item.module || 'default'
-    groups[key] ||= []
-    groups[key].push(item)
-  })
-  return groups
-})
-const permissionCodeSet = computed(() => new Set(permissions.value.map(item => item.code)))
-
-type PermissionCategoryVariant = 'default' | 'secondary' | 'outline' | 'destructive'
-
-interface PermissionCategoryMeta {
-  key: string
-  label: string
-  actions: string[]
-  variant: PermissionCategoryVariant
-}
-
-// 与 AGENTS.md「权限码业务分类」词表保持一致，新增动作词需同步两边
-const permissionCategoryMeta: PermissionCategoryMeta[] = [
-  { key: 'view', label: '查看', actions: ['view', 'export', 'download'], variant: 'secondary' },
-  { key: 'operate', label: '操作', actions: ['create', 'edit', 'import', 'upload', 'use', 'generate', 'publish', 'connect', 'send', 'test', 'run', 'invoke', 'execute', 'enable', 'disable', 'assign-role', 'assign-dept', 'dataset', 'report', 'accept'], variant: 'outline' },
-  { key: 'manage', label: '管理', actions: ['manage', 'config'], variant: 'default' },
-  { key: 'danger', label: '危险', actions: ['delete', 'kickout', 'revoke', 'impersonate'], variant: 'destructive' },
-  { key: 'other', label: '其他', actions: [], variant: 'outline' },
-]
-
-function permissionCategoryOf(code: string): PermissionCategoryMeta {
-  const action = code.split(':').pop() || ''
-  return permissionCategoryMeta.find(item => item.actions.includes(action)) || permissionCategoryMeta[permissionCategoryMeta.length - 1]
-}
+const permissionCodeSet = computed(() => new Set(permissions.value.filter(item => item.status === 'ACTIVE').map(item => item.code)))
+const legacyPermissionCount = computed(() => permissions.value.filter(item => item.status === 'ACTIVE' && (!permissionResourceOf(item).valid || permissionCategoryOf(item.code).key === 'other')).length)
 
 const permissionKeyword = ref('')
 const expandedKeys = ref<string[]>([])
-const permissionTreeData = computed(() => {
-  const keyword = permissionKeyword.value.trim().toLowerCase()
-  return Object.entries(permissionGroups.value).map(([module, items]) => {
-    const matched = keyword
-      ? items.filter(item =>
-          item.name.toLowerCase().includes(keyword)
-          || item.code.toLowerCase().includes(keyword)
-          || module.toLowerCase().includes(keyword)
-          || permissionCategoryOf(item.code).label.includes(keyword),
-        )
-      : items
-    return {
-      key: `module:${module}`,
-      title: `${module}（${matched.length}）`,
-      children: permissionCategoryMeta
-        .map(meta => ({
-          key: `cat:${module}:${meta.key}`,
-          title: `${meta.label}（${matched.filter(item => permissionCategoryOf(item.code).key === meta.key).length}）`,
-          variant: meta.variant as PermissionCategoryVariant,
-          children: matched
-            .filter(item => permissionCategoryOf(item.code).key === meta.key)
-            .map(item => ({ key: item.code, title: item.name, code: item.code })),
-        }))
-        .filter(group => group.children.length > 0),
-    }
-  }).filter(node => node.children.length > 0)
-})
+const permissionTreeData = computed(() => buildPermissionTree(permissions.value, permissionKeyword.value))
 // 树当前实际渲染出的权限码集合。搜索过滤后只剩匹配项，勾选事件回传也只反映这部分状态
-const visibleCodeSet = computed(() => {
-  const codes = new Set<string>()
-  permissionTreeData.value.forEach((moduleNode) => {
-    moduleNode.children.forEach((groupNode) => {
-      groupNode.children.forEach((leaf) => codes.add(leaf.key))
-    })
-  })
-  return codes
-})
+const visibleCodeSet = computed(() => new Set(permissionTreeKeys(permissionTreeData.value, true)))
 
 const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
   { accessorKey: 'name', header: '角色名称', width: 160, fixed: 'left' },
@@ -128,8 +78,87 @@ const tableColumns = computed<TableColumn<RoleManageItem>[]>(() => [
 ])
 
 onMounted(async () => {
-  await Promise.all([loadOptions(), loadRoles()])
+  await loadOptions()
+  await loadRoles()
 })
+
+watch(activeView, (value) => {
+  if (value !== 'list' && !overview.value) {
+    loadOverview()
+  }
+})
+
+onActivated(() => {
+  if (overview.value) {
+    loadOverview()
+  }
+})
+
+async function loadOverview() {
+  const request = ++overviewRequest
+  overviewLoading.value = true
+  overviewError.value = ''
+  try {
+    const response = await apiPermission.overview(overviewQuery)
+    if (request === overviewRequest) {
+      overview.value = response.data
+    }
+  }
+  catch {
+    if (request === overviewRequest) {
+      overviewError.value = '权限全景加载失败，请重试。'
+    }
+  }
+  finally {
+    if (request === overviewRequest) {
+      overviewLoading.value = false
+    }
+  }
+}
+
+async function refreshViews() {
+  await loadRoles()
+  if (overview.value || activeView.value !== 'list') {
+    await loadOverview()
+  }
+}
+
+function searchOverviewUsers(keyword: string) {
+  overviewQuery.userKeyword = keyword || undefined
+  overviewQuery.userUnassignedOnly = undefined
+  overviewQuery.userPage = 1
+  loadOverview()
+}
+
+function pageOverviewUsers(page: number) {
+  overviewQuery.userPage = page
+  loadOverview()
+}
+
+function showUnassignedUsers(enabled: boolean) {
+  overviewQuery.userKeyword = undefined
+  overviewQuery.userUnassignedOnly = enabled || undefined
+  overviewQuery.userPage = 1
+  loadOverview()
+}
+
+function editOverviewRole(row: RoleManageItem) {
+  if (auth('system:role:edit')) {
+    openEdit(row)
+  }
+}
+
+function editOverviewUser(id: string) {
+  if (auth('system:user:view') && auth('system:user:edit')) {
+    router.push({ path: '/system/user', query: { editUser: id } })
+  }
+}
+
+function editOverviewMenu(code: string) {
+  if (auth('system:menu:view') && auth('system:menu:edit')) {
+    router.push({ path: '/system/menu', query: { editMenu: code } })
+  }
+}
 
 watch(permissionKeyword, (keyword) => {
   if (keyword.trim()) {
@@ -174,7 +203,7 @@ function resetSearch() {
 }
 
 function treeGroupKeys() {
-  return permissionTreeData.value.flatMap(module => [module.key, ...module.children.map(group => group.key)])
+  return permissionTreeKeys(permissionTreeData.value)
 }
 
 function expandAllPermissions() {
@@ -186,7 +215,7 @@ function collapseAllPermissions() {
 }
 
 function selectAllPermissions() {
-  form.permissions = [...permissionCodeSet.value]
+  form.permissions = [...new Set([...form.permissions, ...permissionCodeSet.value])]
 }
 
 function clearPermissions() {
@@ -195,9 +224,7 @@ function clearPermissions() {
 
 function onPermissionCheck(checkedKeys: (string | number)[]) {
   // 树外的勾选（被搜索过滤隐藏、或权限已失效）不在 checkedKeys 里，直接全量重算会把它们清掉
-  const keptInvisible = form.permissions.filter(code => !visibleCodeSet.value.has(code))
-  const checkedVisible = checkedKeys.filter((key): key is string => typeof key === 'string' && visibleCodeSet.value.has(key))
-  form.permissions = [...keptInvisible, ...checkedVisible]
+  form.permissions = mergeVisiblePermissions(form.permissions, checkedKeys, visibleCodeSet.value)
 }
 
 function resetPermissionPanel() {
@@ -235,13 +262,15 @@ function openEdit(row: RoleManageItem) {
 
 async function saveForm() {
   // 权限码原样提交：失效的插件权限（更新/重载期间）保留在角色中，插件恢复后授权自动生效
-  if (editing.value)
+  if (editing.value) {
     await apiRole.update(editing.value.id, form)
-  else
+  }
+  else {
     await apiRole.create(form)
+  }
   toast.success(editing.value ? '编辑成功' : '新增成功')
   formVisible.value = false
-  await loadRoles()
+  await refreshViews()
 }
 
 function confirmDisable(row: RoleManageItem) {
@@ -251,7 +280,7 @@ function confirmDisable(row: RoleManageItem) {
     onConfirm: async () => {
       await apiRole.disable(row.id)
       toast.success('停用成功')
-      await loadRoles()
+      await refreshViews()
     },
   })
 }
@@ -263,7 +292,7 @@ function confirmEnable(row: RoleManageItem) {
     onConfirm: async () => {
       await apiRole.enable(row.id)
       toast.success('启用成功')
-      await loadRoles()
+      await refreshViews()
     },
   })
 }
@@ -301,23 +330,24 @@ function importRoles() {
   pickExcelFile(async (file) => {
     const res = await apiExcel.importRoles(excelForm(file))
     toast.success(importResultMessage(res.data))
-    await loadRoles()
+    await refreshViews()
   })
 }
 </script>
 
 <template>
   <div>
-    <FaPageHeader title="角色管理" class="mb-0">
-      <FaButton v-auth="'system:role:export'" variant="outline" @click="exportRoles">
+    <FaPageHeader title="角色管理" description="配置角色权限，查看授权矩阵并追溯用户与菜单的关系。" main-class="flex-[1_1_240px]" class="mb-0">
+      <YdTabs v-model="activeView" :list="viewOptions" class="min-w-56" />
+      <FaButton v-if="activeView === 'list'" v-auth="'system:role:export'" variant="outline" @click="exportRoles">
         <FaIcon name="morph:file-spreadsheet" />
         导出
       </FaButton>
-      <FaButton v-auth="'system:role:import'" variant="outline" @click="downloadRoleTemplate">
+      <FaButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="downloadRoleTemplate">
         <FaIcon name="morph:download" />
         模板
       </FaButton>
-      <FaButton v-auth="'system:role:import'" variant="outline" @click="importRoles">
+      <FaButton v-if="activeView === 'list'" v-auth="'system:role:import'" variant="outline" @click="importRoles">
         <FaIcon name="morph:upload" />
         导入
       </FaButton>
@@ -327,7 +357,7 @@ function importRoles() {
       </FaButton>
     </FaPageHeader>
 
-    <FaPageMain>
+    <FaPageMain v-if="activeView === 'list'">
       <FaResponsiveTable
         v-loading="loading"
         row-key="id"
@@ -452,6 +482,35 @@ function importRoles() {
       />
     </FaPageMain>
 
+    <YdPageMain v-else>
+      <div v-if="overviewError" class="flex flex-wrap items-center justify-between gap-3 p-6" role="alert">
+        <span>{{ overviewError }}</span>
+        <YdButton variant="outline" @click="loadOverview">重试</YdButton>
+      </div>
+      <PermissionMatrix
+        v-else-if="activeView === 'matrix'"
+        :roles="overview?.roles || []"
+        :permissions="overview?.permissions || []"
+        :loading="overviewLoading"
+        @edit-role="editOverviewRole"
+      />
+      <PermissionConstellation
+        v-else-if="overview"
+        :overview="overview"
+        :loading="overviewLoading"
+        :user-keyword="overviewQuery.userKeyword"
+        :user-unassigned-only="overviewQuery.userUnassignedOnly"
+        @edit-role="editOverviewRole"
+        @edit-user="editOverviewUser"
+        @edit-menu="editOverviewMenu"
+        @user-page="pageOverviewUsers"
+        @user-search="searchOverviewUsers"
+        @user-unassigned="showUnassignedUsers"
+        @refresh="loadOverview"
+      />
+      <div v-else class="p-16 text-center" role="status">正在加载权限全景…</div>
+    </YdPageMain>
+
     <FaModal v-model="formVisible" :title="editing ? '编辑角色' : '新增角色'" show-cancel-button class="sm:max-w-3xl" @confirm="saveForm">
       <a-form :model="form" layout="vertical">
         <a-grid :cols="2" :col-gap="16">
@@ -484,6 +543,9 @@ function importRoles() {
 
         <a-form-item label="权限">
           <div class="permission-panel">
+            <p class="text-xs text-secondary-foreground/70">
+              按业务域、资源和动作分类授权。{{ legacyPermissionCount ? `另有 ${legacyPermissionCount} 项历史或非标准权限，按原码兼容展示。` : '' }}
+            </p>
             <div class="permission-toolbar">
               <FaInput v-model="permissionKeyword" clearable placeholder="搜索权限名称 / 编码" class="min-w-[200px] flex-1" />
               <span class="permission-count">已选 {{ form.permissions.filter(code => permissionCodeSet.has(code)).length }} 项</span>

@@ -29,7 +29,7 @@ class RoleDeptManageControllerEnableTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(
-                new RoleManageController(roleManageAppService),
+                new RoleManageController(roleManageAppService, null),
                 new DeptManageController(deptManageAppService)
         ).build();
     }

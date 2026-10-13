@@ -4,16 +4,20 @@ import cn.dev33.satoken.stp.StpUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import online.yudream.base.application.system.user.query.RolePageQuery;
+import online.yudream.base.application.system.user.query.PermissionOverviewQuery;
+import online.yudream.base.application.system.user.service.PermissionOverviewAppService;
 import online.yudream.base.application.system.user.service.RoleManageAppService;
 import online.yudream.base.domain.common.PageResult;
 import online.yudream.base.domain.system.security.anno.PermissionRegister;
 import online.yudream.base.interfaces.common.Result;
 import online.yudream.base.interfaces.system.user.assembler.UserManageWebAssembler;
+import online.yudream.base.interfaces.system.user.assembler.PermissionOverviewWebAssembler;
 import online.yudream.base.interfaces.system.user.request.RoleAssignPermissionsRequest;
 import online.yudream.base.interfaces.system.user.request.RoleCreateRequest;
 import online.yudream.base.interfaces.system.user.request.RoleUpdateRequest;
 import online.yudream.base.interfaces.system.user.res.OptionRes;
 import online.yudream.base.interfaces.system.user.res.PermissionRes;
+import online.yudream.base.interfaces.system.user.res.PermissionOverviewRes;
 import online.yudream.base.interfaces.system.user.res.RoleManageRes;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +36,15 @@ import java.util.List;
 public class RoleManageController {
 
     private final RoleManageAppService roleManageAppService;
+    private final PermissionOverviewAppService permissionOverviewAppService;
+
+    @GetMapping("/permission-overview")
+    @PermissionRegister(code = "system:role:view", name = "查看角色", module = "系统管理", desc = "查看权限矩阵与授权溯源")
+    public Result<PermissionOverviewRes> permissionOverview(PermissionOverviewQuery query) {
+        StpUtil.checkPermission("system:role:view");
+        return Result.ok(PermissionOverviewWebAssembler.toRes(permissionOverviewAppService.overview(query,
+                StpUtil.hasPermission("system:user:view"), StpUtil.hasPermission("system:menu:view"))));
+    }
 
     @GetMapping
     @PermissionRegister(code = "system:role:view", name = "查看角色", module = "系统管理", desc = "查看角色列表")

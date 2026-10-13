@@ -5,6 +5,8 @@ import cn.dev33.satoken.stp.StpUtil;
 import online.yudream.base.domain.system.user.service.UserContextStore;
 import org.springframework.stereotype.Component;
 
+import java.util.Objects;
+
 /**
  * 基于 Sa-Token Session 的用户上下文存储实现。
  */
@@ -27,6 +29,10 @@ public class SaTokenUserContextStore implements UserContextStore {
     @Override
     public Long getCurrentDeptId(Long userId) {
         try {
+            // TokenSession 属于当前请求的登录身份，不能用于读取其他用户的会话。
+            if (!StpUtil.isLogin() || !Objects.equals(userId, StpUtil.getLoginIdAsLong())) {
+                return null;
+            }
             Object value = StpUtil.getTokenSession().get(CURRENT_DEPT_KEY);
             return value == null ? null : ((Number) value).longValue();
         } catch (SaTokenException ignored) {
@@ -38,6 +44,9 @@ public class SaTokenUserContextStore implements UserContextStore {
     @Override
     public Long getCurrentRoleId(Long userId) {
         try {
+            if (!StpUtil.isLogin() || !Objects.equals(userId, StpUtil.getLoginIdAsLong())) {
+                return null;
+            }
             Object value = StpUtil.getTokenSession().get(CURRENT_ROLE_KEY);
             return value == null ? null : ((Number) value).longValue();
         } catch (SaTokenException ignored) {

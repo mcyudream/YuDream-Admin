@@ -254,7 +254,7 @@
     },
     {
       "key": "permission-code-action-vocabulary",
-      "text": "权限码结构为 {domain}:{resource}:{action}（可选 {domain}:{subdomain}:{resource}:{action}），插件统一 plugin:{pluginCode}:{action}，@PermissionRegister.module 用中文模块名。末段动作词决定角色权限树的业务分组与色彩：查看=view/export/download；操作=create/edit/import/upload/use/generate/publish/connect/send/test/run/invoke/execute/enable/disable/assign-*/dataset/report/accept；管理=manage/config；危险=delete/kickout/revoke/impersonate；词表外动作归入\"其他\"。新增动作词必须同一提交同步主仓 AGENTS.md「权限码业务分类」、角色页 permissionCategoryMeta 与本条目；新权限按资源拆分 view/写/delete 独立权限码，禁止只注册 manage 再在代码内二次判断。"
+      "text": "权限码结构为 {domain}:{resource}:{action}（可选 {domain}:{subdomain}:{resource}:{action}），插件统一 plugin:{pluginCode}:{action}，@PermissionRegister.module 用中文模块名。末段动作词决定业务分组与组件状态：查看=view/export/download；操作=create/edit/import/upload/use/generate/publish/connect/send/test/run/invoke/execute/enable/disable/assign-*/dataset/report/accept；管理=manage/config；危险=delete/kickout/revoke/impersonate；词表外动作归入其他。新增动作词必须同一提交同步主仓 AGENTS.md、集中 src/utils/permission-catalog.ts 的 permissionCategoryMeta 与本条目；新权限按资源拆分 view/写/delete 独立权限码，禁止只注册 manage 再在代码内二次判断。"
     },
     {
       "key": "messaging-identity-not-qq-number",
@@ -319,6 +319,10 @@
     {
       "key": "yd-agent-workbench-render",
       "text": "YD Agent 工作台是受控 UI 投影，运行、权限、上下文压缩与持久化仍由 Harness 管理；version 1 回答协议包含 markdown/reference/tool，引用原文和文件位置、工具的 queued/running/awaiting-approval/success/error/cancelled 状态独立于推理。入口校验协议，MdPreview 默认不清理 HTML，须局部 XSS 清理；引用外链仅 HTTP(S)，工作区文件引用与工具重试交宿主事件。Skills 勾选只是候选，MCP/Git/通用工作区/审批无适配器时不伪造连接，演示明确标识本地状态。公开组件、resolver 和 SDK 桥同步，详见 docs/yd-agent-workbench.md。"
+    },
+    {
+      "key": "permission-management-views",
+      "text": "权限树/只读矩阵/溯源共享 src/utils/permission-catalog.ts，按业务域→稳定资源码→动作分类→权限展示，assign-*匹配完整规范后缀；历史未知码兼容保留，搜索勾选只更新可见叶子，全选合并而不删除暂失效插件码。overview用户/菜单分别校验system:user:view与system:menu:view，全量统计由轻量仓储聚合不按分页，菜单关系复用真实可见码算法。SaTokenUserContextStore只能读取本人tokenSession；他人展示contextSource=DEFAULT默认部门/角色，不冒充真实在线会话。规范见docs/system/permission-management.md。"
     }
   ],
   "utilities": [

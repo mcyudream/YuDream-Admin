@@ -19,6 +19,8 @@ const DEFAULT_MODULE = '系统管理'
 const modal = useFaModal()
 const toast = useFaToast()
 const router = useRouter()
+const route = useRoute()
+const { auth } = useAppAuth()
 
 const loading = ref(false)
 const rows = ref<MenuManageItem[]>([])
@@ -101,7 +103,6 @@ async function fetchParentCandidates(query: YdTablePickerQuery): Promise<YdTable
   return { list: result.records, total: result.total }
 }
 
-
 const sortValue = computed({
   get: () => form.sort ?? 0,
   set: (value: number) => {
@@ -124,7 +125,47 @@ const buttonColumns = computed<TableColumn<MenuManageItem>[]>(() => [
   { id: 'operation', header: '操作', width: 140, align: 'center' },
 ])
 
-onMounted(loadTree)
+onMounted(async () => {
+  await loadTree()
+  await openLinkedMenu()
+})
+
+watch(() => route.query.editMenu, () => openLinkedMenu())
+let linkedMenuRequest = 0
+
+async function openLinkedMenu() {
+  const code = route.query.editMenu
+  if (typeof code !== 'string' || !code || !auth('system:menu:view') || !auth('system:menu:edit')) {
+    return
+  }
+  const request = ++linkedMenuRequest
+  try {
+    let menu = findMenu(rows.value, code)
+    if (!menu) {
+      const response = await apiMenu.tree()
+      if (request !== linkedMenuRequest || route.query.editMenu !== code) {
+        return
+      }
+      rows.value = response.data
+      searchKeyword.value = ''
+      menu = findMenu(rows.value, code)
+    }
+    if (menu) {
+      selectedKeys.value = [menu.code]
+      openEdit(menu)
+    }
+    else {
+      toast.warning('菜单已不可用，请刷新菜单列表')
+    }
+  }
+  finally {
+    if (request === linkedMenuRequest && route.query.editMenu === code) {
+      const query = { ...route.query }
+      delete query.editMenu
+      await router.replace({ query })
+    }
+  }
+}
 
 async function loadTree() {
   loading.value = true
