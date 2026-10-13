@@ -72,7 +72,7 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
           'justify-end': !isCollapse,
         }"
       >
-        <FaButton variant="secondary" size="icon-sm" @click="appSettingsStore.toggleSidebarCollapse()">
+        <FaButton variant="secondary" size="icon-sm" class="yd-interactive" :aria-label="isCollapse ? '展开侧边栏' : '收起侧边栏'" @click="appSettingsStore.toggleSidebarCollapse()">
           <FaIcon name="app-toolbar-collapse" class="size-4 transition" :class="{ 'rotate-z--180': appSettingsStore.settings.menu.subMenuCollapse }" />
         </FaButton>
       </div>
@@ -96,7 +96,7 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
   width: var(--g-sub-sidebar-width);
   background-color: var(--g-sub-sidebar-bg);
   box-shadow: 1px 0 0 0 oklch(var(--border));
-  transition: inset-inline-start 0.3s, width 0.3s, background-color 0.15s, box-shadow 0.15s;
+  transition: inset-inline-start var(--yd-motion-duration-slow) var(--yd-motion-ease), width var(--yd-motion-duration-slow) var(--yd-motion-ease), background-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
 
   &.is-collapse {
     width: var(--g-sub-sidebar-collapse-width);
@@ -122,31 +122,31 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
 .sub-sidebar-x-end-enter-active,
 .sub-sidebar-y-start-enter-active,
 .sub-sidebar-y-end-enter-active {
-  transition: 0.2s;
+  transition: opacity var(--yd-motion-duration-normal), transform var(--yd-motion-duration-slow) var(--yd-motion-ease);
 }
 
 .sub-sidebar-x-start-enter-from,
 .sub-sidebar-x-start-leave-active {
   opacity: 0;
-  transform: translateX(30px);
+  transform: translateX(var(--yd-motion-enter-y));
 }
 
 .sub-sidebar-x-end-enter-from,
 .sub-sidebar-x-end-leave-active {
   opacity: 0;
-  transform: translateX(-30px);
+  transform: translateX(calc(-1 * var(--yd-motion-enter-y)));
 }
 
 .sub-sidebar-y-start-enter-from,
 .sub-sidebar-y-start-leave-active {
   opacity: 0;
-  transform: translateY(30px);
+  transform: translateY(var(--yd-motion-enter-y));
 }
 
 .sub-sidebar-y-end-enter-from,
 .sub-sidebar-y-end-leave-active {
   opacity: 0;
-  transform: translateY(-30px);
+  transform: translateY(calc(-1 * var(--yd-motion-enter-y)));
 }
 
 .sub-sidebar-x-start-leave-active,
@@ -159,7 +159,7 @@ watch(() => appMenuStore.actived, (val, oldVal) => {
 /* 次侧边栏动画 */
 .sub-sidebar-enter-active,
 .sub-sidebar-leave-active {
-  transition: 0.3s;
+  transition: transform var(--yd-motion-duration-slow) var(--yd-motion-ease);
 }
 
 .sub-sidebar-enter-from,

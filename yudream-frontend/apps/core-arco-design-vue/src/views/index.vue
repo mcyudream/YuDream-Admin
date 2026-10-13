@@ -5,10 +5,10 @@ import { nextTick } from 'vue'
 import apiDashboard from '@/api/modules/system-dashboard'
 import { useAppFeatureStore } from '@/store/modules/app/features'
 import DashboardCapabilityStatsCard from './dashboard/DashboardCapabilityStatsCard.vue'
-import DashboardMobilePairCard from './dashboard/DashboardMobilePairCard.vue'
 import DashboardChartStatsCard from './dashboard/DashboardChartStatsCard.vue'
 import DashboardEndpointCard from './dashboard/DashboardEndpointCard.vue'
 import DashboardGuideCard from './dashboard/DashboardGuideCard.vue'
+import DashboardMobilePairCard from './dashboard/DashboardMobilePairCard.vue'
 import DashboardModuleCard from './dashboard/DashboardModuleCard.vue'
 import DashboardMonitorCard from './dashboard/DashboardMonitorCard.vue'
 import DashboardPluginStatsCard from './dashboard/DashboardPluginStatsCard.vue'
@@ -48,6 +48,7 @@ const featureStore = useAppFeatureStore()
 const menuStore = useAppMenuStore()
 
 const loading = ref(false)
+const loadError = ref('')
 const saving = ref(false)
 const editMode = ref(false)
 const drawerVisible = ref(false)
@@ -96,6 +97,7 @@ const roleSummary = computed(() => accountStore.currentRole ? `${accountStore.cu
 const deptSummary = computed(() => accountStore.currentDept?.name || '未选择部门')
 const drawerContentClass = computed(() => viewportWidth.value < 640 ? 'w-full sm:max-w-full' : 'sm:max-w-[460px]')
 const quickActions = computed(() => preferredMenuActions(menuActions()).slice(0, 8))
+const layoutSummary = computed(() => workspace.value?.userLayout ? '个人布局' : '默认布局')
 
 function canViewCard(card: DashboardCard) {
   return !card.permission || accountStore.permissions.includes('*') || accountStore.permissions.includes(card.permission)
@@ -118,6 +120,7 @@ watch([activeBreakpoint, editMode, () => visibleItems.value.map(item => item.car
 
 async function loadWorkspace() {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await apiDashboard.workspace()
     workspace.value = res.data
@@ -125,7 +128,8 @@ async function loadWorkspace() {
     await renderGrid()
   }
   catch (error) {
-    toast.error(error instanceof Error ? error.message : '首页加载失败')
+    loadError.value = error instanceof Error ? error.message : '首页加载失败'
+    toast.error(loadError.value)
   }
   finally {
     loading.value = false
@@ -215,6 +219,13 @@ function startEdit() {
   layoutMode.value = 'personal'
   editMode.value = true
   draftItems.value = cloneItems(workspace.value?.effectiveLayout.items ?? [])
+}
+
+function openCardPicker() {
+  if (!editMode.value) {
+    startEdit()
+  }
+  drawerVisible.value = true
 }
 
 async function startDefaultEdit() {
@@ -607,10 +618,17 @@ function cardProps(card: DashboardCard) {
     <div class="dashboard-shell">
       <div class="dashboard-header">
         <div class="dashboard-greeting">
-          <strong>首页</strong>
-          <span v-if="editMode" class="dashboard-edit-hint">
+          <div class="dashboard-greeting__title">
+            <h1>工作台</h1>
+            <span v-if="workspace && !editMode" class="dashboard-layout-label">{{ layoutSummary }}</span>
+            <span v-else-if="editMode" class="dashboard-layout-label">编辑模式</span>
+          </div>
+          <p v-if="editMode" class="dashboard-edit-hint">
             {{ layoutMode === 'default' ? '正在配置所有用户的默认首页' : '正在编辑你的个人首页，可拖拽卡片并调整大小' }}
-          </span>
+          </p>
+          <p v-else class="dashboard-edit-hint">
+            常用入口、运行状态与工作动态，尽在这里。
+          </p>
         </div>
         <div class="dashboard-toolbar">
           <FaButton v-if="!editMode && featureStore.cmsEnabled" variant="outline" size="sm" @click="openPublicHome">
@@ -621,9 +639,9 @@ function cardProps(card: DashboardCard) {
             <FaIcon name="morph:layout-dashboard" />
             配置默认首页
           </FaButton>
-          <FaButton v-if="!editMode" size="sm" @click="startEdit">
-            <FaIcon name="morph:pencil" />
-            编辑首页
+          <FaButton v-if="!editMode" size="sm" :disabled="!workspace" @click="startEdit">
+            <FaIcon name="morph:sliders-horizontal" />
+            自定义工作台
           </FaButton>
           <template v-else>
             <FaButton variant="outline" size="sm" @click="drawerVisible = true">
@@ -644,14 +662,29 @@ function cardProps(card: DashboardCard) {
         </div>
       </div>
 
-      <div v-if="loading && !workspace" class="dashboard-loading">
-        <FaIcon name="morph:loader-circle" class="animate-spin" />
-        正在加载首页
+      <div v-if="loading && !workspace" class="dashboard-loading" role="status" aria-live="polite">
+        <div class="dashboard-loading__preview" aria-hidden="true">
+          <div v-for="index in 6" :key="index" class="dashboard-skeleton">
+            <span />
+            <strong />
+            <i />
+          </div>
+        </div>
+        <span class="dashboard-loading__label">正在准备你的工作台…</span>
+      </div>
+
+      <div v-else-if="loadError && !workspace" class="dashboard-empty" role="status">
+        <FaIcon name="morph:cloud-off" />
+        <strong>工作台暂时无法加载</strong>
+        <p>{{ loadError }}</p>
+        <FaButton variant="outline" size="sm" @click="loadWorkspace">
+          重新加载
+        </FaButton>
       </div>
 
       <div v-else ref="gridRef" class="grid-stack dashboard-grid" :class="{ editing: editMode }">
         <div
-          v-for="item in visibleItems"
+          v-for="(item, index) in visibleItems"
           :key="item.cardCode"
           class="grid-stack-item"
           :data-card-code="item.cardCode"
@@ -663,10 +696,14 @@ function cardProps(card: DashboardCard) {
           :gs-min-w="widgetFor(item).minW"
           :gs-min-h="widgetFor(item).minH"
         >
-          <article class="grid-stack-item-content dashboard-card">
+          <article
+            class="grid-stack-item-content dashboard-card"
+            :class="{ 'dashboard-card--welcome': cardMap.get(item.cardCode)?.component === 'PROFILE_SUMMARY' }"
+            :style="{ '--dashboard-card-index': Math.min(index, 7) }"
+          >
             <header class="dashboard-card__header">
               <button v-if="editMode" type="button" class="card-drag-handle" title="拖拽卡片">
-                <FaIcon name="morph:move" />
+                <FaIcon name="morph:move" class="pointer-events-none" />
               </button>
               <div class="dashboard-card__heading">
                 <span class="dashboard-card__icon" :class="toneIconClass(cardMap.get(item.cardCode)?.tone)">
@@ -676,6 +713,7 @@ function cardProps(card: DashboardCard) {
                   <h2>{{ displayCardTitle(cardMap.get(item.cardCode)) }}</h2>
                 </div>
               </div>
+              <span v-if="!editMode && cardMap.get(item.cardCode)?.source === 'PLUGIN'" class="dashboard-card__source">插件</span>
               <button
                 v-if="editMode"
                 type="button"
@@ -688,13 +726,22 @@ function cardProps(card: DashboardCard) {
             </header>
 
             <component
-              v-if="cardMap.get(item.cardCode)"
               :is="resolveCardComponent(cardMap.get(item.cardCode))"
+              v-if="cardMap.get(item.cardCode)"
               :class="{ 'dashboard-card__content--chart': resolveCardComponent(cardMap.get(item.cardCode)) === DashboardChartStatsCard }"
               v-bind="cardProps(cardMap.get(item.cardCode)!)"
             />
           </article>
         </div>
+      </div>
+      <div v-if="!loading && workspace && !visibleItems.length" class="dashboard-empty">
+        <FaIcon name="morph:panels-top-left" />
+        <strong>从一张卡片开始</strong>
+        <p>把常用入口与关心的数据放到工作台。</p>
+        <FaButton size="sm" @click="openCardPicker">
+          <FaIcon name="morph:plus" />
+          添加卡片
+        </FaButton>
       </div>
     </div>
 
@@ -736,42 +783,62 @@ function cardProps(card: DashboardCard) {
   position: absolute;
   inset: 0;
   overflow: auto;
-  background: var(--g-main-area-bg, #f7f8fa);
+  background: var(--g-main-area-bg, var(--color-bg-1));
 }
 
 .dashboard-shell {
-  width: min(1480px, calc(100% - 24px));
-  padding: 16px 0 32px;
+  width: min(1560px, calc(100% - var(--yd-workspace-gap, 24px) * 2));
+  padding: var(--yd-workspace-gap, 24px) 0 40px;
   margin: 0 auto;
 }
 
 .dashboard-header {
   display: flex;
-  gap: 12px;
+  gap: var(--yd-workspace-gap, 24px);
   align-items: center;
   justify-content: space-between;
   min-height: 40px;
 }
 
 .dashboard-greeting {
-  display: flex;
-  gap: 10px;
-  align-items: center;
+  display: grid;
+  gap: 7px;
   min-width: 0;
 }
 
-.dashboard-greeting strong {
-  font-size: 18px;
+.dashboard-greeting__title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.dashboard-greeting h1 {
+  margin: 0;
+  font-size: 26px;
   font-weight: 700;
+  line-height: 1.3;
   color: var(--color-text-1);
+  letter-spacing: -0.04em;
+}
+
+.dashboard-layout-label,
+.dashboard-card__source {
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--color-text-3);
+  white-space: nowrap;
+  background: var(--color-fill-2);
+  border: 1px solid var(--color-border-1);
+  border-radius: 6px;
 }
 
 .dashboard-edit-hint {
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0;
   font-size: 13px;
+  line-height: 1.6;
   color: var(--color-text-3);
-  white-space: nowrap;
 }
 
 .dashboard-toolbar {
@@ -783,8 +850,7 @@ function cardProps(card: DashboardCard) {
 }
 
 .dashboard-grid {
-  min-height: 320px;
-  margin-top: 16px;
+  margin: var(--yd-workspace-gap, 24px) -7px 0;
 }
 
 .grid-stack-item-content.dashboard-card {
@@ -796,27 +862,35 @@ function cardProps(card: DashboardCard) {
   overflow: hidden;
   background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
-  border-radius: 8px;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
-  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+  border-radius: var(--yd-surface-radius, 18px);
+  box-shadow: var(--yd-surface-shadow, 0 2px 8px color-mix(in srgb, var(--color-text-1) 3%, transparent));
+  transition: border-color var(--yd-motion-duration-normal, 240ms) ease, box-shadow var(--yd-motion-duration-normal, 240ms) ease;
+  animation: dashboard-card-enter var(--yd-motion-duration-slow, 420ms) var(--yd-motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  animation-delay: calc(var(--dashboard-card-index, 0) * var(--yd-motion-stagger, 45ms));
 }
 
-.dashboard-card:hover {
+.dashboard-card:hover,
+.dashboard-card:focus-within {
   border-color: var(--color-border-3);
-  box-shadow: 0 3px 10px rgb(0 0 0 / 5%);
+  box-shadow: var(--yd-surface-shadow-hover, 0 6px 24px color-mix(in srgb, var(--color-text-1) 6%, transparent));
+}
+
+.dashboard-card--welcome {
+  background: linear-gradient(125deg, var(--color-bg-2), var(--color-fill-1));
 }
 
 .editing .dashboard-card {
   cursor: default;
   outline: 1px dashed var(--color-border-3);
   outline-offset: -4px;
+  animation: none;
 }
 
 .dashboard-card__header {
   display: flex;
   gap: 10px;
   align-items: center;
-  padding: 16px 16px 10px;
+  padding: 18px 20px 14px;
 }
 
 .dashboard-card__heading {
@@ -831,9 +905,12 @@ function cardProps(card: DashboardCard) {
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   font-size: 16px;
+  color: var(--color-text-2);
+  background: var(--color-fill-2);
+  border-radius: 10px;
 }
 
 .dashboard-card__title-block {
@@ -847,7 +924,7 @@ function cardProps(card: DashboardCard) {
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   color: var(--color-text-1);
   white-space: nowrap;
@@ -888,10 +965,17 @@ function cardProps(card: DashboardCard) {
   border-color: var(--color-border-3);
 }
 
+.card-drag-handle:focus-visible,
+.card-hide-button:focus-visible,
+.picker-card:focus-visible {
+  outline: 2px solid var(--color-text-2);
+  outline-offset: 3px;
+}
+
 .dashboard-card__content {
   flex: 1;
   min-height: 0;
-  margin: 4px 16px 16px;
+  margin: 0 20px 20px;
   overflow: auto;
 }
 
@@ -900,16 +984,91 @@ function cardProps(card: DashboardCard) {
 }
 
 .dashboard-loading {
+  position: relative;
+  margin-top: 26px;
+}
+
+.dashboard-loading__preview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.dashboard-skeleton {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+  height: 238px;
+  padding: 26px;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-surface-radius, 18px);
+}
+
+.dashboard-skeleton :is(span, strong, i) {
+  display: block;
+  height: 14px;
+  background: var(--color-fill-2);
+  border-radius: 6px;
+  animation: dashboard-skeleton-pulse 1.6s ease-in-out infinite alternate;
+}
+
+.dashboard-skeleton span {
+  width: 45%;
+}
+
+.dashboard-skeleton strong {
+  width: 72%;
+  height: 34px;
+  margin-top: 16px;
+}
+
+.dashboard-skeleton i {
+  width: 90%;
+}
+
+.dashboard-loading__label {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--color-text-2);
+  white-space: nowrap;
+  background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.dashboard-empty {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 12px;
   align-items: center;
   justify-content: center;
   min-height: 280px;
-  margin-top: 16px;
+  padding: 32px;
+  margin-top: 20px;
   color: var(--color-text-3);
+  text-align: center;
   background: var(--color-bg-2);
   border: 1px dashed var(--color-border-2);
-  border-radius: 8px;
+  border-radius: var(--yd-surface-radius, 18px);
+}
+
+.dashboard-empty > :deep(.fa-icon) {
+  margin-bottom: 6px;
+  font-size: 32px;
+}
+
+.dashboard-empty strong {
+  font-size: 16px;
+  color: var(--color-text-1);
+}
+
+.dashboard-empty p {
+  margin: 0 0 8px;
+  font-size: 13px;
 }
 
 .card-picker {
@@ -969,12 +1128,13 @@ function cardProps(card: DashboardCard) {
   background: var(--color-bg-2);
   border: 1px solid var(--color-border-2);
   border-radius: 10px;
-  transition: border-color 0.16s ease, background 0.16s ease;
+  transition: border-color var(--yd-motion-duration-fast, 140ms) ease, background var(--yd-motion-duration-fast, 140ms) ease, transform var(--yd-motion-duration-normal, 240ms) var(--yd-motion-ease, ease);
 }
 
 .picker-card:hover {
   background: var(--color-fill-2);
   border-color: var(--color-border-3);
+  transform: translateY(var(--yd-motion-lift, -3px));
 }
 
 .picker-card__icon {
@@ -1054,7 +1214,7 @@ function cardProps(card: DashboardCard) {
 
 .picker-empty :deep(.fa-icon) {
   font-size: 28px;
-  color: var(--primary);
+  color: var(--color-text-2);
 }
 
 .picker-empty strong {
@@ -1062,10 +1222,32 @@ function cardProps(card: DashboardCard) {
   color: var(--color-text-2);
 }
 
-@media (width <= 780px) {
+@keyframes dashboard-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--yd-motion-enter-y, 14px));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes dashboard-skeleton-pulse {
+  to {
+    opacity: 0.45;
+  }
+}
+
+:root[data-admin-motion="reduced"] .dashboard-skeleton :is(span, strong, i) {
+  animation: none;
+}
+
+@media (width <= 768px) {
   .dashboard-shell {
-    width: min(100% - 16px, 1480px);
-    padding-top: 12px;
+    width: calc(100% - 24px);
+    padding-top: 20px;
   }
 
   .dashboard-header {
@@ -1077,6 +1259,18 @@ function cardProps(card: DashboardCard) {
     justify-content: flex-start;
     width: 100%;
   }
+
+  .dashboard-greeting h1 {
+    font-size: 23px;
+  }
+
+  .dashboard-loading__preview {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-skeleton:nth-child(n + 3) {
+    display: none;
+  }
 }
 
 @media (width <= 480px) {
@@ -1085,6 +1279,24 @@ function cardProps(card: DashboardCard) {
     -webkit-line-clamp: 2;
     white-space: normal;
     -webkit-box-orient: vertical;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-card,
+  .dashboard-skeleton :is(span, strong, i) {
+    animation: none;
+  }
+
+  .dashboard-card,
+  .picker-card,
+  .card-hide-button,
+  .card-drag-handle {
+    transition: none;
+  }
+
+  .picker-card:hover {
+    transform: none;
   }
 }
 </style>

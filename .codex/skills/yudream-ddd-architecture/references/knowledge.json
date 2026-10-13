@@ -398,6 +398,10 @@
     {
       "key": "about-build-version-injection",
       "text": "关于系统页版本来源：框架/SPI 版本经 Maven 资源过滤注入（bootstrap about.properties、SPI spi-build.properties），运行时走 domain 端口 + infra classpath 读取（不经 Environment，避免 IDE 未过滤时占位符穿透）；最新版本探测走 domain LatestVersionGateway 端口 + infra NexusLatestVersionGateway（maven-metadata.xml / npm dist-tags，TTL 缓存），出站基址由应用层过 OutboundUrlGuard"
+    },
+    {
+      "key": "admin-appearance-presets",
+      "text": "后台内置灵动/雅致/紧凑预设以 settings.appearance 保存到既有 appSettings JSON，宿主 normalizer 兼容旧值。root 的 data-admin-style/data-admin-motion 驱动 yudream-base 层 --yd-* tokens；ADMIN 主题插件的根变量可覆盖，禁止 inline 或子布局重定义默认值。系统/用户减少动效优先，GridStack 只动画内部卡片，详见 docs/frontend-appearance.md。"
     }
   ],
   "pitfalls": [
@@ -535,6 +539,10 @@
     {
       "key": "merge-import-id-variants",
       "text": "合并导入存在性判定两个坑：① idVariants 必须为规范化 id 生成多类型变体——种子数据大量负数雪花 Long（如 -1740829301），带负号会让 isDigit 判定失败漏掉 Long 变体，误判缺失后 InsertOne 撞 _id（E11000）；② 仅按 _id 判重不够——sysPermission/sysMenu/sysRole(code)、sysUser(username)、sysSetting(key) 有逻辑唯一键，目标库种子重建的同键不同 _id 记录会被重复插入，下次启动 PermissionDomainService.syncPermissions 的 toMap 无 merge 直接崩。修法：BackupBusinessKeys 业务键判重（LOCAL_WINS 跳过 / ARCHIVE_WINS 先 purgeByBusinessKeys 再写）+ 权限同步 keep-first 自愈删除冗余；全局 Jackson long 出网是字符串，前端算术前必须 Number()。"
+    },
+    {
+      "key": "gridstack-button-handle-icon",
+      "text": "GridStack 的拖拽手柄若为 button，鼠标命中其图标后代会被 DDDraggable._mouseDown 的交互元素过滤忽略，表现为只能拖按钮边缘。让 FaIcon 根节点 pointer-events:none（继承到后代），使事件直接命中手柄按钮；浏览器测试应从图标中心真实拖动，并验证保存与刷新后的 placements。"
     }
   ]
 }

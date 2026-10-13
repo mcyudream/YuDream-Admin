@@ -202,7 +202,7 @@ async function resendVerificationEmail() {
         </div>
         <div id="app-content" class="main">
           <RouterView v-slot="{ Component, route }">
-            <Transition :name="!appSettingsStore.isReloading ? 'fade' : ''" mode="out-in">
+            <Transition :name="!appSettingsStore.isReloading ? 'admin-page' : ''" mode="out-in">
               <KeepAlive :include="appKeepAliveStore.list">
                 <Component :is="Component" v-show="!isLink" :key="route.fullPath" />
               </KeepAlive>
@@ -255,7 +255,7 @@ async function resendVerificationEmail() {
   width: 100%;
   height: 100%;
   margin: 0 auto;
-  transition: width 0.3s;
+  transition: width var(--yd-motion-duration-normal) var(--yd-motion-ease);
 }
 
 .email-verification-banner {
@@ -294,7 +294,7 @@ async function resendVerificationEmail() {
     z-index: 1010;
     display: flex;
     width: calc(var(--g-main-sidebar-actual-width) + var(--g-sub-sidebar-actual-width));
-    transition: width 0.3s, transform 0.3s, top 0.3s, box-shadow 0.15s;
+    transition: width var(--yd-motion-duration-slow) var(--yd-motion-ease), transform var(--yd-motion-duration-slow) var(--yd-motion-ease), top var(--yd-motion-duration-normal), box-shadow var(--yd-motion-duration-fast);
 
     &:has(> .main-sidebar-container.main-sidebar-enter-active),
     &:has(> .main-sidebar-container.main-sidebar-leave-active),
@@ -317,14 +317,14 @@ async function resendVerificationEmail() {
     overflow: auto;
     background-color: var(--g-main-area-bg);
     box-shadow: -1px 0 0 0 oklch(var(--border)), 1px 0 0 0 oklch(var(--border));
-    transition: padding-inline-start 0.3s, padding 0.3s, background-color 0.15s, box-shadow 0.15s;
+    transition: padding var(--yd-motion-duration-slow) var(--yd-motion-ease), background-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
 
     .fixed-content-around-area {
       width: calc(100% - var(--g-main-sidebar-actual-width) - var(--g-sub-sidebar-actual-width));
       padding-right: var(--scrollbar-width, 0);
       transform: translateX(-50%) translateX(calc(var(--g-main-sidebar-actual-width) / 2)) translateX(calc(var(--g-sub-sidebar-actual-width) / 2));
       transform-origin: left;
-      transition: width 0.3s, transform 0.3s, translate 0.3s, top 0.3s;
+      transition: width var(--yd-motion-duration-slow) var(--yd-motion-ease), transform var(--yd-motion-duration-slow) var(--yd-motion-ease), translate var(--yd-motion-duration-normal) var(--yd-motion-ease), top var(--yd-motion-duration-normal);
 
       [data-mode="mobile"] & {
         width: 100% !important;
@@ -335,15 +335,15 @@ async function resendVerificationEmail() {
     .main {
       position: relative;
       flex: auto;
-      min-width: 0;
       width: 100%;
+      min-width: 0;
       height: 100%;
       padding-top: var(--g-main-container-padding-top, 0);
       margin: 0 auto;
       overflow: hidden;
       background-color: var(--g-main-area-bg);
       box-shadow: -1px 0 0 0 oklch(var(--border)), 1px 0 0 0 oklch(var(--border));
-      transition: padding-top 0.3s, width 0.3s, background-color 0.15s, box-shadow 0.15s;
+      transition: padding-top var(--yd-motion-duration-normal), width var(--yd-motion-duration-slow) var(--yd-motion-ease), background-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
     }
 
     .copyright {
@@ -358,25 +358,26 @@ async function resendVerificationEmail() {
 
 @media (width <= 640px) {
   .email-verification-banner {
-    align-items: stretch;
     flex-direction: column;
+    align-items: stretch;
   }
 }
 
 /* 主内容区动画 */
-.fade-enter-active {
-  transition: 0.2s;
+.admin-page-enter-active {
+  transition: opacity var(--yd-motion-duration-normal) ease, transform var(--yd-motion-duration-slow) var(--yd-motion-ease);
 }
 
-.fade-leave-active {
-  transition: 0.15s;
+.admin-page-leave-active {
+  transition: opacity var(--yd-motion-duration-fast) ease;
 }
 
-.fade-enter-from {
+.admin-page-enter-from {
   opacity: 0;
+  transform: translateY(var(--yd-motion-enter-y));
 }
 
-.fade-leave-to {
+.admin-page-leave-to {
   opacity: 0;
 }
 </style>

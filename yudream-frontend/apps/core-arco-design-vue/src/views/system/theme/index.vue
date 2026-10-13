@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PluginThemeOverview, PluginThemeScope } from '@/api/modules/platform-plugin'
 import apiPlugin from '@/api/modules/platform-plugin'
+import AppearancePresets from './AppearancePresets.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,7 +57,7 @@ async function saveTheme() {
   saving.value = true
   try {
     await appSettingsStore.saveThemeSettings()
-    toast.success('\u4e3b\u9898\u914d\u7f6e\u5df2\u4fdd\u5b58')
+    toast.success('主题配置已保存')
   }
   finally {
     saving.value = false
@@ -66,22 +67,24 @@ async function saveTheme() {
 
 <template>
   <div>
-    <FaPageHeader title="&#20027;&#39064;&#37197;&#32622;" class="mb-0" />
+    <FaPageHeader title="主题配置" description="让工作空间拥有适合你的风格与节奏" class="mb-0" />
 
     <FaPageMain>
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div class="mb-4 flex flex-wrap gap-3 items-center justify-between">
         <div class="text-sm text-muted-foreground">
-          &#20445;&#23384;&#21518;&#20889;&#20837;&#21518;&#31471;&#20027;&#39064;&#37197;&#32622;&#65292;&#21047;&#26032;&#25110;&#37325;&#26032;&#30331;&#24405;&#21518;&#20173;&#20250;&#29983;&#25928;&#12290;
+          设置即时预览，保存后刷新或重新登录仍会生效。
         </div>
-        <div class="flex items-center gap-2">
-          <FaButton :loading="saving" @click="saveTheme">
+        <div class="flex gap-2 items-center">
+          <FaButton v-auth="'system:setting:theme:edit'" :loading="saving" @click="saveTheme">
             <FaIcon name="morph:save" />
-            &#20445;&#23384;&#35774;&#32622;
+            保存设置
           </FaButton>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <AppearancePresets v-model="appSettingsStore.settings.appearance" />
+
+      <div class="gap-4 grid grid-cols-1 xl:grid-cols-2">
         <section class="theme-section">
           <div class="theme-section__title">
             &#20027;&#39064;
@@ -107,9 +110,9 @@ async function saveTheme() {
               &#20840;&#23616;&#20027;&#33394;
             </div>
             <div class="color-control">
-              <div class="flex items-center gap-2">
+              <div class="flex gap-2 items-center">
                 <input v-model="appSettingsStore.settings.theme.primaryColor" type="color" class="color-input">
-                <FaInput v-model="appSettingsStore.settings.theme.primaryColor" class="w-32 font-mono" />
+                <FaInput v-model="appSettingsStore.settings.theme.primaryColor" class="font-mono w-32" />
               </div>
               <div class="flex flex-wrap gap-2">
                 <button
@@ -139,12 +142,12 @@ async function saveTheme() {
           </div>
         </section>
 
-        <section class="theme-section xl:col-span-2">
+        <section class="theme-section order-last xl:col-span-2">
           <div class="theme-section__title">
             插件主题
           </div>
           <div class="text-sm text-muted-foreground">
-            插件可以为公开站与管理后台注册整套主题；同一范围同时只激活一个主题，在插件管理中启用目标主题插件即自动顶替。公开站主题若自带首页方案，启用时会自动应用该方案，并把当前首页定制保存为快照，可在「内容站点 → 首页方案」一键切回。
+            公开站主题各自保存独立的布局与页面，切换后内容仍会保留，请前往主题中心管理。管理后台主题在插件管理中启用或停用，同一范围同时激活一个主题。
           </div>
           <div v-if="siteThemeName" class="text-sm text-muted-foreground">
             公开站主题正由插件「{{ siteThemeName }}」接管，上方的主题配置仅作用于管理后台。
@@ -152,10 +155,10 @@ async function saveTheme() {
           <div v-if="!pluginThemeOverview.themes.length" class="text-sm text-muted-foreground">
             当前没有已启用插件注册的主题。
           </div>
-          <div v-else class="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div v-else class="gap-3 grid grid-cols-1 md:grid-cols-2">
             <div v-for="theme in pluginThemeOverview.themes" :key="theme.pluginCode" class="plugin-theme-card">
-              <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 font-medium">
+              <div class="flex gap-2 items-center justify-between">
+                <div class="font-medium flex gap-2 items-center">
                   {{ theme.name }}
                   <FaTag v-for="scope in theme.scopes" :key="scope" variant="secondary">
                     {{ scopeLabels[scope] }}
@@ -168,15 +171,19 @@ async function saveTheme() {
                   当前
                 </FaTag>
               </div>
-              <div v-if="theme.description" class="mt-1 text-sm text-muted-foreground">
+              <div v-if="theme.description" class="text-sm text-muted-foreground mt-1">
                 {{ theme.description }}
               </div>
-              <div class="mt-1 text-xs text-muted-foreground font-mono">
+              <div class="text-xs text-muted-foreground font-mono mt-1">
                 {{ theme.pluginCode }}
               </div>
             </div>
           </div>
-          <div class="flex justify-end">
+          <div class="flex flex-wrap gap-2 justify-end">
+            <FaButton variant="outline" size="sm" @click="router.push('/platform/theme-center')">
+              <FaIcon name="morph:panels-top-left" />
+              公开站主题中心
+            </FaButton>
             <FaButton variant="outline" size="sm" @click="goPluginManage">
               <FaIcon name="morph:puzzle" />
               前往插件管理
@@ -382,18 +389,22 @@ async function saveTheme() {
 .theme-section {
   display: grid;
   gap: 16px;
-  padding: 16px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
+  align-content: start;
+  padding: 20px;
   background: var(--color-bg-2);
+  border: 1px solid var(--color-border-2);
+  border-radius: var(--yd-surface-radius, 12px);
+  box-shadow: var(--yd-surface-shadow, none);
 }
 
 .theme-section__title {
+  padding-bottom: 12px;
   font-weight: 600;
+  border-bottom: 1px solid var(--color-border-1);
 }
 
 .setting-item {
-  --uno: flex items-center justify-between gap-4;
+  --uno: flex flex-wrap items-center justify-between gap-4;
 }
 
 .setting-item .label {
@@ -402,25 +413,25 @@ async function saveTheme() {
 
 .color-control {
   display: grid;
-  justify-items: end;
   gap: 8px;
+  justify-items: end;
 }
 
 .color-input {
   width: 36px;
   height: 36px;
   padding: 0;
+  background: transparent;
   border: 1px solid var(--color-border-2);
   border-radius: 6px;
-  background: transparent;
 }
 
 .color-swatch {
   width: 24px;
   height: 24px;
+  cursor: pointer;
   border: 2px solid transparent;
   border-radius: 999px;
-  cursor: pointer;
 }
 
 .color-swatch.active {
@@ -430,8 +441,8 @@ async function saveTheme() {
 
 .plugin-theme-card {
   padding: 12px;
-  border: 1px solid var(--color-border-2);
-  border-radius: 6px;
   background: var(--color-bg-1);
+  border: 1px solid var(--color-border-2);
+  border-radius: 10px;
 }
 </style>

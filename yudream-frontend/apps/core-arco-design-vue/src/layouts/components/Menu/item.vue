@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { SubMenuItemProps } from './types'
 import { cn } from '@/utils'
-import { rootMenuInjectionKey } from './types'
 import { safeExternalLink } from '@/utils/menu-link'
+import { rootMenuInjectionKey } from './types'
 
 defineOptions({
   name: 'SubMenuItem',
@@ -84,7 +84,6 @@ defineExpose({
             <FaIcon
               v-if="icon" :name="icon" :class="cn('menu-item-container-icon', {
                 'size-5': true,
-                'transition-transform group-hover-scale-120': true,
               })"
             />
             <span
@@ -110,3 +109,33 @@ defineExpose({
     </router-link>
   </div>
 </template>
+
+<style scoped>
+.menu-item-container {
+  border-radius: var(--yd-control-radius);
+  transition: background-color var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast), scale var(--yd-motion-duration-fast) var(--yd-motion-ease);
+}
+
+.menu-item-container:active {
+  scale: var(--yd-motion-press);
+}
+
+.menu-item-container:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: -3px;
+}
+
+.active .menu-item-container {
+  font-weight: 600;
+}
+
+.menu-item-container-icon {
+  transition: translate var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menu-item-container:hover .menu-item-container-icon {
+    translate: 0 calc(var(--yd-motion-lift) / 2);
+  }
+}
+</style>

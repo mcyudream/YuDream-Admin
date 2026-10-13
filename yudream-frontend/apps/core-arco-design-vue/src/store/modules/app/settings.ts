@@ -4,12 +4,21 @@ import { merge } from '@fantastic-admin/settings'
 import { cloneDeep } from 'es-toolkit'
 import apiSettings from '@/api/modules/settings'
 import settingsDefault from '@/settings'
+import { normalizeAdminAppearance } from '@/utils/admin-appearance'
 import { toBackendAssetUrl } from '@/utils/backend-url'
+
+// 外观预设属于宿主应用，不扩展供插件消费的共享 settings 契约。
+const hostSettingsDefault = {
+  ...settingsDefault,
+  appearance: normalizeAdminAppearance(undefined),
+}
 
 export const useAppSettingsStore = defineStore(
   'appSettings',
   () => {
-    const settings = ref(cloneDeep(settingsDefault))
+    const settings = ref(cloneDeep(hostSettingsDefault))
+    // 登出会重置应用设置，外观应回到服务端已保存值，而不是未保存的即时预览。
+    let persistedAppearance = normalizeAdminAppearance(undefined)
 
     // 站点名称（从后端 sysSetting 加载）
     const siteName = ref('管理系统')
@@ -143,7 +152,8 @@ export const useAppSettingsStore = defineStore(
       try {
         const res = await apiSettings.publicTheme()
         if (res.data.config) {
-          updateSettings(res.data.config as SettingsOptions)
+          persistedAppearance = normalizeAdminAppearance(res.data.config.appearance)
+          updateSettings({ ...res.data.config, appearance: persistedAppearance } as SettingsOptions & { appearance: unknown })
         }
       }
       catch {
@@ -152,10 +162,22 @@ export const useAppSettingsStore = defineStore(
     }
 
     async function saveThemeSettings() {
+      const config = cloneDeep(settings.value) as Record<string, any>
       await apiSettings.updateTheme({
-        config: cloneDeep(settings.value) as Record<string, any>,
+        config,
       })
+      // 只记录本次请求的快照；请求期间的继续预览和失败保存都不能改变持久化回落值。
+      persistedAppearance = normalizeAdminAppearance(config.appearance)
     }
+
+    watch(() => settings.value.appearance, (value) => {
+      const appearance = normalizeAdminAppearance(value)
+      document.documentElement.dataset.adminStyle = appearance.preset
+      document.documentElement.dataset.adminMotion = appearance.motion
+    }, {
+      deep: true,
+      immediate: true,
+    })
 
     const prefersColorScheme = window.matchMedia('(prefers-color-scheme: dark)')
     watch(() => settings.value.theme.colorScheme, (val) => {
@@ -305,8 +327,12 @@ export const useAppSettingsStore = defineStore(
     }
 
     // 更新应用配置
-    function updateSettings(data: SettingsOptions, fromBase = false) {
-      const mergedSettings = merge(data, fromBase ? cloneDeep(settingsDefault) : settings.value) as typeof settings.value
+    function updateSettings(data: SettingsOptions & { appearance?: unknown }, fromBase = false) {
+      const base = fromBase
+        ? { ...cloneDeep(hostSettingsDefault), appearance: normalizeAdminAppearance(persistedAppearance) }
+        : settings.value
+      const mergedSettings = merge(data, base) as typeof settings.value
+      mergedSettings.appearance = normalizeAdminAppearance(mergedSettings.appearance)
       settings.value = mergedSettings
     }
 

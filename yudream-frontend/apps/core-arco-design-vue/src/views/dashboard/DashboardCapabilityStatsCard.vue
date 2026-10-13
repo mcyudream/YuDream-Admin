@@ -2,7 +2,7 @@
 import type { CapabilityItem } from '@/api/modules/platform-capability'
 import type { DashboardCard } from '@/api/modules/system-dashboard'
 import apiCapability from '@/api/modules/platform-capability'
-import { toneTextClass } from './tone'
+import DashboardMetrics from './DashboardMetrics.vue'
 
 interface Props {
   card: DashboardCard
@@ -12,6 +12,7 @@ interface Props {
 const props = defineProps<Props>()
 
 const loading = ref(false)
+const ready = ref(false)
 const rows = ref<CapabilityItem[]>([])
 const message = ref('')
 
@@ -29,6 +30,12 @@ const mainTypes = computed(() => {
     .map(([type, count]) => `${typeText(type as CapabilityItem['type'])} ${count}`)
     .join(' / ')
 })
+const metrics = computed(() => [
+  { label: '可用能力', value: ready.value ? availableCount.value : null },
+  { label: '已启用', value: ready.value ? enabledCount.value : null },
+  { label: '异常', value: ready.value ? errorCount.value : null },
+  { label: '能力类型', value: ready.value ? mainTypes.value || '暂无' : null, compact: true },
+])
 
 onMounted(loadStats)
 
@@ -38,6 +45,7 @@ async function loadStats() {
   try {
     const res = await apiCapability.list()
     rows.value = res.data
+    ready.value = true
   }
   catch (error) {
     message.value = error instanceof Error ? error.message : '能力数据暂不可用'
@@ -64,94 +72,12 @@ function typeText(type: CapabilityItem['type']) {
 </script>
 
 <template>
-  <div class="dashboard-card__content dashboard-stat">
-    <div class="dashboard-stat__grid">
-      <div class="dashboard-stat__item">
-        <span>可用能力</span>
-        <strong :class="toneTextClass(card.tone)">{{ availableCount }}</strong>
-      </div>
-      <div class="dashboard-stat__item">
-        <span>已启用</span>
-        <strong :class="toneTextClass(card.tone)">{{ enabledCount }}</strong>
-      </div>
-      <div class="dashboard-stat__item">
-        <span>异常</span>
-        <strong>{{ errorCount }}</strong>
-      </div>
-      <div class="dashboard-stat__item">
-        <span>能力类型</span>
-        <strong>{{ mainTypes || '-' }}</strong>
-      </div>
-    </div>
-
-    <div class="dashboard-stat__footer">
-      <span v-if="loading">正在刷新平台能力</span>
-      <span v-else>{{ message || '展示当前项目允许加载的能力' }}</span>
-      <FaButton v-if="card.actionPath" size="sm" variant="outline" @click="props.onOpen?.(card)">
-        <FaIcon name="morph:arrow-right" />
-        管理
-      </FaButton>
-    </div>
-  </div>
+  <DashboardMetrics
+    :metrics="metrics"
+    :loading="loading"
+    :message="loading ? '正在刷新平台能力' : (message || '展示当前项目允许加载的能力')"
+    :show-action="!!card.actionPath"
+    action-label="管理"
+    @open="props.onOpen?.(card)"
+  />
 </template>
-
-<style scoped>
-.dashboard-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.dashboard-stat__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
-}
-
-.dashboard-stat__item {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding-top: 8px;
-  border-top: 1px solid var(--color-border-1);
-}
-
-.dashboard-stat__item span,
-.dashboard-stat__footer span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12px;
-  color: var(--color-text-3);
-  white-space: nowrap;
-}
-
-.dashboard-stat__item strong {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--color-text-1);
-  white-space: nowrap;
-}
-
-.dashboard-stat__footer {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: space-between;
-  min-width: 0;
-  margin-top: auto;
-}
-
-.dashboard-stat__footer span {
-  flex: 1;
-}
-
-@container (max-width: 320px) {
-  .dashboard-stat__grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

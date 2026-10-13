@@ -44,18 +44,20 @@ useHotkeyBindings({
               }"
             >
               <FaTooltip v-if="item.children && item.children.length !== 0" :disabled="!generateTitle(item.meta?.title)" :text="generateTitle(item.meta?.title)" side="right">
-                <div
-                  class="group menu-item-container text-[var(--g-main-sidebar-menu-color)] py-4 rounded-lg flex gap-1 h-full w-full cursor-pointer transition-colors items-center justify-between relative hover-(text-[var(--g-main-sidebar-menu-hover-color)] bg-[var(--g-main-sidebar-menu-hover-bg)]) px-2!" :class="{
+                <button
+                  type="button"
+                  :aria-pressed="index === appMenuStore.actived"
+                  class="group menu-item-container text-[var(--g-main-sidebar-menu-color)] py-4 border-0 rounded-lg bg-transparent flex gap-1 h-full w-full cursor-pointer items-center justify-between relative hover-(text-[var(--g-main-sidebar-menu-hover-color)] bg-[var(--g-main-sidebar-menu-hover-bg)]) px-2!" :class="{
                     'text-[var(--g-main-sidebar-menu-active-color)]! bg-[var(--g-main-sidebar-menu-active-bg)]!': index === appMenuStore.actived,
                   }" @click="switchTo(index)"
                 >
-                  <div class="inline-flex flex-1 flex-col gap-1 w-full items-center justify-center">
-                    <FaIcon v-if="item.meta?.icon" :name="item.meta.icon" class="menu-item-container-icon transition-transform group-hover-scale-120" />
+                  <span class="inline-flex flex-1 flex-col gap-1 w-full items-center justify-center">
+                    <FaIcon v-if="item.meta?.icon" :name="item.meta.icon" class="menu-item-container-icon" />
                     <span class="text-sm text-center flex-1 w-full truncate transition-height transition-opacity transition-width empty:hidden">
                       {{ generateTitle(item.meta?.title) }}
                     </span>
-                  </div>
-                </div>
+                  </span>
+                </button>
               </FaTooltip>
             </div>
           </template>
@@ -80,7 +82,7 @@ useHotkeyBindings({
   color: var(--g-main-sidebar-menu-color);
   background-color: var(--g-main-sidebar-bg);
   box-shadow: 1px 0 0 0 oklch(var(--border));
-  transition: color 0.15s, background-color 0.15s, box-shadow 0.15s;
+  transition: color var(--yd-motion-duration-fast), background-color var(--yd-motion-duration-fast), box-shadow var(--yd-motion-duration-fast);
 
   .sidebar-logo {
     background-color: var(--g-main-sidebar-bg);
@@ -93,6 +95,17 @@ useHotkeyBindings({
         aspect-ratio: 1 / 1;
         padding-block: 8px;
         color: var(--g-main-sidebar-menu-color);
+        border-radius: var(--yd-control-radius);
+        transition: background-color var(--yd-motion-duration-fast), color var(--yd-motion-duration-fast), scale var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
+
+        &:active {
+          scale: var(--yd-motion-press);
+        }
+
+        &:focus-visible {
+          outline: 2px solid currentcolor;
+          outline-offset: -3px;
+        }
 
         &:hover {
           color: var(--g-main-sidebar-menu-hover-color);
@@ -101,6 +114,7 @@ useHotkeyBindings({
 
         .menu-item-container-icon {
           font-size: 20px !important;
+          transition: translate var(--yd-motion-duration-normal) var(--yd-motion-ease-spring);
         }
       }
 
@@ -115,11 +129,17 @@ useHotkeyBindings({
 /* 主侧边栏动画 */
 .main-sidebar-enter-active,
 .main-sidebar-leave-active {
-  transition: 0.3s;
+  transition: transform var(--yd-motion-duration-slow) var(--yd-motion-ease);
 }
 
 .main-sidebar-enter-from,
 .main-sidebar-leave-to {
   transform: translateX(calc(var(--g-main-sidebar-width) * -1));
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .menu-item-container:hover .menu-item-container-icon {
+    translate: 0 var(--yd-motion-lift);
+  }
 }
 </style>
